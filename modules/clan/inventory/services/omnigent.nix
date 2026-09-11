@@ -6,17 +6,52 @@
     };
     roles.server.machines.magnetite.settings.domain = "omni.scientistexperience.net";
     roles.host = {
-      machines.magnetite.settings.environment = {
-        PI_ACP_PI_COMMAND = "atomic";
-        OMNIGENT_RUNNER_ENV_PASSTHROUGH = "PI_ACP_PI_COMMAND,PI_CODING_AGENT_DIR";
+      machines.magnetite.settings = {
+        environment = {
+          PI_ACP_PI_COMMAND = "atomic";
+          OMNIGENT_RUNNER_ENV_PASSTHROUGH = "PI_ACP_PI_COMMAND,PI_CODING_AGENT_DIR";
+        };
+        workers = {
+          cameron = {
+            enable = false;
+            owner = "cameron";
+            user = "omnigent-cameron";
+          };
+          raquel = {
+            enable = false;
+            owner = "raquel";
+            user = "omnigent-raquel";
+          };
+        };
       };
-      machines.pyrite.settings.environment = {
-        PI_ACP_PI_COMMAND = "atomic";
-        OMNIGENT_RUNNER_ENV_PASSTHROUGH = "PI_ACP_PI_COMMAND,PI_CODING_AGENT_DIR";
+      machines.pyrite.settings = {
+        environment = {
+          PI_ACP_PI_COMMAND = "atomic";
+          OMNIGENT_RUNNER_ENV_PASSTHROUGH = "PI_ACP_PI_COMMAND,PI_CODING_AGENT_DIR";
+        };
+        workers = {
+          cameron = {
+            enable = false;
+            owner = "cameron";
+            user = "omnigent-cameron";
+          };
+          raquel = {
+            enable = false;
+            owner = "raquel";
+            user = "omnigent-raquel";
+          };
+        };
       };
-      machines.stibnite.settings.environment = {
-        PI_ACP_PI_COMMAND = "atomic";
-        OMNIGENT_RUNNER_ENV_PASSTHROUGH = "PI_ACP_PI_COMMAND,PI_CODING_AGENT_DIR";
+      machines.stibnite.settings = {
+        environment = {
+          PI_ACP_PI_COMMAND = "atomic";
+          OMNIGENT_RUNNER_ENV_PASSTHROUGH = "PI_ACP_PI_COMMAND,PI_CODING_AGENT_DIR";
+        };
+        workers.cameron = {
+          enable = false;
+          owner = "cameron";
+          user = "omnigent-cameron";
+        };
       };
       extraModules = [
         (

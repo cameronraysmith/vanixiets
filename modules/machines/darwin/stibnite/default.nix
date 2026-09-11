@@ -42,7 +42,6 @@ in
         magnetite-builder
         stibnite-build-host
         # Not importing users module (defines testuser at UID 550)
-        # stibnite defines its own user (crs58)
       ]);
 
       # Re-enable documentation for laptop use
@@ -141,7 +140,6 @@ in
           IdentitiesOnly yes
       '';
 
-      # Single-user configuration
       # crs58: admin AND primary user (UID 501 - matches existing stibnite system)
       users.users.crs58 = {
         uid = 501;
@@ -151,10 +149,22 @@ in
         openssh.authorizedKeys.keys = inputs.self.users.crs58.meta.sshKeys;
       };
 
+      users.users.omnigent-cameron = {
+        uid = 551;
+        gid = 551;
+        home = "/Users/omnigent-cameron";
+        createHome = true;
+        shell = pkgs.bashInteractive;
+        description = "Cameron's dedicated Omnigent worker";
+      };
+      users.groups.omnigent-cameron.gid = 551;
+      users.knownGroups = [ "omnigent-cameron" ];
+
       # Darwin requires explicit knownUsers
       # Not managing root user (no users.users.root definition)
       users.knownUsers = [
         "crs58"
+        "omnigent-cameron"
       ];
 
       environment.systemPackages = with pkgs; [

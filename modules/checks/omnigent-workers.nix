@@ -878,8 +878,238 @@
         assert run(42, source=str(mutant)).returncode == 0
         assert (home / "host-executed").exists(), "activation-failure mutant did not discriminate"
       '';
+      inventoryRoles = config.flake.clan.inventory.instances.omnigent.roles;
+      inventoryMachines = {
+        inherit (config.flake.nixosConfigurations) magnetite pyrite;
+        inherit (config.flake.darwinConfigurations) stibnite;
+      };
+      expectedOwners = {
+        magnetite = [
+          "cameron"
+          "raquel"
+        ];
+        pyrite = [
+          "cameron"
+          "raquel"
+        ];
+        stibnite = [ "cameron" ];
+      };
+      inspectInventory =
+        machine: c:
+        let
+          isDarwin = machine == "stibnite";
+          workers = c.services.omnigent-host.workers;
+          owners = expectedOwners.${machine};
+          workerUsers = map (owner: "omnigent-${owner}") owners;
+        in
+        lib.attrNames workers == owners
+        && lib.filter (lib.hasPrefix "omnigent-") (lib.attrNames c.users.users) == workerUsers
+        && lib.all (a: a.assertion) c.assertions
+        && lib.all (
+          owner:
+          let
+            worker = workers.${owner};
+            user = "omnigent-${owner}";
+            account = c.users.users.${user};
+            group = c.users.groups.${user};
+            home = "${if isDarwin then "/Users" else "/home"}/${user}";
+            memberships = lib.attrNames (lib.filterAttrs (_: g: lib.elem user g.members) c.users.groups);
+            h = c.home-manager.users.${user};
+          in
+          worker.owner == owner
+          && worker.user == user
+          && worker.hostName == "${machine}-${owner}"
+          && worker.workspaceRoot == "${home}/projects"
+          && !worker.autoApproveDirenv
+          && worker.environment == { }
+          && account.home == home
+          && account.createHome
+          && account.openssh.authorizedKeys.keys == [ ]
+          && account.openssh.authorizedKeys.keyFiles == [ ]
+          && lib.all (name: name == user) memberships
+          && lib.all (name: name == user) group.members
+          && lib.all (other: other.name == user || other.home != account.home) (lib.attrValues c.users.users)
+          && (
+            if isDarwin then
+              account.uid == 551
+              && account.gid == 551
+              && group.gid == 551
+              && lib.elem user c.users.knownUsers
+              && lib.elem user c.users.knownGroups
+              && !(builtins.hasAttr user c.home-manager.users)
+              && c.environment.etc ? "omnigent/workers/${owner}"
+              && (builtins.hasAttr "omnigent-host-${owner}" c.launchd.daemons) == worker.enable
+            else
+              account.isNormalUser
+              && account.group == user
+              && account.extraGroups == [ ]
+              && lib.elem account.homeMode [
+                "700"
+                "0700"
+              ]
+              && account.hashedPassword == "!"
+              && account.hashedPasswordFile == null
+              && h.home.username == user
+              && h.home.homeDirectory == home
+              && h.programs.omnigent.enable
+              && h.programs.gh.gitCredentialHelper.enable
+              && h.programs.omnigent.settings.host.name == "${machine}-${owner}"
+              && lib.all (a: a.assertion) h.assertions
+              && (builtins.hasAttr "omnigent-host-${owner}" c.systemd.services) == worker.enable
+          )
+        ) owners;
+      inventoryVariant =
+        machine: module:
+        (inventoryMachines.${machine}.extendModules {
+          modules = [ module ];
+        }).config;
+      inventoryEnabled =
+        machine: enable:
+        inventoryVariant machine {
+          services.omnigent-host.workers = lib.genAttrs expectedOwners.${machine} (_: {
+            enable = lib.mkForce enable;
+          });
+        };
+      inventoryRejects = machine: module: !inspectInventory machine (inventoryVariant machine module);
+      clanHostInterface =
+        (
+          (import ../clan/services/omnigent/flake-module.nix {
+            inherit config;
+          }).clan.modules.omnigent
+          { inherit lib; }
+        ).roles.host.interface;
+      clanSettings =
+        machine:
+        (lib.evalModules {
+          modules = [
+            clanHostInterface
+            inventoryRoles.host.machines.${machine}.settings
+          ];
+        }).config;
+      cacheDownloads = c: c.nix.settings.substituters != [ ] && c.nix.settings.trusted-public-keys != [ ];
+      inventoryCases = {
+        hostMatrix =
+          lib.attrNames inventoryRoles.host.machines == [
+            "magnetite"
+            "pyrite"
+            "stibnite"
+          ];
+        serverMatrix =
+          lib.attrNames inventoryRoles.server.machines == [ "magnetite" ]
+          && inventoryMachines.magnetite.config.services.omnigent.domain == "omni.scientistexperience.net";
+        cacheDownloads = lib.all (d: cacheDownloads d.config) (lib.attrValues inventoryMachines);
+        missingCaches =
+          !cacheDownloads (
+            inventoryVariant "pyrite" {
+              nix.settings.substituters = lib.mkForce [ ];
+            }
+          );
+        missingCacheKeys =
+          !cacheDownloads (
+            inventoryVariant "stibnite" {
+              nix.settings.trusted-public-keys = lib.mkForce [ ];
+            }
+          );
+        missingWorker = inventoryRejects "pyrite" {
+          services.omnigent-host.workers = lib.mkForce { };
+        };
+        extraDarwinWorker = inventoryRejects "stibnite" {
+          services.omnigent-host.workers.raquel = {
+            owner = "raquel";
+            user = "omnigent-cameron";
+          };
+        };
+        wrongOwner = inventoryRejects "magnetite" {
+          services.omnigent-host.workers.raquel.owner = lib.mkForce "cameron";
+        };
+        duplicateHome = inventoryRejects "pyrite" {
+          users.users.omnigent-raquel.home = lib.mkForce "/home/omnigent-cameron";
+        };
+        adminMembership = inventoryRejects "magnetite" {
+          users.groups.wheel.members = [ "omnigent-cameron" ];
+        };
+        trustedDaemon = inventoryRejects "stibnite" {
+          nix.settings.trusted-users = [ "omnigent-cameron" ];
+        };
+        deniedNix = inventoryRejects "pyrite" {
+          nix.settings.allowed-users = lib.mkForce [ "root" ];
+        };
+        inheritedSsh = inventoryRejects "stibnite" {
+          users.users.omnigent-cameron.openssh.authorizedKeys.keys = [ "fixture-unwanted-key" ];
+        };
+        signer = inventoryRejects "pyrite" {
+          services.omnigent-host.workers.cameron.extraHomeModules = [
+            {
+              programs.git.settings.commit.gpgSign = true;
+            }
+          ];
+        };
+        serializable = lib.all (
+          machine:
+          let
+            settings = clanSettings machine;
+          in
+          builtins.fromJSON (builtins.toJSON settings) == settings
+          && lib.attrNames settings.workers == expectedOwners.${machine}
+        ) (lib.attrNames expectedOwners);
+        nixOnlyModules =
+          !(builtins.tryEval (
+            builtins.deepSeq
+              (lib.evalModules {
+                modules = [
+                  clanHostInterface
+                  {
+                    workers.cameron = {
+                      owner = "cameron";
+                      user = "omnigent-cameron";
+                      extraHomeModules = [ { } ];
+                    };
+                  }
+                ];
+              }).config
+              true
+          )).success;
+        serverIndependent =
+          let
+            serverUnit = c: c.systemd.units."omnigent.service".unit.drvPath;
+            current = inventoryMachines.magnetite.config;
+            without = inventoryVariant "magnetite" { services.omnigent-host.workers = lib.mkForce { }; };
+          in
+          serverUnit current == serverUnit without
+          && serverUnit current == serverUnit (inventoryEnabled "magnetite" true);
+      }
+      // lib.mapAttrs' (
+        machine: d:
+        lib.nameValuePair "machine-${machine}" (
+          inspectInventory machine d.config
+          && inspectInventory machine (inventoryEnabled machine false)
+          && inspectInventory machine (inventoryEnabled machine true)
+        )
+      ) inventoryMachines;
+      inventoryFailed = lib.attrNames (lib.filterAttrs (_: ok: !ok) inventoryCases);
     in
     {
+      checks.omnigent-worker-inventory =
+        assert lib.assertMsg (lib.all
+          (
+            machine:
+            lib.attrNames inventoryMachines.${machine}.config.services.omnigent-host.workers
+            == expectedOwners.${machine}
+          )
+          (lib.attrNames expectedOwners)
+        ) "Omnigent inventory requires exactly five declared human workers.";
+        assert lib.assertMsg (
+          inventoryFailed == [ ]
+        ) "Omnigent inventory failures: ${lib.concatStringsSep ", " inventoryFailed}";
+        pkgs.runCommand "omnigent-worker-inventory"
+          {
+            passthru.cases = inventoryCases;
+            passAsFile = [ "report" ];
+            report = builtins.toJSON inventoryCases;
+          }
+          ''
+            cp "$reportPath" "$out"
+          '';
       checks.omnigent-worker-darwin = lib.mkIf pkgs.stdenv.isDarwin (
         assert lib.assertMsg (lib.all (ok: ok) (lib.attrValues darwinCases))
           "Omnigent Darwin failures: ${

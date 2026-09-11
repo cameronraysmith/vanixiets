@@ -116,6 +116,21 @@ Before later human-controlled activation, select pyrite's configured `services.o
 5. Record whether pyrite appears online in the UI host list, an explicitly selected pyrite session completes a turn, and pyrite returns online automatically after suspend/resume without manual restart.
    Only human attestation establishes these live outcomes; also test ordinary network loss and return, keeping expired-login failures separate.
 
+## Dedicated-worker inventory
+
+The inventory prepares Cameron and Raquel on magnetite and pyrite, and Cameron alone on stibnite.
+All five workers initially have `enable = false`; their accounts and Home Manager generations remain declared while stopped.
+Linux account declarations live in `inventory/services/users/omnigent-workers.nix` and use normal UID/private-group allocation with locked passwords and `0700` homes.
+Stibnite declares `omnigent-cameron` with UID/GID `551` and a private `/Users/omnigent-cameron` home, without changing `system.primaryUser`.
+The deployment plan records the operator's allocation approval and separate declared/live collision evidence.
+No provider identity, model grant, SSH key or signing credential is inherited or enrolled by these declarations.
+
+`checks.<system>.omnigent-worker-inventory` evaluates the actual fleet modules, the exact five-worker matrix, private accounts, prepared Home Manager ownership and ordinary Nix access.
+Its negative fixtures cover missing or extra workers, wrong owner, shared home, administrative/Nix-trusted authority, denied Nix access, SSH keys and signing inheritance.
+It checks clan settings serialization without `extraHomeModules`, preserves server behavior when workers are toggled, and accepts both disabled and enabled supervision so later host migrations do not require weakening the inventory check.
+The current all-disabled state and legacy preservation are deployment-step evidence, not a permanent prohibition on future enablement.
+Live Linux collisions, allocated IDs, effective sudo/trust and actual home permissions must still be checked before authorized activation or enablement as specified in the deployment plan.
+
 ## Dedicated Linux workers
 
 The plain `services.omnigent-host.workers` interface prepares integrated Home Manager configurations for explicitly declared accounts even when each worker's `enable` remains false.

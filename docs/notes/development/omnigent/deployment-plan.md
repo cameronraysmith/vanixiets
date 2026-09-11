@@ -773,6 +773,65 @@ Before enablement, audit actual allocated UID/GID against effective sudo authori
 Declarative guards and UID observations are insufficient evidence for that obligation, and arbitrary sudoers parsing is not part of this slice.
 Actual authentication, cached offline activation, protected canaries, logout/reboot and wake recovery remain post-deploy checks.
 
+### Approved account allocation, 2026-09-11
+
+The operator selected "Use proposed allocation" and delegated Darwin numeric-ID selection after read-only collision checks.
+This resolves the earlier inventory prerequisite; no further numeric-ID approval is required for the allocation below.
+These are dedicated accounts associated with humans, not bot identities or provider grants.
+
+| Machine | Owner | Unix account and private group | Home | UID / GID |
+|---|---|---|---|---|
+| magnetite | Cameron | `omnigent-cameron` | `/home/omnigent-cameron` | Normal NixOS allocation |
+| magnetite | Raquel | `omnigent-raquel` | `/home/omnigent-raquel` | Normal NixOS allocation |
+| pyrite | Cameron | `omnigent-cameron` | `/home/omnigent-cameron` | Normal NixOS allocation |
+| pyrite | Raquel | `omnigent-raquel` | `/home/omnigent-raquel` | Normal NixOS allocation |
+| stibnite | Cameron | `omnigent-cameron` | `/Users/omnigent-cameron` | `551` / `551` |
+
+Declaration evidence precedes these account edits.
+The account projection of integrated source `a64e7cc1dc7955790ba3cad3e523ea41a4830cef` found no matching names or homes on the three targets.
+Its stibnite declarations use UIDs `351–382`, `501`, `530`, `535`, and group GIDs `350`, `535`.
+Evidence is captured in `logs/omnigent-account-allocation-20260910-213624.log`, whose evaluation exited zero.
+Before editing, all existing inventory-owned paths matched that same integrated source byte for byte.
+The separate chain baseline is `8ae8f65b2e522920a9ae475c75fb67592c16a390`; it is not the shared filesystem baseline.
+
+Live stibnite evidence was collected at 2026-09-11 02:49:46 UTC in `logs/omnigent-stibnite-collisions-20260910-224946.log`.
+`hostname`, `scutil --get LocalHostName`, and `scutil --get ComputerName` each returned `stibnite`.
+`dscl . -list` enumerated user UIDs, group GIDs and user home records; none used the selected name, home or ID `551`.
+Search-domain queries for UID `551`, GID `551`, and the user/group name `omnigent-cameron` returned no records.
+The home path was absent, including as a symlink.
+Live records also include undeclared `runner` UID `502` and `_rosettabuilder` UID `349`, so declaration absence alone was not treated as a collision check.
+The chosen `551` follows the repository's Darwin account range while leaving its `testuser` UID `550` unused; no repository module declares `551` before this edit.
+Neither the adapter fixture ID nor Raquel's blackphos UID was reused.
+These read-only lookups neither created accounts nor inspected credentials, keychains or sudo policy.
+
+All five new workers remain execution-disabled, with Home Manager generations prepared declaratively and legacy host settings retained.
+Linux homes use mode `0700`, locked passwords and private primary groups without supplementary groups or SSH keys.
+Darwin declares the known user and known private group explicitly; its existing adapter prepares owner-only directories at authorized activation.
+`system.primaryUser` remains `crs58`.
+No account deletion, automatic enrollment, model grant, key copy or remote Linux operation belongs to this change.
+
+Before authorized account activation on each Linux host, check live name, group and home collisions locally through the deployment owner.
+Before execution enablement on every host, read back actual UID/GID, private directory ownership, effective groups, sudo rules including numeric grants and aliases, and Nix allowed/trusted users.
+Null Linux IDs represent future allocation, not proof that numeric sudo grants cannot apply.
+Recheck stibnite's allocation immediately before account creation because these observations are time-bound.
+Keep execution disabled if any readback fails, and do not copy personal state to repair enrollment.
+The separate Pyrite desktop rollout may include only the sealed adapter commit `8ae8f65b2e522920a9ae475c75fb67592c16a390`, not this unreviewed inventory.
+Obtain its deployment receipt before eventual worker migration rather than assuming the old Pyrite generation is still live.
+
+The inventory check first failed with "requires exactly five declared human workers" before account declarations were added.
+The completed check builds on `aarch64-darwin` and `x86_64-linux` with 20 passing cases, including cache-configuration removal fixtures and both enabled and disabled module variants.
+Evidence is in `logs/omnigent-inventory-red-20260910-225429.log` and `logs/omnigent-inventory-final-build-20260910-230122.log`, with exits `1` and `0` respectively.
+These are structural module tests; they neither enroll users nor test live worker cache consumption.
+An additional build of `checks.aarch64-linux.omnigent-worker-inventory` evaluated its derivation but could not realize it because the configured `rosetta-builder` SSH connection was unavailable.
+`logs/omnigent-inventory-all-systems-20260910-230335.log` records that platform/builder failure; no builder configuration or remote host was changed to work around it.
+
+The existing-human/server projection in `logs/omnigent-inventory-preservation-20260910-225731.log` equals the fixed integrated baseline exactly.
+It excludes the newly added worker homes from the human comparison, retaining every original human's projected fields.
+The server unit remains `/nix/store/z7wca45hbmyv77kklzfhnbbvdkzagxz2-unit-omnigent.service.drv`.
+`logs/omnigent-inventory-receipt-20260910-225915.log` also confirms unchanged legacy supervisors, Nix allowed/trusted users, cache settings and builders on all three hosts.
+That receipt reports five disabled workers, five prepared Home Manager configurations, no new execution units, and unchanged stibnite primary user `crs58`.
+These local checks use the integrated source plus this inventory delta; controller-owned same-role gates must still bind the final chain and integrated commits before handoff.
+
 ## Deferred scope
 
 - Managed sandbox providers: freestyle.sh, Modal, Daytona, Blaxel, Kubernetes, and OpenShell.
