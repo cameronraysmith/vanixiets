@@ -167,6 +167,10 @@ in
       # firmware on import; plain false keeps both out of the closure.
       hardware.facetimehd.enable = false;
 
+      boot.extraModulePackages = [
+        (config.boot.kernelPackages.callPackage ../../../../pkgs/kernel-modules/snd-hda-macbookpro.nix { })
+      ];
+
       # Stated explicitly, not inherited from facter's bare-metal mkDefault branch (dead
       # on every existing cloud VM). The axis is redistributability, not freeness:
       # enableRedistributableFirmware puts linux-firmware into hardware.firmware
