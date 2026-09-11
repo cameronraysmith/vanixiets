@@ -73,3 +73,21 @@ This stage creates planning and tracking records only.
 All tasks remain unchecked until the controller accepts their evidence; no implementation, remote operation, or deployment is authorized by file existence.
 The selected schema is `superpowers-bridge-wrspm`.
 Full fast-forward readiness additionally requires its brainstorm, design, and implementation-plan artifacts; this binding stage does not fabricate a raw brainstorming capture or human approval.
+
+## Dedicated-worker amendment, 2026-09-10
+
+The approved follow-on scope is five dedicated human workers: Cameron on magnetite, pyrite and stibnite, and Raquel on magnetite and pyrite.
+It supersedes this proposal's earlier single-owner and excluded dedicated-user migration scope without rewriting the historical S0–S4 gates or ledger.
+The Linux slice adds the shared typed worker interface and integrated Home Manager system-service adapter, with execution disabled until enrollment and legacy execution preserved until explicit migration.
+Darwin's dedicated-UID daemon adapter and the five-account inventory are subsequent slices; the server remains unchanged.
+
+The user explicitly accepted upstream `sandbox: none` initially, relying on dedicated non-admin Unix accounts and platform service restrictions.
+This account boundary includes auxiliaries and project hooks but does not provide namespace or child confinement.
+Normal Unix permissions govern Nix-store/profile visibility; there are no additional child-sandbox grants, and approved projects may expose their store inputs to other local users.
+Additional child sandboxing requires future supported upstream policy delivery rather than an unused host option or shared-server change.
+Account isolation, private state, no administrative/Nix-trusted/signing authority, ordered runtime/profile/extras PATH and activation-failure prevention remain required.
+
+Private worker-local credentials and personal provider identities are accepted; provider permissions and application-admin grants retain their external authority.
+`owner` records intended human association and must be checked against actual enrollment, not presented as module-enforced application authentication.
+This `deploy=false` implementation performs no activation, credentials, OAuth, provisioning or administrative SSH.
+The named Linux module check supplies build/evaluation evidence; actual-user identity, canary, selected-harness and lifecycle tests remain post-activation obligations.

@@ -726,6 +726,33 @@ This proves only the reviewed executable set resolves: constructed names, downlo
 In this Nix deployment, optional UI vendor installs remain unsupported; do not add curl, Kubernetes/Microsandbox CLIs, extra shells or an ambient profile PATH to make those optional installers appear supported.
 Authenticated panel behavior and orphan cleanup remain live acceptance checks, not claims established by executable presence.
 
+## Dedicated-worker rollout amendment, 2026-09-10
+
+The user approved five real-human workers: Cameron on magnetite, pyrite and stibnite, and Raquel on magnetite and pyrite.
+This supersedes the earlier single-owner and deferred dedicated-account recommendations below; it does not authorize activation, account enrollment, provisioning or credential copying in the current `deploy=false` run.
+Linux uses integrated Home Manager and per-account system services; the following Darwin slice supplies a dedicated-UID system daemon with standalone Home Manager activation.
+The shared server and existing human configurations remain unchanged, and legacy host execution remains enabled until deliberate per-machine migration.
+
+The user explicitly selected “Dedicated accounts suffice initially”: retain Omnigent 0.13.0's upstream `sandbox: none` for the first rollout on both platforms.
+No host-local sandbox option is invented, no server policy is modified, and installed bubblewrap does not establish confinement.
+The account boundary covers the entire worker, including native and ACP children, terminals, auxiliaries and project hooks.
+Its processes retain ordinary access allowed by that UID, including the worker Home Manager profile and shared `/nix/store`; private project inputs may enter that shared store only with the already-required project approval.
+There are no additional child-sandbox read/write grants in this mode.
+Supported child-sandbox policy delivery and grant validation remain future work, without a namespace-confinement claim for this rollout.
+
+`services.omnigent-host.workers` requires an explicit intended owner and declared non-admin Unix account.
+The adapter derives HOME and state from that account, rejects root, duplicate identity/home, administrative and Nix-trusted authority, and protects adapter-owned environment selectors.
+Linux requires private homes, applies `UMask=0077` and `NoNewPrivileges` to worker and Home Manager activation units, and starts the worker only after successful integrated activation.
+PATH order is required runtime providers, the worker's actual Home Manager profile, then extras.
+Atomic's ACP-specific `PI_CODING_AGENT_DIR` routing and omp's independent state remain intact.
+Workers default to execution disabled while their Home Manager configuration is prepared; direnv auto-approval also defaults to false.
+
+Private worker-local credential files and personal GitHub/Linear identities are accepted for enrollment; no bot, signer, cache-upload authority or broad private-directory copy is granted.
+`owner` is an intended association, not application-auth enforcement, and application-admin/provider grants retain their external authority.
+Before activating each host, verify actual accounts, groups, trust, private canaries, enrollment identities and absence of competing hosts.
+After activation, test selected native and ACP harnesses, HM-only tools, an approved Nix devshell, cache consumption, hook/auxiliary authority, restart persistence and platform lifecycle behavior.
+Module checks and builds do not attest these live outcomes.
+
 ## Deferred scope
 
 - Managed sandbox providers: freestyle.sh, Modal, Daytona, Blaxel, Kubernetes, and OpenShell.

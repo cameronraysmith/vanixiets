@@ -5,7 +5,7 @@ Magnetite is the only server and the always-on co-located host; stibnite is the 
 Each host requires exactly one server in its instance.
 On NixOS, `perMachine` imports both plain modules once even when a machine holds both roles.
 On Darwin, the host role imports `flake.modules.darwin.omnigent-host` and selects the existing primary user by default.
-The units have fixed names, so multiple Omnigent instances on one machine are not supported.
+The legacy host retains its fixed name; dedicated Linux workers use one system unit per worker key within the same clan instance.
 
 The server interface exposes `domain` and `port`.
 It uses the confidential Kanidm client `omnigent`, the `kanidm-oauth2-omnigent` environment file, and an instance-scoped cookie generator.
@@ -116,5 +116,34 @@ Before later human-controlled activation, select pyrite's configured `services.o
 5. Record whether pyrite appears online in the UI host list, an explicitly selected pyrite session completes a turn, and pyrite returns online automatically after suspend/resume without manual restart.
    Only human attestation establishes these live outcomes; also test ordinary network loss and return, keeping expired-login failures separate.
 
-A dedicated runner account and subsequent sandbox enforcement remain deferred.
+## Dedicated Linux workers
+
+The plain `services.omnigent-host.workers` interface prepares integrated Home Manager configurations for explicitly declared accounts even when each worker's `enable` remains false.
+It requires `owner` and `user`; derives home, UID, group and state from the account; and defaults `hostName` to `<machine>-<key>` and `workspaceRoot` to `<home>/projects`.
+`owner` records intended association, not application authorization.
+No worker inherits the legacy privileged-user selector, human secrets, signing agent, cache-upload credentials, or Nix trusted-user authority.
+Accounts require separate private homes, no administrative groups or sudo grants, and ordinary Nix daemon access.
+The host checks actual home ownership and mode before starting.
+
+Clan exposes serializable `workers` settings and `legacyEnable`, which defaults to true.
+Worker `extraPackages` are nixpkgs attribute names in clan settings and package values in the plain module.
+`extraHomeModules` is available only in the plain module.
+Keep each machine's clan settings in one complete value, preserving legacy environment additions.
+Do not set `legacyEnable = false` until an explicit migration; adding a disabled worker does not retire the old host.
+
+Each enabled worker runs `omnigent-host-<key>.service` as its dedicated account with `UMask=0077`, `NoNewPrivileges`, and the existing restart and memory policy.
+Its `Requires` and `After` dependencies on that account's Home Manager system activation prevent startup after failed activation.
+Home Manager activation also receives a private umask and `NoNewPrivileges`.
+Network-online remains a soft boot dependency, with no sleep or network-lifetime coupling.
+The worker PATH orders required runtime packages, its actual Home Manager profile, then extras; neither shell initialization nor a global user profile supplies it.
+Atomic retains its ACP-only directory routing, and omp retains independent state.
+`autoApproveDirenv` defaults to false; opting in trusts project code under `workspaceRoot` as that worker.
+
+For the first rollout, the user explicitly accepted upstream `sandbox: none` on Linux and Darwin on 2026-09-10.
+The dedicated Unix account is the whole-worker boundary, including auxiliaries, terminals and project hooks; this is not child, namespace, or filesystem confinement.
+There are no child-sandbox path grants to configure in this mode: normal account permissions govern access, including visibility of approved project inputs in the shared `/nix/store` and the worker profile.
+Additional child sandboxing is deferred and must use a supported upstream policy mechanism, not an unused host setting or an inference from bubblewrap's presence.
+Credential grants and application-admin permissions remain external authority.
+`checks.x86_64-linux.omnigent-worker-linux` covers module composition and configured boundaries; actual selected-harness identity, protected-canary, devshell and lifecycle checks remain required after authorized activation.
+
 See the [deployment plan](../../../../docs/notes/development/omnigent/deployment-plan.md) for the exact gates and platform acceptance limits.
