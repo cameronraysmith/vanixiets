@@ -208,7 +208,14 @@ See the [deployment plan](../../../../docs/notes/development/omnigent/deployment
 Enabled sources declare host-local hidden-prompt Clan generators, with secret services files owned by the worker and mode `0400`.
 They do not enroll values automatically.
 The adapters check the declared ciphertext source and consume `files.<name>.path`; personal bundles, age identities and `hm-sops-bridge` enrollment remain prohibited.
-No worker in the real inventory enables credentials or execution in this slice.
+All five inventory workers now declare signing-key and GitHub-token sources while execution remains disabled.
+Their generator names are `<worker-user>-signing-key` (file `key`) and `<worker-user>-github-token` (file `token`), with canonical expected identities derived from owner metadata.
+Linear mappings remain empty and Claude setup-token delivery remains disabled.
+These declarations do not enroll ciphertext: the real machine configuration must fail its credential source assertions until the operator enrolls every selected source under `vars/per-machine`.
+Worker `enable = false` does not bypass that prerequisite for building or deploying the machine.
+The inventory check evaluates the five declarations with explicitly synthetic delivery files, retains non-secret Clan inputs, and separately requires the real configuration's missing-source diagnostics for each unenrolled worker.
+After authorized enrollment commits the ciphertext, the real configuration's source assertions must pass instead; the check accepts that transition without relaxing production guards.
+See the deployment plan's enrollment sequence for the exact generator and multiline signing-key commands.
 
 Git and jj sign with the selected private-key file, using the declared public key and canonical Git email for `allowed_signers`.
 Git's absolute HTTPS helper uses the token-reading `programs.gh.package` wrapper.

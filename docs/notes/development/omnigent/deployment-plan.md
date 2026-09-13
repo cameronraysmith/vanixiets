@@ -901,7 +901,8 @@ Each worker's typed `credentials` options separately enable `signingKey`, `githu
 An enabled source names its own host-local Clan `generator` and `file`.
 Hidden prompts produce only those selected files with `secret = true`, `neededFor = "services"`, worker ownership and mode `0400`.
 Consumers use the resulting `files.<name>.path`; Nix evaluation never reads the plaintext.
-Missing ciphertext prevents an enabled configuration from passing its source assertions, and absent, empty, wrong-owner or wrong-mode runtime material blocks credential-dependent activation or invocation.
+Missing ciphertext prevents a configuration with declared credentials from building or deploying, even when worker execution remains disabled.
+Absent, empty, wrong-owner or wrong-mode runtime material also blocks credential-dependent activation or invocation.
 
 Git and jj use the delegated private-key file directly, matching Cameron's Linux signing semantics on both platforms.
 The declared public key and canonical `credentials.expected.gitEmail` produce the Git `allowed_signers` principal.
@@ -940,3 +941,42 @@ Private homes and mode `0400` do not isolate credentials from the same UID, and 
 `checks.<system>.omnigent-worker-credentials` owns synthetic real-module fixtures and negative controls; it is not live enrollment evidence.
 The designated follow-up is systemd `LoadCredential`, optionally `LoadCredentialEncrypted` after hardware verification.
 Neither is implemented by this file-backed SOPS slice.
+
+## Worker source enrollment sequence
+
+The declaration follow-up enables signing-key and GitHub-token delivery for Cameron and Janette on magnetite and pyrite, and Cameron on stibnite; all five workers keep `enable = false`.
+Expected GitHub, Git, signing-public-key and Omnigent identities derive from the canonical owner metadata.
+Linear mappings remain empty pending workspace approval, and Claude setup-token delivery remains disabled.
+The typed interface still defaults off for other workers.
+
+`omnigent-worker-inventory` evaluates the exact five-worker matrix against explicitly synthetic delivery fixtures, preserving existing non-secret Clan inputs.
+It separately checks the real fleet's assertions against the expected missing-source diagnostics for each unenrolled worker, without filtering by machine role.
+The pre-enrollment state deliberately fails machine build/deploy evaluation.
+Once authorized `clan vars generate` or `clan vars set` enrollment has committed all selected ciphertext under `vars/per-machine`, those real source assertions must pass instead.
+Passing the synthetic checks does not authorize deployment or prove live credential identity.
+
+Run these commands only in the operator's authorized enrollment/routing window, after grant and recipient approval in wizard sections A–B.
+They replace the proposed GitHub/signing commands in section C; do not run that wizard's optional Claude or Linear examples without a separate declaration change.
+GitHub generation prompts for a hidden single-line token and confirmation; use the approved person/host grant for each prompt.
+Do not paste a multiline signing key into a generator's single-line prompt.
+The signing pipelines extract only `ssh-signing-key` from the approved owner's SOPS bundle and pipe it directly into `clan vars set`, never importing that bundle into the worker.
+The key's match to the declared public identity remains an enrollment verification obligation.
+
+```bash
+CLAN_NO_COMMIT=1 clan vars generate magnetite --generator omnigent-cameron-github-token --no-regenerate
+(set +x; set -o pipefail; sops -d --extract '["ssh-signing-key"]' secrets/home-manager/users/crs58/secrets.yaml | CLAN_NO_COMMIT=1 clan vars set magnetite omnigent-cameron-signing-key/key)
+CLAN_NO_COMMIT=1 clan vars generate magnetite --generator omnigent-janettesmith-github-token --no-regenerate
+(set +x; set -o pipefail; sops -d --extract '["ssh-signing-key"]' secrets/home-manager/users/janettesmith/secrets.yaml | CLAN_NO_COMMIT=1 clan vars set magnetite omnigent-janettesmith-signing-key/key)
+CLAN_NO_COMMIT=1 clan vars generate pyrite --generator omnigent-cameron-github-token --no-regenerate
+(set +x; set -o pipefail; sops -d --extract '["ssh-signing-key"]' secrets/home-manager/users/crs58/secrets.yaml | CLAN_NO_COMMIT=1 clan vars set pyrite omnigent-cameron-signing-key/key)
+CLAN_NO_COMMIT=1 clan vars generate pyrite --generator omnigent-janettesmith-github-token --no-regenerate
+(set +x; set -o pipefail; sops -d --extract '["ssh-signing-key"]' secrets/home-manager/users/janettesmith/secrets.yaml | CLAN_NO_COMMIT=1 clan vars set pyrite omnigent-janettesmith-signing-key/key)
+CLAN_NO_COMMIT=1 clan vars generate stibnite --generator omnigent-cameron-github-token --no-regenerate
+(set +x; set -o pipefail; sops -d --extract '["ssh-signing-key"]' secrets/home-manager/users/crs58/secrets.yaml | CLAN_NO_COMMIT=1 clan vars set stibnite omnigent-cameron-signing-key/key)
+```
+
+Alternatively, `CLAN_NO_COMMIT=1 clan vars set <machine> <generator>/<file>` accepts hidden multiline input and confirmation, each terminated by Ctrl-D.
+Keep shell tracing disabled and secret values out of logs.
+`CLAN_NO_COMMIT=1` prevents automatic commits, not Clan's possible Git intent-to-add; route the resulting ciphertext deliberately before evaluating the pinned deployment candidate.
+Never run bare `clan vars generate <machine>` here, which would include unrelated pending generators.
+Enrollment does not enable a worker or activate a host; later authorization, activation and the worker-local `omnigent-worker-verify` invocation remain separate gates.

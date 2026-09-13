@@ -879,10 +879,48 @@
         assert (home / "host-executed").exists(), "activation-failure mutant did not discriminate"
       '';
       inventoryRoles = config.flake.clan.inventory.instances.omnigent.roles;
-      inventoryMachines = {
+      inventoryRealMachines = {
         inherit (config.flake.nixosConfigurations) magnetite pyrite;
         inherit (config.flake.darwinConfigurations) stibnite;
       };
+      inventoryDeliveryFixture = pkgs.runCommandLocal "omnigent-inventory-synthetic-delivery" { } (
+        lib.concatStringsSep "\n" (
+          lib.concatLists (
+            lib.mapAttrsToList (
+              machine: d:
+              lib.concatMap (
+                worker:
+                map (source: ''
+                  mkdir -p "$out/vars/per-machine/${machine}/${source.generator}/${source.file}"
+                  cp ${../home/ai/omnigent/fixtures/vars/per-machine/fixture/fixture-signing/credential/secret} \
+                    "$out/vars/per-machine/${machine}/${source.generator}/${source.file}/secret"
+                '') (lib.attrValues (config.flake.lib.omnigentCredentialSelection worker.credentials))
+              ) (lib.attrValues d.config.services.omnigent-host.workers)
+              ++ lib.concatMap (
+                generator:
+                lib.concatMap (
+                  file:
+                  lib.optional (!file.secret && file.flakePath != null && builtins.pathExists file.flakePath) ''
+                    mkdir -p "$out/vars/${file.rel_dir}/${file.name}"
+                    install -m 0644 ${file.flakePath} "$out/vars/${file.rel_dir}/${file.name}/value"
+                  ''
+                ) (lib.attrValues generator.files)
+              ) (lib.attrValues d.config.clan.core.vars.generators)
+            ) inventoryRealMachines
+          )
+        )
+      );
+      inventoryMachines = lib.mapAttrs (
+        _: d:
+        d.extendModules {
+          modules = [
+            {
+              clan.core.settings.directory = lib.mkForce inventoryDeliveryFixture;
+              sops.validateSopsFiles = false;
+            }
+          ];
+        }
+      ) inventoryRealMachines;
       expectedOwners = {
         magnetite = [
           "cameron"
@@ -1034,6 +1072,84 @@
         }).config.flake.users.fixture.meta.gitEmail;
       cacheDownloads = c: c.nix.settings.substituters != [ ] && c.nix.settings.trusted-public-keys != [ ];
       inventoryCases = {
+        declaredCredentials = lib.all (
+          machine:
+          lib.all (
+            worker:
+            let
+              credentials = worker.credentials;
+              meta = config.flake.users.${if worker.owner == "cameron" then "crs58" else worker.owner}.meta;
+            in
+            credentials.signingKey == {
+              enable = true;
+              generator = "${worker.user}-signing-key";
+              file = "key";
+            }
+            &&
+              credentials.githubToken == {
+                enable = true;
+                generator = "${worker.user}-github-token";
+                file = "token";
+              }
+            && credentials.linearApiKeys == { }
+            && !credentials.claudeSetupToken.enable
+            &&
+              credentials.expected == {
+                githubUser = meta.githubUser;
+                gitEmail = meta.gitEmail;
+                signingPublicKey = lib.head meta.sshKeys;
+                omnigentEmail = meta.email;
+              }
+            &&
+              lib.all
+                (
+                  source:
+                  let
+                    generator = machine.config.clan.core.vars.generators.${source.generator};
+                    file = generator.files.${source.file};
+                  in
+                  generator.prompts.${source.file}.type == "hidden"
+                  && !generator.share
+                  && file.secret
+                  && file.neededFor == "services"
+                  && file.owner == worker.user
+                  && file.mode == "0400"
+                )
+                [
+                  credentials.signingKey
+                  credentials.githubToken
+                ]
+          ) (lib.attrValues machine.config.services.omnigent-host.workers)
+        ) (lib.attrValues inventoryMachines);
+        realEnrollment = lib.all (
+          d:
+          let
+            c = d.config;
+            missing =
+              worker:
+              lib.any (
+                source:
+                !builtins.pathExists (
+                  c.clan.core.settings.directory
+                  + "/vars/per-machine/${c.clan.core.settings.machine.name}/${source.generator}/${source.file}/secret"
+                )
+              ) (lib.attrValues (config.flake.lib.omnigentCredentialSelection worker.credentials));
+            expectedFailures = lib.concatMap (
+              worker:
+              lib.optionals (missing worker) [
+                "Omnigent worker ${worker.user}: credentials require private host-local services files owned by the worker with mode 0400."
+                "Omnigent worker ${worker.user}: only the declared Clan vars ciphertext and delivered paths are allowed."
+              ]
+            ) (lib.attrValues c.services.omnigent-host.workers);
+            failures = map (a: a.message) (lib.filter (a: !a.assertion) c.assertions);
+          in
+          lib.sort builtins.lessThan failures == lib.sort builtins.lessThan expectedFailures
+          &&
+            (builtins.tryEval (
+              assert lib.all (a: a.assertion) c.assertions;
+              true
+            )).success == (expectedFailures == [ ])
+        ) (lib.attrValues inventoryRealMachines);
         allDisabled = lib.all (
           d: lib.all (w: !w.enable) (lib.attrValues d.config.services.omnigent-host.workers)
         ) (lib.attrValues inventoryMachines);
@@ -1160,7 +1276,7 @@
         signer = inventoryRejects "pyrite" {
           services.omnigent-host.workers.cameron.extraHomeModules = [
             {
-              programs.git.settings.commit.gpgSign = true;
+              programs.git.settings.user.signingKey = lib.mkForce "/synthetic-undeclared-signing-key";
             }
           ];
         };
@@ -1500,11 +1616,9 @@
               ];
             };
         defaultOff = lib.all (
-          machine:
-          lib.all (
-            worker: config.flake.lib.omnigentCredentialSelection worker.credentials == { } && !worker.enable
-          ) (lib.attrValues machine.config.services.omnigent-host.workers)
-        ) (lib.attrValues inventoryMachines);
+          worker: config.flake.lib.omnigentCredentialSelection worker.credentials == { }
+        ) (lib.attrValues linux.services.omnigent-host.workers);
+        inherit (inventoryCases) declaredCredentials allDisabled realEnrollment;
         moduleAssertions = lib.all (a: a.assertion) credentialConfig.assertions;
         declaredSources = lib.all (
           name:

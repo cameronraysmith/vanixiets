@@ -89,3 +89,13 @@ Checkboxes remain pending controller acceptance.
 - [ ] 8.3 Require Linux delivery readiness and serialize Darwin's privileged activation/boot installer with a root-owned manifest/boot receipt before standalone Home Manager and host execution.
 - [ ] 8.4 Verify canonical signing and mocked provider identities with the separately invoked `omnigent-worker-verify`; preserve tool-owned OAuth state through restart, redeploy, rollback and deletion.
 - [ ] 8.5 Controller: build `omnigent-worker-credentials` on both systems, retain prior capability/platform/inventory checks, and compare candidate projections only with their matching fixed chain/integrated baselines.
+
+## 9. Worker credential declarations
+
+This follow-up declares sources without issuing grants, enrolling ciphertext, enabling workers or activating machines.
+Controller acceptance remains separate.
+
+- [ ] 9.1 Declare signing-key and GitHub-token generator/file sources and canonical expected identities for all five workers; leave Linear empty, Claude delivery off and worker execution disabled.
+- [ ] 9.2 Evaluate the inventory against synthetic delivery fixtures and separately require the real unenrolled fleet to fail closed with the missing-source diagnostics for every worker; require real source assertions to pass after ciphertext enrollment.
+- [ ] 9.3 Build inventory and credential checks on both systems, compare protected human/server projections with the credential run's fixed supplemental integrated baseline, and verify formatting and signed child routing.
+- [ ] 9.4 Operator: approve scopes and recipients, run only the deployment plan's explicit per-machine GitHub generation and multiline signing-key set commands, route ciphertext, and re-evaluate before separately authorized activation.

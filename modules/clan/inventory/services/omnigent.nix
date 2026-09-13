@@ -4,6 +4,24 @@ let
     name = config.flake.users.janettesmith.meta.fullname;
     email = config.flake.users.janettesmith.meta.gitEmail;
   };
+  workerCredentials = user: meta: {
+    signingKey = {
+      enable = true;
+      generator = "${user}-signing-key";
+      file = "key";
+    };
+    githubToken = {
+      enable = true;
+      generator = "${user}-github-token";
+      file = "token";
+    };
+    expected = {
+      githubUser = meta.githubUser;
+      gitEmail = meta.gitEmail;
+      signingPublicKey = builtins.head meta.sshKeys;
+      omnigentEmail = meta.email;
+    };
+  };
 in
 {
   clan.inventory.instances.omnigent = {
@@ -23,11 +41,13 @@ in
             enable = false;
             owner = "cameron";
             user = "omnigent-cameron";
+            credentials = workerCredentials "omnigent-cameron" config.flake.users.crs58.meta;
           };
           janettesmith = {
             enable = false;
             owner = "janettesmith";
             user = "omnigent-janettesmith";
+            credentials = workerCredentials "omnigent-janettesmith" config.flake.users.janettesmith.meta;
           };
         };
       };
@@ -41,11 +61,13 @@ in
             enable = false;
             owner = "cameron";
             user = "omnigent-cameron";
+            credentials = workerCredentials "omnigent-cameron" config.flake.users.crs58.meta;
           };
           janettesmith = {
             enable = false;
             owner = "janettesmith";
             user = "omnigent-janettesmith";
+            credentials = workerCredentials "omnigent-janettesmith" config.flake.users.janettesmith.meta;
           };
         };
       };
@@ -58,6 +80,7 @@ in
           enable = false;
           owner = "cameron";
           user = "omnigent-cameron";
+          credentials = workerCredentials "omnigent-cameron" config.flake.users.crs58.meta;
         };
       };
       extraModules = [
