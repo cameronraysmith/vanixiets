@@ -8,7 +8,7 @@ The identity phase replaces only Raquel's two experimental workers; both human p
 ## Run and stop boundaries
 
 After independent review and routing this tooling as a new chain-tip commit, the controlling session can reload `omnigent-workers`.
-Run from `/Users/crs58/projects/vanixiets` with `openai-codex/gpt-6-astra` selected.
+Run from `/Users/crs58/projects/vanixiets` with `openai-codex/gpt-6-astra` available in the Atomic model catalog; the session may select a different model.
 
 | Input | Default | Meaning |
 |---|---|---|
@@ -144,9 +144,10 @@ Atomic's completed child checkpoints can replay, but an incomplete child starts 
 All implementation, repair, review and coordination stages request `openai-codex/gpt-6-astra:high`, `thinkingLevel: high` and `fallbackModels: []`.
 Atomic 0.9.18 implicitly appends the current model despite the empty list.
 The compatibility thinking option applies high effort to that unsuffixed candidate; same-model retries are authorized.
-The workflow checks the current model before stage creation and persists observed attempt metadata after each successful stage return.
-The installed catalog's `currentModel` is the session model object, identified by its `provider` and `id`; declared string identities are also accepted.
-Missing or malformed identity metadata blocks separately from a genuinely different selection.
+Before stage creation, the workflow checks `ctx.models.listModels()` for the pinned `fullId` and, when exposed, requires `availableThinkingLevels` to include `high`.
+The installed Atomic 0.9.18 catalog exposes `provider`, `id`, `fullId` and `model`, but not `availableThinkingLevels`; high-effort support is therefore not established by this preflight snapshot.
+The session's `currentModel` does not determine whether the pinned model is available.
+The workflow persists observed attempt metadata after each successful stage return.
 An off-policy model/effort or missing successful high-effort metadata blocks further progress.
 Missing effort metadata on unsuccessful attempts is preserved as unknown, not claimed verified.
 These observations are not atomic session/model locks and cannot prevent an engine race or attest an attempt for which the SDK returns no result.

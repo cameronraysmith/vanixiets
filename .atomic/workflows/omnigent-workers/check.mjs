@@ -39,29 +39,28 @@ const catalogSource = ts.createSourceFile("catalog.mjs", readFileSync(join(atomi
 const catalogFactory = catalogSource.statements.find((n) => ts.isFunctionDeclaration(n) && n.name?.text === "workflowModelCatalogFromContext");
 assert(catalogFactory, "Installed Atomic catalog factory must be inspectable");
 const makeCatalog = runInNewContext(`(${catalogFactory.getText(catalogSource)})`);
-const selectedModel = { provider: "openai-codex", id: "gpt-6-astra" };
-const models = makeCatalog({ model: selectedModel });
+const selectedModel = { provider: "fixture", id: "foreign" };
+const pinnedModel = { provider: "openai-codex", id: "gpt-6-astra" };
+const models = makeCatalog({ model: selectedModel, modelRegistry: { getAvailable: () => [selectedModel, pinnedModel] } });
 assert.equal(models.currentModel, selectedModel);
 assert.equal(await operations.currentModel({ models }), contracts.model);
-await assert.rejects(operations.currentModel({ models: makeCatalog({ modelRegistry: { getAvailable: () => [] } }) }), /current-model metadata missing/);
-for (const currentModel of [null, {}, { provider: "openai-codex" }, { provider: 1, id: "gpt-6-astra" }, { provider: "openai-codex", id: "" }, "", "gpt-6-astra", []]) {
-  await assert.rejects(operations.currentModel({ models: { currentModel } }), /current-model metadata malformed/);
-}
+const [pinnedInfo] = await makeCatalog({ model: pinnedModel }).listModels();
+assert.equal(await operations.currentModel({ models: { listModels: async () => [{ ...pinnedInfo, availableThinkingLevels: ["medium", "high"] }] } }), contracts.model);
 for (const [catalog, reason] of [
-  [makeCatalog({ model: { provider: "fixture", id: "gpt-6-astra" } }), /Configured current model is not/],
-  [makeCatalog({ model: { provider: "openai-codex", id: "foreign" } }), /Configured current model is not/],
+  [makeCatalog({ model: selectedModel }), /Pinned model .* unavailable/],
+  [makeCatalog({ model: pinnedModel, modelRegistry: { getAvailable: () => [] } }), /Pinned model .* unavailable/],
   [makeCatalog({}), /catalog unavailable/],
-  [makeCatalog({ modelRegistry: { getAvailable: () => [] } }), /current-model metadata missing/],
-  [{ currentModel: { fullId: contracts.model } }, /current-model metadata malformed/],
+  [{ currentModel: pinnedModel }, /catalog unavailable/],
+  ...[[], ["medium"]].map((availableThinkingLevels) => [{ listModels: async () => [{ ...pinnedInfo, availableThinkingLevels }] }, /does not support high/]),
 ]) {
   let effects = 0;
   const ctx = { cwd: contracts.repository, models: catalog, task: async () => { effects++; }, tool: async () => { effects++; } };
-  await assert.rejects(operations.currentModel(ctx), reason);
-  await assert.rejects(definition.run(ctx), reason);
-  await assert.rejects(new operations.Operations(ctx, "fixture", 1000).stage("fixture", {}), reason);
+  const blocked = (error) => error instanceof contracts.Stop && error.name === "WorkerMigrationBlocked:model" && reason.test(error.message);
+  await assert.rejects(operations.currentModel(ctx), blocked);
+  await assert.rejects(definition.run(ctx), blocked);
+  await assert.rejects(new operations.Operations(ctx, "fixture", 1000).stage("fixture", {}), blocked);
   assert.equal(effects, 0);
 }
-assert.equal(await operations.currentModel({ models: { currentModel: `${contracts.model}:high` } }), `${contracts.model}:high`);
 for (const catalog of [undefined, null, false, "invalid"]) await assert.rejects(operations.currentModel({ models: catalog }), /catalog unavailable/);
 const sdkSource = ts.createSourceFile("sdk.js", readFileSync(join(atomic, "dist/builtin/workflows/src/index.js"), "utf8"), ts.ScriptTarget.Latest, true, ts.ScriptKind.JS);
 const reasoning = ["effectiveCandidateReasoning", "modelAttemptReasoning"].map((name) => {
@@ -84,15 +83,13 @@ for (const candidate of [{ id: contracts.model, reasoningLevel: "high" }, { id: 
 assert.throws(() => operations.modelEvidence(modelResult({ id: "fixture/foreign" })), /off-policy model/);
 assert.throws(() => operations.modelEvidence(modelResult({ id: contracts.model, reasoningLevel: "medium" })), /off-policy thinking/);
 assert.throws(() => operations.modelEvidence(modelResult({ id: contracts.model }, {})), /lacks observed high-thinking metadata/);
-console.log("PASS installed catalog factory object identity, fail-closed preflight/stage guards and SDK-created primary/compatibility high attempt metadata");
+console.log("PASS installed catalog accepts pinned model with a different session model; missing pin/unsupported high stop before effects; SDK-created high attempt metadata");
 assert.equal(definition.name, "omnigent-workers");
 assert.equal(typeof definition.run, "function");
 assert.throws(() => contracts.parse(contracts.Review, { kind: "approved", evidence: [] }));
 assert.throws(() => contracts.parse(contracts.Review, { kind: "approved", evidence: ["receipt"], bypass: true }));
 assert.throws(() => contracts.parse(contracts.StageReport, { kind: "done" }));
 assert.deepEqual(contracts.parse(contracts.Review, { kind: "repair", findings: ["wrong identity"] }).kind, "repair");
-assert.equal(await operations.currentModel({ models: { currentModel: contracts.model } }), contracts.model);
-await assert.rejects(operations.currentModel({ models: { currentModel: "fixture/foreign" } }));
 await assert.rejects(operations.currentModel({}));
 assert.throws(() => operations.modelEvidence({ modelAttempts: [{ model: "fixture/foreign", reasoningLevel: "high", success: true }] }));
 assert.throws(() => operations.modelEvidence({ modelAttempts: [{ model: contracts.model, success: true }] }));

@@ -1,7 +1,7 @@
 import { mkdir, readFile, writeFile, lstat, readlink } from "node:fs/promises";
 import { join } from "node:path";
 import { createHash } from "node:crypto";
-import type { WorkflowRunContext, WorkflowSerializableValue, WorkflowTaskOptions, WorkflowTaskResult } from "@bastani/atomic/workflows";
+import type { WorkflowModelCatalogPort, WorkflowRunContext, WorkflowSerializableValue, WorkflowTaskOptions, WorkflowTaskResult } from "@bastani/atomic/workflows";
 import { capture, changed, quote, requireSuccess, processCheckpoint } from "../bump/tools.js";
 import { within } from "../bump/types.js";
 import { chain, model, modelOptions, repository, parse, Source, Stop, rethrowControl, stopCategories, type Slice } from "./contract.js";
@@ -10,16 +10,13 @@ export type Port = Pick<WorkflowRunContext, "tool" | "task" | "ui">;
 export type Execute = typeof capture;
 export const digest = (value: unknown) => createHash("sha256").update(JSON.stringify(value)).digest("hex");
 export async function currentModel(ctx: object): Promise<string> {
-  const catalog: unknown = Reflect.get(ctx, "models");
-  if (!catalog || typeof catalog !== "object") throw new Stop("model", "Atomic current-model catalog unavailable; select the requested model before launch");
-  const selected: unknown = Reflect.get(catalog, "currentModel");
-  if (selected === undefined) throw new Stop("model", "Atomic current-model metadata missing; select the requested model before launch");
-  const provider: unknown = selected && typeof selected === "object" ? Reflect.get(selected, "provider") : undefined;
-  const id: unknown = selected && typeof selected === "object" ? Reflect.get(selected, "id") : undefined;
-  const fullId = typeof selected === "string" ? selected : typeof provider === "string" && typeof id === "string" ? `${provider}/${id}` : undefined;
-  if (!fullId || !/^[^/\s]+\/\S+$/.test(fullId)) throw new Stop("model", "Atomic current-model metadata malformed; expected provider/id model identity");
-  if (fullId !== model && fullId !== `${model}:high`) throw new Stop("model", `Configured current model is not ${model}`);
-  return fullId;
+  const catalog = (ctx as { models?: WorkflowModelCatalogPort }).models;
+  if (!catalog || typeof catalog.listModels !== "function") throw new Stop("model", "Atomic model catalog unavailable");
+  const pinned = (await catalog.listModels()).find((entry) => entry.fullId === model);
+  if (!pinned) throw new Stop("model", `Pinned model ${model} unavailable in Atomic catalog`);
+  const levels: unknown = Reflect.get(pinned, "availableThinkingLevels");
+  if (levels !== undefined && (!Array.isArray(levels) || !levels.includes("high"))) throw new Stop("model", `Pinned model ${model} does not support high thinking`);
+  return pinned.fullId;
 }
 export function modelEvidence(result: WorkflowTaskResult) {
   const attempts = result.modelAttempts ?? [];
