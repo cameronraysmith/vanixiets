@@ -174,6 +174,9 @@ The server unit lists both generated env files in `EnvironmentFile`, which is a 
 No harness credential becomes a clan var in the first deployment: Claude Code, Codex, Pi, and Atomic credentials and the runner's Omnigent login token remain under the runner OS user's home (D7).
 No sops entry or `secrets/` change is required beyond the two generators.
 
+The preceding restriction records the legacy first deployment, introduced on 2026-09-07 in `121b549ce8`.
+The approved dedicated-worker credential slice below supersedes it only for explicitly selected static worker grants; the legacy runner and server remain unchanged.
+
 Reversing evidence: a second consumer of the Kanidm client secret that needs a different owner or restart set, or an Omnigent revision that reads its secrets from files rather than environment variables, which would make `LoadCredential` the better carrier.
 
 ### D6 Ingress
@@ -890,3 +893,50 @@ The remaining question identifiers are retained for continuity.
 - Q5 What is the exact representation of the keyless API-key stub in `~/.omnigent/config.yaml`? Recommended: a commented provider block in the file, with the key line omitted entirely, so that Omnigent parses no provider entry until the operator uncomments and fills it after OAuth login is verified.
 - Q7 Is the web UI's fallback to the first online host acceptable when the remembered laptop runner is asleep? Recommended: yes for the first deployment, since `magnetite` is the only always-on runner and the operator can choose a host explicitly; revisit if sessions land on the wrong machine in practice.
 - Q8 Should `OMNIGENT_GRANT_MAX_LIFETIME_DAYS` stay at the 30-day default, requiring a browser login refresh on every unattended runner each month? Recommended: yes, and record the refresh as an operator task until the runner count makes a longer lifetime worth the exposure.
+
+## Dedicated-worker static credentials
+
+The 2026-09-13 credential slice prepares file-backed delivery without enrolling real values or enabling any of the five workers.
+Each worker's typed `credentials` options separately enable `signingKey`, `githubToken`, each named `linearApiKeys` workspace, and optional `claudeSetupToken`; all default off.
+An enabled source names its own host-local Clan `generator` and `file`.
+Hidden prompts produce only those selected files with `secret = true`, `neededFor = "services"`, worker ownership and mode `0400`.
+Consumers use the resulting `files.<name>.path`; Nix evaluation never reads the plaintext.
+Missing ciphertext prevents an enabled configuration from passing its source assertions, and absent, empty, wrong-owner or wrong-mode runtime material blocks credential-dependent activation or invocation.
+
+Git and jj use the delegated private-key file directly, matching Cameron's Linux signing semantics on both platforms.
+The declared public key and canonical `credentials.expected.gitEmail` produce the Git `allowed_signers` principal.
+This narrowly approved delegation does not deliver the person's age identity, personal SOPS bundle, SSH agent, or `hm-sops-bridge` enrollment.
+The worker's `gh` wrapper is its `programs.gh.package`, so Git's absolute HTTPS credential helper reaches the token reader.
+It injects `GH_TOKEN` only into `gh` and its descendants, never the host environment.
+Linear receives a system-SOPS-rendered `0400` inline credentials file through the generalized template helper, with explicit workspace selection, `LINEAR_IGNORE_ENV_FILE=1`, and rejection of ambient or project `api_key` overrides.
+The optional native Claude wrapper replaces the required runtime executable before Omnigent resolves it; competing environment, settings, file and Keychain credentials fail rather than selecting another grant.
+
+Linux orders credential-dependent Home Manager and host units after and requiring `sops-install-secrets.service` when that installation mode is active; file-readiness checks also precede Home Manager writes and host execution.
+Darwin wraps the maintained privileged installer with a process lock shared by activation and boot invocations.
+Activation invokes that installer after account preparation and before launchd loading.
+Only successful delivery publishes a root-owned, non-secret receipt containing the manifest, boot identity and file metadata; stale manifests, a different boot, missing files and partial replacement invalidate readiness.
+Standalone Home Manager and host launch require that receipt and readable private files.
+Workers never decrypt or invoke the privileged installer.
+Network identity queries do not run at activation or startup, preserving offline restart.
+
+Run the separately installed `omnigent-worker-verify` only during an authorized enrollment check under the actual worker home.
+It compares authenticated GitHub login, each Linear viewer and organization, Omnigent `/v1/me`'s email-valued `user_id`, and the signing key's public identity against explicit declarations.
+`owner` remains an association label, not evidence of authentication.
+Failure reports omit credentials and do not dump provider responses.
+Provider denial and expired access tokens require an explicit renewal or login step, not fallback to another identity.
+
+Use independent person/host grants by default.
+The person and the platform's authorized administrators approve scopes, recipients, issuance and revocation; the deployment operator replaces only approved static files.
+GitHub PATs and Linear API keys have no automatic renewal in these adapters; revoke at the provider, since local deletion alone does not revoke a grant.
+Claude setup-token renewal and provider revocation remain explicit human operations.
+Kanidm person provisioning, grant issuance, recipient/scope approval and enrollment of real values remain separate human/deploy-gated steps.
+
+OAuth refresh state remains tool-owned and mutable in Atomic, native Pi, independent omp, Codex and Omnigent directories.
+Deployment, restart and rollback do not seed, import or restore their authentication files, including after logout or deletion.
+The existing explicit selectors and ACP passthrough remain unchanged.
+With accepted `sandbox:none`, any code running as the worker can read or use that worker's grants; root and host administrators can also access them.
+Private homes and mode `0400` do not isolate credentials from the same UID, and approved projects imported into the shared Nix store remain store-visible.
+
+`checks.<system>.omnigent-worker-credentials` owns synthetic real-module fixtures and negative controls; it is not live enrollment evidence.
+The designated follow-up is systemd `LoadCredential`, optionally `LoadCredentialEncrypted` after hardware verification.
+Neither is implemented by this file-backed SOPS slice.

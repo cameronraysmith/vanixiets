@@ -2,6 +2,7 @@
 let
   nixosModules = config.flake.modules.nixos;
   darwinModules = config.flake.modules.darwin;
+  credentialOptions = config.flake.lib.omnigentWorkerCredentialOptions;
 in
 {
   clan.modules.omnigent =
@@ -73,6 +74,11 @@ in
                 lib.types.submodule {
                   options = {
                     enable = lib.mkEnableOption "this enrolled worker's foreground host";
+                    credentials = lib.mkOption {
+                      type = lib.types.submodule { options = credentialOptions; };
+                      default = { };
+                      description = "Explicit static credential sources and expected identities; all delivery defaults off.";
+                    };
                     owner = lib.mkOption {
                       type = lib.types.nonEmptyStr;
                       description = "Intended human owner, verified separately during enrollment.";
@@ -157,6 +163,7 @@ in
                       user
                       autoApproveDirenv
                       environment
+                      credentials
                       ;
                     hostName = lib.mkIf (worker.hostName != null) worker.hostName;
                     workspaceRoot = lib.mkIf (worker.workspaceRoot != null) worker.workspaceRoot;
@@ -186,6 +193,7 @@ in
                       user
                       autoApproveDirenv
                       environment
+                      credentials
                       ;
                     hostName = lib.mkIf (worker.hostName != null) worker.hostName;
                     workspaceRoot = lib.mkIf (worker.workspaceRoot != null) worker.workspaceRoot;

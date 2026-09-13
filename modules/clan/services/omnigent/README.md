@@ -200,3 +200,35 @@ Static group/trust guards do not prove runtime privilege exclusion; this adapter
 Daemon-context authentication, offline activation, actual logout/reboot/wake behavior and selected-harness canaries remain post-deploy acceptance checks.
 
 See the [deployment plan](../../../../docs/notes/development/omnigent/deployment-plan.md) for the exact gates and platform acceptance limits.
+
+## Selected static credentials
+
+`workers.<name>.credentials` is a typed interface on both plain host modules and the serializable Clan role.
+`signingKey`, `githubToken`, `claudeSetupToken`, and each `linearApiKeys.<workspace>` entry have independent default-off `enable` flags and explicit `generator`/`file` names.
+Enabled sources declare host-local hidden-prompt Clan generators, with secret services files owned by the worker and mode `0400`.
+They do not enroll values automatically.
+The adapters check the declared ciphertext source and consume `files.<name>.path`; personal bundles, age identities and `hm-sops-bridge` enrollment remain prohibited.
+No worker in the real inventory enables credentials or execution in this slice.
+
+Git and jj sign with the selected private-key file, using the declared public key and canonical Git email for `allowed_signers`.
+Git's absolute HTTPS helper uses the token-reading `programs.gh.package` wrapper.
+Linear's system-SOPS template contains only the explicitly selected workspace mappings; invocations require `--workspace`, disable `.env` loading, and reject competing `api_key` sources.
+Optional native Claude token injection replaces the required runtime executable, not merely a shadowed profile entry.
+Competing Claude credentials fail closed.
+Process-scoped injection limits incidental inheritance; it does not hide grants from code running as the worker or from host administrators.
+
+Credential-dependent Linux Home Manager activation and host startup check required files and depend on the SOPS service when it owns delivery.
+Darwin serializes activation and boot invocations of the maintained privileged installer, then publishes a root-owned manifest/boot receipt only after successful delivery.
+The worker requires that receipt and readable files before standalone Home Manager and host execution, including after reboot.
+No network verification runs at startup, and workers never invoke privileged decryption.
+
+The separately invoked `omnigent-worker-verify` compares authenticated provider responses with `credentials.expected` and each Linear workspace's `viewerEmail`/`workspaceId`.
+Invoke it only during authorized enrollment; local `owner` labels are not identity evidence.
+Grant issuance, Kanidm person provisioning, recipient/scope approval, real enrollment, renewal and provider-side revocation remain human/deploy-gated.
+Use independent person/host grants by default.
+
+Atomic, native Pi, independent omp, Codex and Omnigent retain their tool-owned mutable OAuth directories and existing selectors.
+There is no seed import or restoration after logout, deletion, redeploy, restart or rollback.
+The accepted execution mode remains `sandbox:none`, with same-UID/admin access and shared-store visibility for approved projects.
+`checks.<system>.omnigent-worker-credentials` uses synthetic material and mocked provider/delivery effects; live acceptance remains separate.
+The designated follow-up is systemd `LoadCredential`, optionally `LoadCredentialEncrypted` after hardware verification, not an implementation in this slice.

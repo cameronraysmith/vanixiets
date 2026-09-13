@@ -9,6 +9,7 @@ in
       lib,
       pkgs,
       utils,
+      options,
       ...
     }:
     let
@@ -28,6 +29,22 @@ in
       enabledWorkers = lib.filterAttrs (_: worker: worker.enable) workers;
       account = worker: config.users.users.${worker.user};
       homeFor = worker: (account worker).home;
+      deliveries = lib.mapAttrs (
+        _: worker:
+        flakeConfig.flake.lib.mkOmnigentWorkerCredentials {
+          inherit pkgs worker;
+          osConfig = config;
+          home = homeFor worker;
+          group = (account worker).group;
+          serverUrl = cfg.serverUrl;
+        }
+      ) workers;
+      credentialDeliveries = lib.filterAttrs (_: delivery: delivery.enabled) deliveries;
+      secretDependencies =
+        name:
+        lib.optional (
+          deliveries.${name}.enabled && (config.sops.useSystemdActivation or false)
+        ) "sops-install-secrets.service";
       groupsFor =
         worker:
         lib.unique (
@@ -186,6 +203,7 @@ in
               message = "Omnigent workers require distinct accounts.";
             }
           ]
+          ++ lib.concatMap (delivery: delivery.assertions) (lib.attrValues credentialDeliveries)
           ++ lib.concatLists (
             lib.mapAttrsToList (name: worker: [
               {
@@ -260,15 +278,29 @@ in
                 assertion = lib.all (key: !reservedEnvironment key) (lib.attrNames worker.environment);
                 message = "Omnigent worker ${name}: environment cannot override identity, state or authority selectors.";
               }
+              {
+                assertion = !(builtins.hasAttr worker.user (config.hm-sops-bridge.users or { }));
+                message = "Omnigent worker ${name}: personal age-bridge enrollment is prohibited.";
+              }
+              {
+                assertion =
+                  config.home-manager.users.${worker.user}.programs.omnigent.workerCredentials
+                  == (if deliveries.${name}.enabled then deliveries.${name}.policy else null);
+                message = "Omnigent worker ${name}: Home Manager credential paths must match the host adapter's allow-list.";
+              }
             ]) workers
           );
 
           home-manager.users = lib.listToAttrs (
             lib.mapAttrsToList (
-              _: worker:
+              name: worker:
               lib.nameValuePair worker.user (
                 { lib, ... }: {
-                  imports = [ flakeConfig.flake.modules.homeManager.omnigent-worker ] ++ worker.extraHomeModules;
+                  imports = [
+                    flakeConfig.flake.modules.homeManager.omnigent-worker
+                    deliveries.${name}.homeModule
+                  ]
+                  ++ worker.extraHomeModules;
                   home.stateVersion = lib.mkDefault config.system.stateVersion;
                   programs.omnigent = {
                     package = cfg.package;
@@ -280,6 +312,9 @@ in
                   home.activation.omnigentWorkspace = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
                     run ${pkgs.coreutils}/bin/install -d -m 0700 ${lib.escapeShellArg worker.workspaceRoot}
                   '';
+                  home.activation.omnigentCredentialReadiness = lib.mkIf deliveries.${name}.enabled (
+                    lib.hm.dag.entryBefore [ "writeBoundary" ] deliveries.${name}.readiness
+                  );
                 }
               )
             ) workers
@@ -288,10 +323,12 @@ in
           systemd.services = lib.mkMerge [
             (lib.listToAttrs (
               lib.mapAttrsToList (
-                _: worker:
+                name: worker:
                 lib.nameValuePair (lib.removeSuffix ".service" (hmUnit worker)) {
                   serviceConfig.UMask = "0077";
                   serviceConfig.NoNewPrivileges = true;
+                  after = secretDependencies name;
+                  requires = secretDependencies name;
                 }
               ) workers
             ))
@@ -303,9 +340,10 @@ in
                 after = [
                   "network-online.target"
                   (hmUnit worker)
-                ];
+                ]
+                ++ secretDependencies name;
                 wants = [ "network-online.target" ];
-                requires = [ (hmUnit worker) ];
+                requires = [ (hmUnit worker) ] ++ secretDependencies name;
                 restartTriggers = [ config.home-manager.users.${worker.user}.home.activationPackage ];
                 environment = workerEnvironment worker;
                 serviceConfig = {
@@ -329,6 +367,7 @@ in
                     set -eu
                     test "$(${pkgs.coreutils}/bin/stat -c %u "$HOME")" = "$(${pkgs.coreutils}/bin/id -u)"
                     test "$(${pkgs.coreutils}/bin/stat -c %a "$HOME")" = 700
+                    ${lib.optionalString deliveries.${name}.enabled deliveries.${name}.readiness}
                   '';
                   ExecStart = lib.escapeShellArgs [
                     (lib.getExe cfg.package)
@@ -341,6 +380,16 @@ in
             ) enabledWorkers)
           ];
         })
+        (lib.optionalAttrs (options ? clan.core.vars) (
+          lib.mkIf (credentialDeliveries != { }) {
+            clan.core.vars.generators = lib.mkMerge (
+              map (delivery: delivery.generators) (lib.attrValues credentialDeliveries)
+            );
+            sops.templates = lib.mkMerge (
+              map (delivery: delivery.templates) (lib.attrValues credentialDeliveries)
+            );
+          }
+        ))
       ];
     };
 }

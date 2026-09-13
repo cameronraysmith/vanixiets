@@ -40,7 +40,21 @@
       home,
       extraPackages ? [ ],
     }:
-    lib.makeBinPath (
-      config.flake.lib.omnigentRuntimePackages pkgs ++ [ home.home.path ] ++ extraPackages
-    );
+    let
+      credentials = home.programs.omnigent.workerCredentials or null;
+      required = map (
+        package:
+        if credentials != null && credentials.githubToken != null && package == pkgs.gh then
+          home.programs.gh.package
+        else if
+          credentials != null
+          && credentials.claudeSetupToken != null
+          && package == inputs.self.packages.${pkgs.stdenv.hostPlatform.system}.claude-code
+        then
+          home.programs.claude-code.package
+        else
+          package
+      ) (config.flake.lib.omnigentRuntimePackages pkgs);
+    in
+    lib.makeBinPath (required ++ [ home.home.path ] ++ extraPackages);
 }

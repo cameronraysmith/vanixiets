@@ -1207,8 +1207,407 @@
         )
       ) inventoryMachines;
       inventoryFailed = lib.attrNames (lib.filterAttrs (_: ok: !ok) inventoryCases);
+      credentialRoot = "/tmp/omnigent-worker-credentials-${system}";
+      credentialHomePath = "${credentialRoot}/home";
+      credentialMock =
+        tool:
+        pkgs.writeShellScriptBin tool ''
+          exec ${lib.getExe pkgs.python3} ${../home/ai/omnigent/credential-fixtures.py} mock-${tool} "$@"
+        '';
+      mockGh = credentialMock "gh";
+      linearResolver = pkgs.runCommand "omnigent-linear-resolver-fixture" { } ''
+        mkdir -p "$out"
+        cp -r ${pkgs.linear-cli.src}/. "$out/"
+        cp -r ${pkgs.linear-cli.denoDeps}/vendor "$out/vendor"
+        cp ${pkgs.writeText "linear-resolver-fixture.ts" ''
+          import { setCliWorkspace } from "./src/config.ts";
+          import { loadCredentials } from "./src/credentials.ts";
+          import { getGraphQLClient } from "./src/utils/graphql.ts";
+          import { _setBackend } from "./src/keyring/index.ts";
+          if (Deno.args[0] === "--prepare") Deno.exit(0);
+
+          _setBackend({
+            get: async () => { throw new Error("keyring forbidden in fixture"); },
+            set: async () => { throw new Error("keyring forbidden in fixture"); },
+            delete: async () => { throw new Error("keyring forbidden in fixture"); },
+            isAvailable: async () => false,
+          });
+          globalThis.fetch = async (input, init) => {
+            const request = new Request(input, init);
+            const expected = (await Deno.readTextFile(Deno.env.get("FIXTURE_LINEAR_GRANT_PATH")!)).trim();
+            if (request.headers.get("Authorization") !== expected) {
+              throw new Error("unexpected synthetic grant");
+            }
+            const data = {
+              viewer: { email: Deno.env.get("FIXTURE_LINEAR_VIEWER") ?? "fixture@example.invalid" },
+              organization: {
+                id: Deno.env.get("FIXTURE_LINEAR_WORKSPACE") ?? "workspace-id",
+                urlKey: "fixture",
+              },
+            };
+            return Response.json({ data });
+          };
+          try {
+            if (Deno.env.get("LINEAR_IGNORE_ENV_FILE") !== "1") throw new Error("dotenv enabled");
+            const [flag, workspace, command, query] = Deno.args;
+            if (flag !== "--workspace" || command !== "api") throw new Error("unexpected fixture argv");
+            setCliWorkspace(workspace);
+            await loadCredentials();
+            await Deno.writeTextFile(Deno.env.get("FIXTURE_ARGV")!, JSON.stringify(["linear", ...Deno.args]) + "\n", { append: true });
+            console.log(JSON.stringify({ data: await getGraphQLClient().request(query) }));
+          } catch {
+            console.error("synthetic Linear resolver rejected request");
+            Deno.exit(1);
+          }
+        ''} "$out/fixture.ts"
+        ${lib.getExe pkgs.python3} ${../home/ai/omnigent/credential-fixtures.py} prepare-linear "$out"
+        export DENO_DIR="$TMPDIR/deno"
+        mkdir -p "$DENO_DIR"
+        ln -s ${pkgs.linear-cli.denoDeps}/deno_dir/npm "$DENO_DIR/npm"
+        chmod u+w "$out/deno.lock"
+        export HOME="$TMPDIR/home" LINEAR_IGNORE_ENV_FILE=1
+        mkdir -p "$HOME"
+        ${lib.getExe pkgs.deno} run --quiet --cached-only --no-check --no-prompt --allow-read --allow-env --allow-sys --deny-run --deny-net "$out/fixture.ts" --prepare
+      '';
+      mockLinear =
+        (pkgs.writeShellScriptBin "linear" ''
+          export DENO_DIR="$HOME/.cache/linear-fixture"
+          ${pkgs.coreutils}/bin/mkdir -p "$DENO_DIR"
+          ${pkgs.coreutils}/bin/ln -sfn ${pkgs.linear-cli.denoDeps}/deno_dir/npm "$DENO_DIR/npm"
+          exec ${lib.getExe pkgs.deno} run --quiet --cached-only --frozen --no-check --allow-read --allow-write --allow-env --allow-sys --allow-run=git --deny-net ${linearResolver}/fixture.ts "$@"
+        '')
+        // {
+          inherit (pkgs.linear-cli) src;
+        };
+      credentialSources = [
+        "signing"
+        "github"
+        "linear"
+        "claude"
+      ];
+      credentialSource = name: {
+        enable = true;
+        generator = "fixture-${name}";
+        file = "credential";
+      };
+      credentialModule = {
+        nixpkgs.pkgs = lib.mkForce (
+          pkgs.extend (
+            _: _: {
+              gh = mockGh;
+              linear-cli = mockLinear;
+            }
+          )
+        );
+        clan.core.settings = {
+          directory = ../home/ai/omnigent/fixtures;
+          name = "fixture";
+          icon = null;
+          tld = "test";
+          domain = "fixture.test";
+          machine.name = "fixture";
+        };
+        sops = {
+          validateSopsFiles = false;
+          age.keyFile = "/synthetic-no-decryption-key";
+          secrets = lib.listToAttrs (
+            map (
+              name:
+              lib.nameValuePair "vars/per-machine/fixture/fixture-${name}/credential" {
+                path = "${credentialRoot}/${name}";
+              }
+            ) credentialSources
+          );
+        };
+        users.users.omnigent-cameron.home = lib.mkForce credentialHomePath;
+        services.omnigent-host = {
+          serverUrl = lib.mkForce "https://fixture.invalid";
+          workers.cameron = {
+            enable = true;
+            credentials = {
+              signingKey = credentialSource "signing";
+              githubToken = credentialSource "github";
+              claudeSetupToken = credentialSource "claude";
+              linearApiKeys.fixture = credentialSource "linear" // {
+                viewerEmail = "fixture@example.invalid";
+                workspaceId = "workspace-id";
+              };
+              expected = {
+                githubUser = "fixture-human";
+                gitEmail = "fixture@example.invalid";
+                omnigentEmail = "fixture@example.invalid";
+                signingPublicKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINdamAGCsQq31Uv+08lkBzoO4XLz2qYjJa8CGmj3B1Ea";
+              };
+            };
+          };
+        };
+      };
+      credentialPathAssertion =
+        host@{ config, ... }:
+        {
+          services.omnigent-host.workers.cameron.extraHomeModules = [
+            ({ config, ... }: {
+              assertions = [
+                {
+                  assertion =
+                    let
+                      policy = config.programs.omnigent.workerCredentials;
+                      path = name: host.config.clan.core.vars.generators."fixture-${name}".files.credential.path;
+                    in
+                    policy.signingKey == path "signing"
+                    && policy.githubToken == path "github"
+                    && policy.claudeSetupToken == path "claude"
+                    && policy.linearApiKeys.fixture.path == path "linear";
+                  message = "Credential fixture: Home Manager credential options must remain Clan vars paths.";
+                }
+              ];
+            })
+          ];
+        };
+      credentialFixture =
+        extra:
+        (if pkgs.stdenv.isDarwin then mkDarwin else mkLinux) (
+          [
+            inputs.clan-core.${if pkgs.stdenv.isDarwin then "darwinModules" else "nixosModules"}.clanCore
+            credentialModule
+          ]
+          ++ extra
+        );
+      credentialConfig = (credentialFixture [ credentialPathAssertion ]).config;
+      credentialGenerationFor =
+        c:
+        if pkgs.stdenv.isDarwin then
+          c.environment.etc."omnigent/workers/cameron".source
+        else
+          c.home-manager.users.omnigent-cameron.home.activationPackage;
+      credentialGeneration = credentialGenerationFor credentialConfig;
+      evaluationMaterial = builtins.toFile "synthetic-evaluation-credential" (
+        builtins.hashString "sha256" "omnigent-evaluation-disclosure-fixture"
+      );
+      disclosureFixture =
+        leak:
+        (credentialFixture [
+          credentialPathAssertion
+          {
+            sops.secrets =
+              lib.genAttrs (map (name: "vars/per-machine/fixture/fixture-${name}/credential") credentialSources)
+                (_: {
+                  path = lib.mkForce (toString evaluationMaterial);
+                });
+            services.omnigent-host.workers.cameron.extraHomeModules = lib.optional leak {
+              home.sessionVariables.OMNIGENT_DISCLOSURE_CONTROL = builtins.readFile evaluationMaterial;
+            };
+          }
+        ]).config;
+      disclosureSettings =
+        c:
+        pkgs.writeText "omnigent-delivery-settings.json" (
+          builtins.toJSON {
+            templates = c.sops.templates;
+            supervisor =
+              if pkgs.stdenv.isDarwin then
+                c.launchd.daemons.omnigent-host-cameron.serviceConfig
+              else
+                c.systemd.services.omnigent-host-cameron.serviceConfig;
+          }
+        );
+      disclosureArtifacts = c: [
+        (credentialGenerationFor c)
+        (disclosureSettings c)
+        (
+          if pkgs.stdenv.isDarwin then
+            c.launchd.daemons.omnigent-host-cameron.command
+          else
+            c.systemd.services.omnigent-host-cameron.serviceConfig.ExecStartPre
+        )
+      ];
+      disclosureClean = disclosureFixture false;
+      disclosureLeaking = disclosureFixture true;
+      disclosureDerivations = map (drv: builtins.unsafeDiscardOutputDependency drv.drvPath) [
+        (disclosureSettings credentialConfig)
+        (disclosureSettings disclosureClean)
+        linearResolver
+      ];
+      credentialArtifact = pkgs.writeText "omnigent-credential-artifacts.json" (
+        builtins.toJSON {
+          root = credentialRoot;
+          evaluationMaterial = toString evaluationMaterial;
+          derivationRoots = map builtins.unsafeDiscardStringContext disclosureDerivations;
+          generatedArtifacts = map toString (
+            (disclosureArtifacts credentialConfig) ++ (disclosureArtifacts disclosureClean)
+          );
+          leakingGeneration = toString (credentialGenerationFor disclosureLeaking);
+          generation = toString credentialGeneration;
+          git = lib.getExe pkgs.git;
+          mockGh = lib.getExe mockGh;
+          linearTemplate = credentialConfig.sops.templates.omnigent-omnigent-cameron-linear.content;
+          mockLinear = lib.getExe mockLinear;
+          linearPlaceholder =
+            credentialConfig.sops.placeholder."vars/per-machine/fixture/fixture-linear/credential";
+          runtimePath =
+            if pkgs.stdenv.isDarwin then
+              credentialConfig.launchd.daemons.omnigent-host-cameron.environment.PATH
+            else
+              credentialConfig.systemd.services.omnigent-host-cameron.environment.PATH;
+          consumerSource = ../home/ai/omnigent/credentials.py;
+          deliverySource = ../home/ai/omnigent/delivery.py;
+          deliveryFixtures = ../home/ai/omnigent/delivery-fixtures.py;
+          hostLauncher =
+            if pkgs.stdenv.isDarwin then
+              toString credentialConfig.launchd.daemons.omnigent-host-cameron.command
+            else
+              toString credentialConfig.systemd.services.omnigent-host-cameron.serviceConfig.ExecStartPre;
+          systemActivation =
+            if pkgs.stdenv.isDarwin then
+              toString credentialConfig.system.activationScripts.script.source
+            else
+              null;
+          installer =
+            if pkgs.stdenv.isDarwin then
+              credentialConfig.launchd.daemons.sops-install-secrets.command
+            else
+              null;
+        }
+      );
+      credentialRejects =
+        message: module:
+        let
+          evaluates =
+            extra:
+            (builtins.tryEval (
+              let
+                c = (credentialFixture extra).config;
+              in
+              assert lib.all (a: a.assertion) c.assertions;
+              c.networking.hostName
+            )).success;
+          removeGuard.options.assertions = lib.mkOption {
+            apply = lib.filter (a: a.assertion || a.message != message);
+          };
+        in
+        !evaluates [ module ]
+        && evaluates [
+          module
+          removeGuard
+        ];
+      credentialCases = {
+        adapterAllowList =
+          credentialRejects
+            "Omnigent worker cameron: Home Manager credential paths must match the host adapter's allow-list."
+            {
+              services.omnigent-host.workers.cameron.extraHomeModules = [
+                { _module.args.omnigentCredentialPolicy = lib.mkForce null; }
+              ];
+            };
+        defaultOff = lib.all (
+          machine:
+          lib.all (
+            worker: config.flake.lib.omnigentCredentialSelection worker.credentials == { } && !worker.enable
+          ) (lib.attrValues machine.config.services.omnigent-host.workers)
+        ) (lib.attrValues inventoryMachines);
+        moduleAssertions = lib.all (a: a.assertion) credentialConfig.assertions;
+        declaredSources = lib.all (
+          name:
+          let
+            g = credentialConfig.clan.core.vars.generators."fixture-${name}";
+            f = g.files.credential;
+          in
+          g.prompts.credential.type == "hidden"
+          && !g.share
+          && f.secret
+          && f.neededFor == "services"
+          && f.owner == "omnigent-cameron"
+          && f.mode == "0400"
+          && f.path == "${credentialRoot}/${name}"
+        ) credentialSources;
+        wrongOwner =
+          credentialRejects
+            "Omnigent worker omnigent-cameron: credentials require private host-local services files owned by the worker with mode 0400."
+            {
+              clan.core.vars.generators.fixture-github.files.credential.owner = lib.mkForce "root";
+            };
+        wrongMode =
+          credentialRejects
+            "Omnigent worker omnigent-cameron: credentials require private host-local services files owned by the worker with mode 0400."
+            {
+              clan.core.vars.generators.fixture-github.files.credential.mode = lib.mkForce "0644";
+            };
+        privateBundle =
+          credentialRejects
+            "Omnigent worker omnigent-cameron: only the declared Clan vars ciphertext and delivered paths are allowed."
+            {
+              sops.secrets."vars/per-machine/fixture/fixture-github/credential".sopsFile = lib.mkForce (
+                pkgs.writeText "synthetic-personal-bundle" "personal bundle fixture"
+              );
+            };
+        inherit (cases)
+          privateSecrets
+          signer
+          socket
+          foreignHome
+          ;
+        agentForward =
+          rejected "Omnigent worker capabilities must not inherit an SSH agent or signing socket."
+            [
+              { programs.ssh.matchBlocks."*".forwardAgent = true; }
+            ];
+        ageIdentity =
+          rejected "Omnigent worker capabilities must not import personal sops secrets or templates."
+            [
+              inputs.sops-nix.homeManagerModules.sops
+              { sops.age.keyFile = "${cfg.home.homeDirectory}/personal-age-key"; }
+            ];
+        bridgeEnrollment =
+          pkgs.stdenv.isDarwin
+          || credentialRejects "Omnigent worker cameron: personal age-bridge enrollment is prohibited." {
+            options.hm-sops-bridge.users = lib.mkOption {
+              type = lib.types.attrs;
+              default = { };
+            };
+            config.hm-sops-bridge.users.omnigent-cameron.sopsIdentity = "cameron";
+          };
+        linuxReadiness =
+          pkgs.stdenv.isDarwin
+          || (
+            let
+              active = (credentialFixture [ { sops.useSystemdActivation = true; } ]).config;
+              unit = active.systemd.services.omnigent-host-cameron;
+              hm = active.systemd.services."home-manager-omnigent\\x2dcameron";
+            in
+            lib.all
+              (
+                service:
+                lib.elem "sops-install-secrets.service" service.requires
+                && lib.elem "sops-install-secrets.service" service.after
+              )
+              [
+                unit
+                hm
+              ]
+            && lib.elem "writeBoundary" active.home-manager.users.omnigent-cameron.home.activation.omnigentCredentialReadiness.before
+          );
+      };
     in
     {
+      checks.omnigent-worker-credentials =
+        assert lib.assertMsg (lib.all (ok: ok) (lib.attrValues credentialCases))
+          "Omnigent credential fixture failures: ${
+            builtins.toJSON (lib.attrNames (lib.filterAttrs (_: ok: !ok) credentialCases))
+          }";
+        pkgs.runCommand "omnigent-worker-credentials"
+          {
+            nativeBuildInputs = [
+              pkgs.python3
+              pkgs.git
+              pkgs.openssh
+            ];
+            fixtureDerivations = disclosureDerivations;
+            passthru.cases = credentialCases;
+          }
+          ''
+            ${pkgs.omnigent.python.interpreter} ${../home/ai/omnigent/credential-fixtures.py} ${credentialArtifact}
+            touch "$out"
+          '';
       checks.omnigent-worker-inventory =
         assert lib.assertMsg (lib.all
           (

@@ -8,6 +8,7 @@ in
       config,
       lib,
       pkgs,
+      options,
       ...
     }:
     let
@@ -28,6 +29,30 @@ in
             _: group: group.gid == (account worker).gid || lib.elem worker.user group.members
           ) config.users.groups
         );
+      deliveries = lib.mapAttrs (
+        _: worker:
+        flakeConfig.flake.lib.mkOmnigentWorkerCredentials {
+          inherit pkgs worker;
+          osConfig = config;
+          home = homeFor worker;
+          group = lib.head (groupsFor worker);
+          serverUrl = cfg.serverUrl;
+        }
+      ) workers;
+      credentialDeliveries = lib.filterAttrs (_: delivery: delivery.enabled) deliveries;
+      deliveryState = "/var/run/omnigent-worker-credentials";
+      deliveryDeclaration = pkgs.writeText "omnigent-credential-delivery.json" (
+        builtins.toJSON {
+          workers = lib.mapAttrsToList (name: delivery: {
+            user = workers.${name}.user;
+            files = delivery.policy.requiredFiles;
+          }) credentialDeliveries;
+        }
+      );
+      receiptReadiness = name: ''
+        ${lib.getExe pkgs.python3} ${../home/ai/omnigent/delivery.py} ready ${deliveryState} ${deliveries.${name}.policyFile} ${config.system.build.sops-nix-manifest}
+        ${deliveries.${name}.readiness}
+      '';
       matchesUser =
         worker: entry:
         entry == "*"
@@ -66,7 +91,7 @@ in
           "DYLD_"
         ];
       workerHomes = lib.mapAttrs (
-        _: worker:
+        name: worker:
         inputs.home-manager.lib.homeManagerConfiguration {
           inherit pkgs;
           extraSpecialArgs = {
@@ -75,6 +100,7 @@ in
           };
           modules = [
             flakeConfig.flake.modules.homeManager.omnigent-worker
+            deliveries.${name}.homeModule
             ({ lib, ... }: {
               home = {
                 username = worker.user;
@@ -84,6 +110,9 @@ in
                 activation.omnigentWorkspace = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
                   run ${pkgs.coreutils}/bin/install -d -m 0700 ${lib.escapeShellArg worker.workspaceRoot}
                 '';
+                activation.omnigentCredentialReadiness = lib.mkIf deliveries.${name}.enabled (
+                  lib.hm.dag.entryBefore [ "writeBoundary" ] (receiptReadiness name)
+                );
               };
               programs.omnigent = {
                 package = cfg.package;
@@ -153,6 +182,7 @@ in
             test "$(${pkgs.coreutils}/bin/stat -c %u "$directory")" = "$(${pkgs.coreutils}/bin/id -u)"
             test "$(${pkgs.coreutils}/bin/stat -c %a "$directory")" = 700
           done
+          ${lib.optionalString deliveries.${name}.enabled (receiptReadiness name)}
           ${workerHomes.${name}.activationPackage}/activate
           exec ${
             lib.escapeShellArgs [
@@ -166,6 +196,16 @@ in
     in
     {
       imports = [ flakeConfig.flake.modules.darwin.omnigent-worker-options ];
+      options.sops.package = lib.mkOption {
+        apply =
+          original:
+          if credentialDeliveries == { } then
+            original
+          else
+            pkgs.writeShellScriptBin "sops-install-secrets" ''
+              exec ${lib.getExe pkgs.python3} ${../home/ai/omnigent/delivery.py} install ${deliveryState} ${deliveryDeclaration} ${original}/bin/sops-install-secrets "$@"
+            '';
+      };
       options.services.omnigent-host = {
         enable = lib.mkEnableOption "the foreground Omnigent host";
         package = lib.mkPackageOption pkgs "omnigent" { };
@@ -273,6 +313,7 @@ in
               message = "Omnigent workers require distinct accounts.";
             }
           ]
+          ++ lib.concatMap (delivery: delivery.assertions) (lib.attrValues credentialDeliveries)
           ++ lib.concatLists (
             lib.mapAttrsToList (name: worker: [
               {
@@ -343,6 +384,12 @@ in
                   && !workerHomes.${name}.config.targets.darwin.linkApps.enable;
                 message = "Omnigent worker ${name}: worker Home Manager must not require desktop application activation.";
               }
+              {
+                assertion =
+                  workerHomes.${name}.config.programs.omnigent.workerCredentials
+                  == (if deliveries.${name}.enabled then deliveries.${name}.policy else null);
+                message = "Omnigent worker ${name}: Home Manager credential paths must match the host adapter's allow-list.";
+              }
             ]) workers
           );
           environment.etc = lib.mapAttrs' (
@@ -370,6 +417,9 @@ in
                 ]
               ) workers
             )
+            + lib.optionalString (credentialDeliveries != { }) (
+              "\n" + config.launchd.daemons.sops-install-secrets.command + " || exit 1\n"
+            )
           );
           launchd.daemons = lib.mapAttrs' (
             name: worker:
@@ -390,6 +440,16 @@ in
             }
           ) enabledWorkers;
         })
+        (lib.optionalAttrs (options ? clan.core.vars) (
+          lib.mkIf (credentialDeliveries != { }) {
+            clan.core.vars.generators = lib.mkMerge (
+              map (delivery: delivery.generators) (lib.attrValues credentialDeliveries)
+            );
+            sops.templates = lib.mkMerge (
+              map (delivery: delivery.templates) (lib.attrValues credentialDeliveries)
+            );
+          }
+        ))
       ];
     };
 }

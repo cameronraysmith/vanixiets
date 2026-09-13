@@ -77,3 +77,15 @@ Checkboxes remain pending controller acceptance.
 - [ ] 7.1 Replace only Raquel's experimental workers on magnetite and pyrite with disabled `janettesmith` workers and bind their Git/jj names and author mail through the Nix-only hook; retain both human profiles and Cameron's three workers.
 - [ ] 7.2 Verify `omnigent-worker-inventory` and `omnigent-worker-capabilities` on `aarch64-darwin` and `x86_64-linux`, plus the existing platform-specific Darwin and Linux checks, including canonical identity and discriminating negative fixtures.
 - [ ] 7.3 Controller: compare protected projections C1/C0 and J1/J0 against the original fixed baselines, allowing only Janette's asserted human Git-mail, jj-mail, signer-principal and GitHub-username differences and their generated artifacts; retain all other human, server, Cameron-worker and stibnite behavior.
+
+## 8. Dedicated-worker credential slice
+
+This amendment leaves identity delivery and historical phase gates unchanged.
+The slice declares only selected static credentials and synthetic checks; real grant issuance, enrollment and worker enablement remain human/deploy-gated.
+Checkboxes remain pending controller acceptance.
+
+- [ ] 8.1 Add typed, default-off signing, GitHub, workspace-specific Linear and optional native Claude credential sources, delivered by host-local Clan hidden prompts as worker-owned `0400` services files; reject personal bundles, age-bridge enrollment and SSH forwarding.
+- [ ] 8.2 Bind Git's absolute HTTPS helper to the token-reading `programs.gh.package`, render explicit Linear workspace mappings without human imports, and bind optional Claude injection at Omnigent's native executable resolution.
+- [ ] 8.3 Require Linux delivery readiness and serialize Darwin's privileged activation/boot installer with a root-owned manifest/boot receipt before standalone Home Manager and host execution.
+- [ ] 8.4 Verify canonical signing and mocked provider identities with the separately invoked `omnigent-worker-verify`; preserve tool-owned OAuth state through restart, redeploy, rollback and deletion.
+- [ ] 8.5 Controller: build `omnigent-worker-credentials` on both systems, retain prior capability/platform/inventory checks, and compare candidate projections only with their matching fixed chain/integrated baselines.

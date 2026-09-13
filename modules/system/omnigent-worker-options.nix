@@ -1,5 +1,67 @@
 { lib, ... }:
 let
+  credentialSourceOptions = {
+    enable = lib.mkEnableOption "delivery of this explicitly selected static credential";
+    generator = lib.mkOption {
+      type = lib.types.nullOr (lib.types.strMatching "[a-z0-9][a-z0-9-]*");
+      default = null;
+      description = "Host-local Clan hidden-prompt generator; required when enabled.";
+    };
+    file = lib.mkOption {
+      type = lib.types.nullOr (lib.types.strMatching "[a-zA-Z0-9][a-zA-Z0-9_-]*");
+      default = null;
+      description = "Secret output file in the declared generator; required when enabled.";
+    };
+  };
+  credentialSource = lib.types.submodule { options = credentialSourceOptions; };
+  expectedIdentity =
+    description:
+    lib.mkOption {
+      type = lib.types.nullOr lib.types.nonEmptyStr;
+      default = null;
+      inherit description;
+    };
+  credentialOptions = {
+    signingKey = lib.mkOption {
+      type = credentialSource;
+      default = { };
+      description = "Explicitly delegated passwordless SSH private key for Git and Jujutsu signing.";
+    };
+    githubToken = lib.mkOption {
+      type = credentialSource;
+      default = { };
+      description = "Personal GitHub token consumed only by the worker's gh wrapper.";
+    };
+    linearApiKeys = lib.mkOption {
+      type = lib.types.attrsOf (
+        lib.types.submodule {
+          options = credentialSourceOptions // {
+            viewerEmail = expectedIdentity "Expected authenticated Linear viewer email in this workspace.";
+            workspaceId = expectedIdentity "Expected authenticated Linear organization ID.";
+          };
+        }
+      );
+      default = { };
+      description = "Explicit workspace URL-key to personal API-key mappings; each entry defaults off.";
+    };
+    claudeSetupToken = lib.mkOption {
+      type = credentialSource;
+      default = { };
+      description = "Optional native Claude setup token, never an OAuth directory seed.";
+    };
+    expected = lib.mkOption {
+      type = lib.types.submodule {
+        options = {
+          githubUser = expectedIdentity "Expected authenticated GitHub login; not inferred from the worker owner label.";
+          gitEmail = expectedIdentity "Canonical Git author and allowed_signers principal.";
+          signingPublicKey = expectedIdentity "Declared OpenSSH public key corresponding to the delegated private key.";
+          omnigentEmail = expectedIdentity "Expected authenticated Omnigent /v1/me user_id in the email-based OIDC deployment.";
+        };
+      };
+      default = { };
+      description = "Non-secret expected identities for separately invoked enrollment verification.";
+    };
+  };
   workerOptions =
     { config, ... }:
     let
@@ -38,6 +100,11 @@ let
                   default = false;
                   description = "Trust direnv files under workspaceRoot without individual approval.";
                 };
+                credentials = lib.mkOption {
+                  type = lib.types.submodule { options = credentialOptions; };
+                  default = { };
+                  description = "Selected host-delivered static credentials, separate from tool-owned mutable OAuth state.";
+                };
                 environment = lib.mkOption {
                   type = lib.types.attrsOf lib.types.str;
                   default = { };
@@ -61,6 +128,7 @@ let
     };
 in
 {
+  flake.lib.omnigentWorkerCredentialOptions = credentialOptions;
   flake.modules.nixos.omnigent-worker-options = workerOptions;
   flake.modules.darwin.omnigent-worker-options = workerOptions;
 }
