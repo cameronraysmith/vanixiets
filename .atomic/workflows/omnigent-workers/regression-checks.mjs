@@ -7,17 +7,17 @@ import { humanChecks } from "./human-checks.mjs";
 export async function regressionChecks({ definition, sliceDefinition, migrationDefinition, migration, contracts, operations, gates, source, models }, only) {
   if (!only || only === "F1") await humanChecks(gates);
   const ctx = {
-    cwd: contracts.repository, inputs: { start_at: 4, deploy: false, max_repairs: 2, build_timeout_minutes: 1 }, models,
+    cwd: contracts.repository, inputs: { start_at: 6, deploy: false, max_repairs: 2, build_timeout_minutes: 1 }, models,
     tool: async (name) => name === "allocate-evidence" ? ".atomic/workflows/runs/fixture" : { ok: true, value: { receipt: [], evidence: source } },
     workflow: async () => { throw Error("unexpected child"); }, exit: (value) => value,
   };
   if (!only || only === "F4") {
-    for (const start_at of [4, 5, 6]) {
+    for (const start_at of [6, 7, 8]) {
       const result = await definition.run({ ...ctx, inputs: { ...ctx.inputs, start_at } });
       assert.equal(result.status, "blocked", `F4 start_at=${start_at} must withhold readiness without evidence`);
       assert.match(result.reason, /implementation evidence/i);
     }
-    console.log("PASS F4 actual definition: 4/5/6 without deployment withhold readiness");
+    console.log("PASS F4 actual definition: 6/7/8 without deployment withhold readiness");
   }
   if (!only || only === "F6") {
     const host = { host: "stibnite", sha: source.sha, system: "/nix/store/fixture", evidence: "fixture", acceptance: "human_attested" };

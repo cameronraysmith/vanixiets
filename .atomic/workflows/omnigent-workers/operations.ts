@@ -220,13 +220,13 @@ export class Operations {
       if (description === marker) target = tip;
       else {
         if (tip !== previous.change) throw new Stop("reconcile", "Chain tip changed before routing");
-        const child = await this.id(`${tip}+`, signal);
+        const child = await this.id(`${tip}+ & ancestors(@-)`, signal);
         const joinId = await this.id("@-", signal);
         if (child !== joinId) throw new Stop("reconcile", "Unfinished splice requires explicit reconciliation");
         if (!delta.owned.length) return this.source(chain, signal);
         await this.attribution(spec, before, pinned, signal);
         await this.command(`jj new --no-edit -A ${quote(tip)} -m ${quote(marker)}`, signal);
-        target = await this.id(`${tip}+`, signal);
+        target = await this.id(`${tip}+ & ancestors(@-)`, signal);
       }
       if (delta.owned.length) {
         this.assertOwnedEqual(spec, after, await this.filesystemTree(signal), "Owned bytes changed before squash");

@@ -2,7 +2,8 @@
 
 This workflow implements the approved dedicated-worker design on the existing `omnigent-magnetite` chain.
 It does not reuse the old deployment workflow's historical S0–S11 replay or infrastructure provisioning.
-The shared server stays on magnetite; Cameron receives workers on magnetite, pyrite and stibnite, and Raquel receives workers on both Linux hosts.
+The shared server stays on magnetite; Cameron receives workers on magnetite, pyrite and stibnite, and Janette (`janettesmith`, GitHub `janetteasmith`) receives workers on both Linux hosts.
+The identity phase replaces only Raquel's two experimental workers; both human profiles remain.
 
 ## Run and stop boundaries
 
@@ -11,26 +12,42 @@ Run from `/Users/crs58/projects/vanixiets` with `openai-codex/gpt-6-astra` selec
 
 | Input | Default | Meaning |
 |---|---|---|
-| `start_at` | `0` | Phase index: capabilities 0, Linux 1, Darwin 2, inventory 3, magnetite 4, pyrite 5, stibnite 6, closure 7. |
+| `start_at` | `0` | First phase index from the table below. |
 | `deploy` | `false` | Permit host migrations after their individual operator confirmations. False still permits implementation and local jj routing; it is not a read-only plan mode. |
 | `max_repairs` | `2` | Additional implementation attempts per slice; contract defects stop immediately. |
 | `build_timeout_minutes` | `90` | Positive deadline per gate/operation batch, forwarded through cancellation signals. |
+
+| Index | Phase |
+|---|---|
+| 0 | capabilities |
+| 1 | linux |
+| 2 | darwin |
+| 3 | inventory |
+| 4 | identity |
+| 5 | credentials |
+| 6 | magnetite |
+| 7 | pyrite |
+| 8 | stibnite |
+| 9 | closure |
 
 The graph is:
 
 ```text
 preflight
   → capabilities child → Linux child → Darwin child → inventory child
+  → identity child → credentials child
   → magnetite migration → pyrite migration → stibnite migration
   → documentation/evidence child
 ```
 
 Each implementation child runs `paired immutable baselines / owned-byte capture → implement → pre-route context check → attributed chain route → paired immutable preservation and chain gates → fresh review / provenance readback`.
 A repair adds new suffixed nodes downstream; it never reopens an ancestor.
-Each migration runs `observe integrated join → prepare disabled accounts → enroll humans → enablement child → integrated gates → activate → runtime probes → human acceptance`.
+Each migration runs `observe integrated join → prepare disabled accounts → verify provisioned credentials/identities → complete missing browser/OAuth enrollment → enablement child → integrated gates → activate → runtime probes → human acceptance`.
 An already-enabled host skips account preparation, verifies its current configuration and rechecks enrollment.
 
-`implementation-ready` means the four implementation phases passed, with no host migration requested.
+`implementation-ready` means the six implementation phases passed, including a credentials receipt, with no host migration requested.
+Phases 0–3 retain the historical Raquel preparation matrix; identity establishes the Janette matrix, and credentials keeps all five workers disabled.
+Magnetite preparation gates credentials; pyrite and stibnite preparation gate the preceding host phase.
 `human-attested` means this run gathered all three host acceptance records; it is not a claim of independently automated end-to-end isolation.
 `partial-resume` deliberately withholds a fleet-completion claim when starting after earlier hosts.
 A blocked exit retains available slice/host receipts and its evidence directory.
@@ -60,6 +77,7 @@ Neither cross-context equality nor replacing the chain URL with the filesystem U
 
 `operations.ts` reuses the repository's process receipts, bounded logs and byte/mode snapshots.
 It refuses pre-existing in-scope edits, detects foreign changes and routes only attributed paths using `jj new --no-edit`, path-scoped squash with `--keep-emptied`, and a chain bookmark advance.
+Both routing child lookups use `${tip}+ & ancestors(@-)` to exclude off-join peers; an unfinished in-join splice still blocks for reconciliation.
 The working-copy change ID and the development join's other chains must survive routing.
 These checks detect observed drift; they do not lock concurrent writers.
 An interrupted splice before bookmark advancement blocks for explicit topology reconciliation rather than creating another change blindly.
@@ -88,10 +106,24 @@ On stibnite, where only one worker is planned, the automated canary has only the
 ## Human enrollment and recovery
 
 The operator confirms account adoption and UID/GID/home compatibility before account activation.
-Each person logs into Omnigent, GitHub, Linear and selected model harnesses under the actual dedicated HOME.
-Use owner-only local files with restrictive creation permissions; do not copy complete personal directories or refresh-state stores.
-The implemented Linear probe targets the existing CLI API-key lane.
-If a user selects MCP-only OAuth instead, stop for a deliberate probe-contract adjustment rather than pretend CLI authentication succeeded or create a bot.
+Static signing, GitHub, Linear and optional native-Claude setup credentials require prior approved enrollment through declarative Clan vars and host-level delivery to selected worker-owned files with mode `0400`.
+Record the approval and delivery evidence; absent evidence stops migration for the separately gated provisioning step.
+Do not run `gh auth login` or `linear auth login` or overwrite managed files.
+Humans complete only missing Omnigent browser tickets and selected model OAuth under the actual dedicated HOME and explicit tool auth directory.
+Use restrictive creation permissions; never copy personal directories, age identities, bundles or tool-owned refresh stores.
+Deployment must leave mutable OAuth state untouched, including after logout or deletion.
+
+Verify the expected GitHub login, Linear person and explicit workspace, Omnigent `/v1/me` primary/SSO mail and owner/admin status, refresh readiness, and the signing key's public fingerprint.
+Janette's primary/SSO mail is `janette.a.smith@gmail.com`; her Git/jj mail and `allowed_signers` principal are `125711642+janetteasmith@users.noreply.github.com`.
+The Linear probe targets the existing CLI API-key lane; MCP-only OAuth requires a deliberate probe-contract adjustment, not a bot substitution.
+Record only non-secret identity and evidence references; never print credential material or use token-output flags.
+
+Narrow file-backed signing-key delegation is approved through selected host-level Clan/SOPS vars files, not a personal secret bundle, age identity, SSH agent or `hm-sops-bridge` enrollment.
+Acceptance requires each worker's signed commit to verify against its declared public key and canonical Git mail principal.
+File-backed SOPS delivery is the current design; systemd `LoadCredential` is the designated follow-up, with `LoadCredentialEncrypted` optional only after hardware verification.
+The accepted `sandbox:none`, shared-store visibility and same-UID/admin access limits remain explicit; file ownership does not remove external grant or administrator authority.
+Use independent person/host grants by default and record renewal/revocation authority during provisioning.
+Kanidm provisioning, real grant issuance and enrollment of real values remain separate human/deploy-gated steps.
 Real external create/update operations require explicit human target approval and evidence references.
 The workflow never performs those writes autonomously.
 
@@ -126,13 +158,23 @@ No Atomic patch or alternate model/provider is introduced.
 node .atomic/workflows/omnigent-workers/check.mjs
 ```
 
-For the offline model boundary alone, append `--model-only`.
+`check.mjs` invokes the full `controller-checks.mjs` and `regression-checks.mjs` fixture functions, along with strict TypeScript, generated syntax and live-probe checks.
+Running either helper module directly only imports its exports; it does not execute its fixtures.
+For the offline model boundary alone, append `--model-only` to `check.mjs`.
 The checker executes the installed catalog factory and successful-attempt metadata writer in isolation, without extension registration or model dispatch; controller fixtures reuse those values.
 
 Controller fixtures use mocked VCS/model/host boundaries; the human-preservation lane additionally runs bounded offline Nix evaluations with IFD disabled and no builds.
 The differentiated controller fixtures execute the actual projection/comparison and source/attribution/routing callbacks, while replacing model, command and filesystem boundaries where needed.
 They cover integrated-only failure despite chain equality, fixed baselines through repairs, relevant foreign drift, owned overlap, byte/mode/symlink drift, tree-identical metadata changes, unrelated working notes and source-bound reviewer receipts.
+Phase fixtures cover all six implementation children, implementation/closure resume indices, credentials-receipt readiness, per-host preparation gates, and join-scoped routing child selection with off-join peers and an unfinished-splice negative control.
 For this repair's separately recorded immutable real-source probes, `--provenance-artifacts` reuses the private ignored C0/J0 and complete archive-movement outputs rather than evaluating the mutable fleet.
 That optional lane retains real projection contents but uses explicitly synthetic routed commit labels; it does not create Git objects or route real changes.
 The separate probe logs, immutable source URLs and projection hashes establish the real Nix semantics, not the controller mocks.
+
+```sh
+node .atomic/workflows/omnigent-workers/check.mjs --model-only
+node .atomic/workflows/omnigent-workers/check.mjs --provenance-artifacts
+```
+
+Use a 5400-second deadline and `set -o pipefail` with `tee` into ignored `logs/` for each validation command.
 These checks do not replace real-fleet or real-user acceptance.

@@ -81,7 +81,7 @@ export async function controllerChecks({ definition, sliceDefinition, sliceModul
         if (name === "baseline-owned" || name.startsWith("acceptance-owned-") || name.startsWith("before-") || name.startsWith("after-") || name.startsWith("diff-")) evidence = tree;
         if (name.startsWith("gates-") || name.endsWith("-gates")) evidence = { passed: !(config.gateFailure && review === 0), results: [{ command: "fixture-check", exitCode: config.gateFailure && review === 0 ? 1 : 0 }], source: didRoute ? routed : source };
         if (name.startsWith("clean-")) evidence = { foreignPaths: [] };
-        if (name === "worker-metadata") evidence = { cameron: { enabled: true, user: "fixture-cameron", home: "/fixture/cameron", owner: "cameron", hostName: "fixture" } };
+        if (name === "worker-metadata") evidence = { cameron: { enabled: config.enabled ?? true, user: "fixture-cameron", home: "/fixture/cameron", owner: "cameron", hostName: "fixture" } };
         assert.notEqual(evidence, undefined, `Unexpected effect requested in mock: ${name}`);
         const value = { receipt: [], evidence };
         compact(value);
@@ -92,7 +92,7 @@ export async function controllerChecks({ definition, sliceDefinition, sliceModul
         assert(!options.worktree && !options.inputs.git_worktree_dir);
         if (config.childFailure) return { exited: true, exitReason: "fixture child blocked" };
         if (options.stageName.startsWith("migrate-")) return { exited: false, outputs: { host: options.inputs.host, sha: source.sha, system: "/nix/store/fixture-system", evidence: tree, acceptance: "human_attested" } };
-        return { exited: false, outputs: { receipt: { phase: options.inputs.phase, change: source.change, sha: source.sha, evidence: tree } } };
+        return { exited: false, outputs: { receipt: { phase: options.inputs.phase === "credentials" && config.staleReceipt ? "inventory" : options.inputs.phase, change: source.change, sha: source.sha, evidence: tree } } };
       },
     };
     return ctx;
@@ -101,8 +101,17 @@ export async function controllerChecks({ definition, sliceDefinition, sliceModul
   let ctx = context(input);
   const result = await definition.run(ctx);
   assert.equal(result.status, "implementation-ready");
-  assert.deepEqual(ctx.events.filter((n) => n.startsWith("slice-")), ["slice-capabilities", "slice-linux", "slice-darwin", "slice-inventory"]);
+  assert.deepEqual(ctx.events.filter((n) => n.startsWith("slice-")), ["slice-capabilities", "slice-linux", "slice-darwin", "slice-inventory", "slice-identity", "slice-credentials"]);
   assert(!ctx.events.some((n) => n.startsWith("migrate")));
+  assert.equal(result.slices.at(-1).phase, "credentials");
+  ctx = context(input, { staleReceipt: true });
+  await assert.rejects(definition.run(ctx), /verify credentials before claiming readiness/);
+  for (const [start_at, previous] of [[1, "capabilities"], [2, "linux"], [3, "darwin"], [4, "inventory"], [5, "identity"], [9, "stibnite"]]) {
+    ctx = context({ ...input, start_at });
+    const resumed = await definition.run(ctx);
+    assert(ctx.events.includes(`reconcile-current-${previous}`));
+    assert.equal(resumed.status, start_at === 9 ? "partial-resume" : "implementation-ready");
+  }
   ctx = context(input, { childFailure: true });
   await assert.rejects(definition.run(ctx), /fixture child blocked/);
   assert.equal(ctx.events.filter((n) => n.startsWith("slice-")).length, 1);
@@ -111,7 +120,7 @@ export async function controllerChecks({ definition, sliceDefinition, sliceModul
   assert.equal(completed.status, "human-attested");
   assert.deepEqual(completed.hosts.map((h) => h.host), contracts.hosts);
   assert(ctx.events.indexOf("migrate-stibnite") < ctx.events.indexOf("slice-closure"));
-  ctx = context({ ...input, deploy: true, start_at: 6 });
+  ctx = context({ ...input, deploy: true, start_at: 8 });
   assert.equal((await definition.run(ctx)).status, "partial-resume");
 
   const j0 = source.join.sha;
@@ -156,8 +165,14 @@ export async function controllerChecks({ definition, sliceDefinition, sliceModul
   assert(!ctx.events.some((n) => n.startsWith("implement-")));
 
   ctx = context({ host: "stibnite", root, timeout: 1000, max_repairs: 2, reads: [] }, { confirm: false });
-  await assert.rejects(migrationDefinition.run(ctx), /Enrollment incomplete/);
+  await assert.rejects(migrationDefinition.run(ctx), /Provisioning\/identity verification incomplete/);
   assert(!ctx.events.some((n) => n.startsWith("activate-") || n.startsWith("enable-")));
+  for (const [host, phase] of [["magnetite", "credentials"], ["pyrite", "magnetite"], ["stibnite", "pyrite"]]) {
+    ctx = context({ host, root, timeout: 1000, max_repairs: 2, reads: [] }, { enabled: false, gateFailure: true });
+    await assert.rejects(migrationDefinition.run(ctx), /Integrated preparation gates failed/);
+    assert.equal(ctx.observations.find((e) => e.name === "prepare-gates").args.phase, phase);
+    assert(!ctx.events.some((n) => n.startsWith("activate-") || n.startsWith("enable-")));
+  }
 
   const tamperCtx = context(capabilities);
   const projectionOps = new Operations(tamperCtx, tamperCtx.inputs.root, 1000);
@@ -226,7 +241,7 @@ async function sourceRouteChecks({ Operations, operations, contracts, source, ro
       else if (command.includes("-r 'parents(@-)'") ) stdout = now.joinParents.join("\n");
       else if (command.startsWith("jj --ignore-working-copy log")) {
         const rev = /-r '([^']+)'/.exec(command)?.[1];
-        stdout = rev === "@" ? source.workingCopy : rev === "@-" ? now.join.change : rev === contracts.chain ? now.change : rev === `${source.change}+` ? inserted ? routed.change : source.join.change : rev?.includes(" & ancestors(@-)") ? rev.split(" ")[0] : undefined;
+        stdout = rev === "@" ? source.workingCopy : rev === "@-" ? now.join.change : rev === contracts.chain ? now.change : rev === `${source.change}+ & ancestors(@-)` ? config.unfinishedSplice ? routed.change : inserted ? routed.change : source.join.change : rev === `${source.change}+` ? `${source.join.change}\n${"p".repeat(32)}` : rev?.includes(" & ancestors(@-)") ? rev.split(" ")[0] : undefined;
       } else if (command.startsWith("jj new --no-edit")) { assert(command.includes(source.change)); inserted = true; stdout = ""; }
       else if (command.startsWith("jj squash")) { assert(command.includes(routed.change) && command.includes("--keep-emptied -- 'modules/owned.nix'")); squashed = true; stdout = ""; }
       else if (command.startsWith("jj bookmark set")) { assert(squashed); bookmarked = true; stdout = ""; }
@@ -265,6 +280,10 @@ async function sourceRouteChecks({ Operations, operations, contracts, source, ro
   assert.equal(result.join.sha, routed.join.sha);
   assert.deepEqual(operations.foreignParents(result), operations.foreignParents(source));
   assert.deepEqual(f.commands.filter((c) => /^jj (new|squash|bookmark)/.test(c)).map((c) => c.split(" ")[1]), ["new", "squash", "bookmark"]);
+  assert.equal(f.commands.filter((c) => c.includes(`-r '${source.change}+ & ancestors(@-)'`)).length, 2, "both child lookups exclude off-join peers");
+  f = fixture({ unfinishedSplice: true });
+  await assert.rejects(f.ops.route("fixture-unfinished-route", spec, beforeFile, afterFile, source), /Unfinished splice requires explicit reconciliation/);
+  assert(!f.commands.some((c) => /^jj (new|squash|bookmark)/.test(c)));
   f = fixture({ foreignDuringRoute: true });
   await assert.rejects(f.ops.route("fixture-foreign-route", spec, beforeFile, afterFile, source), /Foreign-parent provenance changed during routing/);
   console.log("PASS actual source/snapshot/route callbacks: immutable Git parent/tree binding, capture drift, owned overlap, relevant unstored input rejection, dirty-note tolerance, explicit chain splice and foreign-parent continuity");

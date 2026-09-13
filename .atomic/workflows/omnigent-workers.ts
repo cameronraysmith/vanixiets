@@ -10,7 +10,7 @@ import { Operations, currentModel } from "./omnigent-workers/operations.js";
 
 export default workflow({
   name: "omnigent-workers",
-  description: "Dedicated real-user workers: four scoped implementation children, three reconciled host migrations, then evidence closure on omnigent-magnetite.",
+  description: "Dedicated real-user workers: six scoped implementation children, three reconciled host migrations, then evidence closure on omnigent-magnetite.",
   heartbeatIntervalMinutes: 15,
   inputs,
   outputs: {
@@ -35,7 +35,7 @@ export default workflow({
     const reads = [research];
     try {
       await ops.observeSource("preflight");
-      if (ctx.inputs.start_at > 0 && (ctx.inputs.start_at < 4 || ctx.inputs.start_at === 7)) {
+      if (ctx.inputs.start_at > 0 && (ctx.inputs.start_at < phases.indexOf(hosts[0]) || phases[ctx.inputs.start_at] === "closure")) {
         const previous = phases[ctx.inputs.start_at - 1]!;
         const verified = await ctx.workflow(implementation, {
           stageName: `reconcile-current-${previous}`,
@@ -49,7 +49,7 @@ export default workflow({
         if (index < ctx.inputs.start_at) continue;
         if (phase === "magnetite" || phase === "pyrite" || phase === "stibnite") {
           if (!ctx.inputs.deploy) {
-            if (!receipts.some((receipt) => receipt.phase === "inventory")) throw new Stop("reconcile", "No current implementation evidence; start at an implementation phase to verify inventory before claiming readiness");
+            if (!receipts.some((receipt) => receipt.phase === "credentials")) throw new Stop("reconcile", "No current implementation evidence; start at an implementation phase to verify credentials before claiming readiness");
             return { status: "implementation-ready" as const, evidence_root: root, slices: receipts, hosts: migrated };
           }
           const result = await ctx.workflow(migration, {

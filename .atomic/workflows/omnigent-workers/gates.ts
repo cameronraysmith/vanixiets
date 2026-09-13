@@ -57,7 +57,9 @@ in {
   };
   server = f.nixosConfigurations.magnetite.config.systemd.units."omnigent.service".unit.drvPath;
 }`;
-export function stateExpr(source: string, enabled: Host[]) {
+export function stateExpr(source: string, enabled: Host[], phase: Phase = "inventory") {
+  const janette = phases.indexOf(phase) >= phases.indexOf("identity");
+  const secondOwner = janette ? "janettesmith" : "raquel";
   return `let f = builtins.getFlake ${JSON.stringify(source)};
     check = host: names: let
       c = if host == "stibnite" then f.darwinConfigurations.\${host}.config else f.nixosConfigurations.\${host}.config;
@@ -71,16 +73,19 @@ export function stateExpr(source: string, enabled: Host[]) {
       && w.owner == n && u.home != "/var/empty"
       && !(builtins.elem "wheel" groups) && !(builtins.elem "admin" groups)
       && !(builtins.elem w.user trusted) && !(builtins.elem "*" trusted)
-      && builtins.all (g: !(builtins.elem ("@" + g) trusted)) groups
+      && builtins.all (g: !(builtins.elem ("@" + g) trusted)) groups${janette ? '\n      && w.user == "omnigent-" + n && w.hostName == host + "-" + n' : ""}
     ) names;
-  in check "magnetite" [ "cameron" "raquel" ] && check "pyrite" [ "cameron" "raquel" ] && check "stibnite" [ "cameron" ]`;
+  in check "magnetite" [ "cameron" "${secondOwner}" ] && check "pyrite" [ "cameron" "${secondOwner}" ] && check "stibnite" [ "cameron" ]`;
 }
 export function gateCommands(phase: Phase, source: Source): string[] {
   const at = phases.indexOf(phase);
   const installables = ["checks.x86_64-linux.omnigent-worker-capabilities", "checks.aarch64-darwin.omnigent-worker-capabilities"];
-  if (at >= 1) installables.push("checks.x86_64-linux.omnigent-worker-linux");
-  if (at >= 2) installables.push("checks.aarch64-darwin.omnigent-worker-darwin");
-  if (at >= 3) installables.push("checks.x86_64-linux.omnigent-worker-inventory", "checks.aarch64-darwin.omnigent-worker-inventory");
+  if (at >= phases.indexOf("linux")) installables.push("checks.x86_64-linux.omnigent-worker-linux");
+  if (at >= phases.indexOf("darwin")) installables.push("checks.aarch64-darwin.omnigent-worker-darwin");
+  // Identity fixtures must assert Janette's new Git/jj author mail and allowed_signers principal,
+  // then compare all other human behavior in each source role; do not waive her whole projection.
+  if (at >= phases.indexOf("inventory")) installables.push("checks.x86_64-linux.omnigent-worker-inventory", "checks.aarch64-darwin.omnigent-worker-inventory");
+  if (at >= phases.indexOf("credentials")) installables.push("checks.x86_64-linux.omnigent-worker-credentials", "checks.aarch64-darwin.omnigent-worker-credentials");
   return installables.map((attr) => `nix build --no-write-lock-file --no-link --print-out-paths ${quote(`${source.source}#${attr}`)}`);
 }
 export async function gates(ops: Operations, name: string, phase: Phase, source: Source) {
@@ -92,8 +97,8 @@ export async function gates(ops: Operations, name: string, phase: Phase, source:
       results.push({ command, exitCode: result.exitCode });
       if (result.exitCode !== 0) return { passed: false, results, source };
     }
-    if (phases.indexOf(phase) >= 3) {
-      const command = `nix eval --no-write-lock-file --impure --json --expr ${quote(stateExpr(source.source, expectedEnabled(phase)))}`;
+    if (phases.indexOf(phase) >= phases.indexOf("inventory")) {
+      const command = `nix eval --no-write-lock-file --impure --json --expr ${quote(stateExpr(source.source, expectedEnabled(phase), phase))}`;
       const result = await ops.execute("/Users/crs58/projects/vanixiets", command, signal);
       results.push({ command, exitCode: result.exitCode });
       if (result.exitCode !== 0 || result.stdout.trim() !== "true") return { passed: false, results, source };
