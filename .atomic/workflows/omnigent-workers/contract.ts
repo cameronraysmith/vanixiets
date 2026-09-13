@@ -10,6 +10,15 @@ export const hosts = ["magnetite", "pyrite", "stibnite"] as const;
 export type Host = typeof hosts[number];
 export const phases = ["capabilities", "linux", "darwin", "inventory", "identity", "credentials", ...hosts, "closure"] as const;
 export type Phase = typeof phases[number];
+export const janetteMailExclusion = {
+  kind: "janette-author-mail",
+  gitEmail: "programs.git.settings.user.email",
+  jjEmail: "programs.jujutsu.settings.user.email",
+  allowedSigners: "sops.templates.allowed_signers.content",
+  canonicalEmail: "125711642+janetteasmith@users.noreply.github.com",
+} as const;
+export type JanetteMailExclusion = typeof janetteMailExclusion;
+export const supplementalProtection = (phase: Phase) => phases.indexOf(phase) >= phases.indexOf("identity");
 export const HostSchema = Type.Union([Type.Literal("magnetite"), Type.Literal("pyrite"), Type.Literal("stibnite")]);
 export const PhaseSchema = Type.Union([Type.Literal("capabilities"), Type.Literal("linux"), Type.Literal("darwin"), Type.Literal("inventory"), Type.Literal("identity"), Type.Literal("credentials"), Type.Literal("magnetite"), Type.Literal("pyrite"), Type.Literal("stibnite"), Type.Literal("closure")]);
 const text = Type.String({ minLength: 1, maxLength: 4096 });

@@ -23,7 +23,14 @@ export async function controllerChecks({ definition, sliceDefinition, sliceModul
     if (config.evalFailure && sha === routed.join.sha) throw Error("fixture integrated evaluation failed");
     const value = sha === source.sha ? values.c0 : sha === routed.sha ? values.c1 : sha === source.join.sha ? values.j0 : sha === routed.join.sha ? (config.integratedFailure ? values.negative : values.j1) : sha === "d".repeat(40) ? (config.foreignDrift ? values.negative : values.j0) : undefined;
     assert(value, `Unknown immutable fixture source ${sha}`);
-    await writeFile(match[2], JSON.stringify(value), { mode: 0o600 });
+    let projected = value;
+    if (expression.includes("janette = let")) {
+      const candidate = sha === routed.sha || sha === routed.join.sha;
+      const email = candidate ? (config.janetteMailDiff ? "wrong@example.com" : contracts.janetteMailExclusion.canonicalEmail) : this.ctx.inputs.phase === "identity" ? "old@example.com" : contracts.janetteMailExclusion.canonicalEmail;
+      const behavior = candidate && config.janetteBehaviorDiff ? "changed-human-behavior" : "preserved-human-behavior";
+      projected = { ...value, janette: { human: { email, behavior }, mailIndependent: { behavior }, author: { gitEmail: email, jjEmail: email, principal: email, allowedSigners: `${email} namespaces="git" public-key\n` } }, stibniteWorker: { generation: candidate && config.stibniteWorkerDiff ? "changed-worker-generation" : "worker-generation", output: "worker-output" } };
+    }
+    await writeFile(match[2], JSON.stringify(projected), { mode: 0o600 });
     return "";
   };
   let scenario = 0;
@@ -163,6 +170,28 @@ export async function controllerChecks({ definition, sliceDefinition, sliceModul
   ctx = context({ ...childInput, verify_only: true }, { gateFailure: true });
   await assert.rejects(sliceDefinition.run(ctx), /Unverified linux/);
   assert(!ctx.events.some((n) => n.startsWith("implement-")));
+  for (const phase of ["identity", "credentials"]) {
+    ctx = context({ ...childInput, phase }, { gateFailure: true });
+    assert.equal((await sliceDefinition.run(ctx)).receipt.phase, phase);
+    const baselines = JSON.parse(await readFile(`${ctx.inputs.root}/baselines.json`, "utf8"));
+    for (const [key, expectedSha] of [["supplementalBaseline", source.sha], ["supplementalIntegratedBaseline", source.join.sha]]) {
+      const fixed = baselines[key];
+      assert.equal(fixed.source.sha, expectedSha);
+      assert.equal(fixed.phase, phase);
+      const captures = ctx.observations.filter((e) => e.name === fixed.path.split("/").at(-1).replace(".json", ""));
+      assert.equal(captures.length, 1, "Repairs must not recapture a supplemental baseline");
+      for (const writer of ctx.observations.filter((e) => e.name.startsWith("implement-"))) {
+        assert(writer.options.reads.includes(fixed.path) && writer.options.reads.includes(fixed.expression));
+        assert(writer.options.prompt.includes(fixed.path) && writer.options.prompt.includes(expectedSha));
+        assert(ctx.events.indexOf(captures[0].name) < ctx.events.indexOf(writer.name));
+      }
+    }
+    for (const failure of ["janetteMailDiff", "janetteBehaviorDiff", "stibniteWorkerDiff"]) {
+      ctx = context({ ...childInput, phase, max_repairs: 0 }, { [failure]: true });
+      await assert.rejects(sliceDefinition.run(ctx), new RegExp(`Unverified ${phase}`));
+    }
+  }
+  console.log("PASS identity/credentials controller: supplemental C0/J0 files reach writers and gates, stay fixed through repair, accept canonical identity mail only and reject other human/worker drift");
 
   ctx = context({ host: "stibnite", root, timeout: 1000, max_repairs: 2, reads: [] }, { confirm: false });
   await assert.rejects(migrationDefinition.run(ctx), /Provisioning\/identity verification incomplete/);

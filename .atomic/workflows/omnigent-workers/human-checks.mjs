@@ -1,9 +1,14 @@
 import assert from "node:assert/strict";
 import { mkdir, writeFile } from "node:fs/promises";
+import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { resolve } from "node:path";
 
 export async function humanChecks(gates) {
+  const historicalSource = "git+file:///Users/crs58/projects/vanixiets?rev=2a6a89ce9706886cf3cf504ee0b6d3fcfdbe81bc";
+  for (const phase of ["capabilities", "linux", "darwin", "inventory"]) {
+    assert.equal(createHash("sha256").update(JSON.stringify(gates.baselineExpr(historicalSource, phase))).digest("hex"), "ee8dd66537e61147e59c7c942284e596782d415345dfcdc05986a24766575e2c", `${phase} expression must remain byte-identical to the sealed baseline`);
+  }
   const root = `.atomic/workflows/runs/omnigent-workers-human-${Date.now()}`;
   const rev = execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim();
   const evaluate = (expression) => JSON.parse(execFileSync("nix", ["eval", "--offline", "--no-write-lock-file", "--option", "allow-import-from-derivation", "false", "--impure", "--json", "--expr", expression], { encoding: "utf8", timeout: 120_000, maxBuffer: 8 * 1024 * 1024 }));
@@ -24,10 +29,10 @@ export async function humanChecks(gates) {
           modules = [ ${inputs.hm}/nixos {
             system.stateVersion = "25.11";
             home-manager.useGlobalPkgs = true;
-            users.users.fixture = { isNormalUser = true; home = "/home/fixture"; };
-            home-manager.users.fixture = { pkgs, ... }: {
+            users.users.janettesmith = { isNormalUser = true; home = "/home/janettesmith"; };
+            home-manager.users.janettesmith = { pkgs, ... }: {
               imports = [ ${inputs.sops}/modules/home-manager/sops.nix ];
-              home.username = "fixture"; home.homeDirectory = "/home/fixture"; home.stateVersion = "25.11";
+              home.username = "janettesmith"; home.homeDirectory = "/home/janettesmith"; home.stateVersion = "25.11";
               home.packages = [ pkgs.${changes.package ?? "hello"} ];
               home.file."approved-schema".source = self + "/${schemaPath}";
               xdg.configFile."claude-cerebras/settings.json".enable = ${changes.enableUndefined ?? false};
@@ -36,7 +41,10 @@ export async function humanChecks(gates) {
               home.activation.mutableSettings = let settings = pkgs.writeText "mutable-settings.json" "${changes.mutableText ?? "preserved mutable settings"}"; in {
                 after = [ "writeBoundary" ]; before = []; data = "install -Dm644 \${settings} /home/fixture/.config/claude-cerebras/settings.json";
               };
-              programs.git = { enable = true; settings.user.name = "${changes.gitName ?? "Fixture Human"}"; };
+              programs.git = { enable = true; settings.user = { name = "${changes.gitName ?? "Fixture Human"}"; email = "${changes.gitEmail ?? "old@example.com"}"; }; };
+              programs.jujutsu = { enable = true; settings.user.email = "${changes.gitEmail ?? "old@example.com"}"; };
+              sops.templates.allowed_signers = { mode = "${changes.signerMode ?? "0400"}"; content = ''${changes.gitEmail ?? "old@example.com"} namespaces="git" ${changes.signerKey ?? "public-fixture-key"}
+              ''; };
               sops.defaultSopsFile = self + "/public-sops.yaml";
               sops.age.keyFile = "/home/fixture/private-age-key";
               sops.secrets.canary = {};
@@ -46,11 +54,12 @@ export async function humanChecks(gates) {
               };
             };
             systemd.services.omnigent.serviceConfig.ExecStart = "/bin/true";
+            environment.etc."omnigent/workers/cameron".source = d.pkgs.runCommand "worker-home" {} "mkdir $out";
           } ];
         };
-      in { nixosConfigurations = { magnetite = d; pyrite = d; }; darwinConfigurations.stibnite = d; };
+      in { nixosConfigurations = { magnetite = d; pyrite = d; }; darwinConfigurations = { stibnite = d; rosegold = d; }; };
     }`);
-    return evaluate(gates.baselineExpr(`path:${dir}`));
+    return evaluate(gates.baselineExpr(`path:${dir}`, changes.phase ?? "inventory"));
   };
   const before = await fixture("before"), relocated = await fixture("relocated");
   assert.deepEqual(relocated.humans, before.humans, "F1 identical human behavior must survive source-root-only relocation");
@@ -58,5 +67,25 @@ export async function humanChecks(gates) {
     assert.notDeepEqual((await fixture(name, changes)).humans, before.humans, `F1 must reject actual ${name} behavior/input change`);
   }
   await assert.rejects(fixture("enabled-undefined", { enableUndefined: true }), /source.*accessed but has no value defined/s, "Enabled files without a source must still fail");
+  const identityBefore = await fixture("identity-before", { phase: "identity" });
+  assert(identityBefore.janette?.human && identityBefore.stibniteWorker?.generation, "Identity must project Janette's human home and the standalone Darwin generation");
+  assert.deepEqual({ humans: identityBefore.humans, server: identityBefore.server }, before, "Supplemental keys must not change any historical projection value");
+  const canonical = "125711642+janetteasmith@users.noreply.github.com";
+  const mailOnly = await fixture("identity-mail-only", { phase: "identity", gitEmail: canonical });
+  assert.notDeepEqual(identityBefore.janette.human, mailOnly.janette.human, "The real author artifacts must change");
+  assert(gates.compareProtected("identity", identityBefore, mailOnly).janetteUnchanged, "Identity accepts only the asserted canonical mail/principal change and its derived artifacts");
+  assert(!gates.compareProtected("credentials", mailOnly, identityBefore).janetteUnchanged, "Credentials rejects a mail change against the completed identity baseline");
+  assert(gates.compareProtected("credentials", mailOnly, mailOnly).janetteUnchanged);
+  for (const [name, changes] of Object.entries({ package: { package: "jq" }, gitName: { gitName: "Changed Human" }, service: { service: "/bin/false" }, text: { text: "changed human settings" }, mutable: { mutableText: "changed mutable settings" }, signerKey: { signerKey: "different-public-key" }, signerMode: { signerMode: "0444" } })) {
+    const changed = await fixture(`identity-${name}`, { phase: "identity", gitEmail: canonical, ...changes });
+    assert(!gates.compareProtected("identity", identityBefore, changed).janetteUnchanged, `Identity must reject Janette's ${name} change, even alongside the approved mail change`);
+  }
+  const changedWorker = { ...mailOnly, stibniteWorker: { generation: "different-generation", output: "different-output" } };
+  for (const phase of ["identity", "credentials", "magnetite", "pyrite", "stibnite", "closure"]) {
+    assert(!gates.compareProtected(phase, mailOnly, changedWorker).stibniteWorkerUnchanged);
+    assert(!gates.compareProtected(phase, mailOnly, identityBefore).janetteUnchanged);
+  }
+  assert.throws(() => gates.compareProtected("identity", before, before), /Missing Janette/);
+  console.log("PASS supplemental protection: pre-identity expression bytes/payload unchanged; identity mail-only accepted; other Janette behavior/key/mode rejected; credentials and later mail/standalone-generation drift rejected");
   console.log("PASS F1 pinned HM/sops: disabled XDG source accepted; relocation accepted; package, Git, service, input content/location, XDG text and mutable activation changes rejected; enabled undefined source rejected (no builds)");
 }

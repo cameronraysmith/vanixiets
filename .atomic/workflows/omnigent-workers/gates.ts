@@ -1,5 +1,5 @@
 import { quote } from "../bump/tools.js";
-import { phases, hosts, Stop, type Phase, type Host, type Source } from "./contract.js";
+import { phases, hosts, Stop, supplementalProtection, janetteMailExclusion, type Phase, type Host, type Source } from "./contract.js";
 import type { Operations } from "./operations.js";
 
 const config = (host: Host) => `${host === "stibnite" ? "darwin" : "nixos"}Configurations.${host}.config`;
@@ -7,7 +7,7 @@ export function expectedEnabled(phase: Phase): Host[] {
   const index = phases.indexOf(phase);
   return hosts.filter((host) => phases.indexOf(host) <= index);
 }
-export const baselineExpr = (source: string) => `let
+const historicalBaselineExpr = (source: string) => `let
   f = builtins.getFlake ${JSON.stringify(source)};
   project = d: let
     lib = d.pkgs.lib;
@@ -57,6 +57,64 @@ in {
   };
   server = f.nixosConfigurations.magnetite.config.systemd.units."omnigent.service".unit.drvPath;
 }`;
+export function baselineExpr(source: string, phase: Phase = "inventory"): string {
+  const historical = historicalBaselineExpr(source);
+  if (!supplementalProtection(phase)) return historical;
+  const exclusion = janetteMailExclusion;
+  return historical.slice(0, -1) + `
+  janette = let
+    d = f.darwinConfigurations.rosegold;
+    lib = d.pkgs.lib;
+    h = d.config.home-manager.users.janettesmith;
+    content = h.${exclusion.allowedSigners};
+    principal = builtins.head (lib.splitString " " content);
+    suffix = lib.removePrefix principal content;
+    excluded = d.extendModules { modules = [ {
+      home-manager.users.janettesmith = {
+        ${exclusion.gitEmail} = lib.mkForce ${JSON.stringify(exclusion.canonicalEmail)};
+        ${exclusion.jjEmail} = lib.mkForce ${JSON.stringify(exclusion.canonicalEmail)};
+        ${exclusion.allowedSigners} = lib.mkForce (${JSON.stringify(exclusion.canonicalEmail)} + suffix);
+      };
+    } ]; };
+  in assert lib.hasPrefix " namespaces=\\\"git\\\" " suffix; {
+    human = (project d).janettesmith;
+    mailIndependent = (project excluded).janettesmith;
+    author = {
+      gitEmail = h.${exclusion.gitEmail};
+      jjEmail = h.${exclusion.jjEmail};
+      allowedSigners = content;
+      inherit principal;
+    };
+  };
+  stibniteWorker = let generation = f.darwinConfigurations.stibnite.config.environment.etc."omnigent/workers/cameron".source;
+  in { generation = generation.drvPath; output = toString generation; };
+}`;
+}
+export type Protected = {
+  humans: unknown;
+  server: string;
+  janette?: { human: unknown; mailIndependent: unknown; author: { gitEmail: string; jjEmail: string; allowedSigners: string; principal: string } };
+  stibniteWorker?: { generation: string; output: string };
+};
+export function compareProtected(phase: Phase, old: Protected, current: Protected, requireCanonical = true) {
+  const equal = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
+  const supplemental = supplementalProtection(phase);
+  if (supplemental && (!old.janette || !current.janette || !old.stibniteWorker || !current.stibniteWorker)) throw new Stop("contract", "Missing Janette or standalone Darwin protected projection");
+  const janetteUnchanged = !supplemental || (!requireCanonical && equal(old.janette, current.janette)) || (phase === "identity"
+    ? equal(old.janette!.mailIndependent, current.janette!.mailIndependent)
+      && current.janette!.author.gitEmail === janetteMailExclusion.canonicalEmail
+      && current.janette!.author.jjEmail === janetteMailExclusion.canonicalEmail
+      && current.janette!.author.principal === janetteMailExclusion.canonicalEmail
+      && current.janette!.author.allowedSigners === janetteMailExclusion.canonicalEmail + old.janette!.author.allowedSigners.slice(old.janette!.author.principal.length)
+    : equal(old.janette, current.janette));
+  return {
+    serverUnchanged: old.server === current.server,
+    humansUnchanged: equal(old.humans, current.humans),
+    janetteUnchanged,
+    stibniteWorkerUnchanged: !supplemental || equal(old.stibniteWorker, current.stibniteWorker),
+    exclusion: phase === "identity" ? janetteMailExclusion : null,
+  };
+}
 export function stateExpr(source: string, enabled: Host[], phase: Phase = "inventory") {
   const janette = phases.indexOf(phase) >= phases.indexOf("identity");
   const secondOwner = janette ? "janettesmith" : "raquel";

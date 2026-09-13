@@ -71,7 +71,15 @@ One read-only jj observation captures the working-copy change, join and direct p
 The initial owned bytes must match both the stored join and the isolated chain before writing: matching two versions already contaminated by foreign contributions does not authorize a whole-file squash.
 Both baseline projections stay fixed through forward repairs, with private projection/expression files, digests, source roles, controller digest and exact evaluation commands.
 The capabilities phase requires matched C0/C1 and J0/J1 human equality; every slice also requires matched server equality.
-Later account/enablement phases do not require whole-home equality because they intentionally change homes.
+Later account/enablement phases do not require equality of the entire historical `humans` map because they intentionally change worker homes.
+From identity onward, separate `protected-baseline-supplemental-{chain,integrated}.{nix,json}` files add `janette` and `stibniteWorker` without changing the historical keys or their normalization.
+Both supplements are captured from this slice's fixed C0/J0 before the writer and supplied, with their expressions and provenance, to every writer, repair and review.
+Janette's deployed human home is `darwinConfigurations.rosegold.config.home-manager.users.janettesmith`, composed in `modules/machines/darwin/rosegold/default.nix`; `janette.human` uses the same human projection.
+The typed identity-only exclusion names exactly `programs.git.settings.user.email`, `programs.jujutsu.settings.user.email` and the principal prefix of `sops.templates.allowed_signers.content`.
+`janette.author` witnesses the actual values; identity acceptance requires the canonical Git mail in all three places and preserves the remaining signer content.
+`janette.mailIndependent` re-evaluates that same home with only those three values normalized, then compares the complete projected generation, activation, files, packages and inputs; generated artifacts are not discarded or wildcard-excluded.
+Credentials and later phases compare the full Janette projection against their fixed, identity-completed baseline, with no mail exclusion.
+`stibniteWorker.{generation,output}` witnesses the standalone activation package delivered by `environment.etc."omnigent/workers/cameron".source` in `modules/darwin/omnigent-host.nix`; both values must remain equal from identity onward.
 Writer and reviewer reads name both contexts; pre-existing integrated Niri behavior is protected even though it is absent from the isolated chain.
 Neither cross-context equality nor replacing the chain URL with the filesystem URL is a valid local pre-edit check.
 
@@ -167,6 +175,8 @@ The checker executes the installed catalog factory and successful-attempt metada
 Controller fixtures use mocked VCS/model/host boundaries; the human-preservation lane additionally runs bounded offline Nix evaluations with IFD disabled and no builds.
 The differentiated controller fixtures execute the actual projection/comparison and source/attribution/routing callbacks, while replacing model, command and filesystem boundaries where needed.
 They cover integrated-only failure despite chain equality, fixed baselines through repairs, relevant foreign drift, owned overlap, byte/mode/symlink drift, tree-identical metadata changes, unrelated working notes and source-bound reviewer receipts.
+Supplemental fixtures pin the pre-identity expression digest and unchanged historical payload, accept the real HM mail-only change, reject other Janette package/settings/service/key/mode changes, and reject mail drift in credentials and later phases.
+Controller fixtures also require the same-role supplemental baseline files in writer reads before edits, retain them through repairs, and reject standalone Darwin generation drift.
 Phase fixtures cover all six implementation children, implementation/closure resume indices, credentials-receipt readiness, per-host preparation gates, and join-scoped routing child selection with off-join peers and an unfinished-splice negative control.
 For this repair's separately recorded immutable real-source probes, `--provenance-artifacts` reuses the private ignored C0/J0 and complete archive-movement outputs rather than evaluating the mutable fleet.
 That optional lane retains real projection contents but uses explicitly synthetic routed commit labels; it does not create Git objects or route real changes.
