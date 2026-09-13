@@ -118,17 +118,28 @@ Before later human-controlled activation, select pyrite's configured `services.o
 
 ## Dedicated-worker inventory
 
-The inventory prepares Cameron and Raquel on magnetite and pyrite, and Cameron alone on stibnite.
+The inventory prepares Cameron and Janette on magnetite and pyrite, and Cameron alone on stibnite.
 All five workers initially have `enable = false`; their accounts and Home Manager generations remain declared while stopped.
 Linux account declarations live in `inventory/services/users/omnigent-workers.nix` and use normal UID/private-group allocation with locked passwords and `0700` homes.
 Stibnite declares `omnigent-cameron` with UID/GID `551` and a private `/Users/omnigent-cameron` home, without changing `system.primaryUser`.
 The deployment plan records the operator's allocation approval and separate declared/live collision evidence.
 No provider identity, model grant, SSH key or signing credential is inherited or enrolled by these declarations.
 
+Janette's canonical profile and worker owner are `janettesmith`; her Linux account is `omnigent-janettesmith`, with host names `magnetite-janettesmith` and `pyrite-janettesmith`.
+Her primary/SSO mail is `janette.a.smith@gmail.com`, her GitHub username is `janetteasmith`, and her Git/jj author mail is `125711642+janetteasmith@users.noreply.github.com`.
+The existing `github-email` helper verified that author address during read-only B1 research, recorded in `.atomic/workflows/runs/fan-out-and-synthesize-47eef966-2b3f-4a5b-8a3e-57860db40b96/branch-01-b1-janette-identity-and-sso-mapping.md`.
+Evaluation and activation use the recorded constant, never a GitHub lookup.
+`meta.gitEmail` defaults to `meta.email` for other profiles; Janette's human author mail and `allowed_signers` principal use her explicit Git address without changing signing authority.
+Her Git configuration also derives `[github] user = "janetteasmith"` from `meta.githubUser`, following the existing human-profile convention.
+Only her non-secret name and Git address reach worker HM through `extraHomeModules`; neither her human modules nor `contentPrivate` are imported.
+Both Janette's and Raquel's human profiles remain, as do Cameron's three workers.
+The historical Raquel preparation matrix and activation candidate are superseded, not Janette activation evidence or a current activation target.
+
 `checks.<system>.omnigent-worker-inventory` evaluates the actual fleet modules, the exact five-worker matrix, private accounts, prepared Home Manager ownership and ordinary Nix access.
 Its negative fixtures cover missing or extra workers, wrong owner, shared home, administrative/Nix-trusted authority, denied Nix access, SSH keys and signing inheritance.
-It checks clan settings serialization without `extraHomeModules`, preserves server behavior when workers are toggled, and accepts both disabled and enabled supervision so later host migrations do not require weakening the inventory check.
-The current all-disabled state and legacy preservation are deployment-step evidence, not a permanent prohibition on future enablement.
+It checks clan settings serialization without `extraHomeModules`, preserves server behavior when workers are toggled, and exercises both disabled and enabled supervision as fixtures.
+The identity phase additionally requires all five real workers to remain disabled through credential preparation and asserts Janette's canonical author and signer principal.
+Controller gates compare complete protected projections against fixed, same-role chain and integrated baselines, allowing only Janette's asserted Git/jj mail, signer principal, GitHub username and their generated artifacts.
 Live Linux collisions, allocated IDs, effective sudo/trust and actual home permissions must still be checked before authorized activation or enablement as specified in the deployment plan.
 
 ## Dedicated Linux workers

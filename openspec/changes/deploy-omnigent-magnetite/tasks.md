@@ -67,3 +67,13 @@ They record future controller and human work, not permission for this writer to 
 - [ ] 6.1 Collect each literal controller checklist response for `laptop passkey login`, `/ui/apps tile`, `Android app login`, and `one acp:atomic session` — verify: retain each `passed`, `failed`, or `not tested` response verbatim as `human_attested`, separate from tool observations.
 - [ ] 6.2 Preserve the acceptance outcome without weakening a gate — verify: any `failed` response blocks, any `not tested` response leaves acceptance incomplete with a caveat, and only four passed responses yield `human_attested`, never independently verified acceptance.
 - [ ] 6.3 Reconcile the HIL ledger and Linear state from accepted evidence, preserving review gates — verify: the first checked task triggers In Progress, a genuine verify artifact triggers In Review, and Done is withheld until successful archive after human-steered code and documentation review.
+
+## 7. Janette identity slice
+
+This amendment leaves the historical S0–S4 ledger and Raquel preparation evidence unchanged.
+The old Raquel activation candidate is superseded; no enrollment or activation is authorized here.
+Checkboxes remain pending controller acceptance.
+
+- [ ] 7.1 Replace only Raquel's experimental workers on magnetite and pyrite with disabled `janettesmith` workers and bind their Git/jj names and author mail through the Nix-only hook; retain both human profiles and Cameron's three workers.
+- [ ] 7.2 Verify `omnigent-worker-inventory` and `omnigent-worker-capabilities` on `aarch64-darwin` and `x86_64-linux`, plus the existing platform-specific Darwin and Linux checks, including canonical identity and discriminating negative fixtures.
+- [ ] 7.3 Controller: compare protected projections C1/C0 and J1/J0 against the original fixed baselines, allowing only Janette's asserted human Git-mail, jj-mail, signer-principal and GitHub-username differences and their generated artifacts; retain all other human, server, Cameron-worker and stibnite behavior.

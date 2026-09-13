@@ -36,15 +36,18 @@ let
           mode = "0400";
           path = "${config.xdg.configHome}/git/allowed_signers";
           content = ''
-            ${flake.users.janettesmith.meta.email} namespaces="git" ${config.sops.placeholder."ssh-public-key"}
+            ${flake.users.janettesmith.meta.gitEmail} namespaces="git" ${
+              config.sops.placeholder."ssh-public-key"
+            }
           '';
         };
       };
 
       programs.git.settings = {
         user.name = flake.users.janettesmith.meta.fullname;
-        user.email = flake.users.janettesmith.meta.email;
+        user.email = flake.users.janettesmith.meta.gitEmail;
       };
+      programs.jujutsu.settings.user.email = flake.users.janettesmith.meta.gitEmail;
     };
 in
 {

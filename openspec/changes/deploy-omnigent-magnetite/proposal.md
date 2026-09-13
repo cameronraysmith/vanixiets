@@ -91,3 +91,17 @@ Private worker-local credentials and personal provider identities are accepted; 
 `owner` records intended human association and must be checked against actual enrollment, not presented as module-enforced application authentication.
 This `deploy=false` implementation performs no activation, credentials, OAuth, provisioning or administrative SSH.
 The named Linux module check supplies build/evaluation evidence; actual-user identity, canary, selected-harness and lifecycle tests remain post-activation obligations.
+
+## Identity amendment, 2026-09-13
+
+Janette, canonical `janettesmith`, replaces only Raquel's experimental Linux workers on magnetite and pyrite.
+Both human profiles remain; Cameron's three workers, stibnite, legacy execution and the shared server remain unchanged.
+All five workers stay disabled through credential preparation, and the old Raquel activation candidate is superseded.
+Earlier capabilities, Linux, Darwin and inventory evidence keeps its original Raquel preparation scope.
+
+Typed `meta.gitEmail` defaults to the primary address and explicitly records Janette's verified GitHub noreply mail, separate from `janette.a.smith@gmail.com` for primary/SSO use.
+Her human Git/jj mail and signer principal use that Git address, and her GitHub username follows `meta.githubUser` through the existing human Git convention.
+Worker HM imports only her non-secret name and Git address through `extraHomeModules`.
+The [deployment plan](../../../docs/notes/development/omnigent/deployment-plan.md#janette-identity-amendment-2026-09-13) records the B1 helper evidence, unchanged public-key/recipient association and the controller's fixed same-role preservation baselines.
+The inventory check asserts the canonical identity and disabled matrix without source-role heuristics; controller gates retain the complete human/server/Cameron/stibnite comparisons.
+No Kanidm provisioning, grant issuance, key copying, enrollment or activation belongs to this identity slice.

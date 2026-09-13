@@ -832,6 +832,38 @@ The server unit remains `/nix/store/z7wca45hbmyv77kklzfhnbbvdkzagxz2-unit-omnige
 That receipt reports five disabled workers, five prepared Home Manager configurations, no new execution units, and unchanged stibnite primary user `crs58`.
 These local checks use the integrated source plus this inventory delta; controller-owned same-role gates must still bind the final chain and integrated commits before handoff.
 
+## Janette identity amendment, 2026-09-13
+
+Janette replaces only Raquel's two experimental Linux workers.
+The current matrix is Cameron on magnetite, pyrite and stibnite, and Janette on magnetite and pyrite; all five remain execution-disabled through credential preparation.
+Both human profiles remain, and Cameron's workers, stibnite, the shared server and legacy execution remain unchanged.
+The September 10–11 preparation matrix and its recorded Raquel checks above retain their historical scope.
+The old Raquel activation candidate is superseded and must not be activated or relabeled as Janette evidence.
+
+Janette's canonical profile/owner is `janettesmith`, her Unix worker account is `omnigent-janettesmith`, and the host names are `magnetite-janettesmith` and `pyrite-janettesmith`.
+Her primary/SSO address is `janette.a.smith@gmail.com`; her GitHub username is `janetteasmith`.
+The existing `github-email` helper returned `125711642+janetteasmith@users.noreply.github.com` during read-only research, as recorded in `.atomic/workflows/runs/fan-out-and-synthesize-47eef966-2b3f-4a5b-8a3e-57860db40b96/branch-01-b1-janette-identity-and-sso-mapping.md`.
+The implementation records that constant in typed `meta.gitEmail`, whose default remains `meta.email` for every other profile.
+No GitHub lookup runs during evaluation, checks or activation.
+
+Janette's human Git/jj author mail and `allowed_signers` principal use the Git address.
+Her human Git configuration also derives `[github] user = "janetteasmith"` from `meta.githubUser`, following the same convention as Cameron's profile.
+Her declared SSH public key and corresponding recipient `age1mqfqckczkulpne7265j5cxn0pspdlxd3d0kav368u2c2fwknnc4qe27dec` remain unchanged, and `sopsAgeKeyId` remains null.
+Worker HM receives only her non-secret name and Git address through the existing Nix-only `extraHomeModules` hook, not her human modules, personal bundle or `contentPrivate`.
+This identity correction grants no signing key, personal age identity, SSH agent or administrative authority.
+
+The role-agnostic `omnigent-worker-inventory` check asserts canonical metadata, human author/principal, the disabled matrix, account bindings and the narrow worker-HM binding.
+Its negative fixtures reject wrong Git/jj mail, host name and unrelated binding content alongside the existing authority exclusions.
+The controller separately compares C1 against fixed chain C0 `e235c5ae9bb32b54b0631fff97087c1a163a8230` and J1 against fixed integrated J0 `b7962a09eb9ec81467db8b1d4d05c552284e3a82`.
+The original supplemental baselines in `.atomic/workflows/runs/omnigent-workers/7b0fc94a-ba03-4078-b113-6cfc4435121c/identity/` retain Janette's complete human projection.
+The controller-approved identity allowance covers exactly Git author mail, jj mail, the signer principal and `programs.git.settings.github.user`, plus generated artifacts whose differences follow only from those fields.
+The GitHub field is required by canonical `meta.githubUser`; its absence from the original three-field allowance was a controller-contract gap, not a reason to suppress normal profile behavior.
+Janette's home is not excluded from comparison.
+The integrated comparison retains pre-existing Niri and other foreign behavior; neither source role is inferred from module presence or compared against the other role.
+
+Kanidm provisioning, application membership, provider grants and actual worker enrollment remain later authorized human/deploy operations.
+No credentials, accounts or hosts are activated by this slice.
+
 ## Deferred scope
 
 - Managed sandbox providers: freestyle.sh, Modal, Daytona, Blaxel, Kubernetes, and OpenShell.

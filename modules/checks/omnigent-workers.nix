@@ -886,11 +886,11 @@
       expectedOwners = {
         magnetite = [
           "cameron"
-          "raquel"
+          "janettesmith"
         ];
         pyrite = [
           "cameron"
-          "raquel"
+          "janettesmith"
         ];
         stibnite = [ "cameron" ];
       };
@@ -954,6 +954,7 @@
               && h.programs.omnigent.enable
               && h.programs.gh.gitCredentialHelper.enable
               && h.programs.omnigent.settings.host.name == "${machine}-${owner}"
+              && (owner != "janettesmith" || inspectJanetteHome h)
               && lib.all (a: a.assertion) h.assertions
               && (builtins.hasAttr "omnigent-host-${owner}" c.systemd.services) == worker.enable
           )
@@ -986,8 +987,127 @@
             inventoryRoles.host.machines.${machine}.settings
           ];
         }).config;
+      janetteGitEmail = "125711642+janetteasmith@users.noreply.github.com";
+      janetteAuthor = {
+        name = "Janette Smith";
+        email = janetteGitEmail;
+      };
+      janetteMeta = config.flake.users.janettesmith.meta;
+      janetteHuman = config.flake.darwinConfigurations.rosegold.config.home-manager.users.janettesmith;
+      inspectJanetteHome =
+        h:
+        h.programs.git.settings.user.name == janetteAuthor.name
+        && h.programs.git.settings.user.email == janetteGitEmail
+        && h.programs.jujutsu.settings.user == janetteAuthor
+        && !(h ? sops)
+        && !(h.home.sessionVariables ? SSH_AUTH_SOCK);
+      identityBinding =
+        modules:
+        (lib.evalModules {
+          modules = [
+            {
+              options.programs = lib.mkOption { type = lib.types.attrs; };
+            }
+          ]
+          ++ modules;
+        }).config == {
+          programs.git.settings.user = janetteAuthor;
+          programs.jujutsu.settings.user = janetteAuthor;
+        };
+      metaFixture =
+        extra:
+        (lib.evalModules {
+          modules = [
+            ../home/users/lib.nix
+            {
+              options.systems = lib.mkOption { type = lib.types.listOf lib.types.str; };
+              options.flake.lib = lib.mkOption { type = lib.types.attrs; };
+              config.systems = [ system ];
+              config.flake.users.fixture.meta = {
+                username = "fixture";
+                fullname = "Fixture";
+                email = "primary@example.invalid";
+              }
+              // extra;
+            }
+          ];
+        }).config.flake.users.fixture.meta.gitEmail;
       cacheDownloads = c: c.nix.settings.substituters != [ ] && c.nix.settings.trusted-public-keys != [ ];
       inventoryCases = {
+        allDisabled = lib.all (
+          d: lib.all (w: !w.enable) (lib.attrValues d.config.services.omnigent-host.workers)
+        ) (lib.attrValues inventoryMachines);
+        humanProfilesRetained =
+          config.flake.users ? raquel
+          && config.flake.users ? janettesmith
+          && config.flake.darwinConfigurations.blackphos.config.home-manager.users ? raquel
+          && janetteHuman.home.username == "janettesmith";
+        canonicalJanette =
+          janetteMeta.username == "janettesmith"
+          && janetteMeta.fullname == "Janette Smith"
+          && janetteMeta.email == "janette.a.smith@gmail.com"
+          && janetteMeta.githubUser == "janetteasmith"
+          && janetteMeta.gitEmail == janetteGitEmail
+          && janetteMeta.sopsAgeKeyId == null
+          &&
+            janetteMeta.sshKeys == [
+              "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIIePSVx5J/JJ5eN4PSryuL7iP8WXow/SsZOIr96qnKP0"
+            ];
+        publicRecipient = lib.hasInfix "&janettesmith-user age1mqfqckczkulpne7265j5cxn0pspdlxd3d0kav368u2c2fwknnc4qe27dec" (
+          builtins.readFile ../../.sops.yaml
+        );
+        humanAuthor =
+          janetteHuman.programs.git.settings.user.email == janetteGitEmail
+          && janetteHuman.programs.jujutsu.settings.user.email == janetteGitEmail
+          && janetteHuman.programs.git.settings.github.user == "janetteasmith"
+          &&
+            janetteHuman.sops.templates.allowed_signers.content
+            == "${janetteGitEmail} namespaces=\"git\" ${janetteHuman.sops.placeholder.ssh-public-key}\n";
+        gitEmailDefault = metaFixture { } == "primary@example.invalid";
+        gitEmailOverride = metaFixture { gitEmail = "author@example.invalid"; } == "author@example.invalid";
+        gitEmailType =
+          !(builtins.tryEval (metaFixture {
+            gitEmail = 42;
+          })).success;
+        narrowIdentityBinding =
+          lib.all
+            (
+              machine:
+              let
+                modules =
+                  inventoryMachines.${machine}.config.services.omnigent-host.workers.janettesmith.extraHomeModules;
+              in
+              identityBinding modules && inspectJanetteHome (mkHome modules).config
+            )
+            [
+              "magnetite"
+              "pyrite"
+            ];
+        unrelatedBindingRejected =
+          !identityBinding [
+            {
+              programs.git.settings.user = janetteAuthor;
+              programs.jujutsu.settings.user = janetteAuthor;
+              programs.unrelated.enable = true;
+            }
+          ];
+        wrongGitAuthor = inventoryRejects "magnetite" {
+          services.omnigent-host.workers.janettesmith.extraHomeModules = [
+            {
+              programs.git.settings.user.email = lib.mkForce "janette.a.smith@gmail.com";
+            }
+          ];
+        };
+        wrongJjAuthor = inventoryRejects "pyrite" {
+          services.omnigent-host.workers.janettesmith.extraHomeModules = [
+            {
+              programs.jujutsu.settings.user.email = lib.mkForce "janettesmith@example.com";
+            }
+          ];
+        };
+        wrongHostName = inventoryRejects "pyrite" {
+          services.omnigent-host.workers.janettesmith.hostName = lib.mkForce "pyrite-raquel";
+        };
         hostMatrix =
           lib.attrNames inventoryRoles.host.machines == [
             "magnetite"
@@ -1020,10 +1140,10 @@
           };
         };
         wrongOwner = inventoryRejects "magnetite" {
-          services.omnigent-host.workers.raquel.owner = lib.mkForce "cameron";
+          services.omnigent-host.workers.janettesmith.owner = lib.mkForce "cameron";
         };
         duplicateHome = inventoryRejects "pyrite" {
-          users.users.omnigent-raquel.home = lib.mkForce "/home/omnigent-cameron";
+          users.users.omnigent-janettesmith.home = lib.mkForce "/home/omnigent-cameron";
         };
         adminMembership = inventoryRejects "magnetite" {
           users.groups.wheel.members = [ "omnigent-cameron" ];

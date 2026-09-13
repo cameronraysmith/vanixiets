@@ -4,7 +4,7 @@
     _:
     { pkgs, ... }:
     {
-      users.users = lib.genAttrs [ "omnigent-cameron" "omnigent-raquel" ] (user: {
+      users.users = lib.genAttrs [ "omnigent-cameron" "omnigent-janettesmith" ] (user: {
         isNormalUser = true;
         home = "/home/${user}";
         homeMode = "0700";
@@ -14,7 +14,7 @@
         hashedPassword = "!";
         shell = pkgs.bashInteractive;
       });
-      users.groups = lib.genAttrs [ "omnigent-cameron" "omnigent-raquel" ] (_: { });
+      users.groups = lib.genAttrs [ "omnigent-cameron" "omnigent-janettesmith" ] (_: { });
     }
   );
 }

@@ -59,6 +59,12 @@ in
                 type = lib.types.str;
                 description = "Primary email address.";
               };
+              gitEmail = lib.mkOption {
+                type = lib.types.str;
+                default = config.meta.email;
+                defaultText = lib.literalExpression "config.meta.email";
+                description = "Git author email, separate from the primary or SSO address.";
+              };
               githubUser = lib.mkOption {
                 type = lib.types.nullOr lib.types.str;
                 default = null;
