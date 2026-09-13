@@ -41,7 +41,7 @@ export async function humanChecks(gates) {
               home.activation.mutableSettings = let settings = pkgs.writeText "mutable-settings.json" "${changes.mutableText ?? "preserved mutable settings"}"; in {
                 after = [ "writeBoundary" ]; before = []; data = "install -Dm644 \${settings} /home/fixture/.config/claude-cerebras/settings.json";
               };
-              programs.git = { enable = true; settings.user = { name = "${changes.gitName ?? "Fixture Human"}"; email = "${changes.gitEmail ?? "old@example.com"}"; }; };
+              programs.git = { enable = true; settings = { user = { name = "${changes.gitName ?? "Fixture Human"}"; email = "${changes.gitEmail ?? "old@example.com"}"; }; ${changes.githubUser === undefined ? "" : `github.user = "${changes.githubUser}";`} }; };
               programs.jujutsu = { enable = true; settings.user.email = "${changes.gitEmail ?? "old@example.com"}"; };
               sops.templates.allowed_signers = { mode = "${changes.signerMode ?? "0400"}"; content = ''${changes.gitEmail ?? "old@example.com"} namespaces="git" ${changes.signerKey ?? "public-fixture-key"}
               ''; };
@@ -71,21 +71,21 @@ export async function humanChecks(gates) {
   assert(identityBefore.janette?.human && identityBefore.stibniteWorker?.generation, "Identity must project Janette's human home and the standalone Darwin generation");
   assert.deepEqual({ humans: identityBefore.humans, server: identityBefore.server }, before, "Supplemental keys must not change any historical projection value");
   const canonical = "125711642+janetteasmith@users.noreply.github.com";
-  const mailOnly = await fixture("identity-mail-only", { phase: "identity", gitEmail: canonical });
-  assert.notDeepEqual(identityBefore.janette.human, mailOnly.janette.human, "The real author artifacts must change");
-  assert(gates.compareProtected("identity", identityBefore, mailOnly).janetteUnchanged, "Identity accepts only the asserted canonical mail/principal change and its derived artifacts");
-  assert(!gates.compareProtected("credentials", mailOnly, identityBefore).janetteUnchanged, "Credentials rejects a mail change against the completed identity baseline");
-  assert(gates.compareProtected("credentials", mailOnly, mailOnly).janetteUnchanged);
+  const identityOnly = await fixture("identity-four-fields", { phase: "identity", gitEmail: canonical, githubUser: "janetteasmith" });
+  assert.notDeepEqual(identityBefore.janette.human, identityOnly.janette.human, "The real author and GitHub artifacts must change");
+  assert(gates.compareProtected("identity", identityBefore, identityOnly).janetteUnchanged, "Identity accepts the four canonical mail/principal/GitHub fields and their derived artifacts");
+  assert(!gates.compareProtected("credentials", identityOnly, identityBefore).janetteUnchanged, "Credentials rejects a four-field change against the completed identity baseline");
+  assert(gates.compareProtected("credentials", identityOnly, identityOnly).janetteUnchanged);
   for (const [name, changes] of Object.entries({ package: { package: "jq" }, gitName: { gitName: "Changed Human" }, service: { service: "/bin/false" }, text: { text: "changed human settings" }, mutable: { mutableText: "changed mutable settings" }, signerKey: { signerKey: "different-public-key" }, signerMode: { signerMode: "0444" } })) {
-    const changed = await fixture(`identity-${name}`, { phase: "identity", gitEmail: canonical, ...changes });
-    assert(!gates.compareProtected("identity", identityBefore, changed).janetteUnchanged, `Identity must reject Janette's ${name} change, even alongside the approved mail change`);
+    const changed = await fixture(`identity-${name}`, { phase: "identity", gitEmail: canonical, githubUser: "janetteasmith", ...changes });
+    assert(!gates.compareProtected("identity", identityBefore, changed).janetteUnchanged, `Identity must reject Janette's fifth ${name} change alongside the four approved fields`);
   }
-  const changedWorker = { ...mailOnly, stibniteWorker: { generation: "different-generation", output: "different-output" } };
+  const changedWorker = { ...identityOnly, stibniteWorker: { generation: "different-generation", output: "different-output" } };
   for (const phase of ["identity", "credentials", "magnetite", "pyrite", "stibnite", "closure"]) {
-    assert(!gates.compareProtected(phase, mailOnly, changedWorker).stibniteWorkerUnchanged);
-    assert(!gates.compareProtected(phase, mailOnly, identityBefore).janetteUnchanged);
+    assert(!gates.compareProtected(phase, identityOnly, changedWorker).stibniteWorkerUnchanged);
+    assert(!gates.compareProtected(phase, identityOnly, identityBefore).janetteUnchanged);
   }
   assert.throws(() => gates.compareProtected("identity", before, before), /Missing Janette/);
-  console.log("PASS supplemental protection: pre-identity expression bytes/payload unchanged; identity mail-only accepted; other Janette behavior/key/mode rejected; credentials and later mail/standalone-generation drift rejected");
+  console.log("PASS supplemental protection: pre-identity expression bytes/payload unchanged; identity four-field diff accepted; fifth Janette behavior/key/mode change rejected; credentials and later four-field/standalone-generation drift rejected");
   console.log("PASS F1 pinned HM/sops: disabled XDG source accepted; relocation accepted; package, Git, service, input content/location, XDG text and mutable activation changes rejected; enabled undefined source rejected (no builds)");
 }

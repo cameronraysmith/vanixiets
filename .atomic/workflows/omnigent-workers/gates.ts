@@ -72,6 +72,7 @@ export function baselineExpr(source: string, phase: Phase = "inventory"): string
     excluded = d.extendModules { modules = [ {
       home-manager.users.janettesmith = {
         ${exclusion.gitEmail} = lib.mkForce ${JSON.stringify(exclusion.canonicalEmail)};
+        ${exclusion.githubUser} = lib.mkForce ${JSON.stringify(exclusion.canonicalGithubUser)};
         ${exclusion.jjEmail} = lib.mkForce ${JSON.stringify(exclusion.canonicalEmail)};
         ${exclusion.allowedSigners} = lib.mkForce (${JSON.stringify(exclusion.canonicalEmail)} + suffix);
       };
@@ -81,6 +82,7 @@ export function baselineExpr(source: string, phase: Phase = "inventory"): string
     mailIndependent = (project excluded).janettesmith;
     author = {
       gitEmail = h.${exclusion.gitEmail};
+      githubUser = h.${exclusion.githubUser} or null;
       jjEmail = h.${exclusion.jjEmail};
       allowedSigners = content;
       inherit principal;
@@ -93,7 +95,7 @@ export function baselineExpr(source: string, phase: Phase = "inventory"): string
 export type Protected = {
   humans: unknown;
   server: string;
-  janette?: { human: unknown; mailIndependent: unknown; author: { gitEmail: string; jjEmail: string; allowedSigners: string; principal: string } };
+  janette?: { human: unknown; mailIndependent: unknown; author: { gitEmail: string; githubUser: string | null; jjEmail: string; allowedSigners: string; principal: string } };
   stibniteWorker?: { generation: string; output: string };
 };
 export function compareProtected(phase: Phase, old: Protected, current: Protected, requireCanonical = true) {
@@ -103,6 +105,7 @@ export function compareProtected(phase: Phase, old: Protected, current: Protecte
   const janetteUnchanged = !supplemental || (!requireCanonical && equal(old.janette, current.janette)) || (phase === "identity"
     ? equal(old.janette!.mailIndependent, current.janette!.mailIndependent)
       && current.janette!.author.gitEmail === janetteMailExclusion.canonicalEmail
+      && current.janette!.author.githubUser === janetteMailExclusion.canonicalGithubUser
       && current.janette!.author.jjEmail === janetteMailExclusion.canonicalEmail
       && current.janette!.author.principal === janetteMailExclusion.canonicalEmail
       && current.janette!.author.allowedSigners === janetteMailExclusion.canonicalEmail + old.janette!.author.allowedSigners.slice(old.janette!.author.principal.length)

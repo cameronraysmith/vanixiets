@@ -13,9 +13,11 @@ export type Phase = typeof phases[number];
 export const janetteMailExclusion = {
   kind: "janette-author-mail",
   gitEmail: "programs.git.settings.user.email",
+  githubUser: "programs.git.settings.github.user",
   jjEmail: "programs.jujutsu.settings.user.email",
   allowedSigners: "sops.templates.allowed_signers.content",
   canonicalEmail: "125711642+janetteasmith@users.noreply.github.com",
+  canonicalGithubUser: "janetteasmith",
 } as const;
 export type JanetteMailExclusion = typeof janetteMailExclusion;
 export const supplementalProtection = (phase: Phase) => phases.indexOf(phase) >= phases.indexOf("identity");

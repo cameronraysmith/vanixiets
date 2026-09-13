@@ -27,8 +27,9 @@ export async function controllerChecks({ definition, sliceDefinition, sliceModul
     if (expression.includes("janette = let")) {
       const candidate = sha === routed.sha || sha === routed.join.sha;
       const email = candidate ? (config.janetteMailDiff ? "wrong@example.com" : contracts.janetteMailExclusion.canonicalEmail) : this.ctx.inputs.phase === "identity" ? "old@example.com" : contracts.janetteMailExclusion.canonicalEmail;
+      const githubUser = !candidate && this.ctx.inputs.phase === "identity" ? null : contracts.janetteMailExclusion.canonicalGithubUser;
       const behavior = candidate && config.janetteBehaviorDiff ? "changed-human-behavior" : "preserved-human-behavior";
-      projected = { ...value, janette: { human: { email, behavior }, mailIndependent: { behavior }, author: { gitEmail: email, jjEmail: email, principal: email, allowedSigners: `${email} namespaces="git" public-key\n` } }, stibniteWorker: { generation: candidate && config.stibniteWorkerDiff ? "changed-worker-generation" : "worker-generation", output: "worker-output" } };
+      projected = { ...value, janette: { human: { email, githubUser, behavior }, mailIndependent: { behavior }, author: { gitEmail: email, githubUser, jjEmail: email, principal: email, allowedSigners: `${email} namespaces="git" public-key\n` } }, stibniteWorker: { generation: candidate && config.stibniteWorkerDiff ? "changed-worker-generation" : "worker-generation", output: "worker-output" } };
     }
     await writeFile(match[2], JSON.stringify(projected), { mode: 0o600 });
     return "";
@@ -191,7 +192,7 @@ export async function controllerChecks({ definition, sliceDefinition, sliceModul
       await assert.rejects(sliceDefinition.run(ctx), new RegExp(`Unverified ${phase}`));
     }
   }
-  console.log("PASS identity/credentials controller: supplemental C0/J0 files reach writers and gates, stay fixed through repair, accept canonical identity mail only and reject other human/worker drift");
+  console.log("PASS identity/credentials controller: supplemental C0/J0 files reach writers and gates, stay fixed through repair, accept the four canonical identity fields and reject other human/worker drift");
 
   ctx = context({ host: "stibnite", root, timeout: 1000, max_repairs: 2, reads: [] }, { confirm: false });
   await assert.rejects(migrationDefinition.run(ctx), /Provisioning\/identity verification incomplete/);
