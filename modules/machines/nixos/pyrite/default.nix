@@ -169,6 +169,7 @@ in
 
       boot.extraModulePackages = [
         (config.boot.kernelPackages.callPackage ../../../../pkgs/kernel-modules/snd-hda-macbookpro.nix { })
+        (config.boot.kernelPackages.callPackage ../../../../pkgs/kernel-modules/hci-uart-macbook.nix { })
       ];
 
       # Stated explicitly, not inherited from facter's bare-metal mkDefault branch (dead

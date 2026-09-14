@@ -1,0 +1,35 @@
+From: Christoph Gysin <christoph.gysin@gmail.com>
+Subject: [PATCH] Bluetooth: omit the BCM power-transition wake callback
+
+Historical workaround: christophgysin/linux
+commit ddf622a0a19697af473051c8019fffc1eb66efe7, also used by
+leifliddy/macbook12-bluetooth-driver at d393bf988644f0ce24f57c031febe0d9a4256f89.
+https://github.com/christophgysin/linux/commit/ddf622a0a19697af473051c8019fffc1eb66efe7
+
+Rebased without behavior changes onto Linux 6.18.42.
+Keep set_shutdown (Apple BTPU/BTPD) and other error cleanup.
+Only startup/shutdown wake calls (Apple BTLP) are omitted; suspend/resume
+remain unchanged. This is experimental, not a proven power-management fix.
+
+--- a/hci_bcm.c
++++ b/hci_bcm.c
+@@ -281,10 +281,6 @@
+ 	if (err)
+ 		goto err_txco_clk_disable;
+ 
+-	err = dev->set_device_wakeup(dev, powered);
+-	if (err)
+-		goto err_revert_shutdown;
+-
+ 	if (!powered && dev->res_enabled) {
+ 		clk_disable_unprepare(dev->txco_clk);
+ 		clk_disable_unprepare(dev->lpo_clk);
+@@ -304,8 +300,6 @@
+ 
+ 	return 0;
+ 
+-err_revert_shutdown:
+-	dev->set_shutdown(dev, !powered);
+ err_txco_clk_disable:
+ 	if (powered && !dev->res_enabled)
+ 		clk_disable_unprepare(dev->txco_clk);
