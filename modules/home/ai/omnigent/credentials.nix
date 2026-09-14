@@ -10,8 +10,11 @@ let
     credentials:
     lib.filterAttrs (_: source: source.enable) (
       {
-        inherit (credentials) signingKey githubToken claudeSetupToken;
+        inherit (credentials) signingKey claudeSetupToken;
       }
+      // lib.mapAttrs' (
+        owner: source: lib.nameValuePair "github-${owner}" source
+      ) credentials.githubTokens
       // lib.concatMapAttrs (
         label: source:
         lib.genAttrs (map (file: "linear-${label}-${file}") linearFiles) (name: {
@@ -35,6 +38,7 @@ let
       path = source: (output source).path;
       enabledPath = source: if source.enable then path source else null;
       linear = lib.filterAttrs (_: source: source.enable) worker.credentials.linearApiKeys;
+      github = lib.filterAttrs (_: source: source.enable) worker.credentials.githubTokens;
       linearDestination = "${home}/.config/linear/credentials.toml";
       templateName = "omnigent-${worker.user}-linear";
       secretName = source: "vars/${(output source).rel_dir}/${source.file}";
@@ -54,9 +58,12 @@ let
       ) (lib.attrValues linearSelected);
       policy = {
         inherit home serverUrl;
-        inherit (worker.credentials) expected;
+        inherit (worker.credentials) expected defaultOwner;
         signingKey = enabledPath worker.credentials.signingKey;
-        githubToken = enabledPath worker.credentials.githubToken;
+        githubTokens = lib.mapAttrs (_: source: {
+          path = path source;
+          inherit (source) expectedLogin;
+        }) github;
         claudeSetupToken = enabledPath worker.credentials.claudeSetupToken;
         linearCredentials = if linear == { } then null else linearDestination;
         linearApiKeys = lib.mapAttrs (_: source: {
@@ -73,6 +80,7 @@ let
         }) selected;
         executables = {
           gh = lib.getExe pkgs.gh;
+          git = lib.getExe pkgs.git;
           linear = lib.getExe pkgs.linear-cli;
           claude = lib.getExe config.flake.packages.${pkgs.stdenv.hostPlatform.system}.claude-code;
           ssh-keygen = "${pkgs.openssh}/bin/ssh-keygen";
@@ -135,8 +143,21 @@ let
           message = "Omnigent worker ${worker.user}: signing requires the canonical Git email and declared public key.";
         }
         {
-          assertion = !worker.credentials.githubToken.enable || expected.githubUser != null;
-          message = "Omnigent worker ${worker.user}: GitHub credentials require an explicit expected login.";
+          assertion =
+            lib.all (source: source.expectedLogin != null) (lib.attrValues github)
+            && lib.length (lib.unique (map (source: source.expectedLogin) (lib.attrValues github))) <= 1;
+          message = "Omnigent worker ${worker.user}: GitHub owner tokens require the same explicit expected person login.";
+        }
+        {
+          assertion =
+            worker.credentials.defaultOwner == null || builtins.hasAttr worker.credentials.defaultOwner github;
+          message = "Omnigent worker ${worker.user}: defaultOwner must select an enabled GitHub token.";
+        }
+        {
+          assertion = lib.all (owner: github.${owner}.generator == "${worker.user}-github-token-${owner}") (
+            lib.attrNames github
+          );
+          message = "Omnigent worker ${worker.user}: GitHub generators must use the worker user and resource owner.";
         }
         {
           assertion = selected == { } || expected.omnigentEmail != null;
@@ -224,21 +245,26 @@ in
           (wrapper "omnigent-worker-verify" "verify")
         ]
         ++ lib.optional (policy.linearApiKeys != { }) (lib.hiPrio (wrapper "linear" "linear"));
-        programs.gh.package = lib.mkIf (policy.githubToken != null) (wrapper "gh" "gh");
+        programs.gh.package = lib.mkIf (policy.githubTokens != { }) (wrapper "gh" "gh");
         programs.claude-code.package = lib.mkIf (policy.claudeSetupToken != null) (
           wrapper "claude" "claude"
         );
-        programs.git = lib.mkIf (policy.signingKey != null) {
-          signing = {
-            key = policy.signingKey;
-            format = "ssh";
-            signByDefault = true;
-          };
-          settings = {
-            user.email = policy.expected.gitEmail;
-            gpg.ssh.allowedSignersFile = toString signers;
-          };
-        };
+        programs.git = lib.mkMerge [
+          (lib.mkIf (policy.githubTokens != { }) {
+            settings.credential."https://github.com".useHttpPath = true;
+          })
+          (lib.mkIf (policy.signingKey != null) {
+            signing = {
+              key = policy.signingKey;
+              format = "ssh";
+              signByDefault = true;
+            };
+            settings = {
+              user.email = policy.expected.gitEmail;
+              gpg.ssh.allowedSignersFile = toString signers;
+            };
+          })
+        ];
         programs.jujutsu.settings = lib.mkIf (policy.signingKey != null) {
           user.email = policy.expected.gitEmail;
           signing = {

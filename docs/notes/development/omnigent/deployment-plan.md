@@ -897,8 +897,8 @@ The remaining question identifiers are retained for continuity.
 ## Dedicated-worker static credentials
 
 The 2026-09-13 credential slice prepares file-backed delivery without enrolling real values or enabling any of the five workers.
-Each worker's typed `credentials` options separately enable `signingKey`, `githubToken`, each masked `linearApiKeys` label, and optional `claudeSetupToken`; all default off.
-Signing, GitHub and Claude sources name a host-local Clan `generator` and `file`.
+Each worker's typed `credentials` options separately enable `signingKey`, each `githubTokens` resource owner, each masked `linearApiKeys` label, and optional `claudeSetupToken`; all default off.
+Signing and Claude sources name a host-local Clan `generator` and `file`; each GitHub entry names `<worker-user>-github-token-<owner>`, fixed file `token`, and the person's `expectedLogin`.
 Linear accepts only `personal` and `work` labels and a generator `<worker-user>-linear-<label>`, with fixed secret files `key`, `workspace`, `workspace-id` and `viewer-email`.
 Hidden prompts produce only those selected files with `secret = true`, `neededFor = "services"`, worker ownership and mode `0400`.
 Consumers use the resulting `files.<name>.path`; Nix evaluation never reads the plaintext.
@@ -910,6 +910,11 @@ The declared public key and canonical `credentials.expected.gitEmail` produce th
 This narrowly approved delegation does not deliver the person's age identity, personal SOPS bundle, SSH agent, or `hm-sops-bridge` enrollment.
 The worker's `gh` wrapper is its `programs.gh.package`, so Git's absolute HTTPS credential helper reaches the token reader.
 It injects `GH_TOKEN` only into `gh` and its descendants, never the host environment.
+Git HTTPS requests include their repository path through `useHttpPath = true`; the helper matches its first segment exactly to a declared token owner and returns nothing for unknown owners.
+Other gh commands select by `OMNIGENT_GH_OWNER`, then a github.com origin remote, then `defaultOwner`; `GH_REPO` and `-R`/`--repo` must agree with that owner.
+Use `OMNIGENT_GH_OWNER=sciexp gh pr create` for the organization grant.
+This is explicit token selection, not a reproduction of gh's repository-resolution rules; positional/API targets pass through and rely on fine-grained owner scope for access denial.
+Do not enroll classic PATs; verification checks each token's authenticated login, not provider-side scope.
 Linear receives a system-SOPS-rendered `0400` inline credentials file whose workspace names and API keys are both secret placeholders, with explicit workspace selection, `LINEAR_IGNORE_ENV_FILE=1`, endpoint-override stripping and rejection of ambient or project `api_key` overrides, including the effective Git root.
 The wrapper's `--workspace` argument remains the slug, not the masked label; its allow-list and the verifier's expected slug, workspace ID and viewer email are read from delivered files at runtime.
 No actual workspace slug or Linear identity metadata belongs in Nix or Git plaintext.
@@ -949,6 +954,7 @@ Neither is implemented by this file-backed SOPS slice.
 
 The declaration follow-up enables signing-key and GitHub-token delivery for Cameron and Janette on magnetite and pyrite, and Cameron on stibnite; all five workers keep `enable = false`.
 Expected GitHub, Git, signing-public-key and Omnigent identities derive from the canonical owner metadata.
+Cameron's workers select `sciexp` and `cameronraysmith` with `defaultOwner = "cameronraysmith"`; Janette's select only `sciexp` with `defaultOwner = "sciexp"`.
 The Linear masking follow-up selects `personal` and `work` for Cameron on all three hosts, and only `personal` for Janette on magnetite and pyrite.
 Claude setup-token delivery remains disabled.
 The typed interface still defaults off for other workers.
@@ -962,21 +968,24 @@ Passing the synthetic checks does not authorize deployment or prove live credent
 Run these commands only in the operator's authorized enrollment/routing window, after grant and recipient approval in wizard sections A–B.
 They replace the proposed GitHub/signing commands in section C; the C2 sequence below replaces the wizard's stale optional Linear examples.
 Claude delivery remains undeclared and must not be generated here.
-GitHub generation prompts for a hidden single-line token and confirmation; use the approved person/host grant for each prompt.
+GitHub generation prompts for a hidden single-line token and confirmation; use the approved person/host/resource-owner grant for each prompt.
 Do not paste a multiline signing key into a generator's single-line prompt.
 The signing pipelines extract only `ssh-signing-key` from the approved owner's SOPS bundle and pipe it directly into `clan vars set`, never importing that bundle into the worker.
 The key's match to the declared public identity remains an enrollment verification obligation.
 
 ```bash
-CLAN_NO_COMMIT=1 clan vars generate magnetite --generator omnigent-cameron-github-token --no-regenerate
+CLAN_NO_COMMIT=1 clan vars generate magnetite --generator omnigent-cameron-github-token-sciexp --no-regenerate
+CLAN_NO_COMMIT=1 clan vars generate magnetite --generator omnigent-cameron-github-token-cameronraysmith --no-regenerate
 (set +x; set -o pipefail; sops -d --extract '["ssh-signing-key"]' secrets/home-manager/users/crs58/secrets.yaml | CLAN_NO_COMMIT=1 clan vars set magnetite omnigent-cameron-signing-key/key)
-CLAN_NO_COMMIT=1 clan vars generate magnetite --generator omnigent-janettesmith-github-token --no-regenerate
+CLAN_NO_COMMIT=1 clan vars generate magnetite --generator omnigent-janettesmith-github-token-sciexp --no-regenerate
 (set +x; set -o pipefail; sops -d --extract '["ssh-signing-key"]' secrets/home-manager/users/janettesmith/secrets.yaml | CLAN_NO_COMMIT=1 clan vars set magnetite omnigent-janettesmith-signing-key/key)
-CLAN_NO_COMMIT=1 clan vars generate pyrite --generator omnigent-cameron-github-token --no-regenerate
+CLAN_NO_COMMIT=1 clan vars generate pyrite --generator omnigent-cameron-github-token-sciexp --no-regenerate
+CLAN_NO_COMMIT=1 clan vars generate pyrite --generator omnigent-cameron-github-token-cameronraysmith --no-regenerate
 (set +x; set -o pipefail; sops -d --extract '["ssh-signing-key"]' secrets/home-manager/users/crs58/secrets.yaml | CLAN_NO_COMMIT=1 clan vars set pyrite omnigent-cameron-signing-key/key)
-CLAN_NO_COMMIT=1 clan vars generate pyrite --generator omnigent-janettesmith-github-token --no-regenerate
+CLAN_NO_COMMIT=1 clan vars generate pyrite --generator omnigent-janettesmith-github-token-sciexp --no-regenerate
 (set +x; set -o pipefail; sops -d --extract '["ssh-signing-key"]' secrets/home-manager/users/janettesmith/secrets.yaml | CLAN_NO_COMMIT=1 clan vars set pyrite omnigent-janettesmith-signing-key/key)
-CLAN_NO_COMMIT=1 clan vars generate stibnite --generator omnigent-cameron-github-token --no-regenerate
+CLAN_NO_COMMIT=1 clan vars generate stibnite --generator omnigent-cameron-github-token-sciexp --no-regenerate
+CLAN_NO_COMMIT=1 clan vars generate stibnite --generator omnigent-cameron-github-token-cameronraysmith --no-regenerate
 (set +x; set -o pipefail; sops -d --extract '["ssh-signing-key"]' secrets/home-manager/users/crs58/secrets.yaml | CLAN_NO_COMMIT=1 clan vars set stibnite omnigent-cameron-signing-key/key)
 ```
 

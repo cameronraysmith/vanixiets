@@ -10,11 +10,18 @@ let
       generator = "${user}-signing-key";
       file = "key";
     };
-    githubToken = {
-      enable = true;
-      generator = "${user}-github-token";
-      file = "token";
-    };
+    githubTokens = builtins.listToAttrs (
+      map (owner: {
+        name = owner;
+        value = {
+          enable = true;
+          generator = "${user}-github-token-${owner}";
+          file = "token";
+          expectedLogin = meta.githubUser;
+        };
+      }) ([ "sciexp" ] ++ (if user == "omnigent-cameron" then [ "cameronraysmith" ] else [ ]))
+    );
+    defaultOwner = if user == "omnigent-cameron" then "cameronraysmith" else "sciexp";
     linearApiKeys = builtins.listToAttrs (
       map (label: {
         name = label;
@@ -25,7 +32,6 @@ let
       }) labels
     );
     expected = {
-      githubUser = meta.githubUser;
       gitEmail = meta.gitEmail;
       signingPublicKey = builtins.head meta.sshKeys;
       omnigentEmail = meta.email;

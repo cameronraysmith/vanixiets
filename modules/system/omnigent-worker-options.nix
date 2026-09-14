@@ -27,10 +27,33 @@ let
       default = { };
       description = "Explicitly delegated passwordless SSH private key for Git and Jujutsu signing.";
     };
-    githubToken = lib.mkOption {
-      type = credentialSource;
+    githubTokens = lib.mkOption {
+      type = lib.types.attrsOf (
+        lib.types.submodule {
+          options = {
+            inherit (credentialSourceOptions) enable generator;
+            file = lib.mkOption {
+              type = lib.types.enum [ "token" ];
+              default = "token";
+              description = "Fixed GitHub token file in the owner-specific Clan generator.";
+            };
+            expectedLogin = expectedIdentity "Expected authenticated person for this resource-owner token.";
+          };
+        }
+      );
+      apply =
+        entries:
+        assert lib.assertMsg (lib.all (owner: builtins.match "[a-z0-9][a-z0-9-]*" owner != null) (
+          lib.attrNames entries
+        )) "GitHub token owners must be lowercase GitHub logins.";
+        entries;
       default = { };
-      description = "Personal GitHub token consumed only by the worker's gh wrapper.";
+      description = "Fine-grained GitHub tokens keyed by resource owner; each entry defaults off.";
+    };
+    defaultOwner = lib.mkOption {
+      type = lib.types.nullOr (lib.types.strMatching "[a-z0-9][a-z0-9-]*");
+      default = null;
+      description = "Selected GitHub token owner when neither OMNIGENT_GH_OWNER nor a GitHub origin remote supplies one.";
     };
     linearApiKeys = lib.mkOption {
       type = lib.types.attrsOf (
@@ -59,7 +82,6 @@ let
     expected = lib.mkOption {
       type = lib.types.submodule {
         options = {
-          githubUser = expectedIdentity "Expected authenticated GitHub login; not inferred from the worker owner label.";
           gitEmail = expectedIdentity "Canonical Git author and allowed_signers principal.";
           signingPublicKey = expectedIdentity "Declared OpenSSH public key corresponding to the delegated private key.";
           omnigentEmail = expectedIdentity "Expected authenticated Omnigent /v1/me user_id in the email-based OIDC deployment.";

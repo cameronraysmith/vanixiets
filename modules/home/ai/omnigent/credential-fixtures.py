@@ -12,6 +12,7 @@ import shutil
 import struct
 import subprocess
 import sys
+import tempfile
 from unittest.mock import patch
 
 
@@ -23,10 +24,10 @@ def mock(tool: str) -> None:
     if tool == "gh":
         token = os.environ.get("GH_TOKEN")
         assert token
+        second = pathlib.Path(os.environ["FIXTURE_GITHUB_SECOND_PATH"]).read_text()
+        selector = "FIXTURE_GITHUB_SECOND" if token == second else "FIXTURE_GITHUB"
         if arguments == ["api", "user"]:
-            print(
-                json.dumps({"login": os.environ.get("FIXTURE_GITHUB", "fixture-human")})
-            )
+            print(json.dumps({"login": os.environ.get(selector, "fixture-human")}))
         elif arguments == ["auth", "git-credential", "get"]:
             sys.stdin.read()
             print("username=x-access-token\npassword=" + token + "\n")
@@ -172,6 +173,161 @@ def audit_artifacts(artifact: dict, runtime_sentinel: str) -> None:
     )
 
 
+def owner_fixtures(source: str) -> None:
+    with tempfile.TemporaryDirectory() as directory:
+        root = pathlib.Path(directory)
+        first = root / "first"
+        second = root / "second"
+        private_file(first, secrets.token_urlsafe(48).encode())
+        private_file(second, secrets.token_urlsafe(48).encode())
+        policy = root / "policy.json"
+        policy.write_text(
+            json.dumps(
+                {
+                    "githubTokens": {
+                        "first": {"path": str(first), "expectedLogin": "fixture-human"},
+                        "second": {
+                            "path": str(second),
+                            "expectedLogin": "fixture-human",
+                        },
+                    },
+                    "defaultOwner": "first",
+                    "executables": {"gh": str(root / "gh"), "git": shutil.which("git")},
+                }
+            )
+        )
+        (root / "gh").write_text(
+            "#!" + sys.executable + "\nimport os, pathlib\n"
+            "assert os.environ['GH_TOKEN'] == pathlib.Path(os.environ['EXPECTED_TOKEN_FILE']).read_text()\n"
+        )
+        (root / "gh").chmod(0o700)
+        environment = {
+            "PATH": os.environ["PATH"],
+            "HOME": directory,
+            "GIT_CONFIG_NOSYSTEM": "1",
+            "GIT_CONFIG_GLOBAL": "/dev/null",
+        }
+
+        def invoke(
+            arguments, *, owner=None, expected=first, success=True, data=None, env=None
+        ):
+            selected = {} if owner is None else {"OMNIGENT_GH_OWNER": owner}
+            result = subprocess.run(
+                [sys.executable, source, str(policy), "gh", *arguments],
+                input=data,
+                capture_output=True,
+                env=environment
+                | selected
+                | {"EXPECTED_TOKEN_FILE": str(expected)}
+                | (env or {}),
+                cwd=root,
+                check=False,
+            )
+            assert (result.returncode == 0) == success, arguments
+            assert not disclosed(
+                result.stderr, (first.read_bytes(), second.read_bytes())
+            )
+            if data is None:
+                assert not result.stdout
+            if not success:
+                assert b"OMNIGENT_GH_OWNER" in result.stderr
+            return result
+
+        for owner, selected in (("first", first), ("second", second)):
+            result = invoke(
+                ["auth", "git-credential", "get"],
+                owner="unknown",
+                data=f"protocol=https\nhost=github.com\npath={owner}/repo.git\n\n".encode(),
+            )
+            assert (
+                result.stdout
+                == b"username=x-access-token\npassword="
+                + selected.read_bytes()
+                + b"\n\n"
+            )
+        for request in (
+            "protocol=https\nhost=github.com\npath=unknown/repo.git",
+            "protocol=https\nhost=github.com",
+            "protocol=https\nhost=github.com\npath=first",
+            "protocol=https\nhost=other.invalid\npath=first/repo.git",
+            "protocol=http\nhost=github.com\npath=first/repo.git",
+        ):
+            assert not invoke(
+                ["auth", "git-credential", "get"], data=(request + "\n\n").encode()
+            ).stdout
+        for operation in ("store", "erase"):
+            assert not invoke(["auth", "git-credential", operation], data=b"").stdout
+        invoke(["api", "user"])
+        invoke(["pr", "create", "-R", "second/repo"], owner="second", expected=second)
+        for arguments in (
+            ["pr", "view", "-R", "first/repo"],
+            ["pr", "view", "--repo=first/repo"],
+            ["pr", "view", "-Rfirst/repo"],
+            ["pr", "view", "--repo", "https://github.com/first/repo"],
+        ):
+            invoke(arguments, owner="second", success=False)
+        invoke(
+            ["api", "user"],
+            owner="second",
+            env={"GH_REPO": "first/repo"},
+            success=False,
+        )
+        invoke(
+            ["api", "user"],
+            owner="second",
+            expected=second,
+            env={"GH_REPO": "github.com/second/repo"},
+        )
+        invoke(["api", "user"], owner="unknown", success=False)
+        invoke(["api", "user"], owner="", success=False)
+        for arguments in (
+            ["repo", "view", "unknown/repo"],
+            ["api", "repos/unknown/repo"],
+        ):
+            invoke(arguments, owner="second", expected=second)
+        subprocess.run(
+            ["git", "init", str(root)], env=environment, capture_output=True, check=True
+        )
+        subprocess.run(
+            [
+                "git",
+                "-C",
+                str(root),
+                "remote",
+                "add",
+                "origin",
+                "https://github.com/second/repo.git",
+            ],
+            env=environment,
+            check=True,
+        )
+        invoke(["api", "user"], expected=second)
+        invoke(["api", "user"], owner="first")
+        for remote in (
+            "git@github.com:second/repo.git",
+            "ssh://git@github.com/second/repo.git",
+            "https://github.com/unknown/repo.git",
+        ):
+            subprocess.run(
+                ["git", "-C", str(root), "remote", "set-url", "origin", remote],
+                env=environment,
+                check=True,
+            )
+            invoke(["api", "user"], expected=second, success="unknown" not in remote)
+        subprocess.run(
+            ["git", "-C", str(root), "remote", "remove", "origin"],
+            env=environment,
+            check=True,
+        )
+        data = json.loads(policy.read_text())
+        data["defaultOwner"] = None
+        policy.write_text(json.dumps(data))
+        invoke(["api", "user"], success=False)
+        print(
+            "GitHub owner fixtures passed: helper paths, unknown owners, explicit selectors, mismatches, origin precedence and no fallback"
+        )
+
+
 def main() -> None:
     artifact = json.loads(pathlib.Path(sys.argv[1]).read_text())
     root = pathlib.Path(artifact["root"])
@@ -195,6 +351,11 @@ def main() -> None:
         assert policy["home"] == str(home)
         for path in policy["requiredFiles"]:
             private_file(pathlib.Path(path), sentinel.encode())
+        assert set(policy["githubTokens"]) == {"first", "second"}
+        private_file(
+            pathlib.Path(policy["githubTokens"]["second"]["path"]),
+            (sentinel + "-second").encode(),
+        )
         signing_key(pathlib.Path(policy["signingKey"]))
         grant = policy["linearApiKeys"]["personal"]
         assert set(policy["linearApiKeys"]) == {"personal"}
@@ -260,9 +421,14 @@ subprocess.run, os.execve = run, execute
             PYTHONPATH=str(mocks),
             FIXTURE_ARGV=str(root / "argv.jsonl"),
             FIXTURE_LINEAR_GRANT_PATH=grant["path"],
+            FIXTURE_GITHUB_SECOND_PATH=policy["githubTokens"]["second"]["path"],
         )
         for key in (
             "GH_TOKEN",
+            "GH_ENTERPRISE_TOKEN",
+            "GITHUB_ENTERPRISE_TOKEN",
+            "GH_REPO",
+            "OMNIGENT_GH_OWNER",
             "GITHUB_TOKEN",
             "LINEAR_API_KEY",
             "LINEAR_WORKSPACE",
@@ -301,7 +467,7 @@ subprocess.run, os.execve = run, execute
         ):
             assert "LINEAR_GRAPHQL_ENDPOINT" not in runtime.linear_environment(policy)
         try:
-            runtime.material(policy["githubToken"], os.getuid() + 1)
+            runtime.material(policy["githubTokens"]["first"]["path"], os.getuid() + 1)
         except runtime.CredentialError:
             pass
         else:
@@ -326,6 +492,7 @@ subprocess.run, os.execve = run, execute
         run([verify])
         for selector in (
             "FIXTURE_GITHUB",
+            "FIXTURE_GITHUB_SECOND",
             "FIXTURE_LINEAR_VIEWER",
             "FIXTURE_LINEAR_WORKSPACE",
             "FIXTURE_OMNIGENT",
@@ -339,7 +506,7 @@ subprocess.run, os.execve = run, execute
             success=False,
             env={"GH_TOKEN": "unapproved-ambient-grant"},
         )
-        github_path = pathlib.Path(policy["githubToken"])
+        github_path = pathlib.Path(policy["githubTokens"]["first"]["path"])
         original = github_path.read_bytes()
         github_path.unlink()
         run([gh, "api", "user"], success=False)
@@ -369,6 +536,7 @@ subprocess.run, os.execve = run, execute
             "git-credential",
         ]
         assert pathlib.Path(helper_argv[0]).resolve() == gh.resolve()
+        assert query("credential.https://github.com.usehttppath") == "true"
         assert query("user.signingkey") == policy["signingKey"]
         assert query("user.email") == "fixture@example.invalid"
         result = run(
@@ -379,10 +547,37 @@ subprocess.run, os.execve = run, execute
                 "credential",
                 "fill",
             ],
-            data=b"protocol=https\nhost=github.com\n\n",
+            data=b"protocol=https\nhost=github.com\npath=first/repo.git\n\n",
         )
         assert ("password=" + sentinel).encode() in result.stdout
         assert sentinel.encode() not in result.stderr
+        result = run(
+            [
+                artifact["git"],
+                "-c",
+                "include.path=" + str(git_config),
+                "credential",
+                "fill",
+            ],
+            data=b"protocol=https\nhost=github.com\npath=second/repo.git\n\n",
+        )
+        assert ("password=" + sentinel + "-second").encode() in result.stdout
+        result = run(
+            [
+                artifact["git"],
+                "-c",
+                "include.path=" + str(git_config),
+                "credential",
+                "fill",
+            ],
+            data=b"protocol=https\nhost=github.com\npath=unknown/repo.git\n\n",
+            env={
+                "GIT_TERMINAL_PROMPT": "0",
+                "GIT_ASKPASS": "/nonexistent-fixture-askpass",
+            },
+            success=False,
+        )
+        assert sentinel.encode() not in result.stdout
         run(
             [artifact["mockGh"], "auth", "git-credential", "get"],
             success=False,
@@ -776,5 +971,7 @@ if __name__ == "__main__":
         mock(sys.argv[1].removeprefix("mock-"))
     elif sys.argv[1] == "prepare-linear":
         prepare_linear(pathlib.Path(sys.argv[2]))
+    elif sys.argv[1] == "owner-fixtures":
+        owner_fixtures(sys.argv[2])
     else:
         main()

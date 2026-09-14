@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import stat
 import subprocess
 import sys
@@ -50,8 +51,9 @@ def ready(policy: dict[str, Any]) -> None:
         material(path, os.getuid())
 
 
-def github_environment(policy: dict[str, Any]) -> dict[str, str]:
-    approved = token(policy["githubToken"])
+def github_environment(policy: dict[str, Any], owner: str) -> dict[str, str]:
+    require(owner in policy["githubTokens"], "select a declared OMNIGENT_GH_OWNER")
+    approved = token(policy["githubTokens"][owner]["path"])
     for name in (
         "GH_TOKEN",
         "GITHUB_TOKEN",
@@ -63,6 +65,64 @@ def github_environment(policy: dict[str, Any]) -> dict[str, str]:
             "competing GitHub credential environment",
         )
     return dict(os.environ, GH_TOKEN=approved)
+
+
+def github_owner(policy: dict[str, Any], arguments: list[str]) -> str:
+    owner = os.environ.get("OMNIGENT_GH_OWNER")
+    if owner is None:
+        remote = subprocess.run(
+            [policy["executables"]["git"], "remote", "get-url", "origin"],
+            capture_output=True,
+            check=False,
+        )
+        match = re.fullmatch(
+            r"(?:https://github\.com/|git@github\.com:|ssh://git@github\.com/)([^/]+)/[^/]+/?",
+            remote.stdout.decode().strip(),
+        )
+        owner = match[1] if remote.returncode == 0 and match else policy["defaultOwner"]
+    require(owner in policy["githubTokens"], "select a declared OMNIGENT_GH_OWNER")
+    repositories = [os.environ["GH_REPO"]] if "GH_REPO" in os.environ else []
+    for index, argument in enumerate(arguments):
+        if argument == "--":
+            break
+        if argument in ("-R", "--repo"):
+            require(
+                index + 1 < len(arguments),
+                "missing repository for OMNIGENT_GH_OWNER check",
+            )
+            repositories.append(arguments[index + 1])
+        elif argument.startswith("--repo="):
+            repositories.append(argument.split("=", 1)[1])
+        elif argument.startswith("-R"):
+            repositories.append(argument[2:].removeprefix("="))
+    for repository in repositories:
+        match = re.fullmatch(
+            r"(?:(?:https://)?github\.com/)?([^/]+)/[^/]+/?", repository
+        )
+        require(
+            match is not None and match[1] == owner,
+            "repository differs from selected OMNIGENT_GH_OWNER",
+        )
+    return owner
+
+
+def github_credential(policy: dict[str, Any], arguments: list[str]) -> None:
+    if arguments != ["get"]:
+        return
+    request = {}
+    for line in sys.stdin:
+        line = line.rstrip("\n")
+        if not line:
+            break
+        key, value = line.split("=", 1)
+        request[key] = value
+    if request.get("protocol") != "https" or request.get("host") != "github.com":
+        return
+    owner, separator, repository = request.get("path", "").partition("/")
+    if not separator or not repository or owner not in policy["githubTokens"]:
+        return
+    approved = token(policy["githubTokens"][owner]["path"])
+    print("username=x-access-token\npassword=" + approved + "\n")
 
 
 def linear_workspace(arguments: list[str], policy: dict[str, Any]) -> str:
@@ -249,12 +309,13 @@ def omnigent_identity(policy: dict[str, Any]) -> Any:
 def verify(policy: dict[str, Any]) -> None:
     ready(policy)
     expected = policy["expected"]
-    if policy["githubToken"] is not None:
+    for owner, grant in policy["githubTokens"].items():
         observed = command_json(
-            [policy["executables"]["gh"], "api", "user"], github_environment(policy)
+            [policy["executables"]["gh"], "api", "user"],
+            github_environment(policy, owner),
         )
         require(
-            observed.get("login") == expected["githubUser"], "GitHub identity mismatch"
+            observed.get("login") == grant["expectedLogin"], "GitHub identity mismatch"
         )
     for grant in policy["linearApiKeys"].values():
         workspace = token(grant["workspace"])
@@ -308,7 +369,7 @@ def verify(policy: dict[str, Any]) -> None:
 def execute(policy: dict[str, Any], mode: str, arguments: list[str]) -> NoReturn:
     match mode:
         case "gh":
-            environment = github_environment(policy)
+            environment = github_environment(policy, github_owner(policy, arguments))
         case "linear":
             linear_workspace(arguments, policy)
             require(
@@ -332,6 +393,8 @@ def main() -> None:
             ready(policy)
         elif mode == "verify":
             verify(policy)
+        elif mode == "gh" and sys.argv[3:5] == ["auth", "git-credential"]:
+            github_credential(policy, sys.argv[5:])
         else:
             execute(policy, mode, sys.argv[3:])
     except CredentialError as error:

@@ -204,14 +204,17 @@ See the [deployment plan](../../../../docs/notes/development/omnigent/deployment
 ## Selected static credentials
 
 `workers.<name>.credentials` is a typed interface on both plain host modules and the serializable Clan role.
-`signingKey`, `githubToken`, and `claudeSetupToken` have independent default-off `enable` flags and explicit `generator`/`file` names.
+`signingKey` and `claudeSetupToken` have independent default-off `enable` flags and explicit `generator`/`file` names.
+`githubTokens` is keyed by lowercase resource-owner login; each default-off entry selects `<worker-user>-github-token-<owner>`, fixed file `token`, and the authenticated person's `expectedLogin`.
+Every enabled GitHub entry must expect the same person; resource owners are not authenticated user identities.
 `linearApiKeys` is keyed only by the masked labels `personal` and `work`; each default-off entry names a generator `<worker-user>-linear-<label>` with fixed files `key`, `workspace`, `workspace-id` and `viewer-email`.
 All four files are secret services files: the workspace slug and verifier identities must never be Nix literals.
 Enabled sources declare host-local hidden-prompt Clan generators, with secret services files owned by the worker and mode `0400`.
 They do not enroll values automatically.
 The adapters check the declared ciphertext source and consume `files.<name>.path`; personal bundles, age identities and `hm-sops-bridge` enrollment remain prohibited.
 All five inventory workers now declare signing-key and GitHub-token sources while execution remains disabled.
-Their generator names are `<worker-user>-signing-key` (file `key`) and `<worker-user>-github-token` (file `token`), with canonical expected identities derived from owner metadata.
+Signing generators use `<worker-user>-signing-key` (file `key`); GitHub generators use `<worker-user>-github-token-<owner>` (file `token`), with canonical expected identities derived from person metadata.
+Cameron's workers select GitHub owners `sciexp` and `cameronraysmith`, with `defaultOwner = "cameronraysmith"`; Janette's select only `sciexp`, also her `defaultOwner`.
 Cameron's workers select `personal` and `work`; Janette's select only `personal`.
 Claude setup-token delivery remains disabled.
 These declarations do not enroll ciphertext: the real machine configuration must fail its credential source assertions until the operator enrolls every selected source under `vars/per-machine`.
@@ -222,6 +225,18 @@ See the deployment plan's enrollment sequence for the exact generator and multil
 
 Git and jj sign with the selected private-key file, using the declared public key and canonical Git email for `allowed_signers`.
 Git's absolute HTTPS helper uses the token-reading `programs.gh.package` wrapper.
+The worker sets `credential."https://github.com".useHttpPath = true`; its helper chooses only the token whose owner exactly matches the request path's first segment.
+Unknown owners, absent repository paths and non-GitHub/non-HTTPS requests return no credential, with no default-owner or ambient-token fallback.
+The helper does not persist or erase credentials.
+
+For other `gh` commands, token selection uses `OMNIGENT_GH_OWNER`, then the owner in `git remote get-url origin` when it names github.com, then `defaultOwner`.
+An unknown selected owner or no selection fails closed; worker Home Manager sets no `OMNIGENT_GH_OWNER` default.
+Use `OMNIGENT_GH_OWNER=sciexp gh pr create` to select the organization grant explicitly.
+Any `GH_REPO` or `-R`/`--repo` owner must match the selection, or the wrapper fails with an `OMNIGENT_GH_OWNER` diagnostic.
+The wrapper passes arguments and repository selection through unchanged; the origin shortcut is not gh's upstream/base-repository resolution.
+Positional targets and API paths can still address other owners; the selected fine-grained token has no access there and GitHub returns 404/403.
+This boundary depends on issuing genuinely owner-scoped fine-grained tokens, not classic PATs; the identity verifier checks login, not grant scope.
+
 Linear's system-SOPS template substitutes both workspace names and API keys from the selected secret files, matching the human personal/work masking pattern without importing human credentials.
 The wrapper accepts exactly one explicit `--workspace` slug from the delivered workspace files, not a label; it disables `.env` loading, strips endpoint overrides and rejects competing `api_key` sources, including the effective Git root.
 Optional native Claude token injection replaces the required runtime executable, not merely a shadowed profile entry.
@@ -233,7 +248,8 @@ Darwin serializes activation and boot invocations of the maintained privileged i
 The worker requires that receipt and readable files before standalone Home Manager and host execution, including after reboot.
 No network verification runs at startup, and workers never invoke privileged decryption.
 
-The separately invoked `omnigent-worker-verify` compares authenticated provider responses with `credentials.expected` and reads each Linear grant's expected slug, viewer email and workspace ID from its delivered files at runtime.
+The separately invoked `omnigent-worker-verify` queries `gh api user` with each selected owner token and compares its login with that entry's `expectedLogin`.
+It compares other authenticated provider responses with `credentials.expected` and reads each Linear grant's expected slug, viewer email and workspace ID from its delivered files at runtime.
 Linear prompts persist to their secret files, so `--no-regenerate` reuses pre-enrolled metadata and prompts only for missing values.
 Invoke it only during authorized enrollment; local `owner` labels are not identity evidence.
 Grant issuance, Kanidm person provisioning, recipient/scope approval, real enrollment, renewal and provider-side revocation remain human/deploy-gated.

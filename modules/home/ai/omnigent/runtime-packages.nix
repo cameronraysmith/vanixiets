@@ -44,7 +44,7 @@
       credentials = home.programs.omnigent.workerCredentials or null;
       required = map (
         package:
-        if credentials != null && credentials.githubToken != null && package == pkgs.gh then
+        if credentials != null && credentials.githubTokens != { } && package == pkgs.gh then
           home.programs.gh.package
         else if
           credentials != null

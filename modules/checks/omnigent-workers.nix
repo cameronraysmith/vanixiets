@@ -1086,11 +1086,15 @@
               file = "key";
             }
             &&
-              credentials.githubToken == {
-                enable = true;
-                generator = "${worker.user}-github-token";
-                file = "token";
-              }
+              credentials.githubTokens
+              == lib.genAttrs ([ "sciexp" ] ++ lib.optional (worker.owner == "cameron") "cameronraysmith")
+                (owner: {
+                  enable = true;
+                  generator = "${worker.user}-github-token-${owner}";
+                  file = "token";
+                  expectedLogin = meta.githubUser;
+                })
+            && credentials.defaultOwner == (if worker.owner == "cameron" then "cameronraysmith" else "sciexp")
             &&
               credentials.linearApiKeys
               == lib.genAttrs ([ "personal" ] ++ lib.optional (worker.owner == "cameron") "work") (label: {
@@ -1100,7 +1104,6 @@
             && !credentials.claudeSetupToken.enable
             &&
               credentials.expected == {
-                githubUser = meta.githubUser;
                 gitEmail = meta.gitEmail;
                 signingPublicKey = lib.head meta.sshKeys;
                 omnigentEmail = meta.email;
@@ -1396,8 +1399,11 @@
         };
       credentialSources = [
         "signing"
-        "github"
         "claude"
+      ];
+      credentialGithubOwners = [
+        "first"
+        "second"
       ];
       credentialSource = name: {
         enable = true;
@@ -1418,6 +1424,11 @@
           cp ${../home/ai/omnigent/fixtures/vars/per-machine/fixture/fixture-signing/credential/secret} \
             "$out/vars/per-machine/fixture/omnigent-cameron-linear-personal/${file}/secret"
         '') credentialLinearFiles}
+        ${lib.concatMapStringsSep "\n" (owner: ''
+          mkdir -p "$out/vars/per-machine/fixture/omnigent-cameron-github-token-${owner}/token"
+          cp ${../home/ai/omnigent/fixtures/vars/per-machine/fixture/fixture-signing/credential/secret} \
+            "$out/vars/per-machine/fixture/omnigent-cameron-github-token-${owner}/token/secret"
+        '') credentialGithubOwners}
       '';
       credentialModule = {
         nixpkgs.pkgs = lib.mkForce (
@@ -1450,6 +1461,14 @@
             )
             // lib.listToAttrs (
               map (
+                owner:
+                lib.nameValuePair "vars/per-machine/fixture/omnigent-cameron-github-token-${owner}/token" {
+                  path = "${credentialRoot}/github-${owner}";
+                }
+              ) credentialGithubOwners
+            )
+            // lib.listToAttrs (
+              map (
                 file:
                 lib.nameValuePair "vars/per-machine/fixture/omnigent-cameron-linear-personal/${file}" {
                   path = "${credentialRoot}/linear-${file}";
@@ -1464,14 +1483,18 @@
             enable = true;
             credentials = {
               signingKey = credentialSource "signing";
-              githubToken = credentialSource "github";
+              githubTokens = lib.genAttrs credentialGithubOwners (owner: {
+                enable = true;
+                generator = "omnigent-cameron-github-token-${owner}";
+                expectedLogin = "fixture-human";
+              });
+              defaultOwner = "first";
               claudeSetupToken = credentialSource "claude";
               linearApiKeys.personal = {
                 enable = true;
                 generator = "omnigent-cameron-linear-personal";
               };
               expected = {
-                githubUser = "fixture-human";
                 gitEmail = "fixture@example.invalid";
                 omnigentEmail = "fixture@example.invalid";
                 signingPublicKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINdamAGCsQq31Uv+08lkBzoO4XLz2qYjJa8CGmj3B1Ea";
@@ -1493,7 +1516,11 @@
                       path = name: host.config.clan.core.vars.generators."fixture-${name}".files.credential.path;
                     in
                     policy.signingKey == path "signing"
-                    && policy.githubToken == path "github"
+                    && lib.all (
+                      owner:
+                      policy.githubTokens.${owner}.path
+                      == host.config.clan.core.vars.generators."omnigent-cameron-github-token-${owner}".files.token.path
+                    ) credentialGithubOwners
                     && policy.claudeSetupToken == path "claude"
                     &&
                       lib.all
@@ -1548,7 +1575,13 @@
           credentialPathAssertion
           {
             sops.secrets =
-              lib.genAttrs (map (name: "vars/per-machine/fixture/fixture-${name}/credential") credentialSources)
+              lib.genAttrs
+                (
+                  (map (name: "vars/per-machine/fixture/fixture-${name}/credential") credentialSources)
+                  ++ map (
+                    owner: "vars/per-machine/fixture/omnigent-cameron-github-token-${owner}/token"
+                  ) credentialGithubOwners
+                )
                 (_: {
                   path = lib.mkForce (toString evaluationMaterial);
                 });
@@ -1706,6 +1739,33 @@
               clan.core.vars.generators.omnigent-cameron-linear-personal.files.workspace.mode =
                 lib.mkForce "0644";
             };
+        declaredGithubTokens = lib.all (
+          owner:
+          let
+            g = credentialConfig.clan.core.vars.generators."omnigent-cameron-github-token-${owner}";
+            f = g.files.token;
+          in
+          g.prompts.token.type == "hidden"
+          && !g.share
+          && f.secret
+          && f.neededFor == "services"
+          && f.owner == "omnigent-cameron"
+          && f.mode == "0400"
+          && f.path == "${credentialRoot}/github-${owner}"
+        ) credentialGithubOwners;
+        githubDefaultOwner =
+          credentialRejects
+            "Omnigent worker omnigent-cameron: defaultOwner must select an enabled GitHub token."
+            {
+              services.omnigent-host.workers.cameron.credentials.defaultOwner = lib.mkForce "unknown";
+            };
+        githubExpectedPerson =
+          credentialRejects
+            "Omnigent worker omnigent-cameron: GitHub owner tokens require the same explicit expected person login."
+            {
+              services.omnigent-host.workers.cameron.credentials.githubTokens.second.expectedLogin =
+                lib.mkForce "another-person";
+            };
         declaredSources = lib.all (
           name:
           let
@@ -1724,21 +1784,21 @@
           credentialRejects
             "Omnigent worker omnigent-cameron: credentials require private host-local services files owned by the worker with mode 0400."
             {
-              clan.core.vars.generators.fixture-github.files.credential.owner = lib.mkForce "root";
+              clan.core.vars.generators.omnigent-cameron-github-token-first.files.token.owner =
+                lib.mkForce "root";
             };
         wrongMode =
           credentialRejects
             "Omnigent worker omnigent-cameron: credentials require private host-local services files owned by the worker with mode 0400."
             {
-              clan.core.vars.generators.fixture-github.files.credential.mode = lib.mkForce "0644";
+              clan.core.vars.generators.omnigent-cameron-github-token-first.files.token.mode = lib.mkForce "0644";
             };
         privateBundle =
           credentialRejects
             "Omnigent worker omnigent-cameron: only the declared Clan vars ciphertext and delivered paths are allowed."
             {
-              sops.secrets."vars/per-machine/fixture/fixture-github/credential".sopsFile = lib.mkForce (
-                pkgs.writeText "synthetic-personal-bundle" "personal bundle fixture"
-              );
+              sops.secrets."vars/per-machine/fixture/omnigent-cameron-github-token-first/token".sopsFile =
+                lib.mkForce (pkgs.writeText "synthetic-personal-bundle" "personal bundle fixture");
             };
         inherit (cases)
           privateSecrets
@@ -1805,6 +1865,7 @@
             passthru.cases = credentialCases;
           }
           ''
+            ${pkgs.python3.interpreter} ${../home/ai/omnigent/credential-fixtures.py} owner-fixtures ${../home/ai/omnigent/credentials.py}
             ${pkgs.omnigent.python.interpreter} ${../home/ai/omnigent/credential-fixtures.py} ${credentialArtifact}
             touch "$out"
           '';

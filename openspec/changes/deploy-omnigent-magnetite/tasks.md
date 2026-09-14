@@ -109,3 +109,13 @@ Controller acceptance remains separate.
 - [ ] 10.2 Select personal/work for Cameron on magnetite, pyrite and stibnite, and personal only for Janette on magnetite and pyrite; retain real unenrolled fail-closed assertions and serializable Clan settings.
 - [ ] 10.3 Reject a synthetic literal-slug key before implementation, then verify synthetic file-backed rendering, runtime selection and identity rejection with the pinned resolver and existing Git-root/endpoint guards; build credentials/inventory checks on both systems and preserve protected human/server and capability/adapter projections.
 - [ ] 10.4 Operator: follow deployment-plan section C2 to pipe only approved key/workspace entries into the named generators, prompt for identity metadata and Janette's own key, route ciphertext and verify identities before separately authorized activation.
+
+## 11. GitHub resource-owner tokens
+
+This follow-up replaces the single GitHub token without enrolling grants or enabling workers.
+Controller acceptance remains separate.
+
+- [ ] 11.1 Replace `githubToken` with default-off `githubTokens.<owner>` entries, owner-specific generators, fixed `token` files, per-entry expected person logins and nullable `defaultOwner`.
+- [ ] 11.2 Select Git HTTPS credentials exactly by request path with `useHttpPath`; select gh tokens by explicit environment, GitHub origin, then default owner, rejecting repository override mismatches without reproducing gh's command grammar or remote heuristics.
+- [ ] 11.3 Verify each token's login and two-owner synthetic selection, unknown-owner rejection, mismatch rejection and non-disclosure; build credentials/inventory checks on both platforms and preserve protected projections.
+- [ ] 11.4 Operator: issue fine-grained PATs separately for each person/resource owner, inspect owner scope and 90-day expiry, enroll only the named host-local generators, then verify identity after separately authorized activation.
