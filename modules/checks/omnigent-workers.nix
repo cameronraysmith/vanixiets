@@ -1717,6 +1717,15 @@
         ) (lib.attrValues linux.services.omnigent-host.workers);
         inherit (inventoryCases) declaredCredentials allDisabled realEnrollment;
         moduleAssertions = lib.all (a: a.assertion) credentialConfig.assertions;
+        fleetLinearGeneratorScript =
+          let
+            g =
+              inventoryRealMachines.magnetite.config.clan.core.vars.generators.omnigent-janettesmith-linear-personal;
+          in
+          lib.attrNames g.files == lib.sort builtins.lessThan credentialLinearFiles
+          && lib.all (
+            file: lib.hasInfix ''cp "$prompts/${file}" "$out/${file}"'' g.script
+          ) credentialLinearFiles;
         declaredLinearFiles = lib.all (
           file:
           let

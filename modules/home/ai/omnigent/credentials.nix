@@ -170,30 +170,32 @@ let
           message = "Omnigent worker ${worker.user}: Linear generators must use the worker user and masked label.";
         }
       ];
-      generators = lib.mkMerge (
-        lib.mapAttrsToList (name: source: {
-          ${source.generator} = {
-            share = false;
-            files.${source.file} = {
-              secret = true;
-              neededFor = "services";
-              owner = worker.user;
-              inherit group;
-              mode = "0400";
-            };
-            prompts.${source.file} = {
-              type = "hidden";
-              persist = lib.hasPrefix "linear-" name;
-              description = "Approved ${worker.user} credential for ${source.generator}/${source.file}";
-            };
-            runtimeInputs = [ pkgs.coreutils ];
-            script = ''
-              test -s "$prompts/${source.file}"
-              cp "$prompts/${source.file}" "$out/${source.file}"
-            '';
-          };
-        }) selected
-      );
+      generators = lib.mapAttrs (
+        generator: sources:
+        let
+          files = map (source: source.file) sources;
+        in
+        {
+          share = false;
+          files = lib.genAttrs files (_: {
+            secret = true;
+            neededFor = "services";
+            owner = worker.user;
+            inherit group;
+            mode = "0400";
+          });
+          prompts = lib.genAttrs files (file: {
+            type = "hidden";
+            persist = lib.hasPrefix "${worker.user}-linear-" generator;
+            description = "Approved ${worker.user} credential for ${generator}/${file}";
+          });
+          runtimeInputs = [ pkgs.coreutils ];
+          script = lib.concatMapStringsSep "\n" (file: ''
+            test -s "$prompts/${file}"
+            cp "$prompts/${file}" "$out/${file}"
+          '') files;
+        }
+      ) (lib.groupBy (source: source.generator) (lib.attrValues selected));
       templates = lib.optionalAttrs (linear != { } && linearPresent) {
         ${templateName} =
           (config.flake.lib.mkLinearCredentialsTemplate {
