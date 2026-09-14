@@ -887,13 +887,13 @@
         lib.concatStringsSep "\n" (
           lib.concatLists (
             lib.mapAttrsToList (
-              machine: d:
+              _: d:
               lib.concatMap (
                 worker:
                 map (source: ''
-                  mkdir -p "$out/vars/per-machine/${machine}/${source.generator}/${source.file}"
-                  cp ${../home/ai/omnigent/fixtures/vars/per-machine/fixture/fixture-signing/credential/secret} \
-                    "$out/vars/per-machine/${machine}/${source.generator}/${source.file}/secret"
+                  mkdir -p "$out/vars/shared/${source.generator}/${source.file}"
+                  install -m 0644 ${../home/ai/omnigent/fixtures/vars/per-machine/fixture/fixture-signing/credential/secret} \
+                    "$out/vars/shared/${source.generator}/${source.file}/secret"
                 '') (lib.attrValues (config.flake.lib.omnigentCredentialSelection worker.credentials))
               ) (lib.attrValues d.config.services.omnigent-host.workers)
               ++ lib.concatMap (
@@ -1115,7 +1115,7 @@
                 file = generator.files.${source.file};
               in
               generator.prompts.${source.file}.type == "hidden"
-              && !generator.share
+              && generator.share
               && file.secret
               && file.neededFor == "services"
               && file.owner == worker.user
@@ -1132,14 +1132,13 @@
               lib.any (
                 source:
                 !builtins.pathExists (
-                  c.clan.core.settings.directory
-                  + "/vars/per-machine/${c.clan.core.settings.machine.name}/${source.generator}/${source.file}/secret"
+                  c.clan.core.settings.directory + "/vars/shared/${source.generator}/${source.file}/secret"
                 )
               ) (lib.attrValues (config.flake.lib.omnigentCredentialSelection worker.credentials));
             expectedFailures = lib.concatMap (
               worker:
               lib.optionals (missing worker) [
-                "Omnigent worker ${worker.user}: credentials require private host-local services files owned by the worker with mode 0400."
+                "Omnigent worker ${worker.user}: credentials require private shared services files owned by the worker with mode 0400."
                 "Omnigent worker ${worker.user}: only the declared Clan vars ciphertext and delivered paths are allowed."
               ]
             ) (lib.attrValues c.services.omnigent-host.workers);
@@ -1419,15 +1418,16 @@
       credentialDirectory = pkgs.runCommandLocal "omnigent-credential-synthetic-delivery" { } ''
         cp -r ${../home/ai/omnigent/fixtures}/. "$out/"
         chmod -R u+w "$out"
+        cp -r "$out/vars/per-machine/fixture" "$out/vars/shared"
         ${lib.concatMapStringsSep "\n" (file: ''
-          mkdir -p "$out/vars/per-machine/fixture/omnigent-cameron-linear-personal/${file}"
+          mkdir -p "$out/vars/shared/omnigent-cameron-linear-personal/${file}"
           cp ${../home/ai/omnigent/fixtures/vars/per-machine/fixture/fixture-signing/credential/secret} \
-            "$out/vars/per-machine/fixture/omnigent-cameron-linear-personal/${file}/secret"
+            "$out/vars/shared/omnigent-cameron-linear-personal/${file}/secret"
         '') credentialLinearFiles}
         ${lib.concatMapStringsSep "\n" (owner: ''
-          mkdir -p "$out/vars/per-machine/fixture/omnigent-cameron-github-token-${owner}/token"
+          mkdir -p "$out/vars/shared/omnigent-cameron-github-token-${owner}/token"
           cp ${../home/ai/omnigent/fixtures/vars/per-machine/fixture/fixture-signing/credential/secret} \
-            "$out/vars/per-machine/fixture/omnigent-cameron-github-token-${owner}/token/secret"
+            "$out/vars/shared/omnigent-cameron-github-token-${owner}/token/secret"
         '') credentialGithubOwners}
       '';
       credentialModule = {
@@ -1454,7 +1454,7 @@
             lib.listToAttrs (
               map (
                 name:
-                lib.nameValuePair "vars/per-machine/fixture/fixture-${name}/credential" {
+                lib.nameValuePair "vars/shared/fixture-${name}/credential" {
                   path = "${credentialRoot}/${name}";
                 }
               ) credentialSources
@@ -1462,7 +1462,7 @@
             // lib.listToAttrs (
               map (
                 owner:
-                lib.nameValuePair "vars/per-machine/fixture/omnigent-cameron-github-token-${owner}/token" {
+                lib.nameValuePair "vars/shared/omnigent-cameron-github-token-${owner}/token" {
                   path = "${credentialRoot}/github-${owner}";
                 }
               ) credentialGithubOwners
@@ -1470,7 +1470,7 @@
             // lib.listToAttrs (
               map (
                 file:
-                lib.nameValuePair "vars/per-machine/fixture/omnigent-cameron-linear-personal/${file}" {
+                lib.nameValuePair "vars/shared/omnigent-cameron-linear-personal/${file}" {
                   path = "${credentialRoot}/linear-${file}";
                 }
               ) credentialLinearFiles
@@ -1577,10 +1577,8 @@
             sops.secrets =
               lib.genAttrs
                 (
-                  (map (name: "vars/per-machine/fixture/fixture-${name}/credential") credentialSources)
-                  ++ map (
-                    owner: "vars/per-machine/fixture/omnigent-cameron-github-token-${owner}/token"
-                  ) credentialGithubOwners
+                  (map (name: "vars/shared/fixture-${name}/credential") credentialSources)
+                  ++ map (owner: "vars/shared/omnigent-cameron-github-token-${owner}/token") credentialGithubOwners
                 )
                 (_: {
                   path = lib.mkForce (toString evaluationMaterial);
@@ -1634,8 +1632,7 @@
           linearTemplate = credentialConfig.sops.templates.omnigent-omnigent-cameron-linear.content;
           mockLinear = lib.getExe mockLinear;
           linearPlaceholders = lib.genAttrs credentialLinearFiles (
-            file:
-            credentialConfig.sops.placeholder."vars/per-machine/fixture/omnigent-cameron-linear-personal/${file}"
+            file: credentialConfig.sops.placeholder."vars/shared/omnigent-cameron-linear-personal/${file}"
           );
           runtimePath =
             if pkgs.stdenv.isDarwin then
@@ -1684,6 +1681,24 @@
           removeGuard
         ];
       credentialCases = {
+        hostLocalCredentials =
+          let
+            c =
+              (credentialFixture [
+                {
+                  clan.core.vars.generators.fixture-signing.share = lib.mkForce false;
+                  sops.secrets."vars/shared/fixture-signing/credential".sopsFile =
+                    ../home/ai/omnigent/fixtures/vars/per-machine/fixture/fixture-signing/credential/secret;
+                }
+              ]).config;
+          in
+          lib.any (
+            a:
+            !a.assertion
+            &&
+              a.message
+              == "Omnigent worker omnigent-cameron: credentials require private shared services files owned by the worker with mode 0400."
+          ) c.assertions;
         maskedLinearLabels =
           let
             accepts =
@@ -1734,7 +1749,7 @@
           in
           g.prompts.${file}.type == "hidden"
           && g.prompts.${file}.persist
-          && !g.share
+          && g.share
           && f.secret
           && f.neededFor == "services"
           && f.owner == "omnigent-cameron"
@@ -1743,7 +1758,7 @@
         ) credentialLinearFiles;
         linearMetadataMode =
           credentialRejects
-            "Omnigent worker omnigent-cameron: credentials require private host-local services files owned by the worker with mode 0400."
+            "Omnigent worker omnigent-cameron: credentials require private shared services files owned by the worker with mode 0400."
             {
               clan.core.vars.generators.omnigent-cameron-linear-personal.files.workspace.mode =
                 lib.mkForce "0644";
@@ -1755,7 +1770,7 @@
             f = g.files.token;
           in
           g.prompts.token.type == "hidden"
-          && !g.share
+          && g.share
           && f.secret
           && f.neededFor == "services"
           && f.owner == "omnigent-cameron"
@@ -1782,7 +1797,7 @@
             f = g.files.credential;
           in
           g.prompts.credential.type == "hidden"
-          && !g.share
+          && g.share
           && f.secret
           && f.neededFor == "services"
           && f.owner == "omnigent-cameron"
@@ -1791,14 +1806,14 @@
         ) credentialSources;
         wrongOwner =
           credentialRejects
-            "Omnigent worker omnigent-cameron: credentials require private host-local services files owned by the worker with mode 0400."
+            "Omnigent worker omnigent-cameron: credentials require private shared services files owned by the worker with mode 0400."
             {
               clan.core.vars.generators.omnigent-cameron-github-token-first.files.token.owner =
                 lib.mkForce "root";
             };
         wrongMode =
           credentialRejects
-            "Omnigent worker omnigent-cameron: credentials require private host-local services files owned by the worker with mode 0400."
+            "Omnigent worker omnigent-cameron: credentials require private shared services files owned by the worker with mode 0400."
             {
               clan.core.vars.generators.omnigent-cameron-github-token-first.files.token.mode = lib.mkForce "0644";
             };
@@ -1806,8 +1821,9 @@
           credentialRejects
             "Omnigent worker omnigent-cameron: only the declared Clan vars ciphertext and delivered paths are allowed."
             {
-              sops.secrets."vars/per-machine/fixture/omnigent-cameron-github-token-first/token".sopsFile =
-                lib.mkForce (pkgs.writeText "synthetic-personal-bundle" "personal bundle fixture");
+              sops.secrets."vars/shared/omnigent-cameron-github-token-first/token".sopsFile = lib.mkForce (
+                pkgs.writeText "synthetic-personal-bundle" "personal bundle fixture"
+              );
             };
         inherit (cases)
           privateSecrets

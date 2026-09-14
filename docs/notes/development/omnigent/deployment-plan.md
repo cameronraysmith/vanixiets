@@ -898,9 +898,9 @@ The remaining question identifiers are retained for continuity.
 
 The 2026-09-13 credential slice prepares file-backed delivery without enrolling real values or enabling any of the five workers.
 Each worker's typed `credentials` options separately enable `signingKey`, each `githubTokens` resource owner, each masked `linearApiKeys` label, and optional `claudeSetupToken`; all default off.
-Signing and Claude sources name a host-local Clan `generator` and `file`; each GitHub entry names `<worker-user>-github-token-<owner>`, fixed file `token`, and the person's `expectedLogin`.
+Signing and Claude sources name a per-person shared Clan `generator` and `file`; each GitHub entry names `<worker-user>-github-token-<owner>`, fixed file `token`, and the person's `expectedLogin`.
 Linear accepts only `personal` and `work` labels and a generator `<worker-user>-linear-<label>`, with fixed secret files `key`, `workspace`, `workspace-id` and `viewer-email`.
-Hidden prompts produce only those selected files with `secret = true`, `neededFor = "services"`, worker ownership and mode `0400`.
+Hidden prompts produce only those selected files with `share = true`, `secret = true`, `neededFor = "services"`, worker ownership and mode `0400` on each host.
 Consumers use the resulting `files.<name>.path`; Nix evaluation never reads the plaintext.
 Missing ciphertext prevents a configuration with declared credentials from building or deploying, even when worker execution remains disabled.
 Absent, empty, wrong-owner or wrong-mode runtime material also blocks credential-dependent activation or invocation.
@@ -934,7 +934,8 @@ It compares authenticated GitHub login, each Linear viewer and organization, Omn
 Failure reports omit credentials and do not dump provider responses.
 Provider denial and expired access tokens require an explicit renewal or login step, not fallback to another identity.
 
-Use independent person/host grants by default.
+Static grants are shared across each person's referencing hosts, never across people; resource-owner GitHub grants and masked-label Linear grants remain separate.
+Rotate one static file with one authorized `CLAN_NO_COMMIT=1 clan vars set magnetite <generator>/<file>`, route the ciphertext, then redeploy every referencing host.
 The person and the platform's authorized administrators approve scopes, recipients, issuance and revocation; the deployment operator replaces only approved static files.
 GitHub PATs and Linear API keys have no automatic renewal in these adapters; revoke at the provider, since local deletion alone does not revoke a grant.
 Claude setup-token renewal and provider revocation remain explicit human operations.
@@ -962,13 +963,13 @@ The typed interface still defaults off for other workers.
 `omnigent-worker-inventory` evaluates the exact five-worker matrix against explicitly synthetic delivery fixtures, preserving existing non-secret Clan inputs.
 It separately checks the real fleet's assertions against the expected missing-source diagnostics for each unenrolled worker, without filtering by machine role.
 The pre-enrollment state deliberately fails machine build/deploy evaluation.
-Once authorized `clan vars generate` or `clan vars set` enrollment has committed all selected ciphertext under `vars/per-machine`, those real source assertions must pass instead.
+Once authorized `clan vars generate` or `clan vars set` enrollment has committed all selected ciphertext under `vars/shared`, those real source assertions must pass instead.
 Passing the synthetic checks does not authorize deployment or prove live credential identity.
 
 Run these commands only in the operator's authorized enrollment/routing window, after grant and recipient approval in wizard sections A–B.
 They replace the proposed GitHub/signing commands in section C; the C2 sequence below replaces the wizard's stale optional Linear examples.
 Claude delivery remains undeclared and must not be generated here.
-GitHub generation prompts for a hidden single-line token and confirmation; use the approved person/host/resource-owner grant for each prompt.
+GitHub generation prompts for a hidden single-line token and confirmation; enroll once per approved person/resource-owner grant, through magnetite.
 Do not paste a multiline signing key into a generator's single-line prompt.
 The signing pipelines extract only `ssh-signing-key` from the approved owner's SOPS bundle and pipe it directly into `clan vars set`, never importing that bundle into the worker.
 The key's match to the declared public identity remains an enrollment verification obligation.
@@ -979,14 +980,6 @@ CLAN_NO_COMMIT=1 clan vars generate magnetite --generator omnigent-cameron-githu
 (set +x; set -o pipefail; sops -d --extract '["ssh-signing-key"]' secrets/home-manager/users/crs58/secrets.yaml | CLAN_NO_COMMIT=1 clan vars set magnetite omnigent-cameron-signing-key/key)
 CLAN_NO_COMMIT=1 clan vars generate magnetite --generator omnigent-janettesmith-github-token-sciexp --no-regenerate
 (set +x; set -o pipefail; sops -d --extract '["ssh-signing-key"]' secrets/home-manager/users/janettesmith/secrets.yaml | CLAN_NO_COMMIT=1 clan vars set magnetite omnigent-janettesmith-signing-key/key)
-CLAN_NO_COMMIT=1 clan vars generate pyrite --generator omnigent-cameron-github-token-sciexp --no-regenerate
-CLAN_NO_COMMIT=1 clan vars generate pyrite --generator omnigent-cameron-github-token-cameronraysmith --no-regenerate
-(set +x; set -o pipefail; sops -d --extract '["ssh-signing-key"]' secrets/home-manager/users/crs58/secrets.yaml | CLAN_NO_COMMIT=1 clan vars set pyrite omnigent-cameron-signing-key/key)
-CLAN_NO_COMMIT=1 clan vars generate pyrite --generator omnigent-janettesmith-github-token-sciexp --no-regenerate
-(set +x; set -o pipefail; sops -d --extract '["ssh-signing-key"]' secrets/home-manager/users/janettesmith/secrets.yaml | CLAN_NO_COMMIT=1 clan vars set pyrite omnigent-janettesmith-signing-key/key)
-CLAN_NO_COMMIT=1 clan vars generate stibnite --generator omnigent-cameron-github-token-sciexp --no-regenerate
-CLAN_NO_COMMIT=1 clan vars generate stibnite --generator omnigent-cameron-github-token-cameronraysmith --no-regenerate
-(set +x; set -o pipefail; sops -d --extract '["ssh-signing-key"]' secrets/home-manager/users/crs58/secrets.yaml | CLAN_NO_COMMIT=1 clan vars set stibnite omnigent-cameron-signing-key/key)
 ```
 
 Alternatively, `CLAN_NO_COMMIT=1 clan vars set <machine> <generator>/<file>` accepts hidden multiline input and confirmation, each terminated by Ctrl-D.
@@ -1002,7 +995,7 @@ Run from the repository root only after the owners approve delegation, scopes an
 Cameron's existing bundle declares only `linear-api-key-personal`, `linear-api-key-work`, `linear-workspace-personal` and `linear-workspace-work`; it declares no workspace-ID or viewer-email entries.
 Enter each expected organization ID and each person's expected Linear viewer email at the hidden `clan vars set` prompt and confirmation, ending each input with Ctrl-D.
 Do not infer the Linear viewer email from Git or SSO metadata.
-The sequence processes magnetite, then pyrite, then stibnite; on each host it enrolls Cameron's personal/work grants before Janette's personal grant where present.
+Enroll Cameron's personal/work grants once, then Janette's personal grant, through magnetite; shared storage serves all referencing hosts.
 Janette's workspace and identity files are enrolled first; persistent hidden prompts let `--no-regenerate` reuse them and ask only for her own missing personal API key.
 Never give Janette Cameron's API key.
 
@@ -1010,26 +1003,45 @@ Never give Janette Cameron's API key.
 (
 set +x
 set -e -o pipefail
-for machine in magnetite pyrite stibnite; do
-  for label in personal work; do
-    sops -d --extract "[\"linear-api-key-$label\"]" secrets/home-manager/users/crs58/secrets.yaml |
-      CLAN_NO_COMMIT=1 clan vars set "$machine" "omnigent-cameron-linear-$label/key"
-    sops -d --extract "[\"linear-workspace-$label\"]" secrets/home-manager/users/crs58/secrets.yaml |
-      CLAN_NO_COMMIT=1 clan vars set "$machine" "omnigent-cameron-linear-$label/workspace"
-    CLAN_NO_COMMIT=1 clan vars set "$machine" "omnigent-cameron-linear-$label/workspace-id"
-    CLAN_NO_COMMIT=1 clan vars set "$machine" "omnigent-cameron-linear-$label/viewer-email"
-  done
-  if test "$machine" != stibnite; then
-    sops -d --extract '["linear-workspace-personal"]' secrets/home-manager/users/crs58/secrets.yaml |
-      CLAN_NO_COMMIT=1 clan vars set "$machine" omnigent-janettesmith-linear-personal/workspace
-    CLAN_NO_COMMIT=1 clan vars set "$machine" omnigent-janettesmith-linear-personal/workspace-id
-    CLAN_NO_COMMIT=1 clan vars set "$machine" omnigent-janettesmith-linear-personal/viewer-email
-    CLAN_NO_COMMIT=1 clan vars generate "$machine" --generator omnigent-janettesmith-linear-personal --no-regenerate
-  fi
+for label in personal work; do
+  sops -d --extract "[\"linear-api-key-$label\"]" secrets/home-manager/users/crs58/secrets.yaml |
+    CLAN_NO_COMMIT=1 clan vars set magnetite "omnigent-cameron-linear-$label/key"
+  sops -d --extract "[\"linear-workspace-$label\"]" secrets/home-manager/users/crs58/secrets.yaml |
+    CLAN_NO_COMMIT=1 clan vars set magnetite "omnigent-cameron-linear-$label/workspace"
+  CLAN_NO_COMMIT=1 clan vars set magnetite "omnigent-cameron-linear-$label/workspace-id"
+  CLAN_NO_COMMIT=1 clan vars set magnetite "omnigent-cameron-linear-$label/viewer-email"
 done
+sops -d --extract '["linear-workspace-personal"]' secrets/home-manager/users/crs58/secrets.yaml |
+  CLAN_NO_COMMIT=1 clan vars set magnetite omnigent-janettesmith-linear-personal/workspace
+CLAN_NO_COMMIT=1 clan vars set magnetite omnigent-janettesmith-linear-personal/workspace-id
+CLAN_NO_COMMIT=1 clan vars set magnetite omnigent-janettesmith-linear-personal/viewer-email
+CLAN_NO_COMMIT=1 clan vars generate magnetite --generator omnigent-janettesmith-linear-personal --no-regenerate
 )
 ```
 
-Stop on any failed command rather than proceeding to the next host.
+Stop on any failed command rather than proceeding to the next grant.
 Route the resulting ciphertext deliberately and re-evaluate the pinned candidate before separately authorized activation and live identity verification.
 All workers remain execution-disabled throughout this sequence.
+
+## Shared-credential migration
+
+The 2026-09-14 shared-credential contract supersedes the earlier per-host static enrollment policy, not the host-local mutable OAuth policy.
+The current matrix selects 17 shared secret files: three GitHub tokens, two signing keys and twelve Linear files.
+The operator must migrate existing per-machine values before deploying the shared schema; synthetic fixture success does not satisfy real source assertions.
+
+Pinned Clan `1c21a2388ffbf9a957a60f58d18757420666cc43`, `pkgs/clan-cli/clan_lib/vars/set.py:15-34,43-50`, resolves all referencing machines before setting a shared variable.
+`clan_lib/vars/_types.py:281-295,311-322` removes each old per-machine variable and writes the shared value with that machine list.
+This automatic deletion is the approved credential cleanup.
+`clan_lib/vars/generate.py:358-375` fixes existing shared secrets after generation; `clan_lib/vars/secret_modules/sops.py:446-482` adds missing machine recipients and re-encrypts when recipient sets differ.
+Adding a referencing host therefore requires the authorized generation/fix step before deployment, not a new copy of the person's grant.
+These sources are available locally (see local: `~/ghq/git.clan.lol/clan/clan-core`).
+
+The operator-only `logs/omnigent-migrate-shared-vars.fish` first decrypts every old source directly with `sops -d vars/per-machine/<machine>/<generator>/<file>/secret` into a `0700` temporary directory, choosing magnetite where present and pyrite only as fallback.
+The operator's age key is an existing recipient; values must never reach the terminal.
+Do not use `clan vars get` for this step: `clan_lib/vars/get.py:16-41` resolves the current shared schema rather than the old path.
+Only after all source values are saved does the script pipe each into `CLAN_NO_COMMIT=1 clan vars set magnetite <generator>/<file>`.
+It checks all shared ciphertext files, removes empty generator parents with `rmdir`, and rejects remaining per-machine paths for exactly the eight worker generators selected by the evaluated declarations.
+The server's `omnigent-cookie-secret-omnigent` and all other non-worker generators remain untouched.
+Clan's SOPS delete removes the variable directory only (`secret_modules/sops.py:230-233`); `rmdir` refuses nonempty parents.
+Finally, the script rips its temporary plaintext directory and prints the all-three-machine fail-closed evaluation command.
+The script is an operator artifact, not an automatically executed migration or enrollment evidence.

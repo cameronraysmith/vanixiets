@@ -209,7 +209,7 @@ See the [deployment plan](../../../../docs/notes/development/omnigent/deployment
 Every enabled GitHub entry must expect the same person; resource owners are not authenticated user identities.
 `linearApiKeys` is keyed only by the masked labels `personal` and `work`; each default-off entry names a generator `<worker-user>-linear-<label>` with fixed files `key`, `workspace`, `workspace-id` and `viewer-email`.
 All four files are secret services files: the workspace slug and verifier identities must never be Nix literals.
-Enabled sources declare host-local hidden-prompt Clan generators, with secret services files owned by the worker and mode `0400`.
+Enabled sources declare per-person shared hidden-prompt Clan generators (`share = true`), with secret services files owned by the worker and mode `0400` on each host.
 They do not enroll values automatically.
 The adapters check the declared ciphertext source and consume `files.<name>.path`; personal bundles, age identities and `hm-sops-bridge` enrollment remain prohibited.
 All five inventory workers now declare signing-key and GitHub-token sources while execution remains disabled.
@@ -217,7 +217,7 @@ Signing generators use `<worker-user>-signing-key` (file `key`); GitHub generato
 Cameron's workers select GitHub owners `sciexp` and `cameronraysmith`, with `defaultOwner = "cameronraysmith"`; Janette's select only `sciexp`, also her `defaultOwner`.
 Cameron's workers select `personal` and `work`; Janette's select only `personal`.
 Claude setup-token delivery remains disabled.
-These declarations do not enroll ciphertext: the real machine configuration must fail its credential source assertions until the operator enrolls every selected source under `vars/per-machine`.
+These declarations do not enroll ciphertext: the real machine configuration must fail its credential source assertions until the operator enrolls every selected source under `vars/shared`.
 Worker `enable = false` does not bypass that prerequisite for building or deploying the machine.
 The inventory check evaluates the five declarations with explicitly synthetic delivery files, retains non-secret Clan inputs, and separately requires the real configuration's missing-source diagnostics for each unenrolled worker.
 After authorized enrollment commits the ciphertext, the real configuration's source assertions must pass instead; the check accepts that transition without relaxing production guards.
@@ -253,7 +253,10 @@ It compares other authenticated provider responses with `credentials.expected` a
 Linear prompts persist to their secret files, so `--no-regenerate` reuses pre-enrolled metadata and prompts only for missing values.
 Invoke it only during authorized enrollment; local `owner` labels are not identity evidence.
 Grant issuance, Kanidm person provisioning, recipient/scope approval, real enrollment, renewal and provider-side revocation remain human/deploy-gated.
-Use independent person/host grants by default.
+Static grants are shared across the person's referencing hosts, never across people; GitHub grants remain separate for each resource owner and Linear grants for each masked label.
+Rotate a static file with one authorized `CLAN_NO_COMMIT=1 clan vars set magnetite <generator>/<file>`, route the ciphertext, then redeploy every referencing host.
+Clan resolves the shared generator's complete machine recipient list; adding a referencing machine requires the authorized Clan generation/fix step to re-encrypt existing shared secrets before deployment.
+See the deployment plan's shared-credential migration section for pinned Clan source citations and the old-ciphertext migration procedure.
 
 Atomic, native Pi, independent omp, Codex and Omnigent retain their tool-owned mutable OAuth directories and existing selectors.
 There is no seed import or restoration after logout, deletion, redeploy, restart or rollback.

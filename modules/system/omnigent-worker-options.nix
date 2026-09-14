@@ -5,7 +5,7 @@ let
     generator = lib.mkOption {
       type = lib.types.nullOr (lib.types.strMatching "[a-z0-9][a-z0-9-]*");
       default = null;
-      description = "Host-local Clan hidden-prompt generator; required when enabled.";
+      description = "Per-person shared Clan hidden-prompt generator; required when enabled.";
     };
     file = lib.mkOption {
       type = lib.types.nullOr (lib.types.strMatching "[a-zA-Z0-9][a-zA-Z0-9_-]*");

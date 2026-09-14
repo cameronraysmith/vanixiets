@@ -116,11 +116,11 @@ let
             && file.neededFor == "services"
             && file.owner == worker.user
             && file.mode == "0400"
-            && !osConfig.clan.core.vars.generators.${source.generator}.share
+            && osConfig.clan.core.vars.generators.${source.generator}.share
             && (osConfig.sops.secrets.${secretName source}.owner or null) == worker.user
             && (osConfig.sops.secrets.${secretName source}.mode or null) == "0400"
           ) (lib.attrValues selected);
-          message = "Omnigent worker ${worker.user}: credentials require private host-local services files owned by the worker with mode 0400.";
+          message = "Omnigent worker ${worker.user}: credentials require private shared services files owned by the worker with mode 0400.";
         }
         {
           assertion = lib.all (
@@ -130,7 +130,7 @@ let
               secret = osConfig.sops.secrets.${secretName source} or null;
             in
             secret != null
-            && file.rel_dir == "per-machine/${osConfig.clan.core.settings.machine.name}/${source.generator}"
+            && file.rel_dir == "shared/${source.generator}"
             && secret.path == file.path
             && toString secret.sopsFile == toString (sourceFile source)
           ) (lib.attrValues selected);
@@ -176,7 +176,7 @@ let
           files = map (source: source.file) sources;
         in
         {
-          share = false;
+          share = true;
           files = lib.genAttrs files (_: {
             secret = true;
             neededFor = "services";
