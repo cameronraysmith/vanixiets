@@ -1,13 +1,23 @@
 { config, lib, ... }:
 let
+  linearFiles = [
+    "key"
+    "workspace"
+    "workspace-id"
+    "viewer-email"
+  ];
   sourceSelection =
     credentials:
     lib.filterAttrs (_: source: source.enable) (
       {
         inherit (credentials) signingKey githubToken claudeSetupToken;
       }
-      // lib.mapAttrs' (
-        workspace: source: lib.nameValuePair "linear-${workspace}" source
+      // lib.concatMapAttrs (
+        label: source:
+        lib.genAttrs (map (file: "linear-${label}-${file}") linearFiles) (name: {
+          inherit (source) enable generator;
+          file = lib.removePrefix "linear-${label}-" name;
+        })
       ) credentials.linearApiKeys
     );
   mkDelivery =
@@ -37,9 +47,11 @@ let
           name = lib.strings.sanitizeDerivationName "${file.rel_dir}_${file.name}";
           path = osConfig.clan.core.settings.directory + "/vars/${file.rel_dir}/${file.name}/secret";
         };
+      linearSource = source: file: source // { inherit file; };
+      linearSelected = lib.filterAttrs (name: _: lib.hasPrefix "linear-" name) selected;
       linearPresent = lib.all (
         source: builtins.hasAttr (secretName source) (osConfig.sops.secrets or { })
-      ) (lib.attrValues linear);
+      ) (lib.attrValues linearSelected);
       policy = {
         inherit home serverUrl;
         inherit (worker.credentials) expected;
@@ -48,8 +60,10 @@ let
         claudeSetupToken = enabledPath worker.credentials.claudeSetupToken;
         linearCredentials = if linear == { } then null else linearDestination;
         linearApiKeys = lib.mapAttrs (_: source: {
-          inherit (source) viewerEmail workspaceId;
-          path = path source;
+          path = path (linearSource source "key");
+          workspace = path (linearSource source "workspace");
+          workspaceId = path (linearSource source "workspace-id");
+          viewerEmail = path (linearSource source "viewer-email");
         }) linear;
         requiredFiles =
           map path (lib.attrValues selected) ++ lib.optional (linear != { }) linearDestination;
@@ -129,14 +143,14 @@ let
           message = "Omnigent worker ${worker.user}: credential verification requires an explicit expected Omnigent email.";
         }
         {
-          assertion = lib.all (source: source.viewerEmail != null && source.workspaceId != null) (
-            lib.attrValues linear
+          assertion = lib.all (label: linear.${label}.generator == "${worker.user}-linear-${label}") (
+            lib.attrNames linear
           );
-          message = "Omnigent worker ${worker.user}: Linear credentials require explicit viewer and workspace identities.";
+          message = "Omnigent worker ${worker.user}: Linear generators must use the worker user and masked label.";
         }
       ];
       generators = lib.mkMerge (
-        lib.mapAttrsToList (_: source: {
+        lib.mapAttrsToList (name: source: {
           ${source.generator} = {
             share = false;
             files.${source.file} = {
@@ -148,6 +162,7 @@ let
             };
             prompts.${source.file} = {
               type = "hidden";
+              persist = lib.hasPrefix "linear-" name;
               description = "Approved ${worker.user} credential for ${source.generator}/${source.file}";
             };
             runtimeInputs = [ pkgs.coreutils ];
@@ -162,8 +177,15 @@ let
         ${templateName} =
           (config.flake.lib.mkLinearCredentialsTemplate {
             destination = linearDestination;
-            workspaces = lib.mapAttrs (_: source: osConfig.sops.placeholder.${secretName source}) linear;
-            defaultWorkspace = lib.head (lib.attrNames linear);
+            workspaces = lib.mapAttrs' (
+              _: source:
+              lib.nameValuePair osConfig.sops.placeholder.${secretName (linearSource source "workspace")}
+                osConfig.sops.placeholder.${secretName (linearSource source "key")}
+            ) linear;
+            defaultWorkspace =
+              osConfig.sops.placeholder.${
+                secretName (linearSource (linear.${lib.head (lib.attrNames linear)}) "workspace")
+              };
           })
           // {
             owner = worker.user;

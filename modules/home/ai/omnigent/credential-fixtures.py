@@ -196,10 +196,19 @@ def main() -> None:
         for path in policy["requiredFiles"]:
             private_file(pathlib.Path(path), sentinel.encode())
         signing_key(pathlib.Path(policy["signingKey"]))
+        grant = policy["linearApiKeys"]["personal"]
+        assert set(policy["linearApiKeys"]) == {"personal"}
+        for field, value in (
+            ("workspace", "fixture"),
+            ("workspaceId", "workspace-id"),
+            ("viewerEmail", "fixture@example.invalid"),
+        ):
+            private_file(pathlib.Path(grant[field]), value.encode())
         private_file(
             pathlib.Path(policy["linearCredentials"]),
             artifact["linearTemplate"]
-            .replace(artifact["linearPlaceholder"], sentinel)
+            .replace(artifact["linearPlaceholders"]["key"], sentinel)
+            .replace(artifact["linearPlaceholders"]["workspace"], "fixture")
             .encode(),
         )
         oauth = {
@@ -250,7 +259,7 @@ subprocess.run, os.execve = run, execute
             XDG_CONFIG_HOME=str(home / ".config"),
             PYTHONPATH=str(mocks),
             FIXTURE_ARGV=str(root / "argv.jsonl"),
-            FIXTURE_LINEAR_GRANT_PATH=policy["linearApiKeys"]["fixture"]["path"],
+            FIXTURE_LINEAR_GRANT_PATH=grant["path"],
         )
         for key in (
             "GH_TOKEN",
@@ -448,6 +457,23 @@ subprocess.run, os.execve = run, execute
             )
         linear = generation / "home-path/bin/linear"
         run([linear, "--workspace", "fixture", "api", "query { viewer { email } }"])
+        run(
+            [linear, "--workspace", "personal", "api", "query { viewer { email } }"],
+            success=False,
+        )
+        for field in ("workspace", "workspaceId", "viewerEmail"):
+            path = pathlib.Path(grant[field])
+            original_metadata = path.read_bytes()
+            private_file(path, b"other-synthetic-identity")
+            run([verify], success=False)
+            private_file(path, original_metadata)
+        workspace_path = pathlib.Path(grant["workspace"])
+        workspace_path.unlink()
+        run(
+            [linear, "--workspace", "fixture", "api", "query { viewer { email } }"],
+            success=False,
+        )
+        private_file(workspace_path, b"fixture")
         run([linear, "api", "query { viewer { email } }"], success=False)
         run(
             [linear, "--workspace", "other", "api", "query { viewer { email } }"],

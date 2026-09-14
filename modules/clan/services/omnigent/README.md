@@ -204,13 +204,16 @@ See the [deployment plan](../../../../docs/notes/development/omnigent/deployment
 ## Selected static credentials
 
 `workers.<name>.credentials` is a typed interface on both plain host modules and the serializable Clan role.
-`signingKey`, `githubToken`, `claudeSetupToken`, and each `linearApiKeys.<workspace>` entry have independent default-off `enable` flags and explicit `generator`/`file` names.
+`signingKey`, `githubToken`, and `claudeSetupToken` have independent default-off `enable` flags and explicit `generator`/`file` names.
+`linearApiKeys` is keyed only by the masked labels `personal` and `work`; each default-off entry names a generator `<worker-user>-linear-<label>` with fixed files `key`, `workspace`, `workspace-id` and `viewer-email`.
+All four files are secret services files: the workspace slug and verifier identities must never be Nix literals.
 Enabled sources declare host-local hidden-prompt Clan generators, with secret services files owned by the worker and mode `0400`.
 They do not enroll values automatically.
 The adapters check the declared ciphertext source and consume `files.<name>.path`; personal bundles, age identities and `hm-sops-bridge` enrollment remain prohibited.
 All five inventory workers now declare signing-key and GitHub-token sources while execution remains disabled.
 Their generator names are `<worker-user>-signing-key` (file `key`) and `<worker-user>-github-token` (file `token`), with canonical expected identities derived from owner metadata.
-Linear mappings remain empty and Claude setup-token delivery remains disabled.
+Cameron's workers select `personal` and `work`; Janette's select only `personal`.
+Claude setup-token delivery remains disabled.
 These declarations do not enroll ciphertext: the real machine configuration must fail its credential source assertions until the operator enrolls every selected source under `vars/per-machine`.
 Worker `enable = false` does not bypass that prerequisite for building or deploying the machine.
 The inventory check evaluates the five declarations with explicitly synthetic delivery files, retains non-secret Clan inputs, and separately requires the real configuration's missing-source diagnostics for each unenrolled worker.
@@ -219,7 +222,8 @@ See the deployment plan's enrollment sequence for the exact generator and multil
 
 Git and jj sign with the selected private-key file, using the declared public key and canonical Git email for `allowed_signers`.
 Git's absolute HTTPS helper uses the token-reading `programs.gh.package` wrapper.
-Linear's system-SOPS template contains only the explicitly selected workspace mappings; invocations require `--workspace`, disable `.env` loading, and reject competing `api_key` sources.
+Linear's system-SOPS template substitutes both workspace names and API keys from the selected secret files, matching the human personal/work masking pattern without importing human credentials.
+The wrapper accepts exactly one explicit `--workspace` slug from the delivered workspace files, not a label; it disables `.env` loading, strips endpoint overrides and rejects competing `api_key` sources, including the effective Git root.
 Optional native Claude token injection replaces the required runtime executable, not merely a shadowed profile entry.
 Competing Claude credentials fail closed.
 Process-scoped injection limits incidental inheritance; it does not hide grants from code running as the worker or from host administrators.
@@ -229,7 +233,8 @@ Darwin serializes activation and boot invocations of the maintained privileged i
 The worker requires that receipt and readable files before standalone Home Manager and host execution, including after reboot.
 No network verification runs at startup, and workers never invoke privileged decryption.
 
-The separately invoked `omnigent-worker-verify` compares authenticated provider responses with `credentials.expected` and each Linear workspace's `viewerEmail`/`workspaceId`.
+The separately invoked `omnigent-worker-verify` compares authenticated provider responses with `credentials.expected` and reads each Linear grant's expected slug, viewer email and workspace ID from its delivered files at runtime.
+Linear prompts persist to their secret files, so `--no-regenerate` reuses pre-enrolled metadata and prompts only for missing values.
 Invoke it only during authorized enrollment; local `owner` labels are not identity evidence.
 Grant issuance, Kanidm person provisioning, recipient/scope approval, real enrollment, renewal and provider-side revocation remain human/deploy-gated.
 Use independent person/host grants by default.

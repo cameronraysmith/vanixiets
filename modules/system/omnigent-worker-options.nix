@@ -35,14 +35,21 @@ let
     linearApiKeys = lib.mkOption {
       type = lib.types.attrsOf (
         lib.types.submodule {
-          options = credentialSourceOptions // {
-            viewerEmail = expectedIdentity "Expected authenticated Linear viewer email in this workspace.";
-            workspaceId = expectedIdentity "Expected authenticated Linear organization ID.";
-          };
+          options = { inherit (credentialSourceOptions) enable generator; };
         }
       );
+      apply =
+        entries:
+        assert lib.assertMsg (lib.all (
+          label:
+          lib.elem label [
+            "personal"
+            "work"
+          ]
+        ) (lib.attrNames entries)) "Linear credentials must use masked personal/work labels.";
+        entries;
       default = { };
-      description = "Explicit workspace URL-key to personal API-key mappings; each entry defaults off.";
+      description = "Masked personal/work labels selecting a Clan generator with secret key, workspace, workspace-id and viewer-email files; each entry defaults off.";
     };
     claudeSetupToken = lib.mkOption {
       type = credentialSource;

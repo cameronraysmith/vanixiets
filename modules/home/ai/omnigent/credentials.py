@@ -74,7 +74,9 @@ def linear_workspace(arguments: list[str], policy: dict[str, Any]) -> str:
         elif argument.startswith("--workspace="):
             found.append(argument.split("=", 1)[1])
     require(
-        len(found) == 1 and found[0] in policy["linearApiKeys"],
+        len(found) == 1
+        and found[0]
+        in {token(grant["workspace"]) for grant in policy["linearApiKeys"].values()},
         "select one declared Linear workspace",
     )
     return found[0]
@@ -116,7 +118,12 @@ def linear_environment(policy: dict[str, Any]) -> dict[str, str]:
     credentials = tomllib.loads(
         material(policy["linearCredentials"], os.getuid()).decode()
     )
-    grants = policy["linearApiKeys"]
+    grants = {
+        token(grant["workspace"]): grant for grant in policy["linearApiKeys"].values()
+    }
+    require(
+        len(grants) == len(policy["linearApiKeys"]), "duplicate Linear workspace grants"
+    )
     require(
         set(credentials) == {"default", *grants} and credentials["default"] in grants,
         "Linear credential workspaces differ from selected grants",
@@ -249,7 +256,8 @@ def verify(policy: dict[str, Any]) -> None:
         require(
             observed.get("login") == expected["githubUser"], "GitHub identity mismatch"
         )
-    for workspace, grant in policy["linearApiKeys"].items():
+    for grant in policy["linearApiKeys"].values():
+        workspace = token(grant["workspace"])
         observed = command_json(
             [
                 policy["executables"]["linear"],
@@ -262,12 +270,12 @@ def verify(policy: dict[str, Any]) -> None:
         )
         data = observed.get("data", observed)
         require(
-            data.get("viewer", {}).get("email") == grant["viewerEmail"],
+            data.get("viewer", {}).get("email") == token(grant["viewerEmail"]),
             "Linear viewer mismatch",
         )
         organization = data.get("organization", {})
         require(
-            organization.get("id") == grant["workspaceId"]
+            organization.get("id") == token(grant["workspaceId"])
             and organization.get("urlKey") == workspace,
             "Linear workspace mismatch",
         )

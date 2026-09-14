@@ -897,8 +897,9 @@ The remaining question identifiers are retained for continuity.
 ## Dedicated-worker static credentials
 
 The 2026-09-13 credential slice prepares file-backed delivery without enrolling real values or enabling any of the five workers.
-Each worker's typed `credentials` options separately enable `signingKey`, `githubToken`, each named `linearApiKeys` workspace, and optional `claudeSetupToken`; all default off.
-An enabled source names its own host-local Clan `generator` and `file`.
+Each worker's typed `credentials` options separately enable `signingKey`, `githubToken`, each masked `linearApiKeys` label, and optional `claudeSetupToken`; all default off.
+Signing, GitHub and Claude sources name a host-local Clan `generator` and `file`.
+Linear accepts only `personal` and `work` labels and a generator `<worker-user>-linear-<label>`, with fixed secret files `key`, `workspace`, `workspace-id` and `viewer-email`.
 Hidden prompts produce only those selected files with `secret = true`, `neededFor = "services"`, worker ownership and mode `0400`.
 Consumers use the resulting `files.<name>.path`; Nix evaluation never reads the plaintext.
 Missing ciphertext prevents a configuration with declared credentials from building or deploying, even when worker execution remains disabled.
@@ -909,7 +910,9 @@ The declared public key and canonical `credentials.expected.gitEmail` produce th
 This narrowly approved delegation does not deliver the person's age identity, personal SOPS bundle, SSH agent, or `hm-sops-bridge` enrollment.
 The worker's `gh` wrapper is its `programs.gh.package`, so Git's absolute HTTPS credential helper reaches the token reader.
 It injects `GH_TOKEN` only into `gh` and its descendants, never the host environment.
-Linear receives a system-SOPS-rendered `0400` inline credentials file through the generalized template helper, with explicit workspace selection, `LINEAR_IGNORE_ENV_FILE=1`, and rejection of ambient or project `api_key` overrides.
+Linear receives a system-SOPS-rendered `0400` inline credentials file whose workspace names and API keys are both secret placeholders, with explicit workspace selection, `LINEAR_IGNORE_ENV_FILE=1`, endpoint-override stripping and rejection of ambient or project `api_key` overrides, including the effective Git root.
+The wrapper's `--workspace` argument remains the slug, not the masked label; its allow-list and the verifier's expected slug, workspace ID and viewer email are read from delivered files at runtime.
+No actual workspace slug or Linear identity metadata belongs in Nix or Git plaintext.
 The optional native Claude wrapper replaces the required runtime executable before Omnigent resolves it; competing environment, settings, file and Keychain credentials fail rather than selecting another grant.
 
 Linux orders credential-dependent Home Manager and host units after and requiring `sops-install-secrets.service` when that installation mode is active; file-readiness checks also precede Home Manager writes and host execution.
@@ -946,7 +949,8 @@ Neither is implemented by this file-backed SOPS slice.
 
 The declaration follow-up enables signing-key and GitHub-token delivery for Cameron and Janette on magnetite and pyrite, and Cameron on stibnite; all five workers keep `enable = false`.
 Expected GitHub, Git, signing-public-key and Omnigent identities derive from the canonical owner metadata.
-Linear mappings remain empty pending workspace approval, and Claude setup-token delivery remains disabled.
+The Linear masking follow-up selects `personal` and `work` for Cameron on all three hosts, and only `personal` for Janette on magnetite and pyrite.
+Claude setup-token delivery remains disabled.
 The typed interface still defaults off for other workers.
 
 `omnigent-worker-inventory` evaluates the exact five-worker matrix against explicitly synthetic delivery fixtures, preserving existing non-secret Clan inputs.
@@ -956,7 +960,8 @@ Once authorized `clan vars generate` or `clan vars set` enrollment has committed
 Passing the synthetic checks does not authorize deployment or prove live credential identity.
 
 Run these commands only in the operator's authorized enrollment/routing window, after grant and recipient approval in wizard sections A–B.
-They replace the proposed GitHub/signing commands in section C; do not run that wizard's optional Claude or Linear examples without a separate declaration change.
+They replace the proposed GitHub/signing commands in section C; the C2 sequence below replaces the wizard's stale optional Linear examples.
+Claude delivery remains undeclared and must not be generated here.
 GitHub generation prompts for a hidden single-line token and confirmation; use the approved person/host grant for each prompt.
 Do not paste a multiline signing key into a generator's single-line prompt.
 The signing pipelines extract only `ssh-signing-key` from the approved owner's SOPS bundle and pipe it directly into `clan vars set`, never importing that bundle into the worker.
@@ -980,3 +985,42 @@ Keep shell tracing disabled and secret values out of logs.
 `CLAN_NO_COMMIT=1` prevents automatic commits, not Clan's possible Git intent-to-add; route the resulting ciphertext deliberately before evaluating the pinned deployment candidate.
 Never run bare `clan vars generate <machine>` here, which would include unrelated pending generators.
 Enrollment does not enable a worker or activate a host; later authorization, activation and the worker-local `omnigent-worker-verify` invocation remain separate gates.
+
+## C2: Masked Linear enrollment
+
+These are operator commands, not executed enrollment evidence.
+Run from the repository root only after the owners approve delegation, scopes and recipients, with shell tracing disabled.
+Cameron's existing bundle declares only `linear-api-key-personal`, `linear-api-key-work`, `linear-workspace-personal` and `linear-workspace-work`; it declares no workspace-ID or viewer-email entries.
+Enter each expected organization ID and each person's expected Linear viewer email at the hidden `clan vars set` prompt and confirmation, ending each input with Ctrl-D.
+Do not infer the Linear viewer email from Git or SSO metadata.
+The sequence processes magnetite, then pyrite, then stibnite; on each host it enrolls Cameron's personal/work grants before Janette's personal grant where present.
+Janette's workspace and identity files are enrolled first; persistent hidden prompts let `--no-regenerate` reuse them and ask only for her own missing personal API key.
+Never give Janette Cameron's API key.
+
+```bash
+(
+set +x
+set -e -o pipefail
+for machine in magnetite pyrite stibnite; do
+  for label in personal work; do
+    sops -d --extract "[\"linear-api-key-$label\"]" secrets/home-manager/users/crs58/secrets.yaml |
+      CLAN_NO_COMMIT=1 clan vars set "$machine" "omnigent-cameron-linear-$label/key"
+    sops -d --extract "[\"linear-workspace-$label\"]" secrets/home-manager/users/crs58/secrets.yaml |
+      CLAN_NO_COMMIT=1 clan vars set "$machine" "omnigent-cameron-linear-$label/workspace"
+    CLAN_NO_COMMIT=1 clan vars set "$machine" "omnigent-cameron-linear-$label/workspace-id"
+    CLAN_NO_COMMIT=1 clan vars set "$machine" "omnigent-cameron-linear-$label/viewer-email"
+  done
+  if test "$machine" != stibnite; then
+    sops -d --extract '["linear-workspace-personal"]' secrets/home-manager/users/crs58/secrets.yaml |
+      CLAN_NO_COMMIT=1 clan vars set "$machine" omnigent-janettesmith-linear-personal/workspace
+    CLAN_NO_COMMIT=1 clan vars set "$machine" omnigent-janettesmith-linear-personal/workspace-id
+    CLAN_NO_COMMIT=1 clan vars set "$machine" omnigent-janettesmith-linear-personal/viewer-email
+    CLAN_NO_COMMIT=1 clan vars generate "$machine" --generator omnigent-janettesmith-linear-personal --no-regenerate
+  fi
+done
+)
+```
+
+Stop on any failed command rather than proceeding to the next host.
+Route the resulting ciphertext deliberately and re-evaluate the pinned candidate before separately authorized activation and live identity verification.
+All workers remain execution-disabled throughout this sequence.

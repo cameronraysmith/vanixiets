@@ -4,7 +4,7 @@ let
     name = config.flake.users.janettesmith.meta.fullname;
     email = config.flake.users.janettesmith.meta.gitEmail;
   };
-  workerCredentials = user: meta: {
+  workerCredentials = user: meta: labels: {
     signingKey = {
       enable = true;
       generator = "${user}-signing-key";
@@ -15,6 +15,15 @@ let
       generator = "${user}-github-token";
       file = "token";
     };
+    linearApiKeys = builtins.listToAttrs (
+      map (label: {
+        name = label;
+        value = {
+          enable = true;
+          generator = "${user}-linear-${label}";
+        };
+      }) labels
+    );
     expected = {
       githubUser = meta.githubUser;
       gitEmail = meta.gitEmail;
@@ -41,13 +50,18 @@ in
             enable = false;
             owner = "cameron";
             user = "omnigent-cameron";
-            credentials = workerCredentials "omnigent-cameron" config.flake.users.crs58.meta;
+            credentials = workerCredentials "omnigent-cameron" config.flake.users.crs58.meta [
+              "personal"
+              "work"
+            ];
           };
           janettesmith = {
             enable = false;
             owner = "janettesmith";
             user = "omnigent-janettesmith";
-            credentials = workerCredentials "omnigent-janettesmith" config.flake.users.janettesmith.meta;
+            credentials = workerCredentials "omnigent-janettesmith" config.flake.users.janettesmith.meta [
+              "personal"
+            ];
           };
         };
       };
@@ -61,13 +75,18 @@ in
             enable = false;
             owner = "cameron";
             user = "omnigent-cameron";
-            credentials = workerCredentials "omnigent-cameron" config.flake.users.crs58.meta;
+            credentials = workerCredentials "omnigent-cameron" config.flake.users.crs58.meta [
+              "personal"
+              "work"
+            ];
           };
           janettesmith = {
             enable = false;
             owner = "janettesmith";
             user = "omnigent-janettesmith";
-            credentials = workerCredentials "omnigent-janettesmith" config.flake.users.janettesmith.meta;
+            credentials = workerCredentials "omnigent-janettesmith" config.flake.users.janettesmith.meta [
+              "personal"
+            ];
           };
         };
       };
@@ -80,7 +99,10 @@ in
           enable = false;
           owner = "cameron";
           user = "omnigent-cameron";
-          credentials = workerCredentials "omnigent-cameron" config.flake.users.crs58.meta;
+          credentials = workerCredentials "omnigent-cameron" config.flake.users.crs58.meta [
+            "personal"
+            "work"
+          ];
         };
       };
       extraModules = [

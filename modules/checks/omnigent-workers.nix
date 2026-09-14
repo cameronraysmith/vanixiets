@@ -1091,7 +1091,12 @@
                 generator = "${worker.user}-github-token";
                 file = "token";
               }
-            && credentials.linearApiKeys == { }
+            &&
+              credentials.linearApiKeys
+              == lib.genAttrs ([ "personal" ] ++ lib.optional (worker.owner == "cameron") "work") (label: {
+                enable = true;
+                generator = "${worker.user}-linear-${label}";
+              })
             && !credentials.claudeSetupToken.enable
             &&
               credentials.expected == {
@@ -1100,25 +1105,19 @@
                 signingPublicKey = lib.head meta.sshKeys;
                 omnigentEmail = meta.email;
               }
-            &&
-              lib.all
-                (
-                  source:
-                  let
-                    generator = machine.config.clan.core.vars.generators.${source.generator};
-                    file = generator.files.${source.file};
-                  in
-                  generator.prompts.${source.file}.type == "hidden"
-                  && !generator.share
-                  && file.secret
-                  && file.neededFor == "services"
-                  && file.owner == worker.user
-                  && file.mode == "0400"
-                )
-                [
-                  credentials.signingKey
-                  credentials.githubToken
-                ]
+            && lib.all (
+              source:
+              let
+                generator = machine.config.clan.core.vars.generators.${source.generator};
+                file = generator.files.${source.file};
+              in
+              generator.prompts.${source.file}.type == "hidden"
+              && !generator.share
+              && file.secret
+              && file.neededFor == "services"
+              && file.owner == worker.user
+              && file.mode == "0400"
+            ) (lib.attrValues (config.flake.lib.omnigentCredentialSelection credentials))
           ) (lib.attrValues machine.config.services.omnigent-host.workers)
         ) (lib.attrValues inventoryMachines);
         realEnrollment = lib.all (
@@ -1398,7 +1397,6 @@
       credentialSources = [
         "signing"
         "github"
-        "linear"
         "claude"
       ];
       credentialSource = name: {
@@ -1406,6 +1404,21 @@
         generator = "fixture-${name}";
         file = "credential";
       };
+      credentialLinearFiles = [
+        "key"
+        "workspace"
+        "workspace-id"
+        "viewer-email"
+      ];
+      credentialDirectory = pkgs.runCommandLocal "omnigent-credential-synthetic-delivery" { } ''
+        cp -r ${../home/ai/omnigent/fixtures}/. "$out/"
+        chmod -R u+w "$out"
+        ${lib.concatMapStringsSep "\n" (file: ''
+          mkdir -p "$out/vars/per-machine/fixture/omnigent-cameron-linear-personal/${file}"
+          cp ${../home/ai/omnigent/fixtures/vars/per-machine/fixture/fixture-signing/credential/secret} \
+            "$out/vars/per-machine/fixture/omnigent-cameron-linear-personal/${file}/secret"
+        '') credentialLinearFiles}
+      '';
       credentialModule = {
         nixpkgs.pkgs = lib.mkForce (
           pkgs.extend (
@@ -1416,7 +1429,7 @@
           )
         );
         clan.core.settings = {
-          directory = ../home/ai/omnigent/fixtures;
+          directory = credentialDirectory;
           name = "fixture";
           icon = null;
           tld = "test";
@@ -1426,14 +1439,23 @@
         sops = {
           validateSopsFiles = false;
           age.keyFile = "/synthetic-no-decryption-key";
-          secrets = lib.listToAttrs (
-            map (
-              name:
-              lib.nameValuePair "vars/per-machine/fixture/fixture-${name}/credential" {
-                path = "${credentialRoot}/${name}";
-              }
-            ) credentialSources
-          );
+          secrets =
+            lib.listToAttrs (
+              map (
+                name:
+                lib.nameValuePair "vars/per-machine/fixture/fixture-${name}/credential" {
+                  path = "${credentialRoot}/${name}";
+                }
+              ) credentialSources
+            )
+            // lib.listToAttrs (
+              map (
+                file:
+                lib.nameValuePair "vars/per-machine/fixture/omnigent-cameron-linear-personal/${file}" {
+                  path = "${credentialRoot}/linear-${file}";
+                }
+              ) credentialLinearFiles
+            );
         };
         users.users.omnigent-cameron.home = lib.mkForce credentialHomePath;
         services.omnigent-host = {
@@ -1444,9 +1466,9 @@
               signingKey = credentialSource "signing";
               githubToken = credentialSource "github";
               claudeSetupToken = credentialSource "claude";
-              linearApiKeys.fixture = credentialSource "linear" // {
-                viewerEmail = "fixture@example.invalid";
-                workspaceId = "workspace-id";
+              linearApiKeys.personal = {
+                enable = true;
+                generator = "omnigent-cameron-linear-personal";
               };
               expected = {
                 githubUser = "fixture-human";
@@ -1473,7 +1495,27 @@
                     policy.signingKey == path "signing"
                     && policy.githubToken == path "github"
                     && policy.claudeSetupToken == path "claude"
-                    && policy.linearApiKeys.fixture.path == path "linear";
+                    &&
+                      lib.all
+                        (
+                          field:
+                          policy.linearApiKeys.personal.${field}
+                          == host.config.clan.core.vars.generators.omnigent-cameron-linear-personal.files.${
+                            {
+                              path = "key";
+                              workspace = "workspace";
+                              workspaceId = "workspace-id";
+                              viewerEmail = "viewer-email";
+                            }
+                            .${field}
+                          }.path
+                        )
+                        [
+                          "path"
+                          "workspace"
+                          "workspaceId"
+                          "viewerEmail"
+                        ];
                   message = "Credential fixture: Home Manager credential options must remain Clan vars paths.";
                 }
               ];
@@ -1558,8 +1600,10 @@
           mockGh = lib.getExe mockGh;
           linearTemplate = credentialConfig.sops.templates.omnigent-omnigent-cameron-linear.content;
           mockLinear = lib.getExe mockLinear;
-          linearPlaceholder =
-            credentialConfig.sops.placeholder."vars/per-machine/fixture/fixture-linear/credential";
+          linearPlaceholders = lib.genAttrs credentialLinearFiles (
+            file:
+            credentialConfig.sops.placeholder."vars/per-machine/fixture/omnigent-cameron-linear-personal/${file}"
+          );
           runtimePath =
             if pkgs.stdenv.isDarwin then
               credentialConfig.launchd.daemons.omnigent-host-cameron.environment.PATH
@@ -1607,6 +1651,26 @@
           removeGuard
         ];
       credentialCases = {
+        maskedLinearLabels =
+          let
+            accepts =
+              label:
+              (builtins.tryEval (
+                builtins.deepSeq
+                  (lib.evalModules {
+                    modules = [
+                      {
+                        options.credentials = lib.mkOption {
+                          type = lib.types.submodule { options = config.flake.lib.omnigentWorkerCredentialOptions; };
+                        };
+                      }
+                      { credentials.linearApiKeys.${label}.enable = false; }
+                    ];
+                  }).config.credentials
+                  true
+              )).success;
+          in
+          accepts "personal" && accepts "work" && !accepts "synthetic-workspace-slug";
         adapterAllowList =
           credentialRejects
             "Omnigent worker cameron: Home Manager credential paths must match the host adapter's allow-list."
@@ -1620,6 +1684,28 @@
         ) (lib.attrValues linux.services.omnigent-host.workers);
         inherit (inventoryCases) declaredCredentials allDisabled realEnrollment;
         moduleAssertions = lib.all (a: a.assertion) credentialConfig.assertions;
+        declaredLinearFiles = lib.all (
+          file:
+          let
+            g = credentialConfig.clan.core.vars.generators.omnigent-cameron-linear-personal;
+            f = g.files.${file};
+          in
+          g.prompts.${file}.type == "hidden"
+          && g.prompts.${file}.persist
+          && !g.share
+          && f.secret
+          && f.neededFor == "services"
+          && f.owner == "omnigent-cameron"
+          && f.mode == "0400"
+          && f.path == "${credentialRoot}/linear-${file}"
+        ) credentialLinearFiles;
+        linearMetadataMode =
+          credentialRejects
+            "Omnigent worker omnigent-cameron: credentials require private host-local services files owned by the worker with mode 0400."
+            {
+              clan.core.vars.generators.omnigent-cameron-linear-personal.files.workspace.mode =
+                lib.mkForce "0644";
+            };
         declaredSources = lib.all (
           name:
           let

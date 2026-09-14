@@ -99,3 +99,13 @@ Controller acceptance remains separate.
 - [ ] 9.2 Evaluate the inventory against synthetic delivery fixtures and separately require the real unenrolled fleet to fail closed with the missing-source diagnostics for every worker; require real source assertions to pass after ciphertext enrollment.
 - [ ] 9.3 Build inventory and credential checks on both systems, compare protected human/server projections with the credential run's fixed supplemental integrated baseline, and verify formatting and signed child routing.
 - [ ] 9.4 Operator: approve scopes and recipients, run only the deployment plan's explicit per-machine GitHub generation and multiline signing-key set commands, route ciphertext, and re-evaluate before separately authorized activation.
+
+## 10. Masked Linear declarations
+
+This follow-up supersedes section 9's empty Linear mappings without enrolling material or enabling execution.
+Controller acceptance remains separate.
+
+- [ ] 10.1 Restrict `linearApiKeys` to masked `personal`/`work` labels; declare `<worker-user>-linear-<label>` generators with secret `key`, `workspace`, `workspace-id` and `viewer-email` files and runtime-only slug/identity resolution.
+- [ ] 10.2 Select personal/work for Cameron on magnetite, pyrite and stibnite, and personal only for Janette on magnetite and pyrite; retain real unenrolled fail-closed assertions and serializable Clan settings.
+- [ ] 10.3 Reject a synthetic literal-slug key before implementation, then verify synthetic file-backed rendering, runtime selection and identity rejection with the pinned resolver and existing Git-root/endpoint guards; build credentials/inventory checks on both systems and preserve protected human/server and capability/adapter projections.
+- [ ] 10.4 Operator: follow deployment-plan section C2 to pipe only approved key/workspace entries into the named generators, prompt for identity metadata and Janette's own key, route ciphertext and verify identities before separately authorized activation.
