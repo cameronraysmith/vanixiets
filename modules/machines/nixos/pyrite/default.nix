@@ -110,6 +110,7 @@ in
       boot.zfs.devNodes = "/dev/disk/by-id";
 
       networking.hostName = "pyrite";
+      time.timeZone = "America/New_York";
 
       # Matches the 26.05 installer ISO release this machine is installed from. Never
       # change after install. This plain assignment overrides clan-core's state-version
