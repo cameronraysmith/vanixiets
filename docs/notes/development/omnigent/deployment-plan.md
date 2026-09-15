@@ -1045,3 +1045,19 @@ The server's `omnigent-cookie-secret-omnigent` and all other non-worker generato
 Clan's SOPS delete removes the variable directory only (`secret_modules/sops.py:230-233`); `rmdir` refuses nonempty parents.
 Finally, the script rips its temporary plaintext directory and prints the all-three-machine fail-closed evaluation command.
 The script is an operator artifact, not an automatically executed migration or enrollment evidence.
+
+## Worker Linear parent-directory repair, 2026-09-14
+
+Magnetite generation `lm8r61ijiw4kv860hz8ggx8j40j8a8m6` activated with both worker Home Manager units failing at `linkGeneration` because their `.config` directories were root-owned.
+The activation log is `logs/omnigent-magnetite-activate-prepare-20260914-235007.log:90-139` (journal timestamps are September 15 UTC).
+The operator reported that SOPS had created `.config` and `.config/linear` as `root:root` mode `0755`, while the rendered Linear files were correctly worker-owned mode `0400`.
+The live repair was `chown -R <worker>:<worker> /home/<worker>/.config` for `omnigent-cameron` and `omnigent-janettesmith`, followed by restarting their Home Manager units.
+That repair was already performed by hand; this change performs no host action.
+
+The declarative fix leaves worker templates at SOPS' default `/run/secrets/rendered/<name>` and gives Home Manager ownership of the home-local symlink through `mkOutOfStoreSymlink`.
+At pinned sops-nix `fbf759290e0cb0a98dfc813a4eb7d53ad1dacb57`, `modules/sops/templates/default.nix:34-38` defines that default; `pkgs/sops-install-secrets/main.go:269-279` creates custom destination parents with `os.MkdirAll(parent, os.ModePerm)`, and `:189-218` changes only the symlink's ownership, not the parent directories (see local: `/Users/crs58/ghq/github.com/Mic92/sops-nix`).
+Under root activation and umask `0022`, those missing parents become root-owned `0755` directories.
+Using the default skips custom-destination symlink creation entirely.
+Readiness continues to require the rendered file before Home Manager activation, without requiring the home link to exist yet.
+The Linear wrapper's Git-root guard, endpoint stripping and `LINEAR_IGNORE_ENV_FILE` behavior are unchanged.
+Human Linear templates retain their existing destinations and content.

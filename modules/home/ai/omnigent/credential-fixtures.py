@@ -115,9 +115,18 @@ def signing_key(path: pathlib.Path) -> None:
 
 
 def generated_files(paths: list[str]):
+    def in_store(path: pathlib.Path) -> bool:
+        target = path.resolve()
+        if target.is_relative_to("/nix/store"):
+            return True
+        print(f"{path}: runtime link → {target}")
+        return False
+
     visited = set()
     for name in paths:
         path = pathlib.Path(name)
+        if not in_store(path):
+            continue
         roots = (
             [
                 path / "activate",
@@ -128,6 +137,8 @@ def generated_files(paths: list[str]):
             else [path]
         )
         for root in roots:
+            if not in_store(root):
+                continue
             if root.is_file():
                 yield root
                 continue
@@ -137,9 +148,12 @@ def generated_files(paths: list[str]):
                     directories.clear()
                     continue
                 visited.add(resolved)
+                directories[:] = [
+                    name for name in directories if in_store(pathlib.Path(directory) / name)
+                ]
                 for file in files:
                     candidate = pathlib.Path(directory) / file
-                    if candidate.is_file():
+                    if in_store(candidate) and candidate.is_file():
                         yield candidate
 
 

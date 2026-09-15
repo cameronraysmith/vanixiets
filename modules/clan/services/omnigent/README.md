@@ -238,6 +238,10 @@ Positional targets and API paths can still address other owners; the selected fi
 This boundary depends on issuing genuinely owner-scoped fine-grained tokens, not classic PATs; the identity verifier checks login, not grant scope.
 
 Linear's system-SOPS template substitutes both workspace names and API keys from the selected secret files, matching the human personal/work masking pattern without importing human credentials.
+It renders only under `/run/secrets/rendered/omnigent-<worker-user>-linear`, owned by the worker with mode `0400`; SOPS must not create paths inside worker homes.
+Home Manager owns `~/.config/linear/credentials.toml` through an out-of-store symlink, so credentials are read at runtime rather than copied into the Nix store.
+Pinned `schpet/linear-cli` v2.6.0 has no credentials-file override: `src/credentials.ts:26-42,136-143` resolves the file through `XDG_CONFIG_HOME` or `HOME` and reads it at runtime (see local: `/Users/crs58/ghq/github.com/schpet/linear-cli`).
+Readiness checks the rendered file before Home Manager creates its link; Linux's SOPS dependencies and Darwin's delivery receipt remain unchanged.
 The wrapper accepts exactly one explicit `--workspace` slug from the delivered workspace files, not a label; it disables `.env` loading, strips endpoint overrides and rejects competing `api_key` sources, including the effective Git root.
 Optional native Claude token injection replaces the required runtime executable, not merely a shadowed profile entry.
 Competing Claude credentials fail closed.

@@ -1450,6 +1450,7 @@
         sops = {
           validateSopsFiles = false;
           age.keyFile = "/synthetic-no-decryption-key";
+          templates.omnigent-omnigent-cameron-linear.path = "${credentialRoot}/rendered-linear";
           secrets =
             lib.listToAttrs (
               map (
@@ -1544,6 +1545,19 @@
                           "viewerEmail"
                         ];
                   message = "Credential fixture: Home Manager credential options must remain Clan vars paths.";
+                }
+                {
+                  assertion =
+                    let
+                      rendered = host.config.sops.templates.omnigent-omnigent-cameron-linear.path;
+                      policy = config.programs.omnigent.workerCredentials;
+                    in
+                    lib.elem rendered policy.requiredFiles
+                    && !lib.elem policy.linearCredentials policy.requiredFiles
+                    &&
+                      toString (config.xdg.configFile."linear/credentials.toml".source or "")
+                      == toString (config.lib.file.mkOutOfStoreSymlink rendered);
+                  message = "Credential fixture: Home Manager must link Linear credentials to the rendered-only readiness artifact.";
                 }
               ];
             })
@@ -1681,6 +1695,23 @@
           removeGuard
         ];
       credentialCases = {
+        linearRenderedOutsideHomes = lib.all (
+          machine:
+          let
+            c = machine.config;
+            homes = map (worker: toString c.users.users.${worker.user}.home) (
+              lib.attrValues c.services.omnigent-host.workers
+            );
+            templates = lib.filterAttrs (name: _: lib.hasPrefix "omnigent-" name) c.sops.templates;
+          in
+          lib.all (
+            template:
+            template.path == "/run/secrets/rendered/${template.name}"
+            && !lib.any (home: lib.hasPrefix "${home}/" template.path) homes
+            && template.mode == "0400"
+            && lib.any (worker: worker.user == template.owner) (lib.attrValues c.services.omnigent-host.workers)
+          ) (lib.attrValues templates)
+        ) (lib.attrValues inventoryRealMachines);
         hostLocalCredentials =
           let
             c =
@@ -1890,6 +1921,14 @@
             passthru.cases = credentialCases;
           }
           ''
+            ${pkgs.python3.interpreter} - <<'PY'
+            from pathlib import Path
+            link = Path("${credentialGeneration}/home-files/.config/linear/credentials.toml")
+            assert link.is_symlink()
+            target = link.resolve()
+            assert target == Path("${credentialConfig.sops.templates.omnigent-omnigent-cameron-linear.path}").resolve()
+            assert not target.is_relative_to("/nix/store")
+            PY
             ${pkgs.python3.interpreter} ${../home/ai/omnigent/credential-fixtures.py} owner-fixtures ${../home/ai/omnigent/credentials.py}
             ${pkgs.omnigent.python.interpreter} ${../home/ai/omnigent/credential-fixtures.py} ${credentialArtifact}
             touch "$out"

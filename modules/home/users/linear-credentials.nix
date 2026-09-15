@@ -5,7 +5,6 @@
     if config ? workspaces then
       {
         mode = "0400";
-        path = config.destination;
         content = ''
           default = ${builtins.toJSON config.defaultWorkspace}
 
@@ -16,6 +15,7 @@
           )}
         '';
       }
+      // lib.optionalAttrs (config ? destination) { path = config.destination; }
     else
       {
         mode = "0400";

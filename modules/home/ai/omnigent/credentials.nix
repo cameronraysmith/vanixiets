@@ -41,6 +41,7 @@ let
       github = lib.filterAttrs (_: source: source.enable) worker.credentials.githubTokens;
       linearDestination = "${home}/.config/linear/credentials.toml";
       templateName = "omnigent-${worker.user}-linear";
+      linearRenderedPath = osConfig.sops.templates.${templateName}.path;
       secretName = source: "vars/${(output source).rel_dir}/${source.file}";
       sourceFile =
         source:
@@ -73,7 +74,7 @@ let
           viewerEmail = path (linearSource source "viewer-email");
         }) linear;
         requiredFiles =
-          map path (lib.attrValues selected) ++ lib.optional (linear != { }) linearDestination;
+          map path (lib.attrValues selected) ++ lib.optional (linear != { }) linearRenderedPath;
         sources = lib.mapAttrs (_: source: {
           inherit (source) generator file;
           path = path source;
@@ -96,9 +97,14 @@ let
       enabled = selected != { };
       inherit policy policyFile;
       readiness = command "ready";
-      homeModule = lib.mkIf (selected != { }) {
-        _module.args.omnigentCredentialPolicy = policy;
-      };
+      homeModule =
+        { config, ... }:
+        lib.mkIf (selected != { }) {
+          _module.args.omnigentCredentialPolicy = policy;
+          xdg.configFile."linear/credentials.toml" = lib.mkIf (linear != { }) {
+            source = config.lib.file.mkOutOfStoreSymlink linearRenderedPath;
+          };
+        };
       assertions = [
         {
           assertion = lib.all (source: source.generator != null && source.file != null) (
@@ -199,7 +205,6 @@ let
       templates = lib.optionalAttrs (linear != { } && linearPresent) {
         ${templateName} =
           (config.flake.lib.mkLinearCredentialsTemplate {
-            destination = linearDestination;
             workspaces = lib.mapAttrs' (
               _: source:
               lib.nameValuePair osConfig.sops.placeholder.${secretName (linearSource source "workspace")}
