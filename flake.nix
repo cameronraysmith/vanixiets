@@ -36,6 +36,9 @@
       flake = false;
     };
 
+    zen-browser.url = "github:youwen5/zen-browser-flake/4036109214cf20632000558935bd823b901fa886";
+    zen-browser.inputs.nixpkgs.follows = "nixpkgs";
+
     sops-nix.url = "github:Mic92/sops-nix";
     sops-nix.inputs.nixpkgs.follows = "nixpkgs";
 

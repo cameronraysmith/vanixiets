@@ -8,6 +8,21 @@
   perSystem =
     { system, ... }:
     lib.mkIf (system == "x86_64-linux") {
+      checks.pyrite-zen-desktop =
+        let
+          machine = config.flake.nixosConfigurations.pyrite;
+          pkgs = machine.pkgs;
+          zen = inputs.zen-browser.packages.${system}.zen-browser;
+        in
+        pkgs.runCommand "pyrite-zen-desktop" { } ''
+          desktop=${zen}/share/applications/zen.desktop
+          ${pkgs.desktop-file-utils}/bin/desktop-file-validate "$desktop"
+          ${pkgs.gnugrep}/bin/grep -Fx 'Name=Zen Browser' "$desktop"
+          ${pkgs.gnugrep}/bin/grep -Fx 'Exec=zen --name zen %U' "$desktop"
+          test -x ${zen}/bin/zen
+          mkdir -p "$out"
+          cp "$desktop" "$out/zen.desktop"
+        '';
       checks.pyrite-dankgreeter-config =
         let
           machine = config.flake.nixosConfigurations.pyrite;
@@ -159,6 +174,20 @@
     in
     {
       assertions = [
+        {
+          message = "pyrite desktop: one pinned wrapped Zen Browser in cameron's home";
+          assertion =
+            inputs.zen-browser.rev == "4036109214cf20632000558935bd823b901fa886"
+            && inputs.zen-browser.inputs.nixpkgs.outPath == inputs.nixpkgs.outPath
+            &&
+              builtins.length (
+                builtins.filter (
+                  package:
+                  toString package
+                  == toString inputs.zen-browser.packages.${pkgs.stdenv.hostPlatform.system}.zen-browser
+                ) home.home.packages
+              ) == 1;
+        }
         {
           message = "pyrite desktop: native package identities and configuration pins";
           assertion =

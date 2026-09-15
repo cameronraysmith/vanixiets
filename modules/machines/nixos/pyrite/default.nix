@@ -476,6 +476,7 @@ in
         imports = flakeUsers.cameron.modules ++ [
           flakeHomeModules.niri
           flakeHomeModules.dms
+          flakeHomeModules.zen-browser
         ];
         # Validate with the exact derivation installed by nixpkgs' NixOS module.
         programs.niri.package = config.programs.niri.package;
