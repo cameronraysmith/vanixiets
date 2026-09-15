@@ -28,6 +28,7 @@
               id = "default";
               name = "Main Bar";
               enabled = true;
+              autoHide = true;
               position = 0;
               screenPreferences = [ "all" ];
               showOnLastDisplay = true;

@@ -201,6 +201,9 @@
           assertion =
             builtins.length settings.barConfigs == 1
             && bar.enabled
+            && bar.id == "default"
+            && (bar.autoHide or false)
+            && !(bar.showOnWindowsOpen or false)
             &&
               widgets == [
                 "launcherButton"
