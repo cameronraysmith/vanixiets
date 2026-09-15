@@ -1061,3 +1061,34 @@ Using the default skips custom-destination symlink creation entirely.
 Readiness continues to require the rendered file before Home Manager activation, without requiring the home link to exist yet.
 The Linear wrapper's Git-root guard, endpoint stripping and `LINEAR_IGNORE_ENV_FILE` behavior are unchanged.
 Human Linear templates retain their existing destinations and content.
+
+## ZeroTier MSS lifecycle recovery, 2026-09-15
+
+The shared clamp remains a fixed TCP MSS of 1300 for IPv4/IPv6 INPUT and OUTPUT on `zt+` interfaces.
+It mitigates constrained TCP paths; it does not guarantee every network path or UDP behavior, and it does not change interface MTU.
+The lifecycle correction must converge exact legacy duplicates to one rule per family/direction and remove only those rules on stop, preserving unrelated mangle rules and chains.
+It applies to an enabled NixOS iptables firewall, with IPv6 hooks following `networking.enableIPv6`; native nftables and firewalld are not covered by this implementation.
+
+The September 15 source/live reconciliation found six copies of each rule on cinnabar and an interrupted magnetite activation, not a builder Unix-account defect.
+The switch failed while reading a disappearing logind user object's GID, before firewall and other pending service work.
+An advanced system profile is not successful activation; preserve the pending firewall, Home Manager and sysinit work.
+Source and live evidence are indexed in `.atomic/workflows/runs/fan-out-and-synthesize-eb58d561-2895-4d2e-a3f2-8a0be9caa1de/synthesis.md`.
+
+Before activation approval, require both platform `zerotier-mss-clamp` structural checks, the isolated Linux `zerotier-mss-clamp-runtime` check, `nix develop -c prek run --all-files`, independent review, one signed delivery child and a build of the exact routed integrated join's magnetite closure.
+The VM must exercise actual NixOS firewall unit scripts and real iptables/ip6tables through install, legacy-duplicate convergence, repeated reload/restart, stop and re-enable, with unrelated-rule preservation and material-error checks.
+These are acceptance gates, not claims that activation has occurred.
+
+Candidate verification passed on September 15: both structural builds and `nix develop -c prek run --all-files` exited 0, and the narrow Omnigent unit/Home Manager/profile projection matched the pre-edit integrated baseline byte-for-byte.
+The runtime check at candidate `9759bec8a79203b2d10fa8383551de147e30c3f1` executed Linux 6.18.42 in an isolated VM and exited 0; it was not a cached result.
+It verified all lifecycle transitions and error exits above, plus IPv4/IPv6 negotiation of MSS 1300 for an offered 1460 and preservation of an offered 1200 in both directions; stopping the firewall supplied the unclamped negative control.
+Full evidence is in `logs/zerotier-mss-runtime-green-20260915-2.log`, the two `zerotier-mss-structural-*-20260915.log` files, and `logs/zerotier-mss-acceptance-20260915.md`.
+The observed cinnabar duplicates establish the regression; the pre-fix VM attempt timed out during dependency construction, and no automated pre-fix lifecycle failure is claimed.
+
+The user subsequently reported working direct Cameron SSH after the laptop's phone Wi-Fi switched to Wi-Fi upstream; network reachability no longer blocks deployment approval.
+After separate approval, prefer normal `clan machines update magnetite --flake "git+file:///Users/crs58/projects/vanixiets?rev=$FINAL_JOIN_SHA"`, with `FINAL_JOIN_SHA` set to the reviewed, routed and built integrated join, without moving the checkout.
+The documented controller IFD correction removes its own evaluator override; it does not modify Clan's evaluator, and a direct Nix toplevel build does not validate Clan's evaluation path.
+ProxyJump through `cameron@cinnabar.zt` remains an available alternative, not a prerequisite; a firewall-only restart would leave other pending work unfinished.
+Require switch exit 0, exactly one copy of all four rules, stability after one separately authorized firewall restart, fresh direct Cameron SSH without multiplexing or KEX overrides, and healthy Cameron/Janette worker units.
+Capture complete outputs and individual exits, and stop on failure: pinned NixOS firewall reload failure can remove its base firewall jump.
+If the same logind race recurs, stop and re-evaluate rather than retrying, changing accounts, restarting logind or deleting pending lists.
+Cinnabar duplicate cleanup requires its own later activation approval; full Omnigent application acceptance remains separate.

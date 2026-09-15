@@ -119,3 +119,14 @@ Controller acceptance remains separate.
 - [ ] 11.2 Select Git HTTPS credentials exactly by request path with `useHttpPath`; select gh tokens by explicit environment, GitHub origin, then default owner, rejecting repository override mismatches without reproducing gh's command grammar or remote heuristics.
 - [ ] 11.3 Verify each token's login and two-owner synthetic selection, unknown-owner rejection, mismatch rejection and non-disclosure; build credentials/inventory checks on both platforms and preserve protected projections.
 - [ ] 11.4 Operator: issue fine-grained PATs separately for each person/resource owner, inspect owner scope and 90-day expiry, enroll only the named host-local generators, then verify identity after separately authorized activation.
+
+## 12. ZeroTier MSS lifecycle correction
+
+This bounded follow-up permits configured Nix builder transport, not host activation, account changes, credential access or enrollment.
+It preserves the Omnigent service and worker profile bindings; controller acceptance and live application acceptance remain separate.
+
+- [x] 12.1 Record observed regression: successful cinnabar IPv4/IPv6 listings contain six copies of each exact rule, corroborated by pinned append-only startup/reload source. The pre-fix VM attempt timed out during dependency construction; the corrected-candidate runtime check passed, but no automated pre-fix lifecycle failure is claimed.
+- [x] 12.2 Make installation and reload converge to one exact legacy-owned rule per family/direction, clean those rules on stop, preserve unrelated mangle rules/chains and propagate material failures; retain fixed MSS 1300 and role attachment. Verified by the isolated Linux VM, including startup migration and both TCP directions.
+- [x] 12.3 Build both platform `zerotier-mss-clamp` checks and the Linux `zerotier-mss-clamp-runtime` lifecycle check; verify enabled/backend/IP-family variants, all NixOS members and unchanged Omnigent unit/Home Manager/profile projections, then run `nix develop -c prek run --all-files` with full logs and exits. All exited 0; evidence is indexed in `logs/zerotier-mss-acceptance-20260915.md`.
+- [ ] 12.4 Controller: independently review the candidate, route one signed child of `fe29da8376188eb5e5edc1460860ba5cee236f03` while preserving the integrated join and peers, and build magnetite from that exact routed join revision.
+- [ ] 12.5 Operator: separately approve normal `clan machines update magnetite` pinned to the final built join; ProxyJump remains an alternative. Require switch exit 0 and pending-work completion, one rule each across a firewall restart, fresh direct Cameron SSH and both workers; stop on a repeated logind race. Cinnabar cleanup remains a separate activation.
