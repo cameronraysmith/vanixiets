@@ -19,8 +19,14 @@ export async function reconcileActivation(ops: Operations, host: Host, system: s
     if ((await ops.command("cat /nix/var/nix/profiles/system/systemConfig", signal)).trim() !== system) throw new Stop("reconcile", "Darwin persistent profile target mismatch");
   }
   if (current !== system) {
-    const activate = host === "stibnite" ? `sudo -n ${quote(`${system}/sw/bin/darwin-rebuild`)} activate` : `clan machines update ${host} --flake ${quote(source.source)}`;
-    await ops.command(activate, signal);
+    if (host === "stibnite") {
+      await ops.command(`sudo -n ${quote(`${system}/sw/bin/darwin-rebuild`)} activate`, signal);
+    } else {
+      // Linux hosts activate the locally built closure; remote flake evaluation
+      // on these hosts overflows the evaluator stack for this flake.
+      await ops.command(`nix copy --to ssh-ng://root@${host}.zt ${quote(system)}`, signal);
+      await ops.command(hostCommand(host, `nix-env -p /nix/var/nix/profiles/system --set ${quote(system)} && ${quote(`${system}/bin/switch-to-configuration`)} switch`), signal);
+    }
   }
   const observed = (await ops.command(hostCommand(host, "readlink /run/current-system"), signal)).trim();
   if (observed !== system || (host === "stibnite" && (await ops.command("cat /nix/var/nix/profiles/system/systemConfig", signal)).trim() !== system)) throw new Stop("reconcile", `Activation/profile target mismatch on ${host}: ${observed}`);
