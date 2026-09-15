@@ -5,7 +5,7 @@
   runCommand,
 }:
 let
-  version = "0.13.0";
+  version = "0.14.0";
   py = python3Packages;
   omnigent-client = py.callPackage ./omnigent-client.nix { inherit version; };
   omnigent-ui-sdk = py.callPackage ./omnigent-ui-sdk.nix {
@@ -29,7 +29,7 @@ let
       python = "py3";
       dist = "py3";
       platform = "any";
-      hash = "sha256-IQvXOpMsN0iN7o9wzkJXMiCuioSjMf4SxP2D/1pAtxM=";
+      hash = "sha256-Z2UwxAb/XF6dtP7ai/PlX5MI+W87yUQ9+iYvPBS28pM=";
     };
 
     pythonRelaxDeps = [
@@ -53,6 +53,7 @@ let
       py.claude-agent-sdk
       py.click
       py.fastapi
+      py.filelock
       py.ftfy
       py.httpx
       py.json5
@@ -127,6 +128,7 @@ runCommand "omnigent-${version}"
     import omnigent, omnigent.harnesses.claude_native.hook, subprocess, sys
     subprocess.run([sys.executable, "-I", "-m", "omnigent.harnesses.claude_native.hook", "--help"], env={}, check=True)
     '
+    env -i HOME="$TMPDIR" "$out/bin/omnigent" --version | grep -F "omnigent ${version} ("
     env -i HOME="$TMPDIR" "$out/bin/omnigent" --help > omnigent-help.txt
     cat omnigent-help.txt
     grep -w server omnigent-help.txt
