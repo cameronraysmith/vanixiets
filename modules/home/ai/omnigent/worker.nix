@@ -24,7 +24,8 @@ in
             builtins.toJSON value
           );
         in
-        builtins.match ".*[\"'[:space:]=(:]/(home|Users)/.*" text != null;
+        # A whole-string .* match exhausts libstdc++'s stack on large configurations.
+        builtins.length (builtins.split "[\"'[:space:]=(:]/(home|Users)/" text) > 1;
       files = lib.filterAttrs (_: file: file.enable) config.home.file;
       # Check declared configuration and activation inputs, not documentary file bodies
       # or the contents of store dependencies; this is not a runtime sandbox.

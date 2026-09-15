@@ -190,6 +190,21 @@
                 '';
               })
             ];
+        largeBenignSettings = valid (mkHome [
+          {
+            programs.atomic.settings.workerFixture = lib.concatStrings (lib.genList (_: "x") 300000);
+          }
+        ]);
+        largeForeignSettings =
+          rejected "Omnigent worker configuration must use its own home, not a foreign human home."
+            [
+              {
+                programs.atomic.settings.workerFixture =
+                  lib.concatStrings (lib.genList (_: "x") 150000)
+                  + " /home/human/private "
+                  + lib.concatStrings (lib.genList (_: "x") 150000);
+              }
+            ];
         benignDocumentation = valid (mkHome [
           {
             home.file."example.md".text =
