@@ -47,13 +47,14 @@ in
     roles.server.machines.magnetite.settings.domain = "omni.scientistexperience.net";
     roles.host = {
       machines.magnetite.settings = {
+        legacyEnable = false;
         environment = {
           PI_ACP_PI_COMMAND = "atomic";
           OMNIGENT_RUNNER_ENV_PASSTHROUGH = "PI_ACP_PI_COMMAND,PI_CODING_AGENT_DIR";
         };
         workers = {
           cameron = {
-            enable = false;
+            enable = true;
             owner = "cameron";
             user = "omnigent-cameron";
             credentials = workerCredentials "omnigent-cameron" config.flake.users.crs58.meta [
@@ -62,7 +63,7 @@ in
             ];
           };
           janettesmith = {
-            enable = false;
+            enable = true;
             owner = "janettesmith";
             user = "omnigent-janettesmith";
             credentials = workerCredentials "omnigent-janettesmith" config.flake.users.janettesmith.meta [

@@ -1151,9 +1151,17 @@
               true
             )).success == (expectedFailures == [ ])
         ) (lib.attrValues inventoryRealMachines);
-        allDisabled = lib.all (
-          d: lib.all (w: !w.enable) (lib.attrValues d.config.services.omnigent-host.workers)
-        ) (lib.attrValues inventoryMachines);
+        enableMap = lib.all (
+          name:
+          let
+            c = inventoryMachines.${name}.config;
+            migrated = lib.elem name [ "magnetite" ];
+            workersEnabled = lib.all (w: w.enable) (lib.attrValues c.services.omnigent-host.workers);
+            workersDisabled = lib.all (w: !w.enable) (lib.attrValues c.services.omnigent-host.workers);
+            legacy = c.services.omnigent-host.enable;
+          in
+          if migrated then workersEnabled && !legacy else workersDisabled && legacy
+        ) (lib.attrNames inventoryMachines);
         humanProfilesRetained =
           config.flake.users ? raquel
           && config.flake.users ? janettesmith
@@ -1761,7 +1769,7 @@
         defaultOff = lib.all (
           worker: config.flake.lib.omnigentCredentialSelection worker.credentials == { }
         ) (lib.attrValues linux.services.omnigent-host.workers);
-        inherit (inventoryCases) declaredCredentials allDisabled realEnrollment;
+        inherit (inventoryCases) declaredCredentials enableMap realEnrollment;
         moduleAssertions = lib.all (a: a.assertion) credentialConfig.assertions;
         fleetLinearGeneratorScript =
           let
