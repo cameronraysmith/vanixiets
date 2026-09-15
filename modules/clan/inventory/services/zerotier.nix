@@ -1,4 +1,5 @@
 # Zerotier VPN with cinnabar as controller, NixOS peers, and external darwin members
+{ config, ... }:
 {
   clan.inventory.instances.zerotier = {
     module = {
@@ -8,6 +9,7 @@
     # Replace with the name (string) of your machine that you will use as zerotier-controller
     # See: https://docs.zerotier.com/controller/
     # Deploy this machine first to create the network secrets
+    roles.controller.extraModules = [ config.flake.modules.nixos.zerotier-mss-clamp ];
     roles.controller.machines."cinnabar" = {
       settings = {
         # External members (darwin machines not managed by clan zerotier service)
@@ -21,6 +23,7 @@
       };
     };
     # Peers of the network (NixOS machines only - darwin uses external zerotier-one)
+    roles.peer.extraModules = [ config.flake.modules.nixos.zerotier-mss-clamp ];
     roles.peer.tags."peer" = { };
   };
 }

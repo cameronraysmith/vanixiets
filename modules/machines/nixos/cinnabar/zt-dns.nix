@@ -107,21 +107,6 @@
         ''}"
       ];
 
-      # TCP MSS clamping on zerotier interfaces to avoid PMTU black holes.
-      # Mobile carriers (5G/LTE) silently drop packets exceeding ~1374 bytes
-      # without sending ICMP fragmentation-needed. The zerotier tun0 advertises
-      # MTU 2800 but the real path MTU is lower, causing TLS handshakes (~1500
-      # bytes) to time out. Clamping MSS to 1300 keeps TCP segments within the
-      # constrained path MTU. OUTPUT clamps cinnabar's SYN-ACK (tells remote
-      # to send small segments). INPUT clamps incoming SYN (tells Caddy the
-      # remote accepts small segments, so Caddy sends small responses).
-      networking.firewall.extraCommands = ''
-        iptables -t mangle -A OUTPUT -o zt+ -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --set-mss 1300
-        ip6tables -t mangle -A OUTPUT -o zt+ -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --set-mss 1300
-        iptables -t mangle -A INPUT -i zt+ -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --set-mss 1300
-        ip6tables -t mangle -A INPUT -i zt+ -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --set-mss 1300
-      '';
-
       # Route .zt queries to local dnsmasq via systemd-resolved split DNS
       systemd.network.networks."09-zerotier" = {
         dns = [ "fddb:4344:343b:14b9:399:93db:4344:343b" ];
