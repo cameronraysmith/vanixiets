@@ -87,6 +87,10 @@ let
 
     dontWrapPythonPrograms = true;
 
+    postInstall = ''
+      (cd "$out/${py.python.sitePackages}" && patch -p1 < ${./acp-readiness.patch})
+    '';
+
     pythonImportsCheck = [
       "omnigent"
       "omnigent.cli"
@@ -124,6 +128,7 @@ runCommand "omnigent-${version}"
       substituteInPlace "$out/bin/$program" \
         --replace-fail '#!${py.python.interpreter}' '#!${pythonEnv.interpreter}'
     done
+    env -i HOME="$TMPDIR" ${pythonEnv.interpreter} -I ${./test_acp_readiness.py}
     env -i ${pythonEnv.interpreter} -I -c '
     import omnigent, omnigent.harnesses.claude_native.hook, subprocess, sys
     subprocess.run([sys.executable, "-I", "-m", "omnigent.harnesses.claude_native.hook", "--help"], env={}, check=True)

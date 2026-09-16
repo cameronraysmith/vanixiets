@@ -1,0 +1,46 @@
+--- a/omnigent/onboarding/harness_readiness.py
++++ b/omnigent/onboarding/harness_readiness.py
+@@ -172,6 +172,8 @@
+     :returns: The canonical spelling, e.g. ``"claude-sdk"`` or
+         ``"codex-native"``; unknown names are returned unchanged.
+     """
++    if harness.startswith("acp:"):
++        return harness
+     canonical = canonicalize_harness(harness) or harness
+     return _EXECUTOR_TYPE_HARNESS_ALIASES.get(canonical, canonical)
+ 
+@@ -208,7 +210,7 @@
+         ``False`` or a reason string otherwise.
+     """
+     canonical = _canonical_harness(harness)
+-    if canonical == "acp":
++    if canonical == "acp" or canonical.startswith("acp:"):
+         # The generic ACP harness has no fixed binary — "configured" means at
+         # least one agent is registered in the ``acp:`` config block. Each
+         # agent's own binary is a soft PATH hint surfaced in setup, not a hard
+@@ -216,7 +218,10 @@
+         try:
+             from omnigent.onboarding.acp_auth import acp_agents
+ 
+-            return bool(acp_agents())
++            agents = acp_agents()
++            if canonical.startswith("acp:"):
++                return any(f"acp:{agent.slug}" == canonical for agent in agents)
++            return bool(agents)
+         except Exception:
+             return False
+     if canonical in _SDK_HARNESSES:
+@@ -562,6 +567,13 @@
+     spellings.add(GOOSE_KEY)  # headless Goose (``goose acp``) gates on the goose binary
+     spellings.add(HERMES_KEY)  # Hermes Agent wraps the ``hermes`` CLI
+     spellings.add(COPILOT_KEY)
++    try:
++        from omnigent.onboarding.acp_auth import acp_agents
++
++        spellings.update(f"acp:{agent.slug}" for agent in acp_agents())
++    except Exception:
++        _logger.debug("acp readiness rows skipped", exc_info=True)
++
+     availability_cache: dict[tuple[str, ...], HarnessAvailability] = {}
+     result: dict[str, HarnessAvailability] = {}
+     for spelling in spellings:
