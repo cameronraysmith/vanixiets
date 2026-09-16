@@ -135,7 +135,7 @@ It preserves the Omnigent service and worker profile bindings; controller accept
 
 These source slices preserve current inventory, credentials, server behavior and human aggregate membership.
 Earlier disabled-worker tasks record preparation, not a request to disable the currently enabled fleet.
-Only A1 is in the current writer's scope; no activation, enrollment, grant issuance or publication is authorized.
+The current source delivery covers A2 after A1; A3 worker selection and A4 authority-sensitive review remain separate, and no activation, enrollment, grant issuance or publication is authorized.
 Checkboxes remain pending controller acceptance of the named evidence.
 
 - [ ] 13.1 A1: record the refined contract and independently export existing OpenSpec/Mergify declarations, preserving module identity, human enablement and OpenSpec schemas/configuration; compare captured human package versions/settings/files/activation before and after, evaluate standalone default/disabled/enabled and duplicate-import fixtures without personal secrets or `osConfig`, and build focused generated-file checks on Darwin/Linux.
@@ -143,3 +143,7 @@ Checkboxes remain pending controller acceptance of the named evidence.
 - [ ] 13.3 A3: explicitly select worker capabilities and close Git/jj's declared editor and git-xet dependencies in their owning features without the personal editor bundle; extend capability checks to exercise the generated supervisor PATH without login-shell initialization, schema resolution and local Git/jj/acquisition operations while retaining runtime precedence and procps selection.
 - [ ] 13.4 A4: review Mergify's authentication adapter and any selected stack-land `GH_BIN` wrapper route without new grants; test synthetic owner selection and unknown-owner/ambient-agent/personal-secret rejection, then run existing capability, credential, inventory and platform-adapter checks on Darwin/Linux.
 - [ ] 13.5 Controller/operator: review the exact signed source and evidence before separately authorized deployment; retain partial/untested live acceptance explicitly rather than treating evaluation/build success or the prior CLI deployment as acceptance of these new capabilities.
+
+A2 source and focused verification evidence is indexed in `logs/capability-a2-evidence-20260916.md`.
+It compares immutable human projections, including package versions, zoxide settings, enabled file definitions and activation DAG/scripts, with store hashes normalized explicitly rather than claiming byte-identical derivations or live activation equivalence.
+The task checkbox remains pending controller review of that delivery.

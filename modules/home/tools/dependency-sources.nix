@@ -1,11 +1,10 @@
-# dependency-sources: git-forge source URLs of a workspace's declared deps, for `ghq get`.
-# Installs the by-name writeShellApplication (pkgs/by-name/dependency-sources/), so it lives
-# beside the other package-install modules here, not under tools/commands/ (inline in-tree commands).
-{ ... }:
+{ config, ... }:
 {
-  flake.modules.homeManager.tools =
+  flake.modules.homeManager.tools.imports = [ config.flake.modules.homeManager.dependency-sources ];
+  flake.modules.homeManager.dependency-sources =
     { pkgs, ... }:
     {
+      key = "vanixiets/dependency-sources-home-module";
       home.packages = [ pkgs.dependency-sources ];
     };
 }

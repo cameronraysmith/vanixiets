@@ -31,6 +31,19 @@ A user who cannot run one module of an aggregate imports the aggregate and disab
 Reusable options and shared data are named deferred modules or `flake.lib` values, never `_name.nix` files pulled in through `imports`; `core/catppuccin.nix` shows the pattern.
 Neither Den (drupol's aspect framework over dendritic flake-parts) nor `flake-file` (generating `flake.nix` from modules) is adopted here; both are evaluated in `github:drupol/infra`.
 
+## Selectable development capabilities
+
+`flake.modules.homeManager.repository-acquisition` supplies `ghq`, `ghq-sync`, `dependency-sources` and direct `zoxide` lookup without enabling interactive shell hooks.
+It uses `programs.zoxide.package` directly when the program module is disabled; when that module is enabled, it owns both installation and shell integration.
+This deliberate raw-package exception allows noninteractive lookup without changing the terminal aggregate's behavior.
+The `ghq`, `ghq-sync` and `dependency-sources` constituent exports preserve the existing split: `development` selects only `ghq`, while `tools` selects the two wrappers.
+
+`engineering-tools` groups recipe execution, edit checking and structured-output inspection through `just`, `shellcheck`, `uncomment` (from `uncomment-bin`), `ratchet`, `jc`, `jaq` and `yq`.
+`nix-development` exposes the existing group in `development/nix-tools.nix` intact.
+`development` imports both groups without moving its other domain, diagram or clipboard tools into them.
+These Home Manager exports use consumer packages and stable module identities, so importing a named capability alongside its aggregate does not duplicate its contribution.
+They require neither personal secrets nor `osConfig`, and selecting them confers no credentials or host authority.
+
 ## Hazards
 
 Adding a file activates it on the next evaluation; there is no registration step.

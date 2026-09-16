@@ -1,11 +1,10 @@
-# ghq-sync: lazy, partial-clone-aware ghq wrapper for the Category-2 reference tree.
-# Installs the by-name writeShellApplication (pkgs/by-name/ghq-sync/), so it lives
-# beside the other package-install modules here, not under tools/commands/ (inline in-tree commands).
-{ ... }:
+{ config, ... }:
 {
-  flake.modules.homeManager.tools =
+  flake.modules.homeManager.tools.imports = [ config.flake.modules.homeManager.ghq-sync ];
+  flake.modules.homeManager.ghq-sync =
     { pkgs, ... }:
     {
+      key = "vanixiets/ghq-sync-home-module";
       home.packages = [ pkgs.ghq-sync ];
     };
 }

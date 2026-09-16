@@ -1,8 +1,12 @@
-{ ... }:
+{ config, ... }:
 {
-  flake.modules.homeManager.development =
+  flake.modules.homeManager.development.imports = [
+    config.flake.modules.homeManager.nix-development
+  ];
+  flake.modules.homeManager.nix-development =
     { pkgs, ... }:
     {
+      key = "vanixiets/nix-development-home-module";
       home.packages = with pkgs; [
         cachix
         deadnix

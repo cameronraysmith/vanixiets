@@ -1,4 +1,4 @@
-{ ... }:
+{ config, ... }:
 {
   flake.modules.homeManager.development =
     { pkgs, ... }:
@@ -35,6 +35,10 @@
       };
     in
     {
+      imports = [
+        config.flake.modules.homeManager.ghq
+        config.flake.modules.homeManager.engineering-tools
+      ];
       home.packages = with pkgs; [
         act
         bazelisk
@@ -44,7 +48,6 @@
         clipboard-jh
         dvcWithOptionalRemotes
         forgejo-cli
-        ghq
         git-filter-repo
         git-machete
         git-revise
@@ -52,18 +55,11 @@
         gitmux
         d2
         graphviz
-        jc
-        just
         mkcert
         linear-cli
-        uncomment-bin
         plantuml-c4
-        ratchet
-        shellcheck
         tea
         tree-sitter
-        jaq
-        yq
       ];
     };
 }
