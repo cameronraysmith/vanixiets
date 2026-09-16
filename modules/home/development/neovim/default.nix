@@ -1,6 +1,12 @@
 { ... }:
 {
   flake.modules = {
+    homeManager.neovim.programs.neovim = {
+      enable = true;
+      withPython3 = false;
+      withRuby = false;
+    };
+
     homeManager.development =
       {
         pkgs,

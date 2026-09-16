@@ -105,7 +105,13 @@ in
         "gh"
         "git"
         "jujutsu"
+        "neovim"
         "linear"
+        "repository-acquisition"
+        "engineering-tools"
+        "nix-development"
+        "openspec"
+        "mergify"
       ];
 
       # Prefer HM's configured wrappers inside the profile, not in the supervisor PATH.
@@ -117,6 +123,8 @@ in
         else
           lib.lowPrio package
       ) (runtimePackages pkgs);
+
+      programs.openspec.enable = true;
 
       programs.claude-code = {
         enable = true;

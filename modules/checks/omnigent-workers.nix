@@ -43,6 +43,14 @@
       cleanHome = mkHome [ ];
       home = mkHome [
         {
+          programs.git.settings.user = {
+            name = "Worker fixture";
+            email = "worker@example.invalid";
+          };
+          programs.jujutsu.settings.user = {
+            name = "Worker fixture";
+            email = "worker@example.invalid";
+          };
           home.packages = [
             profileOnly
             (lib.hiPrio shadow)
@@ -67,6 +75,71 @@
         home = cfg;
       };
       merge = config.flake.lib.omnigentMergeConfig pkgs;
+      workflowFixture = pkgs.writeShellScript "worker-workflow-fixture" ''
+        set -euo pipefail
+        export HOME="$TMPDIR/workflow-home"
+        export XDG_CONFIG_HOME="$HOME/.config" XDG_DATA_HOME="$HOME/.local/share"
+        export OPENSPEC_TELEMETRY=0
+        mkdir -p "$XDG_CONFIG_HOME" "$XDG_DATA_HOME" "$HOME/work"
+        ${lib.concatMapStringsSep "\n"
+          (file: ''
+            target="$HOME"/${lib.escapeShellArg (lib.removePrefix "${cfg.home.homeDirectory}/" file.target)}
+            mkdir -p "$(dirname "$target")"
+            ln -s ${lib.escapeShellArg (toString file.source)} "$target"
+          '')
+          (
+            lib.filter (
+              file:
+              file.enable
+              && lib.elem (lib.removePrefix "${cfg.home.homeDirectory}/" file.target) [
+                ".config/git/config"
+                ".config/jj/config.toml"
+                ".config/openspec/config.json"
+                ".local/share/openspec/schemas/superpowers-bridge"
+                ".local/share/openspec/schemas/superpowers-bridge-wrspm"
+              ]
+            ) (lib.attrValues cfg.home.file)
+          )
+        }
+        cd "$HOME/work"
+        for executable in ghq ghq-sync dependency-sources zoxide just shellcheck uncomment ratchet jc jaq yq nixfmt nil nixd openspec mergify nvim git-xet; do
+          test -x "$(command -v "$executable")"
+        done
+        test "$(git config get core.editor)" = nvim
+        test "$(jj config get ui.editor)" = nvim
+        timeout 15 "$(git var GIT_EDITOR)" --headless '+call writefile(["editor-ok"], "editor-result")' +qa
+        test "$(cat editor-result)" = editor-ok
+        "$(git config get lfs.customtransfer.xet.path)" --version
+        git init -q repository
+        cd repository
+        printf 'fixture\n' > tracked
+        git add tracked
+        git commit -qm 'Local fixture'
+        test "$(git show HEAD:tracked)" = fixture
+        jj git init --colocate
+        jj describe -m 'Local jj fixture'
+        jj log --no-graph -r @ -T description | grep 'Local jj fixture'
+        cd ..
+        mkdir -p "$HOME/ghq/example.test/fixture"
+        mv repository "$HOME/ghq/example.test/fixture/repository"
+        test "$(ghq root)" = "$HOME/ghq"
+        test "$(ghq list)" = example.test/fixture/repository
+        zoxide add "$HOME/ghq/example.test/fixture/repository"
+        test "$(zoxide query repository)" = "$HOME/ghq/example.test/fixture/repository"
+        openspec schemas --json > schemas.json
+        jaq -e 'map(.name) | index("superpowers-bridge") != null and index("superpowers-bridge-wrspm") != null' schemas.json
+        jaq -e '.profile == "custom" and .delivery == "skills" and (.workflows | length == 12)' "$XDG_CONFIG_HOME/openspec/config.json"
+        printf 'check:\n    printf "fixture-ok" > result\n' > justfile
+        just --shell ${pkgs.bash}/bin/bash check
+        test "$(cat result)" = fixture-ok
+        printf '#!/usr/bin/env bash\nprintf "fixture\\n"\n' > good.sh
+        shellcheck good.sh
+        printf '#!/usr/bin/env bash\necho $undefined\n' > bad.sh
+        if shellcheck bad.sh > diagnostic; then exit 1; fi
+        grep SC2154 diagnostic
+        printf 'answer: 42\n' | yq '.answer' | jaq -e '. == 42'
+        printf 'answer=42\n' | jc --ini | jaq -e '.answer == "42"'
+      '';
       atomicActivation = pkgs.writeText "worker-atomic-activation" cfg.home.activation.atomicMergeSettings.data;
       atomicMergeTest = pkgs.writeText "worker-atomic-merge-test.py" ''
         import json
@@ -153,6 +226,55 @@
           && !lib.elem "${pkgs.gh}/bin" (lib.splitString ":" wrappedPath)
           && lib.hasPrefix "${wrappedHome.programs.claude-code.package}/bin:" wrappedPath;
         tools = cfg.programs.ripgrep.enable && cfg.programs.fd.enable && cfg.programs.gh.enable;
+        workflowCapabilities =
+          (cfg.programs.openspec.enable or false)
+          && (cfg.programs.mergify.enable or false)
+          && lib.all (p: lib.elem p cfg.home.packages) [
+            pkgs.ghq
+            pkgs.ghq-sync
+            pkgs.dependency-sources
+            pkgs.just
+            pkgs.shellcheck
+            pkgs.nixfmt
+          ];
+        configuredDependencies =
+          cfg.programs.neovim.enable
+          && cfg.programs.git.settings.core.editor == "nvim"
+          && cfg.programs.jujutsu.settings.ui.editor == "nvim"
+          && lib.elem pkgs.git-xet cfg.home.packages;
+        plainEditor =
+          cfg.programs.neovim.plugins == [ ]
+          && cfg.programs.neovim.extraConfig == ""
+          && !(cfg.programs.lazyvim.enable or false);
+        xetOwnedByTransfer =
+          !lib.elem pkgs.git-xet
+            (mkHome [ { programs.git.lfs.enable = lib.mkForce false; } ]).config.home.packages
+          && !lib.elem pkgs.git-xet
+            (mkHome [
+              { programs.git.settings."lfs \"customtransfer.xet\"".path = lib.mkForce "another-transfer"; }
+            ]).config.home.packages;
+        duplicateCapabilities =
+          let
+            composed =
+              (mkHome (
+                map (name: config.flake.modules.homeManager.${name}) [
+                  "repository-acquisition"
+                  "engineering-tools"
+                  "nix-development"
+                  "openspec"
+                  "mergify"
+                  "neovim"
+                ]
+              )).config;
+          in
+          lib.all (package: builtins.length (lib.filter (p: p == package) composed.home.packages) == 1) [
+            pkgs.ghq
+            pkgs.just
+            pkgs.nixfmt
+            composed.programs.openspec.package
+            composed.programs.mergify.package
+            composed.programs.neovim.finalPackage
+          ];
         harnesses =
           cfg.programs.atomic.enable
           && cfg.programs.omp.enable
@@ -2189,6 +2311,7 @@
             for executable in rg fd gh linear atomic omp pi claude codex nix direnv; do
               test -x "$(command -v "$executable")"
             done
+            ${pkgs.bash}/bin/bash --noprofile --norc ${workflowFixture}
             export PATH=${
               lib.makeBinPath [
                 pkgs.coreutils

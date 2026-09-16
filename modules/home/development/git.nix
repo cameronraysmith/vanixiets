@@ -12,6 +12,14 @@ let
       ...
     }:
     {
+      home.packages = lib.optional (
+        config.programs.git.enable
+        && config.programs.git.lfs.enable
+        && lib.any (settings: (settings."lfs \"customtransfer.xet\"".path or null) == "git-xet") (
+          lib.toList config.programs.git.settings
+        )
+      ) pkgs.git-xet;
+
       programs.git = {
         package = pkgs.gitFull;
         enable = true;

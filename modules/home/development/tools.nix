@@ -51,7 +51,6 @@
         git-filter-repo
         git-machete
         git-revise
-        git-xet
         gitmux
         d2
         graphviz

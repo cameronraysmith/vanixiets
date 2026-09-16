@@ -44,6 +44,12 @@ The `ghq`, `ghq-sync` and `dependency-sources` constituent exports preserve the 
 These Home Manager exports use consumer packages and stable module identities, so importing a named capability alongside its aggregate does not duplicate its contribution.
 They require neither personal secrets nor `osConfig`, and selecting them confers no credentials or host authority.
 
+`neovim` supplies plain Home Manager Neovim without personal plugins or language-provider hooks; the human `development` aggregate keeps its LazyVim configuration.
+The Git feature owns `git-xet` when Git LFS uses the configured xet transfer, rather than relying on the general development package list.
+`omnigent-worker` selects these editor and Git dependencies alongside repository acquisition, engineering tools, Nix development, OpenSpec and Mergify.
+Workers explicitly enable OpenSpec's existing configuration and both schema bundles.
+Mergify installation is not authenticated workflow readiness: credential-adapter review and publication authorization remain separate.
+
 ## Hazards
 
 Adding a file activates it on the next evaluation; there is no registration step.

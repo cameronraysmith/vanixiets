@@ -1,4 +1,4 @@
-{ config, ... }:
+{ config, inputs, ... }:
 {
   flake.modules.homeManager.ai.imports = [ config.flake.modules.homeManager.openspec ];
   flake.modules.homeManager.openspec =
@@ -11,7 +11,7 @@
     }:
     let
       cfg = config.programs.openspec;
-      assetsDir = flake.inputs.self + "/modules/home/ai/openspec/assets";
+      assetsDir = inputs.self + "/modules/home/ai/openspec/assets";
       jsonFormat = pkgs.formats.json { };
     in
     {

@@ -135,7 +135,7 @@ It preserves the Omnigent service and worker profile bindings; controller accept
 
 These source slices preserve current inventory, credentials, server behavior and human aggregate membership.
 Earlier disabled-worker tasks record preparation, not a request to disable the currently enabled fleet.
-The current source delivery covers A2 after A1; A3 worker selection and A4 authority-sensitive review remain separate, and no activation, enrollment, grant issuance or publication is authorized.
+The current source delivery covers A3 after A1/A2; A4 authority-sensitive review remains separate, and no activation, enrollment, grant issuance or publication is authorized.
 Checkboxes remain pending controller acceptance of the named evidence.
 
 - [ ] 13.1 A1: record the refined contract and independently export existing OpenSpec/Mergify declarations, preserving module identity, human enablement and OpenSpec schemas/configuration; compare captured human package versions/settings/files/activation before and after, evaluate standalone default/disabled/enabled and duplicate-import fixtures without personal secrets or `osConfig`, and build focused generated-file checks on Darwin/Linux.
@@ -147,3 +147,8 @@ Checkboxes remain pending controller acceptance of the named evidence.
 A2 source and focused verification evidence is indexed in `logs/capability-a2-evidence-20260916.md`.
 It compares immutable human projections, including package versions, zoxide settings, enabled file definitions and activation DAG/scripts, with store hashes normalized explicitly rather than claiming byte-identical derivations or live activation equivalence.
 The task checkbox remains pending controller review of that delivery.
+
+A3 source and fixture verification evidence is indexed in `logs/capability-a3-evidence-20260916.md`.
+Workers select the independent capabilities with plain Neovim and Git-owned xet dependencies; OpenSpec schema assets resolve from their owning flake, including system-integrated consumers.
+Mergify is installed but authenticated external workflows remain unverified and reserved for A4.
+The A3 checkbox remains pending controller review, not deployment or live acceptance.
