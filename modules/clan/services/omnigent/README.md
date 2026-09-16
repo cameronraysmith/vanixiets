@@ -267,3 +267,29 @@ There is no seed import or restoration after logout, deletion, redeploy, restart
 The accepted execution mode remains `sandbox:none`, with same-UID/admin access and shared-store visibility for approved projects.
 `checks.<system>.omnigent-worker-credentials` uses synthetic material and mocked provider/delivery effects; live acceptance remains separate.
 The designated follow-up is systemd `LoadCredential`, optionally `LoadCredentialEncrypted` after hardware verification, not an implementation in this slice.
+
+## Worker model login and renewal
+
+Run `nix run .#omnigent-worker-login -- HOST OWNER TOOL` from an administrative workstation.
+The helper selects the dedicated account and its installed profile, clears inherited credentials and agents, and runs the tool from the worker's home.
+It does not change the human account's authentication or synchronize OAuth files.
+The current matrix is Cameron on magnetite, pyrite and stibnite, and Janette on magnetite and pyrite.
+Use `cameron` or `janettesmith` as `OWNER`.
+
+```sh
+nix run .#omnigent-worker-login -- pyrite cameron claude
+nix run .#omnigent-worker-login -- pyrite janettesmith atomic
+nix run .#omnigent-worker-login -- stibnite cameron codex
+```
+
+`claude` starts subscription login; `codex` starts device login.
+`atomic`, `omp` and `pi` open their interactive interfaces, where `/login` selects the intended provider.
+Each login receives its own refresh state even when the underlying subscription is shared.
+`verify` runs the GitHub, Linear, signing-key and Omnigent identity verifier; it does not attest model login or a model turn.
+Remote access uses SSH without agent forwarding; local Stibnite access uses sudo.
+The operator must already have the required administrative access.
+
+Do not rsync, merge or bidirectionally synchronize rotating OAuth records between active workers.
+Codex can reject a reused refresh token, so filesystem synchronization is not an authentication-renewal protocol.
+Selected static credentials continue to use shared Clan vars.
+Omnigent's first-party non-rotating grants may be distributed to the same person's workers with explicit approval, coupling revocation and expiry; never copy host IDs or whole configuration directories.
