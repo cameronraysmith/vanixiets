@@ -207,6 +207,7 @@ Generate it once with `CLAN_NO_COMMIT=1 clan vars generate stibnite --generator 
 Do not regenerate this password to repair an unlock failure: the existing Keychain and its OAuth entries still require the original password.
 
 The worker's Home Manager activation prepares `~/Library/Keychains/omnigent.keychain-db` after credential-delivery readiness and before starting Omnigent.
+Keychain-enabled worker daemons set launchd's `SessionCreate = true` so Keychain operations run in a dedicated security audit session; changing the Unix UID alone is insufficient.
 The login helper invokes the same `omnigent-worker-keychain` executable before opening the selected tool.
 Initialization preserves an existing Keychain, rejects wrong ownership and symlinks, and fails on unlock errors without resetting credentials.
 It selects the worker-private default Keychain while preserving other entries in that worker's search list.

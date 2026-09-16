@@ -474,6 +474,7 @@ in
               environment = workerEnvironment name worker;
               serviceConfig = {
                 UserName = worker.user;
+                SessionCreate = lib.mkIf worker.keychainEnable true;
                 WorkingDirectory = homeFor worker;
                 Umask = 63;
                 RunAtLoad = true;

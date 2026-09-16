@@ -728,6 +728,7 @@
             assert p["UserName"] == "omnigent-cameron", "wrong user"
             assert p["WorkingDirectory"] == worker_home
             assert p["Umask"] == 63
+            assert "SessionCreate" not in p
             assert p["ProcessType"] == "Standard"
             assert p["RunAtLoad"] and p["KeepAlive"] == {"SuccessfulExit": False}
             assert p["ThrottleInterval"] == 5
@@ -1682,6 +1683,11 @@
           keychainHome =
             if pkgs.stdenv.isDarwin then
               toString inventoryRealMachines.stibnite.config.environment.etc."omnigent/workers/cameron".source
+            else
+              null;
+          keychainLaunchd =
+            if pkgs.stdenv.isDarwin then
+              toString inventoryRealMachines.stibnite.config.system.build.launchd
             else
               null;
           loginHelperSource = ../apps/omnigent-worker-login.sh;

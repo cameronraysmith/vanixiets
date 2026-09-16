@@ -5,6 +5,7 @@ import importlib.util
 import json
 import os
 import pathlib
+import plistlib
 import re
 import secrets
 import shlex
@@ -841,6 +842,11 @@ subprocess.run, os.execve = run, execute
                 < activation.index('_iNote "Activating %s" "writeBoundary"')
             )
             assert (keychain_home / "home-path/bin/omnigent-worker-keychain").is_file()
+            plist = (
+                pathlib.Path(artifact["keychainLaunchd"])
+                / "Library/LaunchDaemons/org.nixos.omnigent-host-cameron.plist"
+            )
+            assert plistlib.loads(plist.read_bytes())["SessionCreate"] is True
         launcher = pathlib.Path(artifact["hostLauncher"]).read_text()
         assert " ready" in launcher
         if artifact["systemActivation"] is not None:
