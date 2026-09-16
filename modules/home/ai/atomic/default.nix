@@ -81,13 +81,13 @@ let
             # to; the read-only codebase-* agents take Opus for quick research.
             # atomic rewrites the default* keys on /model and /thinking, so an
             # interactive switch survives only until the next activation.
-            defaultProvider = "anthropic";
-            defaultModel = "claude-fable-5-1";
+            defaultProvider = "openai-codex";
+            defaultModel = "gpt-6-astra";
             defaultThinkingLevel = "medium";
             modelThinkingLevels = {
               "anthropic/claude-fable-5-1" = "medium";
               "anthropic/claude-opus-5" = "medium";
-              "openai-codex/gpt-6-astra" = "high";
+              "openai-codex/gpt-6-astra" = "medium";
             };
             fallbackModels = [
               "openai-codex/gpt-6-astra:high"
