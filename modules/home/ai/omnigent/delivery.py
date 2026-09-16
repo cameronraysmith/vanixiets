@@ -24,7 +24,7 @@ def require(condition: bool) -> None:
 def boot_id() -> str:
     if sys.platform == "darwin":
         return subprocess.check_output(
-            ["/usr/sbin/sysctl", "-n", "kern.boottime"], text=True
+            ["/usr/sbin/sysctl", "-n", "kern.bootsessionuuid"], text=True
         ).strip()
     return Path("/proc/sys/kernel/random/boot_id").read_text().strip()
 

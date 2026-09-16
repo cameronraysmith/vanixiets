@@ -21,6 +21,26 @@ def load(path):
 
 def exercise(source, root):
     delivery = load(source)
+    with (
+        patch.object(delivery.sys, "platform", "darwin"),
+        patch.object(
+            delivery.subprocess,
+            "check_output",
+            side_effect=[
+                "fixture-boot-uuid\n",
+                "fixture-boot-uuid\n",
+                "next-boot-uuid\n",
+            ],
+        ) as sysctl,
+    ):
+        assert delivery.boot_id() == delivery.boot_id() == "fixture-boot-uuid"
+        assert delivery.boot_id() == "next-boot-uuid"
+        for invocation in sysctl.call_args_list:
+            assert invocation.args[0] == [
+                "/usr/sbin/sysctl",
+                "-n",
+                "kern.bootsessionuuid",
+            ]
     actual_uid = os.getuid()
     state = root / "receipt"
     secret = root / "delivered-static"
