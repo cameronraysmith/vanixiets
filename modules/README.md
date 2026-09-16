@@ -31,3 +31,12 @@ A file must also be tracked by git before a flake build can see it, because flak
 - `terranix/` — cloud resource definitions rendered to OpenTofu.
 
 Top-level files configure the flake itself: `flake-parts.nix`, `formatting.nix`, `systems.nix`, `debug.nix`, `kubernetes.nix`, and `nixidy.nix`.
+
+## Shared CLI capabilities
+
+`system/cli-tools/` exports `cli-unix`, `cli-archives`, `cli-network`, and their `cli-tools` aggregate under each of `flake.modules.nixos`, `flake.modules.darwin`, and `flake.modules.homeManager`.
+Import the export matching the consumer's module class; package selection uses that consumer's `pkgs`.
+The aggregate adds jq through its configured Home Manager module or as a system package.
+These exports are opt-in: Omnigent workers import `homeManager.cli-tools`, while human terminal declarations remain independent.
+Worker profiles prefer procps' `kill` over coreutils' overlapping executable, matching the existing supervisor PATH; the shared capabilities impose no worker-specific package priorities.
+`checks.<system>.omnigent-worker-capabilities` evaluates the matching system adapter and Home Manager adapter, then exercises file, text, archive, and JSON operations on the generated worker PATH without a login shell or network requests.

@@ -101,8 +101,57 @@
             assert merge().returncode != 0, "accepted invalid Atomic settings"
             assert target.read_bytes() == before, "modified invalid Atomic settings"
       '';
+      cliHome = inputs.home-manager.lib.homeManagerConfiguration {
+        inherit pkgs;
+        modules = [
+          config.flake.modules.homeManager.cli-tools
+          {
+            home = {
+              inherit (cfg.home) username homeDirectory;
+              stateVersion = "25.11";
+            };
+          }
+        ];
+      };
+      cliSystem =
+        if pkgs.stdenv.isDarwin then
+          (mkDarwin [ config.flake.modules.darwin.cli-tools ]).config
+        else
+          (mkLinux [ config.flake.modules.nixos.cli-tools ]).config;
+      cliProviders =
+        packages:
+        lib.all (p: lib.elem p packages) (
+          config.flake.lib.cliUnixPackages pkgs
+          ++ config.flake.lib.cliArchivePackages pkgs
+          ++ config.flake.lib.cliNetworkPackages pkgs
+          ++ [ pkgs.jq ]
+        );
+      wrappedHome =
+        (mkHome [
+          {
+            _module.args.omnigentCredentialPolicy = {
+              signingKey = null;
+              githubTokens.fixture = {
+                path = "/synthetic-github-token";
+                expectedLogin = "fixture";
+              };
+              claudeSetupToken = "/synthetic-claude-token";
+              linearApiKeys = { };
+            };
+          }
+        ]).config;
+      wrappedPath = config.flake.lib.omnigentWorkerPath {
+        inherit pkgs;
+        home = wrappedHome;
+      };
       cases = {
         composition = valid home;
+        cliHomeAdapter = cliHome.config.programs.jq.enable && cliProviders cliHome.config.home.packages;
+        cliSystemAdapter = cliProviders cliSystem.environment.systemPackages;
+        credentialWrapperPrecedence =
+          lib.elem "${wrappedHome.programs.gh.package}/bin" (lib.splitString ":" wrappedPath)
+          && !lib.elem "${pkgs.gh}/bin" (lib.splitString ":" wrappedPath)
+          && lib.hasPrefix "${wrappedHome.programs.claude-code.package}/bin:" wrappedPath;
         tools = cfg.programs.ripgrep.enable && cfg.programs.fd.enable && cfg.programs.gh.enable;
         harnesses =
           cfg.programs.atomic.enable
@@ -2106,6 +2155,33 @@
             test -x ${cleanHome.config.home.path}/bin/pi
             test -x ${cleanHome.config.home.path}/bin/atomic
             export PATH=${lib.escapeShellArg workerPath}
+            id -u
+            ${lib.optionalString pkgs.stdenv.hostPlatform.isLinux "hostname"}
+            ${lib.optionalString pkgs.stdenv.hostPlatform.isLinux ''
+              test "$(type -P kill)" = ${pkgs.procps}/bin/kill
+              test "$(readlink -f ${cfg.home.path}/bin/kill)" = "$(readlink -f ${pkgs.procps}/bin/kill)"
+            ''}
+            mkdir -p cli-fixture/input cli-fixture/output
+            printf 'beta\nalpha\nalpha\n' > cli-fixture/input/text
+            test "$(find cli-fixture/input -type f | wc -l)" -eq 1
+            test "$(sort cli-fixture/input/text | uniq | grep alpha | sed s/alpha/42/ | awk '{print $1}')" = 42
+            cp cli-fixture/input/text cli-fixture/copy
+            cmp cli-fixture/input/text cli-fixture/copy
+            printf 'gamma\n' > cli-fixture/replacement
+            diff -u cli-fixture/copy cli-fixture/replacement > cli-fixture/change.patch || test "$?" -eq 1
+            patch cli-fixture/copy < cli-fixture/change.patch
+            cmp cli-fixture/copy cli-fixture/replacement
+            tar -czf cli-fixture/archive.tar.gz -C cli-fixture/input text
+            tar -xzf cli-fixture/archive.tar.gz -C cli-fixture/output
+            cmp cli-fixture/input/text cli-fixture/output/text
+            xz -c cli-fixture/input/text | xz -d | cmp - cli-fixture/input/text
+            zstd -q -c cli-fixture/input/text | zstd -q -d | cmp - cli-fixture/input/text
+            zip -q -j cli-fixture/archive.zip cli-fixture/input/text
+            unzip -p cli-fixture/archive.zip text | cmp - cli-fixture/input/text
+            printf '{"items":[1,2]}' | jq -e '.items | add == 3'
+            for executable in curl ssh scp sftp ssh-keygen openssl; do
+              test -x "$(command -v "$executable")"
+            done
             test "$(worker-profile-only)" = worker-profile
             if ${cfg.home.path}/bin/node; then exit 1; else test "$?" = 99; fi
             test "$(command -v node)" = ${pkgs.nodejs_22}/bin/node

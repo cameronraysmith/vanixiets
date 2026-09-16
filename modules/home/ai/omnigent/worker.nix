@@ -98,6 +98,7 @@ in
         "ai-skills"
         "agents-md"
         "agent-context"
+        "cli-tools"
         "ripgrep"
         "fd"
         "direnv"
@@ -108,7 +109,14 @@ in
       ];
 
       # Prefer HM's configured wrappers inside the profile, not in the supervisor PATH.
-      home.packages = map lib.lowPrio (runtimePackages pkgs);
+      home.packages = map (
+        package:
+        # lowPrio ties coreutils at 10; preserve the runtime PATH's procps kill provider.
+        if pkgs.stdenv.hostPlatform.isLinux && package == pkgs.procps then
+          lib.setPrio 9 package
+        else
+          lib.lowPrio package
+      ) (runtimePackages pkgs);
 
       programs.claude-code = {
         enable = true;
