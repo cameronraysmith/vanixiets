@@ -199,6 +199,25 @@ Before enablement, audit actual UID/GID and effective sudo authority, including 
 Static group/trust guards do not prove runtime privilege exclusion; this adapter does not parse arbitrary sudoers text.
 Daemon-context authentication, offline activation, actual logout/reboot/wake behavior and selected-harness canaries remain post-deploy acceptance checks.
 
+### Worker Keychain
+
+Darwin workers may opt into `services.omnigent-host.workers.<name>.keychainEnable`; only Stibnite's Cameron worker enables it.
+The machine-local Clan generator `<worker-user>-keychain` creates a random `password`, delivered through SOPS with worker ownership and mode `0400`.
+Generate it once with `CLAN_NO_COMMIT=1 clan vars generate stibnite --generator omnigent-cameron-keychain --no-regenerate` before deploying the enabled configuration.
+Do not regenerate this password to repair an unlock failure: the existing Keychain and its OAuth entries still require the original password.
+
+The worker's Home Manager activation prepares `~/Library/Keychains/omnigent.keychain-db` after credential-delivery readiness and before starting Omnigent.
+The login helper invokes the same `omnigent-worker-keychain` executable before opening the selected tool.
+Initialization preserves an existing Keychain, rejects wrong ownership and symlinks, and fails on unlock errors without resetting credentials.
+It selects the worker-private default Keychain while preserving other entries in that worker's search list.
+Password-bearing commands use one `security -i` stdin invocation each, never process arguments or environment variables; output is suppressed.
+Secrets and OAuth entries remain outside the Nix store.
+
+Automatic sleep and idle locking are disabled for this unattended worker Keychain; startup and explicit login preparation unlock it using the delivered password.
+This does not grant access to the human account's Keychain or require a graphical worker login.
+The password is readable by the worker, so this arrangement preserves the Unix-account boundary, not secrecy against that worker's code or administrators.
+Native daemon-context access and preservation of a non-secret test entry across preparation/restart must be verified at deployment; synthetic checks do not establish macOS Security session behavior.
+
 See the [deployment plan](../../../../docs/notes/development/omnigent/deployment-plan.md) for the exact gates and platform acceptance limits.
 
 ## Selected static credentials

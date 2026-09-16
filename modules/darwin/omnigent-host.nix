@@ -22,6 +22,25 @@ in
       enabledWorkers = lib.filterAttrs (_: worker: worker.enable) workers;
       account = worker: config.users.users.${worker.user};
       homeFor = worker: toString (account worker).home;
+      keychains = lib.filterAttrs (_: worker: worker.keychainEnable) workers;
+      keychainGenerator = worker: "${worker.user}-keychain";
+      keychainPassword =
+        worker: config.clan.core.vars.generators.${keychainGenerator worker}.files.password.path;
+      keychainHelpers = lib.mapAttrs (
+        _: worker:
+        let
+          policy = pkgs.writeText "omnigent-keychain-policy.json" (
+            builtins.toJSON {
+              inherit (worker) user;
+              home = homeFor worker;
+              passwordFile = keychainPassword worker;
+            }
+          );
+        in
+        pkgs.writeShellScriptBin "omnigent-worker-keychain" ''
+          exec ${lib.getExe pkgs.python3} ${../home/ai/omnigent/keychain.py} ${policy}
+        ''
+      ) keychains;
       groupsFor =
         worker:
         lib.attrNames (
@@ -39,18 +58,32 @@ in
           serverUrl = cfg.serverUrl;
         }
       ) workers;
-      credentialDeliveries = lib.filterAttrs (_: delivery: delivery.enabled) deliveries;
+      credentialDeliveries = lib.filterAttrs (
+        name: delivery: delivery.enabled || workers.${name}.keychainEnable
+      ) deliveries;
+      receiptPolicies = lib.mapAttrs (
+        name: delivery:
+        delivery.policy
+        // {
+          requiredFiles =
+            delivery.policy.requiredFiles
+            ++ lib.optional workers.${name}.keychainEnable (keychainPassword workers.${name});
+        }
+      ) credentialDeliveries;
+      receiptPolicyFiles = lib.mapAttrs (
+        _: policy: pkgs.writeText "omnigent-receipt-policy.json" (builtins.toJSON policy)
+      ) receiptPolicies;
       deliveryState = "/var/run/omnigent-worker-credentials";
       deliveryDeclaration = pkgs.writeText "omnigent-credential-delivery.json" (
         builtins.toJSON {
           workers = lib.mapAttrsToList (name: delivery: {
             user = workers.${name}.user;
-            files = delivery.policy.requiredFiles;
+            files = receiptPolicies.${name}.requiredFiles;
           }) credentialDeliveries;
         }
       );
       receiptReadiness = name: ''
-        ${lib.getExe pkgs.python3} ${../home/ai/omnigent/delivery.py} ready ${deliveryState} ${deliveries.${name}.policyFile} ${config.system.build.sops-nix-manifest}
+        ${lib.getExe pkgs.python3} ${../home/ai/omnigent/delivery.py} ready ${deliveryState} ${receiptPolicyFiles.${name}} ${config.system.build.sops-nix-manifest}
         ${deliveries.${name}.readiness}
       '';
       matchesUser =
@@ -110,9 +143,15 @@ in
                 activation.omnigentWorkspace = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
                   run ${pkgs.coreutils}/bin/install -d -m 0700 ${lib.escapeShellArg worker.workspaceRoot}
                 '';
-                activation.omnigentCredentialReadiness = lib.mkIf deliveries.${name}.enabled (
+                activation.omnigentCredentialReadiness = lib.mkIf (builtins.hasAttr name credentialDeliveries) (
                   lib.hm.dag.entryBefore [ "writeBoundary" ] (receiptReadiness name)
                 );
+                activation.omnigentKeychain = lib.mkIf worker.keychainEnable (
+                  lib.hm.dag.entryBetween [ "writeBoundary" ] [ "omnigentCredentialReadiness" ] ''
+                    run ${lib.getExe keychainHelpers.${name}}
+                  ''
+                );
+                packages = lib.optional worker.keychainEnable keychainHelpers.${name};
               };
               programs.omnigent = {
                 package = cfg.package;
@@ -182,7 +221,7 @@ in
             test "$(${pkgs.coreutils}/bin/stat -c %u "$directory")" = "$(${pkgs.coreutils}/bin/id -u)"
             test "$(${pkgs.coreutils}/bin/stat -c %a "$directory")" = 700
           done
-          ${lib.optionalString deliveries.${name}.enabled (receiptReadiness name)}
+          ${lib.optionalString (builtins.hasAttr name credentialDeliveries) (receiptReadiness name)}
           ${workerHomes.${name}.activationPackage}/activate
           exec ${
             lib.escapeShellArgs [
@@ -196,6 +235,13 @@ in
     in
     {
       imports = [ flakeConfig.flake.modules.darwin.omnigent-worker-options ];
+      options.services.omnigent-host.workers = lib.mkOption {
+        type = lib.types.attrsOf (
+          lib.types.submodule {
+            options.keychainEnable = lib.mkEnableOption "a private, automatically unlocked Darwin worker Keychain";
+          }
+        );
+      };
       options.sops.package = lib.mkOption {
         apply =
           original:
@@ -444,6 +490,23 @@ in
           lib.mkIf (credentialDeliveries != { }) {
             clan.core.vars.generators = lib.mkMerge (
               map (delivery: delivery.generators) (lib.attrValues credentialDeliveries)
+              ++ [
+                (lib.mapAttrs' (
+                  _: worker:
+                  lib.nameValuePair (keychainGenerator worker) {
+                    share = false;
+                    files.password = {
+                      secret = true;
+                      neededFor = "services";
+                      owner = worker.user;
+                      group = lib.head (groupsFor worker);
+                      mode = "0400";
+                    };
+                    runtimeInputs = [ pkgs.openssl ];
+                    script = ''openssl rand -hex 32 > "$out/password"'';
+                  }
+                ) keychains)
+              ]
             );
             sops.templates = lib.mkMerge (
               map (delivery: delivery.templates) (lib.attrValues credentialDeliveries)

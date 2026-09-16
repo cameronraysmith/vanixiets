@@ -149,7 +149,9 @@ def generated_files(paths: list[str]):
                     continue
                 visited.add(resolved)
                 directories[:] = [
-                    name for name in directories if in_store(pathlib.Path(directory) / name)
+                    name
+                    for name in directories
+                    if in_store(pathlib.Path(directory) / name)
                 ]
                 for file in files:
                     candidate = pathlib.Path(directory) / file
@@ -821,6 +823,24 @@ subprocess.run, os.execve = run, execute
         module(artifact["deliveryFixtures"], "delivery_fixtures").exercise(
             artifact["deliverySource"], root
         )
+        keychain_root = root / "keychain-fixtures"
+        keychain_root.mkdir()
+        module(artifact["keychainFixtures"], "keychain_fixtures").exercise(
+            artifact["keychainSource"], keychain_root
+        )
+        login_helper = pathlib.Path(artifact["loginHelperSource"]).read_text()
+        assert login_helper.index(
+            "omnigent-worker-keychain || exit"
+        ) < login_helper.index('exec "$@"')
+        if artifact["keychainHome"] is not None:
+            keychain_home = pathlib.Path(artifact["keychainHome"])
+            activation = (keychain_home / "activate").read_text()
+            assert (
+                activation.index('_iNote "Activating %s" "omnigentCredentialReadiness"')
+                < activation.index('_iNote "Activating %s" "omnigentKeychain"')
+                < activation.index('_iNote "Activating %s" "writeBoundary"')
+            )
+            assert (keychain_home / "home-path/bin/omnigent-worker-keychain").is_file()
         launcher = pathlib.Path(artifact["hostLauncher"]).read_text()
         assert " ready" in launcher
         if artifact["systemActivation"] is not None:

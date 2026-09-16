@@ -56,6 +56,7 @@ in
 
       networking.hostName = "stibnite";
       networking.computerName = "stibnite";
+      services.omnigent-host.workers.cameron.keychainEnable = true;
 
       # Remote deployment target (enables `clan machines update` from other machines)
       clan.core.networking.targetHost = "crs58@stibnite.zt";

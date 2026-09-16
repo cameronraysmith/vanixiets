@@ -39,7 +39,7 @@ if [[ "$tool" == atomic ]]; then
   command+=("PI_CODING_AGENT_DIR=$home/.atomic/agent")
 fi
 # shellcheck disable=SC2016
-command+=(/bin/sh -c 'cd "$HOME" && exec "$@"' worker-login "${arguments[@]}")
+command+=(/bin/sh -c 'cd "$HOME" || exit; if command -v omnigent-worker-keychain >/dev/null 2>&1; then omnigent-worker-keychain || exit; fi; exec "$@"' worker-login "${arguments[@]}")
 cd /
 if [[ "$host" == stibnite && "$(/bin/hostname -s)" == stibnite ]]; then
   exec "${command[@]}"

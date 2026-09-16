@@ -1170,12 +1170,10 @@
           name:
           let
             c = inventoryMachines.${name}.config;
-            migrated = lib.elem name [ "magnetite" ];
             workersEnabled = lib.all (w: w.enable) (lib.attrValues c.services.omnigent-host.workers);
-            workersDisabled = lib.all (w: !w.enable) (lib.attrValues c.services.omnigent-host.workers);
             legacy = c.services.omnigent-host.enable;
           in
-          if migrated then workersEnabled && !legacy else workersDisabled && legacy
+          workersEnabled && legacy == (name != "magnetite")
         ) (lib.attrNames inventoryMachines);
         humanProfilesRetained =
           config.flake.users ? raquel
@@ -1679,6 +1677,14 @@
           consumerSource = ../home/ai/omnigent/credentials.py;
           deliverySource = ../home/ai/omnigent/delivery.py;
           deliveryFixtures = ../home/ai/omnigent/delivery-fixtures.py;
+          keychainSource = ../home/ai/omnigent/keychain.py;
+          keychainFixtures = ../home/ai/omnigent/keychain-fixtures.py;
+          keychainHome =
+            if pkgs.stdenv.isDarwin then
+              toString inventoryRealMachines.stibnite.config.environment.etc."omnigent/workers/cameron".source
+            else
+              null;
+          loginHelperSource = ../apps/omnigent-worker-login.sh;
           hostLauncher =
             if pkgs.stdenv.isDarwin then
               toString credentialConfig.launchd.daemons.omnigent-host-cameron.command
@@ -1786,6 +1792,24 @@
         ) (lib.attrValues linux.services.omnigent-host.workers);
         inherit (inventoryCases) declaredCredentials enableMap realEnrollment;
         moduleAssertions = lib.all (a: a.assertion) credentialConfig.assertions;
+        keychainScope = lib.all (
+          machine:
+          lib.all (
+            name:
+            (inventoryRealMachines.${machine}.config.services.omnigent-host.workers.${name}.keychainEnable
+              or false
+            ) == (machine == "stibnite" && name == "cameron")
+          ) expectedOwners.${machine}
+        ) (lib.attrNames inventoryRealMachines);
+        keychainSecret =
+          let
+            g = inventoryRealMachines.stibnite.config.clan.core.vars.generators.omnigent-cameron-keychain;
+          in
+          !g.share
+          && g.files.password.secret
+          && g.files.password.owner == "omnigent-cameron"
+          && g.files.password.mode == "0400"
+          && g.files.password.neededFor == "services";
         fleetLinearGeneratorScript =
           let
             g =
