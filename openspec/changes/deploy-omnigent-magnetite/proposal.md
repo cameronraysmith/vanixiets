@@ -105,3 +105,27 @@ Worker HM imports only her non-secret name and Git address through `extraHomeMod
 The [deployment plan](../../../docs/notes/development/omnigent/deployment-plan.md#janette-identity-amendment-2026-09-13) records the B1 helper evidence, unchanged public-key/recipient association and the controller's fixed same-role preservation baselines.
 The inventory check asserts the canonical identity and disabled matrix without source-role heuristics; controller gates retain the complete human/server/Cameron/stibnite comparisons.
 No Kanidm provisioning, grant issuance, key copying, enrollment or activation belongs to this identity slice.
+
+## Capability refinement, 2026-09-16
+
+This amendment refines reusable Home Manager features within CAM-57, not the server, worker identity or credential authority.
+The September 13 disabled-worker statements above describe preparation: inventory now enables all five workers and disables magnetite's legacy runner (magnetite: `21d66e12f4`, September 15; pyrite/stibnite: `adaa18f960`, September 15).
+The controller reports the CLI delivery `c72b7d38` deployed on all three hosts; this source slice does not repeat live observations or close untested human acceptance gates.
+
+The first slice exposes `homeManager.openspec` and `homeManager.mergify` independently, reusing their existing declarations with stable module identity.
+Human `ai` retains OpenSpec's opt-in semantics, schema directory symlinks and global workflow configuration; human `development` retains Mergify's default-on behavior.
+No worker imports change in this slice.
+
+Later slices group repository acquisition (`ghq`, `ghq-sync`, `dependency-sources` and direct zoxide lookup), engineering utilities (`just`, `shellcheck`, `uncomment`, `ratchet`, `jc`, `jaq`, `yq`) and the existing Nix development tools as selectable capabilities.
+Human aggregates retain their existing package membership through constituent exports, rather than each importing the union of a new group.
+Workers opt in explicitly, without importing personal development/editor or AI aggregates.
+Git's declared `git-xet` and Git/jj's declared `nvim` dependencies must be closed in their owning features later; editor configuration remains a separate decision, not permission to import the personal editor bundle.
+
+Tools confer no authority: identity, credential adapters, signing, privileged services, sudo, container sockets and Nix trusted-user rights remain separate.
+Mergify authentication requires credential-adapter review without new grants or ambient-token fallback; if `stack-land` is selected later, its `GH_BIN` route must preserve the worker's credential-aware wrapper.
+Project devshell dependencies and approval of project hooks/direnv are a separate trust decision, not evidence of baseline closure.
+Structured no-foreign-home, no-personal-secret and no-inherited-agent guards remain required.
+Existing signed commits, logs, check results and PR records provide provenance; this work adds no telemetry, Den migration, Atomic defaults or publication authority.
+
+Each slice compares actual before/after human package versions, relevant settings, generated files and activation effects without committed package goldens.
+Evaluation and focused builds on Darwin and Linux establish source behavior only; generated supervisor PATH exercises and separately authorized live acceptance remain later gates.

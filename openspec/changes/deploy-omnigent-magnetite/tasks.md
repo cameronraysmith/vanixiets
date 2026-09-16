@@ -130,3 +130,16 @@ It preserves the Omnigent service and worker profile bindings; controller accept
 - [x] 12.3 Build both platform `zerotier-mss-clamp` checks and the Linux `zerotier-mss-clamp-runtime` lifecycle check; verify enabled/backend/IP-family variants, all NixOS members and unchanged Omnigent unit/Home Manager/profile projections, then run `nix develop -c prek run --all-files` with full logs and exits. All exited 0; evidence is indexed in `logs/zerotier-mss-acceptance-20260915.md`.
 - [ ] 12.4 Controller: independently review the candidate, route one signed child of `fe29da8376188eb5e5edc1460860ba5cee236f03` while preserving the integrated join and peers, and build magnetite from that exact routed join revision.
 - [ ] 12.5 Operator: separately approve normal `clan machines update magnetite` pinned to the final built join; ProxyJump remains an alternative. Require switch exit 0 and pending-work completion, one rule each across a firewall restart, fresh direct Cameron SSH and both workers; stop on a repeated logind race. Cinnabar cleanup remains a separate activation.
+
+## 13. Capability refinement
+
+These source slices preserve current inventory, credentials, server behavior and human aggregate membership.
+Earlier disabled-worker tasks record preparation, not a request to disable the currently enabled fleet.
+Only A1 is in the current writer's scope; no activation, enrollment, grant issuance or publication is authorized.
+Checkboxes remain pending controller acceptance of the named evidence.
+
+- [ ] 13.1 A1: record the refined contract and independently export existing OpenSpec/Mergify declarations, preserving module identity, human enablement and OpenSpec schemas/configuration; compare captured human package versions/settings/files/activation before and after, evaluate standalone default/disabled/enabled and duplicate-import fixtures without personal secrets or `osConfig`, and build focused generated-file checks on Darwin/Linux.
+- [ ] 13.2 A2: extract repository-acquisition and engineering-tools groups plus the existing nix-development group; preserve human membership through constituent selection, compare matching human projections and exercise local lookup, structured-data processing, task execution and shell checking in disposable fixtures.
+- [ ] 13.3 A3: explicitly select worker capabilities and close Git/jj's declared editor and git-xet dependencies in their owning features without the personal editor bundle; extend capability checks to exercise the generated supervisor PATH without login-shell initialization, schema resolution and local Git/jj/acquisition operations while retaining runtime precedence and procps selection.
+- [ ] 13.4 A4: review Mergify's authentication adapter and any selected stack-land `GH_BIN` wrapper route without new grants; test synthetic owner selection and unknown-owner/ambient-agent/personal-secret rejection, then run existing capability, credential, inventory and platform-adapter checks on Darwin/Linux.
+- [ ] 13.5 Controller/operator: review the exact signed source and evidence before separately authorized deployment; retain partial/untested live acceptance explicitly rather than treating evaluation/build success or the prior CLI deployment as acceptance of these new capabilities.

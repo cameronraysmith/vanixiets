@@ -1,21 +1,7 @@
-# User-level install of the vendored OpenSpec Claude assets:
-#   - the superpowers-bridge schema bundle, delivered user-global
-#   - the global openspec config.json pinned to the 12-workflow custom profile
-#   - the OpenSpec CLI itself (programs.openspec.package)
-#
-# The 12 generated openspec-* skills are NOT delivered by this module. They live
-# in the planning-and-development apm package
-# (modules/home/ai/plugins/planning-and-development/.apm/skills/) and ship through
-# apm-skills-compose alongside the other first-party skills, so this module no
-# longer contributes an aiSkills.extraSkillDirs entry.
-#
-# Opt-in member of the homeManager.ai aggregate: the config applies only to
-# users who set programs.openspec.enable = true (e.g. crs58). The schema bundle is
-# committed generated output; it and the in-package skills are regenerated via the
-# openspec-refresh-vendored-artifacts flake app (nix run .#openspec-refresh-vendored-artifacts).
-{ ... }:
+{ config, ... }:
 {
-  flake.modules.homeManager.ai =
+  flake.modules.homeManager.ai.imports = [ config.flake.modules.homeManager.openspec ];
+  flake.modules.homeManager.openspec =
     {
       config,
       pkgs,
@@ -29,6 +15,8 @@
       jsonFormat = pkgs.formats.json { };
     in
     {
+      key = "vanixiets/openspec-home-module";
+
       options.programs.openspec = {
         enable = lib.mkEnableOption "the vendored OpenSpec user-level Claude assets (CLI, skills, schema bundle, and global config.json)";
 
@@ -171,8 +159,6 @@
       };
 
       config = lib.mkIf cfg.enable {
-        # The OpenSpec CLI. Owned here (not development/tools.nix) now that a module
-        # exists; null disables installing it.
         home.packages = lib.mkIf (cfg.package != null) [ cfg.package ];
 
         # OpenSpec canonicalizes <schema dir>/schema.yaml and rejects a result outside
@@ -183,8 +169,6 @@
           name: src: lib.nameValuePair ".local/share/openspec/schemas/${name}" { source = src; }
         ) cfg.schemaDirs;
 
-        # Deliver the global config.json via the json format generator (RFC-42
-        # settings), not builtins.toJSON, so it is overridable and extensible.
         xdg.configFile."openspec/config.json".source =
           jsonFormat.generate "openspec-config.json" cfg.settings;
       };

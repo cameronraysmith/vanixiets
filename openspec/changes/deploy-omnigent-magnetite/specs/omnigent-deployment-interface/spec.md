@@ -127,3 +127,42 @@ Any failed response SHALL block; any untested response SHALL leave acceptance in
 
 - **WHEN** the operator records `passed` once for all four checklist items
 - **THEN** the result reports human-attested acceptance separately from tool observations
+
+### Requirement: Independently selectable workflow capabilities
+
+The Home Manager interface SHALL expose `openspec` and `mergify` independently without importing personal secrets, identity or host configuration.
+The existing `ai` and `development` aggregates SHALL retain their respective OpenSpec opt-in and Mergify default-on behavior, package versions, settings, generated files and activation effects.
+Selecting a named export alongside its existing aggregate SHALL NOT duplicate option declarations or package installation.
+
+#### Scenario: OpenSpec is selected without enabling it
+
+- **WHEN** a standalone Home Manager consumer imports `openspec` and leaves its enable option unset or false
+- **THEN** no OpenSpec package, global configuration or schema files are installed
+
+#### Scenario: OpenSpec is explicitly enabled
+
+- **WHEN** the consumer sets `programs.openspec.enable = true`
+- **THEN** the selected CLI and existing global workflow configuration are delivered with both schema bundles as directory symlinks, while a null package still permits configuration/schema delivery
+
+#### Scenario: Mergify is independently selected
+
+- **WHEN** a standalone consumer imports `mergify`
+- **THEN** its existing package is enabled by default, can be explicitly disabled, and introduces no managed token or credential grant
+
+### Requirement: Capability selection preserves authority boundaries
+
+Later capability slices SHALL group repository acquisition, engineering utilities and existing Nix tools for explicit worker selection while preserving human aggregate membership through constituent exports.
+The A1 source slice SHALL NOT change worker imports, inventory enablement, credential delivery or privileged services.
+Tool selection SHALL NOT imply signing permission, provider grants, sudo, container-daemon access or Nix trusted-user powers.
+Worker composition SHALL retain structured no-foreign-home, no-personal-secret and no-inherited-agent guards.
+Project devshell availability SHALL NOT substitute for baseline dependency closure or approval to execute project hooks.
+
+#### Scenario: A worker gains a later tool capability
+
+- **WHEN** a subsequent reviewed slice selects an engineering or workflow capability
+- **THEN** its declared runtime dependencies are verified on the generated supervisor PATH without login initialization, and authentication/authority remain separately selected and tested through the existing adapters
+
+#### Scenario: Source checks pass before deployment
+
+- **WHEN** focused evaluation/build checks pass for Darwin and Linux
+- **THEN** the evidence identifies the checked source and scope without closing untested live acceptance or authorizing activation, new grants or publication

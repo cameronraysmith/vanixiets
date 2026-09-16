@@ -1,11 +1,7 @@
-# The Mergify CLI, as a member of the homeManager.development aggregate.
-#
-# Upstream ships no home-manager, nixos, or darwin module, so this file declares
-# options.programs.mergify itself and owns the package: nothing installs
-# mergify from a shared package aggregate.
-{ ... }:
+{ config, ... }:
 {
-  flake.modules.homeManager.development =
+  flake.modules.homeManager.development.imports = [ config.flake.modules.homeManager.mergify ];
+  flake.modules.homeManager.mergify =
     {
       config,
       lib,
@@ -16,6 +12,8 @@
       cfg = config.programs.mergify;
     in
     {
+      key = "vanixiets/mergify-home-module";
+
       options.programs.mergify = {
         enable = lib.mkEnableOption "the Mergify CLI, whose `mergify stack` subcommand drives stacked-pull-request landing";
 
@@ -23,9 +21,6 @@
       };
 
       config = {
-        # Self-enabling, matching gh: every development user gets it. mkDefault
-        # so a machine or user module can disable it without a definition
-        # collision.
         programs.mergify.enable = lib.mkDefault true;
 
         home.packages = lib.mkIf cfg.enable [ cfg.package ];
