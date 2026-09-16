@@ -1345,7 +1345,7 @@
             workersEnabled = lib.all (w: w.enable) (lib.attrValues c.services.omnigent-host.workers);
             legacy = c.services.omnigent-host.enable;
           in
-          workersEnabled && legacy == (name != "magnetite")
+          workersEnabled && !legacy
         ) (lib.attrNames inventoryMachines);
         humanProfilesRetained =
           config.flake.users ? raquel
