@@ -41,6 +41,18 @@
           ++ extra;
         };
       cleanHome = mkHome [ ];
+      humanACP =
+        (inputs.home-manager.lib.homeManagerConfiguration {
+          inherit pkgs;
+          modules = [
+            (import ../home/ai/omnigent/default.nix { inherit config; }).flake.modules.homeManager.ai
+            {
+              home = {
+                inherit (cleanHome.config.home) username homeDirectory stateVersion;
+              };
+            }
+          ];
+        }).config.programs.omnigent.settings.acp;
       home = mkHome [
         {
           programs.git.settings.user = {
@@ -219,6 +231,16 @@
       };
       cases = {
         composition = valid home;
+        workerACPApproval =
+          cfg.programs.omnigent.settings.acp == {
+            agents = [
+              (builtins.head humanACP.agents)
+              ((builtins.elemAt humanACP.agents 1) // { command = "omp acp --approval-mode yolo"; })
+            ];
+          }
+          && humanACP == config.flake.lib.omnigentACP
+          && (builtins.elemAt humanACP.agents 1).command == "omp acp"
+          && (builtins.elemAt humanACP.agents 1).env_passthrough == [ ];
         cliHomeAdapter = cliHome.config.programs.jq.enable && cliProviders cliHome.config.home.packages;
         cliSystemAdapter = cliProviders cliSystem.environment.systemPackages;
         credentialWrapperPrecedence =

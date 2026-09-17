@@ -152,3 +152,12 @@ A3 source and fixture verification evidence is indexed in `logs/capability-a3-ev
 Workers select the independent capabilities with plain Neovim and Git-owned xet dependencies; OpenSpec schema assets resolve from their owning flake, including system-integrated consumers.
 Mergify is installed but authenticated external workflows remain unverified and reserved for A4.
 The A3 checkbox remains pending controller review, not deployment or live acceptance.
+
+## 14. Worker-only OMP ACP auto-approval
+
+The operator selected the interim `omp acp --approval-mode yolo` launcher policy, explicitly skipping ordinary ACP consent checkpoints without sandboxing or safe-command filtering.
+This follow-up authorizes one scoped source commit and controller-owned deployment/UAT after source review; it does not reopen the historical workflow gates above.
+
+- [x] 14.1 Change only the dedicated-worker OMP ACP command and add an exact worker/human preservation regression; observe the pre-fix assertion failure and build `omnigent-worker-capabilities` on `aarch64-darwin` and `x86_64-linux` successfully.
+- [ ] 14.2 Controller: review the signed source, compare worker/human settings projections, build the affected full systems and activate the reviewed integrated revision.
+- [ ] 14.3 Operator/controller: use fresh worker sessions after deployment and record UAT separately; no live acceptance is claimed by the source checks.

@@ -166,3 +166,19 @@ Project devshell availability SHALL NOT substitute for baseline dependency closu
 
 - **WHEN** focused evaluation/build checks pass for Darwin and Linux
 - **THEN** the evidence identifies the checked source and scope without closing untested live acceptance or authorizing activation, new grants or publication
+
+### Requirement: Worker-only OMP ACP auto-approval
+
+Dedicated workers SHALL launch Oh My Pi with `omp acp --approval-mode yolo` as the agreed interim launcher policy.
+This deliberately skips ordinary ACP consent checkpoints; it provides neither sandboxing nor safe-command filtering.
+All other ACP fields, including empty OMP `env_passthrough`, the Atomic row, human-profile defaults, OMP global settings, credentials, accounts and privileges SHALL remain unchanged.
+
+#### Scenario: Worker and human settings are composed
+
+- **WHEN** Home Manager evaluates on Linux or Darwin
+- **THEN** only the worker OMP command gains `--approval-mode yolo`, while the human OMP command remains `omp acp` and every other ACP field is preserved
+
+#### Scenario: Reviewed source is deployed
+
+- **WHEN** the controller builds and activates the reviewed source
+- **THEN** acceptance requires fresh worker sessions and separately recorded operator UAT; existing sessions and source checks do not establish live acceptance

@@ -46,7 +46,15 @@ let
         programs.omnigent = {
           enable = lib.mkDefault true;
           settings = {
-            inherit acp;
+            acp = acp // {
+              agents = map (
+                agent:
+                agent
+                // lib.optionalAttrs (!legacy && agent.name == "Oh My Pi") {
+                  command = "omp acp --approval-mode yolo";
+                }
+              ) acp.agents;
+            };
           }
           // lib.optionalAttrs (hostName != null && hostName != "") {
             host.name = lib.mkDefault hostName;
