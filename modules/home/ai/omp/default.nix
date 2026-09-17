@@ -144,7 +144,7 @@ let
             # for the same reason they do in atomic and claude-code.
             modelRoles = {
               # The session model.
-              default = lib.mkDefault "anthropic/claude-fable-5-1:medium";
+              default = lib.mkDefault "openai-codex/gpt-6-astra:medium";
               # Plan mode (src/modes/interactive-mode.ts resolveRoleModelWithThinking).
               plan = lib.mkDefault "anthropic/claude-fable-5-1:medium";
               # The bundled `task` subagent carries model "@task"
@@ -156,14 +156,14 @@ let
               # two tie on DeepSWE pass@1, but Astra takes the fewest steps of
               # any catalog row and leads document reasoning, and atomic's
               # builtins already review on it.
-              slow = lib.mkDefault "openai-codex/gpt-6-astra:xhigh";
-              advisor = lib.mkDefault "openai-codex/gpt-6-astra:xhigh";
+              slow = lib.mkDefault "openai-codex/gpt-6-astra:high";
+              advisor = lib.mkDefault "openai-codex/gpt-6-astra:high";
               # smol drives both `scout` and `sonic`, one exploratory and one
               # strictly mechanical, so it stays cheap; scout is raised on its
               # own through task.agentModelOverrides below.
               # smol = lib.mkDefault "openrouter/moonshotai/kimi-k3:high";
               smol = lib.mkDefault "zai/glm-5.3:high";
-              vision = lib.mkDefault "openrouter/google/gemini-3.7-flash:high";
+              vision = lib.mkDefault "anthropic/claude-opus-5:medium";
               commit = lib.mkDefault "openai-codex/gpt-5.6-luna:medium";
               # Titles, the unexpected-stop classifier, and mnemopi fact
               # extraction, which resolve ["tiny", "smol"] in that order.
