@@ -8,9 +8,6 @@
       ...
     }:
     let
-      # apm comes from pkgs, which carries the apm-skill-bundle-workaround patch
-      # (Linear CAM-55) in modules/nixpkgs/overlays/apm.nix, unlike the raw
-      # llm-agents package the other three bind here.
       cursor-agent = flake.inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.cursor-agent;
       droid = flake.inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.droid;
       gemini-cli = flake.inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.gemini-cli;

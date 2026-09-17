@@ -19,8 +19,6 @@
           pkgs.writeShellApplication {
             name = "apm-skills-install";
             runtimeInputs = [
-              # apm-skill-bundle-workaround (Linear CAM-55): pkgs.apm is the
-              # patched build that can install skill_bundle dependencies.
               pkgs.apm
               pkgs.git # repo root resolution
               pkgs.yq-go

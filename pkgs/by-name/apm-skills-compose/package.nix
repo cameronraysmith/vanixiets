@@ -6,9 +6,6 @@
   ripgrep,
   writeText,
 
-  # pkgs.apm carries the apm-skill-bundle-workaround patch (Linear CAM-55)
-  # without which the github/gh-stack skill_bundle dependency below fails to
-  # install. See modules/nixpkgs/overlays/apm.nix.
   apm,
 
   # Auto-discover every apm package dir (one containing .apm/skills) under the
@@ -246,6 +243,11 @@ runCommandLocal "apm-skills-compose"
       echo "apm-skills-compose: mergify-cli SHA drift — version-control-and-forge/apm.yml does not pin $MF_SHA" >&2
       exit 1
     fi
+
+    # APM 0.31 rejects HEAD-only cache seeds to rematerialize older CRLF checkouts.
+    for checkout in "$CK" "$CK_AG" "$CK_WT" "$CK_MP" "$CK_US" "$CK_GH" "$CK_MF"; do
+      printf '[core]\n\tautocrlf = false\n' > "$checkout/.git/config"
+    done
 
     cp ${rootConsumerManifest} ./apm.yml
     # agent-skills,claude only: the codex/hermes/opencode/droid harnesses are

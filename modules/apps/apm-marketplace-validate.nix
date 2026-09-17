@@ -30,8 +30,6 @@
           pkgs.writeShellApplication {
             name = "apm-marketplace-validate";
             runtimeInputs = [
-              # apm-skill-bundle-workaround (Linear CAM-55): pkgs.apm is the
-              # patched build that can install skill_bundle dependencies.
               pkgs.apm
               pkgs.git # repo root + local git-backed marketplace `git show <ref>:<file>`
               pkgs.jq
