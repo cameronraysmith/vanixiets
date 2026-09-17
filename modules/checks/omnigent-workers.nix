@@ -2151,224 +2151,230 @@
       };
     in
     {
-      checks.omnigent-worker-credentials =
-        assert lib.assertMsg (lib.all (ok: ok) (lib.attrValues credentialCases))
-          "Omnigent credential fixture failures: ${
-            builtins.toJSON (lib.attrNames (lib.filterAttrs (_: ok: !ok) credentialCases))
-          }";
-        pkgs.runCommand "omnigent-worker-credentials"
-          {
-            nativeBuildInputs = [
-              pkgs.python3
-              pkgs.git
-              pkgs.openssh
-            ];
-            fixtureDerivations = disclosureDerivations;
-            passthru.cases = credentialCases;
-          }
-          ''
-            ${pkgs.python3.interpreter} - <<'PY'
-            from pathlib import Path
-            link = Path("${credentialGeneration}/home-files/.config/linear/credentials.toml")
-            assert link.is_symlink()
-            target = link.resolve()
-            assert target == Path("${credentialConfig.sops.templates.omnigent-omnigent-cameron-linear.path}").resolve()
-            assert not target.is_relative_to("/nix/store")
-            PY
-            ${pkgs.python3.interpreter} ${../home/ai/omnigent/credential-fixtures.py} owner-fixtures ${../home/ai/omnigent/credentials.py}
-            ${pkgs.omnigent.python.interpreter} ${../home/ai/omnigent/credential-fixtures.py} ${credentialArtifact}
-            touch "$out"
-          '';
-      checks.omnigent-worker-inventory =
-        assert lib.assertMsg (lib.all
-          (
-            machine:
-            lib.attrNames inventoryMachines.${machine}.config.services.omnigent-host.workers
-            == expectedOwners.${machine}
-          )
-          (lib.attrNames expectedOwners)
-        ) "Omnigent inventory requires exactly five declared human workers.";
-        assert lib.assertMsg (
-          inventoryFailed == [ ]
-        ) "Omnigent inventory failures: ${lib.concatStringsSep ", " inventoryFailed}";
-        pkgs.runCommand "omnigent-worker-inventory"
-          {
-            passthru.cases = inventoryCases;
-            passAsFile = [ "report" ];
-            report = builtins.toJSON inventoryCases;
-          }
-          ''
-            cp "$reportPath" "$out"
-          '';
-      checks.omnigent-worker-darwin = lib.mkIf pkgs.stdenv.isDarwin (
-        assert lib.assertMsg (lib.all (ok: ok) (lib.attrValues darwinCases))
-          "Omnigent Darwin failures: ${
-            builtins.toJSON (lib.attrNames (lib.filterAttrs (_: ok: !ok) darwinCases))
-          }; assertions: ${builtins.toJSON (darwinFailures darwin)}";
-        pkgs.runCommand "omnigent-worker-darwin"
-          {
-            nativeBuildInputs = [
-              pkgs.python3
-              pkgs.coreutils
-            ];
-            passthru.cases = darwinCases;
-          }
-          ''
-            ${pkgs.omnigent.python.interpreter} ${darwinArtifactTest} \
-              ${darwin.system.build.launchd} \
-              ${darwinWrongUser.system.build.launchd} \
-              ${darwinWrongDomain.system.build.launchd} \
-              ${(darwinMissingPath "/usr/bin:/bin").system.build.launchd} \
-              ${
-                (darwinMissingPath (
-                  (lib.makeBinPath (config.flake.lib.omnigentRuntimePackages pkgs)) + ":/usr/bin:/bin:/usr/sbin:/sbin"
-                )).system.build.launchd
-              } \
-              ${darwinControl.system.build.launchd} \
-              ${darwin.system.activationScripts.script.source} \
-              ${darwin.environment.etc."omnigent/workers/cameron".source}
-            python3 ${darwinLauncherTest}
-            mkdir "$out"
-            cp artifacts.json "$out/"
-          ''
-      );
-      checks.omnigent-worker-linux = lib.mkIf pkgs.stdenv.isLinux (
-        assert lib.assertMsg (linuxFailed == [ ])
-          "Omnigent Linux failures: ${lib.concatStringsSep ", " linuxFailed}; module assertions: ${builtins.toJSON (linuxFailures linux)}";
-        pkgs.runCommand "omnigent-worker-linux"
-          {
-            passthru = {
-              cases = linuxCases;
-            };
-          }
-          ''
-            ${lib.concatMapStringsSep "\n"
-              (owner: ''
-                export PATH=${lib.escapeShellArg linux.systemd.services."omnigent-host-${owner}".environment.PATH}
-                test "$(worker-profile-only)" = worker-profile
-                test "$(command -v node)" = ${pkgs.nodejs_22}/bin/node
-                test "$(command -v hello)" = ${pkgs.hello}/bin/hello
-                for executable in atomic omp pi claude codex nix direnv gh linear rg fd; do
-                  test -x "$(command -v "$executable")"
-                done
-                export HOME="$TMPDIR/private-${owner}"
-                ${pkgs.coreutils}/bin/mkdir -m 700 "$HOME"
-                ${linux.systemd.services."omnigent-host-${owner}".serviceConfig.ExecStartPre}
-                uid="$(${pkgs.coreutils}/bin/id -u)"
-                ${homeUidFixture} ${
-                  linux.systemd.services."omnigent-host-${owner}".serviceConfig.ExecStartPre
-                } "$uid"
-                if ${homeUidFixture} ${
-                  linux.systemd.services."omnigent-host-${owner}".serviceConfig.ExecStartPre
-                } "$((uid + 1))"; then
-                  echo "accepted a wrong-owner worker home (UID-observation fixture)" >&2
-                  exit 1
-                fi
-                ${pkgs.coreutils}/bin/chmod 755 "$HOME"
-                if ${linux.systemd.services."omnigent-host-${owner}".serviceConfig.ExecStartPre}; then
-                  echo "accepted a public worker home" >&2
-                  exit 1
-                fi
-                ${pkgs.coreutils}/bin/chmod 700 "$HOME"
-                ${pkgs.coreutils}/bin/ln -s "$HOME" "$TMPDIR/linked-${owner}"
-                export HOME="$TMPDIR/linked-${owner}"
-                if ${linux.systemd.services."omnigent-host-${owner}".serviceConfig.ExecStartPre}; then
-                  echo "accepted a symlinked worker home" >&2
-                  exit 1
-                fi
-              '')
-              [
-                "cameron"
-                "raquel"
-              ]
+      checks = {
+        omnigent-worker-credentials =
+          assert lib.assertMsg (lib.all (ok: ok) (lib.attrValues credentialCases))
+            "Omnigent credential fixture failures: ${
+              builtins.toJSON (lib.attrNames (lib.filterAttrs (_: ok: !ok) credentialCases))
+            }";
+          pkgs.runCommand "omnigent-worker-credentials"
+            {
+              nativeBuildInputs = [
+                pkgs.python3
+                pkgs.git
+                pkgs.openssh
+              ];
+              fixtureDerivations = disclosureDerivations;
+              passthru.cases = credentialCases;
             }
-            ${pkgs.omnigent.python.interpreter} ${sandboxSelectionTest}
-            ${pkgs.coreutils}/bin/touch "$out"
-          ''
-      );
-      checks.omnigent-worker-capabilities =
-        assert lib.assertMsg (
-          failed == [ ]
-        ) "omnigent worker capability failures: ${lib.concatStringsSep ", " failed}";
-        pkgs.runCommand "omnigent-worker-capabilities"
-          {
-            nativeBuildInputs = [ pkgs.yq-go ];
-            passthru = { inherit cases workerPath; };
-          }
-          ''
-            test -x ${cleanHome.config.home.path}/bin/pi
-            test -x ${cleanHome.config.home.path}/bin/atomic
-            export PATH=${lib.escapeShellArg workerPath}
-            id -u
-            ${lib.optionalString pkgs.stdenv.hostPlatform.isLinux "hostname"}
-            ${lib.optionalString pkgs.stdenv.hostPlatform.isLinux ''
-              test "$(type -P kill)" = ${pkgs.procps}/bin/kill
-              test "$(readlink -f ${cfg.home.path}/bin/kill)" = "$(readlink -f ${pkgs.procps}/bin/kill)"
-            ''}
-            mkdir -p cli-fixture/input cli-fixture/output
-            printf 'beta\nalpha\nalpha\n' > cli-fixture/input/text
-            test "$(find cli-fixture/input -type f | wc -l)" -eq 1
-            test "$(sort cli-fixture/input/text | uniq | grep alpha | sed s/alpha/42/ | awk '{print $1}')" = 42
-            cp cli-fixture/input/text cli-fixture/copy
-            cmp cli-fixture/input/text cli-fixture/copy
-            printf 'gamma\n' > cli-fixture/replacement
-            diff -u cli-fixture/copy cli-fixture/replacement > cli-fixture/change.patch || test "$?" -eq 1
-            patch cli-fixture/copy < cli-fixture/change.patch
-            cmp cli-fixture/copy cli-fixture/replacement
-            tar -czf cli-fixture/archive.tar.gz -C cli-fixture/input text
-            tar -xzf cli-fixture/archive.tar.gz -C cli-fixture/output
-            cmp cli-fixture/input/text cli-fixture/output/text
-            xz -c cli-fixture/input/text | xz -d | cmp - cli-fixture/input/text
-            zstd -q -c cli-fixture/input/text | zstd -q -d | cmp - cli-fixture/input/text
-            zip -q -j cli-fixture/archive.zip cli-fixture/input/text
-            unzip -p cli-fixture/archive.zip text | cmp - cli-fixture/input/text
-            printf '{"items":[1,2]}' | jq -e '.items | add == 3'
-            for executable in curl ssh scp sftp ssh-keygen openssl; do
-              test -x "$(command -v "$executable")"
-            done
-            test "$(worker-profile-only)" = worker-profile
-            if ${cfg.home.path}/bin/node; then exit 1; else test "$?" = 99; fi
-            test "$(command -v node)" = ${pkgs.nodejs_22}/bin/node
-            node --version
-            for executable in rg fd gh linear atomic omp pi claude codex nix direnv; do
-              test -x "$(command -v "$executable")"
-            done
-            ${pkgs.bash}/bin/bash --noprofile --norc ${workflowFixture}
-            export PATH=${
-              lib.makeBinPath [
+            ''
+              ${pkgs.python3.interpreter} - <<'PY'
+              from pathlib import Path
+              link = Path("${credentialGeneration}/home-files/.config/linear/credentials.toml")
+              assert link.is_symlink()
+              target = link.resolve()
+              assert target == Path("${credentialConfig.sops.templates.omnigent-omnigent-cameron-linear.path}").resolve()
+              assert not target.is_relative_to("/nix/store")
+              PY
+              ${pkgs.python3.interpreter} ${../home/ai/omnigent/credential-fixtures.py} owner-fixtures ${../home/ai/omnigent/credentials.py}
+              ${pkgs.omnigent.python.interpreter} ${../home/ai/omnigent/credential-fixtures.py} ${credentialArtifact}
+              touch "$out"
+            '';
+        omnigent-worker-inventory =
+          assert lib.assertMsg (lib.all
+            (
+              machine:
+              lib.attrNames inventoryMachines.${machine}.config.services.omnigent-host.workers
+              == expectedOwners.${machine}
+            )
+            (lib.attrNames expectedOwners)
+          ) "Omnigent inventory requires exactly five declared human workers.";
+          assert lib.assertMsg (
+            inventoryFailed == [ ]
+          ) "Omnigent inventory failures: ${lib.concatStringsSep ", " inventoryFailed}";
+          pkgs.runCommand "omnigent-worker-inventory"
+            {
+              passthru.cases = inventoryCases;
+              passAsFile = [ "report" ];
+              report = builtins.toJSON inventoryCases;
+            }
+            ''
+              cp "$reportPath" "$out"
+            '';
+      }
+      // lib.optionalAttrs pkgs.stdenv.isDarwin {
+        omnigent-worker-darwin =
+          assert lib.assertMsg (lib.all (ok: ok) (lib.attrValues darwinCases))
+            "Omnigent Darwin failures: ${
+              builtins.toJSON (lib.attrNames (lib.filterAttrs (_: ok: !ok) darwinCases))
+            }; assertions: ${builtins.toJSON (darwinFailures darwin)}";
+          pkgs.runCommand "omnigent-worker-darwin"
+            {
+              nativeBuildInputs = [
+                pkgs.python3
                 pkgs.coreutils
-                pkgs.diffutils
-                pkgs.yq-go
-              ]
+              ];
+              passthru.cases = darwinCases;
             }
-            mkdir -p state
-            printf 'host:\n  name: new\nsequence: [new]\n' > declared.yaml
-            printf 'host:\n  name: old\n  host_id: fixture-id\nunknown:\n  nested: retained\nsequence: [old]\n' > state/config.yaml
-            ${lib.getExe merge} declared.yaml state/config.yaml
-            yq -e '.host.name == "new" and .host.host_id == "fixture-id" and .unknown.nested == "retained" and (.sequence | length) == 1 and .sequence[0] == "new"' state/config.yaml
-            cp state/config.yaml expected.yaml
-            ${lib.getExe merge} declared.yaml state/config.yaml
-            cmp expected.yaml state/config.yaml
-            test "$(stat -c %a state/config.yaml)" = 600
-            for invalid in '[unterminated' '[sequence]' 'scalar' 'null' $'---\na: one\n---\nb: two'; do
-              printf '%s\n' "$invalid" > state/config.yaml
-              cp state/config.yaml before.yaml
-              if ${lib.getExe merge} declared.yaml state/config.yaml; then
-                echo 'accepted invalid persisted configuration' >&2
-                exit 1
-              fi
-              cmp before.yaml state/config.yaml
-            done
-            ${lib.getExe merge} declared.yaml state/fresh.yaml
-            yq -e '.host.name == "new"' state/fresh.yaml
-            printf '[unterminated\n' > invalid-declaration.yaml
-            cp state/fresh.yaml before.yaml
-            if ${lib.getExe merge} invalid-declaration.yaml state/fresh.yaml; then exit 1; fi
-            cmp before.yaml state/fresh.yaml
-            if ${lib.getExe merge} invalid-declaration.yaml state/absent.yaml; then exit 1; fi
-            test ! -e state/absent.yaml
-            ${lib.getExe pkgs.python3} ${atomicMergeTest} ${atomicActivation} ${lib.escapeShellArg "${cfg.programs.atomic.configDir}/settings.json"}
-            touch "$out"
-          '';
+            ''
+              ${pkgs.omnigent.python.interpreter} ${darwinArtifactTest} \
+                ${darwin.system.build.launchd} \
+                ${darwinWrongUser.system.build.launchd} \
+                ${darwinWrongDomain.system.build.launchd} \
+                ${(darwinMissingPath "/usr/bin:/bin").system.build.launchd} \
+                ${
+                  (darwinMissingPath (
+                    (lib.makeBinPath (config.flake.lib.omnigentRuntimePackages pkgs)) + ":/usr/bin:/bin:/usr/sbin:/sbin"
+                  )).system.build.launchd
+                } \
+                ${darwinControl.system.build.launchd} \
+                ${darwin.system.activationScripts.script.source} \
+                ${darwin.environment.etc."omnigent/workers/cameron".source}
+              python3 ${darwinLauncherTest}
+              mkdir "$out"
+              cp artifacts.json "$out/"
+            '';
+      }
+      // lib.optionalAttrs pkgs.stdenv.isLinux {
+        omnigent-worker-linux =
+          assert lib.assertMsg (linuxFailed == [ ])
+            "Omnigent Linux failures: ${lib.concatStringsSep ", " linuxFailed}; module assertions: ${builtins.toJSON (linuxFailures linux)}";
+          pkgs.runCommand "omnigent-worker-linux"
+            {
+              passthru = {
+                cases = linuxCases;
+              };
+            }
+            ''
+              ${lib.concatMapStringsSep "\n"
+                (owner: ''
+                  export PATH=${lib.escapeShellArg linux.systemd.services."omnigent-host-${owner}".environment.PATH}
+                  test "$(worker-profile-only)" = worker-profile
+                  test "$(command -v node)" = ${pkgs.nodejs_22}/bin/node
+                  test "$(command -v hello)" = ${pkgs.hello}/bin/hello
+                  for executable in atomic omp pi claude codex nix direnv gh linear rg fd; do
+                    test -x "$(command -v "$executable")"
+                  done
+                  export HOME="$TMPDIR/private-${owner}"
+                  ${pkgs.coreutils}/bin/mkdir -m 700 "$HOME"
+                  ${linux.systemd.services."omnigent-host-${owner}".serviceConfig.ExecStartPre}
+                  uid="$(${pkgs.coreutils}/bin/id -u)"
+                  ${homeUidFixture} ${
+                    linux.systemd.services."omnigent-host-${owner}".serviceConfig.ExecStartPre
+                  } "$uid"
+                  if ${homeUidFixture} ${
+                    linux.systemd.services."omnigent-host-${owner}".serviceConfig.ExecStartPre
+                  } "$((uid + 1))"; then
+                    echo "accepted a wrong-owner worker home (UID-observation fixture)" >&2
+                    exit 1
+                  fi
+                  ${pkgs.coreutils}/bin/chmod 755 "$HOME"
+                  if ${linux.systemd.services."omnigent-host-${owner}".serviceConfig.ExecStartPre}; then
+                    echo "accepted a public worker home" >&2
+                    exit 1
+                  fi
+                  ${pkgs.coreutils}/bin/chmod 700 "$HOME"
+                  ${pkgs.coreutils}/bin/ln -s "$HOME" "$TMPDIR/linked-${owner}"
+                  export HOME="$TMPDIR/linked-${owner}"
+                  if ${linux.systemd.services."omnigent-host-${owner}".serviceConfig.ExecStartPre}; then
+                    echo "accepted a symlinked worker home" >&2
+                    exit 1
+                  fi
+                '')
+                [
+                  "cameron"
+                  "raquel"
+                ]
+              }
+              ${pkgs.omnigent.python.interpreter} ${sandboxSelectionTest}
+              ${pkgs.coreutils}/bin/touch "$out"
+            '';
+      }
+      // {
+        omnigent-worker-capabilities =
+          assert lib.assertMsg (
+            failed == [ ]
+          ) "omnigent worker capability failures: ${lib.concatStringsSep ", " failed}";
+          pkgs.runCommand "omnigent-worker-capabilities"
+            {
+              nativeBuildInputs = [ pkgs.yq-go ];
+              passthru = { inherit cases workerPath; };
+            }
+            ''
+              test -x ${cleanHome.config.home.path}/bin/pi
+              test -x ${cleanHome.config.home.path}/bin/atomic
+              export PATH=${lib.escapeShellArg workerPath}
+              id -u
+              ${lib.optionalString pkgs.stdenv.hostPlatform.isLinux "hostname"}
+              ${lib.optionalString pkgs.stdenv.hostPlatform.isLinux ''
+                test "$(type -P kill)" = ${pkgs.procps}/bin/kill
+                test "$(readlink -f ${cfg.home.path}/bin/kill)" = "$(readlink -f ${pkgs.procps}/bin/kill)"
+              ''}
+              mkdir -p cli-fixture/input cli-fixture/output
+              printf 'beta\nalpha\nalpha\n' > cli-fixture/input/text
+              test "$(find cli-fixture/input -type f | wc -l)" -eq 1
+              test "$(sort cli-fixture/input/text | uniq | grep alpha | sed s/alpha/42/ | awk '{print $1}')" = 42
+              cp cli-fixture/input/text cli-fixture/copy
+              cmp cli-fixture/input/text cli-fixture/copy
+              printf 'gamma\n' > cli-fixture/replacement
+              diff -u cli-fixture/copy cli-fixture/replacement > cli-fixture/change.patch || test "$?" -eq 1
+              patch cli-fixture/copy < cli-fixture/change.patch
+              cmp cli-fixture/copy cli-fixture/replacement
+              tar -czf cli-fixture/archive.tar.gz -C cli-fixture/input text
+              tar -xzf cli-fixture/archive.tar.gz -C cli-fixture/output
+              cmp cli-fixture/input/text cli-fixture/output/text
+              xz -c cli-fixture/input/text | xz -d | cmp - cli-fixture/input/text
+              zstd -q -c cli-fixture/input/text | zstd -q -d | cmp - cli-fixture/input/text
+              zip -q -j cli-fixture/archive.zip cli-fixture/input/text
+              unzip -p cli-fixture/archive.zip text | cmp - cli-fixture/input/text
+              printf '{"items":[1,2]}' | jq -e '.items | add == 3'
+              for executable in curl ssh scp sftp ssh-keygen openssl; do
+                test -x "$(command -v "$executable")"
+              done
+              test "$(worker-profile-only)" = worker-profile
+              if ${cfg.home.path}/bin/node; then exit 1; else test "$?" = 99; fi
+              test "$(command -v node)" = ${pkgs.nodejs_22}/bin/node
+              node --version
+              for executable in rg fd gh linear atomic omp pi claude codex nix direnv; do
+                test -x "$(command -v "$executable")"
+              done
+              ${pkgs.bash}/bin/bash --noprofile --norc ${workflowFixture}
+              export PATH=${
+                lib.makeBinPath [
+                  pkgs.coreutils
+                  pkgs.diffutils
+                  pkgs.yq-go
+                ]
+              }
+              mkdir -p state
+              printf 'host:\n  name: new\nsequence: [new]\n' > declared.yaml
+              printf 'host:\n  name: old\n  host_id: fixture-id\nunknown:\n  nested: retained\nsequence: [old]\n' > state/config.yaml
+              ${lib.getExe merge} declared.yaml state/config.yaml
+              yq -e '.host.name == "new" and .host.host_id == "fixture-id" and .unknown.nested == "retained" and (.sequence | length) == 1 and .sequence[0] == "new"' state/config.yaml
+              cp state/config.yaml expected.yaml
+              ${lib.getExe merge} declared.yaml state/config.yaml
+              cmp expected.yaml state/config.yaml
+              test "$(stat -c %a state/config.yaml)" = 600
+              for invalid in '[unterminated' '[sequence]' 'scalar' 'null' $'---\na: one\n---\nb: two'; do
+                printf '%s\n' "$invalid" > state/config.yaml
+                cp state/config.yaml before.yaml
+                if ${lib.getExe merge} declared.yaml state/config.yaml; then
+                  echo 'accepted invalid persisted configuration' >&2
+                  exit 1
+                fi
+                cmp before.yaml state/config.yaml
+              done
+              ${lib.getExe merge} declared.yaml state/fresh.yaml
+              yq -e '.host.name == "new"' state/fresh.yaml
+              printf '[unterminated\n' > invalid-declaration.yaml
+              cp state/fresh.yaml before.yaml
+              if ${lib.getExe merge} invalid-declaration.yaml state/fresh.yaml; then exit 1; fi
+              cmp before.yaml state/fresh.yaml
+              if ${lib.getExe merge} invalid-declaration.yaml state/absent.yaml; then exit 1; fi
+              test ! -e state/absent.yaml
+              ${lib.getExe pkgs.python3} ${atomicMergeTest} ${atomicActivation} ${lib.escapeShellArg "${cfg.programs.atomic.configDir}/settings.json"}
+              touch "$out"
+            '';
+      };
     };
 }
