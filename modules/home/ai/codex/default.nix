@@ -37,8 +37,8 @@
           # https://github.com/openai/codex/blob/main/codex-rs/config.md
           settings = {
             # Model configuration
-            model = "gpt-5.5";
-            # model_reasoning_effort = "high";
+            model = "gpt-6-astra";
+            model_reasoning_effort = "medium";
             # model_reasoning_summary = "auto";
 
             # Top-level web_search gates WebSearchMode (disabled | cached | live).
