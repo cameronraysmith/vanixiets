@@ -6,6 +6,8 @@
       imports = [ inputs.niri-flake.homeModules.config ];
 
       programs.niri.settings = {
+        layout.focus-ring.enable = false;
+
         input = {
           # logind also ignores this key on pyrite; neither handler may suspend it.
           power-key-handling.enable = false;
