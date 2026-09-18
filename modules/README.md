@@ -29,6 +29,7 @@ A file must also be tracked by git before a flake build can see it, because flak
 - `nixpkgs/` — channel selection and the overlay stack.
 - `system/` — cross-platform system aspects.
 - `terranix/` — cloud resource definitions rendered to OpenTofu.
+- `vm-tests/` — on-demand KVM-only tests exported as `vmTests.<system>.<name>`, outside PR gating.
 
 Top-level files configure the flake itself: `flake-parts.nix`, `formatting.nix`, `systems.nix`, `debug.nix`, `kubernetes.nix`, and `nixidy.nix`.
 
@@ -41,3 +42,20 @@ These exports are opt-in: Omnigent workers import `homeManager.cli-tools`, while
 Worker profiles prefer procps' `kill` over coreutils' overlapping executable, matching the existing supervisor PATH; the shared capabilities impose no worker-specific package priorities.
 `checks.<system>.omnigent-worker-capabilities` evaluates the matching system adapter and Home Manager adapter, then exercises file, text, archive, and JSON operations on the generated worker PATH without a login shell or network requests.
 Its foreign-input guards keep the ordinary-sized fixtures; the two 300,000-character settings fixtures that checked the same guards at size were removed for evaluation cost.
+
+## On-demand VM tests
+
+`nixbot.toml` evaluates `checks.x86_64-linux`; VM tests instead live under `vmTests` and are not part of pull-request coverage.
+The independent `checks.<system>.zerotier-mss-clamp` structural check remains gated.
+Run the runtime test on a reachable KVM-capable Linux host, such as Pyrite, from its checkout of the intended revision:
+
+```sh
+nix build .#vmTests.x86_64-linux.zerotier-mss-clamp-runtime
+```
+
+The test requires `kvm` and `nixos-test` builder features and forces KVM acceleration rather than falling back to TCG.
+Unavailable hardware is a build failure if this command is requested, not a passed or silently skipped test.
+Leaving this output outside PR gating allows operators to run it when a suitable host is available without making PR CI depend on a laptop.
+Automatic opportunistic scheduling and registering Pyrite as a remote builder are deferred; adding a builder alone does not put this output back into PR gating.
+Magnetite's host configuration removes `kvm` from NixOS's default local feature advertisement because the cloud VM has no `/dev/kvm`; source changes take effect only after activation.
+New VM test modules belong in `vm-tests/` and assign `perSystem.vmTests`, using the same automatically discovered flake-parts composition as the other module directories.

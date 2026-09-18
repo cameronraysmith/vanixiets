@@ -15,6 +15,7 @@ in
       config,
       pkgs,
       lib,
+      options,
       ...
     }:
     let
@@ -78,6 +79,10 @@ in
       # systemd-nspawn-flavor NixOS tests require uid-range, auto-allocate-uids, and cgroups.
       # See nixos/doc/manual/development/running-nixos-tests.section.md in nixpkgs.
       nix.settings = {
+        # NixOS defaults advertise KVM even though this cloud VM has no /dev/kvm.
+        system-features = lib.mkForce (
+          lib.remove "kvm" (options.nix.settings.type.getSubOptions [ ]).system-features.default
+        );
         auto-allocate-uids = true;
         extra-system-features = [ "uid-range" ];
         experimental-features = [

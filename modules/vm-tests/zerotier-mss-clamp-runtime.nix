@@ -3,9 +3,14 @@
   perSystem =
     { pkgs, lib, ... }:
     {
-      checks = lib.optionalAttrs pkgs.stdenv.isLinux {
+      vmTests = lib.optionalAttrs pkgs.stdenv.hostPlatform.isLinux {
         zerotier-mss-clamp-runtime = pkgs.testers.runNixOSTest {
           name = "zerotier-mss-clamp-runtime";
+          requiredFeatures = {
+            kvm = true;
+            nixos-test = true;
+          };
+          qemu.forceAccel = true;
           nodes.machine = { config, ... }: {
             imports = [ self.modules.nixos.zerotier-mss-clamp ];
             networking.firewall.enable = true;
