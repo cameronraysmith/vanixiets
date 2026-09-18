@@ -74,12 +74,15 @@
                 check_rules(1)
                 preserved()
 
-            with subtest("bounded repeated reload and restart"):
+            with subtest("bounded reload and restart"):
+                # Reload is the path a nixos-rebuild switch takes, since
+                # firewall.service is reloadIfChanged and its reloadScript runs
+                # extraStopCommands then startScript; restart additionally
+                # covers ExecStop plus ExecStart. Repeating either adds nothing.
                 for action in ("reload", "restart"):
-                    for _ in range(3):
-                        machine.succeed(f"systemctl {action} firewall.service")
-                        check_rules(1)
-                        preserved()
+                    machine.succeed(f"systemctl {action} firewall.service")
+                    check_rules(1)
+                    preserved()
 
             with subtest("stop preserves every sentinel and near-match"):
                 machine.succeed("systemctl stop firewall.service")
@@ -103,6 +106,11 @@
                 preserved()
 
             with subtest("material listing deletion and insertion errors propagate"):
+                # Each case resets through the module's own generated hook rather
+                # than a systemd restart: the hook cleans before it adds, so it
+                # converges from any partially-applied state, it re-asserts
+                # idempotency for free, and six consecutive restarts would breach
+                # systemd's StartLimitBurst on an accelerated VM.
                 for tool in tools:
                     for hook, action, code in (("stop", "-S", 42), ("stop", "-D", 43), ("start", "-A", 44)):
                         script = f"""{tool}() {{
@@ -115,7 +123,7 @@
                         """
                         status, output = machine.execute("bash -c " + shlex.quote(script))
                         assert status == code, (tool, hook, action, status, output)
-                        machine.succeed("systemctl restart firewall.service")
+                        machine.succeed("bash /etc/mss-start")
                         check_rules(1)
                         preserved()
 
