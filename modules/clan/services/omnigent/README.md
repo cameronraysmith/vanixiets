@@ -165,6 +165,7 @@ It requires `owner` and `user`; derives home, UID, group and state from the acco
 `owner` records intended association, not application authorization.
 No worker inherits the legacy privileged-user selector, human secrets, signing agent, cache-upload credentials, or Nix trusted-user authority.
 Accounts require separate private homes, no administrative groups or sudo grants, and ordinary Nix daemon access.
+Group membership is resolved by numeric gid as well as by name, matching the Darwin adapter, so a group aliasing a privileged group's gid counts as that privileged group for both the administrative-group and `@group` trusted-user guards.
 The host checks actual home ownership and mode before starting.
 
 `checks.<system>.omnigent-worker-capabilities` enforces four of those exclusions on both platforms, rejecting personal sops secrets and templates, Git or Jujutsu signing authority, an inherited SSH agent or signing socket, and any foreign human home reference in declared paths, settings or activation.

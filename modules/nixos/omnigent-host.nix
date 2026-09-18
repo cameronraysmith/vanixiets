@@ -47,11 +47,20 @@ in
         ) "sops-install-secrets.service";
       groupsFor =
         worker:
+        let
+          named = lib.unique (
+            [ (account worker).group ]
+            ++ (account worker).extraGroups
+            ++ lib.attrNames (
+              lib.filterAttrs (_: group: lib.elem worker.user group.members) config.users.groups
+            )
+          );
+          gids = lib.filter (gid: gid != null) (map (name: config.users.groups.${name}.gid or null) named);
+        in
         lib.unique (
-          [ (account worker).group ]
-          ++ (account worker).extraGroups
+          named
           ++ lib.attrNames (
-            lib.filterAttrs (_: group: lib.elem worker.user group.members) config.users.groups
+            lib.filterAttrs (_: group: group.gid != null && lib.elem group.gid gids) config.users.groups
           )
         );
       matchesUser =

@@ -437,18 +437,29 @@
       linux = (mkLinux [ activeModule ]).config;
       linuxFailures = c: map (a: a.message) (lib.filter (a: !a.assertion) c.assertions);
       compositeInvalid = [
-        {
-          users.users.omnigent-cameron.homeMode = "0755";
-          users.users.omnigent-cameron.extraGroups = [ "wheel" ];
-          nix.settings.trusted-users = [ "omnigent-cameron" ];
-          services.omnigent-host.workers.cameron.environment.NIX_CONFIG = "foreign";
-        }
+        (
+          { config, ... }:
+          {
+            users.users.omnigent-cameron.homeMode = "0755";
+            users.users.omnigent-cameron.extraGroups = [ "wheel" ];
+            # NixOS rejects duplicate gids unless uniqueness enforcement is off, so this is the declarable form of the runtime alias.
+            users.enforceIdUniqueness = false;
+            users.groups.omnigent-raquel.gid = config.users.groups.wheel.gid;
+            nix.settings.trusted-users = [
+              "omnigent-cameron"
+              "@wheel"
+            ];
+            services.omnigent-host.workers.cameron.environment.NIX_CONFIG = "foreign";
+          }
+        )
       ];
       compositeMessages = [
         "Omnigent worker cameron: requires a private distinct home and home-local workspace."
         "Omnigent worker cameron: administrative groups or sudo grants are prohibited."
         "Omnigent worker cameron: Nix trusted-user authority is prohibited."
         "Omnigent worker cameron: environment cannot override identity, state or authority selectors."
+        "Omnigent worker raquel: administrative groups or sudo grants are prohibited."
+        "Omnigent worker raquel: Nix trusted-user authority is prohibited."
       ];
       linuxCases = {
         valid = linuxFailures linux == [ ];
