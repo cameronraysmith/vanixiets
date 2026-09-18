@@ -376,19 +376,24 @@ This:
 - Updates secrets if changed
 - Restarts affected services
 
-### Step 6: Set up legacy sops-nix secrets
+### Step 6: Confirm user secret key delivery
 
-For user-level secrets (API keys, tokens), configure legacy sops-nix:
+User-level secrets (API keys, tokens) still use legacy sops-nix, but a clan-managed NixOS host needs no hand-provisioned `~/.config/sops/age/keys.txt`.
+The `hm-sops-bridge` module decrypts `secrets/bridge/<id>-age-key.enc` with the machine's clan age key during system activation, writes it to `/run/secrets/<id>-age-key` owned by the user with mode `0400`, and points that user's home-manager `sops.age.keyFile` at it, overriding the XDG default set by `base-sops`.
+
+Enrolling a user on this host therefore means three declarations rather than a manual key copy:
+- `flake.users.<user>.meta.sopsAgeKeyId` is set in `modules/home/users/<user>/meta.nix`
+- the host declares `hm-sops-bridge.users.<user> = { };` in `modules/machines/nixos/<host>/default.nix`
+- `secrets/bridge/<id>-age-key.enc` exists and is encrypted to this machine's age key
+
+Verify on the host after deployment:
 
 ```bash
-# Generate age key (if not already done)
-age-keygen -o ~/.config/sops/age/keys.txt
-
-# Display public key
-age-keygen -y ~/.config/sops/age/keys.txt
+ls -l /run/secrets/<id>-age-key
+systemctl status home-manager-<user>.service
 ```
 
-Add the public key to `.sops.yaml` and create encrypted secrets files.
+Encrypting new secrets for a user is still an operator task performed from a workstation holding its own age key.
 See [Legacy sops-nix secrets](#sops-nix-legacy-user-secrets) below for details.
 
 ### Step 7: Verify zerotier mesh
@@ -600,14 +605,14 @@ sops secrets/users/<username>.sops.yaml
 
 **Location on target**: `~/.config/sops-nix/secrets/`
 
-**Platforms**: All (darwin and NixOS)
+**Platforms**: All (darwin and NixOS), with the age key file itself provisioned differently per platform: manually at the XDG path on darwin, and delivered by `hm-sops-bridge` from `/run/secrets/<id>-age-key` on NixOS.
 
 ### Platform secret comparison
 
 | Aspect | Darwin | NixOS |
 |--------|--------|-------|
 | Clan vars | Available (future) | `clan vars generate`, `/run/secrets/` |
-| sops-nix (legacy) | Age key + home-manager | Age key + home-manager |
+| sops-nix (legacy) | Age key at XDG path + home-manager | Age key bridged by `hm-sops-bridge` + home-manager |
 | SSH host keys | Manual or existing | Clan vars generated |
 | Zerotier identity | Homebrew installation generates | Clan vars generated |
 | User API keys | sops-nix (legacy) | sops-nix (legacy) |

@@ -10,6 +10,29 @@
 #
 # Darwin hosts are unaffected: they continue using the Bitwarden SSH agent
 # workflow with the XDG-path key file (set via mkDefault in base-sops).
+#
+# Activation mode, measured 2026-09-18 by `nix eval` over all six NixOS hosts
+# (cinnabar, electrum, galena, magnetite, pyrite, scheelite): sops.useSystemdActivation,
+# services.userborn.enable and systemd.sysusers.enable are all false, so the whole
+# fleet decrypts through the setupSecrets activation script. That script is ordered
+# after the "users" and "groups" activation snippets, so the bridge secret exists with
+# its final ownership before any home-manager activation runs and the ordering relative
+# to home-manager is free. srvos would otherwise enable userborn, but its definition in
+# srvos nixos/common/default.nix is guarded by lib.mkIf over a condition that is false
+# whenever any user sets subUidRanges or autoSubUidGidRange, and nixpkgs
+# config/users-groups.nix sets autoSubUidGidRange = mkDefault true for every
+# isNormalUser; each host declares at least one. Removing the normal users, or setting
+# sops.useSystemdActivation, flips the fleet into systemd mode.
+#
+# In systemd mode the ordering is no longer free: sops-nix gives
+# sops-install-secrets.service requiredBy/before sysinit-reactivation.target, while
+# home-manager's NixOS module orders home-manager-<user>.service only after
+# nix-daemon.socket and before systemd-user-sessions.service and declares no dependency
+# on any secret store. A switch-time race between key delivery and home-manager
+# activation is therefore possible in that mode. It does not exist in ours today.
+#
+# This module has no OpenSpec change and no ADR: its introducing commit 5be53d720 carries
+# a subject line and no body, so this header is the entire design record.
 flakeArgs@{ inputs, ... }:
 {
   flake.modules.nixos.hm-sops-bridge =

@@ -154,7 +154,7 @@ creation_rules:
 
 ### Step 4: Reference secrets in user module
 
-Use sops in the user module:
+Use sops in the user module, leaving the age key file location to `base-sops`, which sets the XDG path with `mkDefault`:
 
 ```nix
 # modules/home/users/raquel/default.nix
@@ -162,7 +162,6 @@ Use sops in the user module:
 {
   flake.modules.homeManager."users/raquel" = { pkgs, lib, ... }: {
     sops = {
-      age.keyFile = "${config.home.homeDirectory}/.config/sops/age/keys.txt";
       defaultSopsFile = "${inputs.self}/secrets/users/raquel.sops.yaml";
       secrets = {
         "github-token" = { };
@@ -176,18 +175,26 @@ Use sops in the user module:
 }
 ```
 
-### Step 5: Generate age key on target machine
+Do not set `sops.age.keyFile` in a user module.
+On a NixOS host that enrolls this user in `hm-sops-bridge`, the bridge assigns the same option at ordinary priority, and a second ordinary-priority definition is an evaluation conflict rather than an override.
 
-On the machine where this user will be active:
+### Step 5: Provision the user's age key
+
+On a darwin host, the user generates the key themselves:
 
 ```bash
-# As the user (raquel)
+# As the user (raquel), on the darwin host
 mkdir -p ~/.config/sops/age
 age-keygen -o ~/.config/sops/age/keys.txt
 
 # Display public key - add this to .sops.yaml
 age-keygen -y ~/.config/sops/age/keys.txt
 ```
+
+On a clan-managed NixOS host, do not generate a key on the host.
+Set `flake.users.<user>.meta.sopsAgeKeyId`, declare `hm-sops-bridge.users.<user> = { };` on the host, and commit the user's age private key as `secrets/bridge/<id>-age-key.enc` encrypted to that machine's age key.
+System activation then delivers it to `/run/secrets/<id>-age-key` and home-manager reads it from there.
+See [Host onboarding](/guides/host-onboarding/) for the host-side steps.
 
 ### Step 6: Deploy
 
