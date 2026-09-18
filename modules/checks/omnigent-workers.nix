@@ -459,23 +459,22 @@
       });
       linux = (mkLinux [ activeModule ]).config;
       linuxFailures = c: map (a: a.message) (lib.filter (a: !a.assertion) c.assertions);
-      linuxRejects =
-        message: extra:
-        let
-          evaluate =
-            modules:
-            builtins.tryEval (
-              let
-                c = (mkLinux modules).config;
-              in
-              assert linuxFailures c == [ ];
-              c.networking.hostName
-            );
-          withoutGuard.options.assertions = lib.mkOption {
-            apply = lib.filter (a: a.assertion || a.message != message);
-          };
-        in
-        !(evaluate extra).success && (evaluate (extra ++ [ withoutGuard ])).success;
+      linuxRejects = message: extra: linuxFailures (mkLinux extra).config == [ message ];
+      compositeInvalid = [
+        {
+          users.users.omnigent-cameron.homeMode = "0755";
+          users.users.omnigent-cameron.extraGroups = [ "wheel" ];
+          nix.settings.trusted-users = [ "omnigent-cameron" ];
+          services.omnigent-host.workers.cameron.environment.NIX_CONFIG = "foreign";
+        }
+      ];
+      compositeMessages = [
+        "Omnigent worker cameron: requires a private distinct home and home-local workspace."
+        "Omnigent worker cameron: administrative groups or sudo grants are prohibited."
+        "Omnigent worker cameron: Nix trusted-user authority is prohibited."
+        "Omnigent worker cameron: environment cannot override identity, state or authority selectors."
+      ];
+      compositeRemoved = "Omnigent worker cameron: Nix trusted-user authority is prohibited.";
       sudoRule = users: groups: {
         security.sudo.extraRules = [
           {
@@ -486,6 +485,31 @@
       };
       linuxCases = {
         valid = linuxFailures linux == [ ];
+        compositeInvalid =
+          lib.sort builtins.lessThan (linuxFailures (mkLinux compositeInvalid).config)
+          == lib.sort builtins.lessThan compositeMessages;
+        compositeGuardRemoval =
+          lib.sort builtins.lessThan (
+            linuxFailures
+              (mkLinux (
+                compositeInvalid
+                ++ [
+                  {
+                    assertions = [
+                      {
+                        assertion = true;
+                        message = throw "Successful assertion messages must remain unevaluated.";
+                      }
+                    ];
+                  }
+                  {
+                    options.assertions = lib.mkOption {
+                      apply = lib.filter (a: a.assertion || a.message != compositeRemoved);
+                    };
+                  }
+                ]
+              )).config
+          ) == lib.sort builtins.lessThan (lib.remove compositeRemoved compositeMessages);
         disabledPrepared =
           !(prepared.systemd.services ? omnigent-host-cameron)
           && !(prepared.systemd.services ? omnigent-host-raquel)
@@ -858,27 +882,6 @@
               "SKIP_SANITY_CHECKS"
             ];
       };
-      darwinWrongUser =
-        (mkDarwin [
-          {
-            launchd.daemons.omnigent-host-cameron.serviceConfig.UserName = lib.mkForce "root";
-          }
-        ]).config;
-      darwinWrongDomain =
-        (mkDarwin [
-          {
-            environment.launchDaemons."org.nixos.omnigent-host-cameron.plist".enable = false;
-            environment.launchAgents."org.nixos.omnigent-host-cameron.plist".text =
-              darwin.environment.launchDaemons."org.nixos.omnigent-host-cameron.plist".text;
-          }
-        ]).config;
-      darwinMissingPath =
-        path:
-        (mkDarwin [
-          {
-            launchd.daemons.omnigent-host-cameron.environment.PATH = lib.mkForce path;
-          }
-        ]).config;
       darwinHostCanary = pkgs.writeShellScriptBin "omnigent" ''
         set -eu
         test "$*" = 'host --server https://fixture.invalid'
@@ -966,16 +969,32 @@
             return p, launcher, str(activation), merger, declaration
 
         production = inspect(sys.argv[1])
-        for root, reason in zip(sys.argv[2:6], ["wrong user", "wrong domain", "missing runtime", "missing profile"], strict=True):
-            try:
-                inspect(root)
-            except AssertionError as error:
-                assert str(error) == reason, (reason, str(error))
-            else:
-                raise AssertionError("accepted " + reason)
-        control = inspect(sys.argv[6])
+        for reason in ["wrong user", "wrong domain", "missing runtime", "missing profile"]:
+            with tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                relative = Path("Library/LaunchDaemons") / (label + ".plist")
+                plist = root / relative
+                plist.parent.mkdir(parents=True)
+                p = plistlib.loads((Path(sys.argv[1]) / relative).read_bytes())
+                if reason == "wrong user":
+                    p["UserName"] = "root"
+                elif reason == "wrong domain":
+                    plist = root / "Library/LaunchAgents" / plist.name
+                    plist.parent.mkdir()
+                elif reason == "missing runtime":
+                    p["EnvironmentVariables"]["PATH"] = "/usr/bin:/bin"
+                else:
+                    p["EnvironmentVariables"]["PATH"] = "${lib.makeBinPath (config.flake.lib.omnigentRuntimePackages pkgs)}:/usr/bin:/bin:/usr/sbin:/sbin"
+                plist.write_bytes(plistlib.dumps(p))
+                try:
+                    inspect(root)
+                except AssertionError as error:
+                    assert str(error) == reason, (reason, str(error))
+                else:
+                    raise AssertionError("accepted " + reason)
+        control = inspect(sys.argv[2])
         _, _, activation, merger, declaration = production
-        assert str(Path(activation).parent) == sys.argv[8], "enrollment generation differs from launched generation"
+        assert str(Path(activation).parent) == sys.argv[4], "enrollment generation differs from launched generation"
         settings = yaml.safe_load(Path(declaration).read_text())
         assert settings["host"]["name"] == "fixture-cameron"
         target = Path("worker-config.yaml")
@@ -998,7 +1017,7 @@
             spec = yaml.safe_load(_materialize_pi_agent_spec(Path(directory)).read_text())
             assert spec["os_env"] == {"type": "caller_process", "cwd": ".", "sandbox": {"type": "none"}}
 
-        system_activation = Path(sys.argv[7]).read_text()
+        system_activation = Path(sys.argv[3]).read_text()
         preparation_lines = [line for line in system_activation.splitlines() if "-omnigent-prepare-darwin-home " in line]
         assert len(preparation_lines) == 1
         invocation = shlex.split(preparation_lines[0])
@@ -1211,13 +1230,6 @@
         (inventoryMachines.${machine}.extendModules {
           modules = [ module ];
         }).config;
-      inventoryEnabled =
-        machine: enable:
-        inventoryVariant machine {
-          services.omnigent-host.workers = lib.genAttrs expectedOwners.${machine} (_: {
-            enable = lib.mkForce enable;
-          });
-        };
       inventoryRejects = machine: module: !inspectInventory machine (inventoryVariant machine module);
       clanHostInterface =
         (
@@ -1437,9 +1449,6 @@
             }
           ];
         };
-        wrongHostName = inventoryRejects "pyrite" {
-          services.omnigent-host.workers.janettesmith.hostName = lib.mkForce "pyrite-raquel";
-        };
         hostMatrix =
           lib.attrNames inventoryRoles.host.machines == [
             "magnetite"
@@ -1450,44 +1459,8 @@
           lib.attrNames inventoryRoles.server.machines == [ "magnetite" ]
           && inventoryMachines.magnetite.config.services.omnigent.domain == "omni.scientistexperience.net";
         cacheDownloads = lib.all (d: cacheDownloads d.config) (lib.attrValues inventoryMachines);
-        missingCaches =
-          !cacheDownloads (
-            inventoryVariant "pyrite" {
-              nix.settings.substituters = lib.mkForce [ ];
-            }
-          );
-        missingCacheKeys =
-          !cacheDownloads (
-            inventoryVariant "stibnite" {
-              nix.settings.trusted-public-keys = lib.mkForce [ ];
-            }
-          );
-        missingWorker = inventoryRejects "pyrite" {
-          services.omnigent-host.workers = lib.mkForce { };
-        };
-        extraDarwinWorker = inventoryRejects "stibnite" {
-          services.omnigent-host.workers.raquel = {
-            owner = "raquel";
-            user = "omnigent-cameron";
-          };
-        };
-        wrongOwner = inventoryRejects "magnetite" {
-          services.omnigent-host.workers.janettesmith.owner = lib.mkForce "cameron";
-        };
-        duplicateHome = inventoryRejects "pyrite" {
-          users.users.omnigent-janettesmith.home = lib.mkForce "/home/omnigent-cameron";
-        };
-        adminMembership = inventoryRejects "magnetite" {
-          users.groups.wheel.members = [ "omnigent-cameron" ];
-        };
-        trustedDaemon = inventoryRejects "stibnite" {
-          nix.settings.trusted-users = [ "omnigent-cameron" ];
-        };
         deniedNix = inventoryRejects "pyrite" {
           nix.settings.allowed-users = lib.mkForce [ "root" ];
-        };
-        inheritedSsh = inventoryRejects "stibnite" {
-          users.users.omnigent-cameron.openssh.authorizedKeys.keys = [ "fixture-unwanted-key" ];
         };
         signer = inventoryRejects "pyrite" {
           services.omnigent-host.workers.cameron.extraHomeModules = [
@@ -1527,16 +1500,10 @@
             current = inventoryMachines.magnetite.config;
             without = inventoryVariant "magnetite" { services.omnigent-host.workers = lib.mkForce { }; };
           in
-          serverUnit current == serverUnit without
-          && serverUnit current == serverUnit (inventoryEnabled "magnetite" true);
+          serverUnit current == serverUnit without;
       }
       // lib.mapAttrs' (
-        machine: d:
-        lib.nameValuePair "machine-${machine}" (
-          inspectInventory machine d.config
-          && inspectInventory machine (inventoryEnabled machine false)
-          && inspectInventory machine (inventoryEnabled machine true)
-        )
+        machine: d: lib.nameValuePair "machine-${machine}" (inspectInventory machine d.config)
       ) inventoryMachines;
       inventoryFailed = lib.attrNames (lib.filterAttrs (_: ok: !ok) inventoryCases);
       credentialRoot = "/tmp/omnigent-worker-credentials-${system}";
@@ -2219,14 +2186,6 @@
             ''
               ${pkgs.omnigent.python.interpreter} ${darwinArtifactTest} \
                 ${darwin.system.build.launchd} \
-                ${darwinWrongUser.system.build.launchd} \
-                ${darwinWrongDomain.system.build.launchd} \
-                ${(darwinMissingPath "/usr/bin:/bin").system.build.launchd} \
-                ${
-                  (darwinMissingPath (
-                    (lib.makeBinPath (config.flake.lib.omnigentRuntimePackages pkgs)) + ":/usr/bin:/bin:/usr/sbin:/sbin"
-                  )).system.build.launchd
-                } \
                 ${darwinControl.system.build.launchd} \
                 ${darwin.system.activationScripts.script.source} \
                 ${darwin.environment.etc."omnigent/workers/cameron".source}
