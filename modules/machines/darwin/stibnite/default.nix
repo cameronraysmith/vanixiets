@@ -209,6 +209,15 @@ in
       # Connection details (sshUser/sshKey/publicHostKey) are null in upstream
       # too; ssh resolution is handled by /etc/ssh/ssh_config.d/100-rosetta-builder.conf.
       # Remove once nix-rosetta-builder advertises uid-range upstream.
+      #
+      # "kvm" is dropped from the upstream feature list (module.nix:400-404 in
+      # nix-rosetta-builder, where it is a hardcoded literal with no option):
+      # `ls -l /dev/kvm` in the running VM reports no such file, so the VM cannot
+      # accelerate any guest, and Rosetta translates userspace rather than
+      # providing a hypervisor, so an x86_64-linux guest could not be
+      # KVM-accelerated there even if the aarch64 VM had nested virtualisation.
+      # Advertising it sent kvm-requiring derivations to a machine that fails
+      # them; pyrite below is the fleet's only host that can run them.
       nix.buildMachines = lib.mkForce (
         [
           {
@@ -223,7 +232,6 @@ in
             supportedFeatures = [
               "benchmark"
               "big-parallel"
-              "kvm"
               "nixos-test"
               "uid-range"
             ];

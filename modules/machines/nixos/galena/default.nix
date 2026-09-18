@@ -25,6 +25,7 @@ in
       ++ (with flakeModules; [
         base
         hm-sops-bridge
+        kvm-declaration
         ssh-known-hosts
       ]);
 
@@ -52,6 +53,9 @@ in
 
       # Override state version for new deployment
       system.stateVersion = "25.05";
+
+      # GCP VM with no nested virtualisation, so no /dev/kvm.
+      declaredKvm.present = false;
 
       # User configuration managed via clan inventory users service
 

@@ -50,6 +50,7 @@ in
       ++ (with flakeModules; [
         base
         hm-sops-bridge
+        kvm-declaration
         ssh-known-hosts
       ]);
 
@@ -118,6 +119,11 @@ in
       # (clan-core nixosModules/clanCore/state-version/default.nix:18), so the committed
       # vars/per-machine/pyrite/state-version/version/value does not affect evaluation.
       system.stateVersion = "26.05";
+
+      # Bare metal with /dev/kvm present at mode 0666, the only machine in the
+      # fleet that can accelerate a QEMU guest, which is what makes the vmTests
+      # lane runnable here.
+      declaredKvm.present = true;
 
       # Kept from base as a deliberate decision, not an inheritance (D6): the install
       # touches the pool from the installer environment under a different hostid, so
@@ -463,7 +469,6 @@ in
       # Increase MaxAuthTries to accommodate agent forwarding with many keys
       # Default is 6, but Bitwarden SSH agent may have 10+ keys loaded
       services.openssh.settings.MaxAuthTries = 20;
-
       # Bridge NixOS-level sops to home-manager for user secret key delivery.
       # sopsIdentity defaults to flake.users.cameron.meta.sopsAgeKeyId
       # ("crs58" via alias-fold inheritance).

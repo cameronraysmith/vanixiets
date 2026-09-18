@@ -15,7 +15,6 @@ in
       config,
       pkgs,
       lib,
-      options,
       ...
     }:
     let
@@ -41,6 +40,7 @@ in
       ++ (with flakeModules; [
         base
         hm-sops-bridge
+        kvm-declaration
         niks3
         ssh-known-hosts
         stibnite-builder
@@ -76,13 +76,12 @@ in
 
       system.stateVersion = "25.05";
 
+      # Hetzner CX53 with no nested virtualisation, so no /dev/kvm.
+      declaredKvm.present = false;
+
       # systemd-nspawn-flavor NixOS tests require uid-range, auto-allocate-uids, and cgroups.
       # See nixos/doc/manual/development/running-nixos-tests.section.md in nixpkgs.
       nix.settings = {
-        # NixOS defaults advertise KVM even though this cloud VM has no /dev/kvm.
-        system-features = lib.mkForce (
-          lib.remove "kvm" (options.nix.settings.type.getSubOptions [ ]).system-features.default
-        );
         auto-allocate-uids = true;
         extra-system-features = [ "uid-range" ];
         experimental-features = [

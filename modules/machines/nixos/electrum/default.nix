@@ -26,6 +26,7 @@ in
       ++ (with flakeModules; [
         base
         hm-sops-bridge
+        kvm-declaration
         ssh-known-hosts
       ]);
 
@@ -54,6 +55,9 @@ in
 
       # Override state version for new deployment
       system.stateVersion = "25.05";
+
+      # Hetzner CCX23 with no nested virtualisation, so no /dev/kvm.
+      declaredKvm.present = false;
 
       # User configuration now managed via clan inventory users service
       # See: modules/clan/inventory/services/users.nix (user-cameron instance)

@@ -28,6 +28,7 @@ in
       ++ (with flakeModules; [
         base
         hm-sops-bridge
+        kvm-declaration
         ssh-known-hosts
         nvidia # GPU/CUDA support (datacenter-optimized)
       ]);
@@ -56,6 +57,15 @@ in
 
       # Override state version for new deployment
       system.stateVersion = "25.05";
+
+      # GCP L4 node with no nested virtualisation, so no /dev/kvm. The GPU
+      # features come from nixpkgs' nix-required-mounts nvidia-gpu preset, which
+      # the kvm-declaration force would otherwise discard; they are carried over
+      # from that module's own option rather than restated as literals.
+      declaredKvm = {
+        present = false;
+        extraFeatures = config.programs.nix-required-mounts.allowedPatterns.nvidia-gpu.onFeatures;
+      };
 
       # User configuration managed via clan inventory users service
       # Zerotier peer configuration via clan inventory
