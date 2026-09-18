@@ -40,6 +40,7 @@ in
         zt-dns
         zt-services-trust
         magnetite-builder
+        pyrite-builder
         stibnite-build-host
         # Not importing users module (defines testuser at UID 550)
       ]);
@@ -239,10 +240,19 @@ in
           }
         ]
         ++ config.services.magnetite-builder.buildMachines
+        ++ config.services.pyrite-builder.buildMachines
       );
 
       # Offload native x86_64-linux builds to magnetite over ZeroTier.
       services.magnetite-builder.enable = true;
+
+      # pyrite is the only machine in the fleet with /dev/kvm, so it is the only
+      # place a kvm-requiring derivation such as a vmTests output can be built.
+      # It is a laptop, and an unreachable one costs a logged connection failure
+      # and a failed kvm build rather than a hang or a silently unaccelerated
+      # one; see modules/system/pyrite-builder.nix for the nix behaviour this
+      # relies on and the ssh timeouts that bound it.
+      services.pyrite-builder.enable = true;
 
       # Inbound side of the same asymmetry: stibnite is the fleet's only
       # aarch64-darwin machine, so it serves darwin builds to hosts that cannot

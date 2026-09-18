@@ -469,6 +469,37 @@ in
       # Increase MaxAuthTries to accommodate agent forwarding with many keys
       # Default is 6, but Bitwarden SSH agent may have 10+ keys loaded
       services.openssh.settings.MaxAuthTries = 20;
+
+      # Inbound half of the fleet's kvm lane: pyrite is the only machine with
+      # /dev/kvm, so it serves kvm-requiring builds (the vmTests outputs) to
+      # hosts that cannot run them. stibnite dispatches as this account with the
+      # same `nix-remote-build` key it already presents to magnetite's builder
+      # account, so no new key material is introduced. Mirrors
+      # modules/machines/nixos/magnetite/default.nix.
+      users.users.builder = {
+        isNormalUser = true;
+        description = "Remote nix build user";
+        # nix-daemon --stdio is exactly what an ssh-ng caller would otherwise
+        # invoke (`remote-program` defaults to nix-daemon), so forcing it serves
+        # the build protocol and discards anything else the client asks for.
+        # sshd runs the forced command through the account's login shell, so the
+        # shell must stay executable; a nologin shell would break the protocol
+        # rather than harden it.
+        openssh.authorizedKeys.keys = [
+          ''restrict,command="${config.nix.package}/bin/nix-daemon --stdio" ${
+            lib.removeSuffix "\n"
+              inputs.self.darwinConfigurations.stibnite.config.clan.core.vars.generators.nix-remote-build.files."key.pub".value
+          }''
+        ];
+      };
+
+      # An untrusted remote-build account cannot push unsigned store paths: the
+      # daemon rejects them with "lacks a signature by a trusted key", which
+      # fails any derivation whose inputs were evaluated on the caller. This
+      # list appends to the fleet-wide root/@wheel set in
+      # modules/system/nix-settings.nix.
+      nix.settings.trusted-users = [ "builder" ];
+
       # Bridge NixOS-level sops to home-manager for user secret key delivery.
       # sopsIdentity defaults to flake.users.cameron.meta.sopsAgeKeyId
       # ("crs58" via alias-fold inheritance).

@@ -56,9 +56,17 @@ nix build .#vmTests.x86_64-linux.zerotier-mss-clamp-runtime
 The test requires `kvm` and `nixos-test` builder features and forces KVM acceleration rather than falling back to TCG.
 Unavailable hardware is a build failure if this command is requested, not a passed or silently skipped test.
 Leaving this output outside PR gating allows operators to run it when a suitable host is available without making PR CI depend on a laptop.
-Automatic opportunistic scheduling and registering Pyrite as a remote builder are deferred; adding a builder alone does not put this output back into PR gating.
+Registering Pyrite as a remote builder does not put this output back into PR gating; automatic opportunistic scheduling remains deferred.
 Every NixOS host imports `system/kvm-declaration.nix` and states `declaredKvm.present` explicitly, because NixOS advertises `kvm` in `nix.settings.system-features` unconditionally and that claim is true only on Pyrite: Cinnabar, Electrum, Galena, Magnetite, and Scheelite are cloud VMs without nested virtualisation.
 Evaluation cannot inspect a machine's device nodes, so the option is an operator declaration rather than a detection, and a wrong declaration is visible at one line per host instead of inherited silently.
 Stibnite's `nix.buildMachines` mirror of the rosetta builder no longer advertises `kvm` either; the VM has no `/dev/kvm`, and Rosetta translates userspace rather than providing a hypervisor.
 Corrected advertisements take effect only after each machine is activated.
+
+Stibnite reaches Pyrite through `services.pyrite-builder`, whose entry advertises `kvm` and `nixos-test`.
+Pyrite is a laptop, so unreachability is ordinary, and nix 2.35 handles it in two distinct ways.
+A build the caller or another builder can perform continues: the build hook logs `cannot build on '<store uri>'`, marks that machine disabled for the rest of its lifetime, and reconsiders the remaining machines or falls back to a local build.
+A build requiring `kvm` fails outright while Pyrite is the fleet's only `kvm` builder and is offline, reporting `missing system features` with `Required features: {kvm}`, and never degrades into an unaccelerated or emulated build.
+That second case is the intended behaviour: vmTests are opt-in and outside PR gating, so an offline laptop costs a manual re-run rather than a red pull request.
+The ssh alias sets `ConnectTimeout 5`, `BatchMode yes`, and a `ServerAliveInterval 15` / `ServerAliveCountMax 2` pair, so a sleeping or off-network laptop is declared unreachable in seconds instead of absorbing the kernel's SYN retry schedule or parking a build on a half-open connection.
+The builder is inert until Stibnite and Pyrite are activated.
 New VM test modules belong in `vm-tests/` and assign `perSystem.vmTests`, using the same automatically discovered flake-parts composition as the other module directories.
