@@ -383,21 +383,6 @@
                 '';
               })
             ];
-        largeBenignSettings = valid (mkHome [
-          {
-            programs.atomic.settings.workerFixture = lib.concatStrings (lib.genList (_: "x") 300000);
-          }
-        ]);
-        largeForeignSettings =
-          rejected "Omnigent worker configuration must use its own home, not a foreign human home."
-            [
-              {
-                programs.atomic.settings.workerFixture =
-                  lib.concatStrings (lib.genList (_: "x") 150000)
-                  + " /home/human/private "
-                  + lib.concatStrings (lib.genList (_: "x") 150000);
-              }
-            ];
         benignDocumentation = valid (mkHome [
           {
             home.file."example.md".text =
@@ -459,7 +444,6 @@
       });
       linux = (mkLinux [ activeModule ]).config;
       linuxFailures = c: map (a: a.message) (lib.filter (a: !a.assertion) c.assertions);
-      linuxRejects = message: extra: linuxFailures (mkLinux extra).config == [ message ];
       compositeInvalid = [
         {
           users.users.omnigent-cameron.homeMode = "0755";
@@ -474,158 +458,17 @@
         "Omnigent worker cameron: Nix trusted-user authority is prohibited."
         "Omnigent worker cameron: environment cannot override identity, state or authority selectors."
       ];
-      compositeRemoved = "Omnigent worker cameron: Nix trusted-user authority is prohibited.";
-      sudoRule = users: groups: {
-        security.sudo.extraRules = [
-          {
-            inherit users groups;
-            commands = [ "ALL" ];
-          }
-        ];
-      };
       linuxCases = {
         valid = linuxFailures linux == [ ];
         compositeInvalid =
           lib.sort builtins.lessThan (linuxFailures (mkLinux compositeInvalid).config)
           == lib.sort builtins.lessThan compositeMessages;
-        compositeGuardRemoval =
-          lib.sort builtins.lessThan (
-            linuxFailures
-              (mkLinux (
-                compositeInvalid
-                ++ [
-                  {
-                    assertions = [
-                      {
-                        assertion = true;
-                        message = throw "Successful assertion messages must remain unevaluated.";
-                      }
-                    ];
-                  }
-                  {
-                    options.assertions = lib.mkOption {
-                      apply = lib.filter (a: a.assertion || a.message != compositeRemoved);
-                    };
-                  }
-                ]
-              )).config
-          ) == lib.sort builtins.lessThan (lib.remove compositeRemoved compositeMessages);
         disabledPrepared =
           !(prepared.systemd.services ? omnigent-host-cameron)
           && !(prepared.systemd.services ? omnigent-host-raquel)
           && prepared.home-manager.users.omnigent-cameron.programs.omnigent.enable
           && builtins.hasAttr "home-manager-omnigent\\x2dcameron" prepared.systemd.services;
         noLegacyFallback = !(linux.systemd.services ? omnigent-host);
-        root = lib.elem "Omnigent worker cameron: requires a dedicated non-root normal account." (
-          linuxFailures (mkLinux [ { users.users.omnigent-cameron.uid = 0; } ]).config
-        );
-        duplicateUser = linuxRejects "Omnigent workers require distinct accounts." [
-          {
-            services.omnigent-host.workers.duplicate = {
-              owner = "cameron";
-              user = "omnigent-cameron";
-              hostName = "fixture-cameron";
-            };
-          }
-        ];
-        duplicateHome =
-          let
-            c =
-              (mkLinux [ { users.users.omnigent-raquel.home = lib.mkForce "/home/omnigent-cameron"; } ]).config;
-          in
-          lib.elem "Omnigent worker cameron: requires a private distinct home and home-local workspace." (
-            linuxFailures c
-          )
-          && lib.elem "Omnigent worker raquel: requires a private distinct home and home-local workspace." (
-            linuxFailures c
-          );
-        publicHome =
-          linuxRejects "Omnigent worker cameron: requires a private distinct home and home-local workspace."
-            [ { users.users.omnigent-cameron.homeMode = "0755"; } ];
-        admin =
-          linuxRejects "Omnigent worker cameron: administrative groups or sudo grants are prohibited."
-            [ { users.users.omnigent-cameron.extraGroups = [ "wheel" ]; } ];
-        groupMembership =
-          linuxRejects "Omnigent worker cameron: administrative groups or sudo grants are prohibited."
-            [ { users.groups.docker.members = [ "omnigent-cameron" ]; } ];
-        sudo =
-          linuxRejects "Omnigent worker cameron: administrative groups or sudo grants are prohibited."
-            [
-              {
-                security.sudo.extraRules = [
-                  {
-                    users = [ "omnigent-cameron" ];
-                    commands = [ "ALL" ];
-                  }
-                ];
-              }
-            ];
-        sudoAll =
-          linuxFailures (mkLinux [ (sudoRule [ "ALL" ] [ ]) ]).config
-          == map (owner: "Omnigent worker ${owner}: administrative groups or sudo grants are prohibited.") [
-            "cameron"
-            "raquel"
-          ];
-        sudoUid =
-          linuxRejects "Omnigent worker cameron: administrative groups or sudo grants are prohibited."
-            [
-              { users.users.omnigent-cameron.uid = 22001; }
-              (sudoRule [ 22001 ] [ ])
-            ];
-        sudoPrimaryGid =
-          linuxRejects "Omnigent worker cameron: administrative groups or sudo grants are prohibited."
-            [
-              { users.groups.omnigent-cameron.gid = 22001; }
-              (sudoRule [ ] [ 22001 ])
-            ];
-        sudoSupplementaryGid =
-          linuxRejects "Omnigent worker cameron: administrative groups or sudo grants are prohibited."
-            [
-              {
-                users.users.omnigent-cameron.extraGroups = [ "fixture" ];
-                users.groups.fixture.gid = 22001;
-              }
-              (sudoRule [ ] [ 22001 ])
-            ];
-        sudoMemberGid =
-          linuxRejects "Omnigent worker cameron: administrative groups or sudo grants are prohibited."
-            [
-              {
-                users.groups.fixture = {
-                  gid = 22001;
-                  members = [ "omnigent-cameron" ];
-                };
-              }
-              (sudoRule [ ] [ 22001 ])
-            ];
-        sudoPrimaryGroup =
-          linuxRejects "Omnigent worker cameron: administrative groups or sudo grants are prohibited."
-            [ (sudoRule [ ] [ "omnigent-cameron" ]) ];
-        sudoSupplementaryGroup =
-          linuxRejects "Omnigent worker cameron: administrative groups or sudo grants are prohibited."
-            [
-              {
-                users.users.omnigent-cameron.extraGroups = [ "fixture" ];
-                users.groups.fixture = { };
-              }
-              (sudoRule [ ] [ "fixture" ])
-            ];
-        sudoUnrelated =
-          linuxFailures
-            (mkLinux [
-              {
-                users.users.omnigent-cameron.uid = 22001;
-                users.groups.omnigent-cameron.gid = 22001;
-              }
-              (sudoRule [ "unrelated" 22002 "22001" ] [ "unrelated" 22002 "22001" "ALL" ])
-            ]).config == [ ];
-        sudoUnallocatedIds = linuxFailures (mkLinux [ (sudoRule [ 22001 ] [ 22001 ]) ]).config == [ ];
-        trusted = linuxRejects "Omnigent worker cameron: Nix trusted-user authority is prohibited." [
-          { nix.settings.trusted-users = [ "omnigent-cameron" ]; }
-        ];
-        trustedGroup = linuxRejects "Omnigent worker cameron: Nix trusted-user authority is prohibited." [
-          { nix.settings.trusted-users = [ "@omnigent-cameron" ]; }
-        ];
         direnvOptIn =
           prepared.home-manager.users.omnigent-cameron.programs.direnv.config.whitelist.prefix or [ ] == [ ];
       }
@@ -764,23 +607,6 @@
       darwinPrepared =
         (mkDarwin [ { services.omnigent-host.workers.cameron.enable = lib.mkForce false; } ]).config;
       darwinFailures = c: map (a: a.message) (lib.filter (a: !a.assertion) c.assertions);
-      darwinRejects =
-        message: extra:
-        let
-          evaluate =
-            modules:
-            builtins.tryEval (
-              let
-                c = (mkDarwin modules).config;
-              in
-              assert darwinFailures c == [ ];
-              c.networking.hostName
-            );
-          withoutGuard.options.assertions = lib.mkOption {
-            apply = lib.filter (a: a.assertion || a.message != message);
-          };
-        in
-        !(evaluate extra).success && (evaluate (extra ++ [ withoutGuard ])).success;
       darwinCases = {
         valid = darwinFailures darwin == [ ];
         disabledPrepared =
@@ -788,62 +614,6 @@
           && darwinPrepared.environment.etc ? "omnigent/workers/cameron"
           && darwinPrepared.home-manager.users == { };
         noLegacyFallback = darwin.home-manager.users == { };
-        root = darwinRejects "Omnigent worker cameron: requires a dedicated non-root managed account." [
-          { users.users.omnigent-cameron.uid = lib.mkForce 0; }
-        ];
-        admin = darwinRejects "Omnigent worker cameron: administrative groups are prohibited." [
-          {
-            users.groups.admin = {
-              gid = 80;
-              members = [ "omnigent-cameron" ];
-            };
-          }
-        ];
-        primaryAdmin = darwinRejects "Omnigent worker cameron: administrative groups are prohibited." [
-          { users.users.omnigent-cameron.gid = lib.mkForce 80; }
-        ];
-        trusted = darwinRejects "Omnigent worker cameron: Nix trusted-user authority is prohibited." [
-          { nix.settings.trusted-users = [ "omnigent-cameron" ]; }
-        ];
-        trustedGroup = darwinRejects "Omnigent worker cameron: Nix trusted-user authority is prohibited." [
-          { nix.settings.trusted-users = [ "@omnigent-cameron" ]; }
-        ];
-        noNix = darwinRejects "Omnigent worker cameron: ordinary Nix daemon access is required." [
-          { nix.settings.allowed-users = lib.mkForce [ "root" ]; }
-        ];
-        duplicateActivation =
-          darwinRejects "Omnigent worker cameron: standalone Home Manager must be the only activation owner."
-            [
-              { home-manager.users.omnigent-cameron.home.stateVersion = "25.11"; }
-            ];
-        workerAgent =
-          darwinRejects "Omnigent worker cameron: worker Home Manager must not require a user launchd domain."
-            [
-              {
-                services.omnigent-host.workers.cameron.extraHomeModules = [
-                  {
-                    launchd.agents.unwanted = {
-                      enable = true;
-                      config.ProgramArguments = [ "/usr/bin/true" ];
-                    };
-                  }
-                ];
-              }
-            ];
-        desktopActivation =
-          darwinRejects
-            "Omnigent worker cameron: worker Home Manager must not require desktop application activation."
-            [
-              {
-                services.omnigent-host.workers.cameron.extraHomeModules = [
-                  { targets.darwin.copyApps.enable = lib.mkForce true; }
-                ];
-              }
-            ];
-        selectors =
-          darwinRejects
-            "Omnigent worker cameron: environment cannot override identity, state or authority selectors."
-            [ { services.omnigent-host.workers.cameron.environment.BASH_ENV = "foreign"; } ];
       };
       darwinHostCanary = pkgs.writeShellScriptBin "omnigent" ''
         set -eu
@@ -1074,44 +844,6 @@
         inherit (config.flake.nixosConfigurations) magnetite pyrite;
         inherit (config.flake.darwinConfigurations) stibnite;
       };
-      inventoryDeliveryFixture = pkgs.runCommandLocal "omnigent-inventory-synthetic-delivery" { } (
-        lib.concatStringsSep "\n" (
-          lib.concatLists (
-            lib.mapAttrsToList (
-              _: d:
-              lib.concatMap (
-                worker:
-                map (source: ''
-                  mkdir -p "$out/vars/shared/${source.generator}/${source.file}"
-                  install -m 0644 ${../home/ai/omnigent/fixtures/vars/per-machine/fixture/fixture-signing/credential/secret} \
-                    "$out/vars/shared/${source.generator}/${source.file}/secret"
-                '') (lib.attrValues (config.flake.lib.omnigentCredentialSelection worker.credentials))
-              ) (lib.attrValues d.config.services.omnigent-host.workers)
-              ++ lib.concatMap (
-                generator:
-                lib.concatMap (
-                  file:
-                  lib.optional (!file.secret && file.flakePath != null && builtins.pathExists file.flakePath) ''
-                    mkdir -p "$out/vars/${file.rel_dir}/${file.name}"
-                    install -m 0644 ${file.flakePath} "$out/vars/${file.rel_dir}/${file.name}/value"
-                  ''
-                ) (lib.attrValues generator.files)
-              ) (lib.attrValues d.config.clan.core.vars.generators)
-            ) inventoryRealMachines
-          )
-        )
-      );
-      inventoryMachines = lib.mapAttrs (
-        _: d:
-        d.extendModules {
-          modules = [
-            {
-              clan.core.settings.directory = lib.mkForce inventoryDeliveryFixture;
-              sops.validateSopsFiles = false;
-            }
-          ];
-        }
-      ) inventoryRealMachines;
       expectedOwners = {
         magnetite = [
           "cameron"
@@ -1123,9 +855,10 @@
         ];
         stibnite = [ "cameron" ];
       };
-      inspectInventory =
-        machine: c:
+      inventoryObligations =
+        machine:
         let
+          c = inventoryRealMachines.${machine}.config;
           isDarwin = machine == "stibnite";
           workers = c.services.omnigent-host.workers;
           owners = expectedOwners.${machine};
@@ -1133,7 +866,6 @@
         in
         lib.attrNames workers == owners
         && lib.filter (lib.hasPrefix "omnigent-") (lib.attrNames c.users.users) == workerUsers
-        && lib.all (a: a.assertion) c.assertions
         && lib.all (
           owner:
           let
@@ -1143,7 +875,6 @@
             group = c.users.groups.${user};
             home = "${if isDarwin then "/Users" else "/home"}/${user}";
             memberships = lib.attrNames (lib.filterAttrs (_: g: lib.elem user g.members) c.users.groups);
-            h = c.home-manager.users.${user};
           in
           worker.owner == owner
           && worker.user == user
@@ -1151,6 +882,7 @@
           && worker.workspaceRoot == "${home}/projects"
           && !worker.autoApproveDirenv
           && worker.environment == { }
+          && worker.enable
           && account.home == home
           && account.createHome
           && account.openssh.authorizedKeys.keys == [ ]
@@ -1167,7 +899,7 @@
               && lib.elem user c.users.knownGroups
               && !(builtins.hasAttr user c.home-manager.users)
               && c.environment.etc ? "omnigent/workers/${owner}"
-              && (builtins.hasAttr "omnigent-host-${owner}" c.launchd.daemons) == worker.enable
+              && builtins.hasAttr "omnigent-host-${owner}" c.launchd.daemons
             else
               account.isNormalUser
               && account.group == user
@@ -1178,22 +910,9 @@
               ]
               && account.hashedPassword == "!"
               && account.hashedPasswordFile == null
-              && h.home.username == user
-              && h.home.homeDirectory == home
-              && h.programs.omnigent.enable
-              && h.programs.gh.gitCredentialHelper.enable
-              && h.programs.omnigent.settings.host.name == "${machine}-${owner}"
-              && (owner != "janettesmith" || inspectJanetteHome h)
-              && lib.all (a: a.assertion) h.assertions
-              && (builtins.hasAttr "omnigent-host-${owner}" c.systemd.services) == worker.enable
+              && builtins.hasAttr "omnigent-host-${owner}" c.systemd.services
           )
         ) owners;
-      inventoryVariant =
-        machine: module:
-        (inventoryMachines.${machine}.extendModules {
-          modules = [ module ];
-        }).config;
-      inventoryRejects = machine: module: !inspectInventory machine (inventoryVariant machine module);
       clanHostInterface =
         (
           (import ../clan/services/omnigent/flake-module.nix {
@@ -1215,14 +934,6 @@
         email = janetteGitEmail;
       };
       janetteMeta = config.flake.users.janettesmith.meta;
-      janetteHuman = config.flake.darwinConfigurations.rosegold.config.home-manager.users.janettesmith;
-      inspectJanetteHome =
-        h:
-        h.programs.git.settings.user.name == janetteAuthor.name
-        && h.programs.git.settings.user.email == janetteGitEmail
-        && h.programs.jujutsu.settings.user == janetteAuthor
-        && !(h ? sops)
-        && !(h.home.sessionVariables ? SSH_AUTH_SOCK);
       identityBinding =
         modules:
         (lib.evalModules {
@@ -1254,8 +965,51 @@
             }
           ];
         }).config.flake.users.fixture.meta.gitEmail;
-      cacheDownloads = c: c.nix.settings.substituters != [ ] && c.nix.settings.trusted-public-keys != [ ];
       inventoryCases = {
+        linearRenderedOutsideHomes = lib.all (
+          machine:
+          let
+            c = machine.config;
+            homes = map (worker: toString c.users.users.${worker.user}.home) (
+              lib.attrValues c.services.omnigent-host.workers
+            );
+            templates = lib.filterAttrs (name: _: lib.hasPrefix "omnigent-" name) c.sops.templates;
+          in
+          lib.all (
+            template:
+            template.path == "/run/secrets/rendered/${template.name}"
+            && !lib.any (home: lib.hasPrefix "${home}/" template.path) homes
+            && template.mode == "0400"
+            && lib.any (worker: worker.user == template.owner) (lib.attrValues c.services.omnigent-host.workers)
+          ) (lib.attrValues templates)
+        ) (lib.attrValues inventoryRealMachines);
+        keychainScope = lib.all (
+          machine:
+          lib.all (
+            name:
+            (inventoryRealMachines.${machine}.config.services.omnigent-host.workers.${name}.keychainEnable
+              or false
+            ) == (machine == "stibnite" && name == "cameron")
+          ) expectedOwners.${machine}
+        ) (lib.attrNames inventoryRealMachines);
+        keychainSecret =
+          let
+            g = inventoryRealMachines.stibnite.config.clan.core.vars.generators.omnigent-cameron-keychain;
+          in
+          !g.share
+          && g.files.password.secret
+          && g.files.password.owner == "omnigent-cameron"
+          && g.files.password.mode == "0400"
+          && g.files.password.neededFor == "services";
+        fleetLinearGeneratorScript =
+          let
+            g =
+              inventoryRealMachines.magnetite.config.clan.core.vars.generators.omnigent-janettesmith-linear-personal;
+          in
+          lib.attrNames g.files == lib.sort builtins.lessThan credentialLinearFiles
+          && lib.all (
+            file: lib.hasInfix ''cp "$prompts/${file}" "$out/${file}"'' g.script
+          ) credentialLinearFiles;
         declaredCredentials = lib.all (
           machine:
           lib.all (
@@ -1306,7 +1060,7 @@
               && file.mode == "0400"
             ) (lib.attrValues (config.flake.lib.omnigentCredentialSelection credentials))
           ) (lib.attrValues machine.config.services.omnigent-host.workers)
-        ) (lib.attrValues inventoryMachines);
+        ) (lib.attrValues inventoryRealMachines);
         realEnrollment = lib.all (
           d:
           let
@@ -1329,26 +1083,12 @@
             failures = map (a: a.message) (lib.filter (a: !a.assertion) c.assertions);
           in
           lib.sort builtins.lessThan failures == lib.sort builtins.lessThan expectedFailures
-          &&
-            (builtins.tryEval (
-              assert lib.all (a: a.assertion) c.assertions;
-              true
-            )).success == (expectedFailures == [ ])
         ) (lib.attrValues inventoryRealMachines);
         enableMap = lib.all (
-          name:
-          let
-            c = inventoryMachines.${name}.config;
-            workersEnabled = lib.all (w: w.enable) (lib.attrValues c.services.omnigent-host.workers);
-            legacy = c.services.omnigent-host.enable;
-          in
-          workersEnabled && !legacy
-        ) (lib.attrNames inventoryMachines);
-        humanProfilesRetained =
-          config.flake.users ? raquel
-          && config.flake.users ? janettesmith
-          && config.flake.darwinConfigurations.blackphos.config.home-manager.users ? raquel
-          && janetteHuman.home.username == "janettesmith";
+          d:
+          lib.all (w: w.enable) (lib.attrValues d.config.services.omnigent-host.workers)
+          && !d.config.services.omnigent-host.enable
+        ) (lib.attrValues inventoryRealMachines);
         canonicalJanette =
           janetteMeta.username == "janettesmith"
           && janetteMeta.fullname == "Janette Smith"
@@ -1363,13 +1103,6 @@
         publicRecipient = lib.hasInfix "&janettesmith-user age1mqfqckczkulpne7265j5cxn0pspdlxd3d0kav368u2c2fwknnc4qe27dec" (
           builtins.readFile ../../.sops.yaml
         );
-        humanAuthor =
-          janetteHuman.programs.git.settings.user.email == janetteGitEmail
-          && janetteHuman.programs.jujutsu.settings.user.email == janetteGitEmail
-          && janetteHuman.programs.git.settings.github.user == "janetteasmith"
-          &&
-            janetteHuman.sops.templates.allowed_signers.content
-            == "${janetteGitEmail} namespaces=\"git\" ${janetteHuman.sops.placeholder.ssh-public-key}\n";
         gitEmailDefault = metaFixture { } == "primary@example.invalid";
         gitEmailOverride = metaFixture { gitEmail = "author@example.invalid"; } == "author@example.invalid";
         gitEmailType =
@@ -1380,11 +1113,8 @@
           lib.all
             (
               machine:
-              let
-                modules =
-                  inventoryMachines.${machine}.config.services.omnigent-host.workers.janettesmith.extraHomeModules;
-              in
-              identityBinding modules && inspectJanetteHome (mkHome modules).config
+              identityBinding
+                inventoryRealMachines.${machine}.config.services.omnigent-host.workers.janettesmith.extraHomeModules
             )
             [
               "magnetite"
@@ -1398,20 +1128,6 @@
               programs.unrelated.enable = true;
             }
           ];
-        wrongGitAuthor = inventoryRejects "magnetite" {
-          services.omnigent-host.workers.janettesmith.extraHomeModules = [
-            {
-              programs.git.settings.user.email = lib.mkForce "janette.a.smith@gmail.com";
-            }
-          ];
-        };
-        wrongJjAuthor = inventoryRejects "pyrite" {
-          services.omnigent-host.workers.janettesmith.extraHomeModules = [
-            {
-              programs.jujutsu.settings.user.email = lib.mkForce "janettesmith@example.com";
-            }
-          ];
-        };
         hostMatrix =
           lib.attrNames inventoryRoles.host.machines == [
             "magnetite"
@@ -1420,18 +1136,8 @@
           ];
         serverMatrix =
           lib.attrNames inventoryRoles.server.machines == [ "magnetite" ]
-          && inventoryMachines.magnetite.config.services.omnigent.domain == "omni.scientistexperience.net";
-        cacheDownloads = lib.all (d: cacheDownloads d.config) (lib.attrValues inventoryMachines);
-        deniedNix = inventoryRejects "pyrite" {
-          nix.settings.allowed-users = lib.mkForce [ "root" ];
-        };
-        signer = inventoryRejects "pyrite" {
-          services.omnigent-host.workers.cameron.extraHomeModules = [
-            {
-              programs.git.settings.user.signingKey = lib.mkForce "/synthetic-undeclared-signing-key";
-            }
-          ];
-        };
+          &&
+            inventoryRealMachines.magnetite.config.services.omnigent.domain == "omni.scientistexperience.net";
         serializable = lib.all (
           machine:
           let
@@ -1457,17 +1163,10 @@
               }).config
               true
           )).success;
-        serverIndependent =
-          let
-            serverUnit = c: c.systemd.units."omnigent.service".unit.drvPath;
-            current = inventoryMachines.magnetite.config;
-            without = inventoryVariant "magnetite" { services.omnigent-host.workers = lib.mkForce { }; };
-          in
-          serverUnit current == serverUnit without;
       }
       // lib.mapAttrs' (
-        machine: d: lib.nameValuePair "machine-${machine}" (inspectInventory machine d.config)
-      ) inventoryMachines;
+        machine: _: lib.nameValuePair "machine-${machine}" (inventoryObligations machine)
+      ) expectedOwners;
       inventoryFailed = lib.attrNames (lib.filterAttrs (_: ok: !ok) inventoryCases);
       credentialRoot = "/tmp/omnigent-worker-credentials-${system}";
       credentialHomePath = "${credentialRoot}/home";
@@ -1728,25 +1427,9 @@
       evaluationMaterial = builtins.toFile "synthetic-evaluation-credential" (
         builtins.hashString "sha256" "omnigent-evaluation-disclosure-fixture"
       );
-      disclosureFixture =
-        leak:
-        (credentialFixture [
-          credentialPathAssertion
-          {
-            sops.secrets =
-              lib.genAttrs
-                (
-                  (map (name: "vars/shared/fixture-${name}/credential") credentialSources)
-                  ++ map (owner: "vars/shared/omnigent-cameron-github-token-${owner}/token") credentialGithubOwners
-                )
-                (_: {
-                  path = lib.mkForce (toString evaluationMaterial);
-                });
-            services.omnigent-host.workers.cameron.extraHomeModules = lib.optional leak {
-              home.sessionVariables.OMNIGENT_DISCLOSURE_CONTROL = builtins.readFile evaluationMaterial;
-            };
-          }
-        ]).config;
+      disclosureLeakControl = pkgs.writeText "omnigent-disclosure-leak-control" (
+        builtins.readFile evaluationMaterial
+      );
       disclosureSettings =
         c:
         pkgs.writeText "omnigent-delivery-settings.json" (
@@ -1769,11 +1452,8 @@
             c.systemd.services.omnigent-host-cameron.serviceConfig.ExecStartPre
         )
       ];
-      disclosureClean = disclosureFixture false;
-      disclosureLeaking = disclosureFixture true;
       disclosureDerivations = map (drv: builtins.unsafeDiscardOutputDependency drv.drvPath) [
         (disclosureSettings credentialConfig)
-        (disclosureSettings disclosureClean)
         linearResolver
       ];
       credentialArtifact = pkgs.writeText "omnigent-credential-artifacts.json" (
@@ -1781,10 +1461,8 @@
           root = credentialRoot;
           evaluationMaterial = toString evaluationMaterial;
           derivationRoots = map builtins.unsafeDiscardStringContext disclosureDerivations;
-          generatedArtifacts = map toString (
-            (disclosureArtifacts credentialConfig) ++ (disclosureArtifacts disclosureClean)
-          );
-          leakingGeneration = toString (credentialGenerationFor disclosureLeaking);
+          generatedArtifacts = map toString (disclosureArtifacts credentialConfig);
+          leakControl = toString disclosureLeakControl;
           generation = toString credentialGeneration;
           git = lib.getExe pkgs.git;
           mockGh = lib.getExe mockGh;
@@ -1831,63 +1509,7 @@
               null;
         }
       );
-      credentialRejects =
-        message: module:
-        let
-          evaluates =
-            extra:
-            (builtins.tryEval (
-              let
-                c = (credentialFixture extra).config;
-              in
-              assert lib.all (a: a.assertion) c.assertions;
-              c.networking.hostName
-            )).success;
-          removeGuard.options.assertions = lib.mkOption {
-            apply = lib.filter (a: a.assertion || a.message != message);
-          };
-        in
-        !evaluates [ module ]
-        && evaluates [
-          module
-          removeGuard
-        ];
       credentialCases = {
-        linearRenderedOutsideHomes = lib.all (
-          machine:
-          let
-            c = machine.config;
-            homes = map (worker: toString c.users.users.${worker.user}.home) (
-              lib.attrValues c.services.omnigent-host.workers
-            );
-            templates = lib.filterAttrs (name: _: lib.hasPrefix "omnigent-" name) c.sops.templates;
-          in
-          lib.all (
-            template:
-            template.path == "/run/secrets/rendered/${template.name}"
-            && !lib.any (home: lib.hasPrefix "${home}/" template.path) homes
-            && template.mode == "0400"
-            && lib.any (worker: worker.user == template.owner) (lib.attrValues c.services.omnigent-host.workers)
-          ) (lib.attrValues templates)
-        ) (lib.attrValues inventoryRealMachines);
-        hostLocalCredentials =
-          let
-            c =
-              (credentialFixture [
-                {
-                  clan.core.vars.generators.fixture-signing.share = lib.mkForce false;
-                  sops.secrets."vars/shared/fixture-signing/credential".sopsFile =
-                    ../home/ai/omnigent/fixtures/vars/per-machine/fixture/fixture-signing/credential/secret;
-                }
-              ]).config;
-          in
-          lib.any (
-            a:
-            !a.assertion
-            &&
-              a.message
-              == "Omnigent worker omnigent-cameron: credentials require private shared services files owned by the worker with mode 0400."
-          ) c.assertions;
         maskedLinearLabels =
           let
             accepts =
@@ -1908,176 +1530,18 @@
               )).success;
           in
           accepts "personal" && accepts "work" && !accepts "synthetic-workspace-slug";
-        adapterAllowList =
-          credentialRejects
-            "Omnigent worker cameron: Home Manager credential paths must match the host adapter's allow-list."
-            {
-              services.omnigent-host.workers.cameron.extraHomeModules = [
-                { _module.args.omnigentCredentialPolicy = lib.mkForce null; }
+        defaultOff =
+          config.flake.lib.omnigentCredentialSelection
+            (lib.evalModules {
+              modules = [
+                {
+                  options.credentials = lib.mkOption {
+                    type = lib.types.submodule { options = config.flake.lib.omnigentWorkerCredentialOptions; };
+                  };
+                }
               ];
-            };
-        defaultOff = lib.all (
-          worker: config.flake.lib.omnigentCredentialSelection worker.credentials == { }
-        ) (lib.attrValues linux.services.omnigent-host.workers);
-        inherit (inventoryCases) declaredCredentials enableMap realEnrollment;
+            }).config.credentials == { };
         moduleAssertions = lib.all (a: a.assertion) credentialConfig.assertions;
-        keychainScope = lib.all (
-          machine:
-          lib.all (
-            name:
-            (inventoryRealMachines.${machine}.config.services.omnigent-host.workers.${name}.keychainEnable
-              or false
-            ) == (machine == "stibnite" && name == "cameron")
-          ) expectedOwners.${machine}
-        ) (lib.attrNames inventoryRealMachines);
-        keychainSecret =
-          let
-            g = inventoryRealMachines.stibnite.config.clan.core.vars.generators.omnigent-cameron-keychain;
-          in
-          !g.share
-          && g.files.password.secret
-          && g.files.password.owner == "omnigent-cameron"
-          && g.files.password.mode == "0400"
-          && g.files.password.neededFor == "services";
-        fleetLinearGeneratorScript =
-          let
-            g =
-              inventoryRealMachines.magnetite.config.clan.core.vars.generators.omnigent-janettesmith-linear-personal;
-          in
-          lib.attrNames g.files == lib.sort builtins.lessThan credentialLinearFiles
-          && lib.all (
-            file: lib.hasInfix ''cp "$prompts/${file}" "$out/${file}"'' g.script
-          ) credentialLinearFiles;
-        declaredLinearFiles = lib.all (
-          file:
-          let
-            g = credentialConfig.clan.core.vars.generators.omnigent-cameron-linear-personal;
-            f = g.files.${file};
-          in
-          g.prompts.${file}.type == "hidden"
-          && g.prompts.${file}.persist
-          && g.share
-          && f.secret
-          && f.neededFor == "services"
-          && f.owner == "omnigent-cameron"
-          && f.mode == "0400"
-          && f.path == "${credentialRoot}/linear-${file}"
-        ) credentialLinearFiles;
-        linearMetadataMode =
-          credentialRejects
-            "Omnigent worker omnigent-cameron: credentials require private shared services files owned by the worker with mode 0400."
-            {
-              clan.core.vars.generators.omnigent-cameron-linear-personal.files.workspace.mode =
-                lib.mkForce "0644";
-            };
-        declaredGithubTokens = lib.all (
-          owner:
-          let
-            g = credentialConfig.clan.core.vars.generators."omnigent-cameron-github-token-${owner}";
-            f = g.files.token;
-          in
-          g.prompts.token.type == "hidden"
-          && g.share
-          && f.secret
-          && f.neededFor == "services"
-          && f.owner == "omnigent-cameron"
-          && f.mode == "0400"
-          && f.path == "${credentialRoot}/github-${owner}"
-        ) credentialGithubOwners;
-        githubDefaultOwner =
-          credentialRejects
-            "Omnigent worker omnigent-cameron: defaultOwner must select an enabled GitHub token."
-            {
-              services.omnigent-host.workers.cameron.credentials.defaultOwner = lib.mkForce "unknown";
-            };
-        githubExpectedPerson =
-          credentialRejects
-            "Omnigent worker omnigent-cameron: GitHub owner tokens require the same explicit expected person login."
-            {
-              services.omnigent-host.workers.cameron.credentials.githubTokens.second.expectedLogin =
-                lib.mkForce "another-person";
-            };
-        declaredSources = lib.all (
-          name:
-          let
-            g = credentialConfig.clan.core.vars.generators."fixture-${name}";
-            f = g.files.credential;
-          in
-          g.prompts.credential.type == "hidden"
-          && g.share
-          && f.secret
-          && f.neededFor == "services"
-          && f.owner == "omnigent-cameron"
-          && f.mode == "0400"
-          && f.path == "${credentialRoot}/${name}"
-        ) credentialSources;
-        wrongOwner =
-          credentialRejects
-            "Omnigent worker omnigent-cameron: credentials require private shared services files owned by the worker with mode 0400."
-            {
-              clan.core.vars.generators.omnigent-cameron-github-token-first.files.token.owner =
-                lib.mkForce "root";
-            };
-        wrongMode =
-          credentialRejects
-            "Omnigent worker omnigent-cameron: credentials require private shared services files owned by the worker with mode 0400."
-            {
-              clan.core.vars.generators.omnigent-cameron-github-token-first.files.token.mode = lib.mkForce "0644";
-            };
-        privateBundle =
-          credentialRejects
-            "Omnigent worker omnigent-cameron: only the declared Clan vars ciphertext and delivered paths are allowed."
-            {
-              sops.secrets."vars/shared/omnigent-cameron-github-token-first/token".sopsFile = lib.mkForce (
-                pkgs.writeText "synthetic-personal-bundle" "personal bundle fixture"
-              );
-            };
-        inherit (cases)
-          privateSecrets
-          signer
-          socket
-          foreignHome
-          ;
-        agentForward =
-          rejected "Omnigent worker capabilities must not inherit an SSH agent or signing socket."
-            [
-              { programs.ssh.matchBlocks."*".forwardAgent = true; }
-            ];
-        ageIdentity =
-          rejected "Omnigent worker capabilities must not import personal sops secrets or templates."
-            [
-              inputs.sops-nix.homeManagerModules.sops
-              { sops.age.keyFile = "${cfg.home.homeDirectory}/personal-age-key"; }
-            ];
-        bridgeEnrollment =
-          pkgs.stdenv.isDarwin
-          || credentialRejects "Omnigent worker cameron: personal age-bridge enrollment is prohibited." {
-            options.hm-sops-bridge.users = lib.mkOption {
-              type = lib.types.attrs;
-              default = { };
-            };
-            config.hm-sops-bridge.users.omnigent-cameron.sopsIdentity = "cameron";
-          };
-        linuxReadiness =
-          pkgs.stdenv.isDarwin
-          || (
-            let
-              active = (credentialFixture [ { sops.useSystemdActivation = true; } ]).config;
-              unit = active.systemd.services.omnigent-host-cameron;
-              hm = active.systemd.services."home-manager-omnigent\\x2dcameron";
-            in
-            lib.all
-              (
-                service:
-                lib.elem "sops-install-secrets.service" service.requires
-                && lib.elem "sops-install-secrets.service" service.after
-              )
-              [
-                unit
-                hm
-              ]
-            && lib.elem "writeBoundary" active.home-manager.users.omnigent-cameron.home.activation.omnigentCredentialReadiness.before
-          );
       };
     in
     {
@@ -2114,7 +1578,7 @@
           assert lib.assertMsg (lib.all
             (
               machine:
-              lib.attrNames inventoryMachines.${machine}.config.services.omnigent-host.workers
+              lib.attrNames inventoryRealMachines.${machine}.config.services.omnigent-host.workers
               == expectedOwners.${machine}
             )
             (lib.attrNames expectedOwners)

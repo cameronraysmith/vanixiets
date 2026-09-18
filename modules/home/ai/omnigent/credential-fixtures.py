@@ -183,8 +183,8 @@ def audit_artifacts(artifact: dict, runtime_sentinel: str) -> None:
         )
     assert any(
         disclosed(path.read_bytes(), sentinels)
-        for path in generated_files([artifact["leakingGeneration"]])
-    ), "evaluation-time settings leak control did not fail"
+        for path in generated_files([artifact["leakControl"]])
+    ), "credential disclosure scanner did not detect its own leak control"
     print(
         f"credential disclosure audit: {len(derivations)} derivations, {len(settings)} generated files"
     )

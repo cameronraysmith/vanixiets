@@ -40,3 +40,4 @@ The aggregate adds jq through its configured Home Manager module or as a system 
 These exports are opt-in: Omnigent workers import `homeManager.cli-tools`, while human terminal declarations remain independent.
 Worker profiles prefer procps' `kill` over coreutils' overlapping executable, matching the existing supervisor PATH; the shared capabilities impose no worker-specific package priorities.
 `checks.<system>.omnigent-worker-capabilities` evaluates the matching system adapter and Home Manager adapter, then exercises file, text, archive, and JSON operations on the generated worker PATH without a login shell or network requests.
+Its foreign-input guards keep the ordinary-sized fixtures; the two 300,000-character settings fixtures that checked the same guards at size were removed for evaluation cost.

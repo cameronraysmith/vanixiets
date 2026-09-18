@@ -135,10 +135,11 @@ Only her non-secret name and Git address reach worker HM through `extraHomeModul
 Both Janette's and Raquel's human profiles remain, as do Cameron's three workers.
 The historical Raquel preparation matrix and activation candidate are superseded, not Janette activation evidence or a current activation target.
 
-`checks.<system>.omnigent-worker-inventory` evaluates the actual fleet modules, the exact five-worker matrix, private accounts, prepared Home Manager ownership and ordinary Nix access.
-Independent literal projections check worker membership, ownership, homes, groups, Nix trust, SSH keys and signing policy; inventory mutations retain denied Nix access and author/signing controls.
-It checks clan settings serialization without `extraHomeModules` and compares current server behavior with workers absent.
-The Linux and Darwin adapter checks own disabled preparation and enabled supervision fixtures; the inventory check asserts Janette's canonical author and signer principal.
+`checks.<system>.omnigent-worker-inventory` evaluates each of the three real machine configurations once and projects independent literal expectations over the five declared workers: exact worker keys and account names, owner, host name, workspace root, empty environment, enablement, private distinct homes with locked passwords, private group membership, absent SSH keys, Darwin UID/GID `551` with its retained generation, and the presence of each worker's supervision unit.
+It also checks clan settings serialization without `extraHomeModules`, Janette's canonical metadata, her non-secret author binding, her public recipient entry, and each unenrolled worker's missing-source credential diagnostics.
+Because it is the one check that evaluates the real fleet, it also owns the real-host credential facts: rendered Linear templates outside every worker home, Keychain scope and its machine-local generator, and Janette's Linear generator files and script.
+Full validity of the real machine configurations is owned by the ordinary per-machine checks, not by this check, and the Linux and Darwin adapter checks own module guards, disabled preparation and enabled supervision on fixture hosts.
+This check no longer evaluates synthetic-delivery copies of the real machines, so the following are not covered by any check: inventory mutation fixtures (wrong Git/jj author, denied Nix access, undeclared signer), the fleet cache-download fold, the server-unit independence comparison with workers absent, the retained human profile and human author projections, and per-real-host Home Manager projections of worker home, Omnigent enablement and credential-helper wiring.
 Controller gates compare complete protected projections against fixed, same-role chain and integrated baselines, allowing only Janette's asserted Git/jj mail, signer principal, GitHub username and their generated artifacts.
 Live Linux collisions, allocated IDs, effective sudo/trust and actual home permissions must still be checked before authorized activation or enablement as specified in the deployment plan.
 
@@ -171,6 +172,7 @@ There are no child-sandbox path grants to configure in this mode: normal account
 Additional child sandboxing is deferred and must use a supported upstream policy mechanism, not an unused host setting or an inference from bubblewrap's presence.
 Credential grants and application-admin permissions remain external authority.
 `checks.x86_64-linux.omnigent-worker-linux` covers module composition and configured boundaries; actual selected-harness identity, protected-canary, devshell and lifecycle checks remain required after authorized activation.
+Its account guards are now checked by one composite invalid configuration with literal expected messages, plus the two-worker enabled and both-disabled configurations and the generated supervision projections; per-guard negative attribution, the root, duplicate-account, duplicate-home and public-home fixtures, the numeric/alias sudo matrix and the assertion-filter regression are no longer evaluated.
 
 ## Dedicated Darwin workers
 
@@ -191,7 +193,8 @@ The adapter suppresses HM's otherwise unconditional Darwin LaunchAgent reconcili
 
 `checks.aarch64-darwin.omnigent-worker-darwin` follows the realized plist to its launcher, activation generation, profile and declared YAML.
 It exercises private-directory preparation and launcher failure handling with disposable state; account lookup and effectful HM activation are controlled test boundaries, not live account tests.
-Wrong-user/domain and missing-runtime/profile module fixtures must fail inspection.
+Copied-plist mutants for wrong user, wrong domain and missing runtime/profile must fail inspection, and the real generated artifacts, activation ordering, private preparation and launcher failure handling remain checked.
+Whole-system Darwin rejection fixtures — root account, administrative group, Nix trust, missing daemon access, duplicate activation owner, worker launch agent, desktop activation and environment selectors — are no longer evaluated; `checks.<system>.omnigent-worker-environment` owns the reserved-selector policy table and the Linux composite configuration owns its wiring.
 The upstream native Pi and configured ACP generation checks retain the accepted `sandbox: none` policy, with no child path grants or namespace-confinement claim.
 
 Keep the human HM agent unchanged until explicit inventory migration retires it.
@@ -239,8 +242,8 @@ Cameron's workers select `personal` and `work`; Janette's select only `personal`
 Claude setup-token delivery remains disabled.
 These declarations do not enroll ciphertext: the real machine configuration must fail its credential source assertions until the operator enrolls every selected source under `vars/shared`.
 Worker `enable = false` does not bypass that prerequisite for building or deploying the machine.
-The inventory check evaluates the five declarations with explicitly synthetic delivery files, retains non-secret Clan inputs, and separately requires the real configuration's missing-source diagnostics for each unenrolled worker.
-After authorized enrollment commits the ciphertext, the real configuration's source assertions must pass instead; the check accepts that transition without relaxing production guards.
+The inventory check reads the five declarations and their generator files directly from the real machine configurations, without synthetic delivery copies, and requires the real configuration's exact missing-source diagnostics for each unenrolled worker.
+After authorized enrollment commits the ciphertext, those diagnostics disappear and the declaration projections continue to hold; the check's expected-failure set is derived from which selected sources are actually present.
 See the deployment plan's enrollment sequence for the exact generator and multiline signing-key commands.
 
 Git and jj sign with the selected private-key file, using the declared public key and canonical Git email for `allowed_signers`.
@@ -286,6 +289,10 @@ Atomic, native Pi, independent omp, Codex and Omnigent retain their tool-owned m
 There is no seed import or restoration after logout, deletion, redeploy, restart or rollback.
 The accepted execution mode remains `sandbox:none`, with same-UID/admin access and shared-store visibility for approved projects.
 `checks.<system>.omnigent-worker-credentials` uses synthetic material and mocked provider/delivery effects; live acceptance remains separate.
+It evaluates exactly one synthetic host, whose justification is the disposable delivery state its runtime probes need: the generated worker generation, the out-of-store Linear link, the rendered template placeholders, the supervisor PATH and launcher, and the Python owner/rejection/ambient-fallback/runtime fixtures, none of which the unenrolled real hosts can supply.
+Its remaining evaluation-time cases are that fixture's own accepted assertions, the typed rejection of an unmasked Linear label and the default-off credential selection.
+Declared generator ownership, mode, `neededFor` and secrecy are read from the real machine configurations in the inventory check instead of from that fixture, so the fixture's duplicate positive projections, the nine paired rejection fixtures (adapter allow-list, generator owner, generator mode, private bundle, `defaultOwner`, expected login, Linear metadata mode, host-local generator and age-bridge enrollment) and the Linux SOPS readiness ordering are no longer evaluated by any check; readiness ordering and delivery failure modes remain deployment-time observations.
+The disclosure audit now covers only the real fixture's generated artifacts, and the scanner's own sensitivity is proven against a cheap leak control instead of a second leaking worker generation, so evaluation-time reads of delivered secret files are no longer detected by a check.
 The designated follow-up is systemd `LoadCredential`, optionally `LoadCredentialEncrypted` after hardware verification, not an implementation in this slice.
 
 ## Worker model login and renewal
