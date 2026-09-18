@@ -138,13 +138,25 @@ The historical Raquel preparation matrix and activation candidate are superseded
 `flake.lib.omnigentFleetObligations` in `modules/lib/omnigent-fleet-obligations.nix` states what Omnigent requires of each host's own evaluated configuration, and `modules/checks/machines.nix` asserts those obligations on the configuration its per-machine toplevel check already forces.
 The obligations therefore ride on `checks.x86_64-linux.nixos-magnetite`, `checks.x86_64-linux.nixos-pyrite` and `checks.aarch64-darwin.darwin-stibnite`, each host on its own system, and no host is evaluated a second time to read them.
 They project independent literal expectations over the five declared workers: exact worker keys and account names, owner, host name, workspace root, empty environment, enablement, private distinct homes with locked passwords, private group membership, absent SSH keys, Darwin UID/GID `551` with its retained generation, and the presence of each worker's supervision unit.
-They also own the real-host credential facts — rendered Linear templates outside every worker home, Keychain scope and its machine-local generator, each selected source's generator ownership, mode, `neededFor` and secrecy, the Linear generator's files and script, Janette's non-secret author binding with its discriminating negative fixture, the server domain, and each unenrolled worker's missing-source credential diagnostics.
-A failing obligation names its case in the machine check's assertion message; the machine check reports no separate case report.
+They also own the real-host credential facts — rendered Linear templates outside every worker home, Keychain scope and its machine-local generator, each selected source's generator ownership, mode, `neededFor` and secrecy, the Linear generator's files and script, Janette's non-secret author binding with its discriminating negative fixture, and the server domain.
+A failing obligation names its case in the machine check's assertion message, which also reproduces that host's own failing assertion messages, so a mutation that breaks both an obligation and a module guard surfaces both; the machine check reports no separate case report.
 `checks.<system>.omnigent-worker-inventory` retains only what needs no machine evaluation: the clan host/server role matrices, clan settings serialization without `extraHomeModules`, Janette's canonical metadata and public recipient entry, and the `meta.gitEmail` fixtures.
 Full validity of the real machine configurations is owned by those same per-machine checks, and the Linux and Darwin adapter checks own module guards, disabled preparation and enabled supervision on fixture hosts.
 This slice no longer evaluates synthetic-delivery copies of the real machines, so the following are not covered by any check: inventory mutation fixtures (wrong Git/jj author, denied Nix access, undeclared signer), the fleet cache-download fold, the server-unit independence comparison with workers absent, the retained human profile and human author projections, and per-real-host Home Manager projections of worker home, Omnigent enablement and credential-helper wiring.
+The obligations also no longer compare a host's failing assertions with the expected missing-source diagnostics for its unenrolled workers: while a worker is unenrolled the machine check forces the toplevel and throws those same assertions anyway, and after enrollment the case reduces to the empty-failure condition the toplevel already enforces, so no check now asserts the exact text of those diagnostics.
 Controller gates compare complete protected projections against fixed, same-role chain and integrated baselines, allowing only Janette's asserted Git/jj mail, signer principal, GitHub username and their generated artifacts.
 Live Linux collisions, allocated IDs, effective sudo/trust and actual home permissions must still be checked before authorized activation or enablement as specified in the deployment plan.
+
+### Stibnite obligations are outside CI
+
+`nixbot.toml` scopes evaluation to `checks.x86_64-linux`, so nixbot never evaluates `checks.aarch64-darwin.darwin-stibnite`, and stibnite's fleet obligations — which now assert solely on that Darwin machine check — are no longer enforced by CI.
+They are verified locally, or by anyone who evaluates that system, and by nothing else.
+That covers stibnite's Keychain scope and its machine-local keychain secret; the Darwin branch of the account obligations, including UID/GID `551`, `knownUsers` and `knownGroups` membership, the `omnigent-host-cameron` launchd daemon, the absent `home-manager.users` entry and the `/etc/omnigent/workers/cameron` generation; and stibnite's roster, enablement and credential declarations with each selected source's generator ownership, mode, `neededFor` and secrecy.
+
+This is accepted rather than repaired.
+The fleet has x86_64-linux cloud workers available to nixbot and no aarch64-darwin server, so enforcing stibnite in CI would mean dispatching to a Darwin workstation.
+Making stibnite, rosegold or argentum opportunistically available as transient Darwin workers over the ZeroTier network — dispatched when reachable, never failing a run when none is available — is deferred until flake evaluation and the ensuing builds are healthy, and may not be expressible in nixbot's current feature set.
+None of that is implemented or configured here.
 
 ## Dedicated Linux workers
 
@@ -245,8 +257,8 @@ Cameron's workers select `personal` and `work`; Janette's select only `personal`
 Claude setup-token delivery remains disabled.
 These declarations do not enroll ciphertext: the real machine configuration must fail its credential source assertions until the operator enrolls every selected source under `vars/shared`.
 Worker `enable = false` does not bypass that prerequisite for building or deploying the machine.
-The fleet obligations read the five declarations and their generator files directly from each real machine configuration, without synthetic delivery copies, and require that configuration's exact missing-source diagnostics for each unenrolled worker.
-After authorized enrollment commits the ciphertext, those diagnostics disappear and the declaration projections continue to hold; the obligations' expected-failure set is derived from which selected sources are actually present.
+The fleet obligations read the five declarations and their generator files directly from each real machine configuration, without synthetic delivery copies.
+They do not assert the missing-source diagnostics themselves: an unenrolled worker's assertions fail its machine check through the toplevel that check already forces, and the obligation message reproduces them.
 See the deployment plan's enrollment sequence for the exact generator and multiline signing-key commands.
 
 Git and jj sign with the selected private-key file, using the declared public key and canonical Git email for `allowed_signers`.

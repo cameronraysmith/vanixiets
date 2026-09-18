@@ -118,6 +118,7 @@ let
       isDarwin = lib.hasSuffix "-darwin" config.flake.lib.machineSystems.${machine};
       owners = expectedOwners.${machine};
       workers = hostConfig.services.omnigent-host.workers;
+      declaredOwners = lib.filter (owner: workers ? ${owner}) owners;
       generators = hostConfig.clan.core.vars.generators;
       homes = map (worker: toString hostConfig.users.users.${worker.user}.home) (lib.attrValues workers);
     in
@@ -128,7 +129,7 @@ let
           lib.filter (lib.hasPrefix "omnigent-") (lib.attrNames hostConfig.users.users)
           == map (owner: "omnigent-${owner}") owners;
 
-      accounts = lib.all (accountObligations { inherit hostConfig isDarwin machine; }) owners;
+      accounts = lib.all (accountObligations { inherit hostConfig isDarwin machine; }) declaredOwners;
 
       enablement =
         lib.all (worker: worker.enable) (lib.attrValues workers)
@@ -226,29 +227,8 @@ let
         ) (lib.attrValues (selection credentials))
       ) (lib.attrValues workers);
 
-      enrollmentDiagnostics =
-        let
-          missing =
-            worker:
-            lib.any (
-              source:
-              !builtins.pathExists (
-                hostConfig.clan.core.settings.directory + "/vars/shared/${source.generator}/${source.file}/secret"
-              )
-            ) (lib.attrValues (selection worker.credentials));
-          expectedFailures = lib.concatMap (
-            worker:
-            lib.optionals (missing worker) [
-              "Omnigent worker ${worker.user}: credentials require private shared services files owned by the worker with mode 0400."
-              "Omnigent worker ${worker.user}: only the declared Clan vars ciphertext and delivered paths are allowed."
-            ]
-          ) (lib.attrValues workers);
-          failures = map (a: a.message) (lib.filter (a: !a.assertion) hostConfig.assertions);
-        in
-        lib.sort builtins.lessThan failures == lib.sort builtins.lessThan expectedFailures;
-
       identityBoundHomeModules = lib.all (owner: identityBinding workers.${owner}.extraHomeModules) (
-        lib.filter (owner: owner == "janettesmith") owners
+        lib.filter (owner: owner == "janettesmith") declaredOwners
       );
 
       identityBindingDiscriminates =

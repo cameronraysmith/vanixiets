@@ -855,7 +855,7 @@ Her declared SSH public key and corresponding recipient `age1mqfqckczkulpne7265j
 Worker HM receives only her non-secret name and Git address through the existing Nix-only `extraHomeModules` hook, not her human modules, personal bundle or `contentPrivate`.
 This identity correction grants no signing key, personal age identity, SSH agent or administrative authority.
 
-The role-agnostic `omnigent-worker-inventory` check asserts canonical metadata, human author/principal, the disabled matrix, account bindings and the narrow worker-HM binding.
+The role-agnostic `omnigent-worker-inventory` check asserts canonical metadata and human author/principal; account bindings and the narrow worker-HM binding moved to `flake.lib.omnigentFleetObligations`, asserted on each real machine's own toplevel check.
 Its negative fixtures reject wrong Git/jj mail, host name and unrelated binding content alongside the existing authority exclusions.
 The controller separately compares C1 against fixed chain C0 `e235c5ae9bb32b54b0631fff97087c1a163a8230` and J1 against fixed integrated J0 `b7962a09eb9ec81467db8b1d4d05c552284e3a82`.
 The original supplemental baselines in `.atomic/workflows/runs/omnigent-workers/7b0fc94a-ba03-4078-b113-6cfc4435121c/identity/` retain Janette's complete human projection.
@@ -960,8 +960,8 @@ The Linear masking follow-up selects `personal` and `work` for Cameron on all th
 Claude setup-token delivery remains disabled.
 The typed interface still defaults off for other workers.
 
-`omnigent-worker-inventory` evaluates the exact five-worker matrix against explicitly synthetic delivery fixtures, preserving existing non-secret Clan inputs.
-It separately checks the real fleet's assertions against the expected missing-source diagnostics for each unenrolled worker, without filtering by machine role.
+`flake.lib.omnigentFleetObligations` reads the exact five-worker matrix from the real machine configurations rather than from synthetic delivery fixtures, and `omnigent-worker-inventory` retains only the cases that need no machine evaluation.
+No check compares the real fleet's assertions with the expected missing-source diagnostics for each unenrolled worker; those assertions fail the machine checks directly.
 The pre-enrollment state deliberately fails machine build/deploy evaluation.
 Once authorized `clan vars generate` or `clan vars set` enrollment has committed all selected ciphertext under `vars/shared`, those real source assertions must pass instead.
 Passing the synthetic checks does not authorize deployment or prove live credential identity.

@@ -28,10 +28,14 @@
         name: machineConfig: toplevel:
         let
           unmet = obligations.failures name machineConfig;
+          hostFailures = map (a: a.message) (lib.filter (a: !a.assertion) machineConfig.assertions);
         in
-        assert lib.assertMsg (
-          unmet == [ ]
-        ) "Omnigent fleet obligations unmet on ${name}: ${lib.concatStringsSep ", " unmet}";
+        assert lib.assertMsg (unmet == [ ]) (
+          "Omnigent fleet obligations unmet on ${name}: ${lib.concatStringsSep ", " unmet}"
+          + lib.optionalString (hostFailures != [ ]) (
+            "\n${name} assertion failures: ${lib.concatStringsSep "\n" hostFailures}"
+          )
+        );
         toplevel;
     in
     assert lib.assertMsg (
