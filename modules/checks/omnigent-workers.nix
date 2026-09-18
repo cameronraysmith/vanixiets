@@ -71,17 +71,25 @@
       ];
       cfg = home.config;
       valid = h: lib.all (a: a.assertion) h.config.assertions;
-      rejected =
-        message: extra:
-        let
-          evaluates = modules: (builtins.tryEval (mkHome modules).config.home.username).success;
-          withoutGuard = {
-            options.assertions = lib.mkOption {
-              apply = assertions: lib.filter (a: a.message != message) assertions;
-            };
-          };
-        in
-        !evaluates extra && evaluates (extra ++ [ withoutGuard ]);
+      # Home Manager throws on any failed assertion before `config` is readable, so the
+      # failure set is only observable through an apply that neutralises the assertions.
+      observedAssertions = {
+        options.assertions = lib.mkOption {
+          apply = map (
+            a:
+            a
+            // {
+              failed = !a.assertion;
+              assertion = true;
+            }
+          );
+        };
+      };
+      homeFailures =
+        extra:
+        map (a: a.message) (
+          lib.filter (a: a.failed) (mkHome (extra ++ [ observedAssertions ])).config.assertions
+        );
       workerPath = config.flake.lib.omnigentWorkerPath {
         inherit pkgs;
         home = cfg;
@@ -229,6 +237,55 @@
         inherit pkgs;
         home = wrappedHome;
       };
+      capabilityInvalid = [
+        inputs.sops-nix.homeManagerModules.sops
+        (
+          { lib, ... }:
+          {
+            sops = {
+              age.keyFile = "${cfg.home.homeDirectory}/fixture-age";
+              secrets.personal.sopsFile = pkgs.writeText "fixture-secret.yaml" "personal: fixture";
+            };
+            programs.git = {
+              signing = {
+                key = "${cfg.home.homeDirectory}/signing-key";
+                signByDefault = true;
+              };
+              settings = lib.mkForce [
+                { user.name = "Worker fixture"; }
+                {
+                  user.signingKey = "${cfg.home.homeDirectory}/private-signing-key";
+                  commit.gpgSign = true;
+                }
+                { tag.gpgSign = "yes"; }
+                {
+                  COMMIT.GPGSIGN = [
+                    false
+                    1
+                  ];
+                }
+              ];
+            };
+            programs.atomic = {
+              configDir = "/Users/human/.atomic/agent";
+              settings.packages = lib.mkForce [ "/home/human/extensions" ];
+            };
+            home = {
+              sessionVariables.SSH_AUTH_SOCK = "/run/user/1000/agent";
+              file.foreign.source = "/home/human/private";
+              activation.foreignInput = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+                cat /home/human/config
+              '';
+            };
+          }
+        )
+      ];
+      capabilityMessages = [
+        "Omnigent worker capabilities must not import personal sops secrets or templates."
+        "Omnigent worker capabilities do not grant Git or Jujutsu signing authority."
+        "Omnigent worker capabilities must not inherit an SSH agent or signing socket."
+        "Omnigent worker configuration must use its own home, not a foreign human home."
+      ];
       cases = {
         composition = valid home;
         workerACPApproval =
@@ -305,53 +362,9 @@
         linear = lib.elem pkgs.linear-cli cfg.home.packages;
         skills = cfg.home.file."${cfg.home.homeDirectory}/.claude/skills/linear-cli".enable;
         githubHelper = cfg.programs.gh.gitCredentialHelper.enable;
-        privateSecrets =
-          rejected "Omnigent worker capabilities must not import personal sops secrets or templates."
-            [
-              inputs.sops-nix.homeManagerModules.sops
-              {
-                sops.age.keyFile = "${cfg.home.homeDirectory}/fixture-age";
-                sops.secrets.personal.sopsFile = pkgs.writeText "fixture-secret.yaml" "personal: fixture";
-              }
-            ];
-        signer = rejected "Omnigent worker capabilities do not grant Git or Jujutsu signing authority." [
-          {
-            programs.git.signing = {
-              key = "${cfg.home.homeDirectory}/signing-key";
-              signByDefault = true;
-            };
-          }
-        ];
-        effectiveSigner =
-          rejected "Omnigent worker capabilities do not grant Git or Jujutsu signing authority."
-            [
-              {
-                programs.git.settings = {
-                  user.signingKey = "${cfg.home.homeDirectory}/private-signing-key";
-                  commit.gpgSign = true;
-                };
-              }
-            ];
-        effectiveTagSigner =
-          rejected "Omnigent worker capabilities do not grant Git or Jujutsu signing authority."
-            [
-              { programs.git.settings.tag.gpgSign = "yes"; }
-            ];
-        signingFragments =
-          rejected "Omnigent worker capabilities do not grant Git or Jujutsu signing authority."
-            [
-              {
-                programs.git.settings = lib.mkForce [
-                  { user.name = "Worker fixture"; }
-                  {
-                    COMMIT.GPGSIGN = [
-                      false
-                      1
-                    ];
-                  }
-                ];
-              }
-            ];
+        compositeInvalid =
+          lib.sort builtins.lessThan (homeFailures capabilityInvalid)
+          == lib.sort builtins.lessThan capabilityMessages;
         unsignedAuthor = valid (mkHome [
           {
             programs.git.settings = {
@@ -362,27 +375,6 @@
             };
           }
         ]);
-        socket = rejected "Omnigent worker capabilities must not inherit an SSH agent or signing socket." [
-          { home.sessionVariables.SSH_AUTH_SOCK = "/run/user/1000/agent"; }
-        ];
-        foreignHome =
-          rejected "Omnigent worker configuration must use its own home, not a foreign human home."
-            [ { home.file.foreign.source = "/home/human/private"; } ];
-        foreignConfig =
-          rejected "Omnigent worker configuration must use its own home, not a foreign human home."
-            [ { programs.atomic.configDir = "/Users/human/.atomic/agent"; } ];
-        foreignSettings =
-          rejected "Omnigent worker configuration must use its own home, not a foreign human home."
-            [ { programs.atomic.settings.packages = lib.mkForce [ "/home/human/extensions" ]; } ];
-        foreignActivation =
-          rejected "Omnigent worker configuration must use its own home, not a foreign human home."
-            [
-              ({ lib, ... }: {
-                home.activation.foreignInput = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
-                  cat /home/human/config
-                '';
-              })
-            ];
         benignDocumentation = valid (mkHome [
           {
             home.file."example.md".text =

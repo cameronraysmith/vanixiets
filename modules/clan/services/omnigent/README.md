@@ -167,6 +167,11 @@ No worker inherits the legacy privileged-user selector, human secrets, signing a
 Accounts require separate private homes, no administrative groups or sudo grants, and ordinary Nix daemon access.
 The host checks actual home ownership and mode before starting.
 
+`checks.<system>.omnigent-worker-capabilities` enforces four of those exclusions on both platforms, rejecting personal sops secrets and templates, Git or Jujutsu signing authority, an inherited SSH agent or signing socket, and any foreign human home reference in declared paths, settings or activation.
+All four are now checked by one composite invalid home whose failing-assertion messages must equal a sorted literal message set, so a guard that stops firing, changes its text, or fires unexpectedly fails the check.
+The ten paired fixtures it replaces each evaluated the home twice — once to observe the rejection, once with that guard filtered out — and their per-input attribution is no longer evaluated: the four signing inputs (declared signing key, effective `user.signingKey` with `commit.gpgSign`, `tag.gpgSign`, and a case-varied list-form settings fragment) and the four foreign-reference inputs (home file source, `configDir`, Atomic settings packages, and an activation script) are retained inside the composite but no longer named individually on failure.
+The positive homes, including the unsigned-author and benign-documentation controls, the CLI Home Manager and system adapters, and every runtime and artifact probe are unchanged.
+
 Clan exposes serializable `workers` settings and `legacyEnable`, which defaults to true.
 Worker `extraPackages` are nixpkgs attribute names in clan settings and package values in the plain module.
 `extraHomeModules` is available only in the plain module.
