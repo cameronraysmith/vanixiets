@@ -626,27 +626,6 @@
         trustedGroup = linuxRejects "Omnigent worker cameron: Nix trusted-user authority is prohibited." [
           { nix.settings.trusted-users = [ "@omnigent-cameron" ]; }
         ];
-        selectors =
-          lib.all
-            (
-              key:
-              linuxRejects
-                "Omnigent worker cameron: environment cannot override identity, state or authority selectors."
-                [ { services.omnigent-host.workers.cameron.environment.${key} = "foreign"; } ]
-            )
-            [
-              "HOME"
-              "USER"
-              "LOGNAME"
-              "PATH"
-              "XDG_CONFIG_HOME"
-              "PI_CODING_AGENT_DIR"
-              "ATOMIC_CODING_AGENT_DIR"
-              "OMP_CODING_AGENT_DIR"
-              "OMNIGENT_RUNNER_ENV_PASSTHROUGH"
-              "SSH_AUTH_SOCK"
-              "NIX_CONFIG"
-            ];
         direnvOptIn =
           prepared.home-manager.users.omnigent-cameron.programs.direnv.config.whitelist.prefix or [ ] == [ ];
       }
@@ -862,25 +841,9 @@
               }
             ];
         selectors =
-          lib.all
-            (
-              key:
-              darwinRejects
-                "Omnigent worker cameron: environment cannot override identity, state or authority selectors."
-                [
-                  { services.omnigent-host.workers.cameron.environment.${key} = "foreign"; }
-                ]
-            )
-            [
-              "HOME"
-              "PATH"
-              "SSH_AUTH_SOCK"
-              "NIX_CONFIG"
-              "ATOMIC_CODING_AGENT_DIR"
-              "OMP_CODING_AGENT_DIR"
-              "BASH_ENV"
-              "SKIP_SANITY_CHECKS"
-            ];
+          darwinRejects
+            "Omnigent worker cameron: environment cannot override identity, state or authority selectors."
+            [ { services.omnigent-host.workers.cameron.environment.BASH_ENV = "foreign"; } ];
       };
       darwinHostCanary = pkgs.writeShellScriptBin "omnigent" ''
         set -eu

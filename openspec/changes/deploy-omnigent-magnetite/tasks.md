@@ -161,3 +161,16 @@ This follow-up authorizes one scoped source commit and controller-owned deployme
 - [x] 14.1 Change only the dedicated-worker OMP ACP command and add an exact worker/human preservation regression; observe the pre-fix assertion failure and build `omnigent-worker-capabilities` on `aarch64-darwin` and `x86_64-linux` successfully.
 - [ ] 14.2 Controller: review the signed source, compare worker/human settings projections, build the affected full systems and activate the reviewed integrated revision.
 - [ ] 14.3 Operator/controller: use fresh worker sessions after deployment and record UAT separately; no live acceptance is claimed by the source checks.
+
+## 15. Worker-check evaluator reduction
+
+These incident slices are distinct from the capability A1/A2 work above and authorize no publication or deployment.
+
+- [x] 15.1 Incident A1: reduce redundant inventory and platform evaluations; pass focused Linux, Darwin and inventory evaluations/builds and the assertion-filter regression on signed `1eede68cdf966b098a64e9fafd1feaa43ee26c86`.
+- [ ] 15.2 Incident A2: share the exact reserved-environment predicate between production adapters, replace selector fanout with literal policy tables, and verify adapter sensitivity, effective configuration preservation and bounded focused gates.
+- [ ] 15.3 Controller: review A2 and separately establish full-CI resource fit; focused evaluator measurements do not establish aggregate CI headroom.
+
+A1 evidence is indexed in `logs/omnigent-a1-coverage-20260917.md`.
+Completed Linux evaluations measured 409 seconds/6,441,902,080 peak bytes before A1 and 259 seconds/5,526,016,000 bytes after A1 under the same 600-second, 8 GiB, zero-swap, 200% CPU service bounds.
+These evaluator-only observations exclude daemon memory and retain cache/order confounds; inventory peaked at 8,360,685,568 bytes, close to its 8 GiB limit.
+Credentials and capability checks were unchanged and were not rerun for A1; no full-CI pass is claimed.

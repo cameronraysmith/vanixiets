@@ -119,7 +119,7 @@ Before later human-controlled activation, select pyrite's configured `services.o
 ## Dedicated-worker inventory
 
 The inventory prepares Cameron and Janette on magnetite and pyrite, and Cameron alone on stibnite.
-All five workers initially have `enable = false`; their accounts and Home Manager generations remain declared while stopped.
+All five workers are currently enabled; disabled preparation remains covered by platform fixtures rather than the live inventory.
 Linux account declarations live in `inventory/services/users/omnigent-workers.nix` and use normal UID/private-group allocation with locked passwords and `0700` homes.
 Stibnite declares `omnigent-cameron` with UID/GID `551` and a private `/Users/omnigent-cameron` home, without changing `system.primaryUser`.
 The deployment plan records the operator's allocation approval and separate declared/live collision evidence.
@@ -136,9 +136,9 @@ Both Janette's and Raquel's human profiles remain, as do Cameron's three workers
 The historical Raquel preparation matrix and activation candidate are superseded, not Janette activation evidence or a current activation target.
 
 `checks.<system>.omnigent-worker-inventory` evaluates the actual fleet modules, the exact five-worker matrix, private accounts, prepared Home Manager ownership and ordinary Nix access.
-Its negative fixtures cover missing or extra workers, wrong owner, shared home, administrative/Nix-trusted authority, denied Nix access, SSH keys and signing inheritance.
-It checks clan settings serialization without `extraHomeModules`, preserves server behavior when workers are toggled, and exercises both disabled and enabled supervision as fixtures.
-The identity phase additionally requires all five real workers to remain disabled through credential preparation and asserts Janette's canonical author and signer principal.
+Independent literal projections check worker membership, ownership, homes, groups, Nix trust, SSH keys and signing policy; inventory mutations retain denied Nix access and author/signing controls.
+It checks clan settings serialization without `extraHomeModules` and compares current server behavior with workers absent.
+The Linux and Darwin adapter checks own disabled preparation and enabled supervision fixtures; the inventory check asserts Janette's canonical author and signer principal.
 Controller gates compare complete protected projections against fixed, same-role chain and integrated baselines, allowing only Janette's asserted Git/jj mail, signer principal, GitHub username and their generated artifacts.
 Live Linux collisions, allocated IDs, effective sudo/trust and actual home permissions must still be checked before authorized activation or enablement as specified in the deployment plan.
 

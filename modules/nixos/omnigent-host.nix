@@ -73,34 +73,7 @@ in
         "shadow"
         "nixbld"
       ];
-      reservedEnvironment =
-        name:
-        lib.elem name [
-          "HOME"
-          "USER"
-          "LOGNAME"
-          "PATH"
-          "SHELL"
-          "SSH_AUTH_SOCK"
-          "SSH_AGENT_PID"
-          "GIT_CONFIG_GLOBAL"
-          "GIT_CONFIG_SYSTEM"
-          "GIT_CONFIG_COUNT"
-        ]
-        || lib.any (prefix: lib.hasPrefix prefix name) [
-          "XDG_"
-          "NIX_"
-          "OMNIGENT_"
-          "PI_"
-          "ATOMIC_"
-          "OMP_"
-          "CLAUDE_"
-          "CODEX_"
-          "GH_"
-          "LINEAR_"
-          "LD_"
-          "DYLD_"
-        ];
+      reservedEnvironment = flakeConfig.flake.lib.omnigentReservedEnvironment { isDarwin = false; };
       hmUnit = worker: "home-manager-${utils.escapeSystemdPath worker.user}.service";
       workerEnvironment =
         worker:

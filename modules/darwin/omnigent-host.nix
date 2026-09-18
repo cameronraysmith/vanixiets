@@ -91,38 +91,7 @@ in
         entry == "*"
         || entry == worker.user
         || (lib.hasPrefix "@" entry && lib.elem (lib.removePrefix "@" entry) (groupsFor worker));
-      reservedEnvironment =
-        name:
-        lib.elem name [
-          "HOME"
-          "USER"
-          "LOGNAME"
-          "PATH"
-          "SHELL"
-          "SSH_AUTH_SOCK"
-          "SSH_AGENT_PID"
-          "GIT_CONFIG_GLOBAL"
-          "GIT_CONFIG_SYSTEM"
-          "GIT_CONFIG_COUNT"
-          "BASH_ENV"
-          "ENV"
-          "SKIP_SANITY_CHECKS"
-          "DRY_RUN"
-        ]
-        || lib.any (prefix: lib.hasPrefix prefix name) [
-          "XDG_"
-          "NIX_"
-          "OMNIGENT_"
-          "PI_"
-          "ATOMIC_"
-          "OMP_"
-          "CLAUDE_"
-          "CODEX_"
-          "GH_"
-          "LINEAR_"
-          "LD_"
-          "DYLD_"
-        ];
+      reservedEnvironment = flakeConfig.flake.lib.omnigentReservedEnvironment { isDarwin = true; };
       workerHomes = lib.mapAttrs (
         name: worker:
         inputs.home-manager.lib.homeManagerConfiguration {
