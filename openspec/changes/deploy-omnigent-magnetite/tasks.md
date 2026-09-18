@@ -23,6 +23,9 @@ Only `pkgs/by-name/omnigent/` is writable in this slice.
 - [ ] 2.1 Add `pkgs/by-name/omnigent/package.nix` using the PyPI 0.12.0 wheel, `buildPythonApplication`, `psycopg[binary]`, `pythonRelaxDeps`, and a PYTHONPATH-only wrapper — verify: `nix eval --json .#packages.x86_64-linux.omnigent.version` returns `"0.12.0"` and the controller's remote package-build gate in `slice-1.json` passes with an observed source hash.
 - [ ] 2.2 Exercise the built CLI rather than a source-tree executable — verify: the exact remote CLI command in `slice-1.json` exits zero and its stdout includes both `server` and `host`.
 
+The 0.12.0 literals in 2.1–2.2 record what S1 verified at the time.
+`pkgs/by-name/omnigent/package.nix` has since moved to 0.13.0 and 0.14.0 (`a7c0bd99d`, `2e530409a`) and carries the registered-ACP-harness readiness patch (`421dcf23c`); those bumps travelled on this branch without a row here and are not gated by this ledger.
+
 ## 3. S2 server
 
 Depends on accepted S1.
@@ -159,12 +162,18 @@ The operator selected the interim `omp acp --approval-mode yolo` launcher policy
 This follow-up authorizes one scoped source commit and controller-owned deployment/UAT after source review; it does not reopen the historical workflow gates above.
 
 - [x] 14.1 Change only the dedicated-worker OMP ACP command and add an exact worker/human preservation regression; observe the pre-fix assertion failure and build `omnigent-worker-capabilities` on `aarch64-darwin` and `x86_64-linux` successfully.
-- [ ] 14.2 Controller: review the signed source, compare worker/human settings projections, build the affected full systems and activate the reviewed integrated revision.
-- [ ] 14.3 Operator/controller: use fresh worker sessions after deployment and record UAT separately; no live acceptance is claimed by the source checks.
+- [x] 14.2 Controller: review the signed source, compare worker/human settings projections, build the affected full systems and activate the reviewed integrated revision.
+- [ ] 14.3 Operator/controller: record UAT from fresh worker sessions separately; the operator accepts basic Omnigent function in interactive use, and the two named checks below remain untested.
+
+14.2 evidence: the reviewed source built all three systems (`logs/omp-yolo-system-builds-20260917.log`), and the two-platform projection shows only the worker OMP command gaining `--approval-mode yolo` while the human command stays `omp acp` (`logs/omp-yolo-projection-20260917-012229.log`).
+Magnetite and pyrite were updated and stibnite activated, each deployed generation's rendered worker registration reading `omp acp --approval-mode yolo` (`logs/omp-yolo-magnetite-{deploy,verify}-20260917.log`, `logs/omp-yolo-pyrite-{deploy,verify}-20260917.log`, `logs/omp-yolo-stibnite-{activation,verify,verify-final}-20260917.log`).
+14.3 is partial and stays open: the operator's acceptance is a human attestation about ordinary interactive use, not a tool observation, and it substitutes for neither remaining check.
+The fresh-session OMP approval check on stibnite, the intended Darwin-side coverage, was never run and is untested.
+Per-OS Atomic ACP execution with a runtime-confirmed model and effort was never run and is untested; its effort half is also not observable today, because Omnigent 0.14.0's ACP client keeps only the `model` config option's `currentValue` and drops every other advertised option's value, including a thinking or effort level (`omnigent/inner/acp_executor.py`, `_note_config_options`), so the UI cannot confirm effort whatever OMP reports.
 
 ## 15. Worker-check evaluator reduction
 
-These incident slices are distinct from the capability A1/A2 work above and authorize no publication or deployment.
+These incident slices reuse the A-labels of section 13's capability slices and are distinct from them; they authorize no publication or deployment.
 
 - [x] 15.1 Incident A1: reduce redundant inventory and platform evaluations; pass focused Linux, Darwin and inventory evaluations/builds and the assertion-filter regression on signed `1eede68cdf966b098a64e9fafd1feaa43ee26c86`.
 - [x] 15.2 Incident A2: share the exact reserved-environment predicate between production adapters, replace selector fanout with literal policy tables, and verify adapter sensitivity, effective configuration preservation and bounded focused gates.
@@ -204,3 +213,5 @@ Capped probes on magnetite (8 GiB, zero swap, 200% CPU, 600 s, eval cache off, `
 `checks.x86_64-linux.omnigent-worker-capabilities` then built successfully on magnetite from the same source, and both platforms' derivations evaluate with every case passing.
 The check still exceeds the ~2 GB/60 s budget: what remains is the positive worker home, the clean home, the wrapped-credential home, the CLI Home Manager home, the two `git-xet` ownership homes, the duplicate-capability composition, the two positive control homes, the composite invalid home and one whole `nixosSystem`/`darwinSystem` for the CLI system adapter.
 A5 evidence is indexed in `logs/omnigent-a5-capability-composite-20260918.md`; no full-CI pass, publication or deployment is claimed.
+
+Full-CI resource fit, which 15.3 asks for, remains unestablished: `logs/nixbot-oom-root-cause-report-20260917-203600.md` records nixbot build 497 failing at `2dfb25332` with an evaluator SIGKILL and explicitly declines to promote any local success to a full-CI claim, and no full-CI run after the A3–A5 reductions is recorded here.
