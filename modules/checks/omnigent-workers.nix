@@ -840,79 +840,8 @@
         assert (home / "host-executed").exists(), "activation-failure mutant did not discriminate"
       '';
       inventoryRoles = config.flake.clan.inventory.instances.omnigent.roles;
-      inventoryRealMachines = {
-        inherit (config.flake.nixosConfigurations) magnetite pyrite;
-        inherit (config.flake.darwinConfigurations) stibnite;
-      };
-      expectedOwners = {
-        magnetite = [
-          "cameron"
-          "janettesmith"
-        ];
-        pyrite = [
-          "cameron"
-          "janettesmith"
-        ];
-        stibnite = [ "cameron" ];
-      };
-      inventoryObligations =
-        machine:
-        let
-          c = inventoryRealMachines.${machine}.config;
-          isDarwin = machine == "stibnite";
-          workers = c.services.omnigent-host.workers;
-          owners = expectedOwners.${machine};
-          workerUsers = map (owner: "omnigent-${owner}") owners;
-        in
-        lib.attrNames workers == owners
-        && lib.filter (lib.hasPrefix "omnigent-") (lib.attrNames c.users.users) == workerUsers
-        && lib.all (
-          owner:
-          let
-            worker = workers.${owner};
-            user = "omnigent-${owner}";
-            account = c.users.users.${user};
-            group = c.users.groups.${user};
-            home = "${if isDarwin then "/Users" else "/home"}/${user}";
-            memberships = lib.attrNames (lib.filterAttrs (_: g: lib.elem user g.members) c.users.groups);
-          in
-          worker.owner == owner
-          && worker.user == user
-          && worker.hostName == "${machine}-${owner}"
-          && worker.workspaceRoot == "${home}/projects"
-          && !worker.autoApproveDirenv
-          && worker.environment == { }
-          && worker.enable
-          && account.home == home
-          && account.createHome
-          && account.openssh.authorizedKeys.keys == [ ]
-          && account.openssh.authorizedKeys.keyFiles == [ ]
-          && lib.all (name: name == user) memberships
-          && lib.all (name: name == user) group.members
-          && lib.all (other: other.name == user || other.home != account.home) (lib.attrValues c.users.users)
-          && (
-            if isDarwin then
-              account.uid == 551
-              && account.gid == 551
-              && group.gid == 551
-              && lib.elem user c.users.knownUsers
-              && lib.elem user c.users.knownGroups
-              && !(builtins.hasAttr user c.home-manager.users)
-              && c.environment.etc ? "omnigent/workers/${owner}"
-              && builtins.hasAttr "omnigent-host-${owner}" c.launchd.daemons
-            else
-              account.isNormalUser
-              && account.group == user
-              && account.extraGroups == [ ]
-              && lib.elem account.homeMode [
-                "700"
-                "0700"
-              ]
-              && account.hashedPassword == "!"
-              && account.hashedPasswordFile == null
-              && builtins.hasAttr "omnigent-host-${owner}" c.systemd.services
-          )
-        ) owners;
+      stibnite = config.flake.darwinConfigurations.stibnite;
+      expectedOwners = config.flake.lib.omnigentFleetObligations.expectedOwners;
       clanHostInterface =
         (
           (import ../clan/services/omnigent/flake-module.nix {
@@ -928,25 +857,7 @@
             inventoryRoles.host.machines.${machine}.settings
           ];
         }).config;
-      janetteGitEmail = "125711642+janetteasmith@users.noreply.github.com";
-      janetteAuthor = {
-        name = "Janette Smith";
-        email = janetteGitEmail;
-      };
       janetteMeta = config.flake.users.janettesmith.meta;
-      identityBinding =
-        modules:
-        (lib.evalModules {
-          modules = [
-            {
-              options.programs = lib.mkOption { type = lib.types.attrs; };
-            }
-          ]
-          ++ modules;
-        }).config == {
-          programs.git.settings.user = janetteAuthor;
-          programs.jujutsu.settings.user = janetteAuthor;
-        };
       metaFixture =
         extra:
         (lib.evalModules {
@@ -966,135 +877,12 @@
           ];
         }).config.flake.users.fixture.meta.gitEmail;
       inventoryCases = {
-        linearRenderedOutsideHomes = lib.all (
-          machine:
-          let
-            c = machine.config;
-            homes = map (worker: toString c.users.users.${worker.user}.home) (
-              lib.attrValues c.services.omnigent-host.workers
-            );
-            templates = lib.filterAttrs (name: _: lib.hasPrefix "omnigent-" name) c.sops.templates;
-          in
-          lib.all (
-            template:
-            template.path == "/run/secrets/rendered/${template.name}"
-            && !lib.any (home: lib.hasPrefix "${home}/" template.path) homes
-            && template.mode == "0400"
-            && lib.any (worker: worker.user == template.owner) (lib.attrValues c.services.omnigent-host.workers)
-          ) (lib.attrValues templates)
-        ) (lib.attrValues inventoryRealMachines);
-        keychainScope = lib.all (
-          machine:
-          lib.all (
-            name:
-            (inventoryRealMachines.${machine}.config.services.omnigent-host.workers.${name}.keychainEnable
-              or false
-            ) == (machine == "stibnite" && name == "cameron")
-          ) expectedOwners.${machine}
-        ) (lib.attrNames inventoryRealMachines);
-        keychainSecret =
-          let
-            g = inventoryRealMachines.stibnite.config.clan.core.vars.generators.omnigent-cameron-keychain;
-          in
-          !g.share
-          && g.files.password.secret
-          && g.files.password.owner == "omnigent-cameron"
-          && g.files.password.mode == "0400"
-          && g.files.password.neededFor == "services";
-        fleetLinearGeneratorScript =
-          let
-            g =
-              inventoryRealMachines.magnetite.config.clan.core.vars.generators.omnigent-janettesmith-linear-personal;
-          in
-          lib.attrNames g.files == lib.sort builtins.lessThan credentialLinearFiles
-          && lib.all (
-            file: lib.hasInfix ''cp "$prompts/${file}" "$out/${file}"'' g.script
-          ) credentialLinearFiles;
-        declaredCredentials = lib.all (
-          machine:
-          lib.all (
-            worker:
-            let
-              credentials = worker.credentials;
-              meta = config.flake.users.${if worker.owner == "cameron" then "crs58" else worker.owner}.meta;
-            in
-            credentials.signingKey == {
-              enable = true;
-              generator = "${worker.user}-signing-key";
-              file = "key";
-            }
-            &&
-              credentials.githubTokens
-              == lib.genAttrs ([ "sciexp" ] ++ lib.optional (worker.owner == "cameron") "cameronraysmith")
-                (owner: {
-                  enable = true;
-                  generator = "${worker.user}-github-token-${owner}";
-                  file = "token";
-                  expectedLogin = meta.githubUser;
-                })
-            && credentials.defaultOwner == (if worker.owner == "cameron" then "cameronraysmith" else "sciexp")
-            &&
-              credentials.linearApiKeys
-              == lib.genAttrs ([ "personal" ] ++ lib.optional (worker.owner == "cameron") "work") (label: {
-                enable = true;
-                generator = "${worker.user}-linear-${label}";
-              })
-            && !credentials.claudeSetupToken.enable
-            &&
-              credentials.expected == {
-                gitEmail = meta.gitEmail;
-                signingPublicKey = lib.head meta.sshKeys;
-                omnigentEmail = meta.email;
-              }
-            && lib.all (
-              source:
-              let
-                generator = machine.config.clan.core.vars.generators.${source.generator};
-                file = generator.files.${source.file};
-              in
-              generator.prompts.${source.file}.type == "hidden"
-              && generator.share
-              && file.secret
-              && file.neededFor == "services"
-              && file.owner == worker.user
-              && file.mode == "0400"
-            ) (lib.attrValues (config.flake.lib.omnigentCredentialSelection credentials))
-          ) (lib.attrValues machine.config.services.omnigent-host.workers)
-        ) (lib.attrValues inventoryRealMachines);
-        realEnrollment = lib.all (
-          d:
-          let
-            c = d.config;
-            missing =
-              worker:
-              lib.any (
-                source:
-                !builtins.pathExists (
-                  c.clan.core.settings.directory + "/vars/shared/${source.generator}/${source.file}/secret"
-                )
-              ) (lib.attrValues (config.flake.lib.omnigentCredentialSelection worker.credentials));
-            expectedFailures = lib.concatMap (
-              worker:
-              lib.optionals (missing worker) [
-                "Omnigent worker ${worker.user}: credentials require private shared services files owned by the worker with mode 0400."
-                "Omnigent worker ${worker.user}: only the declared Clan vars ciphertext and delivered paths are allowed."
-              ]
-            ) (lib.attrValues c.services.omnigent-host.workers);
-            failures = map (a: a.message) (lib.filter (a: !a.assertion) c.assertions);
-          in
-          lib.sort builtins.lessThan failures == lib.sort builtins.lessThan expectedFailures
-        ) (lib.attrValues inventoryRealMachines);
-        enableMap = lib.all (
-          d:
-          lib.all (w: w.enable) (lib.attrValues d.config.services.omnigent-host.workers)
-          && !d.config.services.omnigent-host.enable
-        ) (lib.attrValues inventoryRealMachines);
         canonicalJanette =
           janetteMeta.username == "janettesmith"
           && janetteMeta.fullname == "Janette Smith"
           && janetteMeta.email == "janette.a.smith@gmail.com"
           && janetteMeta.githubUser == "janetteasmith"
-          && janetteMeta.gitEmail == janetteGitEmail
+          && janetteMeta.gitEmail == "125711642+janetteasmith@users.noreply.github.com"
           && janetteMeta.sopsAgeKeyId == null
           &&
             janetteMeta.sshKeys == [
@@ -1109,35 +897,13 @@
           !(builtins.tryEval (metaFixture {
             gitEmail = 42;
           })).success;
-        narrowIdentityBinding =
-          lib.all
-            (
-              machine:
-              identityBinding
-                inventoryRealMachines.${machine}.config.services.omnigent-host.workers.janettesmith.extraHomeModules
-            )
-            [
-              "magnetite"
-              "pyrite"
-            ];
-        unrelatedBindingRejected =
-          !identityBinding [
-            {
-              programs.git.settings.user = janetteAuthor;
-              programs.jujutsu.settings.user = janetteAuthor;
-              programs.unrelated.enable = true;
-            }
-          ];
         hostMatrix =
           lib.attrNames inventoryRoles.host.machines == [
             "magnetite"
             "pyrite"
             "stibnite"
           ];
-        serverMatrix =
-          lib.attrNames inventoryRoles.server.machines == [ "magnetite" ]
-          &&
-            inventoryRealMachines.magnetite.config.services.omnigent.domain == "omni.scientistexperience.net";
+        serverMatrix = lib.attrNames inventoryRoles.server.machines == [ "magnetite" ];
         serializable = lib.all (
           machine:
           let
@@ -1163,10 +929,7 @@
               }).config
               true
           )).success;
-      }
-      // lib.mapAttrs' (
-        machine: _: lib.nameValuePair "machine-${machine}" (inventoryObligations machine)
-      ) expectedOwners;
+      };
       inventoryFailed = lib.attrNames (lib.filterAttrs (_: ok: !ok) inventoryCases);
       credentialRoot = "/tmp/omnigent-worker-credentials-${system}";
       credentialHomePath = "${credentialRoot}/home";
@@ -1483,14 +1246,11 @@
           keychainFixtures = ../home/ai/omnigent/keychain-fixtures.py;
           keychainHome =
             if pkgs.stdenv.isDarwin then
-              toString inventoryRealMachines.stibnite.config.environment.etc."omnigent/workers/cameron".source
+              toString stibnite.config.environment.etc."omnigent/workers/cameron".source
             else
               null;
           keychainLaunchd =
-            if pkgs.stdenv.isDarwin then
-              toString inventoryRealMachines.stibnite.config.system.build.launchd
-            else
-              null;
+            if pkgs.stdenv.isDarwin then toString stibnite.config.system.build.launchd else null;
           loginHelperSource = ../apps/omnigent-worker-login.sh;
           hostLauncher =
             if pkgs.stdenv.isDarwin then
@@ -1575,14 +1335,6 @@
               touch "$out"
             '';
         omnigent-worker-inventory =
-          assert lib.assertMsg (lib.all
-            (
-              machine:
-              lib.attrNames inventoryRealMachines.${machine}.config.services.omnigent-host.workers
-              == expectedOwners.${machine}
-            )
-            (lib.attrNames expectedOwners)
-          ) "Omnigent inventory requires exactly five declared human workers.";
           assert lib.assertMsg (
             inventoryFailed == [ ]
           ) "Omnigent inventory failures: ${lib.concatStringsSep ", " inventoryFailed}";

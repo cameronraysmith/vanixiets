@@ -21,6 +21,18 @@
       darwinForSystem = lib.filterAttrs (
         name: machine: machine.machineClass == "darwin" && machineSystems.${name} == system
       ) inventory;
+
+      obligations = self.lib.omnigentFleetObligations;
+
+      withFleetObligations =
+        name: machineConfig: toplevel:
+        let
+          unmet = obligations.failures name machineConfig;
+        in
+        assert lib.assertMsg (
+          unmet == [ ]
+        ) "Omnigent fleet obligations unmet on ${name}: ${lib.concatStringsSep ", " unmet}";
+        toplevel;
     in
     assert lib.assertMsg (
       builtins.attrNames machineSystems == builtins.attrNames inventory
@@ -31,14 +43,24 @@
     assert lib.assertMsg (
       inventoryNamesFor "darwin" == builtins.attrNames self.darwinConfigurations
     ) "Darwin inventory names must match darwinConfigurations";
+    assert lib.assertMsg (lib.all (name: inventory ? ${name} && !(builtins.elem name deferred)) (
+      lib.attrNames obligations.expectedOwners
+    )) "every machine carrying Omnigent fleet obligations must have a machine check to assert them";
     {
       checks =
         (lib.mapAttrs' (
           name: _:
-          lib.nameValuePair "nixos-${name}" self.nixosConfigurations.${name}.config.system.build.toplevel
+          lib.nameValuePair "nixos-${name}" (
+            withFleetObligations name self.nixosConfigurations.${name}.config
+              self.nixosConfigurations.${name}.config.system.build.toplevel
+          )
         ) nixosForSystem)
         // (lib.mapAttrs' (
-          name: _: lib.nameValuePair "darwin-${name}" self.darwinConfigurations.${name}.system
+          name: _:
+          lib.nameValuePair "darwin-${name}" (
+            withFleetObligations name self.darwinConfigurations.${name}.config
+              self.darwinConfigurations.${name}.system
+          )
         ) darwinForSystem);
     };
 }
