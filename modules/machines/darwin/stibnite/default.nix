@@ -211,14 +211,29 @@ in
       # too; ssh resolution is handled by /etc/ssh/ssh_config.d/100-rosetta-builder.conf.
       # Remove once nix-rosetta-builder advertises uid-range upstream.
       #
-      # "kvm" is dropped from the upstream feature list (module.nix:400-404 in
-      # nix-rosetta-builder, where it is a hardcoded literal with no option):
-      # `ls -l /dev/kvm` in the running VM reports no such file, so the VM cannot
-      # accelerate any guest, and Rosetta translates userspace rather than
-      # providing a hypervisor, so an x86_64-linux guest could not be
-      # KVM-accelerated there even if the aarch64 VM had nested virtualisation.
-      # Advertising it sent kvm-requiring derivations to a machine that fails
-      # them; pyrite below is the fleet's only host that can run them.
+      # "kvm" is advertised here although the guest has no /dev/kvm. One nix
+      # feature name carries two claims: "can accelerate a guest" and "can run
+      # a derivation that starts a VM at all". Only the first is false here.
+      # `ls -l /dev/kvm` in the VM reports no such file, so qemu logs `Could
+      # not access KVM kernel module` and `falling back to tcg`, then completes
+      # the build emulated. Verified 2026-09-19 by building this guest's own
+      # nixos-disk-image, aarch64-linux with requiredSystemFeatures ["kvm"], on
+      # it in 1m18s. Upstream hardcodes the same claim (module.nix:403 in
+      # nix-rosetta-builder, no option, no stated rationale) and its README
+      # relies on it: the builder rebuilds its own next-generation image.
+      #
+      # Nothing else can take the work. pyrite is the fleet's only /dev/kvm
+      # host but builds x86_64-linux only, so an aarch64-linux kvm derivation
+      # has no other candidate, and checks.aarch64-darwin.darwin-stibnite and
+      # checks.aarch64-darwin.omnigent-worker-credentials both reach
+      # nixos-disk-image and stop being schedulable without this.
+      #
+      # The cost: an x86_64-linux kvm derivation now sees this builder and
+      # pyrite at equal speedFactor, and landing here means TCG under Rosetta
+      # instead of native acceleration — correct, and far slower. The vmTests
+      # lane is on-demand and outside pull-request gating, so that is a slow
+      # manual run rather than a red pull request. Split into two entries,
+      # aarch64-linux with kvm and x86_64-linux without, if the tie costs time.
       nix.buildMachines = lib.mkForce (
         [
           {
@@ -233,6 +248,7 @@ in
             supportedFeatures = [
               "benchmark"
               "big-parallel"
+              "kvm"
               "nixos-test"
               "uid-range"
             ];
@@ -246,12 +262,13 @@ in
       # Offload native x86_64-linux builds to magnetite over ZeroTier.
       services.magnetite-builder.enable = true;
 
-      # pyrite is the only machine in the fleet with /dev/kvm, so it is the only
-      # place a kvm-requiring derivation such as a vmTests output can be built.
-      # It is a laptop, and an unreachable one costs a logged connection failure
-      # and a failed kvm build rather than a hang or a silently unaccelerated
-      # one; see modules/system/pyrite-builder.nix for the nix behaviour this
-      # relies on and the ssh timeouts that bound it.
+      # pyrite is the fleet's only machine with /dev/kvm, so it is the only
+      # place a kvm-requiring derivation runs accelerated rather than emulated.
+      # It is a laptop, and an unreachable one no longer fails such a build:
+      # since the rosetta builder above also advertises kvm, an x86_64-linux
+      # vmTests output falls back to it and runs under TCG plus Rosetta, which
+      # is slow rather than red. See modules/system/pyrite-builder.nix for the
+      # nix scheduling behaviour and the ssh timeouts that bound it.
       services.pyrite-builder.enable = true;
 
       # Inbound side of the same asymmetry: stibnite is the fleet's only
