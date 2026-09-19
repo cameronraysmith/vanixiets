@@ -64,7 +64,7 @@
       # Version constraint needs to be compatible with nixpkgs terraform-providers.hashicorp_google
       terraform.required_providers.google = {
         source = "hashicorp/google";
-        version = "~> 7.0";
+        version = "~> 8.0";
       };
       terraform.required_providers.tls.source = "hashicorp/tls";
       terraform.required_providers.null.source = "hashicorp/null";
