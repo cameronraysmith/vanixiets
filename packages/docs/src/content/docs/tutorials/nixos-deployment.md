@@ -418,6 +418,11 @@ chmod 600 ~/.config/sops/age/keys.txt
 
 After setting up the key, your user's sops secrets will decrypt during home-manager activation.
 
+This manual step applies only to users the host does not enroll in the NixOS-to-home-manager sops bridge.
+On a host that declares `hm-sops-bridge.users.<user>`, system activation decrypts that user's age key to `/run/secrets/<id>-age-key`, owned by the user at mode `0400`, and points home-manager's `sops.age.keyFile` at it (`modules/nixos/hm-sops-bridge.nix`).
+Do not set `sops.age.keyFile` in a user module on such a host: the bridge assigns that option at ordinary priority, so a second ordinary-priority definition is an evaluation conflict rather than an override.
+Enrollment is per host and per user, and only users whose age private key is committed as a ciphertext under `secrets/bridge/` can be enrolled; see [Home manager onboarding](/guides/home-manager-onboarding/) for the user-side steps.
+
 ### Verify secrets
 
 ```bash
