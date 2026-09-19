@@ -41,7 +41,6 @@ in
         magnetite-builder
         pyrite-builder
         stibnite-build-host
-        # Not importing users module (defines testuser at UID 550)
       ]);
 
       # Re-enable documentation for laptop use

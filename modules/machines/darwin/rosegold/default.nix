@@ -33,8 +33,6 @@ in
         ssh-ca-trust
         ssh-known-hosts
         zt-dns
-        # Not importing users module (defines testuser at UID 550)
-        # rosegold defines its own users (janettesmith + cameron)
       ]);
 
       # Re-enable documentation for laptop use

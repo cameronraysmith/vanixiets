@@ -35,8 +35,6 @@ in
         dnscrypt-proxy
         zt-dns
         zt-services-trust
-        # Not importing users module (defines testuser at UID 550)
-        # blackphos defines its own users (crs58 + raquel)
       ]);
 
       # Re-enable documentation for laptop use

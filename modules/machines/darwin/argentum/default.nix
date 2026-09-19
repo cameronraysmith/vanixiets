@@ -33,8 +33,6 @@ in
         ssh-ca-trust
         ssh-known-hosts
         zt-dns
-        # Not importing users module (defines testuser at UID 550)
-        # argentum defines its own users (christophersmith + cameron)
       ]);
 
       # Re-enable documentation for laptop use
