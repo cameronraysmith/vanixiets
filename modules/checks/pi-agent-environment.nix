@@ -1546,7 +1546,6 @@
             module = "ESNext";
             moduleResolution = "Bundler";
             target = "ES2022";
-            baseUrl = ".";
             paths."pi-agent-extensions/permission-gate/*" = [ "./permission-gate/*" ];
             skipLibCheck = true;
           };
