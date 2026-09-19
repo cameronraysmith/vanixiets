@@ -38,11 +38,11 @@ Independent authors use the same policy directly for their own PRs and stacks.
 
 ## Queue authorization
 
-This procedure takes effect for a repository only after its coordinated installation-readiness evidence is confirmed.
-In vanixiets, gitea-mq is deployed at https://mq.scientistexperience.net with App id 4875422, `batchMax = 5`, and required external checks `nixbot/nix-eval` and `nixbot/nix-build`.
-It manages zero repositories because the App is deliberately not yet installed.
-Mergify's queues in `.github/mergify.yml` remain the working landing path until the operator-coordinated installation window.
-Until readiness is confirmed, stop before authorization and request that coordinated cutover; do not use a direct-push or real `stack-land` fallback.
+In vanixiets, gitea-mq is deployed at https://mq.scientistexperience.net with App id 4875422, `batchMax = 20`, and `skipQueueIfUpToDate = true`, and the App is installed on `cameronraysmith/vanixiets` (`modules/nixos/gitea-mq.nix`).
+Its required external checks come from our active default-branch ruleset: `nixbot/nix-eval`, `nixbot/nix-build`, and `nixbot/effects`.
+The App's own ruleset requires the `gitea-mq` context, which it posts only after enqueue; never treat that context's absence as a reason to withhold authorization.
+`.github/mergify.yml` carries pull-request rules only and no queue rules; Mergify lands nothing.
+For a repository whose queue is not yet installed, stop before authorization and request the coordinated cutover; do not use a direct-push or real `stack-land` fallback.
 
 Risk class determines when to authorize; PR shape independently determines how to enqueue.
 Human or agent authorship determines neither axis.
@@ -69,8 +69,11 @@ Native laptop feedback is separate; `--no-download` brings no outputs back to th
 
 After warming and any required review, authorize according to shape:
 
-1. For an ordinary trunk-based PR, enable GitHub native auto-merge with the button or `gh pr merge --auto <PR>`.
-   That act authorizes the queue to merge the PR.
+1. For an ordinary trunk-based PR, enable GitHub native auto-merge with the button or `gh pr merge <PR> --auto --rebase`.
+   That act authorizes the queue to merge the PR; approving a review does not, because no ruleset requires review and the App bypasses rulesets.
+   `--rebase` matters only on the single up-to-date entry path, where the forge performs the merge; a batch lands by fast-forward to the tested SHA regardless.
+   For a wave of PRs, `gh-queue-open-prs` derives the required set from the live rulesets, reports each PR's verdict, and enqueues the green ones.
+   It reports rather than enqueues any PR that is draft, conflicting, already queued, labelled `merge-queue`, or based on a branch other than the target, so the stack hazard below cannot be tripped by bulk authorization.
 2. For a registered stack, publish with `mergify stack push --github-native` under §Fleet upstream overrides.
    Verify actual GitHub-native membership, that all intended lower-member heads are ancestors of the selected head, and that the selected head descends from the intended target.
    Command success or `Depends-On:` headers alone do not establish native registration; withhold authorization until missing membership or ancestry evidence is resolved.
