@@ -325,17 +325,17 @@
     "dms-src": {
       "flake": false,
       "locked": {
-        "lastModified": 1785111455,
-        "narHash": "sha256-aTNuC9NDBnYAeEtFsleeUwmGX3AZlKOutbl+LQRPkmQ=",
+        "lastModified": 1788887664,
+        "narHash": "sha256-Uvp+jbeSoi95wzxeimwsVIIQ17Cf2yY6Lct05Ng3SN0=",
         "owner": "AvengeMedia",
         "repo": "DankMaterialShell",
-        "rev": "069ddab041c738236a8910e4c39b65d9628d3018",
+        "rev": "aa4b99def48637d86a69620c0a8f3cc6aa0c4092",
         "type": "github"
       },
       "original": {
         "owner": "AvengeMedia",
         "repo": "DankMaterialShell",
-        "rev": "069ddab041c738236a8910e4c39b65d9628d3018",
+        "rev": "aa4b99def48637d86a69620c0a8f3cc6aa0c4092",
         "type": "github"
       }
     },

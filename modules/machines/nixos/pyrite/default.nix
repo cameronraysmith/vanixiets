@@ -362,7 +362,7 @@ in
       services.desktopManager.gnome.enable = false;
       services.displayManager.dms-greeter = {
         enable = true;
-        package = pkgs.dms-shell;
+        package = pkgs.dms-greeter;
         quickshell.package = pkgs.quickshell;
         compositor = {
           name = "niri";

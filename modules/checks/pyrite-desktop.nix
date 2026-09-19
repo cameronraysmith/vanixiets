@@ -31,14 +31,17 @@
           greeter = cfg.services.displayManager.dms-greeter;
           configuration = pkgs.writeText "pyrite-dankgreeter.kdl" greeter.compositor.customConfig;
           launcher = cfg.services.greetd.settings.default_session.command;
-          assets = "${greeter.package}/share/quickshell/dms";
+          greeterBin = "${greeter.package}/bin/dms-greeter";
         in
         pkgs.runCommand "pyrite-dankgreeter-config" { } ''
           ${lib.getExe cfg.programs.niri.package} validate -c ${configuration}
           test -x ${launcher}
-          test -f ${assets}/Modules/Greetd/assets/dms-greeter
-          test -f ${assets}/shell.qml
-          ${pkgs.gnugrep}/bin/grep -F -- '${assets}/Modules/Greetd/assets/dms-greeter' ${launcher}
+          test -x ${greeterBin}
+          ${greeterBin} --help > help.txt
+          ${pkgs.gnugrep}/bin/grep -F -- '--cache-dir' help.txt
+          ${pkgs.gnugrep}/bin/grep -F -- '--command' help.txt
+          ${pkgs.gnugrep}/bin/grep -F -- '-C, --config' help.txt
+          ${pkgs.gnugrep}/bin/grep -F -- '${greeterBin} --cache-dir /var/lib/dms-greeter --command niri' ${launcher}
           ${pkgs.gnugrep}/bin/grep -F -- '${cfg.programs.niri.package}/bin' ${launcher}
           ${pkgs.gnugrep}/bin/grep -F -- '${greeter.quickshell.package}/bin' ${launcher}
           ${pkgs.gnugrep}/bin/grep -F -- ' -C ' ${launcher}
@@ -196,9 +199,10 @@
             && toString dms.package == toString pkgs.dms-shell
             && toString dms.quickshell.package == toString pkgs.quickshell
             && toString home.programs.quickshell.package == toString pkgs.quickshell
-            && pkgs.dms-shell.version == "1.5.3"
+            && pkgs.dms-shell.version == "1.6.1"
+            && pkgs.dms-greeter.version == "1.6.2"
             && inputs.niri-flake.rev == "db2615fc6b3f75539ec681a984e3311b8d79ede0"
-            && inputs.dms-src.rev == "069ddab041c738236a8910e4c39b65d9628d3018"
+            && inputs.dms-src.rev == "aa4b99def48637d86a69620c0a8f3cc6aa0c4092"
             &&
               map toString options.programs.niri.enable.declarations == [
                 "${inputs.nixpkgs}/nixos/modules/programs/wayland/niri.nix"
@@ -366,7 +370,7 @@
             && greetd.settings.default_session.user == "dms-greeter"
             && lib.hasSuffix "/bin/dms-greeter-start" greetd.settings.default_session.command
             && greeter.compositor.name == "niri"
-            && toString greeter.package == toString pkgs.dms-shell
+            && toString greeter.package == toString pkgs.dms-greeter
             && toString greeter.quickshell.package == toString pkgs.quickshell
             && greeter.configHome == null
             && greeter.configFiles == [ ]
