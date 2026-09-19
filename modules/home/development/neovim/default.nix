@@ -89,7 +89,6 @@
           extraPackages = with pkgs; [
             vimPlugins.blink-copilot
             markdown-toc
-            pplatex
             texliveWithPackages
             typstWithPackages
           ];
