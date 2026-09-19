@@ -18,8 +18,6 @@
 #     sudo launchctl bootout system/org.nixos.dnscrypt-proxy
 #   Complete portal login, then re-enable:
 #     sudo launchctl bootstrap system /Library/LaunchDaemons/org.nixos.dnscrypt-proxy.plist
-#
-# Cannot be enabled simultaneously with localDnsmasq (both bind to port 53).
 { ... }:
 {
   flake.modules.darwin.dnscrypt-proxy =
@@ -174,14 +172,6 @@
       };
 
       config = lib.mkIf cfg.enable {
-        # Ensure dnsmasq and dnscrypt-proxy are not both enabled
-        assertions = [
-          {
-            assertion = !(config.services.localDnsmasq.enable or false);
-            message = "Cannot enable both localDnsmasq and localDnscryptProxy - they both bind to port 53";
-          }
-        ];
-
         # Configure dnscrypt-proxy via nix-darwin's module
         services.dnscrypt-proxy = {
           enable = true;
