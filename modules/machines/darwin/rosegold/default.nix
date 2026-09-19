@@ -98,18 +98,9 @@ in
         # Fonts managed via base homebrew module (manageFonts defaults to true)
       };
 
-      security.pam.services.sudo_local.touchIdAuth = true;
-
       # Operator claim (modules/darwin/sshd-declaration.nix): rosegold accepts
       # inbound SSH so it can be deployed to from stibnite over zerotier.
       declaredSshd.serving = true;
-
-      # Increase MaxAuthTries to accommodate agent forwarding with many keys
-      # Default is 6, but Bitwarden SSH agent may have 10+ keys loaded
-      # nix-darwin writes this to /etc/ssh/sshd_config.d/100-nix-darwin.conf
-      services.openssh.extraConfig = ''
-        MaxAuthTries 20
-      '';
 
       # UIDs verified against rosegold system state (2025-11-28)
       users.users.janettesmith = {
@@ -133,13 +124,6 @@ in
         "janettesmith"
         "cameron"
       ];
-
-      environment.systemPackages = with pkgs; [
-        vim
-        git
-      ];
-
-      programs.zsh.enable = true;
 
       home-manager = {
         useGlobalPkgs = true;

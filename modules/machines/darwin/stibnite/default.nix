@@ -122,18 +122,9 @@ in
         # Fonts managed via base homebrew module (manageFonts defaults to true)
       };
 
-      security.pam.services.sudo_local.touchIdAuth = true;
-
       # Operator claim (modules/darwin/sshd-declaration.nix): stibnite serves
       # SSH for remote deployment and as the fleet's darwin build host.
       declaredSshd.serving = true;
-
-      # Increase MaxAuthTries to accommodate agent forwarding with many keys
-      # Default is 6, but Bitwarden SSH agent may have 10+ keys loaded
-      # nix-darwin writes this to /etc/ssh/sshd_config.d/100-nix-darwin.conf
-      services.openssh.extraConfig = ''
-        MaxAuthTries 20
-      '';
 
       # SSH client fix for nix-rosetta-builder
       # The nix-rosetta-builder module generates 100-rosetta-builder.conf without IdentitiesOnly
@@ -171,13 +162,6 @@ in
         "crs58"
         "omnigent-cameron"
       ];
-
-      environment.systemPackages = with pkgs; [
-        vim
-        git
-      ];
-
-      programs.zsh.enable = true;
 
       # Disable native linux-builder (replaced by nix-rosetta-builder)
       # Bootstrap step 1 complete - see docs/notes/containers/multi-arch-container-builds.md
