@@ -20,7 +20,10 @@ let
     {
       home.username = setter user;
       home.homeDirectory = setter (
-        if pkgs.stdenv.isDarwin then "/Users/${config.home.username}" else "/home/${config.home.username}"
+        if pkgs.stdenv.hostPlatform.isDarwin then
+          "/Users/${config.home.username}"
+        else
+          "/home/${config.home.username}"
       );
     };
 

@@ -48,7 +48,7 @@
         # Stable channel (OS-specific: darwin-stable or linux-stable)
         # Direct conditional based on system (test-clan doesn't have lib'.systemInput)
         stable =
-          if prev.stdenv.isDarwin then
+          if prev.stdenv.hostPlatform.isDarwin then
             import inputs.nixpkgs-darwin-stable nixpkgsConfig
           else
             import inputs.nixpkgs-linux-stable nixpkgsConfig;

@@ -10,14 +10,14 @@
     {
       programs.ghostty = {
         enable = true;
-        package = if pkgs.stdenv.isDarwin then null else pkgs.ghostty;
+        package = if pkgs.stdenv.hostPlatform.isDarwin then null else pkgs.ghostty;
         # https://ghostty.org/docs/config/reference
         settings = {
           auto-update = "download";
           auto-update-channel = "stable";
           cursor-click-to-move = true;
           font-family = "MonaspiceNe Nerd Font Mono";
-          font-size = if pkgs.stdenv.isDarwin then 13 else 11;
+          font-size = if pkgs.stdenv.hostPlatform.isDarwin then 13 else 11;
           font-thicken = false;
           quick-terminal-position = "center";
           quick-terminal-size = "1000px,600px";

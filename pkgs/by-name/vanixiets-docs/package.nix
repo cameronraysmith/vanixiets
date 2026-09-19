@@ -26,7 +26,7 @@ let
   # expects. On darwin, CFT works fine — use the original browsers.
   # Revision derived from browsersJSON for automatic version tracking.
   playwrightBrowsers =
-    if stdenv.isLinux then
+    if stdenv.hostPlatform.isLinux then
       let
         browsersJSON = playwrightDriver.passthru.browsersJSON;
         chromiumRevision = browsersJSON.chromium.revision;
@@ -71,7 +71,7 @@ let
   # PT_INTERP + RUNPATH against stdenv glibc + libstdc++. Both `astro build`
   # (via @cloudflare/vite-plugin loading miniflare) and `astro preview`
   # (miniflare's webServer) spawn this binary.
-  patchBundledWorkerd = lib.optionalString stdenv.isLinux ''
+  patchBundledWorkerd = lib.optionalString stdenv.hostPlatform.isLinux ''
     shopt -s nullglob
     for binary in node_modules/.bun/@cloudflare+workerd-linux-64@*/node_modules/@cloudflare/workerd-linux-64/bin/workerd; do
       # bun's isolated linker ships files r-xr-xr-x; patchelf needs u+w.
@@ -116,9 +116,9 @@ stdenv.mkDerivation (finalAttrs: {
     svgo
     jq
   ]
-  ++ lib.optionals stdenv.isLinux [ autoPatchelfHook ];
+  ++ lib.optionals stdenv.hostPlatform.isLinux [ autoPatchelfHook ];
 
-  buildInputs = lib.optionals stdenv.isLinux [ stdenv.cc.cc.lib ];
+  buildInputs = lib.optionals stdenv.hostPlatform.isLinux [ stdenv.cc.cc.lib ];
 
   # Patch the bundled workerd binary manually in buildPhase; $out has no ELFs.
   dontAutoPatchelf = true;
@@ -224,9 +224,9 @@ stdenv.mkDerivation (finalAttrs: {
       bun
       nodejs-slim
     ]
-    ++ lib.optionals stdenv.isLinux [ autoPatchelfHook ];
+    ++ lib.optionals stdenv.hostPlatform.isLinux [ autoPatchelfHook ];
 
-    buildInputs = lib.optionals stdenv.isLinux [ stdenv.cc.cc.lib ];
+    buildInputs = lib.optionals stdenv.hostPlatform.isLinux [ stdenv.cc.cc.lib ];
 
     dontAutoPatchelf = true;
 

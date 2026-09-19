@@ -34,7 +34,7 @@
             {
               home.username = "omnigent-fixture";
               home.homeDirectory =
-                if pkgs.stdenv.isDarwin then "/Users/omnigent-fixture" else "/home/omnigent-fixture";
+                if pkgs.stdenv.hostPlatform.isDarwin then "/Users/omnigent-fixture" else "/home/omnigent-fixture";
               home.stateVersion = "25.11";
             }
           ]
@@ -207,7 +207,7 @@
         ];
       };
       cliSystem =
-        if pkgs.stdenv.isDarwin then
+        if pkgs.stdenv.hostPlatform.isDarwin then
           (mkDarwin [ config.flake.modules.darwin.cli-tools ]).config
         else
           (mkLinux [ config.flake.modules.nixos.cli-tools ]).config;
@@ -1175,9 +1175,11 @@
         };
       credentialFixture =
         extra:
-        (if pkgs.stdenv.isDarwin then mkDarwin else mkLinux) (
+        (if pkgs.stdenv.hostPlatform.isDarwin then mkDarwin else mkLinux) (
           [
-            inputs.clan-core.${if pkgs.stdenv.isDarwin then "darwinModules" else "nixosModules"}.clanCore
+            inputs.clan-core.${
+              if pkgs.stdenv.hostPlatform.isDarwin then "darwinModules" else "nixosModules"
+            }.clanCore
             credentialModule
           ]
           ++ extra
@@ -1185,7 +1187,7 @@
       credentialConfig = (credentialFixture [ credentialPathAssertion ]).config;
       credentialGenerationFor =
         c:
-        if pkgs.stdenv.isDarwin then
+        if pkgs.stdenv.hostPlatform.isDarwin then
           c.environment.etc."omnigent/workers/cameron".source
         else
           c.home-manager.users.omnigent-cameron.home.activationPackage;
@@ -1202,7 +1204,7 @@
           builtins.toJSON {
             templates = c.sops.templates;
             supervisor =
-              if pkgs.stdenv.isDarwin then
+              if pkgs.stdenv.hostPlatform.isDarwin then
                 c.launchd.daemons.omnigent-host-cameron.serviceConfig
               else
                 c.systemd.services.omnigent-host-cameron.serviceConfig;
@@ -1212,7 +1214,7 @@
         (credentialGenerationFor c)
         (disclosureSettings c)
         (
-          if pkgs.stdenv.isDarwin then
+          if pkgs.stdenv.hostPlatform.isDarwin then
             c.launchd.daemons.omnigent-host-cameron.command
           else
             c.systemd.services.omnigent-host-cameron.serviceConfig.ExecStartPre
@@ -1238,7 +1240,7 @@
             file: credentialConfig.sops.placeholder."vars/shared/omnigent-cameron-linear-personal/${file}"
           );
           runtimePath =
-            if pkgs.stdenv.isDarwin then
+            if pkgs.stdenv.hostPlatform.isDarwin then
               credentialConfig.launchd.daemons.omnigent-host-cameron.environment.PATH
             else
               credentialConfig.systemd.services.omnigent-host-cameron.environment.PATH;
@@ -1248,25 +1250,25 @@
           keychainSource = ../home/ai/omnigent/keychain.py;
           keychainFixtures = ../home/ai/omnigent/keychain-fixtures.py;
           keychainHome =
-            if pkgs.stdenv.isDarwin then
+            if pkgs.stdenv.hostPlatform.isDarwin then
               toString stibnite.config.environment.etc."omnigent/workers/cameron".source
             else
               null;
           keychainLaunchd =
-            if pkgs.stdenv.isDarwin then toString stibnite.config.system.build.launchd else null;
+            if pkgs.stdenv.hostPlatform.isDarwin then toString stibnite.config.system.build.launchd else null;
           loginHelperSource = ../apps/omnigent-worker-login.sh;
           hostLauncher =
-            if pkgs.stdenv.isDarwin then
+            if pkgs.stdenv.hostPlatform.isDarwin then
               toString credentialConfig.launchd.daemons.omnigent-host-cameron.command
             else
               toString credentialConfig.systemd.services.omnigent-host-cameron.serviceConfig.ExecStartPre;
           systemActivation =
-            if pkgs.stdenv.isDarwin then
+            if pkgs.stdenv.hostPlatform.isDarwin then
               toString credentialConfig.system.activationScripts.script.source
             else
               null;
           installer =
-            if pkgs.stdenv.isDarwin then
+            if pkgs.stdenv.hostPlatform.isDarwin then
               credentialConfig.launchd.daemons.sops-install-secrets.command
             else
               null;
@@ -1351,7 +1353,7 @@
               cp "$reportPath" "$out"
             '';
       }
-      // lib.optionalAttrs pkgs.stdenv.isDarwin {
+      // lib.optionalAttrs pkgs.stdenv.hostPlatform.isDarwin {
         omnigent-worker-darwin =
           assert lib.assertMsg (lib.all (ok: ok) (lib.attrValues darwinCases))
             "Omnigent Darwin failures: ${
@@ -1376,7 +1378,7 @@
               cp artifacts.json "$out/"
             '';
       }
-      // lib.optionalAttrs pkgs.stdenv.isLinux {
+      // lib.optionalAttrs pkgs.stdenv.hostPlatform.isLinux {
         omnigent-worker-linux =
           assert lib.assertMsg (linuxFailed == [ ])
             "Omnigent Linux failures: ${lib.concatStringsSep ", " linuxFailed}; module assertions: ${builtins.toJSON (linuxFailures linux)}";

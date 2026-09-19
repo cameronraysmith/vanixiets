@@ -10,7 +10,7 @@
       ...
     }:
     let
-      isDarwin = pkgs.stdenv.isDarwin;
+      isDarwin = pkgs.stdenv.hostPlatform.isDarwin;
 
       # On Darwin, bitwarden is installed via homebrew MAS and enabled by default
       # On NixOS, it's disabled by default to avoid circular dependencies

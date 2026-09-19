@@ -12,7 +12,7 @@
         (pkgs.writeShellApplication {
           name = "ntfy-send";
           text = ''
-            export NTFY_CURL_BIN=${if pkgs.stdenv.isDarwin then "/usr/bin/curl" else "curl"}
+            export NTFY_CURL_BIN=${if pkgs.stdenv.hostPlatform.isDarwin then "/usr/bin/curl" else "curl"}
             ${builtins.readFile ./ntfy-send.sh}
           '';
           meta.description = "Send push notification via ntfy.zt (Apple-signed curl on Darwin)";

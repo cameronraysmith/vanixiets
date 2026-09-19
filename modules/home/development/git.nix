@@ -28,7 +28,7 @@ let
         signing = lib.mkIf personal (
           lib.mkDefault {
             key =
-              if pkgs.stdenv.isDarwin then
+              if pkgs.stdenv.hostPlatform.isDarwin then
                 config.sops.secrets.ssh-public-key.path # Bitwarden agent
               else
                 config.sops.secrets.ssh-signing-key.path; # passwordless private key
@@ -69,7 +69,7 @@ let
               ""
               "store --file ${config.home.homeDirectory}/.git-credentials"
             ]
-            ++ lib.optionals pkgs.stdenv.isDarwin [ "osxkeychain" ]
+            ++ lib.optionals pkgs.stdenv.hostPlatform.isDarwin [ "osxkeychain" ]
           );
           github = lib.mkIf (personal && flake.users.${config.home.username}.meta.githubUser != null) {
             user = flake.users.${config.home.username}.meta.githubUser;

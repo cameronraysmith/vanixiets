@@ -14,7 +14,7 @@
       home.packages =
         with pkgs;
         # Linux-only GUI apps (GTK apps often don't build on Darwin)
-        (lib.optionals pkgs.stdenv.isLinux [
+        (lib.optionals pkgs.stdenv.hostPlatform.isLinux [
           dino # Modern XMPP/Jabber client (GTK/Vala) - broken on Darwin due to libudev-zero dependency
         ])
         ++

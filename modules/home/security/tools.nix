@@ -17,7 +17,7 @@
           ssh-to-age
           yubikey-manager
         ]
-        ++ lib.optionals (!stdenv.isDarwin) [
+        ++ lib.optionals (!stdenv.hostPlatform.isDarwin) [
           # Darwin: system SSH uses Network.framework for zerotier feth routing
           # Nix openssh uses BSD sockets which can't route to virtual interfaces
           openssh

@@ -122,7 +122,7 @@
         ]
         # buildbot-effects CLI for local dispatch of hercules-ci-effects
         # (see buildbot-nix/docs/EFFECTS.md). Linux-only: depends on bwrap.
-        ++ lib.optionals pkgs.stdenv.isLinux [
+        ++ lib.optionals pkgs.stdenv.hostPlatform.isLinux [
           inputs'.buildbot-nix.packages.buildbot-effects
         ];
 

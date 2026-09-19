@@ -116,7 +116,7 @@
 
       config = {
         # Install incus client (Linux only - Darwin uses remote incus via Colima)
-        home.packages = lib.optionals pkgs.stdenv.isLinux [ pkgs.incus ];
+        home.packages = lib.optionals pkgs.stdenv.hostPlatform.isLinux [ pkgs.incus ];
 
         # Profile YAMLs (version-controlled)
         # Deployed on all platforms for reference; applied only when incus is available

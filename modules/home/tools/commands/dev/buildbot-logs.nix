@@ -17,7 +17,7 @@
         (pkgs.writeShellApplication {
           name = "buildbot-logs";
           text = ''
-            export BUILDBOT_SSH_BIN=${if pkgs.stdenv.isDarwin then "/usr/bin/ssh" else "ssh"}
+            export BUILDBOT_SSH_BIN=${if pkgs.stdenv.hostPlatform.isDarwin then "/usr/bin/ssh" else "ssh"}
             ${builtins.readFile ./buildbot-logs.sh}
           '';
           meta.description = "Fetch buildbot-nix build logs from magnetite via ssh";

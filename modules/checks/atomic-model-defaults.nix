@@ -26,7 +26,7 @@
           {
             home.username = "omnigent-fixture";
             home.homeDirectory =
-              if pkgs.stdenv.isDarwin then "/Users/omnigent-fixture" else "/home/omnigent-fixture";
+              if pkgs.stdenv.hostPlatform.isDarwin then "/Users/omnigent-fixture" else "/home/omnigent-fixture";
             home.stateVersion = "25.11";
           }
         ];

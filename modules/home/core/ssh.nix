@@ -24,7 +24,7 @@
           # Custom user config (highest priority for overrides)
           "${config.home.homeDirectory}/.ssh/custom_config"
         ]
-        ++ lib.optionals pkgs.stdenv.isDarwin [
+        ++ lib.optionals pkgs.stdenv.hostPlatform.isDarwin [
           # Darwin-specific includes
           "${config.home.homeDirectory}/.config/colima/ssh_config"
           "${config.home.homeDirectory}/.orbstack/ssh/config"
@@ -135,7 +135,7 @@
             # - Darwin: uses bitwarden desktop app SSH agent + keychain fallback
             # - Linux: uses bitwarden desktop app SSH agent (if enabled in bitwarden.nix)
             AddKeysToAgent =
-              if pkgs.stdenv.isDarwin then
+              if pkgs.stdenv.hostPlatform.isDarwin then
                 "yes" # add to both bitwarden agent and macOS keychain
               else
                 "confirm"; # prompt before adding to agent on linux
@@ -162,7 +162,7 @@
           # macOS-specific options.
           # Note: UseKeychain removed - only works with Apple's SSH, not Nix OpenSSH;
           # we use the Bitwarden SSH agent via SSH_AUTH_SOCK instead.
-          // lib.optionalAttrs pkgs.stdenv.isDarwin {
+          // lib.optionalAttrs pkgs.stdenv.hostPlatform.isDarwin {
             # XAuthLocation for X11 forwarding (XQuartz)
             XAuthLocation = "/opt/X11/bin/xauth";
           };
