@@ -1,6 +1,7 @@
 {
   inputs,
   lib,
+  bun,
   nodejs-slim,
   stdenv,
   svgo,
@@ -12,10 +13,10 @@
   makeFontsConf,
   runCommand,
   typstWithPackages,
+  vanixiets-docs-deps,
   ...
 }:
 let
-  bun2nix = inputs.bun2nix.packages.${stdenv.system}.default;
   playwrightDriver = inputs.playwright-web-flake.packages.${stdenv.system}.playwright-driver;
 
   # Nixpkgs chromium wrapper for nix build sandbox compatibility.
@@ -78,6 +79,23 @@ let
       autoPatchelf "$binary"
     done
   '';
+
+  # Consume the vanixiets-docs-deps output instead of calling bun2nix here.
+  # bun2nix's per-package derivations set allowSubstitutes = false and
+  # preferLocalBuild, so every consumer of bun2nix.hook forces its coordinator
+  # to build the whole bun cache locally whenever those build-time-only paths
+  # are absent. Routing every docs derivation through the one substitutable
+  # deps output keeps that cache in a single build graph.
+  # The tree is copied rather than symlinked because astro writes into
+  # node_modules/.astro and vite into node_modules/.vite during the build.
+  materialiseNodeModules = ''
+    # stdenv points HOME at the non-existent /homeless-shelter; astro's
+    # telemetry notice and vite's cache both write under $HOME.
+    export HOME=$(mktemp -d)
+    cp -R ${vanixiets-docs-deps}/node_modules node_modules
+    cp -R ${vanixiets-docs-deps}/packages/docs/node_modules packages/docs/node_modules
+    chmod -R u+w node_modules packages/docs/node_modules
+  '';
 in
 stdenv.mkDerivation (finalAttrs: {
   pname = "vanixiets-docs";
@@ -93,7 +111,6 @@ stdenv.mkDerivation (finalAttrs: {
   };
 
   nativeBuildInputs = [
-    bun2nix.hook
     nodejs-slim
     typstWithPackages
     svgo
@@ -106,12 +123,7 @@ stdenv.mkDerivation (finalAttrs: {
   # Patch the bundled workerd binary manually in buildPhase; $out has no ELFs.
   dontAutoPatchelf = true;
 
-  bunDeps = bun2nix.fetchBunDeps {
-    bunNix = ../../../bun.nix;
-  };
-
-  dontUseBunBuild = true;
-  dontUseBunInstall = true;
+  preBuild = materialiseNodeModules;
 
   # Skip miniflare's external fetch to workers.cloudflare.com/cf.json during
   # astro build; the placeholder fallback is sufficient for the prerender pass
@@ -173,14 +185,10 @@ stdenv.mkDerivation (finalAttrs: {
     inherit (finalAttrs) src;
 
     nativeBuildInputs = [
-      bun2nix.hook
       nodejs-slim
     ];
 
-    bunDeps = finalAttrs.bunDeps;
-    dontUseBunBuild = true;
-    dontUseBunInstall = true;
-    dontRunLifecycleScripts = true;
+    preBuild = materialiseNodeModules;
 
     buildPhase = ''
       runHook preBuild
@@ -213,7 +221,7 @@ stdenv.mkDerivation (finalAttrs: {
     inherit (finalAttrs) src;
 
     nativeBuildInputs = [
-      bun2nix.hook
+      bun
       nodejs-slim
     ]
     ++ lib.optionals stdenv.isLinux [ autoPatchelfHook ];
@@ -222,10 +230,7 @@ stdenv.mkDerivation (finalAttrs: {
 
     dontAutoPatchelf = true;
 
-    bunDeps = finalAttrs.bunDeps;
-    dontUseBunBuild = true;
-    dontUseBunInstall = true;
-    dontRunLifecycleScripts = true;
+    preBuild = materialiseNodeModules;
     __darwinAllowLocalNetworking = true;
 
     env = {

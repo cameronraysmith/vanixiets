@@ -25,6 +25,18 @@ stdenv.mkDerivation {
 
   bunDeps = bun2nix.fetchBunDeps {
     bunNix = ../../../bun.nix;
+    # bun.nix registers the workspace's own package as a cache entry sourced
+    # from the whole ./packages/docs tree, so every documentation content edit
+    # changed the bun cache and forced all of bun2nix's non-substitutable
+    # per-package derivations to rebuild. bun only needs the manifest to
+    # resolve the workspace entry, and the override's argument is deliberately
+    # discarded so the content tree leaves the dependency graph entirely.
+    overrides."@vanixiets/docs" =
+      _:
+      lib.fileset.toSource {
+        root = ../../../packages/docs;
+        fileset = ../../../packages/docs/package.json;
+      };
   };
 
   # Skip lifecycle (postinstall) scripts. semantic-release, its @semantic-release/*
