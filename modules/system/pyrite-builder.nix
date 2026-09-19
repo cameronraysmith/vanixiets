@@ -6,11 +6,11 @@
 # nix.buildMachines; this module never assigns nix.buildMachines directly.
 #
 # pyrite is the only machine in the fleet with /dev/kvm (see the kvm-declaration
-# module), so it is the only host that builds a kvm-requiring derivation, such
-# as a vmTests output, with hardware acceleration. It is not the only host that
-# can build one at all: stibnite's rosetta-builder entry also advertises kvm,
-# on the evidence that qemu there falls back to TCG and completes the build
-# emulated, so on stibnite the two are alternatives and pyrite is the fast one.
+# module), so it is the only host that builds an x86_64-linux kvm-requiring
+# derivation, such as a vmTests output, at all. stibnite's rosetta-builder
+# entries advertise kvm for aarch64-linux only — qemu there falls back to TCG
+# and completes such a build emulated, which is the only route for that system
+# — so x86_64-linux kvm work never ties emulation against real acceleration.
 #
 # It is also a laptop that is often but not always reachable, and nix 2.35
 # handles that as follows (src/nix/build-remote/build-remote.cc:250-259 and
@@ -26,10 +26,10 @@
 #     `Cannot build '<drv>' ... missing system features / Required features:
 #     {kvm}`. There is no silent degradation to a TCG-emulated or unaccelerated
 #     local build.
-# The second case is the intended outcome on a consumer with no other kvm
-# machine. vmTests are opt-in and outside pull-request gating, so an offline
-# pyrite costs a manual re-run and never a red pull request; on stibnite it
-# costs an emulated run on the rosetta builder instead.
+# The second case is the intended outcome for x86_64-linux kvm work on every
+# consumer, stibnite included. vmTests are opt-in and outside pull-request
+# gating, so an offline pyrite costs a manual re-run and never a red pull
+# request.
 { lib, ... }:
 let
   mkOptions =
