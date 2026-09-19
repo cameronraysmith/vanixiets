@@ -9,8 +9,8 @@ let
   release = kernel.modDirVersion;
   kernelBuild = "${kernel.dev}/lib/modules/${release}/build";
 in
-assert lib.assertMsg (kernel.version == "6.18.42" && release == "6.18.42")
-  "hci-uart-macbook: only Linux 6.18.42 has been checked; revalidate source, prepared configuration, ABI and effective module selection before updating";
+assert lib.assertMsg (kernel.version == "6.18.52" && release == "6.18.52")
+  "hci-uart-macbook: only Linux 6.18.52 has been checked; revalidate source, prepared configuration, ABI and effective module selection before updating";
 kernel.stdenv.mkDerivation {
   pname = "hci-uart-macbook";
   version = "0-unstable-2026-09-14-${release}";
@@ -48,7 +48,7 @@ kernel.stdenv.mkDerivation {
     mkdir bluetooth unpatched
     tar -xJf "$src" --strip-components=3 -C bluetooth linux-${kernel.version}/drivers/bluetooth
     cp -r bluetooth/. unpatched/
-    echo '41872454a09edd1cf9404ba28fca6338315175024d9772a336a97f3ce9735621  bluetooth/hci_bcm.c' | sha256sum -c -
+    echo '7745ad8c06dd7145004524e35f31f7860d067cc3521ea30a5588085155c2e683  bluetooth/hci_bcm.c' | sha256sum -c -
     runHook postUnpack
   '';
   patchPhase = ''
@@ -79,9 +79,9 @@ kernel.stdenv.mkDerivation {
     ln -s ${kernel.dev}/vmlinux prepared/vmlinux
     test "$(cat prepared/include/config/kernel.release)" = '${release}'
     sha256sum -c <<'HASHES'
-    43c599b950c397da0d35cab5c5ea490ac045a95ad34be14320ecdcbea9823667  prepared/.config
-    75241088e6443b28532ad1b5bd542542fb33822596a924b3f779f571cd40862e  prepared/Module.symvers
-    61ddb154e6dcdc62b6d4aab2f6cf9c2623856e30aa0dca7340e5ca0f49c0ed72  prepared/include/generated/autoconf.h
+    8dfad899daccf5ffe6cad4a1bfa2073d0e87bc5ddc05380963707e9759243b63  prepared/.config
+    9de95ac055ee7c5a118d8fb4b54d137912eed3a2eefa35cc0b1e60b8adf816ee  prepared/Module.symvers
+    a659b0d52a78c4fe47723096a43fb78eacd493ced501680960dfe803cf9388a3  prepared/include/generated/autoconf.h
     HASHES
     flagsArray=()
     concatTo flagsArray makeFlags makeFlagsArray
@@ -107,7 +107,7 @@ kernel.stdenv.mkDerivation {
     module="$out/lib/modules/${release}/updates/bluetooth/hci_uart.ko"
     test "$(find "$out" -type f | wc -l)" -eq 1
     test "$(modinfo -F name "$module")" = hci_uart
-    test "$(modinfo -F srcversion "$module")" = 38434B5BC4D13B1F87D266E
+    test "$(modinfo -F srcversion "$module")" = C2A6853CD07EA9F1F38B35A
     case "$(modinfo -F vermagic "$module")" in
       '${release} '*) ;;
       *) echo 'Module/kernel release mismatch' >&2; exit 1 ;;

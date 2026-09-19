@@ -11,8 +11,8 @@ let
   kernelBuild = "${kernel.dev}/lib/modules/${kernel.modDirVersion}/build";
   appleFlags = "-DAPPLE_PINSENSE_FIXUP -DAPPLE_CODECS -DCONFIG_SND_HDA_RECONFIG=1 -Wno-unused-variable -Wno-unused-function";
 in
-assert lib.assertMsg (kernel.version == "6.18.42")
-  "snd-hda-macbookpro: only Linux 6.18.42 has been checked; revalidate the source/header layout and module selection before changing this boundary";
+assert lib.assertMsg (kernel.version == "6.18.52")
+  "snd-hda-macbookpro: only Linux 6.18.52 has been checked; revalidate the source/header layout and module selection before changing this boundary";
 stdenv.mkDerivation {
   pname = "snd-hda-macbookpro";
   version = "0-unstable-2026-09-06-${kernel.modDirVersion}";
