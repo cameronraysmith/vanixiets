@@ -100,6 +100,10 @@ in
 
       security.pam.services.sudo_local.touchIdAuth = true;
 
+      # Operator claim (modules/darwin/sshd-declaration.nix): rosegold accepts
+      # inbound SSH so it can be deployed to from stibnite over zerotier.
+      declaredSshd.serving = true;
+
       # Increase MaxAuthTries to accommodate agent forwarding with many keys
       # Default is 6, but Bitwarden SSH agent may have 10+ keys loaded
       # nix-darwin writes this to /etc/ssh/sshd_config.d/100-nix-darwin.conf

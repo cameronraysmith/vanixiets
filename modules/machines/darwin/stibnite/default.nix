@@ -33,7 +33,6 @@ in
         base
         casks
         ssh-ca-trust
-        sshd-server
         ssh-known-hosts
         colima
         dnscrypt-proxy
@@ -124,6 +123,10 @@ in
       };
 
       security.pam.services.sudo_local.touchIdAuth = true;
+
+      # Operator claim (modules/darwin/sshd-declaration.nix): stibnite serves
+      # SSH for remote deployment and as the fleet's darwin build host.
+      declaredSshd.serving = true;
 
       # Increase MaxAuthTries to accommodate agent forwarding with many keys
       # Default is 6, but Bitwarden SSH agent may have 10+ keys loaded
