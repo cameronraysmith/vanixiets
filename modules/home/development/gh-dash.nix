@@ -11,10 +11,41 @@
 { ... }:
 {
   flake.modules.homeManager = {
+    # Landing in this repository is queue-mediated, and gh-dash's built-in `m`
+    # cannot express that: MergePR (internal/tui/components/tasks/pr.go) hardcodes
+    # `gh pr merge <N> -R <repo>` with no flags. Our default-branch rulesets
+    # require nixbot/nix-eval, nixbot/nix-build, nixbot/effects, and the App's
+    # gitea-mq, so a fresh PR is BLOCKED and gh's canMerge (pkg/cmd/pr/merge in
+    # cli/cli) refuses with "add the `--auto` flag" — gh-dash then reports the
+    # failure. gitea-mq is also not GitHub's native merge queue, so gh's
+    # isMergeQueueEnabled path never fires and `--auto` stays the enqueue signal.
+    #
+    # Custom bindings are matched before built-ins (internal/tui/ui.go), so `m`
+    # shadows the built-in merge with the enqueue that actually works, and `M`
+    # covers the registered-stack case, where auto-merge on any member is
+    # forbidden and the merge-queue label on the topmost PR is the authorization.
+    # Both are non-interactive: one keystroke is a merge authorization.
+    #
+    # mkDefault on both this list and the tuicr list below keeps them at equal
+    # priority so the module system concatenates them; a plain list here would
+    # outrank the mkDefault one and silently drop the review binding.
     development =
       { lib, ... }:
       {
         programs.gh-dash.enable = lib.mkDefault true;
+
+        programs.gh-dash.settings.keybindings.prs = lib.mkDefault [
+          {
+            key = "m";
+            name = "enqueue";
+            command = "gh pr merge --auto --rebase --repo {{.RepoName}} {{.PrNumber}}";
+          }
+          {
+            key = "M";
+            name = "enqueue stack";
+            command = "gh pr edit --repo {{.RepoName}} {{.PrNumber}} --add-label merge-queue";
+          }
+        ];
       };
 
     # Review the selected PR in tuicr, in a new herdr tab.
