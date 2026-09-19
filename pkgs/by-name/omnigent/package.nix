@@ -32,9 +32,16 @@ let
       hash = "sha256-Z2UwxAb/XF6dtP7ai/PlX5MI+W87yUQ9+iYvPBS28pM=";
     };
 
+    # openai<2.45 is upstream's transitive cap on openai-agents, not on omnigent's
+    # own openai surface; upstream holds it only because its websockets<15 macOS
+    # pin blocks openai-agents 0.18.2. We already relax websockets (16.1), so the
+    # cap does not bind. Accepted tradeoff: nixpkgs' openai-agents 0.18.1 omits
+    # prompt_cache_options, which is optional in openai 2.53, so the agents path
+    # loses prompt-cache control; bumping the override to 0.18.2 would restore it.
     pythonRelaxDeps = [
       "argon2-cffi"
       "cachetools"
+      "openai"
       "packaging"
       "rich"
       "websockets"
