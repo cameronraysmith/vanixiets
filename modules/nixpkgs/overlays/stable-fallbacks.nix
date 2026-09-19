@@ -19,7 +19,7 @@
         # Cross-platform stable fallbacks (all systems)
         # (Add as needed)
       }
-      // (prev.lib.optionalAttrs prev.stdenv.isDarwin {
+      // (prev.lib.optionalAttrs prev.stdenv.hostPlatform.isDarwin {
         # Darwin-wide stable fallbacks (aarch64-only fleet)
         # (Add as needed)
       })
@@ -27,7 +27,7 @@
         # aarch64-darwin specific stable fallbacks
         # (Add as needed)
       })
-      // (prev.lib.optionalAttrs prev.stdenv.isLinux {
+      // (prev.lib.optionalAttrs prev.stdenv.hostPlatform.isLinux {
         # Linux-wide stable fallbacks
         # (Add Linux-specific stable fallbacks here as needed)
       })
