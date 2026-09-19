@@ -59,6 +59,26 @@ in
       # Override base.nix which sets stateVersion = 5
       system.stateVersion = lib.mkForce 4;
 
+      # Known gap: no environment.etc."nix/nix.conf".knownSha256Hashes.
+      # stibnite, argentum and rosegold each carry the sha256 of the
+      # /etc/nix/nix.conf that the nix installer left on that specific Mac.
+      # The value is a property of the machine, not of this repository: it
+      # cannot be computed here, and another host's hash is simply the wrong
+      # file. blackphos is semi-permanently offline, so it cannot be read now,
+      # and no placeholder is supplied because a wrong hash never matches and
+      # would only look like the gap was closed.
+      #
+      # It matters only if /etc/nix/nix.conf there is still an unmanaged
+      # regular file. nix-darwin's /etc check (modules/system/etc.nix) skips
+      # any /etc entry already symlinked into /etc/static, so an already
+      # activated blackphos needs nothing; otherwise activation aborts with
+      # "Unexpected files in /etc" naming /etc/nix/nix.conf and refuses to
+      # overwrite it.
+      #
+      # To close it when the machine next boots:
+      #   readlink /etc/nix/nix.conf        # /etc/static/... means no hash needed
+      #   shasum -a 256 /etc/nix/nix.conf   # otherwise add the digest here
+
       # Primary user for homebrew and system-level user operations
       # crs58 is the admin user on blackphos
       system.primaryUser = "crs58";
