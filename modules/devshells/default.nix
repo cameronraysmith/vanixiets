@@ -54,6 +54,24 @@
               echo "apm-context-compile: skipped (run 'just agents-context' to regenerate AGENTS.md/CLAUDE.md manually)" >&2
             fi
           fi
+        ''
+        + lib.optionalString pkgs.stdenv.hostPlatform.isLinux ''
+          # WPE WebKit aborts with "Could not create EGL display: no supported
+          # platform available" wherever there is no DRM device -- headless
+          # servers, containers, and the nix build sandbox alike -- because
+          # playwright-web-flake ships no software EGL vendor. Point libglvnd at
+          # mesa's llvmpipe vendor, but only when /dev/dri is absent, so a
+          # workstation keeps its hardware driver. The hermetic check sets the
+          # same two variables unconditionally (pkgs/by-name/vanixiets-docs).
+          if [[ ! -d /dev/dri ]]; then
+            export __EGL_VENDOR_LIBRARY_FILENAMES="${pkgs.mesa}/share/glvnd/egl_vendor.d/50_mesa.json"
+            export LD_LIBRARY_PATH="${
+              lib.makeLibraryPath [ pkgs.mesa ]
+            }''${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+          fi
+          # The fork drops webkit revisionOverrides, so playwright resolves the
+          # linux webkit directory under the ubuntu-24.04 name.
+          export PLAYWRIGHT_HOST_PLATFORM_OVERRIDE="ubuntu-24.04"
         '';
 
         # The playwright-web-flake default devShell is intentionally not inherited;
@@ -62,9 +80,10 @@
         # darwin webkit layout whose newest base build is macOS-26 (rev 2359,
         # matching playwright 1.63.0) alongside a macOS-14 fallback, plus the
         # Linux webkit builds, so the all-browser local `just docs-test` passes.
-        # The Chrome-for-Testing sandbox crash that forces the nixpkgs-chromium
-        # wrapper is specific to the hermetic e2e check in
-        # pkgs/by-name/vanixiets-docs/package.nix, not this interactive devShell.
+        # The hermetic e2e check in pkgs/by-name/vanixiets-docs/package.nix now
+        # uses this same browser set on both platforms; the nixpkgs-chromium
+        # wrapper it used to carry was removed after a differential experiment
+        # disproved the Chrome-for-Testing sandbox-crash premise behind it.
         PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD = "1";
         PLAYWRIGHT_BROWSERS_PATH = "${inputs'.playwright-web-flake.packages.playwright-driver.browsers}";
 
