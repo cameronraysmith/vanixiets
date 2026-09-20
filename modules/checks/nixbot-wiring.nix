@@ -7,8 +7,9 @@
 # secrets, delivers an empty set, and every effect stops at its own
 # missing-secret guard — exactly what an unwired service does. The check reads
 # the name off the evaluated unit, so it exercises nixbot's own module code
-# rather than a transcription of it, and also pins the allowlists, the cache
-# step, the shared secrets files, and the deliberately empty sandbox options.
+# rather than a transcription of it, and also pins the allowlists, the
+# binary-cache uploader set, the shared secrets files, and the deliberately
+# empty sandbox options.
 #
 # The repository-root config file is nixbot.toml. nixbot prefers that name over
 # the legacy buildbot-nix.toml it also still reads
@@ -105,7 +106,21 @@
             buildbotUserAllowlist = buildbot.github.userAllowlist;
             buildbotRepoAllowlist = buildbot.github.repoAllowlist;
             nixbotRepoAllowlist = nixbot.github.repoAllowlist;
-            postBuildStepNames = map (step: step.name) nixbot.postBuildSteps;
+            # Binary-cache upload is nixbot's uploader set since upstream's
+            # niks3 integration stopped emitting a per-attribute post-build
+            # step and started registering a whole-closure uploader instead
+            # (Mic92/nixbot cb0e0719, nixosModules/niks3.nix:40). An empty
+            # uploader set is a service that builds correctly and uploads
+            # nothing, which is indistinguishable from success by inspection,
+            # so it is asserted on its own line rather than left to fall out
+            # of a structural diff of the names. legacyPostBuildStepNames
+            # catches the inverse regression: postBuildSteps still exists
+            # upstream and unaliased, so something re-introducing a post-build
+            # step in place of an uploader would otherwise be silent.
+            uploadsSomewhere = nixbot.uploaders != [ ];
+            uploaderNames = map (uploader: uploader.name) nixbot.uploaders;
+            uploaderCommandsNonEmpty = lib.all (uploader: uploader.command != [ ]) nixbot.uploaders;
+            legacyPostBuildStepNames = map (step: step.name) nixbot.postBuildSteps;
             niks3ServerUrl = nixbot.niks3.serverUrl;
 
             # Effects run in the sandbox the service configures. Nothing either
@@ -146,7 +161,10 @@
               "cameronraysmith/vanixiets"
               "sciexp/ironstar"
             ];
-            postBuildStepNames = [ "Upload to niks3" ];
+            uploadsSomewhere = true;
+            uploaderNames = [ "niks3" ];
+            uploaderCommandsNonEmpty = true;
+            legacyPostBuildStepNames = [ ];
             niks3ServerUrl = "https://niks3.scientistexperience.net";
             extraSandboxPaths = [ ];
             mountables = [ ];

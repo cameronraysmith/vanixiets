@@ -147,14 +147,17 @@
 
         # Push successful builds to the fleet's binary cache, mirroring
         # buildbot.nix:158-163. Without it the service builds correctly and
-        # uploads nothing: postBuildSteps defaults to the empty list, so no
+        # uploads nothing: the uploader set defaults to the empty list, so no
         # upload is attempted and no signal is emitted anywhere. The public URL
         # rather than a local socket keeps the endpoint reachable from future
         # remote builders.
         #
-        # The upstream integration marks its post-build step warnOnly, so an
-        # upload failure leaves the build green and logs a warning. That is the
-        # same bargain the incumbent already takes.
+        # This option surface is ours; the mechanism behind it is not. Upstream
+        # implements these four settings by registering an entry in
+        # services.nixbot.uploaders (nixosModules/niks3.nix), a whole-closure
+        # push queue that replaced the per-attribute post-build step it used to
+        # emit. Uploader failures are logged and never fail a build, which is
+        # the same bargain the incumbent's warnOnly post-build step takes.
         niks3 = {
           enable = true;
           serverUrl = "https://niks3.scientistexperience.net";
