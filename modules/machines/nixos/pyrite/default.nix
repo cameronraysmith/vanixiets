@@ -500,6 +500,80 @@ in
       # modules/system/nix-settings.nix.
       nix.settings.trusted-users = [ "builder" ];
 
+      # Local build concurrency, pyrite's view of ITSELF — distinct from
+      # services.pyrite-builder's maxJobs = 1, which is how many jobs stibnite
+      # dispatches TO this machine. Without these two settings the daemon runs
+      # nix's defaults, max-jobs = auto (4 here) and cores = 0 (every thread per
+      # job), i.e. four concurrent derivations each entitled to all four threads.
+      #
+      # Hardware: MacBookPro14,1, Intel i5-7360U, 2 physical cores / 4 threads,
+      # 2.3 GHz base / 3.6 turbo, 15 W mobile; 15.5 GiB RAM; 15.5 GiB of zstd
+      # zram swap; ZFS root whose ARC c_max is 14.5 GiB. It is also a daily
+      # driver running a niri session, ~7 GiB resident before any build starts.
+      #
+      # 2 x 2 = 4, the thread count, with no oversubscription on either axis.
+      # modules/checks/pyrite-nix-concurrency.nix asserts that product against
+      # the thread count in machines/pyrite/facter.json rather than against
+      # these literals, so a retune stays legal and an oversubscription does not.
+      #
+      # Measured, not inferred (logs/pyrite-nix-concurrency-report.md): one
+      # fixed workload of eight from-source builds (re2, fmt, capnproto,
+      # ripgrep, fd, hyperfine, yaml-cpp, jq, each salted so nothing
+      # substitutes) run at six (max-jobs, cores) points on this machine,
+      # sampled every 5 s. Wall clock, peak load1, min MemAvailable:
+      #
+      #   1 x 4   1125 s    5.28   4814 MiB
+      #   2 x 2    981 s    4.37   6361 MiB   (chosen)
+      #   2 x 4    954 s    7.64   4795 MiB
+      #   4 x 4    985 s   15.44   4117 MiB   (nix's default)
+      #   6 x 2   1094 s   12.03   6329 MiB
+      #   8 x 4   1047 s   27.34   3621 MiB
+      #
+      # No run swapped a page and no run produced an OOM kill. Parallelism is
+      # worth one step and no more: 1125 -> 981 s is 13% for the first extra
+      # job. Beyond that the points are NOT flat — 6 x 2 at 1094 s is 15% slower
+      # than 2 x 4 at 954 s (1094/954 = 1.147). The default is not faster than
+      # 2 x 2 (985 against 981 s) and costs peak load 15.4 against 4.4 and
+      # 2.2 GiB of memory low-water (4117 against 6361 MiB). The 27 s (2.8%)
+      # that 2 x 4 wins costs 1.5 GiB of that low-water mark (4795 against
+      # 6361 MiB) on a machine someone is typing on, so 2 x 2 takes it.
+      #
+      # Why there is a ceiling at all, stated at the strength the evidence
+      # supports. A synthetic allocator probe (N processes x G GiB, touched
+      # continuously) with COMPRESSIBLE fill absorbed 6 x 3 = 18 GiB of demand
+      # on a 15.5 GiB box with no OOM and stayed responsive throughout, because
+      # zram compressed those pages 6729/188 = 36:1. The same probe writing
+      # per-page-random data compressed 13417/12731 = 1.05:1 — swapping freed
+      # nothing — and the machine livelocked and left the network. It did not
+      # come back on its own. The kernel OOM killer never fired: journalctl -k
+      # -b -1 matching killed process|out of memory|oom-kill|oom_reaper returns
+      # ZERO lines. The userspace safeguards did not save it either, though both
+      # were armed (oom_score_adj = 1000 on every allocator, plus a sampler set
+      # to kill the probe above 11 GiB of swap), and the sampler's own cadence
+      # shows why: 30-odd samples per compressible run against 4 and 3 for the
+      # two incompressible ones, with a 247 s gap between consecutive samples of
+      # a 2 s loop. Userspace, safeguards included, was not being scheduled. The
+      # operator rebooted the machine; boot -1 ends in a clean deliberate reboot
+      # at 17:51, filesystems synced, not a self-heal. So past the memory edge
+      # this hardware does not degrade gracefully, and 15.5 GiB of zram is
+      # headroom in proportion to the workload's compressibility, nothing more.
+      # That probe is adversarial and is NOT a model of a nix build — the worst
+      # of the six build points still had 3.5 GiB of MemAvailable left — but it
+      # is why raising max-jobs is a re-measurement rather than an edit.
+      #
+      # Revisit if the machine is re-RAMed or replaced, or if the workload
+      # shifts to derivations with much larger link peaks than these (LLVM,
+      # chromium, LTO-heavy Rust): the binding constraint is memory per
+      # concurrent job, not CPU. ARC is deliberately left unbounded here — under
+      # pressure it fell from ~5.5 GiB to 348 MiB, below its own c_min of
+      # ~0.5 GiB, and was never the thing that ran the machine out of memory;
+      # bounding c_max for the KVM guests is a separate change with its own
+      # measurement.
+      nix.settings = {
+        max-jobs = 2;
+        cores = 2;
+      };
+
       # Bridge NixOS-level sops to home-manager for user secret key delivery.
       # sopsIdentity defaults to flake.users.cameron.meta.sopsAgeKeyId
       # ("crs58" via alias-fold inheritance).
