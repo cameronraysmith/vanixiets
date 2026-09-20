@@ -32,11 +32,11 @@
     niri-flake.inputs.nixpkgs-stable.follows = "nixpkgs";
 
     dms-src = {
-      url = "github:AvengeMedia/DankMaterialShell/aa4b99def48637d86a69620c0a8f3cc6aa0c4092";
+      url = "github:AvengeMedia/DankMaterialShell/03a3ef28d2d7a123f6fce7fdccfb4f2e5d20ccd6";
       flake = false;
     };
 
-    zen-browser.url = "github:youwen5/zen-browser-flake/4036109214cf20632000558935bd823b901fa886";
+    zen-browser.url = "github:youwen5/zen-browser-flake/9c1767f705262bf08498877fd1053b6a6db12a9f";
     zen-browser.inputs.nixpkgs.follows = "nixpkgs";
 
     sops-nix.url = "github:Mic92/sops-nix";

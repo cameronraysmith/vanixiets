@@ -4,6 +4,34 @@
   lib,
   ...
 }:
+let
+  # flake.lock carries both halves of every input pin: `original` is the
+  # specification written in flake.nix, `locked` is what it resolved to. When
+  # flake.nix pins an input by explicit revision, `original.rev` is that
+  # revision, so the expected value can be *derived* from the declaration
+  # instead of being restated as a literal here.
+  #
+  # Restating it was two hand-synchronised sources of truth for one fact, and
+  # it failed every digest bump of the input by construction, independent of
+  # whether the new revision was good (cameronraysmith/vanixiets#3102, #3101).
+  #
+  # The derived form is not a tautology: the actual value is read off the
+  # evaluated input and the expected value off the declaration, so it still
+  # fails if the input stops being pinned to an exact revision (a branch or
+  # tag pin leaves `original.rev` null) or if the resolved revision ever
+  # disagrees with the declared one. What it no longer does is assert which
+  # revision that is; the pinned package's *identity* is asserted separately,
+  # by the conjuncts that compare the packages actually installed against the
+  # packages this input provides.
+  #
+  # Input names are resolved through the root node's input map rather than
+  # indexed directly, because a lock node's key is not its input name once nix
+  # deduplicates: the root's "nixpkgs" is the node "nixpkgs_9" here, and any
+  # input can acquire such a suffix as the graph changes.
+  lock = builtins.fromJSON (builtins.readFile ../../flake.lock);
+  declaredRev = name: lock.nodes.${lock.nodes.root.inputs.${name}}.original.rev or null;
+  pinnedToDeclaredRev = name: input: declaredRev name != null && input.rev == declaredRev name;
+in
 {
   perSystem =
     { system, ... }:
@@ -180,7 +208,7 @@
         {
           message = "pyrite desktop: one pinned wrapped Zen Browser in cameron's home";
           assertion =
-            inputs.zen-browser.rev == "4036109214cf20632000558935bd823b901fa886"
+            pinnedToDeclaredRev "zen-browser" inputs.zen-browser
             && inputs.zen-browser.inputs.nixpkgs.outPath == inputs.nixpkgs.outPath
             &&
               builtins.length (
@@ -201,8 +229,11 @@
             && toString home.programs.quickshell.package == toString pkgs.quickshell
             && pkgs.dms-shell.version == "1.6.1"
             && pkgs.dms-greeter.version == "1.6.2"
+            # niri-flake is branch-tracked in flake.nix, so there is no
+            # declared revision to derive an expectation from; this literal is
+            # a lock pin rather than a duplicated one.
             && inputs.niri-flake.rev == "db2615fc6b3f75539ec681a984e3311b8d79ede0"
-            && inputs.dms-src.rev == "aa4b99def48637d86a69620c0a8f3cc6aa0c4092"
+            && pinnedToDeclaredRev "dms-src" inputs.dms-src
             &&
               map toString options.programs.niri.enable.declarations == [
                 "${inputs.nixpkgs}/nixos/modules/programs/wayland/niri.nix"
