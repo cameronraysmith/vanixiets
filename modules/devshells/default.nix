@@ -58,10 +58,12 @@
 
         # The playwright-web-flake default devShell is intentionally not inherited;
         # select the browser set explicitly. Use the full flake set (chromium,
-        # firefox, webkit) on both platforms: the fork carries working macOS-15
-        # (rev 2311) and Linux webkit builds, so the all-browser local `just
-        # docs-test` passes. The Chrome-for-Testing sandbox crash that forces the
-        # nixpkgs-chromium wrapper is specific to the hermetic e2e check in
+        # firefox, webkit) on both platforms: the fork carries a side-by-side
+        # darwin webkit layout whose newest base build is macOS-26 (rev 2359,
+        # matching playwright 1.63.0) alongside a macOS-14 fallback, plus the
+        # Linux webkit builds, so the all-browser local `just docs-test` passes.
+        # The Chrome-for-Testing sandbox crash that forces the nixpkgs-chromium
+        # wrapper is specific to the hermetic e2e check in
         # pkgs/by-name/vanixiets-docs/package.nix, not this interactive devShell.
         PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD = "1";
         PLAYWRIGHT_BROWSERS_PATH = "${inputs'.playwright-web-flake.packages.playwright-driver.browsers}";

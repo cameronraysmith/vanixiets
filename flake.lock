@@ -1425,16 +1425,16 @@
         ]
       },
       "locked": {
-        "lastModified": 1785682393,
-        "narHash": "sha256-Q5hZzuFEypDC1Q0iZbtwdQU96EgyW4XhcFl4GucSWX0=",
+        "lastModified": 1789934348,
+        "narHash": "sha256-PAIOe0R4myYyaf9dQV56zWzjnq52RQplNebpeu33xtQ=",
         "owner": "cameronraysmith",
         "repo": "playwright-web-flake",
-        "rev": "4c6e71dffbb62f6e453a0c0a7c5c9ebcd481954e",
+        "rev": "dad87258e45f8a4bc606de26438e7e4eb3733bb6",
         "type": "github"
       },
       "original": {
         "owner": "cameronraysmith",
-        "ref": "fix-webkit-darwin-mac15-arm64",
+        "ref": "1.63.0-mac26.2",
         "repo": "playwright-web-flake",
         "type": "github"
       }

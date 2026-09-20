@@ -1,4 +1,4 @@
-name: PR Check Fast-forward
+name: PR Check
 on:
   pull_request:
     types: [opened, reopened, synchronize]
@@ -17,3 +17,32 @@ jobs:
         with:
           merge: false
           comment: on-error
+
+  # The npm playwright pins and the playwright-web-flake input are two halves of
+  # one version. pkgs/by-name/vanixiets-docs/package.nix materialises browser
+  # directories named from the flake driver's browsers.json revision, while the
+  # npm playwright-core resolves them from its own bundled revision; if the two
+  # versions differ the lookup misses and every browser test fails to launch.
+  # `just bun-drift-check` asserts the equality in about a second. Before this
+  # job existed nothing enforced it in a workflow, so PR #3097 -- a lock-only
+  # bump of the flake half -- surfaced as a 25-second
+  # checks.x86_64-linux.package-vanixiets-docs-test-e2e failure with nine dead
+  # Chromium specs instead of a one-line gate failure naming the real cause.
+  playwright-drift-check:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout PR head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Setup nix
+        uses: ./.github/actions/setup-nix
+        with:
+          installer: quick
+          system: x86_64-linux
+
+      - name: Check playwright flake/npm version drift
+        run: nix develop --accept-flake-config -c just bun-drift-check

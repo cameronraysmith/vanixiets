@@ -121,7 +121,7 @@
     bun2nix.inputs.systems.follows = "systems";
     bun2nix.inputs.treefmt-nix.follows = "treefmt-nix";
 
-    playwright-web-flake.url = "github:cameronraysmith/playwright-web-flake/fix-webkit-darwin-mac15-arm64";
+    playwright-web-flake.url = "github:cameronraysmith/playwright-web-flake/1.63.0-mac26.2";
     playwright-web-flake.inputs.nixpkgs.follows = "nixpkgs";
 
     nuenv.url = "github:hallettj/nuenv/writeShellApplication";
