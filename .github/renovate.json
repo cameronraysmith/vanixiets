@@ -69,6 +69,14 @@
       "groupName": "cloudflare-workers-tooling"
     },
     {
+      "description": "Move astro, its integrations and starlight in one PR. Renovate's built-in monorepo preset already groups astro with @astrojs/* because they share the withastro/astro repository, but @astrojs/starlight lives in withastro/starlight, so it arrives in a PR of its own. That is not a merge-order inconvenience, it is a broken tree: @astrojs/starlight 0.42.2 declares peerDependencies astro ^7.2.10 and @astrojs/markdown-remark ^7.3.0, while this repo pins astro 7.2.9 and @astrojs/markdown-remark ^7.2.4, and the resulting build fails with \"@astrojs/markdown-remark is too old to render .mdx files\". The grouping criterion here is a shared peer-dependency floor, not a shared upstream repository. @astrojs/** deliberately includes @astrojs/cloudflare, which has peers on both astro ^7.2.0 and wrangler ^4.125.0 and so straddles this group and cloudflare-workers-tooling: packageRules are applied in array order and a later match overwrites an earlier one, so placing this rule after the cloudflare rule makes the astro group the deliberate winner. The astro floor is the one that breaks the build on a minor bump; the wrangler floor is a caret range that any 4.x satisfies, and a wrangler major would surface as a docs build failure rather than a silent mismatch.",
+      "matchPackageNames": [
+        "astro",
+        "@astrojs/**"
+      ],
+      "groupName": "astro"
+    },
+    {
       "description": "conventional-changelog-conventionalcommits@10 requires conventional-changelog-writer@9, which semantic-release@25's bundled @semantic-release/release-notes-generator@14 does not resolve; hold on 9.x until semantic-release ships a compatible generator",
       "matchPackageNames": [
         "conventional-changelog-conventionalcommits"

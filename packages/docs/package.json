@@ -38,14 +38,14 @@
     "test-release": "semantic-release --dry-run --no-ci"
   },
   "dependencies": {
-    "@astrojs/cloudflare": "14.2.5",
-    "@astrojs/markdown-remark": "^7.2.4",
-    "@astrojs/starlight": "0.41.10",
-    "astro": "7.2.9"
+    "@astrojs/cloudflare": "14.3.2",
+    "@astrojs/markdown-remark": "^7.3.1",
+    "@astrojs/starlight": "0.42.2",
+    "astro": "7.3.3"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.14",
-    "@cloudflare/vite-plugin": "^1.54.2",
+    "@cloudflare/vite-plugin": "^1.57.0",
     "@playwright/test": "1.63.0",
     "@semantic-release/changelog": "^7.0.0",
     "@semantic-release/git": "^11.0.1",
@@ -61,7 +61,7 @@
     "starlight-katex": "^0.0.4",
     "starlight-links-validator": "0.26.0",
     "vitest": "^5.0.1",
-    "wrangler": "^4.127.1"
+    "wrangler": "^4.136.0"
   },
   "release": {
     "extends": "semantic-release-monorepo",
