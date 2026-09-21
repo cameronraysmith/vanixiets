@@ -310,17 +310,17 @@
     "dms-src": {
       "flake": false,
       "locked": {
-        "lastModified": 1789922350,
-        "narHash": "sha256-DwRSW42uP8dFGp3c7LO22HuVhr/1txeKoyzlDYb7K6g=",
+        "lastModified": 1789958440,
+        "narHash": "sha256-fWzhqM/DzWChcg0gWgc4C4Mh/013KIpb+5F66818jBE=",
         "owner": "AvengeMedia",
         "repo": "DankMaterialShell",
-        "rev": "03a3ef28d2d7a123f6fce7fdccfb4f2e5d20ccd6",
+        "rev": "567c14f6d9e0028ab042b151a9d897ec081820f1",
         "type": "github"
       },
       "original": {
         "owner": "AvengeMedia",
         "repo": "DankMaterialShell",
-        "rev": "03a3ef28d2d7a123f6fce7fdccfb4f2e5d20ccd6",
+        "rev": "567c14f6d9e0028ab042b151a9d897ec081820f1",
         "type": "github"
       }
     },
