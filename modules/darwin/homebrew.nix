@@ -134,13 +134,13 @@
               upgrade = true;
               # https://nix-darwin.github.io/nix-darwin/manual/#opt-homebrew.onActivation.cleanup
               cleanup = "uninstall";
-              # homebrew >=5.1.15 requires --force-cleanup for brew bundle --cleanup (nix-darwin#1787)
-              extraFlags = [ "--force-cleanup" ];
               # homebrew >=6.0 tap-trust gate reads per-user trust.json which activation's env-scrubbed sudo never sees
               extraEnv.HOMEBREW_NO_REQUIRE_TAP_TRUST = "1";
             };
 
-            # apply --no-quarantine to all casks
+            # quarantine stays on: `no_quarantine = true` would emit --no-quarantine and
+            # suppress Gatekeeper's first-run verification for every cask; the option is
+            # also deprecated upstream (Homebrew/brew#20755)
             caskArgs = {
               no_quarantine = false;
             };
