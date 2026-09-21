@@ -36,6 +36,14 @@
         package = flake.inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.herdr;
         # https://herdr.dev/docs/configuration/ — ported from modules/home/shell/tmux.nix
         settings = {
+          # herdr persists onboarding dismissal by rewriting config.toml
+          # (src/config/write.rs: upsert_top_level_bool "onboarding"), which
+          # EACCESes against this store symlink and re-toasts every launch.
+          # Declaring it is what both Mic92/dotfiles and mirkolenz/infra do.
+          onboarding = false;
+          # The binary comes from the flake input, so the self-updater has
+          # nothing to update and its writes would fail the same way.
+          update.version_check = false;
           theme = {
             name = "catppuccin";
             auto_switch = true;
@@ -46,7 +54,15 @@
             default_shell = "fish";
             new_cwd = "follow";
           };
-          session.resume_agents_on_restore = false;
+          # The two recovery paths are disjoint per pane, not alternatives:
+          # persist/restore.rs:785 gives native resume precedence and suppresses
+          # replay for that pane only, so history covers shells, logs and any
+          # agent pane without a usable session ref. Resume relaunches agent
+          # CLIs unattended on server start, which is the risk being accepted.
+          # Cost of history: session-history.json holds every pane's full
+          # scrollback in plaintext, bounded only by scrollback_limit_bytes.
+          session.resume_agents_on_restore = true;
+          experimental.pane_history = true;
           ui = {
             confirm_close = false;
             prompt_new_tab_name = false;
