@@ -121,7 +121,12 @@
     bun2nix.inputs.systems.follows = "systems";
     bun2nix.inputs.treefmt-nix.follows = "treefmt-nix";
 
-    playwright-web-flake.url = "github:cameronraysmith/playwright-web-flake/1.63.0-mac26.2";
+    # Fork of pietdevries94's adding side-by-side darwin webkit and libmanette.
+    # Tags mirror upstream's names, so `1.63.0` is our tree, not upstream's, and
+    # dropping the fork stays a one-word owner swap. Never bulk-push tags from a
+    # fork clone: it creates upstream tags for versions we have not yet rebased
+    # onto, which renovate's github-tags datasource then offers as newest.
+    playwright-web-flake.url = "github:cameronraysmith/playwright-web-flake/1.63.0";
     playwright-web-flake.inputs.nixpkgs.follows = "nixpkgs";
 
     nuenv.url = "github:hallettj/nuenv/writeShellApplication";

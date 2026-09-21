@@ -30,7 +30,7 @@
       "enabled": false
     },
     {
-      "description": "Group playwright across npm and flake.nix into a single PR. The flake driver's browsers.json revision names the PLAYWRIGHT_BROWSERS_PATH directories that the npm playwright-core looks up from its own bundled revision, so the flake ref and both npm pins must move together or every browser test fails to launch. Both the upstream and the fork coordinates are listed so the group survives a fork-drop.",
+      "description": "Group playwright across npm and flake.nix into a single PR. The flake driver's browsers.json revision names the PLAYWRIGHT_BROWSERS_PATH directories that the npm playwright-core looks up from its own bundled revision, so the flake ref and both npm pins must move together or every browser test fails to launch. Both the upstream and the fork coordinates are listed so the group survives a fork-drop, and the fork's tags mirror upstream's exactly, so the two coordinates share one continuous version series.",
       "matchPackageNames": [
         "playwright",
         "@playwright/test",
@@ -38,13 +38,6 @@
         "cameronraysmith/playwright-web-flake"
       ],
       "groupName": "playwright"
-    },
-    {
-      "description": "Fork tags are <upstream-version>-mac26.<n> so they sort after the upstream tag they are based on. Parse them as semver and do not filter them as unstable, otherwise the github-tags datasource skips every fork release.",
-      "matchDatasources": ["github-tags"],
-      "matchPackageNames": ["cameronraysmith/playwright-web-flake"],
-      "versioning": "semver",
-      "ignoreUnstable": false
     },
     {
       "description": "Pin playwright npm packages to exact versions for flake input sync",
