@@ -53,11 +53,11 @@
     git-hooks.inputs.nixpkgs.follows = "nixpkgs";
     git-hooks.inputs.flake-compat.follows = "";
 
-    nix-unit.url = "github:nix-community/nix-unit";
+    nix-unit.url = "github:nix-community/nix-unit/v2.35.1";
     nix-unit.inputs.nixpkgs.follows = "nixpkgs";
     nix-unit.inputs.treefmt-nix.follows = "treefmt-nix";
 
-    lazyvim-nix.url = "github:pfassina/lazyvim-nix";
+    lazyvim-nix.url = "github:pfassina/lazyvim-nix/v16.0.1";
     lazyvim-nix.inputs.nixpkgs.follows = "nixpkgs";
 
     nix2container.url = "github:nlewo/nix2container";
