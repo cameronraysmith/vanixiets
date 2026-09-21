@@ -161,10 +161,14 @@ let
         settings = {
           git = {
             overrideGpg = true;
-            pagers = [
+            # lazygit 0.65 renamed git.pagers to git.diffRenderers and the
+            # entry's `pager` key to `command`. Its automatic migration
+            # rewrites config.yml, which fails against this store symlink, so
+            # the schema is declared post-migration here instead.
+            diffRenderers = [
               {
                 colorArg = "always";
-                pager = "delta --color-only --dark --paging=never";
+                command = "delta --color-only --dark --paging=never";
                 useConfig = false;
               }
             ];
