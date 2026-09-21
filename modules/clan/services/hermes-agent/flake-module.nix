@@ -331,6 +331,119 @@
                   };
                 };
 
+                # ─── config.yaml corruption guard and style fixpoint ────────
+                # ~/.hermes/config.yaml has three writers, and two of them
+                # disagree about how a YAML block sequence is indented:
+                #
+                #   - upstream's activation merge (nix/configMergeScript.nix)
+                #     re-dumps the whole file with PyYAML defaults, which emit
+                #     sequence items at the parent's indent:
+                #         plugins:
+                #           enabled:
+                #           - moshi-hooks
+                #   - `moshi-hook install`, run from the user's home-manager
+                #     activation (modules/home/ai/moshi/default.nix), inserts
+                #     its entry textually at a deeper indent and only detects an
+                #     existing entry written in its own style:
+                #         plugins:
+                #           enabled:
+                #             - moshi-hooks
+                #   - hermes itself, when the user edits settings at runtime.
+                #
+                # Feeding moshi-hook a PyYAML-styled file reproduces the
+                # failure exactly: it appends a second `- moshi-hooks` at the
+                # shallower indent, which parses as a sequence item inside a
+                # mapping and makes the document invalid. That wedges every
+                # later deploy, because the merge script's `yaml.safe_load`
+                # raises and takes `hermes-agent-setup` down with it, and it
+                # wedges hermes too, which then runs on defaults. Neither side
+                # repairs it: hermes copies the bad file into backups/ and keeps
+                # serving defaults. cinnabar sat in that state from 2026-08-31.
+                #
+                # Two snippets close the loop. `quarantine` runs before the
+                # merge and moves an unparseable file aside so the merge can
+                # rebuild it from these settings in the same activation, rather
+                # than failing forever. `normalize` runs after the merge and
+                # re-dumps with indented sequences, which is the fixpoint both
+                # writers accept: moshi-hook is idempotent against its own
+                # style, so the install that follows in the user's home-manager
+                # activation becomes a no-op instead of a corruption.
+                #
+                # This is a defect in the vendor's closed-source moshi-hook
+                # binary, not in hermes-agent, and it is not fixed by moving
+                # either side forward: 0.3.16 and 0.3.26 both corrupt the same
+                # input, and nix/configMergeScript.nix is byte-identical at the
+                # pinned rev, at v2026.9.14 and at upstream main.
+                system.activationScripts =
+                  let
+                    hermesConfig = "${userHome}/.hermes/config.yaml";
+                    guard = pkgs.writeScript "hermes-config-guard" ''
+                      #!${pkgs.python3.withPackages (ps: [ ps.pyyaml ])}/bin/python3
+                      import os, shutil, sys, time
+                      from pathlib import Path
+
+                      import yaml
+
+                      mode, path = sys.argv[1], Path(sys.argv[2])
+                      if not path.exists():
+                          sys.exit(0)
+
+                      class IndentedDumper(yaml.SafeDumper):
+                          """Emit block sequences indented under their key."""
+
+                          def increase_indent(self, flow=False, indentless=False):
+                              return super().increase_indent(flow, False)
+
+                      raw = path.read_bytes()
+                      try:
+                          data = yaml.safe_load(raw) or {}
+                      except yaml.YAMLError as err:
+                          if mode == "quarantine":
+                              quarantine_dir = path.parent / "backups" / "config"
+                              quarantine_dir.mkdir(parents=True, exist_ok=True)
+                              dest = quarantine_dir / (
+                                  "config.yaml.unparseable-" + time.strftime("%Y%m%d-%H%M%S")
+                              )
+                              shutil.move(str(path), str(dest))
+                              sys.stderr.write(
+                                  "hermes-config-guard: %s did not parse (%s); moved to %s "
+                                  "and regenerating from the Nix settings\n"
+                                  % (path, err.__class__.__name__, dest)
+                              )
+                          sys.exit(0)
+
+                      if mode != "normalize":
+                          sys.exit(0)
+
+                      wanted = yaml.dump(
+                          data, Dumper=IndentedDumper, default_flow_style=False, sort_keys=False
+                      ).encode()
+                      if wanted == raw:
+                          sys.exit(0)
+
+                      stat = path.stat()
+                      tmp = Path(str(path) + ".guard-tmp")
+                      tmp.write_bytes(wanted)
+                      os.chown(tmp, stat.st_uid, stat.st_gid)
+                      os.chmod(tmp, stat.st_mode & 0o7777)
+                      os.replace(tmp, path)
+                    '';
+                  in
+                  {
+                    hermes-config-quarantine = lib.stringAfter [ "users" ] ''
+                      ${guard} quarantine ${hermesConfig}
+                    '';
+
+                    # Make upstream's merge wait for the quarantine step, so a
+                    # file that cannot be parsed is out of the way before the
+                    # snippet that would die on it runs.
+                    hermes-agent-setup.deps = [ "hermes-config-quarantine" ];
+
+                    hermes-config-normalize = lib.stringAfter [ "hermes-agent-setup" ] ''
+                      ${guard} normalize ${hermesConfig}
+                    '';
+                  };
+
                 # ─── clan-vars generators (nix-gyy.4) ───────────────────────
                 # Each generator writes `KEY=value\n` env-file format to its
                 # output file. This is the contract enforced by the adapter
