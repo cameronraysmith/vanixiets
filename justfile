@@ -1655,6 +1655,109 @@ release *args:
 release-package package dry_run="false":
   nix run --accept-flake-config .#release -- packages/{{package}} {{ if dry_run == "true" { "--dry-run" } else { "" } }}
 
+# CREDENTIAL: `gh auth token` first; the sops GITHUB_TOKEN is a fallback that is
+# not trusted -- it holds a `gho_` OAuth App token that currently 401s. The
+# credential is verified against https://api.github.com/user before renovate
+# starts, because without a working token lookups do not fail, they silently
+# return no updates. The value never appears in argv.
+#
+# WHICH VARIABLE, and why collapsing them silently breaks this recipe:
+# GITHUB_COM_TOKEN authenticates github.com *lookups* (renovate turns it into a
+# global github host rule), RENOVATE_TOKEN is the *platform* credential, and a
+# bare GITHUB_TOKEN is listed as unsupported and deleted --
+# lib/workers/global/config/parse/env.ts.
+#
+# Default (`just renovate`): `renovate --platform=local` over the working tree.
+# Its branch, PR and issue functions are stubs, so it cannot create a branch,
+# commit, PR or issue at all -- lib/modules/platform/local/index.ts. The token
+# is read authority for lookups, which is why a token in the default is safe.
+#
+# Real run (`just renovate false`): platform=github against the real repository.
+# IT MUTATES IT -- pushes branches, opens, updates and closes pull requests, and
+# edits the dependency dashboard issue. The hosted Renovate app owns real runs
+# here; normally you should not invoke this at all.
+#
+# Cache is pinned to .direnv/renovate, which .gitignore already covers.
+#
+# Preview renovate's decisions: dry run by default, `just renovate false` is real.
+[group('CI/CD')]
+renovate dry_run="true":
+  #!/usr/bin/env bash
+  set -euo pipefail
+
+  repo="cameronraysmith/vanixiets"
+  cache_dir="{{justfile_directory()}}/.direnv/renovate"
+
+  # Credential, in order: the live gh session, then the sops fallback. Neither
+  # branch ever emits the value; sops expands it only inside its own shell.
+  token=""
+  token_source=""
+  if command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; then
+    token="$(gh auth token 2>/dev/null || true)"
+    token_source="gh auth token"
+  fi
+  if [ -z "${token}" ]; then
+    token="$(sops exec-env secrets/shared.yaml 'printf %s "${GITHUB_TOKEN:-}"' 2>/dev/null || true)"
+    token_source="GITHUB_TOKEN from secrets/shared.yaml"
+  fi
+  if [ -z "${token}" ]; then
+    echo "error: no GitHub credential available." >&2
+    echo "       Tried 'gh auth token', then GITHUB_TOKEN in secrets/shared.yaml." >&2
+    echo "       Fix either one: run 'gh auth login', or restore sops access --" >&2
+    echo "       sops cannot decrypt the file (no age key on this machine) or the" >&2
+    echo "       key is missing from it; verify with 'just check-secrets'." >&2
+    echo "       renovate was not started and nothing was written." >&2
+    exit 1
+  fi
+
+  # Verify before handing it to renovate: a rejected credential must fail here,
+  # with its status, not as a warning buried in renovate's JSON output. The
+  # header is passed on stdin so the value never appears in any argv.
+  status="$(printf 'header = "Authorization: Bearer %s"\n' "${token}" |
+    curl --silent --show-error --config - --output /dev/null \
+      --write-out '%{http_code}' https://api.github.com/user || true)"
+  if [ "${status}" != "200" ]; then
+    echo "error: this credential is rejected by GitHub (HTTP ${status:-none})." >&2
+    echo "       Source: ${token_source}." >&2
+    echo "       Remedies: run 'gh auth login' to refresh the gh session, or fix" >&2
+    echo "       GITHUB_TOKEN in secrets/shared.yaml -- its stored value is a gho_" >&2
+    echo "       OAuth App token, which dies when gh re-authenticates or revokes." >&2
+    echo "       renovate was not started and nothing was written." >&2
+    exit 1
+  fi
+  echo "Credential: ${token_source}; accepted by GitHub (HTTP 200). Value not shown." >&2
+
+  mkdir -p "${cache_dir}"
+
+  if [ "{{dry_run}}" = "true" ]; then
+    echo "Dry run: renovate --platform=local -- lookups only; this platform cannot" >&2
+    echo "create branches, commits, PRs or issues. Token is read authority only." >&2
+    echo "Cache: ${cache_dir} (gitignored)." >&2
+    GITHUB_COM_TOKEN="${token}" \
+    RENOVATE_CACHE_DIR="${cache_dir}" \
+    LOG_LEVEL="${LOG_LEVEL:-debug}" \
+      renovate --platform=local
+  else
+    if [ ! -t 0 ]; then
+      echo "error: a real run requires an interactive terminal for confirmation." >&2
+      echo "       Refusing to run non-interactively. Nothing was done." >&2
+      exit 1
+    fi
+    echo "REAL RUN against ${repo} as the owner of the credential above." >&2
+    echo "This PUSHES BRANCHES, opens/updates/closes PULL REQUESTS and edits the" >&2
+    echo "dependency dashboard issue on the real repository. The hosted Renovate" >&2
+    echo "app normally owns this; a local run competes with it." >&2
+    printf 'Type the repository slug to proceed (anything else aborts): ' >&2
+    read -r confirmation
+    if [ "${confirmation}" != "${repo}" ]; then
+      echo "Aborted; renovate was not started and nothing was written." >&2
+      exit 1
+    fi
+    RENOVATE_TOKEN="${token}" \
+    RENOVATE_CACHE_DIR="${cache_dir}" \
+      renovate --platform=github "${repo}"
+  fi
+
 ## sops
 
 # Extract key details from Bitwarden (all sops-* keys or specific key)

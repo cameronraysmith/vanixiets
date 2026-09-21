@@ -140,6 +140,13 @@
           self'.packages.linear-cli
           self'.packages.mergify-cli-bin
           inputs'.llm-agents.packages.openspec
+          # Supplies both `renovate` and `renovate-config-validator`. The
+          # validator is what `checks.renovate-config` runs in the sandbox;
+          # having it on PATH lets an edit to .github/renovate.json be checked
+          # in a second rather than through a nix build. `renovate` itself is
+          # here for `just renovate`, which previews the bot's decisions
+          # against the working tree via the local platform.
+          pkgs.renovate
         ]
         # buildbot-effects CLI for local dispatch of hercules-ci-effects
         # (see buildbot-nix/docs/EFFECTS.md). Linux-only: depends on bwrap.
