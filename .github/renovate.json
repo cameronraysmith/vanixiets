@@ -14,10 +14,12 @@
   ],
   "customManagers": [
     {
+      "description": "Track the tag/ref of every version-pinned github flake input. The nix manager only advances flake.lock along the ref an input already tracks; it never rewrites the ref string in flake.nix, so a tag-pinned input reports nothing at all. Before this manager existed only playwright-web-flake was matched, and cilium-src, argocd-src, argocd-helm-src, gateway-api-src and sops-secrets-operator-src had never once been bumped since the commits that introduced them. The first pattern requires the ref to be an optional v followed by a dotted numeric version, which is what keeps this honest: it declines to match refs with no version (github:owner/repo, deliberate trunk tracking), branch refs (main, master, dev, writeShellApplication, future-26.11), fork labels (cognee-v112) and 40-hex revision pins (zen-browser, dms-src), whose exactness modules/checks/pyrite-desktop.nix asserts on. Anchoring on .url also keeps .inputs.<x>.follows lines out. The second pattern is narrow on purpose: argo-helm publishes one tag series per chart, so its ref carries an argo-cd- prefix that no general version pattern can accept without also accepting branch names, and the packageRule below gives that one dependency a matching versioning scheme.",
       "customType": "regex",
       "managerFilePatterns": ["flake.nix"],
       "matchStrings": [
-        "playwright-web-flake\\.url\\s*=\\s*\"github:(?<depName>[^/]+/[^/]+)/(?<currentValue>[^\"]+)\""
+        "\\.url\\s*=\\s*\"github:(?<depName>[^\"/]+/[^\"/]+)/(?<currentValue>v?[0-9]+\\.[0-9]+[^\"]*)\"",
+        "\\.url\\s*=\\s*\"github:(?<depName>argoproj/argo-helm)/(?<currentValue>argo-cd-[0-9]+\\.[0-9]+\\.[0-9]+)\""
       ],
       "datasourceTemplate": "github-tags"
     }
@@ -28,6 +30,11 @@
       "matchManagers": ["nix"],
       "matchPackageNames": ["playwright-web-flake"],
       "enabled": false
+    },
+    {
+      "description": "argo-helm tags every chart in one repository, so the argo-cd chart's tags read argo-cd-9.3.4 rather than 9.3.4. Under the default semver versioning that string is not a version at all, so the dependency would be extracted and then silently skipped. This regex versioning makes the whole tag the version: non-argo-cd tags in the same repository fail to parse and are discarded, and getNewValue returns the datasource's tag verbatim (lib/modules/versioning/generic.ts), so the prefix is preserved when the ref is rewritten.",
+      "matchPackageNames": ["argoproj/argo-helm"],
+      "versioning": "regex:^argo-cd-(?<major>\\d+)\\.(?<minor>\\d+)\\.(?<patch>\\d+)$"
     },
     {
       "description": "Group playwright across npm and flake.nix into a single PR. The flake driver's browsers.json revision names the PLAYWRIGHT_BROWSERS_PATH directories that the npm playwright-core looks up from its own bundled revision, so the flake ref and both npm pins must move together or every browser test fails to launch. Both the upstream and the fork coordinates are listed so the group survives a fork-drop, and the fork's tags mirror upstream's exactly, so the two coordinates share one continuous version series.",
