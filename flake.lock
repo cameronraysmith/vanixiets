@@ -1434,7 +1434,7 @@
       },
       "original": {
         "owner": "cameronraysmith",
-        "ref": "1.63.0-mac26.2",
+        "ref": "1.63.0",
         "repo": "playwright-web-flake",
         "type": "github"
       }
