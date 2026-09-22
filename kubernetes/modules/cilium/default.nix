@@ -22,7 +22,7 @@ in
 
     version = lib.mkOption {
       type = lib.types.str;
-      default = "1.18.6";
+      default = "1.20.2";
       description = "Cilium version to deploy (must match cilium-src flake input)";
     };
 
@@ -38,6 +38,21 @@ in
       # Use flake input instead of dynamic fetchTree for pure evaluation
       src = cilium-src;
       crdDir = "${src}/pkg/k8s/apis/cilium.io/client/crds/v2";
+
+      # Select CRD manifests by name. `builtins.readDir` alone is unsafe here:
+      # cilium >= 1.19 ships a `//go:embed *.yaml` shim (`embed.go`) inside this
+      # directory, and handing a Go source file to importyaml's yq step fails with
+      # an opaque YAML scanner error. Matching on the `.yaml` suffix keeps every
+      # non-YAML sibling away from yq, and the throw turns a genuine upstream
+      # relocation of the CRD directory into an explicit failure instead of a
+      # silently empty import set.
+      crdFiles =
+        let
+          yamls = lib.filter (lib.hasSuffix ".yaml") (lib.attrNames (builtins.readDir crdDir));
+        in
+        lib.throwIf (yamls == [ ])
+          "cilium: no *.yaml CRD manifests found in ${crdDir}; the upstream CRD layout moved, update kubernetes/modules/cilium/default.nix"
+          yamls;
 
       # Create derivation for each CRD file (required for importyaml)
       # importyaml expects either a derivation or URL, not a store path string
@@ -91,14 +106,9 @@ in
         };
 
         # Import Cilium CRDs from source (v2 only)
-        importyaml = lib.pipe (builtins.readDir crdDir) [
-          (lib.mapAttrs' (
-            filename: _type: {
-              name = filename;
-              value.src = mkCrdDrv filename;
-            }
-          ))
-        ];
+        importyaml = lib.listToAttrs (
+          map (filename: lib.nameValuePair filename { src = mkCrdDrv filename; }) crdFiles
+        );
       })
 
       # API mappings always defined (allows other modules to reference Cilium types)

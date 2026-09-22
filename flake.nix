@@ -156,7 +156,7 @@
     easykubenix.url = "github:cameronraysmith/easykubenix/dev";
     easykubenix.flake = false;
 
-    cilium-src.url = "github:cilium/cilium/v1.18.6";
+    cilium-src.url = "github:cilium/cilium/v1.20.2";
     cilium-src.flake = false;
 
     step-ca-src.url = "github:smallstep/helm-charts/master";

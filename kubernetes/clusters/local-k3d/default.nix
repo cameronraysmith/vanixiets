@@ -54,7 +54,7 @@ in
 
   # Enable Cilium CNI
   cilium.enable = isFoundation;
-  cilium.version = "1.18.6";
+  cilium.version = "1.20.2";
   # k3d/OrbStack eBPF accommodations:
   # - Kube-proxy replacement on, as in the production module: cilium >= 1.19
   #   runs its Gateway API controller only with kube-proxy replacement
