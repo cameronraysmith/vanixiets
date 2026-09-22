@@ -15,7 +15,7 @@
 let
   namespace = "sops-secrets-operator";
   ageKeySecret = "sops-age-key";
-  version = "0.16.0";
+  version = "0.21.2";
 in
 {
   applications.sops-secrets-operator = {
@@ -41,7 +41,7 @@ in
 
     # Use flake input for chart source (same as easykubenix)
     helm.releases.sops-secrets-operator = {
-      chart = "${sops-secrets-operator-src}/chart/helm3/sops-secrets-operator";
+      chart = "${sops-secrets-operator-src}/chart/helm4/sops-secrets-operator";
 
       # Values MUST match easykubenix kubernetes/modules/sops-secrets-operator/default.nix
       values = {

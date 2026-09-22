@@ -45,7 +45,7 @@ in
 
     version = lib.mkOption {
       type = lib.types.str;
-      default = "0.16.0";
+      default = "0.21.2";
       description = "sops-secrets-operator version to deploy (compatible with k8s 1.34.x)";
     };
 
@@ -86,12 +86,14 @@ in
 
     helm.releases.${moduleName} = {
       namespace = cfg.namespace;
-      chart = "${sops-secrets-operator-src}/chart/helm3/sops-secrets-operator";
+      chart = "${sops-secrets-operator-src}/chart/helm4/sops-secrets-operator";
 
       # Patch namespaced resources that the upstream Helm chart renders without
-      # metadata.namespace (notably Deployment and ServiceAccount). The shared
-      # enforceNamespace helper consults the bundled API resource snapshot to
-      # route only namespaced kinds, leaving cluster-scoped objects untouched.
+      # metadata.namespace. As of chart 0.28.x (app 0.21.2) the chart templates
+      # metadata.namespace itself, so this is now a no-op safety net rather than
+      # a correction; it is kept because the shared enforceNamespace helper
+      # consults the bundled API resource snapshot to route only namespaced
+      # kinds, leaving cluster-scoped objects untouched.
       overrides = [
         (config.lib.kubernetes.enforceNamespace cfg.namespace)
       ];
