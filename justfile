@@ -12,6 +12,24 @@ help:
   @printf "\n...by running 'just <command>'.\n"
   @printf "This message is printed by 'just help' and just 'just'.\n"
 
+# Resolve the JSON processor this repo actually provides. The default devshell
+# ships jaq, not jq (modules/devshells/default.nix), so a recipe that hardcodes
+# jq only works for operators who happen to carry jq in a user profile. Both
+# accept the --arg/-r/@tsv subset used here and round-trip package.json
+# byte-identically, so either is a correct backend.
+[private]
+_json-cmd:
+  #!/usr/bin/env bash
+  set -euo pipefail
+  for candidate in jaq jq; do
+    if command -v "${candidate}" >/dev/null 2>&1; then
+      echo "${candidate}"
+      exit 0
+    fi
+  done
+  echo "error: neither jaq nor jq is on PATH; enter the devshell." >&2
+  exit 1
+
 ## nix
 
 # Check if a package is cached (substitutable) on the current locked nixpkgs rev
@@ -557,6 +575,117 @@ bun-repin-playwright:
   mv "$tmp" "$pkg"
   echo "Re-pinned playwright + @playwright/test to $FLAKE_PW in $pkg"
 
+# Print Renovate's version holds, derived from .github/renovate.json: every
+# packageRule carrying allowedVersions, expanded to one `name<TAB>range` row per
+# matched package name (matchPackageNames and matchDepNames, glob patterns left
+# intact). .github/renovate.json is the single source of truth and no hold is
+# ever restated here, so adding or lifting a rule there changes this output with
+# no justfile edit. Prints nothing when no rule carries allowedVersions.
+[group('bun')]
+bun-holds:
+  #!/usr/bin/env bash
+  set -euo pipefail
+  json="$(just _json-cmd)"
+  "${json}" -r '
+    .packageRules[]
+    | select(has("allowedVersions"))
+    | .allowedVersions as $range
+    | ((.matchPackageNames // []) + (.matchDepNames // []))[]
+    | [., $range]
+    | @tsv
+  ' .github/renovate.json
+
+# Enforce (mode=repin) or verify (mode=check) the derived holds against every
+# workspace package.json. `bun update --latest` has no package-name exclusion --
+# -F/--filter selects workspaces, and `--latest` is rejected outright when
+# combined with a version spec -- so the bump cannot be prevented at the source.
+# This mirrors what bun-repin-playwright already does for the flake ceiling:
+# let the bulk bump overshoot, then restore the constrained ranges before the
+# lockfile is reconciled, so no broken lockfile is ever produced.
+[private]
+_bun-hold-scan mode:
+  #!/usr/bin/env bash
+  set -euo pipefail
+  json="$(just _json-cmd)"
+  violations=0
+  # Materialised rather than piped: a `done < <(just bun-holds)` process
+  # substitution swallows a non-zero exit, so a malformed renovate.json would
+  # yield an empty hold list and this guard would report success having checked
+  # nothing. Redirecting into a file keeps that failure fatal under set -e.
+  holds="$(mktemp -t renovate-holds.XXXXXX)"
+  just bun-holds > "${holds}"
+  while IFS=$'\t' read -r pattern range; do
+    [ -n "${pattern:-}" ] || continue
+    case "${range}" in
+      /*|!/*)
+        echo "error: ${pattern} carries a regex allowedVersions (${range})." >&2
+        echo "       Renovate honours it; this guard only reads semver ranges." >&2
+        exit 1
+        ;;
+    esac
+    for pkg in package.json packages/docs/package.json; do
+      [ -f "${pkg}" ] || continue
+      for section in dependencies devDependencies peerDependencies optionalDependencies; do
+        while IFS=$'\t' read -r name current; do
+          [ -n "${name:-}" ] || continue
+          case "${name}" in
+            ${pattern}) ;;
+            *) continue ;;
+          esac
+          version="$(printf '%s' "${current}" | sed 's/^[^0-9]*//')"
+          prefix="$(printf '%s' "${current}" | sed 's/[0-9].*$//')"
+          [ -n "${version}" ] || continue
+          if bun -e 'process.exit(Bun.semver.satisfies(process.argv[1], process.argv[2]) ? 0 : 1)' \
+            "${version}" "${range}"; then
+            continue
+          fi
+          violations=$((violations + 1))
+          echo "HOLD VIOLATED: ${name} ${current} in ${pkg} (${section}); Renovate allows ${range}" >&2
+          [ "{{mode}}" = "repin" ] || continue
+          max="$(bun info "${name}" versions --json 2>/dev/null | bun -e '
+            const versions = JSON.parse(await Bun.stdin.text());
+            const range = process.argv[1];
+            const allowed = versions.filter((v) => !v.includes("-") && Bun.semver.satisfies(v, range));
+            allowed.sort(Bun.semver.order);
+            console.log(allowed.at(-1) ?? "");
+          ' "${range}")"
+          if [ -z "${max}" ]; then
+            echo "error: no published ${name} version satisfies ${range}." >&2
+            exit 1
+          fi
+          tmp="$(mktemp)"
+          "${json}" --arg s "${section}" --arg n "${name}" --arg v "${prefix}${max}" \
+            '.[$s][$n] = $v' "${pkg}" > "${tmp}"
+          mv "${tmp}" "${pkg}"
+          echo "  re-pinned ${name} to ${prefix}${max} in ${pkg}" >&2
+        done < <("${json}" -r --arg s "${section}" \
+          '(.[$s] // empty) | to_entries[] | [.key, .value] | @tsv' "${pkg}")
+      done
+    done
+  done < "${holds}"
+  if [ "${violations}" -eq 0 ]; then
+    echo "Renovate version holds honoured."
+    exit 0
+  fi
+  if [ "{{mode}}" = "repin" ]; then
+    echo "Re-pinned ${violations} held dependency range(s)." >&2
+    exit 0
+  fi
+  echo "ERROR: ${violations} Renovate version hold(s) violated." >&2
+  exit 1
+
+# Verify every workspace package.json range still satisfies Renovate's holds.
+# Read-only; exits 1 after listing each violation.
+[group('bun')]
+bun-check-holds:
+  @just _bun-hold-scan check
+
+# Re-pin any range that breaks a Renovate hold down to the highest published
+# version the hold allows, preserving the original range operator.
+[group('bun')]
+bun-repin-holds:
+  @just _bun-hold-scan repin
+
 # Reconcile bun.lock with the current package.json(s) without touching node_modules.
 # Re-resolves any dep whose locked version no longer satisfies its package.json range.
 [group('bun')]
@@ -572,7 +701,8 @@ bun-outdated:
 
 # Bump all non-playwright deps to latest stable, then reconcile bun.lock and
 # regenerate bun.nix. Playwright stays pinned to the playwright-web-flake version
-# per the flake-is-version-ceiling invariant.
+# per the flake-is-version-ceiling invariant, and any dependency Renovate holds
+# back via allowedVersions is restored to the newest version that hold permits.
 [group('bun')]
 bun-update-latest-stable:
   #!/usr/bin/env bash
@@ -581,17 +711,26 @@ bun-update-latest-stable:
   echo "=== Phase 1: Playwright drift check ==="
   just bun-drift-check
 
-  echo "=== Phase 2: Bump all deps to latest stable ==="
+  echo "=== Phase 2: Renovate version holds in force ==="
+  just bun-holds
+
+  echo "=== Phase 3: Bump all deps to latest stable ==="
   just bun-bump-all
 
-  echo "=== Phase 3: Re-pin playwright to flake version ==="
+  echo "=== Phase 4: Re-pin playwright to flake version ==="
   just bun-repin-playwright
 
-  echo "=== Phase 4: Reconcile bun.lock ==="
+  echo "=== Phase 5: Re-pin held deps within Renovate's allowedVersions ==="
+  just bun-repin-holds
+
+  echo "=== Phase 6: Reconcile bun.lock ==="
   just bun-lockfile-reconcile
 
-  echo "=== Phase 5: Regenerate bun.nix ==="
+  echo "=== Phase 7: Regenerate bun.nix ==="
   just regenerate-bun-nix
+
+  echo "=== Phase 8: Assert holds survived the reconcile ==="
+  just bun-check-holds
 
   echo "=== Done ==="
   git diff --stat -- package.json packages/docs/package.json bun.lock bun.nix
@@ -1679,6 +1818,15 @@ release-package package dry_run="false":
 #
 # Cache is pinned to .direnv/renovate, which .gitignore already covers.
 #
+# OUTPUT: `just renovate` prints a summary table -- depName, currentValue and
+# the proposed update -- for every dependency renovate resolved a version for,
+# grouped by manager. It gets that by running renovate at LOG_LEVEL=debug with
+# LOG_FORMAT=json and reading the one `packageFiles with updates` record, which
+# is where the extracted deps and their computed updates actually live; the
+# ~3600 lines of pretty-printed debug around it are what made a default run
+# unreadable. Setting LOG_LEVEL in the environment restores the raw firehose
+# verbatim, so `LOG_LEVEL=debug just renovate` is exactly the old behaviour.
+#
 # Preview renovate's decisions: dry run by default, `just renovate false` is real.
 [group('CI/CD')]
 renovate dry_run="true":
@@ -1733,10 +1881,73 @@ renovate dry_run="true":
     echo "Dry run: renovate --platform=local -- lookups only; this platform cannot" >&2
     echo "create branches, commits, PRs or issues. Token is read authority only." >&2
     echo "Cache: ${cache_dir} (gitignored)." >&2
+
+    if [ -n "${LOG_LEVEL:-}" ]; then
+      echo "LOG_LEVEL=${LOG_LEVEL} is set: streaming renovate's raw log." >&2
+      GITHUB_COM_TOKEN="${token}" \
+      RENOVATE_CACHE_DIR="${cache_dir}" \
+      LOG_LEVEL="${LOG_LEVEL}" \
+        renovate --platform=local
+      exit 0
+    fi
+
+    json="$(just _json-cmd)"
+    raw="$(mktemp -t renovate-run.XXXXXX)"
+    echo "Raw log: ${raw} (re-run with LOG_LEVEL=debug to stream it instead)." >&2
     GITHUB_COM_TOKEN="${token}" \
     RENOVATE_CACHE_DIR="${cache_dir}" \
-    LOG_LEVEL="${LOG_LEVEL:-debug}" \
-      renovate --platform=local
+    LOG_LEVEL=debug \
+    LOG_FORMAT=json \
+      renovate --platform=local > "${raw}"
+
+    rows="$(mktemp -t renovate-rows.XXXXXX)"
+    "${json}" -r '
+      select(.msg == "packageFiles with updates")
+      | .config
+      | to_entries[]
+      | .key as $manager
+      | .value[]
+      | .deps[]
+      | select(.skipReason == null)
+      | [ $manager,
+          (.depName // .packageName // "?"),
+          (.currentValue // .currentDigest // "-"),
+          ( if (.updates | length) == 0 then "-"
+            else [ .updates[]
+                   | ((.newValue // .newDigest // "?") + " (" + (.updateType // "?") + ")") ]
+                 | join(", ")
+            end )
+        ]
+      | @tsv
+    ' "${raw}" > "${rows}"
+
+    if [ ! -s "${rows}" ]; then
+      echo "error: renovate produced no 'packageFiles with updates' record." >&2
+      echo "       The run may have failed; inspect ${raw}." >&2
+      exit 1
+    fi
+
+    echo ""
+    echo "== renovate dry run: dependencies seen and updates proposed =="
+    awk -F'\t' '
+      {
+        mgr[NR] = $1; dep[NR] = $2; cur[NR] = $3; prop[NR] = $4; n = NR
+        if (length($2) > w1) w1 = length($2)
+        if (length($3) > w2) w2 = length($3)
+        if ($4 != "-") upd++
+        if (!($1 in seen)) { seen[$1] = 1; order[++groups] = $1 }
+      }
+      END {
+        fmt = "  %-" w1 "s  %-" w2 "s  %s\n"
+        for (g = 1; g <= groups; g++) {
+          printf "\n-- %s --\n", order[g]
+          printf fmt, "depName", "currentValue", "proposed"
+          for (i = 1; i <= n; i++) if (mgr[i] == order[g]) printf fmt, dep[i], cur[i], prop[i]
+        }
+        printf "\n%d versioned dependencies, %d with a proposed update.\n", n, upd
+      }
+    ' "${rows}"
+    echo "Nothing was written to the repository."
   else
     if [ ! -t 0 ]; then
       echo "error: a real run requires an interactive terminal for confirmation." >&2
