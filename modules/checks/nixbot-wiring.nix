@@ -47,6 +47,19 @@
         )
       );
 
+      # Every memory/OOM property the evaluated unit carries, by name. This is
+      # the regulator for a deliberately near-empty set: MemoryHigh throttles
+      # and never kills, while MemoryMax or any OOM* knob would move the OOM
+      # domain off nixbot's delegated eval leaf onto the whole service and put
+      # the daemon itself in the kernel's victim pool
+      # (logs/nixbot-memorymax-oom-victim.md). The match is by name, so an
+      # unrelated hardening property such as MemoryDenyWriteExecute would also
+      # surface here and has to be admitted deliberately.
+      nixbotUnit = magnetite.systemd.services.nixbot.serviceConfig;
+      memoryAndOomKnobs = lib.naturalSort (
+        builtins.filter (n: lib.hasInfix "Memory" n || lib.hasInfix "OOM" n) (builtins.attrNames nixbotUnit)
+      );
+
       # Each service's own repository filter, transcribed with its citation so
       # the two selections can be asserted rather than described. Both take
       # the topic first and then the allowlists; only the allowlist stage is
@@ -82,6 +95,16 @@
             effectsCredentialNames = effectsCredentialNames;
             nixbotSecretKeys = sortedNames nixbot.effects.perRepoSecretFiles;
             buildbotSecretKeys = sortedNames buildbot.effects.perRepoSecretFiles;
+
+            # Eval throughput tuning, pinned because the pair is only safe
+            # together: 8 workers at 4096 MiB is 33 % faster than 4x4096 solely
+            # because MemoryHigh holds per-worker VmRSS under the restart
+            # threshold (logs/magnetite-zram-headroom-experiment.md), and the
+            # overflow needs magnetite's 150 % zram to land in.
+            evalWorkerCount = nixbot.evalWorkerCount;
+            evalMaxMemorySize = nixbot.evalMaxMemorySize;
+            memoryAndOomKnobs = memoryAndOomKnobs;
+            memoryHigh = nixbotUnit.MemoryHigh or null;
 
             # Booleans rather than the paths themselves: the assertion is that
             # each repository's two entries read one file, and the paths are
@@ -147,6 +170,10 @@
               "github:cameronraysmith/vanixiets"
               "github:sciexp/ironstar"
             ];
+            evalWorkerCount = 8;
+            evalMaxMemorySize = 4096;
+            memoryAndOomKnobs = [ "MemoryHigh" ];
+            memoryHigh = "12G";
             oneSecretsFileForBothServices = {
               "github:cameronraysmith/vanixiets" = true;
               "github:sciexp/ironstar" = true;

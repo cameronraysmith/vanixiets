@@ -84,31 +84,25 @@
 
         buildSystems = [ "x86_64-linux" ];
 
-        # 6 evaluation workers on magnetite, below both nixbot's own 16-core
-        # auto-sizing heuristic of 8 and the 20 used by clan-infra, the upstream
-        # reference deployment, because the memory cap has to stay enforceable.
-        # nixbot evaluates inside a cgroup capped at evalMaxMemorySize x
-        # (workers + 1), and exceeding that cap fails the pull request
-        # permanently with no retry, unlike an attribute build. A cap above the
-        # memory magnetite can supply cannot fire before magnetite itself is
-        # exhausted, so the count is bounded by arithmetic rather than by its 16
-        # cores: at the 2048 MiB per worker chosen just below, 6 caps the
-        # evaluation tree at 14 GiB, where 8 would imply 18 GiB and 20 would
-        # imply 43 GiB. magnetite has 30.6 GiB of RAM, and 17 GiB of it were
-        # free when nixbot was deployed there in August 2026, measured with
-        # kanidm, postgres, nginx and buildbot-nix already resident. To revise
-        # the count, read MemAvailable from /proc/meminfo on magnetite under
-        # that same resident set and keep evalMaxMemorySize x (workers + 1)
-        # below it.
+        # 8 x 4096 MiB: 131.5 s for magnetite's 144 attributes, against 196.0 s
+        # at 4 x 4096. The win is not parallelism. nix-eval-jobs recycles a
+        # worker once its VmRSS passes --max-memory-size, and each restart
+        # redoes the flake-root evaluation on a cold heap; with MemoryHigh below
+        # holding resident memory down, per-worker VmRSS stays near 1.9 GiB and
+        # restarts go 12 -> 0. All three parts carry weight: the same cap on 4
+        # workers still restarted 11 times, and magnetite's 150 % zram is what
+        # absorbs the ~31.4 GiB of overflow.
         #
-        # evalWorkerCount is nix-eval-jobs' --workers, so it shortens a single
-        # evaluation instead of overlapping several. Overlapping would need
-        # nixbot's eval_concurrency setting, which nixbot's NixOS module does
-        # not expose, so evaluations stay serial across pull requests and each
-        # one's latency adds to the total. The measurements behind 6 are in
-        # cameronraysmith/vanixiets PR 2869.
-        evalWorkerCount = 6;
-        evalMaxMemorySize = 2048;
+        # Dispatch is gated by nix-eval-jobs' own budget, workers x
+        # max-memory-size. The cgroup ceiling nixbot derives from these is the
+        # larger of that budget plus a worker and a limit it recomputes per eval
+        # from live memory (25.6 GiB measured), so it is dynamic and usually
+        # above physical RAM -- MemoryHigh is what actually binds. Overlapping
+        # evaluations would need nixbot's eval_concurrency, which this module
+        # leaves unexposed rather than unreachable. Ladder and derivations:
+        # logs/magnetite-zram-headroom-experiment.md.
+        evalWorkerCount = 8;
+        evalMaxMemorySize = 4096;
 
         github = {
           enable = true;
@@ -165,5 +159,16 @@
           package = inputs.niks3.packages.${config.nixpkgs.hostPlatform.system}.niks3;
         };
       };
+
+      # The limit that actually binds the evaluation. nixbot runs each eval in
+      # a delegated cgroup leaf whose own memory.max it sizes above physical
+      # RAM, and a cap on the service binds those leaves regardless. MemoryHigh
+      # throttles into zram and never kills. MemoryMax is deliberately absent:
+      # when the parent limit binds, the kernel declares OOM at the service and
+      # picks the largest process in the whole subtree, the nixbot daemon
+      # included — measured killing the daemon in a replica. MemoryAccounting
+      # is already yes (systemd's DefaultMemoryAccounting), so it is not
+      # restated. logs/nixbot-memorymax-oom-victim.md.
+      systemd.services.nixbot.serviceConfig.MemoryHigh = "12G";
     };
 }
