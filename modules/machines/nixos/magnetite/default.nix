@@ -432,6 +432,21 @@ in
         };
       };
 
+      # nixbot's `8 x 4096` nix-eval-jobs configuration peaks at 31.4 GiB of
+      # swap (logs/magnetite-zram-headroom-experiment.md §6.2), above the
+      # 30.6 GiB a single zram0 at the fleet default of 100 % provides, and an
+      # eval that exhausts swap is OOM-killed into a permanent PR failure.
+      # 150 % is 45.9 GiB; holding that peak costs ~6.9 GiB of real RAM at the
+      # measured 4.55x. Machine-scoped, not fleet-wide: pyrite is a 15 GiB
+      # laptop that livelocked under zram pressure. mkForce because base sets
+      # the percentage as a plain value (modules/system/zram-swap.nix).
+      zramSwap.memoryPercent = lib.mkForce 150;
+
+      # The 60 default is calibrated for disk swap. Nothing reaches zram
+      # without reclaim pressure, and the measured runs used 100, which is also
+      # what clan-infra sets on its zram hosts.
+      boot.kernel.sysctl."vm.swappiness" = 100;
+
       # Permit binding magnetite's ZeroTier-assigned IPv6 before zerotierone
       # settles on cold boot (mirrors modules/machines/nixos/cinnabar/caddy.nix).
       boot.kernel.sysctl."net.ipv6.ip_nonlocal_bind" = 1;
