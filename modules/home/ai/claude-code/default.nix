@@ -38,7 +38,7 @@
                 padding = 0;
               };
 
-              # Fable 5.1 orchestrates; Opus 5 does the worker tasks via
+              # Fable 5.1 orchestrates; Opus 5.5 does the worker tasks via
               # CLAUDE_CODE_SUBAGENT_MODEL below. Both run at medium through the
               # per-model modelSettings key, which outranks effortLevel; that
               # key is the floor for every other model. ultracode must stay off
@@ -50,9 +50,9 @@
               ultracode = false;
               modelSettings = {
                 "claude-fable-5-1".effortLevel = "medium";
-                "claude-opus-5".effortLevel = "medium";
+                "claude-opus-5-5".effortLevel = "medium";
               };
-              fallbackModel = [ "claude-opus-5" ];
+              fallbackModel = [ "claude-opus-5-5" ];
               forceLoginMethod = "claudeai";
               theme = "dark";
               editorMode = "vim";
@@ -176,8 +176,8 @@
 
               env = {
                 ANTHROPIC_DEFAULT_HAIKU_MODEL = "claude-sonnet-5";
-                ANTHROPIC_DEFAULT_OPUS_MODEL = "claude-opus-5";
-                ANTHROPIC_DEFAULT_SONNET_MODEL = "claude-opus-5";
+                ANTHROPIC_DEFAULT_OPUS_MODEL = "claude-opus-5-5";
+                ANTHROPIC_DEFAULT_SONNET_MODEL = "claude-opus-5-5";
                 ASTRO_TELEMETRY_DISABLED = "1";
                 CLAUDE_BASH_MAINTAIN_PROJECT_WORKING_DIR = "0";
                 CLAUDE_CODE_DISABLE_FEEDBACK_SURVEY = "1";
@@ -185,7 +185,7 @@
                 # A default, not a force: subagent frontmatter and per-invocation
                 # models still win. CLAUDE_CODE_SUBAGENT_MODEL_FORCE would make it
                 # absolute, at the cost of ignoring every definition's own model.
-                CLAUDE_CODE_SUBAGENT_MODEL = "claude-opus-5";
+                CLAUDE_CODE_SUBAGENT_MODEL = "claude-opus-5-5";
                 DISABLE_BUG_COMMAND = "1";
                 ENABLE_CLAUDEAI_MCP_SERVERS = "0";
                 # Both stay disabled: DISABLE_TELEMETRY also stops feature-flag
