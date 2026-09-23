@@ -53,6 +53,19 @@ for app in "${EXPECTED_APPS[@]}"; do
 done
 
 echo ""
+echo "Waiting for the cilium GatewayClass to be Accepted..."
+# The gateway-api app (wave -2) creates the GatewayClass; the cilium operator
+# accepts it only if its Gateway API controller started. When it did not, every
+# Gateway waits "for controller" until the Healthy waits below time out, so
+# fail here with the operator's own reason instead.
+timeout 300 bash -c "until kubectl get gatewayclass/cilium &>/dev/null; do sleep 2; done"
+if ! kubectl wait --for=condition=Accepted gatewayclass/cilium --timeout=120s; then
+  echo "error: GatewayClass cilium not Accepted; cilium-operator Gateway API log:" >&2
+  kubectl logs -n kube-system deploy/cilium-operator --tail=2000 | grep -i 'gateway' | grep -iE 'warn|error|requires|not found' >&2 || true
+  exit 1
+fi
+
+echo ""
 echo "Listing applications..."
 kubectl get applications -n argocd -o wide || true
 echo ""

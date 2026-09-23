@@ -11,6 +11,7 @@ Blocks until all Phase-3 (foundation + infrastructure) pods are Ready in
 the local-k3d cluster, in the order:
 
   Foundation:      cilium-agent, cilium-operator         (kube-system)
+                   then asserts the agent reports KubeProxyReplacement True
   Infrastructure:  argocd deployments, argocd-app-ctrl   (argocd)
                    step-ca statefulset pod               (step-ca)
                    sops-secrets-operator deployments     (sops-secrets-operator)
@@ -28,6 +29,17 @@ kubectl wait --for=condition=Ready pod -l app.kubernetes.io/name=cilium-agent -n
 
 echo "Waiting for Cilium Operator..."
 kubectl wait --for=condition=Ready pod -l app.kubernetes.io/name=cilium-operator -n kube-system --timeout=300s
+
+# The cluster runs without kube-proxy, and cilium >= 1.19 enables its Gateway
+# API controller only with kube-proxy replacement. Fail here, naming the
+# cause, rather than minutes later as a Gateway stuck "Waiting for controller".
+echo "Checking Cilium kube-proxy replacement..."
+kpr_status=$(kubectl exec -n kube-system ds/cilium -c cilium-agent -- cilium-dbg status | grep '^KubeProxyReplacement:' || true)
+echo "  ${kpr_status:-KubeProxyReplacement: <missing>}"
+if [[ "$kpr_status" != *"KubeProxyReplacement:"*"True"* ]]; then
+  echo "error: Cilium agent does not report KubeProxyReplacement True" >&2
+  exit 1
+fi
 
 echo ""
 echo "=== Waiting for Infrastructure ==="

@@ -16,6 +16,7 @@
             runtimeInputs = [
               pkgs.bash
               pkgs.coreutils
+              pkgs.gnugrep
               pkgs.kubectl
             ];
             text = builtins.readFile ./k3d-wait-argocd-sync.sh;

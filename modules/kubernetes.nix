@@ -52,6 +52,13 @@
       };
     in
     {
+      # Evaluated clusters, shared with other perSystem modules as a module
+      # argument (consumed by modules/checks/k8s-cilium-compat.nix).
+      _module.args.k8sClusters = {
+        local = localCluster;
+        local-k3d = localK3dCluster;
+      };
+
       packages = {
         # YAML manifest file for local cluster
         k8s-manifests-local = localCluster.manifestYAMLFile;
