@@ -1,11 +1,11 @@
 # ctlptl cluster configuration for local k3d development cluster
-# This configuration creates a single-node k3d cluster (k3s v1.31) with:
+# This configuration creates a single-node k3d cluster (k3s v1.33) with:
 # - Static subnet 192.168.100.0/24 for predictable IPs:
 #   - .2 = k3d-serverlb (load balancer container)
 #   - .3 = k3d-dev-server-0 (k3s node, where servicelb binds)
 #   sslip.io domains use .3: *.192.168.100.3.sslip.io resolves to k3s node
 # - Disabled Flannel (for Cilium CNI - pod networking)
-# - k3s kube-proxy enabled (Cilium kube-proxy replacement has eBPF issues in k3d)
+# - k3s kube-proxy disabled (Cilium kube-proxy replacement serves Services)
 # - Disabled Traefik (using Cilium Gateway API for ingress)
 # - ServiceLB enabled (klipper-lb assigns node IPs to LoadBalancer services)
 # - Ports 80/443 exposed for Gateway API ingress via servicelb
@@ -19,7 +19,9 @@ k3d:
   v1alpha5Simple:
     servers: 1
     subnet: "192.168.100.0/24"
-    image: rancher/k3s:v1.31.4-k3s1
+    # v1.33 is inside every pinned support matrix: cilium v1.18.6 (1.30-1.33),
+    # cilium v1.20.2 (1.33-1.36), and Argo CD v3.2 (1.31-1.34).
+    image: rancher/k3s:v1.33.13-k3s2
     volumes:
       - volume: /tmp/k3d-manifests:/manifests
         nodeFilters:
@@ -46,5 +48,8 @@ k3d:
             nodeFilters:
               - server:*
           - arg: --disable=traefik
+            nodeFilters:
+              - server:*
+          - arg: --disable-kube-proxy
             nodeFilters:
               - server:*

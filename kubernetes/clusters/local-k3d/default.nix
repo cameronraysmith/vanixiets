@@ -56,21 +56,19 @@ in
   cilium.enable = isFoundation;
   cilium.version = "1.18.6";
   # k3d/OrbStack eBPF accommodations:
-  # - Disable kube-proxy replacement (use k3s native kube-proxy)
-  # - Disable BPF masquerade (use iptables masquerade instead)
+  # - Kube-proxy replacement on, as in the production module: cilium >= 1.19
+  #   runs its Gateway API controller only with kube-proxy replacement
+  #   (operator/pkg/gateway-api/cell.go), and cluster.yaml disables the k3s
+  #   kube-proxy to match. BPF masquerade is left at the module default.
   cilium.helmValues = {
-    kubeProxyReplacement = false;
-    bpf.masquerade = false;
-    enableIPv4Masquerade = true;
+    kubeProxyReplacement = true;
     # Disable sysctlfix init container - fails in k3d/kind containers
     # because /proc/sys is read-only
     sysctlfix.enabled = false;
     # Gateway API support for ingress
     # hostNetwork disabled - use k3s servicelb for LoadBalancer IP assignment
-    # nodePort required when kubeProxyReplacement=false (k3d eBPF constraints)
     gatewayAPI.enabled = true;
     gatewayAPI.hostNetwork.enabled = false;
-    nodePort.enabled = true;
   };
 
   # ==========================================================================

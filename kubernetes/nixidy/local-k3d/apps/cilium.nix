@@ -53,8 +53,8 @@ in
         # Core settings for local dev
         cluster.name = clusterName;
 
-        # kube-proxy replacement disabled for k3d/OrbStack (use k3s native kube-proxy)
-        kubeProxyReplacement = false;
+        # kube-proxy replacement on; cluster.yaml disables the k3s kube-proxy
+        kubeProxyReplacement = true;
 
         # Use tunnel mode for simplicity (works with any network)
         routingMode = "tunnel";
@@ -74,10 +74,8 @@ in
         hubble.relay.enabled = false;
         hubble.ui.enabled = false;
 
-        # k3d/OrbStack eBPF accommodations
-        # Disable BPF masquerade (use iptables masquerade instead)
-        bpf.masquerade = false;
-        enableIPv4Masquerade = true;
+        # BPF masquerade for outbound NAT (module default)
+        bpf.masquerade = true;
 
         # Disable sysctlfix init container - it fails in k3d/kind containers
         # because /proc/sys is read-only and systemd-sysctl.service doesn't exist
@@ -92,10 +90,8 @@ in
 
         # Gateway API support
         # hostNetwork disabled - use k3s servicelb for LoadBalancer IP assignment
-        # nodePort required when kubeProxyReplacement=false (k3d eBPF constraints)
         gatewayAPI.enabled = true;
         gatewayAPI.hostNetwork.enabled = false;
-        nodePort.enabled = true;
       };
     };
 
