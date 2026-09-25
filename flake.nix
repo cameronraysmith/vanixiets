@@ -171,7 +171,7 @@
     argocd-helm-src.url = "github:argoproj/argo-helm/argo-cd-9.3.4";
     argocd-helm-src.flake = false;
 
-    gateway-api-src.url = "github:kubernetes-sigs/gateway-api/v1.4.1";
+    gateway-api-src.url = "github:kubernetes-sigs/gateway-api/v1.6.2";
     gateway-api-src.flake = false;
   };
 
