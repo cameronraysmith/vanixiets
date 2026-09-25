@@ -162,7 +162,7 @@
     step-ca-src.url = "github:smallstep/helm-charts/master";
     step-ca-src.flake = false;
 
-    sops-secrets-operator-src.url = "github:isindir/sops-secrets-operator/0.16.0";
+    sops-secrets-operator-src.url = "github:isindir/sops-secrets-operator/0.21.2";
     sops-secrets-operator-src.flake = false;
 
     argocd-src.url = "github:argoproj/argo-cd/v3.2.5";
