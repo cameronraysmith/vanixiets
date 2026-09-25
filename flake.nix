@@ -165,7 +165,7 @@
     sops-secrets-operator-src.url = "github:isindir/sops-secrets-operator/0.16.0";
     sops-secrets-operator-src.flake = false;
 
-    argocd-src.url = "github:argoproj/argo-cd/v3.2.5";
+    argocd-src.url = "github:argoproj/argo-cd/v3.5.3";
     argocd-src.flake = false;
 
     argocd-helm-src.url = "github:argoproj/argo-helm/argo-cd-9.3.4";
