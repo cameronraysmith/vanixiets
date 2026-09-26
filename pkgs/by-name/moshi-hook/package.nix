@@ -26,26 +26,26 @@ let
   systemToAsset = {
     "aarch64-darwin" = {
       label = "Darwin_arm64";
-      hash = "sha256-tGTRaxIqzlyMNCiKcXmVtPdD45Yc+pJhtbqLYWPX5tw=";
+      hash = "sha256-+HAAv8hm9Kh3tc0n3fSuO8j+mlS8UCJ3fQKV6/bqlpo=";
     };
     "x86_64-darwin" = {
       label = "Darwin_x86_64";
-      hash = "sha256-doZeWxB5ZqCs6pfg6b4ePbLAaTDNZAZnKoWYdWlBk2Q=";
+      hash = "sha256-Mgbk9xx+0XTtWTVEXkww/Zp/Wv9GV3ic8mAMOhZkKLo=";
     };
     "aarch64-linux" = {
       label = "Linux_arm64";
-      hash = "sha256-0QVwP7BT5q9BbnucqdjOOx+0iEQ1haHF6kX9OSukgRg=";
+      hash = "sha256-0BEbe8W45CeLPaFoYk8M56wrRuv/8tDMPrtEZ3beaH0=";
     };
     "x86_64-linux" = {
       label = "Linux_x86_64";
-      hash = "sha256-AkFhSriCghWYAMr5oKZSMLjpJ+IfAqbTTsws/tx4JVA=";
+      hash = "sha256-L2gYt8XcaB3ezNPyRnmapN+4DaIxA0hu+gjDmWqrPN0=";
     };
   };
   asset = systemToAsset.${system} or (throw "moshi-hook: unsupported platform ${system}");
 in
 stdenv.mkDerivation (finalAttrs: {
   pname = "moshi-hook";
-  version = "0.3.26";
+  version = "0.4.3";
 
   src = fetchurl {
     url = "https://cdn.getmoshi.app/hook/v${finalAttrs.version}/moshi-hook_${asset.label}.tar.gz";
