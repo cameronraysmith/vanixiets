@@ -32,7 +32,7 @@
     niri-flake.inputs.nixpkgs-stable.follows = "nixpkgs";
 
     dms-src = {
-      url = "github:AvengeMedia/DankMaterialShell/9dc5b2c5af7d18b7231f425fe0d8fa7243233109";
+      url = "github:AvengeMedia/DankMaterialShell/e4fb86be91cb4cfc78f8ac936b68cc587848c1de";
       flake = false;
     };
 
