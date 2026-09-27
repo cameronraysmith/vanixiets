@@ -16,9 +16,6 @@
         };
       };
 
-      # Automatic store optimization via hardlinking
-      nix.optimise.automatic = true;
-
       # Additional nix settings
       nix.settings = {
         # Fleet is aarch64-only; no x86_64-darwin in extra-platforms

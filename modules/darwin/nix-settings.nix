@@ -39,8 +39,15 @@
             };
           };
 
-          # Automatic store optimization via hardlinking
-          optimise.automatic = true;
+          # No scheduled `nix-store --optimise` on darwin. Hardlinking an existing
+          # store file into /nix/store/.links bumps its inode ctime, which discards
+          # syspolicyd's cached malware-scan verdict for any binary already run.
+          # The next exec rescans the whole file, and concurrent execs each rescan
+          # independently. On 2026-09-27 the 03:45 run relinked the 178 MB omp
+          # binary; after the next wake, a burst of omp execs saturated syspolicyd,
+          # authd and then WindowServer blocked, and the watchdog ended the session.
+          # Run `nix store optimise` by hand (ngc) when disk space matters more.
+          optimise.automatic = false;
 
           settings = {
             # Write nix-path to nix.conf for daemon and non-shell contexts
