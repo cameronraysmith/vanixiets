@@ -548,6 +548,24 @@
         "type": "github"
       }
     },
+    "flake-utils_7": {
+      "inputs": {
+        "systems": "systems_11"
+      },
+      "locked": {
+        "lastModified": 1731533236,
+        "narHash": "sha256-l0KFg5HjrsfsO/JpG+r7fRrqm12kzFHyUHqHCVpMMbI=",
+        "owner": "numtide",
+        "repo": "flake-utils",
+        "rev": "11707dc2f618dd54ca8739b309ec4fc024de578b",
+        "type": "github"
+      },
+      "original": {
+        "owner": "numtide",
+        "repo": "flake-utils",
+        "type": "github"
+      }
+    },
     "gateway-api-src": {
       "flake": false,
       "locked": {
@@ -1419,9 +1437,31 @@
         "type": "github"
       }
     },
-    "playwright-web-flake": {
+    "playwright-cli": {
       "inputs": {
         "flake-utils": "flake-utils_6",
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1789805356,
+        "narHash": "sha256-MyUYqZykq+PzYFmNBngk6a/A4t+wVdas9+pAdqhN0RU=",
+        "owner": "halfwhey",
+        "repo": "nix-playwright-nightly",
+        "rev": "339105f4a51f14995c746baff1c75155a0f48b61",
+        "type": "github"
+      },
+      "original": {
+        "owner": "halfwhey",
+        "repo": "nix-playwright-nightly",
+        "rev": "339105f4a51f14995c746baff1c75155a0f48b61",
+        "type": "github"
+      }
+    },
+    "playwright-web-flake": {
+      "inputs": {
+        "flake-utils": "flake-utils_7",
         "nixpkgs": [
           "nixpkgs"
         ]
@@ -1583,13 +1623,14 @@
         "nixpkgs-linux-stable": "nixpkgs-linux-stable",
         "nuenv": "nuenv",
         "pkgs-by-name-for-flake-parts": "pkgs-by-name-for-flake-parts",
+        "playwright-cli": "playwright-cli",
         "playwright-web-flake": "playwright-web-flake",
         "rust-overlay": "rust-overlay_2",
         "sops-nix": "sops-nix",
         "sops-secrets-operator-src": "sops-secrets-operator-src",
         "srvos": "srvos",
         "step-ca-src": "step-ca-src",
-        "systems": "systems_11",
+        "systems": "systems_12",
         "terranix": "terranix",
         "treefmt-nix": "treefmt-nix_5",
         "zen-browser": "zen-browser"
@@ -1743,6 +1784,21 @@
       }
     },
     "systems_11": {
+      "locked": {
+        "lastModified": 1681028828,
+        "narHash": "sha256-Vy1rq5AaRuLzOxct8nz4T6wlgyUR7zLU309k9mBC768=",
+        "owner": "nix-systems",
+        "repo": "default",
+        "rev": "da67096a3b9bf56a91d16901293e51ba5b49a27e",
+        "type": "github"
+      },
+      "original": {
+        "owner": "nix-systems",
+        "repo": "default",
+        "type": "github"
+      }
+    },
+    "systems_12": {
       "locked": {
         "lastModified": 1774449309,
         "narHash": "sha256-brhZ8DmuGtzkCYHJg4HEd602amKm89Y9ytsFZ5uWD1w=",

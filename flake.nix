@@ -131,6 +131,11 @@
     playwright-web-flake.url = "github:cameronraysmith/playwright-web-flake/1.63.0";
     playwright-web-flake.inputs.nixpkgs.follows = "nixpkgs";
 
+    # The agent CLI pins an alpha Playwright core; keep its browsers independent
+    # of the stable docs-test runtime above.
+    playwright-cli.url = "github:halfwhey/nix-playwright-nightly/339105f4a51f14995c746baff1c75155a0f48b61";
+    playwright-cli.inputs.nixpkgs.follows = "nixpkgs";
+
     nuenv.url = "github:hallettj/nuenv/writeShellApplication";
     nuenv.inputs.nixpkgs.follows = "nixpkgs";
 
