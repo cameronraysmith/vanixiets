@@ -12,7 +12,10 @@
     inputs.home-manager.lib.homeManagerConfiguration {
       pkgs = import inputs.nixpkgs {
         inherit system;
-        config.allowUnfree = true;
+        config = {
+          allowUnfree = true;
+          inherit (config.flake.lib) permittedInsecurePackages;
+        };
         overlays = [
           config.flake.overlays.default
         ];
