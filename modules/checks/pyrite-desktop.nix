@@ -227,7 +227,7 @@ in
             && toString dms.package == toString pkgs.dms-shell
             && toString dms.quickshell.package == toString pkgs.quickshell
             && toString home.programs.quickshell.package == toString pkgs.quickshell
-            && pkgs.dms-shell.version == "1.6.1"
+            && pkgs.dms-shell.version == "1.6.2"
             && pkgs.dms-greeter.version == "1.6.2"
             # niri-flake is branch-tracked in flake.nix, so there is no
             # declared revision to derive an expectation from; this literal is

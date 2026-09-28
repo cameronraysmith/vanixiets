@@ -259,7 +259,6 @@ The workflow consists of three jobs that run sequentially:
 - `version`: Primary version tag (default: "latest")
 - `tags`: Comma-separated additional tags applied via crane without re-uploading (default: "")
 - `push`: Whether to push images to registry (default: false for workflow_dispatch, true for workflow_call)
-- `debug_enabled`: Enable tmate debug session (default: false)
 
 ### Running the workflow
 
