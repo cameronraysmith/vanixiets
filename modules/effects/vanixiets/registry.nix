@@ -9,6 +9,7 @@
 #   main              herculesCI.onPush.default.outputs.effects.<name>
 #   pullRequest       herculesCI.onEvent.pull_request.<name>
 #   pullRequestClosed herculesCI.onEvent.pull_request_closed.<name>
+#   buildFinished     herculesCI.onEvent.build_finished.<name>
 #
 # nixbot evaluates onEvent from the default branch whatever pull request the
 # event is about, delivers pull_request once a pull request head built green
@@ -95,6 +96,7 @@ let
         main = triggerOption "Run on nixbot's onPush for main, behind the main-only guard, with `--rev <rev>` appended.";
         pullRequest = triggerOption "Run as a nixbot onEvent pull_request effect.";
         pullRequestClosed = triggerOption "Run as a nixbot onEvent pull_request_closed effect.";
+        buildFinished = triggerOption "Run as a nixbot onEvent build_finished effect, without the main-only guard or appended revision.";
       };
     };
   };
@@ -181,7 +183,7 @@ let
     if lib.any (trigger: trigger != null) (builtins.attrValues entry.triggers) then
       entry
     else
-      throw "vanixiets.effects.${name}: declares no trigger; set at least one of triggers.{main,pullRequest,pullRequestClosed}";
+      throw "vanixiets.effects.${name}: declares no trigger; set at least one of triggers.{main,pullRequest,pullRequestClosed,buildFinished}";
 in
 {
   options.vanixiets.effects = lib.mkOption {
@@ -199,6 +201,7 @@ in
       onPush.default.outputs.effects = effectsFor "main" herculesCI.config.repo.rev;
       onEvent.pull_request = effectsFor "pullRequest" null;
       onEvent.pull_request_closed = effectsFor "pullRequestClosed" null;
+      onEvent.build_finished = effectsFor "buildFinished" null;
     };
   };
 }

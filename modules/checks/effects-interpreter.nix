@@ -2,10 +2,10 @@
 #
 # That script is the only code an effect runs before its program, and it
 # decides whether the program runs, with which secrets and which arguments.
-# Each row renders a synthetic entry for one trigger kind (main, pullRequest,
-# pullRequestClosed) through flake.lib.vanixietsEffectScript, the function
-# modules/effects/vanixiets/registry.nix uses, runs it the way mkEffect's
-# effectPhase does (eval of the script text), and asserts the exit status, the
+# Rows render synthetic entries through flake.lib.vanixietsEffectScript,
+# the function modules/effects/vanixiets/registry.nix uses for main,
+# pullRequest, pullRequestClosed and buildFinished, run it the way mkEffect's
+# effectPhase does (eval of the script text), and assert the exit status, the
 # output, and exactly the argv and environment the program saw. Only main runs
 # the guard and receives `--rev`; secrets and the forge token are exported per
 # trigger. Rows marked "registry" render the vanixiets.effects entries
@@ -16,6 +16,10 @@
 # too, through flake.lib.vanixietsEffectSecretsMap, the function mkEffect
 # uses, since that map is what nixbot writes into the secrets file.
 #
+# buildFinished rows use the actual onEvent.build_finished effectScript from
+# an isolated registry evaluation, so a broken event mapping cannot pass by
+# testing the renderer alone.
+#
 # The program is a stub that records its argv and the secret variables, and
 # curl is stubbed for the nixbot id-token endpoint the main guard calls,
 # as in checks.effect-run-context. Secret values are dummies.
@@ -23,6 +27,8 @@
   config,
   self,
   lib,
+  inputs,
+  withSystem,
   ...
 }:
 let
@@ -42,11 +48,108 @@ in
       ];
 
       stubProgram = pkgs.writeShellScript "stub-program" ''
-        printf '%s\n' "$@" > "$PWD/argv"
+        for arg in "$@"; do
+          printf '%s\n' "$arg"
+        done > "$PWD/argv"
         ${lib.concatMapStrings (var: ''
           printf '%s\n' "${var}=''${${var}-UNSET}" >> "$PWD/env"
         '') recordedVars}
       '';
+
+      # Evaluate the production registry in isolation: these entries never
+      # register live effects, but exercise its option defaults and onEvent map.
+      fixture = lib.evalModules {
+        specialArgs = { inherit inputs withSystem; };
+        modules = [
+          ../effects/vanixiets/registry.nix
+          {
+            options.flake.lib = lib.mkOption { type = lib.types.attrs; };
+            options.herculesCI = lib.mkOption { type = lib.types.raw; };
+            config = {
+              flake.lib = {
+                inherit (self.lib) effectRunContext vanixietsEffectSecrets;
+              };
+              vanixiets.effects = {
+                finished = {
+                  program = stubProgram;
+                  rehearsals = [ pkgs.emptyFile ];
+                  triggers.buildFinished = {
+                    lock = "finished";
+                    args = [
+                      "two words"
+                      "$HOME"
+                      "it's literal"
+                      ""
+                    ];
+                    secrets = [ "CLOUDFLARE_API_TOKEN" ];
+                    forgeToken = true;
+                  };
+                  triggers.main = {
+                    lock = "main";
+                    secrets = [ "GITHUB_TOKEN" ];
+                  };
+                };
+                defaults = {
+                  program = stubProgram;
+                  rehearsals = [ pkgs.emptyFile ];
+                  triggers.buildFinished.lock = "defaults";
+                };
+                omitted = {
+                  program = stubProgram;
+                  rehearsals = [ pkgs.emptyFile ];
+                  triggers.pullRequest.lock = "omitted";
+                };
+              };
+            };
+          }
+        ];
+      };
+      fixtureOutputs = fixture.config.herculesCI { config.repo = { inherit rev; }; };
+      finishedEffects = fixtureOutputs.onEvent.build_finished;
+      structural = {
+        eventNames = builtins.attrNames finishedEffects;
+        mainNames = builtins.attrNames fixtureOutputs.onPush.default.outputs.effects;
+        pullRequestNames = builtins.attrNames fixtureOutputs.onEvent.pull_request;
+        closedNames = builtins.attrNames fixtureOutputs.onEvent.pull_request_closed;
+        omitted = fixture.config.vanixiets.effects.omitted.triggers.buildFinished;
+        defaults = fixture.config.vanixiets.effects.defaults.triggers;
+        lock = finishedEffects.finished.lock;
+        secretsMap = builtins.fromJSON finishedEffects.finished.secretsMap;
+        defaultSecretsMap = builtins.fromJSON finishedEffects.defaults.secretsMap;
+        hasAudience = finishedEffects.finished ? idTokenAudiences;
+        liveFinished = builtins.attrNames (
+          lib.filterAttrs (_: entry: entry.triggers.buildFinished != null) registry
+        );
+      };
+      expectedStructural = {
+        eventNames = [
+          "defaults"
+          "finished"
+        ];
+        mainNames = [ "finished" ];
+        pullRequestNames = [ "omitted" ];
+        closedNames = [ ];
+        omitted = null;
+        defaults = {
+          main = null;
+          pullRequest = null;
+          pullRequestClosed = null;
+          buildFinished = {
+            lock = "defaults";
+            args = [ ];
+            secrets = [ ];
+            forgeToken = false;
+          };
+        };
+        lock = "finished";
+        secretsMap = {
+          CLOUDFLARE_API_TOKEN = "CLOUDFLARE_API_TOKEN";
+          GITHUB_FORGE_TOKEN.type = "GitToken";
+        };
+        defaultSecretsMap = { };
+        hasAudience = false;
+        liveFinished = [ ];
+      };
 
       mkTokenResponse = claims: ''
         payload="$(printf '%s' ${lib.escapeShellArg (builtins.toJSON claims)} \
@@ -66,6 +169,7 @@ in
           entry ? null,
           trigger ? { },
           otherTriggers ? { },
+          effectScript ? null,
           claims ? null,
           secretsJson,
           status,
@@ -90,7 +194,10 @@ in
                 };
               };
           script = pkgs.writeText "effect-script.sh" (
-            self.lib.vanixietsEffectScript { inherit rev; } kind rendered
+            if effectScript != null then
+              effectScript
+            else
+              self.lib.vanixietsEffectScript { inherit rev; } kind rendered
           );
         in
         ''
@@ -126,7 +233,7 @@ in
               ''
             else
               ''
-                printf '%s\n' ${lib.escapeShellArgs argv} > argv.expected
+                printf '%s' ${lib.escapeShellArg (lib.concatMapStrings (arg: arg + "\n") argv)} > argv.expected
                 diff -u argv.expected argv
                 printf '%s\n' ${
                   lib.escapeShellArgs (map (var: "${var}=${env.${var} or "UNSET"}") recordedVars)
@@ -205,7 +312,54 @@ in
             printf '%s' ${lib.escapeShellArg (builtins.toJSON grantedSecrets)} | jq -S . > granted
             diff -u granted.expected granted
 
+            echo "--- build_finished registry mapping and defaults"
+            printf '%s' ${lib.escapeShellArg (builtins.toJSON expectedStructural)} | jq -S . > structural.expected
+            printf '%s' ${lib.escapeShellArg (builtins.toJSON structural)} | jq -S . > structural
+            diff -u structural.expected structural
+
             ${lib.concatMapStrings row [
+              {
+                name = "buildFinished maps to an unguarded event with literal argv and only its own secrets";
+                kind = "buildFinished";
+                effectScript = finishedEffects.finished.effectScript;
+                secretsJson = everySecret;
+                status = 0;
+                argv = [
+                  "two words"
+                  "$HOME"
+                  "it's literal"
+                  ""
+                ];
+                env = {
+                  CLOUDFLARE_API_TOKEN = "dummy-cloudflare-token";
+                  GITHUB_FORGE_TOKEN = "dummy-forge-token";
+                };
+              }
+              {
+                name = "buildFinished defaults grant no secrets and append no revision";
+                kind = "buildFinished";
+                effectScript = finishedEffects.defaults.effectScript;
+                secretsJson = everySecret;
+                status = 0;
+                argv = [ ];
+                env = { };
+              }
+              {
+                name = "buildFinished missing declared secret fails before the program runs";
+                kind = "buildFinished";
+                effectScript = finishedEffects.finished.effectScript;
+                secretsJson = forge;
+                status = 1;
+                expect = [ "error: CLOUDFLARE_API_TOKEN missing from $HERCULES_CI_SECRETS_JSON" ];
+              }
+              {
+                name = "buildFinished missing forge token fails before the program runs";
+                kind = "buildFinished";
+                effectScript = finishedEffects.finished.effectScript;
+                secretsJson = cloudflare;
+                status = 1;
+                expect = [ "error: GITHUB_FORGE_TOKEN missing from $HERCULES_CI_SECRETS_JSON" ];
+              }
               {
                 name = "main execs the program with --rev and its secrets";
                 kind = "main";
