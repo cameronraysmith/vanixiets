@@ -139,6 +139,7 @@
           pkgs.duckdb
           self'.packages.linear-cli
           self'.packages.mergify-cli-bin
+          self'.packages.playwright-cli
           inputs'.llm-agents.packages.openspec
           # Supplies both `renovate` and `renovate-config-validator`. The
           # validator is what `checks.renovate-config` runs in the sandbox;

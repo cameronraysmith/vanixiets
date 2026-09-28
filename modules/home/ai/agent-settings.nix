@@ -229,6 +229,5 @@ let
     };
 in
 {
-  flake.modules.homeManager.ai = content;
   flake.modules.homeManager.agent-settings = content;
 }

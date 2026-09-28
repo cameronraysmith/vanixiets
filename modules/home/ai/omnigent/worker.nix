@@ -90,12 +90,10 @@ in
       imports = map (name: modules.${name}) [
         "omnigent"
         "omnigent-worker-credentials"
-        "agent-settings"
+        "ai-capabilities"
         "atomic"
         "omp"
         "pi"
-        "ai-skills-compose"
-        "ai-skills"
         "agents-md"
         "agent-context"
         "cli-tools"

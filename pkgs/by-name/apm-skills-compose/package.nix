@@ -4,6 +4,7 @@
   stdenv,
   runCommandLocal,
   ripgrep,
+  jq,
   writeText,
 
   apm,
@@ -78,6 +79,8 @@
   linearCliSrc ? inputs.self.packages.${stdenv.hostPlatform.system}.linear-cli.src,
   linearCliRev ? linearCliSrc.rev,
 
+  playwrightCli ? inputs.self.packages.${stdenv.hostPlatform.system}.playwright-cli,
+
   targets ? [
     "agent-skills"
     "claude"
@@ -113,6 +116,7 @@ runCommandLocal "apm-skills-compose"
     nativeBuildInputs = [
       apm
       ripgrep
+      jq
     ];
     meta = {
       description = "Consumer apm compose over all auto-discovered first-party plugin packages, emitting flat .claude/skills and .agents/skills trees for the vanixiets marketplace; superpowers resolves as a regular remote apm dep offline via a pre-warmed git checkout cache.";
@@ -267,8 +271,30 @@ runCommandLocal "apm-skills-compose"
       exit 1
     fi
 
+    # Reuse the CLI's release source, including the skill's references directory.
+    PW_SHA=${playwrightCli.src.rev}
+    if ! awk -v sha="$PW_SHA" '
+      $1 == "-" && $2 == "git:" { selected = ($3 == "microsoft/playwright-cli") }
+      selected && $1 == "ref:" && $2 == sha { found = 1 }
+      END { exit !found }
+    ' ./planning-and-development/apm.yml; then
+      echo "apm-skills-compose: playwright-cli manifest/source SHA drift" >&2
+      exit 1
+    fi
+    if [ "$(jq -r .version ${playwrightCli.src}/package.json)" != ${lib.escapeShellArg playwrightCli.version} ]; then
+      echo "apm-skills-compose: playwright-cli package/source version drift" >&2
+      exit 1
+    fi
+    SHARD_PW=$(printf '%s' 'https://github.com/microsoft/playwright-cli' | sha256sum | cut -c1-16)
+    CK_PW="$APM_CACHE_DIR/git/checkouts_v1/$SHARD_PW/$PW_SHA/full"
+    mkdir -p "$CK_PW"
+    cp -RL ${playwrightCli.src}/. "$CK_PW"/
+    chmod -R u+w "$CK_PW"
+    mkdir -p "$CK_PW/.git"
+    printf '%s\n' "$PW_SHA" > "$CK_PW/.git/HEAD"
+
     # APM 0.31 rejects HEAD-only cache seeds to rematerialize older CRLF checkouts.
-    for checkout in "$CK" "$CK_AG" "$CK_WT" "$CK_MP" "$CK_US" "$CK_GH" "$CK_MF" "$CK_LC"; do
+    for checkout in "$CK" "$CK_AG" "$CK_WT" "$CK_MP" "$CK_US" "$CK_GH" "$CK_MF" "$CK_LC" "$CK_PW"; do
       printf '[core]\n\tautocrlf = false\n' > "$checkout/.git/config"
     done
 
@@ -302,10 +328,16 @@ runCommandLocal "apm-skills-compose"
       "$out/.claude/skills/mergify-stack/SKILL.md" \
       "$out/.agents/skills/mergify-stack/SKILL.md" \
       "$out/.claude/skills/linear-cli/SKILL.md" \
-      "$out/.agents/skills/linear-cli/SKILL.md"; do
+      "$out/.agents/skills/linear-cli/SKILL.md" \
+      "$out/.claude/skills/playwright-cli/SKILL.md" \
+      "$out/.agents/skills/playwright-cli/SKILL.md"; do
       if [ ! -f "$expected" ]; then
         echo "apm-skills-compose assertion failed: missing $expected" >&2
         exit 1
       fi
+    done
+
+    for target in .claude .agents; do
+      diff -r ${playwrightCli.src}/skills/playwright-cli "$out/$target/skills/playwright-cli"
     done
   ''

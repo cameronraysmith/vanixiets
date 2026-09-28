@@ -352,6 +352,12 @@
           && !lib.elem "${pkgs.gh}/bin" (lib.splitString ":" wrappedPath)
           && lib.hasPrefix "${wrappedHome.programs.claude-code.package}/bin:" wrappedPath;
         tools = cfg.programs.ripgrep.enable && cfg.programs.fd.enable && cfg.programs.gh.enable;
+        browserAutomation =
+          lib.elem pkgs.playwright-cli cfg.home.packages
+          &&
+            toString cfg.programs.claude-code.skills.playwright-cli
+            == "${cfg.aiSkills.composed}/.claude/skills/playwright-cli"
+          && !lib.elem pkgs.playwright-cli.skills cfg.aiSkills.extraSkillDirs;
         workflowCapabilities =
           (cfg.programs.openspec.enable or false)
           && (cfg.programs.mergify.enable or false)
@@ -384,6 +390,7 @@
             composed =
               (mkHome (
                 map (name: config.flake.modules.homeManager.${name}) [
+                  "ai-capabilities"
                   "repository-acquisition"
                   "engineering-tools"
                   "nix-development"
@@ -397,6 +404,7 @@
             pkgs.ghq
             pkgs.just
             pkgs.nixfmt
+            pkgs.playwright-cli
             composed.programs.openspec.package
             composed.programs.mergify.package
             composed.programs.neovim.finalPackage
@@ -1498,6 +1506,8 @@
               test -x ${cleanHome.config.home.path}/bin/pi
               test -x ${cleanHome.config.home.path}/bin/atomic
               export PATH=${lib.escapeShellArg workerPath}
+              test -x "$(command -v playwright-cli)"
+              playwright-cli --version | grep -Fx ${lib.escapeShellArg pkgs.playwright-cli.version}
               id -u
               ${lib.optionalString pkgs.stdenv.hostPlatform.isLinux "hostname"}
               ${lib.optionalString pkgs.stdenv.hostPlatform.isLinux ''

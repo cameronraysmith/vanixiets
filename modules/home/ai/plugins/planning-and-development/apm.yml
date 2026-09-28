@@ -30,6 +30,11 @@ dependencies:
     - git: schpet/linear-cli
       ref: 196315343d2bc58f30ca5d5ab40f4eb6a449fd71
       skills: [linear-cli]
+    # Keep the CLI and its skill on the same release source; offline composition
+    # checks this pin against pkgs.playwright-cli.src.rev.
+    - git: microsoft/playwright-cli
+      ref: 74354ecc7a43da16d91a9bc54fa8db8283a3fcf5
+      skills: [playwright-cli]
 # Soft coupling (agentic planning Manual execution mode): this package pairs with
 # beads-issue-tracking-and-session-workflow@vanixiets, whose beads issue-tracking
 # skills (issues-beads-*) have been retired pending re-base onto Linear/OpenSpec;
