@@ -27,7 +27,9 @@
     home-manager.inputs.nixpkgs.follows = "nixpkgs";
 
     # Typed configuration only; pyrite runs and validates with nixpkgs' niri.
-    niri-flake.url = "github:epireyn/niri-flake";
+    # Pinned by revision so a schema/renderer change arrives as a reviewed
+    # declaration bump (renovate digest PR) that pyrite-desktop.nix checks.
+    niri-flake.url = "github:epireyn/niri-flake/b745078f945e13ba7aca0a5c77968e07289fa03c";
     niri-flake.inputs.nixpkgs.follows = "nixpkgs";
     niri-flake.inputs.nixpkgs-stable.follows = "nixpkgs";
 

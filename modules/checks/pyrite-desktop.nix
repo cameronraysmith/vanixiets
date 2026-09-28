@@ -229,10 +229,7 @@ in
             && toString home.programs.quickshell.package == toString pkgs.quickshell
             && pkgs.dms-shell.version == "1.6.2"
             && pkgs.dms-greeter.version == "1.6.2"
-            # niri-flake is branch-tracked in flake.nix, so there is no
-            # declared revision to derive an expectation from; this literal is
-            # a lock pin rather than a duplicated one.
-            && inputs.niri-flake.rev == "db2615fc6b3f75539ec681a984e3311b8d79ede0"
+            && pinnedToDeclaredRev "niri-flake" inputs.niri-flake
             && pinnedToDeclaredRev "dms-src" inputs.dms-src
             &&
               map toString options.programs.niri.enable.declarations == [
