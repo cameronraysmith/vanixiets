@@ -24,6 +24,16 @@ let
   # by the conjuncts that compare the packages actually installed against the
   # packages this input provides.
   #
+  # dms-src is the exception, pinned by release tag rather than revision. Only
+  # its home-manager module (distro/nix) is imported; the shell itself is
+  # nixpkgs' dms-shell. The invariant is that the module and the running shell
+  # are the same release: the tag declared in flake.nix (`original.ref`), the
+  # release the fetched tree names in quickshell/VERSION, and the packaged
+  # dms-shell version must all agree. A nixpkgs bump of dms-shell therefore
+  # fails until the tag follows it, and a tag bump fails until nixpkgs ships
+  # that release; an untagged master revision fails because its VERSION names
+  # the next pre-release, not a shipped one.
+  #
   # Input names are resolved through the root node's input map rather than
   # indexed directly, because a lock node's key is not its input name once nix
   # deduplicates: the root's "nixpkgs" is the node "nixpkgs_9" here, and any
@@ -31,6 +41,8 @@ let
   lock = builtins.fromJSON (builtins.readFile ../../flake.lock);
   declaredRev = name: lock.nodes.${lock.nodes.root.inputs.${name}}.original.rev or null;
   pinnedToDeclaredRev = name: input: declaredRev name != null && input.rev == declaredRev name;
+  declaredRef = name: lock.nodes.${lock.nodes.root.inputs.${name}}.original.ref or null;
+  dmsSrcVersion = lib.trim (builtins.readFile "${inputs.dms-src}/quickshell/VERSION");
 in
 {
   perSystem =
@@ -227,10 +239,10 @@ in
             && toString dms.package == toString pkgs.dms-shell
             && toString dms.quickshell.package == toString pkgs.quickshell
             && toString home.programs.quickshell.package == toString pkgs.quickshell
-            && pkgs.dms-shell.version == "1.6.2"
+            && declaredRef "dms-src" == dmsSrcVersion
+            && dmsSrcVersion == "v${pkgs.dms-shell.version}"
             && pkgs.dms-greeter.version == "1.6.2"
             && pinnedToDeclaredRev "niri-flake" inputs.niri-flake
-            && pinnedToDeclaredRev "dms-src" inputs.dms-src
             &&
               map toString options.programs.niri.enable.declarations == [
                 "${inputs.nixpkgs}/nixos/modules/programs/wayland/niri.nix"

@@ -310,17 +310,17 @@
     "dms-src": {
       "flake": false,
       "locked": {
-        "lastModified": 1790547861,
-        "narHash": "sha256-AfBGTWpYFnuGU3225ho4eR7fSRv7XtOpEkwN6pboqI4=",
+        "lastModified": 1789657660,
+        "narHash": "sha256-NPYX33iiXo6aBwh7umfJzeZQBedupOG7pk5z171ID3s=",
         "owner": "AvengeMedia",
         "repo": "DankMaterialShell",
-        "rev": "a4e500bc0083ed234a8db8c6f33a2c7987af3352",
+        "rev": "2db7646fe3ab47fddfdb8723f2da07d61a0d47ac",
         "type": "github"
       },
       "original": {
         "owner": "AvengeMedia",
+        "ref": "v1.6.2",
         "repo": "DankMaterialShell",
-        "rev": "a4e500bc0083ed234a8db8c6f33a2c7987af3352",
         "type": "github"
       }
     },
@@ -894,8 +894,8 @@
       "original": {
         "owner": "epireyn",
         "repo": "niri-flake",
-        "type": "github",
-        "rev": "b745078f945e13ba7aca0a5c77968e07289fa03c"
+        "rev": "b745078f945e13ba7aca0a5c77968e07289fa03c",
+        "type": "github"
       }
     },
     "niri-stable": {

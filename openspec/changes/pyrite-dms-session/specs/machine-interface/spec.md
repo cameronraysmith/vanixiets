@@ -4,7 +4,7 @@
 
 Pyrite's cameron home configuration SHALL enable upstream DankMaterialShell v1.5.3 with native nixpkgs DMS and Quickshell packages.
 The niri runtime and typed configuration validator MUST resolve to the same native nixpkgs niri store path.
-The epireyn input MUST remain at `db2615fc6b3f75539ec681a984e3311b8d79ede0`, using only `homeModules.config`; the upstream DMS module source MUST be pinned to `069ddab041c738236a8910e4c39b65d9628d3018`.
+The epireyn niri-flake input MUST be pinned to a reviewed revision declared in `flake.nix`, from which the check derives the expected revision, using only `homeModules.config`; the upstream DMS module source MUST be pinned to the release tag equal to the packaged `dms-shell` version.
 One DMS user service MUST have PartOf, After, Requisite and WantedBy equal to `[niri.service]`, condition `XDG_CURRENT_DESKTOP=niri`, native `dms run --session`, Type `dbus` and BusName `org.freedesktop.Notifications`.
 No additional Quickshell, notification, clipboard, network applet, polkit agent, idle daemon or locker startup SHALL be declared for niri.
 DMS MUST enable its built-in polkit agent; native niri portal routing and supporting services MUST remain intact.
