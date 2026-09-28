@@ -23,16 +23,19 @@
 { inputs, ... }:
 let
   # radicle-node (and radicle-tui, which propagates it) is marked insecure for
-  # every release to date: the node transport neither encrypts nor
-  # authenticates peers, which leaks private repositories to anyone on the
-  # network path (https://radicle.dev/2026/09/23/disclosure-of-vulnerability-in-network-protocol,
-  # NixOS/nixpkgs#566450). The fix is a wire-incompatible major release. The
-  # fleet replicates only public repositories: clients point at public seeds and
-  # the cinnabar seed defaults to seedingPolicy "block", so there is no private
-  # repository whose confidentiality depends on the transport. Signed
-  # references still reject tampering in transit. Pinned to the exact version
-  # so any radicle-node bump drops the permission and forces this to be
-  # re-examined; remove it once a release no longer carries the advisory.
+  # every release to date: the node transport sends data in cleartext after the
+  # handshake, and the handshake lets a peer present a Node ID it does not own
+  # (https://radicle.dev/2026/09/23/disclosure-of-vulnerability-in-network-protocol,
+  # NixOS/nixpkgs#566450). Both flaws cost confidentiality, not integrity:
+  # signed references still reject objects tampered with in transit. The fleet
+  # accepts this because it publishes and replicates only public Radicle
+  # repositories, so nothing the transport carries is secret. Traffic from
+  # fleet clients to the cinnabar seed also stays on ZeroTier, since cinnabar
+  # opens 8776 only on the zt+ interfaces (cinnabar/zt-dns.nix). That narrows
+  # the network path but does not fix impersonation, so no private repository
+  # may be added until a Radicle 2.x transport replaces this one. Pinned to the
+  # exact version so any radicle-node bump drops the permission and forces this
+  # to be re-examined; remove it once a release no longer carries the advisory.
   permittedInsecurePackages = [ "radicle-node-1.10.3" ];
 
   defaults = {
