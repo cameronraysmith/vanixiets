@@ -75,7 +75,8 @@ export default defineConfig({
     ? [
         ["html", { outputFolder: "playwright-report", open: "never" }],
         ["json", { outputFile: "playwright-report/results.json" }],
-        ["github"],
+        ["./tests/report/completion-reporter.ts"],
+        ["line"],
       ]
     : [["list"], ["html", { outputFolder: "playwright-report", open: "never" }]],
 
@@ -89,8 +90,8 @@ export default defineConfig({
     // Base URL for page.goto() calls
     baseURL: process.env.BASE_URL ?? "http://localhost:4321",
 
-    // Collect trace when retrying the failed test
-    trace: "on-first-retry",
+    // Keep the original failing attempt, even if its retry passes.
+    trace: "retain-on-failure",
 
     // Screenshot on failure
     screenshot: "only-on-failure",

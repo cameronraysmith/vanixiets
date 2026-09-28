@@ -18,7 +18,7 @@ export default getViteConfig({
     include: ["src/**/*.{test,spec}.{ts,tsx}", "tests/**/*.{test,spec}.{ts,tsx}"],
 
     // Files to exclude from test discovery
-    exclude: ["node_modules", "dist", ".astro", "e2e"],
+    exclude: ["node_modules", "dist", ".astro", "e2e", "tests/negative-control"],
 
     // Coverage configuration
     coverage: {

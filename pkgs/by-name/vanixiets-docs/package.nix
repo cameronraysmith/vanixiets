@@ -4,6 +4,7 @@
   bun,
   nodejs-slim,
   stdenv,
+  runCommand,
   svgo,
   jq,
   autoPatchelfHook,
@@ -173,6 +174,7 @@ stdenv.mkDerivation (finalAttrs: {
     buildPhase = ''
       runHook preBuild
       cd packages/docs
+      node --test tests/report-*.test.mjs
       node ./node_modules/.bin/vitest run
       cd ../..
       runHook postBuild
@@ -195,14 +197,15 @@ stdenv.mkDerivation (finalAttrs: {
     };
   });
 
-  passthru.tests.e2e = stdenv.mkDerivation {
-    pname = "vanixiets-docs-e2e";
+  passthru.tests.e2e-report = stdenv.mkDerivation {
+    pname = "vanixiets-docs-e2e-report";
     version = finalAttrs.version;
     inherit (finalAttrs) src;
 
     nativeBuildInputs = [
       bun
       nodejs-slim
+      jq
     ]
     ++ lib.optionals stdenv.hostPlatform.isLinux [ autoPatchelfHook ];
 
@@ -215,6 +218,7 @@ stdenv.mkDerivation (finalAttrs: {
 
     env = {
       CI = "true";
+      PLAYWRIGHT_CONFIG = "playwright.config.ts";
       # Engine coverage is platform-split. The split lives in the project
       # list only: no spec is deleted, skipped, or weakened on either platform.
       #
@@ -292,18 +296,72 @@ stdenv.mkDerivation (finalAttrs: {
       # is incompatible with Playwright's worker model.
       # PLAYWRIGHT_PROJECTS selects the engines; playwright manages the webServer
       # lifecycle via playwright.config webServer (bun run preview:ci → astro preview).
-      ${nodejs-slim}/bin/node ./node_modules/@playwright/test/cli.js test
+      status=0
+      ${nodejs-slim}/bin/node ./node_modules/@playwright/test/cli.js test \
+        --config "$PLAYWRIGHT_CONFIG" > runner.log 2>&1 || status=$?
+      cat runner.log
+      # JSON reporter paths are absolute sandbox paths. Make attachment links
+      # portable alongside the HTML reporter's self-contained data directory.
+      jq --arg root "$PWD/" \
+        'walk(if type == "object" and has("attachments") then
+          .attachments |= map(if has("path") then .path |= ltrimstr($root) else . end)
+        else . end)' playwright-report/results.json > results.tmp
+      mv results.tmp playwright-report/results.json
+      jq -n --argjson exitCode "$status" \
+        --arg site "${finalAttrs.finalPackage}" \
+        --arg source "${finalAttrs.src}" \
+        --arg dependencies "${vanixiets-docs-deps}" \
+        --arg browsers "${playwrightBrowsers}" \
+        --arg node "${nodejs-slim}" \
+        --arg system "${stdenv.system}" \
+        --arg config "$PLAYWRIGHT_CONFIG" \
+        --arg projects "$PLAYWRIGHT_PROJECTS" \
+        '{schemaVersion: 1, exitCode: $exitCode, provenance: {
+          site: $site, source: $source, dependencies: $dependencies,
+          browsers: $browsers, node: $node, system: $system,
+          config: $config, projects: $projects, trace: "retain-on-failure"
+        }}' > run.json
+      # A completed assertion failure is evidence, not producer failure.
+      # Missing/malformed/incomplete evidence or infrastructure failure is fatal.
+      node tests/report/validate-report.mjs validate .
       cd ../..
 
       runHook postBuild
     '';
 
     installPhase = ''
-      touch $out
+      mkdir -p "$out"
+      cp -R packages/docs/playwright-report packages/docs/test-results "$out/"
+      cp packages/docs/run.json packages/docs/runner.log "$out/"
     '';
 
-    meta.description = "Playwright E2E tests for vanixiets-docs";
+    meta.description = "Cacheable Playwright evidence for vanixiets-docs (not a passing verdict)";
   };
+
+  # Keep the existing required check name. This dependency consumes evidence;
+  # it never launches Playwright or the docs server a second time.
+  passthru.tests.e2e = runCommand "vanixiets-docs-e2e" { } ''
+    ${nodejs-slim}/bin/node ${../../../packages/docs/tests/report}/validate-report.mjs \
+      verdict ${finalAttrs.finalPackage.tests.e2e-report}
+    mkdir -p "$out"
+    ln -s ${finalAttrs.finalPackage.tests.e2e-report} "$out/report"
+  '';
+
+  passthru.tests.e2e-negative-control =
+    let
+      report = finalAttrs.finalPackage.tests.e2e-report.overrideAttrs (old: {
+        pname = "vanixiets-docs-e2e-negative-report";
+        env = old.env // {
+          PLAYWRIGHT_CONFIG = "playwright.negative.config.ts";
+          PLAYWRIGHT_PROJECTS = "chromium";
+        };
+      });
+    in
+    runCommand "vanixiets-docs-e2e-negative-control" { } ''
+      ${nodejs-slim}/bin/node ${../../../packages/docs/tests/report}/check-negative-report.mjs ${report}
+      mkdir -p "$out"
+      ln -s ${report} "$out/report"
+    '';
 
   meta = {
     description = "Vanixiets documentation site built with Astro Starlight";
