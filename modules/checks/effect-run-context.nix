@@ -1,30 +1,27 @@
-# Behavioural check for the effects' runtime CI-event normalisation.
+# Behavioural check for the effects' main-only guard.
 #
-# The fragment in modules/lib/effect-run-context.nix decides, at effect
-# runtime, whether a run is a pull request. Two properties matter and neither
-# is visible by reading the generated script.
+# The fragment in modules/lib/effect-run-context.nix is the backstop that stops
+# an effect, and so its secrets, from running for anything but a push to main.
+# What matters is the verdict on each token nixbot might mint and on each way
+# the fetch can fail, and none of that is visible by reading the generated
+# script. Every row runs the fragment as an effect would, first in a
+# `set -euo pipefail` script, and asserts its exit status and output.
 #
-# Under buildbot-nix nothing sets the identity-endpoint variables, so the
-# fragment must reduce to the derivation the effects previously performed at
-# eval time: `branch == "main"` for the production path, and
-# `^refs/pull/([0-9]+)/merge$` for a pull request. Rows 1-4 assert that against
-# the branch strings buildbot-nix actually supplies.
-#
-# Under nixbot the eval-time branch of a pull request is its BASE ref, so a
-# pull request against main arrives indistinguishable from a push to main. Row
-# 5 is the one that matters: same seed as row 1, opposite verdict, because the
-# token says so. Without the fragment that row deploys unmerged code to
-# production.
-#
-# curl is stubbed. What is under test is claim decoding and branch
-# resolution, not curl's argument handling; the request form itself matches
-# nixbot's own end-to-end check, and a build sandbox has no server to call.
+# curl is stubbed. What is under test is claim decoding and the verdict, not
+# curl's argument handling; the request form itself matches nixbot's own
+# end-to-end check, and a build sandbox has no server to call.
 { self, lib, ... }:
 {
   perSystem =
     { pkgs, ... }:
     let
       runContext = self.lib.effectRunContext;
+
+      effectScript = pkgs.writeText "guarded-effect.sh" ''
+        set -euo pipefail
+        ${runContext.mainOnlyGuard}
+        echo "EFFECT-BODY: CI_BRANCH=$CI_BRANCH"
+      '';
 
       # A JWT is header.payload.signature with an unpadded base64url payload.
       # Only the payload is read, so the other two fields are placeholders.
@@ -34,39 +31,44 @@
         printf '{"token":"eyJhbGciOiJSUzI1NiJ9.%s.signature"}' "$payload" > "$PWD/token.json"
       '';
 
-      # Each row runs the fragment in a subshell and diffs the four exported
-      # variables against a literal expectation.
+      # Each row runs the effect in a fresh directory. Without claims no
+      # token.json exists and the curl stub fails as an unreachable server would.
       row =
         {
           name,
-          branch,
           claims ? null,
-          expected,
+          env ? {
+            NIXBOT_ID_TOKEN_REQUEST_URL = "https://nixbot.invalid/api/v1/id-token";
+            NIXBOT_ID_TOKEN_REQUEST_TOKEN = "task-token";
+          },
+          status,
+          expect,
         }:
         ''
           echo "--- ${name}"
-          (
-            set -euo pipefail
-            ${if claims == null then "" else mkTokenResponse claims}
-            ${
-              if claims == null then
-                ''
-                  unset NIXBOT_ID_TOKEN_REQUEST_URL NIXBOT_ID_TOKEN_REQUEST_TOKEN || true
-                ''
-              else
-                ''
-                  export NIXBOT_ID_TOKEN_REQUEST_URL="https://nixbot.invalid/api/v1/id-token"
-                  export NIXBOT_ID_TOKEN_REQUEST_TOKEN="task-token"
-                ''
-            }
-            ${runContext.mkScript { inherit branch; }} > /dev/null
-            printf '%s|%s|%s|%s\n' "$CI_BRANCH" "$CI_IS_MAIN" "$CI_IS_PR" "$CI_PR_NUMBER" > actual
-          )
-          printf '%s\n' ${lib.escapeShellArg expected} > expected
-          if ! diff -u expected actual; then
-            echo "run-context row '${name}' produced the wrong verdict" >&2
+          rm -rf "$TMPDIR/row" && mkdir "$TMPDIR/row" && cd "$TMPDIR/row"
+          ${if claims == null then "" else mkTokenResponse claims}
+          status=0
+          env -u NIXBOT_ID_TOKEN_REQUEST_URL -u NIXBOT_ID_TOKEN_REQUEST_TOKEN \
+            ${lib.concatStringsSep " " (lib.mapAttrsToList (n: v: "${n}=${lib.escapeShellArg v}") env)} \
+            bash ${effectScript} > output 2>&1 || status=$?
+          cat output
+          if [ "$status" != ${toString status} ]; then
+            echo "row '${name}': exit status $status, expected ${toString status}" >&2
             exit 1
           fi
+          ${lib.concatMapStrings (line: ''
+            if ! grep -qxF ${lib.escapeShellArg line} output; then
+              echo "row '${name}': missing output line: "${lib.escapeShellArg line} >&2
+              exit 1
+            fi
+          '') expect}
+          ${lib.optionalString (!lib.any (lib.hasPrefix "EFFECT-BODY:") expect) ''
+            if grep -q '^EFFECT-BODY:' output; then
+              echo "row '${name}': effect body ran after the guard stopped it" >&2
+              exit 1
+            fi
+          ''}
         '';
     in
     {
@@ -76,17 +78,18 @@
             nativeBuildInputs = [
               pkgs.jq
               pkgs.coreutils
-              pkgs.diffutils
+              pkgs.gnugrep
             ];
-            meta.description = "behavioural check: effect run-context resolution";
+            meta.description = "behavioural check: effect main-only guard";
           }
           ''
-            mkdir -p "$TMPDIR/work" "$TMPDIR/bin" && cd "$TMPDIR/work"
+            mkdir -p "$TMPDIR/bin"
 
-            # The fragment's only network call. It reads the response body from a
-            # file the row wrote, so the decode path downstream is exercised whole.
+            # The fragment's only network call. It serves the token the row
+            # wrote, or fails as curl -f does on an unreachable server.
             cat > "$TMPDIR/bin/curl" <<'STUB'
             #!/bin/sh
+            [ -f "$PWD/token.json" ] || exit 7
             cat "$PWD/token.json"
             STUB
             chmod +x "$TMPDIR/bin/curl"
@@ -94,52 +97,56 @@
 
             ${lib.concatMapStrings row [
               {
-                name = "buildbot: push to main";
-                branch = "main";
-                expected = "main|true|false|";
+                name = "push to main runs";
+                claims = {
+                  event = "push";
+                  ref = "refs/heads/main";
+                };
+                status = 0;
+                expect = [
+                  "CI-RUN-CONTEXT: branch=main is_main=true"
+                  "EFFECT-BODY: CI_BRANCH=main"
+                ];
               }
               {
-                name = "buildbot: pull request";
-                branch = "refs/pull/42/merge";
-                expected = "refs/pull/42/merge|false|true|42";
+                name = "push to a gitea-mq batch branch is skipped";
+                claims = {
+                  event = "push";
+                  ref = "refs/heads/gitea-mq/batch/7";
+                };
+                status = 0;
+                expect = [
+                  "EFFECT-GUARD: skipping outside a push to main (event=push ref=refs/heads/gitea-mq/batch/7)"
+                ];
               }
               {
-                name = "buildbot: push to a feature branch";
-                branch = "feature/widget";
-                expected = "feature/widget|false|false|";
-              }
-              {
-                name = "buildbot: tag push carries no branch";
-                branch = null;
-                expected = "|false|false|";
-              }
-              {
-                name = "nixbot: pull request against main resolves as a pull request";
-                branch = "main";
+                name = "pull request against main is skipped";
                 claims = {
                   event = "pull_request";
                   pr_number = 42;
                   base_ref = "refs/heads/main";
                 };
-                expected = "refs/pull/42/merge|false|true|42";
+                status = 0;
+                expect = [
+                  "EFFECT-GUARD: skipping outside a push to main (event=pull_request ref=)"
+                ];
               }
               {
-                name = "nixbot: push to main resolves as main";
-                branch = "main";
+                name = "missing id-token endpoint is refused";
                 claims = {
                   event = "push";
                   ref = "refs/heads/main";
                 };
-                expected = "main|true|false|";
+                env.NIXBOT_ID_TOKEN_REQUEST_TOKEN = "task-token";
+                status = 1;
+                expect = [
+                  "EFFECT-GUARD: NIXBOT_ID_TOKEN_REQUEST_URL and NIXBOT_ID_TOKEN_REQUEST_TOKEN are required; declare idTokenAudiences on the effect"
+                ];
               }
               {
-                name = "nixbot: push to a feature branch";
-                branch = "feature/widget";
-                claims = {
-                  event = "push";
-                  ref = "refs/heads/feature/widget";
-                };
-                expected = "feature/widget|false|false|";
+                name = "failed token fetch is refused";
+                status = 1;
+                expect = [ "EFFECT-GUARD: failed to obtain an id token from nixbot" ];
               }
             ]}
 

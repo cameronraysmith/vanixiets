@@ -1,85 +1,76 @@
-# Runtime CI-event normalisation for the herculesCI effects.
+# Fail-closed guard confining the herculesCI effects to pushes to main.
 #
-# The two build services describe a pull request differently. buildbot-nix
-# reports refs/pull/<N>/merge as the branch, so the branch string alone
-# identifies the event and carries the number. nixbot reports the pull
-# request's base ref, so a pull request against main is indistinguishable from
-# a push to main by branch; an effect that trusts that value takes the
-# production path against unmerged code.
+# Effects hold secrets, so only code from main may run them. The primary
+# control is nixbot's gating: nixbot reads nixbot.toml from the default
+# branch, and with effects_branches empty and effects_on_pull_requests false
+# it runs onPush effects only for pushes to main. Pull requests and gitea-mq
+# batches build an effect's dependencies without running it.
 #
-# nixbot does supply a discriminator, but only at runtime and only on request.
-# An effect declaring idTokenAudiences receives NIXBOT_ID_TOKEN_REQUEST_URL and
-# NIXBOT_ID_TOKEN_REQUEST_TOKEN in its environment, and the token minted from
-# that endpoint carries either event=pull_request with an integer pr_number, or
-# event=push with a ref.
-#
-# This fragment resolves both services onto buildbot-nix's convention, which
-# the effect scripts already speak, and then derives every decision from that
-# one string. The eval-time branch is the seed; the token overrides it only
-# when nixbot's endpoint is present, which never happens under buildbot-nix
-# because nothing there sets those variables. So the buildbot-nix path reduces
-# to the same derivation the effects previously performed at eval time, over
-# the same input.
-#
-# Exports CI_BRANCH, CI_IS_MAIN, CI_IS_PR and CI_PR_NUMBER.
+# This fragment is the backstop in case that gating is ever misconfigured. An
+# effect declaring idTokenAudiences receives NIXBOT_ID_TOKEN_REQUEST_URL and
+# NIXBOT_ID_TOKEN_REQUEST_TOKEN, and the token minted from that endpoint
+# carries the event and ref nixbot is running it for. Any other event or ref
+# ends the effect before it touches a secret or the network, with exit 0: a
+# run nixbot should not have started is skipped, not failed, so a required
+# nixbot/effects status stays green while main's nixbot.toml still admits
+# such runs (as it does for the change that introduced this guard). A missing
+# endpoint or a failed fetch is an error and exits 1; no path proceeds
+# without positive evidence.
 #
 # The effect reads its own token's claims without verifying the signature. It
-# fetched the token directly from the issuer over an authenticated endpoint
-# reachable only inside its own sandbox, so a signature check would re-verify
-# the transport it already trusts. Nothing here is a third-party assertion.
+# fetched the token from nixbot over an authenticated endpoint reachable only
+# inside its own sandbox, so a signature check would re-verify the transport it
+# already trusts. The guard protects against misclassification of the run, not
+# against tampering with effect code; that is prevented by effects never
+# running pull request code.
 #
-# A failed fetch aborts the effect under `set -e` rather than falling back.
-# Falling back would mean resolving a pull request as its base branch, which is
-# the production path: failing loudly is the safe direction.
-{ lib, ... }:
+# Interpolate mainOnlyGuard first in an effectScript, declare
+# `idTokenAudiences = builtins.toJSON [ runContext.audience ];` (mkEffect
+# attributes become environment strings), and put curl, jq and coreutils in
+# the effect's inputs. On success it exports CI_BRANCH=main.
 {
   flake.lib.effectRunContext = {
     # Any string works; nixbot checks only that the requested audience is one
     # the effect declared, and imposes no format.
     audience = "vanixiets-ci";
 
-    mkScript =
-      { branch }:
-      ''
-        CI_BRANCH=${lib.escapeShellArg (if branch == null then "" else toString branch)}
+    mainOnlyGuard = ''
+      if [ -z "''${NIXBOT_ID_TOKEN_REQUEST_URL:-}" ] || [ -z "''${NIXBOT_ID_TOKEN_REQUEST_TOKEN:-}" ]; then
+        echo "EFFECT-GUARD: NIXBOT_ID_TOKEN_REQUEST_URL and NIXBOT_ID_TOKEN_REQUEST_TOKEN are required; declare idTokenAudiences on the effect" >&2
+        exit 1
+      fi
 
-        if [ -n "''${NIXBOT_ID_TOKEN_REQUEST_URL:-}" ] && [ -n "''${NIXBOT_ID_TOKEN_REQUEST_TOKEN:-}" ]; then
-          _ci_token="$(curl -fsS -X POST "$NIXBOT_ID_TOKEN_REQUEST_URL" \
-            -H "Authorization: Bearer $NIXBOT_ID_TOKEN_REQUEST_TOKEN" \
-            -H 'Content-Type: application/json' \
-            --data '{"audience":"vanixiets-ci"}' | jq -re .token)"
+      if ! _ci_response="$(curl -fsS -X POST "$NIXBOT_ID_TOKEN_REQUEST_URL" \
+        -H "Authorization: Bearer $NIXBOT_ID_TOKEN_REQUEST_TOKEN" \
+        -H 'Content-Type: application/json' \
+        --data '{"audience":"vanixiets-ci"}')" \
+        || ! _ci_token="$(printf '%s' "$_ci_response" | jq -re .token)"; then
+        echo "EFFECT-GUARD: failed to obtain an id token from nixbot" >&2
+        exit 1
+      fi
 
-          # JWT payloads are unpadded base64url.
-          _ci_payload="$(printf '%s' "$_ci_token" | cut -d. -f2 | tr '_-' '/+')"
-          case $(( ''${#_ci_payload} % 4 )) in
-            2) _ci_payload="$_ci_payload==" ;;
-            3) _ci_payload="$_ci_payload=" ;;
-          esac
-          _ci_claims="$(printf '%s' "$_ci_payload" | base64 -d)"
+      # JWT payloads are unpadded base64url.
+      _ci_payload="$(printf '%s' "$_ci_token" | cut -d. -f2 | tr '_-' '/+')"
+      case $(( ''${#_ci_payload} % 4 )) in
+        2) _ci_payload="$_ci_payload==" ;;
+        3) _ci_payload="$_ci_payload=" ;;
+      esac
+      if ! _ci_claims="$(printf '%s' "$_ci_payload" | base64 -d)"; then
+        echo "EFFECT-GUARD: failed to decode the id token payload" >&2
+        exit 1
+      fi
 
-          if [ "$(printf '%s' "$_ci_claims" | jq -re .event)" = pull_request ]; then
-            CI_BRANCH="refs/pull/$(printf '%s' "$_ci_claims" | jq -re .pr_number)/merge"
-          else
-            CI_BRANCH="$(printf '%s' "$_ci_claims" | jq -re .ref)"
-            CI_BRANCH="''${CI_BRANCH#refs/heads/}"
-          fi
-          unset _ci_token _ci_payload _ci_claims
-        fi
+      _ci_event="$(printf '%s' "$_ci_claims" | jq -r '.event // ""')" || _ci_event=""
+      _ci_ref="$(printf '%s' "$_ci_claims" | jq -r '.ref // ""')" || _ci_ref=""
+      if [ "$_ci_event" != push ] || [ "$_ci_ref" != refs/heads/main ]; then
+        echo "EFFECT-GUARD: skipping outside a push to main (event=$_ci_event ref=$_ci_ref)" >&2
+        exit 0
+      fi
+      unset _ci_response _ci_token _ci_payload _ci_claims _ci_event _ci_ref
 
-        CI_PR_NUMBER="''${CI_BRANCH#refs/pull/}"
-        CI_PR_NUMBER="''${CI_PR_NUMBER%/merge}"
-        if [ "$CI_PR_NUMBER" = "$CI_BRANCH" ]; then
-          CI_PR_NUMBER=""
-        fi
-        # Digits only, matching the ^refs/pull/([0-9]+)/merge$ the effects used.
-        case "$CI_PR_NUMBER" in
-          "" | *[!0-9]*) CI_PR_NUMBER="" ;;
-        esac
-        if [ -n "$CI_PR_NUMBER" ]; then CI_IS_PR=true; else CI_IS_PR=false; fi
-        if [ "$CI_BRANCH" = main ]; then CI_IS_MAIN=true; else CI_IS_MAIN=false; fi
-
-        export CI_BRANCH CI_IS_MAIN CI_IS_PR CI_PR_NUMBER
-        echo "CI-RUN-CONTEXT: branch=$CI_BRANCH is_main=$CI_IS_MAIN is_pr=$CI_IS_PR pr_number=$CI_PR_NUMBER"
-      '';
+      CI_BRANCH=main
+      export CI_BRANCH
+      echo "CI-RUN-CONTEXT: branch=main is_main=true"
+    '';
   };
 }

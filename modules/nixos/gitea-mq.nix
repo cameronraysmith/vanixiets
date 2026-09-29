@@ -23,8 +23,11 @@
 # gitea-mq prefers the non-empty forge-required list, so requiredChecks below
 # remains an inactive fallback. It must match all three contexts nonetheless:
 # an empty forge list must not silently weaken the landing gate.
-# Requiring effects also needs default-branch nixbot.toml to keep PR effects
-# enabled and a non-empty effect set, or that context is never posted.
+# Pull-request and batch builds, where effects are gated off, still post
+# nixbot/effects: they build the dependencies of every gated onPush effect
+# and every onEvent/onSchedule effect as checks (nixbot effect_checks.py
+# `discover_checks`). The flake must keep a non-empty effect set, or that
+# context is never posted and landing blocks.
 # Startup setup adds its own second ruleset named gitea-mq carrying only the
 # queue's context, and adds the App as a bypass actor on ours. Installation
 # selection must remain vanixiets alone: github.repos adds repositories to

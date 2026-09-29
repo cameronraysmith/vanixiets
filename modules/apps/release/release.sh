@@ -1,13 +1,17 @@
 #!/usr/bin/env bash
 # shellcheck shell=bash
-# release.sh - Production semantic-release runner for a monorepo package.
+# release.sh - semantic-release runner for a monorepo package.
 # See `usage()` for caller-facing usage; this header documents the env-var
 # contract only.
 #
-# Required (secret, production path only — not --dry-run):
+# There is one plugin set: the package.json "release" block. Arguments after
+# `--` pass through to semantic-release, so `-- --dry-run` rehearses that same
+# plugin set with semantic-release's own dry run.
+#
+# Required (secret):
 #   GITHUB_TOKEN         @semantic-release/github auth for tag push and
-#                        release publish. Filtered-out plugin list under
-#                        --dry-run means no token is consulted in that mode.
+#                        release publish; its verifyConditions step needs it
+#                        under --dry-run too.
 # Required (config, injected by release.nix runtimeEnv):
 #   DOCS_NODE_MODULES    vanixiets-docs-deps node_modules tree hosting
 #                        node_modules/.bin/semantic-release.
@@ -35,19 +39,20 @@ set -euo pipefail
 
 usage() {
   cat <<'EOF'
-usage: release <package-path> [--dry-run] [-- extra semantic-release args]
+usage: release <package-path> [-- extra semantic-release args]
        release info [<package-path>]
        release --help
 
 Run semantic-release against a monorepo package, or extract release info.
 
 Subcommands:
-  (default)  Run semantic-release for <package-path>.
+  (default)  Run semantic-release for <package-path> with the package.json
+             plugin set. Arguments after `--` pass through to
+             semantic-release, e.g. `release packages/docs -- --dry-run`.
   info       Emit release info JSON (version, tag, released) from latest
              git tag matching the package.
 
 Flags:
-  --dry-run  Dry-run (skips @semantic-release/github; no GITHUB_TOKEN needed).
   --help     Print this usage and exit.
 
 Environment:
@@ -63,9 +68,11 @@ emit_release_info() {
   local version=""
 
   if [ -n "$package_path" ]; then
-    # Monorepo tag convention (semantic-release-monorepo): <pkg-name>-vX.Y.Z
-    local package_name
-    package_name=$(basename "$package_path")
+    # Monorepo tag convention (semantic-release-monorepo):
+    # <package.json name>-vX.Y.Z, e.g. @vanixiets/docs-v0.7.0.
+    local repo_root package_name
+    repo_root="${RELEASE_REPO_ROOT:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
+    package_name=$(jq -r .name "${repo_root}/${package_path}/package.json")
     latest_tag=$(git tag --list "${package_name}-v*" --sort=-v:refname 2>/dev/null | head -1 || true)
   else
     latest_tag=$(git describe --tags --abbrev=0 2>/dev/null || true)
@@ -104,16 +111,11 @@ case "$1" in
     ;;
 esac
 
-dry_run=0
 package_path=""
 extra_args=()
 
 while [ $# -gt 0 ]; do
   case "$1" in
-    --dry-run)
-      dry_run=1
-      shift
-      ;;
     -h|--help)
       usage
       exit 0
@@ -174,67 +176,20 @@ export GIT_COMMITTER_EMAIL="${GIT_COMMITTER_EMAIL:-semantic-release@vanixiets.lo
 
 cd "$package_path"
 
-# Production-path contract guard: fail fast on missing GITHUB_TOKEN
-# BEFORE any node_modules mutation so the error points at the contract
-# rather than at an opaque state-mutation side effect. Gated on dry_run.
-if [ "$dry_run" -ne 1 ]; then
-  : "${GITHUB_TOKEN:?GITHUB_TOKEN is required for production semantic-release (see release.sh header for caller mechanisms; not needed for --dry-run)}"
-fi
+# Contract guard: fail fast on missing GITHUB_TOKEN BEFORE any node_modules
+# mutation so the error points at the contract rather than at an opaque
+# state-mutation side effect.
+: "${GITHUB_TOKEN:?GITHUB_TOKEN is required by @semantic-release/github (see release.sh header for caller mechanisms)}"
 
 # Guard node_modules slot against clobbering a developer's real install.
-# Production (non-dry-run): strict — refuse to overwrite a real node_modules
-# directory. Only an empty slot or a pre-existing symlink is safe to clobber.
-# Dry-run: proceed safely via two strategies that NEVER mutate the
-# developer's real install in place:
-#   (b) reuse the existing node_modules directly if it already contains a
-#       usable semantic-release binary (common when the dev ran `bun install`
-#       to completion), or
-#   (a) move the existing node_modules aside to a tempdir, symlink
-#       DOCS_NODE_MODULES in its place for the duration of the run, and
-#       atomically restore the original on EXIT (including on error/SIGINT).
-nm_exists_real=0
+# Only an empty slot or a pre-existing symlink is safe to clobber.
 if [[ -e node_modules && ! -L node_modules ]]; then
-  nm_exists_real=1
-fi
-
-if [ "$nm_exists_real" -eq 1 ] && [ "$dry_run" -ne 1 ]; then
   echo "error: $package_path/node_modules exists and is not a symlink; refusing to overwrite a local bun install" >&2
   exit 1
 fi
 
-if [ "$nm_exists_real" -eq 1 ] && [ -x node_modules/.bin/semantic-release ]; then
-  # Dry-run strategy (b): reuse existing node_modules in place.
-  echo "dry-run: reusing existing node_modules (.bin/semantic-release present)" >&2
-elif [ "$nm_exists_real" -eq 1 ]; then
-  # Dry-run strategy (a): move existing node_modules aside, symlink for the
-  # duration of the run, restore atomically on exit.
-  backup_dir="$(mktemp -d)"
-  echo "dry-run: moving existing node_modules to ${backup_dir} (restored on exit)" >&2
-  mv node_modules "${backup_dir}/node_modules"
-  # shellcheck disable=SC2064
-  trap "rm -f '${PWD}/node_modules'; mv '${backup_dir}/node_modules' '${PWD}/node_modules' 2>/dev/null || true; rmdir '${backup_dir}' 2>/dev/null || true" EXIT
-  ln -snf "$DOCS_NODE_MODULES" node_modules
-else
-  # Slot is empty or already a symlink — safe to (re)link.
-  trap 'rm -f "$PWD/node_modules"' EXIT
-  ln -snf "$DOCS_NODE_MODULES" node_modules
-fi
+trap 'rm -f "$PWD/node_modules"' EXIT
+ln -snf "$DOCS_NODE_MODULES" node_modules
 
-if [ "$dry_run" -eq 1 ]; then
-  # Filter @semantic-release/github so GITHUB_TOKEN is not required for
-  # preview; safe under --dry-run (prepare/publish steps are no-ops).
-  # Mirrors preview-version.sh plus changelog + major-tag plugins from
-  # the package.json "release" block.
-  plugins="@semantic-release/commit-analyzer,@semantic-release/release-notes-generator,@semantic-release/changelog,semantic-release-major-tag"
-  echo "running semantic-release (dry-run, no GitHub plugin) in ${package_path}..."
-  node ./node_modules/.bin/semantic-release \
-    --dry-run \
-    --no-ci \
-    --plugins "$plugins" \
-    "${extra_args[@]}"
-else
-  # GITHUB_TOKEN is enforced via the early :? guard above (placed before
-  # node_modules setup so failure modes are contract-first).
-  echo "running production semantic-release in ${package_path}..."
-  node ./node_modules/.bin/semantic-release "${extra_args[@]}"
-fi
+echo "running semantic-release in ${package_path}..."
+node ./node_modules/.bin/semantic-release "${extra_args[@]}"

@@ -5,19 +5,30 @@
 # See: https://www.github.com/nix-community/buildbot-nix/pull/318 (per-repo config support)
 attribute = "checks.x86_64-linux"
 
-# herculesCI effects config
+# herculesCI effects gating (nixbot, github:Mic92/nixbot)
 #
-# Effects declared at `herculesCI.onPush.default.outputs.effects.<name>`
-# share a single fixed attribute path across all branches; which branches
-# actually dispatch effects is controlled by the `effects_branches` key value and
-# read from the default branch of the repo (buildbot-nix/buildbot_nix/nix_eval.py:596-632,
-# which prevents a PR author from self-authorizing).
+# Deploy secrets are only ever held by code from main, so onPush effects run
+# only for pushes to main.
 #
-# `effects_branches`:
-#   fnmatch glob list of branch names that trigger effect dispatch on
-#   push. `["main"]` restricts dispatch to the default branch only.
+# nixbot reads these keys from the default branch's nixbot.toml, never from
+# the ref being built, so a pull request cannot grant itself effects
+# (nixbot/effects_run.py `_effects_allowed`).
 #
-# `effects_on_pull_requests`:
-#   `false` blocks PR-event effect dispatch for fork PRs
-effects_branches = ["*"]
-effects_on_pull_requests = true
+# A push to the default branch always runs onPush effects; other pushes run
+# them only if the branch matches `effects_branches`, which is left at its
+# empty default (nixbot/effects.py `should_run_effects`).
+#
+# `effects_on_pull_requests = false` covers ALL pull requests, not only forks:
+# `should_run_effects` answers every pull-request event with this flag alone.
+#
+# Pull-request and merge-queue batch builds still build each gated onPush
+# effect's dependencies as a check and post the `nixbot/effects` status, so
+# a required `nixbot/effects` context is satisfied without running anything
+# that reads secrets (nixbot/effect_checks.py `discover_checks`,
+# nixbot/effects.py `check_effect`).
+#
+# `effects_branches = ["*"]` was wrong: the batch branch build ran and claimed
+# the effects, so when gitea-mq fast-forwarded main onto that tree the reused
+# build only replayed the effect statuses and main never ran them itself
+# (nixbot/after_build.py `_effects`).
+effects_on_pull_requests = false

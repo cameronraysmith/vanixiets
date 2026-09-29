@@ -5,20 +5,19 @@
 # Env-var contract:
 #   One of the following MUST be satisfied (narrow exception; env-first):
 #     SOPS_AGE_KEY                       (env)  single-line AGE-SECRET-KEY-…
-#                                               body (CI / effect preamble)
+#                                               body (GHA CI)
 #     $HOME/.config/sops/age/keys.txt    (file) local dev pathway
 #
 #   This is the ONLY flake app in modules/apps/ that intentionally consumes
-#   SOPS_AGE_KEY directly. No other effect or app is permitted to expose
+#   SOPS_AGE_KEY directly. No effect or other app is permitted to expose
 #   it. Rationale: the k3d bootstrap flow needs an age key INSIDE the
 #   ephemeral cluster for sops-secrets-operator to decrypt SopsSecret CRs
 #   at runtime — this is a load-bearing narrow exception.
 #
 #   Caller mechanisms:
 #     - Local dev:    file-branch via $HOME/.config/sops/age/keys.txt
-#     - GHA env:      GHA `env:` block with SOPS_AGE_KEY from repo secrets
-#     - effect:       effect preamble extracts SOPS_AGE_KEY from
-#                     HERCULES_CI_SECRETS_JSON and exports before invoking
+#     - GHA env:      `env:` block with SOPS_AGE_KEY from repo secrets in
+#                     .github/workflows/test-cluster.yaml, reached through
 #                     the transitive caller (k3d-integration-ci)
 #
 # NB: intentionally uses if-else ladder rather than `: "${VAR:?…}"` because

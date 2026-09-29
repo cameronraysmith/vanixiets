@@ -1756,7 +1756,7 @@ cache-darwin-system:
 list-packages:
   @ls -1 packages/
 
-# List packages in JSON format for CI matrix
+# List packages in JSON format, as the release-packages effect enumerates them
 # Body lives in modules/apps/cluster/list-packages-json.{nix,sh}.
 [group('CI/CD')]
 list-packages-json *ARGS:
@@ -1775,24 +1775,20 @@ validate-package package:
 test-package package:
   cd packages/{{ package }} && bun install && bun run test:unit && bun run test:coverage && bun run build && bun run test:e2e
 
-# Preview semantic-release version after merging current branch to target
-[group('CI/CD')]
-preview-version target="main" package="":
-  nix run --accept-flake-config .#preview-version -- "{{target}}" "{{package}}"
-
 # Run the release flake app with passthrough args (see modules/apps/release/release.{nix,sh})
 # Examples:
 #   just release --help
 #   just release info packages/docs
-#   just release packages/docs --dry-run
+#   just release packages/docs -- --dry-run
 [group('CI/CD')]
 release *args:
   {{nix_cmd}} run --no-warn-dirty .#release -- {{args}}
 
-# Release a package using semantic-release
+# Release a package using semantic-release. dry_run="true" runs semantic-release's
+# own --dry-run with the production plugin list, so GITHUB_TOKEN is still required.
 [group('CI/CD')]
 release-package package dry_run="false":
-  nix run --accept-flake-config .#release -- packages/{{package}} {{ if dry_run == "true" { "--dry-run" } else { "" } }}
+  nix run --accept-flake-config .#release -- packages/{{package}} {{ if dry_run == "true" { "-- --dry-run" } else { "" } }}
 
 # CREDENTIAL: `gh auth token` first; the sops GITHUB_TOKEN is a fallback that is
 # not trusted -- it holds a `gho_` OAuth App token that currently 401s. The

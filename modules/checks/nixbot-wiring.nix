@@ -8,8 +8,9 @@
 # missing-secret guard — exactly what an unwired service does. The check reads
 # the name off the evaluated unit, so it exercises nixbot's own module code
 # rather than a transcription of it, and also pins the allowlists, the
-# binary-cache uploader set, the shared secrets files, and the deliberately
-# empty sandbox options.
+# binary-cache uploader set, the contributor approval gate, which service
+# holds which repository's secrets and which credentials vanixiets' carry, and
+# the deliberately empty sandbox options.
 #
 # The repository-root config file is nixbot.toml. nixbot prefers that name over
 # the legacy buildbot-nix.toml it also still reads
@@ -30,11 +31,7 @@
       magnetite = self.nixosConfigurations.magnetite.config;
       nixbot = magnetite.services.nixbot;
       buildbot = magnetite.services.buildbot-nix.master;
-
-      repoKeys = [
-        "github:cameronraysmith/vanixiets"
-        "github:sciexp/ironstar"
-      ];
+      vanixietsSecrets = magnetite.clan.core.vars.generators.vanixiets-effects-secrets;
 
       # LoadCredential entries are "<name>:<source path>". The name never
       # contains a colon, because the transform that builds it replaces every
@@ -107,15 +104,35 @@
             memoryHigh = nixbotUnit.MemoryHigh or null;
 
             # Booleans rather than the paths themselves: the assertion is that
-            # each repository's two entries read one file, and the paths are
-            # activation-time state that would churn the oracle without adding
-            # evidence. Keyed by repository so a failure names which one
-            # diverged. buildbot admits neither repository, so its copies are
-            # inert; asserting them keeps a later re-admission from silently
-            # reading a different file.
-            oneSecretsFileForBothServices = lib.genAttrs repoKeys (
+            # each repository buildbot still holds secrets for reads the same
+            # file as nixbot, and the paths are activation-time state that
+            # would churn the oracle without adding evidence. Keyed by
+            # repository so a failure names which one diverged. buildbot admits
+            # neither repository, so its copies are inert; asserting them keeps
+            # a later re-admission from silently reading a different file.
+            # Taken over buildbot's own keys, so a repository buildbot holds
+            # nothing for surfaces in buildbotSecretKeys instead of failing
+            # evaluation here.
+            oneSecretsFileForBothServices = lib.genAttrs (sortedNames buildbot.effects.perRepoSecretFiles) (
               key: nixbot.effects.perRepoSecretFiles.${key} == buildbot.effects.perRepoSecretFiles.${key}
             );
+
+            # The environment names the composed vanixiets file carries, by
+            # the labels of the prompts that feed it, and the one file of the
+            # generator that deploys. A credential no effect maps is a secret
+            # held for nothing, so adding one is a reviewable diff here.
+            vanixietsSecretNames = lib.naturalSort (
+              map (prompt: prompt.display.label) (builtins.attrValues vanixietsSecrets.prompts)
+            );
+            vanixietsDeployedFiles = sortedNames (
+              lib.filterAttrs (_: file: file.deploy) vanixietsSecrets.files
+            );
+
+            # Outside pull requests build only once a maintainer approves them.
+            # CONTRIBUTOR, in upstream's default, would admit anyone with a
+            # previously merged pull request unreviewed.
+            prApprovalEnabled = nixbot.prApproval.enable;
+            prApprovalTrustedAssociations = nixbot.prApproval.trustedAssociations;
 
             # The cut itself. nixbot serves both repositories and buildbot
             # serves neither on GitHub, so the two selections are disjoint.
@@ -166,8 +183,9 @@
               "github:cameronraysmith/vanixiets"
               "github:sciexp/ironstar"
             ];
+            # buildbot serves neither GitHub repository. vanixiets' secrets
+            # were never read there and are withheld; ironstar's copy remains.
             buildbotSecretKeys = [
-              "github:cameronraysmith/vanixiets"
               "github:sciexp/ironstar"
             ];
             evalWorkerCount = 8;
@@ -175,9 +193,20 @@
             memoryAndOomKnobs = [ "MemoryHigh" ];
             memoryHigh = "12G";
             oneSecretsFileForBothServices = {
-              "github:cameronraysmith/vanixiets" = true;
               "github:sciexp/ironstar" = true;
             };
+            vanixietsSecretNames = [
+              "CLOUDFLARE_ACCOUNT_ID"
+              "CLOUDFLARE_API_TOKEN"
+              "GITHUB_TOKEN"
+            ];
+            vanixietsDeployedFiles = [ "secrets" ];
+            prApprovalEnabled = true;
+            prApprovalTrustedAssociations = [
+              "OWNER"
+              "MEMBER"
+              "COLLABORATOR"
+            ];
             buildbotAdmitsVanixiets = false;
             buildbotAdmitsIronstar = false;
             nixbotAdmitsVanixiets = true;

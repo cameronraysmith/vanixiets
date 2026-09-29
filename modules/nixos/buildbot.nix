@@ -10,8 +10,9 @@
 # Gitea-specific credentials live in gitea.nix:
 #   - buildbot-gitea-token: manual `clan vars set` (API token with write:repository, write:user)
 #   - buildbot-gitea-webhook-secret: auto-generated
-# Per-repo effects secrets for github:cameronraysmith/vanixiets are wired in
-# modules/effects/vanixiets/secrets.nix (flake module `effects-vanixiets-secrets`).
+# buildbot-nix serves only Gitea repositories and holds no GitHub effects
+# secrets; vanixiets' effects secrets (modules/effects/vanixiets/secrets.nix)
+# are consumed by nixbot alone.
 {
   config,
   inputs,

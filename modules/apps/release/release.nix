@@ -1,13 +1,13 @@
-# release.nix - Production semantic-release wrapper as a flake app.
+# release.nix - semantic-release wrapper as a flake app.
 #
 #   nix run .#release -- <package-path>
-#   nix run .#release -- <package-path> --dry-run
+#   nix run .#release -- <package-path> -- --dry-run
 #   nix run .#release -- info <package-path>
 #   nix run .#release -- --help
 #
-# Configures git, invokes semantic-release against the target monorepo
-# package, filters `@semantic-release/github` out of the plugin list when
-# `--dry-run` is set (so GITHUB_TOKEN is not required for previews), and
+# Invokes semantic-release against the target monorepo package with the
+# package.json plugin set, passing arguments after `--` through to
+# semantic-release (so `-- --dry-run` rehearses the production plugins), and
 # provides an `info` subcommand emitting release info as JSON.
 #
 # Hermetic: semantic-release and all plugins are provided by the

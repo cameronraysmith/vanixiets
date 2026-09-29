@@ -132,6 +132,24 @@
           ];
         };
 
+        # Hold pull requests from outside the repositories until a maintainer
+        # approves CI for them. Upstream's default also trusts CONTRIBUTOR,
+        # which is anyone with a previously merged pull request; dropping it
+        # gates them too. Pull requests whose head branch lives in the base
+        # repository, renovate's and the flake updater's included, are always
+        # trusted, since pushing that branch already needed write access
+        # (nixbot/nixbot/approval.py:31-38). A held pull request is approved
+        # with its check run's button or
+        # `POST /api/repos/github/<owner>/<repo>/pulls/<N>/approve`.
+        prApproval = {
+          enable = true;
+          trustedAssociations = [
+            "OWNER"
+            "MEMBER"
+            "COLLABORATOR"
+          ];
+        };
+
         # The module creates the vhost proxying to /run/nixbot/web.sock and this
         # flag makes it forceSSL + enableACME. The incumbent aspect writes that
         # vhost override by hand only because buildbot-nix has no such option.

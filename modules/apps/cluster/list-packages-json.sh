@@ -10,7 +10,8 @@ Usage: list-packages-json [--help]
 
 Emit a JSON array of {"name": "<pkg>", "path": "packages/<pkg>"} for every
 packages/<pkg>/ directory containing a package.json. Consumed by the
-preview-release-version CI matrix in cd.yaml (set-variables job).
+release-packages effect (modules/effects/vanixiets/herculesCI), which
+releases each listed path, and exposed as `just list-packages-json`.
 
 No positional arguments; must run inside a git worktree rooted at the
 vanixiets repo (or subdirectory thereof).

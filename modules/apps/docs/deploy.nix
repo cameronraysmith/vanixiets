@@ -1,10 +1,13 @@
 # Deploy the vanixiets-docs derivation to Cloudflare Workers.
 #
-#   nix run .#deploy-docs -- preview <branch>
-#   nix run .#deploy-docs -- production
+#   nix run .#deploy-docs -- preview <branch>   preview version of <branch>
+#   nix run .#deploy-docs -- production         production deploy; exits 0
+#                                               without deploying when main
+#                                               has moved past this commit
 #
 # Why: consumes the nix-built CF Worker payload from
-# config.packages.vanixiets-docs (DOCS_PAYLOAD).
+# config.packages.vanixiets-docs (DOCS_PAYLOAD). A caller may set DOCS_PAYLOAD
+# to another build of the docs: the preview effect passes a pull request's.
 #
 # Template bifurcation (writeShellApplication): INTERPOLATION FORM.
 # `text` is a nix string that injects one eval-time-computed path
@@ -32,12 +35,14 @@
             # inside the script), so pkgs.sops / pkgs.age are not required
             # runtime inputs.
             #
-            # sed/awk/grep/find are explicitly declared because the
+            # sed/awk/grep/find/curl are explicitly declared because the
             # hercules-ci-effects bwrap sandbox PATH does not include them
-            # by default. Required for the writeShellApplication invariant
-            # that PATH equals runtimeInputs at runtime.
+            # by default; curl resolves main's head for the production
+            # supersede check. Required for the writeShellApplication
+            # invariant that PATH equals runtimeInputs at runtime.
             runtimeInputs = [
               pkgs.nodejs_24
+              pkgs.curl
               pkgs.jq
               pkgs.coreutils
               pkgs.git
@@ -50,7 +55,7 @@
               DOCS_NODE_MODULES = "${config.packages.vanixiets-docs-deps}/packages/docs/node_modules";
             };
             text = ''
-              export DOCS_PAYLOAD=${lib.escapeShellArg config.packages.vanixiets-docs}
+              export DOCS_PAYLOAD="''${DOCS_PAYLOAD:-${config.packages.vanixiets-docs}}"
               ${builtins.readFile ./deploy.sh}
             '';
           }

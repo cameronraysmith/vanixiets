@@ -19,9 +19,6 @@
 #     - Local dev:      .envrc dotenv or file-branch ($HOME/.config/sops/...)
 #     - GHA env:        job-level `env:` block populates SOPS_AGE_KEY from
 #                       repo secrets (.github/workflows/test-cluster.yaml)
-#     - effect:         test-cluster effect preamble extracts SOPS_AGE_KEY
-#                       from HERCULES_CI_SECRETS_JSON and exports before
-#                       invoking ${config.apps.k3d-integration-ci.program}
 #
 # NB: required-env guard via the `:?` idiom lives in the leaf
 # k3d-bootstrap-secrets.sh; this file intentionally has no top-level

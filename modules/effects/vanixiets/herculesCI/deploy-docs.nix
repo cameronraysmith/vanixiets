@@ -1,4 +1,9 @@
-# herculesCI effect: docs deployment branch-dispatcher (preview vs promote).
+# herculesCI effect: deploy the docs to production on a push to main.
+#
+# The effect holds Cloudflare credentials, so it runs only code from main: the
+# run-context guard refuses every other event. Runs share a lock so landings in
+# quick succession deploy in order, and deploy.sh skips a run whose commit main
+# has already moved past.
 {
   config,
   inputs,
@@ -10,8 +15,6 @@
   herculesCI =
     herculesCI:
     let
-      # Nullable: null on tag pushes (no branch).
-      branch = herculesCI.config.repo.branch;
       shortRev = herculesCI.config.repo.shortRev;
       rev = herculesCI.config.repo.rev;
 
@@ -24,28 +27,27 @@
           hci-effects = inputs.hercules-ci-effects.lib.withPkgs pkgs;
 
           deployDocsProgram = config.apps.deploy-docs.program;
-
-          # The branch a preview is named after is resolved at runtime, since
-          # only then is a pull request distinguishable from a push to its
-          # base branch.
-          fallbackPreviewBranch = shortRev;
         in
         hci-effects.mkEffect {
           name = "deploy-docs";
+          lock = "deploy-docs";
 
           # Declaring an audience is what makes nixbot expose its identity
           # endpoint to this effect; the token's claims are the only way the
-          # script can tell a pull request from a push to the base branch.
+          # script can tell a push to main from any other event.
           # Must be a JSON-array string: a bare nix list serialises
           # space-separated and nixbot rejects it before the sandbox starts.
           # buildbot-nix has no such endpoint and ignores this attribute.
           idTokenAudiences = builtins.toJSON [ runContext.audience ];
 
-          # Why: mkEffect's defaultInputs cover jq but not curl or coreutils,
-          # which the run-context fragment needs.
+          # Why: the run-context guard needs curl, jq and coreutils; mkEffect's
+          # defaultInputs are not relied on for any of them.
           inputs = [
             pkgs.curl
             pkgs.coreutils
+            pkgs.jq
+            # Why: building it is part of the pre-merge nixbot/effects gate.
+            config.checks.deploy-docs-rehearsal
           ];
 
           # nixbot enforces hercules-ci secretsMap semantics: only the
@@ -64,19 +66,11 @@
           effectScript = ''
             set -euo pipefail
 
-            ${runContext.mkScript { inherit branch; }}
+            ${runContext.mainOnlyGuard}
 
-            echo "=== effects.deploy-docs (docs deployment dispatcher) ==="
-            echo "branch:   $CI_BRANCH"
+            echo "=== effects.deploy-docs (docs production deploy) ==="
             echo "rev:      ${lib.escapeShellArg (toString rev)}"
             echo "shortRev: ${lib.escapeShellArg (toString shortRev)}"
-            echo "isMain:   $CI_IS_MAIN"
-
-            if [ "$CI_IS_MAIN" = true ]; then
-              echo "DEPLOY-DOCS-ACTION: promote"
-            else
-              echo "DEPLOY-DOCS-ACTION: preview-upload"
-            fi
 
             export CLOUDFLARE_API_TOKEN="$(jq -r '.CLOUDFLARE_API_TOKEN.data.value' "$HERCULES_CI_SECRETS_JSON")"
             export CLOUDFLARE_ACCOUNT_ID="$(jq -r '.CLOUDFLARE_ACCOUNT_ID.data.value' "$HERCULES_CI_SECRETS_JSON")"
@@ -101,43 +95,19 @@
               exit 1
             fi
 
+            deploy_log="$(mktemp -t deploy-docs-prod.XXXXXX.log)"
+            set +e
             # Why: bwrap sandbox does not bind working tree; .# cannot resolve. Use eval-time /nix/store path.
-            DEPLOY_DOCS=${deployDocsProgram}
-
-            if [ "$CI_IS_MAIN" = true ]; then
-              # release.sh's production subcommand re-emits "falling back to direct deploy" on the fresh-deploy fallback; the dispatcher grep below depends on that exact substring.
-              deploy_log="$(mktemp -t deploy-docs-prod.XXXXXX.log)"
-              set +e
-              "$DEPLOY_DOCS" production 2>&1 | tee "$deploy_log"
-              deploy_rc=''${PIPESTATUS[0]}
-              set -e
-              if grep -q "falling back to direct deploy" "$deploy_log"; then
-                echo "DEPLOY-DOCS-ACTION: fresh-deploy-and-promote"
-              fi
-              if [ "$deploy_rc" -ne 0 ]; then
-                echo "error: deploy-docs production exited $deploy_rc" >&2
-                exit "$deploy_rc"
-              fi
-            else
-              preview_branch="$CI_BRANCH"
-              if [ -z "$preview_branch" ]; then
-                preview_branch=${lib.escapeShellArg fallbackPreviewBranch}
-              fi
-              preview_log="$(mktemp -t deploy-docs-preview.XXXXXX.log)"
-              set +e
-              "$DEPLOY_DOCS" preview "$preview_branch" 2>&1 | tee "$preview_log"
-              upload_rc=''${PIPESTATUS[0]}
-              set -e
-              preview_url="$(grep -oE 'Preview URL: https://[^[:space:]]+' "$preview_log" | head -1 | awk '{print $3}' || true)"
-              if [ -n "$preview_url" ]; then
-                echo "DEPLOY-DOCS-PREVIEW-URL: $preview_url"
-              else
-                echo "warning: could not parse preview URL from deploy.sh output" >&2
-              fi
-              if [ "$upload_rc" -ne 0 ]; then
-                echo "error: deploy-docs preview exited $upload_rc" >&2
-                exit "$upload_rc"
-              fi
+            ${deployDocsProgram} production 2>&1 | tee "$deploy_log"
+            deploy_rc=''${PIPESTATUS[0]}
+            set -e
+            if [ "$deploy_rc" -ne 0 ]; then
+              echo "error: deploy-docs production exited $deploy_rc" >&2
+              exit "$deploy_rc"
+            fi
+            # deploy.sh reports a superseded run itself and deploys nothing.
+            if ! grep -q '^DEPLOY-DOCS-ACTION: superseded' "$deploy_log"; then
+              echo "DEPLOY-DOCS-ACTION: deploy"
             fi
 
             echo "=== deploy-docs effect complete (exit 0) ==="

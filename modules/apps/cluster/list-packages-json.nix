@@ -1,8 +1,8 @@
 # list-packages-json.nix - Emit a JSON matrix of workspace packages.
 #
 # Enumerates packages/<name>/ directories containing a package.json
-# and emits a JSON array of {name, path} entries consumed by the
-# preview-release-version matrix step in cd.yaml's set-variables job.
+# and emits a JSON array of {name, path} entries that the release-packages
+# effect iterates, calling the release app once per package path.
 { ... }:
 {
   perSystem =
