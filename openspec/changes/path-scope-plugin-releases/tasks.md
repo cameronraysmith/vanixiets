@@ -1,7 +1,7 @@
 ## 1. Release-package discovery
 
 - [ ] 1.1 Generalize `modules/apps/cluster/list-packages-json.sh` to also emit `{"name": "plugins", "path": "modules/home/ai/plugins"}` when `modules/home/ai/plugins/package.json` exists, alongside its existing `packages/<name>/package.json` discovery — verify: run `nix run .#list-packages-json` before and after step 2.2 and diff the JSON output for the new entry.
-- [ ] 1.2 Confirm the emitted path string is byte-identical to what `modules/apps/release/release.sh`'s `cd "$package_path"` expects (relative to repo root, no trailing slash) — verify: `release.sh --dry-run --package-path modules/home/ai/plugins` (or equivalent local invocation) completes the `cd` without error.
+- [ ] 1.2 Confirm the emitted path string is byte-identical to what `modules/apps/release/release.sh`'s `cd "$package_path"` expects (relative to repo root, no trailing slash) — verify: `nix run .#release -- modules/home/ai/plugins -- --dry-run` (needs `GITHUB_TOKEN`) completes the `cd` without error.
 
 ## 2. Plugins release-line package
 
@@ -11,8 +11,8 @@
 
 ## 3. Rehearsal verification
 
-- [ ] 3.1 Run the existing `release-packages-dry-run` hercules-ci effect attribute (or its local equivalent, `nix build .#checks.<system>.release-packages-dry-run` / direct `nix run` of `config.apps.release.program -- modules/home/ai/plugins -- --dry-run`) against a commit touching `modules/home/ai/plugins/` — verify: rehearsal log shows the plugins package discovered and analyzed, and no tag is pushed.
-- [ ] 3.2 Confirm the docs release line's dry-run behavior is unchanged by this addition — verify: run the same rehearsal attribute and confirm `packages/docs` still appears in the discovered-packages list with no new failures attributable to this change.
+- [ ] 3.1 Run the hermetic `release-rehearsal` check (`nix build .#checks.<system>.release-rehearsal`; before it lands, the local equivalent is `nix run .#release -- modules/home/ai/plugins -- --dry-run` with `GITHUB_TOKEN`) against a commit touching `modules/home/ai/plugins/` — verify: rehearsal log shows the plugins package discovered and analyzed, and no tag is pushed.
+- [ ] 3.2 Confirm the docs release line's rehearsal outcome is unchanged by this addition — verify: run the same rehearsal and confirm `packages/docs` is still discovered with no new failures attributable to this change.
 
 ## 4. First-party dependency repointing
 

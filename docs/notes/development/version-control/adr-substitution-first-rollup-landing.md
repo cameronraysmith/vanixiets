@@ -70,6 +70,9 @@ nixbot:
 - Cancels in-flight builds only when a PR closes unmerged; merged PR builds continue (`service.py::CIService._submit_pr_closed`; `canceller.py::CancellationManager.cancel_pr`).
 - Gates PR effects through `effects_on_pull_requests`, independently of `effects_branches`; default-branch pushes always qualify, and other branches must match `effects_branches` (`effects.py::should_run_effects`).
 
+  > **Superseded in part (2026-09-28):** vanixiets now sets `effects_on_pull_requests = false` with an empty `effects_branches`, so only pushes to `main` run effects.
+  > For each gated onPush effect on a pull request or batch, nixbot builds the effect's dependencies as a check and still posts `nixbot/effects` (`effect_checks.py::discover_checks`; `effects.py::check_effect`); see R9.
+
 nix-fast-build, used by vanixiets' `justfile::check-fast`:
 
 - `--skip-cached` skips derivations reported `cached`; `local` outputs are uploaded without a build unless an output link is requested (`nix_fast_build/processes.py::nix_eval_jobs`; `nix_fast_build/workers.py::run_evaluation`).
@@ -294,6 +297,10 @@ Manual checks before promotion from Proposed (existing V identifiers retained fo
   This is settled at the source pin (`nix/module.nix::services.gitea-mq`; `internal/config/config.go::Load`); validate the rendered unit, database provisioning, and reverse proxy in deployment.
 - V10. Review needed PR previews before changing vanixiets' current `effects_on_pull_requests = true` and `effects_branches = ["*"]`.
   Scope PR effects through `effects_on_pull_requests` and queue-branch effects through `effects_branches`; changing the latter alone does not disable PR effects (`effects.py::should_run_effects`).
+
+  > **Superseded in part (2026-09-28):** resolved by moving PR previews off PR effects.
+  > vanixiets now sets `effects_on_pull_requests = false` and leaves `effects_branches` empty; docs previews come from the onEvent effect `herculesCI.onEvent.pull_request.deploy-docs-preview`, which is evaluated from `main`, runs only for authors or pushers with write permission, uploads the PR's already-built docs store path fetched from nixbot's API, and never blocks a merge.
+  > Reasons are recorded at R9.
 - V11. Measure actual nixbot executions per PR landed, including unconditional PR builds, batch retries/bisection, and tree reuse, against a comparable Mergify baseline.
   Record the sample window, cache state, and workload; savings remain unverified until measured.
 - V12. Audit authorization samples across both risk classes and PR shapes: review precedes the signal where required, native registration and ancestry hold, and no stack member has auto-merge enabled.
@@ -303,7 +310,7 @@ Manual checks before promotion from Proposed (existing V identifiers retained fo
 
 Author: Cameron Ray Smith with Claude, 2026-09-07.
 Approval date and approved by: not yet approved.
-Superseded date: not applicable.
+Superseded date: R9, R10, and V10 superseded in part on 2026-09-28; see the dated notes at each.
 
 Source basis: nixbot `25df5fb`, gitea-mq `d44c455`, mergify-cli `d393fe7`, nix-fast-build `8f0c351`, rust-lang/bors `43a7baa`, MADR template `ba75bb1`, vanixiets `edc85b40` (original source baseline).
 Claims about component behaviour must be reverified when these pins move; upstream commit dates were not established by the verification reports.
@@ -339,7 +346,15 @@ Source filtering and cache warming are the core; process policies and upstream w
   This extends the original eval/build pair after the operator added effects to ruleset `16212553` so landing waits for effect completion; `openspec/changes/stand-up-gitea-mq-on-magnetite/design.md::D2` records the reason and the coupled invariant.
   Requiring effects depends on default-branch `nixbot.toml::effects_on_pull_requests = true` and a non-empty effect set: `effects_run.py::enqueue_effects` returns before `effects_started` on an empty set, leaving a required context unposted and a PR blocked indefinitely.
   The ruleset, configured fallback, and effect-production configuration must move together.
+
+  > **Superseded in part (2026-09-28):** requiring `nixbot/effects` no longer depends on `effects_on_pull_requests = true`.
+  > With `effects_on_pull_requests = false`, nixbot still posts `nixbot/effects` on pull requests and gitea-mq batches by building each gated onPush effect's dependencies as a check (`effect_checks.py::discover_checks`; `effects.py::check_effect`).
+  > Those dependencies include the hermetic rehearsals `checks.<system>.release-rehearsal` and `checks.<system>.deploy-docs-rehearsal`, so the required context now gates the release and deploy programs against stubs; the non-empty effect set requirement still holds.
+  > Two defects motivated the change: PR effects handed the deploy secrets to code from the pull request, and `effects_branches = ["*"]` let a batch-branch build claim the effects, so when gitea-mq fast-forwarded `main` onto that tree the reused build replayed the effect statuses and `main` never ran its deploys (`after_build.py::_effects`).
+  > Each onPush effect now also refuses to run unless nixbot's identity token says the event is a push to `refs/heads/main`.
 - R10. Scope PR previews with `effects_on_pull_requests` and non-default branch effects with `effects_branches`, preserving the previews identified in V10.
+
+  > **Superseded in part (2026-09-28):** PR previews are no longer scoped through `effects_on_pull_requests`; they run as the onEvent effect `herculesCI.onEvent.pull_request.deploy-docs-preview` (see V10), and both `effects_on_pull_requests` and `effects_branches` are off for vanixiets.
 - R11. Serve `mq.scientistexperience.net` with `batchMax = 20`, `skipQueueIfUpToDate = true`, and the default `merge-queue` label; provision its database and reverse proxy.
 - R12. Publish stacks with `--github-native` and verify registration and selected-head ancestry before enqueue; `Depends-On:` alone does not enable queue stack resolution.
 - R13. Use a separate GitHub App from nixbot's, with the permissions in gitea-mq `README.md`, “GitHub setup”: Checks read/write, Commit statuses read, Contents read/write, Pull requests read/write, Administration read/write, Metadata read.

@@ -42,6 +42,6 @@ It does not establish that GitHub Actions plays any role in that push — the de
 
 #### Scenario: A rehearsal run exercises the plugins release line without pushing tags
 
-- **WHEN** the effect's dry-run rehearsal attribute is invoked against a commit touching `modules/home/ai/plugins/`
+- **WHEN** the hermetic `release-rehearsal` check, which runs the release effect's program against stubs, is built for a commit touching `modules/home/ai/plugins/`
 - **THEN** the plugins release line is analyzed and a rehearsal outcome is reported
 - **AND** no tag is pushed to the remote as a result

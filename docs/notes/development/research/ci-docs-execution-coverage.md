@@ -2,6 +2,11 @@
 
 This document captures the findings from a comprehensive audit of documentation code snippets against CI test coverage, conducted on 2025-12-04.
 
+> **Correction (2026-09-28):** the CI described below is the GitHub Actions pipeline as audited on 2025-12-04 and no longer exists.
+> `ci.yaml`, `deploy-docs.yaml`, `package-test.yaml`, and `package-release.yaml` are gone or archived under `.github/deprecated/`; nixbot now builds `checks.x86_64-linux` and runs the deploy effects.
+> The `preview-version` recipe and app were removed, and no CI job calls the `docs-deploy-*` or `release-package` recipes.
+> See `packages/docs/src/content/docs/reference/ci-jobs.md` for current CI.
+
 ## Executive summary
 
 The audit analyzed whether code snippets recommended to users in the documentation are actually tested by CI workflows.
@@ -90,6 +95,9 @@ These recipes are executed by CI jobs:
 | `docs-test-coverage` | typescript |
 | `docs-deploy-preview` | preview-docs-deploy |
 | `docs-deploy-production` | production-docs-deploy |
+
+> **Correction (2026-09-28):** `preview-version` no longer exists; `just release-package <package> true` runs the production plugins with semantic-release's `--dry-run`.
+> Docs deploys now run in the `deploy-docs` onPush effect (production, main only) and the `deploy-docs-preview` onEvent effect (pull requests), not through these recipes.
 
 ### Test implementation summary
 
@@ -285,6 +293,10 @@ These documents provide partial traceability that this audit extends and validat
 | typescript | `just test-package docs` | Package tests |
 | production-release-packages | `just release-package <package> true` | Semantic-release |
 | production-docs-deploy | `just docs-deploy-production` | Production deployment |
+
+> **Correction (2026-09-28):** these jobs were replaced by nixbot contexts and effects.
+> `preview-release-version` has no successor job; its local equivalent is `just release-package <package> true`, and pull requests build `checks.<system>.release-rehearsal` instead.
+> `production-docs-deploy` became the `deploy-docs` effect, and pull requests build `checks.<system>.deploy-docs-rehearsal`.
 
 ## Appendix: nix-unit test inventory
 

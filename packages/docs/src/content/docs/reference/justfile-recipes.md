@@ -16,12 +16,12 @@ Run `just --list` to see available recipes or `just help` for usage information.
 | [nix](#nix) | 15 | Core nix operations |
 | [terraform](#terraform) | 3 | Terraform/terranix infrastructure |
 | [clan](#clan) | 7 | Machine building and testing |
-| [docs](#docs) | 17 | Documentation site management |
+| [docs](#docs) | 18 | Documentation site management |
 | [diagrams](#diagrams) | 3 | Typst diagram compilation |
 | [containers](#containers) | 7 | Container image building |
 | [secrets](#secrets) | 14 | SOPS secrets management |
 | [sops](#sops) | 8 | SOPS key management |
-| [CI/CD](#cicd) | 30 | CI/CD operations and caching |
+| [CI/CD](#cicd) | 25 | CI/CD operations and caching |
 | [nix-home-manager](#nix-home-manager) | 4 | Home-manager bootstrap |
 | [nix-darwin](#nix-darwin) | 3 | Darwin bootstrap |
 | [nixos](#nixos) | 4 | NixOS operations |
@@ -67,8 +67,8 @@ Core nix operations for building, checking, and managing the flake.
 | `build` | `profile` | Build nix flake (runs lint and check first) | No |
 | `debug-build` | `package` | Build experimental debug package with nom | No |
 | `debug-list` | - | List all available debug packages | No |
-| `check` | - | Run nix flake check (full, including VM tests) | **Yes** |
-| `check-fast` | `system` | Fast checks excluding heavy VM integration tests | No |
+| `check` | - | Run nix flake check (full, including VM tests) | No |
+| `check-fast` | `nom? push? system?` | Build `checks.<system>` via nix-fast-build, skipping cached derivations | No |
 | `verify` | - | Verify system configuration builds after updates | No |
 | `bisect-nixpkgs` | - | Bisect nixpkgs commits (automatic mode) | No |
 | `bisect-nixpkgs-manual` | `command` | Bisect nixpkgs commits (manual mode) | No |
@@ -76,7 +76,7 @@ Core nix operations for building, checking, and managing the flake.
 | `update` | - | Update all nix flake inputs | No |
 | `update-package` | `package` | Update a package using its updateScript | No |
 
-**CI-tested recipes:** `check` is called by the `flake-validation` CI job.
+**CI:** nixbot builds `checks.x86_64-linux` directly rather than calling these recipes; `just check-fast auto off x86_64-linux` builds the same set.
 
 ## Terraform
 
@@ -119,18 +119,20 @@ Documentation site management using Starlight and Cloudflare Workers.
 | `docs-lint` | - | Lint documentation code with Biome | No |
 | `docs-check` | - | Check and fix documentation code with Biome | No |
 | `docs-linkcheck` | - | Validate internal and external links | No |
-| `docs-test` | - | Run all documentation tests | **Yes** |
-| `docs-test-unit` | - | Run documentation unit tests | **Yes** |
-| `docs-test-e2e` | - | Run documentation E2E tests | **Yes** |
-| `docs-test-coverage` | - | Generate documentation test coverage report | **Yes** |
-| `docs-deploy-preview` | `branch` | Deploy to Cloudflare Workers (preview) | **Yes** |
-| `docs-deploy-production` | - | Deploy to Cloudflare Workers (production) | **Yes** |
+| `docs-test` | - | Run all documentation tests | No |
+| `docs-test-unit` | - | Run documentation unit tests | No |
+| `docs-test-e2e` | - | Run documentation E2E tests | No |
+| `docs-test-e2e-report` | - | Show the E2E test report | No |
+| `docs-test-coverage` | - | Generate documentation test coverage report | No |
+| `docs-deploy-preview` | `branch?` | Upload a preview version aliased at `b-<branch>` | No |
+| `docs-deploy-production` | - | Deploy to production with `wrangler deploy` | No |
 | `docs-deployments` | - | List recent Cloudflare deployments | No |
 | `docs-tail` | - | Tail live logs from Cloudflare Workers | No |
 | `docs-versions` | `limit` | List recent Cloudflare versions | No |
 
-**CI-tested recipes:** `docs-test-*` recipes are called by the `typescript` CI job.
-`docs-deploy-*` recipes are called by `preview-docs-deploy` and `production-docs-deploy` jobs.
+**CI:** nixbot builds the docs tests as `checks.<system>.package-vanixiets-docs-test-*` rather than calling these recipes.
+`docs-deploy-preview` and `docs-deploy-production` run the same `deploy-docs` flake app as CI, with credentials from `secrets/shared.yaml`.
+In CI the `deploy-docs` onPush effect deploys production on each push to `main`, and the `deploy-docs-preview` onEvent effect uploads pull request previews.
 
 ## Diagrams
 
@@ -142,7 +144,7 @@ Typst diagram compilation and optimization for documentation.
 | `diagrams-compile` | `name` | Compile a single typst diagram (without optimization) | No |
 | `diagrams-watch` | - | Watch typst diagrams for changes and recompile | No |
 
-**Note:** `diagrams-build` is called as a dependency by `docs-build`, `docs-linkcheck`, `docs-deploy-preview`, and `docs-deploy-production`.
+**Note:** `diagrams-build` is called as a dependency by `docs-build`.
 
 ## Containers
 
@@ -179,8 +181,6 @@ SOPS-based secrets management.
 | `run-with-secrets` | `+command` | Run command with all shared secrets as env vars | No |
 | `validate-secrets` | - | Validate all sops encrypted files can be decrypted | No |
 
-**Note:** CI uses `nix run nixpkgs#gitleaks` directly rather than `just scan-secrets`.
-
 ## SOPS
 
 SOPS key management and rotation.
@@ -202,43 +202,34 @@ CI/CD operations, caching, and release management.
 
 | Recipe | Arguments | Description | CI-tested |
 |--------|-----------|-------------|-----------|
-| `ci-run-watch` | `workflow?` | Trigger CI workflow and wait for result | No |
-| `ci-status` | `workflow?` | View latest CI run status | No |
-| `ci-logs` | `workflow?` | View latest CI run logs | No |
-| `ci-logs-failed` | `workflow?` | View only failed logs from latest CI run | No |
-| `ci-show-outputs` | `system?` | List categorized flake outputs | No |
-| `ci-build-local` | `category? system?` | Build all flake outputs locally with nom | No |
-| `ci-build-category` | `system category config?` | Build specific category for CI matrix | **Yes** |
-| `ci-cache-category` | `system category config?` | Build and cache category with cachix | No |
-| `ci-validate` | `workflow? run_id?` | Validate latest CI run comprehensively | No |
+| `ci-run-watch` | `workflow?` | Trigger a GitHub Actions workflow and wait for result | No |
+| `ci-status` | `workflow?` | View latest workflow run status | No |
+| `ci-logs` | `workflow?` | View latest workflow run logs | No |
+| `ci-logs-failed` | `workflow?` | View only failed logs from latest workflow run | No |
+| `ci-validate` | `workflow? run_id?` | Validate latest workflow run comprehensively | No |
 | `ci-debug-job` | `workflow? job_name?` | Debug specific failed job | No |
+| `update-flake-inputs` | - | Trigger an ad hoc flake input update on main | No |
 | `ghsecrets` | `repo?` | Update GitHub secrets from sops | No |
 | `list-workflows` | - | List available workflows (via act) | No |
-| `test-flake-workflow` | - | Execute ci.yaml workflow locally via act | No |
+| `test-flake-workflow` | - | Execute a workflow locally via act | No |
 | `ratchet-pin` | - | Pin GitHub Actions workflow versions to hashes | No |
 | `ratchet-unpin` | - | Unpin workflow versions to semantic values | No |
 | `ratchet-update` | - | Update GitHub Actions to latest versions | No |
 | `ratchet-upgrade` | - | Upgrade GitHub Actions across major versions | No |
 | `cache-rosetta-builder` | - | Push nix-rosetta-builder VM image to cachix | No |
 | `check-rosetta-cache` | - | Check if rosetta-builder image is cached | No |
-| `cache-linux-package` | `package` | Build Linux package and push to cachix | No |
 | `test-cachix` | - | Test cachix push/pull with simple derivation | No |
-| `cache-ci-outputs` | `system?` | Build all CI outputs and push to cachix | No |
 | `cache-darwin-system` | - | Build darwin system and push to cachix | No |
-| `cache-overlay-packages` | `system` | Cache all overlay packages for system | **Yes** |
 | `list-packages` | - | List all packages in packages/ directory | No |
-| `list-packages-json` | - | List packages in JSON format for CI matrix | **Yes** |
+| `list-packages-json` | `*ARGS` | List packages in JSON format | No |
 | `validate-package` | `package` | Validate package structure | No |
-| `test-package` | `package` | Test package (install, tests, build) | **Yes** |
-| `preview-version` | `target? package?` | Preview semantic-release version | **Yes** |
-| `release-package` | `package dry_run?` | Release package using semantic-release | No |
+| `test-package` | `package` | Test package (install, tests, build) | No |
+| `release` | `*args` | Run the `release` flake app with passthrough arguments | No |
+| `release-package` | `package dry_run?` | Release a package with semantic-release; `true` runs `--dry-run` | No |
+| `renovate` | `dry_run?` | Preview renovate's decisions (dry run by default) | No |
 
-**CI-tested recipes:**
-- `ci-build-category` is called by the `nix` CI job matrix
-- `cache-overlay-packages` is called by the `cache-overlay-packages` CI job
-- `list-packages-json` is called by the `set-variables` CI job
-- `test-package` is called by the `typescript` CI job
-- `preview-version` is called by the `preview-release-version` CI job
+**CI:** releases run only in the `release-packages` effect on pushes to `main`, which calls the `release` flake app directly.
+Preview a release locally with `just release-package docs true`: semantic-release's `--dry-run` with the production plugins, so `GITHUB_TOKEN` is required.
 
 ## Nix-home-manager
 

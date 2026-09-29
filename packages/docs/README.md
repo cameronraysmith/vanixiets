@@ -123,12 +123,15 @@ bun run check:fix
 # Preview locally
 bun run preview
 
-# Deploy
-bun run deploy
+# From the repository root: upload a preview version aliased at b-<branch>
+just docs-deploy-preview
 
-# Or use justfile from root
-just cf-deploy-production
+# From the repository root: deploy the nix-built site to production
+just docs-deploy-production
 ```
+
+Production deploys normally run in CI: the `deploy-docs` effect deploys each push to `main`, and pull requests get a preview from the `deploy-docs-preview` effect.
+See `src/content/docs/about/contributing/ci-cd-setup.md`.
 
 ## Documentation structure
 

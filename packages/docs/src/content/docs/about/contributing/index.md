@@ -16,8 +16,8 @@ Contributing to the infra documentation site.
 
 ## CI/CD and Deployment
 
-- [CI/CD Setup](/about/contributing/ci-cd-setup/) - GitHub Actions CI/CD pipeline for Cloudflare Workers
-- [Semantic Release Preview](/about/contributing/semantic-release-preview/) - Preview semantic-release behavior
+- [CI/CD Setup](/about/contributing/ci-cd-setup/) - nixbot checks, rehearsals, and main-only deploy effects
+- [Semantic Release Preview](/about/contributing/semantic-release-preview/) - Preview a release locally and the hermetic release rehearsal
 
 ## Infrastructure
 

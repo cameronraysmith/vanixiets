@@ -67,7 +67,7 @@ This change delivers planning artifacts only; the following is the sequencing a 
 
 1. Generalize `list-packages-json.sh` to also discover `modules/home/ai/plugins/package.json`, verified by running it and observing the new path in its JSON output.
 2. Add `modules/home/ai/plugins/package.json` with the `semantic-release-monorepo` + `semantic-release-major-tag` (18-entry `customTags`) release config.
-3. Verify via the existing `release-packages-dry-run` hercules-ci effect attribute (`release-packages.nix:260`, the `dryRun = true` rehearsal path) that the new package is discovered and dry-run semantic-release completes without attempting a real tag push.
+3. Verify via the hermetic `release-rehearsal` check (`checks.<system>.release-rehearsal`, which runs the same release program against stubs and cannot push tags) that the new package is discovered and semantic-release completes its analysis. Until that check exists, the local equivalent is `nix run .#release -- modules/home/ai/plugins -- --dry-run` (semantic-release's own dry run with the production plugins; needs `GITHUB_TOKEN`).
 4. Merge to `main`; the live `release-packages` effect cuts the first real `@vanixiets/plugins-v1.0.0` tag plus 18 aliases on the next qualifying commit under `modules/home/ai/plugins/**`.
 5. Add the tag-triggered relock-notify GH Actions workflow; verify it fires on the tag pushed in step 4 (or a subsequent test tag) and opens a PR.
 6. Repoint the 18 `dependencies.apm` entries in the root `apm.yml` from `#main` to `#<group>-v1.0.0`, run `just agents-relock`, and verify `apm outdated` now reports `up-to-date`/`outdated` (never `unknown`) for all 18.

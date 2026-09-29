@@ -32,10 +32,10 @@
 
 ## Task 3: Rehearsal verification (tasks.md 3.1-3.2)
 
-- [ ] **Step 1:** Identify the local invocation equivalent to the `release-packages-dry-run` hercules-ci effect attribute (likely `nix build .#checks.x86_64-linux.release-packages-dry-run` or a direct `nix run .#release -- modules/home/ai/plugins -- --dry-run` per `release.sh`'s CLI grammar) by reading `modules/effects/vanixiets/herculesCI/release-packages.nix`'s `dryRun = true` branch alongside `flake.nix`'s check wiring.
+- [ ] **Step 1:** Confirm the hermetic `release-rehearsal` check exists (`nix build .#checks.x86_64-linux.release-rehearsal`); it runs the same release program as the `release-packages` effect against stubs, so it never pushes a tag. If it has not landed yet, use the local equivalent `nix run .#release -- modules/home/ai/plugins -- --dry-run` (semantic-release's own dry run with the production plugins; needs `GITHUB_TOKEN`).
 - [ ] **Step 2:** Run it against a commit that touches `modules/home/ai/plugins/`; capture the log.
-- [ ] **Step 3:** Confirm the log shows the plugins package discovered (via `list-packages-json`'s echoed `packages discovered:` line) and analyzed, with no tag push attempted (dry-run semantics).
-- [ ] **Step 4:** Re-run against a commit that does NOT touch `modules/home/ai/plugins/`, confirming `packages/docs`'s own dry-run behavior is unaffected (regression check for Task 1's discovery change).
+- [ ] **Step 3:** Confirm the log shows the plugins package discovered and analyzed, with no tag push attempted.
+- [ ] **Step 4:** Re-run against a commit that does NOT touch `modules/home/ai/plugins/`, confirming `packages/docs`'s own rehearsal outcome is unaffected (regression check for Task 1's discovery change).
 
 ## Task 4: First-party dependency repointing (tasks.md 4.1-4.4) — gated on a real release existing
 

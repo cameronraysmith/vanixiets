@@ -27,6 +27,10 @@ Deployment operations are encapsulated as `nix run .#<app>` flake apps using `wr
 CI platforms (GitHub Actions, Gitea Actions) become thin triggers that provide timing (on push to main, on PR merge) and secrets (via environment variables), while the deployment logic is entirely owned by the flake.
 This makes CD operations portable across CI platforms, locally testable via `nix run .#deploy-docs -- --dry-run`, and hermetically reproducible because the flake pins every dependency.
 
+> **Correction (2026-09-28):** `deploy-docs` has no `--dry-run` flag; its subcommands are `production` and `preview <branch>`.
+> vanixiets now tests its CD programs hermetically instead: `checks.<system>.deploy-docs-rehearsal` runs `deploy-docs` against a stub wrangler and `checks.<system>.release-rehearsal` runs a full semantic-release against a local fixture and a stub GitHub API.
+> vanixiets also departed from this note's flake-apps-over-effects recommendation: its docs deploy and release run as nixbot effects on pushes to `main`, with the flake apps as the effect programs.
+
 ## Why flake apps instead of buildbot-nix effects
 
 buildbot-nix supports a Hercules CI-style effects system where post-build deployment steps run as part of the CI pipeline.
