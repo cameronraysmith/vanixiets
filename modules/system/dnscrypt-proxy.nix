@@ -17,11 +17,17 @@
 #   sudo /nix/var/nix/profiles/system-N-link/activate  # where N is previous gen
 #   OR: sudo darwin-rebuild --rollback
 #
+# macOS pins every hardware network service to the local listener, including
+# services created later by newly attached adapters (see dnscrypt-pin-dns.sh),
+# so switching between Wi-Fi and wired adapters keeps DNS encrypted.
+#
 # Captive portals (public WiFi login pages):
-#   Portal auth requires DNS before external traffic works. Temporarily disable:
-#     sudo launchctl bootout system/org.nixos.dnscrypt-proxy
-#   Complete portal login, then re-enable:
-#     sudo launchctl bootstrap system /Library/LaunchDaemons/org.nixos.dnscrypt-proxy.plist
+#   Portal auth needs the network's own DNS. Stop the pinning daemon so it does
+#   not re-pin, then hand the portal's service back to DHCP-supplied DNS:
+#     sudo launchctl bootout system/org.nixos.dnscrypt-pin-dns
+#     sudo networksetup -setdnsservers Wi-Fi empty
+#   Complete portal login, then restart the daemon, which re-pins every service:
+#     sudo launchctl bootstrap system /Library/LaunchDaemons/org.nixos.dnscrypt-pin-dns.plist
 { lib, ... }:
 let
   # DoH stamps with embedded IP addresses (no DNS lookup required).
@@ -203,19 +209,29 @@ in
     }:
     let
       cfg = config.services.localDnscryptProxy;
+
+      pinDns = pkgs.writeShellApplication {
+        name = "dnscrypt-pin-dns";
+        runtimeInputs = [
+          pkgs.coreutils
+          pkgs.gnugrep
+        ];
+        runtimeEnv.EXCLUDED_SERVICES = lib.concatStringsSep "\n" cfg.excludeNetworkServices;
+        text = builtins.readFile ./dnscrypt-pin-dns.sh;
+      };
     in
     {
       options.services.localDnscryptProxy = sharedOptions // {
-        networkServices = lib.mkOption {
+        excludeNetworkServices = lib.mkOption {
           type = lib.types.listOf lib.types.str;
-          default = [ "Wi-Fi" ];
-          example = [
-            "Wi-Fi"
-            "Ethernet"
-          ];
+          default = [ ];
+          example = [ "Thunderbolt Bridge" ];
           description = ''
-            Network services to configure DNS for.
-            Use `networksetup -listallnetworkservices` to list available services.
+            Hardware network services whose DNS servers are left alone.
+            Every other service with a hardware device (Wi-Fi, Ethernet, and
+            adapters attached later) is pointed at the local listener; software
+            services such as VPNs are never touched.
+            Use `networksetup -listnetworkserviceorder` to list services.
           '';
         };
 
@@ -251,15 +267,24 @@ in
           GroupName = lib.mkForce "wheel";
         };
 
-        # Configure system DNS to use local dnscrypt-proxy (IPv4 and IPv6)
-        networking.knownNetworkServices = cfg.networkServices;
-        networking.dns = [
-          "127.0.0.1"
-          "::1"
-        ];
+        # Point every hardware network service at the local listener, now and
+        # whenever the network configuration changes: attaching an adapter for
+        # the first time creates its service in the SystemConfiguration
+        # preferences, which this watch picks up within seconds.
+        launchd.daemons.dnscrypt-pin-dns.serviceConfig = {
+          ProgramArguments = [ (lib.getExe pinDns) ];
+          RunAtLoad = true;
+          WatchPaths = [ "/Library/Preferences/SystemConfiguration/preferences.plist" ];
+          StandardOutPath = "/var/log/dnscrypt-pin-dns.log";
+          StandardErrorPath = "/var/log/dnscrypt-pin-dns.log";
+        };
+
+        # `dnscrypt-pin-dns --check` lists any service not pinned
+        environment.systemPackages = [ pinDns ];
 
         # Health check: ensure dnscrypt-proxy is responding after activation
         system.activationScripts.postActivation.text = lib.mkAfter ''
+          ${lib.getExe pinDns}
           echo "checking dnscrypt-proxy health..." >&2
           sleep 1  # Give dnscrypt-proxy time to start
           if ! ${pkgs.dig}/bin/dig @127.0.0.1 +short +time=2 +tries=1 example.com &>/dev/null; then
@@ -273,6 +298,13 @@ in
               echo "warning: dnscrypt-proxy still not responding after restart" >&2
               echo "  Rollback: sudo darwin-rebuild --rollback" >&2
             fi
+          fi
+          # The listener answering is not enough: the resolver macOS actually
+          # uses must be it, or queries leave in plaintext via the active service.
+          active="$(/usr/sbin/scutil --dns | ${pkgs.gawk}/bin/awk '/^resolver #1/ { r = 1 } r && /nameserver\[0\]/ { print $3; exit }')"
+          if [ -n "$active" ] && [ "$active" != 127.0.0.1 ] && [ "$active" != ::1 ]; then
+            echo "warning: active resolver is $active, not the local dnscrypt-proxy" >&2
+            ${lib.getExe pinDns} --check || true
           fi
         '';
       };
