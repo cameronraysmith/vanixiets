@@ -1,0 +1,1 @@
+dnscrypt-proxy exited on pyrite's first deploy: nixpkgs' upstreamDefaults added [sources] that fetch resolver lists by hostname, unresolvable once the listener is the system resolver; upstreamDefaults is now off. The NixOS captive-portal steps also needed resolvectl default-route and domain ~. to take effect (found while restoring pyrite's DNS).
