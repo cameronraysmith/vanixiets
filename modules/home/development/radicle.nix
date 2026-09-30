@@ -9,13 +9,21 @@
       lib,
       ...
     }:
+    let
+      radHome = "${config.home.homeDirectory}/.radicle";
+      nodeArgv = [
+        (lib.getExe' pkgs.radicle-node "radicle-node")
+        "--force"
+      ];
+      nodeEnv.RAD_HOME = radHome;
+    in
     {
       home.packages = [
         pkgs.radicle-node
         pkgs.radicle-tui
       ];
 
-      sops.secrets.ssh-signing-key.path = "${config.home.homeDirectory}/.radicle/keys/radicle";
+      sops.secrets.ssh-signing-key.path = "${radHome}/keys/radicle";
 
       # Deploy Radicle configuration to ~/.radicle/config.json
       home.file.".radicle/config.json".source = pkgs.writers.writeJSON "config.json" {
@@ -43,14 +51,45 @@
       # Same key serves radicle node identity, git signing, and jj signing.
       # Public key deployed via user module (e.g. modules/home/users/crs58/).
 
-      # TODO: Service management on Darwin
-      # radicle-node can be run manually as needed
-      # but would be more convenient to use a launchd agent
-      # (systemd.user.services obviously not available on Darwin)
-      #
-      # For manual operation:
-      #   Start node: radicle-node
-      #   Check identity: rad auth
-      #   View node info: rad self
+      # State only a running node maintains, such as the COB cache that
+      # Radicle Desktop requires to be current, never exists unless a node
+      # runs, so the user's service manager keeps one running. The node
+      # migrates that cache itself on start, and the sops key is unencrypted,
+      # so it needs neither `rad cob migrate` nor RAD_PASSPHRASE. The key is
+      # rendered by sops-nix's own user agent or unit. systemd orders the node
+      # after that oneshot unit; launchd cannot, so at login the node may find
+      # no key, exit non-zero, and be relaunched after ThrottleInterval. On
+      # both platforms the 30s retry spaces out permanent failures, and a
+      # clean `rad node stop` exits zero and stays stopped. --force clears a
+      # control socket left by a node that did not shut down cleanly, which
+      # the supervisor's single instance makes safe.
+      launchd.agents.radicle-node = lib.mkIf pkgs.stdenv.hostPlatform.isDarwin {
+        enable = true;
+        config = {
+          ProgramArguments = nodeArgv;
+          EnvironmentVariables = nodeEnv;
+          RunAtLoad = true;
+          KeepAlive.SuccessfulExit = false;
+          ThrottleInterval = 30;
+          ProcessType = "Background";
+          StandardOutPath = "${config.home.homeDirectory}/Library/Logs/radicle-node.log";
+          StandardErrorPath = "${config.home.homeDirectory}/Library/Logs/radicle-node.log";
+        };
+      };
+
+      systemd.user.services.radicle-node = lib.mkIf pkgs.stdenv.hostPlatform.isLinux {
+        Unit = {
+          Description = "Radicle node";
+          After = [ "sops-nix.service" ];
+          Wants = [ "sops-nix.service" ];
+        };
+        Service = {
+          ExecStart = lib.escapeShellArgs nodeArgv;
+          Environment = lib.mapAttrsToList (name: value: "${name}=${value}") nodeEnv;
+          Restart = "on-failure";
+          RestartSec = 30;
+        };
+        Install.WantedBy = [ "default.target" ];
+      };
     };
 }
