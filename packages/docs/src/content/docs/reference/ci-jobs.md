@@ -58,8 +58,8 @@ nixbot instead builds each effect's dependencies as a check, and every effect li
 
 | Check | What it runs | Listed by |
 |-------|--------------|-----------|
-| `checks.<system>.deploy-docs-rehearsal` | Every `deploy-docs` mode (`production`, `preview`, `pull-request`, `pull-request-closed`, `versions`, `deployments`) against a stub wrangler that also runs each invocation's identical argv through the real pinned wrangler (`deploy --dry-run`, the other commands against a loopback fake Cloudflare API), including a superseded production run, the untrusted `--payload` hardening, the same-repository-or-writer trust rule, each build status and failure path, the `docs-preview` check-run lifecycle, Preview teardown when deleted, absent, or failing, `--limit` truncation, and missing secrets | `docs` |
-| `checks.<system>.release-rehearsal` | `release-packages --rev` with the production semantic-release plugins against a local git fixture and a stub GitHub API, including the floating major and minor tags, a superseded rev, and a diverged rev; `release-packages plan` on fixture pull requests through the installation-token path, covering a minor, a major, and no bump, a release-configuration edit that is ignored in favour of `main`'s, a merge conflict, a head mismatch, a missing forge token, and an unused release PAT, with no write to the fixture remote and no release created | `release-packages` |
+| `checks.<system>.deploy-docs-rehearsal` | Every `deploy-docs` mode (`production`, `preview`, `pull-request`, `pull-request-closed`, `versions`, `deployments`) against a stub wrangler that also runs each invocation's identical argv through the real pinned wrangler (`deploy --dry-run`, the other commands against a loopback fake Cloudflare API), including a superseded production run, the untrusted `--payload` hardening, the same-repository-or-writer trust rule, each build status and failure path, the `docs-preview` check-run lifecycle, a pull request found closed or superseded before the upload (skipped, with no Cloudflare or nixbot API request) or closed during it (Preview withdrawn), a failed pull request state lookup, Preview teardown when deleted, absent, or failing, `--limit` truncation, and missing secrets | `docs` |
+| `checks.<system>.release-rehearsal` | `release-packages --rev` with the production semantic-release plugins against a local git fixture and a stub GitHub API, including the floating major and minor tags, a superseded rev, and a diverged rev; `release-packages plan` on fixture pull requests through the installation-token path, covering a minor, a major, and no bump, a release-configuration edit that is ignored in favour of `main`'s, a closed or superseded pull request (skipped without cloning), a failed pull request state lookup, a merge conflict, a head mismatch, a missing forge token, and an unused release PAT, with no write to the fixture remote and no release created | `release-packages` |
 
 `checks.<system>.effects-interpreter`, built by `nixbot/nix-build`, checks the script the effects interpreter generates for each trigger kind (`main`, `pullRequest`, `pullRequestClosed`): the main-only guard, secret export, that a trigger never receives another trigger's secrets, the missing-secret failure, the per-trigger forge token, and the program's exact argv, including `--rev`.
 
@@ -80,6 +80,10 @@ The generated script for a `main` trigger starts with a fail-closed guard that r
 It then exports the trigger's declared secrets, and only those, and execs the program, appending `--rev <commit>` for `main` triggers.
 
 Programs that report a GitHub check run (`deploy-docs pull-request` for `docs-preview`, `release-packages plan` for `release-plan`) share the `github-check-run` program (`modules/apps/ci/github-check-run.{nix,sh}`): `create --repo <owner/name> --name <check> --head-sha <sha>` prints the new `in_progress` check run's id, and `complete --repo <owner/name> --id <id> --conclusion <success|neutral|failure> --title <title> --summary <summary> [--details-url <url>]` completes it, both authenticated with nixbot's forge token (`GITHUB_FORGE_TOKEN`).
+
+nixbot does not guarantee the order in which it delivers pull request events, and a fast merge can deliver `pull_request_closed` before the `pull_request` event for the last green head.
+Both pull request modes therefore check, after creating their check run and before acting, that the pull request is still open at the event's head commit with the shared `github-pull-request` program (`modules/apps/ci/github-pull-request.{nix,sh}`): `state --repo <owner/name> --number <n> --head-sha <sha>` prints `current` (open at that head), `closed` (closed or merged), or `superseded` (open at a different head), and exits 1 on an API or argument failure.
+A mode whose pull request is not `current` completes its check run as `neutral` and exits 0 without acting; a failed lookup fails the run.
 
 ### docs
 
@@ -102,15 +106,17 @@ Local equivalent: `just docs-deploy-production`.
 
 **Production URL:** `https://infra.cameronraysmith.net`
 
-**`pullRequest`:** evaluated from `main`, it fetches the pull request's already-built docs store path from nixbot's API instead of evaluating pull-request code, accepting the docs attribute when nixbot reports it `succeeded` or `skipped_local`, and deploys it with `wrangler preview --ignore-base-config` as the Cloudflare Preview `pr-<number>` of the `infra-docs` Worker.
+**`pullRequest`:** evaluated from `main`, it first confirms the pull request is open at the event's head commit, and otherwise completes `neutral` ("Docs preview skipped") and logs `DEPLOY-DOCS-PREVIEW: skipped (<closed|superseded>)` without fetching or deploying anything.
+It then fetches the pull request's already-built docs store path from nixbot's API instead of evaluating pull-request code, accepting the docs attribute when nixbot reports it `succeeded` or `skipped_local`, and deploys it with `wrangler preview --ignore-base-config` as the Cloudflare Preview `pr-<number>` of the `infra-docs` Worker.
 It previews pull requests whose head branch is in this repository and forks whose actor or author has `write` or `admin` permission (a maintainer adding any label); other forks complete `neutral` without deploying.
-It reports as the GitHub check run `docs-preview` on the head commit, which is not required and never blocks a merge: its details link is the Preview URL, a skipped fork completes `neutral` with the reason and remedy in its summary, and a failure carries the error in its summary.
+After the upload it checks the pull request's state again: if the pull request closed in the meantime, it deletes `pr-<number>` as teardown would, logs `DEPLOY-DOCS-PREVIEW: withdrawn (closed during upload)`, and completes `neutral`, failing if the delete fails; a head superseded during the upload keeps the Preview, which the newer head's run updates.
+It reports as the GitHub check run `docs-preview` on the head commit, which is not required and never blocks a merge: its details link is the Preview URL, a skipped or withdrawn run completes `neutral` with the reason in its summary, and a failure carries the error in its summary.
 Local equivalent: `just docs-deploy-preview pr-<number>`.
 
 **Preview URL:** `https://pr-<number>-infra-docs.sciexp.workers.dev`; a local `just docs-deploy-preview` with no argument names the Preview after the current branch.
 
 **`pullRequestClosed`:** when the pull request is closed or merged, runs `wrangler preview delete --name pr-<number> --skip-confirmation` and logs `DEPLOY-DOCS-PREVIEW: deleted (pr-<number>)`; a pull request that never got a Preview logs `DEPLOY-DOCS-PREVIEW: absent (pr-<number>)` and exits 0.
-The shared `docs-preview-{pr}` lock makes teardown wait for an upload still in flight.
+The shared `docs-preview-{pr}` lock makes teardown wait for an upload still in flight; it does not order the two triggers, so a `pullRequest` run that follows teardown finds the pull request `closed` and skips.
 
 Cloudflare Previews are public, with `X-Robots-Tag: noindex` on `workers.dev`; a Worker holds at most 100 (Free) or 500 (paid) Previews of at most 100 deployments each, and Cloudflare deletes the least recently deployed Preview or oldest deployment at the limit.
 A deleted Preview's URL can keep serving for hours after `wrangler preview delete` succeeds ([cloudflare/developer-platform#73](https://github.com/cloudflare/developer-platform/issues/73)).
@@ -134,8 +140,10 @@ It exits 0 without releasing when `main` has moved past its commit, and fails fo
 Local equivalent: `just release-package <package> true` (semantic-release `--dry-run`; needs `GITHUB_TOKEN`).
 
 **`pullRequest`:** runs on every pull request once its head has built green, forks included once CI is approved for them, and reports the GitHub check run `release-plan` on the head commit, which is not required and never blocks a merge.
+It first confirms the pull request is open at the event's head commit, and otherwise completes `neutral` ("Release plan skipped") and logs `RELEASE-PLAN: skipped (<closed|superseded>)` without cloning.
 On success it is titled "Release plan" and its summary is a table with columns package, last, next, and bump; the nixbot log carries one `RELEASE-PLAN: <package> <last|none> -> <next|no release>` line per package.
-It completes as `failure`, with the reason in its summary, on a conflict with `main`, a fetched `refs/pull/<number>/head` that differs from the event's head commit, or a package whose semantic-release run fails.
+It completes as `failure`, with the reason in its summary, on a failed pull request state lookup, a conflict with `main`, a fetched `refs/pull/<number>/head` that differs from the event's head commit, or a package whose semantic-release run fails.
+The log also shows semantic-release's `Published release <version> on <channel> channel`, which it prints even under `--dry-run` (semantic-release 25.0.9 `index.js`, line 221); the forecast publishes nothing, and the `RELEASE-PLAN` lines and the check run are its authoritative output.
 
 The forecast analyses the pull request's commits on a simulated merge into `main` while the working tree, and so semantic-release's configuration and plugins, are `main`'s files; a pull request cannot change what the forecast runs.
 It authenticates only with nixbot's installation token (contents read, checks write), never receives or reads the release PAT, and never pushes: it runs semantic-release with `--dry-run` and redirects every git network operation to a local bare clone.

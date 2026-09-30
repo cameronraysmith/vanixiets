@@ -22,9 +22,10 @@
 # Git identity and CI=true go through the environment: env-ci aborts outside
 # a recognised CI without CI=true, and the sandbox cannot write .git/config.
 #
-# RELEASE_PACKAGES_LIST, RELEASE_PACKAGES_RELEASE and RELEASE_PACKAGES_CHECK_RUN
-# are the list-packages-json, release and github-check-run programs, injected
-# by release-packages.nix runtimeEnv.
+# RELEASE_PACKAGES_LIST, RELEASE_PACKAGES_RELEASE, RELEASE_PACKAGES_CHECK_RUN
+# and RELEASE_PACKAGES_PULL_REQUEST are the list-packages-json, release,
+# github-check-run and github-pull-request programs, injected by
+# release-packages.nix runtimeEnv.
 #
 # Plan mode runs on a pull request with nixbot's read-only forge installation
 # token and never the release PAT. It analyses the pull request's commits on a
@@ -34,6 +35,11 @@
 # --dry-run against a throwaway bare copy of main that git's url.insteadOf
 # substitutes for the GitHub URL, and every other https remote is rewritten to
 # a path that does not exist, so no git operation reaches the network.
+#
+# nixbot delivers pull_request effects in no guaranteed order, after a merge
+# as readily as before it, and the event is a delivery-time snapshot. Plan
+# mode therefore asks GitHub whether the pull request is still open at the
+# event's head and, if not, completes the check run neutral without cloning.
 
 set -euo pipefail
 
@@ -49,7 +55,8 @@ ancestor of origin/main; fails when <rev> is not in main's history.
 
 plan forecasts, for the nixbot pull_request event, the release each package
 would get if the pull request merged, and reports it as the release-plan
-check run on the pull request head.
+check run on the pull request head. When the pull request is no longer open
+at the event's head, plan skips (exit 0) and completes the check run neutral.
 
 Environment:
   GITHUB_TOKEN               --rev: required; release authority for tags and
@@ -69,6 +76,7 @@ readonly plan_repo_url=https://github.com/cameronraysmith/vanixiets
 check_run_id=""
 plan_tmp=""
 plan_summary=""
+plan_skipped=""
 plan_failure=""
 
 # Completes the check run from the exit status; reporting never changes it.
@@ -76,7 +84,9 @@ plan_exit() {
   local rc=$? conclusion=failure title="Release plan failed" summary="$plan_failure"
   trap - EXIT
   if [ -n "$check_run_id" ]; then
-    if [ "$rc" -eq 0 ]; then
+    if [ "$rc" -eq 0 ] && [ -n "$plan_skipped" ]; then
+      conclusion=neutral title="Release plan skipped" summary="$plan_summary"
+    elif [ "$rc" -eq 0 ]; then
       conclusion=success title="Release plan" summary="$plan_summary"
     elif [ -z "$summary" ]; then
       summary="release-packages plan exited with status $rc."
@@ -146,6 +156,16 @@ plan() {
   plan_tmp="$(mktemp -d -t release-plan.XXXXXX)"
   trap plan_exit EXIT
   check_run_id="$("$RELEASE_PACKAGES_CHECK_RUN" create --repo "$plan_repo" --name release-plan --head-sha "$head")"
+
+  local pr_state
+  pr_state="$("$RELEASE_PACKAGES_PULL_REQUEST" state --repo "$plan_repo" --number "$pr" --head-sha "$head")" ||
+    plan_fail "cannot read the state of pull request #$pr"
+  if [ "$pr_state" != current ]; then
+    plan_skipped=1
+    plan_summary="pull request #$pr is $pr_state; no forecast"
+    echo "RELEASE-PLAN: skipped ($pr_state)"
+    return 0
+  fi
 
   export GIT_AUTHOR_NAME=semantic-release
   export GIT_AUTHOR_EMAIL=semantic-release@vanixiets.local

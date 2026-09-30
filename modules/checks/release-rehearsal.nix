@@ -32,7 +32,10 @@
 # forecast and its plugin never runs; a PR conflicting with main completes the
 # check run as a failure. Every plan row leaves the remote's refs untouched,
 # publishes no release, and authenticates every API call with the forge token
-# although a release PAT sits in the environment.
+# although a release PAT sits in the environment. The stub reports each of
+# those pull requests open at the event's head; one closed, or open at another
+# head, skips with a neutral check run and never clones, and a failed state
+# request fails the check run without cloning.
 #
 # The floating tags depend on `"success": {}` in that release block. Without
 # it semantic-release-monorepo's wrapped success step runs instead, which
@@ -62,7 +65,7 @@
 
         REPO = "${repoApi}"
         FORGE = "${forgeToken}"
-        log_path, port_path = sys.argv[1], sys.argv[2]
+        log_path, port_path, pull_path = sys.argv[1], sys.argv[2], sys.argv[3]
 
         class Handler(BaseHTTPRequestHandler):
             def _handle(self):
@@ -91,6 +94,9 @@
                     status, reply = 201, {"id": ${checkRunId}}
                 elif self.command == "PATCH" and path == REPO + "/check-runs/${checkRunId}":
                     status, reply = 200, {"id": ${checkRunId}}
+                elif self.command == "GET" and path.startswith(REPO + "/pulls/"):
+                    with open(pull_path) as f:
+                        status, reply = json.load(f)
                 else:
                     status, reply = 404, {"message": "Not Found"}
                 data = json.dumps(reply).encode()
@@ -216,7 +222,7 @@
               "$conflict_pr:refs/pull/5/head"
             plan_refs="$(git -C "$plan_remote" for-each-ref)"
 
-            python3 ${githubStub} "$TMPDIR/requests.jsonl" "$TMPDIR/port" &
+            python3 ${githubStub} "$TMPDIR/requests.jsonl" "$TMPDIR/port" "$TMPDIR/pull.json" &
             stub_pid=$!
             trap 'kill "$stub_pid"' EXIT
             for _ in $(seq 100); do [ -s "$TMPDIR/port" ] && break; sleep 0.1; done
@@ -320,6 +326,8 @@
               "  insteadOf = https://x-access-token:${forgeToken}@github.com/cameronraysmith/vanixiets" \
               "  insteadOf = https://${forgeToken}@github.com/cameronraysmith/vanixiets" \
               > "$TMPDIR/plan-gitconfig"
+            # pull_reply, when set, is the stub's [status, body] for the pull
+            # request; by default it is open at the event's head.
             plan() { # <number> <head> [env operands...]
               local number=$1 head=$2
               shift 2
@@ -327,6 +335,11 @@
               rm -f "$sentinel"
               jq -n --argjson n "$number" --arg h "$head" \
                 '{pullRequest: {number: $n, headRev: $h}}' > "$TMPDIR/event.json"
+              if [ -n "''${pull_reply:-}" ]; then
+                printf '%s\n' "$pull_reply" > "$TMPDIR/pull.json"
+              else
+                jq -n --arg h "$head" '[200, {state: "open", head: {sha: $h}}]' > "$TMPDIR/pull.json"
+              fi
               capture env \
                 GIT_CONFIG_GLOBAL="$TMPDIR/plan-gitconfig" \
                 GITHUB_TOKEN=rehearsal-release-pat \
@@ -349,6 +362,7 @@
               if jq -e 'select(
                   (.method == "GET" and .path == "${repoApi}")
                   or (.method == "HEAD" and .path == "/installation/repositories")
+                  or (.method == "GET" and (.path | test("^${repoApi}/pulls/[0-9]+$")))
                   or (.method == "POST" and .path == "${repoApi}/check-runs")
                   or (.method == "PATCH" and .path == "${repoApi}/check-runs/${checkRunId}")
                   | not)' "$TMPDIR/requests.jsonl" > /dev/null; then
@@ -380,6 +394,21 @@
               assert_check_run "$1" "$2" success
               [ "$(printf '%s\n' "$completion" | jq -r .output.title)" = "Release plan" ] \
                 || fail "$1 check run has the wrong title: $completion"
+              assert_plan_harmless "$1"
+            }
+            assert_skipped() { # <label> <number> <head> <state>
+              [ "$rc" = 0 ] || fail "$1 exited $rc, expected 0"
+              grep -qxF "RELEASE-PLAN: skipped ($4)" "$TMPDIR/stdout" \
+                || fail "$1 did not report RELEASE-PLAN: skipped ($4)"
+              ! grep -q RELEASE-PLAN-CLONE-START "$TMPDIR/stdout" \
+                || fail "$1 cloned the repository"
+              jq -e --arg p "${repoApi}/pulls/$2" 'select(.method == "GET" and .path == $p)' \
+                "$TMPDIR/requests.jsonl" > /dev/null \
+                || fail "$1 did not ask for pull request #$2: $(cat "$TMPDIR/requests.jsonl")"
+              assert_check_run "$1" "$3" neutral
+              [ "$(printf '%s\n' "$completion" | jq -r '.output.title + ": " + .output.summary')" \
+                = "Release plan skipped: pull request #$2 is $4; no forecast" ] \
+                || fail "$1 check run has the wrong output: $completion"
               assert_plan_harmless "$1"
             }
 
@@ -429,6 +458,29 @@
             printf '%s\n' "$completion" | grep -qF "conflicts with main" \
               || fail "conflict plan check run does not report the conflict: $completion"
             assert_plan_harmless "conflict plan"
+
+            # The clone URL is absent, so a fetch the skip failed to prevent
+            # would fail the row as well as print RELEASE-PLAN-CLONE-START.
+            echo "--- plan: closed PR skips without cloning"
+            pull_reply="$(jq -nc --arg h "$feat_pr" '[200, {state: "closed", merged: true, head: {sha: $h}}]')" \
+              plan 1 "$feat_pr" RELEASE_PACKAGES_REPO_URL="file://$TMPDIR/absent.git"
+            assert_skipped "closed plan" 1 "$feat_pr" closed
+
+            echo "--- plan: PR moved to a newer head skips without cloning"
+            pull_reply="$(jq -nc --arg h "$major_pr" '[200, {state: "open", head: {sha: $h}}]')" \
+              plan 1 "$feat_pr" RELEASE_PACKAGES_REPO_URL="file://$TMPDIR/absent.git"
+            assert_skipped "superseded plan" 1 "$feat_pr" superseded
+
+            echo "--- plan: pull request state unavailable fails its check run"
+            pull_reply='[404, {"message": "Not Found"}]' \
+              plan 1 "$feat_pr" RELEASE_PACKAGES_REPO_URL="file://$TMPDIR/absent.git"
+            [ "$rc" = 1 ] || fail "plan without pull request state exited $rc, expected 1"
+            ! grep -q RELEASE-PLAN-CLONE-START "$TMPDIR/stdout" \
+              || fail "plan without pull request state cloned the repository"
+            assert_check_run "plan without pull request state" "$feat_pr" failure
+            printf '%s\n' "$completion" | grep -qF "cannot read the state of pull request #1" \
+              || fail "plan without pull request state check run does not report it: $completion"
+            assert_plan_harmless "plan without pull request state"
 
             touch $out
           '';

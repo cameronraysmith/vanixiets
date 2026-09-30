@@ -7,13 +7,14 @@
 # from the environment.
 #
 # Set by deploy.nix: builtin_payload (config.packages.vanixiets-docs),
-# DOCS_NODE_MODULES (vanixiets-docs-deps node_modules tree) and
-# DEPLOY_DOCS_CHECK_RUN (the github-check-run program).
+# DOCS_NODE_MODULES (vanixiets-docs-deps node_modules tree),
+# DEPLOY_DOCS_CHECK_RUN (the github-check-run program) and
+# DEPLOY_DOCS_PULL_REQUEST (the github-pull-request program).
 # Test seams: WRANGLER (wrangler JS entrypoint run under node),
 # DEPLOY_DOCS_MAIN_SHA_URL (main's head as JSON `.sha`), GITHUB_API_URL
-# (check-run API base, read by github-check-run), DEPLOY_DOCS_DEBUG (keep the
-# tmpdir). nix-store honours NIX_REMOTE, so a rehearsal realises payloads
-# against a chroot store.
+# (GitHub API base, read by github-check-run and github-pull-request),
+# DEPLOY_DOCS_DEBUG (keep the tmpdir). nix-store honours NIX_REMOTE, so a
+# rehearsal realises payloads against a chroot store.
 
 set -euo pipefail
 
@@ -41,6 +42,11 @@ Subcommands:
   pull-request         nixbot pull_request event: preview the docs nixbot
                        built for the pull request as Preview pr-<number>,
                        reported as the `docs-preview` check run on its head.
+                       Prints `DEPLOY-DOCS-PREVIEW: skipped (<state>)` and
+                       deploys nothing unless the pull request is open at
+                       that head, and deletes the Preview again, printing
+                       `DEPLOY-DOCS-PREVIEW: withdrawn (closed during
+                       upload)`, when it closed during the upload.
   pull-request-closed  nixbot pull_request_closed event: delete Preview
                        pr-<number>, printing
                        `DEPLOY-DOCS-PREVIEW: deleted (pr-<number>)`, or
@@ -157,6 +163,7 @@ fi
 : "${CLOUDFLARE_ACCOUNT_ID:?CLOUDFLARE_ACCOUNT_ID is required}"
 : "${DOCS_NODE_MODULES:?DOCS_NODE_MODULES not set; deploy.nix must expose vanixiets-docs-deps via runtimeEnv}"
 : "${DEPLOY_DOCS_CHECK_RUN:?DEPLOY_DOCS_CHECK_RUN not set; deploy.nix must expose github-check-run via runtimeEnv}"
+: "${DEPLOY_DOCS_PULL_REQUEST:?DEPLOY_DOCS_PULL_REQUEST not set; deploy.nix must expose github-pull-request via runtimeEnv}"
 
 # The only Worker this script may touch. Payload configs are build output of
 # whatever tree was built, including an untrusted pull request's, so their
@@ -434,14 +441,16 @@ deploy_production() {
   echo "DEPLOY-DOCS-ACTION: deploy (version ${deploy_version_id})"
 }
 
-skipped=""
+# A run that ends without deploying sets both; the check run then completes
+# neutral with them.
+neutral_title=""
+neutral_summary=""
 preview_url=""
 report_check_run() {
   local rc=$1
-  if [[ "$rc" -eq 0 && -n "$skipped" ]]; then
+  if [[ "$rc" -eq 0 && -n "$neutral_title" ]]; then
     "$DEPLOY_DOCS_CHECK_RUN" complete --repo "$repo" --id "$check_run_id" \
-      --conclusion neutral --title "Docs preview skipped" \
-      --summary "Docs preview of ${rev:0:12} skipped: $skipped. A maintainer can preview it by adding any label to the pull request."
+      --conclusion neutral --title "$neutral_title" --summary "$neutral_summary"
   elif [[ "$rc" -eq 0 ]]; then
     "$DEPLOY_DOCS_CHECK_RUN" complete --repo "$repo" --id "$check_run_id" \
       --conclusion success --title "Docs preview deployed" \
@@ -454,6 +463,21 @@ report_check_run() {
   fi
 }
 
+# nixbot may deliver a pull request's events in any order, a merge's
+# pull_request_closed before the pull_request of its last push among them,
+# and the event payload is a snapshot from delivery time. So the pull
+# request's state is read from GitHub itself into pr_state: current, closed
+# or superseded (open at another head).
+pr_state=""
+read_pull_request_state() {
+  pr_state="$("$DEPLOY_DOCS_PULL_REQUEST" state --repo "$repo" --number "$pr" --head-sha "$rev")" ||
+    die "cannot read the state of pull request #$pr"
+  case "$pr_state" in
+    current | closed | superseded) ;;
+    *) die "unexpected state '$pr_state' of pull request #$pr" ;;
+  esac
+}
+
 # Runs from the default branch whatever pull request the event is about. The
 # pull request contributes data only: its number, head rev, and the docs
 # payload nixbot already built for it, located through nixbot's build API and
@@ -463,7 +487,7 @@ report_check_run() {
 # the outcome is the `docs-preview` check run on the head commit.
 pull_request() {
   local docs_attr=checks.x86_64-linux.package-vanixiets-docs
-  local build_number is_fork writer who build_url build_json build_status attribute attr_status payload
+  local build_number is_fork writer who reason build_url build_json build_status attribute attr_status payload
 
   [[ "${NIXBOT_EVENT_KIND:-}" == pull_request ]] ||
     die "expected a pull_request event, got ${NIXBOT_EVENT_KIND:-none}"
@@ -485,6 +509,15 @@ pull_request() {
     echo "warning: could not create the docs-preview check run" >&2
   }
 
+  # Only a pull request still open at the event's head gets a Preview.
+  read_pull_request_state
+  if [[ "$pr_state" != current ]]; then
+    neutral_title="Docs preview skipped"
+    neutral_summary="pull request #$pr is $pr_state; no preview"
+    echo "DEPLOY-DOCS-PREVIEW: skipped ($pr_state)"
+    exit 0
+  fi
+
   # A head branch in this repository took write access to push, which bots
   # hold without reporting it; a fork's content is previewed with our token
   # only once a writer has acted on or authored the pull request.
@@ -505,8 +538,10 @@ pull_request() {
           | if . == [] then "no actor or author reported" else join(", ") end
         ' "$NIXBOT_EVENT_JSON")" ||
           die "cannot read the actor and author from $NIXBOT_EVENT_JSON"
-        skipped="pull request #$pr comes from a fork and neither its actor nor its author has write access ($who)"
-        echo "skipped: $skipped"
+        reason="pull request #$pr comes from a fork and neither its actor nor its author has write access ($who)"
+        neutral_title="Docs preview skipped"
+        neutral_summary="Docs preview of ${rev:0:12} skipped: $reason. A maintainer can preview it by adding any label to the pull request."
+        echo "skipped: $reason"
         exit 0
       fi
       ;;
@@ -537,6 +572,17 @@ pull_request() {
     die "cannot realise $payload"
 
   deploy_preview "pr-$pr" "$payload"
+
+  # A close delivered during the upload has already run its delete, so the
+  # Preview just deployed would outlive the pull request. A newer head's run
+  # replaces a superseded one under the same name.
+  read_pull_request_state
+  if [[ "$pr_state" == closed ]]; then
+    delete_preview "pr-$pr"
+    neutral_title="Docs preview withdrawn"
+    neutral_summary="pull request #$pr closed during the upload; Preview pr-$pr deleted"
+    echo "DEPLOY-DOCS-PREVIEW: withdrawn (closed during upload)"
+  fi
 }
 
 # Every pull request's Preview is deleted on close, whether or not one was
@@ -544,13 +590,15 @@ pull_request() {
 # as the Cloudflare API error 10025 in its `command-failed` NDJSON record,
 # the code wrangler itself reads as "Preview not found".
 pull_request_closed() {
-  local pr name ndjson code
   [[ "${NIXBOT_EVENT_KIND:-}" == pull_request_closed ]] ||
     die "expected a pull_request_closed event, got ${NIXBOT_EVENT_KIND:-none}"
   pr="${NIXBOT_PR_NUMBER:-}"
   [[ "$pr" =~ ^[0-9]+$ ]] || die "malformed event (pr=$pr)"
-  name="pr-$pr"
+  delete_preview "pr-$pr"
+}
 
+delete_preview() {
+  local name=$1 ndjson code
   wrangler_config="$minimal_config"
   ndjson="$tmpdir/wrangler-preview-delete.ndjson"
   : > "$ndjson"

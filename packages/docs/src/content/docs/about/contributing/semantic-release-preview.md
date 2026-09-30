@@ -28,6 +28,10 @@ nixbot delivers that event once a pull request's head has built green, so every 
 Each new green head produces a new forecast on that head commit, under `lock = "release-plan-{pr}"`.
 `release-plan` is not a required context: a failed forecast never blocks a merge.
 
+nixbot does not guarantee the order in which it delivers pull request events, so a `pull_request` event can arrive after the pull request has merged or after a newer head was pushed.
+Before forecasting, `release-packages plan` asks the shared `github-pull-request` program whether the pull request is still open at the event's head commit.
+When it is `closed` (closed or merged) or `superseded` (open at a newer head), the check run completes as `neutral`, titled "Release plan skipped" with the summary "pull request #<number> is <state>; no forecast", the log prints `RELEASE-PLAN: skipped (<state>)`, and the program exits 0 without cloning anything; a superseded head gets its forecast from the newer head's own run.
+
 ### What it shows
 
 On success the check run is titled "Release plan" and its summary is a table with one row per package:
@@ -47,18 +51,23 @@ RELEASE-PLAN: <package> <last|none> -> <next|no release>
 ```
 
 The check run completes as `failure`, with the reason in its summary, when the pull request conflicts with `main`, when the fetched `refs/pull/<number>/head` is not the head commit nixbot reported, or when semantic-release fails for a package (the summary then carries that package's output tail).
+A failed pull request state lookup also fails the run.
+
+The effect log also carries semantic-release's own output, which includes `Published release <version> on <channel> channel` even under `--dry-run` (semantic-release 25.0.9 `index.js`, line 221).
+The forecast publishes nothing: the `RELEASE-PLAN` lines and the `release-plan` check run are its authoritative output.
 
 ### How it forecasts, and what it trusts
 
 The pull request contributes commits only; every file the forecast executes or reads comes from `main`.
 
 1. `release-packages plan` creates the `in_progress` check run on the pull request's head commit, and an exit trap completes it; reporting never masks the program's exit status.
-2. It clones the public repository without a token, with tags, fetches `refs/pull/<number>/head`, and requires it to equal the head commit in nixbot's event.
-3. It simulates the merge with `git merge-tree --write-tree origin/main <head>` and records a merge commit whose parents are `main` and the pull request head.
-4. It checks that merge commit out as `main`, then resets the index and working tree to `main`'s tree, and fails closed if the working tree then differs from `main`'s.
+2. It confirms with `github-pull-request state` that the pull request is still open at the event's head commit, and otherwise completes the check run as `neutral` without cloning.
+3. It clones the public repository without a token, with tags, fetches `refs/pull/<number>/head`, and requires it to equal the head commit in nixbot's event.
+4. It simulates the merge with `git merge-tree --write-tree origin/main <head>` and records a merge commit whose parents are `main` and the pull request head.
+5. It checks that merge commit out as `main`, then resets the index and working tree to `main`'s tree, and fails closed if the working tree then differs from `main`'s.
    semantic-release therefore analyses the pull request's history, but loads its configuration, including any `extends`, and its plugins from `main`'s files.
    A pull request that edits a package's release configuration cannot change what the forecast runs.
-5. It runs the `release` program for each package with `--dry-run --no-ci`.
+6. It runs the `release` program for each package with `--dry-run --no-ci`.
 
 Credentials and writes:
 
