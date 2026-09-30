@@ -4,10 +4,10 @@
 
 fetchFromGitHub {
   pname = "agent-plugins-mergify-cli";
-  version = "2026.8.31.1";
+  version = "2026.9.16.1";
   owner = "Mergifyio";
   repo = "mergify-cli";
-  rev = "727ce50b8fb3be8a9a24025807e159d644dbba80";
-  hash = "sha256-BQl5L61m6uSr7y7fXoUsEwELmmSmHvs0jJMH22Zm82A=";
-  passthru.releaseTag = "2026.8.31.1";
+  rev = "e7c1ebbc281361f0b2b7827cf583f57339c97ebc";
+  hash = "sha256-i8roSCDYJKtHeb6oDcD1BnUBe0hjLK5v8D5QmxISNVg=";
+  passthru.releaseTag = "2026.9.16.1";
 }

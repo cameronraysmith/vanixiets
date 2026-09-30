@@ -25,9 +25,13 @@
 
         home.packages = lib.mkIf cfg.enable [ cfg.package ];
 
-        # No configuration file is managed: every API-touching command resolves
-        # its credential from MERGIFY_TOKEN, GITHUB_TOKEN, or a per-command
-        # --token, so there is no non-secret settings surface to render.
+        # No configuration file is managed, so there is no non-secret settings
+        # surface to render. Non-stack commands resolve their credential from
+        # --token, then MERGIFY_TOKEN, then the OS-keychain credential stored
+        # by `mergify auth login`, then GITHUB_TOKEN, then `gh auth token`
+        # (the last two print a deprecation warning). `mergify stack` commands
+        # are unaffected and keep --token, MERGIFY_TOKEN, GITHUB_TOKEN,
+        # `gh auth token`.
       };
     };
 }

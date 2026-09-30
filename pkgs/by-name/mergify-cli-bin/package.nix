@@ -20,19 +20,19 @@ let
   systemToPlatform = {
     "x86_64-linux" = {
       triple = "x86_64-unknown-linux-gnu";
-      hash = "sha256-B73d7l56XjLfRVni7PMWSnpL8AoOLJ/W/2OC62tHziQ=";
+      hash = "sha256-kH382b2ZvcQGF8DO5waumUFYKU7Ksorc6vQrNlKrshI=";
     };
     "aarch64-linux" = {
       triple = "aarch64-unknown-linux-gnu";
-      hash = "sha256-qdpYOxUd50YFUjk8QBSzTOkQetCz8ZKuZ8O3daycb6g=";
+      hash = "sha256-3LQ+HnzWCoBmUHBzkp7Qj61g2NpGyZMzeAnTaGhOcc4=";
     };
     "x86_64-darwin" = {
       triple = "x86_64-apple-darwin";
-      hash = "sha256-dB7n4Z/wZ+sKDbEK6tr3l4fLgPi40KaIKtbc7gGrB0o=";
+      hash = "sha256-ODI9iZYNTYN4r9Stmj4opZoovDWD9ZhLs78/bUSXQRk=";
     };
     "aarch64-darwin" = {
       triple = "aarch64-apple-darwin";
-      hash = "sha256-tmyLfINMMX0Te+FoC2HN5VVd6wf3Rt1mrlr2NZHdON0=";
+      hash = "sha256-oPoA+cDjOnJIQ5FUt8ijta3AqFnMG7uZRbHVfKx4h1c=";
     };
   };
   platform = systemToPlatform.${system} or (throw "mergify-cli-bin: unsupported platform ${system}");
@@ -40,7 +40,7 @@ in
 stdenv.mkDerivation (finalAttrs: {
   pname = "mergify-cli-bin";
   # Bare calver with no `v` prefix, matching the upstream tag exactly.
-  version = "2026.8.31.1";
+  version = "2026.9.16.1";
 
   src = fetchurl {
     url = "https://github.com/Mergifyio/mergify-cli/releases/download/${finalAttrs.version}/mergify-${finalAttrs.version}-${platform.triple}.tar.gz";

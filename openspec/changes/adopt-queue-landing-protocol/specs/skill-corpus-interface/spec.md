@@ -63,7 +63,7 @@ The section SHALL describe the following policy and procedure; these are require
 - PR shape determines how to enqueue independently of risk class; human or agent authorship determines neither axis.
 - The enqueue signal is merge authorization under E1, a convention subject to manual audit: the queue is review-blind and its App bypasses rulesets, so approving-review rules do not constrain its ref update.
 - An ordinary trunk-based PR is authorized by enabling GitHub native auto-merge with the button or `gh pr merge --auto`.
-- A registered stack is published with `mergify stack push --github-native`; the author verifies native registration, selected-head ancestry, and absence of auto-merge on every member before labelling only the topmost intended PR `merge-queue`.
+- A registered stack is published with `mergify stack push --trunk origin/main -R` under native registration (default since mergify-cli 2026.9.16.1; never pass `--no-github-native` and never set `mergify-cli.stack-github-native false`); the author verifies native registration, selected-head ancestry, and absence of auto-merge on every member before labelling only the topmost intended PR `merge-queue`.
 - Auto-merge is prohibited on every stack member, including the bottom member, even with a correct top label.
 - The prohibition's rationale names gitea-mq `internal/poller/poller.go::enqueueAutoMergePRs`, which targets `pr.BaseBranch` without resolving a stack; `labeledTargetBranch`, which calls `ResolveStack`; and `PollOnce`, whose auto-merge path runs first while `enqueueLabeledPRs` skips already-queued PRs, allowing a member's auto-merge to silently override the correct stack target.
 - A successful push or `Depends-On:` header alone is insufficient evidence of native registration.

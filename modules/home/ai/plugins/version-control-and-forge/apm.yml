@@ -28,5 +28,5 @@ dependencies:
       ref: 14fc42ed9b6c376a53b2f999f138d3bd26dac546
       skills: [gh-stack]
     - git: Mergifyio/mergify-cli
-      ref: 727ce50b8fb3be8a9a24025807e159d644dbba80
+      ref: e7c1ebbc281361f0b2b7827cf583f57339c97ebc
       skills: [mergify-stack]

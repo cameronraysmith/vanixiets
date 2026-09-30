@@ -36,7 +36,7 @@ The queue reads no reviews and the App bypasses rulesets, so an approving-review
 Authorship by a person or agent changes neither axis.
 
 Ordinary trunk-based PRs use GitHub native auto-merge, by button or `gh pr merge --auto`.
-Registered stacks use `mergify stack push --github-native`, verification of native registration and selected-head ancestry, and `merge-queue` on the topmost intended PR.
+Registered stacks use `mergify stack push --trunk origin/main -R` under native registration (default since mergify-cli 2026.9.16.1; never pass `--no-github-native` and never set `mergify-cli.stack-github-native false`), verification of native registration and selected-head ancestry, and `merge-queue` on the topmost intended PR.
 Auto-merge is prohibited on every stack member, including the bottom member.
 The ADR's `internal/poller/poller.go::enqueueAutoMergePRs` targets `pr.BaseBranch` without stack resolution, whereas `labeledTargetBranch` calls `ResolveStack`.
 `PollOnce` runs auto-merge enqueue first and `enqueueLabeledPRs` skips already-queued PRs, so a correct top label cannot repair a member's auto-merge signal.
@@ -56,7 +56,7 @@ Repeating the full procedure in every caller was rejected because `modules/home/
 ## Q4 [given]: upstream and delivery boundaries
 
 The upstream `mergify-stack` skill is apm-installed and has no source directory under `modules/home/ai/plugins/`.
-Leave it unchanged and put the mandatory native-registration flag, branch-prefix explanation, and never-resync-a-landed-stack override in the first-party owner.
+Leave it unchanged and put the mandatory native-registration requirement, branch-prefix explanation, and never-resync-a-landed-stack override in the first-party owner.
 `mergify-cli` source `crates/mergify-stack/src/stack_context.rs::configured_branch_prefix`, `default_branch_prefix`, and `resolve_default_branch_prefix` resolves `mergify-cli.stack-branch-prefix`, defaulting to `stack/<author>`.
 Document that configured namespace rather than inventing a fleet-specific prefix.
 Retain Change-Id identity, PR-author identity, and branch bookkeeping; start a fresh stack after landing instead of resyncing or repushing the landed stack.

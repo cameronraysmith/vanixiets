@@ -74,7 +74,7 @@ After warming and any required review, authorize according to shape:
    `--rebase` matters only on the single up-to-date entry path, where the forge performs the merge; a batch lands by fast-forward to the tested SHA regardless.
    For a wave of PRs, `gh-queue-open-prs` derives the required set from the live rulesets, reports each PR's verdict, and enqueues the green ones.
    It reports rather than enqueues any PR that is draft, conflicting, already queued, labelled `merge-queue`, or based on a branch other than the target, so the stack hazard below cannot be tripped by bulk authorization.
-2. For a registered stack, publish with `mergify stack push --github-native` under §Fleet upstream overrides.
+2. For a registered stack, publish with `mergify stack push --trunk origin/main -R` under §Fleet upstream overrides.
    Verify actual GitHub-native membership, that all intended lower-member heads are ancestors of the selected head, and that the selected head descends from the intended target.
    Command success or `Depends-On:` headers alone do not establish native registration; withhold authorization until missing membership or ancestry evidence is resolved.
    Verify absence of auto-merge on every stack member, then label only the topmost intended PR `merge-queue`.
@@ -92,7 +92,8 @@ The queue owns testing and landing; rejection arrives as a queue comment on the 
 ## Fleet upstream overrides
 
 For this protocol, these first-party overrides take precedence over examples in the unedited upstream `mergify-stack` skill.
-Stack publication requires `--github-native` and the registration checks in §Queue authorization, even when an upstream example uses plain push.
+Stack publication requires native registration (default since mergify-cli 2026.9.16.1; never pass `--no-github-native` and never set `mergify-cli.stack-github-native false`) and the registration checks in §Queue authorization, even when an upstream example uses plain push.
+The client silently skips registration where GitHub's Stacks API is unavailable, so the default does not replace those checks.
 
 The remote stack namespace comes from `mergify-cli.stack-branch-prefix`, defaulting to `stack/<author>` when unset.
 See mergify-cli `crates/mergify-stack/src/stack_context.rs::configured_branch_prefix`, `default_branch_prefix`, and `resolve_default_branch_prefix`.

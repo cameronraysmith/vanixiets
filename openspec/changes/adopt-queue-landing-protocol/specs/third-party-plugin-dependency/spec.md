@@ -4,7 +4,7 @@
 
 The apm-installed upstream `mergify-stack` skill and references SHALL remain unchanged from their pinned upstream source.
 `git-stacked-pr-integration` SHALL expose a first-party override section that takes precedence over upstream examples for repositories using the queue-authorization protocol.
-That section SHALL require `--github-native` on stack publication and verification of native registration, as defined in `Queue authorization has one documented owner`.
+That section SHALL require native registration on stack publication (default since mergify-cli 2026.9.16.1; never pass `--no-github-native` and never set `mergify-cli.stack-github-native false`) and verification of native registration, as defined in `Queue authorization has one documented owner`.
 It SHALL identify `mergify-cli.stack-branch-prefix` as the configured remote stack namespace and `stack/<author>` as the default, with the PR-opening identity used consistently for stack discovery.
 It SHALL distinguish the local work branch from generated remote stack branches and require keeping the published namespace stable across updates.
 It SHALL prohibit resyncing or repushing a landed stack as the normal author workflow and direct subsequent work to a fresh stack.

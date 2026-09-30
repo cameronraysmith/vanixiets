@@ -124,6 +124,7 @@ mergify-cli:
 
 - `mergify stack push --github-native` publishes one PR per commit and requests registration with GitHub's Stacks API (`crates/mergify-stack/src/plan.rs::plan`; `crates/mergify-stack/src/native_stack.rs::register`).
   Registration is opt-in through `mergify-cli.stack-github-native` and requires at least two PRs; registration failure can degrade to `Depends-On:` headers without failing the push (`crates/mergify-stack/src/commands/push.rs::run`).
+  As of mergify-cli 2026.9.16.1 (2026-09-30 note), registration is the default, the `--github-native` flag was removed, and opting out takes `--no-github-native` or `mergify-cli.stack-github-native false` (upstream Mergifyio/mergify-cli#1833).
   The operator must verify registration before using the stack enqueue rule.
 - New or updated head branches are pushed atomically with `--force-with-lease`; unchanged or merged entries are skipped (`crates/mergify-stack/src/notes_push.rs::push_branches`; `crates/mergify-stack/src/commands/push.rs::run`).
 - A commit counts as merged only when its PR has non-null `merged_at` and its head SHA equals the local commit (`crates/mergify-stack/src/sync_status.rs::classify`; `crates/mergify-stack/src/changes.rs::classify`).
@@ -356,7 +357,7 @@ Source filtering and cache warming are the core; process policies and upstream w
 
   > **Superseded in part (2026-09-28):** PR previews are no longer scoped through `effects_on_pull_requests`; they run as the onEvent effect `herculesCI.onEvent.pull_request.deploy-docs-preview` (see V10), and both `effects_on_pull_requests` and `effects_branches` are off for vanixiets.
 - R11. Serve `mq.scientistexperience.net` with `batchMax = 20`, `skipQueueIfUpToDate = true`, and the default `merge-queue` label; provision its database and reverse proxy.
-- R12. Publish stacks with `--github-native` and verify registration and selected-head ancestry before enqueue; `Depends-On:` alone does not enable queue stack resolution.
+- R12. Publish stacks with `mergify stack push --trunk origin/main -R` under native registration (default since mergify-cli 2026.9.16.1; never pass `--no-github-native` and never set `mergify-cli.stack-github-native false`) and verify registration and selected-head ancestry before enqueue; `Depends-On:` alone does not enable queue stack resolution.
 - R13. Use a separate GitHub App from nixbot's, with the permissions in gitea-mq `README.md`, “GitHub setup”: Checks read/write, Commit statuses read, Contents read/write, Pull requests read/write, Administration read/write, Metadata read.
   The required subscribable event set is exactly `check_run`, `pull_request`, `status`, and our registered App `sciexp-gitea-mq` (id 4875422) carries exactly those (`GET /apps/sciexp-gitea-mq`: `events: ["check_run", "pull_request", "status"]`).
   The README list also names `installation` and `installation_repositories`, which GitHub does not expose as subscribable events: GitHub delivers them to every App automatically, and they are absent from a correctly configured App's API `events` array.
@@ -370,6 +371,6 @@ Source filtering and cache warming are the core; process policies and upstream w
 After cache warming and any review required by E1, authorize by shape:
 
 1. Ordinary trunk-based PR: enable GitHub native auto-merge; gitea-mq waits for required checks and handles landing asynchronously.
-2. Stack: publish with `mergify stack push --github-native`, verify native registration and selected-head ancestry, then label the topmost PR intended to land `merge-queue`.
+2. Stack: publish with `mergify stack push --trunk origin/main -R` (native registration is the default since mergify-cli 2026.9.16.1; never pass `--no-github-native`), verify native registration and selected-head ancestry, then label the topmost PR intended to land `merge-queue`.
 
 Never enable auto-merge on any stack member, even when its top PR is correctly labelled; the auto-merge enqueue path runs first and does not resolve the stack base.

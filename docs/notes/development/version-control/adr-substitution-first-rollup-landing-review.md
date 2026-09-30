@@ -114,7 +114,7 @@ Two style deviations: multiple sentences per line throughout, and several source
 | R10 | machine: nixbot | `statusContextPrefix` and the two contexts |
 | R11 | machine: nixbot | `effects_branches` repo config |
 | R12 | machine: gitea-mq | module options; label holds by `config.go::Load` default |
-| R13 | machine: orchestrator; world-assumption | pushing with `--github-native` is ours; gitea-mq not reading `Depends-On:` is a tool fact |
+| R13 | machine: orchestrator; world-assumption | pushing with `--github-native` is ours; gitea-mq not reading `Depends-On:` is a tool fact (note 2026-09-30: mergify-cli 2026.9.16.1 removed `--github-native`; native registration is now the default, upstream Mergifyio/mergify-cli#1833) |
 | R14 | machine: orchestrator | serialization rule at the labeling interface |
 | R15 | machine: GitHub | App permissions and events; checkable against the App settings |
 | R16 | machine: GitHub | ruleset contents; checkable through the rulesets API |
