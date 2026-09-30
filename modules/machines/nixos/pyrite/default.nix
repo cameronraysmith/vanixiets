@@ -49,6 +49,7 @@ in
       ]
       ++ (with flakeModules; [
         base
+        dnscrypt-proxy
         hm-sops-bridge
         kvm-declaration
         ssh-known-hosts
@@ -384,6 +385,14 @@ in
         enableGnomeKeyring = true;
         # shadow.nix sets true at normal priority; this also rejects empty console passwords.
         allowNullPassword = lib.mkForce false;
+      };
+
+      # Encrypted DNS via DoH (DNS-over-HTTPS) on every network interface
+      services.localDnscryptProxy = {
+        enable = true;
+        providers = [
+          "quad9"
+        ];
       };
 
       # These effective support values previously came from GNOME's module.
