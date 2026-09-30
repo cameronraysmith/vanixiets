@@ -17,6 +17,7 @@
 # (nixbot/nixbot/repo_config.py:17), and buildbot no longer serves either
 # GitHub repository, so nothing reads the legacy name here.
 {
+  config,
   self,
   lib,
   ...
@@ -128,6 +129,13 @@
               lib.filterAttrs (_: file: file.deploy) vanixietsSecrets.files
             );
 
+            # Every declared effect secret is read by some effect and every
+            # secret an effect reads is declared, so the composed file holds
+            # nothing no effect uses.
+            effectSecretsUsed = lib.naturalSort (
+              lib.unique (lib.concatMap (entry: entry.secrets) (builtins.attrValues config.vanixiets.effects))
+            );
+
             # Outside pull requests build only once a maintainer approves them.
             # CONTRIBUTOR, in upstream's default, would admit anyone with a
             # previously merged pull request unreviewed.
@@ -201,6 +209,7 @@
               "GITHUB_TOKEN"
             ];
             vanixietsDeployedFiles = [ "secrets" ];
+            effectSecretsUsed = sortedNames self.lib.vanixietsEffectSecrets;
             prApprovalEnabled = true;
             prApprovalTrustedAssociations = [
               "OWNER"

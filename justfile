@@ -972,26 +972,25 @@ docs-test-e2e-report:
 docs-test-coverage:
   cd packages/docs && bun run test:coverage
 
-# Deploy documentation to Cloudflare Workers (preview).
+# Deploy documentation to Cloudflare Workers (preview) as alias b-<branch>.
 # Wraps with `sops exec-env secrets/shared.yaml '<cmd>'` so
-# CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID are exported per the
-# deploy-docs env-var contract (ADR-002 / env-var-contract-design.md
-# §2.1.3 Call site A). Devs with a local `.env` already exporting the
-# vars can skip the wrap; the sops prefix is idempotent and keeps fresh
-# clones without `.env` working. `sops exec-env` requires exactly two
-# positional args (file + single shell-command string), so the nix-run
-# invocation is quoted as one arg.
+# CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID are exported for
+# deploy-docs, which reads its secrets from the environment only.
+# `sops exec-env` requires exactly two positional args (file + single
+# shell-command string), so the nix-run invocation is one arg, with the
+# commit resolved beforehand by the recipe's shell.
 [group('docs')]
 docs-deploy-preview branch=`git branch --show-current`:
-  sops exec-env secrets/shared.yaml \
-    'nix run --accept-flake-config .#deploy-docs -- preview "{{branch}}"'
+  rev="$(git rev-parse HEAD)" && sops exec-env secrets/shared.yaml \
+    "nix run --accept-flake-config .#deploy-docs -- preview --rev $rev --alias '{{branch}}' --deployed-by $(whoami)"
 
-# Deploy documentation to Cloudflare Workers (production).
+# Deploy documentation to Cloudflare Workers (production); exits 0 without
+# deploying unless HEAD is main's head on GitHub.
 # See docs-deploy-preview header for the sops wrap rationale.
 [group('docs')]
 docs-deploy-production:
-  sops exec-env secrets/shared.yaml \
-    'nix run --accept-flake-config .#deploy-docs -- production'
+  rev="$(git rev-parse HEAD)" && sops exec-env secrets/shared.yaml \
+    "nix run --accept-flake-config .#deploy-docs -- production --rev $rev --deployed-by $(whoami)"
 
 # List recent Cloudflare deployments
 [group('docs')]

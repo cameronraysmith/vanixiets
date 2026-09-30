@@ -29,7 +29,7 @@
 # Optional (git identity; env-first, NO .git/config writes — bwrap mounts
 # /nix/store ro-bind, so `git config user.email …` would fail to lock
 # .git/config). git honours these natively without any config write.
-# Defaults applied by the effect preamble:
+# Defaults applied by the release-packages program:
 #   GIT_AUTHOR_NAME      / GIT_AUTHOR_EMAIL    (semantic-release@vanixiets.local)
 #   GIT_COMMITTER_NAME   / GIT_COMMITTER_EMAIL (semantic-release@vanixiets.local)
 
@@ -150,7 +150,7 @@ fi
 # pwd. Required because the buildbot-effects bwrap sandbox does not bind-
 # mount the working tree's .git, so `git rev-parse --show-toplevel` would
 # fail with `fatal: not a git repository` (exit 128) and abort the script.
-# The effect preamble sets RELEASE_REPO_ROOT="$PWD" so this branch resolves
+# release-packages sets RELEASE_REPO_ROOT="$PWD" so this branch resolves
 # without invoking git. Local-shell callers leave RELEASE_REPO_ROOT unset,
 # exercising the git fallback against the live worktree.
 repo_root="${RELEASE_REPO_ROOT:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
@@ -168,7 +168,7 @@ fi
 # `git config user.email "…"` would fail with `error: could not lock config
 # file .git/config`. git honours these env vars natively without any config
 # write. Each export uses parameter-expansion default chaining so a pre-set
-# value (effect preamble or caller env) is preserved unchanged.
+# value (release-packages or caller env) is preserved unchanged.
 export GIT_AUTHOR_NAME="${GIT_AUTHOR_NAME:-semantic-release}"
 export GIT_AUTHOR_EMAIL="${GIT_AUTHOR_EMAIL:-semantic-release@vanixiets.local}"
 export GIT_COMMITTER_NAME="${GIT_COMMITTER_NAME:-semantic-release}"

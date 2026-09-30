@@ -10,7 +10,7 @@ Usage: list-packages-json [--help]
 
 Emit a JSON array of {"name": "<pkg>", "path": "packages/<pkg>"} for every
 packages/<pkg>/ directory containing a package.json. Consumed by the
-release-packages effect (modules/effects/vanixiets/herculesCI), which
+release-packages app (modules/apps/release/release-packages.sh), which
 releases each listed path, and exposed as `just list-packages-json`.
 
 No positional arguments; must run inside a git worktree rooted at the

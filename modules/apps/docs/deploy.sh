@@ -1,91 +1,59 @@
 #!/usr/bin/env bash
 # shellcheck shell=bash
-# Docs deployment invoked via `nix run .#deploy-docs`.
-# See `usage()` for caller-facing usage; this header documents the
-# env-var contract only.
+# Docs deployment invoked via `nix run .#deploy-docs`; see usage() for the
+# interface. The program owns every derived value (short SHAs, messages,
+# alias sanitisation) so callers pass only the commit, the alias and, for a
+# pull request preview, the payload nixbot built. Only the Cloudflare
+# secrets come from the environment.
 #
-# Required (secret, caller-provided):
-#   CLOUDFLARE_API_TOKEN     wrangler auth token.
-#   CLOUDFLARE_ACCOUNT_ID    Cloudflare account id (account-scoped ops
-#                            require this).
-# Required (config, injected by deploy.nix; DOCS_PAYLOAD is overridable):
-#   DOCS_PAYLOAD             vanixiets-docs derivation outPath
-#                            ($out/{dist/, .wrangler/, wrangler.jsonc}); the
-#                            preview effect passes a pull request's build,
-#                            so preview treats it as untrusted data.
-#   DOCS_NODE_MODULES        vanixiets-docs-deps node_modules tree.
-# Optional (env-first with git-fallback): every GIT_* consumer is
-# `${GIT_X:-$(git … 2>/dev/null || true)}` so the script runs both
-# inside the effects bwrap sandbox (no .git bind-mounted; env
-# pre-populated by the effect preamble) and from a live worktree (env
-# unset; git fallback resolves locally):
-#   GIT_REV, GIT_REV_SHORT, GIT_REV_SHORT12, GIT_BRANCH,
-#   GIT_COMMIT_MSG, GIT_WORKTREE_STATUS.
-# Optional (env-first with bash-builtin / shelled-fallback): the bwrap
-# sandbox lacks `hostname`/`whoami` on PATH, so DEPLOY_HOST falls back to
-# `${HOSTNAME%%.*}` (bash builtin populated from gethostname(2)) and
-# DEPLOY_DEPLOYER falls back to GITHUB_ACTOR → `whoami 2>/dev/null`
-# → "unknown".
-# Optional (caller debugging / overrides):
-#   WRANGLER, DEPLOY_DOCS_MAIN_SHA_URL, DEPLOY_DOCS_DEBUG, GITHUB_ACTIONS /
-#   GITHUB_ACTOR / GITHUB_WORKFLOW (when GITHUB_ACTIONS is set, the
-#   production deploy message uses GITHUB_WORKFLOW (default "CI") as deploy
-#   context instead of DEPLOY_HOST).
+# Set by deploy.nix: builtin_payload (config.packages.vanixiets-docs) and
+# DOCS_NODE_MODULES (vanixiets-docs-deps node_modules tree).
+# Test seams: WRANGLER (wrangler JS entrypoint run under node),
+# DEPLOY_DOCS_MAIN_SHA_URL (main's head as JSON `.sha`), DEPLOY_DOCS_DEBUG
+# (keep the tmpdir).
 
 set -euo pipefail
 
 usage() {
   cat <<'EOF'
-usage: deploy-docs preview <branch>
-       deploy-docs production
+usage: deploy-docs production --rev <sha> [--deployed-by <name>]
+       deploy-docs preview --rev <sha> --alias <name> [--payload <dir>] [--deployed-by <name>]
        deploy-docs --help
 
 Deploy the nix-built vanixiets-docs payload to Cloudflare Workers.
 
 Subcommands:
-  preview <branch>   Upload a Cloudflare Workers preview version tagged with
-                     the current HEAD short SHA, aliased at b-<sanitized-branch>.
-                     <branch> defaults to `git branch --show-current`; explicit
-                     value required when HEAD is detached.
-  production         Deploy the nix-built payload to 100% production traffic.
-                     Exits 0 without deploying when main has moved past the
-                     current commit: the run for the newer main deploys it.
+  production   Deploy the built-in payload to 100% of production traffic.
+               Exits 0 without deploying, printing
+               `DEPLOY-DOCS-ACTION: superseded (main is <sha>)`, when main's
+               head is not --rev: the run for the newer main deploys it.
+  preview      Upload a preview version aliased at b-<sanitized alias> and
+               print `DEPLOY-DOCS-PREVIEW-URL: <url>`.
 
 Flags:
-  --help, -h         Print this usage and exit 0.
+  --rev <sha>          full 40-hex commit the payload was built from (required)
+  --alias <name>       preview alias, sanitized to [a-zA-Z0-9-] and at most
+                       40 characters (preview only, required)
+  --payload <dir>      vanixiets-docs build to preview instead of the built-in
+                       one; treated as untrusted (preview only)
+  --deployed-by <name> deployer recorded in the version message
+                       (default: nixbot)
+  --help, -h           print this usage and exit 0
 
-Environment contract (see top-of-file header for full details):
-  Required (secret, caller-provided):
-    CLOUDFLARE_API_TOKEN   wrangler auth token
-    CLOUDFLARE_ACCOUNT_ID  Cloudflare account id (account-scoped ops)
-  Required (config, injected by deploy.nix; DOCS_PAYLOAD is overridable):
-    DOCS_PAYLOAD           path to the vanixiets-docs derivation output
-    DOCS_NODE_MODULES      path to vanixiets-docs-deps node_modules tree
-  Optional (env-first with shelled-fallback):
-    GIT_REV, GIT_REV_SHORT, GIT_REV_SHORT12, GIT_BRANCH,
-    GIT_COMMIT_MSG, GIT_WORKTREE_STATUS
-                     git metadata; supplied by effect preamble when no
-                     .git is reachable; otherwise resolved via `git ...`.
-    DEPLOY_HOST      short hostname; fallback `${HOSTNAME%%.*}` (bash
-                     builtin, no external binary).
-    DEPLOY_DEPLOYER  actor identity; fallback chain GITHUB_ACTOR →
-                     `whoami 2>/dev/null` → "unknown".
-  Optional (caller debugging / overrides):
-    WRANGLER         wrangler JS entrypoint run under node; default is the
-                     vanixiets-docs-deps copy.
-    DEPLOY_DOCS_MAIN_SHA_URL
-                     endpoint returning main's head commit as JSON `.sha`;
-                     default is the anonymous GitHub commits API.
-    DEPLOY_DOCS_DEBUG
-    GITHUB_ACTIONS / GITHUB_ACTOR / GITHUB_WORKFLOW
-                     When GITHUB_ACTIONS is set, the production deploy
-                     message uses the GitHub Actions context (workflow
-                     name) instead of DEPLOY_HOST.
+Environment:
+  CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID   required
+  WRANGLER, DEPLOY_DOCS_MAIN_SHA_URL, DEPLOY_DOCS_DEBUG   optional overrides
 
 Examples:
-  nix run .#deploy-docs -- preview my-feature-branch
-  nix run .#deploy-docs -- production
+  nix run .#deploy-docs -- production --rev "$(git rev-parse HEAD)"
+  nix run .#deploy-docs -- preview --rev "$(git rev-parse HEAD)" --alias my-branch
 EOF
+}
+
+usage_error() {
+  echo "error: $*" >&2
+  echo "(run deploy-docs --help for usage)" >&2
+  exit 2
 }
 
 mode="${1:-}"
@@ -94,22 +62,65 @@ case "$mode" in
     usage
     exit 0
     ;;
+  production | preview) ;;
+  "") usage_error "missing subcommand (production or preview)" ;;
+  *) usage_error "unknown subcommand '$mode'" ;;
 esac
-
-if [[ -z "$mode" ]]; then
-  echo "error: missing subcommand" >&2
-  echo "usage: deploy-docs preview <branch> | deploy-docs production" >&2
-  echo "(run with --help for full usage and env-var contract)" >&2
-  exit 2
-fi
 shift
 
-# Env-var contract guards: fail fast before any wrangler / filesystem work.
-: "${DOCS_PAYLOAD:?DOCS_PAYLOAD not set; deploy.nix must pass the nix-built payload}"
-[[ -d "$DOCS_PAYLOAD" ]] || { echo "error: DOCS_PAYLOAD=$DOCS_PAYLOAD is not a directory" >&2; exit 1; }
+deployed_by=nixbot
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    --rev | --alias | --payload | --deployed-by)
+      [[ $# -ge 2 ]] || usage_error "$1 requires a value"
+      case "$1" in
+        --rev) rev="$2" ;;
+        --alias) preview_alias="$2" ;;
+        --payload) payload="$2" ;;
+        --deployed-by) deployed_by="$2" ;;
+      esac
+      shift 2
+      ;;
+    *) usage_error "unexpected argument '$1'" ;;
+  esac
+done
+
+[[ -v rev ]] || usage_error "--rev is required"
+[[ "$rev" =~ ^[0-9a-f]{40}$ ]] || usage_error "--rev must be a full 40-hex commit SHA, got '$rev'"
+[[ -n "$deployed_by" ]] || usage_error "--deployed-by must not be empty"
+
+case "$mode" in
+  production)
+    # Production ships the custom-domain config of the payload it deploys,
+    # so only main's own build may reach it.
+    [[ ! -v preview_alias ]] || usage_error "--alias is only valid for preview"
+    [[ ! -v payload ]] || usage_error "--payload is only valid for preview"
+    payload="$builtin_payload"
+    ;;
+  preview)
+    [[ -n "${preview_alias:-}" ]] || usage_error "preview requires a non-empty --alias"
+    safe_alias=$(printf '%s' "$preview_alias" \
+      | tr '/' '-' \
+      | tr -c 'a-zA-Z0-9-' '-' \
+      | sed 's/--*/-/g; s/^-//; s/-$//' \
+      | cut -c1-40)
+    [[ -n "$safe_alias" ]] || usage_error "--alias '$preview_alias' has no [a-zA-Z0-9] characters"
+    payload="${payload:-$builtin_payload}"
+    ;;
+esac
+
+# Secret guards precede every filesystem and network step.
+: "${CLOUDFLARE_API_TOKEN:?CLOUDFLARE_API_TOKEN is required}"
+: "${CLOUDFLARE_ACCOUNT_ID:?CLOUDFLARE_ACCOUNT_ID is required}"
 : "${DOCS_NODE_MODULES:?DOCS_NODE_MODULES not set; deploy.nix must expose vanixiets-docs-deps via runtimeEnv}"
-: "${CLOUDFLARE_API_TOKEN:?CLOUDFLARE_API_TOKEN is required (see deploy.sh header for caller mechanisms: effect preamble, direnv, caller-side sops wrapper, or GHA env)}"
-: "${CLOUDFLARE_ACCOUNT_ID:?CLOUDFLARE_ACCOUNT_ID is required (see deploy.sh header for caller mechanisms: effect preamble, direnv, caller-side sops wrapper, or GHA env)}"
+[[ -d "$payload" ]] || { echo "error: payload $payload is not a directory" >&2; exit 1; }
+
+commit_short="${rev:0:7}"
+commit_tag="${rev:0:12}"
 
 # Hermetic wrangler via bun-managed node_modules (vanixiets-docs-deps derivation).
 # The `${WRANGLER:-...}` fallback lets a test harness substitute a stub
@@ -163,7 +174,7 @@ run_wrangler() {
 # to a secret on the runner would be published as an asset; devices and
 # fifos have no place in a static site either. Refuse before copying, and
 # copy without dereferencing.
-unexpected_entry="$(find "$DOCS_PAYLOAD" ! -type f ! -type d -print -quit)"
+unexpected_entry="$(find "$payload" ! -type f ! -type d -print -quit)"
 if [[ -n "$unexpected_entry" ]]; then
   echo "error: payload entry is neither a regular file nor a directory: $unexpected_entry" >&2
   exit 1
@@ -180,7 +191,7 @@ case "$mode" in
     # payload so they follow packages/docs/wrangler.jsonc, but only after
     # their shape is checked.
     assets_dir="$tmpdir/assets"
-    cp -RP "$DOCS_PAYLOAD/dist/client" "$assets_dir"
+    cp -RP "$payload/dist/client" "$assets_dir"
     chmod -R u+w "$assets_dir"
 
     mkdir "$tmpdir/config"
@@ -202,7 +213,7 @@ case "$mode" in
         error("unexpected compatibility or observability settings")
       end
     ' "$assets_dir/wrangler.json" > "$wrangler_config"; then
-      echo "error: cannot derive a preview config from $DOCS_PAYLOAD/dist/client/wrangler.json" >&2
+      echo "error: cannot derive a preview config from $payload/dist/client/wrangler.json" >&2
       exit 1
     fi
     ;;
@@ -213,7 +224,7 @@ case "$mode" in
     # payload's .wrangler/deploy/config.json points at it, and wrangler may
     # write state beside it, hence the writable copy.
     mkdir "$tmpdir/payload"
-    cp -RP "$DOCS_PAYLOAD"/. "$tmpdir/payload/"
+    cp -RP "$payload"/. "$tmpdir/payload/"
     chmod -R u+w "$tmpdir/payload"
     wrangler_config="$tmpdir/payload/dist/client/wrangler.json"
 
@@ -226,65 +237,14 @@ case "$mode" in
     ;;
 esac
 
-# Commit metadata: env-first with errexit-tolerant git fallback so a
-# missing .git (bwrap sandbox) surfaces as empty strings rather than
-# aborting; the env-first path supplies authoritative values in that case.
-commit_sha="${GIT_REV:-$(git rev-parse HEAD 2>/dev/null || true)}"
-commit_tag="${GIT_REV_SHORT12:-$(git rev-parse --short=12 HEAD 2>/dev/null || true)}"
-commit_short="${GIT_REV_SHORT:-$(git rev-parse --short HEAD 2>/dev/null || true)}"
-current_branch="${GIT_BRANCH:-$(git branch --show-current 2>/dev/null || true)}"
-
-# Resolve deployer / deploy_host with env-first / bash-builtin /
-# shelled-fallback. Bash builtin `$HOSTNAME` is populated from
-# gethostname(2) at shell startup, so `${HOSTNAME%%.*}` mimics
-# `hostname -s` without shelling out — required because the bwrap
-# sandbox lacks `hostname` on PATH.
-deploy_host="${DEPLOY_HOST:-${HOSTNAME%%.*}}"
-deployer="${DEPLOY_DEPLOYER:-${GITHUB_ACTOR:-$(whoami 2>/dev/null || echo unknown)}}"
-
-if [[ -n "${GITHUB_ACTIONS:-}" ]]; then
-  deploy_context="${GITHUB_WORKFLOW:-CI}"
-  deploy_msg="Deployed by ${deployer} from ${current_branch} via ${deploy_context}"
-else
-  deploy_msg="Deployed by ${deployer} from ${current_branch} on ${deploy_host}"
-fi
-
 case "$mode" in
   preview)
-    branch="${1:-${current_branch:-}}"
-    if [[ -z "$branch" ]]; then
-      echo "error: preview requires a <branch> argument" >&2
-      echo "usage: deploy-docs preview <branch>" >&2
-      exit 2
-    fi
+    version_message="[b-${safe_alias}] ${commit_tag} deployed by ${deployed_by}"
+    preview_url="https://b-${safe_alias}-${worker_name}.sciexp.workers.dev"
 
-    safe_branch=$(echo "$branch" \
-      | tr '/' '-' \
-      | tr -c 'a-zA-Z0-9-' '-' \
-      | sed 's/--*/-/g; s/^-//; s/-$//' \
-      | cut -c1-40)
-
-    # Env-first / errexit-tolerant git fallback so a missing .git leaves
-    # commit_msg empty; the effect preamble supplies authoritative values.
-    commit_msg="${GIT_COMMIT_MSG:-$(git log -1 --pretty=format:'%s' 2>/dev/null || true)}"
-    if [[ -n "${GIT_WORKTREE_STATUS:-}" ]]; then
-      git_status="$GIT_WORKTREE_STATUS"
-    elif git diff-index --quiet HEAD -- 2>/dev/null; then
-      git_status="clean"
-    else
-      # Non-zero from `git diff-index` covers both "dirty worktree" and
-      # "not a git repository" — collapse both to "dirty" so downstream
-      # version_message is always well-formed.
-      git_status="dirty"
-    fi
-    version_message="[${branch}] ${commit_msg} (${commit_tag}, ${git_status})"
-
-    echo "Deploying preview for branch: ${branch}"
-    echo "Sanitized alias: b-${safe_branch}"
-    echo "Commit: ${commit_short} (${git_status})"
-    echo "Full SHA: ${commit_sha}"
-    echo "Tag: ${commit_tag}"
-    echo "Message: ${commit_msg}"
+    echo "Deploying preview: b-${safe_alias} (alias ${preview_alias})"
+    echo "Commit: ${rev}"
+    echo "Payload: ${payload}"
     echo ""
 
     # Capture wrangler's machine-readable NDJSON event log via
@@ -322,12 +282,12 @@ case "$mode" in
     # `type:"version-upload"` event. Retained as defense-in-depth against
     # future wrangler silent-success regressions.
     printf '>> wrangler upload command (cwd %s): node %s --config %s --env-file %s versions upload --name %s --preview-alias %s --tag %s --message %q\n' \
-      "$wrangler_cwd" "$WRANGLER" "$wrangler_config" "$wrangler_env_file" "$worker_name" "b-${safe_branch}" "$commit_tag" "$version_message" >&2
+      "$wrangler_cwd" "$WRANGLER" "$wrangler_config" "$wrangler_env_file" "$worker_name" "b-${safe_alias}" "$commit_tag" "$version_message" >&2
 
     set +e
     run_wrangler versions upload \
         --name "$worker_name" \
-        --preview-alias "b-${safe_branch}" \
+        --preview-alias "b-${safe_alias}" \
         --tag "$commit_tag" \
         --message "$version_message" \
       > >(tee "$wrangler_upload_stdout") \
@@ -372,7 +332,7 @@ case "$mode" in
       echo "  raw wrangler stderr:   $wrangler_upload_stderr" >&2
       echo "  hints:" >&2
       echo "    - confirm CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID are exported by" >&2
-      echo "      the caller (see deploy.sh env-var contract header for caller mechanisms)" >&2
+      echo "      the caller" >&2
       echo "    - if linux-x64 regression, confirm wrangler invoked under real node and" >&2
       echo "      not bun-fake-node (see deploy.sh node invocation rationale)" >&2
       echo "    - inspect the wrangler internal log dumped below / raw NDJSON and stdout paths above for any output" >&2
@@ -417,17 +377,13 @@ case "$mode" in
     echo "Version uploaded successfully"
     echo "  Worker Version ID: ${version_id}"
     echo "  Tag: ${commit_tag}"
-    echo "  Full SHA: ${commit_sha}"
+    echo "  Full SHA: ${rev}"
     echo "  Message: ${version_message}"
-    echo "  Preview URL: https://b-${safe_branch}-${worker_name}.sciexp.workers.dev"
+    echo "  Preview URL: ${preview_url}"
+    echo "DEPLOY-DOCS-PREVIEW-URL: ${preview_url}"
     ;;
 
   production)
-    if [[ -z "$commit_sha" ]]; then
-      echo "error: production requires the commit SHA (GIT_REV or a git checkout)" >&2
-      exit 1
-    fi
-
     # gitea-mq lands batches by fast-forwarding main, possibly several in
     # quick succession, and each landing runs this effect under a shared
     # lock. A run whose commit is no longer main's head must not overwrite a
@@ -438,14 +394,13 @@ case "$mode" in
       echo "error: could not resolve main's head commit from ${main_sha_url}" >&2
       exit 1
     fi
-    if [[ "$main_sha" != "$commit_sha" ]]; then
+    if [[ "$main_sha" != "$rev" ]]; then
       echo "DEPLOY-DOCS-ACTION: superseded (main is ${main_sha})"
       exit 0
     fi
 
-    echo "Deploying to production from branch: ${current_branch}"
-    echo "Current commit: ${commit_short}"
-    echo "Full SHA: ${commit_sha}"
+    deploy_msg="Deployed by ${deployed_by} from main at ${commit_short}"
+    echo "Deploying to production: ${rev}"
     echo "Deployment message: ${deploy_msg}"
     echo ""
 
@@ -492,7 +447,7 @@ case "$mode" in
       echo "  raw wrangler stdout:   $deploy_stdout" >&2
       echo "  hints:" >&2
       echo "    - confirm CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID are exported by" >&2
-      echo "      the caller (see deploy.sh env-var contract header for caller mechanisms)" >&2
+      echo "      the caller" >&2
       echo "    - if linux-x64 regression, confirm wrangler invoked under real node and" >&2
       echo "      not bun-fake-node (see deploy.sh node invocation rationale)" >&2
       exit 1
@@ -523,15 +478,9 @@ case "$mode" in
     echo "deployed nix-built payload to production"
     echo "  Worker Version ID: ${deploy_version_id}"
     echo "  tag: ${commit_tag}"
-    echo "  full SHA: ${commit_sha}"
-    echo "  deployed by: ${deploy_msg}"
+    echo "  full SHA: ${rev}"
+    echo "  message: ${deploy_msg}"
     echo "  production URL: https://infra.cameronraysmith.net"
-    ;;
-
-  *)
-    echo "error: unknown subcommand '$mode'" >&2
-    echo "usage: deploy-docs preview <branch> | deploy-docs production" >&2
-    echo "(run with --help for full usage and env-var contract)" >&2
-    exit 2
+    echo "DEPLOY-DOCS-ACTION: deploy (version ${deploy_version_id})"
     ;;
 esac

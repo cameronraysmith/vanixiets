@@ -1,28 +1,38 @@
 # Behavioural check: the deploy-docs program drives wrangler as intended.
 #
-# The deploy-docs and deploy-docs-preview effects only run after a merge or on
-# a pull request event with the Cloudflare token, so nothing before a merge
-# otherwise runs deploy.sh. This check runs the same deploy-docs program the
-# effects run, against the real docs payload and small fixture payloads, with
-# a stub standing in for wrangler. No secret or network is involved: the
-# Cloudflare values are fixed dummies, and main's head is a file:// URL.
+# The effects that run deploy-docs only run after a merge or on a pull request
+# event with the Cloudflare token, so nothing before a merge otherwise runs
+# deploy.sh. This check runs the same deploy-docs program the effects run,
+# through its flag interface, against the built-in docs payload and small
+# fixture payloads, with a stub standing in for wrangler. No secret or network
+# is involved: the Cloudflare values are fixed dummies, and main's head is a
+# file:// URL.
 #
-# Both effects list this check in their inputs, so the gated
+# The effects list this check as a rehearsal in their inputs, so the gated
 # `nix build <effect>^*` on pull requests and merge-queue batches runs it.
 #
-# The stub records each invocation's argv, working directory, env file and
-# parsed --config, emits the NDJSON event and stdout line deploy.sh parses,
-# and, like wrangler, runs the config's build command.
+# The stub records each invocation's argv, working directory, env file,
+# parsed --config and asset marker, emits the NDJSON event and stdout line
+# deploy.sh parses, and, like wrangler, runs the config's build command.
 #
-# Asserted: production deploys the payload's own config as infra-docs from an
-# empty directory and cross-checks the deployments list; a superseded run
-# deploys nothing; a version not at 100% fails the run. Preview uploads with a
-# config synthesized from a fixed shape, refuses a payload holding a symlink
-# before wrangler runs, and never carries a payload's build command.
+# Asserted: production deploys the built-in payload's own config as
+# infra-docs from an empty directory, cross-checks the deployments list and
+# reports the deployed version; a superseded run deploys nothing; a version
+# not at 100% fails the run. Preview uploads with a config synthesized from a
+# fixed shape, uploads a --payload build when given one, prints exactly one
+# DEPLOY-DOCS-PREVIEW-URL line, refuses a payload holding a symlink before
+# wrangler runs, and never carries a payload's build command. A missing or
+# malformed --rev, an empty --alias, --payload on production, or a missing
+# Cloudflare secret fails before wrangler or main's head is consulted.
 { ... }:
 {
   perSystem =
-    { pkgs, config, ... }:
+    {
+      pkgs,
+      lib,
+      config,
+      ...
+    }:
     let
       deployDocsProgram = config.apps.deploy-docs.program;
       payload = config.packages.vanixiets-docs;
@@ -63,6 +73,9 @@
           configPath,
           config,
           assetsIndex: assetsDir !== null && fs.existsSync(path.join(assetsDir, "index.html")),
+          assetsMarker: assetsDir !== null && fs.existsSync(path.join(assetsDir, "marker.txt"))
+            ? fs.readFileSync(path.join(assetsDir, "marker.txt"), "utf8")
+            : null,
         }) + "\n");
 
         if (config?.build?.command) execSync(config.build.command, { stdio: "inherit" });
@@ -103,14 +116,6 @@
             export WRANGLER=${wranglerStub}
             export CLOUDFLARE_API_TOKEN=rehearsal-dummy-token
             export CLOUDFLARE_ACCOUNT_ID=rehearsal-dummy-account
-            export GIT_REV=${rev}
-            export GIT_REV_SHORT=${builtins.substring 0 7 rev}
-            export GIT_REV_SHORT12=${builtins.substring 0 12 rev}
-            export GIT_BRANCH=main
-            export GIT_COMMIT_MSG=rehearsal
-            export GIT_WORKTREE_STATUS=clean
-            export DEPLOY_DEPLOYER=rehearsal
-            export DEPLOY_HOST=sandbox
             export DEPLOY_DOCS_MAIN_SHA_URL="file://$TMPDIR/main.json"
             export STUB_LOG
 
@@ -121,18 +126,17 @@
             main_is() {
               printf '{"sha":"%s"}' "$1" > "$TMPDIR/main.json"
             }
-            # run <name> <payload> <program args...>: runs deploy-docs with
-            # its own stub log and records the exit status in $status.
+            # run <name> <program args...>: runs deploy-docs with its own
+            # stub log and records the exit status in $status.
             run() {
               name=$1
-              local payload=$2
-              shift 2
+              shift
               echo "--- $name"
               row="$TMPDIR/rows/$name"
               mkdir -p "$row"
               STUB_LOG="$row/wrangler.ndjson"
               status=0
-              DOCS_PAYLOAD="$payload" ${deployDocsProgram} "$@" > "$row/output" 2>&1 || status=$?
+              ${deployDocsProgram} "$@" > "$row/output" 2>&1 || status=$?
               cat "$row/output"
             }
             expect_status() {
@@ -171,6 +175,9 @@
             }
             fixture_config='{"name":"infra-docs","compatibility_date":"2025-10-06","compatibility_flags":["nodejs_compat"]}'
 
+            fixture override "$fixture_config"
+            printf override > "$TMPDIR/fixtures/override/dist/client/marker.txt"
+
             fixture symlink "$fixture_config"
             ln -s /etc/passwd "$TMPDIR/fixtures/symlink/dist/client/leak"
 
@@ -195,13 +202,14 @@
             rm "$sentinel"
 
             main_is ${rev}
-            run production-current ${payload} production
+            run production-current production --rev ${rev}
             expect_status 0
             expect_line "deployed nix-built payload to production"
             expect_line "  Worker Version ID: ${versionId}"
+            expect_line "DEPLOY-DOCS-ACTION: deploy (version ${versionId})"
             expect_calls 2
-            expect "deploy runs as infra-docs" \
-              '.[0].args | index(["deploy", "--name", "infra-docs"]) != null'
+            expect "deploy runs as infra-docs with a message naming the deployer" \
+              '.[0].args | index(["deploy", "--name", "infra-docs", "--message", "Deployed by nixbot from main at ${builtins.substring 0 7 rev}"]) != null'
             expect "deploy uses the payload's config" \
               '.[0].config == $config[0] and (.[0].configPath | endswith("/payload/dist/client/wrangler.json"))' \
               --slurpfile config ${payload}/dist/client/wrangler.json
@@ -210,23 +218,26 @@
             expect "wrangler runs isolated" "$isolated"
 
             main_is ${otherRev}
-            run production-superseded ${payload} production
+            run production-superseded production --rev ${rev}
             expect_status 0
             expect_line "DEPLOY-DOCS-ACTION: superseded (main is ${otherRev})"
             expect_calls 0
 
             main_is ${rev}
-            STUB_PERCENTAGE=50 run production-partial ${payload} production
+            STUB_PERCENTAGE=50 run production-partial production --rev ${rev}
             expect_failure
             expect_line "error: version ${versionId} is not at 100% in deployments list"
             expect_calls 2
 
-            run preview ${payload} preview pr-7
+            run preview preview --rev ${rev} --alias pr-7 --deployed-by rehearsal
             expect_status 0
             expect_line "  Preview URL: https://b-pr-7-infra-docs.sciexp.workers.dev"
+            [ "$(grep -c '^DEPLOY-DOCS-PREVIEW-URL: ' "$row/output")" = 1 ] \
+              || fail "expected exactly one DEPLOY-DOCS-PREVIEW-URL line"
+            expect_line "DEPLOY-DOCS-PREVIEW-URL: https://b-pr-7-infra-docs.sciexp.workers.dev"
             expect_calls 1
-            expect "preview uploads as infra-docs with alias b-pr-7 and the commit tag" \
-              '.[0].args | index(["versions", "upload", "--name", "infra-docs", "--preview-alias", "b-pr-7", "--tag", $tag]) != null' \
+            expect "preview uploads as infra-docs with alias b-pr-7, the commit tag and the deployer" \
+              '.[0].args | index(["versions", "upload", "--name", "infra-docs", "--preview-alias", "b-pr-7", "--tag", $tag, "--message", "[b-pr-7] \($tag) deployed by rehearsal"]) != null' \
               --arg tag ${builtins.substring 0 12 rev}
             expect "preview config has only the fixed shape" \
               ".[0].config | (keys - $preview_keys) == [] and (.assets | keys) == [\"directory\"]"
@@ -235,20 +246,69 @@
             expect "preview config keeps the payload's compatibility settings" \
               '.[0].config | .compatibility_date == $config[0].compatibility_date and .compatibility_flags == $config[0].compatibility_flags' \
               --slurpfile config ${payload}/dist/client/wrangler.json
-            expect "preview assets are the payload's client build" '.[0].assetsIndex'
+            expect "preview assets are the built-in payload's client build" '.[0].assetsIndex and .[0].assetsMarker == null'
             expect "wrangler runs isolated" "$isolated"
 
-            run preview-symlink "$TMPDIR/fixtures/symlink" preview pr-7
+            run preview-override preview --rev ${rev} --alias feature/Some_Branch --payload "$TMPDIR/fixtures/override"
+            expect_status 0
+            expect_line "DEPLOY-DOCS-PREVIEW-URL: https://b-feature-Some-Branch-infra-docs.sciexp.workers.dev"
+            expect_calls 1
+            expect "preview uploads the --payload build" '.[0].assetsMarker == "override"'
+
+            run preview-symlink preview --rev ${rev} --alias pr-7 --payload "$TMPDIR/fixtures/symlink"
             expect_failure
             expect_line "error: payload entry is neither a regular file nor a directory: $TMPDIR/fixtures/symlink/dist/client/leak"
             expect_calls 0
 
-            run preview-build-command "$TMPDIR/fixtures/build-command" preview pr-7
+            run preview-build-command preview --rev ${rev} --alias pr-7 --payload "$TMPDIR/fixtures/build-command"
             expect_status 0
             expect_calls 1
             expect "preview config drops the payload's build, main, routes and bindings" \
               ".[0].config | (keys - $preview_keys) == [] and .name == \"infra-docs\""
             [ ! -e "$sentinel" ] || fail "the payload's build command ran"
+
+            run production-missing-rev production
+            expect_status 2
+            expect_line "error: --rev is required"
+            expect_calls 0
+
+            run preview-missing-rev preview --alias pr-7
+            expect_status 2
+            expect_line "error: --rev is required"
+            expect_calls 0
+
+            run production-short-rev production --rev ${builtins.substring 0 12 rev}
+            expect_status 2
+            expect_line "error: --rev must be a full 40-hex commit SHA, got '${builtins.substring 0 12 rev}'"
+            expect_calls 0
+
+            run preview-uppercase-rev preview --rev ${lib.toUpper rev} --alias pr-7
+            expect_status 2
+            expect_calls 0
+
+            run preview-empty-alias preview --rev ${rev} --alias ""
+            expect_status 2
+            expect_line "error: preview requires a non-empty --alias"
+            expect_calls 0
+
+            run production-rejects-payload production --rev ${rev} --payload "$TMPDIR/fixtures/override"
+            expect_status 2
+            expect_line "error: --payload is only valid for preview"
+            expect_calls 0
+
+            # main is elsewhere, so a secret check placed after main's head
+            # fetch would exit 0 as superseded instead of failing.
+            main_is ${otherRev}
+            for secret in CLOUDFLARE_API_TOKEN CLOUDFLARE_ACCOUNT_ID; do
+              saved="''${!secret}"
+              unset "$secret"
+              run "production-without-$secret" production --rev ${rev}
+              export "$secret=$saved"
+              expect_failure
+              grep -qF "$secret is required" "$row/output" || fail "missing error naming $secret"
+              ! grep -q '^DEPLOY-DOCS-ACTION' "$row/output" || fail "ran past the secret check"
+              expect_calls 0
+            done
 
             touch $out
           '';
