@@ -10,6 +10,12 @@
 # content with our token. pullRequestClosed tears the pull request's Preview
 # down; it shares the per-pull-request lock ({pr} is nixbot's expansion to the
 # number) so teardown waits for an in-flight upload rather than racing it.
+#
+# release-packages publishes from main with the release PAT. Its pullRequest
+# run is the release plan: the same program forecasts what merging would
+# release, with main's files and only nixbot's read-only forge token, so the
+# PAT never reaches a pull request run. Its lock is per pull request, apart
+# from the release lock, so a forecast never waits on a release.
 { withSystem, ... }:
 {
   vanixiets.effects = withSystem "x86_64-linux" (
@@ -17,33 +23,49 @@
     {
       docs = {
         program = config.apps.deploy-docs.program;
-        secrets = [
-          "CLOUDFLARE_API_TOKEN"
-          "CLOUDFLARE_ACCOUNT_ID"
-        ];
         rehearsals = [ config.checks.deploy-docs-rehearsal ];
-        triggers = {
-          main = {
-            args = [ "production" ];
-            lock = "deploy-docs";
+        triggers =
+          let
+            secrets = [
+              "CLOUDFLARE_API_TOKEN"
+              "CLOUDFLARE_ACCOUNT_ID"
+            ];
+          in
+          {
+            main = {
+              args = [ "production" ];
+              lock = "deploy-docs";
+              inherit secrets;
+            };
+            pullRequest = {
+              args = [ "pull-request" ];
+              lock = "docs-preview-{pr}";
+              forgeToken = true;
+              inherit secrets;
+            };
+            pullRequestClosed = {
+              args = [ "pull-request-closed" ];
+              lock = "docs-preview-{pr}";
+              inherit secrets;
+            };
           };
-          pullRequest = {
-            args = [ "pull-request" ];
-            lock = "docs-preview-{pr}";
-            forgeToken = true;
-          };
-          pullRequestClosed = {
-            args = [ "pull-request-closed" ];
-            lock = "docs-preview-{pr}";
-          };
-        };
       };
 
       release-packages = {
         program = config.apps.release-packages.program;
-        secrets = [ "GITHUB_TOKEN" ];
         rehearsals = [ config.checks.release-rehearsal ];
-        triggers.main.lock = "release-packages";
+        triggers = {
+          main = {
+            secrets = [ "GITHUB_TOKEN" ];
+            lock = "release-packages";
+          };
+          pullRequest = {
+            args = [ "plan" ];
+            secrets = [ ];
+            forgeToken = true;
+            lock = "release-plan-{pr}";
+          };
+        };
       };
     }
   );

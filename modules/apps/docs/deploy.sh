@@ -6,12 +6,14 @@
 # the Preview name and, for a manual preview, a payload. Secrets come only
 # from the environment.
 #
-# Set by deploy.nix: builtin_payload (config.packages.vanixiets-docs) and
-# DOCS_NODE_MODULES (vanixiets-docs-deps node_modules tree).
+# Set by deploy.nix: builtin_payload (config.packages.vanixiets-docs),
+# DOCS_NODE_MODULES (vanixiets-docs-deps node_modules tree) and
+# DEPLOY_DOCS_CHECK_RUN (the github-check-run program).
 # Test seams: WRANGLER (wrangler JS entrypoint run under node),
 # DEPLOY_DOCS_MAIN_SHA_URL (main's head as JSON `.sha`), GITHUB_API_URL
-# (check-run API base), DEPLOY_DOCS_DEBUG (keep the tmpdir). nix-store honours
-# NIX_REMOTE, so a rehearsal realises payloads against a chroot store.
+# (check-run API base, read by github-check-run), DEPLOY_DOCS_DEBUG (keep the
+# tmpdir). nix-store honours NIX_REMOTE, so a rehearsal realises payloads
+# against a chroot store.
 
 set -euo pipefail
 
@@ -154,6 +156,7 @@ fi
 : "${CLOUDFLARE_API_TOKEN:?CLOUDFLARE_API_TOKEN is required}"
 : "${CLOUDFLARE_ACCOUNT_ID:?CLOUDFLARE_ACCOUNT_ID is required}"
 : "${DOCS_NODE_MODULES:?DOCS_NODE_MODULES not set; deploy.nix must expose vanixiets-docs-deps via runtimeEnv}"
+: "${DEPLOY_DOCS_CHECK_RUN:?DEPLOY_DOCS_CHECK_RUN not set; deploy.nix must expose github-check-run via runtimeEnv}"
 
 # The only Worker this script may touch. Payload configs are build output of
 # whatever tree was built, including an untrusted pull request's, so their
@@ -431,50 +434,24 @@ deploy_production() {
   echo "DEPLOY-DOCS-ACTION: deploy (version ${deploy_version_id})"
 }
 
-github() {
-  local method=$1 path=$2
-  curl -fsS --retry 3 -X "$method" "${GITHUB_API_URL:-https://api.github.com}/repos/$repo/$path" \
-    -H "Authorization: Bearer $GITHUB_FORGE_TOKEN" \
-    -H 'Accept: application/vnd.github+json' \
-    -H 'X-GitHub-Api-Version: 2022-11-28' \
-    -H 'Content-Type: application/json' \
-    --data @-
-}
-
 skipped=""
 preview_url=""
 report_check_run() {
-  local rc=$1 body
+  local rc=$1
   if [[ "$rc" -eq 0 && -n "$skipped" ]]; then
-    body="$(jq -n --arg reason "$skipped" --arg rev "$rev" '{
-      status: "completed",
-      conclusion: "neutral",
-      output: {
-        title: "Docs preview skipped",
-        summary: "Docs preview of \($rev[0:12]) skipped: \($reason). A maintainer can preview it by adding any label to the pull request."
-      }
-    }')"
+    "$DEPLOY_DOCS_CHECK_RUN" complete --repo "$repo" --id "$check_run_id" \
+      --conclusion neutral --title "Docs preview skipped" \
+      --summary "Docs preview of ${rev:0:12} skipped: $skipped. A maintainer can preview it by adding any label to the pull request."
   elif [[ "$rc" -eq 0 ]]; then
-    body="$(jq -n --arg url "$preview_url" --arg rev "$rev" --arg pr "$pr" '{
-      status: "completed",
-      conclusion: "success",
-      details_url: $url,
-      output: {
-        title: "Docs preview deployed",
-        summary: "Docs preview of \($rev[0:12]) for pull request #\($pr): \($url)"
-      }
-    }')"
+    "$DEPLOY_DOCS_CHECK_RUN" complete --repo "$repo" --id "$check_run_id" \
+      --conclusion success --title "Docs preview deployed" \
+      --summary "Docs preview of ${rev:0:12} for pull request #$pr: $preview_url" \
+      --details-url "$preview_url"
   else
-    body="$(jq -n --arg error "${error:-deploy-docs pull-request exited with status $rc}" --arg rev "$rev" '{
-      status: "completed",
-      conclusion: "failure",
-      output: {
-        title: "Docs preview failed",
-        summary: "Docs preview of \($rev[0:12]) failed: \($error)"
-      }
-    }')"
+    "$DEPLOY_DOCS_CHECK_RUN" complete --repo "$repo" --id "$check_run_id" \
+      --conclusion failure --title "Docs preview failed" \
+      --summary "Docs preview of ${rev:0:12} failed: ${error:-deploy-docs pull-request exited with status $rc}"
   fi
-  github PATCH "check-runs/$check_run_id" <<<"$body" >/dev/null
 }
 
 # Runs from the default branch whatever pull request the event is about. The
@@ -503,10 +480,7 @@ pull_request() {
 
   echo "=== docs-preview (pull request #$pr at ${rev:0:12}, build $build_number) ==="
 
-  check_run_id="$(
-    jq -n --arg sha "$rev" '{name: "docs-preview", head_sha: $sha, status: "in_progress"}' |
-      github POST check-runs | jq -er '.id'
-  )" || {
+  check_run_id="$("$DEPLOY_DOCS_CHECK_RUN" create --repo "$repo" --name docs-preview --head-sha "$rev")" || {
     check_run_id=""
     echo "warning: could not create the docs-preview check run" >&2
   }

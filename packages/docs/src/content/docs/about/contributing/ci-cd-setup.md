@@ -12,6 +12,7 @@ The GitHub Actions release and docs-deploy workflows are archived under `.github
 
 Effects are the only CI programs that receive deploy secrets (the Cloudflare API token and the GitHub release token).
 onPush effects run only for pushes to `main`, and onEvent effects are always evaluated from `main`, so the code that holds a secret has always already been reviewed and landed.
+Secrets are declared per trigger, so a pull request trigger receives only the secrets it declares: the `release-packages` pull request trigger declares none.
 
 An effect contains no behaviour of its own.
 Each effect is a data entry naming a program, and every behaviour lives in that program, which a hermetic rehearsal check runs against stubs.
@@ -48,7 +49,7 @@ The required contexts are `nixbot/nix-eval`, `nixbot/nix-build`, and `nixbot/eff
 Each effect lists the rehearsal checks for its program among its inputs, so every pull request and batch builds them as part of the required `nixbot/effects` gate:
 
 - `checks.<system>.deploy-docs-rehearsal` runs every `deploy-docs` mode (`production`, `preview`, `pull-request`, `pull-request-closed`, `versions`, and `deployments`) against a stub wrangler that also executes each invocation with the real pinned wrangler and the identical argv: `deploy` with `--dry-run`, and `preview`, `preview delete`, `versions list`, and `deployments list` against a loopback fake Cloudflare API, so an argv wrangler would reject fails the check. It covers the superseded production run; the untrusted `--payload` hardening, including symlink refusal and a payload build command that never runs; the pull request trust rule (a same-repository bot pull request and fork pull requests with a writer as actor or author preview, an untrusted fork is skipped as `neutral`, and a missing `isFork` fails); `succeeded`, `skipped_local`, failed, and missing docs attributes, a malformed event, a failed deploy, and the `docs-preview` check-run lifecycle; teardown of an existing Preview, of one that never existed, and a failed delete; `--limit` truncation of the listings; and missing secrets failing before any network call;
-- `checks.<system>.release-rehearsal` runs `release-packages --rev` with the production semantic-release plugin list against a local git fixture and a stub GitHub API, including the floating major and minor tags from `semantic-release-major-tag`, a superseded rev that main has moved past, and a diverged rev outside main's history.
+- `checks.<system>.release-rehearsal` runs `release-packages --rev` with the production semantic-release plugin list against a local git fixture and a stub GitHub API, including the floating major and minor tags from `semantic-release-major-tag`, a superseded rev that main has moved past, and a diverged rev outside main's history; it also runs `release-packages plan` on fixture pull requests through the installation-token path, covering a minor, a major, and no bump, a pull request that edits the release configuration (forecast from main's configuration, its plugin never run), a merge conflict, a head mismatch, a missing forge token, and a release PAT in the environment that is never used, and it asserts that a forecast leaves the fixture remote's tags and refs untouched and creates no release.
 
 The `docs` effect lists `deploy-docs-rehearsal` and `release-packages` lists `release-rehearsal`.
 The rehearsals run the real programs without a token or network access, so a change that breaks the release, deploy, preview, or teardown path fails before it reaches `main`.
@@ -59,6 +60,11 @@ The rehearsals run the real programs without a token or network access, so a cha
 
 The `docs` effect's pull request trigger deploys each pull request's docs as a Cloudflare Preview, and its pull-request-closed trigger deletes that Preview; see [docs](#docs) below.
 The preview reports as the `docs-preview` check run, which is not a required context and never blocks a merge.
+
+### Release plan
+
+The `release-packages` effect's pull request trigger forecasts, per package, what semantic-release would publish if the pull request landed, and reports it as the `release-plan` check run on the head commit; see [release-packages](#release-packages) below.
+It is not a required context and never blocks a merge.
 
 ### Fork pull requests
 
@@ -77,17 +83,21 @@ The production deploy and the release handle this the same way: a `lock` orders 
 ## Effects
 
 Effects are data.
-`modules/effects/vanixiets/effects.nix` declares them as entries of the flake option `vanixiets.effects.<name>`, each naming its program, the secrets it reads, its rehearsals, and its `triggers`.
-An entry has at least one of the triggers `main`, `pullRequest`, and `pullRequestClosed`, and each trigger sets the program's literal arguments, its lock, and whether it receives nixbot's forge token.
+`modules/effects/vanixiets/effects.nix` declares them as entries of the flake option `vanixiets.effects.<name>`, each naming its program, its rehearsals, and its `triggers`.
+An entry has at least one of the triggers `main`, `pullRequest`, and `pullRequestClosed`, and each trigger sets the program's literal arguments, the secrets it reads, its lock, and whether it receives nixbot's forge token.
 
 One interpreter, `modules/effects/vanixiets/registry.nix`, turns each trigger into a nixbot effect: `main` into `herculesCI.onPush.default.outputs.effects.<name>`, `pullRequest` into `herculesCI.onEvent.pull_request.<name>`, and `pullRequestClosed` into `herculesCI.onEvent.pull_request_closed.<name>`.
 The script it generates for each trigger does three things, in order:
 
 1. for `main` triggers, runs the fail-closed guard (`mainOnlyGuard` from `modules/lib/effect-run-context.nix`), which asks nixbot for an identity token and refuses to run unless the token says the event is a push to `refs/heads/main`: any other run is skipped with exit 0 before a secret is read, and a missing or unreadable token fails the effect;
-2. exports each declared secret, failing with a specific error on the first one that is absent, null, or empty;
+2. exports each secret the trigger declares, failing with a specific error on the first one that is absent, null, or empty;
 3. execs the program with the trigger's arguments, followed by `--rev <commit>` for `main` triggers.
 
-`checks.<system>.effects-interpreter` renders synthetic entries with all three trigger kinds through the same function and runs the generated scripts against stubs, asserting the guard's skip on a non-main run, the exported secrets, the failure on a missing secret, the forge token of each trigger, and the exact argv the program receives, including `--rev`.
+`checks.<system>.effects-interpreter` renders synthetic entries with all three trigger kinds through the same function and runs the generated scripts against stubs, asserting the guard's skip on a non-main run, the exported secrets, that a trigger never receives another trigger's secrets, the failure on a missing secret, the forge token of each trigger, and the exact argv the program receives, including `--rev`.
+
+Programs that report a GitHub check run share one program for it, `github-check-run` (`modules/apps/ci/github-check-run.{nix,sh}`, also `apps.github-check-run`).
+`github-check-run create --repo <owner/name> --name <check> --head-sha <sha>` creates an `in_progress` check run and prints its id; `github-check-run complete --repo <owner/name> --id <id> --conclusion <success|neutral|failure> --title <title> --summary <summary> [--details-url <url>]` completes it.
+It authenticates with `GITHUB_FORGE_TOKEN` and fails on any non-2xx response; `deploy-docs pull-request` and `release-packages plan` both call it, and both complete their check run from an exit trap that never masks the program's exit status.
 
 ### docs
 
@@ -105,7 +115,7 @@ It skips with exit 0, logging `DEPLOY-DOCS-ACTION: superseded`, when `main`'s he
 The two pull request triggers are onEvent effects: nixbot evaluates them from `main`, never from the pull request, so pull-request code never holds their secrets.
 On a pull request event, `deploy-docs pull-request`:
 
-1. creates an `in_progress` GitHub check run named `docs-preview` on the pull request's head commit, using nixbot's forge token;
+1. creates an `in_progress` GitHub check run named `docs-preview` on the pull request's head commit with `github-check-run`, using nixbot's forge token;
 2. decides whether to trust the pull request from the event's `pullRequest.isFork`, `actor.permission`, and `pullRequest.author.permission`: a pull request whose head branch is in this repository is trusted, bots included, since pushing that branch already required write access; a fork is trusted only when the actor or the author has `write` or `admin`, so a maintainer previews a fork by adding any label to it; an untrusted fork completes the check run as `neutral` ("Docs preview skipped", naming the reason and that remedy) and exits 0 without fetching or deploying anything, and an event without a boolean `isFork` fails;
 3. fetches the pull request's nixbot build from nixbot's API, without evaluating any pull-request code, and requires the build to have succeeded and its `checks.x86_64-linux.package-vanixiets-docs` attribute to be `succeeded` or `skipped_local` (nixbot reports a cached output as `skipped_local`);
 4. deploys that payload with `wrangler preview --name pr-<number> --worker-name infra-docs --ignore-base-config` as the Cloudflare Preview `pr-<number>` of the `infra-docs` Worker, from a synthesized assets-only wrangler config with an empty `previews` block and no build command, bindings, or routes, so neither the payload nor the dashboard's Preview base config adds anything to it;
@@ -131,23 +141,41 @@ It sanitizes a Preview name to at most 40 lowercase letters, digits, and hyphens
 
 ### release-packages
 
-Runs `release-packages --rev <commit>`, which clones the repository, checks out the commit as `main`, discovers packages with `list-packages-json`, and runs the `release` program for each, which runs semantic-release with the production plugins.
-It runs under `lock = "release-packages"`, skips with exit 0 and logs `RELEASE-PACKAGES-ACTION: superseded` when `main` has moved past its commit, and refuses a commit outside `main`'s history.
-See [Semantic Release Preview](/about/contributing/semantic-release-preview/) for previewing a release.
+The `release-packages` effect runs the `release-packages` program on two triggers:
+
+| Trigger | nixbot effect | Program | Secrets | Lock |
+|---------|---------------|---------|---------|------|
+| `main` | `herculesCI.onPush.default.outputs.effects.release-packages` | `release-packages --rev <commit>` | `GITHUB_TOKEN` | `release-packages` |
+| `pullRequest` | `herculesCI.onEvent.pull_request.release-packages` | `release-packages plan` | none (forge token only) | `release-plan-{pr}` |
+
+`release-packages --rev <commit>` clones the repository, checks out the commit as `main`, discovers packages with `list-packages-json`, and runs the `release` program for each, which runs semantic-release with the production plugins.
+It skips with exit 0 and logs `RELEASE-PACKAGES-ACTION: superseded` when `main` has moved past its commit, and refuses a commit outside `main`'s history.
+
+`release-packages plan` runs on every pull request once its head has built green, forks included once CI is approved for them, and reports the `release-plan` check run on the head commit:
+
+1. it creates the check run with `github-check-run`, using nixbot's forge token;
+2. it clones the public repository without a token, fetches `refs/pull/<number>/head`, and requires it to equal the head commit in nixbot's event;
+3. it simulates the merge into `main` with `git merge-tree`, failing on a conflict, and checks out the merge commit as `main` with the index and working tree reset to `main`'s tree, so semantic-release analyses the pull request's commits while its configuration and plugins come from `main`'s files;
+4. it runs the `release` program for each package with semantic-release's `--dry-run`, with nixbot's installation token as `GITHUB_TOKEN`, and with git's URLs for the repository rewritten to a local bare clone, so semantic-release's push-permission check and every other git network operation reach that clone and nothing is ever pushed;
+5. it logs `RELEASE-PLAN: <package> <last|none> -> <next|no release>` per package and completes the check run as `success` with a package, last, next, and bump table, or as `failure` with the reason.
+
+The release PAT is never given to this trigger and plan mode never reads it.
+The forecast is informational and never blocks a merge.
+See [Semantic Release Preview](/about/contributing/semantic-release-preview/) for reading the forecast and previewing a release locally.
 
 ## Secrets
 
 Effect secrets are declared once, in `flake.lib.vanixietsEffectSecrets` (`modules/effects/vanixiets/secrets.nix`).
 The `vanixiets-effects-secrets` clan vars generator's prompts and the secrets JSON it composes are generated from that schema; the generator runs on magnetite and nixbot receives the result as a systemd credential.
-An effect entry's `secrets` is typed as an enum of the schema's names, and the interpreter derives each effect's `secretsMap` from it, so an effect can read exactly the secrets it declares.
-`checks.x86_64-linux.nixbot-wiring` asserts that the union of the entries' `secrets` equals the schema, so no secret is prompted for without being used and none is used without being prompted for.
+Each trigger's `secrets` is typed as an enum of the schema's names, and the interpreter derives each trigger's `secretsMap` from it, so a trigger can read exactly the secrets it declares and no other trigger's.
+`checks.x86_64-linux.nixbot-wiring` asserts that the union of every trigger's `secrets` across all entries equals the schema, so no secret is prompted for without being used and none is used without being prompted for.
 
 | Secret | Used by |
 |--------|---------|
-| `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` | `docs` |
-| `GITHUB_TOKEN` (fine-grained PAT, read and write) | `release-packages` |
+| `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` | `docs`: `main`, `pullRequest`, and `pullRequestClosed` |
+| `GITHUB_TOKEN` (fine-grained PAT, read and write) | `release-packages`: `main` only |
 
-The `docs` effect's `pullRequest` trigger also sets `forgeToken = true`, which gives it nixbot's per-run GitHub token as `GITHUB_FORGE_TOKEN` for the `docs-preview` check run; that token is not an entry of the schema.
+The `pullRequest` triggers of `docs` and `release-packages` also set `forgeToken = true`, which gives them nixbot's per-run GitHub App installation token as `GITHUB_FORGE_TOKEN` for their `docs-preview` and `release-plan` check runs; that token is not an entry of the schema.
 
 To rotate a value, regenerate the generator's prompts with `clan vars generate --regenerate` and redeploy magnetite.
 

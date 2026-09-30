@@ -3,8 +3,8 @@
 # An effect carries no behaviour of its own: each entry names a program whose
 # behaviour a rehearsal check exercises, and the only code between nixbot and
 # that program is the script rendered here, which checks.effects-interpreter
-# runs. An entry declares what every run shares (program, secrets,
-# rehearsals) and, per trigger, how that run is invoked:
+# runs. An entry declares what every run shares (program, rehearsals) and,
+# per trigger, how that run is invoked and which secrets it holds:
 #
 #   main              herculesCI.onPush.default.outputs.effects.<name>
 #   pullRequest       herculesCI.onEvent.pull_request.<name>
@@ -17,15 +17,17 @@
 #
 # The rendered script, in order: for main, the effectRunContext guard that
 # ends any run that is not a push to main before a secret is read; exports
-# each declared secret from $HERCULES_CI_SECRETS_JSON, failing on the first
-# one absent, null or empty; then execs the program with the trigger's
-# arguments, and for main `--rev <rev>`.
+# each secret the trigger declares from $HERCULES_CI_SECRETS_JSON, failing on
+# the first one absent, null or empty; then execs the program with the
+# trigger's arguments, and for main `--rev <rev>`.
 #
 # nixbot enforces hercules-ci secretsMap semantics: only the destinations named
 # in the map are written into $HERCULES_CI_SECRETS_JSON, and mkEffect declares
 # an empty map when none is given, which grants nothing. The map is therefore
-# derived from each entry's `secrets` and the trigger's `forgeToken`, so a run
-# can read exactly what it declares.
+# derived from each trigger's `secrets` and `forgeToken`, so a run can read
+# exactly what its trigger declares and never another trigger's secrets: a
+# pull request run of a program whose main run holds a write credential
+# receives none of it.
 #
 # Rehearsals are effect inputs that nothing runs: nixbot builds the inputs of
 # every onPush and onEvent effect on pull requests and merge-queue batches
@@ -58,6 +60,11 @@ let
           trigger kinds. `{pr}` expands to the pull request number.
         '';
       };
+      secrets = lib.mkOption {
+        type = types.listOf (types.enum secretNames);
+        default = [ ];
+        description = "flake.lib.vanixietsEffectSecrets entries exported to this run's environment.";
+      };
       forgeToken = lib.mkOption {
         type = types.bool;
         default = false;
@@ -79,11 +86,6 @@ let
       program = lib.mkOption {
         type = types.pathInStore;
         description = "Executable the effect execs, normally a flake app's program.";
-      };
-      secrets = lib.mkOption {
-        type = types.listOf (types.enum secretNames);
-        default = [ ];
-        description = "flake.lib.vanixietsEffectSecrets entries exported to the program's environment.";
       };
       rehearsals = lib.mkOption {
         type = types.nonEmptyListOf types.package;
@@ -122,12 +124,19 @@ let
     ''
       set -euo pipefail
       ${lib.optionalString main runContext.mainOnlyGuard}
-      ${lib.concatMapStrings (name: exportSecret name ".${name}.data.value") entry.secrets}
+      ${lib.concatMapStrings (name: exportSecret name ".${name}.data.value") trigger.secrets}
       ${lib.optionalString trigger.forgeToken (
         exportSecret "GITHUB_FORGE_TOKEN" ".GITHUB_FORGE_TOKEN.data.token"
       )}
       exec ${lib.escapeShellArgs ([ entry.program ] ++ argv)}
     '';
+
+  # Pure, so checks.effects-interpreter pins the map every registry trigger
+  # receives with the function mkEffect uses.
+  secretsMapFor =
+    trigger:
+    lib.genAttrs trigger.secrets lib.id
+    // lib.optionalAttrs trigger.forgeToken { GITHUB_FORGE_TOKEN.type = "GitToken"; };
 
   mkEffect =
     kind: rev: name: entry:
@@ -149,9 +158,7 @@ let
             pkgs.curl
           ]
           ++ entry.rehearsals;
-          secretsMap =
-            lib.genAttrs entry.secrets lib.id
-            // lib.optionalAttrs trigger.forgeToken { GITHUB_FORGE_TOKEN.type = "GitToken"; };
+          secretsMap = secretsMapFor trigger;
           effectScript = renderEffectScript { inherit rev; } kind entry;
         }
         // lib.optionalAttrs main {
@@ -186,6 +193,7 @@ in
 
   config = {
     flake.lib.vanixietsEffectScript = renderEffectScript;
+    flake.lib.vanixietsEffectSecretsMap = secretsMapFor;
 
     herculesCI = herculesCI: {
       onPush.default.outputs.effects = effectsFor "main" herculesCI.config.repo.rev;

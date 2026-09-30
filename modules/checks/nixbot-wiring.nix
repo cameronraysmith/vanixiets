@@ -129,11 +129,18 @@
               lib.filterAttrs (_: file: file.deploy) vanixietsSecrets.files
             );
 
-            # Every declared effect secret is read by some effect and every
-            # secret an effect reads is declared, so the composed file holds
-            # nothing no effect uses.
+            # Every declared effect secret is read by some trigger of some
+            # effect and every secret a trigger reads is declared, so the
+            # composed file holds nothing no effect uses.
             effectSecretsUsed = lib.naturalSort (
-              lib.unique (lib.concatMap (entry: entry.secrets) (builtins.attrValues config.vanixiets.effects))
+              lib.unique (
+                lib.concatMap (
+                  entry:
+                  lib.concatMap (trigger: trigger.secrets) (
+                    builtins.filter (trigger: trigger != null) (builtins.attrValues entry.triggers)
+                  )
+                ) (builtins.attrValues config.vanixiets.effects)
+              )
             );
 
             # Outside pull requests build only once a maintainer approves them.

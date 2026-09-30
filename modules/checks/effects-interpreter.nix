@@ -7,12 +7,27 @@
 # modules/effects/vanixiets/registry.nix uses, runs it the way mkEffect's
 # effectPhase does (eval of the script text), and asserts the exit status, the
 # output, and exactly the argv and environment the program saw. Only main runs
-# the guard and receives `--rev`; the forge token is exported per trigger.
+# the guard and receives `--rev`; secrets and the forge token are exported per
+# trigger. Rows marked "registry" render the vanixiets.effects entries
+# themselves, program swapped for the stub, against a secrets file holding
+# every secret, so a trigger that exported another trigger's secret would
+# show it; in particular release-packages' pullRequest run never sees
+# GITHUB_TOKEN. The secretsMap every registry trigger is granted is pinned
+# too, through flake.lib.vanixietsEffectSecretsMap, the function mkEffect
+# uses, since that map is what nixbot writes into the secrets file.
 #
 # The program is a stub that records its argv and the secret variables, and
 # curl is stubbed for the nixbot id-token endpoint the main guard calls,
 # as in checks.effect-run-context. Secret values are dummies.
-{ self, lib, ... }:
+{
+  config,
+  self,
+  lib,
+  ...
+}:
+let
+  registry = config.vanixiets.effects;
+in
 {
   perSystem =
     { pkgs, ... }:
@@ -21,6 +36,7 @@
 
       recordedVars = [
         "CLOUDFLARE_API_TOKEN"
+        "CLOUDFLARE_ACCOUNT_ID"
         "GITHUB_TOKEN"
         "GITHUB_FORGE_TOKEN"
       ];
@@ -47,8 +63,9 @@
         {
           name,
           kind,
-          secrets ? [ ],
+          entry ? null,
           trigger ? { },
+          otherTriggers ? { },
           claims ? null,
           secretsJson,
           status,
@@ -57,16 +74,23 @@
           env ? null,
         }:
         let
+          defaultTrigger = {
+            args = [ ];
+            secrets = [ ];
+            forgeToken = false;
+          };
+          rendered =
+            if entry != null then
+              entry // { program = stubProgram; }
+            else
+              {
+                program = stubProgram;
+                triggers = lib.mapAttrs (_: other: defaultTrigger // other) otherTriggers // {
+                  ${kind} = defaultTrigger // trigger;
+                };
+              };
           script = pkgs.writeText "effect-script.sh" (
-            self.lib.vanixietsEffectScript { inherit rev; } kind {
-              program = stubProgram;
-              inherit secrets;
-              triggers.${kind} = {
-                args = [ ];
-                forgeToken = false;
-              }
-              // trigger;
-            }
+            self.lib.vanixietsEffectScript { inherit rev; } kind rendered
           );
         in
         ''
@@ -119,8 +143,38 @@
         '';
 
       cloudflare.CLOUDFLARE_API_TOKEN.data.value = "dummy-cloudflare-token";
+      cloudflareAccount.CLOUDFLARE_ACCOUNT_ID.data.value = "dummy-cloudflare-account";
       github.GITHUB_TOKEN.data.value = "dummy-github-token";
       forge.GITHUB_FORGE_TOKEN.data.token = "dummy-forge-token";
+      everySecret = cloudflare // cloudflareAccount // github // forge;
+
+      grantedSecrets = lib.mapAttrs (
+        _: entry:
+        lib.mapAttrs (_: trigger: builtins.attrNames (self.lib.vanixietsEffectSecretsMap trigger)) (
+          lib.filterAttrs (_: trigger: trigger != null) entry.triggers
+        )
+      ) registry;
+      expectedGrantedSecrets = {
+        docs = {
+          main = [
+            "CLOUDFLARE_ACCOUNT_ID"
+            "CLOUDFLARE_API_TOKEN"
+          ];
+          pullRequest = [
+            "CLOUDFLARE_ACCOUNT_ID"
+            "CLOUDFLARE_API_TOKEN"
+            "GITHUB_FORGE_TOKEN"
+          ];
+          pullRequestClosed = [
+            "CLOUDFLARE_ACCOUNT_ID"
+            "CLOUDFLARE_API_TOKEN"
+          ];
+        };
+        release-packages = {
+          main = [ "GITHUB_TOKEN" ];
+          pullRequest = [ "GITHUB_FORGE_TOKEN" ];
+        };
+      };
     in
     {
       checks.effects-interpreter =
@@ -146,11 +200,16 @@
             chmod +x "$TMPDIR/bin/curl"
             export PATH="$TMPDIR/bin:$PATH"
 
+            echo "--- registry secretsMap per trigger"
+            printf '%s' ${lib.escapeShellArg (builtins.toJSON expectedGrantedSecrets)} | jq -S . > granted.expected
+            printf '%s' ${lib.escapeShellArg (builtins.toJSON grantedSecrets)} | jq -S . > granted
+            diff -u granted.expected granted
+
             ${lib.concatMapStrings row [
               {
                 name = "main execs the program with --rev and its secrets";
                 kind = "main";
-                secrets = [
+                trigger.secrets = [
                   "CLOUDFLARE_API_TOKEN"
                   "GITHUB_TOKEN"
                 ];
@@ -178,7 +237,7 @@
               {
                 name = "main on a non-main token is skipped";
                 kind = "main";
-                secrets = [ "GITHUB_TOKEN" ];
+                trigger.secrets = [ "GITHUB_TOKEN" ];
                 claims = {
                   event = "push";
                   ref = "refs/heads/gitea-mq/batch/7";
@@ -192,7 +251,7 @@
               {
                 name = "missing secret fails before the program runs";
                 kind = "main";
-                secrets = [
+                trigger.secrets = [
                   "CLOUDFLARE_API_TOKEN"
                   "GITHUB_TOKEN"
                 ];
@@ -204,7 +263,7 @@
               {
                 name = "null secret fails before the program runs";
                 kind = "main";
-                secrets = [ "GITHUB_TOKEN" ];
+                trigger.secrets = [ "GITHUB_TOKEN" ];
                 claims = mainClaims;
                 secretsJson.GITHUB_TOKEN.data.value = null;
                 status = 1;
@@ -213,9 +272,9 @@
               {
                 name = "pullRequest runs unguarded, without --rev, with the forge token";
                 kind = "pullRequest";
-                secrets = [ "CLOUDFLARE_API_TOKEN" ];
                 trigger = {
                   args = [ "pull-request" ];
+                  secrets = [ "CLOUDFLARE_API_TOKEN" ];
                   forgeToken = true;
                 };
                 secretsJson = cloudflare // forge;
@@ -237,8 +296,10 @@
               {
                 name = "pullRequestClosed runs unguarded, without --rev, without the forge token";
                 kind = "pullRequestClosed";
-                secrets = [ "CLOUDFLARE_API_TOKEN" ];
-                trigger.args = [ "pull-request-closed" ];
+                trigger = {
+                  args = [ "pull-request-closed" ];
+                  secrets = [ "CLOUDFLARE_API_TOKEN" ];
+                };
                 secretsJson = cloudflare // forge;
                 status = 0;
                 argv = [ "pull-request-closed" ];
@@ -247,11 +308,83 @@
               {
                 name = "missing secret fails a pullRequestClosed run before the program runs";
                 kind = "pullRequestClosed";
-                secrets = [ "CLOUDFLARE_API_TOKEN" ];
-                trigger.args = [ "pull-request-closed" ];
+                trigger = {
+                  args = [ "pull-request-closed" ];
+                  secrets = [ "CLOUDFLARE_API_TOKEN" ];
+                };
                 secretsJson = github;
                 status = 1;
                 expect = [ "error: CLOUDFLARE_API_TOKEN missing from $HERCULES_CI_SECRETS_JSON" ];
+              }
+              {
+                name = "pullRequest never receives the main trigger's secrets";
+                kind = "pullRequest";
+                otherTriggers.main.secrets = [ "GITHUB_TOKEN" ];
+                trigger.forgeToken = true;
+                secretsJson = everySecret;
+                status = 0;
+                argv = [ ];
+                env.GITHUB_FORGE_TOKEN = "dummy-forge-token";
+              }
+              {
+                name = "main never receives the pullRequest trigger's secrets or forge token";
+                kind = "main";
+                otherTriggers.pullRequest = {
+                  secrets = [ "CLOUDFLARE_API_TOKEN" ];
+                  forgeToken = true;
+                };
+                trigger.secrets = [ "GITHUB_TOKEN" ];
+                claims = mainClaims;
+                secretsJson = everySecret;
+                status = 0;
+                argv = [
+                  "--rev"
+                  rev
+                ];
+                env.GITHUB_TOKEN = "dummy-github-token";
+              }
+              {
+                name = "registry: release-packages pullRequest runs the plan with the forge token and never GITHUB_TOKEN";
+                kind = "pullRequest";
+                entry = registry.release-packages;
+                secretsJson = everySecret;
+                status = 0;
+                argv = [ "plan" ];
+                env.GITHUB_FORGE_TOKEN = "dummy-forge-token";
+              }
+              {
+                name = "registry: release-packages pullRequest without the forge token fails before the program runs";
+                kind = "pullRequest";
+                entry = registry.release-packages;
+                secretsJson = github;
+                status = 1;
+                expect = [ "error: GITHUB_FORGE_TOKEN missing from $HERCULES_CI_SECRETS_JSON" ];
+              }
+              {
+                name = "registry: release-packages main receives GITHUB_TOKEN and not the forge token";
+                kind = "main";
+                entry = registry.release-packages;
+                claims = mainClaims;
+                secretsJson = everySecret;
+                status = 0;
+                expect = [ "CI-RUN-CONTEXT: branch=main is_main=true" ];
+                argv = [
+                  "--rev"
+                  rev
+                ];
+                env.GITHUB_TOKEN = "dummy-github-token";
+              }
+              {
+                name = "registry: docs pullRequestClosed receives Cloudflare and not the forge token";
+                kind = "pullRequestClosed";
+                entry = registry.docs;
+                secretsJson = everySecret;
+                status = 0;
+                argv = [ "pull-request-closed" ];
+                env = {
+                  CLOUDFLARE_API_TOKEN = "dummy-cloudflare-token";
+                  CLOUDFLARE_ACCOUNT_ID = "dummy-cloudflare-account";
+                };
               }
             ]}
 
