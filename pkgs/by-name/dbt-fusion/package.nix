@@ -18,41 +18,31 @@ let
   systemToPlatform = {
     "x86_64-linux" = {
       name = "x86_64-unknown-linux-gnu";
-      dbtHash = "sha256-VlIwh/2mekekqJ+kiAvqlSFdnBTroDtO7xiiJld9hvY=";
-      lspHash = "sha256-LbgL1eadWmwqIo9uE0bQln1nbwdgihRbMYvB+dQ0Kz4=";
+      hash = "sha256-ZGEaODSDg+roakg0YRz8eG+WzbyQf735OCXFVg0gwZc=";
     };
     "aarch64-linux" = {
       name = "aarch64-unknown-linux-gnu";
-      dbtHash = "sha256-GMTwo0lBJVtGeOBTjsQ5B2u92fBy+DsJw2HS1Fgk2d0=";
-      lspHash = "sha256-7MHW8R/LYbuyv8jPqaVSLohnEbqzntfgK9lmFgf/80c=";
+      hash = "sha256-57iF2oEQkN+IYxuHkWdr7TGVO6xlMqf6DD+94WRaV60=";
     };
     "x86_64-darwin" = {
       name = "x86_64-apple-darwin";
-      dbtHash = "sha256-iTVqA7Kj0Klci3TKq6U/MX/ovU9lrnOd6yqxyRX6hUk=";
-      lspHash = "sha256-SuYtO8guYNCZ+zKD1/clwOgMuAb9gx4MmWh7flsOfJQ=";
+      hash = "sha256-2+bf5n76s/Iml3nJVtCWWGbOp+iUWTg7bb5+ijNrr6A=";
     };
     "aarch64-darwin" = {
       name = "aarch64-apple-darwin";
-      dbtHash = "sha256-CHrRfeqAIiHdZNBfpKgID4v+Ri6tPwWiaelPaPhdpLU=";
-      lspHash = "sha256-KhzUtvTTg7Kj5gk8CBMs33zPpSFQjg669dZBcY3QLNs=";
+      hash = "sha256-H/jpQhScnELgomQZ8pTDKT5QC4QmTMuVof+bZYXIjds=";
     };
   };
   platform = systemToPlatform.${system} or (throw "dbt-fusion: unsupported platform ${system}");
 in
 stdenv.mkDerivation (finalAttrs: {
   pname = "dbt-fusion";
-  version = "2.0.0-preview.101";
+  version = "2.0.6";
 
-  srcs = [
-    (fetchurl {
-      url = "https://public.cdn.getdbt.com/fs/cli/fs-v${finalAttrs.version}-${platform.name}.tar.gz";
-      hash = platform.dbtHash;
-    })
-    (fetchurl {
-      url = "https://public.cdn.getdbt.com/fs/lsp/fs-lsp-v${finalAttrs.version}-${platform.name}.tar.gz";
-      hash = platform.lspHash;
-    })
-  ];
+  src = fetchurl {
+    url = "https://public.cdn.getdbt.com/fs/cli/fs-v${finalAttrs.version}-${platform.name}.tar.gz";
+    inherit (platform) hash;
+  };
 
   nativeBuildInputs = lib.optionals stdenv.hostPlatform.isLinux [ autoPatchelfHook ];
 
@@ -65,7 +55,6 @@ stdenv.mkDerivation (finalAttrs: {
   installPhase = ''
     runHook preInstall
     install -m755 -D dbt $out/bin/dbtf
-    install -m755 -D dbt-lsp $out/bin/dbt-lsp
     runHook postInstall
   '';
 
@@ -76,7 +65,8 @@ stdenv.mkDerivation (finalAttrs: {
     longDescription = ''
       dbt Fusion is the next-generation dbt CLI offering faster execution
       and enhanced capabilities for data transformation workflows.
-      Includes both the dbtf CLI and dbt-lsp language server.
+      The language server ships inside the CLI as `dbtf lsp`; upstream no
+      longer publishes a standalone dbt-lsp artifact.
     '';
     homepage = "https://github.com/dbt-labs/dbt-fusion";
     changelog = "https://github.com/dbt-labs/dbt-fusion/blob/main/CHANGELOG.md";

@@ -16,18 +16,8 @@ fetch_dbt_arch() {
   nix-hash --to-sri --type sha256 "$(nix-prefetch-url --type sha256 "$URL")"
 }
 
-fetch_lsp_arch() {
-  VER="$1"; ARCH="$2"
-  URL="https://public.cdn.getdbt.com/fs/lsp/fs-lsp-v${VER}-${ARCH}.tar.gz"
-  nix-hash --to-sri --type sha256 "$(nix-prefetch-url --type sha256 "$URL")"
-}
-
 replace_dbt_hash() {
-  sed -i "/\"$1\" = {/,/};/ s#dbtHash = \"sha256-.\{44\}\"#dbtHash = \"$2\"#" "$NIX_DRV"
-}
-
-replace_lsp_hash() {
-  sed -i "/\"$1\" = {/,/};/ s#lspHash = \"sha256-.\{44\}\"#lspHash = \"$2\"#" "$NIX_DRV"
+  sed -i "/\"$1\" = {/,/};/ s#hash = \"sha256-.\{44\}\"#hash = \"$2\"#" "$NIX_DRV"
 }
 
 FUSION_VER=$(curl -s "https://public.cdn.getdbt.com/fs/versions.json" | jq -r ".latest.tag" | sed 's/^v//')
@@ -43,13 +33,3 @@ replace_dbt_hash "x86_64-linux" "$FUSION_LINUX_X64_DBT_HASH"
 replace_dbt_hash "aarch64-linux" "$FUSION_LINUX_AARCH64_DBT_HASH"
 replace_dbt_hash "x86_64-darwin" "$FUSION_DARWIN_X64_DBT_HASH"
 replace_dbt_hash "aarch64-darwin" "$FUSION_DARWIN_AARCH64_DBT_HASH"
-
-FUSION_LINUX_X64_LSP_HASH=$(fetch_lsp_arch "$FUSION_VER" "x86_64-unknown-linux-gnu")
-FUSION_LINUX_AARCH64_LSP_HASH=$(fetch_lsp_arch "$FUSION_VER" "aarch64-unknown-linux-gnu")
-FUSION_DARWIN_X64_LSP_HASH=$(fetch_lsp_arch "$FUSION_VER" "x86_64-apple-darwin")
-FUSION_DARWIN_AARCH64_LSP_HASH=$(fetch_lsp_arch "$FUSION_VER" "aarch64-apple-darwin")
-
-replace_lsp_hash "x86_64-linux" "$FUSION_LINUX_X64_LSP_HASH"
-replace_lsp_hash "aarch64-linux" "$FUSION_LINUX_AARCH64_LSP_HASH"
-replace_lsp_hash "x86_64-darwin" "$FUSION_DARWIN_X64_LSP_HASH"
-replace_lsp_hash "aarch64-darwin" "$FUSION_DARWIN_AARCH64_LSP_HASH"
