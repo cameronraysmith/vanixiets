@@ -13,8 +13,9 @@ The GitHub Actions release and docs-deploy workflows are archived under `.github
 Effects are the only CI programs that receive deploy secrets (the Cloudflare API token and the GitHub release token).
 onPush effects run only for pushes to `main`, and the one onEvent effect is always evaluated from `main`, so the code that holds a secret has always already been reviewed and landed.
 
-Each onPush effect has one program and one execution path.
-There is no separate preview or dry-run implementation of an effect; pre-merge confidence comes from hermetic rehearsal checks that run the same programs against stubs.
+An effect contains no behaviour of its own.
+Each effect is a data entry naming a program, and every behaviour lives in that program, which a hermetic rehearsal check runs against stubs.
+There is no separate preview or dry-run implementation of an effect; pre-merge confidence comes from those rehearsals.
 
 ## Gating
 
@@ -44,17 +45,21 @@ The required contexts are `nixbot/nix-eval`, `nixbot/nix-build`, and `nixbot/eff
 
 ### Rehearsals
 
-The effects list two hermetic rehearsal checks among their dependencies, so every pull request and batch builds them as part of `nixbot/effects`:
+Each effect lists the rehearsal checks for its program among its inputs, so every pull request and batch builds them as part of the required `nixbot/effects` gate:
 
-- `checks.<system>.release-rehearsal` runs a full semantic-release with the production plugin list against a local git fixture and a stub GitHub API, including the floating major and minor tags from `semantic-release-major-tag`;
-- `checks.<system>.deploy-docs-rehearsal` runs `deploy-docs production` and `deploy-docs preview` against a stub wrangler.
+- `checks.<system>.deploy-docs-rehearsal` runs `deploy-docs production` and `deploy-docs preview` through their flag interface against a stub wrangler, including the superseded production run and the untrusted `--payload` hardening;
+- `checks.<system>.release-rehearsal` runs `release-packages --rev` with the production semantic-release plugin list against a local git fixture and a stub GitHub API, including the floating major and minor tags from `semantic-release-major-tag`, a superseded rev that main has moved past, and a diverged rev outside main's history;
+- `checks.<system>.docs-preview-rehearsal` runs `docs-preview` against a stub nixbot API, a stub GitHub check-runs API, and a stub `deploy-docs`, covering succeeded and `skipped_local` docs attributes, failed and missing attributes, a build that did not succeed, a malformed event, and a failed deploy.
 
-Both run the real programs without a token or network access, so a change that breaks the release or deploy path fails before it reaches `main`.
+`deploy-docs` and `docs-preview` list `deploy-docs-rehearsal`, `release-packages` lists `release-rehearsal`, and `docs-preview` also lists `docs-preview-rehearsal`.
+The rehearsals run the real programs without a token or network access, so a change that breaks the release, deploy, or preview path fails before it reaches `main`.
+
+`checks.<system>.effects-interpreter` covers the one piece of code between nixbot and a program: the script the interpreter generates for each effect.
 
 ### Docs previews
 
-The `deploy-docs-preview` onEvent effect uploads a docs preview for each pull request; see [deploy-docs-preview](#deploy-docs-preview) below.
-It is not a required context and never blocks a merge.
+The `docs-preview` onEvent effect uploads a docs preview for each pull request; see [docs-preview](#docs-preview) below.
+It reports as the `docs-preview` check run, which is not a required context and never blocks a merge.
 
 ### Fork pull requests
 
@@ -68,46 +73,63 @@ gitea-mq tests batches of queued pull requests and lands a batch by fast-forward
 The resulting push to `main` reuses the batch's build, and nixbot then runs the effects for that commit.
 
 Batches can land in quick succession, so an effect may start after `main` has already moved past the commit it was built for.
-Both onPush effects handle this the same way: a `lock` orders runs across builds, and a run whose commit is an ancestor of the current `main` exits 0 without acting, leaving the work to the run for the newer commit.
+Both onPush effects handle this the same way: a `lock` orders runs across builds, and the program exits 0 without acting when its `--rev` is no longer `main`'s head, leaving the work to the run for the newer commit.
 
 ## Effects
 
-onPush effects are declared under `herculesCI.onPush.default.outputs.effects` in `modules/effects/vanixiets/herculesCI/`.
-Each one starts with a fail-closed guard (`mainOnlyGuard` from `modules/lib/effect-run-context.nix`) that asks nixbot for an identity token and refuses to run unless the token says the event is a push to `refs/heads/main`: any other run is skipped with exit 0 before a secret is read, and a missing or unreadable token fails the effect.
+Effects are data.
+`modules/effects/vanixiets/effects.nix` declares them as entries of the flake option `vanixiets.effects.<name>`, each naming its trigger (`push-main` or `pull-request`), its program, literal arguments, the secrets it reads, its rehearsals, its lock, and, for pull-request entries, the permission nixbot requires.
+
+One interpreter, `modules/effects/vanixiets/registry.nix`, turns the entries into `herculesCI.onPush.default.outputs.effects.<name>` and `herculesCI.onEvent.pull_request.<name>`.
+The script it generates for each effect does three things, in order:
+
+1. for `push-main` entries, runs the fail-closed guard (`mainOnlyGuard` from `modules/lib/effect-run-context.nix`), which asks nixbot for an identity token and refuses to run unless the token says the event is a push to `refs/heads/main`: any other run is skipped with exit 0 before a secret is read, and a missing or unreadable token fails the effect;
+2. exports each declared secret, failing with a specific error on the first one that is absent, null, or empty;
+3. execs the program with the entry's arguments, followed by `--rev <commit>` for `push-main` entries.
+
+`checks.<system>.effects-interpreter` renders synthetic entries through the same function and runs the generated script against stubs, asserting the guard's skip on a non-main run, the exported secrets, the failure on a missing secret, the forge token, and the exact argv the program receives, including `--rev`.
 
 ### deploy-docs
 
-Runs `nix run .#deploy-docs -- production`, which deploys the nix-built `vanixiets-docs` payload with `wrangler deploy` to 100% of production traffic.
-It runs under `lock = "deploy-docs"` and skips with exit 0, logging `DEPLOY-DOCS-ACTION: superseded`, when `main` has moved past its commit.
+Runs `deploy-docs production --rev <commit>`, which deploys the nix-built `vanixiets-docs` payload with `wrangler deploy` to 100% of production traffic.
+It runs under `lock = "deploy-docs"` and skips with exit 0, logging `DEPLOY-DOCS-ACTION: superseded`, when `main`'s head is no longer its commit.
+
+`deploy-docs` owns its interface: `production --rev <sha>` or `preview --rev <sha> --alias <name> [--payload <dir>]`, with an optional `--deployed-by <name>`.
+It derives short SHAs, the version message, and the sanitized alias from its flags and reads only `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` from the environment; `deploy-docs --help` prints the usage.
 
 ### release-packages
 
-Discovers packages with `nix run .#list-packages-json` and runs `nix run .#release -- <package-path>` for each, which runs semantic-release with the production plugins.
-It runs under `lock = "release-packages"` and skips with exit 0 when `main` has moved past its commit.
+Runs `release-packages --rev <commit>`, which clones the repository, checks out the commit as `main`, discovers packages with `list-packages-json`, and runs the `release` program for each, which runs semantic-release with the production plugins.
+It runs under `lock = "release-packages"`, skips with exit 0 and logs `RELEASE-PACKAGES-ACTION: superseded` when `main` has moved past its commit, and refuses a commit outside `main`'s history.
 See [Semantic Release Preview](/about/contributing/semantic-release-preview/) for previewing a release.
 
-### deploy-docs-preview
+### docs-preview
 
-`herculesCI.onEvent.pull_request.deploy-docs-preview` is an event effect: nixbot evaluates it from `main`, never from the pull request, so pull-request code never holds its secret.
-On a pull request event it:
+`herculesCI.onEvent.pull_request.docs-preview` is an event effect: nixbot evaluates it from `main`, never from the pull request, so pull-request code never holds its secret.
+It runs the `docs-preview` program, which on a pull request event:
 
-1. runs only when the pull request's author or pusher has write permission on the repository (`passthru.when.permission = "write"`);
-2. fetches the pull request's already-built docs store path from nixbot's API, without evaluating any pull-request code;
-3. uploads that payload as a preview version aliased at `b-pr-<number>` (`https://b-pr-<number>-infra-docs.sciexp.workers.dev`), using a synthesized assets-only wrangler config;
-4. posts the preview URL as a comment on the pull request through nixbot's API.
+1. runs only when the pull request's author or pusher has write permission on the repository (`permission = "write"`, which the interpreter emits as `passthru.when.permission`);
+2. creates an `in_progress` GitHub check run named `docs-preview` on the pull request's head commit, using nixbot's forge token;
+3. fetches the pull request's nixbot build from nixbot's API, without evaluating any pull-request code, and requires the build to have succeeded and its `checks.x86_64-linux.package-vanixiets-docs` attribute to be `succeeded` or `skipped_local` (nixbot reports a cached output as `skipped_local`);
+4. runs `deploy-docs preview --rev <head> --alias pr-<number> --payload <store path>`, which uploads that payload as a preview version aliased at `b-pr-<number>` (`https://b-pr-<number>-infra-docs.sciexp.workers.dev`) using a synthesized assets-only wrangler config;
+5. completes the check run as `success` with the preview URL as its details link, or as `failure` with the error in its summary.
 
-Runs for the same pull request are ordered by `lock = "deploy-docs-preview-<number>"`.
+Runs for the same pull request are ordered by `lock = "deploy-docs-preview-{pr}"`.
 The effect is informational: a failed or skipped preview never blocks a merge.
 
 ## Secrets
 
-Effect secrets are generated on magnetite by the `vanixiets-effects-secrets` clan vars generator (`modules/effects/vanixiets/secrets.nix`) and handed to nixbot as a systemd credential.
-Each effect names the entries it reads in its `secretsMap`.
+Effect secrets are declared once, in `flake.lib.vanixietsEffectSecrets` (`modules/effects/vanixiets/secrets.nix`).
+The `vanixiets-effects-secrets` clan vars generator's prompts and the secrets JSON it composes are generated from that schema; the generator runs on magnetite and nixbot receives the result as a systemd credential.
+An effect entry's `secrets` is typed as an enum of the schema's names, and the interpreter derives each effect's `secretsMap` from it, so an effect can read exactly the secrets it declares.
+`checks.x86_64-linux.nixbot-wiring` asserts that the union of the entries' `secrets` equals the schema, so no secret is prompted for without being used and none is used without being prompted for.
 
 | Secret | Used by |
 |--------|---------|
-| `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` | `deploy-docs`, `deploy-docs-preview` |
+| `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` | `deploy-docs`, `docs-preview` |
 | `GITHUB_TOKEN` (fine-grained PAT, read and write) | `release-packages` |
+
+`docs-preview` also sets `forgeToken = true`, which gives it nixbot's per-run GitHub token as `GITHUB_FORGE_TOKEN` for the check run; that token is not an entry of the schema.
 
 To rotate a value, regenerate the generator's prompts with `clan vars generate --regenerate` and redeploy magnetite.
 
@@ -115,11 +137,11 @@ To rotate a value, regenerate the generator's prompts with `clan vars generate -
 
 Local runs use `secrets/shared.yaml` through `sops exec-env` for Cloudflare credentials:
 
-```bash
-# Upload a preview version aliased at b-<branch>
+# Upload a preview version of HEAD aliased at b-<branch>
 just docs-deploy-preview
 
-# Deploy to production (normally done by the deploy-docs effect)
+# Deploy HEAD to production (normally done by the deploy-docs effect);
+# exits 0 without deploying unless HEAD is main's head on GitHub
 just docs-deploy-production
 
 # Inspect Cloudflare state

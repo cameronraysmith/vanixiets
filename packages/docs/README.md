@@ -123,14 +123,17 @@ bun run check:fix
 # Preview locally
 bun run preview
 
-# From the repository root: upload a preview version aliased at b-<branch>
+# From the repository root: upload a preview version of HEAD aliased at b-<branch>
+# (runs `deploy-docs preview --rev <HEAD> --alias <branch>`)
 just docs-deploy-preview
 
 # From the repository root: deploy the nix-built site to production
+# (runs `deploy-docs production --rev <HEAD>`; exits 0 without deploying unless HEAD is main's head on GitHub)
 just docs-deploy-production
 ```
 
-Production deploys normally run in CI: the `deploy-docs` effect deploys each push to `main`, and pull requests get a preview from the `deploy-docs-preview` effect.
+Production deploys normally run in CI: the `deploy-docs` effect runs `deploy-docs production --rev <commit>` for each push to `main`.
+Pull requests get a preview from the `docs-preview` effect, which reports it as a `docs-preview` GitHub check run whose details link is the preview URL.
 See `src/content/docs/about/contributing/ci-cd-setup.md`.
 
 ## Documentation structure

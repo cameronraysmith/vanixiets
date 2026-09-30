@@ -9,9 +9,11 @@ Preview what semantic-release would publish for a monorepo package, using the sa
 ## How releases run
 
 Releases happen only on `main`.
-The `release-packages` effect runs on each push to `main`, discovers every package with `nix run .#list-packages-json`, and runs `nix run .#release -- <package-path>` for each one.
-It runs under `lock = "release-packages"` and exits 0 without releasing when `main` has moved past the commit it was built for.
-There is no separate preview implementation: a local preview is the same `release` program with semantic-release's own `--dry-run`, and the pre-merge rehearsal runs that program against stubs.
+The `release-packages` effect runs on each push to `main` as `release-packages --rev <commit>`.
+That program clones the repository, checks out the commit as `main`, discovers every package with `list-packages-json`, and runs the `release` program (`nix run .#release -- <package-path>`) for each one.
+It runs under `lock = "release-packages"`, exits 0 without releasing when `main` has moved past the commit it was built for, and fails for a commit outside `main`'s history.
+The effect itself is a data entry in `vanixiets.effects` with no behaviour of its own; the release logic lives entirely in `release-packages` and `release`.
+There is no separate preview implementation: a local preview is the same `release` program with semantic-release's own `--dry-run`, and the pre-merge rehearsal runs `release-packages` against stubs.
 
 Tags follow semantic-release-monorepo's `<package-name>-v<version>` format, for example `@vanixiets/docs-v0.7.0`.
 The `semantic-release-major-tag` plugin additionally maintains floating major and minor tags, as ADR-0006 requires.
@@ -44,10 +46,11 @@ On any other branch it reports that no version would be published, so preview fr
 
 ## Hermetic rehearsal
 
-`checks.<system>.release-rehearsal` runs a full, non-dry-run semantic-release with the production plugin list inside a derivation, against a local git fixture and a stub GitHub API.
+`checks.<system>.release-rehearsal` runs the `release-packages` program with the production plugin list inside a derivation, against a local git fixture it clones as the repository and a stub GitHub API, and cuts a full, non-dry-run release.
 It exercises the whole release path, including the floating `docs-v<major>` and `docs-v<major>.<minor>` tags from `semantic-release-major-tag`, without a token or network access.
+It also covers a missing `GITHUB_TOKEN`, a superseded rev that `main` has moved past, a diverged rev outside `main`'s history, and a second run with nothing new to release.
 
-The `release-packages` effect lists the rehearsal among its dependencies, so every pull request and merge-queue batch builds it as part of the required `nixbot/effects` check.
+The `release-packages` effect lists the rehearsal among its inputs, so every pull request and merge-queue batch builds it as part of the required `nixbot/effects` check.
 Build the same check CI builds with:
 
 ```bash

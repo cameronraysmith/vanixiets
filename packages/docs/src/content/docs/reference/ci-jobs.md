@@ -18,7 +18,8 @@ pull request / gitea-mq batch
 ├── nixbot/nix-build      build checks.x86_64-linux             (required)
 ├── nixbot/effects        build each effect's dependencies,     (required)
 │                         including the rehearsal checks
-├── deploy-docs-preview   onEvent effect, docs preview + comment (informational)
+├── docs-preview          check run from the onEvent effect,     (informational)
+│                         details link is the preview URL
 └── PR Check (GitHub Actions)
     ├── check-fast-forward
     └── playwright-drift-check
@@ -46,12 +47,15 @@ Evaluate and build `checks.x86_64-linux`, the attribute set by `nixbot.toml`.
 ### nixbot/effects
 
 On pull requests and merge-queue batches no effect runs.
-nixbot instead builds each onPush effect's dependencies as a check, which includes two hermetic rehearsals of the effect programs:
+nixbot instead builds each effect's dependencies as a check, and every effect lists the rehearsals of its program among them:
 
-| Check | What it runs |
-|-------|--------------|
-| `checks.<system>.release-rehearsal` | A full semantic-release with the production plugins against a local git fixture and a stub GitHub API, including the floating major and minor tags |
-| `checks.<system>.deploy-docs-rehearsal` | `deploy-docs production` and `deploy-docs preview` against a stub wrangler |
+| Check | What it runs | Listed by |
+|-------|--------------|-----------|
+| `checks.<system>.deploy-docs-rehearsal` | `deploy-docs production` and `deploy-docs preview` through their flag interface against a stub wrangler, including a superseded production run and the untrusted `--payload` hardening | `deploy-docs`, `docs-preview` |
+| `checks.<system>.release-rehearsal` | `release-packages --rev` with the production semantic-release plugins against a local git fixture and a stub GitHub API, including the floating major and minor tags, a superseded rev, and a diverged rev | `release-packages` |
+| `checks.<system>.docs-preview-rehearsal` | `docs-preview` against a stub nixbot API, a stub GitHub check-runs API, and a stub `deploy-docs`, including `succeeded` and `skipped_local` docs attributes and each failure path | `docs-preview` |
+
+`checks.<system>.effects-interpreter`, built by `nixbot/nix-build`, checks the script the effects interpreter generates around each program: the main-only guard, secret export, the missing-secret failure, the forge token, and the program's exact argv, including `--rev`.
 
 On a push to `main` the same context reports the effect runs themselves.
 
@@ -60,51 +64,59 @@ On a push to `main` the same context reports the effect runs themselves.
 | Runner | nixbot on magnetite |
 | Triggers | Pull requests and batches (dependency build); pushes to `main` (effect run) |
 | Required | Yes |
-| Local equivalent | `nix build .#checks.x86_64-linux.release-rehearsal .#checks.x86_64-linux.deploy-docs-rehearsal` |
+| Local equivalent | `nix build .#checks.x86_64-linux.deploy-docs-rehearsal .#checks.x86_64-linux.release-rehearsal .#checks.x86_64-linux.docs-preview-rehearsal` |
 
 ## Effects
 
-Effects live in `modules/effects/vanixiets/herculesCI/`.
-The onPush effects start with a fail-closed guard that refuses to run unless nixbot's identity token says the event is a push to `refs/heads/main`; any other run is skipped with exit 0 before a secret is read.
+Effects are data entries of `vanixiets.effects` in `modules/effects/vanixiets/effects.nix`.
+Each entry names a program, its arguments, secrets, rehearsals, and lock; one interpreter, `modules/effects/vanixiets/registry.nix`, generates the nixbot effects from them.
+The generated script for an onPush effect starts with a fail-closed guard that refuses to run unless nixbot's identity token says the event is a push to `refs/heads/main`; any other run is skipped with exit 0 before a secret is read.
+It then exports the declared secrets and execs the program, appending `--rev <commit>` for onPush effects.
 
 ### deploy-docs
 
-Deploys the nix-built docs payload to production with `wrangler deploy`.
+Runs `deploy-docs production --rev <commit>`, which deploys the nix-built docs payload to production with `wrangler deploy`.
 
 | Attribute | Value |
 |-----------|-------|
 | Kind | onPush |
 | Triggers | Push to `main` only |
+| Program | `deploy-docs production --rev <commit>` |
+| Rehearsal | `deploy-docs-rehearsal` |
 | Lock | `deploy-docs` |
-| Superseded run | Exits 0 without deploying when `main` has moved past its commit |
+| Superseded run | Exits 0 without deploying when `main`'s head is no longer its commit |
 | Local equivalent | `just docs-deploy-production` |
 
 **Production URL:** `https://infra.cameronraysmith.net`
 
 ### release-packages
 
-Runs semantic-release for each package discovered by `nix run .#list-packages-json`.
+Runs `release-packages --rev <commit>`, which runs semantic-release for each package discovered by `list-packages-json`.
 
 | Attribute | Value |
 |-----------|-------|
 | Kind | onPush |
 | Triggers | Push to `main` only |
+| Program | `release-packages --rev <commit>` |
+| Rehearsal | `release-rehearsal` |
 | Lock | `release-packages` |
-| Superseded run | Exits 0 without releasing when `main` has moved past its commit |
+| Superseded run | Exits 0 without releasing when `main` has moved past its commit; a commit outside `main`'s history fails |
 | Local equivalent | `just release-package <package> true` (semantic-release `--dry-run`; needs `GITHUB_TOKEN`) |
 
-### deploy-docs-preview
+### docs-preview
 
-`herculesCI.onEvent.pull_request.deploy-docs-preview` uploads a docs preview version for a pull request.
-Its code is evaluated from `main`; it fetches the pull request's already-built docs store path from nixbot's API instead of evaluating pull-request code.
+`herculesCI.onEvent.pull_request.docs-preview` runs the `docs-preview` program, which uploads a docs preview version for a pull request.
+Its code is evaluated from `main`; it fetches the pull request's already-built docs store path from nixbot's API instead of evaluating pull-request code, accepting the docs attribute when nixbot reports it `succeeded` or `skipped_local`, and runs `deploy-docs preview --rev <head> --alias pr-<number> --payload <store path>`.
 
 | Attribute | Value |
 |-----------|-------|
 | Kind | onEvent (`pull_request`) |
 | Triggers | Pull requests whose author or pusher has write permission |
-| Lock | `deploy-docs-preview-<pr-number>` |
+| Program | `docs-preview` |
+| Rehearsals | `docs-preview-rehearsal`, `deploy-docs-rehearsal` |
+| Lock | `deploy-docs-preview-{pr}` |
 | Required | No; never blocks a merge |
-| Output | Preview URL posted as a pull request comment |
+| Output | GitHub check run `docs-preview` on the head commit; its details link is the preview URL, and a failure carries the error in its summary |
 | Local equivalent | `just docs-deploy-preview pr-<number>` |
 
 **Preview URL:** `https://b-pr-<number>-infra-docs.sciexp.workers.dev`; a local `just docs-deploy-preview` with no argument aliases the current branch as `b-<branch>`.
@@ -143,9 +155,11 @@ just check-fast
 # Full nix flake check, including VM tests
 just check
 
-# Rehearse the effect programs against stubs
-nix build .#checks.x86_64-linux.release-rehearsal
+# Rehearse the effect programs and the interpreter's generated scripts against stubs
 nix build .#checks.x86_64-linux.deploy-docs-rehearsal
+nix build .#checks.x86_64-linux.release-rehearsal
+nix build .#checks.x86_64-linux.docs-preview-rehearsal
+nix build .#checks.x86_64-linux.effects-interpreter
 
 # Test the docs package
 just test-package docs
@@ -164,7 +178,9 @@ just docs-deploy-preview
 **nixbot/nix-build fails:** rebuild the named check locally with `nix build -L .#checks.x86_64-linux.<name>`.
 
 **nixbot/effects fails on a pull request:** one of the effect dependencies failed to build, usually a rehearsal.
-Build `release-rehearsal` or `deploy-docs-rehearsal` with `-L` to see the program output against the stubs.
+Build `deploy-docs-rehearsal`, `release-rehearsal`, or `docs-preview-rehearsal` with `-L` to see the program output against the stubs.
+
+**The docs-preview check run fails:** its summary carries the error, for example a docs attribute that did not build or a failed upload.
 
 **An effect on `main` reports superseded:** a newer commit landed on `main` before the run started; the run for that commit does the work.
 
