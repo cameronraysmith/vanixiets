@@ -123,8 +123,8 @@ bun run check:fix
 # Preview locally
 bun run preview
 
-# From the repository root: upload a preview version of HEAD aliased at b-<branch>
-# (runs `deploy-docs preview --rev <HEAD> --alias <branch>`)
+# From the repository root: deploy HEAD as the Cloudflare Preview named after the current branch
+# (runs `deploy-docs preview --rev <HEAD> --name <branch>`)
 just docs-deploy-preview
 
 # From the repository root: deploy the nix-built site to production
@@ -132,8 +132,9 @@ just docs-deploy-preview
 just docs-deploy-production
 ```
 
-Production deploys normally run in CI: the `deploy-docs` effect runs `deploy-docs production --rev <commit>` for each push to `main`.
-Pull requests get a preview from the `docs-preview` effect, which reports it as a `docs-preview` GitHub check run whose details link is the preview URL.
+Deploys normally run in CI through the `docs` effect, whose three triggers all run `deploy-docs`.
+Each push to `main` runs `deploy-docs production --rev <commit>`.
+Each pull request gets the Cloudflare Preview `pr-<number>`, reported as a `docs-preview` GitHub check run whose details link is the Preview URL, and the Preview is deleted when the pull request closes or merges.
 See `src/content/docs/about/contributing/ci-cd-setup.md`.
 
 ## Documentation structure

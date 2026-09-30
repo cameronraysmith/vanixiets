@@ -18,8 +18,9 @@ pull request / gitea-mq batch
 ├── nixbot/nix-build      build checks.x86_64-linux             (required)
 ├── nixbot/effects        build each effect's dependencies,     (required)
 │                         including the rehearsal checks
-├── docs-preview          check run from the onEvent effect,     (informational)
-│                         details link is the preview URL
+├── docs-preview          check run from the docs effect's       (informational)
+│                         pull request trigger; details link
+│                         is the Cloudflare Preview URL
 └── PR Check (GitHub Actions)
     ├── check-fast-forward
     └── playwright-drift-check
@@ -27,8 +28,11 @@ pull request / gitea-mq batch
 push to main
 ├── nixbot/nix-eval, nixbot/nix-build
 └── nixbot/effects        run the onPush effects
-    ├── deploy-docs
+    ├── docs
     └── release-packages
+
+pull request closed or merged
+└── docs effect           delete the pull request's Cloudflare Preview
 ```
 
 ## nixbot contexts
@@ -51,11 +55,10 @@ nixbot instead builds each effect's dependencies as a check, and every effect li
 
 | Check | What it runs | Listed by |
 |-------|--------------|-----------|
-| `checks.<system>.deploy-docs-rehearsal` | `deploy-docs production` and `deploy-docs preview` through their flag interface against a stub wrangler, including a superseded production run and the untrusted `--payload` hardening | `deploy-docs`, `docs-preview` |
+| `checks.<system>.deploy-docs-rehearsal` | Every `deploy-docs` mode (`production`, `preview`, `pull-request`, `pull-request-closed`, `versions`, `deployments`) against a stub wrangler that also runs each invocation's identical argv through the real pinned wrangler (`deploy --dry-run`, the other commands against a loopback fake Cloudflare API), including a superseded production run, the untrusted `--payload` hardening, the same-repository-or-writer trust rule, each build status and failure path, the `docs-preview` check-run lifecycle, Preview teardown when deleted, absent, or failing, `--limit` truncation, and missing secrets | `docs` |
 | `checks.<system>.release-rehearsal` | `release-packages --rev` with the production semantic-release plugins against a local git fixture and a stub GitHub API, including the floating major and minor tags, a superseded rev, and a diverged rev | `release-packages` |
-| `checks.<system>.docs-preview-rehearsal` | `docs-preview` against a stub nixbot API, a stub GitHub check-runs API, and a stub `deploy-docs`, including `succeeded` and `skipped_local` docs attributes and each failure path | `docs-preview` |
 
-`checks.<system>.effects-interpreter`, built by `nixbot/nix-build`, checks the script the effects interpreter generates around each program: the main-only guard, secret export, the missing-secret failure, the forge token, and the program's exact argv, including `--rev`.
+`checks.<system>.effects-interpreter`, built by `nixbot/nix-build`, checks the script the effects interpreter generates for each trigger kind (`main`, `pullRequest`, `pullRequestClosed`): the main-only guard, secret export, the missing-secret failure, the per-trigger forge token, and the program's exact argv, including `--rev`.
 
 On a push to `main` the same context reports the effect runs themselves.
 
@@ -64,30 +67,48 @@ On a push to `main` the same context reports the effect runs themselves.
 | Runner | nixbot on magnetite |
 | Triggers | Pull requests and batches (dependency build); pushes to `main` (effect run) |
 | Required | Yes |
-| Local equivalent | `nix build .#checks.x86_64-linux.deploy-docs-rehearsal .#checks.x86_64-linux.release-rehearsal .#checks.x86_64-linux.docs-preview-rehearsal` |
+| Local equivalent | `nix build .#checks.x86_64-linux.deploy-docs-rehearsal .#checks.x86_64-linux.release-rehearsal` |
 
 ## Effects
 
 Effects are data entries of `vanixiets.effects` in `modules/effects/vanixiets/effects.nix`.
-Each entry names a program, its arguments, secrets, rehearsals, and lock; one interpreter, `modules/effects/vanixiets/registry.nix`, generates the nixbot effects from them.
-The generated script for an onPush effect starts with a fail-closed guard that refuses to run unless nixbot's identity token says the event is a push to `refs/heads/main`; any other run is skipped with exit 0 before a secret is read.
-It then exports the declared secrets and execs the program, appending `--rev <commit>` for onPush effects.
+Each entry names a program, its secrets, its rehearsals, and one or more triggers (`main`, `pullRequest`, `pullRequestClosed`), each with its own arguments, lock, and forge-token setting; one interpreter, `modules/effects/vanixiets/registry.nix`, generates a nixbot effect per trigger.
+The generated script for a `main` trigger starts with a fail-closed guard that refuses to run unless nixbot's identity token says the event is a push to `refs/heads/main`; any other run is skipped with exit 0 before a secret is read.
+It then exports the declared secrets and execs the program, appending `--rev <commit>` for `main` triggers.
 
-### deploy-docs
+### docs
 
-Runs `deploy-docs production --rev <commit>`, which deploys the nix-built docs payload to production with `wrangler deploy`.
+Runs the `deploy-docs` program on each of its three triggers: production deploys on `main`, and a Cloudflare Preview per pull request, deleted when the pull request closes.
 
 | Attribute | Value |
 |-----------|-------|
-| Kind | onPush |
-| Triggers | Push to `main` only |
-| Program | `deploy-docs production --rev <commit>` |
+| Program | `deploy-docs` |
 | Rehearsal | `deploy-docs-rehearsal` |
-| Lock | `deploy-docs` |
-| Superseded run | Exits 0 without deploying when `main`'s head is no longer its commit |
-| Local equivalent | `just docs-deploy-production` |
+| Secrets | `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` |
+
+| Trigger | nixbot effect | Program | Lock | Forge token |
+|---------|---------------|---------|------|-------------|
+| `main` | `onPush.default.outputs.effects.docs` | `deploy-docs production --rev <commit>` | `deploy-docs` | No |
+| `pullRequest` | `onEvent.pull_request.docs` | `deploy-docs pull-request` | `docs-preview-{pr}` | Yes |
+| `pullRequestClosed` | `onEvent.pull_request_closed.docs` | `deploy-docs pull-request-closed` | `docs-preview-{pr}` | No |
+
+**`main`:** deploys the nix-built docs payload to production with `wrangler deploy`, and exits 0 without deploying when `main`'s head is no longer its commit.
+Local equivalent: `just docs-deploy-production`.
 
 **Production URL:** `https://infra.cameronraysmith.net`
+
+**`pullRequest`:** evaluated from `main`, it fetches the pull request's already-built docs store path from nixbot's API instead of evaluating pull-request code, accepting the docs attribute when nixbot reports it `succeeded` or `skipped_local`, and deploys it with `wrangler preview --ignore-base-config` as the Cloudflare Preview `pr-<number>` of the `infra-docs` Worker.
+It previews pull requests whose head branch is in this repository and forks whose actor or author has `write` or `admin` permission (a maintainer adding any label); other forks complete `neutral` without deploying.
+It reports as the GitHub check run `docs-preview` on the head commit, which is not required and never blocks a merge: its details link is the Preview URL, a skipped fork completes `neutral` with the reason and remedy in its summary, and a failure carries the error in its summary.
+Local equivalent: `just docs-deploy-preview pr-<number>`.
+
+**Preview URL:** `https://pr-<number>-infra-docs.sciexp.workers.dev`; a local `just docs-deploy-preview` with no argument names the Preview after the current branch.
+
+**`pullRequestClosed`:** when the pull request is closed or merged, runs `wrangler preview delete --name pr-<number> --skip-confirmation` and logs `DEPLOY-DOCS-PREVIEW: deleted (pr-<number>)`; a pull request that never got a Preview logs `DEPLOY-DOCS-PREVIEW: absent (pr-<number>)` and exits 0.
+The shared `docs-preview-{pr}` lock makes teardown wait for an upload still in flight.
+
+Cloudflare Previews are public, with `X-Robots-Tag: noindex` on `workers.dev`; a Worker holds at most 100 (Free) or 500 (paid) Previews of at most 100 deployments each, and Cloudflare deletes the least recently deployed Preview or oldest deployment at the limit.
+A deleted Preview's URL can keep serving for hours after `wrangler preview delete` succeeds ([cloudflare/developer-platform#73](https://github.com/cloudflare/developer-platform/issues/73)).
 
 ### release-packages
 
@@ -102,24 +123,6 @@ Runs `release-packages --rev <commit>`, which runs semantic-release for each pac
 | Lock | `release-packages` |
 | Superseded run | Exits 0 without releasing when `main` has moved past its commit; a commit outside `main`'s history fails |
 | Local equivalent | `just release-package <package> true` (semantic-release `--dry-run`; needs `GITHUB_TOKEN`) |
-
-### docs-preview
-
-`herculesCI.onEvent.pull_request.docs-preview` runs the `docs-preview` program, which uploads a docs preview version for a pull request.
-Its code is evaluated from `main`; it fetches the pull request's already-built docs store path from nixbot's API instead of evaluating pull-request code, accepting the docs attribute when nixbot reports it `succeeded` or `skipped_local`, and runs `deploy-docs preview --rev <head> --alias pr-<number> --payload <store path>`.
-
-| Attribute | Value |
-|-----------|-------|
-| Kind | onEvent (`pull_request`) |
-| Triggers | Pull requests whose author or pusher has write permission |
-| Program | `docs-preview` |
-| Rehearsals | `docs-preview-rehearsal`, `deploy-docs-rehearsal` |
-| Lock | `deploy-docs-preview-{pr}` |
-| Required | No; never blocks a merge |
-| Output | GitHub check run `docs-preview` on the head commit; its details link is the preview URL, and a failure carries the error in its summary |
-| Local equivalent | `just docs-deploy-preview pr-<number>` |
-
-**Preview URL:** `https://b-pr-<number>-infra-docs.sciexp.workers.dev`; a local `just docs-deploy-preview` with no argument aliases the current branch as `b-<branch>`.
 
 ## GitHub Actions workflows
 
@@ -158,7 +161,6 @@ just check
 # Rehearse the effect programs and the interpreter's generated scripts against stubs
 nix build .#checks.x86_64-linux.deploy-docs-rehearsal
 nix build .#checks.x86_64-linux.release-rehearsal
-nix build .#checks.x86_64-linux.docs-preview-rehearsal
 nix build .#checks.x86_64-linux.effects-interpreter
 
 # Test the docs package
@@ -169,8 +171,13 @@ just docs-linkcheck
 # Preview a release (semantic-release --dry-run with the production plugins)
 GITHUB_TOKEN="$(gh auth token)" just release-package docs true
 
-# Upload a docs preview version aliased at b-<branch>
+# Deploy HEAD as the Cloudflare Preview named after the current branch
 just docs-deploy-preview
+
+# Inspect Cloudflare state (newest first, default limit 10)
+just docs-deployments
+just docs-versions
+just docs-tail
 ```
 
 ## Troubleshooting
@@ -178,9 +185,11 @@ just docs-deploy-preview
 **nixbot/nix-build fails:** rebuild the named check locally with `nix build -L .#checks.x86_64-linux.<name>`.
 
 **nixbot/effects fails on a pull request:** one of the effect dependencies failed to build, usually a rehearsal.
-Build `deploy-docs-rehearsal`, `release-rehearsal`, or `docs-preview-rehearsal` with `-L` to see the program output against the stubs.
+Build `deploy-docs-rehearsal` or `release-rehearsal` with `-L` to see the program output against the stubs.
 
-**The docs-preview check run fails:** its summary carries the error, for example a docs attribute that did not build or a failed upload.
+**The docs-preview check run fails:** its summary carries the error, for example a docs attribute that did not build or a failed Preview deploy.
+
+**A closed pull request's Preview still serves:** Cloudflare can keep serving a deleted Preview's URL for hours ([cloudflare/developer-platform#73](https://github.com/cloudflare/developer-platform/issues/73)); the `docs` effect's `pull_request_closed` run log shows whether `deploy-docs` logged `DEPLOY-DOCS-PREVIEW: deleted`.
 
 **An effect on `main` reports superseded:** a newer commit landed on `main` before the run started; the run for that commit does the work.
 
