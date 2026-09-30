@@ -30,26 +30,26 @@ let
   systemToPlatform = {
     "x86_64-linux" = {
       asset = "linux-amd64";
-      hash = "sha256-fFzqCOfBkJ1D2gy8J95td0Q1vI7UQih0t4AUko8QTtQ=";
+      hash = "sha256-vofGNxT/BGrI7WaEZcoMh1+U5v8Kie2D2n6zhzExl68=";
     };
     "aarch64-linux" = {
       asset = "linux-arm64";
-      hash = "sha256-usPoOMCoYfTYDAhla294MPSSvsb3Uoq+/xSAhfjECJ8=";
+      hash = "sha256-E9AB1eONniAHqjwQbfuCMyVX3Wx6rlPB8m5uDxvwYaE=";
     };
     "x86_64-darwin" = {
       asset = "darwin-amd64";
-      hash = "sha256-UFfMM2nLJaqicLxiC9H14EK46//z4QiWXLvtFnHhJDg=";
+      hash = "sha256-pYqVd8ha16qSRIHPKiXTmWGjiDLSlimjR06ItLCYjHo=";
     };
     "aarch64-darwin" = {
       asset = "darwin-arm64";
-      hash = "sha256-FErBbsV8SFV8KFCcp2JYbxLJJOhXVeeq8+XzYvJLJm4=";
+      hash = "sha256-nNBxkvA4xgUBJCZIwlBBvXBzBP946CYlFdr1+4MsR/Q=";
     };
   };
   platform = systemToPlatform.${system} or (throw "hindsight: unsupported platform ${system}");
 in
 stdenv.mkDerivation (finalAttrs: {
   pname = "hindsight";
-  version = "0.9.1";
+  version = "0.10.2";
 
   src = fetchurl {
     url = "https://github.com/vectorize-io/hindsight/releases/download/v${finalAttrs.version}/hindsight-${platform.asset}";
