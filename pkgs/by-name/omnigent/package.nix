@@ -5,7 +5,7 @@
   runCommand,
 }:
 let
-  version = "0.15.0";
+  version = "0.16.0";
   py = python3Packages;
   omnigent-client = py.callPackage ./omnigent-client.nix { inherit version; };
   omnigent-ui-sdk = py.callPackage ./omnigent-ui-sdk.nix {
@@ -29,7 +29,7 @@ let
       python = "py3";
       dist = "py3";
       platform = "any";
-      hash = "sha256-CIHJJR3XU+vsFAoNsA5cKyT37nEcfgG55z5LnUDOHxU=";
+      hash = "sha256-8P1IHvV/Dn4KUzJQ5FDLlUpuNbwBc+imhb7FibWjP/c=";
     };
 
     # openai<2.45 is upstream's transitive cap on openai-agents, not on omnigent's

@@ -1,6 +1,6 @@
 --- a/omnigent/onboarding/harness_readiness.py
 +++ b/omnigent/onboarding/harness_readiness.py
-@@ -181,6 +181,8 @@
+@@ -191,6 +191,8 @@
      :returns: The canonical spelling, e.g. ``"claude-sdk"`` or
          ``"codex-native"``; unknown names are returned unchanged.
      """
@@ -9,16 +9,16 @@
      canonical = canonicalize_harness(harness) or harness
      return _EXECUTOR_TYPE_HARNESS_ALIASES.get(canonical, canonical)
  
-@@ -222,7 +224,7 @@
-         ``False`` or a reason string otherwise.
-     """
-     canonical = _canonical_harness(harness)
+@@ -235,7 +237,7 @@
+     if IS_WINDOWS and canonical in NATIVE_HARNESSES:
+         # Native harnesses require tmux/PTY, which the runner does not support on Windows.
+         return False
 -    if canonical == "acp":
 +    if canonical == "acp" or canonical.startswith("acp:"):
          # The generic ACP harness has no fixed binary — "configured" means at
          # least one agent is registered in the ``acp:`` config block. Each
          # agent's own binary is a soft PATH hint surfaced in setup, not a hard
-@@ -230,7 +232,10 @@
+@@ -243,7 +245,10 @@
          try:
              from omnigent.onboarding.acp_auth import acp_agents
  
@@ -30,7 +30,7 @@
          except Exception:
              return False
      if canonical in _SDK_HARNESSES:
-@@ -580,6 +585,13 @@
+@@ -1059,6 +1064,13 @@
      spellings.add(GOOSE_KEY)  # headless Goose (``goose acp``) gates on the goose binary
      spellings.add(HERMES_KEY)  # Hermes Agent wraps the ``hermes`` CLI
      spellings.add(COPILOT_KEY)
