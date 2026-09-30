@@ -101,13 +101,17 @@
         echo "=== effects.deploy-docs-preview (pull request #$pr at ''${head_rev:0:12}) ==="
 
         # The store path nixbot built for this pull request, by build number
-        # from the event: no evaluation of the pull request's flake.
+        # from the event: no evaluation of the pull request's flake. nixbot
+        # reports an attribute whose output was already in the store as
+        # skipped_local rather than succeeded (build_scheduler.py); both carry
+        # a valid outputs.out. `// empty` keeps a miss from ending the script
+        # under set -e before the error below can say why.
         build_json="$(curl -fsS --retry 3 "$NIXBOT_API_URL/${buildsApi}/$build_number")"
-        payload="$(jq -er --arg attr ${lib.escapeShellArg docsAttr} '
+        payload="$(jq -r --arg attr ${lib.escapeShellArg docsAttr} '
           select(.build.status == "succeeded")
           | .attributes[]
-          | select(.attr == $attr and .status == "succeeded")
-          | .outputs.out' <<<"$build_json")"
+          | select(.attr == $attr and (.status == "succeeded" or .status == "skipped_local"))
+          | .outputs.out // empty' <<<"$build_json")"
         if ! [[ "$payload" =~ ^/nix/store/[0-9a-z]{32}-[^/]+$ ]]; then
           echo "error: build $build_number has no store path for ${docsAttr}: $payload" >&2
           exit 1
