@@ -117,13 +117,15 @@ let
             because atomic fails to load it. Under the npm distribution
             pkgs/by-name/atomic now builds, atomic resolves
             `@earendil-works/pi-coding-agent` through the `_aliases` map and
-            pi-vim 0.14.1 loads with exit status 0. What is dead is the editor:
+            pi-vim 0.14.2 loads under atomic 0.9.24 with exit status 0 and no
+            `extension_error`. What is dead is the editor:
             `ctx.ui.setEditorComponent` is a warn-once stub in every atomic
-            distribution, never remoted to the isolated interactive engine child
-            the way `EngineCustomUiService` remotes `ctx.ui.custom`, so under
-            atomic the extension registers, warns, and leaves the native editor
-            in place with no modal keybindings. Registering it there would spend
-            a startup warning and a 58 KB source tree to change nothing an
+            distribution (0.9.24 dist/modes/rpc/rpc-extension-ui.js), never
+            remoted to the isolated interactive engine child the way
+            `EngineCustomUiService` remotes `ctx.ui.custom`. Under atomic the
+            extension registers, warns, and leaves the native editor in place
+            with no modal keybindings. Registering it there would spend a startup
+            warning and a 58 KB tarball to change nothing an
             operator can observe. Restoring it under atomic is an upstream fix
             (route `setEditorComponent` through the existing remoting machinery)
             or a ground-up atomic-native extension on `ctx.ui.custom`, not a

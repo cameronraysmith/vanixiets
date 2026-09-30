@@ -14,7 +14,7 @@ The legacy `@mariozechner/pi-coding-agent` scope is absent from both maps, so ex
 
 | extension | npm distribution | release split-launcher |
 |---|---|---|
-| pi-vim 0.14.1 (pristine) | loads | fails: `Cannot find module '@earendil-works/pi-coding-agent'` |
+| pi-vim 0.14.2 (pristine) | loads (re-measured on atomic 0.9.24: exit 0, no `extension_error`) | fails: `Cannot find module '@earendil-works/pi-coding-agent'` (measured with 0.14.1 on 0.9.13; not re-measured) |
 | @burneikis/pi-vim | fails: `Cannot find module '@mariozechner/pi-coding-agent'` | same failure |
 | rytswd direnv, permission-gate, questionnaire, slow-mode, stash | load; commands registered | load identically |
 | rytswd statusline | loads | loads |

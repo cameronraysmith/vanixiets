@@ -10,6 +10,19 @@
 #
 # The tarball unpacks to `package/`, hence sourceRoot; its sha256 is
 # cross-checkable against the registry's published dist.integrity.
+#
+# No postPatch. Up to 0.14.1, clipboard-mirror.ts called
+# `import.meta.resolve("@earendil-works/pi-coding-agent")` at module top level.
+# That throws under the Bun-compiled pi from llm-agents, which has no
+# pi-coding-agent on disk, so the extension failed to load without a patch.
+# 0.14.2 moves the call into a lazy try/catch
+# (`tryResolvePiCodingAgentModuleUrl`). Under our pi the resolve still throws,
+# and the argv[1] fallback hits the virtual `/$bunfs/root/pi`, so the function
+# returns undefined and the extension loads pristine with the clipboard mirror
+# off. No patch can enable the mirror there: its helper respawns
+# `process.execPath --input-type=module -e`, and process.execPath is pi itself,
+# not node, which rejects `--input-type`. A bare-specifier patch was measured
+# failing the helper with exit code 1.
 {
   fetchurl,
   lib,
@@ -17,11 +30,11 @@
 }:
 stdenvNoCC.mkDerivation (finalAttrs: {
   pname = "pi-vim";
-  version = "0.14.1";
+  version = "0.14.2";
 
   src = fetchurl {
     url = "https://registry.npmjs.org/pi-vim/-/pi-vim-${finalAttrs.version}.tgz";
-    hash = "sha256-gAsnQvbaNS7ug9tQPFQhwhXtHLrrO2mHBiNQLh9ZGQs=";
+    hash = "sha256-BJkHE2C/SIBYHyINCD971+ew+yDS+X0yU5xjkNks4rg=";
   };
 
   sourceRoot = "package";
@@ -29,23 +42,6 @@ stdenvNoCC.mkDerivation (finalAttrs: {
   dontConfigure = true;
   dontBuild = true;
   strictDeps = true;
-
-  # clipboard-mirror.ts resolves the host agent's module URL at module scope, to
-  # embed it in the source of a clipboard helper child process. `import.meta.resolve`
-  # throws on a specifier pi satisfies through its virtual-module map rather than
-  # through node_modules, and a throw at module scope is a fatal extension-load
-  # error for the whole extension, not just the clipboard mirror. The bare
-  # specifier is what the child would need anyway; it degrades the OS-clipboard
-  # mirror instead of the editor. Re-derive this call site on every version bump:
-  # --replace-fail turns a moved or reworded call into a build failure rather
-  # than a silently unpatched output.
-  postPatch = ''
-    substituteInPlace clipboard-mirror.ts --replace-fail \
-      'import.meta.resolve(
-      "@earendil-works/pi-coding-agent",
-    )' \
-      '"@earendil-works/pi-coding-agent"'
-  '';
 
   installPhase = ''
     runHook preInstall
