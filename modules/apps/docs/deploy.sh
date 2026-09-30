@@ -163,10 +163,14 @@ mkdir "$wrangler_cwd"
 # (playwright) precedent for tools with known bun incompatibilities.
 # Empirical: diagnosed 2026-04-22 via magnetite linux-x64 reproducer;
 # same machine + wrangler runs fine under real node, hangs under bun.
+#
+# --env-file is an array option: before the subcommand it swallows
+# `deploy`/`versions upload` as env files, so the subcommand leads and the
+# global options follow in --opt=value form.
 run_wrangler() {
   (
     cd "$wrangler_cwd"
-    node "$WRANGLER" --config "$wrangler_config" --env-file "$wrangler_env_file" "$@"
+    node "$WRANGLER" "$@" --config="$wrangler_config" --env-file="$wrangler_env_file"
   )
 }
 
@@ -281,8 +285,8 @@ case "$mode" in
     # WRANGLER_OUTPUT_FILE_PATH doesn't produce the expected
     # `type:"version-upload"` event. Retained as defense-in-depth against
     # future wrangler silent-success regressions.
-    printf '>> wrangler upload command (cwd %s): node %s --config %s --env-file %s versions upload --name %s --preview-alias %s --tag %s --message %q\n' \
-      "$wrangler_cwd" "$WRANGLER" "$wrangler_config" "$wrangler_env_file" "$worker_name" "b-${safe_alias}" "$commit_tag" "$version_message" >&2
+    printf '>> wrangler upload command (cwd %s): node %s versions upload --name %s --preview-alias %s --tag %s --message %q --config=%s --env-file=%s\n' \
+      "$wrangler_cwd" "$WRANGLER" "$worker_name" "b-${safe_alias}" "$commit_tag" "$version_message" "$wrangler_config" "$wrangler_env_file" >&2
 
     set +e
     run_wrangler versions upload \

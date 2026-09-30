@@ -12,8 +12,14 @@
 # `nix build <effect>^*` on pull requests and merge-queue batches runs it.
 #
 # The stub records each invocation's argv, working directory, env file,
-# parsed --config and asset marker, emits the NDJSON event and stdout line
-# deploy.sh parses, and, like wrangler, runs the config's build command.
+# parsed --config and asset marker, then holds deploy.sh to wrangler's own
+# grammar: it runs the pinned real wrangler with the identical argv in the
+# same directory, as a --dry-run for `deploy` and `versions upload` (which
+# also runs the config's build command), and fails the call when that run
+# fails. Only then does it emit the NDJSON event and stdout line deploy.sh
+# parses. `deployments list` has no dry run, and --help skips argument
+# validation, so the real wrangler runs it for real against a loopback
+# Cloudflare API serving the canned deployments.
 #
 # Asserted: production deploys the built-in payload's own config as
 # infra-docs from an empty directory, cross-checks the deployments list and
@@ -36,6 +42,7 @@
     let
       deployDocsProgram = config.apps.deploy-docs.program;
       payload = config.packages.vanixiets-docs;
+      realWrangler = "${config.packages.vanixiets-docs-deps}/packages/docs/node_modules/.bin/wrangler";
 
       rev = "0123456789abcdef0123456789abcdef01234567";
       otherRev = "fedcba9876543210fedcba9876543210fedcba98";
@@ -44,23 +51,28 @@
       wranglerStub = pkgs.writeText "wrangler-stub.js" ''
         "use strict";
         const fs = require("fs");
+        const http = require("http");
+        const os = require("os");
         const path = require("path");
-        const { execSync } = require("child_process");
+        const { spawn } = require("child_process");
 
+        const REAL_WRANGLER = "${realWrangler}";
         const VERSION = "${versionId}";
         const args = process.argv.slice(2);
-        const flag = (name) => {
-          const i = args.indexOf(name);
-          return i < 0 ? null : args[i + 1];
+        const option = (name) => {
+          const arg = args.find((a) => a.startsWith(`''${name}=`));
+          return arg === undefined ? null : arg.slice(name.length + 1);
         };
-        const rest = [];
-        for (let i = 0; i < args.length; i++) {
-          if (args[i] === "--config" || args[i] === "--env-file") i++;
-          else rest.push(args[i]);
-        }
+        // Found anywhere in argv, so a misplaced subcommand reaches the real
+        // wrangler, whose grammar decides.
+        const has = (...words) => args.some((_, i) => words.every((w, j) => args[i + j] === w));
+        const command = has("versions", "upload") ? "versions upload"
+          : has("deployments", "list") ? "deployments list"
+          : has("deploy") ? "deploy"
+          : null;
 
-        const configPath = flag("--config");
-        const envFile = flag("--env-file");
+        const configPath = option("--config");
+        const envFile = option("--env-file");
         const config = configPath === null ? null : JSON.parse(fs.readFileSync(configPath, "utf8"));
         const assetsDir = config?.assets?.directory == null
           ? null
@@ -78,24 +90,78 @@
             : null,
         }) + "\n");
 
-        if (config?.build?.command) execSync(config.build.command, { stdio: "inherit" });
+        // A loopback Cloudflare API: the deployments list is the canned
+        // answer, anything else is an error, so a dry run that reaches for
+        // the API fails.
+        const api = http.createServer((req, res) => {
+          res.setHeader("content-type", "application/json");
+          if (req.method === "GET" && req.url.endsWith("/workers/scripts/infra-docs/deployments")) {
+            const percentage = Number(process.env.STUB_PERCENTAGE ?? 100);
+            res.end(JSON.stringify({ success: true, errors: [], messages: [], result: {
+              deployments: [{ id: "rehearsal", versions: [{ version_id: VERSION, percentage }] }],
+            } }));
+          } else {
+            res.statusCode = 500;
+            res.end(JSON.stringify({ success: false, errors: [{ code: 1, message: `rehearsal API: unexpected ''${req.method} ''${req.url}` }], messages: [], result: null }));
+          }
+        });
+
+        // Runs the real wrangler with deploy.sh's argv in deploy.sh's cwd,
+        // resolving to its exit status and output. HOME is private because
+        // the sandbox's is unwritable; the hidden banner skips the npm update
+        // check. A .wrangler state directory it leaves in the cwd is removed
+        // so the next call's record shows only what deploy.sh put there.
+        const real = (extraArgs) => new Promise((resolve) => {
+          const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "wrangler-real-"));
+          const hadState = fs.existsSync(".wrangler");
+          const env = {
+            ...process.env,
+            HOME: path.join(scratch, "home"),
+            WRANGLER_SEND_METRICS: "false",
+            WRANGLER_HIDE_BANNER: "true",
+            WRANGLER_OUTPUT_FILE_PATH: path.join(scratch, "events.ndjson"),
+            CLOUDFLARE_API_BASE_URL: `http://127.0.0.1:''${api.address().port}/client/v4`,
+          };
+          const child = spawn(process.execPath, [REAL_WRANGLER, ...args, ...extraArgs(scratch)], { env });
+          let stdout = "", stderr = "";
+          child.stdout.on("data", (d) => (stdout += d));
+          child.stderr.on("data", (d) => (stderr += d));
+          child.on("close", (status) => {
+            if (!hadState) fs.rmSync(".wrangler", { recursive: true, force: true });
+            fs.rmSync(scratch, { recursive: true, force: true });
+            if (status !== 0) stderr += `wrangler stub: the real wrangler rejected ''${args.join(" ")}\n`;
+            resolve({ status, stdout, stderr });
+          });
+        });
 
         const emit = (event) =>
           fs.appendFileSync(process.env.WRANGLER_OUTPUT_FILE_PATH, JSON.stringify(event) + "\n");
-        const command = rest.slice(0, 2).join(" ");
-        if (rest[0] === "deploy") {
-          emit({ type: "deploy", version_id: VERSION });
-          console.log(`Current Version ID: ''${VERSION}`);
-        } else if (command === "versions upload") {
-          emit({ type: "version-upload", version_id: VERSION });
-          console.log(`Worker Version ID: ''${VERSION}`);
-        } else if (command === "deployments list") {
-          const percentage = Number(process.env.STUB_PERCENTAGE ?? 100);
-          console.log(JSON.stringify([{ versions: [{ version_id: VERSION, percentage }] }]));
-        } else {
-          console.error(`wrangler stub: unexpected command: ''${rest.join(" ")}`);
-          process.exit(1);
-        }
+
+        const dryRun = (scratch) => ["--dry-run", "--outdir", path.join(scratch, "out")];
+        const main = async () => {
+          if (command === "deploy" || command === "versions upload") {
+            const run = await real(dryRun);
+            if (run.status !== 0) return run;
+            if (command === "deploy") {
+              emit({ type: "deploy", version_id: VERSION });
+              console.log(`Current Version ID: ''${VERSION}`);
+            } else {
+              emit({ type: "version-upload", version_id: VERSION });
+              console.log(`Worker Version ID: ''${VERSION}`);
+            }
+            return { status: 0, stdout: "", stderr: "" };
+          }
+          if (command === "deployments list") return real(() => []);
+          return { status: 1, stdout: "", stderr: `wrangler stub: unexpected command: ''${args.join(" ")}\n` };
+        };
+
+        api.listen(0, "127.0.0.1", async () => {
+          const { status, stdout, stderr } = await main();
+          api.close();
+          process.stdout.write(stdout);
+          process.stderr.write(stderr);
+          process.exitCode = status;
+        });
       '';
     in
     {
@@ -108,6 +174,9 @@
               pkgs.jq
               pkgs.nodejs_24
             ];
+            # The loopback Cloudflare API needs local networking in the
+            # darwin sandbox.
+            __darwinAllowLocalNetworking = true;
             meta.description = "behavioural check: deploy-docs against a wrangler stub";
           }
           ''
@@ -192,12 +261,13 @@
               kv_namespaces: [{ binding: "KV", id: "0" }]
             }')"
 
-            # Control: the stub runs a build command handed to it, so the
-            # sentinel's absence below means deploy.sh did not pass it on.
+            # Control: the real wrangler behind the stub runs a build command
+            # handed to it, then rejects the config's missing entry point, so
+            # the sentinel's absence below means deploy.sh did not pass it on.
             name=stub-runs-build-command
             STUB_LOG="$TMPDIR/control.ndjson" WRANGLER_OUTPUT_FILE_PATH="$TMPDIR/control-events.ndjson" \
-              node "$WRANGLER" --config "$TMPDIR/fixtures/build-command/dist/client/wrangler.json" \
-              --env-file /dev/null versions upload > /dev/null
+              node "$WRANGLER" versions upload --config="$TMPDIR/fixtures/build-command/dist/client/wrangler.json" \
+              --env-file=/dev/null > /dev/null 2>&1 || true
             [ -e "$sentinel" ] || fail "stub did not run the build command"
             rm "$sentinel"
 
