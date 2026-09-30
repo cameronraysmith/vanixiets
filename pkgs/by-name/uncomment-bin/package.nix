@@ -15,26 +15,26 @@ let
   systemToPlatform = {
     "x86_64-linux" = {
       name = "x86_64-unknown-linux-gnu";
-      hash = "sha256-/zo/r7sBHRs14AEd6gbpiDwkgGiLatuCZ6GhE54V0oE=";
+      hash = "sha256-VOPIsOprfzF3zV83QS6aYpMnTU8vD/P2t5yeZvcD8EQ=";
     };
     "aarch64-linux" = {
       name = "aarch64-unknown-linux-gnu";
-      hash = "sha256-j1JAdbCjH7+Ml62S3lzc9ozTcGJ+74Gzer72X/zUffs=";
+      hash = "sha256-BQnRYmK8M1fLWEztbqPunR2f15qXqSCY9wiOwzves6M=";
     };
     "x86_64-darwin" = {
       name = "x86_64-apple-darwin";
-      hash = "sha256-WevGkp3cvKeT+XjzvyeewFxFZUZA60eAyUQBRGHFW8k=";
+      hash = "sha256-/eLb5ytyZleagTg8XjGmKMj+DFAqmq+8IyigtTtwivU=";
     };
     "aarch64-darwin" = {
       name = "aarch64-apple-darwin";
-      hash = "sha256-gyTLdYKpzO06R3B1fzBzpKEo4+DpT0UwY+y0l54fyMU=";
+      hash = "sha256-+1mKWw6z3jZpq9LK9bPEdcFZWJTVbppykYydyilX3tg=";
     };
   };
   platform = systemToPlatform.${system} or (throw "uncomment-bin: unsupported platform ${system}");
 in
 stdenv.mkDerivation (finalAttrs: {
   pname = "uncomment-bin";
-  version = "3.6.0";
+  version = "3.10.2";
 
   src = fetchurl {
     url = "https://github.com/Goldziher/uncomment/releases/download/v${finalAttrs.version}/uncomment-${platform.name}.tar.gz";
