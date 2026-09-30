@@ -187,11 +187,18 @@
             ouroboros = {
               command = "uvx";
               args = [
+                "--isolated"
+                "--python"
+                ">=3.12"
                 "--from"
-                "ouroboros-ai[mcp,claude]==${pkgs.ouroboros.version}"
+                "ouroboros-ai[mcp]==${pkgs.ouroboros.version}"
                 "ouroboros"
                 "mcp"
                 "serve"
+                "--runtime"
+                "claude-cli"
+                "--llm-backend"
+                "claude_code"
               ];
             };
           };

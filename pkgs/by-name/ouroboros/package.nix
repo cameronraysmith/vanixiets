@@ -5,7 +5,7 @@
 }:
 
 let
-  version = "0.42.0";
+  version = "0.55.3";
 in
 writeShellApplication {
   name = "ouroboros";
@@ -13,11 +13,13 @@ writeShellApplication {
 
   derivationArgs.version = version;
 
-  # uvx fetches the exact-pinned extras (mcp, claude, tui) into the uv cache on
-  # first run. A hermetic python build is impossible here: upstream pins extras
-  # absent from nixpkgs.
+  # uvx fetches the exact-pinned extras (mcp, tui) into the uv cache on first
+  # run. A hermetic python build is impossible here: upstream pins extras
+  # absent from nixpkgs. Since 0.55 the [claude] extra (Agent SDK, MCP 1.x)
+  # conflicts with [mcp] (MCP 2.x); upstream's recommended profile is
+  # [mcp,tui] with the dependency-free claude-cli runtime.
   text = ''
-    exec uvx --from "ouroboros-ai[mcp,claude,tui]==${version}" ouroboros "$@"
+    exec uvx --isolated --python '>=3.12' --from "ouroboros-ai[mcp,claude-cli,tui]==${version}" ouroboros "$@"
   '';
 
   meta = {
