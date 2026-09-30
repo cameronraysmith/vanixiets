@@ -38,9 +38,15 @@
             externalAddresses = [ "radicle.zt:8776" ];
             seedingPolicy.default = "block";
           };
+          # Public seeds from modules/home/development/radicle.nix, minus
+          # cinnabar itself. iris and rosa use heartwood's bootstrap hostnames
+          # (radicle.network; the radicle.xyz names still resolve to the same
+          # nodes), and seed.radicle.dev is the address the seed.radicle.xyz
+          # node advertises for itself.
           preferredSeeds = [
-            "z6MkrLMMsiPWUcNPHcRajuMi9mDfYckSoJyPwwnknocNYPm7@seed.radicle.xyz:8776"
-            "z6Mkmqogy2qEM2ummccUthFEaaHvyYmYBYh3dbe9W4ebScxo@iris.radicle.xyz:8776"
+            "z6MksmpU5b1dS7oaqF2bHXhQi1DWy2hB7Mh9CuN7y1DN6QSz@seed.radicle.dev:8776"
+            "z6MkrLMMsiPWUcNPHcRajuMi9mDfYckSoJyPwwnknocNYPm7@iris.radicle.network:8776"
+            "z6Mkmqogy2qEM2ummccUthFEaaHvyYmYBYh3dbe9W4ebScxo@rosa.radicle.network:8776"
           ];
           web.pinned.repositories = [ ];
         };

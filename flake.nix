@@ -27,14 +27,18 @@
     home-manager.inputs.nixpkgs.follows = "nixpkgs";
 
     # Typed configuration only; pyrite runs and validates with nixpkgs' niri.
-    niri-flake.url = "github:epireyn/niri-flake";
+    # Pinned by revision so a schema/renderer change arrives as a reviewed
+    # declaration bump (renovate digest PR) that pyrite-desktop.nix checks.
+    niri-flake.url = "github:epireyn/niri-flake/b745078f945e13ba7aca0a5c77968e07289fa03c";
     niri-flake.inputs.nixpkgs.follows = "nixpkgs";
     niri-flake.inputs.nixpkgs-stable.follows = "nixpkgs";
 
-    dms-src = {
-      url = "github:AvengeMedia/DankMaterialShell/a4e500bc0083ed234a8db8c6f33a2c7987af3352";
-      flake = false;
-    };
+    # Pinned to the release tag equal to nixpkgs' dms-shell version, so the
+    # imported home-manager module is the release the running shell was built
+    # from; renovate's github-tags manager bumps the tag and pyrite-desktop.nix
+    # holds it to the packaged version.
+    dms-src.url = "github:AvengeMedia/DankMaterialShell/v1.6.2";
+    dms-src.flake = false;
 
     zen-browser.url = "github:youwen5/zen-browser-flake/6979f283e596eead5459a6f181dbb735a10c8588";
     zen-browser.inputs.nixpkgs.follows = "nixpkgs";

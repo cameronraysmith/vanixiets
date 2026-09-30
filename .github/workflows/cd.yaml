@@ -6,11 +6,6 @@ on:
         description: specific job to run (leave empty to run all)
         required: false
         type: string
-      debug_enabled:
-        description: "Run the workflow with tmate.io debugging enabled"
-        required: false
-        type: boolean
-        default: false
       force_run:
         description: "Force execution even if already successful for this commit"
         required: false
@@ -35,14 +30,9 @@ jobs:
       !cancelled() &&
       (inputs.job == '' || inputs.job == 'set-variables')
     outputs:
-      debug: ${{ steps.set-variables.outputs.debug }}
       force-ci: ${{ steps.compute-force-ci.outputs.force-ci }}
 
     steps:
-      - name: Set action variables
-        id: set-variables
-        run: echo "debug=${{ inputs.debug_enabled }}" >> "$GITHUB_OUTPUT"
-
       - name: Compute force-ci flag
         id: compute-force-ci
         run: echo "force-ci=${{ inputs.force_run }}" >> "$GITHUB_OUTPUT"
@@ -139,7 +129,5 @@ jobs:
       !cancelled() &&
       (inputs.job == '' || inputs.job == 'test-cluster')
     uses: ./.github/workflows/test-cluster.yaml
-    with:
-      debug_enabled: ${{ needs.set-variables.outputs.debug }}
     secrets: inherit
 

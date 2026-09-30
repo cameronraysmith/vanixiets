@@ -2,11 +2,6 @@ name: Test Cluster
 on:
   workflow_dispatch:
     inputs:
-      debug_enabled:
-        description: "Run the workflow with tmate.io debugging enabled"
-        required: false
-        type: boolean
-        default: false
       force_run:
         description: "Force execution even if already successful"
         required: false
@@ -14,11 +9,6 @@ on:
         default: false
   workflow_call:
     inputs:
-      debug_enabled:
-        description: "Enable tmate debugging"
-        required: false
-        type: string
-        default: "false"
       force_run:
         description: "Force execution even if already successful"
         required: false

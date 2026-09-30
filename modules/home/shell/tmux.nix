@@ -314,10 +314,6 @@
           '';
         };
 
-        programs.tmate = {
-          enable = true;
-        };
-
         # Fix tmux-which-key XDG file permissions
         # The plugin copies files from Nix store (read-only) to XDG dirs, breaking auto-rebuild
         home.activation.fixTmuxWhichKeyPermissions = {

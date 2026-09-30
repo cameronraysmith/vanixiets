@@ -18,11 +18,6 @@ on:
         required: false
         type: boolean
         default: false
-      debug_enabled:
-        description: "Enable tmate debug session"
-        required: false
-        type: boolean
-        default: false
   workflow_call:
     inputs:
       version:
@@ -106,10 +101,6 @@ jobs:
           enable-cachix: true
           cachix-name: ${{ env.CACHIX_BINARY_CACHE }}
           cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
-
-      - name: Setup tmate debug session
-        if: inputs.debug_enabled
-        uses: mxschmitt/action-tmate@35b54afac29c97fb54faba5b513f8fbd1882f113 # v3
 
       - name: Build ${{ matrix.container }} for ${{ matrix.target }}
         run: |
