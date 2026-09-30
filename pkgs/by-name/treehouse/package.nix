@@ -9,13 +9,13 @@
 
 buildGoModule (finalAttrs: {
   pname = "treehouse";
-  version = "2.1.1";
+  version = "3.1.0";
 
   src = fetchFromGitHub {
     owner = "kunchenguid";
     repo = "treehouse";
     tag = "v${finalAttrs.version}";
-    hash = "sha256-nybPc6SXPxw5MZIFrjrmJDno9aMH2R4uZz0U8rayAOo=";
+    hash = "sha256-HtAoUrP/2toG+8LB5H79fuvBhn3lAJGOtaNKxq41DxI=";
   };
 
   vendorHash = "sha256-z8IndcHcZ6nLqhLtAYul3ppddpOA4AHGQWIlfYY/pfI=";
