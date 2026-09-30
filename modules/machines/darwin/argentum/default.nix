@@ -26,8 +26,8 @@ in
 
       # dnscrypt-proxy and zt-services-trust are imported on every darwin host
       # so that enabling them is the per-host decision rather than importing
-      # them being it. Both are inert until enabled, and argentum does not
-      # enable either.
+      # them being it. Both are inert until enabled; argentum enables
+      # dnscrypt-proxy and not zt-services-trust.
       imports = [
         inputs.home-manager.darwinModules.home-manager
         inputs.srvos.darwinModules.server
@@ -93,6 +93,15 @@ in
       # Operator claim (modules/darwin/sshd-declaration.nix): argentum accepts
       # inbound SSH so it can be deployed to from stibnite over zerotier.
       declaredSshd.serving = true;
+
+      # Encrypted DNS via DoH (DNS-over-HTTPS) on every network adapter
+      services.localDnscryptProxy = {
+        enable = true;
+        providers = [
+          "quad9"
+        ];
+        userHome = "/private/var/lib/dnscrypt-proxy";
+      };
 
       # UIDs based on standard macOS assignment
       users.users.christophersmith = {
