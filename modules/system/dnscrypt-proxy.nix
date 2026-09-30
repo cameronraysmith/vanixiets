@@ -14,20 +14,37 @@
 # module adds only how the operating system is pointed at the local listener.
 #
 # Rollback instructions (no internet required):
-#   sudo /nix/var/nix/profiles/system-N-link/activate  # where N is previous gen
-#   OR: sudo darwin-rebuild --rollback
+#   darwin: sudo /nix/var/nix/profiles/system-N-link/activate  # where N is previous gen
+#           OR: sudo darwin-rebuild --rollback
+#   NixOS:  boot the previous generation, or sudo nixos-rebuild switch --rollback
 #
 # macOS pins every hardware network service to the local listener, including
 # services created later by newly attached adapters (see dnscrypt-pin-dns.sh),
 # so switching between Wi-Fi and wired adapters keeps DNS encrypted.
 #
+# NixOS sends every name to the local listener through systemd-resolved's
+# global server (Domains=~.) and stops both NetworkManager and
+# systemd-networkd handing resolved the DNS servers and search domains that
+# each network's DHCP or router advertisements offer, so no interface,
+# whenever attached, has a DNS server of its own to leak to. Plaintext
+# fallback servers are removed.
+#
 # Captive portals (public WiFi login pages):
-#   Portal auth needs the network's own DNS. Stop the pinning daemon so it does
-#   not re-pin, then hand the portal's service back to DHCP-supplied DNS:
+#   Portal auth needs the network's own DNS.
+#   darwin: stop the pinning daemon so it does not re-pin, then hand the
+#   portal's service back to DHCP-supplied DNS:
 #     sudo launchctl bootout system/org.nixos.dnscrypt-pin-dns
 #     sudo networksetup -setdnsservers Wi-Fi empty
 #   Complete portal login, then restart the daemon, which re-pins every service:
 #     sudo launchctl bootstrap system /Library/LaunchDaemons/org.nixos.dnscrypt-pin-dns.plist
+#   NixOS: give the portal's link the DNS server its DHCP lease offered, make
+#   it a default route, and route every name to it alongside the global ~.
+#   (a link DNS server alone is never consulted):
+#     sudo resolvectl dns wlp2s0 "$(nmcli -g IP4.DNS device show wlp2s0 | cut -d'|' -f1)"
+#     sudo resolvectl default-route wlp2s0 true
+#     sudo resolvectl domain wlp2s0 '~.'
+#   Complete portal login, then drop all three again:
+#     sudo resolvectl revert wlp2s0
 { lib, ... }:
 let
   # DoH stamps with embedded IP addresses (no DNS lookup required).
@@ -307,6 +324,83 @@ in
             ${lib.getExe pinDns} --check || true
           fi
         '';
+      };
+    };
+
+  flake.modules.nixos.dnscrypt-proxy =
+    { config, ... }:
+    let
+      cfg = config.services.localDnscryptProxy;
+    in
+    {
+      options.services.localDnscryptProxy = sharedOptions;
+
+      # Every systemd-networkd network, including the catch-all DHCP networks
+      # that match adapters attached later, stops taking DNS servers and
+      # search domains from DHCP and router advertisements. A network that
+      # sets them explicitly (a static DNS= or Domains=, such as the
+      # ZeroTier split DNS) is unaffected, and a network can still opt back
+      # in by setting these at normal priority.
+      options.systemd.network.networks = lib.mkOption {
+        type = lib.types.attrsOf (
+          lib.types.submodule {
+            config = lib.mkIf cfg.enable {
+              dhcpV4Config = {
+                UseDNS = lib.mkDefault false;
+                UseDomains = lib.mkDefault false;
+              };
+              dhcpV6Config = {
+                UseDNS = lib.mkDefault false;
+                UseDomains = lib.mkDefault false;
+              };
+              ipv6AcceptRAConfig = {
+                UseDNS = lib.mkDefault false;
+                UseDomains = lib.mkDefault false;
+              };
+            };
+          }
+        );
+      };
+
+      config = lib.mkIf cfg.enable {
+        services.dnscrypt-proxy = {
+          enable = true;
+          # The upstream example config adds [sources] that download resolver
+          # lists by hostname. With bootstrap_resolvers and the system resolver
+          # disabled, and this listener being the system resolver, those names
+          # cannot resolve and dnscrypt-proxy exits before serving; the
+          # embedded-IP static stamps are the only servers wanted.
+          upstreamDefaults = false;
+          settings = mkSettings cfg.providers;
+        };
+
+        # The listener is resolved's only upstream (DNS= comes from
+        # networking.nameservers). resolved's own stub stays on 127.0.0.53, so
+        # the two do not contend for port 53.
+        networking.nameservers = [
+          "127.0.0.1"
+          "::1"
+        ];
+        services.resolved.settings.Resolve = {
+          # Route every name to the global server rather than to whichever
+          # link resolved considers the default route
+          Domains = [ "~." ];
+          # An empty list renders FallbackDNS= and disables the plaintext
+          # 1.1.1.1 / 8.8.8.8 fallback
+          FallbackDNS = [ ];
+          # The listener already encrypts, and the providers validate DNSSEC
+          DNSOverTLS = false;
+          DNSSEC = false;
+        };
+
+        # Without this NetworkManager gives resolved each connection's DHCP
+        # DNS server and search domain as link settings, and names under that
+        # search domain would still be sent to the link server in plaintext.
+        # Forced because nixpkgs' resolved module sets "systemd-resolved" at
+        # normal priority.
+        networking.networkmanager.dns = lib.mkIf config.networking.networkmanager.enable (
+          lib.mkForce "none"
+        );
       };
     };
 }
