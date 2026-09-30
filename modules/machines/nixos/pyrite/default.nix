@@ -53,6 +53,7 @@ in
         hm-sops-bridge
         kvm-declaration
         ssh-known-hosts
+        zt-dns
       ]);
 
       # A disabledModules path that matches nothing is silently ignored, so a
