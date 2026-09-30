@@ -48,6 +48,7 @@
             runtimeEnv = {
               DOCS_NODE_MODULES = "${config.packages.vanixiets-docs-deps}/packages/docs/node_modules";
               DEPLOY_DOCS_CHECK_RUN = config.apps.github-check-run.program;
+              DEPLOY_DOCS_PULL_REQUEST = config.apps.github-pull-request.program;
             };
             text = ''
               builtin_payload=${lib.escapeShellArg config.packages.vanixiets-docs}

@@ -6,9 +6,10 @@
 # `nix build <effect>^*` on pull requests and merge-queue batches runs it.
 #
 # One python server stands in for the network: nixbot's build API from
-# fixture files, GitHub's check-runs API, and a Cloudflare API implementing
-# the endpoints wrangler@4.145.0 calls for `preview` (@cloudflare/
-# deploy-helpers src/preview/api.ts and src/deploy/helpers/assets.ts),
+# fixture files, GitHub's check-runs and pulls APIs, and a Cloudflare API
+# implementing the endpoints wrangler@4.145.0 calls for `preview`
+# (@cloudflare/deploy-helpers src/preview/api.ts and
+# src/deploy/helpers/assets.ts),
 # `preview delete`, `versions list` and `deployments list`
 # (src/deploy/helpers/versions-api.ts). An absent Preview answers 404 with
 # API error 10025, the code wrangler itself reads as "Preview not found"
@@ -39,10 +40,13 @@
 # record, sanitizes its name, refuses a payload holding a symlink and never
 # runs a payload's build command. The pull-request rows cover the trust
 # matrix, nixbot build and attribute statuses, malformed events, Cloudflare
-# failures and the docs-preview check-run lifecycle. pull-request-closed
-# deletes the Preview, reports an absent one as success and fails on any
-# other API error. The listings print the newest rows first, truncated to
-# --limit. A missing Cloudflare secret fails every mode before any request.
+# failures, the docs-preview check-run lifecycle and the pull request's
+# currency: one no longer open at the event's head is skipped before any
+# nixbot or Cloudflare request, and one that closed during the upload has
+# its Preview deleted again. pull-request-closed deletes the Preview, reports
+# an absent one as success and fails on any other API error. The listings
+# print the newest rows first, truncated to --limit. A missing Cloudflare
+# secret fails every mode before any request.
 { ... }:
 {
   perSystem =
@@ -91,6 +95,7 @@
         previews = state / "previews"
         builds = "/api/repos/github/cameronraysmith/vanixiets/builds/"
         check_runs = "/repos/cameronraysmith/vanixiets/check-runs"
+        pull = "/repos/cameronraysmith/vanixiets/pulls/${pr}"
         account = "/client/v4/accounts/rehearsal-dummy-account"
         worker = "/workers/workers/infra-docs"
         script = "/workers/scripts/infra-docs"
@@ -191,6 +196,20 @@
                     if (state / "patch-down").exists():
                         return self.reply(403, {"message": "Resource not accessible"})
                     return self.reply(200, {"id": ${checkRunId}})
+                elif self.command == "GET" and self.path == pull:
+                    # The file `pull` names the state this GET reports;
+                    # `pull-next`, when present, replaces it afterwards.
+                    current = (state / "pull").read_text().strip()
+                    if (state / "pull-next").exists():
+                        (state / "pull-next").rename(state / "pull")
+                    if current == "down":
+                        return self.reply(403, {"message": "Resource not accessible"})
+                    return self.reply(200, {
+                        "number": ${pr},
+                        "state": "closed" if current == "closed" else "open",
+                        "merged": current == "closed",
+                        "head": {"sha": "${otherRev}" if current == "superseded" else "${rev}"},
+                    })
                 self.reply(404, {"message": "Not Found"})
 
             def cloudflare(self, path, raw):
@@ -393,6 +412,7 @@
 
             export STUB_STATE=$TMPDIR/stub
             mkdir -p "$STUB_STATE/builds" "$STUB_STATE/previews"
+            echo current > "$STUB_STATE/pull"
             echo 100 > "$STUB_STATE/percentage"
             python3 ${server} &
             server_pid=$!
@@ -736,14 +756,39 @@
                   and .body == {name: "docs-preview", head_sha: $head, status: "in_progress"}' \
                 --arg head ${rev}
             }
+            check_run_post="POST /repos/cameronraysmith/vanixiets/check-runs"
+            check_run_patch="PATCH /repos/cameronraysmith/vanixiets/check-runs/${checkRunId}"
+            pull_get="GET /repos/cameronraysmith/vanixiets/pulls/${pr}"
+            build_get() {
+              printf 'GET /api/repos/github/cameronraysmith/vanixiets/builds/%s' "$1"
+            }
+            # requests <line...>: the JSON array of these request lines.
+            requests() {
+              jq -nc '$ARGS.positional' --args "$@"
+            }
+            expect_pull_read() {
+              expect "the pull request is read with the forge token" "$STUB_STATE/requests.jsonl" \
+                'map(select("\(.method) \(.path)" == $pull)) | length > 0 and all(.auth == "Bearer rehearsal-forge-token")' \
+                --arg pull "$pull_get"
+            }
+            # expect_lifecycle <build number>: the pull request read, the
+            # build looked up and the check run completed, with no upload.
             expect_lifecycle() {
-              expect_requests "[\"POST /repos/cameronraysmith/vanixiets/check-runs\", \"GET /api/repos/github/cameronraysmith/vanixiets/builds/$1\", \"PATCH /repos/cameronraysmith/vanixiets/check-runs/${checkRunId}\"]"
+              expect_requests "$(requests "$check_run_post" "$pull_get" "$(build_get "$1")" "$check_run_patch")"
               expect_created
+              expect_pull_read
+            }
+            # expect_uploaded_lifecycle <build number>: as expect_lifecycle,
+            # with the pull request read again after the upload.
+            expect_uploaded_lifecycle() {
+              expect_requests "$(requests "$check_run_post" "$pull_get" "$(build_get "$1")" "$pull_get" "$check_run_patch")"
+              expect_created
+              expect_pull_read
             }
             expect_success() {
-              expect_lifecycle "$1"
+              expect_uploaded_lifecycle "$1"
               expect "check run completed success with the preview URL" "$STUB_STATE/requests.jsonl" \
-                '.[2] | .auth == "Bearer rehearsal-forge-token" and .body == {
+                'last | .auth == "Bearer rehearsal-forge-token" and .body == {
                   status: "completed",
                   conclusion: "success",
                   details_url: "${previewUrl}",
@@ -753,21 +798,20 @@
                   }
                 }'
             }
+            # expect_completed <conclusion> <title> <summary>: the check run's
+            # completion.
+            expect_completed() {
+              expect "check run completed $1 with title $2 and summary $3" "$STUB_STATE/requests.jsonl" \
+                'last.body == {status: "completed", conclusion: $conclusion, output: {title: $title, summary: $summary}}' \
+                --arg conclusion "$1" --arg title "$2" --arg summary "$3"
+            }
             # expect_pr_failure <build number> <error>: exit 1, the error
             # printed, and the check run completed as a failure carrying it.
             expect_pr_failure() {
               expect_status 1
               expect_line "error: $2"
               expect_lifecycle "$1"
-              expect "check run completed failure with the error" "$STUB_STATE/requests.jsonl" \
-                '.[2].body == {
-                  status: "completed",
-                  conclusion: "failure",
-                  output: {
-                    title: "Docs preview failed",
-                    summary: ("Docs preview of ${rev12} failed: " + $error)
-                  }
-                }' --arg error "$2"
+              expect_completed failure "Docs preview failed" "Docs preview of ${rev12} failed: $2"
             }
 
             export NIXBOT_EVENT_KIND=pull_request
@@ -803,9 +847,10 @@
             # created and completed without a build lookup or a deploy.
             completed_before_build() {
               expect_not_deployed
-              expect_requests '["POST /repos/cameronraysmith/vanixiets/check-runs", "PATCH /repos/cameronraysmith/vanixiets/check-runs/${checkRunId}"]'
+              expect_requests "$(requests "$check_run_post" "$pull_get" "$check_run_patch")"
               expect_created
-              expect "check run completed with $1" "$STUB_STATE/requests.jsonl" ".[1].body == $1"
+              expect_pull_read
+              expect "check run completed with $1" "$STUB_STATE/requests.jsonl" "last.body == $1"
             }
 
             event 11 \
@@ -904,9 +949,106 @@
             expect_status 1
             expect_lifecycle 11
             expect "check run completed failure naming the missing URL" "$STUB_STATE/requests.jsonl" \
-              '.[2].body | .conclusion == "failure"
+              'last.body | .conclusion == "failure"
                 and (.output.summary | startswith("Docs preview of ${rev12} failed: wrangler preview reported no Preview URL in "))'
             expect_preview_argv pr-${pr} "$pr_message"
+
+            # pull_is <state> [<state from the second read on>]: what the
+            # pulls API reports, current, closed, superseded or down.
+            pull_is() {
+              echo "$1" > "$STUB_STATE/pull"
+              rm -f "$STUB_STATE/pull-next"
+              [ $# -lt 2 ] || echo "$2" > "$STUB_STATE/pull-next"
+            }
+            # skipped_as <name> <state>: a pull request no longer open at the
+            # event's head gets neither a nixbot lookup nor a Preview.
+            skipped_as() {
+              pull_is "$2"
+              run "$1" pull-request
+              pull_is current
+              expect_status 0
+              expect_line "DEPLOY-DOCS-PREVIEW: skipped ($2)"
+              expect_no_line '^skipped: '
+              completed_before_build "{
+                status: \"completed\",
+                conclusion: \"neutral\",
+                output: {title: \"Docs preview skipped\", summary: \"pull request #${pr} is $2; no preview\"}
+              }"
+            }
+            skipped_as closed-before-upload closed
+            skipped_as superseded-before-upload superseded
+            # The state is read before the trust rule, whose skip invites a
+            # maintainer to label a pull request that is already closed.
+            event 11 \
+              '{"isFork": true, "author": {"name": "github:mallory", "permission": "read"}}' \
+              '{"name": "github:mallory", "permission": "read"}'
+            skipped_as closed-untrusted-fork closed
+            event 11
+
+            pull_is down
+            run pull-state-failure pull-request
+            pull_is current
+            expect_status 1
+            expect_line "error: cannot read the state of pull request #${pr}"
+            expect_not_deployed
+            expect_requests "$(requests "$check_run_post" "$pull_get" "$check_run_patch")"
+            expect_completed failure "Docs preview failed" "Docs preview of ${rev12} failed: cannot read the state of pull request #${pr}"
+
+            # expect_withdrawn_calls: wrangler deployed Preview pr-<N>, then
+            # deleted it against the minimal config.
+            expect_withdrawn_calls() {
+              expect_calls 2
+              expect_wrangler "wrangler deploys Preview pr-${pr}, then deletes it without a prompt" \
+                '(.[0].args | .[:3] == ["preview", "--name", "pr-${pr}"])
+                  and (.[1].args | .[:7] == ["preview", "delete", "--name", "pr-${pr}", "--skip-confirmation", "--worker-name", "infra-docs"])
+                  and .[1].config == {name: "infra-docs", previews: {}}'
+              expect_preview_deployed pr-${pr} "$pr_message" '"pull-request"'
+              expect_cloudflare "Preview pr-${pr} is deleted after its deployment" \
+                'map("\(.method) \(.path)") | last == "DELETE /workers/workers/infra-docs/previews/pr-${pr}"'
+            }
+
+            pull_is current closed
+            run closed-during-upload pull-request
+            pull_is current
+            expect_status 0
+            expect_line "DEPLOY-DOCS-PREVIEW-URL: ${previewUrl}"
+            expect_line "DEPLOY-DOCS-PREVIEW: withdrawn (closed during upload)"
+            expect_withdrawn_calls
+            [ ! -e "$STUB_STATE/previews/pr-${pr}" ] || fail "the Preview still exists"
+            expect_uploaded_lifecycle 11
+            expect_completed neutral "Docs preview withdrawn" "pull request #${pr} closed during the upload; Preview pr-${pr} deleted"
+
+            pull_is current closed
+            touch "$STUB_STATE/cf-delete-down"
+            run closed-during-upload-delete-failure pull-request
+            rm "$STUB_STATE/cf-delete-down"
+            pull_is current
+            expect_status 1
+            expect_line "error: wrangler preview delete failed for pr-${pr}"
+            expect_no_line '^DEPLOY-DOCS-PREVIEW: '
+            expect_withdrawn_calls
+            expect_uploaded_lifecycle 11
+            expect_completed failure "Docs preview failed" "Docs preview of ${rev12} failed: wrangler preview delete failed for pr-${pr}"
+
+            # The newer head's run replaces this Preview under the same name.
+            pull_is current superseded
+            run superseded-during-upload pull-request
+            pull_is current
+            expect_status 0
+            expect_line "DEPLOY-DOCS-PREVIEW-URL: ${previewUrl}"
+            expect_no_line '^DEPLOY-DOCS-PREVIEW: '
+            expect_deployed
+            expect_success 11
+            [ -e "$STUB_STATE/previews/pr-${pr}" ] || fail "the Preview was deleted"
+
+            pull_is current down
+            run pull-state-failure-after-upload pull-request
+            pull_is current
+            expect_status 1
+            expect_line "error: cannot read the state of pull request #${pr}"
+            expect_deployed
+            expect_uploaded_lifecycle 11
+            expect_completed failure "Docs preview failed" "Docs preview of ${rev12} failed: cannot read the state of pull request #${pr}"
 
             # malformed <name> <error>: refused before any request or deploy.
             malformed() {
@@ -927,14 +1069,14 @@
             run check-run-create-refused pull-request
             expect_status 0
             expect_deployed
-            expect_requests '["POST /repos/cameronraysmith/vanixiets/check-runs", "GET /api/repos/github/cameronraysmith/vanixiets/builds/11"]'
+            expect_requests "$(requests "$check_run_post" "$pull_get" "$(build_get 11)" "$pull_get")"
             rm "$STUB_STATE/post-down"
 
             touch "$STUB_STATE/patch-down"
             run check-run-complete-refused pull-request
             expect_status 0
             expect_deployed
-            expect_lifecycle 11
+            expect_uploaded_lifecycle 11
             touch "$STUB_STATE/cf-deploy-down"
             run check-run-complete-refused-after-failure pull-request
             rm "$STUB_STATE/cf-deploy-down"

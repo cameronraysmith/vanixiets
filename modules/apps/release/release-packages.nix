@@ -5,9 +5,9 @@
 #   nix run .#release-packages -- plan
 #
 # The program the release-packages effect executes; release-rehearsal runs it
-# against a local GitHub stand-in. list-packages-json, release and
-# github-check-run are passed as store paths because the effect sandbox binds
-# no working tree for `.#`.
+# against a local GitHub stand-in. list-packages-json, release,
+# github-check-run and github-pull-request are passed as store paths because
+# the effect sandbox binds no working tree for `.#`.
 { ... }:
 {
   perSystem =
@@ -34,6 +34,7 @@
               RELEASE_PACKAGES_LIST = config.apps.list-packages-json.program;
               RELEASE_PACKAGES_RELEASE = config.apps.release.program;
               RELEASE_PACKAGES_CHECK_RUN = config.apps.github-check-run.program;
+              RELEASE_PACKAGES_PULL_REQUEST = config.apps.github-pull-request.program;
             };
             text = builtins.readFile ./release-packages.sh;
           }
