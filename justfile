@@ -972,40 +972,46 @@ docs-test-e2e-report:
 docs-test-coverage:
   cd packages/docs && bun run test:coverage
 
-# Deploy documentation to Cloudflare Workers (preview) as alias b-<branch>.
+# Docs recipes run the deploy-docs program instead of calling wrangler
+# directly, so local runs share its single wrangler invocation path, whose
+# argv deploy-docs-rehearsal checks against the real pinned wrangler.
 # Wraps with `sops exec-env secrets/shared.yaml '<cmd>'` so
 # CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID are exported for
 # deploy-docs, which reads its secrets from the environment only.
 # `sops exec-env` requires exactly two positional args (file + single
 # shell-command string), so the nix-run invocation is one arg, with the
 # commit resolved beforehand by the recipe's shell.
+
+# Deploy documentation as the Cloudflare Preview <name> (default: the branch)
 [group('docs')]
-docs-deploy-preview branch=`git branch --show-current`:
+docs-deploy-preview name=`git branch --show-current`:
   rev="$(git rev-parse HEAD)" && sops exec-env secrets/shared.yaml \
-    "nix run --accept-flake-config .#deploy-docs -- preview --rev $rev --alias '{{branch}}' --deployed-by $(whoami)"
+    "nix run --accept-flake-config .#deploy-docs -- preview --rev $rev --name '{{name}}' --deployed-by $(whoami)"
 
 # Deploy documentation to Cloudflare Workers (production); exits 0 without
 # deploying unless HEAD is main's head on GitHub.
-# See docs-deploy-preview header for the sops wrap rationale.
 [group('docs')]
 docs-deploy-production:
   rev="$(git rev-parse HEAD)" && sops exec-env secrets/shared.yaml \
     "nix run --accept-flake-config .#deploy-docs -- production --rev $rev --deployed-by $(whoami)"
 
-# List recent Cloudflare deployments
+# List the most recent Cloudflare deployments of infra-docs
 [group('docs')]
-docs-deployments:
-  cd packages/docs && sops exec-env ../../secrets/shared.yaml "bunx wrangler deployments list"
+docs-deployments limit="10":
+  sops exec-env secrets/shared.yaml \
+    "nix run --accept-flake-config .#deploy-docs -- deployments --limit {{limit}}"
 
-# Tail live logs from Cloudflare Workers
+# Tail live logs from the infra-docs Worker
 [group('docs')]
 docs-tail:
-  cd packages/docs && sops exec-env ../../secrets/shared.yaml "bunx wrangler tail"
+  sops exec-env secrets/shared.yaml \
+    "nix run --accept-flake-config .#deploy-docs -- tail"
 
-# List recent Cloudflare versions
+# List the most recent Cloudflare versions of infra-docs
 [group('docs')]
 docs-versions limit="10":
-  cd packages/docs && sops exec-env ../../secrets/shared.yaml "bunx wrangler versions list --limit {{limit}}"
+  sops exec-env secrets/shared.yaml \
+    "nix run --accept-flake-config .#deploy-docs -- versions --limit {{limit}}"
 
 ## containers
 # Unified container builds using pkgsCross

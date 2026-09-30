@@ -2,13 +2,15 @@
 #
 # That script is the only code an effect runs before its program, and it
 # decides whether the program runs, with which secrets and which arguments.
-# Each row renders a synthetic entry through flake.lib.vanixietsEffectScript,
-# the function modules/effects/vanixiets/registry.nix uses, runs it the way
-# mkEffect's effectPhase does (eval of the script text), and asserts the exit
-# status, the output, and exactly the argv and environment the program saw.
+# Each row renders a synthetic entry for one trigger kind (main, pullRequest,
+# pullRequestClosed) through flake.lib.vanixietsEffectScript, the function
+# modules/effects/vanixiets/registry.nix uses, runs it the way mkEffect's
+# effectPhase does (eval of the script text), and asserts the exit status, the
+# output, and exactly the argv and environment the program saw. Only main runs
+# the guard and receives `--rev`; the forge token is exported per trigger.
 #
 # The program is a stub that records its argv and the secret variables, and
-# curl is stubbed for the nixbot id-token endpoint the push-main guard calls,
+# curl is stubbed for the nixbot id-token endpoint the main guard calls,
 # as in checks.effect-run-context. Secret values are dummies.
 { self, lib, ... }:
 {
@@ -44,7 +46,9 @@
       row =
         {
           name,
-          entry,
+          kind,
+          secrets ? [ ],
+          trigger ? { },
           claims ? null,
           secretsJson,
           status,
@@ -54,15 +58,15 @@
         }:
         let
           script = pkgs.writeText "effect-script.sh" (
-            self.lib.vanixietsEffectScript { inherit rev; } (
-              {
-                program = stubProgram;
+            self.lib.vanixietsEffectScript { inherit rev; } kind {
+              program = stubProgram;
+              inherit secrets;
+              triggers.${kind} = {
                 args = [ ];
-                secrets = [ ];
                 forgeToken = false;
               }
-              // entry
-            )
+              // trigger;
+            }
           );
         in
         ''
@@ -106,9 +110,9 @@
                 diff -u env.expected env
               ''
           }
-          ${lib.optionalString (entry.trigger == "pull-request") ''
+          ${lib.optionalString (kind != "main") ''
             if [ -e curl-calls ]; then
-              echo "row '${name}': a pull-request entry ran the main-only guard" >&2
+              echo "row '${name}': a ${kind} run ran the main-only guard" >&2
               exit 1
             fi
           ''}
@@ -144,21 +148,19 @@
 
             ${lib.concatMapStrings row [
               {
-                name = "push to main execs the program with --rev and its secrets";
-                entry = {
-                  trigger = "push-main";
-                  args = [
-                    "production"
-                    "two words"
-                    "$HOME"
-                  ];
-                  secrets = [
-                    "CLOUDFLARE_API_TOKEN"
-                    "GITHUB_TOKEN"
-                  ];
-                };
+                name = "main execs the program with --rev and its secrets";
+                kind = "main";
+                secrets = [
+                  "CLOUDFLARE_API_TOKEN"
+                  "GITHUB_TOKEN"
+                ];
+                trigger.args = [
+                  "production"
+                  "two words"
+                  "$HOME"
+                ];
                 claims = mainClaims;
-                secretsJson = cloudflare // github;
+                secretsJson = cloudflare // github // forge;
                 status = 0;
                 expect = [ "CI-RUN-CONTEXT: branch=main is_main=true" ];
                 argv = [
@@ -174,11 +176,9 @@
                 };
               }
               {
-                name = "push-main entry on a non-main token is skipped";
-                entry = {
-                  trigger = "push-main";
-                  secrets = [ "GITHUB_TOKEN" ];
-                };
+                name = "main on a non-main token is skipped";
+                kind = "main";
+                secrets = [ "GITHUB_TOKEN" ];
                 claims = {
                   event = "push";
                   ref = "refs/heads/gitea-mq/batch/7";
@@ -191,13 +191,11 @@
               }
               {
                 name = "missing secret fails before the program runs";
-                entry = {
-                  trigger = "push-main";
-                  secrets = [
-                    "CLOUDFLARE_API_TOKEN"
-                    "GITHUB_TOKEN"
-                  ];
-                };
+                kind = "main";
+                secrets = [
+                  "CLOUDFLARE_API_TOKEN"
+                  "GITHUB_TOKEN"
+                ];
                 claims = mainClaims;
                 secretsJson = cloudflare;
                 status = 1;
@@ -205,26 +203,24 @@
               }
               {
                 name = "null secret fails before the program runs";
-                entry = {
-                  trigger = "push-main";
-                  secrets = [ "GITHUB_TOKEN" ];
-                };
+                kind = "main";
+                secrets = [ "GITHUB_TOKEN" ];
                 claims = mainClaims;
                 secretsJson.GITHUB_TOKEN.data.value = null;
                 status = 1;
                 expect = [ "error: GITHUB_TOKEN missing from $HERCULES_CI_SECRETS_JSON" ];
               }
               {
-                name = "pull-request entry runs unguarded with the forge token";
-                entry = {
-                  trigger = "pull-request";
-                  args = [ "preview" ];
-                  secrets = [ "CLOUDFLARE_API_TOKEN" ];
+                name = "pullRequest runs unguarded, without --rev, with the forge token";
+                kind = "pullRequest";
+                secrets = [ "CLOUDFLARE_API_TOKEN" ];
+                trigger = {
+                  args = [ "pull-request" ];
                   forgeToken = true;
                 };
                 secretsJson = cloudflare // forge;
                 status = 0;
-                argv = [ "preview" ];
+                argv = [ "pull-request" ];
                 env = {
                   CLOUDFLARE_API_TOKEN = "dummy-cloudflare-token";
                   GITHUB_FORGE_TOKEN = "dummy-forge-token";
@@ -232,13 +228,30 @@
               }
               {
                 name = "missing forge token fails before the program runs";
-                entry = {
-                  trigger = "pull-request";
-                  forgeToken = true;
-                };
+                kind = "pullRequest";
+                trigger.forgeToken = true;
                 secretsJson = cloudflare;
                 status = 1;
                 expect = [ "error: GITHUB_FORGE_TOKEN missing from $HERCULES_CI_SECRETS_JSON" ];
+              }
+              {
+                name = "pullRequestClosed runs unguarded, without --rev, without the forge token";
+                kind = "pullRequestClosed";
+                secrets = [ "CLOUDFLARE_API_TOKEN" ];
+                trigger.args = [ "pull-request-closed" ];
+                secretsJson = cloudflare // forge;
+                status = 0;
+                argv = [ "pull-request-closed" ];
+                env.CLOUDFLARE_API_TOKEN = "dummy-cloudflare-token";
+              }
+              {
+                name = "missing secret fails a pullRequestClosed run before the program runs";
+                kind = "pullRequestClosed";
+                secrets = [ "CLOUDFLARE_API_TOKEN" ];
+                trigger.args = [ "pull-request-closed" ];
+                secretsJson = github;
+                status = 1;
+                expect = [ "error: CLOUDFLARE_API_TOKEN missing from $HERCULES_CI_SECRETS_JSON" ];
               }
             ]}
 

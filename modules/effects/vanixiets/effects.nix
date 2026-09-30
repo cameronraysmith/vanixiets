@@ -1,51 +1,49 @@
 # The vanixiets effects, interpreted by ./registry.nix.
 #
-# docs-preview runs as a pull_request event effect, which nixbot evaluates
-# from the default branch, so its program comes from main and the pull request
-# contributes data only. Its lock serialises runs per pull request, and a
-# writer must have pushed or authored the pull request: approval of an outside
+# docs is one program in three runs. Its event runs are onEvent effects,
+# which nixbot evaluates from the default branch, so the program comes from
+# main and the pull request contributes data only. pullRequest sets no nixbot
+# `when.permission`: bots such as renovate report no permission though their
+# head branches live here, and `when` cannot express "same repository or a
+# writer", so the program applies that rule itself; approval of an outside
 # pull request is sticky across later pushes, and a preview publishes its
-# content with our token.
+# content with our token. pullRequestClosed tears the pull request's Preview
+# down; it shares the per-pull-request lock ({pr} is nixbot's expansion to the
+# number) so teardown waits for an in-flight upload rather than racing it.
 { withSystem, ... }:
 {
   vanixiets.effects = withSystem "x86_64-linux" (
     { config, ... }:
     {
-      deploy-docs = {
-        trigger = "push-main";
+      docs = {
         program = config.apps.deploy-docs.program;
-        args = [ "production" ];
         secrets = [
           "CLOUDFLARE_API_TOKEN"
           "CLOUDFLARE_ACCOUNT_ID"
         ];
         rehearsals = [ config.checks.deploy-docs-rehearsal ];
-        lock = "deploy-docs";
+        triggers = {
+          main = {
+            args = [ "production" ];
+            lock = "deploy-docs";
+          };
+          pullRequest = {
+            args = [ "pull-request" ];
+            lock = "docs-preview-{pr}";
+            forgeToken = true;
+          };
+          pullRequestClosed = {
+            args = [ "pull-request-closed" ];
+            lock = "docs-preview-{pr}";
+          };
+        };
       };
 
       release-packages = {
-        trigger = "push-main";
         program = config.apps.release-packages.program;
         secrets = [ "GITHUB_TOKEN" ];
         rehearsals = [ config.checks.release-rehearsal ];
-        lock = "release-packages";
-      };
-
-      docs-preview = {
-        trigger = "pull-request";
-        program = config.apps.docs-preview.program;
-        secrets = [
-          "CLOUDFLARE_API_TOKEN"
-          "CLOUDFLARE_ACCOUNT_ID"
-        ];
-        forgeToken = true;
-        rehearsals = [
-          config.checks.docs-preview-rehearsal
-          config.checks.deploy-docs-rehearsal
-        ];
-        # {pr} is nixbot's expansion to the pull request number.
-        lock = "deploy-docs-preview-{pr}";
-        permission = "write";
+        triggers.main.lock = "release-packages";
       };
     }
   );
