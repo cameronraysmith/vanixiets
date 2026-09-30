@@ -28,7 +28,7 @@ The system adapts to the host platform:
 
 On x86_64-linux hosts, x86_64 containers build natively while aarch64 containers are cross-compiled.
 On aarch64-linux hosts, aarch64 containers build natively while x86_64 containers are cross-compiled.
-On aarch64-darwin hosts, both architectures require remote Linux builds (see nix-rosetta-builder section below).
+On aarch64-darwin hosts, both architectures require remote Linux builds: aarch64-linux images build on nix-rosetta-builder (see the section below) and x86_64-linux images build natively on the magnetite and pyrite remote builders.
 
 CI uses ubuntu-latest (x86_64) runners and builds both architectures through a combination of native and cross-compilation.
 
@@ -274,8 +274,9 @@ No workflow file changes are needed.
 
 ## nix-rosetta-builder for Darwin
 
-On Darwin (macOS) systems, Linux container builds require a remote Linux builder.
-The nix-rosetta-builder provides fast Linux builds on Apple Silicon through a NixOS VM.
+On Darwin (macOS) systems, Linux container builds require remote Linux builders.
+The nix-rosetta-builder provides fast aarch64-linux builds on Apple Silicon through a NixOS VM.
+It does not serve x86_64-linux; those builds go to the native x86_64-linux builders magnetite and pyrite.
 
 This builder is only necessary for Darwin hosts.
 Linux hosts (including CI runners) build containers directly using pkgsCross without any remote builder configuration.
@@ -333,7 +334,7 @@ Both can run simultaneously:
 Example workflow combining both:
 
 ```bash
-# Build with nix-rosetta-builder
+# Build: aarch64 via nix-rosetta-builder, x86_64 via magnetite/pyrite
 just container-all fdContainer fd
 
 # Load into Colima's Docker runtime

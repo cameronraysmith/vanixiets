@@ -22,7 +22,7 @@ let
         speedFactor = lib.mkOption {
           type = lib.types.int;
           default = 2;
-          description = "Scheduler weight; higher than the rosetta builder (1) so the scheduler prefers native magnetite for x86_64-linux.";
+          description = "Scheduler weight; higher than pyrite (1) so ordinary x86_64-linux work prefers magnetite and reaches pyrite only when magnetite is busy.";
         };
         systems = lib.mkOption {
           type = lib.types.listOf lib.types.str;

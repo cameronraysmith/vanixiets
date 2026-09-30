@@ -20,17 +20,17 @@ Options:
   --status Show VM status and diagnostic commands
   --gc     Run garbage collection on rosetta-builder before restart
   --idle   Don't verify connection (leaves VM in idle/stopped state)
-  --stop   Disable the rosetta-builder service entirely (for remote builds)
+  --stop   Disable the rosetta-builder service entirely (no local aarch64-linux builds)
   --start  Re-enable a stopped rosetta-builder service
 
 Service Control (--stop/--start):
-  Use --stop to fully disable rosetta-builder when you want clan/nix
-  to use remote builds instead of local cross-compilation. This makes
-  --build-on auto fall back to remote since local can't build x86_64.
+  Use --stop to fully disable rosetta-builder, e.g. to reclaim its memory.
+  The VM serves aarch64-linux builds only; while it is stopped those
+  builds have no builder. x86_64-linux builds always go to magnetite
+  or pyrite, regardless of the VM's state.
 
-  Workflow for remote cloud VM deployment:
-    rosetta-manage --stop        # Disable local x86_64 builds
-    nix run .#terraform          # auto → remote (can't build locally)
+  Workflow:
+    rosetta-manage --stop        # Disable local aarch64-linux builds
     rosetta-manage --start       # Re-enable rosetta-builder
 
 Restart Mode (default):
@@ -49,8 +49,8 @@ Examples:
   rosetta-manage              # Restart and verify (fresh VM ready)
   rosetta-manage --idle       # Restart only (VM stays stopped)
   rosetta-manage --gc         # GC on VM, then restart and verify
-  rosetta-manage --stop       # Disable for remote builds
-  rosetta-manage --start      # Re-enable after remote builds
+  rosetta-manage --stop       # Disable aarch64-linux builder
+  rosetta-manage --start      # Re-enable aarch64-linux builder
 HELP
       exit 0
       ;;
@@ -133,8 +133,8 @@ if $DO_STOP; then
       echo "VM process terminated (PID $OLD_PID → stopped)"
     fi
     echo ""
-    echo "Local x86_64-linux builds are now unavailable."
-    echo "clan/nix --build-on auto will fall back to remote builds."
+    echo "Local aarch64-linux builds are now unavailable."
+    echo "x86_64-linux builds are unaffected (magnetite/pyrite)."
     echo ""
     echo "To re-enable: rosetta-manage --start"
   else
@@ -170,7 +170,7 @@ if $DO_START; then
     FINAL_PID=$(pgrep -f "com.apple.Virtualization.VirtualMachine" 2>/dev/null || echo "none")
     echo "rosetta-builder is ready (PID: $FINAL_PID)."
     echo ""
-    echo "Local x86_64-linux builds are now available."
+    echo "Local aarch64-linux builds are now available."
   else
     echo "Warning: Connection check failed. VM may still be booting."
     echo "Try again in a few seconds: nix store info --store ssh-ng://rosetta-builder"

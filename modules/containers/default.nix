@@ -8,7 +8,7 @@
 # Platform behavior:
 # - x86_64-linux host: x86_64 native, aarch64 cross-compiled
 # - aarch64-linux host: aarch64 native, x86_64 cross-compiled
-# - aarch64-darwin host: both via rosetta-builder
+# - aarch64-darwin host: aarch64 via rosetta-builder, x86_64 via magnetite/pyrite
 #
 # Performance: cross-compilation at native speed (no QEMU), push skips unchanged layers
 {

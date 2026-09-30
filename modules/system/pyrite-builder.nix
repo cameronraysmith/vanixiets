@@ -7,10 +7,9 @@
 #
 # pyrite is the only machine in the fleet with /dev/kvm (see the kvm-declaration
 # module), so it is the only host that builds an x86_64-linux kvm-requiring
-# derivation, such as a vmTests output, at all. stibnite's rosetta-builder
-# entries advertise kvm for aarch64-linux only — qemu there falls back to TCG
-# and completes such a build emulated, which is the only route for that system
-# — so x86_64-linux kvm work never ties emulation against real acceleration.
+# derivation, such as a vmTests output, at all. magnetite does not advertise
+# kvm, and stibnite's rosetta-builder advertises aarch64-linux only, so pyrite
+# is the sole candidate for x86_64-linux kvm work by construction.
 #
 # It is also a laptop that is often but not always reachable, and nix 2.35
 # handles that as follows (src/nix/build-remote/build-remote.cc:250-259 and
@@ -52,9 +51,8 @@ let
           type = lib.types.int;
           # Below magnetite's 2, so ordinary x86_64-linux work prefers the cloud
           # build host and pyrite is picked for it only when magnetite is busy.
-          # kvm-requiring work reaches pyrite because magnetite does not
-          # advertise the feature; on stibnite the rosetta builder does, at the
-          # same speedFactor, so the two tie and either may take it.
+          # kvm-requiring work reaches pyrite because no other x86_64-linux
+          # builder advertises the feature.
           default = 1;
           description = "Scheduler weight, compared against other x86_64-linux builders.";
         };

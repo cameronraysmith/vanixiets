@@ -154,8 +154,9 @@ in
       # Bootstrap step 1 complete - see docs/notes/containers/multi-arch-container-builds.md
       nix.linux-builder.enable = false;
 
-      # nix-rosetta-builder for cross-platform Linux builds on Apple Silicon
-      # Provides x86_64-linux builder via Rosetta 2 translation
+      # nix-rosetta-builder for Linux builds on Apple Silicon
+      # Provides the aarch64-linux builder; x86_64-linux is served natively by
+      # magnetite and pyrite, so Rosetta inside the guest is not a scheduled route
       nix-rosetta-builder = {
         enable = true;
         onDemand = true; # VM powers off when idle to save resources
@@ -203,12 +204,9 @@ in
       # checks.aarch64-darwin.omnigent-worker-credentials both reach
       # nixos-disk-image and stop being schedulable without it.
       #
-      # The two systems are split across two entries for the same host so that
-      # the claim is scoped to where it is the only route. x86_64-linux omits
-      # kvm, leaving pyrite — which has real acceleration — the sole candidate
-      # for x86_64-linux kvm work instead of tying with TCG under Rosetta at
-      # equal speedFactor. x86_64-linux work that does not require kvm still
-      # routes here as before.
+      # The VM serves aarch64-linux only. x86_64-linux is served natively by
+      # magnetite and pyrite, spliced in below, so pyrite (which has real
+      # acceleration) is the sole candidate for x86_64-linux kvm work.
       nix.buildMachines = lib.mkForce (
         [
           {
@@ -226,20 +224,6 @@ in
             ];
             mandatoryFeatures = [ ];
           }
-          {
-            hostName = "rosetta-builder";
-            systems = [ "x86_64-linux" ];
-            maxJobs = 12;
-            speedFactor = 1;
-            protocol = "ssh-ng";
-            supportedFeatures = [
-              "benchmark"
-              "big-parallel"
-              "nixos-test"
-              "uid-range"
-            ];
-            mandatoryFeatures = [ ];
-          }
         ]
         ++ config.services.magnetite-builder.buildMachines
         ++ config.services.pyrite-builder.buildMachines
@@ -249,8 +233,8 @@ in
       services.magnetite-builder.enable = true;
 
       # pyrite is the fleet's only machine with /dev/kvm, and since the rosetta
-      # entries above scope that claim to aarch64-linux, it is the only
-      # candidate for an x86_64-linux kvm derivation such as a vmTests output.
+      # entry above serves aarch64-linux only, it is the only candidate for an
+      # x86_64-linux kvm derivation such as a vmTests output.
       # It is a laptop, and an unreachable one costs a logged connection
       # failure and a failed kvm build rather than a hang or a silently
       # unaccelerated one; see modules/system/pyrite-builder.nix for the nix
