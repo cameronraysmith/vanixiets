@@ -10,26 +10,26 @@ let
   systemToPlatform = {
     "x86_64-linux" = {
       asset = "x86_64-unknown-linux-musl";
-      hash = "sha256-O/TXwCbWHxuN+AvOO8xc4TOK7Sggu0tdBETkt0aZBpM=";
+      hash = "sha256-Uyzj7V7ssb4nTJJbWIf2FnHiQ0pMolYbmorJN527oZk=";
     };
     "aarch64-linux" = {
       asset = "aarch64-unknown-linux-musl";
-      hash = "sha256-JEvn9doeVqbYBa0vzXD0beVm9SK+Or8oxUUOGCzabcI=";
+      hash = "sha256-NHsmDBsESlOncgszGB18ZtzelF771gXXhOW2pWFsF+k=";
     };
     "x86_64-darwin" = {
       asset = "x86_64-apple-darwin";
-      hash = "sha256-CA93Vgr10mBJCD8UnsBA60dq9zQf6xOkVybohVEMEak=";
+      hash = "sha256-qomKowFherr5HLMHjeTIwRREoGEBbcj23YCqF8wcRr4=";
     };
     "aarch64-darwin" = {
       asset = "aarch64-apple-darwin";
-      hash = "sha256-exm7nV7GDqS5vLEdkmBuBXW98XoB7f5LhB9CgeXQ9W0=";
+      hash = "sha256-iiuwU8S8gN6n2c5sIh/wONEKPS3KLcj2DRsaCU+ng6k=";
     };
   };
   platform = systemToPlatform.${system} or (throw "worktrunk-bin: unsupported platform ${system}");
 in
 stdenv.mkDerivation (finalAttrs: {
   pname = "worktrunk-bin";
-  version = "0.76.0";
+  version = "0.80.0";
 
   src = fetchurl {
     url = "https://github.com/max-sixty/worktrunk/releases/download/v${finalAttrs.version}/worktrunk-${platform.asset}.tar.xz";

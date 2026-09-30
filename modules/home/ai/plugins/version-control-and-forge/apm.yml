@@ -11,10 +11,10 @@ dependencies:
     # Upstream's tag series is not monotonic: `apm outdated` reported v0.1.4
     # (b08d381f...) as "latest", but that tag is an orphan not reachable from
     # main (verify ancestry via `gh api .../compare/<sha>...main` before
-    # trusting the table on a future bump). This pin instead tracks v0.76.0,
+    # trusting the table on a future bump). This pin instead tracks v0.80.0,
     # the release actually reachable from main at bump time.
     - git: max-sixty/worktrunk
-      ref: de0052d8db917e46c1663979d376eff3f90c8119
+      ref: b49ca7eea9b03145791a5b94eccaf9c59412ed37
       skills: [worktrunk, wt-switch-create]
     # gh-stack is a Go CLI repo that also ships one agent skill under
     # skills/gh-stack/. apm types it SKILL_BUNDLE (nested skills/<name>/SKILL.md,
