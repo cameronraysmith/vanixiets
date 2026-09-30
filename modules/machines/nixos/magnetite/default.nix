@@ -387,7 +387,13 @@ in
       services.omnigraph = {
         enable = true;
 
-        storageUri = "s3://sciexp/omnigraph/clusters/dev-graph";
+        # A fresh root for omnigraph 0.11. The previous root,
+        # s3://sciexp/omnigraph/clusters/dev-graph, holds a graph written by a
+        # pre-0.9 development build at internal manifest schema v19, which 0.11
+        # refuses to open and cannot upgrade in place. It stays untouched as
+        # the export source and rollback copy; upstream's parallel-root cutover
+        # (docs/user/operations/upgrade.md, "Cluster cutover") applies.
+        storageUri = "s3://sciexp/omnigraph/clusters/dev-graph-v9";
 
         s3 = {
           endpointUrl = "https://1ece4a9a8f092f8cbdd679d22b9ecb1f.r2.cloudflarestorage.com";

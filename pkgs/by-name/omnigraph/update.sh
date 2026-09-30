@@ -2,18 +2,18 @@
 #!nix-shell --pure -i bash -p curl jq cacert git nix-prefetch-github gnused coreutils
 # shellcheck shell=bash
 #
-# Bumps pkgs/by-name/omnigraph to the current tip of upstream main: rewrites the
-# version, rev and src hash in package.nix, and blanks cargoHash.
+# Bumps pkgs/by-name/omnigraph to the latest upstream release: rewrites the
+# version, rev (the peeled commit of the release tag) and src hash in
+# package.nix, and blanks cargoHash.
 # Invoked via `nix run .#update-omnigraph` (passthru.updateScript).
 #
-# Upstream publishes no releases, so the version is the crate version declared
-# at the new rev suffixed with that commit's date.
+# rev stays a commit sha rather than the tag name because package.nix stamps
+# OMNIGRAPH_SOURCE_VERSION from src.rev, which upstream sets to a commit sha.
 
 set -euo pipefail
 
 owner="ModernRelay"
 repo="omnigraph"
-branch="main"
 fake_sri="sha256-0000000000000000000000000000000000000000000="
 
 repo_root="$(git rev-parse --show-toplevel)"
@@ -26,14 +26,24 @@ if [[ -z "$current_version" || -z "$current_rev" ]]; then
   exit 1
 fi
 
-commit_json="$(curl -fsSL \
+release_json="$(curl -fsSL \
   -H "Accept: application/vnd.github+json" \
-  "https://api.github.com/repos/${owner}/${repo}/commits/${branch}")"
+  "https://api.github.com/repos/${owner}/${repo}/releases/latest")"
 
-new_rev="$(printf '%s' "$commit_json" | jq -r '.sha')"
-commit_date="$(printf '%s' "$commit_json" | jq -r '.commit.committer.date[0:10]')"
-if [[ -z "$new_rev" || "$new_rev" == "null" || -z "$commit_date" || "$commit_date" == "null" ]]; then
-  echo "error: could not resolve ${branch} to a commit sha and date" >&2
+tag="$(printf '%s' "$release_json" | jq -r '.tag_name')"
+new_version="${tag#v}"
+if [[ ! "$new_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+  echo "error: latest release tag is not a stable vX.Y.Z tag" >&2
+  echo "observed: ${tag:-<empty>}" >&2
+  exit 1
+fi
+
+# The commits endpoint peels annotated tags to the commit they point at.
+new_rev="$(curl -fsSL \
+  -H "Accept: application/vnd.github+json" \
+  "https://api.github.com/repos/${owner}/${repo}/commits/${tag}" | jq -r '.sha')"
+if [[ ! "$new_rev" =~ ^[0-9a-f]{40}$ ]]; then
+  echo "error: could not resolve tag ${tag} to a commit sha" >&2
   exit 1
 fi
 
@@ -41,17 +51,6 @@ if [[ "$current_rev" == "$new_rev" ]]; then
   echo "omnigraph is already at rev ${current_rev} (${current_version})"
   exit 0
 fi
-
-crate_version="$(curl -fsSL \
-  "https://raw.githubusercontent.com/${owner}/${repo}/${new_rev}/crates/omnigraph-server/Cargo.toml" \
-  | sed -n 's/^version = "\(.*\)"$/\1/p' | head -1)"
-if [[ ! "$crate_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-  echo "error: no semver version found in crates/omnigraph-server/Cargo.toml at ${new_rev}" >&2
-  echo "observed: ${crate_version:-<empty>}" >&2
-  exit 1
-fi
-
-new_version="${crate_version}-unstable-${commit_date}"
 
 echo "Updating omnigraph: ${current_version} -> ${new_version}"
 
@@ -66,6 +65,7 @@ fi
 # the src hash and cargoHash cannot be confused.
 sed -i'' -e "s|^  version = \"[^\"]*\";\$|  version = \"${new_version}\";|" "$pkg_nix"
 sed -i'' -e "s|^    rev = \"[0-9a-f]\{40\}\";\$|    rev = \"${new_rev}\";|" "$pkg_nix"
+sed -i'' -e "s|^  # rev is the v[0-9.]* tag peel|  # rev is the ${tag} tag peel|" "$pkg_nix"
 sed -i'' -e "s|^    hash = \"sha256-[^\"]*\";\$|    hash = \"${new_sri}\";|" "$pkg_nix"
 sed -i'' -e "s|^  cargoHash = \"sha256-[^\"]*\";\$|  cargoHash = \"${fake_sri}\";|" "$pkg_nix"
 

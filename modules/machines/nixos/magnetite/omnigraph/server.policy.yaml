@@ -1,5 +1,4 @@
 version: 1
-kind: server
 groups:
   operators: [admin]
 rules:

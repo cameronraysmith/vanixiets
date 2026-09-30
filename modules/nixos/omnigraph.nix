@@ -123,12 +123,12 @@
           export OMNIGRAPH_HOME
           trap 'rm -rf -- "$OMNIGRAPH_HOME"' EXIT
           cd ${lib.escapeShellArg clusterEtcPath}
-          # Only apply, approve and the stream family are actor-bound; the
-          # read-only verbs (validate, plan, status, refresh, import,
-          # force-unlock) reject --as outright rather than ignoring it.
+          # Only apply and approve are actor-bound; the read-only verbs
+          # (validate, plan, observe, status, refresh, import, force-unlock)
+          # reject --as outright rather than ignoring it.
           actorArgs=()
           case "''${1-}" in
-            apply | approve | stream)
+            apply | approve)
               actorArgs=(--as ${lib.escapeShellArg cfg.cluster.actor})
               ;;
           esac
@@ -374,8 +374,8 @@
               is no storage-URI form — and the rendered directory is an
               anonymous store path. The wrapper runs from `${clusterEtcPath}`,
               passes {option}`services.omnigraph.cluster.actor` as `--as` on
-              the actor-bound subcommands alone (`apply`, `approve`, `stream`),
-              since the read-only verbs reject that flag, and reads
+              the actor-bound subcommands alone (`apply`, `approve`), since
+              the read-only verbs reject that flag, and reads
               {option}`services.omnigraph.environmentFile` for the storage
               credentials, which omnigraph accepts only from the process
               environment. That file is readable by root alone, so the wrapper
