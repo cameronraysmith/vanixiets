@@ -71,7 +71,7 @@ The key flags for CI integration:
 - `--niks3-server URL` uploads built paths to a self-hosted niks3 cache. Cache lookups use nix's `substituters` configuration, which is separate.
 - `--result-format junit` produces JUnit XML output that CI platforms parse for per-check reporting in their dashboards.
 - `--skip-cached` avoids rebuilding derivations that already exist in the configured binary cache.
-- `--no-nom` disables the nix output monitor (nom) interactive display, producing plain log output suitable for CI log capture.
+- `--no-nom` forces the non-interactive per-build log renderer even on a terminal. The name is historical: since 2.0 nix-fast-build renders build logs itself and no longer uses nix output monitor (nom). The interactive renderer already disables itself when stderr or stdin is not a TTY, so CI log capture does not require the flag; passing it is explicit rather than necessary.
 
 The `--eval-workers` flag deserves elaboration because the default behavior can cause CI failures that are difficult to diagnose.
 nix-eval-jobs evaluates flake outputs by forking multiple worker processes, each of which accesses the nix eval cache (a SQLite database).

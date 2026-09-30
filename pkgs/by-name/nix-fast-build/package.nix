@@ -1,38 +1,34 @@
 {
   lib,
-  stdenv,
   fetchFromGitHub,
   python3Packages,
   nix-eval-jobs,
-  nix-output-monitor,
   nix-update-script,
   bashInteractive,
 }:
 
 python3Packages.buildPythonApplication (finalAttrs: {
   pname = "nix-fast-build";
-  version = "1.6.0";
+  version = "2.0.4";
   pyproject = true;
 
   src = fetchFromGitHub {
     owner = "Mic92";
     repo = "nix-fast-build";
     tag = finalAttrs.version;
-    hash = "sha256-PMBbenLBvn/0pSFOhwPVn171Vw7kU5YmBUNDhxllZ7c=";
+    hash = "sha256-sc/NZIHkRhgyAzK8Xn6G++vGrl/Uf7QHh+J5fnZ/o4s=";
   };
 
   build-system = [ python3Packages.setuptools ];
 
+  # 2.x renders build logs itself and no longer uses nix-output-monitor.
   makeWrapperArgs = [
     "--prefix PATH : ${
-      lib.makeBinPath (
-        [
-          nix-eval-jobs
-          nix-eval-jobs.nix
-          bashInteractive
-        ]
-        ++ lib.optional (lib.meta.availableOn stdenv.buildPlatform nix-output-monitor.compiler) nix-output-monitor
-      )
+      lib.makeBinPath [
+        nix-eval-jobs
+        nix-eval-jobs.nix
+        bashInteractive
+      ]
     }"
   ];
 
@@ -47,7 +43,7 @@ python3Packages.buildPythonApplication (finalAttrs: {
   };
 
   meta = {
-    description = "Combine the power of nix-eval-jobs with nix-output-monitor to speed-up your evaluation and building process";
+    description = "Speed up your Nix evaluation and building process with parallel evaluation and building";
     homepage = "https://github.com/Mic92/nix-fast-build";
     changelog = "https://github.com/Mic92/nix-fast-build/releases/tag/${finalAttrs.version}";
     license = lib.licenses.mit;

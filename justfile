@@ -311,10 +311,13 @@ home-package-names system="":
   [ -n "$system" ] || system=$(nix eval --impure --raw --expr builtins.currentSystem)
   {{nix_cmd}} eval --json .#lib.homePackageNames --apply "f: f \"$system\"" | jq --sort-keys .
 
-# Validate flake checks via nix-fast-build (failure isolation, parallel eval+build, nom output)
+# Validate flake checks via nix-fast-build (failure isolation, parallel eval+build, built-in log renderer)
 # --eval-workers 4: reduces SQLite eval-cache contention (harmless but noisy at default=ncpus)
 # --skip-cached: derivations already present in the binary cache are not rebuilt
-# nom=auto|on|off: auto disables nom when stdout is not a TTY (e.g., piped to tee)
+# Out-links are not created (nix-fast-build >= 2.0 only gc-roots builds for the duration of the run).
+# nom=auto|on|off: selects the interactive renderer; off passes --no-nom (a historical name: since
+#   nix-fast-build 2.0 it forces the non-interactive per-build log renderer rather than disabling
+#   nix-output-monitor). auto picks off when stdout is not a TTY (e.g., piped to tee)
 # push=off|on: on uploads built paths to the niks3 PUSH server (auth token resolved by the
 #   niks3 client from ~/.config/niks3/auth-token); the PULL substituter cache.scientistexperience.net
 #   is configured separately. push stays opt-in on every lane, including the remote one: pushing
@@ -348,7 +351,6 @@ check-fast nom="auto" push="off" system="":
   remoteflags=""
   [ "$system" = "$native" ] || remoteflags="--remote magnetite.zt --no-download --retries 2"
   nix-fast-build $flag $pushflag $remoteflags \
-    --no-link \
     --option accept-flake-config true \
     --eval-workers 4 \
     --skip-cached \
