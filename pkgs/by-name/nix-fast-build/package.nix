@@ -38,6 +38,11 @@ python3Packages.buildPythonApplication (finalAttrs: {
     PYTHONPATH= $out/bin/nix-fast-build --help
   '';
 
+  postFixup = ''
+    # don't leak python into devshell
+    rm $out/nix-support/propagated-build-inputs
+  '';
+
   passthru = {
     updateScript = nix-update-script { };
   };
