@@ -1,11 +1,11 @@
 lockfile_version: '1'
-generated_at: '2026-09-07T14:39:28.582404+00:00'
-apm_version: 0.30.0
+generated_at: '2026-10-01T01:17:26.738585+00:00'
+apm_version: 0.32.0
 dependencies:
 - repo_url: cameronraysmith/vanixiets
   name: agent-orchestration-and-meta-tooling
   host: github.com
-  resolved_commit: 59e184a5e1e3f4e8115bb8b980eaccbfb4e11538
+  resolved_commit: 8aa5fb47d81f2f9a0d2108b82c360aa7ff691251
   resolved_ref: main
   version: 0.0.0
   virtual_path: modules/home/ai/plugins/agent-orchestration-and-meta-tooling
@@ -105,7 +105,7 @@ dependencies:
 - repo_url: cameronraysmith/vanixiets
   name: beads-issue-tracking-and-session-workflow
   host: github.com
-  resolved_commit: 59e184a5e1e3f4e8115bb8b980eaccbfb4e11538
+  resolved_commit: 8aa5fb47d81f2f9a0d2108b82c360aa7ff691251
   resolved_ref: main
   version: 0.0.0
   virtual_path: modules/home/ai/plugins/beads-issue-tracking-and-session-workflow
@@ -132,7 +132,7 @@ dependencies:
 - repo_url: cameronraysmith/vanixiets
   name: document-authoring-and-visualization
   host: github.com
-  resolved_commit: 59e184a5e1e3f4e8115bb8b980eaccbfb4e11538
+  resolved_commit: 8aa5fb47d81f2f9a0d2108b82c360aa7ff691251
   resolved_ref: main
   version: 0.0.0
   virtual_path: modules/home/ai/plugins/document-authoring-and-visualization
@@ -176,7 +176,7 @@ dependencies:
 - repo_url: cameronraysmith/vanixiets
   name: event-modeling-workflow
   host: github.com
-  resolved_commit: 59e184a5e1e3f4e8115bb8b980eaccbfb4e11538
+  resolved_commit: 8aa5fb47d81f2f9a0d2108b82c360aa7ff691251
   resolved_ref: main
   version: 0.0.0
   virtual_path: modules/home/ai/plugins/event-modeling-workflow
@@ -200,7 +200,7 @@ dependencies:
 - repo_url: cameronraysmith/vanixiets
   name: formal-specification-and-refinement
   host: github.com
-  resolved_commit: 59e184a5e1e3f4e8115bb8b980eaccbfb4e11538
+  resolved_commit: 8aa5fb47d81f2f9a0d2108b82c360aa7ff691251
   resolved_ref: main
   version: 0.0.0
   virtual_path: modules/home/ai/plugins/formal-specification-and-refinement
@@ -256,7 +256,7 @@ dependencies:
 - repo_url: cameronraysmith/vanixiets
   name: nix-build-operations
   host: github.com
-  resolved_commit: 59e184a5e1e3f4e8115bb8b980eaccbfb4e11538
+  resolved_commit: 8aa5fb47d81f2f9a0d2108b82c360aa7ff691251
   resolved_ref: main
   version: 0.0.0
   virtual_path: modules/home/ai/plugins/nix-build-operations
@@ -278,18 +278,18 @@ dependencies:
   - .agents/skills/worktree-sparsity-eval/scripts/update_claude_md.sh
   deployed_file_hashes:
     .agents/skills/ci-log-verification/SKILL.md: sha256:3d39b10e55ee25e8e8b178f6aa515e515be16e093b331565039de6108d706593
-    .agents/skills/nix-flake-pr-cycle/SKILL.md: sha256:2c85196dd0b9cf94eb6afa70140b64d2e422dccda399d75946f95daa0310e49c
+    .agents/skills/nix-flake-pr-cycle/SKILL.md: sha256:470486f45454e7548b05dc2c20036dec7ed2e18d79dc7eaf943439e4f0e13029
     .agents/skills/nixpkgs-broken-package/SKILL.md: sha256:d85e3566c7e41daacf69579568c765121846b68a58b1c2c36123eb49f104d6f6
     .agents/skills/process-compose-init/SKILL.md: sha256:e5b8add4f560cb80003676019f58e62f5703b6c26ce29b5759815d765ac47fd2
     .agents/skills/worktree-sparsity-eval/SKILL.md: sha256:5c9284eb0cb4bdbec6a0568a3c740b2449bc7a2a3395066db56e9b956f1b4eb2
     .agents/skills/worktree-sparsity-eval/references/sparse-checkout-patterns.md: sha256:e705baaaf6b655c9655627f4f1d02fd933cd7468668b1be25f6a421401b58273
     .agents/skills/worktree-sparsity-eval/scripts/collect_metrics.sh: sha256:aba77011a293a40baeb4c8708e2644999da09d2147f7f219a1d969ea810db39f
     .agents/skills/worktree-sparsity-eval/scripts/update_claude_md.sh: sha256:d794b75c4f31487f8c0f87ceddfa543a11ce611c6556b03b1db74642619c163c
-  content_hash: sha256:e4d3a3965e3718470a197c682c86652f15f9e076c026326549012d8463437f7d
+  content_hash: sha256:8c2bddad34c6f0d391ee2a2322468f9a733a6d9c67163220c1dbd870dee90b71
 - repo_url: cameronraysmith/vanixiets
   name: planning-and-development
   host: github.com
-  resolved_commit: 59e184a5e1e3f4e8115bb8b980eaccbfb4e11538
+  resolved_commit: 8aa5fb47d81f2f9a0d2108b82c360aa7ff691251
   resolved_ref: main
   version: 0.0.0
   virtual_path: modules/home/ai/plugins/planning-and-development
@@ -356,9 +356,9 @@ dependencies:
     .agents/skills/linear-project-management/SKILL.md: sha256:4565d596db4332a81a4ca0abe0ff807b36e055e670e968f415f7264ba49008ab
     .agents/skills/linear-project-management/references/beads-overview.md: sha256:58108232b8cec53d9b87b63f8957e06b4bc083635ff03c53dd5ae82f42a70c2a
     .agents/skills/linear-project-management/references/github-overview.md: sha256:b5b44d224cf468f138abf4ddd834684844227421bd9cecff62b8af3dd6d12d24
-    .agents/skills/linear-project-management/references/linear-conventions.md: sha256:3cc39ddfce61d6aaeb4488c4c5de218a8c48be8268ae464c288509c619dcf8b7
+    .agents/skills/linear-project-management/references/linear-conventions.md: sha256:d0acb0ce823498bd81fdf41739f0582181939ac3a215d86dfdeb23d4ad911056
     .agents/skills/linear-project-management/references/linear-overview.md: sha256:828696e0e63202730d587798a0b40352d23b8530a8b36ccbee54c4008aaa3766
-    .agents/skills/linear-project-management/references/linear-workspace-safety-gate.md: sha256:5bf9c6a6ffa28feaaa1ffa00a93ffe4f5ee7c4a9ea458ea4eb306b7015ab4cbc
+    .agents/skills/linear-project-management/references/linear-workspace-safety-gate.md: sha256:75dfaada258ed61e8a204aed52ae3784610fdeca82903babae4175cda8a34b4e
     .agents/skills/linear-project-management/references/method-overview.md: sha256:12569cf5a63d1815584df13ad5cc33999a9126f393ce638982e042f4c11b3825
     .agents/skills/openspec-apply-change/SKILL.md: sha256:9bc2d4661cba9cb3b540a3dd5e958646b701b9575c573669938927ec93108a1b
     .agents/skills/openspec-archive-change/SKILL.md: sha256:e6364769863dbfa2ca3cc05edf127b6c535d5a136af85776fb9a34352968b475
@@ -370,18 +370,18 @@ dependencies:
     .agents/skills/openspec-linear-sync/SKILL.md: sha256:7c4df99af653ce6efb11e86dcb86c46f6d8867ec7978a6fd8eb4230cfec55830
     .agents/skills/openspec-linear-sync/references/config-and-frontmatter.md: sha256:c327910d5b57c668163a389e49b59d58c1e8e88530fa2509477f4f3ea349c959
     .agents/skills/openspec-linear-sync/references/lifecycle.md: sha256:7017d1cdaf4d935b95ecd25d8129a3af1223220b164c5b61af9b5a877b290062
-    .agents/skills/openspec-linear-sync/references/linear-cli-mapping.md: sha256:10f4a5fc3b7bf5fade2e59f69a3a3c03f2c8b38fdcfed803cbd2691fe1652a8c
+    .agents/skills/openspec-linear-sync/references/linear-cli-mapping.md: sha256:1d8d5862bfc96318c03a3e26836ea2cf2cf93b844e4c840da09b39c146923a17
     .agents/skills/openspec-new-change/SKILL.md: sha256:84374cb8ab0c6e076933126f688bc7f59abdfa7aced7bb710743dd3bf72e3383
     .agents/skills/openspec-onboard/SKILL.md: sha256:12b7fbe19e2d7fbc7c8874dc281e0aab655bed72eb9e961efb8d2ac28fc1885c
     .agents/skills/openspec-propose/SKILL.md: sha256:3d993daee500c765ba93a2a5f167e3510c81dc4749e9626361c986f8d2a27f7c
     .agents/skills/openspec-sync-specs/SKILL.md: sha256:10976095976c6bb53a840f5f6ea74924c3ab2cd21b3fb7c624dc7b28411574fb
     .agents/skills/openspec-update-change/SKILL.md: sha256:82c2250f8d8ec77e98736438a71113f577e9d0d249db181fbb891f598d8533a0
     .agents/skills/openspec-verify-change/SKILL.md: sha256:6e55af9ecd207644fd7d993aa1933da30d1595880fe20b67ede7b0d9f646a291
-  content_hash: sha256:93847df37a59a7b537077fd2f9e450d8338759d011ada0ff999dfc522f23f5e5
+  content_hash: sha256:615fdd2fb76fd870e811d881058a1b74daf7177785b08e4017e36642bff31049
 - repo_url: cameronraysmith/vanixiets
   name: preferences-code-and-collaboration-conventions
   host: github.com
-  resolved_commit: 59e184a5e1e3f4e8115bb8b980eaccbfb4e11538
+  resolved_commit: 8aa5fb47d81f2f9a0d2108b82c360aa7ff691251
   resolved_ref: main
   version: 0.0.0
   virtual_path: modules/home/ai/plugins/preferences-code-and-collaboration-conventions
@@ -392,7 +392,7 @@ dependencies:
   - .agents/skills/preferences-change-management/SKILL.md
   - .agents/skills/preferences-comment-cleanup
   - .agents/skills/preferences-comment-cleanup/SKILL.md
-  - .agents/skills/preferences-comment-cleanup/uncommentrc.toml
+  - .agents/skills/preferences-comment-cleanup/uncomment.toml
   - .agents/skills/preferences-documentation
   - .agents/skills/preferences-documentation/SKILL.md
   - .agents/skills/preferences-documentation/references/adr-conventions.md
@@ -414,26 +414,26 @@ dependencies:
   - .agents/skills/preferences-style-and-conventions/SKILL.md
   deployed_file_hashes:
     .agents/skills/preferences-change-management/SKILL.md: sha256:89f0bf716c8877a402c3e6742e162ce1b62ac2b65cae004394ef1c3151002622
-    .agents/skills/preferences-comment-cleanup/SKILL.md: sha256:448f85cd1e82466cc1d0b90342a54f5f80db96049f1e254f301a0c4b541c8d47
-    .agents/skills/preferences-comment-cleanup/uncommentrc.toml: sha256:b663d4da18e38a6c35f812b3a634610f0dd35d7b99aa8e01ab5be3268980ff98
+    .agents/skills/preferences-comment-cleanup/SKILL.md: sha256:65de3bfbae96e543480145e10edf340149ac00788a0bce634c44a56020fedb39
+    .agents/skills/preferences-comment-cleanup/uncomment.toml: sha256:741d4d9b47655f53e3119ba455c8fab2b4aced8403153cdc23569d9e49f3a9af
     .agents/skills/preferences-documentation/SKILL.md: sha256:be63a54ff40e3ecf8203f7c8f115e60aad0d8e7beb8bbf9ad3a90701e17804bb
     .agents/skills/preferences-documentation/references/adr-conventions.md: sha256:73233c2348c2d83d20e0d9baef2a54d4a2a0b4f673ff9d85085e2b2f3bd3c767
     .agents/skills/preferences-essential-complexity/SKILL.md: sha256:7cdd23c677529154a403038be0f66a6ba55b226ff289033fef911de2d7a5b8ac
     .agents/skills/preferences-git-history-cleanup/SKILL.md: sha256:caab66c123be4153c6bb05c5b9beae994fdd50f928a0de237c7a9037cce65c3a
     .agents/skills/preferences-git-version-control/01-git-native-mode.md: sha256:62fe9dfcd1ac4892912f8c6a8d7ef7a7910fc7dc0670af0cc68b345a6c7a7dae
     .agents/skills/preferences-git-version-control/02-gitbutler-mode.md: sha256:d03e334ed05126acf905d6c0b9518635bd0931501c54c08528d2d9ba7a044ea9
-    .agents/skills/preferences-git-version-control/03-jj-mode.md: sha256:8e5a009f17b0c90e8da2643ec8a109604def282e9d7ce61fcb82c7d02656b718
+    .agents/skills/preferences-git-version-control/03-jj-mode.md: sha256:64b63288ae57044870126da272f943b0a56b85616f023bac3ab4e4dba5a9b44b
     .agents/skills/preferences-git-version-control/04-history-investigation.md: sha256:24eac9248e0412799f41b6c88f07a0921d29ac0c0afc4fb12dcb93d675039c8b
     .agents/skills/preferences-git-version-control/05-commit-workflow.md: sha256:530338d7f45f1cbfce79e8eba6bfb0ade80bb8e385a4b15a6fd215b9734b5ab8
     .agents/skills/preferences-git-version-control/06-github-pr-issue-safety.md: sha256:44b48cb9047cf57a66a0daa16fb1548b7421d39bcef30e37013344cce47611eb
-    .agents/skills/preferences-git-version-control/SKILL.md: sha256:fe9909b99d57f94450a9252ef8a042c7898f4bddd02245f0465c50b8964619ba
+    .agents/skills/preferences-git-version-control/SKILL.md: sha256:4ed82ee7328bca7a02b0ecf1bea6cbef229803bffd87e7aaa82a99b4ac087220
     .agents/skills/preferences-prose-clarity/SKILL.md: sha256:4c271b78aa7251a18c7bb1087e6f1b6a8636e9e168b7153881bafec8ff68bc48
     .agents/skills/preferences-style-and-conventions/SKILL.md: sha256:4d10e946ff597cc578183a85a4d0564fe25a3e9506b9aa0ebe20601006ebd864
-  content_hash: sha256:dea4cf02874c95bb4a620e30a909362734fd8399b2c7305053036a19049f1bba
+  content_hash: sha256:e63127ba7f61a4cfca3f7066727294816ba9938c86153af5e25004b129eb1cab
 - repo_url: cameronraysmith/vanixiets
   name: preferences-data-and-scientific-computing
   host: github.com
-  resolved_commit: 59e184a5e1e3f4e8115bb8b980eaccbfb4e11538
+  resolved_commit: 8aa5fb47d81f2f9a0d2108b82c360aa7ff691251
   resolved_ref: main
   version: 0.0.0
   virtual_path: modules/home/ai/plugins/preferences-data-and-scientific-computing
@@ -488,7 +488,7 @@ dependencies:
 - repo_url: cameronraysmith/vanixiets
   name: preferences-domain-driven-architecture
   host: github.com
-  resolved_commit: 59e184a5e1e3f4e8115bb8b980eaccbfb4e11538
+  resolved_commit: 8aa5fb47d81f2f9a0d2108b82c360aa7ff691251
   resolved_ref: main
   version: 0.0.0
   virtual_path: modules/home/ai/plugins/preferences-domain-driven-architecture
@@ -533,7 +533,7 @@ dependencies:
 - repo_url: cameronraysmith/vanixiets
   name: preferences-event-driven-systems
   host: github.com
-  resolved_commit: 59e184a5e1e3f4e8115bb8b980eaccbfb4e11538
+  resolved_commit: 8aa5fb47d81f2f9a0d2108b82c360aa7ff691251
   resolved_ref: main
   version: 0.0.0
   virtual_path: modules/home/ai/plugins/preferences-event-driven-systems
@@ -560,7 +560,7 @@ dependencies:
 - repo_url: cameronraysmith/vanixiets
   name: preferences-functional-programming-theory
   host: github.com
-  resolved_commit: 59e184a5e1e3f4e8115bb8b980eaccbfb4e11538
+  resolved_commit: 8aa5fb47d81f2f9a0d2108b82c360aa7ff691251
   resolved_ref: main
   version: 0.0.0
   virtual_path: modules/home/ai/plugins/preferences-functional-programming-theory
@@ -624,7 +624,7 @@ dependencies:
 - repo_url: cameronraysmith/vanixiets
   name: preferences-nix-and-secrets
   host: github.com
-  resolved_commit: 59e184a5e1e3f4e8115bb8b980eaccbfb4e11538
+  resolved_commit: 8aa5fb47d81f2f9a0d2108b82c360aa7ff691251
   resolved_ref: main
   version: 0.0.0
   virtual_path: modules/home/ai/plugins/preferences-nix-and-secrets
@@ -654,19 +654,19 @@ dependencies:
     .agents/skills/preferences-nix-checks-architecture/references/nix-unit-invariants.md: sha256:fa6e312637cc8761e752f2a542deea6508a530b6340dad2f0d34e9e9b9a1667e
     .agents/skills/preferences-nix-checks-architecture/references/nixos-vm-tests.md: sha256:3ae52d94fc112f5075e3e81db020a6e1b0da10817b6c5504e9887173de9a27f6
     .agents/skills/preferences-nix-checks-architecture/references/process-compose-checks.md: sha256:80aac4508b84b06f5dd44c04de896b118ee16be95848313416ec49f02b3b3338
-    .agents/skills/preferences-nix-ci-cd-integration/SKILL.md: sha256:927a31429bb9c2bdcb23b9f8539f1e41786d4cab1583688055d531f09e79cbdb
-    .agents/skills/preferences-nix-ci-cd-integration/references/buildbot-nix-configuration.md: sha256:e8d491c7b6161f703a0879218f78f36e0ede212e3ec0bf9634467d0defea7526
+    .agents/skills/preferences-nix-ci-cd-integration/SKILL.md: sha256:a5f094799384fa4456468b513f20f1bb99175abc4d19e6ec09fbbecd554a3816
+    .agents/skills/preferences-nix-ci-cd-integration/references/buildbot-nix-configuration.md: sha256:6ca0ddf19b428d429cbbed496c92cfc7c0124aa20b782dff9ea8376b76343764
     .agents/skills/preferences-nix-ci-cd-integration/references/caching-strategies.md: sha256:48d3fc51acbf6cbe836556ecacdfd634b1923fc72bcb2364d20df02947d08d7c
-    .agents/skills/preferences-nix-ci-cd-integration/references/migration-pattern.md: sha256:9ce89a6f9e56de3e178cd8e37af0afe204a61ef38d5f6ce2bc96d8ba97d6b50f
+    .agents/skills/preferences-nix-ci-cd-integration/references/migration-pattern.md: sha256:4886dd8cc8f5b1b5f96c21a0262a02d8162e8a751faf878cc05f3248eef0d0ee
     .agents/skills/preferences-nix-ci-cd-integration/references/nix-native-effects.md: sha256:72d4ceac07665327275cbbe9e2ac3be9c17055297718bcdc1e0edbaca4f9efae
     .agents/skills/preferences-nix-development/SKILL.md: sha256:ac4eeddb57fb66ea660e2fc0939660662376e93c503c20b44c1963f002a85205
     .agents/skills/preferences-nix-development/references/dendritic-module-composition.md: sha256:29373464d2ee8e444df266c56ecdda6259834cae976e51d28c1effdc83af61ee
     .agents/skills/preferences-secrets/SKILL.md: sha256:7a92aef91af096be1ad05c3ff1b8b7b0b1c02da030c140e7f7ee2a7cd876c2c7
-  content_hash: sha256:e97fe721bf8a6df03a2d5399b6521bb67d75c803c09cb66ef732a67070d86751
+  content_hash: sha256:e31267fa3186c2e1c6f534316162dad82b6c58b72359536c9c7647d5101d6fe7
 - repo_url: cameronraysmith/vanixiets
   name: preferences-operations-and-reliability
   host: github.com
-  resolved_commit: 59e184a5e1e3f4e8115bb8b980eaccbfb4e11538
+  resolved_commit: 8aa5fb47d81f2f9a0d2108b82c360aa7ff691251
   resolved_ref: main
   version: 0.0.0
   virtual_path: modules/home/ai/plugins/preferences-operations-and-reliability
@@ -702,7 +702,7 @@ dependencies:
 - repo_url: cameronraysmith/vanixiets
   name: preferences-programming-languages
   host: github.com
-  resolved_commit: 59e184a5e1e3f4e8115bb8b980eaccbfb4e11538
+  resolved_commit: 8aa5fb47d81f2f9a0d2108b82c360aa7ff691251
   resolved_ref: main
   version: 0.0.0
   virtual_path: modules/home/ai/plugins/preferences-programming-languages
@@ -756,7 +756,7 @@ dependencies:
 - repo_url: cameronraysmith/vanixiets
   name: preferences-web-platform-and-deployment
   host: github.com
-  resolved_commit: 59e184a5e1e3f4e8115bb8b980eaccbfb4e11538
+  resolved_commit: 8aa5fb47d81f2f9a0d2108b82c360aa7ff691251
   resolved_ref: main
   version: 0.0.0
   virtual_path: modules/home/ai/plugins/preferences-web-platform-and-deployment
@@ -810,7 +810,7 @@ dependencies:
 - repo_url: cameronraysmith/vanixiets
   name: testing-and-quality
   host: github.com
-  resolved_commit: 59e184a5e1e3f4e8115bb8b980eaccbfb4e11538
+  resolved_commit: 8aa5fb47d81f2f9a0d2108b82c360aa7ff691251
   resolved_ref: main
   version: 0.0.0
   virtual_path: modules/home/ai/plugins/testing-and-quality
@@ -877,7 +877,7 @@ dependencies:
 - repo_url: cameronraysmith/vanixiets
   name: version-control-and-forge
   host: github.com
-  resolved_commit: 59e184a5e1e3f4e8115bb8b980eaccbfb4e11538
+  resolved_commit: 8aa5fb47d81f2f9a0d2108b82c360aa7ff691251
   resolved_ref: main
   version: 0.0.0
   virtual_path: modules/home/ai/plugins/version-control-and-forge
@@ -917,7 +917,7 @@ dependencies:
   deployed_file_hashes:
     .agents/skills/dependency-source-acquisition/SKILL.md: sha256:a3ca09e84a6dbf4fdbc795f58dca275de220f39908b4dabcc1e76f5a6069c744
     .agents/skills/git-commit-prompt/SKILL.md: sha256:d2f68ea84b50eac0791f3b19822561daaef7781e9ea679bc179809f72ad79795
-    .agents/skills/git-stacked-pr-integration/SKILL.md: sha256:3cc4bc9d5b9f07f08c8572a358493a4c0d41898d2d6bc3e3598db0ecbe2dacb4
+    .agents/skills/git-stacked-pr-integration/SKILL.md: sha256:e9122b4c4ecfb38b1f93a38b92dd8861118b05451d41f1aeb19b5d7c862aab91
     .agents/skills/gitbutler-but-cli/README.md: sha256:bba64a3ca1f6edf24198612765cfaab447395a2e826ef3ac2ad9949b995c4b07
     .agents/skills/gitbutler-but-cli/RESEARCH.md: sha256:8cde76007941230cc4fecdc4adcd23c220ba92a5fc4a2bae82a0d3c8c4f56d64
     .agents/skills/gitbutler-but-cli/SKILL.md: sha256:7e6d2fe8c236df4fb499881a79a70b0f6c5dc56a66dafbe802634a1e3a2ee81c
@@ -929,12 +929,12 @@ dependencies:
     .agents/skills/jj-git-interactive-rebase-to-jj/SKILL.md: sha256:eabdbc270c63cf3f0718f89a3114603baec9887df9c456ef6e525230a1c666db
     .agents/skills/jj-history-cleanup/SKILL.md: sha256:6c680eefa63adcf84d6fd02375903384c9c52bd688dad26d0aeaf4d1f53a1ac6
     .agents/skills/jj-summary/SKILL.md: sha256:0f91668ba68193a80e0992b30631e4fbe3686a319d98b8ca7add97babf0ecd0e
-    .agents/skills/jj-version-control/SKILL.md: sha256:302b029bd317644abbc0b90c150926d115a0586b953dd984c00c83aef5c2860a
-    .agents/skills/jj-version-control/diamond-workflow.md: sha256:14d8104f0c3241b6fd637246294abaf278cb4cf280179230f7ff8e960c587c3b
+    .agents/skills/jj-version-control/SKILL.md: sha256:2b93f7bb6e139ab5ed35dccb94529b1e61475363c68e92e5202844b92dc70ac9
+    .agents/skills/jj-version-control/diamond-workflow.md: sha256:cc1c1f77f895b9444e79b751f9b13eff91a9d4d3c239b0f9d0f205456e1556a7
     .agents/skills/jj-version-control/hazards.md: sha256:c1a9b01f5075f4fff67450ff3d2118b8d7cfcb1b3a59f8eee203feaa015a853a
-    .agents/skills/jj-version-control/tiered-ceremony.md: sha256:69bbbd8725261e7c05738f439959071dfcf531045e884189c5f88e24394f8514
+    .agents/skills/jj-version-control/tiered-ceremony.md: sha256:730b577fe4e15a00b5b2cd37e7080205bba5fa19dddeecba9763e268272d50f3
     .agents/skills/jj-workflow/SKILL.md: sha256:9db0b7d47aebf0cc34634cb8d06263a1c994a96a4fb3585ade4636165460b784
-  content_hash: sha256:bb1c50b28b1fff87db6cb030a2435dc3875788ddfa0ce86c65866fc7afef7d8e
+  content_hash: sha256:9e764c4e8b629d1019b31c5395b6b59cf53d48462131bec6c0ad8547aeeab9f0
 - repo_url: github/gh-stack
   name: gh-stack
   host: github.com
@@ -1147,16 +1147,15 @@ dependencies:
 - repo_url: max-sixty/worktrunk
   name: worktrunk
   host: github.com
-  resolved_commit: de0052d8db917e46c1663979d376eff3f90c8119
-  resolved_ref: de0052d8db917e46c1663979d376eff3f90c8119
-  version: de0052d
+  resolved_commit: b49ca7eea9b03145791a5b94eccaf9c59412ed37
+  resolved_ref: b49ca7eea9b03145791a5b94eccaf9c59412ed37
+  version: b49ca7e
   depth: 2
   resolved_by: cameronraysmith/vanixiets
   package_type: marketplace_plugin
   deployed_files:
   - .agents/skills/worktrunk
   - .agents/skills/worktrunk/SKILL.md
-  - .agents/skills/worktrunk/reference/README.md
   - .agents/skills/worktrunk/reference/claude-code.md
   - .agents/skills/worktrunk/reference/code-signing.md
   - .agents/skills/worktrunk/reference/config.md
@@ -1177,27 +1176,26 @@ dependencies:
   - .agents/skills/wt-switch-create/SKILL.md
   - .agents/skills/wt-switch-create/rationale.md
   deployed_file_hashes:
-    .agents/skills/worktrunk/SKILL.md: sha256:69ebaa585f37a3cbe825028129409f4f22e11549afc4ab5cc872603af4459a90
-    .agents/skills/worktrunk/reference/README.md: sha256:7d4ec03df4b0b3220f7afba5f31cefb97845957c11e92babcbcaff75ecf4572e
-    .agents/skills/worktrunk/reference/claude-code.md: sha256:c72cc823a544e87d9d1007ed50029b7802f09ad700f665f28216b10d27884321
+    .agents/skills/worktrunk/SKILL.md: sha256:62f15124703137fac06dc37179c2325374fae6d99f6b7dad7ffd5031feaf0119
+    .agents/skills/worktrunk/reference/claude-code.md: sha256:1d26cb95c426f4672dd260aeeabf65a4a411baeb81b98e271a9b4677046065f4
     .agents/skills/worktrunk/reference/code-signing.md: sha256:8f27f89e960ecc914cef4d30ad00121047365d245f50a5d58f0c2b9918497858
-    .agents/skills/worktrunk/reference/config.md: sha256:f91c58425b06627f1d5249cca421f001a86b0f5cad5aa2515b9f4bcff8077ffc
-    .agents/skills/worktrunk/reference/extending.md: sha256:7aa57ff59d4dda0a7d249e32a848599cbed65f05ab41dc35e9076bfdd4ef50a4
-    .agents/skills/worktrunk/reference/faq.md: sha256:e37406fcfb272e828872bea08d646905b6fb9f1a8bf221349e93917e30657610
-    .agents/skills/worktrunk/reference/hook.md: sha256:cf0b31e52856355f0d94fbac2fd5f6b54990cdfed667fcabf8fcbcb9065313c9
-    .agents/skills/worktrunk/reference/list.md: sha256:0194f55254ad5b780e6eeb68c03cef350f15d0faa02873b9a72fbd8b911188e4
-    .agents/skills/worktrunk/reference/llm-commits.md: sha256:f393ebe314a937a31e62d4dfa6b53af3a2525a6e65abb0bd6f550502d4228b92
-    .agents/skills/worktrunk/reference/merge.md: sha256:bff79ff3219cd6af235f053f68b3ea1e4ed67f8278b9c31ebcc4c6dcd7177598
-    .agents/skills/worktrunk/reference/remove.md: sha256:7ac7c25836319bd5933ec72432279efc105527a845171d814c571e3b8ce22b27
-    .agents/skills/worktrunk/reference/shell-integration.md: sha256:89e27cc9ecfed2d1600974f281e811857e0f1a53e1c74c6d7f96d949906a32c9
-    .agents/skills/worktrunk/reference/step.md: sha256:40db14fdd36d16e42842b4ff1937815eeb53523b2fc24f9a9900a0eb5f3be1ac
-    .agents/skills/worktrunk/reference/switch.md: sha256:61be025099e9d9cdc55d1704528bd31cf1742dd96e993ecd797d2fda3658bc8b
-    .agents/skills/worktrunk/reference/tips-patterns.md: sha256:aba4b13c653104718202e86b7a9ff073f79598cad0693b8e4a0335bfe5e24a50
-    .agents/skills/worktrunk/reference/troubleshooting.md: sha256:704f845e147519f059457a7b1780afbd56a83191b7329826e937aaa0e546703b
-    .agents/skills/worktrunk/reference/worktrunk.md: sha256:8d3c83ff1ddc98ac048d91c7ec86959003901da6f286dd2cca97de7edc0cf0b7
-    .agents/skills/wt-switch-create/SKILL.md: sha256:9e0873e1480c5c276572e5cbb744e1edb470cac929aa1d61aa82bd5cf2f4f61a
-    .agents/skills/wt-switch-create/rationale.md: sha256:a842f00d39d77d4a28fe697e6690e75be147f23c21fc98f79f5d812d798bdd87
-  content_hash: sha256:1176ed55b2d1f0c5ddec23ebcd040115666110036223b7c01861a2cc36a49cfc
+    .agents/skills/worktrunk/reference/config.md: sha256:95ea05dd29c72277ef08e0f5413aa5e4a8b2df5c5dc96d604bdc999c50409a3e
+    .agents/skills/worktrunk/reference/extending.md: sha256:1513f34876019b7ce5425c6286a1814741243a080c437a957b07525d7a72331b
+    .agents/skills/worktrunk/reference/faq.md: sha256:beea3a8fef903da303786a469a6c3c52c60708ffdc36a2ae4c7d799d2c72982e
+    .agents/skills/worktrunk/reference/hook.md: sha256:54632c553ea07add63593fd7423c7a7eae8ad4d446fa2d13c1519e5bb0d910d4
+    .agents/skills/worktrunk/reference/list.md: sha256:2a0392421b5353155873c71cb0826285eec8785893de55a3fa51d4f5b7abcfd6
+    .agents/skills/worktrunk/reference/llm-commits.md: sha256:b32e0a875a85321f5fe6a381c38632ebbe1f0e25d3906c92586567b40cfa5aeb
+    .agents/skills/worktrunk/reference/merge.md: sha256:78142d762b9db11c161b1616af553b4845efb2913eafd3b9ecf4e4a379869a9b
+    .agents/skills/worktrunk/reference/remove.md: sha256:2f5ffa5e52616f494ce6ae63b0d83ebb83b44f3eab9f613396d921b14810e611
+    .agents/skills/worktrunk/reference/shell-integration.md: sha256:ea0efa6b4eca0934b6b060fb002dc7f7c4b1deeb44d4cc0165c45a4bace4eb5d
+    .agents/skills/worktrunk/reference/step.md: sha256:dbbcdb84d4ca3f0e60376e37a484b4f1a8527dce558505eb4d43b7a2bc3dccb5
+    .agents/skills/worktrunk/reference/switch.md: sha256:c728710cdd81008018917dba8e734f3fe17ac3006edf380ffa6ceeff421e2983
+    .agents/skills/worktrunk/reference/tips-patterns.md: sha256:c3edc8db77065e46fe0d8febb0ee0302db80c69496562dd5592e973650c536a9
+    .agents/skills/worktrunk/reference/troubleshooting.md: sha256:669a3ea0aeed18d0b982f5be1181e9e74ecb8000ca47b4c0a55552e1f7099b5f
+    .agents/skills/worktrunk/reference/worktrunk.md: sha256:8066d6857659dd1c4f021df2549e2f7f9e726515ba5ab058aa4ce3b1ca4b0f17
+    .agents/skills/wt-switch-create/SKILL.md: sha256:07bf4211b26187f54bffd40c9fb5703511d176fc8710c87a7fe265ddfd7957e2
+    .agents/skills/wt-switch-create/rationale.md: sha256:46c8fd38492d11c006999bc38c3b26a71c12dc036926ecc00af5802b6da2e3b5
+  content_hash: sha256:fc2b2c474dbe92eeedc41fb59e1ee7243ef5eab0c70ae1569d33ebbfc71b5a3f
   skill_subset:
   - worktrunk
   - wt-switch-create
@@ -1205,9 +1203,9 @@ dependencies:
   materialization_repo_url: Mergifyio/mergify-cli
   name: mergify
   host: github.com
-  resolved_commit: 727ce50b8fb3be8a9a24025807e159d644dbba80
-  resolved_ref: 727ce50b8fb3be8a9a24025807e159d644dbba80
-  version: 727ce50
+  resolved_commit: e7c1ebbc281361f0b2b7827cf583f57339c97ebc
+  resolved_ref: e7c1ebbc281361f0b2b7827cf583f57339c97ebc
+  version: e7c1ebb
   depth: 2
   resolved_by: cameronraysmith/vanixiets
   package_type: marketplace_plugin
@@ -1215,8 +1213,8 @@ dependencies:
   - .agents/skills/mergify-stack
   - .agents/skills/mergify-stack/SKILL.md
   deployed_file_hashes:
-    .agents/skills/mergify-stack/SKILL.md: sha256:7db957f8cd81fcc50bc080d8c4af1d09823eba323993545e160f10757caf4de4
-  content_hash: sha256:e4f971babeeac95dd3eb51e9b251f16bfc73bd79808d7544d844270116cd6950
+    .agents/skills/mergify-stack/SKILL.md: sha256:69c5e2a2c54dca56c5b938379eaeb86fa72dd6f6b4c02a0cc84b5390fe1e0cfd
+  content_hash: sha256:8f1cf977803743e3167dc48f4c5f3f227032423152bfa08c87f5104e236ecc4a
   skill_subset:
   - mergify-stack
   declared_license: Apache-2.0
@@ -3183,7 +3181,7 @@ deployments:
   owners:
   - cameronraysmith/vanixiets/modules/home/ai/plugins/version-control-and-forge
   active_owner: cameronraysmith/vanixiets/modules/home/ai/plugins/version-control-and-forge
-  content_hash: sha256:3cc4bc9d5b9f07f08c8572a358493a4c0d41898d2d6bc3e3598db0ecbe2dacb4
+  content_hash: sha256:e9122b4c4ecfb38b1f93a38b92dd8861118b05451d41f1aeb19b5d7c862aab91
 - kind: project-relative
   target: agent-skills
   value: .agents/skills/gitbutler-but-cli
@@ -3570,7 +3568,7 @@ deployments:
   owners:
   - cameronraysmith/vanixiets/modules/home/ai/plugins/version-control-and-forge
   active_owner: cameronraysmith/vanixiets/modules/home/ai/plugins/version-control-and-forge
-  content_hash: sha256:302b029bd317644abbc0b90c150926d115a0586b953dd984c00c83aef5c2860a
+  content_hash: sha256:2b93f7bb6e139ab5ed35dccb94529b1e61475363c68e92e5202844b92dc70ac9
 - kind: project-relative
   target: agent-skills
   value: .agents/skills/jj-version-control/diamond-workflow.md
@@ -3579,7 +3577,7 @@ deployments:
   owners:
   - cameronraysmith/vanixiets/modules/home/ai/plugins/version-control-and-forge
   active_owner: cameronraysmith/vanixiets/modules/home/ai/plugins/version-control-and-forge
-  content_hash: sha256:14d8104f0c3241b6fd637246294abaf278cb4cf280179230f7ff8e960c587c3b
+  content_hash: sha256:cc1c1f77f895b9444e79b751f9b13eff91a9d4d3c239b0f9d0f205456e1556a7
 - kind: project-relative
   target: agent-skills
   value: .agents/skills/jj-version-control/hazards.md
@@ -3597,7 +3595,7 @@ deployments:
   owners:
   - cameronraysmith/vanixiets/modules/home/ai/plugins/version-control-and-forge
   active_owner: cameronraysmith/vanixiets/modules/home/ai/plugins/version-control-and-forge
-  content_hash: sha256:69bbbd8725261e7c05738f439959071dfcf531045e884189c5f88e24394f8514
+  content_hash: sha256:730b577fe4e15a00b5b2cd37e7080205bba5fa19dddeecba9763e268272d50f3
 - kind: project-relative
   target: agent-skills
   value: .agents/skills/jj-workflow
@@ -3723,7 +3721,7 @@ deployments:
   owners:
   - cameronraysmith/vanixiets/modules/home/ai/plugins/planning-and-development
   active_owner: cameronraysmith/vanixiets/modules/home/ai/plugins/planning-and-development
-  content_hash: sha256:3cc39ddfce61d6aaeb4488c4c5de218a8c48be8268ae464c288509c619dcf8b7
+  content_hash: sha256:d0acb0ce823498bd81fdf41739f0582181939ac3a215d86dfdeb23d4ad911056
 - kind: project-relative
   target: agent-skills
   value: .agents/skills/linear-project-management/references/linear-overview.md
@@ -3741,7 +3739,7 @@ deployments:
   owners:
   - cameronraysmith/vanixiets/modules/home/ai/plugins/planning-and-development
   active_owner: cameronraysmith/vanixiets/modules/home/ai/plugins/planning-and-development
-  content_hash: sha256:5bf9c6a6ffa28feaaa1ffa00a93ffe4f5ee7c4a9ea458ea4eb306b7015ab4cbc
+  content_hash: sha256:75dfaada258ed61e8a204aed52ae3784610fdeca82903babae4175cda8a34b4e
 - kind: project-relative
   target: agent-skills
   value: .agents/skills/linear-project-management/references/method-overview.md
@@ -3786,7 +3784,7 @@ deployments:
   owners:
   - mergifyio/mergify-cli
   active_owner: mergifyio/mergify-cli
-  content_hash: sha256:7db957f8cd81fcc50bc080d8c4af1d09823eba323993545e160f10757caf4de4
+  content_hash: sha256:69c5e2a2c54dca56c5b938379eaeb86fa72dd6f6b4c02a0cc84b5390fe1e0cfd
 - kind: project-relative
   target: agent-skills
   value: .agents/skills/meta-agent-teams
@@ -4254,7 +4252,7 @@ deployments:
   owners:
   - cameronraysmith/vanixiets/modules/home/ai/plugins/nix-build-operations
   active_owner: cameronraysmith/vanixiets/modules/home/ai/plugins/nix-build-operations
-  content_hash: sha256:2c85196dd0b9cf94eb6afa70140b64d2e422dccda399d75946f95daa0310e49c
+  content_hash: sha256:470486f45454e7548b05dc2c20036dec7ed2e18d79dc7eaf943439e4f0e13029
 - kind: project-relative
   target: agent-skills
   value: .agents/skills/nixpkgs-broken-package
@@ -4515,7 +4513,7 @@ deployments:
   owners:
   - cameronraysmith/vanixiets/modules/home/ai/plugins/planning-and-development
   active_owner: cameronraysmith/vanixiets/modules/home/ai/plugins/planning-and-development
-  content_hash: sha256:10f4a5fc3b7bf5fade2e59f69a3a3c03f2c8b38fdcfed803cbd2691fe1652a8c
+  content_hash: sha256:1d8d5862bfc96318c03a3e26836ea2cf2cf93b844e4c840da09b39c146923a17
 - kind: project-relative
   target: agent-skills
   value: .agents/skills/openspec-new-change
@@ -4857,16 +4855,16 @@ deployments:
   owners:
   - cameronraysmith/vanixiets/modules/home/ai/plugins/preferences-code-and-collaboration-conventions
   active_owner: cameronraysmith/vanixiets/modules/home/ai/plugins/preferences-code-and-collaboration-conventions
-  content_hash: sha256:448f85cd1e82466cc1d0b90342a54f5f80db96049f1e254f301a0c4b541c8d47
+  content_hash: sha256:65de3bfbae96e543480145e10edf340149ac00788a0bce634c44a56020fedb39
 - kind: project-relative
   target: agent-skills
-  value: .agents/skills/preferences-comment-cleanup/uncommentrc.toml
+  value: .agents/skills/preferences-comment-cleanup/uncomment.toml
   runtime: null
   scope: project
   owners:
   - cameronraysmith/vanixiets/modules/home/ai/plugins/preferences-code-and-collaboration-conventions
   active_owner: cameronraysmith/vanixiets/modules/home/ai/plugins/preferences-code-and-collaboration-conventions
-  content_hash: sha256:b663d4da18e38a6c35f812b3a634610f0dd35d7b99aa8e01ab5be3268980ff98
+  content_hash: sha256:741d4d9b47655f53e3119ba455c8fab2b4aced8403153cdc23569d9e49f3a9af
 - kind: project-relative
   target: agent-skills
   value: .agents/skills/preferences-compositional-continuous-verification
@@ -5163,7 +5161,7 @@ deployments:
   owners:
   - cameronraysmith/vanixiets/modules/home/ai/plugins/preferences-code-and-collaboration-conventions
   active_owner: cameronraysmith/vanixiets/modules/home/ai/plugins/preferences-code-and-collaboration-conventions
-  content_hash: sha256:8e5a009f17b0c90e8da2643ec8a109604def282e9d7ce61fcb82c7d02656b718
+  content_hash: sha256:64b63288ae57044870126da272f943b0a56b85616f023bac3ab4e4dba5a9b44b
 - kind: project-relative
   target: agent-skills
   value: .agents/skills/preferences-git-version-control/04-history-investigation.md
@@ -5199,7 +5197,7 @@ deployments:
   owners:
   - cameronraysmith/vanixiets/modules/home/ai/plugins/preferences-code-and-collaboration-conventions
   active_owner: cameronraysmith/vanixiets/modules/home/ai/plugins/preferences-code-and-collaboration-conventions
-  content_hash: sha256:fe9909b99d57f94450a9252ef8a042c7898f4bddd02245f0465c50b8964619ba
+  content_hash: sha256:4ed82ee7328bca7a02b0ecf1bea6cbef229803bffd87e7aaa82a99b4ac087220
 - kind: project-relative
   target: agent-skills
   value: .agents/skills/preferences-haskell-development
@@ -5451,7 +5449,7 @@ deployments:
   owners:
   - cameronraysmith/vanixiets/modules/home/ai/plugins/preferences-nix-and-secrets
   active_owner: cameronraysmith/vanixiets/modules/home/ai/plugins/preferences-nix-and-secrets
-  content_hash: sha256:927a31429bb9c2bdcb23b9f8539f1e41786d4cab1583688055d531f09e79cbdb
+  content_hash: sha256:a5f094799384fa4456468b513f20f1bb99175abc4d19e6ec09fbbecd554a3816
 - kind: project-relative
   target: agent-skills
   value: .agents/skills/preferences-nix-ci-cd-integration/references/buildbot-nix-configuration.md
@@ -5460,7 +5458,7 @@ deployments:
   owners:
   - cameronraysmith/vanixiets/modules/home/ai/plugins/preferences-nix-and-secrets
   active_owner: cameronraysmith/vanixiets/modules/home/ai/plugins/preferences-nix-and-secrets
-  content_hash: sha256:e8d491c7b6161f703a0879218f78f36e0ede212e3ec0bf9634467d0defea7526
+  content_hash: sha256:6ca0ddf19b428d429cbbed496c92cfc7c0124aa20b782dff9ea8376b76343764
 - kind: project-relative
   target: agent-skills
   value: .agents/skills/preferences-nix-ci-cd-integration/references/caching-strategies.md
@@ -5478,7 +5476,7 @@ deployments:
   owners:
   - cameronraysmith/vanixiets/modules/home/ai/plugins/preferences-nix-and-secrets
   active_owner: cameronraysmith/vanixiets/modules/home/ai/plugins/preferences-nix-and-secrets
-  content_hash: sha256:9ce89a6f9e56de3e178cd8e37af0afe204a61ef38d5f6ce2bc96d8ba97d6b50f
+  content_hash: sha256:4886dd8cc8f5b1b5f96c21a0262a02d8162e8a751faf878cc05f3248eef0d0ee
 - kind: project-relative
   target: agent-skills
   value: .agents/skills/preferences-nix-ci-cd-integration/references/nix-native-effects.md
@@ -11535,16 +11533,7 @@ deployments:
   owners:
   - max-sixty/worktrunk
   active_owner: max-sixty/worktrunk
-  content_hash: sha256:69ebaa585f37a3cbe825028129409f4f22e11549afc4ab5cc872603af4459a90
-- kind: project-relative
-  target: agent-skills
-  value: .agents/skills/worktrunk/reference/README.md
-  runtime: null
-  scope: project
-  owners:
-  - max-sixty/worktrunk
-  active_owner: max-sixty/worktrunk
-  content_hash: sha256:7d4ec03df4b0b3220f7afba5f31cefb97845957c11e92babcbcaff75ecf4572e
+  content_hash: sha256:62f15124703137fac06dc37179c2325374fae6d99f6b7dad7ffd5031feaf0119
 - kind: project-relative
   target: agent-skills
   value: .agents/skills/worktrunk/reference/claude-code.md
@@ -11553,7 +11542,7 @@ deployments:
   owners:
   - max-sixty/worktrunk
   active_owner: max-sixty/worktrunk
-  content_hash: sha256:c72cc823a544e87d9d1007ed50029b7802f09ad700f665f28216b10d27884321
+  content_hash: sha256:1d26cb95c426f4672dd260aeeabf65a4a411baeb81b98e271a9b4677046065f4
 - kind: project-relative
   target: agent-skills
   value: .agents/skills/worktrunk/reference/code-signing.md
@@ -11571,7 +11560,7 @@ deployments:
   owners:
   - max-sixty/worktrunk
   active_owner: max-sixty/worktrunk
-  content_hash: sha256:f91c58425b06627f1d5249cca421f001a86b0f5cad5aa2515b9f4bcff8077ffc
+  content_hash: sha256:95ea05dd29c72277ef08e0f5413aa5e4a8b2df5c5dc96d604bdc999c50409a3e
 - kind: project-relative
   target: agent-skills
   value: .agents/skills/worktrunk/reference/extending.md
@@ -11580,7 +11569,7 @@ deployments:
   owners:
   - max-sixty/worktrunk
   active_owner: max-sixty/worktrunk
-  content_hash: sha256:7aa57ff59d4dda0a7d249e32a848599cbed65f05ab41dc35e9076bfdd4ef50a4
+  content_hash: sha256:1513f34876019b7ce5425c6286a1814741243a080c437a957b07525d7a72331b
 - kind: project-relative
   target: agent-skills
   value: .agents/skills/worktrunk/reference/faq.md
@@ -11589,7 +11578,7 @@ deployments:
   owners:
   - max-sixty/worktrunk
   active_owner: max-sixty/worktrunk
-  content_hash: sha256:e37406fcfb272e828872bea08d646905b6fb9f1a8bf221349e93917e30657610
+  content_hash: sha256:beea3a8fef903da303786a469a6c3c52c60708ffdc36a2ae4c7d799d2c72982e
 - kind: project-relative
   target: agent-skills
   value: .agents/skills/worktrunk/reference/hook.md
@@ -11598,7 +11587,7 @@ deployments:
   owners:
   - max-sixty/worktrunk
   active_owner: max-sixty/worktrunk
-  content_hash: sha256:cf0b31e52856355f0d94fbac2fd5f6b54990cdfed667fcabf8fcbcb9065313c9
+  content_hash: sha256:54632c553ea07add63593fd7423c7a7eae8ad4d446fa2d13c1519e5bb0d910d4
 - kind: project-relative
   target: agent-skills
   value: .agents/skills/worktrunk/reference/list.md
@@ -11607,7 +11596,7 @@ deployments:
   owners:
   - max-sixty/worktrunk
   active_owner: max-sixty/worktrunk
-  content_hash: sha256:0194f55254ad5b780e6eeb68c03cef350f15d0faa02873b9a72fbd8b911188e4
+  content_hash: sha256:2a0392421b5353155873c71cb0826285eec8785893de55a3fa51d4f5b7abcfd6
 - kind: project-relative
   target: agent-skills
   value: .agents/skills/worktrunk/reference/llm-commits.md
@@ -11616,7 +11605,7 @@ deployments:
   owners:
   - max-sixty/worktrunk
   active_owner: max-sixty/worktrunk
-  content_hash: sha256:f393ebe314a937a31e62d4dfa6b53af3a2525a6e65abb0bd6f550502d4228b92
+  content_hash: sha256:b32e0a875a85321f5fe6a381c38632ebbe1f0e25d3906c92586567b40cfa5aeb
 - kind: project-relative
   target: agent-skills
   value: .agents/skills/worktrunk/reference/merge.md
@@ -11625,7 +11614,7 @@ deployments:
   owners:
   - max-sixty/worktrunk
   active_owner: max-sixty/worktrunk
-  content_hash: sha256:bff79ff3219cd6af235f053f68b3ea1e4ed67f8278b9c31ebcc4c6dcd7177598
+  content_hash: sha256:78142d762b9db11c161b1616af553b4845efb2913eafd3b9ecf4e4a379869a9b
 - kind: project-relative
   target: agent-skills
   value: .agents/skills/worktrunk/reference/remove.md
@@ -11634,7 +11623,7 @@ deployments:
   owners:
   - max-sixty/worktrunk
   active_owner: max-sixty/worktrunk
-  content_hash: sha256:7ac7c25836319bd5933ec72432279efc105527a845171d814c571e3b8ce22b27
+  content_hash: sha256:2f5ffa5e52616f494ce6ae63b0d83ebb83b44f3eab9f613396d921b14810e611
 - kind: project-relative
   target: agent-skills
   value: .agents/skills/worktrunk/reference/shell-integration.md
@@ -11643,7 +11632,7 @@ deployments:
   owners:
   - max-sixty/worktrunk
   active_owner: max-sixty/worktrunk
-  content_hash: sha256:89e27cc9ecfed2d1600974f281e811857e0f1a53e1c74c6d7f96d949906a32c9
+  content_hash: sha256:ea0efa6b4eca0934b6b060fb002dc7f7c4b1deeb44d4cc0165c45a4bace4eb5d
 - kind: project-relative
   target: agent-skills
   value: .agents/skills/worktrunk/reference/step.md
@@ -11652,7 +11641,7 @@ deployments:
   owners:
   - max-sixty/worktrunk
   active_owner: max-sixty/worktrunk
-  content_hash: sha256:40db14fdd36d16e42842b4ff1937815eeb53523b2fc24f9a9900a0eb5f3be1ac
+  content_hash: sha256:dbbcdb84d4ca3f0e60376e37a484b4f1a8527dce558505eb4d43b7a2bc3dccb5
 - kind: project-relative
   target: agent-skills
   value: .agents/skills/worktrunk/reference/switch.md
@@ -11661,7 +11650,7 @@ deployments:
   owners:
   - max-sixty/worktrunk
   active_owner: max-sixty/worktrunk
-  content_hash: sha256:61be025099e9d9cdc55d1704528bd31cf1742dd96e993ecd797d2fda3658bc8b
+  content_hash: sha256:c728710cdd81008018917dba8e734f3fe17ac3006edf380ffa6ceeff421e2983
 - kind: project-relative
   target: agent-skills
   value: .agents/skills/worktrunk/reference/tips-patterns.md
@@ -11670,7 +11659,7 @@ deployments:
   owners:
   - max-sixty/worktrunk
   active_owner: max-sixty/worktrunk
-  content_hash: sha256:aba4b13c653104718202e86b7a9ff073f79598cad0693b8e4a0335bfe5e24a50
+  content_hash: sha256:c3edc8db77065e46fe0d8febb0ee0302db80c69496562dd5592e973650c536a9
 - kind: project-relative
   target: agent-skills
   value: .agents/skills/worktrunk/reference/troubleshooting.md
@@ -11679,7 +11668,7 @@ deployments:
   owners:
   - max-sixty/worktrunk
   active_owner: max-sixty/worktrunk
-  content_hash: sha256:704f845e147519f059457a7b1780afbd56a83191b7329826e937aaa0e546703b
+  content_hash: sha256:669a3ea0aeed18d0b982f5be1181e9e74ecb8000ca47b4c0a55552e1f7099b5f
 - kind: project-relative
   target: agent-skills
   value: .agents/skills/worktrunk/reference/worktrunk.md
@@ -11688,7 +11677,7 @@ deployments:
   owners:
   - max-sixty/worktrunk
   active_owner: max-sixty/worktrunk
-  content_hash: sha256:8d3c83ff1ddc98ac048d91c7ec86959003901da6f286dd2cca97de7edc0cf0b7
+  content_hash: sha256:8066d6857659dd1c4f021df2549e2f7f9e726515ba5ab058aa4ce3b1ca4b0f17
 - kind: project-relative
   target: agent-skills
   value: .agents/skills/writing-for-agents
@@ -11841,7 +11830,7 @@ deployments:
   owners:
   - max-sixty/worktrunk
   active_owner: max-sixty/worktrunk
-  content_hash: sha256:9e0873e1480c5c276572e5cbb744e1edb470cac929aa1d61aa82bd5cf2f4f61a
+  content_hash: sha256:07bf4211b26187f54bffd40c9fb5703511d176fc8710c87a7fe265ddfd7957e2
 - kind: project-relative
   target: agent-skills
   value: .agents/skills/wt-switch-create/rationale.md
@@ -11850,4 +11839,4 @@ deployments:
   owners:
   - max-sixty/worktrunk
   active_owner: max-sixty/worktrunk
-  content_hash: sha256:a842f00d39d77d4a28fe697e6690e75be147f23c21fc98f79f5d812d798bdd87
+  content_hash: sha256:46c8fd38492d11c006999bc38c3b26a71c12dc036926ecc00af5802b6da2e3b5
