@@ -133,7 +133,7 @@
 
     # The agent CLI pins an alpha Playwright core; keep its browsers independent
     # of the stable docs-test runtime above.
-    playwright-cli.url = "github:halfwhey/nix-playwright-nightly/339105f4a51f14995c746baff1c75155a0f48b61";
+    playwright-cli.url = "github:halfwhey/nix-playwright-nightly/59e4df6f945a54c194f26a27ebd588b10e2cbd16";
     playwright-cli.inputs.nixpkgs.follows = "nixpkgs";
 
     nuenv.url = "github:hallettj/nuenv/writeShellApplication";

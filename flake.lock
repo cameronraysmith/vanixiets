@@ -1445,17 +1445,17 @@
         ]
       },
       "locked": {
-        "lastModified": 1789805356,
-        "narHash": "sha256-MyUYqZykq+PzYFmNBngk6a/A4t+wVdas9+pAdqhN0RU=",
+        "lastModified": 1790676317,
+        "narHash": "sha256-4LNnokdtz00ENinINF5i6HxEpImTozcVj0Vd+sqgmIA=",
         "owner": "halfwhey",
         "repo": "nix-playwright-nightly",
-        "rev": "339105f4a51f14995c746baff1c75155a0f48b61",
+        "rev": "59e4df6f945a54c194f26a27ebd588b10e2cbd16",
         "type": "github"
       },
       "original": {
         "owner": "halfwhey",
         "repo": "nix-playwright-nightly",
-        "rev": "339105f4a51f14995c746baff1c75155a0f48b61",
+        "rev": "59e4df6f945a54c194f26a27ebd588b10e2cbd16",
         "type": "github"
       }
     },
