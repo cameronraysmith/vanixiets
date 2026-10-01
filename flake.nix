@@ -27,9 +27,7 @@
     home-manager.inputs.nixpkgs.follows = "nixpkgs";
 
     # Typed configuration only; pyrite runs and validates with nixpkgs' niri.
-    # Pinned by revision so a schema/renderer change arrives as a reviewed
-    # declaration bump (renovate digest PR) that pyrite-desktop.nix checks.
-    niri-flake.url = "github:epireyn/niri-flake/a008d6dfac70c833b3afc3e7f73fa2ac714583a4";
+    niri-flake.url = "github:epireyn/niri-flake";
     niri-flake.inputs.nixpkgs.follows = "nixpkgs";
     niri-flake.inputs.nixpkgs-stable.follows = "nixpkgs";
 
@@ -40,7 +38,7 @@
     dms-src.url = "github:AvengeMedia/DankMaterialShell/v1.6.2";
     dms-src.flake = false;
 
-    zen-browser.url = "github:youwen5/zen-browser-flake/6979f283e596eead5459a6f181dbb735a10c8588";
+    zen-browser.url = "github:youwen5/zen-browser-flake";
     zen-browser.inputs.nixpkgs.follows = "nixpkgs";
 
     sops-nix.url = "github:Mic92/sops-nix";

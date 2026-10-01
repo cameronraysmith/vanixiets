@@ -5,42 +5,21 @@
   ...
 }:
 let
-  # flake.lock carries both halves of every input pin: `original` is the
-  # specification written in flake.nix, `locked` is what it resolved to. When
-  # flake.nix pins an input by explicit revision, `original.rev` is that
-  # revision, so the expected value can be *derived* from the declaration
-  # instead of being restated as a literal here.
-  #
-  # Restating it was two hand-synchronised sources of truth for one fact, and
-  # it failed every digest bump of the input by construction, independent of
-  # whether the new revision was good (cameronraysmith/vanixiets#3102, #3101).
-  #
-  # The derived form is not a tautology: the actual value is read off the
-  # evaluated input and the expected value off the declaration, so it still
-  # fails if the input stops being pinned to an exact revision (a branch or
-  # tag pin leaves `original.rev` null) or if the resolved revision ever
-  # disagrees with the declared one. What it no longer does is assert which
-  # revision that is; the pinned package's *identity* is asserted separately,
-  # by the conjuncts that compare the packages actually installed against the
-  # packages this input provides.
-  #
-  # dms-src is the exception, pinned by release tag rather than revision. Only
-  # its home-manager module (distro/nix) is imported; the shell itself is
-  # nixpkgs' dms-shell. The invariant is that the module and the running shell
-  # are the same release: the tag declared in flake.nix (`original.ref`), the
-  # release the fetched tree names in quickshell/VERSION, and the packaged
-  # dms-shell version must all agree. A nixpkgs bump of dms-shell therefore
-  # fails until the tag follows it, and a tag bump fails until nixpkgs ships
-  # that release; an untagged master revision fails because its VERSION names
-  # the next pre-release, not a shipped one.
+  # dms-src is pinned by release tag. Only its home-manager module (distro/nix)
+  # is imported; the shell itself is nixpkgs' dms-shell. The invariant is that
+  # the module and the running shell are the same release: the tag declared in
+  # flake.nix (`original.ref`), the release the fetched tree names in
+  # quickshell/VERSION, and the packaged dms-shell version must all agree. A
+  # nixpkgs bump of dms-shell therefore fails until the tag follows it, and a
+  # tag bump fails until nixpkgs ships that release; an untagged master
+  # revision fails because its VERSION names the next pre-release, not a
+  # shipped one.
   #
   # Input names are resolved through the root node's input map rather than
   # indexed directly, because a lock node's key is not its input name once nix
   # deduplicates: the root's "nixpkgs" is the node "nixpkgs_9" here, and any
   # input can acquire such a suffix as the graph changes.
   lock = builtins.fromJSON (builtins.readFile ../../flake.lock);
-  declaredRev = name: lock.nodes.${lock.nodes.root.inputs.${name}}.original.rev or null;
-  pinnedToDeclaredRev = name: input: declaredRev name != null && input.rev == declaredRev name;
   declaredRef = name: lock.nodes.${lock.nodes.root.inputs.${name}}.original.ref or null;
   dmsSrcVersion = lib.trim (builtins.readFile "${inputs.dms-src}/quickshell/VERSION");
 in
@@ -218,10 +197,9 @@ in
     {
       assertions = [
         {
-          message = "pyrite desktop: one pinned wrapped Zen Browser in cameron's home";
+          message = "pyrite desktop: one wrapped Zen Browser in cameron's home";
           assertion =
-            pinnedToDeclaredRev "zen-browser" inputs.zen-browser
-            && inputs.zen-browser.inputs.nixpkgs.outPath == inputs.nixpkgs.outPath
+            inputs.zen-browser.inputs.nixpkgs.outPath == inputs.nixpkgs.outPath
             &&
               builtins.length (
                 builtins.filter (
@@ -242,7 +220,6 @@ in
             && declaredRef "dms-src" == dmsSrcVersion
             && dmsSrcVersion == "v${pkgs.dms-shell.version}"
             && pkgs.dms-greeter.version == "1.6.2"
-            && pinnedToDeclaredRev "niri-flake" inputs.niri-flake
             &&
               map toString options.programs.niri.enable.declarations == [
                 "${inputs.nixpkgs}/nixos/modules/programs/wayland/niri.nix"
