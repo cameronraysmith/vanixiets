@@ -111,6 +111,17 @@ else
   # 400KiB-plus path and refuse to snapshot it under
   # snapshot.max-new-file-size, because that limit applies only to paths jj
   # does not already track.
+  #
+  # Relock starts from an empty apm_modules/ cache. In apm 0.32.0, an existing
+  # install path under --update is re-fetched only for semver refs
+  # (should_force_ref_recheck, src/apm_cli/drift.py:174-193): a literal commit
+  # pin that changed in a dependency's own manifest reuses the cached checkout
+  # and writes the old resolved_commit back. Plain install catches that drift;
+  # --update does not. Observed when version-control-and-forge/apm.yml moved
+  # its worktrunk and mergify-cli refs and the relock kept both old commits.
+  # apm_modules/ is git-ignored materialization only, and the lockfile ledger
+  # carries ownership of deployed files, so removing it costs one re-fetch.
+  rm -rf "${repo_root}/apm_modules"
   relock_log="$(mktemp)"
   if ! apm install --update 2>&1 | tee "${relock_log}"; then
     rm -f "${relock_log}"
