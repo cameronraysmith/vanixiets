@@ -318,7 +318,7 @@ in
           fi
           # The listener answering is not enough: the resolver macOS actually
           # uses must be it, or queries leave in plaintext via the active service.
-          active="$(/usr/sbin/scutil --dns | ${pkgs.gawk}/bin/awk '/^resolver #1/ { r = 1 } r && /nameserver\[0\]/ { print $3; exit }')"
+          active="$(/usr/sbin/scutil --dns | ${pkgs.gawk}/bin/awk '/^resolver #1/ { r = 1 } r && !found && /nameserver\[0\]/ { print $3; found = 1 }')"
           if [ -n "$active" ] && [ "$active" != 127.0.0.1 ] && [ "$active" != ::1 ]; then
             echo "warning: active resolver is $active, not the local dnscrypt-proxy" >&2
             ${lib.getExe pinDns} --check || true
