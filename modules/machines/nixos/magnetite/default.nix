@@ -41,7 +41,9 @@ in
         base
         hm-sops-bridge
         kvm-declaration
+        memory-pressure-guards
         niks3
+        nix-eval-lock
         ssh-known-hosts
         stibnite-builder
         stibnite-session
@@ -293,10 +295,12 @@ in
       # Both dials therefore oversubscribe relative to the 16 cores on purpose,
       # because the work they bound is latency-bound rather than CPU-bound.
       # Neither is bounded by RAM: they live in nix-daemon.service, outside the
-      # eval cgroup whose evalMaxMemorySize x (evalWorkerCount + 1) = 14 GiB cap
-      # is the one ceiling that must stay enforceable, since exceeding it fails
-      # a pull request permanently with no retry. A curl handle costs tens of
-      # KiB, so 100 connections is single-digit MiB against 20 GiB available.
+      # eval cgroup. That cgroup's memory.max is not the binding ceiling either
+      # (nixbot sizes it above physical RAM; MemoryHigh 12G on the service is
+      # what binds, nixbot.nix), and host memory is shared with every other
+      # evaluator, which is why evaluations are serialised by the host
+      # evaluation lock (modules/nixos/nix-eval-lock.nix). A curl handle costs
+      # tens of KiB, so 100 connections is single-digit MiB.
       nix.settings = {
         min-free = 30 * 1024 * 1024 * 1024;
         max-free = 80 * 1024 * 1024 * 1024;
@@ -452,6 +456,16 @@ in
       # without reclaim pressure, and the measured runs used 100, which is also
       # what clan-infra sets on its zram hosts.
       boot.kernel.sysctl."vm.swappiness" = 100;
+
+      # Memory-pressure governance. nixbot's evaluation overlapping a remote
+      # `just check-fast` evaluation OOM-killed this host twice (2026-09-27,
+      # 2026-10-01). The evaluation lock serialises every nix-eval-jobs here
+      # (nixbot, buildbot, ssh users) and makes the running evaluator the OOM
+      # killer's first choice; MGLRU thrash protection turns a working-set
+      # collapse into an OOM kill. Rationale: modules/nixos/nix-eval-lock.nix,
+      # modules/nixos/memory-pressure-guards.nix.
+      services.nixEvalLock.enable = true;
+      services.memoryPressureGuards.enable = true;
 
       # Permit binding magnetite's ZeroTier-assigned IPv6 before zerotierone
       # settles on cold boot (mirrors modules/machines/nixos/cinnabar/caddy.nix).

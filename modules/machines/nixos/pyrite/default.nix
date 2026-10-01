@@ -52,6 +52,8 @@ in
         dnscrypt-proxy
         hm-sops-bridge
         kvm-declaration
+        memory-pressure-guards
+        nix-eval-lock
         ssh-known-hosts
         zt-dns
       ]);
@@ -583,6 +585,42 @@ in
         max-jobs = 2;
         cores = 2;
       };
+
+      # Memory-pressure governance. The evaluation lock serialises
+      # nix-eval-jobs (including a remote `just check-fast` aimed at pyrite)
+      # and puts the running evaluator at oom_score_adj 900; MGLRU thrash
+      # protection turns a working-set collapse into an OOM kill. Rationale:
+      # modules/nixos/nix-eval-lock.nix, modules/nixos/memory-pressure-guards.nix.
+      services.nixEvalLock.enable = true;
+      services.memoryPressureGuards.enable = true;
+
+      # Cap what the zram pool may hold in RAM. The livelock above is zram
+      # holding incompressible pages 1.05:1, so swap-out freed nothing while
+      # the pool itself grew without bound. zram-resident-limit writes
+      # /sys/block/zram0/mem_limit (zram-generator setup.rs); once the pool
+      # reaches it, further swap-out to zram fails, reclaim has nothing left to
+      # gain and the OOM killer fires rather than the machine stalling. 55 % of
+      # MemTotal (~8.5 GiB) leaves the ~7 GiB a niri session needs outside the
+      # pool. The expression is in MiB of MemTotal (`ram`), the same form
+      # zramSwap writes zram-size in; zramSwap.memoryPercent stays at the fleet
+      # default, so modules/checks/magnetite-zram-headroom.nix is unaffected.
+      services.zram-generator.settings.zram0.zram-resident-limit = "55 / 100 * ram";
+
+      # OOM victim order, cheapest first: evaluators (900), builds (inherit
+      # nix-daemon's 250, as srvos sets on magnetite), the desktop. User
+      # managers ship with OOMScoreAdjust=100 (systemd's user@.service) and a
+      # user manager runs its own units at its value + 100 (DefaultOOMScoreAdjust
+      # in systemd-system.conf(5)), which put niri, DMS and quickshell at 200,
+      # above every build. -100 brings the user manager to -100 and its units to
+      # 0. Set on the template because a "user@1000" definition would be a new
+      # unit file shadowing the template instance rather than a drop-in.
+      systemd.services.nix-daemon.serviceConfig.OOMScoreAdjust = 250;
+      systemd.services."user@".serviceConfig.OOMScoreAdjust = -100;
+
+      # Both omnigent workers (6G high / 8G max each) share one 8G ceiling, so
+      # together they can never take more than a single worker's budget from a
+      # 15.5 GiB laptop.
+      services.omnigent-host.workerSliceMemoryMax = "8G";
 
       # Bridge NixOS-level sops to home-manager for user secret key delivery.
       # sopsIdentity defaults to flake.users.cameron.meta.sopsAgeKeyId
