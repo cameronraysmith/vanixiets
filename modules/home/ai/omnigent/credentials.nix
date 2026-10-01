@@ -23,58 +23,46 @@ let
         })
       ) credentials.linearApiKeys
     );
-  mkDelivery =
+  # The adapter's decisions over a vars-shaped view, `vars.<generator>.<file> = { path; placeholder; }`:
+  # the host supplies Clan generator paths and SOPS placeholders, checks supply synthetic ones.
+  credentialPolicy =
     {
       pkgs,
-      osConfig,
-      worker,
+      credentials,
+      vars,
+      linearRendered,
       home,
-      group,
       serverUrl,
     }:
     let
-      selected = sourceSelection worker.credentials;
-      output = source: osConfig.clan.core.vars.generators.${source.generator}.files.${source.file};
+      selected = sourceSelection credentials;
+      output = source: vars.${source.generator}.${source.file};
       path = source: (output source).path;
+      placeholder = source: file: (output (source // { inherit file; })).placeholder;
       enabledPath = source: if source.enable then path source else null;
-      linear = lib.filterAttrs (_: source: source.enable) worker.credentials.linearApiKeys;
-      github = lib.filterAttrs (_: source: source.enable) worker.credentials.githubTokens;
-      linearDestination = "${home}/.config/linear/credentials.toml";
-      templateName = "omnigent-${worker.user}-linear";
-      linearRenderedPath = osConfig.sops.templates.${templateName}.path;
-      secretName = source: "vars/${(output source).rel_dir}/${source.file}";
-      sourceFile =
-        source:
-        let
-          file = output source;
-        in
-        builtins.path {
-          name = lib.strings.sanitizeDerivationName "${file.rel_dir}_${file.name}";
-          path = osConfig.clan.core.settings.directory + "/vars/${file.rel_dir}/${file.name}/secret";
-        };
-      linearSource = source: file: source // { inherit file; };
-      linearSelected = lib.filterAttrs (name: _: lib.hasPrefix "linear-" name) selected;
-      linearPresent = lib.all (
-        source: builtins.hasAttr (secretName source) (osConfig.sops.secrets or { })
-      ) (lib.attrValues linearSelected);
+      linear = lib.filterAttrs (_: source: source.enable) credentials.linearApiKeys;
+      github = lib.filterAttrs (_: source: source.enable) credentials.githubTokens;
+      linearPath = source: file: path (source // { inherit file; });
+    in
+    {
       policy = {
         inherit home serverUrl;
-        inherit (worker.credentials) expected defaultOwner;
-        signingKey = enabledPath worker.credentials.signingKey;
+        inherit (credentials) expected defaultOwner;
+        signingKey = enabledPath credentials.signingKey;
         githubTokens = lib.mapAttrs (_: source: {
           path = path source;
           inherit (source) expectedLogin;
         }) github;
-        claudeSetupToken = enabledPath worker.credentials.claudeSetupToken;
-        linearCredentials = if linear == { } then null else linearDestination;
+        claudeSetupToken = enabledPath credentials.claudeSetupToken;
+        linearCredentials = if linear == { } then null else "${home}/.config/linear/credentials.toml";
+        linearRendered = if linear == { } then null else linearRendered;
         linearApiKeys = lib.mapAttrs (_: source: {
-          path = path (linearSource source "key");
-          workspace = path (linearSource source "workspace");
-          workspaceId = path (linearSource source "workspace-id");
-          viewerEmail = path (linearSource source "viewer-email");
+          path = linearPath source "key";
+          workspace = linearPath source "workspace";
+          workspaceId = linearPath source "workspace-id";
+          viewerEmail = linearPath source "viewer-email";
         }) linear;
-        requiredFiles =
-          map path (lib.attrValues selected) ++ lib.optional (linear != { }) linearRenderedPath;
+        requiredFiles = map path (lib.attrValues selected) ++ lib.optional (linear != { }) linearRendered;
         sources = lib.mapAttrs (_: source: {
           inherit (source) generator file;
           path = path source;
@@ -87,6 +75,59 @@ let
           ssh-keygen = "${pkgs.openssh}/bin/ssh-keygen";
         };
       };
+      linearTemplate =
+        if linear == { } then
+          null
+        else
+          config.flake.lib.mkLinearCredentialsTemplate {
+            workspaces = lib.mapAttrs' (
+              _: source: lib.nameValuePair (placeholder source "workspace") (placeholder source "key")
+            ) linear;
+            defaultWorkspace = placeholder linear.${lib.head (lib.attrNames linear)} "workspace";
+          };
+    };
+  mkDelivery =
+    {
+      pkgs,
+      osConfig,
+      worker,
+      home,
+      group,
+      serverUrl,
+    }:
+    let
+      selected = sourceSelection worker.credentials;
+      output = source: osConfig.clan.core.vars.generators.${source.generator}.files.${source.file};
+      linear = lib.filterAttrs (_: source: source.enable) worker.credentials.linearApiKeys;
+      github = lib.filterAttrs (_: source: source.enable) worker.credentials.githubTokens;
+      templateName = "omnigent-${worker.user}-linear";
+      secretName = source: "vars/${(output source).rel_dir}/${source.file}";
+      sourceFile =
+        source:
+        let
+          file = output source;
+        in
+        builtins.path {
+          name = lib.strings.sanitizeDerivationName "${file.rel_dir}_${file.name}";
+          path = osConfig.clan.core.settings.directory + "/vars/${file.rel_dir}/${file.name}/secret";
+        };
+      linearSelected = lib.filterAttrs (name: _: lib.hasPrefix "linear-" name) selected;
+      linearPresent = lib.all (
+        source: builtins.hasAttr (secretName source) (osConfig.sops.secrets or { })
+      ) (lib.attrValues linearSelected);
+      derived = credentialPolicy {
+        inherit pkgs home serverUrl;
+        credentials = worker.credentials;
+        vars = lib.mapAttrs (
+          _: generator:
+          lib.mapAttrs (name: file: {
+            inherit (file) path;
+            placeholder = osConfig.sops.placeholder."vars/${file.rel_dir}/${name}";
+          }) generator.files
+        ) osConfig.clan.core.vars.generators;
+        linearRendered = osConfig.sops.templates.${templateName}.path;
+      };
+      policy = derived.policy;
       policyFile = pkgs.writeText "omnigent-${worker.user}-credential-policy.json" (
         builtins.toJSON policy
       );
@@ -97,14 +138,9 @@ let
       enabled = selected != { };
       inherit policy policyFile;
       readiness = command "ready";
-      homeModule =
-        { config, ... }:
-        lib.mkIf (selected != { }) {
-          _module.args.omnigentCredentialPolicy = policy;
-          xdg.configFile."linear/credentials.toml" = lib.mkIf (linear != { }) {
-            source = config.lib.file.mkOutOfStoreSymlink linearRenderedPath;
-          };
-        };
+      homeModule = lib.mkIf (selected != { }) {
+        _module.args.omnigentCredentialPolicy = policy;
+      };
       assertions = [
         {
           assertion = lib.all (source: source.generator != null && source.file != null) (
@@ -203,27 +239,16 @@ let
         }
       ) (lib.groupBy (source: source.generator) (lib.attrValues selected));
       templates = lib.optionalAttrs (linear != { } && linearPresent) {
-        ${templateName} =
-          (config.flake.lib.mkLinearCredentialsTemplate {
-            workspaces = lib.mapAttrs' (
-              _: source:
-              lib.nameValuePair osConfig.sops.placeholder.${secretName (linearSource source "workspace")}
-                osConfig.sops.placeholder.${secretName (linearSource source "key")}
-            ) linear;
-            defaultWorkspace =
-              osConfig.sops.placeholder.${
-                secretName (linearSource (linear.${lib.head (lib.attrNames linear)}) "workspace")
-              };
-          })
-          // {
-            owner = worker.user;
-            inherit group;
-          };
+        ${templateName} = derived.linearTemplate // {
+          owner = worker.user;
+          inherit group;
+        };
       };
     };
 in
 {
   flake.lib.omnigentCredentialSelection = sourceSelection;
+  flake.lib.omnigentCredentialPolicy = credentialPolicy;
   flake.lib.mkOmnigentWorkerCredentials = mkDelivery;
   flake.modules.homeManager.omnigent-worker-credentials =
     { config, pkgs, ... }:
@@ -252,6 +277,9 @@ in
           (wrapper "omnigent-worker-verify" "verify")
         ]
         ++ lib.optional (policy.linearApiKeys != { }) (lib.hiPrio (wrapper "linear" "linear"));
+        xdg.configFile."linear/credentials.toml" = lib.mkIf (policy.linearApiKeys != { }) {
+          source = config.lib.file.mkOutOfStoreSymlink policy.linearRendered;
+        };
         programs.gh.package = lib.mkIf (policy.githubTokens != { }) (wrapper "gh" "gh");
         programs.claude-code.package = lib.mkIf (policy.claudeSetupToken != null) (
           wrapper "claude" "claude"

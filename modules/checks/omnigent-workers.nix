@@ -1066,270 +1066,228 @@
         // {
           inherit (pkgs.linear-cli) src;
         };
-      credentialSources = [
-        "signing"
-        "claude"
-      ];
+      credentialPkgs = pkgs.extend (
+        _: _: {
+          gh = mockGh;
+          linear-cli = mockLinear;
+        }
+      );
+      credentialsOf =
+        definition:
+        (lib.evalModules {
+          modules = [
+            {
+              options.credentials = lib.mkOption {
+                type = lib.types.submodule { options = config.flake.lib.omnigentWorkerCredentialOptions; };
+              };
+            }
+            { credentials = definition; }
+          ];
+        }).config.credentials;
       credentialGithubOwners = [
         "first"
         "second"
       ];
-      credentialSource = name: {
-        enable = true;
-        generator = "fixture-${name}";
-        file = "credential";
-      };
       credentialLinearFiles = [
         "key"
         "workspace"
         "workspace-id"
         "viewer-email"
       ];
-      credentialDirectory = pkgs.runCommandLocal "omnigent-credential-synthetic-delivery" { } ''
-        cp -r ${../home/ai/omnigent/fixtures}/. "$out/"
-        chmod -R u+w "$out"
-        cp -r "$out/vars/per-machine/fixture" "$out/vars/shared"
-        ${lib.concatMapStringsSep "\n" (file: ''
-          mkdir -p "$out/vars/shared/omnigent-cameron-linear-personal/${file}"
-          cp ${../home/ai/omnigent/fixtures/vars/per-machine/fixture/fixture-signing/credential/secret} \
-            "$out/vars/shared/omnigent-cameron-linear-personal/${file}/secret"
-        '') credentialLinearFiles}
-        ${lib.concatMapStringsSep "\n" (owner: ''
-          mkdir -p "$out/vars/shared/omnigent-cameron-github-token-${owner}/token"
-          cp ${../home/ai/omnigent/fixtures/vars/per-machine/fixture/fixture-signing/credential/secret} \
-            "$out/vars/shared/omnigent-cameron-github-token-${owner}/token/secret"
-        '') credentialGithubOwners}
-      '';
-      credentialModule = {
-        nixpkgs.pkgs = lib.mkForce (
-          pkgs.extend (
-            _: _: {
-              gh = mockGh;
-              linear-cli = mockLinear;
-            }
-          )
+      # Vars-shaped view the host adapter derives from Clan generators and SOPS placeholders.
+      credentialVar = generator: file: {
+        path = "${credentialRoot}/${generator}-${file}";
+        placeholder = "<SYNTHETIC:${generator}/${file}>";
+      };
+      credentialVars =
+        lib.genAttrs [ "fixture-signing" "fixture-claude" ] (generator: {
+          credential = credentialVar generator "credential";
+        })
+        //
+          lib.genAttrs (map (owner: "omnigent-cameron-github-token-${owner}") credentialGithubOwners)
+            (generator: {
+              token = credentialVar generator "token";
+            })
+        // lib.genAttrs [ "omnigent-cameron-linear-personal" "omnigent-cameron-linear-work" ] (
+          generator: lib.genAttrs credentialLinearFiles (credentialVar generator)
         );
-        clan.core.settings = {
-          directory = credentialDirectory;
-          name = "fixture";
-          icon = null;
-          tld = "test";
-          domain = "fixture.test";
-          machine.name = "fixture";
+      credentialPolicy =
+        definition: linearRendered:
+        config.flake.lib.omnigentCredentialPolicy {
+          pkgs = credentialPkgs;
+          credentials = credentialsOf definition;
+          vars = credentialVars;
+          inherit linearRendered;
+          home = credentialHomePath;
+          serverUrl = "https://fixture.invalid";
         };
-        sops = {
-          validateSopsFiles = false;
-          age.keyFile = "/synthetic-no-decryption-key";
-          templates.omnigent-omnigent-cameron-linear.path = "${credentialRoot}/rendered-linear";
-          secrets =
-            lib.listToAttrs (
-              map (
-                name:
-                lib.nameValuePair "vars/shared/fixture-${name}/credential" {
-                  path = "${credentialRoot}/${name}";
-                }
-              ) credentialSources
-            )
-            // lib.listToAttrs (
-              map (
-                owner:
-                lib.nameValuePair "vars/shared/omnigent-cameron-github-token-${owner}/token" {
-                  path = "${credentialRoot}/github-${owner}";
-                }
-              ) credentialGithubOwners
-            )
-            // lib.listToAttrs (
-              map (
-                file:
-                lib.nameValuePair "vars/shared/omnigent-cameron-linear-personal/${file}" {
-                  path = "${credentialRoot}/linear-${file}";
-                }
-              ) credentialLinearFiles
-            );
-        };
-        users.users.omnigent-cameron.home = lib.mkForce credentialHomePath;
-        services.omnigent-host = {
-          serverUrl = lib.mkForce "https://fixture.invalid";
-          workers.cameron = {
-            enable = true;
-            credentials = {
-              signingKey = credentialSource "signing";
-              githubTokens = lib.genAttrs credentialGithubOwners (owner: {
-                enable = true;
-                generator = "omnigent-cameron-github-token-${owner}";
-                expectedLogin = "fixture-human";
-              });
-              defaultOwner = "first";
-              claudeSetupToken = credentialSource "claude";
-              linearApiKeys.personal = {
-                enable = true;
-                generator = "omnigent-cameron-linear-personal";
-              };
-              expected = {
-                gitEmail = "fixture@example.invalid";
-                omnigentEmail = "fixture@example.invalid";
-                signingPublicKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINdamAGCsQq31Uv+08lkBzoO4XLz2qYjJa8CGmj3B1Ea";
-              };
-            };
-          };
+      credentialSource = name: {
+        enable = true;
+        generator = "fixture-${name}";
+        file = "credential";
+      };
+      credentialLinearKey = label: {
+        enable = true;
+        generator = "omnigent-cameron-linear-${label}";
+      };
+      workerCredentials = {
+        signingKey = credentialSource "signing";
+        githubTokens = lib.genAttrs credentialGithubOwners (owner: {
+          enable = true;
+          generator = "omnigent-cameron-github-token-${owner}";
+          expectedLogin = "fixture-human";
+        });
+        defaultOwner = "first";
+        claudeSetupToken = credentialSource "claude";
+        linearApiKeys.personal = credentialLinearKey "personal";
+        expected = {
+          gitEmail = "fixture@example.invalid";
+          omnigentEmail = "fixture@example.invalid";
+          signingPublicKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINdamAGCsQq31Uv+08lkBzoO4XLz2qYjJa8CGmj3B1Ea";
         };
       };
-      credentialPathAssertion =
-        host@{ config, ... }:
-        {
-          services.omnigent-host.workers.cameron.extraHomeModules = [
-            ({ config, ... }: {
-              assertions = [
-                {
-                  assertion =
-                    let
-                      policy = config.programs.omnigent.workerCredentials;
-                      path = name: host.config.clan.core.vars.generators."fixture-${name}".files.credential.path;
-                    in
-                    policy.signingKey == path "signing"
-                    && lib.all (
-                      owner:
-                      policy.githubTokens.${owner}.path
-                      == host.config.clan.core.vars.generators."omnigent-cameron-github-token-${owner}".files.token.path
-                    ) credentialGithubOwners
-                    && policy.claudeSetupToken == path "claude"
-                    &&
-                      lib.all
-                        (
-                          field:
-                          policy.linearApiKeys.personal.${field}
-                          == host.config.clan.core.vars.generators.omnigent-cameron-linear-personal.files.${
-                            {
-                              path = "key";
-                              workspace = "workspace";
-                              workspaceId = "workspace-id";
-                              viewerEmail = "viewer-email";
-                            }
-                            .${field}
-                          }.path
-                        )
-                        [
-                          "path"
-                          "workspace"
-                          "workspaceId"
-                          "viewerEmail"
-                        ];
-                  message = "Credential fixture: Home Manager credential options must remain Clan vars paths.";
-                }
-                {
-                  assertion =
-                    let
-                      rendered = host.config.sops.templates.omnigent-omnigent-cameron-linear.path;
-                      policy = config.programs.omnigent.workerCredentials;
-                    in
-                    lib.elem rendered policy.requiredFiles
-                    && !lib.elem policy.linearCredentials policy.requiredFiles
-                    &&
-                      toString (config.xdg.configFile."linear/credentials.toml".source or "")
-                      == toString (config.lib.file.mkOutOfStoreSymlink rendered);
-                  message = "Credential fixture: Home Manager must link Linear credentials to the rendered-only readiness artifact.";
-                }
-              ];
-            })
-          ];
+      credentialRendered = "${credentialRoot}/rendered-linear";
+      credentialDelivery = credentialPolicy workerCredentials credentialRendered;
+      credentialHome = inputs.home-manager.lib.homeManagerConfiguration {
+        pkgs = credentialPkgs;
+        extraSpecialArgs = {
+          inherit flake;
+          osConfig = null;
         };
-      credentialFixture =
-        extra:
-        (if pkgs.stdenv.hostPlatform.isDarwin then mkDarwin else mkLinux) (
-          [
-            inputs.clan-core.${
-              if pkgs.stdenv.hostPlatform.isDarwin then "darwinModules" else "nixosModules"
-            }.clanCore
-            credentialModule
-          ]
-          ++ extra
-        );
-      credentialConfig = (credentialFixture [ credentialPathAssertion ]).config;
-      credentialGenerationFor =
-        c:
-        if pkgs.stdenv.hostPlatform.isDarwin then
-          c.environment.etc."omnigent/workers/cameron".source
-        else
-          c.home-manager.users.omnigent-cameron.home.activationPackage;
-      credentialGeneration = credentialGenerationFor credentialConfig;
+        modules = [
+          config.flake.modules.homeManager.omnigent-worker
+          {
+            _module.args.omnigentCredentialPolicy = credentialDelivery.policy;
+            home = {
+              username = "omnigent-cameron";
+              homeDirectory = credentialHomePath;
+              stateVersion = "25.11";
+            };
+            programs.omnigent.settings.host.name = "fixture";
+          }
+        ];
+      };
+      credentialGeneration = credentialHome.activationPackage;
       evaluationMaterial = builtins.toFile "synthetic-evaluation-credential" (
         builtins.hashString "sha256" "omnigent-evaluation-disclosure-fixture"
       );
       disclosureLeakControl = pkgs.writeText "omnigent-disclosure-leak-control" (
         builtins.readFile evaluationMaterial
       );
-      disclosureSettings =
-        c:
-        pkgs.writeText "omnigent-delivery-settings.json" (
-          builtins.toJSON {
-            templates = c.sops.templates;
-            supervisor =
-              if pkgs.stdenv.hostPlatform.isDarwin then
-                c.launchd.daemons.omnigent-host-cameron.serviceConfig
-              else
-                c.systemd.services.omnigent-host-cameron.serviceConfig;
-          }
-        );
-      disclosureArtifacts = c: [
-        (credentialGenerationFor c)
-        (disclosureSettings c)
-        (
-          if pkgs.stdenv.hostPlatform.isDarwin then
-            c.launchd.daemons.omnigent-host-cameron.command
-          else
-            c.systemd.services.omnigent-host-cameron.serviceConfig.ExecStartPre
-        )
-      ];
+      disclosureSettings = pkgs.writeText "omnigent-delivery-settings.json" (
+        builtins.toJSON { inherit (credentialDelivery) policy linearTemplate; }
+      );
       disclosureDerivations = map (drv: builtins.unsafeDiscardOutputDependency drv.drvPath) [
-        (disclosureSettings credentialConfig)
+        disclosureSettings
         linearResolver
       ];
+      # Real hosts running credentialed workers, each checked on its own system.
+      deliveryHosts = lib.filter (machine: config.flake.lib.machineSystems.${machine} == system) (
+        lib.attrNames inventoryRoles.host.machines
+      );
+      # Linux: SOPS installs secrets before the worker's Home Manager unit and host unit
+      # start, both of which run readiness over the delivered policy, which requires the
+      # rendered Linear template rather than the Home Manager link to it.
+      linuxDelivery =
+        machine:
+        let
+          host = config.flake.nixosConfigurations.${machine}.config;
+          homeOf = worker: host.home-manager.users.${worker.user};
+          credentialed = lib.attrNames (
+            lib.filterAttrs (
+              _: worker: (homeOf worker).programs.omnigent.workerCredentials != null
+            ) host.services.omnigent-host.workers
+          );
+        in
+        credentialed != [ ]
+        && lib.all (
+          name:
+          let
+            worker = host.services.omnigent-host.workers.${name};
+            home = homeOf worker;
+            policy = home.programs.omnigent.workerCredentials;
+            readiness = home.home.activation.omnigentCredentialReadiness;
+            hostUnit = host.systemd.services."omnigent-host-${name}";
+            units = [
+              hostUnit
+              host.systemd.services."home-manager-${lib.replaceStrings [ "-" ] [ "\\x2d" ] worker.user}"
+            ];
+            installed =
+              if host.sops.useSystemdActivation then
+                lib.all (
+                  unit:
+                  lib.elem "sops-install-secrets.service" unit.after
+                  && lib.elem "sops-install-secrets.service" unit.requires
+                ) units
+              else
+                host.system.activationScripts ? setupSecrets;
+            linear = host.sops.templates."omnigent-${worker.user}-linear".path;
+          in
+          installed
+          && readiness.before == [ "writeBoundary" ]
+          && lib.hasInfix (builtins.unsafeDiscardStringContext readiness.data) (
+            builtins.unsafeDiscardStringContext hostUnit.serviceConfig.ExecStartPre.text
+          )
+          && (
+            policy.linearApiKeys == { }
+            || (lib.elem linear policy.requiredFiles && !lib.elem policy.linearCredentials policy.requiredFiles)
+          )
+        ) credentialed;
+      # Darwin: activation creates the worker accounts, then runs the fail-closed SOPS
+      # installer, and only then loads the worker launch daemons.
+      darwinDelivery =
+        machine:
+        let
+          host = config.flake.darwinConfigurations.${machine}.config;
+          installer = builtins.unsafeDiscardStringContext host.launchd.daemons.sops-install-secrets.command;
+          parts = lib.splitString installer (
+            builtins.unsafeDiscardStringContext host.system.activationScripts.script.text
+          );
+        in
+        lib.length parts == 2
+        && lib.hasInfix "setting up users" (lib.head parts)
+        && !lib.hasInfix "setting up launchd services" (lib.head parts)
+        && lib.hasPrefix " || exit 1\n" (lib.last parts)
+        && lib.hasInfix "setting up launchd services" (lib.last parts);
       credentialArtifact = pkgs.writeText "omnigent-credential-artifacts.json" (
         builtins.toJSON {
           root = credentialRoot;
           evaluationMaterial = toString evaluationMaterial;
           derivationRoots = map builtins.unsafeDiscardStringContext disclosureDerivations;
-          generatedArtifacts = map toString (disclosureArtifacts credentialConfig);
+          generatedArtifacts = map toString [
+            credentialGeneration
+            disclosureSettings
+          ];
           leakControl = toString disclosureLeakControl;
           generation = toString credentialGeneration;
           git = lib.getExe pkgs.git;
           mockGh = lib.getExe mockGh;
-          linearTemplate = credentialConfig.sops.templates.omnigent-omnigent-cameron-linear.content;
+          linearTemplate = credentialDelivery.linearTemplate.content;
           mockLinear = lib.getExe mockLinear;
           linearPlaceholders = lib.genAttrs credentialLinearFiles (
-            file: credentialConfig.sops.placeholder."vars/shared/omnigent-cameron-linear-personal/${file}"
+            file: credentialVars.omnigent-cameron-linear-personal.${file}.placeholder
           );
-          runtimePath =
-            if pkgs.stdenv.hostPlatform.isDarwin then
-              credentialConfig.launchd.daemons.omnigent-host-cameron.environment.PATH
-            else
-              credentialConfig.systemd.services.omnigent-host-cameron.environment.PATH;
+          runtimePath = config.flake.lib.omnigentWorkerPath {
+            pkgs = credentialPkgs;
+            home = credentialHome.config;
+          };
           consumerSource = ../home/ai/omnigent/credentials.py;
           deliverySource = ../home/ai/omnigent/delivery.py;
           deliveryFixtures = ../home/ai/omnigent/delivery-fixtures.py;
           keychainSource = ../home/ai/omnigent/keychain.py;
           keychainFixtures = ../home/ai/omnigent/keychain-fixtures.py;
-          keychainHome =
+          loginHelperSource = ../apps/omnigent-worker-login.sh;
+          # Stibnite's own worker generation, launch daemons and supervisor launcher.
+          hostGeneration =
             if pkgs.stdenv.hostPlatform.isDarwin then
               toString stibnite.config.environment.etc."omnigent/workers/cameron".source
             else
               null;
-          keychainLaunchd =
+          hostLaunchd =
             if pkgs.stdenv.hostPlatform.isDarwin then toString stibnite.config.system.build.launchd else null;
-          loginHelperSource = ../apps/omnigent-worker-login.sh;
           hostLauncher =
             if pkgs.stdenv.hostPlatform.isDarwin then
-              toString credentialConfig.launchd.daemons.omnigent-host-cameron.command
-            else
-              toString credentialConfig.systemd.services.omnigent-host-cameron.serviceConfig.ExecStartPre;
-          systemActivation =
-            if pkgs.stdenv.hostPlatform.isDarwin then
-              toString credentialConfig.system.activationScripts.script.source
-            else
-              null;
-          installer =
-            if pkgs.stdenv.hostPlatform.isDarwin then
-              credentialConfig.launchd.daemons.sops-install-secrets.command
+              toString stibnite.config.launchd.daemons.omnigent-host-cameron.command
             else
               null;
         }
@@ -1340,34 +1298,80 @@
             accepts =
               label:
               (builtins.tryEval (
-                builtins.deepSeq
-                  (lib.evalModules {
-                    modules = [
-                      {
-                        options.credentials = lib.mkOption {
-                          type = lib.types.submodule { options = config.flake.lib.omnigentWorkerCredentialOptions; };
-                        };
-                      }
-                      { credentials.linearApiKeys.${label}.enable = false; }
-                    ];
-                  }).config.credentials
-                  true
+                builtins.deepSeq (credentialsOf { linearApiKeys.${label}.enable = false; }) true
               )).success;
           in
           accepts "personal" && accepts "work" && !accepts "synthetic-workspace-slug";
-        defaultOff =
-          config.flake.lib.omnigentCredentialSelection
-            (lib.evalModules {
-              modules = [
-                {
-                  options.credentials = lib.mkOption {
-                    type = lib.types.submodule { options = config.flake.lib.omnigentWorkerCredentialOptions; };
+        defaultOff = config.flake.lib.omnigentCredentialSelection (credentialsOf { }) == { };
+        # Disabled sources stay declared but are neither selected, required nor exposed.
+        disabledSourcesOmitted =
+          let
+            policy =
+              (credentialPolicy (
+                workerCredentials
+                // {
+                  signingKey = credentialSource "signing" // {
+                    enable = false;
+                  };
+                  githubTokens = workerCredentials.githubTokens // {
+                    second = workerCredentials.githubTokens.second // {
+                      enable = false;
+                    };
+                  };
+                  claudeSetupToken = credentialSource "claude" // {
+                    enable = false;
+                  };
+                  linearApiKeys = {
+                    personal = credentialLinearKey "personal";
+                    work = credentialLinearKey "work" // {
+                      enable = false;
+                    };
                   };
                 }
-              ];
-            }).config.credentials == { };
-        moduleAssertions = lib.all (a: a.assertion) credentialConfig.assertions;
-      };
+              ) credentialRendered).policy;
+            disabled = [
+              credentialVars.fixture-signing.credential.path
+              credentialVars.fixture-claude.credential.path
+              credentialVars.omnigent-cameron-github-token-second.token.path
+            ]
+            ++ map (file: file.path) (lib.attrValues credentialVars.omnigent-cameron-linear-work);
+          in
+          policy.signingKey == null
+          && policy.claudeSetupToken == null
+          && lib.attrNames policy.githubTokens == [ "first" ]
+          && lib.attrNames policy.linearApiKeys == [ "personal" ]
+          && !lib.any (path: lib.elem path policy.requiredFiles) disabled
+          && lib.elem credentialVars.omnigent-cameron-github-token-first.token.path policy.requiredFiles;
+        # Readiness waits for the rendered template; the Home Manager link to it is created later.
+        linearRequiresRendered =
+          let
+            policy = credentialDelivery.policy;
+          in
+          lib.elem credentialRendered policy.requiredFiles
+          && policy.linearCredentials == "${credentialHomePath}/.config/linear/credentials.toml"
+          && !lib.elem policy.linearCredentials policy.requiredFiles;
+        # Without Linear grants the host has no rendered template, so the policy must not read one.
+        noLinearNoTemplate =
+          let
+            delivery = credentialPolicy (workerCredentials // { linearApiKeys = { }; }) (
+              throw "rendered Linear template read without Linear grants"
+            );
+          in
+          (builtins.tryEval (builtins.deepSeq delivery.policy true)).success
+          && delivery.policy.linearCredentials == null
+          && delivery.linearTemplate == null;
+      }
+      // lib.listToAttrs (
+        map (
+          machine:
+          lib.nameValuePair "delivery-${machine}" (
+            if config.flake.nixosConfigurations ? ${machine} then
+              linuxDelivery machine
+            else
+              darwinDelivery machine
+          )
+        ) deliveryHosts
+      );
     in
     {
       checks = {
@@ -1392,7 +1396,7 @@
               link = Path("${credentialGeneration}/home-files/.config/linear/credentials.toml")
               assert link.is_symlink()
               target = link.resolve()
-              assert target == Path("${credentialConfig.sops.templates.omnigent-omnigent-cameron-linear.path}").resolve()
+              assert target == Path("${credentialRendered}").resolve()
               assert not target.is_relative_to("/nix/store")
               PY
               ${pkgs.python3.interpreter} ${../home/ai/omnigent/credential-fixtures.py} owner-fixtures ${../home/ai/omnigent/credentials.py}

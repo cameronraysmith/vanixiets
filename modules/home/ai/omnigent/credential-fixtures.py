@@ -833,35 +833,26 @@ subprocess.run, os.execve = run, execute
         assert login_helper.index(
             "omnigent-worker-keychain || exit"
         ) < login_helper.index('exec "$@"')
-        if artifact["keychainHome"] is not None:
-            keychain_home = pathlib.Path(artifact["keychainHome"])
-            activation = (keychain_home / "activate").read_text()
+        readiness = [*argv[1:4], "ready"]
+        run(readiness)
+        github_path.unlink()
+        run(readiness, success=False)
+        private_file(github_path, original)
+        if artifact["hostGeneration"] is not None:
+            host_generation = pathlib.Path(artifact["hostGeneration"])
+            activation = (host_generation / "activate").read_text()
             assert (
                 activation.index('_iNote "Activating %s" "omnigentCredentialReadiness"')
                 < activation.index('_iNote "Activating %s" "omnigentKeychain"')
                 < activation.index('_iNote "Activating %s" "writeBoundary"')
             )
-            assert (keychain_home / "home-path/bin/omnigent-worker-keychain").is_file()
+            assert (host_generation / "home-path/bin/omnigent-worker-keychain").is_file()
             plist = (
-                pathlib.Path(artifact["keychainLaunchd"])
+                pathlib.Path(artifact["hostLaunchd"])
                 / "Library/LaunchDaemons/org.nixos.omnigent-host-cameron.plist"
             )
             assert plistlib.loads(plist.read_bytes())["SessionCreate"] is True
-        launcher = pathlib.Path(artifact["hostLauncher"]).read_text()
-        assert " ready" in launcher
-        if artifact["systemActivation"] is not None:
-            activation = pathlib.Path(artifact["systemActivation"]).read_text()
-            assert activation.index("setting up users") < activation.index(
-                artifact["installer"]
-            )
-            assert activation.index(artifact["installer"]) < activation.index(
-                "setting up launchd services"
-            )
-            assert (
-                launcher.index(" ready")
-                < launcher.index(str(generation) + "/activate")
-                < launcher.index("exec ")
-            )
+            launcher = pathlib.Path(artifact["hostLauncher"]).read_text()
             for suffix in (".omnigent", ".omnigent/logs", ".omnigent/logs/host"):
                 directory = home / suffix
                 directory.mkdir(parents=True, exist_ok=True)
@@ -889,17 +880,21 @@ subprocess.run, os.execve = run, execute
     printf 'receipt\\n' >> "$FIXTURE_EVENTS"
     return "$FIXTURE_DELIVERY_STATUS"
   fi
+  if test "$1" = {shlex.quote(artifact["consumerSource"])} && test "$3" = ready; then
+    printf 'readiness\\n' >> "$FIXTURE_EVENTS"
+    return 0
+  fi
   command {python_command} "$@"
 }}
-{generation}/activate() {{
+{host_generation}/activate() {{
   printf 'activation\\n' >> "$FIXTURE_EVENTS"
   return "$FIXTURE_ACTIVATION_STATUS"
 }}
 """
             for delivery_status, activation_status, expected_events in (
                 (1, 0, ["receipt"]),
-                (0, 1, ["receipt", "activation"]),
-                (0, 0, ["receipt", "activation", "host"]),
+                (0, 1, ["receipt", "readiness", "activation"]),
+                (0, 0, ["receipt", "readiness", "activation", "host"]),
             ):
                 events.write_text("")
                 executable.write_text(stubs + body)
@@ -930,12 +925,11 @@ subprocess.run, os.execve = run, execute
                     "FIXTURE_ACTIVATION_STATUS": "0",
                 },
             )
-            assert events.read_text().splitlines() == ["activation", "host"]
-        else:
-            run([artifact["hostLauncher"]])
-            github_path.unlink()
-            run([artifact["hostLauncher"]], success=False)
-            private_file(github_path, original)
+            assert events.read_text().splitlines() == [
+                "readiness",
+                "activation",
+                "host",
+            ]
         activation_text = (generation / "activate").read_text()
         managed_lines = [
             shlex.split(line)[1:]
