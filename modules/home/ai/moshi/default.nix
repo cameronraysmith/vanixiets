@@ -247,21 +247,12 @@
 
           # Agent-hook reconciliation.
           #
-          # This repository generates the agent configuration files that
-          # `moshi-hook install` also writes into -- ~/.claude/settings.json and
-          # ~/.codex/config.toml are reinstalled wholesale on every activation,
-          # so anything moshi added to them is gone by the time the daemon next
-          # starts. Rather than teaching our generators to emit moshi's entries,
-          # which would pin their shape and moshi's own binary path to whatever
-          # this module happened to know, the two writers are ordered: nix
-          # writes its declared configuration first, then moshi re-adds its own
-          # entries on top, every activation.
-          #
-          # That composes because `install` is additive and idempotent: it
-          # appends its hooks beside nix-declared PreToolUse and SessionStart
-          # entries without touching them, a second run leaves the file
-          # byte-identical, and `uninstall` removes exactly its own entries,
-          # restoring the file to its pre-install content.
+          # managedConfigs rewrites the claude, codex, devin, and pi configs
+          # wholesale on every activation, dropping the hooks `moshi-hook
+          # install` added; this entry runs after it so moshi re-adds them.
+          # Those agents declare the hook subtrees as externalPaths, which keeps
+          # them out of managedConfigs' dropped-key report. `install` is
+          # additive and idempotent, so a second run leaves each file unchanged.
           home.activation.moshiHookReconcile =
             lib.hm.dag.entryBetween
               [
@@ -271,10 +262,7 @@
               [
                 "writeBoundary"
                 "linkGeneration"
-                "claudeCodeMutableSettings"
-                "codexMutableSettings"
-                "piCodingAgentMutableSettings"
-                "ompMergeConfig"
+                "managedConfigs"
               ]
               ''
                 $DRY_RUN_CMD install -d -m 0700 ${lib.escapeShellArg cfg.stateDir}
