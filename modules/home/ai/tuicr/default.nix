@@ -67,7 +67,7 @@
 
         home.packages = lib.mkIf cfg.enable [ cfg.package ];
 
-        aiSkills.extraSkillDirs = lib.mkIf cfg.enable [ "${cfg.package.src}/skills" ];
+        aiSkills.extraSkills = lib.mkIf cfg.enable { tuicr = "${cfg.package.src}/skills/tuicr"; };
 
         # tuicr only reads this path (src/config/mod.rs, one fs::read_to_string at
         # startup), so a store symlink suffices; no managedConfigs entry is needed.

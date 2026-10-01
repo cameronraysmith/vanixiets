@@ -86,7 +86,7 @@ let
         composed = lib.mkOption {
           type = lib.types.package;
           internal = true;
-          description = "Wired apm-skills-compose derivation; its .claude/skills/ subtree is re-globbed by skills/default.nix. Never reference its .claude/settings.json or hooks/ (superpowers side-effect).";
+          description = "Wired apm-skills-compose derivation; skills/default.nix points into its .claude/skills/ subtree using the committed name index in passthru.skillNames. Never reference its .claude/settings.json or hooks/ (superpowers side-effect).";
         };
       };
 

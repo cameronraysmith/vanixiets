@@ -28,8 +28,8 @@ let
   };
 
   # `src` is the upstream SOURCE tree (NOT the binary). Consumers inject the
-  # bundled agent skill via `${pkgs.linear-cli.src}/skills` (see
-  # modules/home/users/crs58/default.nix aiSkills.extraSkillDirs), so `src` must
+  # bundled agent skill via `${pkgs.linear-cli.src}/skills/linear-cli` (see
+  # modules/home/development/linear.nix flake.lib.linearSkills), so `src` must
   # remain the upstream source tree on every platform.
   src = fetchFromGitHub {
     owner = "schpet";

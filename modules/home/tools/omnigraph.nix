@@ -95,8 +95,10 @@
       ...
     }:
     {
-      aiSkills.extraSkillDirs = lib.mkIf (
-        (options.programs ? omnigraph) && config.programs.omnigraph.enable
-      ) [ "${config.programs.omnigraph.package.src}/skills" ];
+      aiSkills.extraSkills =
+        lib.mkIf ((options.programs ? omnigraph) && config.programs.omnigraph.enable)
+          {
+            omnigraph = "${config.programs.omnigraph.package.src}/skills/omnigraph";
+          };
     };
 }

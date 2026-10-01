@@ -57,9 +57,8 @@ An untracked file is invisible to `nix flake check`, so run `git add` before eva
 
 A user's evaluated package set is a contract for that user.
 Moving a declaration between files must not change `home.packages` for any user unless the change is the point.
-No check pins these sets, because a committed manifest would need regenerating on every package change and its aarch64 entries can only be produced on a host that can evaluate those configurations.
+No check pins these sets, because a committed manifest would need regenerating on every package change.
 Instead, `just home-package-names` prints the sorted package names of every configuration for one system, the current one by default; run it on the base and on the change and diff the two outputs to review a relocation.
-A configuration that imports from a derivation can only be evaluated by a host that can realise it; today this is `crs58` and `cameron` on aarch64-darwin and aarch64-linux, through `apm-skills-compose` in the `ai` aggregate.
 
 The `<aggregate>/tools.nix` files hold raw packages that no home-manager module owns yet; they are split into per-program files as modules are adopted.
 

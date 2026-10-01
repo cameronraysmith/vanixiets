@@ -85,6 +85,13 @@
     "agent-skills"
     "claude"
   ],
+
+  # Committed index of the skill directory names this compose emits under
+  # .claude/skills and .agents/skills, so consumers enumerate skills at eval time
+  # without reading the build output (no import-from-derivation). The build fails
+  # when the output drifts from it; `just agents-skills-index` regenerates it.
+  # null disables the guard (used only by that recipe).
+  skillNames ? lib.importJSON ./skills.json,
 }:
 let
   pluginsDir = ../../../modules/home/ai/plugins;
@@ -110,6 +117,20 @@ let
   copyUpstreamDeps = lib.concatMapStringsSep "\n" (d: ''
     cp -RL ${d.src} ./${d.name}
     chmod -R u+w ./${d.name}'') upstreamDeps;
+
+  # Fails the build, printing the corrected index, when either skills tree's
+  # directory names differ from skillNames.
+  skillIndexGuard = lib.optionalString (skillNames != null) ''
+    for target in .claude .agents; do
+      actual=$(find "$out/$target/skills" -mindepth 1 -maxdepth 1 -type d -printf '%f\n' | LC_ALL=C sort | jq -R . | jq -s .)
+      if [ "$(jq -c . <<<"$actual")" != ${lib.escapeShellArg (builtins.toJSON skillNames)} ]; then
+        echo "apm-skills-compose: $target/skills differs from pkgs/by-name/apm-skills-compose/skills.json." >&2
+        echo "Run 'just agents-skills-index' or replace skills.json with:" >&2
+        echo "$actual" >&2
+        exit 1
+      fi
+    done
+  '';
 in
 runCommandLocal "apm-skills-compose"
   {
@@ -121,6 +142,7 @@ runCommandLocal "apm-skills-compose"
     meta = {
       description = "Consumer apm compose over all auto-discovered first-party plugin packages, emitting flat .claude/skills and .agents/skills trees for the vanixiets marketplace; superpowers resolves as a regular remote apm dep offline via a pre-warmed git checkout cache.";
     };
+    passthru = { inherit skillNames; };
   }
   ''
     set -euo pipefail
@@ -340,4 +362,6 @@ runCommandLocal "apm-skills-compose"
     for target in .claude .agents; do
       diff -r ${playwrightCli.src}/skills/playwright-cli "$out/$target/skills/playwright-cli"
     done
+
+    ${skillIndexGuard}
   ''

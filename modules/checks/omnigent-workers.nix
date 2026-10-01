@@ -357,7 +357,7 @@
           &&
             toString cfg.programs.claude-code.skills.playwright-cli
             == "${cfg.aiSkills.composed}/.claude/skills/playwright-cli"
-          && !lib.elem pkgs.playwright-cli.skills cfg.aiSkills.extraSkillDirs;
+          && !(cfg.aiSkills.extraSkills ? playwright-cli);
         workflowCapabilities =
           (cfg.programs.openspec.enable or false)
           && (cfg.programs.mergify.enable or false)

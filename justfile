@@ -776,6 +776,18 @@ agents-install:
 agents-relock:
   {{nix_cmd}} run .#apm-skills-install -- --relock
 
+# Regenerate pkgs/by-name/apm-skills-compose/skills.json, the committed skill index the
+# compose build guards against drift. New skill dirs must be git-tracked first.
+[group('agents')]
+agents-skills-index:
+  #!/usr/bin/env bash
+  set -euo pipefail
+  out=$({{nix_cmd}} build --no-link --print-out-paths --impure --expr \
+    'let f = builtins.getFlake (toString ./.); in f.packages.${builtins.currentSystem}.apm-skills-compose.override { skillNames = null; }')
+  find "$out/.claude/skills" -mindepth 1 -maxdepth 1 -type d -exec basename {} \; \
+    | LC_ALL=C sort | jq -R . | jq -s . > pkgs/by-name/apm-skills-compose/skills.json
+  echo "wrote pkgs/by-name/apm-skills-compose/skills.json ($(jq length pkgs/by-name/apm-skills-compose/skills.json) skills)"
+
 # Compose this repo's agent-context-* apm packages into the repo-root AGENTS.md (vanixiets tier only).
 [group('agents')]
 agents-context:

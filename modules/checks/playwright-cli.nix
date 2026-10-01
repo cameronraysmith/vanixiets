@@ -57,7 +57,7 @@
         matchingSkill =
           toString ai.programs.claude-code.skills.playwright-cli
           == "${ai.aiSkills.composed}/.claude/skills/playwright-cli"
-          && !lib.elem package.skills ai.aiSkills.extraSkillDirs;
+          && !(ai.aiSkills.extraSkills ? playwright-cli);
         devshell = lib.elem package self'.devShells.default.nativeBuildInputs;
       };
       failed = lib.attrNames (lib.filterAttrs (_: passed: !passed) cases);

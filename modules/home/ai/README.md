@@ -27,7 +27,7 @@ The lighter human `agents` aggregate does not import it.
 - `plugins/` — the first-party skill corpus, eighteen apm packages; indexed by its own README.
 - `skills/` — composition and delivery of the corpus to each harness's skill directory.
 - `playwright-cli/` — the pinned agent CLI; packaging and smoke tests live in `pkgs/by-name/playwright-cli/` at the repository root.
-  Its matching upstream skill is a selected Git dependency of `planning-and-development/apm.yml`, delivered through the shared APM composition rather than `extraSkillDirs`.
+  Its matching upstream skill is a selected Git dependency of `planning-and-development/apm.yml`, delivered through the shared APM composition rather than `aiSkills.extraSkills`.
   The offline compose cache reuses the CLI's source and checks the manifest revision and source version against the package.
   Composition verifies both harness trees against the complete upstream skill directory, including its references.
   Regenerate the planning plugin's lock with `apm install --update -t agent-skills,claude` from that plugin directory.

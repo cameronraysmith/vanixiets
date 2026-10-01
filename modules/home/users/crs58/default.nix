@@ -41,7 +41,7 @@ let
         pkgs.buzz-git-sign-nostr
       ];
 
-      aiSkills.extraSkillDirs = flake.lib.linearSkillDirs pkgs;
+      aiSkills.extraSkills = flake.lib.linearSkills pkgs;
 
       # User-level OpenSpec install (skills, schema bundle, and the global
       # config.json) is provided by the opt-in programs.openspec module in
