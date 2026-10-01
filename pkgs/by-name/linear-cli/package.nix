@@ -34,7 +34,8 @@ let
   src = fetchFromGitHub {
     owner = "schpet";
     repo = "linear-cli";
-    rev = "v${version}";
+    # v${version} tag commit
+    rev = "196315343d2bc58f30ca5d5ab40f4eb6a449fd71";
     hash = "sha256-wInqzwamLoWgIU6qDaOjgblBuqUJRQmhs5xg4+Npabo=";
   };
 
