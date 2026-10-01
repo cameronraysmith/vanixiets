@@ -13,6 +13,7 @@
   mesa,
   typstWithPackages,
   vanixiets-docs-deps,
+  evidenceEpoch ? lib.trim (builtins.readFile ./evidence-epoch),
   ...
 }:
 let
@@ -187,6 +188,24 @@ stdenv.mkDerivation (finalAttrs: {
     meta.description = "Vitest unit tests for vanixiets-docs";
   };
 
+  passthru.tests.e2e-runner-controls = finalAttrs.finalPackage.tests.unit.overrideAttrs {
+    pname = "vanixiets-docs-e2e-runner-controls";
+    __darwinAllowLocalNetworking = true;
+    env = {
+      PLAYWRIGHT_BROWSERS_PATH = "${playwrightBrowsers}";
+      PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD = "1";
+      PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS = "true";
+    }
+    // linuxBrowserEnv;
+    buildPhase = ''
+      runHook preBuild
+      cd packages/docs
+      node --test tests/browser-report.test.mjs
+      cd ../..
+      runHook postBuild
+    '';
+  };
+
   passthru.tests.linkcheck = finalAttrs.finalPackage.overrideAttrs (old: {
     pname = "${old.pname}-linkcheck";
     env = (old.env or { }) // {
@@ -218,11 +237,16 @@ stdenv.mkDerivation (finalAttrs: {
 
     env = {
       CI = "true";
+      DOCS_EVIDENCE_EPOCH =
+        assert lib.assertMsg (
+          builtins.isString evidenceEpoch && builtins.match "(0|[1-9][0-9]*)" evidenceEpoch != null
+        ) "Docs evidenceEpoch must be a nonnegative decimal string";
+        evidenceEpoch;
       PLAYWRIGHT_CONFIG = "playwright.config.ts";
       # Engine coverage is platform-split. The split lives in the project
       # list only: no spec is deleted, skipped, or weakened on either platform.
       #
-      # x86_64-linux: chromium + firefox + webkit, all 27 specs passing.
+      # x86_64-linux: chromium + firefox + webkit.
       #
       # aarch64-darwin: chromium + webkit. WebKit is net-new coverage here —
       # this check was chromium-only before. Firefox is excluded because it
@@ -239,10 +263,10 @@ stdenv.mkDerivation (finalAttrs: {
       #     not sandboxed at all, and the failure still reproduces;
       #   - concurrency: reproduced at workers = 1;
       #   - HOME: reproduced with a stable, writable HOME under /private/tmp.
-      # Decisively, the same firefox binary from the same browsers tree passes
-      # outside the build: `nix develop -c just docs-test` is 27/27 green on
-      # darwin with all 9 firefox specs included. Firefox on darwin is
-      # therefore covered; what is absent is only its hermetic re-run.
+      # In the pre-reader-journey investigation, the same firefox binary passed
+      # outside the build: `nix develop -c just docs-test` was 27/27 green on
+      # darwin with all 9 then-existing firefox specs included. That historical
+      # result does not establish Firefox coverage of subsequently added tests.
       # Remaining unexplored candidates — CoreFoundation environment, the
       # getpwuid-derived home of the build user, app-bundle launch
       # requirements — have no bounded cost, so they were not pursued. Add
@@ -271,7 +295,8 @@ stdenv.mkDerivation (finalAttrs: {
       cd packages/docs
       # Size the worker pool to the cores nix actually granted this build
       # (`--cores`, else every core on the builder) rather than a fixed 3.
-      # Measured on magnetite (16 cores) over 27 tests: 3 workers 23.2-23.8s,
+      # Historical pre-reader-journey measurements on magnetite (16 cores)
+      # over 27 tests: 3 workers 23.2-23.8s,
       # 6 -> 20.3s, 9 -> 21.2s, 12 -> 18.4s, 16 -> 17.7-19.0s. The floor is the
       # shared astro-preview/miniflare boot plus firefox and webkit cold start,
       # so the curve flattens quickly, but nothing is gained by leaving cores idle.
@@ -316,10 +341,12 @@ stdenv.mkDerivation (finalAttrs: {
         --arg system "${stdenv.system}" \
         --arg config "$PLAYWRIGHT_CONFIG" \
         --arg projects "$PLAYWRIGHT_PROJECTS" \
+        --arg evidenceEpoch "$DOCS_EVIDENCE_EPOCH" \
         '{schemaVersion: 1, exitCode: $exitCode, provenance: {
           site: $site, source: $source, dependencies: $dependencies,
           browsers: $browsers, node: $node, system: $system,
-          config: $config, projects: $projects, trace: "retain-on-failure"
+          config: $config, projects: $projects, trace: "retain-on-failure",
+          evidenceEpoch: $evidenceEpoch
         }}' > run.json
       # A completed assertion failure is evidence, not producer failure.
       # Missing/malformed/incomplete evidence or infrastructure failure is fatal.
@@ -340,11 +367,10 @@ stdenv.mkDerivation (finalAttrs: {
 
   # Keep the existing required check name. This dependency consumes evidence;
   # it never launches Playwright or the docs server a second time.
-  passthru.tests.e2e = runCommand "vanixiets-docs-e2e" { } ''
+  passthru.tests.e2e = runCommand "vanixiets-docs-e2e" { allowedReferences = [ ]; } ''
     ${nodejs-slim}/bin/node ${../../../packages/docs/tests/report}/validate-report.mjs \
       verdict ${finalAttrs.finalPackage.tests.e2e-report}
     mkdir -p "$out"
-    ln -s ${finalAttrs.finalPackage.tests.e2e-report} "$out/report"
   '';
 
   passthru.tests.e2e-negative-control =
@@ -359,6 +385,22 @@ stdenv.mkDerivation (finalAttrs: {
     in
     runCommand "vanixiets-docs-e2e-negative-control" { } ''
       ${nodejs-slim}/bin/node ${../../../packages/docs/tests/report}/check-negative-report.mjs ${report}
+      mkdir -p "$out"
+      ln -s ${report} "$out/report"
+    '';
+
+  passthru.tests.e2e-action-negative-control =
+    let
+      report = finalAttrs.finalPackage.tests.e2e-report.overrideAttrs (old: {
+        pname = "vanixiets-docs-e2e-action-negative-report";
+        env = old.env // {
+          PLAYWRIGHT_CONFIG = "playwright.action-negative.config.ts";
+          PLAYWRIGHT_PROJECTS = "chromium";
+        };
+      });
+    in
+    runCommand "vanixiets-docs-e2e-action-negative-control" { } ''
+      ${nodejs-slim}/bin/node ${../../../packages/docs/tests/report}/check-negative-report.mjs ${report} removed-link
       mkdir -p "$out"
       ln -s ${report} "$out/report"
     '';

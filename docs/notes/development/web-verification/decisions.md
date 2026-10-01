@@ -43,11 +43,22 @@ Ambiguity between an intended behavior change and a regression requires review.
 - Report destination, serving-origin isolation, access policy, and retention.
 - Whether publication failures should add a separate required gate.
 - Scope of successful-run recordings beyond the focused demonstration.
-- Fresh-run policy for investigating cached negative or flaky results.
 - Association of a new revision with existing evidence when nixbot reuses an entire build and does not emit build_finished.
 
 These choices do not block pure report/verdict work, skill composition, or hermetic publisher rehearsals.
 They do block enabling live publication.
+
+## D7: preserve observations and refresh through an explicit evidence epoch
+
+Review R2 identified that a completed negative report remains a valid cached output.
+Pinned nixbot restarts use ordinary realization; Nix 2.35.2 `--rebuild` compares output hashes and does not replace a valid report.
+Changing only cache availability would not prevent local reuse.
+
+Use a source-controlled decimal evidence epoch outside the application's source fileset.
+Increment it deliberately to collect another required observation without rebuilding unchanged application or browser inputs.
+Record the epoch in the report and preserve the old observation.
+Do not reuse an epoch or interpret a fresh pass as proof that an earlier failure was harmless.
+This provides a defined refresh mechanism; it does not make live or inherently time-dependent tests hermetic.
 
 ## Source grounding
 

@@ -28,11 +28,12 @@ These results do not validate the proposed report/verdict split or APM skill rou
 The implementation checkout was then rebased onto `af98cc44c25664c5658b36f4d8f5251aa2022188`.
 New changes require new validation.
 
-## Current increment
+## Initial implementation history
 
 After that rebase and addition of this design tree, `nix develop --accept-flake-config -c just lint` completed with exit status 0: gitleaks and treefmt passed.
 Nix emitted a nonfatal evaluation-cache SQLite contention warning.
 This run covers the parent checkout's design and existing capability changes, not the isolated workers' unfinished APM, report, or registry changes.
+That was the state at this particular lint run, not the current integration status; subsequent entries record their integration.
 
 ### Registry prerequisite
 
@@ -92,6 +93,68 @@ Those runs preceded final formatting, README changes, and the additional unit-ru
 An attempted full `just check-fast auto off x86_64-linux` warm-up reached 11 successful checks and no observed failures before the 200-second terminal limit.
 It did not complete and is not evidence that the full Linux check surface passed.
 The draft review checkpoint must disclose that limit.
+
+## Independent review and corrections
+
+The independent `omp` review covers published head `d9d44f5c5c8d94412021e1f46386a9dccb211b56` in draft PR #3265.
+Its eight findings are recorded in tuicr session `gh:cameronraysmith/vanixiets/pr/3265`.
+Review finding identifiers R1–R8 are distinct from the requirement identifiers in the table above.
+
+The reviewer reports successful targeted Darwin and Linux checks at that head, mostly from cached outputs, and an actual reproduction of lost evidence for a missing-element action timeout.
+This supplements the initial implementation history; it is not a full check sweep or a fresh browser-suite run.
+
+The correction work has passed this integrated native Darwin selection, with remote builders disabled:
+
+```sh
+nix build .#checks.aarch64-darwin.docs-e2e-wiring \
+  .#checks.aarch64-darwin.playwright-cli-consumers \
+  .#checks.aarch64-darwin.docs-evidence-cache \
+  .#checks.aarch64-darwin.effects-interpreter \
+  .#checks.aarch64-darwin.effect-run-context \
+  .#checks.aarch64-darwin.deployment-safety \
+  --no-link --builders '' --cores 4
+```
+
+- R2: the evidence-epoch check rejects invalid epochs, requires identical epochs to reuse the report, and requires a new epoch to change the report and verdict without changing the site derivation.
+  Native report outputs for epochs `0` and `1` were realized and their provenance read back.
+  Ordinary nixbot restart and Nix `--rebuild` semantics were inspected in pinned source; neither is documented as a replacement mechanism for an existing negative report.
+- R3: credentialed `buildFinished` definitions now require write/admin permission metadata.
+  Real registry evaluation covers unsafe configurations; seven direct assertions against the pinned nixbot matcher cover permission behavior.
+  Those assertions ran without pytest, which was unavailable in the research Python environment.
+- R5: a successfully built verdict reading another producer is rejected despite matching enumeration identities.
+  Removing the dependency predicate made the negative fixture fail, demonstrating that the fixture exercises that predicate.
+- R6: consumer tests evaluate the real `ai` and `agents` aggregates without named-user enrollment lists.
+  Injecting the package into the lighter aggregate made its exclusion check fail.
+- R7: the required verdict no longer links to the report and enforces `allowedReferences = [ ]`.
+  A measured empty verdict closure was 96 bytes with no references; the separately enumerated report intentionally retains its provenance closure.
+
+The same six-check selection passed for x86_64-linux with `--max-jobs 0` and only the configured Magnetite/Pyrite builder entries supplied.
+The effects interpreter and wrong-producer fixture emitted build logs; these results do not imply every selected derivation executed afresh.
+`nix develop --accept-flake-config -c just lint` passed gitleaks and treefmt for this intermediate integrated state.
+
+After R1/R4 integration, the following five checks passed on both platforms with the actual source-defined epoch wiring:
+
+```text
+package-vanixiets-docs-test-e2e
+package-vanixiets-docs-test-e2e-negative-control
+package-vanixiets-docs-test-e2e-action-negative-control
+package-vanixiets-docs-test-e2e-runner-controls
+package-vanixiets-docs-test-unit
+```
+
+Build logs show fresh positive browser execution: 20 passed on Darwin and 30 passed on Linux, with no flaky or skipped tests.
+Both negative controls retained reports and attachments and independently checked verdict exit 1.
+The removed-link control failed at the unchanged reader journey's click after its 5000ms action timeout, rather than reaching the whole-test deadline.
+Separate native-browser controls cover accepted locator timeouts and rejected launch, hook, closed-page, and whole-test failures.
+The unit check remains browser-free; independent policy tests reject omission of each required browser engine.
+Linux again used only Magnetite/Pyrite builder entries and `--max-jobs 0`; Darwin used `--builders ''`.
+
+Positive report outputs:
+
+- Darwin: `/nix/store/m8w4hnmvjx0gn6ryd5hmjwvqkgrg4d2w-vanixiets-docs-e2e-report-0.0.0-development`.
+- Linux: `/nix/store/vyl60h11xsq8jzw13xbn6cr55xyxja14-vanixiets-docs-e2e-report-0.0.0-development`.
+
+No correction adds a live publisher, deployment, or current-revision receipt for whole-build reuse.
 
 ## Required negative cases
 

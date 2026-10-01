@@ -76,7 +76,10 @@ Attribute-level availability accepts the API's succeeded and skipped_local state
 
 Browser traces can contain timestamps and other nondeterministic diagnostic bytes.
 Nix input pinning supports reuse of a realization; it does not establish bit-identical traces across repeated executions or universal absence of flakes.
-Negative results are reusable observations of those inputs, with deliberate reruns available for diagnosis.
+Negative results are reusable observations of those inputs.
+A source-controlled report-only evidence epoch requests a fresh required observation without changing the application or browser build.
+Ordinary CI restarts may reuse the old report; `--rebuild` checks reproducibility rather than replacing it.
+The operational procedure is in `packages/docs/tests/report/README.md`.
 
 A binary cache is not a browsable report archive or an indefinite retention guarantee.
 Artifact realization failure must remain visible.

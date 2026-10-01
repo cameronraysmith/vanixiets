@@ -57,6 +57,7 @@ function workerCount() {
 export default defineConfig({
   // Test directory
   testDir: "./e2e",
+  timeout: 30000,
 
   // Run tests in files in parallel
   fullyParallel: true,
@@ -87,6 +88,10 @@ export default defineConfig({
 
   // Shared settings for all projects
   use: {
+    // Let a missing/unusable element complete as an action failure before the
+    // whole-test deadline, leaving time for evidence and fixture teardown.
+    actionTimeout: 5000,
+    navigationTimeout: 10000,
     // Base URL for page.goto() calls
     baseURL: process.env.BASE_URL ?? "http://localhost:4321",
 

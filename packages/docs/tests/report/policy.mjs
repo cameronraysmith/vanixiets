@@ -14,4 +14,26 @@ export const requiredCases = {
     "reader-journey.spec.ts::reader finds bootstrap prerequisites and a guided reading path",
   ],
   "playwright.negative.config.ts": ["reader-journey.spec.ts::damaged guide is rejected by the real reader journey"],
+  "playwright.action-negative.config.ts": [
+    "removed-link.spec.ts::removed homepage link is rejected by the real reader journey",
+  ],
 };
+
+// Independent of PLAYWRIGHT_PROJECTS and of discovery: the producer cannot
+// redefine coverage by narrowing its own configuration and metadata together.
+// Darwin Firefox cannot launch in the Nix build environment; the package
+// documents the native-build experiments behind this explicit exception.
+export const requiredEngines = {
+  "aarch64-darwin": ["chromium", "webkit"],
+  "x86_64-darwin": ["chromium", "webkit"],
+  "x86_64-linux": ["chromium", "firefox", "webkit"],
+  "aarch64-linux": ["chromium", "firefox", "webkit"],
+};
+
+export function requiredProjects(system, config) {
+  if (!Object.hasOwn(requiredEngines, system)) return undefined;
+  if (config === "playwright.negative.config.ts" || config === "playwright.action-negative.config.ts") {
+    return ["chromium"];
+  }
+  return config === "playwright.config.ts" ? requiredEngines[system] : undefined;
+}

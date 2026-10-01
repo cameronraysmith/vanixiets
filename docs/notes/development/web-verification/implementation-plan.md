@@ -1,18 +1,20 @@
 # Implementation plan
 
 Each increment updates these notes alongside its implementation.
-Commits remain local to the isolated Delta checkout; publication, deployment, and changes to other agents' working copies are excluded.
+The five-commit checkpoint is published as draft PR #3265 at `d9d44f5c5c8d94412021e1f46386a9dccb211b56`.
+Independent review updates continue in the isolated Delta checkout.
+Live artifact publication, deployment, and changes to other agents' working copies remain excluded.
 
 | Increment | Deliverable | State |
 | --- | --- | --- |
-| 1 | Pinned CLI/browser package, shared capability, and devshell wiring | Implemented in working change; revalidation needed after rebases |
+| 1 | Pinned CLI/browser package, shared capability, and devshell wiring | Implemented; reviewer confirmed targeted Darwin/Linux checks at the published head |
 | 2 | APM-owned upstream skill with offline composition and updated consumer checks | Integrated; native consumer/worker checks pass; remote root lock follows publication |
 | 3 | Requirements, architecture, decisions, and verification ledger | Initial working design written |
-| 4 | Docs journey, completed-report producer, required verdict check | Integrated; targeted native Darwin checks pass |
-| 5 | Negative controls for failure detection and report integrity | Implemented and exercised on both platforms; final Linux unit additions await rerun |
+| 4 | Docs journey, completed-report producer, required verdict check | Integrated; fresh positive runs pass on Darwin and Linux |
+| 5 | Negative controls for failure detection and report integrity | Assertion and missing-link controls pass on both platforms with retained evidence and negative verdicts |
 | 6 | build_finished registry support and publisher sidecar rehearsals | Registry prerequisite integrated and checks pass; publisher not implemented |
 | 7 | CLI reproduction, diagnosis, correction, and re-verification receipt | Planned |
-| 8 | Independent review, integrated lint/checks, atomic commit organization | Draft review checkpoint being prepared; integrated lint and focused Darwin checks pass |
+| 8 | Independent review, integrated lint/checks, atomic commit organization | First independent review complete; R1–R8 corrections implemented, targeted checks pass; reviewer confirmation pending |
 
 ## Execution constraints
 

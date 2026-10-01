@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync, realpathSync, statSync } from "node:fs";
 import { isAbsolute, relative, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
-import { requiredCases } from "./policy.mjs";
+import { requiredCases, requiredProjects } from "./policy.mjs";
 
 function array(value, label) {
   assert(Array.isArray(value), `${label} must be an array`);
@@ -45,12 +45,19 @@ export function validateReport(root) {
     assert(typeof metadata.provenance?.[key] === "string" && metadata.provenance[key], `missing provenance: ${key}`);
   }
   assert.equal(metadata.provenance.trace, "retain-on-failure");
+  assert(
+    typeof metadata.provenance.evidenceEpoch === "string" && /^(0|[1-9]\d*)$/.test(metadata.provenance.evidenceEpoch),
+    "invalid evidence epoch",
+  );
   assert(["passed", "failed"].includes(completion.status), "incomplete run");
   assert.equal(array(completion.errors, "completion errors").length, 0, "runner infrastructure error");
   assert.equal(array(results.errors, "JSON errors").length, 0, "JSON runner infrastructure error");
   const tests = array(completion.tests, "tests");
   assert(tests.length > 0, "zero-test report");
   const projects = metadata.provenance.projects.split(",");
+  const expectedProjects = requiredProjects(metadata.provenance.system, metadata.provenance.config);
+  assert(expectedProjects, "unknown system/suite policy");
+  assert.deepEqual([...projects].sort(), [...expectedProjects].sort(), "required browser engines");
   assert.equal(new Set(projects).size, projects.length, "duplicate project");
   assert.deepEqual([...array(completion.projects, "projects")].sort(), [...projects].sort(), "project disagreement");
   assert.deepEqual(
@@ -87,7 +94,7 @@ export function validateReport(root) {
       assert.equal(attempt.retry, index, "missing/out-of-order attempt");
       assert.equal(json.results[index].status, attempt.status, "attempt status disagreement");
       assert.equal(json.results[index].retry, attempt.retry);
-      assert.equal(attempt.failureKind, attempt.status === "failed" ? "assertion" : null, "infrastructure failure");
+      assert.equal(attempt.failureKind, attempt.status === "failed" ? "product" : null, "infrastructure failure");
       const attachments = array(attempt.attachments, "attachments");
       const jsonAttachments = array(json.results[index].attachments, "JSON attachments")
         .filter((attachment) => attachment.path)

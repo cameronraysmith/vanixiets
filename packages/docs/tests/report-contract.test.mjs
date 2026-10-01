@@ -33,7 +33,7 @@ function fixture(t, failed = false) {
           {
             status,
             retry: 0,
-            failureKind: failed ? "assertion" : null,
+            failureKind: failed ? "product" : null,
             attachments,
           },
         ],
@@ -73,6 +73,7 @@ function fixture(t, failed = false) {
       config: "playwright.negative.config.ts",
       projects: "chromium",
       trace: "retain-on-failure",
+      evidenceEpoch: "0",
     },
   };
   const save = () => {
@@ -244,11 +245,15 @@ test("well-formed partial scenario inventory is rejected even when counts agree"
   const data = fixture(t);
   const names = requiredCases["playwright.config.ts"];
   data.metadata.provenance.config = "playwright.config.ts";
+  data.metadata.provenance.projects = "chromium,webkit";
+  data.completion.projects = ["chromium", "webkit"];
   const template = data.completion.tests[0];
   const spec = data.results.suites[0].specs[0];
-  data.completion.tests = names.map((name, index) => ({ ...template, id: `case-${index}`, case: name }));
-  data.results.suites[0].specs = names.map((_, index) => ({ ...spec, id: `case-${index}` }));
-  data.results.stats.expected = names.length;
+  data.completion.tests = ["chromium", "webkit"].flatMap((project) =>
+    names.map((name, index) => ({ ...template, project, id: `${project}-${index}`, case: name })),
+  );
+  data.results.suites[0].specs = data.completion.tests.map(({ id }) => ({ ...spec, id }));
+  data.results.stats.expected = names.length * 2;
   data.save();
   assert.equal(validateReport(data.root).passed, true);
   data.completion.tests.pop();
@@ -256,4 +261,63 @@ test("well-formed partial scenario inventory is rejected even when counts agree"
   data.results.stats.expected--;
   data.save();
   assert.throws(() => validateReport(data.root), /partial\/unexpected scenario matrix/);
+});
+
+for (const system of ["aarch64-darwin", "x86_64-linux"]) {
+  test(`independent ${system} engine policy rejects self-consistent chromium-only producer`, (t) => {
+    const data = fixture(t);
+    const names = requiredCases["playwright.config.ts"];
+    data.metadata.provenance.config = "playwright.config.ts";
+    data.metadata.provenance.system = system;
+    const template = data.completion.tests[0];
+    const spec = data.results.suites[0].specs[0];
+    data.completion.tests = names.map((name, index) => ({ ...template, id: `case-${index}`, case: name }));
+    data.results.suites[0].specs = names.map((_, index) => ({ ...spec, id: `case-${index}` }));
+    data.results.stats.expected = names.length;
+    data.save();
+    assert.throws(() => validateReport(data.root), /required browser engines/);
+  });
+}
+
+for (const [system, projects] of [
+  ["aarch64-darwin", ["chromium", "webkit"]],
+  ["x86_64-linux", ["chromium", "firefox", "webkit"]],
+]) {
+  test(`${system} requires every declared engine even with consistent producer metadata`, (t) => {
+    const data = fixture(t);
+    const names = requiredCases["playwright.config.ts"];
+    const template = data.completion.tests[0];
+    const spec = data.results.suites[0].specs[0];
+    const saveMatrix = (engines) => {
+      data.metadata.provenance.config = "playwright.config.ts";
+      data.metadata.provenance.system = system;
+      data.metadata.provenance.projects = engines.join(",");
+      data.completion.projects = engines;
+      data.completion.tests = engines.flatMap((project) =>
+        names.map((name, index) => ({ ...template, project, id: `${project}-${index}`, case: name })),
+      );
+      data.results.suites[0].specs = data.completion.tests.map(({ id }) => ({ ...spec, id }));
+      data.results.stats.expected = data.completion.tests.length;
+      data.save();
+    };
+    saveMatrix(projects);
+    assert.equal(validateReport(data.root).passed, true);
+    for (const missing of projects) {
+      saveMatrix(projects.filter((engine) => engine !== missing));
+      assert.throws(() => validateReport(data.root), /required browser engines/);
+    }
+  });
+}
+
+test("unknown platform and malformed evidence epoch fail closed", (t) => {
+  const data = fixture(t);
+  data.metadata.provenance.system = "unknown";
+  data.save();
+  assert.throws(() => validateReport(data.root), /unknown system\/suite policy/);
+  data.metadata.provenance.system = "aarch64-darwin";
+  for (const epoch of [undefined, 0, "-1", "1.2", "", "01"]) {
+    data.metadata.provenance.evidenceEpoch = epoch;
+    data.save();
+    assert.throws(() => validateReport(data.root), /invalid evidence epoch/);
+  }
 });

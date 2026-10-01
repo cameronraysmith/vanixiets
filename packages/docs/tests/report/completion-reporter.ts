@@ -10,24 +10,39 @@ import type {
   TestStep,
 } from "@playwright/test/reporter";
 
-function assertionErrors(steps: TestStep[]): TestError[] {
-  return steps.flatMap((step) => [
-    ...(step.category === "expect" && step.error ? [step.error] : []),
-    ...assertionErrors(step.steps),
-  ]);
+function productErrors(steps: TestStep[]): TestError[] {
+  return steps.flatMap((step) => {
+    // Setup/teardown assertions and actions are infrastructure, not reader work.
+    if (step.category === "hook" || step.category === "fixture") return [];
+    // Public 1.63 metadata identifies locator operations without trusting a
+    // pw:api category alone (browserType.launch also uses that category).
+    // Only bounded auto-wait timeouts qualify; crashes/closed pages and other
+    // API exceptions remain infrastructure. Test-level deadlines never qualify.
+    const locatorTimeout =
+      step.category === "pw:api" &&
+      typeof step.params?.locator === "string" &&
+      /^(Click|Double click|Check|Uncheck|Hover|Tap|Select option|Set input files|Fill ".*"|Press ".*")$/.test(
+        step.title,
+      ) &&
+      step.error?.message?.startsWith("TimeoutError:");
+    return [
+      ...((step.category === "expect" || locatorTimeout) && step.error ? [step.error] : []),
+      ...productErrors(step.steps),
+    ];
+  });
 }
 
 function failureKind(result: TestResult) {
   if (result.status === "passed" && result.errors.length === 0) return null;
-  const assertions = assertionErrors(result.steps);
-  // Playwright serializes errors without matcherResult. Match against its
-  // structured expect steps, not prose such as "Timeout" or "browser closed".
+  const failures = productErrors(result.steps);
+  // Every reported error must have matching completed product-step evidence.
+  // A second hook/worker error must not be hidden by a legitimate product error.
   return result.status === "failed" &&
     result.errors.length > 0 &&
     result.errors.every((error) =>
-      assertions.some((assertion) => assertion.message === error.message && assertion.stack === error.stack),
+      failures.some((failure) => failure.message === error.message && failure.stack === error.stack),
     )
-    ? "assertion"
+    ? "product"
     : "infrastructure";
 }
 
