@@ -1,20 +1,19 @@
 # Implementation plan
 
 Each increment updates these notes alongside its implementation.
-The five-commit checkpoint is published as draft PR #3265 at `d9d44f5c5c8d94412021e1f46386a9dccb211b56`.
-Independent review updates continue in the isolated Delta checkout.
-Live artifact publication, deployment, and changes to other agents' working copies remain excluded.
+Increments 1–5 and the registry part of 6 merged to `main` in #3265.
+Live artifact publication and deployment remain excluded.
 
 | Increment | Deliverable | State |
 | --- | --- | --- |
 | 1 | Pinned CLI/browser package, shared capability, and devshell wiring | Implemented; reviewer confirmed targeted Darwin/Linux checks at the published head |
-| 2 | APM-owned upstream skill with offline composition and updated consumer checks | Integrated; native consumer/worker checks pass; remote root lock follows publication |
+| 2 | APM-owned upstream skill with offline composition and updated consumer checks | Merged; the root `apm.lock.yaml` records the skill after relocking against `main` |
 | 3 | Requirements, architecture, decisions, and verification ledger | Initial working design written |
 | 4 | Docs journey, completed-report producer, required verdict check | Integrated; fresh positive runs pass on Darwin and Linux |
 | 5 | Negative controls for failure detection and report integrity | Assertion and missing-link controls pass on both platforms with retained evidence and negative verdicts |
-| 6 | build_finished registry support and publisher sidecar rehearsals | Registry prerequisite integrated and checks pass; publisher not implemented |
+| 6 | build_finished registry support and publisher sidecar rehearsals | Registry prerequisite integrated; `publish-evidence` and its rehearsal pass on Darwin and Linux; no effect registered |
 | 7 | CLI reproduction, diagnosis, correction, and re-verification receipt | Planned |
-| 8 | Independent review, integrated lint/checks, atomic commit organization | First independent review complete; R1–R8 corrections implemented, targeted checks pass; reviewer confirmation pending |
+| 8 | Independent review, integrated lint/checks, atomic commit organization | Review findings closed before #3265 merged |
 
 ## Execution constraints
 

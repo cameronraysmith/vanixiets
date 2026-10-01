@@ -18,7 +18,7 @@ The package-test registry exposes these attributes under `checks.<system>`:
 The verdict output is an empty success marker with no runtime store references.
 The negative-control output retains a `report` symlink for inspection.
 The independently enumerable producer gives nixbot a successful build artifact to expose even when the verdict fails.
-This change does not publish artifacts or deploy the site.
+These checks do not publish artifacts or deploy the site.
 
 ```sh
 node packages/docs/tests/report/validate-report.ts validate /nix/store/...-vanixiets-docs-e2e-report-...
@@ -63,6 +63,15 @@ The negative controls require every attempt to fail and the terminal attempt to 
 Report builds run at most four workers: CI builders grant every concurrent build all cores, so `NIX_BUILD_CORES` overstates what one build may use.
 `trace: "retain-on-failure"` captures the original failing attempt, unlike the previous `on-first-retry` policy.
 HTML/JSON serve artifact readers; the line reporter serves nixbot build logs without GitHub-specific annotations.
+
+## Publication
+
+`nix run .#publish-evidence -- build-finished --out <dir>` is the trusted `build_finished` sidecar for this contract; `modules/apps/docs/publish-evidence.sh` documents its interface.
+It looks up `checks.x86_64-linux.package-vanixiets-docs-test-e2e-report` through nixbot's build API by the event's build number and realises the recorded output; a missing, failed, or unrealisable output is reported as unavailable evidence, never rebuilt.
+It validates the report with its own copy of `validate-report.ts` and copies only `run.json`, `playwright-report/completion.json`, and PNG screenshots referenced by attempts, beside a deterministic `receipt.json` carrying the build, output path, the API's `cached` field, provenance, verdict, and file digests.
+Product-failing reports are published with `passed: false`; invalid evidence, unsafe attachment paths, symlinks, non-PNG screenshots, and build/report identity mismatches are rejected.
+No effect runs it yet and the storage destination is undecided, so publication ends at the local `--out` directory.
+`publish-evidence-rehearsal` exercises it against a loopback nixbot API and a chroot store.
 
 ## Failure classification boundary
 
@@ -129,7 +138,7 @@ Such a result does not replace the report selected by the source-controlled requ
 
 Invalid/incomplete runs fail the producer; they have Nix build logs, not a successful report output.
 They must never be presented as a passing or product-failing completed report.
-Tests cover the local built site and synthetic failure controls, not a deployed site, live nixbot API retrieval, or the report publisher.
+Tests cover the local built site and synthetic failure controls, not a deployed site or live nixbot API retrieval; the publisher is rehearsed separately against a loopback API.
 
 Run the protocol tests with installed dependencies using `node --test tests/report-*.test.ts` from `packages/docs`, or build `package-vanixiets-docs-test-unit`; Node strips the types at load time.
 The unit check also runs the existing Vitest suite.

@@ -12,7 +12,7 @@ No entry below claims live deployment or evidence publication.
 | R3 | CLI reproduction and reviewed correction followed by independent rerun | Pending |
 | R4 | Relevant-input identity and cache-reuse receipt | Pending; whole-build reuse does not emit build_finished |
 | R5 | Isolated browser/profile/fixture cleanup checks | CLI smoke has isolation; harness integration pending |
-| R6 | Trusted publisher rehearsal, malformed metadata rejection, no PR evaluation | Existing docs precedent; browser publisher pending |
+| R6 | Trusted publisher rehearsal, malformed metadata rejection, no PR evaluation | Loopback rehearsal passes on Darwin and Linux; live effect pending |
 | R7 | Deliberate defect rejected for the expected reason | Controlled guide-heading mutation rejected with retained trace and screenshot |
 | R8 | Documented lifecycle seam, later exercised by a second application | Design only |
 
@@ -155,6 +155,36 @@ Positive report outputs:
 - Linux: `/nix/store/vyl60h11xsq8jzw13xbn6cr55xyxja14-vanixiets-docs-e2e-report-0.0.0-development`.
 
 No correction adds a live publisher, deployment, or current-revision receipt for whole-build reuse.
+
+## Evidence publisher
+
+`modules/apps/docs/publish-evidence.nix` exposes `nix run .#publish-evidence -- build-finished --out <dir>`, a `writeShellApplication` sidecar for a trusted default-branch `build_finished` event.
+No effect registers it; storage destination, retention, and access remain undecided, so publication ends at the local `--out` directory.
+
+Implemented behavior:
+
+- The event supplies only data: `NIXBOT_EVENT_KIND` must be `build_finished`, and `.build.number`, `.build.rev`, `.build.status`, and `.build.url` are validated before any request.
+- The build is fetched from nixbot's build API by number; its number and `commit_sha` must equal the event's.
+  The aggregate build may have failed.
+- The `checks.x86_64-linux.package-vanixiets-docs-test-e2e-report` attribute must be `succeeded` or `skipped_local`, carry a boolean `cached`, and have a realisable store output.
+  Otherwise the program prints `evidence unavailable` and exits 1 without evaluating or building anything.
+- Before validation, attachment paths must be relative and normalised, selected files must be regular files with no symlinked path component, and referenced `.png` attachments must start with the PNG signature.
+  Report provenance must name `x86_64-linux` and `playwright.config.ts`.
+- The program's own `validate-report.ts` copy then judges the report: a product-failing report is published with `verdict.passed: false` and exit 0; validator exit 2 is rejected.
+- The bundle holds `run.json`, `playwright-report/completion.json`, and the referenced PNG screenshots, without HTML, traces, or other attachments.
+  `receipt.json` records the build, attribute, output path, the API's `cached` value verbatim, report provenance, verdict, and per-file SHA-256 and size, with no timestamp.
+- Publication is staged beside `--out` and renamed into place, so a rejected run leaves no receipt.
+  A repeat for the same build, revision, attribute, and output path is a no-op when the bytes match; an existing receipt for another identity, or a non-empty directory without one, is refused.
+
+`publish-evidence-rehearsal` runs the real program against a loopback nixbot API and a chroot store with synthetic report fixtures generated from `policy.ts`.
+A control first runs the repository validator on every fixture, so the program, not the validator, makes each rejection except for the invalid and absolute-path fixtures.
+Its rows cover passing, product-failing, failed-aggregate, and `skipped_local`/cached publication; byte-identical repeat and fresh republication; another identity's destination; a non-empty destination; missing `--out`; missing, failed, unfetchable, and unrealisable outputs; traversal, absolute, symlinked, and non-PNG attachments; revision, system, and config mismatches; a wrong event kind; malformed build number and revision; and invalid evidence.
+Each rejection asserts its exit status, exact message, API requests, and the absence of a publication.
+
+`checks.aarch64-darwin.publish-evidence-rehearsal` passed natively, and `checks.x86_64-linux.publish-evidence-rehearsal` passed on Magnetite.
+`apps-build`, which runs shellcheck over the new program, passed on both platforms.
+
+This rehearsal does not cover live nixbot delivery, an upload backend, HTML or trace hosting, or whole-build reuse.
 
 ## Required negative cases
 
