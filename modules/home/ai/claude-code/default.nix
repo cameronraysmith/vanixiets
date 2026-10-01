@@ -36,21 +36,20 @@ in
                 padding = 0;
               };
 
-              # Fable 5.1 orchestrates; Opus 5.5 does the worker tasks via
-              # CLAUDE_CODE_SUBAGENT_MODEL below. Both run at medium through the
-              # per-model modelSettings key, which outranks effortLevel; that
-              # key is the floor for every other model. ultracode must stay off
-              # because it pins the whole session to xhigh, which would make the
-              # medium levels below unreachable -- the cost is its dynamic
-              # workflow planning, which we run through atomic instead.
-              model = "fable";
+              # Opus 5.5 is the session and subagent default (`opus` resolves
+              # through ANTHROPIC_DEFAULT_OPUS_MODEL); Fable is opt-in via
+              # `ccfable`. Per-model modelSettings outrank effortLevel, so both
+              # run at medium and effortLevel is the floor for every other model.
+              # ultracode must stay off: it pins the session to xhigh, which
+              # would make the medium levels unreachable.
+              model = "opus";
               effortLevel = "high";
               ultracode = false;
               modelSettings = {
                 "claude-fable-5-1".effortLevel = "medium";
                 "claude-opus-5-5".effortLevel = "medium";
               };
-              fallbackModel = [ "claude-opus-5-5" ];
+              fallbackModel = [ "claude-sonnet-5-5" ];
               forceLoginMethod = "claudeai";
               theme = "dark";
               editorMode = "vim";
@@ -173,7 +172,7 @@ in
               alwaysThinkingEnabled = true;
 
               env = {
-                ANTHROPIC_DEFAULT_HAIKU_MODEL = "claude-sonnet-5";
+                ANTHROPIC_DEFAULT_HAIKU_MODEL = "claude-sonnet-5-5";
                 ANTHROPIC_DEFAULT_OPUS_MODEL = "claude-opus-5-5";
                 ANTHROPIC_DEFAULT_SONNET_MODEL = "claude-opus-5-5";
                 ASTRO_TELEMETRY_DISABLED = "1";
