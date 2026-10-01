@@ -20,7 +20,18 @@
       checks.apps-build =
         pkgs.runCommand "apps-build"
           {
-            programs = builtins.attrValues (builtins.mapAttrs (_: app: app.program) self'.apps);
+            # The k8s-deploy-* programs need import-from-derivation to evaluate;
+            # IFD-free reintroduction is part of the cryolite programme.
+            programs = builtins.attrValues (
+              builtins.mapAttrs (_: app: app.program) (
+                removeAttrs self'.apps [
+                  "k8s-deploy-local"
+                  "k8s-deploy-local-k3d"
+                  "k8s-deploy-local-k3d-foundation"
+                  "k8s-deploy-local-k3d-infrastructure"
+                ]
+              )
+            );
             passthru.meta.description = "Every flake app on this system evaluates and its program realizes";
           }
           ''

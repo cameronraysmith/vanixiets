@@ -13,11 +13,12 @@
     { self', ... }:
     let
       blacklist = [
-        # already exposed under existing check names
+        # evaluation needs import-from-derivation
         "k8s-manifests-local"
         "k8s-manifests-local-json"
         "k8s-manifests-local-k3d"
         "k8s-manifests-local-k3d-json"
+        # already exposed under existing check names
         "fdContainer-aarch64"
         "fdContainer-x86_64"
         "rgContainer-aarch64"
