@@ -188,6 +188,9 @@
     gateway-api-src.flake = false;
   };
 
+  # allow-import-from-derivation is deliberately unset: with accept-flake-config
+  # a value here overrides both the command line and nixbot's NIX_CONFIG.
+  #
   # sync with lib/caches.nix for machine modules
   nixConfig = {
     extra-substituters = [

@@ -191,6 +191,10 @@
       # restated. logs/nixbot-memorymax-oom-victim.md.
       systemd.services.nixbot.serviceConfig.MemoryHigh = "12G";
 
+      # nixbot forwards NIX_* into its evaluator sandbox and has no option for
+      # extra evaluation arguments; scoped here so buildbot-nix is unaffected.
+      systemd.services.nixbot.environment.NIX_CONFIG = "allow-import-from-derivation = false";
+
       # Every evaluation queues on the host evaluation lock and runs at
       # oom_score_adj 900 (modules/nixos/nix-eval-lock.nix). The wrapper sits
       # over the evaluator nixbot would otherwise use, its own patched build,

@@ -374,6 +374,34 @@ check-fast nom="auto" push="off" system="" remote="magnetite":
     --skip-cached \
     --flake ".#checks.$system"
 
+# Evaluate every check (including all nixos, darwin and home configurations) with
+# import-from-derivation disallowed, as nixbot's CI does; nothing is built.
+# Usage: just check-ifd                    (all three systems)
+#        just check-ifd "aarch64-darwin"
+[group('nix')]
+check-ifd systems="x86_64-linux aarch64-linux aarch64-darwin" workers="4" mem="4096":
+  #!/usr/bin/env bash
+  set -euo pipefail
+  out=$(mktemp); trap 'rm -f "$out"' EXIT
+  failed=0
+  for system in {{systems}}; do
+    nix-eval-jobs \
+      --flake ".#checks.$system" \
+      --force-recurse \
+      --workers {{workers}} --max-memory-size {{mem}} \
+      --option allow-import-from-derivation false \
+      --option eval-cache false \
+      --option accept-flake-config true \
+      > "$out"
+    if jq -e -s 'any(.[]; .error != null)' "$out" > /dev/null; then
+      jq -r --arg s "$system" 'select(.error != null) | "checks.\($s).\(.attr): \(.error | split("\n") | map(select(test("error:"))) | last // "")"' "$out" >&2
+      failed=1
+    else
+      echo "checks.$system: $(wc -l < "$out" | tr -d ' ') attributes evaluated with import-from-derivation disallowed"
+    fi
+  done
+  exit "$failed"
+
 # Verify system configuration builds after updates (run before activate)
 [group('nix')]
 verify:

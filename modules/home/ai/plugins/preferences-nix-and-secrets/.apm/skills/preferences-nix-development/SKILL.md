@@ -36,6 +36,28 @@ Discovery is location-bound: `import-tree ./modules` only finds files under that
 Litmus test for a file under the root: it must import to an attrset module or a function module; every config value it defines must target a declared option (or a freeform type such as `flake.*`); and a function form must end in `...` with formals drawn only from flake-level args (`pkgs`/`stdenv` are perSystem-only).
 See `references/dendritic-module-composition.md` for the exact module-validity rules for both forms, the import-tree discovery API, and the common crash causes with fixes.
 
+## No import-from-derivation
+
+Never read a derivation output at evaluation time.
+`import`, `builtins.readFile`, `lib.importJSON`, `lib.importTOML`, `builtins.pathExists`, `builtins.readDir`, and `builtins.path` applied to a path inside a derivation's output (a `runCommand` result, a package's `${pkg}/share/...`, a converter such as `yaml2json` or `chart2json`) force that derivation to build in the middle of evaluation: import-from-derivation (IFD).
+
+Why it is forbidden:
+- Evaluation serializes on the build: the evaluator blocks until the derivation is realized, so no other attribute evaluates and no build is scheduled meanwhile.
+- Evaluation becomes platform-bound: the IFD derivation must be buildable by the evaluating machine, so evaluating `aarch64-darwin` outputs on a Linux CI worker (or the reverse) fails or needs a remote builder just to evaluate.
+- The work is invisible to caches and schedulers: `nix-eval-jobs`, CI, and `nix flake check` see the dependency only after building it, so it is neither parallelized nor reported as a job, and a cold cache turns evaluation into a build.
+
+IFD-free patterns, in order of preference:
+- Take data from a flake input, including `flake = false` inputs for plain source trees; reading files of an input is a source read, not a build.
+- Interpolate store paths into strings (`"${pkg}/share/foo"`) instead of reading them; string context carries the dependency to build time without evaluating the contents.
+- Commit generated data (JSON indexes, rendered manifests, goldens) to the repository, regenerate it with a recipe, and add an in-build guard that fails, printing the corrected data, when the committed copy drifts from what the build produces.
+- Move the step into a build: do the conversion or comparison inside a derivation's builder rather than feeding its output back into Nix.
+- Write platform-independent checks for one system instead of every system when their evaluation cannot be made IFD-free elsewhere.
+
+Enforcement: CI evaluates with `allow-import-from-derivation = false` (nixbot's `NIX_CONFIG`), and `just check-ifd` runs `nix-eval-jobs` over `checks.<system>` for every system with IFD disabled and lists each attribute that errors.
+Verify a single attribute with `nix eval --raw --option allow-import-from-derivation false '.#<attr>.drvPath'`.
+
+An exception requires an argument in review showing that none of the patterns above applies, and a recorded decision naming the attribute; an IFD-dependent output stays out of `checks` until then.
+
 ## Best practices
 - Follow nixpkgs naming conventions and style
 - Use `inputs.*.follows = "nixpkgs"` to minimize flake input duplication
