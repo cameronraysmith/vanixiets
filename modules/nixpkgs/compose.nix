@@ -27,9 +27,11 @@
 
       # Custom packages from pkgs-by-name
       # Provides: Project-specific packages (ccstatusline, etc.)
-      # Use withSystem to access perSystem packages for the target system
-      customPackages = withSystem prev.stdenv.hostPlatform.system (
-        { config, ... }: config.packages or { }
+      # Only for config.systems: nixpkgs re-applies this overlay to nested sets
+      # such as pkgsi686Linux, whose perSystem packages do not exist.
+      system = prev.stdenv.hostPlatform.system;
+      customPackages = lib.optionalAttrs (lib.elem system config.systems) (
+        withSystem system ({ config, ... }: config.packages or { })
       );
     in
     # Compose all (order matters!)
