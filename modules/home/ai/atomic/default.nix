@@ -82,17 +82,17 @@ let
             defaultThinkingLevel = "medium";
             modelThinkingLevels = {
               "anthropic/claude-fable-5-1" = "medium";
-              "anthropic/claude-opus-5" = "medium";
+              "anthropic/claude-opus-5-5" = "medium";
               "openai-codex/gpt-6-astra" = "medium";
             };
             fallbackModels = [
               "openai-codex/gpt-6-astra:high"
-              "anthropic/claude-opus-5:medium"
+              "anthropic/claude-opus-5-5:medium"
             ];
             subagents.agentOverrides =
               let
                 research = {
-                  model = "anthropic/claude-opus-5:medium";
+                  model = "anthropic/claude-opus-5-5:medium";
                 };
               in
               {

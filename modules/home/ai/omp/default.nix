@@ -158,8 +158,6 @@ let
             # The per-agent analog of atomic's subagents.agentOverrides. `scout`
             # is omp's read-only research agent, so it takes the Opus tier of
             # atomic's codebase-* agents rather than sonic's mechanical tier.
-            # atomic stays on claude-opus-5 until its bundled model registry
-            # (@bastani/pi-ai) knows claude-opus-5-5.
             task.agentModelOverrides = {
               scout = lib.mkDefault "anthropic/claude-opus-5-5:medium";
             };
