@@ -9,7 +9,7 @@ No entry below claims live deployment or evidence publication.
 | --- | --- | --- |
 | R1 | Committed journey with independent expected outcomes and required verdict | Implemented; real browser checks pass |
 | R2 | Completed negative report retains attachments and is discoverable by named check | Report and negative control pass; live API retrieval pending |
-| R3 | CLI reproduction and reviewed correction followed by independent rerun | Pending |
+| R3 | CLI reproduction and reviewed correction followed by independent rerun | Mobile hero overflow reproduced with Playwright CLI; strengthened scenario fails the required gate on Linux with a kept report and passes after the CSS correction on Linux and Darwin; review pending |
 | R4 | Relevant-input identity and cache-reuse receipt | Pending; whole-build reuse does not emit build_finished |
 | R5 | Isolated browser/profile/fixture cleanup checks | CLI smoke has isolation; harness integration pending |
 | R6 | Trusted publisher rehearsal, malformed metadata rejection, no PR evaluation | Loopback rehearsal passes on Darwin and Linux; live effect pending |
@@ -185,6 +185,66 @@ Each rejection asserts its exit status, exact message, API requests, and the abs
 `apps-build`, which runs shellcheck over the new program, passed on both platforms.
 
 This rehearsal does not cover live nixbot delivery, an upload backend, HTML or trace hosting, or whole-build reuse.
+
+## Increment 7: mobile hero overflow repair
+
+A Playwright CLI smoke against the built site found that the homepage did not fit a phone.
+The existing "is responsive on mobile" scenario passed because it only required a visible `h1`.
+
+### Reproduction and diagnosis
+
+The site and dependency packages were built natively on aarch64-darwin, staged as the e2e derivation stages them, and served with `astro preview` on loopback.
+Measurements came from `playwright-cli` `--raw eval` on `/`:
+
+| Context | Before: scrollWidth / clientWidth / innerWidth | Before: hero img left–right (wrapper) | After: scrollWidth / clientWidth / innerWidth | After: hero img left–right (wrapper) |
+| --- | --- | --- | --- | --- |
+| `--mobile` (Pixel, 360 device width) | 466 / 360 / 466 | 65–465, 400 wide (65–295) | 360 / 360 / 360 | 65–295, 230 wide (65–295) |
+| `--device="iPhone 15"` (393) | 471 / 393 / 471 | 70–470 (70–323) | 393 / 393 / 393 | 70–323, 253 wide (70–323) |
+| Desktop context resized to 375×667 | 467 / 375 / 375 | 67–467, 400 wide (67–308) | not separately measured; covered by the scenario | |
+| Desktop 1280 | not measured | | 1280 / 1280 / 1280 | 799–1180, 381 wide (799–1180) |
+
+The meta viewport was `width=device-width, initial-scale=1` and `visualViewport.scale` was 1, so this was not an emulation or zoom artifact.
+Before the repair, the visible screenshot cut off the right of the logo and pushed the header search button to 418–450 px, outside the 360 px device.
+The only unclipped elements extending past the device width were the hero image and the fixed header, which spans the widened layout viewport.
+The code blocks seen in the first smoke run sit inside scroll containers and were not the cause.
+
+Root cause: the homepage uses `hero.image.html` with `<img … width="400" height="400">` (`packages/docs/src/content/docs/index.mdx:8`).
+Starlight 0.42.4 `Hero.astro` sizes the `.hero-html` wrapper (`width: min(70%, 20rem)`, or `min(100%, 25rem)` from 50rem) but does not constrain the raw markup inside it.
+The image kept its 400 px attribute width, overflowed the wrapper, and mobile browsers widened the layout viewport to contain it.
+
+### Strengthened expectation
+
+`packages/docs/e2e/homepage.spec.ts` "is responsive on mobile" keeps its 375×667 viewport and visible-`h1` assertion.
+It now also requires a visible hero image, a layout viewport no wider than 375 px, `documentElement.scrollWidth <= clientWidth`, and the hero image's left and right edges within `[0, clientWidth]`.
+No assertion was removed or relaxed, and the required-case inventory is unchanged because no test identity was added.
+
+With the unmodified site, the pinned runner (`@playwright/test` from `vanixiets-docs-deps`, browsers from `vanixiets-docs.tests.e2e-report.PLAYWRIGHT_BROWSERS_PATH`) ran `e2e/homepage.spec.ts` for Chromium and WebKit against the preview: 10 passed and 2 failed.
+Both failures were the strengthened scenario:
+
+```text
+Error: document must not scroll horizontally
+expect(received).toBeLessThanOrEqual(expected)
+Expected: <= 375
+Received:    467
+```
+
+### Correction and re-verification
+
+`packages/docs/src/styles/custom.css:10-17` gives `.hero-html img` `max-width: 100%` and `height: auto`, so the raw hero markup fits the wrapper Starlight already sizes.
+After rebuilding `vanixiets-docs` and restaging its `dist`, the same spec, projects, and runner passed 12 of 12 with no retries, and the CLI measurements above showed no horizontal overflow.
+
+These local runs used a temporary configuration without `webServer`, since the committed configuration probes port 4321 and would otherwise start a dev server.
+They are developer-platform evidence only.
+
+### Required gate
+
+On x86_64-linux (Magnetite), the report producer ran the strengthened scenario against the unmodified site and kept a valid report.
+Its verdict exited 1 with 27 expected and 3 unexpected: the strengthened scenario failed on Chromium, Firefox, and WebKit with `Received: 467`, each attempt keeping a trace and a non-empty screenshot.
+With the CSS correction, the same producer passed 30 of 30 with no flaky tests, and the verdict, both negative controls, and the unit and wiring checks passed.
+
+On aarch64-darwin, the corrected suite passed 20 of 20 with no flaky tests, and the same checks passed.
+The Darwin run against the unmodified site failed the same scenario on Chromium and WebKit, but the producer rejected the report: every failed WebKit attempt wrote a 0-byte `test-failed-1.png`.
+That is a separate Darwin WebKit capture defect, not a property of this repair; until it is fixed, a WebKit product failure on Darwin keeps no report.
 
 ## Required negative cases
 

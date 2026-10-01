@@ -12,7 +12,7 @@ Live artifact publication and deployment remain excluded.
 | 4 | Docs journey, completed-report producer, required verdict check | Integrated; fresh positive runs pass on Darwin and Linux |
 | 5 | Negative controls for failure detection and report integrity | Assertion and missing-link controls pass on both platforms with retained evidence and negative verdicts |
 | 6 | build_finished registry support and publisher sidecar rehearsals | Registry prerequisite integrated; `publish-evidence` and its rehearsal pass on Darwin and Linux; no effect registered |
-| 7 | CLI reproduction, diagnosis, correction, and re-verification receipt | Planned |
+| 7 | CLI reproduction, diagnosis, correction, and re-verification receipt | Mobile hero overflow repaired: strengthened scenario fails the Linux gate with a kept report, then passes on Linux and Darwin after the CSS correction; review pending |
 | 8 | Independent review, integrated lint/checks, atomic commit organization | Review findings closed before #3265 merged |
 
 ## Execution constraints

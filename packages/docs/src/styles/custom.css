@@ -7,6 +7,15 @@
   height: inherit;
 }
 
+/* Starlight sizes the hero.image.html wrapper (.hero-html) but not the markup
+ * inside it, so the logo's width="400" attribute overflowed narrow viewports
+ * and widened the mobile layout viewport past the device.
+ */
+.hero-html img {
+  max-width: 100%;
+  height: auto;
+}
+
 /* Center standalone images (markdown images on their own line become <p><img></p>)
  * This applies to typst-generated diagram SVGs and other block-level images.
  * Uses the Starlight content container class for specificity.

@@ -39,6 +39,24 @@ test.describe("Homepage", () => {
 
     // Page should still be functional
     await expect(page.locator("h1").first()).toBeVisible();
+
+    // A visible h1 does not show that the page fits: an oversized hero once
+    // widened the document past the device, cutting off the logo and header.
+    const heroImg = page.locator(".hero img");
+    await expect(heroImg).toBeVisible();
+    const layout = await heroImg.evaluate((img) => {
+      const rect = img.getBoundingClientRect();
+      return {
+        scrollWidth: document.documentElement.scrollWidth,
+        clientWidth: document.documentElement.clientWidth,
+        heroLeft: rect.left,
+        heroRight: rect.right,
+      };
+    });
+    expect(layout.clientWidth, "layout viewport width").toBeLessThanOrEqual(375);
+    expect(layout.scrollWidth, "document must not scroll horizontally").toBeLessThanOrEqual(layout.clientWidth);
+    expect(layout.heroLeft, "hero image left edge").toBeGreaterThanOrEqual(0);
+    expect(layout.heroRight, "hero image right edge").toBeLessThanOrEqual(layout.clientWidth);
   });
 
   test("loads without console errors", async ({ page }) => {
