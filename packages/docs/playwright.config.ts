@@ -51,6 +51,24 @@ function workerCount() {
 }
 
 /**
+ * Port of the server Playwright starts and browses. DOCS_PREVIEW_PORT wins
+ * when set so concurrent nix report builds on an unsandboxed (shared-network)
+ * darwin host each get their own port; otherwise the conventional 4321.
+ */
+function previewPort() {
+  const explicit = process.env.DOCS_PREVIEW_PORT;
+  if (!explicit) return 4321;
+  const parsed = Number(explicit);
+  if (!Number.isInteger(parsed) || parsed < 1 || parsed > 65535) {
+    throw new Error(`DOCS_PREVIEW_PORT must be a TCP port (1-65535), got ${explicit}`);
+  }
+  return parsed;
+}
+
+const port = previewPort();
+const serverUrl = `http://localhost:${port}`;
+
+/**
  * Playwright configuration for E2E testing
  * @see https://playwright.dev/docs/test-configuration
  */
@@ -95,7 +113,7 @@ export default defineConfig({
     // evidence, so a limit below the test deadline only turns a slow load on a
     // busy builder into an infrastructure failure. The test deadline bounds it.
     // Base URL for page.goto() calls
-    baseURL: process.env.BASE_URL ?? "http://localhost:4321",
+    baseURL: process.env.BASE_URL ?? serverUrl,
 
     // Keep the original failing attempt, even if its retry passes.
     trace: "retain-on-failure",
@@ -114,8 +132,8 @@ export default defineConfig({
   // In CI: serve pre-built static output (faster, matches production artifact).
   // In dev: astro dev server (supports HMR, serves from source).
   webServer: {
-    command: process.env.CI ? "bun run preview:ci" : "bun run dev",
-    url: "http://localhost:4321",
+    command: `${process.env.CI ? "bun run preview:ci" : "bun run dev"} --port ${port}`,
+    url: serverUrl,
     reuseExistingServer: !process.env.CI,
     timeout: 120000,
   },

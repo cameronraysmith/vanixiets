@@ -111,6 +111,14 @@ Removing that symlink reduced the verdict output closure to 96 bytes with no ref
 The report producer still deliberately retains its provenance closure; removing the verdict reference does not eliminate that separate cost.
 Resolve evidence through the named producer, not the verdict output.
 
+Darwin report builds are unsandboxed and share the host network, so report builds that run concurrently (the producer and every negative-control report) must not share any fixed listening port.
+The e2e-report build phase asks the kernel for a free loopback port and exports it as `DOCS_PREVIEW_PORT`; `playwright.config.ts` passes it to the preview command as `--port` and uses it for `webServer.url` and `baseURL` (`BASE_URL` still overrides `baseURL`).
+Unset, the port is 4321, so local runs are unchanged.
+The port is released just before astro preview binds it, so another process can claim it in that window; that is unlikely within milliseconds, and the outcome is an infrastructure failure: under `CI` Playwright refuses a URL that already answers, and astro preview (Vite without `strictPort`) moves to another port, so the configured URL never comes up and the webServer start times out.
+The preview's workerd also opens a debugger inspector, which `@cloudflare/vite-plugin` places on the first free port from 9229 upward; concurrent builds race between that probe and the bind (`EADDRINUSE 127.0.0.1:9231` was observed).
+The e2e-report derivation therefore sets `DOCS_DISABLE_WORKER_INSPECTOR=1`, and `astro.config.ts` then passes `inspectorPort: false` to the Cloudflare adapter, so the preview opens no inspector port; nothing in a report build attaches a debugger.
+Without that variable, local `bun run dev` and `astro preview` keep the default inspector.
+
 ### Intentionally collect a fresh required observation
 
 A valid report with failed assertions is cached like any other successful derivation.

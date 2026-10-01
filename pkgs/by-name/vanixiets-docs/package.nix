@@ -251,6 +251,13 @@ stdenv.mkDerivation (finalAttrs: {
 
     env = {
       CI = "true";
+      # Read by astro.config.ts: pass `inspectorPort: false` to the cloudflare
+      # adapter so astro preview's workerd opens no inspector. Unset, the vite
+      # plugin probes upward from 9229 and concurrent unsandboxed darwin report
+      # builds race for the same port (EADDRINUSE 127.0.0.1:9231 observed).
+      # Nothing here attaches a debugger. Negative-control reports inherit it
+      # via `old.env //`.
+      DOCS_DISABLE_WORKER_INSPECTOR = "1";
       DOCS_EVIDENCE_EPOCH =
         assert lib.assertMsg (
           builtins.isString evidenceEpoch && builtins.match "(0|[1-9][0-9]*)" evidenceEpoch != null
@@ -324,10 +331,32 @@ stdenv.mkDerivation (finalAttrs: {
       # across 18 workers on stibnite).
       cores="''${NIX_BUILD_CORES:-1}"
       export PLAYWRIGHT_WORKERS=$(( cores < 4 ? cores : 4 ))
+      # Darwin builds run unsandboxed on the host network, so concurrently
+      # built reports (this one and both negative-control overrideAttrs, which
+      # inherit this buildPhase) must not share astro preview's default 4321:
+      # one build's server would answer or kill the other's tests. Ask the
+      # kernel for a free loopback port and hand it to playwright.config.ts,
+      # which uses it for webServer (`--port`), webServer.url and baseURL.
+      # The port is released before astro preview binds it; another process
+      # taking it within those milliseconds is unlikely, and a taken port
+      # still fails closed as an infrastructure failure: under CI playwright
+      # refuses a url that already answers, and astro preview (vite, no
+      # strictPort) moves elsewhere so the url never comes up. Linux
+      # sandboxes have private loopback, where this is merely harmless.
+      DOCS_PREVIEW_PORT="$(${nodejs-slim}/bin/node -e '
+        const server = require("node:net").createServer();
+        server.listen(0, "127.0.0.1", () => {
+          process.stdout.write(String(server.address().port));
+          server.close();
+        });
+      ')"
+      export DOCS_PREVIEW_PORT
+      echo "docs preview port: $DOCS_PREVIEW_PORT"
       # Run Playwright via node — bun's child_process.fork() IPC
       # is incompatible with Playwright's worker model.
       # PLAYWRIGHT_PROJECTS selects the engines; playwright manages the webServer
-      # lifecycle via playwright.config webServer (bun run preview:ci → astro preview).
+      # lifecycle via playwright.config webServer (bun run preview:ci --port
+      # $DOCS_PREVIEW_PORT → astro preview).
       status=0
       ${nodejs-slim}/bin/node ./node_modules/@playwright/test/cli.js test \
         --config "$PLAYWRIGHT_CONFIG" > runner.log 2>&1 || status=$?

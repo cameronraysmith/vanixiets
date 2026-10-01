@@ -21,7 +21,7 @@
     "build": "astro build",
     "build:clean": "bun run clean && bun run build",
     "preview": "bun run build && wrangler dev",
-    "preview:ci": "node ./node_modules/.bin/astro preview --host 127.0.0.1 --port 4321",
+    "preview:ci": "node ./node_modules/.bin/astro preview --host 127.0.0.1",
     "deploy": "bun run build && wrangler deploy",
     "linkcheck": "CHECK_LINKS=true bun run build",
     "cf-typegen": "wrangler types",

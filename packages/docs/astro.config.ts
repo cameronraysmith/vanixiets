@@ -118,6 +118,14 @@ export default defineConfig({
         // Reference: @astrojs/cloudflare src/prerenderer.ts (workerd path gated
         // on prerenderEnvironment === 'workerd').
         prerenderEnvironment: "node",
+        // Report builds serve `astro preview` concurrently on a shared darwin
+        // host network. Unset, @cloudflare/vite-plugin probes upward from 9229
+        // for a workerd inspector port, so concurrent builds race between the
+        // probe and the bind (EADDRINUSE). Nothing in a report build attaches
+        // a debugger, so the nix e2e-report derivation turns it off; `false`
+        // makes the plugin pass no inspectorPort to miniflare. Local dev keeps
+        // the default inspector.
+        ...(process.env.DOCS_DISABLE_WORKER_INSPECTOR === "1" ? { inspectorPort: false as const } : {}),
       }),
 
   vite: {
