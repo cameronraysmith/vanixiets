@@ -24,6 +24,7 @@
       config,
       pkgs,
       lib,
+      options,
       ...
     }:
     {
@@ -160,8 +161,11 @@
         };
 
         # Sized for Hetzner AMD CX53 (16 vCPU / 32 GB RAM / 320 GB SSD).
-        # 4 workers × 2 GiB = 8 GiB peak eval allocation, leaving ~24 GiB headroom
-        # for buildbot subprocesses + postgres + matrix + nginx baseline.
+        # 4 workers × 2 GiB = 8 GiB peak eval allocation. That is not headroom
+        # the host keeps free: nixbot's 8 × 4096 evaluation and remote
+        # check-fast evaluations draw on the same RAM and zram, so evaluations
+        # are serialised by the host evaluation lock (nix-eval-lock.nix) rather
+        # than budgeted side by side.
         evalWorkerCount = 4;
         evalMaxMemorySize = 2048;
 
@@ -181,10 +185,17 @@
         enableACME = true;
       };
 
-      # Local worker on magnetite (colocated with master)
+      # Local worker on magnetite (colocated with master). The worker is the
+      # buildbot process that runs nix-eval-jobs, from its service PATH; the
+      # wrapper queues it on the host evaluation lock
+      # (modules/nixos/nix-eval-lock.nix) over the package it would otherwise
+      # use, keeping the version buildbot-nix asserts on.
       services.buildbot-nix.worker = {
         enable = true;
         workerPasswordFile = config.clan.core.vars.generators.buildbot-worker.files."password".path;
+        nixEvalJobs.package = lib.mkIf config.services.nixEvalLock.enable (
+          config.services.nixEvalLock.wrap options.services.buildbot-nix.worker.nixEvalJobs.package.default
+        );
       };
 
       # Restart on failure (no default restart policy in upstream buildbot-nix or nixpkgs).

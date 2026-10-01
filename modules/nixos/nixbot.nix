@@ -37,6 +37,8 @@
   flake.modules.nixos.nixbot =
     {
       config,
+      lib,
+      options,
       pkgs,
       ...
     }:
@@ -188,5 +190,16 @@
       # is already yes (systemd's DefaultMemoryAccounting), so it is not
       # restated. logs/nixbot-memorymax-oom-victim.md.
       systemd.services.nixbot.serviceConfig.MemoryHigh = "12G";
+
+      # Every evaluation queues on the host evaluation lock and runs at
+      # oom_score_adj 900 (modules/nixos/nix-eval-lock.nix). The wrapper sits
+      # over the evaluator nixbot would otherwise use, its own patched build,
+      # and forwards that build's `nix` passthru, so the patched nix CLI on the
+      # service PATH and the nixbot package itself are unchanged. nixbot runs
+      # the bare name from the service PATH inside its bwrap sandbox, which is
+      # why the lock lives under /etc/nix.
+      services.nixbot.packages.nix-eval-jobs = lib.mkIf config.services.nixEvalLock.enable (
+        config.services.nixEvalLock.wrap options.services.nixbot.packages.nix-eval-jobs.default
+      );
     };
 }
