@@ -1,4 +1,4 @@
-import { test } from "@playwright/test";
+import { test } from "./fixtures";
 import { readBootstrapGuide } from "./reader-journey";
 
 test("reader finds bootstrap prerequisites and a guided reading path", async ({ page }) => {

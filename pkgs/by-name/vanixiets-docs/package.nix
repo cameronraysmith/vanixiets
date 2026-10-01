@@ -441,6 +441,27 @@ stdenv.mkDerivation (finalAttrs: {
       ln -s ${report} "$out/report"
     '';
 
+  # The damaged-guide journey on WebKit, on every system. On darwin the build
+  # users have no LaunchServices database, so WebKit's own page.screenshot()
+  # encodes to `data:,` and Playwright writes a 0-byte PNG; e2e/fixtures.ts
+  # replaces such a file with the latest screencast frame. This control proves
+  # a completed WebKit product failure keeps a trace and a real PNG.
+  passthru.tests.e2e-webkit-negative-control =
+    let
+      report = finalAttrs.finalPackage.tests.e2e-report.overrideAttrs (old: {
+        pname = "vanixiets-docs-e2e-webkit-negative-report";
+        env = old.env // {
+          PLAYWRIGHT_CONFIG = "playwright.webkit-negative.config.ts";
+          PLAYWRIGHT_PROJECTS = "webkit";
+        };
+      });
+    in
+    runCommand "vanixiets-docs-e2e-webkit-negative-control" { } ''
+      ${nodejs-slim}/bin/node ${../../../packages/docs/tests/report}/check-negative-report.ts ${report} webkit
+      mkdir -p "$out"
+      ln -s ${report} "$out/report"
+    '';
+
   meta = {
     description = "Vanixiets documentation site built with Astro Starlight";
     license = lib.licenses.mit;

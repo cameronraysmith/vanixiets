@@ -17,6 +17,9 @@ export const requiredCases: Readonly<Record<string, readonly string[]>> = {
   "playwright.action-negative.config.ts": [
     "removed-link.spec.ts::removed homepage link is rejected by the real reader journey",
   ],
+  "playwright.webkit-negative.config.ts": [
+    "reader-journey.spec.ts::damaged guide is rejected by the real reader journey",
+  ],
 };
 
 export type Engine = "chromium" | "firefox" | "webkit";
@@ -34,6 +37,9 @@ export const requiredEngines: Readonly<Record<string, readonly Engine[]>> = {
 
 export function requiredProjects(system: string, config: string): readonly Engine[] | undefined {
   if (!Object.hasOwn(requiredEngines, system)) return undefined;
+  // WebKit failure evidence is required on every system, including Darwin,
+  // where the screenshot needs the e2e/fixtures.ts repair.
+  if (config === "playwright.webkit-negative.config.ts") return ["webkit"];
   if (config === "playwright.negative.config.ts" || config === "playwright.action-negative.config.ts") {
     return ["chromium"];
   }

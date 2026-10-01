@@ -1,4 +1,4 @@
-import { test } from "@playwright/test";
+import { test } from "../../e2e/fixtures";
 import { readBootstrapGuide } from "../../e2e/reader-journey";
 
 test("damaged guide is rejected by the real reader journey", async ({ page }) => {

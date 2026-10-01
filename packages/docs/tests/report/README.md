@@ -11,6 +11,7 @@ The package-test registry exposes these attributes under `checks.<system>`:
 - `package-vanixiets-docs-test-e2e`: the existing mandatory verdict; validates the report dependency without running browsers again.
 - `package-vanixiets-docs-test-e2e-negative-control`: runs the same reader journey against an intercepted guide response whose heading is damaged, then verifies the intended failure and its retained attachments.
 - `package-vanixiets-docs-test-e2e-action-negative-control`: removes the homepage's Getting started links from the intercepted HTML, runs the unchanged reader journey, and verifies a completed locator timeout, verdict exit 1, and retained trace/screenshot.
+- `package-vanixiets-docs-test-e2e-webkit-negative-control`: runs the damaged-guide journey on WebKit alone, on every system, and verifies the completed failure, verdict exit 1, the trace, and a PNG screenshot with a valid nonzero-sized header.
 - `package-vanixiets-docs-test-e2e-runner-controls`: native-browser classification controls, separated from the browser-free unit check.
 - `docs-e2e-wiring`: asserts both public identities and the verdict's Nix dependency on that producer.
   Its negative fixtures omit the verdict or supply a successfully built verdict consuming a different producer; both must fail the same predicate.
@@ -48,7 +49,7 @@ The validator first parses the three JSON files into types taken from the comple
 Each attempt is classified by an exhaustive match on Playwright's `TestStatus`: `passed`; a `failed` product failure; an infrastructure failure (`failed`, `timedOut`, or `interrupted` with an infrastructure kind); or invalid, which includes every `skipped` attempt.
 `policy.ts` specifies the required scenario/project matrix independently of test discovery, including the reader journey.
 Its independently declared engine policy requires Chromium and WebKit on Darwin, and Chromium, Firefox, and WebKit on Linux.
-Only the two named negative-control suites have a Chromium-only exception; unknown systems/configs fail closed.
+The Chromium negative-control suites require Chromium only; the WebKit negative-control suite requires WebKit only; unknown systems/configs fail closed.
 Narrowing both producer metadata and discovery cannot narrow the required matrix.
 Update it deliberately when adding or removing a scenario; deleting a spec alone must fail validation.
 Zero tests, partial matrices, skips, expected failures, interrupted attempts, a terminal timed-out attempt, global errors, unknown outcomes, and missing or empty referenced files fail closed.
@@ -63,6 +64,22 @@ The negative controls require every attempt to fail and the terminal attempt to 
 Report builds run at most four workers: CI builders grant every concurrent build all cores, so `NIX_BUILD_CORES` overstates what one build may use.
 `trace: "retain-on-failure"` captures the original failing attempt, unlike the previous `on-first-retry` policy.
 HTML/JSON serve artifact readers; the line reporter serves nixbot build logs without GitHub-specific annotations.
+
+### WebKit failure screenshots
+
+On Darwin the Nix build users (`_nixbld*`) have no LaunchServices database (their `$DARWIN_USER_DIR/0/` holds no `com.apple.LaunchServices.dv`).
+WebKit's sandboxed WebContent process resolves `image/png` through LaunchServices, so ImageIO is asked for an empty type identifier (`unsupported output file format ''`).
+`Page.snapshotRect` then returns `data:,`, and Playwright 1.63 writes the empty buffer as a 0-byte `test-failed-1.png` without raising.
+Rendering itself works: canvas pixels and screencast frames are correct, while `canvas.toDataURL()` returns `data:,` for the same reason.
+Running as the normal user, even with the build's exact environment, produces real screenshots; running as `_nixbld9` through `sudo` outside Nix reproduces the empty file.
+
+Every browser spec therefore imports `test` from `e2e/fixtures.ts`.
+For WebKit it records the latest screencast frame.
+Only if Playwright's own failure screenshot is a 0-byte file does it write that frame, converted to PNG, into the same attachment.
+First it waits for the frame stream to stay quiet for 500 ms, because frames trail paints.
+The frame is the video's downscaled viewport (800x450 bounds), not a device-pixel capture.
+If no painted frame exists, the fixture teardown throws, so the attempt fails as infrastructure rather than carrying a blank image.
+The validator still rejects any empty attachment.
 
 ## Publication
 

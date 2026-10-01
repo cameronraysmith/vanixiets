@@ -3,7 +3,7 @@
 # Iterates self'.packages and exposes each pkg.passthru.tests.<tname> as
 # package-${pname}-test-${tname}. Free coverage for any package that
 # declares passthru.tests in the standard nixpkgs convention. Notably
-# exercises vanixiets-docs's {unit,linkcheck,e2e,e2e-report,e2e-negative-control}
+# exercises vanixiets-docs's unit, linkcheck, e2e, e2e-report and negative-control
 # test set. e2e-report exposes cacheable evidence to nixbot independently of
 # the mandatory e2e verdict; a report artifact alone is not a passing test.
 #

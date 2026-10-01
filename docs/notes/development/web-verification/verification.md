@@ -13,7 +13,7 @@ No entry below claims live deployment or evidence publication.
 | R4 | Relevant-input identity and cache-reuse receipt | Pending; whole-build reuse does not emit build_finished |
 | R5 | Isolated browser/profile/fixture cleanup checks | CLI smoke has isolation; harness integration pending |
 | R6 | Trusted publisher rehearsal, malformed metadata rejection, no PR evaluation | Loopback rehearsal passes on Darwin and Linux; live effect pending |
-| R7 | Deliberate defect rejected for the expected reason | Controlled guide-heading mutation rejected with retained trace and screenshot |
+| R7 | Deliberate defect rejected for the expected reason | Damaged-guide and removed-link controls (Chromium) and a damaged-guide control (WebKit) rejected with retained trace and screenshot on both platforms |
 | R8 | Documented lifecycle seam, later exercised by a second application | Design only |
 
 ## Prior evidence and its limits
@@ -244,7 +244,34 @@ With the CSS correction, the same producer passed 30 of 30 with no flaky tests, 
 
 On aarch64-darwin, the corrected suite passed 20 of 20 with no flaky tests, and the same checks passed.
 The Darwin run against the unmodified site failed the same scenario on Chromium and WebKit, but the producer rejected the report: every failed WebKit attempt wrote a 0-byte `test-failed-1.png`.
-That is a separate Darwin WebKit capture defect, not a property of this repair; until it is fixed, a WebKit product failure on Darwin keeps no report.
+That was a separate Darwin WebKit capture defect, fixed below.
+
+## Harness defects found while re-verifying increment 7
+
+Running the repair's RED and GREEN reports exposed three defects in the harness itself, all invisible to earlier single-report runs.
+
+### Shared ports on Darwin
+
+Darwin Nix builds are unsandboxed, so report derivations built at the same time share the host network.
+Every report served `astro preview` on 4321, and one build's server broke another's tests (`page.goto: Could not connect to the server`); the producer rejected those reports as infrastructure failures.
+The e2e-report build now picks a free loopback port and passes it to Playwright as `DOCS_PREVIEW_PORT`.
+A second collision followed on the workerd inspector: `@cloudflare/vite-plugin` 1.62.3 probes upward from 9229, and concurrent builds raced for 9231 (`EADDRINUSE`).
+Report builds now set `DOCS_DISABLE_WORKER_INSPECTOR=1`, which makes `astro.config.ts` pass `inspectorPort: false`; local development keeps 4321 and the inspector.
+With both fixes, the producer and all three negative-control reports built concurrently on each platform with distinct ports and no `EADDRINUSE`.
+
+### Empty WebKit screenshots on Darwin
+
+Every WebKit failure screenshot taken as a Darwin Nix build user (`_nixbld*`) was a 0-byte file.
+Those users have no LaunchServices database, so WebKit's image encoder resolves `image/png` to an empty type, `Page.snapshotRect` returns `data:,`, and Playwright 1.63 writes the empty buffer without raising.
+Running as a normal user, even with the build's exact environment, produced real screenshots.
+A shared fixture (`packages/docs/e2e/fixtures.ts`) now replaces a 0-byte WebKit failure screenshot with the latest screencast frame, or fails the attempt as infrastructure if no frame exists; the validator still rejects empty attachments.
+`e2e-webkit-negative-control` fails the damaged-guide journey on WebKit and requires a decodable PNG; it passed on Darwin and Linux.
+
+### Rehearsal teardown
+
+One x86_64-linux `publish-evidence-rehearsal` build was reported failed after its output was already built and copied back; Nix's remote-build hook exited 1 without a message, and 22 later runs of the unmodified check passed.
+The harness had two latent weaknesses, fixed while investigating: its teardown `kill` could fail the build under `set -e` if the stub server had already exited, and its readiness wait gave up after 10 s with no message.
+The fixed check passed 8 runs on Linux and 3 on Darwin.
 
 ## Required negative cases
 
