@@ -1,11 +1,11 @@
 lockfile_version: '1'
-generated_at: '2026-10-01T13:01:46.638053+00:00'
+generated_at: '2026-10-01T19:34:13.161946+00:00'
 apm_version: 0.32.0
 dependencies:
 - repo_url: cameronraysmith/vanixiets
   name: agent-orchestration-and-meta-tooling
   host: github.com
-  resolved_commit: d5d75ca5d718b325f3fede009803f169e985f2cd
+  resolved_commit: ab98a627df1800cf904862a1076036d11f497283
   resolved_ref: main
   version: 0.0.0
   virtual_path: modules/home/ai/plugins/agent-orchestration-and-meta-tooling
@@ -105,7 +105,7 @@ dependencies:
 - repo_url: cameronraysmith/vanixiets
   name: beads-issue-tracking-and-session-workflow
   host: github.com
-  resolved_commit: d5d75ca5d718b325f3fede009803f169e985f2cd
+  resolved_commit: ab98a627df1800cf904862a1076036d11f497283
   resolved_ref: main
   version: 0.0.0
   virtual_path: modules/home/ai/plugins/beads-issue-tracking-and-session-workflow
@@ -132,7 +132,7 @@ dependencies:
 - repo_url: cameronraysmith/vanixiets
   name: document-authoring-and-visualization
   host: github.com
-  resolved_commit: d5d75ca5d718b325f3fede009803f169e985f2cd
+  resolved_commit: ab98a627df1800cf904862a1076036d11f497283
   resolved_ref: main
   version: 0.0.0
   virtual_path: modules/home/ai/plugins/document-authoring-and-visualization
@@ -176,7 +176,7 @@ dependencies:
 - repo_url: cameronraysmith/vanixiets
   name: event-modeling-workflow
   host: github.com
-  resolved_commit: d5d75ca5d718b325f3fede009803f169e985f2cd
+  resolved_commit: ab98a627df1800cf904862a1076036d11f497283
   resolved_ref: main
   version: 0.0.0
   virtual_path: modules/home/ai/plugins/event-modeling-workflow
@@ -200,7 +200,7 @@ dependencies:
 - repo_url: cameronraysmith/vanixiets
   name: formal-specification-and-refinement
   host: github.com
-  resolved_commit: d5d75ca5d718b325f3fede009803f169e985f2cd
+  resolved_commit: ab98a627df1800cf904862a1076036d11f497283
   resolved_ref: main
   version: 0.0.0
   virtual_path: modules/home/ai/plugins/formal-specification-and-refinement
@@ -256,7 +256,7 @@ dependencies:
 - repo_url: cameronraysmith/vanixiets
   name: nix-build-operations
   host: github.com
-  resolved_commit: d5d75ca5d718b325f3fede009803f169e985f2cd
+  resolved_commit: ab98a627df1800cf904862a1076036d11f497283
   resolved_ref: main
   version: 0.0.0
   virtual_path: modules/home/ai/plugins/nix-build-operations
@@ -289,7 +289,7 @@ dependencies:
 - repo_url: cameronraysmith/vanixiets
   name: planning-and-development
   host: github.com
-  resolved_commit: d5d75ca5d718b325f3fede009803f169e985f2cd
+  resolved_commit: ab98a627df1800cf904862a1076036d11f497283
   resolved_ref: main
   version: 0.0.0
   virtual_path: modules/home/ai/plugins/planning-and-development
@@ -377,11 +377,11 @@ dependencies:
     .agents/skills/openspec-sync-specs/SKILL.md: sha256:10976095976c6bb53a840f5f6ea74924c3ab2cd21b3fb7c624dc7b28411574fb
     .agents/skills/openspec-update-change/SKILL.md: sha256:82c2250f8d8ec77e98736438a71113f577e9d0d249db181fbb891f598d8533a0
     .agents/skills/openspec-verify-change/SKILL.md: sha256:6e55af9ecd207644fd7d993aa1933da30d1595880fe20b67ede7b0d9f646a291
-  content_hash: sha256:a0673663ce0c76e506904d22f1f264a8ae8709b42562548da9629861c542167f
+  content_hash: sha256:866d9956dd3263ca51f441d91b90755f61027e8629db2843ca6b3284a2dbf6f0
 - repo_url: cameronraysmith/vanixiets
   name: preferences-code-and-collaboration-conventions
   host: github.com
-  resolved_commit: d5d75ca5d718b325f3fede009803f169e985f2cd
+  resolved_commit: ab98a627df1800cf904862a1076036d11f497283
   resolved_ref: main
   version: 0.0.0
   virtual_path: modules/home/ai/plugins/preferences-code-and-collaboration-conventions
@@ -433,7 +433,7 @@ dependencies:
 - repo_url: cameronraysmith/vanixiets
   name: preferences-data-and-scientific-computing
   host: github.com
-  resolved_commit: d5d75ca5d718b325f3fede009803f169e985f2cd
+  resolved_commit: ab98a627df1800cf904862a1076036d11f497283
   resolved_ref: main
   version: 0.0.0
   virtual_path: modules/home/ai/plugins/preferences-data-and-scientific-computing
@@ -488,7 +488,7 @@ dependencies:
 - repo_url: cameronraysmith/vanixiets
   name: preferences-domain-driven-architecture
   host: github.com
-  resolved_commit: d5d75ca5d718b325f3fede009803f169e985f2cd
+  resolved_commit: ab98a627df1800cf904862a1076036d11f497283
   resolved_ref: main
   version: 0.0.0
   virtual_path: modules/home/ai/plugins/preferences-domain-driven-architecture
@@ -533,7 +533,7 @@ dependencies:
 - repo_url: cameronraysmith/vanixiets
   name: preferences-event-driven-systems
   host: github.com
-  resolved_commit: d5d75ca5d718b325f3fede009803f169e985f2cd
+  resolved_commit: ab98a627df1800cf904862a1076036d11f497283
   resolved_ref: main
   version: 0.0.0
   virtual_path: modules/home/ai/plugins/preferences-event-driven-systems
@@ -560,7 +560,7 @@ dependencies:
 - repo_url: cameronraysmith/vanixiets
   name: preferences-functional-programming-theory
   host: github.com
-  resolved_commit: d5d75ca5d718b325f3fede009803f169e985f2cd
+  resolved_commit: ab98a627df1800cf904862a1076036d11f497283
   resolved_ref: main
   version: 0.0.0
   virtual_path: modules/home/ai/plugins/preferences-functional-programming-theory
@@ -624,7 +624,7 @@ dependencies:
 - repo_url: cameronraysmith/vanixiets
   name: preferences-nix-and-secrets
   host: github.com
-  resolved_commit: d5d75ca5d718b325f3fede009803f169e985f2cd
+  resolved_commit: ab98a627df1800cf904862a1076036d11f497283
   resolved_ref: main
   version: 0.0.0
   virtual_path: modules/home/ai/plugins/preferences-nix-and-secrets
@@ -666,7 +666,7 @@ dependencies:
 - repo_url: cameronraysmith/vanixiets
   name: preferences-operations-and-reliability
   host: github.com
-  resolved_commit: d5d75ca5d718b325f3fede009803f169e985f2cd
+  resolved_commit: ab98a627df1800cf904862a1076036d11f497283
   resolved_ref: main
   version: 0.0.0
   virtual_path: modules/home/ai/plugins/preferences-operations-and-reliability
@@ -702,7 +702,7 @@ dependencies:
 - repo_url: cameronraysmith/vanixiets
   name: preferences-programming-languages
   host: github.com
-  resolved_commit: d5d75ca5d718b325f3fede009803f169e985f2cd
+  resolved_commit: ab98a627df1800cf904862a1076036d11f497283
   resolved_ref: main
   version: 0.0.0
   virtual_path: modules/home/ai/plugins/preferences-programming-languages
@@ -756,7 +756,7 @@ dependencies:
 - repo_url: cameronraysmith/vanixiets
   name: preferences-web-platform-and-deployment
   host: github.com
-  resolved_commit: d5d75ca5d718b325f3fede009803f169e985f2cd
+  resolved_commit: ab98a627df1800cf904862a1076036d11f497283
   resolved_ref: main
   version: 0.0.0
   virtual_path: modules/home/ai/plugins/preferences-web-platform-and-deployment
@@ -810,7 +810,7 @@ dependencies:
 - repo_url: cameronraysmith/vanixiets
   name: testing-and-quality
   host: github.com
-  resolved_commit: d5d75ca5d718b325f3fede009803f169e985f2cd
+  resolved_commit: ab98a627df1800cf904862a1076036d11f497283
   resolved_ref: main
   version: 0.0.0
   virtual_path: modules/home/ai/plugins/testing-and-quality
@@ -877,7 +877,7 @@ dependencies:
 - repo_url: cameronraysmith/vanixiets
   name: version-control-and-forge
   host: github.com
-  resolved_commit: d5d75ca5d718b325f3fede009803f169e985f2cd
+  resolved_commit: ab98a627df1800cf904862a1076036d11f497283
   resolved_ref: main
   version: 0.0.0
   virtual_path: modules/home/ai/plugins/version-control-and-forge
@@ -1218,6 +1218,43 @@ dependencies:
   skill_subset:
   - mergify-stack
   declared_license: Apache-2.0
+- repo_url: microsoft/playwright-cli
+  name: playwright-cli
+  host: github.com
+  resolved_commit: 74354ecc7a43da16d91a9bc54fa8db8283a3fcf5
+  resolved_ref: 74354ecc7a43da16d91a9bc54fa8db8283a3fcf5
+  version: unknown
+  depth: 2
+  resolved_by: cameronraysmith/vanixiets
+  package_type: skill_bundle
+  deployed_files:
+  - .agents/skills/playwright-cli
+  - .agents/skills/playwright-cli/SKILL.md
+  - .agents/skills/playwright-cli/references/element-attributes.md
+  - .agents/skills/playwright-cli/references/playwright-tests.md
+  - .agents/skills/playwright-cli/references/pr-attachments.md
+  - .agents/skills/playwright-cli/references/request-mocking.md
+  - .agents/skills/playwright-cli/references/running-code.md
+  - .agents/skills/playwright-cli/references/session-management.md
+  - .agents/skills/playwright-cli/references/storage-state.md
+  - .agents/skills/playwright-cli/references/test-generation.md
+  - .agents/skills/playwright-cli/references/tracing.md
+  - .agents/skills/playwright-cli/references/video-recording.md
+  deployed_file_hashes:
+    .agents/skills/playwright-cli/SKILL.md: sha256:85ef187460f776a4e9b44ffbf4a0293e5585d4192d0858c23fb011c72784f347
+    .agents/skills/playwright-cli/references/element-attributes.md: sha256:bf19aa4671e0a50a0fefa9c790f39124e803060eefe395042b723c29fcb7faa2
+    .agents/skills/playwright-cli/references/playwright-tests.md: sha256:c5b0719fef2cfdff50bd744051b2f9afc119775db4b48e9b2882c1cf3886797c
+    .agents/skills/playwright-cli/references/pr-attachments.md: sha256:24b118e74598be72e73e24fe223d295b9099c85b1860a7c8f6e5690c9038fa2a
+    .agents/skills/playwright-cli/references/request-mocking.md: sha256:54e801c9663fc2b6d68ceb058cb1c360724c2499f42acc7852a68e83e5b5f37c
+    .agents/skills/playwright-cli/references/running-code.md: sha256:d95c539a5990b71d02d8bdf1d9414df16191eb6cff95b0063820518b7a13dcb2
+    .agents/skills/playwright-cli/references/session-management.md: sha256:a4f16271f95d3eec7bc56e659d8adbb8f6ad7d603a6fa15efdcdd071a50c6ce3
+    .agents/skills/playwright-cli/references/storage-state.md: sha256:9ac47f9ae4a1aedcd2077f8ac9ab1ba6bee1962cb83ff51adcd36fb6d83b5ec6
+    .agents/skills/playwright-cli/references/test-generation.md: sha256:12f54cfa718d9e559bad918120a4ca4f11c933167713d1b9c5f99872eddaf749
+    .agents/skills/playwright-cli/references/tracing.md: sha256:ef73e71bee792e341df9cd4f60529c929ade48b538ac76e033f4f20843e8dbda
+    .agents/skills/playwright-cli/references/video-recording.md: sha256:1c800b897824cb54394c34265d8ebffdbb530adfc8d612c5d798b667a1799f48
+  content_hash: sha256:19253e173f666d6499cff576f48f9353bac769c058d69658fe4e90dde30afa4d
+  skill_subset:
+  - playwright-cli
 - repo_url: obra/superpowers
   name: superpowers
   host: github.com
@@ -4877,6 +4914,114 @@ deployments:
   - cameronraysmith/vanixiets/modules/home/ai/plugins/planning-and-development
   active_owner: cameronraysmith/vanixiets/modules/home/ai/plugins/planning-and-development
   content_hash: sha256:6e55af9ecd207644fd7d993aa1933da30d1595880fe20b67ede7b0d9f646a291
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/playwright-cli
+  runtime: null
+  scope: project
+  owners:
+  - microsoft/playwright-cli
+  active_owner: microsoft/playwright-cli
+  content_hash: null
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/playwright-cli/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - microsoft/playwright-cli
+  active_owner: microsoft/playwright-cli
+  content_hash: sha256:85ef187460f776a4e9b44ffbf4a0293e5585d4192d0858c23fb011c72784f347
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/playwright-cli/references/element-attributes.md
+  runtime: null
+  scope: project
+  owners:
+  - microsoft/playwright-cli
+  active_owner: microsoft/playwright-cli
+  content_hash: sha256:bf19aa4671e0a50a0fefa9c790f39124e803060eefe395042b723c29fcb7faa2
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/playwright-cli/references/playwright-tests.md
+  runtime: null
+  scope: project
+  owners:
+  - microsoft/playwright-cli
+  active_owner: microsoft/playwright-cli
+  content_hash: sha256:c5b0719fef2cfdff50bd744051b2f9afc119775db4b48e9b2882c1cf3886797c
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/playwright-cli/references/pr-attachments.md
+  runtime: null
+  scope: project
+  owners:
+  - microsoft/playwright-cli
+  active_owner: microsoft/playwright-cli
+  content_hash: sha256:24b118e74598be72e73e24fe223d295b9099c85b1860a7c8f6e5690c9038fa2a
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/playwright-cli/references/request-mocking.md
+  runtime: null
+  scope: project
+  owners:
+  - microsoft/playwright-cli
+  active_owner: microsoft/playwright-cli
+  content_hash: sha256:54e801c9663fc2b6d68ceb058cb1c360724c2499f42acc7852a68e83e5b5f37c
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/playwright-cli/references/running-code.md
+  runtime: null
+  scope: project
+  owners:
+  - microsoft/playwright-cli
+  active_owner: microsoft/playwright-cli
+  content_hash: sha256:d95c539a5990b71d02d8bdf1d9414df16191eb6cff95b0063820518b7a13dcb2
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/playwright-cli/references/session-management.md
+  runtime: null
+  scope: project
+  owners:
+  - microsoft/playwright-cli
+  active_owner: microsoft/playwright-cli
+  content_hash: sha256:a4f16271f95d3eec7bc56e659d8adbb8f6ad7d603a6fa15efdcdd071a50c6ce3
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/playwright-cli/references/storage-state.md
+  runtime: null
+  scope: project
+  owners:
+  - microsoft/playwright-cli
+  active_owner: microsoft/playwright-cli
+  content_hash: sha256:9ac47f9ae4a1aedcd2077f8ac9ab1ba6bee1962cb83ff51adcd36fb6d83b5ec6
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/playwright-cli/references/test-generation.md
+  runtime: null
+  scope: project
+  owners:
+  - microsoft/playwright-cli
+  active_owner: microsoft/playwright-cli
+  content_hash: sha256:12f54cfa718d9e559bad918120a4ca4f11c933167713d1b9c5f99872eddaf749
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/playwright-cli/references/tracing.md
+  runtime: null
+  scope: project
+  owners:
+  - microsoft/playwright-cli
+  active_owner: microsoft/playwright-cli
+  content_hash: sha256:ef73e71bee792e341df9cd4f60529c929ade48b538ac76e033f4f20843e8dbda
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/playwright-cli/references/video-recording.md
+  runtime: null
+  scope: project
+  owners:
+  - microsoft/playwright-cli
+  active_owner: microsoft/playwright-cli
+  content_hash: sha256:1c800b897824cb54394c34265d8ebffdbb530adfc8d612c5d798b667a1799f48
 - kind: project-relative
   target: agent-skills
   value: .agents/skills/preferences-adaptive-planning
