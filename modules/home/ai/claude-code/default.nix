@@ -1,5 +1,8 @@
 # Claude Code CLI configuration with MCP servers and ccstatusline
-{ ... }:
+{ config, ... }:
+let
+  managedConfigsModule = config.flake.modules.homeManager.managedConfigs;
+in
 {
   flake.modules = {
     homeManager.ai =
@@ -11,16 +14,11 @@
         ...
       }:
       {
-        options.programs.claude-code.mutableSettings = lib.mkOption {
-          type = lib.types.bool;
-          default = false;
-          description = "Use mutable copies instead of immutable nix store symlinks for settings.json files. Enables Claude Code to edit settings at runtime (e.g. /voice toggle) at the cost of nix-declared state being overwritten between activations.";
-        };
+        imports = [ managedConfigsModule ];
 
         config = {
           programs.claude-code = {
             enable = true;
-            mutableSettings = true;
             # package = flake.inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.claude-code;
             package = flake.packages.${pkgs.stdenv.hostPlatform.system}.claude-code;
 
@@ -418,38 +416,17 @@
             };
           };
 
-          # Mutable settings: copy instead of symlink so Claude Code can write at runtime.
-          # Each home-manager activation overwrites with declared state.
-          #
-          # Override the upstream programs.claude-code module's home.file declaration.
-          # Upstream uses the absolute path key `${cfg.configDir}/settings.json` (where
-          # cfg.configDir defaults to `/home/cameron/.claude` for this user), NOT the
-          # relative `.claude/settings.json`. Targeting the relative path was a no-op
-          # bug that let home-manager continue managing the file as a symlink while
-          # our activation script also tried to install it, producing
-          # checkLinkTargets backup-conflict errors at deploy time.
-          #
-          # With enable=mkForce false on the correct absolute-path key, the upstream
-          # symlink isn't built into home-files; checkLinkTargets doesn't iterate
-          # over settings.json; the activation script below becomes the sole source
-          # of truth, supporting runtime mutation by claude-code itself.
-          home.file."${config.programs.claude-code.configDir}/settings.json".enable =
-            lib.mkIf config.programs.claude-code.mutableSettings (lib.mkForce false);
-
-          home.activation.claudeCodeMutableSettings = lib.mkIf config.programs.claude-code.mutableSettings (
-            let
-              jsonFormat = pkgs.formats.json { };
-              settingsFile = jsonFormat.generate "claude-code-settings.json" (
-                config.programs.claude-code.settings
-                // {
-                  "$schema" = "https://json.schemastore.org/claude-code-settings.json";
-                }
-              );
-            in
-            lib.hm.dag.entryAfter [ "writeBoundary" ] ''
-              $DRY_RUN_CMD install -Dm644 ${settingsFile} $HOME/.claude/settings.json
-            ''
-          );
+          # Claude Code rewrites settings.json at runtime (e.g. /voice), so it is a
+          # managed copy rather than a store symlink; moshi-hook re-adds `hooks`.
+          managedConfigs.claude-code-settings = {
+            target = "${config.programs.claude-code.configDir}/settings.json";
+            format = "json";
+            settings = config.programs.claude-code.settings // {
+              "$schema" = "https://json.schemastore.org/claude-code-settings.json";
+            };
+            externalPaths = [ "hooks" ];
+            replacesHomeFile = "${config.programs.claude-code.configDir}/settings.json";
+          };
 
           home.shellAliases = {
             ccds = "claude --permission-mode auto";

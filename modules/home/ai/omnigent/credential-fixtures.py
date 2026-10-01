@@ -937,37 +937,43 @@ subprocess.run, os.execve = run, execute
             run([artifact["hostLauncher"]], success=False)
             private_file(github_path, original)
         activation_text = (generation / "activate").read_text()
-        merges = [
+        managed_lines = [
             shlex.split(line)[1:]
             for line in activation_text.splitlines()
-            if line.startswith(("run ", "$DRY_RUN_CMD "))
-            and any(
-                name in line
-                for name in (
-                    "/bin/atomic-merge-settings ",
-                    "/bin/omp-merge-config ",
-                    "/bin/omnigent-merge-config ",
-                )
-            )
+            if line.startswith("run ") and "/bin/managed-config " in line
         ]
-        assert len(merges) == 4
+        assert len(managed_lines) == 1
+        program, *spec_paths = managed_lines[0]
+        specs = [json.loads(pathlib.Path(path).read_text()) for path in spec_paths]
+        assert {
+            "atomic-settings",
+            "omp-config",
+            "omp-watchdog",
+            "omnigent-config",
+        } <= {spec["name"] for spec in specs}
         assert all(
             not (generation / "home-files" / relative).exists() for relative in oauth
         )
         older = root / "older-declaration"
         older.write_text("{}")
+        rollback = root / "rollback-specs"
+        rollback.mkdir()
+        rollback_paths = []
+        for spec in specs:
+            path = rollback / (spec["name"] + ".json")
+            path.write_text(json.dumps(spec | {"declared": str(older)}))
+            rollback_paths.append(str(path))
 
         def redeploy():
             for declaration in ("current", "current", "rollback"):
-                for executable, source, destination in merges:
-                    assert destination.startswith(str(home) + "/")
-                    run(
-                        [
-                            executable,
-                            older if declaration == "rollback" else source,
-                            destination,
-                        ]
-                    )
+                for spec in specs:
+                    assert spec["target"].startswith(str(home) + "/")
+                run(
+                    [
+                        program,
+                        *(rollback_paths if declaration == "rollback" else spec_paths),
+                    ]
+                )
 
         redeploy()
         for relative, value in oauth.items():
@@ -978,9 +984,7 @@ subprocess.run, os.execve = run, execute
         redeploy()
         assert all(not (home / relative).exists() for relative in oauth)
         audit_artifacts(artifact, sentinel)
-        settings = [
-            pathlib.Path(destination).read_bytes() for _, _, destination in merges
-        ]
+        settings = [pathlib.Path(spec["target"]).read_bytes() for spec in specs]
         argument_log = (root / "argv.jsonl").read_bytes()
         for data in (
             captured

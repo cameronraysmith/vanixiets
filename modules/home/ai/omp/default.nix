@@ -2,26 +2,19 @@
 #
 # oh-my-pi is a fork of pi and does ship a home-manager module, exported from
 # its own flake as homeManagerModules.omp. This file deliberately does not
-# import it, which is the opposite of what hunk and worktrunk do with theirs.
-#
-# That module carries three options. Two of them, enable and package, are the
-# declarations below, and the third is the reason to decline it: its `settings`
-# writes ~/.omp/agent/config.yml as a read-only store symlink, while omp's
-# settings singleton persists to that same file in the background
-# (packages/coding-agent/src/config/settings.ts). Its own option description
-# concedes the result -- changes made from inside omp "replace it but revert on
-# the next home-manager switch". The activation below takes the other route
-# this repository has twice chosen instead, merging rather than installing, so
-# that setupVersion and anything else omp owns survives a switch.
+# import it: its `settings` writes ~/.omp/agent/config.yml as a read-only store
+# symlink, while omp's settings singleton persists to that same file
+# (packages/coding-agent/src/config/settings.ts). Both files below are rendered
+# by managedConfigs instead, which rewrites them from the declaration on every
+# activation and keeps only the keys listed as appOwned.
 #
 # If upstream's module later grows options worth having, adopting it is
-# deleting these declarations and adding one imports line; the cost of waiting
-# is that migration, against an input carried from now until then.
+# deleting these declarations and adding one imports line.
 #
 # Two files are nix-owned, both at user scope, and omp writes both at runtime:
 # config.yml from the /settings, /model, and /theme screens, and WATCHDOG.yml
-# whole from the /advisor editor (src/modes/components/advisor-config.ts). The
-# merge shape and its retract limitation are documented in merge-config.sh.
+# whole from the /advisor editor (src/modes/components/advisor-config.ts). A
+# runtime change to a key not listed in appOwned lasts until the next activation.
 # WATCHDOG.yml is discovered at ${configDir}/WATCHDOG.yml and combined with any
 # project-level roster rather than overridden by it (src/advisor/watchdog.ts
 # collectConfigCandidates), so what is declared here is the fleet-wide baseline.
@@ -37,10 +30,10 @@
 # LSP servers are not declared here either. omp auto-detects them from its
 # 54-entry registry (src/lsp/defaults.json) by requiring a root marker in the
 # project and a resolvable binary, so the roster follows whatever PATH omp is
-# launched with. Pinning it would mean an lsp.yml, which unlike config.yml omp
-# only ever reads, so it would not need this merge.
-{ ... }:
+# launched with. Pinning it would mean an lsp.yml, which omp only ever reads.
+{ config, ... }:
 let
+  managedConfigsModule = config.flake.modules.homeManager.managedConfigs;
   content =
     {
       pkgs,
@@ -52,13 +45,10 @@ let
     let
       cfg = config.programs.omp;
       yamlFormat = pkgs.formats.yaml { };
-      mergeConfig = pkgs.writeShellApplication {
-        name = "omp-merge-config";
-        runtimeInputs = [ pkgs.yq-go ];
-        text = builtins.readFile ./merge-config.sh;
-      };
     in
     {
+      imports = [ managedConfigsModule ];
+
       options.programs.omp = {
         enable = lib.mkEnableOption "omp, a coding agent forked from pi with an IDE, LSP, and DAP surface wired in";
 
@@ -85,9 +75,9 @@ let
           type = yamlFormat.type;
           default = { };
           description = ''
-            Nix-owned subset of {file}`config.yml`. Each declared key wins on
-            activation; every key omp writes and nix does not declare, setupVersion
-            among them, survives untouched.
+            Content of {file}`config.yml`, rewritten on every activation.
+            setupVersion and dev.autoqaConsent are kept from the existing file;
+            every other key omp writes lasts until the next activation.
           '';
         };
 
@@ -95,14 +85,9 @@ let
           type = yamlFormat.type;
           default = { };
           description = ''
-            Nix-owned subset of {file}`WATCHDOG.yml`, the advisor roster the
-            {command}`/advisor` editor reads and rewrites.
-
-            `advisors` is a sequence, and sequences are replaced rather than merged,
-            so this states the roster outright. Disable one entry with
-            `enabled = false` rather than removing it: merge-config.sh cannot retract
-            a key, and a dropped advisor would otherwise persist from the last
-            activation that declared it.
+            Content of {file}`WATCHDOG.yml`, the advisor roster the
+            {command}`/advisor` editor reads and rewrites, replaced wholesale
+            on every activation.
           '';
         };
       };
@@ -301,22 +286,22 @@ let
 
         home.packages = lib.mkIf cfg.enable [ cfg.package ];
 
-        home.activation.ompMergeConfig = lib.mkIf cfg.enable (
-          let
-            merge =
-              declared: target: "$DRY_RUN_CMD ${lib.getExe mergeConfig} ${declared} ${cfg.configDir}/${target}";
-          in
-          lib.hm.dag.entryAfter [ "writeBoundary" ] (
-            lib.concatStringsSep "\n" (
-              lib.optional (cfg.settings != { }) (
-                merge (yamlFormat.generate "omp-config.yml" cfg.settings) "config.yml"
-              )
-              ++ lib.optional (cfg.watchdog != { }) (
-                merge (yamlFormat.generate "omp-watchdog.yml" cfg.watchdog) "WATCHDOG.yml"
-              )
-            )
-          )
-        );
+        managedConfigs = lib.mkIf cfg.enable {
+          omp-config = {
+            target = "${cfg.configDir}/config.yml";
+            format = "yaml";
+            settings = cfg.settings;
+            appOwned = [
+              "setupVersion"
+              "dev.autoqaConsent"
+            ];
+          };
+          omp-watchdog = {
+            target = "${cfg.configDir}/WATCHDOG.yml";
+            format = "yaml";
+            settings = cfg.watchdog;
+          };
+        };
       };
     };
 in

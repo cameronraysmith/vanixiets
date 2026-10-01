@@ -2,6 +2,9 @@
 {
   flake.modules.homeManager.ai.imports = [ config.flake.modules.homeManager.openspec ];
   flake.modules.homeManager.openspec =
+    let
+      managedConfigsModule = config.flake.modules.homeManager.managedConfigs;
+    in
     {
       config,
       pkgs,
@@ -16,6 +19,7 @@
     in
     {
       key = "vanixiets/openspec-home-module";
+      imports = [ managedConfigsModule ];
 
       options.programs.openspec = {
         enable = lib.mkEnableOption "the vendored OpenSpec user-level Claude assets (CLI, skills, schema bundle, and global config.json)";
@@ -126,6 +130,7 @@
               noticeSeen = true;
               anonymousId = "00000000-0000-0000-0000-000000000000";
             };
+            completionTipSeen = true;
           };
           defaultText = lib.literalExpression ''
             {
@@ -137,6 +142,7 @@
                 noticeSeen = true;
                 anonymousId = "00000000-0000-0000-0000-000000000000";
               };
+              completionTipSeen = true;
             }'';
           example = lib.literalExpression "{ featureFlags.experimental = true; }";
           description = ''
@@ -147,13 +153,8 @@
             and {option}`programs.openspec.workflows`; override or extend here for
             keys this module does not model.
 
-            Delivered as a read-only symlink into the nix store. This is safe: the
-            only writer on ordinary (read) commands is the telemetry preAction hook,
-            which writes solely to add a missing telemetry.noticeSeen/anonymousId and
-            only when telemetry is enabled; both writes are wrapped in try/catch, so a
-            failed write on a read-only file is swallowed and the command still
-            succeeds (verified with @fission-ai/openspec@1.4.1). Both telemetry fields
-            are pre-set so no write is ever attempted.
+            Written as a managed copy each activation; keys not declared here are
+            dropped from the existing file.
           '';
         };
       };
@@ -169,8 +170,11 @@
           name: src: lib.nameValuePair ".local/share/openspec/schemas/${name}" { source = src; }
         ) cfg.schemaDirs;
 
-        xdg.configFile."openspec/config.json".source =
-          jsonFormat.generate "openspec-config.json" cfg.settings;
+        managedConfigs.openspec-config = {
+          target = "${config.xdg.configHome}/openspec/config.json";
+          format = "json";
+          inherit (cfg) settings;
+        };
       };
     };
 }

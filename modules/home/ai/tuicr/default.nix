@@ -70,7 +70,7 @@
         aiSkills.extraSkillDirs = lib.mkIf cfg.enable [ "${cfg.package.src}/skills" ];
 
         # tuicr only reads this path (src/config/mod.rs, one fs::read_to_string at
-        # startup), so it needs none of programs.codex.mutableSettings' copy handling.
+        # startup), so a store symlink suffices; no managedConfigs entry is needed.
         xdg.configFile."tuicr/config.toml" = lib.mkIf cfg.enable {
           source = tomlFormat.generate "tuicr-config.toml" cfg.settings;
         };

@@ -1,13 +1,7 @@
 { config, ... }:
 let
   acp = config.flake.lib.omnigentACP;
-  merge =
-    pkgs:
-    pkgs.writeShellApplication {
-      name = "omnigent-merge-config";
-      runtimeInputs = [ pkgs.yq-go ];
-      text = builtins.readFile ./merge-config.sh;
-    };
+  managedConfigsModule = config.flake.modules.homeManager.managedConfigs;
   content =
     legacy:
     {
@@ -22,10 +16,10 @@ let
       yamlFormat = pkgs.formats.yaml { };
       hostName = if !legacy || osConfig == null then null else osConfig.networking.hostName;
       runner = if !legacy || osConfig == null then { } else osConfig.services.omnigent-host or { };
-      mergeConfig = merge pkgs;
-      declared = yamlFormat.generate "omnigent-config.yaml" cfg.settings;
     in
     {
+      imports = [ managedConfigsModule ];
+
       options.programs.omnigent = {
         enable = lib.mkEnableOption "Omnigent and its runner configuration";
         package = lib.mkPackageOption pkgs "omnigent" { };
@@ -33,11 +27,11 @@ let
           type = yamlFormat.type;
           default = { };
           description = ''
-            Declarative subset of {file}`~/.omnigent/config.yaml`.
-            Activation merges mappings and replaces sequences and scalars;
-            undeclared runtime keys, including host.host_id, survive.
-            Removing a declaration does not remove its previously merged value.
-            Credentials belong in runtime state, not these store-visible settings.
+            Content of {file}`~/.omnigent/config.yaml`, rewritten on every
+            activation. host.host_id, server, and host.name when not declared
+            here are kept from the existing file; every other runtime key is
+            dropped. Credentials belong in runtime state, not these
+            store-visible settings.
           '';
         };
       };
@@ -66,16 +60,21 @@ let
         ) [ "${config.home.homeDirectory}/projects" ];
 
         home.packages = lib.mkIf cfg.enable [ cfg.package ];
-        home.activation.omnigentMergeConfig = lib.mkIf (cfg.enable && cfg.settings != { }) (
-          lib.hm.dag.entryAfter [ "writeBoundary" ] ''
-            run ${lib.getExe mergeConfig} ${declared} ${lib.escapeShellArg "${config.home.homeDirectory}/.omnigent/config.yaml"}
-          ''
-        );
+        managedConfigs.omnigent-config = lib.mkIf (cfg.enable && cfg.settings != { }) {
+          target = "${config.home.homeDirectory}/.omnigent/config.yaml";
+          format = "yaml";
+          settings = cfg.settings;
+          appOwned = [
+            "host.host_id"
+            "server"
+          ]
+          ++ lib.optional (!lib.hasAttrByPath [ "host" "name" ] cfg.settings) "host.name";
+          fileMode = "0600";
+        };
       };
     };
 in
 {
-  flake.lib.omnigentMergeConfig = merge;
   flake.modules.homeManager.ai = content true;
   flake.modules.homeManager.omnigent = content false;
 }

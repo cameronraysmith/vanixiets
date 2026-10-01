@@ -8,19 +8,16 @@
 # the perSystem packages set into flake.overlays.default, which
 # modules/nixpkgs/base-defaults.nix wires into every machine's nixpkgs.overlays.
 #
-# settings.json is merged rather than installed. atomic writes its own keys into
-# that file — onboardedVersion, the changelog marker, the provider and model
-# selection — and an install(1) of a nix-generated file would drop them, which
-# for onboardedVersion means re-running the first-run wizard on every
-# activation. The merge writes only the keys declared below, which come from
-# modules/home/ai/agent-settings.nix so that pi's settings.json and this one
-# cannot drift apart. auth.json and models-store.json are runtime state and are
-# not managed here.
+# settings.json is rendered by managedConfigs: every activation rewrites it from
+# the keys declared below, keeping only atomic's onboarding and changelog
+# markers from the existing file, so the first-run wizard does not reappear.
+# The declared keys come from modules/home/ai/agent-settings.nix so that pi's
+# settings.json and this one cannot drift apart. auth.json and
+# models-store.json are runtime state and are not managed here.
 #
 # packages is the one key the two agents do not share verbatim: atomic takes
 # packagesForAtomic, which carries the extension exclusions that agent-settings
-# declares for it. The key is still written rather than dropped, because
-# merge-settings.sh can update a nix-owned key but not retract one.
+# declares for it.
 #
 # extensions is atomic's alone. It carries the force-excludes that keep pi-only
 # extensions out of atomic, which is not a redundancy with packagesForAtomic:
@@ -28,8 +25,9 @@
 # writes into its own extensions/ directory is loaded by atomic without either
 # settings file naming it, and only this key can refuse it. See
 # aiAgentSettings.piOnlyExtensions for the mechanism.
-{ ... }:
+{ config, ... }:
 let
+  managedConfigsModule = config.flake.modules.homeManager.managedConfigs;
   content =
     {
       config,
@@ -40,13 +38,10 @@ let
     let
       cfg = config.programs.atomic;
       jsonFormat = pkgs.formats.json { };
-      mergeSettings = pkgs.writeShellApplication {
-        name = "atomic-merge-settings";
-        runtimeInputs = [ pkgs.jq ];
-        text = builtins.readFile ./merge-settings.sh;
-      };
     in
     {
+      imports = [ managedConfigsModule ];
+
       options.programs.atomic = {
         enable = lib.mkEnableOption "atomic, a terminal coding agent with read, bash, edit, and write tools and session management";
 
@@ -61,7 +56,7 @@ let
         settings = lib.mkOption {
           type = jsonFormat.type;
           default = { };
-          description = "Nix-owned subset of atomic's settings.json. Each declared key is overwritten on activation; every key atomic writes and nix does not declare survives untouched.";
+          description = "Content of atomic's settings.json, rewritten on every activation. firstRunOnboardingStartedVersion, lastChangelogVersion, and onboardedVersion are kept from the existing file; every other key atomic writes lasts until the next activation.";
         };
       };
 
@@ -71,6 +66,7 @@ let
 
           settings = {
             inherit (config.aiAgentSettings) theme enableInstallTelemetry hideThinkingBlock;
+            enableAnalytics = false;
             packages = config.aiAgentSettings.packagesForAtomic;
             extensions = config.aiAgentSettings.extensionsForAtomic;
 
@@ -115,14 +111,16 @@ let
 
         home.packages = lib.mkIf cfg.enable [ cfg.package ];
 
-        home.activation.atomicMergeSettings = lib.mkIf cfg.enable (
-          let
-            settingsFile = jsonFormat.generate "atomic-settings.json" cfg.settings;
-          in
-          lib.hm.dag.entryAfter [ "writeBoundary" ] ''
-            $DRY_RUN_CMD ${lib.getExe mergeSettings} ${settingsFile} ${cfg.configDir}/settings.json
-          ''
-        );
+        managedConfigs.atomic-settings = lib.mkIf cfg.enable {
+          target = "${cfg.configDir}/settings.json";
+          format = "json";
+          settings = cfg.settings;
+          appOwned = [
+            "firstRunOnboardingStartedVersion"
+            "lastChangelogVersion"
+            "onboardedVersion"
+          ];
+        };
       };
     };
 in

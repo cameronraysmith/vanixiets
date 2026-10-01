@@ -319,8 +319,8 @@ This shipped configuration contradicts an interpretation of #6714's retrospectiv
 Express the ACP block once as `flake.lib.omnigentACP` and deliver it to both serving and runner processes.
 The UI's `/v1/harnesses` catalogue reads `acp_agents()` in the server process, so configuring only cameron's home leaves Atomic absent from the UI (`/Users/crs58/ghq/github.com/omnigent-ai/omnigent@ea89e38cb2488c003cec06ae123640be0c97eb5d:omnigent/harness_plugins.py:1165,1196-1209`).
 Set the server unit's `OMNIGENT_CONFIG_HOME` to a store directory containing `config.yaml`, without writing into `/var/lib/omnigent`; configuration resolution uses that variable before `$HOME/.omnigent/config.yaml` (`omnigent/config.py:13-22` at the same pin).
-For the runner, Home Manager merges `programs.omnigent.settings` into a writable `~/.omnigent/config.yaml` after `writeBoundary`, adding the shared ACP block and `host.name` from `osConfig.networking.hostName` when known.
-Mappings merge key by key, sequences and scalars are replaced, and undeclared runtime keys remain, especially `host.host_id`; a removed declaration does not retract its previously merged value.
+For the runner, Home Manager's `managedConfigs` renders `programs.omnigent.settings` into a writable `~/.omnigent/config.yaml` after `writeBoundary`, carrying the shared ACP block and `host.name` from `osConfig.networking.hostName` when known.
+Each activation rewrites the file from the declaration, keeping only `host.host_id`, `server`, and (when not declared) `host.name` from the existing file; every other runtime key is dropped and reported by name.
 Do not symlink the runner file to the store: `load_or_create_host_identity` persists missing identity fields with `yaml.safe_dump` (`omnigent/host/identity.py:170-185` at the same pin).
 The pinned adapter launches the selected `atomic` child with `--mode rpc --no-themes`; the supplied ACP research records adapter revision `d1cffc047ab37a096ee70ca39cfc1de463db8d12`, package version `0.0.33` (`69c674ea_codebase-analyzer_1_output.md:30-84`, supplied session artifact).
 Vendor login remains manual and per runner: run `claude auth login` and `codex login` as `cameron`, configure Pi under `~/.pi/agent`, and provision authenticated Atomic state under `~/.atomic/agent` before non-interactive ACP use.
@@ -371,7 +371,7 @@ It has `RunAtLoad=true`, `KeepAlive.SuccessfulExit=false`, `ThrottleInterval=5`,
 Its environment is `cfg.environment // { HOME = userHome; PATH = explicitPath; }`.
 The required store PATH comes from the same `flake.lib.omnigentRuntimePackages pkgs` as NixOS, including the S10 Bash/which/direnv/nix floor, unconditionally before extras and `/usr/bin:/bin:/usr/sbin:/sbin`.
 It includes no bubblewrap and relies on no profile, login shell or `launchctl setenv`.
-Both log streams use `<selected-home>/.omnigent/logs/host/service.log`; HM creates the private directory with mode `0700` after `writeBoundary` and `omnigentMergeConfig`, before `setupLaunchAgents`.
+Both log streams use `<selected-home>/.omnigent/logs/host/service.log`; HM creates the private directory with mode `0700` after `writeBoundary` and `managedConfigs`, before `setupLaunchAgents`.
 The same two shared ACP rows remain unchanged, with omp's `env_passthrough` exactly empty to exclude Atomic state.
 
 `NoNewPrivileges` has no launchd analogue.
@@ -505,7 +505,7 @@ The `.#` examples below name attributes for local exploration; the current S1–
 - Runner hardening: `nix eval .#nixosConfigurations.magnetite.config.systemd.services.omnigent-host.serviceConfig` shows `User = "cameron"`, `NoNewPrivileges = true`, and no `RestrictNamespaces`, `SystemCallFilter`, `ProtectKernelTunables`, `ProtectKernelLogs`, `ProtectHostname`, or `ProcSubset` key.
 - Runner environment: evaluate `.systemd.services.omnigent-host.environment` and `.serviceConfig.ExecStart` against all three D7 values and the foreground `--server` command, with neither `--background` nor `host enable`.
 - S5 runtime configuration: for both `crs58@aarch64-darwin` and magnetite's `cameron`, evaluate the base Claude settings attrset and check rendered GLM and Cerebras JSON for absent `TMPDIR`, `TMPPREFIX`, and `/tmp/claude` text.
-  The base `settings.json` is installed by `home.activation.claudeCodeMutableSettings`, whose generated store file pure evaluation cannot realize; verify the deployed base file separately through the deploy-phase `probe-claude-hook-env`.
+  The base `settings.json` is written by `home.activation.managedConfigs` (entry `managedConfigs.claude-code-settings`), whose generated store file pure evaluation cannot realize; verify the deployed base file separately through the deploy-phase `probe-claude-hook-env`.
   Evaluate the runner with `extraPackages = [ ]` and prove that its required PATH still contains bare `pkgs.python3`, before appending `cfg.extraPackages`.
   The controller owns the literal `slice-5.json` gates, including rendered-wrapper builds and the single remote machine build; source inspection or focused module evaluation does not replace composed Home Manager, rendered-file, or deployment verification.
 - ACP configuration: compare both the server's `OMNIGENT_CONFIG_HOME/config.yaml` and the runner's merged YAML with the exact D7 list of Atomic and Oh My Pi; verify the merge preserves a seeded `host.host_id`.
@@ -602,7 +602,7 @@ assert a.RunAtLoad && !a.KeepAlive.SuccessfulExit && a.ThrottleInterval == 5 && 
 assert builtins.filter (k: a.KeepAlive.${k} != null) (builtins.attrNames a.KeepAlive) == [ "SuccessfulExit" ];
 assert (a.Disabled or null) != true && (a.LimitLoadToHosts or null) == null && (a.LimitLoadFromHosts or null) == null;
 assert a.WorkingDirectory == home && a.StandardOutPath == home + "/.omnigent/logs/host/service.log" && a.StandardErrorPath == a.StandardOutPath;
-assert builtins.elem "setupLaunchAgents" logs.before && builtins.all (n: builtins.elem n logs.after) [ "writeBoundary" "omnigentMergeConfig" ];
+assert builtins.elem "setupLaunchAgents" logs.before && builtins.all (n: builtins.elem n logs.after) [ "writeBoundary" "managedConfigs" ];
 assert h.programs.omnigent.settings.host.name == "stibnite";
 assert h.programs.omnigent.settings.acp.agents == [
   { name = "Atomic"; command = "bunx pi-acp@0.0.33"; omnigent_mcp = false; inject_system_prompt = false; env_passthrough = [ "PI_ACP_PI_COMMAND" "PI_CODING_AGENT_DIR" ]; }
@@ -699,13 +699,13 @@ HM_DRV=/nix/store/kc9fmc0pdzf2zsp5avxcjkj09fzlg88f-home-manager-generation.drv
 HM_GENERATION=$(nix-store --query --outputs "$HM_DRV")
 printf 'generation: %s\n' "$HM_GENERATION"
 test -r "$HM_GENERATION/activate"
-rg -n 'Activating.*(writeBoundary|omnigentMergeConfig|omnigentHostLogDirectory|setupLaunchAgents)|install -d -m 0700 .*\.omnigent/logs/host' "$HM_GENERATION/activate"
+rg -n 'Activating.*(writeBoundary|managedConfigs|omnigentHostLogDirectory|setupLaunchAgents)|install -d -m 0700 .*\.omnigent/logs/host' "$HM_GENERATION/activate"
 plutil -lint "$HM_GENERATION/LaunchAgents/org.nix-community.home.omnigent-host.plist"
 plutil -p "$HM_GENERATION/LaunchAgents/org.nix-community.home.omnigent-host.plist"
 cat "$HM_GENERATION/LaunchAgentDomains/org.nix-community.home.omnigent-host.domain"
 ```
 
-The receipt must show `writeBoundary`, `omnigentMergeConfig`, the log directory's `install -d -m 0700`, and `setupLaunchAgents` in that order.
+The receipt must show `writeBoundary`, `managedConfigs`, the log directory's `install -d -m 0700`, and `setupLaunchAgents` in that order.
 Inspect the plist for the selected home and both log destinations, the full declared environment and required store PATH, `RunAtLoad=true`, `KeepAlive.SuccessfulExit=false`, `ThrottleInterval=5`, and `ProcessType=Standard`.
 Its foreground command must wait for `/nix/store` and `exec` the built Omnigent package with `host --server https://omni.scientistexperience.net`, without `--background`, `host enable` or `service_entry`; the domain file must read `user`.
 `LimitLoadToSessionType=Background` is distinct from `ProcessType=Background`; the latter must remain absent.

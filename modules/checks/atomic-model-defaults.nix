@@ -1,6 +1,7 @@
 {
   config,
   inputs,
+  lib,
   self,
   ...
 }:
@@ -32,36 +33,56 @@
         ];
       };
       human = self.homeConfigurations."crs58@${system}";
-      activation =
+      program = config.flake.lib.managedConfigProgram pkgs;
+      spec =
         name: home:
-        pkgs.writeText "${name}-atomic-activation" home.config.home.activation.atomicMergeSettings.data;
+        let
+          entry = home.config.managedConfigs.atomic-settings;
+        in
+        pkgs.writeText "${name}-atomic-spec.json" (
+          builtins.toJSON {
+            name = "atomic-settings";
+            inherit (entry)
+              target
+              format
+              fileMode
+              appOwned
+              externalPaths
+              ;
+            declared = (pkgs.formats.json { }).generate "${name}-atomic-settings.json" entry.settings;
+          }
+        );
     in
     {
       checks.atomic-model-defaults = pkgs.runCommand "atomic-model-defaults" { } ''
-        ${pkgs.python3.interpreter} - ${activation "human" human} ${activation "worker" worker} <<'PY'
+        ${pkgs.python3.interpreter} - ${lib.getExe program} ${spec "human" human} ${spec "worker" worker} <<'PY'
         import json
         import pathlib
-        import shlex
         import subprocess
         import sys
 
-        for index, activation in enumerate(sys.argv[1:]):
-            dry_run, executable, declaration, destination = shlex.split(pathlib.Path(activation).read_text())
-            assert dry_run == "$DRY_RUN_CMD"
-            declared = json.loads(pathlib.Path(declaration).read_text())
+        program = sys.argv[1]
+        for index, template in enumerate(sys.argv[2:]):
+            spec = json.loads(pathlib.Path(template).read_text())
+            assert spec["target"].endswith("/.atomic/agent/settings.json")
+            declared = json.loads(pathlib.Path(spec["declared"]).read_text())
             assert declared["defaultProvider"] == "openai-codex"
             assert declared["defaultModel"] == "gpt-6-astra"
             assert declared["defaultThinkingLevel"] == "medium"
             assert declared["modelThinkingLevels"]["openai-codex/gpt-6-astra"] == "medium"
             assert declared["fallbackModels"][0] == "openai-codex/gpt-6-astra:high"
             assert declared["subagents"]["agentOverrides"]["worker"]["model"] == "openai-codex/gpt-6-astra:medium"
-            target = pathlib.Path(f"settings-{index}.json")
-            retained = {"onboardedVersion": "fixture", "unmanaged": {"nested": True}}
-            target.write_text(json.dumps(retained | {"defaultModel": "old", "defaultThinkingLevel": "high"}))
-            subprocess.run([executable, declaration, str(target)], check=True)
-            assert json.loads(target.read_text()) == retained | declared
+            target = pathlib.Path.cwd() / f"settings-{index}.json"
+            spec["target"] = str(target)
+            local = pathlib.Path(f"spec-{index}.json")
+            local.write_text(json.dumps(spec))
+            retained = {"onboardedVersion": "fixture"}
+            target.write_text(json.dumps(retained | {"unmanaged": {"nested": "sentinel-value"}, "defaultModel": "old", "defaultThinkingLevel": "high"}))
+            result = subprocess.run([program, str(local)], check=True, capture_output=True, text=True)
+            assert json.loads(target.read_text()) == declared | retained
+            assert "unmanaged.nested" in result.stderr and "sentinel-value" not in result.stderr, result.stderr
             previous = target.read_bytes()
-            subprocess.run([executable, declaration, str(target)], check=True)
+            subprocess.run([program, str(local)], check=True)
             assert target.read_bytes() == previous
         PY
         touch "$out"

@@ -1,4 +1,7 @@
-{ ... }:
+{ config, ... }:
+let
+  managedConfigsModule = config.flake.modules.homeManager.managedConfigs;
+in
 {
   flake.modules.homeManager.ai =
     {
@@ -13,24 +16,15 @@
       # picks .codex vs xdg.configHome/codex based on home.preferXdgDirectories
       # and the codex package version (TOML for >=0.2.0). We're on codex 0.130
       # without XDG preference, so .codex/config.toml is the live key. If either
-      # condition flips, the override key and install destination both need to
-      # follow.
-      configDir = ".codex";
-      configFileName = "config.toml";
-      settingsKey = "${configDir}/${configFileName}";
-      tomlFormat = pkgs.formats.toml { };
+      # condition flips, settingsKey must follow.
+      settingsKey = ".codex/config.toml";
     in
     {
-      options.programs.codex.mutableSettings = lib.mkOption {
-        type = lib.types.bool;
-        default = false;
-        description = "Use a mutable copy instead of an immutable nix store symlink for ${configFileName}. Allows codex to write to its config at runtime at the cost of nix-declared state being overwritten between activations.";
-      };
+      imports = [ managedConfigsModule ];
 
       config = {
         programs.codex = {
           enable = true;
-          mutableSettings = true;
           package = flake.inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.codex;
 
           # https://developers.openai.com/codex/config-reference
@@ -100,23 +94,18 @@
           # to maintain unified instructions across all AI agents.
         };
 
-        # Mutable settings: suppress the upstream symlink-style home.file entry
-        # on the absolute-path key upstream actually writes to. Mirrors the
-        # claude-code pattern at modules/home/ai/claude-code/default.nix:374-376;
-        # targeting a relative key would be a silent no-op (see the
-        # homemanager-upstream-key-paths memory entry).
-        home.file.${settingsKey}.enable = lib.mkIf config.programs.codex.mutableSettings (
-          lib.mkForce false
-        );
-
-        home.activation.codexMutableSettings = lib.mkIf config.programs.codex.mutableSettings (
-          let
-            settingsFile = tomlFormat.generate "codex-config" config.programs.codex.settings;
-          in
-          lib.hm.dag.entryAfter [ "writeBoundary" ] ''
-            $DRY_RUN_CMD install -Dm644 ${settingsFile} $HOME/${settingsKey}
-          ''
-        );
+        # codex writes its config at runtime, so it is a managed copy; moshi-hook
+        # re-adds `hooks` and `features.hooks`.
+        managedConfigs.codex-config = {
+          target = "${config.home.homeDirectory}/${settingsKey}";
+          format = "toml";
+          inherit (config.programs.codex) settings;
+          externalPaths = [
+            "hooks"
+            "features.hooks"
+          ];
+          replacesHomeFile = settingsKey;
+        };
       };
     };
 }

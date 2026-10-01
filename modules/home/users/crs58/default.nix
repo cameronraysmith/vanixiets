@@ -57,6 +57,12 @@ let
       # option feeds a secret into it.
       programs.devin.enable = true;
 
+      programs.omp.settings = {
+        tui.vimMode = true;
+        tui.vimModeDisplay = "icon";
+        composer.shape = "pi";
+      };
+
       programs.omnigraph = {
         enable = true;
         settings = {

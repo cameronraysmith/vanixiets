@@ -94,7 +94,25 @@
         inherit pkgs;
         home = cfg;
       };
-      merge = config.flake.lib.omnigentMergeConfig pkgs;
+      managedConfig = config.flake.lib.managedConfigProgram pkgs;
+      managedConfigSpec =
+        name:
+        let
+          entry = cfg.managedConfigs.${name};
+        in
+        pkgs.writeText "worker-${name}-spec.json" (
+          builtins.toJSON {
+            inherit name;
+            inherit (entry)
+              target
+              format
+              fileMode
+              appOwned
+              externalPaths
+              ;
+            declared = (pkgs.formats.json { }).generate "worker-${name}-declared.json" entry.settings;
+          }
+        );
       workflowFixture = pkgs.writeShellScript "worker-workflow-fixture" ''
         set -euo pipefail
         export HOME="$TMPDIR/workflow-home"
@@ -114,13 +132,15 @@
               && lib.elem (lib.removePrefix "${cfg.home.homeDirectory}/" file.target) [
                 ".config/git/config"
                 ".config/jj/config.toml"
-                ".config/openspec/config.json"
                 ".local/share/openspec/schemas/superpowers-bridge"
                 ".local/share/openspec/schemas/superpowers-bridge-wrspm"
               ]
             ) (lib.attrValues cfg.home.file)
           )
         }
+        install -Dm644 ${
+          (pkgs.formats.json { }).generate "openspec-config.json" cfg.managedConfigs.openspec-config.settings
+        } "$XDG_CONFIG_HOME/openspec/config.json"
         cd "$HOME/work"
         for executable in ghq ghq-sync dependency-sources zoxide just shellcheck uncomment ratchet jc jaq yq nixfmt nil nixd openspec mergify nvim git-xet; do
           test -x "$(command -v "$executable")"
@@ -160,39 +180,66 @@
         printf 'answer: 42\n' | yq '.answer' | jaq -e '. == 42'
         printf 'answer=42\n' | jc --ini | jaq -e '.answer == "42"'
       '';
-      atomicActivation = pkgs.writeText "worker-atomic-activation" cfg.home.activation.atomicMergeSettings.data;
-      atomicMergeTest = pkgs.writeText "worker-atomic-merge-test.py" ''
+      managedConfigTest = pkgs.writeText "worker-managed-config-test.py" ''
         import json
         import pathlib
-        import shlex
         import stat
         import subprocess
         import sys
+        import yaml
 
-        dry_run, executable, declaration, destination = shlex.split(pathlib.Path(sys.argv[1]).read_text())
-        assert dry_run == "$DRY_RUN_CMD"
-        assert destination == sys.argv[2]
-        declared = json.loads(pathlib.Path(declaration).read_text())
-        target = pathlib.Path("atomic-state/settings.json")
+        program, omnigent_template, atomic_template = sys.argv[1:]
+        sentinel = "sentinel-value"
+        state = pathlib.Path.cwd() / "state"
+
+        def localize(template, relative):
+            spec = json.loads(pathlib.Path(template).read_text())
+            spec["target"] = str(state / relative)
+            path = state.parent / (spec["name"] + ".json")
+            path.write_text(json.dumps(spec))
+            return spec, json.loads(pathlib.Path(spec["declared"]).read_text()), pathlib.Path(spec["target"]), path
+
+        def render(path):
+            return subprocess.run([program, str(path)], check=False, capture_output=True, text=True)
+
+        def rejects(spec_path, target, invalid):
+            for content in invalid:
+                target.write_text(content)
+                before = target.read_bytes()
+                assert render(spec_path).returncode != 0, ("accepted invalid", content)
+                assert target.read_bytes() == before, ("modified invalid", content)
+
+        spec, declared, target, spec_path = localize(omnigent_template, "omnigent/config.yaml")
+        assert spec["fileMode"] == "0600"
+        assert {"host.host_id", "server"} <= set(spec["appOwned"])
+        assert render(spec_path).returncode == 0
+        assert yaml.safe_load(target.read_text()) == declared, "invented app-owned keys"
+        target.write_text(yaml.safe_dump({"host": {"name": "old", "host_id": "fixture-id"}, "server": "https://fixture.invalid", "unknown": {"nested": sentinel}}))
+        result = render(spec_path)
+        assert result.returncode == 0, result.stderr
+        host = declared.get("host", {}) | {"host_id": "fixture-id"}
+        if "name" not in declared.get("host", {}):
+            host["name"] = "old"
+        assert yaml.safe_load(target.read_text()) == declared | {"host": host, "server": "https://fixture.invalid"}
+        assert "unknown.nested" in result.stderr and sentinel not in result.stderr, result.stderr
+        assert stat.S_IMODE(target.stat().st_mode) == 0o600
+        first = target.read_bytes()
+        assert render(spec_path).returncode == 0
+        assert target.read_bytes() == first
+        rejects(spec_path, target, ["[unterminated\n", "[sequence]\n", "scalar\n", "null\n"])
+
+        spec, declared, target, spec_path = localize(atomic_template, "atomic/settings.json")
         target.parent.mkdir()
-        unknown = {"workerFixture": {"nested": "retained"}}
-        assert not unknown.keys() & declared.keys()
-        target.write_text(json.dumps(unknown | {"theme": "old"}))
-
-        def merge():
-            return subprocess.run([executable, declaration, str(target)], check=False)
-
-        assert merge().returncode == 0
-        assert json.loads(target.read_text()) == unknown | declared
+        target.write_text(json.dumps({"onboardedVersion": "fixture", "workerFixture": {"nested": sentinel}, "theme": "old"}))
+        result = render(spec_path)
+        assert result.returncode == 0, result.stderr
+        assert json.loads(target.read_text()) == declared | {"onboardedVersion": "fixture"}
+        assert "workerFixture.nested" in result.stderr and sentinel not in result.stderr, result.stderr
         assert stat.S_IMODE(target.stat().st_mode) == 0o644
         first = target.read_bytes()
-        assert merge().returncode == 0
+        assert render(spec_path).returncode == 0
         assert target.read_bytes() == first
-        for invalid in ['{"unfinished":', '[]', 'null', '"scalar"']:
-            target.write_text(invalid)
-            before = target.read_bytes()
-            assert merge().returncode != 0, "accepted invalid Atomic settings"
-            assert target.read_bytes() == before, "modified invalid Atomic settings"
+        rejects(spec_path, target, ['{"unfinished":', "[]", "null", '"scalar"'])
       '';
       cliHome = inputs.home-manager.lib.homeManagerConfiguration {
         inherit pkgs;
@@ -698,11 +745,13 @@
             actual_activation = activation.read_text()
             assert "launchctl" not in actual_activation and "sw_vers" not in actual_activation
             assert "checkStringEq UID" in actual_activation and "22001" in actual_activation
-            merge_lines = [line for line in actual_activation.splitlines() if line.startswith("run ") and line.endswith("/.omnigent/config.yaml")]
-            assert len(merge_lines) == 1
-            run, merger, declaration, destination = shlex.split(merge_lines[0])
-            assert destination == worker_home + "/.omnigent/config.yaml"
-            return p, launcher, str(activation), merger, declaration
+            managed_lines = [line for line in actual_activation.splitlines() if line.startswith("run ") and "/bin/managed-config " in line]
+            assert len(managed_lines) == 1
+            _, program, *specs = shlex.split(managed_lines[0])
+            omnigent_specs = [spec for spec in specs if json.loads(Path(spec).read_text())["name"] == "omnigent-config"]
+            assert len(omnigent_specs) == 1
+            assert json.loads(Path(omnigent_specs[0]).read_text())["target"] == worker_home + "/.omnigent/config.yaml"
+            return p, launcher, str(activation), program, omnigent_specs[0]
 
         production = inspect(sys.argv[1])
         for reason in ["wrong user", "wrong domain", "missing runtime", "missing profile"]:
@@ -729,14 +778,17 @@
                 else:
                     raise AssertionError("accepted " + reason)
         control = inspect(sys.argv[2])
-        _, _, activation, merger, declaration = production
+        _, _, activation, program, spec_path = production
         assert str(Path(activation).parent) == sys.argv[4], "enrollment generation differs from launched generation"
-        settings = yaml.safe_load(Path(declaration).read_text())
+        spec = json.loads(Path(spec_path).read_text())
+        settings = json.loads(Path(spec["declared"]).read_text())
         assert settings["host"]["name"] == "fixture-cameron"
-        target = Path("worker-config.yaml")
+        target = Path.cwd() / "worker-config.yaml"
+        local_spec = Path("worker-config-spec.json")
+        local_spec.write_text(json.dumps(spec | {"target": str(target)}))
         target.write_text("host:\n  host_id: retained-worker-id\nunknown: retained\n")
-        subprocess.run([merger, declaration, str(target)], check=True)
-        assert yaml.safe_load(target.read_text()) == settings | {"host": settings["host"] | {"host_id": "retained-worker-id"}, "unknown": "retained"}
+        subprocess.run([program, str(local_spec)], check=True)
+        assert yaml.safe_load(target.read_text()) == settings | {"host": settings["host"] | {"host_id": "retained-worker-id"}}
         assert target.stat().st_mode & 0o777 == 0o600
         os.environ["HOME"] = tempfile.mkdtemp()
         entries = acp_agents(settings)
@@ -1440,7 +1492,6 @@
           ) "omnigent worker capability failures: ${lib.concatStringsSep ", " failed}";
           pkgs.runCommand "omnigent-worker-capabilities"
             {
-              nativeBuildInputs = [ pkgs.yq-go ];
               passthru = { inherit cases workerPath; };
             }
             ''
@@ -1482,40 +1533,10 @@
                 test -x "$(command -v "$executable")"
               done
               ${pkgs.bash}/bin/bash --noprofile --norc ${workflowFixture}
-              export PATH=${
-                lib.makeBinPath [
-                  pkgs.coreutils
-                  pkgs.diffutils
-                  pkgs.yq-go
-                ]
-              }
-              mkdir -p state
-              printf 'host:\n  name: new\nsequence: [new]\n' > declared.yaml
-              printf 'host:\n  name: old\n  host_id: fixture-id\nunknown:\n  nested: retained\nsequence: [old]\n' > state/config.yaml
-              ${lib.getExe merge} declared.yaml state/config.yaml
-              yq -e '.host.name == "new" and .host.host_id == "fixture-id" and .unknown.nested == "retained" and (.sequence | length) == 1 and .sequence[0] == "new"' state/config.yaml
-              cp state/config.yaml expected.yaml
-              ${lib.getExe merge} declared.yaml state/config.yaml
-              cmp expected.yaml state/config.yaml
-              test "$(stat -c %a state/config.yaml)" = 600
-              for invalid in '[unterminated' '[sequence]' 'scalar' 'null' $'---\na: one\n---\nb: two'; do
-                printf '%s\n' "$invalid" > state/config.yaml
-                cp state/config.yaml before.yaml
-                if ${lib.getExe merge} declared.yaml state/config.yaml; then
-                  echo 'accepted invalid persisted configuration' >&2
-                  exit 1
-                fi
-                cmp before.yaml state/config.yaml
-              done
-              ${lib.getExe merge} declared.yaml state/fresh.yaml
-              yq -e '.host.name == "new"' state/fresh.yaml
-              printf '[unterminated\n' > invalid-declaration.yaml
-              cp state/fresh.yaml before.yaml
-              if ${lib.getExe merge} invalid-declaration.yaml state/fresh.yaml; then exit 1; fi
-              cmp before.yaml state/fresh.yaml
-              if ${lib.getExe merge} invalid-declaration.yaml state/absent.yaml; then exit 1; fi
-              test ! -e state/absent.yaml
-              ${lib.getExe pkgs.python3} ${atomicMergeTest} ${atomicActivation} ${lib.escapeShellArg "${cfg.programs.atomic.configDir}/settings.json"}
+              export PATH=${lib.makeBinPath [ pkgs.coreutils ]}
+              ${
+                lib.getExe (pkgs.python3.withPackages (p: [ p.pyyaml ]))
+              } ${managedConfigTest} ${lib.getExe managedConfig} ${managedConfigSpec "omnigent-config"} ${managedConfigSpec "atomic-settings"}
               touch "$out"
             '';
       };

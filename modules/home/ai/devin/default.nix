@@ -9,10 +9,8 @@
 # system-wide service manager, and home-manager is the layer that reaches
 # every host in this repository where the user exists.
 #
-# The rendered config.json is a Nix store symlink, so the CLI cannot write it
-# back. Anything the CLI would otherwise persist itself -- the first-run theme
-# prompt, keybindings saved from `/shortcuts` -- has to be declared here
-# instead, which is what `settings` is for.
+# config.json is a managed copy rewritten from `settings` each activation;
+# only the CLI-owned `version` key survives from the previous file.
 { config, ... }:
 {
   flake.modules.homeManager.ai = {
@@ -20,6 +18,9 @@
   };
 
   flake.modules.homeManager.devin =
+    let
+      managedConfigsModule = config.flake.modules.homeManager.managedConfigs;
+    in
     {
       config,
       lib,
@@ -49,6 +50,8 @@
       };
     in
     {
+      imports = [ managedConfigsModule ];
+
       options.programs.devin = {
         enable = lib.mkEnableOption "the Devin CLI with a declaratively rendered user configuration";
 
@@ -115,9 +118,7 @@
           default = null;
           description = ''
             Colour theme, rendered as `theme_mode`. Null leaves the key unset,
-            which is upstream's auto-detect behaviour -- but note that
-            auto-detect asks on first run and cannot record the answer,
-            because the rendered file is a read-only store symlink.
+            which is upstream's auto-detect behaviour.
           '';
         };
 
@@ -152,9 +153,13 @@
       config = lib.mkIf cfg.enable {
         home.packages = [ cfg.package ];
 
-        xdg.configFile."devin/config.json".source = jsonFormat.generate "devin-config.json" (
-          lib.recursiveUpdate declared cfg.settings
-        );
+        managedConfigs.devin-config = {
+          target = "${config.xdg.configHome}/devin/config.json";
+          format = "json";
+          settings = lib.recursiveUpdate declared cfg.settings;
+          appOwned = [ "version" ];
+          externalPaths = [ "hooks" ];
+        };
       };
     };
 }

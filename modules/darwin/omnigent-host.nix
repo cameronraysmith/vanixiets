@@ -287,7 +287,7 @@ in
                   [ "setupLaunchAgents" ]
                   [
                     "writeBoundary"
-                    "omnigentMergeConfig"
+                    "managedConfigs"
                   ]
                   ''
                     run ${pkgs.coreutils}/bin/install -d -m 0700 ${lib.escapeShellArg logDirectory}

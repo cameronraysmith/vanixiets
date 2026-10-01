@@ -11,8 +11,6 @@
         ...
       }:
       let
-        jsonFormat = pkgs.formats.json { };
-
         mkClaudeWrapper =
           {
             name,
@@ -36,12 +34,9 @@
                 CLAUDE_CODE_SUBAGENT_MODEL = models.opus;
               };
             };
-            settingsFile = jsonFormat.generate "${wrapperName}-settings.json" (
-              wrapperSettings
-              // {
-                "$schema" = "https://json.schemastore.org/claude-code-settings.json";
-              }
-            );
+            settings = wrapperSettings // {
+              "$schema" = "https://json.schemastore.org/claude-code-settings.json";
+            };
           in
           {
             package = pkgs.writeShellApplication {
@@ -64,12 +59,6 @@
             };
 
             configFiles = {
-              "${wrapperName}/settings.json" =
-                if config.programs.claude-code.mutableSettings then
-                  { enable = false; }
-                else
-                  { source = settingsFile; };
-
               # Share commands directory
               "${wrapperName}/commands" = lib.mkIf (config.programs.claude-code.commandsDir != null) {
                 source = config.programs.claude-code.commandsDir;
@@ -82,11 +71,8 @@
                 recursive = true;
               };
             };
-          }
-          // lib.optionalAttrs config.programs.claude-code.mutableSettings {
-            activation = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
-              $DRY_RUN_CMD install -Dm644 ${settingsFile} ${configDir}/settings.json
-            '';
+
+            inherit configDir settings;
           };
 
         glmWrapper = mkClaudeWrapper {
@@ -119,9 +105,17 @@
 
         xdg.configFile = glmWrapper.configFiles // cerebrasWrapper.configFiles;
 
-        home.activation = lib.mkIf config.programs.claude-code.mutableSettings {
-          claudeGlmMutableSettings = glmWrapper.activation;
-          claudeCerebrasMutableSettings = cerebrasWrapper.activation;
+        managedConfigs = {
+          claude-glm-settings = {
+            target = "${glmWrapper.configDir}/settings.json";
+            format = "json";
+            inherit (glmWrapper) settings;
+          };
+          claude-cerebras-settings = {
+            target = "${cerebrasWrapper.configDir}/settings.json";
+            format = "json";
+            inherit (cerebrasWrapper) settings;
+          };
         };
       };
   };

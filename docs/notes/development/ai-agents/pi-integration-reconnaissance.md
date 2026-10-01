@@ -55,10 +55,10 @@ On interactive start with no `theme` set it persists the auto-detected terminal 
 A failed write is caught, recorded, and surfaced as a yellow `Warning:` line rather than crashing, so a store symlink degrades to a recurring warning with silently discarded state rather than a hard failure.
 The persist logic merges only session-modified fields back over the current on-disk content, so nix-seeded keys the user never touches survive a pi write.
 
-The mechanism that fits is exactly the one vanixiets already uses for claude-code and codex: a repo-local `mutableSettings` boolean, suppression of the upstream `home.file` entry via `enable = lib.mkIf cfg.mutableSettings (lib.mkForce false)`, and a `home.activation` DAG entry after `writeBoundary` that runs `install -Dm644 ${generatedFile} $HOME/<path>`.
+The mechanism that fits is the one vanixiets uses for claude-code and codex: a `managedConfigs` entry that rewrites the target from the Nix-declared settings in an activation step after `writeBoundary`, with `replacesHomeFile` disabling the upstream `home.file` entry.
 home-manager at the pinned revision already ships `programs.pi-coding-agent` with options `enable`, `package`, `extraPackages`, `configDir`, `settings`, `keybindings`, `models`, and `context`, and it writes `home.file` under absolute keys derived from `configDir` whose default is `${config.home.homeDirectory}/.pi/agent`.
 The suppression key must therefore be the absolute `"${config.programs.pi-coding-agent.configDir}/settings.json"`, matching claude-code, not the relative `.pi/agent/settings.json`.
-The claude-code module records that targeting the relative path was a real no-op bug that surfaced later as `checkLinkTargets` backup conflicts at deploy time.
+Targeting the relative path is a silent no-op that surfaces later as `checkLinkTargets` backup conflicts at deploy time.
 
 By contrast `models.json` needs none of that machinery and should be a plain store symlink through `programs.pi-coding-agent.models`, on exactly the criterion the tuicr module states for its own config file: pi only ever reads it.
 This mirrors the opencode and tuicr shape, where no override is taken at all.
@@ -176,7 +176,7 @@ All 128 first-party `SKILL.md` files do carry a non-empty description, so nothin
 
 ## Proposed module layering
 
-Create `modules/home/ai/pi/default.nix` as a home-manager module writing `flake.modules.homeManager.ai`, enabling `programs.pi-coding-agent`, pointing `package` at the llm-agents attribute, setting `models`, and carrying the `mutableSettings` fork for `settings.json`.
+Create `modules/home/ai/pi/default.nix` as a home-manager module writing `flake.modules.homeManager.ai`, enabling `programs.pi-coding-agent`, pointing `package` at the llm-agents attribute, setting `models`, and declaring a `managedConfigs` entry for `settings.json`.
 This is the only strictly required new file; the `ai` aggregate is auto-discovered by import-tree and already listed in crs58's `aggregates`, so no registration step exists.
 
 Modify `modules/home/modules/agents-md.nix` to add a `.pi/agent/AGENTS.md` destination, if the decision is to route pi's global instructions through the unified generator rather than `programs.pi-coding-agent.context`; the two are mutually exclusive because the absolute and relative keys normalize to the same target and trip home-manager's duplicate-target assertion.
@@ -243,8 +243,8 @@ Five of the questions this note originally posed are settled by the landed imple
 
 Package source: the llm-agents attribute, `flake.inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.pi`, rather than nixpkgs' `pi-coding-agent`.
 
-Settings delivery: nix-seeded-then-mutable, through a repo-local `mutableSettings` option that defaults to `false` and is set to `true` in the module.
-The upstream `home.file` entry is suppressed on the absolute `"${cfg.configDir}/settings.json"` key, and a `home.activation` entry after `writeBoundary` installs the generated file, so the seeded keys — `theme`, `enableInstallTelemetry = false`, and the `packages` array — are refreshed on every activation.
+Settings delivery: nix-seeded-then-mutable, through `managedConfigs.pi-settings`.
+Its `replacesHomeFile` disables the upstream `home.file` entry on the absolute `"${cfg.configDir}/settings.json"` key, and its activation step rewrites the file from `programs.pi-coding-agent.settings`, so the seeded keys — `theme`, `enableInstallTelemetry = false`, and the `packages` array — are refreshed on every activation.
 The fork is scoped to `settings.json`, since pi has no writer for `keybindings.json` or `models.json`.
 
 Instruction file: the upstream `programs.pi-coding-agent.context` option, fed from `config.programs.agents-md.settings.text`, which writes `AGENTS.md` into `configDir`.

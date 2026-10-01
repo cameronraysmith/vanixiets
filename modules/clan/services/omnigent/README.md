@@ -29,8 +29,8 @@ Both carriers derive from one attribute set and use nixpkgs' JSON quoting, so th
 The NixOS runner reads the selected existing account's credentials; both magnetite and pyrite currently select `cameron`, while stibnite selects `crs58`.
 Both platforms derive HOME and working directory from `config.users.users.${cfg.user}.home`; the shared inventory uses that home for Atomic state, and Darwin also uses it for logs.
 The aliases map reuses `crs58`'s Home Manager content under `cameron`; it does not rename Unix accounts.
-Home Manager enables `programs.omnigent` with the same package and merges `host.name` and the shared ACP definitions into writable `~/.omnigent/config.yaml`.
-The merge preserves undeclared runtime state, including `host.host_id`; it must not become a Nix-store symlink.
+Home Manager enables `programs.omnigent` with the same package and renders `host.name` and the shared ACP definitions into writable `~/.omnigent/config.yaml` through `managedConfigs`.
+Each activation rewrites the file from the declaration, keeping only `host.host_id` and `server` from the existing file; it must not become a Nix-store symlink.
 All three hosts use the exact shared `Atomic` / `bunx pi-acp@0.0.33` and `Oh My Pi` / `omp acp` rows from `modules/home/ai/omnigent/acp.nix`.
 Both rows disable `omnigent_mcp` and `inject_system_prompt`; Atomic allows `PI_ACP_PI_COMMAND` and `PI_CODING_AGENT_DIR`, while omp's `env_passthrough` is exactly empty so Atomic state does not reach omp.
 
@@ -70,7 +70,7 @@ The explicit store PATH always contains repository Claude Code and Atomic; llm-a
 Extra packages follow those requirements, then `/usr/bin:/bin:/usr/sbin:/sbin` supplies native macOS utilities.
 Darwin gets no bubblewrap and relies on neither a profile PATH, shell initialization nor `launchctl setenv`.
 Both output streams go to `<selected-home>/.omnigent/logs/host/service.log`.
-Home Manager creates the private log directory with mode `0700` after `writeBoundary` and `omnigentMergeConfig`, before `setupLaunchAgents`.
+Home Manager creates the private log directory with mode `0700` after `writeBoundary` and `managedConfigs`, before `setupLaunchAgents`.
 
 A sleeping laptop shows offline and reconnects automatically on wake or network return; offline is expected, not a fault.
 There is no network-state load restriction or disabled restart.
@@ -99,7 +99,7 @@ Follow this order on stibnite after selecting the configured `services.omnigent-
 The controller first builds `checks.aarch64-darwin.package-omnigent`, then `checks.aarch64-darwin.darwin-stibnite` locally after the evaluation gates pass.
 The Darwin package and magnetite server configuration are unchanged by this extension.
 
-For pyrite, the controller evaluates S8's account, unit, PATH and shared-settings gates, inspects the actual HM activation's store YAML, and rehearses its merge while preserving a seeded runtime `host.host_id`.
+For pyrite, the controller evaluates S8's account, unit, PATH and shared-settings gates, inspects the actual HM activation's declared `omnigent-config` content, and rehearses its render while preserving a seeded runtime `host.host_id`.
 It builds `checks.x86_64-linux.nixos-pyrite` once on magnetite, not pyrite; inspecting the rendered YAML must not require another machine build.
 Implementation and these gates do not activate pyrite or establish live acceptance.
 The current contract's whole-settings G5 override evaluates successfully; the deployment plan records the earlier partial-override failure and its reconciliation.

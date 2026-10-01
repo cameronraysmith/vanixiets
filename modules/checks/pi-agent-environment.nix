@@ -117,10 +117,7 @@
       authenticationTarget = "${piConfig.configDir}/auth.json";
       projectTrustTarget = "${piConfig.configDir}/trust.json";
       extensionStateTarget = "${piConfig.configDir}/packages";
-      settingsActivation = lib.attrByPath [
-        "piCodingAgentMutableSettings"
-      ] { } homeConfig.home.activation;
-      settingsActivationData = settingsActivation.data or "";
+      settingsManaged = homeConfig.managedConfigs.pi-settings or null;
       # These stay total and defer their diagnostics to build-time guards in the
       # smoke check: a `throw` here aborts evaluation of the whole flake-check
       # set, which would preempt the structural check's readable diff.
@@ -136,7 +133,7 @@
         target: if homeFileImmutable target then (homeFileAt target).source else null;
       # Pi persists several runtime-state categories into one file: settings.json
       # takes model selection, thinking preferences, and `pi install` extension
-      # state (see the home.file comment in modules/home/ai/pi/default.nix), and
+      # state (see the managedConfigs comment in modules/home/ai/pi/default.nix), and
       # sessions/ holds compaction state. The eight spec categories therefore
       # reduce to five distinct probes, and rows sharing a probe cannot disagree
       # by construction.
@@ -2205,12 +2202,13 @@
             inherit globalInstructionsNixOwned piSpecificSkillsPresent;
             canonicalSkills = if canonicalSkillsScript == "" then null else "~/.agents/skills";
             slowModeSettingsShape = builtins.attrNames piConfig.settings;
-            settingsActivation = {
-              afterWriteBoundary = builtins.elem "writeBoundary" (settingsActivation.after or [ ]);
-              copyCommand = lib.hasInfix "install -Dm644" settingsActivationData;
+            settingsDelivery = {
+              managed = settingsManaged != null;
+              format = settingsManaged.format or null;
+              declaredFromProgramSettings = (settingsManaged.settings or null) == piConfig.settings;
               immutableHomeFileEnabled = homeFileEnabled settingsTarget;
               target =
-                if lib.hasInfix settingsTarget settingsActivationData then "~/.pi/agent/settings.json" else null;
+                if (settingsManaged.target or null) == settingsTarget then "~/.pi/agent/settings.json" else null;
             };
             inherit runtimeStateOutsideImmutableLinks;
             immutableResourceTargets = {
@@ -2306,9 +2304,10 @@
               "packages"
               "theme"
             ];
-            settingsActivation = {
-              afterWriteBoundary = true;
-              copyCommand = true;
+            settingsDelivery = {
+              managed = true;
+              format = "json";
+              declaredFromProgramSettings = true;
               immutableHomeFileEnabled = false;
               target = "~/.pi/agent/settings.json";
             };

@@ -30,12 +30,10 @@
 # exclusion to pi flips piNegativeExtensions. Moving pi-vim from piOnlyPackages
 # into packages flips atomicPiOnlyPackages; dropping it flips piOnlyPackages.
 #
-# The retraction claim is why atomicDeclaresPackages is asserted separately
-# rather than inferred from the selector lists. modules/home/ai/atomic/
-# merge-settings.sh can update a nix-owned key but not retract one, so a change
-# that stopped declaring `packages` would leave whatever value last reached
-# ~/.atomic/agent/settings.json frozen there. That failure is invisible in the
-# generated payload and visible only as the key's absence.
+# atomicDeclaresPackages is asserted separately rather than inferred from the
+# selector lists: a change that stopped declaring `packages` would leave atomic
+# on its default package set, and that failure is invisible in the generated
+# payload and visible only as the key's absence.
 #
 # Evidence boundary. This claims declaration shape alone: that the two agents'
 # settings carry the selectors named below. It does not claim that atomic
