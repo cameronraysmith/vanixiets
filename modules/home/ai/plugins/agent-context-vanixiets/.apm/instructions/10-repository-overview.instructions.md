@@ -28,7 +28,8 @@ Documentation lives in two places.
 `just` is the task entry point; `just help` lists the recipes.
 
 `just check` runs `nix flake check` over everything.
-`just check-fast` runs the same check set through `nix-fast-build` and is the normal local loop.
+`just check-fast` runs the same check set through `nix-fast-build` and is the normal local loop; its positional parameters are `nom push system remote`, and a non-native `system` evaluates and builds on `remote`, `magnetite` by default or `pyrite`, e.g. `just check-fast auto off x86_64-linux`.
+On those hosts `nix-eval-jobs` takes a host-wide evaluation lock, so a remote run may print `nix-eval-jobs: waiting for the host evaluation lock held by ...` every 30 seconds while nixbot evaluates; that is queueing, not a hang.
 `just test-quick` builds a named subset of checks directly for fast feedback.
 `just lint` runs the `prek` hook set, which is treefmt plus a staged-diff gitleaks scan; the hooks are declared in `modules/formatting.nix` rather than in a `.pre-commit-config.yaml`.
 

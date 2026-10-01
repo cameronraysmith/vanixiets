@@ -66,6 +66,13 @@ just check-fast 2>&1 | tee logs/check-fast-$(date +%Y%m%dT%H%M%S).log
 Before publication from an aarch64-darwin laptop, follow the Linux CI-warming command and store-reuse explanation in `git-stacked-pr-integration` §Queue authorization.
 That warming step is separate from this native local feedback loop.
 
+The recipe's positional parameters are `nom push system remote`.
+When `system` differs from the native system, the run evaluates and builds on the host named by `remote`: `magnetite` (the default) passes `--remote magnetite.zt --eval-workers 4`, and `pyrite` passes `--remote pyrite.zt --eval-workers 2 --eval-max-memory-size 2048` because pyrite is a 15.5 GiB laptop.
+Any other value fails before evaluation with the list of allowed values, for example `just check-fast auto off x86_64-linux pyrite`.
+On both hosts the remote `nix-eval-jobs` is a wrapper that takes a host-wide evaluation lock, so a remote run that collides with nixbot's evaluation waits rather than overlapping it.
+While it waits it prints `nix-eval-jobs: waiting for the host evaluation lock held by <user> pid <pid> since <time> (<command>); evaluations on this host run one at a time to avoid exhausting memory` to stderr every 30 seconds.
+That line is expected queueing, not a hang; do not interrupt the run or retry it in parallel, since a second evaluation would queue behind the same lock.
+
 The sibling `just check` recipe runs `nix flake check -L --show-trace` sequentially and is the slower, verbose alternative.
 Prefer it when a single-derivation failure under `check-fast` is obscured by parallel buffering and the linear trace order matters more than wall-clock.
 

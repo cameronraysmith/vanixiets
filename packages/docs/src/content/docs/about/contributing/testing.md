@@ -248,10 +248,16 @@ Changed CI workflow?
 | Command | Runtime | Strategy | Use when |
 |---------|---------|----------|----------|
 | `just check` | ~5-7 min | Sequential, verbose (`nix flake check -L --show-trace`) | Before PR, after rebase, full validation |
-| `just check-fast` | ~1-2 min | Parallel, content-addressed cache (`nix-fast-build --eval-workers 4`) | Development iteration, config-only changes |
+| `just check-fast` | ~1-2 min | Parallel, content-addressed cache (`nix-fast-build`, 4 eval workers locally and on magnetite) | Development iteration, config-only changes |
 
 Both commands run the same set of checks.
 The difference is execution strategy: `just check` evaluates and builds checks sequentially with verbose tracing, while `just check-fast` fans them out in parallel against a content-addressed cache for faster feedback.
+
+`just check-fast` takes positional parameters `nom push system remote`.
+When `system` is not the native system, evaluation and builds run on the `remote` host over ssh: `magnetite` by default with 4 evaluation workers, or `pyrite` with 2 workers, each restarted once it passes 2048 MiB resident.
+Any other `remote` value fails before evaluation and lists the allowed values.
+Both hosts serialize `nix-eval-jobs` through a host-wide evaluation lock, so a remote run that starts while nixbot is evaluating prints `nix-eval-jobs: waiting for the host evaluation lock held by ...` every 30 seconds and starts once the lock is released.
+The incident behind the lock is recorded in `docs/notes/development/incidents/2026-10-01-magnetite-concurrent-eval-oom.md`.
 
 ## Troubleshooting
 
@@ -308,8 +314,8 @@ nix build .#checks.aarch64-darwin.nix-unit
 # List all available checks
 nix flake show --json | jq '.checks'
 
-# Run all checks in parallel against the content-addressed cache
-just check-fast x86_64-linux
+# Run all x86_64-linux checks in parallel on magnetite (or append pyrite to use pyrite)
+just check-fast auto off x86_64-linux
 ```
 
 ### Documentation test issues

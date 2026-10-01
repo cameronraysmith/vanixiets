@@ -68,7 +68,7 @@ Core nix operations for building, checking, and managing the flake.
 | `debug-build` | `package` | Build experimental debug package with nom | No |
 | `debug-list` | - | List all available debug packages | No |
 | `check` | - | Run nix flake check (full, including VM tests) | No |
-| `check-fast` | `nom? push? system?` | Build `checks.<system>` via nix-fast-build, skipping cached derivations | No |
+| `check-fast` | `nom? push? system? remote?` | Build `checks.<system>` via nix-fast-build, skipping cached derivations; a non-native `system` runs on `remote` (`magnetite` default, or `pyrite`) | No |
 | `verify` | - | Verify system configuration builds after updates | No |
 | `bisect-nixpkgs` | - | Bisect nixpkgs commits (automatic mode) | No |
 | `bisect-nixpkgs-manual` | `command` | Bisect nixpkgs commits (manual mode) | No |
@@ -77,6 +77,11 @@ Core nix operations for building, checking, and managing the flake.
 | `update-package` | `package` | Update a package using its updateScript | No |
 
 **CI:** nixbot builds `checks.x86_64-linux` directly rather than calling these recipes; `just check-fast auto off x86_64-linux` builds the same set.
+
+**check-fast:** parameters are positional (`nom push system remote`); `nom` is `auto|on|off`, `push=on` uploads built paths to niks3, and `system` defaults to the native system.
+A non-native `system` evaluates and builds on the `remote` host with `--no-download --retries 2`: `magnetite` adds `--remote magnetite.zt --eval-workers 4`, and `pyrite` adds `--remote pyrite.zt --eval-workers 2 --eval-max-memory-size 2048`.
+Any other `remote` value fails before evaluation with the allowed values.
+On both hosts `nix-eval-jobs` takes a host-wide evaluation lock, so a remote run that overlaps another evaluation waits and prints `nix-eval-jobs: waiting for the host evaluation lock held by ...` every 30 seconds.
 
 ## Terraform
 

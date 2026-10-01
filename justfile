@@ -312,7 +312,8 @@ home-package-names system="":
   {{nix_cmd}} eval --json .#lib.homePackageNames --apply "f: f \"$system\"" | jq --sort-keys .
 
 # Validate flake checks via nix-fast-build (failure isolation, parallel eval+build, built-in log renderer)
-# --eval-workers 4: reduces SQLite eval-cache contention (harmless but noisy at default=ncpus)
+# --eval-workers 4 (local and magnetite lanes): reduces SQLite eval-cache contention (harmless but
+#   noisy at default=ncpus); the pyrite lane lowers it, see remote below
 # --skip-cached: derivations already present in the binary cache are not rebuilt
 # Out-links are not created (nix-fast-build >= 2.0 only gc-roots builds for the duration of the run).
 # nom=auto|on|off: selects the interactive renderer; off passes --no-nom (a historical name: since
@@ -326,18 +327,33 @@ home-package-names system="":
 #   the outputs stay in the store, so re-running with push=on pays only the upload.
 # system="": defaults to builtins.currentSystem. When system is the native system the build runs
 #   locally and results land in the local store; for any other system the build is routed with
-#   --remote magnetite.zt --no-download, so the remote store is populated and the local store does
+#   --remote <host> --no-download, so the remote store is populated and the local store does
 #   not become a staging area for another platform's closure. The remote lane also gets
 #   --retries 2, because --remote opens one ssh connection per build and a dropped handshake
 #   exits 255 and reds a check that names a package which is not at fault. Retries are scoped to
 #   that lane on purpose: retrying local builds would hide a genuinely flaky check instead of
 #   surfacing it. The underlying limit is magnetite's sshd MaxStartups, raised in its machine
 #   config; these retries absorb the residue rather than substituting for that fix.
-# Params are positional, so usage is: just check-fast auto on x86_64-linux
+# remote=magnetite|pyrite: the host the remote lane uses; ignored when system is native, but
+#   validated on every run so a typo fails before anything is evaluated.
+#   magnetite -> --remote magnetite.zt --eval-workers 4
+#   pyrite    -> --remote pyrite.zt --eval-workers 2 --eval-max-memory-size 2048, sized for a
+#                15.5 GiB laptop that also runs the desktop and the omnigent workers
+#   --remote runs nix-eval-jobs on that host over ssh, and both hosts put an evaluation-lock
+#   wrapper first on PATH (services.nixEvalLock): if nixbot or another evaluation holds the host
+#   lock, this run waits, printing "nix-eval-jobs: waiting for the host evaluation lock held by
+#   ..." every 30 s, instead of overlapping it. Two concurrent evaluations on magnetite caused the
+#   OOMs in docs/notes/development/incidents/2026-10-01-magnetite-concurrent-eval-oom.md.
+# Params are positional, so usage is: just check-fast auto on x86_64-linux pyrite
 [group('nix')]
-check-fast nom="auto" push="off" system="":
+check-fast nom="auto" push="off" system="" remote="magnetite":
   #!/usr/bin/env bash
   set -euo pipefail
+  case "{{remote}}" in
+    magnetite) remotehostflags="--remote magnetite.zt --eval-workers 4" ;;
+    pyrite)    remotehostflags="--remote pyrite.zt --eval-workers 2 --eval-max-memory-size 2048" ;;
+    *) echo "remote must be magnetite|pyrite (got '{{remote}}')" >&2; exit 1 ;;
+  esac
   case "{{nom}}" in
     auto) [ -t 1 ] && flag="" || flag="--no-nom" ;;
     on)   flag="" ;;
@@ -348,11 +364,13 @@ check-fast nom="auto" push="off" system="":
   native=$(nix eval --impure --raw --expr 'builtins.currentSystem')
   system="{{system}}"
   [ -n "$system" ] || system="$native"
-  remoteflags=""
-  [ "$system" = "$native" ] || remoteflags="--remote magnetite.zt --no-download --retries 2"
-  nix-fast-build $flag $pushflag $remoteflags \
+  if [ "$system" = "$native" ]; then
+    targetflags="--eval-workers 4"
+  else
+    targetflags="$remotehostflags --no-download --retries 2"
+  fi
+  nix-fast-build $flag $pushflag $targetflags \
     --option accept-flake-config true \
-    --eval-workers 4 \
     --skip-cached \
     --flake ".#checks.$system"
 
