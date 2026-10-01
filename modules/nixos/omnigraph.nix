@@ -1,4 +1,7 @@
-{ ... }:
+{ config, ... }:
+let
+  flakeLib = config.flake.lib;
+in
 {
   flake.modules.nixos.omnigraph =
     {
@@ -136,25 +139,50 @@
         '';
       };
 
-      readinessProbe = pkgs.writeShellApplication {
-        name = "omnigraph-server-wait-ready";
-        runtimeInputs = [
-          pkgs.coreutils
-          pkgs.curl
-        ];
-        text = ''
-          url="http://${bindTarget}/healthz"
-          deadline=$(( $(date +%s) + ${toString cfg.readinessTimeout} ))
-          until curl --fail --silent --max-time 5 --output /dev/null "$url"; do
-            if [ "$(date +%s)" -ge "$deadline" ]; then
-              printf 'omnigraph-server did not answer %s within %s seconds\n' \
-                "$url" '${toString cfg.readinessTimeout}' >&2
-              curl --fail --silent --show-error --max-time 5 --output /dev/null "$url" || true
-              exit 1
-            fi
-            sleep 2
-          done
-        '';
+      # Graphs the applied cluster revision declares. A root that was imported
+      # but never applied boots with none of them and still passes /readyz,
+      # even under --require-all-graphs, so the probe holds the served count
+      # to this number when the server is meant to serve the whole cluster.
+      declaredGraphCount = builtins.length (lib.attrNames (cfg.cluster.settings.graphs or { }));
+
+      # Fails the start job within seconds when the server process has
+      # already exited (any boot failure is fatal before the listener binds,
+      # and systemd otherwise waits on a running ExecStartPost for its whole
+      # budget) or when it serves fewer graphs than declared (no runtime
+      # registration, so that never improves without an apply and restart).
+      readinessProbe = flakeLib.omnigraphReadinessProbe pkgs {
+        url = "http://${bindTarget}";
+        timeout = cfg.readinessTimeout;
+        expectedGraphCount =
+          if cfg.requireAllGraphs && cfg.cluster.enable then declaredGraphCount else null;
+      };
+
+      bootstrapEnabled = cfg.cluster.enable && cfg.cluster.bootstrap.enable;
+
+      # The bootstrap library derives the create-once marker location from
+      # the storage URI itself; this only classifies the scheme for the
+      # eval-time assertions.
+      storageScheme =
+        let
+          m = builtins.match "([A-Za-z][A-Za-z0-9+.-]*)://.*" cfg.storageUri;
+        in
+        if m == null then null else lib.toLower (builtins.head m);
+      storageIsS3 = storageScheme == "s3";
+      storageIsLocal = storageScheme == null || storageScheme == "file";
+
+      # Every unit runs with ProtectSystem=strict and DynamicUser, and none
+      # carries ReadWritePaths, so the only writable local storage is the
+      # StateDirectory. A local root works only beneath it, which also puts
+      # the marker directory `<parent>/_omnigraph-markers` inside it.
+      stateDirectoryPath = "/var/lib/omnigraph";
+      localStorageRoot = lib.removeSuffix "/" (lib.removePrefix "file://" cfg.storageUri);
+      localRootUnderStateDirectory = lib.hasPrefix "${stateDirectoryPath}/" localStorageRoot;
+
+      bootstrapScript = flakeLib.omnigraphBootstrap pkgs {
+        omnigraph = cfg.package;
+        applyProgram = lib.getExe applyScript;
+        configDir = clusterConfigDir;
+        storageUri = cfg.storageUri;
       };
 
       serverRestartSec = 60;
@@ -280,7 +308,7 @@
           type = lib.types.ints.positive;
           default = 600;
           description = ''
-            Seconds the readiness probe waits for `/healthz` to answer before
+            Seconds the readiness probe waits for `/readyz` to answer before
             failing the `omnigraph-server` start job.
 
             `omnigraph-server` opens every dataset in the cluster from storage
@@ -292,6 +320,19 @@
             it with five minutes of headroom, so that an unready server fails
             through the probe's own diagnostic rather than through systemd's
             generic timeout.
+
+            The probe does not spend this budget on a server that cannot come
+            up. Every boot failure — a missing cluster state, a strict
+            {option}`services.omnigraph.requireAllGraphs` refusal, an
+            unreadable graph — exits the server before it binds, and the probe
+            fails the start job within seconds once the main process is gone,
+            rather than polling a dead port until the deadline. With
+            {option}`services.omnigraph.requireAllGraphs` and
+            {option}`services.omnigraph.cluster.enable` both set, it also fails
+            at once when `/readyz` reports fewer served graphs than
+            `cluster.settings.graphs` declares: the server registers no graph
+            after boot, so that shortfall never resolves without an apply and a
+            restart.
 
             Scale it with the cluster. Startup cost grows with the number of
             datasets and with the latency of the store they are read from.
@@ -480,7 +521,55 @@
               Off is the safer default because apply creates a missing graph
               without ceremony: were the storage root lost out of band, an
               automatic apply would recreate it empty and report an ordinary
-              create.
+              create. First initialization of a fresh root does not need this
+              on: {option}`services.omnigraph.cluster.bootstrap.enable` applies
+              exactly once, and refuses to when the root was initialized
+              before and has since gone missing.
+            '';
+          };
+
+          bootstrap.enable = lib.mkOption {
+            type = lib.types.bool;
+            default = cfg.cluster.enable;
+            defaultText = lib.literalExpression "config.services.omnigraph.cluster.enable";
+            description = ''
+              Whether to run the `omnigraph-cluster-bootstrap` unit before
+              `omnigraph-cluster-apply` and `omnigraph-server`. It initializes a
+              fresh storage root exactly once, so a new deployment serves
+              without a manual apply, while keeping the lost-root protection
+              that {option}`services.omnigraph.cluster.apply.auto` being off
+              provides.
+
+              The cluster state lives only inside the root, so nothing in the
+              root can say whether it was initialized before. The unit records
+              that in a marker outside the root instead, under a
+              `_omnigraph-markers` prefix beside it: the storage URI with
+              trailing slashes removed is split into parent and name, and the
+              marker is `<parent>/_omnigraph-markers/<name>.initialized` (for
+              `s3://bucket/clusters/dev` the object
+              `s3://bucket/clusters/_omnigraph-markers/dev.initialized`, for a
+              directory the corresponding file). It does not share the root's
+              key prefix, so deleting the root by prefix leaves it in place.
+              The unit then acts on the cluster state
+              (`omnigraph cluster status`) and the marker:
+
+              - state present, marker present: nothing to do.
+              - state present, marker absent: an existing root is adopted by
+                writing the marker; nothing is applied.
+              - state absent, marker absent: first initialization — the
+                `omnigraph-cluster-apply` program runs, and the marker is
+                written only once it converges.
+              - state absent, marker present: the root was initialized before
+                and is now missing. The unit refuses, fails, and never
+                applies, so a lost root is not silently recreated empty.
+                Restore the root from backup; or, to start empty
+                deliberately, delete the marker and run
+                `systemctl restart omnigraph-cluster-bootstrap.service`.
+
+              An `s3://` root requires {option}`services.omnigraph.s3.endpointUrl`
+              and {option}`services.omnigraph.s3.region`, which the marker's
+              path-style signed requests need; other roots must be a plain path
+              or a `file://` URI.
             '';
           };
         };
@@ -576,6 +665,40 @@
               revision would then live somewhere the server never reads.
             '';
           }
+          {
+            assertion =
+              !bootstrapEnabled || !storageIsS3 || (cfg.s3.endpointUrl != null && cfg.s3.region != null);
+            message = ''
+              services.omnigraph.cluster.bootstrap.enable is set for the s3://
+              storage root ${cfg.storageUri}, but services.omnigraph.s3.endpointUrl
+              and services.omnigraph.s3.region are not both set. The bootstrap
+              marker is read and written with path-style SigV4 requests, which
+              need both.
+            '';
+          }
+          {
+            assertion = !bootstrapEnabled || storageIsS3 || storageIsLocal;
+            message = ''
+              services.omnigraph.cluster.bootstrap.enable does not support the
+              storage URI scheme "${toString storageScheme}://" of
+              ${cfg.storageUri}. Its create-once marker can live only beside an
+              s3:// root, a plain path or a file:// root. Disable the bootstrap
+              for this root.
+            '';
+          }
+          {
+            assertion = !bootstrapEnabled || !storageIsLocal || localRootUnderStateDirectory;
+            message = ''
+              services.omnigraph.cluster.bootstrap.enable is set for the local
+              storage root ${cfg.storageUri}, which is not beneath
+              ${stateDirectoryPath}/. The omnigraph units run with
+              ProtectSystem=strict and DynamicUser and are granted no
+              ReadWritePaths, so their StateDirectory is the only local storage
+              they can write, and the bootstrap marker directory
+              (<parent>/_omnigraph-markers) must lie inside it. Place the root
+              beneath ${stateDirectoryPath}/, or disable the bootstrap.
+            '';
+          }
         ];
 
         environment.systemPackages = lib.optionals cfg.cluster.enable [
@@ -599,8 +722,16 @@
         systemd.services.omnigraph-server = {
           description = "omnigraph graph database server";
           wantedBy = [ "multi-user.target" ];
-          after = [ "network-online.target" ];
-          wants = [ "network-online.target" ];
+          after = [
+            "network-online.target"
+          ]
+          ++ lib.optional bootstrapEnabled "omnigraph-cluster-bootstrap.service";
+          # Wants, not Requires: a refused bootstrap stays visible as a failed
+          # unit, and the server then fails fast through the readiness probe.
+          wants = [
+            "network-online.target"
+          ]
+          ++ lib.optional bootstrapEnabled "omnigraph-cluster-bootstrap.service";
           restartTriggers = lib.optional (cfg.cluster.enable && cfg.cluster.apply.auto) clusterConfigDir;
 
           environment = {
@@ -634,7 +765,9 @@
             RestartSec = serverRestartSec;
             # Load-bearing: the readiness probe runs inside the start job, and
             # opening the datasets outruns systemd's 90s default, which would
-            # kill a healthy server into a Restart=on-failure loop.
+            # kill a healthy server into a Restart=on-failure loop. A server
+            # that exits during boot does not consume this budget: the probe
+            # sees the main process gone and fails the job at once.
             TimeoutStartSec = serverTimeoutStartSec;
             TimeoutStopSec = serverTimeoutStopSec;
           };
@@ -674,6 +807,34 @@
             Type = "oneshot";
             RemainAfterExit = true;
             ExecStart = lib.getExe applyScript;
+            EnvironmentFile = environmentFiles;
+            StateDirectory = "omnigraph";
+            DynamicUser = true;
+            User = cfg.user;
+            Group = cfg.group;
+          };
+        };
+
+        systemd.services.omnigraph-cluster-bootstrap = lib.mkIf bootstrapEnabled {
+          description = "Initialize the omnigraph cluster storage root once";
+          wantedBy = [ "multi-user.target" ];
+          before = [
+            "omnigraph-server.service"
+            "omnigraph-cluster-apply.service"
+          ];
+          after = [ "network-online.target" ];
+          wants = [ "network-online.target" ];
+
+          environment = {
+            OMNIGRAPH_HOME = "%T/omnigraph";
+          }
+          // storageEnvironment
+          // cfg.extraEnvironment;
+
+          serviceConfig = hardening // {
+            Type = "oneshot";
+            RemainAfterExit = true;
+            ExecStart = lib.getExe bootstrapScript;
             EnvironmentFile = environmentFiles;
             StateDirectory = "omnigraph";
             DynamicUser = true;
