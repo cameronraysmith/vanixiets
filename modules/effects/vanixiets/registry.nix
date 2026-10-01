@@ -16,6 +16,14 @@
 # and pull_request_closed on close or merge of any pull request it built
 # (Mic92/nixbot docs/EFFECTS.md "Events"; nixbot/nixbot/service.py:271-311).
 #
+# build_finished covers any finished build, not just successful main builds.
+# Its effect code comes from the default branch; event data and build artifacts
+# remain untrusted. At nixbot 2626aa2, `when` is scheduler delivery metadata,
+# not a shell guard. Branch/status filters select builds, not authorized actors.
+# Credentialed buildFinished requires write/admin permission; missing actors
+# (including poll-originated builds without an actor) fail closed in nixbot's
+# matcher. A PR author's permission can also satisfy that matcher.
+#
 # The rendered script, in order: for main, the effectRunContext guard that
 # ends any run that is not a push to main before a secret is read; exports
 # each secret the trigger declares from $HERCULES_CI_SECRETS_JSON, failing on
@@ -82,6 +90,49 @@ let
       inherit description;
     };
 
+  finishedTriggerModule = {
+    imports = [ triggerModule ];
+    options.when = lib.mkOption {
+      default = { };
+      description = "nixbot build_finished delivery conditions; enforced by the scheduler, not the effect shell.";
+      type = types.submodule {
+        options = {
+          permission = lib.mkOption {
+            type = types.nullOr (
+              types.enum [
+                "read"
+                "write"
+                "admin"
+              ]
+            );
+            default = null;
+            description = "Minimum actor or PR author permission. Credentialed runs require write or admin; an absent actor/author does not qualify.";
+          };
+          branches = lib.mkOption {
+            type = types.listOf types.str;
+            default = [ ];
+            description = "Branch globs selecting builds, not an authorization boundary.";
+          };
+          status = lib.mkOption {
+            type = types.listOf types.str;
+            default = [ ];
+            description = "Build statuses selecting deliveries, not an authorization boundary.";
+          };
+          transition = lib.mkOption {
+            type = types.nullOr (
+              types.enum [
+                "broke"
+                "fixed"
+              ]
+            );
+            default = null;
+            description = "Build status transition required for delivery.";
+          };
+        };
+      };
+    };
+  };
+
   entryModule = {
     options = {
       program = lib.mkOption {
@@ -96,7 +147,11 @@ let
         main = triggerOption "Run on nixbot's onPush for main, behind the main-only guard, with `--rev <rev>` appended.";
         pullRequest = triggerOption "Run as a nixbot onEvent pull_request effect.";
         pullRequestClosed = triggerOption "Run as a nixbot onEvent pull_request_closed effect.";
-        buildFinished = triggerOption "Run as a nixbot onEvent build_finished effect, without the main-only guard or appended revision.";
+        buildFinished = lib.mkOption {
+          type = types.nullOr (types.submodule finishedTriggerModule);
+          default = null;
+          description = "Run as a nixbot onEvent build_finished effect, without the main-only guard or appended revision.";
+        };
       };
     };
   };
@@ -163,6 +218,9 @@ let
           secretsMap = secretsMapFor trigger;
           effectScript = renderEffectScript { inherit rev; } kind entry;
         }
+        // lib.optionalAttrs (kind == "buildFinished") {
+          passthru.when = lib.filterAttrs (_: value: value != null && value != [ ]) trigger.when;
+        }
         // lib.optionalAttrs main {
           # Declaring an audience is what makes nixbot expose the identity
           # endpoint the guard reads. A JSON-array string: a nix list would
@@ -180,7 +238,19 @@ let
 
   requireTrigger =
     name: entry:
-    if lib.any (trigger: trigger != null) (builtins.attrValues entry.triggers) then
+    let
+      finished = entry.triggers.buildFinished;
+    in
+    if
+      finished != null
+      && (finished.secrets != [ ] || finished.forgeToken)
+      && !(builtins.elem finished.when.permission [
+        "write"
+        "admin"
+      ])
+    then
+      throw "vanixiets.effects.${name}: credentialed triggers.buildFinished requires when.permission = write or admin; branch/status filters are not authorization"
+    else if lib.any (trigger: trigger != null) (builtins.attrValues entry.triggers) then
       entry
     else
       throw "vanixiets.effects.${name}: declares no trigger; set at least one of triggers.{main,pullRequest,pullRequestClosed,buildFinished}";

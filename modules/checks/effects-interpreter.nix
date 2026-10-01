@@ -83,6 +83,15 @@ in
                     ];
                     secrets = [ "CLOUDFLARE_API_TOKEN" ];
                     forgeToken = true;
+                    when = {
+                      permission = "write";
+                      branches = [
+                        "main"
+                        "release/*"
+                      ];
+                      status = [ "succeeded" ];
+                      transition = "fixed";
+                    };
                   };
                   triggers.main = {
                     lock = "main";
@@ -106,6 +115,19 @@ in
       };
       fixtureOutputs = fixture.config.herculesCI { config.repo = { inherit rev; }; };
       finishedEffects = fixtureOutputs.onEvent.build_finished;
+      acceptsFinished =
+        trigger:
+        let
+          evaluated = fixture.extendModules {
+            modules = [
+              {
+                vanixiets.effects.finished.triggers.buildFinished = lib.mkForce ({ lock = "probe"; } // trigger);
+              }
+            ];
+          };
+          outputs = evaluated.config.herculesCI { config.repo = { inherit rev; }; };
+        in
+        (builtins.tryEval (builtins.deepSeq outputs.onEvent.build_finished.finished.when true)).success;
       structural = {
         eventNames = builtins.attrNames finishedEffects;
         mainNames = builtins.attrNames fixtureOutputs.onPush.default.outputs.effects;
@@ -117,6 +139,33 @@ in
         secretsMap = builtins.fromJSON finishedEffects.finished.secretsMap;
         defaultSecretsMap = builtins.fromJSON finishedEffects.defaults.secretsMap;
         hasAudience = finishedEffects.finished ? idTokenAudiences;
+        when = finishedEffects.finished.when;
+        defaultWhen = finishedEffects.defaults.when;
+        authorization = map acceptsFinished [
+          { secrets = [ "GITHUB_TOKEN" ]; }
+          { forgeToken = true; }
+          {
+            forgeToken = true;
+            when.branches = [ "main" ];
+          }
+          {
+            secrets = [ "GITHUB_TOKEN" ];
+            when.status = [ "succeeded" ];
+          }
+          {
+            forgeToken = true;
+            when.permission = "read";
+          }
+          {
+            forgeToken = true;
+            when.permission = "write";
+          }
+          {
+            secrets = [ "GITHUB_TOKEN" ];
+            when.permission = "admin";
+          }
+          { when.branches = [ "main" ]; }
+        ];
         liveFinished = builtins.attrNames (
           lib.filterAttrs (_: entry: entry.triggers.buildFinished != null) registry
         );
@@ -139,6 +188,12 @@ in
             args = [ ];
             secrets = [ ];
             forgeToken = false;
+            when = {
+              permission = null;
+              branches = [ ];
+              status = [ ];
+              transition = null;
+            };
           };
         };
         lock = "finished";
@@ -148,6 +203,26 @@ in
         };
         defaultSecretsMap = { };
         hasAudience = false;
+        when = {
+          permission = "write";
+          branches = [
+            "main"
+            "release/*"
+          ];
+          status = [ "succeeded" ];
+          transition = "fixed";
+        };
+        defaultWhen = { };
+        authorization = [
+          false
+          false
+          false
+          false
+          false
+          true
+          true
+          true
+        ];
         liveFinished = [ ];
       };
 
