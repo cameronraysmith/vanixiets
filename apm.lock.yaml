@@ -1,11 +1,11 @@
 lockfile_version: '1'
-generated_at: '2026-10-01T01:17:26.738585+00:00'
+generated_at: '2026-10-01T13:01:46.638053+00:00'
 apm_version: 0.32.0
 dependencies:
 - repo_url: cameronraysmith/vanixiets
   name: agent-orchestration-and-meta-tooling
   host: github.com
-  resolved_commit: 8aa5fb47d81f2f9a0d2108b82c360aa7ff691251
+  resolved_commit: d5d75ca5d718b325f3fede009803f169e985f2cd
   resolved_ref: main
   version: 0.0.0
   virtual_path: modules/home/ai/plugins/agent-orchestration-and-meta-tooling
@@ -105,7 +105,7 @@ dependencies:
 - repo_url: cameronraysmith/vanixiets
   name: beads-issue-tracking-and-session-workflow
   host: github.com
-  resolved_commit: 8aa5fb47d81f2f9a0d2108b82c360aa7ff691251
+  resolved_commit: d5d75ca5d718b325f3fede009803f169e985f2cd
   resolved_ref: main
   version: 0.0.0
   virtual_path: modules/home/ai/plugins/beads-issue-tracking-and-session-workflow
@@ -132,7 +132,7 @@ dependencies:
 - repo_url: cameronraysmith/vanixiets
   name: document-authoring-and-visualization
   host: github.com
-  resolved_commit: 8aa5fb47d81f2f9a0d2108b82c360aa7ff691251
+  resolved_commit: d5d75ca5d718b325f3fede009803f169e985f2cd
   resolved_ref: main
   version: 0.0.0
   virtual_path: modules/home/ai/plugins/document-authoring-and-visualization
@@ -176,7 +176,7 @@ dependencies:
 - repo_url: cameronraysmith/vanixiets
   name: event-modeling-workflow
   host: github.com
-  resolved_commit: 8aa5fb47d81f2f9a0d2108b82c360aa7ff691251
+  resolved_commit: d5d75ca5d718b325f3fede009803f169e985f2cd
   resolved_ref: main
   version: 0.0.0
   virtual_path: modules/home/ai/plugins/event-modeling-workflow
@@ -200,7 +200,7 @@ dependencies:
 - repo_url: cameronraysmith/vanixiets
   name: formal-specification-and-refinement
   host: github.com
-  resolved_commit: 8aa5fb47d81f2f9a0d2108b82c360aa7ff691251
+  resolved_commit: d5d75ca5d718b325f3fede009803f169e985f2cd
   resolved_ref: main
   version: 0.0.0
   virtual_path: modules/home/ai/plugins/formal-specification-and-refinement
@@ -256,7 +256,7 @@ dependencies:
 - repo_url: cameronraysmith/vanixiets
   name: nix-build-operations
   host: github.com
-  resolved_commit: 8aa5fb47d81f2f9a0d2108b82c360aa7ff691251
+  resolved_commit: d5d75ca5d718b325f3fede009803f169e985f2cd
   resolved_ref: main
   version: 0.0.0
   virtual_path: modules/home/ai/plugins/nix-build-operations
@@ -289,7 +289,7 @@ dependencies:
 - repo_url: cameronraysmith/vanixiets
   name: planning-and-development
   host: github.com
-  resolved_commit: 8aa5fb47d81f2f9a0d2108b82c360aa7ff691251
+  resolved_commit: d5d75ca5d718b325f3fede009803f169e985f2cd
   resolved_ref: main
   version: 0.0.0
   virtual_path: modules/home/ai/plugins/planning-and-development
@@ -377,11 +377,11 @@ dependencies:
     .agents/skills/openspec-sync-specs/SKILL.md: sha256:10976095976c6bb53a840f5f6ea74924c3ab2cd21b3fb7c624dc7b28411574fb
     .agents/skills/openspec-update-change/SKILL.md: sha256:82c2250f8d8ec77e98736438a71113f577e9d0d249db181fbb891f598d8533a0
     .agents/skills/openspec-verify-change/SKILL.md: sha256:6e55af9ecd207644fd7d993aa1933da30d1595880fe20b67ede7b0d9f646a291
-  content_hash: sha256:615fdd2fb76fd870e811d881058a1b74daf7177785b08e4017e36642bff31049
+  content_hash: sha256:a0673663ce0c76e506904d22f1f264a8ae8709b42562548da9629861c542167f
 - repo_url: cameronraysmith/vanixiets
   name: preferences-code-and-collaboration-conventions
   host: github.com
-  resolved_commit: 8aa5fb47d81f2f9a0d2108b82c360aa7ff691251
+  resolved_commit: d5d75ca5d718b325f3fede009803f169e985f2cd
   resolved_ref: main
   version: 0.0.0
   virtual_path: modules/home/ai/plugins/preferences-code-and-collaboration-conventions
@@ -433,7 +433,7 @@ dependencies:
 - repo_url: cameronraysmith/vanixiets
   name: preferences-data-and-scientific-computing
   host: github.com
-  resolved_commit: 8aa5fb47d81f2f9a0d2108b82c360aa7ff691251
+  resolved_commit: d5d75ca5d718b325f3fede009803f169e985f2cd
   resolved_ref: main
   version: 0.0.0
   virtual_path: modules/home/ai/plugins/preferences-data-and-scientific-computing
@@ -488,7 +488,7 @@ dependencies:
 - repo_url: cameronraysmith/vanixiets
   name: preferences-domain-driven-architecture
   host: github.com
-  resolved_commit: 8aa5fb47d81f2f9a0d2108b82c360aa7ff691251
+  resolved_commit: d5d75ca5d718b325f3fede009803f169e985f2cd
   resolved_ref: main
   version: 0.0.0
   virtual_path: modules/home/ai/plugins/preferences-domain-driven-architecture
@@ -533,7 +533,7 @@ dependencies:
 - repo_url: cameronraysmith/vanixiets
   name: preferences-event-driven-systems
   host: github.com
-  resolved_commit: 8aa5fb47d81f2f9a0d2108b82c360aa7ff691251
+  resolved_commit: d5d75ca5d718b325f3fede009803f169e985f2cd
   resolved_ref: main
   version: 0.0.0
   virtual_path: modules/home/ai/plugins/preferences-event-driven-systems
@@ -560,7 +560,7 @@ dependencies:
 - repo_url: cameronraysmith/vanixiets
   name: preferences-functional-programming-theory
   host: github.com
-  resolved_commit: 8aa5fb47d81f2f9a0d2108b82c360aa7ff691251
+  resolved_commit: d5d75ca5d718b325f3fede009803f169e985f2cd
   resolved_ref: main
   version: 0.0.0
   virtual_path: modules/home/ai/plugins/preferences-functional-programming-theory
@@ -624,7 +624,7 @@ dependencies:
 - repo_url: cameronraysmith/vanixiets
   name: preferences-nix-and-secrets
   host: github.com
-  resolved_commit: 8aa5fb47d81f2f9a0d2108b82c360aa7ff691251
+  resolved_commit: d5d75ca5d718b325f3fede009803f169e985f2cd
   resolved_ref: main
   version: 0.0.0
   virtual_path: modules/home/ai/plugins/preferences-nix-and-secrets
@@ -666,7 +666,7 @@ dependencies:
 - repo_url: cameronraysmith/vanixiets
   name: preferences-operations-and-reliability
   host: github.com
-  resolved_commit: 8aa5fb47d81f2f9a0d2108b82c360aa7ff691251
+  resolved_commit: d5d75ca5d718b325f3fede009803f169e985f2cd
   resolved_ref: main
   version: 0.0.0
   virtual_path: modules/home/ai/plugins/preferences-operations-and-reliability
@@ -702,7 +702,7 @@ dependencies:
 - repo_url: cameronraysmith/vanixiets
   name: preferences-programming-languages
   host: github.com
-  resolved_commit: 8aa5fb47d81f2f9a0d2108b82c360aa7ff691251
+  resolved_commit: d5d75ca5d718b325f3fede009803f169e985f2cd
   resolved_ref: main
   version: 0.0.0
   virtual_path: modules/home/ai/plugins/preferences-programming-languages
@@ -756,7 +756,7 @@ dependencies:
 - repo_url: cameronraysmith/vanixiets
   name: preferences-web-platform-and-deployment
   host: github.com
-  resolved_commit: 8aa5fb47d81f2f9a0d2108b82c360aa7ff691251
+  resolved_commit: d5d75ca5d718b325f3fede009803f169e985f2cd
   resolved_ref: main
   version: 0.0.0
   virtual_path: modules/home/ai/plugins/preferences-web-platform-and-deployment
@@ -810,7 +810,7 @@ dependencies:
 - repo_url: cameronraysmith/vanixiets
   name: testing-and-quality
   host: github.com
-  resolved_commit: 8aa5fb47d81f2f9a0d2108b82c360aa7ff691251
+  resolved_commit: d5d75ca5d718b325f3fede009803f169e985f2cd
   resolved_ref: main
   version: 0.0.0
   virtual_path: modules/home/ai/plugins/testing-and-quality
@@ -877,7 +877,7 @@ dependencies:
 - repo_url: cameronraysmith/vanixiets
   name: version-control-and-forge
   host: github.com
-  resolved_commit: 8aa5fb47d81f2f9a0d2108b82c360aa7ff691251
+  resolved_commit: d5d75ca5d718b325f3fede009803f169e985f2cd
   resolved_ref: main
   version: 0.0.0
   virtual_path: modules/home/ai/plugins/version-control-and-forge
@@ -1347,6 +1347,63 @@ dependencies:
     .agents/skills/writing-skills/testing-skills-with-subagents.md: sha256:c711346852c911b24a84aa161e0cff06a4cd7f4e2fa9e9c0a266cead5afcbade
   content_hash: sha256:680dd955e1b2ae42486a354278e0780eed4b268e26e2450e6cd61414e206ae3d
   declared_license: MIT
+- repo_url: schpet/linear-cli
+  name: linear-cli
+  host: github.com
+  resolved_commit: 196315343d2bc58f30ca5d5ab40f4eb6a449fd71
+  resolved_ref: 196315343d2bc58f30ca5d5ab40f4eb6a449fd71
+  version: 2.6.0
+  depth: 2
+  resolved_by: cameronraysmith/vanixiets
+  package_type: skill_bundle
+  deployed_files:
+  - .agents/skills/linear-cli
+  - .agents/skills/linear-cli/SKILL.md
+  - .agents/skills/linear-cli/SKILL.template.md
+  - .agents/skills/linear-cli/references/api.md
+  - .agents/skills/linear-cli/references/auth.md
+  - .agents/skills/linear-cli/references/commands.md
+  - .agents/skills/linear-cli/references/config.md
+  - .agents/skills/linear-cli/references/cycle.md
+  - .agents/skills/linear-cli/references/document.md
+  - .agents/skills/linear-cli/references/initiative-update.md
+  - .agents/skills/linear-cli/references/initiative.md
+  - .agents/skills/linear-cli/references/issue.md
+  - .agents/skills/linear-cli/references/label.md
+  - .agents/skills/linear-cli/references/markdown.md
+  - .agents/skills/linear-cli/references/milestone.md
+  - .agents/skills/linear-cli/references/organization-features.md
+  - .agents/skills/linear-cli/references/project-update.md
+  - .agents/skills/linear-cli/references/project.md
+  - .agents/skills/linear-cli/references/schema.md
+  - .agents/skills/linear-cli/references/team.md
+  - .agents/skills/linear-cli/references/user.md
+  - .agents/skills/linear-cli/scripts/generate-docs.ts
+  deployed_file_hashes:
+    .agents/skills/linear-cli/SKILL.md: sha256:652279efbf4e31d5da57cf727388b3b8d89a84b3ed177750dbfd2c2766f9e70e
+    .agents/skills/linear-cli/SKILL.template.md: sha256:62df07cfeffb2e1522690de06e0653d1b2ce5f2c1c8e857e31856e6db2ded04c
+    .agents/skills/linear-cli/references/api.md: sha256:8eb38f27a7c0e4927a3d4e2538162643d023a5269747044d623f9934030f5aff
+    .agents/skills/linear-cli/references/auth.md: sha256:5194be72489f658dcfcf566ebe6e395688f4335e076edb29451c3c81cfb65e93
+    .agents/skills/linear-cli/references/commands.md: sha256:5eb67435957617ec0a56f57ea6ebd1b6ccfc1aefea6b755fed4429b70a8e354b
+    .agents/skills/linear-cli/references/config.md: sha256:50b20d99e2b5084e2d5e194f2aba2d9448cd0dbc170aba57a7331aa3e46d5b64
+    .agents/skills/linear-cli/references/cycle.md: sha256:c45f9a3165ba9da3eec1c565be24ae4f739834e5e0a084678e48452700aee715
+    .agents/skills/linear-cli/references/document.md: sha256:8058d345e2da8f9da5ad62244a42ff74c2abebc4333ba8cb8e031f94ebebd2cd
+    .agents/skills/linear-cli/references/initiative-update.md: sha256:4635b023962330111233a06156fbb2c9ef2588cea676c459f5eb8ad6d3c081c1
+    .agents/skills/linear-cli/references/initiative.md: sha256:a4001ad51cf3a76ebc039eb42254ea4673ca069f78a2c1e924112bf636e2cfe2
+    .agents/skills/linear-cli/references/issue.md: sha256:eb4e307e246ccd7f4d6b589922d76460208811887e31c919be7810ae948af7e3
+    .agents/skills/linear-cli/references/label.md: sha256:f66f1434416196394230169fe9538894ea78943be030db7bb1584aabc59e5536
+    .agents/skills/linear-cli/references/markdown.md: sha256:7021f20464b05654042602100ffea49a524957a2f2cb027522e3c8e69e7383f0
+    .agents/skills/linear-cli/references/milestone.md: sha256:6dfa3a5a946eca9d4719107e40b7f60bc2994d94bce8647470cb9e90eef6224b
+    .agents/skills/linear-cli/references/organization-features.md: sha256:a150988a9c02234a1e39e0f3d0d6869ffd7a5795bb691291b77f5569563dbf14
+    .agents/skills/linear-cli/references/project-update.md: sha256:a52e10d0390b706f0df5d75b29f24dd9c1501bcffd88d3f55969bea488f5bfb7
+    .agents/skills/linear-cli/references/project.md: sha256:e4d25219c821590d7e908f4d448ace4041b51b7e8d3c6a1ce527d85d54a494f1
+    .agents/skills/linear-cli/references/schema.md: sha256:acbb90509d5587d9c94389429ade18f31cfac8fb139b8b10b2bb4d40683eb33d
+    .agents/skills/linear-cli/references/team.md: sha256:26144b9c272570b910a2bd100e61babeabc710fc6909a6ac6cb1697b093e0c56
+    .agents/skills/linear-cli/references/user.md: sha256:87c62f9b734d37ed5e02471553e640e03716480ccc7a1c0050315e10e4edc730
+    .agents/skills/linear-cli/scripts/generate-docs.ts: sha256:3cbf705ea6245fe4e6ac94b3fa96255c690e320caa491b20d7b9508fccc099c1
+  content_hash: sha256:ecfa4f903d7359898db657b769bb55ae2c2f04daf88c506e2c53d4052e76e514
+  skill_subset:
+  - linear-cli
 - repo_url: srid/agency
   name: agency
   host: github.com
@@ -3677,6 +3734,204 @@ deployments:
   - cameronraysmith/vanixiets/modules/home/ai/plugins/document-authoring-and-visualization
   active_owner: cameronraysmith/vanixiets/modules/home/ai/plugins/document-authoring-and-visualization
   content_hash: sha256:dab1dfe20913e8c878bf51e18722adff0b2978efbed53a7ae96dd05c3bf10c23
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/linear-cli
+  runtime: null
+  scope: project
+  owners:
+  - schpet/linear-cli
+  active_owner: schpet/linear-cli
+  content_hash: null
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/linear-cli/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - schpet/linear-cli
+  active_owner: schpet/linear-cli
+  content_hash: sha256:652279efbf4e31d5da57cf727388b3b8d89a84b3ed177750dbfd2c2766f9e70e
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/linear-cli/SKILL.template.md
+  runtime: null
+  scope: project
+  owners:
+  - schpet/linear-cli
+  active_owner: schpet/linear-cli
+  content_hash: sha256:62df07cfeffb2e1522690de06e0653d1b2ce5f2c1c8e857e31856e6db2ded04c
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/linear-cli/references/api.md
+  runtime: null
+  scope: project
+  owners:
+  - schpet/linear-cli
+  active_owner: schpet/linear-cli
+  content_hash: sha256:8eb38f27a7c0e4927a3d4e2538162643d023a5269747044d623f9934030f5aff
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/linear-cli/references/auth.md
+  runtime: null
+  scope: project
+  owners:
+  - schpet/linear-cli
+  active_owner: schpet/linear-cli
+  content_hash: sha256:5194be72489f658dcfcf566ebe6e395688f4335e076edb29451c3c81cfb65e93
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/linear-cli/references/commands.md
+  runtime: null
+  scope: project
+  owners:
+  - schpet/linear-cli
+  active_owner: schpet/linear-cli
+  content_hash: sha256:5eb67435957617ec0a56f57ea6ebd1b6ccfc1aefea6b755fed4429b70a8e354b
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/linear-cli/references/config.md
+  runtime: null
+  scope: project
+  owners:
+  - schpet/linear-cli
+  active_owner: schpet/linear-cli
+  content_hash: sha256:50b20d99e2b5084e2d5e194f2aba2d9448cd0dbc170aba57a7331aa3e46d5b64
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/linear-cli/references/cycle.md
+  runtime: null
+  scope: project
+  owners:
+  - schpet/linear-cli
+  active_owner: schpet/linear-cli
+  content_hash: sha256:c45f9a3165ba9da3eec1c565be24ae4f739834e5e0a084678e48452700aee715
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/linear-cli/references/document.md
+  runtime: null
+  scope: project
+  owners:
+  - schpet/linear-cli
+  active_owner: schpet/linear-cli
+  content_hash: sha256:8058d345e2da8f9da5ad62244a42ff74c2abebc4333ba8cb8e031f94ebebd2cd
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/linear-cli/references/initiative-update.md
+  runtime: null
+  scope: project
+  owners:
+  - schpet/linear-cli
+  active_owner: schpet/linear-cli
+  content_hash: sha256:4635b023962330111233a06156fbb2c9ef2588cea676c459f5eb8ad6d3c081c1
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/linear-cli/references/initiative.md
+  runtime: null
+  scope: project
+  owners:
+  - schpet/linear-cli
+  active_owner: schpet/linear-cli
+  content_hash: sha256:a4001ad51cf3a76ebc039eb42254ea4673ca069f78a2c1e924112bf636e2cfe2
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/linear-cli/references/issue.md
+  runtime: null
+  scope: project
+  owners:
+  - schpet/linear-cli
+  active_owner: schpet/linear-cli
+  content_hash: sha256:eb4e307e246ccd7f4d6b589922d76460208811887e31c919be7810ae948af7e3
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/linear-cli/references/label.md
+  runtime: null
+  scope: project
+  owners:
+  - schpet/linear-cli
+  active_owner: schpet/linear-cli
+  content_hash: sha256:f66f1434416196394230169fe9538894ea78943be030db7bb1584aabc59e5536
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/linear-cli/references/markdown.md
+  runtime: null
+  scope: project
+  owners:
+  - schpet/linear-cli
+  active_owner: schpet/linear-cli
+  content_hash: sha256:7021f20464b05654042602100ffea49a524957a2f2cb027522e3c8e69e7383f0
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/linear-cli/references/milestone.md
+  runtime: null
+  scope: project
+  owners:
+  - schpet/linear-cli
+  active_owner: schpet/linear-cli
+  content_hash: sha256:6dfa3a5a946eca9d4719107e40b7f60bc2994d94bce8647470cb9e90eef6224b
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/linear-cli/references/organization-features.md
+  runtime: null
+  scope: project
+  owners:
+  - schpet/linear-cli
+  active_owner: schpet/linear-cli
+  content_hash: sha256:a150988a9c02234a1e39e0f3d0d6869ffd7a5795bb691291b77f5569563dbf14
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/linear-cli/references/project-update.md
+  runtime: null
+  scope: project
+  owners:
+  - schpet/linear-cli
+  active_owner: schpet/linear-cli
+  content_hash: sha256:a52e10d0390b706f0df5d75b29f24dd9c1501bcffd88d3f55969bea488f5bfb7
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/linear-cli/references/project.md
+  runtime: null
+  scope: project
+  owners:
+  - schpet/linear-cli
+  active_owner: schpet/linear-cli
+  content_hash: sha256:e4d25219c821590d7e908f4d448ace4041b51b7e8d3c6a1ce527d85d54a494f1
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/linear-cli/references/schema.md
+  runtime: null
+  scope: project
+  owners:
+  - schpet/linear-cli
+  active_owner: schpet/linear-cli
+  content_hash: sha256:acbb90509d5587d9c94389429ade18f31cfac8fb139b8b10b2bb4d40683eb33d
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/linear-cli/references/team.md
+  runtime: null
+  scope: project
+  owners:
+  - schpet/linear-cli
+  active_owner: schpet/linear-cli
+  content_hash: sha256:26144b9c272570b910a2bd100e61babeabc710fc6909a6ac6cb1697b093e0c56
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/linear-cli/references/user.md
+  runtime: null
+  scope: project
+  owners:
+  - schpet/linear-cli
+  active_owner: schpet/linear-cli
+  content_hash: sha256:87c62f9b734d37ed5e02471553e640e03716480ccc7a1c0050315e10e4edc730
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/linear-cli/scripts/generate-docs.ts
+  runtime: null
+  scope: project
+  owners:
+  - schpet/linear-cli
+  active_owner: schpet/linear-cli
+  content_hash: sha256:3cbf705ea6245fe4e6ac94b3fa96255c690e320caa491b20d7b9508fccc099c1
 - kind: project-relative
   target: agent-skills
   value: .agents/skills/linear-project-management
