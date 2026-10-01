@@ -123,7 +123,7 @@ let
             # which is how this stays comparable to the atomic and claude-code
             # splits without pretending the three agents share a role vocabulary.
             #
-            # Opus 5.5 runs the session and delegated work, Fable 5.1 plans, and
+            # Opus 5.5 runs the session, planning and delegated work, and
             # the OpenAI family reviews, so a review never shares a family with
             # the session that produced the work. The Anthropic roles run at
             # medium for the same reason they do in atomic and claude-code.
@@ -131,7 +131,7 @@ let
               # The session model.
               default = lib.mkDefault "anthropic/claude-opus-5-5:medium";
               # Plan mode (src/modes/interactive-mode.ts resolveRoleModelWithThinking).
-              plan = lib.mkDefault "anthropic/claude-fable-5-1:medium";
+              plan = lib.mkDefault "anthropic/claude-opus-5-5:medium";
               # The bundled `task` subagent carries model "@task"
               # (src/task/agents.ts), so this is the delegated-worker model.
               task = lib.mkDefault "anthropic/claude-opus-5-5:medium";
@@ -175,8 +175,8 @@ let
 
             # Fable requests blocked by Anthropic's safety classifier retry on
             # claude-opus-5-5 server-side (omp 18.2.10
-            # src/session/settings-stream-fn.ts). Off upstream; worth having
-            # while the plan role is a Fable.
+            # src/session/settings-stream-fn.ts). Off upstream; kept for
+            # sessions where Fable is picked by hand.
             providers.anthropic.serverSideFallback = lib.mkDefault true;
             # Mnemopi is omp's local memory backend: a SQLite store the agent
             # opens in-process (src/mnemopi/state.ts hands the Mnemopi library a
