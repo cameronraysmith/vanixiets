@@ -67,7 +67,31 @@ When a newly published plugin is not yet visible to `apm marketplace browse`, fo
 
 A plugin group may declare its own remote apm dependencies, which are installed along with it.
 The `preferences-code-and-collaboration-conventions` group, for example, declares `theclaymethod/unslop`, a prose-editing skill.
+The `planning-and-development` group likewise declares `schpet/linear-cli`, the upstream skill for the linear CLI that its `openspec-linear-sync` skill drives.
 The lockfile records a hash for every deployed file, so its size grows with the total deployed payload rather than with the number of direct dependencies.
+
+## Companion skills
+
+Some plugins work best alongside third-party skills that this marketplace deliberately does not bundle.
+Bundling a skill adds its description to every session of every consumer and holds it at whatever version this repository last pinned, so install these directly from upstream when you use the tool.
+
+```bash
+# omnigraph graph database; complements preferences-data-and-scientific-computing
+apm install 'ModernRelay/omnigraph/skills/omnigraph#v0.11.0'
+# tuicr code review TUI; complements version-control-and-forge
+apm install 'agavra/tuicr/skills/tuicr#v0.27.0'
+# DuckDB; complements preferences-data-and-scientific-computing
+apm install 'duckdb/duckdb-skills#7feda8e01e22bc0886c86123f3884947e36d8c69'
+# Dagster; complements preferences-data-and-scientific-computing
+apm install 'dagster-io/skills/skills/dagster-expert/skills/dagster-expert#fa3d023d6700767d3950f94ebe8ea73b5abbd015'
+# Hugging Face CLI and datasets; complement preferences-data-and-scientific-computing
+apm install 'huggingface/skills/skills/hf-cli#7bf59b7f85b79c74207b10d5e425934514e8b089'
+apm install 'huggingface/skills/skills/huggingface-datasets#7bf59b7f85b79c74207b10d5e425934514e8b089'
+```
+
+The omnigraph and tuicr skills are pinned to release tags.
+The DuckDB, Dagster, and Hugging Face skills are pinned to commit SHAs because no release tag points at the verified commit, so the caveat in the pinning policy applies: do not run `apm update` on them, and bump them by hand-editing `apm.yml`.
+Each of these commands was verified with apm 0.32.0 to install exactly the named skills.
 
 ## User-level installs
 

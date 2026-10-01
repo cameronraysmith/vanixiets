@@ -71,6 +71,13 @@
   mergifyCliSrc ? inputs.self.packages.${stdenv.hostPlatform.system}.agent-plugins-mergify-cli,
   mergifyCliRev ? mergifyCliSrc.rev,
 
+  # Flake-pinned schpet/linear-cli source tree feeding apm's git checkout cache so
+  # the skill-bundle remote dep resolves with zero network. linearCliRev (the v tag
+  # commit pinned by pkgs.linear-cli.src) is the single SHA source of truth,
+  # reconciled against the apm.yml pin by the drift guard in the build script.
+  linearCliSrc ? inputs.self.packages.${stdenv.hostPlatform.system}.linear-cli.src,
+  linearCliRev ? linearCliSrc.rev,
+
   targets ? [
     "agent-skills"
     "claude"
@@ -244,8 +251,24 @@ runCommandLocal "apm-skills-compose"
       exit 1
     fi
 
+    # Same offline pre-seed for the linear-cli skills-subset remote dep declared in
+    # planning-and-development/apm.yml; apm installs only skills/linear-cli/.
+    LC_SHA=${linearCliRev}
+    SHARD_LC=$(printf '%s' 'https://github.com/schpet/linear-cli' | sha256sum | cut -c1-16)
+    CK_LC="$APM_CACHE_DIR/git/checkouts_v1/$SHARD_LC/$LC_SHA/full"
+    mkdir -p "$CK_LC"
+    cp -RL ${linearCliSrc}/. "$CK_LC"/
+    chmod -R u+w "$CK_LC"
+    mkdir -p "$CK_LC/.git"
+    printf '%s\n' "$LC_SHA" > "$CK_LC/.git/HEAD"
+
+    if ! rg -q "ref: $LC_SHA" ./planning-and-development/apm.yml; then
+      echo "apm-skills-compose: linear-cli SHA drift — planning-and-development/apm.yml does not pin $LC_SHA" >&2
+      exit 1
+    fi
+
     # APM 0.31 rejects HEAD-only cache seeds to rematerialize older CRLF checkouts.
-    for checkout in "$CK" "$CK_AG" "$CK_WT" "$CK_MP" "$CK_US" "$CK_GH" "$CK_MF"; do
+    for checkout in "$CK" "$CK_AG" "$CK_WT" "$CK_MP" "$CK_US" "$CK_GH" "$CK_MF" "$CK_LC"; do
       printf '[core]\n\tautocrlf = false\n' > "$checkout/.git/config"
     done
 
@@ -277,7 +300,9 @@ runCommandLocal "apm-skills-compose"
       "$out/.agents/skills/gh-stack/SKILL.md" \
       "$out/.claude/skills/gh-stack/references/commands.md" \
       "$out/.claude/skills/mergify-stack/SKILL.md" \
-      "$out/.agents/skills/mergify-stack/SKILL.md"; do
+      "$out/.agents/skills/mergify-stack/SKILL.md" \
+      "$out/.claude/skills/linear-cli/SKILL.md" \
+      "$out/.agents/skills/linear-cli/SKILL.md"; do
       if [ ! -f "$expected" ]; then
         echo "apm-skills-compose assertion failed: missing $expected" >&2
         exit 1

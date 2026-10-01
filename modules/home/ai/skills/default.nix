@@ -62,9 +62,16 @@ let
       # editing AGENTS.md and CLAUDE.md, so it became model-invocable in territory
       # meta-skill-creator, preferences-documentation and preferences-prose-clarity
       # already own. Same routing-bypass class as `tdd`, no name collision.
+      #
+      # `linear-cli` is declared in planning-and-development/apm.yml for marketplace
+      # consumers (openspec-linear-sync drives it). Nix users receive it from
+      # `flake.lib.linearSkillDirs` (pkgs.linear-cli.src/skills) only where the
+      # linear module or the user opts in, so it is withheld from the unconditional
+      # compose delivery. Both paths ship the same pin (pkgs.linear-cli.src.rev).
       excludedUpstreamSkills = [
         "tdd"
         "writing-for-agents"
+        "linear-cli"
       ];
 
       allSkills = removeAttrs (readSkillsFrom "${config.aiSkills.composed}/.claude/skills") excludedUpstreamSkills;

@@ -18,6 +18,18 @@ dependencies:
     - git: srid/agency
       ref: 81455051ccca654c57ad6088838c85e7248ac159
       skills: [hickey, lowy, fact-check]
+    # linear-cli ships one agent skill under skills/linear-cli/ alongside its Deno
+    # CLI. openspec-linear-sync in this plugin is linear-cli-driven, so marketplace
+    # consumers need the skill propagated with the plugin; the skills subset takes
+    # only that skill directory with its references/ and scripts/ siblings. Same
+    # offline resolution as agency above: the nix compose pre-seeds apm's git
+    # checkout cache from the flake-pinned tree. The ref is the v2.6.0 tag commit
+    # (full 40-char SHA; a short ref forces a network fetch) and must equal
+    # pkgs.linear-cli.src.rev; the compose drift guard fails the build otherwise,
+    # and pkgs/by-name/linear-cli/update.sh rewrites both in step.
+    - git: schpet/linear-cli
+      ref: 196315343d2bc58f30ca5d5ab40f4eb6a449fd71
+      skills: [linear-cli]
 # Soft coupling (agentic planning Manual execution mode): this package pairs with
 # beads-issue-tracking-and-session-workflow@vanixiets, whose beads issue-tracking
 # skills (issues-beads-*) have been retired pending re-base onto Linear/OpenSpec;

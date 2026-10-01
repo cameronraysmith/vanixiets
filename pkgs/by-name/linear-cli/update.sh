@@ -8,9 +8,13 @@
 #   1. the `version = "...";` let-binding
 #   2. the two Darwin prebuilt-binary `hash = "...";` lines (one per platform,
 #      paired to each preceding `url` line)
-#   3. the `src` fetchFromGitHub `hash = "...";` line (the hash following
-#      the `rev = "v$VERSION";` line)
+#   3. the `src` fetchFromGitHub `rev = "...";` line (the 40-hex commit the
+#      v$VERSION tag points at) and the `hash = "...";` line following it
 #   4. the Linux source build's `denoDeps.outputHash`
+#
+# and, in modules/home/ai/plugins/planning-and-development/apm.yml, the `ref:`
+# line of the `git: schpet/linear-cli` entry, which must equal the src rev (the
+# apm-skills-compose drift guard enforces it).
 #
 # Usage: ./update.sh [VERSION]   (VERSION overrides the latest-release lookup)
 
@@ -19,6 +23,7 @@ set -euo pipefail
 REPO="schpet/linear-cli"
 REPO_ROOT="$(git rev-parse --show-toplevel)"
 PKG_NIX="${REPO_ROOT}/pkgs/by-name/linear-cli/package.nix"
+APM_YML="${REPO_ROOT}/modules/home/ai/plugins/planning-and-development/apm.yml"
 
 current_version="$(sed -n 's/.*version = "\(.*\)";/\1/p' "$PKG_NIX" | head -1)"
 
@@ -44,12 +49,12 @@ else
   sed -i'' -e "s/version = \"${current_version}\"/version = \"${latest_version}\"/" "$PKG_NIX"
 fi
 
-# Platform map: nix system -> release artifact filename (URL leaf segment)
+# Platform map: nix system -> release artifact filename (URL leaf segment).
+# Only the platforms package.nix pins as prebuilt binaries; Linux builds from
+# the source tree, so its release artifacts have no hash line to update.
 declare -A platform_map=(
   ["aarch64-darwin"]="linear-aarch64-apple-darwin.tar.xz"
   ["x86_64-darwin"]="linear-x86_64-apple-darwin.tar.xz"
-  ["x86_64-linux"]="linear-x86_64-unknown-linux-gnu.tar.xz"
-  ["aarch64-linux"]="linear-aarch64-unknown-linux-gnu.tar.xz"
 )
 
 for platform in "${!platform_map[@]}"; do
@@ -72,11 +77,26 @@ for platform in "${!platform_map[@]}"; do
   echo "  ${platform}: ${sri_hash}"
 done
 
-# Source tree hash for the `src` fetchFromGitHub block. Match the
-# `rev = "v$VERSION";` line, advance to the following `hash =` line, and
-# substitute (distinct from the four binary hashes above).
-echo "Prefetching source tree (v${latest_version})..."
-src_raw="$(nix-prefetch-url --unpack "https://github.com/${REPO}/archive/refs/tags/v${latest_version}.tar.gz")"
+# Resolve the commit the v$VERSION tag points at. An annotated tag lists both the
+# tag object and its peeled `^{}` commit; a lightweight tag lists only the
+# commit. Prefer the peeled line.
+echo "Resolving v${latest_version} tag commit..."
+tag_refs="$(git ls-remote "https://github.com/${REPO}" "refs/tags/v${latest_version}^{}" "refs/tags/v${latest_version}")"
+src_rev="$(printf '%s\n' "$tag_refs" | grep -F '^{}' | cut -f1 || true)"
+if [[ -z "$src_rev" ]]; then
+  src_rev="$(printf '%s\n' "$tag_refs" | head -1 | cut -f1)"
+fi
+
+if [[ ! "$src_rev" =~ ^[0-9a-f]{40}$ ]]; then
+  echo "error: failed to resolve a commit for tag v${latest_version}" >&2
+  exit 1
+fi
+
+# Source tree hash for the `src` fetchFromGitHub block. Rewrite the 40-hex
+# `rev = "...";` line, advance to the following `hash =` line, and substitute
+# (distinct from the two binary hashes above).
+echo "Prefetching source tree (v${latest_version} = ${src_rev})..."
+src_raw="$(nix-prefetch-url --unpack "https://github.com/${REPO}/archive/${src_rev}.tar.gz")"
 src_sri="$(nix hash to-sri --type sha256 "$src_raw")"
 
 if [[ -z "$src_sri" || "$src_sri" == "null" ]]; then
@@ -84,8 +104,19 @@ if [[ -z "$src_sri" || "$src_sri" == "null" ]]; then
   exit 1
 fi
 
-sed -i'' -e "/rev = \"v\${version}\"/{ n; s|hash = \"sha256-[^\"]*\"|hash = \"${src_sri}\"|; }" "$PKG_NIX"
-echo "  src: ${src_sri}"
+sed -i'' -e "/rev = \"[0-9a-f]\{40\}\";/{ s|rev = \"[0-9a-f]\{40\}\"|rev = \"${src_rev}\"|; n; s|hash = \"sha256-[^\"]*\"|hash = \"${src_sri}\"|; }" "$PKG_NIX"
+echo "  src: ${src_rev} ${src_sri}"
+
+# Keep the apm marketplace pin in step with the src rev: match the
+# `git: schpet/linear-cli` entry, advance to its following `ref:` line, and
+# substitute.
+sed -i'' -e "/git: schpet\/linear-cli\$/{ n; s|ref: [0-9a-f]\{40\}|ref: ${src_rev}|; }" "$APM_YML"
+
+if ! grep -qF "ref: ${src_rev}" "$APM_YML"; then
+  echo "error: failed to rewrite the schpet/linear-cli ref in ${APM_YML}" >&2
+  exit 1
+fi
+echo "  apm.yml ref: ${src_rev}"
 
 echo "Prefetching x86_64-linux Deno dependencies..."
 fake_hash="sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
