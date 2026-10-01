@@ -38,6 +38,13 @@
         enable = true;
         autoEnable = true;
         flavor = "mocha";
+
+        # The default sources are build outputs read at evaluation (IFD);
+        # the same upstream revs' committed themes/ come from flake inputs.
+        sources = {
+          bottom = "${inputs.catppuccin-bottom}/themes";
+          starship = "${inputs.catppuccin-starship}/themes";
+        };
       };
     };
 }

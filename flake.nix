@@ -154,6 +154,12 @@
 
     catppuccin.url = "github:catppuccin/nix";
 
+    # Pinned to the revs in catppuccin/nix pkgs/sources.json; bump with catppuccin.
+    catppuccin-bottom.url = "github:catppuccin/bottom/eadd75acd0ecad4a58ade9a1d6daa3b97ccec07c";
+    catppuccin-bottom.flake = false;
+    catppuccin-starship.url = "github:catppuccin/starship/5906cc369dd8207e063c0e6e2d27bd0c0b567cb8";
+    catppuccin-starship.flake = false;
+
     nixidy.url = "github:arnarg/nixidy";
     nixidy.inputs.nixpkgs.follows = "nixpkgs";
 
