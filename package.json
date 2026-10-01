@@ -90,6 +90,6 @@
     "npmPublish": false
   },
   "overrides": {
-    "@cloudflare/vite-plugin": "^1.62.3"
+    "@cloudflare/vite-plugin": "^1.62.4"
   }
 }
