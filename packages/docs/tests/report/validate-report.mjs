@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync, realpathSync, statSync } from "node:fs";
 import { isAbsolute, relative, resolve } from "node:path";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
 import { requiredCases, requiredProjects } from "./policy.mjs";
 
 function array(value, label) {
@@ -123,7 +123,7 @@ export function validateReport(root) {
   return { passed, counts };
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
+if (process.argv[1] && realpathSync(process.argv[1]) === fileURLToPath(import.meta.url)) {
   try {
     const [mode, root] = process.argv.slice(2);
     assert(["validate", "verdict"].includes(mode) && root, "usage: validate-report.mjs validate|verdict REPORT");

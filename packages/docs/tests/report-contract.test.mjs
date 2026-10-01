@@ -1,8 +1,10 @@
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
+import { fileURLToPath } from "node:url";
 import { requiredCases } from "./report/policy.mjs";
 import { validateReport } from "./report/validate-report.mjs";
 
@@ -92,6 +94,23 @@ test("complete success is valid and passes the verdict", (t) => {
 test("complete assertion failure is valid but fails the verdict", (t) => {
   assert.equal(validateReport(fixture(t, true).root).passed, false);
 });
+
+for (const missing of [false, true]) {
+  test(`symlinked CLI rejects ${missing ? "missing" : "negative"} evidence`, (t) => {
+    const { root } = fixture(t, true);
+    const link = join(root, "linked-report-tools");
+    symlinkSync(fileURLToPath(new URL("./report", import.meta.url)), link, "dir");
+    const result = spawnSync(
+      process.execPath,
+      [join(link, "validate-report.mjs"), "verdict", missing ? join(root, "missing") : root],
+      { encoding: "utf8" },
+    );
+    assert.ifError(result.error);
+    assert.equal(result.status, missing ? 2 : 1, result.stderr);
+    if (missing) assert.match(result.stderr, /Invalid Playwright evidence:/);
+    else assert.equal(JSON.parse(result.stdout).passed, false);
+  });
+}
 
 for (const [name, mutate] of [
   [
