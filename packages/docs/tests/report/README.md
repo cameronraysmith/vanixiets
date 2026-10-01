@@ -13,7 +13,7 @@ The package-test registry exposes these attributes under `checks.<system>`:
 - `package-vanixiets-docs-test-e2e-action-negative-control`: removes the homepage's Getting started links from the intercepted HTML, runs the unchanged reader journey, and verifies a completed locator timeout, verdict exit 1, and retained trace/screenshot.
 - `package-vanixiets-docs-test-e2e-runner-controls`: native-browser classification controls, separated from the browser-free unit check.
 - `docs-e2e-wiring`: asserts both public identities and the verdict's Nix dependency on that producer.
-  Its negative fixture removes the verdict from the registry and must fail the same predicate.
+  Its negative fixtures omit the verdict or supply a successfully built verdict consuming a different producer; both must fail the same predicate.
 
 The verdict output is an empty success marker with no runtime store references.
 The negative-control output retains a `report` symlink for inspection.
