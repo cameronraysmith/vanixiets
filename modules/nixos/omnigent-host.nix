@@ -142,6 +142,17 @@ in
           default = { };
           description = "Non-secret environment values forwarded to the foreground host.";
         };
+        workerSliceMemoryMax = lib.mkOption {
+          type = lib.types.nullOr lib.types.str;
+          default = null;
+          example = "8G";
+          description = ''
+            When set, every worker unit runs in omnigent.slice and the slice
+            carries this MemoryMax, so the workers share one ceiling instead of
+            each holding its own. Each unit keeps its MemoryHigh and MemoryMax.
+            Null leaves the units in system.slice.
+          '';
+        };
       };
 
       config = lib.mkMerge [
@@ -302,6 +313,13 @@ in
             ) workers
           );
 
+          systemd.slices = lib.mkIf (cfg.workerSliceMemoryMax != null) {
+            omnigent = {
+              description = "Omnigent workers";
+              sliceConfig.MemoryMax = cfg.workerSliceMemoryMax;
+            };
+          };
+
           systemd.services = lib.mkMerge [
             (lib.listToAttrs (
               lib.mapAttrsToList (
@@ -339,6 +357,7 @@ in
                   RestartSec = 5;
                   MemoryHigh = "6G";
                   MemoryMax = "8G";
+                  Slice = lib.mkIf (cfg.workerSliceMemoryMax != null) "omnigent.slice";
                   UnsetEnvironment = [
                     "SSH_AUTH_SOCK"
                     "SSH_AGENT_PID"
