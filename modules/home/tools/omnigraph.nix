@@ -79,4 +79,24 @@
         home.file.".omnigraph/config.yaml".source = yaml.generate "omnigraph-config.yaml" cfg.settings;
       };
     };
+
+  # The upstream omnigraph skill, from the same pinned source the client is
+  # built from, so it always describes the deployed CLI and server version.
+  # This lives on the ai aggregate because aiSkills is declared there; tools
+  # reaches users (christophersmith) who do not import ai, and an aiSkills
+  # definition in the tools module would fail to evaluate for them.
+  # Marketplace consumers install it directly from upstream instead (see the
+  # companion skills in the consuming-marketplace-plugins guide).
+  flake.modules.homeManager.ai =
+    {
+      config,
+      options,
+      lib,
+      ...
+    }:
+    {
+      aiSkills.extraSkillDirs = lib.mkIf (
+        (options.programs ? omnigraph) && config.programs.omnigraph.enable
+      ) [ "${config.programs.omnigraph.package.src}/skills" ];
+    };
 }
