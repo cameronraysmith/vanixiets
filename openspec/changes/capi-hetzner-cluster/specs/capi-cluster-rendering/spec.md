@@ -22,6 +22,16 @@ Coverage bin: T1 traceability regulator for ADR-009 D9.1, D9.6, D9.16; non-vacui
 - **WHEN** `MachineDeployment.spec.replicas` is set to 2 and the regulator is rebuilt without updating the golden
 - **THEN** the regulator fails with a diff naming the field
 
+### Requirement: The `capi-cryolite` render inherits import-from-derivation freedom
+
+The `capi-cryolite` render and `checks.k8s-capi-render-cryolite`, `k8s-capi-providers`, `k8s-capi-platform-sum`, and `k8s-capi-ccm-present` SHALL satisfy the `k3s-manifest-purity-regulator` requirement `The cryolite tree renders without import-from-derivation`; vendored CRD schemas and provider release manifests SHALL be read from flake inputs or committed JSON, and the golden comparison SHALL run inside the check's build, not at evaluation.
+Coverage bin: interface rule (CI evaluation with import-from-derivation disabled); non-vacuity: the mutation below.
+
+#### Scenario: A provider manifest is converted at evaluation time
+
+- **WHEN** `modules/kubernetes/capi/providers.nix` reads a vendored manifest through a `runCommand` YAML-to-JSON conversion and the flake is evaluated with import-from-derivation disabled
+- **THEN** evaluation fails naming the conversion derivation
+
 ### Requirement: The bootstrap template delivers T0 material only through `contentFrom.secret` and names no node
 
 The rendered `KThreesControlPlane.spec.kthreesConfigSpec` and `KThreesConfigTemplate.spec.template.spec` SHALL set `agentConfig.airGapped: true`, SHALL carry every T0 item a node needs (`/etc/rancher/k3s/config.yaml.d/` drop-ins for the token, the pre-provisioned CA references, and the etcd-S3 credentials on the server; the Flux SOPS age-key `Secret` manifest under `/var/lib/rancher/k3s/server/manifests/` on the server; the SSH CA and cosign public material on both) as `files[]` entries whose content is `contentFrom.secret{name,key}` referencing a management-cluster `Secret` named for `cryolite` and a T0 item, never inline, and SHALL contain no node hostname, host key, or WireGuard key.

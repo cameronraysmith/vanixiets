@@ -95,9 +95,9 @@ The same constraint applies to the Flux configuration artifact introduced by ADR
 
 ### F5: three current phases already have cheaper regulators
 
-`modules/checks/nixidy-k8s.nix:24-30` exposes `k8s-manifests-local-k3d`, `k8s-manifests-local-k3d-json`, `nixidy-env-local-k3d`, and `nixidy-bootstrap-local-k3d` as build checks, for the `local-k3d` environment.
+`k8s-manifests-local-k3d`, `k8s-manifests-local-k3d-json`, `nixidy-env-local-k3d`, and `nixidy-bootstrap-local-k3d` (from `modules/kubernetes.nix` and `modules/nixidy.nix`) build the `local-k3d` environment; they are not `checks` leaves, because their evaluation needs import-from-derivation (easykubenix `chart2json` and `yaml2json`, nixidy's Helm rendering), and they stay buildable on demand.
 The k3d script's phase 1 builds the sibling `local-k3d-ci` environment, which differs only in `nixidy.target.repository = "file:///manifests"` (`modules/nixidy.nix:52`; `modules/apps/cluster/k3d-integration-ci.sh:57`), and its `file:///manifests` grep at line 63 is a pure property of that build; only the runtime consumption of the rendered tree needs a cluster.
-The nixidy leaves keep regulating the frozen `local-k3d` prototype (D7.15); `cryolite` has no nixidy environment, so its T1 leaves are the easykubenix render leaf and the purity, provenance, and identity leaves of S0.
+The frozen `local-k3d` prototype (D7.15) is therefore regulated by those on-demand builds and the k3d `integration` job, not by `checks`; `cryolite` has no nixidy environment, so its T1 leaves are the easykubenix render leaf and the purity, provenance, and identity leaves of S0, all evaluating without import-from-derivation.
 
 ### F6: k3s embeds nix-snapshotter, and its NRI plugin is enabled unless k3s runs in a user namespace
 
@@ -349,7 +349,7 @@ All leaves are scoped to `cryolite`; the `-cryolite` suffix on `k8s-*` leaves is
 | S5 (deferred) | `capi-hetzner-cluster` | `platform = gcp` render-only goldens and the platform-core render-equivalence regulator; `platform = aws` is declared and throws (ADR-009 D9.20); no cloud account is touched | no | T1 | S3 (S4 is not a prerequisite) |
 
 Nothing is deleted by either change.
-The deletion plan of revision 1 (k3d CI scripts, the `integration` job, `SOPS_AGE_KEY`, `modules/nixidy.nix`, `kubernetes/nixidy/`, `modules/checks/nixidy-k8s.nix`, the ArgoCD and sops-secrets-operator manifests, the CI-only k3d justfile recipes) is Future Work for a later, separately authorized feedback change that migrates or retires the frozen prototypes; `kubernetes/clusters/local-k3d/`, the ctlptl recipes, and the k3d `integration` job keep running unchanged until then (D7.15).
+The deletion plan of revision 1 (k3d CI scripts, the `integration` job, `SOPS_AGE_KEY`, `modules/nixidy.nix`, `kubernetes/nixidy/`, the ArgoCD and sops-secrets-operator manifests, the CI-only k3d justfile recipes) is Future Work for a later, separately authorized feedback change that migrates or retires the frozen prototypes; `kubernetes/clusters/local-k3d/`, the ctlptl recipes, and the k3d `integration` job keep running unchanged until then (D7.15).
 
 ## Q7: reference patterns cited
 

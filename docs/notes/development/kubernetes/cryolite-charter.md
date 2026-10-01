@@ -68,7 +68,7 @@ Each requirement names the assumptions and specification properties that dischar
 | Code | Requirement | Discharged by |
 |---|---|---|
 | R1 | Kubernetes configuration, node closure, and workload images share one hash chain from `kubernetes/clusters/cryolite` to the CAPI `imageName` | A16; SP2, SP5, SP10 |
-| R2 | Every regulator is a sandboxed derivation with no network and no runtime Nix evaluation in the cluster | A13; SP1, SP2 |
+| R2 | Every regulator is a sandboxed derivation with no network and no runtime Nix evaluation in the cluster | A13; SP1, SP2, SP24 |
 | R3 | The production k3s module is exercised unmodified by every VM leaf | SP6, SP7, SP8 |
 | R4 | The VM envelope matches the production envelope for `cryolite` (Cilium replaces kube-proxy; F1 is closed for this cluster) | A15; SP8 |
 | R5 | Node identity is disposable and nothing in the repository, inventory, or management cluster names a node | A21; SP3, SP10, SP17 |
@@ -83,6 +83,7 @@ Each requirement names the assumptions and specification properties that dischar
 | R14 | The cluster is recoverable from etcd-S3 snapshots plus L0 | W5; SP17 configures the snapshots; the restore path has no regulator in this revision — undischarged until a rehearsal is authorized |
 | R15 | First-deploy administration needs no overlay; a later overlay is one gateway per cluster controlled by the primary VPS | W6; SP17, SP18 |
 | R16 | Every regulator is non-vacuous: a named mutation makes it fail | SP23 |
+| R17 | Every `cryolite` render and KVM-free regulator evaluates with import-from-derivation disabled on every flake system | A13; SP24 |
 
 ### 2.3 S — specification properties (shared phenomena)
 
@@ -113,6 +114,7 @@ Each property is a check, golden, or effect transcript whose inputs and outputs 
 | SP21 | `git diff --stat` over the frozen paths, `.github/workflows`, and `flake.lock` is empty | review rule (parent IV.6, sibling IV.3) | every stage | both |
 | SP22 | VM leaves are Linux-only, `kvm`-requiring, discovered by prefix, inert on buildbot | `k3s-integration-ci-execution` | S1 | parent |
 | SP23 | Each regulator's PR body records a mutation that made it fail and the revert | review rule in every stage's tasks | every stage | both |
+| SP24 | Renders and `k8s-*` leaves evaluate with `allow-import-from-derivation = false`; goldens equal the sandbox re-render | `checks.k8s-render-golden-cryolite` + IFD-off evaluation (CI job outcome) | S0, extended S3 | parent, sibling |
 
 ### 2.4 P and M
 
@@ -222,6 +224,7 @@ Bootstrap levels (ADR-010 D10.2):
 | AC21 | Core renders identically across `hetzner` and `gcp` | `checks.k8s-capi-core-equivalence-cryolite` | golden | S5 (deferred) | a core object reads `platform.hetzner.region`; fails naming the leak |
 | AC22 | ClusterMesh preconditions hold at evaluation | `checks.k8s-clustermesh-preconditions` | KVM-free eval | S5 (deferred) | overlapping PodCIDRs; fails |
 | AC23 | Frozen paths, workflows, and flake inputs untouched | `git diff --stat` review rule | review | every stage | any line under those paths fails the review |
+| AC24 | Renders are import-from-derivation-free and goldens are current | `checks.k8s-render-golden-cryolite`; IFD-off `nix eval` | KVM-free eval + CI job outcome | S0, S3 | reintroduce `chart2json` at eval: eval fails naming the derivation; bump `cilium-src` without regenerating: fails naming the object |
 
 ## 6. Stage plan
 
@@ -231,10 +234,10 @@ Estimates are in agent sessions of the kind that produced this document, excludi
 
 | Stage | Deliverables | Regulators | KVM | Gates | Estimate |
 |---|---|---|---|---|---|
-| S0 | `k3s-server.snapshotter` option; `kubernetes/clusters/cryolite`; `k8s-manifests-cryolite`, `k8s-oci-cryolite`; Flux install and root modules; `secrets/clusters/cryolite/` generators; `oci-push`, `cosign-sign` effects | AC1–AC4, `k3s-server-eval` | none | plan and merge review | 1 session |
+| S0 | `k3s-server.snapshotter` option; `kubernetes/clusters/cryolite`; `k8s-manifests-cryolite`, `k8s-oci-cryolite`; Flux install and root modules; `secrets/clusters/cryolite/` generators; `oci-push`, `cosign-sign` effects | AC1–AC4, AC24, `k3s-server-eval` | none | plan and merge review | 1 session |
 | S1 | `vm-k3s-substrate`, `vm-k3s-snapshotter`; dead containerd block deleted; buildbot inertness confirmed | AC5, AC6, SP22 | yes | plan and merge review; KVM host available | 1 session |
 | S2 | `cryolite-server`/`agent` machines; `k3s-flux.nix`; preload set; test fixtures; `vm-k3s-platform`; Chainsaw suite in `kubernetes/tests/cryolite` | AC7, AC8 | yes | plan and merge review; S1 green | 1–2 sessions (W8 and the 1.5–2.5 GiB preload bound are the unknowns) |
-| S3 | `capi/providers.nix`; `kubernetes/modules/capi`, `platform/{hetzner,aws,kubevirt}`; goldens; `capi-bootstrap.nix` seam; `vm-k3s-capi-bootstrap`; `apps.k8s.mgmt-k3d`; spend-gate function and check | AC9–AC15 | yes for the bootstrap leaf | plan and merge review; S2 green; no Hetzner call (the handler stops at `InfrastructureReady=False`) | 1–2 sessions (W3, W4 are the unknowns) |
+| S3 | `capi/providers.nix`; `kubernetes/modules/capi`, `platform/{hetzner,aws,kubevirt}`; goldens; `capi-bootstrap.nix` seam; `vm-k3s-capi-bootstrap`; `apps.k8s.mgmt-k3d`; spend-gate function and check | AC9–AC15, AC24 | yes for the bootstrap leaf | plan and merge review; S2 green; no Hetzner call (the handler stops at `InfrastructureReady=False`) | 1–2 sessions (W3, W4 are the unknowns) |
 | S3→S4 | First paid action | — | — | operator sets `VANIXIETS_HETZNER_SPEND_APPROVED` to the S4 revision; the etcd-S3 bucket is declared in fleet Terranix | — |
 | S4 | `hetzner/{image,snapshot}.nix`; `hetzner-snapshot-publish`; two-node deployment; pivot; node roll; etcd-S3 enabled; runbook pages | AC16–AC19, AC3, AC15 | no (effects) | per-revision gate on every effect; review of transcripts and fingerprints | 1 session plus external waits (image build on M2, snapshot minutes, CAPH reconciliation) |
 | S4b | Clan `wireguard` instance on the primary VPS; gateway peer key in T0; gateway workload; stibnite peer | AC20, AC3 | no | plan and merge review; W6 settled at S4b.1 | 1 session |

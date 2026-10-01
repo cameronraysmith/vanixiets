@@ -15,6 +15,28 @@ Coverage bin: T1 integrity regulator for ADR-008 D8.11; non-vacuity: the two mut
 - **WHEN** a rendered container image is changed to `alpine/curl:latest` and the regulator is rebuilt
 - **THEN** the regulator fails naming the object and the image string
 
+### Requirement: The `cryolite` tree renders without import-from-derivation
+
+The `cryolite` easykubenix cluster module, `k8s-manifests-cryolite`, `k8s-oci-cryolite`, and every `k8s-*` and `flux-*` leaf of this change SHALL evaluate on every system in the flake's `systems` with `allow-import-from-derivation = false`; Helm releases, CRDs, and upstream YAML SHALL enter evaluation only as committed JSON goldens under `kubernetes/tests/cryolite/golden/` or as files of a flake input read without a build, never through a derivation output read at evaluation time (easykubenix `helm.nix` `chart2json`, `importyaml.nix` `yaml2json`, or any `runCommand` passed to `importJSON`, `readFile`, `pathExists`, or `builtins.path`).
+A regulator, `checks.k8s-render-golden-cryolite`, SHALL re-render every Helm release and YAML import from the same flake inputs inside the sandbox and fail, naming the object, when the result differs from the committed golden; a recipe regenerates the goldens.
+This requirement rests on world assumption A13.
+Coverage bin: T1 integrity regulator for R2 and R17 (golden drift) plus an interface rule (the CI evaluation runs with import-from-derivation disabled); non-vacuity: the mutations below.
+
+#### Scenario: The render evaluates with import-from-derivation disabled
+
+- **WHEN** `nix eval --option allow-import-from-derivation false .#checks.<system> --apply builtins.attrNames` and `.#packages.<system>.k8s-manifests-cryolite.drvPath` are run for `x86_64-linux`, `aarch64-linux`, and `aarch64-darwin`
+- **THEN** each evaluation succeeds and no derivation is built
+
+#### Scenario: A chart is rendered at evaluation time
+
+- **WHEN** a module under `kubernetes/clusters/cryolite` or `kubernetes/modules` is changed to `lib.importJSON (pkgs.chart2json …)` and the flake is evaluated with import-from-derivation disabled
+- **THEN** evaluation fails with "cannot build '…' during evaluation because the option 'allow-import-from-derivation' is disabled", naming the derivation
+
+#### Scenario: A chart input is bumped without regenerating the golden
+
+- **WHEN** `cilium-src` is bumped to a release whose rendered `DaemonSet` differs and `checks.k8s-render-golden-cryolite` is rebuilt without regenerating the goldens
+- **THEN** the regulator fails naming the `DaemonSet`, and regenerating the goldens through the recipe makes it pass
+
 ### Requirement: Rendered image references are a subset of the preload set
 
 The same `checks.k8s-purity-cryolite` regulator SHALL compute the set of image references in the rendered `cryolite` tree for a target and the set of image names and digests in that target's `services.k3s.images` list (each derived from the same rendered tree by string context, not maintained by hand), and fails when the first set is not contained in the second.

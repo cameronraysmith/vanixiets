@@ -18,7 +18,7 @@ Coverage bin: T3 adequacy for ADR-007 D7.16 and the F2 envelope for `cryolite`; 
 
 ### Requirement: Every image and chart the platform needs is a build input
 
-The platform regulator SHALL obtain every OCI image its rendered manifests reference — including the k3s pause and CoreDNS images and every Cilium, Flux, cert-manager, step-ca, and helper image — from fixed-output derivations pinned by digest or from nix2container/nix-snapshotter outputs, passed through `services.k3s.images`, and every Helm chart from a flake input or store path, so that the regulator builds with no network.
+The platform regulator SHALL obtain every OCI image its rendered manifests reference — including the k3s pause and CoreDNS images and every Cilium, Flux, cert-manager, step-ca, and helper image — from fixed-output derivations pinned by digest or from nix2container/nix-snapshotter outputs, passed through `services.k3s.images`, and every Helm chart from a flake input (a derivation-produced store path is a build-time input only, never read at evaluation; see `The cryolite tree renders without import-from-derivation`), so that the regulator builds with no network.
 The preload set SHALL be derived from the rendered tree, not maintained by hand.
 This requirement rests on world assumption A13 and on the `k3s-manifest-purity-regulator` requirement `Rendered image references are a subset of the preload set`.
 Coverage bin: T3 integrity regulator for hermeticity; non-vacuity: the two scenarios below.

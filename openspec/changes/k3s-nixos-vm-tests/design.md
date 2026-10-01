@@ -72,7 +72,6 @@ modules/
     vm-k3s-platform.nix                 [add S2]
     vm-k3s-capi-bootstrap.nix           [add S3]
     k8s-capi-render.nix                 [add S3/S5]
-    nixidy-k8s.nix                      [keep]
   apps/cluster/                         [keep]
   apps/k8s/                             [add] oci-push, cosign-sign, hetzner-snapshot-publish, clusterctl-init/move
   devshells/kubernetes.nix              [+opt]

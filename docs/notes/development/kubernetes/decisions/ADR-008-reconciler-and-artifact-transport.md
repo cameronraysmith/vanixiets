@@ -164,7 +164,7 @@ The VM leaf signs the in-guest artifact with a test-only key pair and verifies a
 Every decision D8.1–D8.14 is scoped to `kubernetes/clusters/cryolite`.
 What stands for `cryolite`: Flux from `flux install --export` with exactly source-controller, kustomize-controller, and notification-controller (D8.2); bootstrap through `services.k3s.manifests` (D8.3); the root `OCIRepository` pinned by digest (D8.3, D8.4); GHCR tagged by flake revision, consumers by digest (D8.4); nix-snapshotter images for Nix-native workloads and nix2container for portable images (D8.5); the OCI-layout derivation for Flux configuration (D8.5); in-VM registry seeding (D8.6); push as an `apps` effect asserting digest equality (D8.7); keyed cosign (D8.14); Flux SOPS with a per-cluster Clan-vars age key (D8.9); Timoni only as a digest-pinned offline ingest renderer (D8.13); no runtime `flakeRef` or `nixExpr` (D8.11).
 What this record no longer claims: ArgoCD retirement, nixidy retirement, sops-secrets-operator retirement, and the reversal of ADR-006.
-ArgoCD reconciles `local-k3d` from its nixidy-rendered tree; Flux reconciles `cryolite` from its easykubenix-rendered OCI artifact; `modules/nixidy.nix`, `kubernetes/nixidy/`, and `modules/checks/nixidy-k8s.nix` are `[keep]` in the module tree.
+ArgoCD reconciles `local-k3d` from its nixidy-rendered tree; Flux reconciles `cryolite` from its easykubenix-rendered OCI artifact; `modules/nixidy.nix` and `kubernetes/nixidy/` are `[keep]` in the module tree, and the nixidy and `local-k3d` builds are outside `checks` because their evaluation needs import-from-derivation.
 The global retirements and the reversal are Future Work for a later, separately authorized feedback change that migrates or retires the prototypes with the evidence `cryolite` produces.
 
 ## Requirements carried into the OpenSpec delta specs
@@ -178,7 +178,7 @@ The global retirements and the reversal are Future Work for a later, separately 
 | R8.5 | Flux install manifest contains exactly the three controllers | `flux-install-rendered` | T1 |
 | R8.6 | OCI-layout digest equals registry digest after push | `apps.k8s.oci-push` | E |
 | R8.7 | Flux converges from the in-guest registry with SOPS decryption and signature verification, on the two-guest `cryolite` core | `vm-k3s-platform` | T3 |
-| R8.8 | the `local-k3d` rendered tree, nixidy environments, and Chainsaw suite are byte-identical before and after each `cryolite` stage | `git diff --stat` over the frozen paths in each stage PR, and the existing `nixidy-k8s` leaves staying green | T1 |
+| R8.8 | the `local-k3d` rendered tree, nixidy environments, and Chainsaw suite are byte-identical before and after each `cryolite` stage | `git diff --stat` over the frozen paths in each stage PR | T1 |
 
 ## Verified versus inferred
 
