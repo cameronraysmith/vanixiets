@@ -1,4 +1,9 @@
-{ self, lib, ... }:
+{
+  self,
+  inputs,
+  lib,
+  ...
+}:
 {
   perSystem =
     {
@@ -9,29 +14,50 @@
     }:
     let
       package = self'.packages.playwright-cli;
-      home = user: self.homeConfigurations."${user}@${system}".config;
-      installed = user: lib.elem package (home user).home.packages;
+      fixturePkgs = import inputs.nixpkgs {
+        inherit system;
+        config.allowUnfree = true;
+        overlays = [ self.overlays.default ];
+      };
+      home =
+        aggregate:
+        (inputs.home-manager.lib.homeManagerConfiguration {
+          pkgs = fixturePkgs;
+          extraSpecialArgs = {
+            flake = self // {
+              inputs = inputs // {
+                contentPrivate = throw "Playwright aggregate fixture imported private content";
+              };
+              users = throw "Playwright aggregate fixture imported a user";
+            };
+            osConfig = null;
+          };
+          modules = [
+            # Option providers shared by the aggregates, without personal modules.
+            inputs.sops-nix.homeManagerModules.sops
+            self.modules.homeManager.agents-md
+            self.modules.homeManager.${aggregate}
+            {
+              home.username = "playwright-fixture";
+              home.homeDirectory =
+                if pkgs.stdenv.hostPlatform.isDarwin then
+                  "/Users/playwright-fixture"
+                else
+                  "/home/playwright-fixture";
+              home.stateVersion = "25.11";
+              programs.agents-md.settings.body = "Playwright consumer fixture";
+            }
+          ];
+        }).config;
+      ai = home "ai";
+      agents = home "agents";
       cases = {
-        aiUsers = lib.all installed [
-          "crs58"
-          "cameron"
-        ];
-        lighterAgentUsers = lib.all (user: !installed user) [
-          "raquel"
-          "janettesmith"
-        ];
+        aiAggregate = lib.elem package ai.home.packages;
+        lighterAgentsAggregate = !lib.elem package agents.home.packages;
         matchingSkill =
-          lib.all
-            (
-              user:
-              toString (home user).programs.claude-code.skills.playwright-cli
-              == "${(home user).aiSkills.composed}/.claude/skills/playwright-cli"
-              && !lib.elem package.skills (home user).aiSkills.extraSkillDirs
-            )
-            [
-              "crs58"
-              "cameron"
-            ];
+          toString ai.programs.claude-code.skills.playwright-cli
+          == "${ai.aiSkills.composed}/.claude/skills/playwright-cli"
+          && !lib.elem package.skills ai.aiSkills.extraSkillDirs;
         devshell = lib.elem package self'.devShells.default.nativeBuildInputs;
       };
       failed = lib.attrNames (lib.filterAttrs (_: passed: !passed) cases);
@@ -45,13 +71,13 @@
           {
             passthru = {
               inherit cases;
-              meta.description = "Playwright CLI reaches the devshell and AI users without broadening lighter agent profiles";
+              meta.description = "Playwright CLI reaches the devshell and AI aggregate without broadening the lighter agents aggregate";
             };
           }
           ''
             for target in .claude .agents; do
               diff -r ${package.src}/skills/playwright-cli \
-                ${(home "cameron").aiSkills.composed}/"$target"/skills/playwright-cli
+                ${ai.aiSkills.composed}/"$target"/skills/playwright-cli
             done
             touch "$out"
           '';
