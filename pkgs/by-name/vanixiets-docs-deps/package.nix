@@ -18,6 +18,7 @@ stdenv.mkDerivation {
       ../../../bun.lock
       ../../../bun.nix
       ../../../packages/docs/package.json
+      ../../../packages/evidence-worker/package.json
     ];
   };
 
@@ -25,17 +26,23 @@ stdenv.mkDerivation {
 
   bunDeps = bun2nix.fetchBunDeps {
     bunNix = ../../../bun.nix;
-    # bun.nix registers the workspace's own package as a cache entry sourced
-    # from the whole ./packages/docs tree, so every documentation content edit
-    # changed the bun cache and forced all of bun2nix's non-substitutable
-    # per-package derivations to rebuild. bun only needs the manifest to
-    # resolve the workspace entry, and the override's argument is deliberately
-    # discarded so the content tree leaves the dependency graph entirely.
+    # bun.nix registers each workspace package as a cache entry sourced from
+    # its whole ./packages/<name> tree, so every content edit changed the bun
+    # cache and forced all of bun2nix's non-substitutable per-package
+    # derivations to rebuild. bun only needs the manifest to resolve a
+    # workspace entry, and each override's argument is deliberately discarded
+    # so the content trees leave the dependency graph entirely.
     overrides."@vanixiets/docs" =
       _:
       lib.fileset.toSource {
         root = ../../../packages/docs;
         fileset = ../../../packages/docs/package.json;
+      };
+    overrides."@vanixiets/evidence-worker" =
+      _:
+      lib.fileset.toSource {
+        root = ../../../packages/evidence-worker;
+        fileset = ../../../packages/evidence-worker/package.json;
       };
   };
 
@@ -55,18 +62,21 @@ stdenv.mkDerivation {
 
   installPhase = ''
     runHook preInstall
-    if [ ! -d packages/docs/node_modules ]; then
-      echo "error: packages/docs/node_modules not populated by bun install; aborting" >&2
-      exit 1
-    fi
-    mkdir -p $out/packages/docs
+    mkdir -p $out
     cp -R node_modules $out/node_modules
-    cp -R packages/docs/node_modules $out/packages/docs/node_modules
+    for package in docs evidence-worker; do
+      if [ ! -d packages/$package/node_modules ]; then
+        echo "error: packages/$package/node_modules not populated by bun install; aborting" >&2
+        exit 1
+      fi
+      mkdir -p $out/packages/$package
+      cp -R packages/$package/node_modules $out/packages/$package/node_modules
+    done
     runHook postInstall
   '';
 
   meta = {
-    description = "Hermetic node_modules tree for packages/docs (semantic-release runtime)";
+    description = "Hermetic node_modules tree for the bun workspace (packages/docs, packages/evidence-worker)";
     license = lib.licenses.mit;
   };
 }
