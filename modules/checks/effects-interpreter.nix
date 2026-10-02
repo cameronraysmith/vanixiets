@@ -18,7 +18,11 @@
 #
 # buildFinished rows use the actual onEvent.build_finished effectScript from
 # an isolated registry evaluation, so a broken event mapping cannot pass by
-# testing the renderer alone.
+# testing the renderer alone. The live build_finished effects' `when`, read
+# from the flake's herculesCI output, is pinned too: browser-evidence holds
+# the R2 parent secret, so it must reach nixbot as write permission. Rows
+# passing nixbot's NIXBOT_API_URL/NIXBOT_API_TOKEN show the rendered script
+# leaves them in the program's environment.
 #
 # The program is a stub that records its argv and the secret variables, and
 # curl is stubbed for the nixbot id-token endpoint the main guard calls,
@@ -45,6 +49,10 @@ in
         "CLOUDFLARE_ACCOUNT_ID"
         "GITHUB_TOKEN"
         "GITHUB_FORGE_TOKEN"
+        "R2_EVIDENCE_ACCESS_KEY_ID"
+        "R2_EVIDENCE_SECRET_ACCESS_KEY"
+        "NIXBOT_API_URL"
+        "NIXBOT_API_TOKEN"
       ];
 
       stubProgram = pkgs.writeShellScript "stub-program" ''
@@ -114,6 +122,21 @@ in
         ];
       };
       fixtureOutputs = fixture.config.herculesCI { config.repo = { inherit rev; }; };
+      liveOutputs = self.herculesCI {
+        primaryRepo = {
+          inherit rev;
+          ref = "refs/heads/main";
+          branch = "main";
+          tag = null;
+          owner = "cameronraysmith";
+          name = "vanixiets";
+          remoteHttpUrl = "https://github.com/cameronraysmith/vanixiets";
+          shortRev = builtins.substring 0 7 rev;
+          forgeType = "github";
+          webUrl = null;
+        };
+        herculesCI = { };
+      };
       finishedEffects = fixtureOutputs.onEvent.build_finished;
       acceptsFinished =
         trigger:
@@ -169,6 +192,9 @@ in
         liveFinished = builtins.attrNames (
           lib.filterAttrs (_: entry: entry.triggers.buildFinished != null) registry
         );
+        # The delivery conditions the live build_finished effects hand nixbot,
+        # read from the flake's herculesCI output rather than the registry.
+        liveFinishedWhen = lib.mapAttrs (_: effect: effect.when) liveOutputs.onEvent.build_finished;
       };
       expectedStructural = {
         eventNames = [
@@ -223,7 +249,14 @@ in
           true
           true
         ];
-        liveFinished = [ ];
+        liveFinished = [ "browser-evidence" ];
+        liveFinishedWhen.browser-evidence = {
+          permission = "write";
+          status = [
+            "succeeded"
+            "failed"
+          ];
+        };
       };
 
       mkTokenResponse = claims: ''
@@ -251,6 +284,7 @@ in
           expect ? [ ],
           argv ? null,
           env ? null,
+          nixbotApi ? false,
         }:
         let
           defaultTrigger = {
@@ -285,6 +319,7 @@ in
             HERCULES_CI_SECRETS_JSON="$PWD/secrets.json" \
             NIXBOT_ID_TOKEN_REQUEST_URL=https://nixbot.invalid/api/v1/id-token \
             NIXBOT_ID_TOKEN_REQUEST_TOKEN=task-token \
+            ${lib.optionalString nixbotApi "NIXBOT_API_URL=https://nixbot.invalid NIXBOT_API_TOKEN=task-token"} \
             effectScript="$(cat ${script})" \
             ${lib.getExe pkgs.bash} -c 'eval "$effectScript"' > output 2>&1 || status=$?
           cat output
@@ -328,7 +363,16 @@ in
       cloudflareAccount.CLOUDFLARE_ACCOUNT_ID.data.value = "dummy-cloudflare-account";
       github.GITHUB_TOKEN.data.value = "dummy-github-token";
       forge.GITHUB_FORGE_TOKEN.data.token = "dummy-forge-token";
-      everySecret = cloudflare // cloudflareAccount // github // forge;
+      r2.R2_EVIDENCE_ACCESS_KEY_ID.data.value = "dummy-r2-access-key-id";
+      r2.R2_EVIDENCE_SECRET_ACCESS_KEY.data.value = "dummy-r2-secret-access-key";
+      everySecret = cloudflare // cloudflareAccount // github // forge // r2;
+      r2Env = {
+        CLOUDFLARE_ACCOUNT_ID = "dummy-cloudflare-account";
+        R2_EVIDENCE_ACCESS_KEY_ID = "dummy-r2-access-key-id";
+        R2_EVIDENCE_SECRET_ACCESS_KEY = "dummy-r2-secret-access-key";
+        NIXBOT_API_URL = "https://nixbot.invalid";
+        NIXBOT_API_TOKEN = "task-token";
+      };
 
       grantedSecrets = lib.mapAttrs (
         _: entry:
@@ -337,6 +381,18 @@ in
         )
       ) registry;
       expectedGrantedSecrets = {
+        browser-evidence =
+          let
+            r2Secrets = [
+              "CLOUDFLARE_ACCOUNT_ID"
+              "R2_EVIDENCE_ACCESS_KEY_ID"
+              "R2_EVIDENCE_SECRET_ACCESS_KEY"
+            ];
+          in
+          {
+            buildFinished = r2Secrets;
+            main = r2Secrets;
+          };
         docs = {
           main = [
             "CLOUDFLARE_ACCOUNT_ID"
@@ -614,6 +670,44 @@ in
                   CLOUDFLARE_API_TOKEN = "dummy-cloudflare-token";
                   CLOUDFLARE_ACCOUNT_ID = "dummy-cloudflare-account";
                 };
+              }
+              {
+                name = "registry: browser-evidence buildFinished uploads with the R2 secrets and nixbot's API token, without --rev";
+                kind = "buildFinished";
+                entry = registry.browser-evidence;
+                secretsJson = everySecret;
+                nixbotApi = true;
+                status = 0;
+                argv = [
+                  "build-finished"
+                  "--upload"
+                ];
+                env = r2Env;
+              }
+              {
+                name = "registry: browser-evidence buildFinished without an R2 secret fails before the program runs";
+                kind = "buildFinished";
+                entry = registry.browser-evidence;
+                secretsJson = cloudflareAccount // forge;
+                status = 1;
+                expect = [ "error: R2_EVIDENCE_ACCESS_KEY_ID missing from $HERCULES_CI_SECRETS_JSON" ];
+              }
+              {
+                name = "registry: browser-evidence main appends --rev and receives the R2 secrets and nixbot's API token";
+                kind = "main";
+                entry = registry.browser-evidence;
+                claims = mainClaims;
+                secretsJson = everySecret;
+                nixbotApi = true;
+                status = 0;
+                expect = [ "CI-RUN-CONTEXT: branch=main is_main=true" ];
+                argv = [
+                  "main"
+                  "--upload"
+                  "--rev"
+                  rev
+                ];
+                env = r2Env;
               }
             ]}
 
