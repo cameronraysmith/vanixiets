@@ -45,7 +45,6 @@ in
         niks3
         nix-eval-lock
         ssh-known-hosts
-        stibnite-builder
         stibnite-session
         buildbot
         nixbot
@@ -93,21 +92,22 @@ in
       };
 
       # magnetite is x86_64-linux and cannot build aarch64-darwin derivations,
-      # so darwin work is dispatched to stibnite, the fleet's only machine of
-      # that system. Two mechanisms, two callers:
+      # so darwin work is dispatched to the fleet's darwin machines through the
+      # nix-builders clan service (modules/clan/inventory/services/nix-builders.nix),
+      # which also makes magnetite the builder stibnite sends x86_64-linux work
+      # to. Two mechanisms, two callers:
       #   nix.buildMachines below — a local nix build by an operator who wants
       #     the darwin result in magnetite's store.
-      #   /etc/nix/stibnite-store-uri — a caller that wants the build to happen
-      #     entirely in stibnite's store with nothing copied back.
+      #   /etc/nix/<builder>-store-uri — a caller that wants the build to happen
+      #     entirely in that builder's store with nothing copied back.
       # nixbot.toml sets attribute = "checks.x86_64-linux", which prevents CI
-      # from evaluating or requesting aarch64-darwin work and makes this builder
-      # unreachable from CI. modules/nixos/nixbot.nix and
+      # from evaluating or requesting aarch64-darwin work and makes these
+      # builders unreachable from CI. modules/nixos/nixbot.nix and
       # modules/nixos/buildbot.nix each set buildSystems = [ "x86_64-linux" ]
-      # as an independent second layer. These controls remain because stibnite
-      # is a laptop without guaranteed availability and a sleeping machine
-      # could gate CI.
-      services.stibnite-builder.enable = true;
-      nix.buildMachines = config.services.stibnite-builder.buildMachines;
+      # as an independent second layer. These controls remain because the
+      # darwin builders are laptops without guaranteed availability and a
+      # sleeping machine could gate CI.
+      nix.buildMachines = config.services.nix-builders.buildMachines;
 
       # The build and session keys are separately authorized for independent
       # revocation and rotation. Only the build key is confined to the Nix
@@ -508,32 +508,6 @@ in
       # connection -- a red check naming a package that is not at fault. An
       # 18-core client reliably lost a random handful of checks per run this way.
       services.openssh.settings.MaxStartups = "64:30:256";
-
-      # Restricted builder user for remote nix builds (no sudo, SSH key only)
-      users.users.builder = {
-        isNormalUser = true;
-        description = "Remote nix build user";
-        # nix-daemon --stdio is exactly what an ssh-ng caller would otherwise
-        # invoke (`remote-program` defaults to nix-daemon), so forcing it serves
-        # the build protocol and discards anything else the client asks for.
-        # sshd runs the forced command through the account's login shell, so the
-        # shell must stay executable; a nologin shell would break the protocol
-        # rather than harden it. Mirrors the stibnite direction of this pair.
-        openssh.authorizedKeys.keys = [
-          ''restrict,command="${config.nix.package}/bin/nix-daemon --stdio" ${
-            lib.removeSuffix "\n"
-              inputs.self.darwinConfigurations.stibnite.config.clan.core.vars.generators.nix-remote-build.files."key.pub".value
-          }''
-        ];
-      };
-
-      # An untrusted remote-build account cannot push unsigned store paths: the
-      # daemon rejects them with "lacks a signature by a trusted key", which
-      # fails any derivation whose input is evaluated locally on stibnite and so
-      # exists nowhere a signature could come from. Deploys are unaffected
-      # because they connect as root. This list appends to the fleet-wide
-      # root/@wheel set in modules/system/nix-settings.nix.
-      nix.settings.trusted-users = [ "builder" ];
 
       # Bridge NixOS-level sops to home-manager for user secret key delivery.
       # sopsIdentity defaults to flake.users.cameron.meta.sopsAgeKeyId

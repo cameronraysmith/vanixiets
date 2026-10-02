@@ -484,36 +484,12 @@ in
 
       # Inbound half of the fleet's kvm lane: pyrite is the only machine with
       # /dev/kvm, so it serves kvm-requiring builds (the vmTests outputs) to
-      # hosts that cannot run them. stibnite dispatches as this account with the
-      # same `nix-remote-build` key it already presents to magnetite's builder
-      # account, so no new key material is introduced. Mirrors
-      # modules/machines/nixos/magnetite/default.nix.
-      users.users.builder = {
-        isNormalUser = true;
-        description = "Remote nix build user";
-        # nix-daemon --stdio is exactly what an ssh-ng caller would otherwise
-        # invoke (`remote-program` defaults to nix-daemon), so forcing it serves
-        # the build protocol and discards anything else the client asks for.
-        # sshd runs the forced command through the account's login shell, so the
-        # shell must stay executable; a nologin shell would break the protocol
-        # rather than harden it.
-        openssh.authorizedKeys.keys = [
-          ''restrict,command="${config.nix.package}/bin/nix-daemon --stdio" ${
-            lib.removeSuffix "\n"
-              inputs.self.darwinConfigurations.stibnite.config.clan.core.vars.generators.nix-remote-build.files."key.pub".value
-          }''
-        ];
-      };
+      # hosts that cannot run them. The `builder` account, its forced
+      # nix-daemon and its trusted-user grant come from the nix-builders clan
+      # service (modules/clan/inventory/services/nix-builders.nix).
 
-      # An untrusted remote-build account cannot push unsigned store paths: the
-      # daemon rejects them with "lacks a signature by a trusted key", which
-      # fails any derivation whose inputs were evaluated on the caller. This
-      # list appends to the fleet-wide root/@wheel set in
-      # modules/system/nix-settings.nix.
-      nix.settings.trusted-users = [ "builder" ];
-
-      # Local build concurrency, pyrite's view of ITSELF — distinct from
-      # services.pyrite-builder's maxJobs = 1, which is how many jobs stibnite
+      # Local build concurrency, pyrite's view of ITSELF — distinct from the
+      # nix-builders maxJobs = 1, which is how many jobs stibnite
       # dispatches TO this machine. Without these two settings the daemon runs
       # nix's defaults, max-jobs = auto (4 here) and cores = 0 (every thread per
       # job), i.e. four concurrent derivations each entitled to all four threads.

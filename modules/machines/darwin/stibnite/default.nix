@@ -38,9 +38,7 @@ in
         dnscrypt-proxy
         zt-dns
         zt-services-trust
-        magnetite-builder
-        pyrite-builder
-        stibnite-build-host
+        stibnite-session-host
       ]);
 
       # Re-enable documentation for laptop use
@@ -241,39 +239,23 @@ in
             mandatoryFeatures = [ ];
           }
         ]
-        ++ config.services.magnetite-builder.buildMachines
-        ++ config.services.pyrite-builder.buildMachines
+        ++ config.services.nix-builders.buildMachines
       );
 
-      # Offload native x86_64-linux builds to magnetite over ZeroTier.
-      services.magnetite-builder.enable = true;
+      # Remote builders, both directions, come from the nix-builders clan
+      # service (modules/clan/inventory/services/nix-builders.nix): stibnite
+      # dispatches native x86_64-linux work to magnetite and x86_64-linux kvm
+      # work to pyrite, the fleet's only /dev/kvm, and serves aarch64-darwin
+      # builds to magnetite as `nixbuild` when on AC power.
 
-      # pyrite is the fleet's only machine with /dev/kvm, and since the rosetta
-      # entries above scope that claim to aarch64-linux, it is the only
-      # candidate for an x86_64-linux kvm derivation such as a vmTests output.
-      # It is a laptop, and an unreachable one costs a logged connection
-      # failure and a failed kvm build rather than a hang or a silently
-      # unaccelerated one; see modules/system/pyrite-builder.nix for the nix
-      # scheduling behaviour and the ssh timeouts that bound it.
-      services.pyrite-builder.enable = true;
-
-      # Inbound side of the same asymmetry: stibnite is the fleet's only
-      # aarch64-darwin machine, so it serves darwin builds to hosts that cannot
-      # perform them. The two keypairs come from magnetite and are authorized
-      # separately for independent revocation and rotation. The build key is
-      # confined at the SSH boundary to the nix protocol. The session key is
-      # broader: it logs in as admin-group crs58, a Nix trusted user, so it has
-      # build authority plus shell access.
-      # Both encrypted private halves and public values are committed under
-      # vars/per-machine/magnetite/. `clan vars generate magnetite` populates
-      # them; only magnetite and authorized users can decrypt the private
-      # halves.
-      services.stibnite-build-host = {
+      # The session key from magnetite is authorized separately from its build
+      # key for independent revocation and rotation. It is broad: it logs in as
+      # admin-group crs58, a Nix trusted user, so it has build authority plus
+      # shell access. Its encrypted private half and public value are committed
+      # under vars/per-machine/magnetite/stibnite-agent-session.
+      services.stibnite-session-host = {
         enable = true;
-        buildKeys = [
-          inputs.self.nixosConfigurations.magnetite.config.clan.core.vars.generators.stibnite-nix-build.files."key.pub".value
-        ];
-        sessionKeys = [
+        keys = [
           inputs.self.nixosConfigurations.magnetite.config.clan.core.vars.generators.stibnite-agent-session.files."key.pub".value
         ];
       };
