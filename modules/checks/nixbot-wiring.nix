@@ -214,6 +214,8 @@
               "CLOUDFLARE_ACCOUNT_ID"
               "CLOUDFLARE_API_TOKEN"
               "GITHUB_TOKEN"
+              "R2_EVIDENCE_ACCESS_KEY_ID"
+              "R2_EVIDENCE_SECRET_ACCESS_KEY"
             ];
             vanixietsDeployedFiles = [ "secrets" ];
             effectSecretsUsed = sortedNames self.lib.vanixietsEffectSecrets;

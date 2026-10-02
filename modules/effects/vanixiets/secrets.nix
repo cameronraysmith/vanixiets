@@ -16,9 +16,9 @@ in
       prompt = "cloudflare-api-token";
       type = "hidden";
       description = ''
-        Cloudflare API token (scope: Workers/Pages:Edit + relevant zone/R2 scopes).
-        Single token shared by the onEvent docs preview and the production
-        deploy.
+        Cloudflare account API token for the docs preview and production deploy:
+        the "Edit Cloudflare Workers" template plus the cameronraysmith.net zone,
+        which serves the docs custom domain infra.cameronraysmith.net.
       '';
       helperText = ''
         Pasted once at first generate; Enter to keep existing on subsequent
@@ -53,6 +53,31 @@ in
       helperText = ''
         Fine-grained PAT, not a classic PAT. Expires per your GitHub
         account default (rotate before expiry).
+      '';
+    };
+    R2_EVIDENCE_ACCESS_KEY_ID = {
+      prompt = "r2-evidence-access-key-id";
+      type = "line";
+      description = ''
+        Access Key ID of the R2 account token limited to Object Read & Write on
+        the sciexp bucket, used to publish browser evidence.
+      '';
+      helperText = ''
+        The "Access Key ID" shown when the R2 token is created. Enter to keep
+        existing on subsequent `clan vars generate --regenerate` invocations.
+      '';
+    };
+    R2_EVIDENCE_SECRET_ACCESS_KEY = {
+      prompt = "r2-evidence-secret-access-key";
+      type = "hidden";
+      description = ''
+        Secret Access Key of the same R2 token. The effect signs per-run
+        temporary credentials with it, limited to the evidence prefix.
+      '';
+      helperText = ''
+        The "Secret Access Key" shown once when the R2 token is created. Enter
+        to keep existing on subsequent `clan vars generate --regenerate`
+        invocations.
       '';
     };
   };
