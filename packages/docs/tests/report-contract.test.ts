@@ -3,12 +3,46 @@ import { spawnSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { test } from "node:test";
+import { type TestContext, test } from "node:test";
 import { fileURLToPath } from "node:url";
-import { requiredCases } from "./report/policy.mjs";
-import { validateReport } from "./report/validate-report.mjs";
+import type { TestStatus } from "@playwright/test/reporter";
+import type { Completion, FailureKind, TestOutcome } from "./report/completion-reporter.ts";
+import { type Engine, requiredCases } from "./report/policy.ts";
+import {
+  type AttemptClass,
+  classifyAttempt,
+  type JsonStats,
+  type RunMetadata,
+  validateReport,
+} from "./report/validate-report.ts";
 
-function fixture(t, failed = false) {
+// The subset of Playwright's JSON report the validator reads.
+type ResultsFixture = {
+  errors: unknown[];
+  stats: JsonStats;
+  suites: {
+    specs: {
+      id: string;
+      tests: {
+        expectedStatus: TestStatus;
+        status: TestOutcome;
+        results: { status: TestStatus; retry: number; attachments: { path: string }[] }[];
+      }[];
+    }[];
+  }[];
+};
+type Fixture = {
+  root: string;
+  completion: Completion;
+  results: ResultsFixture;
+  metadata: RunMetadata;
+  save: () => void;
+};
+
+// Deliberately corrupts typed evidence the way an untrusted producer could.
+const corrupt = <T>(value: unknown): T => value as T;
+
+function fixture(t: TestContext, failed = false): Fixture {
   const root = mkdtempSync(join(tmpdir(), "docs-report-"));
   t.after(() => rmSync(root, { recursive: true, force: true }));
   mkdirSync(join(root, "playwright-report"));
@@ -17,9 +51,9 @@ function fixture(t, failed = false) {
   writeFileSync(join(root, "test-results/trace.zip"), "trace fixture");
   writeFileSync(join(root, "test-results/failure.png"), "screenshot fixture");
   const attachments = failed ? ["test-results/trace.zip", "test-results/failure.png"] : [];
-  const status = failed ? "failed" : "passed";
-  const outcome = failed ? "unexpected" : "expected";
-  const completion = {
+  const status: TestStatus = failed ? "failed" : "passed";
+  const outcome: TestOutcome = failed ? "unexpected" : "expected";
+  const completion: Completion = {
     schemaVersion: 1,
     status,
     projects: ["chromium"],
@@ -29,6 +63,7 @@ function fixture(t, failed = false) {
         id: "reader-chromium",
         project: "chromium",
         case: "reader-journey.spec.ts::damaged guide is rejected by the real reader journey",
+        title: " > chromium > reader-journey.spec.ts > damaged guide is rejected by the real reader journey",
         outcome,
         expectedStatus: "passed",
         attempts: [
@@ -42,7 +77,7 @@ function fixture(t, failed = false) {
       },
     ],
   };
-  const results = {
+  const results: ResultsFixture = {
     errors: [],
     stats: { expected: failed ? 0 : 1, unexpected: failed ? 1 : 0, skipped: 0, flaky: 0 },
     suites: [
@@ -62,7 +97,7 @@ function fixture(t, failed = false) {
       },
     ],
   };
-  const metadata = {
+  const metadata: RunMetadata = {
     schemaVersion: 1,
     exitCode: failed ? 1 : 0,
     provenance: {
@@ -102,7 +137,7 @@ for (const missing of [false, true]) {
     symlinkSync(fileURLToPath(new URL("./report", import.meta.url)), link, "dir");
     const result = spawnSync(
       process.execPath,
-      [join(link, "validate-report.mjs"), "verdict", missing ? join(root, "missing") : root],
+      [join(link, "validate-report.ts"), "verdict", missing ? join(root, "missing") : root],
       { encoding: "utf8" },
     );
     assert.ifError(result.error);
@@ -112,7 +147,7 @@ for (const missing of [false, true]) {
   });
 }
 
-for (const [name, mutate] of [
+const mutations: [string, (data: Fixture) => void][] = [
   [
     "zero tests",
     ({ completion, results }) => {
@@ -159,7 +194,7 @@ for (const [name, mutate] of [
   [
     "missing provenance",
     ({ metadata }) => {
-      delete metadata.provenance.site;
+      Reflect.deleteProperty(metadata.provenance, "site");
     },
   ],
   [
@@ -184,7 +219,7 @@ for (const [name, mutate] of [
   [
     "unknown outcome",
     ({ completion }) => {
-      completion.tests[0].outcome = "unknown";
+      completion.tests[0].outcome = corrupt<TestOutcome>("unknown");
     },
   ],
   [
@@ -211,7 +246,9 @@ for (const [name, mutate] of [
       rmSync(join(root, "playwright-report/index.html"));
     },
   ],
-]) {
+];
+
+for (const [name, mutate] of mutations) {
   test(`fails closed: ${name}`, (t) => {
     const data = fixture(t);
     if (name === "malformed JSON" || name === "missing HTML") {
@@ -228,10 +265,36 @@ test("terminal infrastructure failure is not a valid report", (t) => {
   const data = fixture(t, true);
   data.completion.tests[0].attempts[0].failureKind = "infrastructure";
   data.save();
-  assert.throws(() => validateReport(data.root), /infrastructure/);
+  assert.throws(() => validateReport(data.root), /infrastructure failure \(failed\)/);
 });
 
-function retried(data, first, final, firstStatus = "failed") {
+// Every TestStatus, with every failure kind the reporter can record, has one
+// explicit classification; the switch in classifyAttempt makes a new status a
+// type error, and this table makes a changed classification a test failure.
+const classifications: [TestStatus, FailureKind | null, AttemptClass["kind"]][] = [
+  ["passed", null, "passed"],
+  ["passed", "product", "invalid"],
+  ["passed", "infrastructure", "invalid"],
+  ["failed", "product", "product"],
+  ["failed", "infrastructure", "infrastructure"],
+  ["failed", null, "invalid"],
+  ["timedOut", "infrastructure", "infrastructure"],
+  ["timedOut", "product", "invalid"],
+  ["timedOut", null, "invalid"],
+  ["interrupted", "infrastructure", "infrastructure"],
+  ["interrupted", "product", "invalid"],
+  ["interrupted", null, "invalid"],
+  ["skipped", "infrastructure", "invalid"],
+  ["skipped", null, "invalid"],
+];
+
+for (const [status, failureKind, kind] of classifications) {
+  test(`classifies a ${status} attempt with failure kind ${failureKind} as ${kind}`, () => {
+    assert.equal(classifyAttempt({ status, failureKind }).kind, kind);
+  });
+}
+
+function retried(data: Fixture, first: FailureKind, final: FailureKind | null, firstStatus: TestStatus = "failed") {
   const test = data.completion.tests[0];
   const json = data.results.suites[0].specs[0].tests[0];
   test.attempts[0].failureKind = first;
@@ -239,7 +302,11 @@ function retried(data, first, final, firstStatus = "failed") {
   const passed = final === null;
   const attachments = passed ? [] : ["test-results/trace.zip", "test-results/failure.png"];
   test.attempts.push({ status: passed ? "passed" : "failed", retry: 1, failureKind: final, attachments });
-  json.results.push({ status: passed ? "passed" : "failed", retry: 1, attachments: attachments.map((path) => ({ path })) });
+  json.results.push({
+    status: passed ? "passed" : "failed",
+    retry: 1,
+    attachments: attachments.map((path) => ({ path })),
+  });
   test.outcome = json.status = passed ? "flaky" : "unexpected";
   data.completion.status = passed ? "passed" : "failed";
   data.metadata.exitCode = passed ? 0 : 1;
@@ -264,13 +331,34 @@ test("recovered test-deadline attempt passes and is counted", (t) => {
   assert.equal(validateReport(data.root).infrastructureRetries, 1);
 });
 
-test("terminal test-deadline attempt is not a valid report", (t) => {
+// nixbot build 956 (PR #3273): an unretried attempt hit the whole-test
+// deadline under load. It is terminal infrastructure, reported as such rather
+// than as malformed evidence.
+test("terminal test-deadline attempt is an infrastructure failure", (t) => {
   const data = fixture(t, true);
   const test = data.completion.tests[0];
   test.attempts[0].status = data.results.suites[0].specs[0].tests[0].results[0].status = "timedOut";
   test.attempts[0].failureKind = "infrastructure";
   data.save();
-  assert.throws(() => validateReport(data.root), /test deadline/);
+  assert.throws(() => validateReport(data.root), /infrastructure failure \(test deadline\)/);
+});
+
+test("recovered interrupted attempt passes; an unrecovered one is an infrastructure failure", (t) => {
+  const data = fixture(t, true);
+  retried(data, "infrastructure", null, "interrupted");
+  assert.equal(validateReport(data.root).infrastructureRetries, 1);
+  const terminal = fixture(t, true);
+  const attempt = terminal.completion.tests[0].attempts[0];
+  attempt.status = terminal.results.suites[0].specs[0].tests[0].results[0].status = "interrupted";
+  attempt.failureKind = "infrastructure";
+  terminal.save();
+  assert.throws(() => validateReport(terminal.root), /infrastructure failure \(interrupted\)/);
+});
+
+test("a skipped attempt is not evidence, even before a passing retry", (t) => {
+  const data = fixture(t, true);
+  retried(data, "infrastructure", null, "skipped");
+  assert.throws(() => validateReport(data.root), /skipped attempt/);
 });
 
 test("a product-classified test deadline is rejected", (t) => {
@@ -355,16 +443,17 @@ for (const system of ["aarch64-darwin", "x86_64-linux"]) {
   });
 }
 
-for (const [system, projects] of [
+const engineMatrices: [string, Engine[]][] = [
   ["aarch64-darwin", ["chromium", "webkit"]],
   ["x86_64-linux", ["chromium", "firefox", "webkit"]],
-]) {
+];
+for (const [system, projects] of engineMatrices) {
   test(`${system} requires every declared engine even with consistent producer metadata`, (t) => {
     const data = fixture(t);
     const names = requiredCases["playwright.config.ts"];
     const template = data.completion.tests[0];
     const spec = data.results.suites[0].specs[0];
-    const saveMatrix = (engines) => {
+    const saveMatrix = (engines: Engine[]) => {
       data.metadata.provenance.config = "playwright.config.ts";
       data.metadata.provenance.system = system;
       data.metadata.provenance.projects = engines.join(",");
@@ -392,7 +481,7 @@ test("unknown platform and malformed evidence epoch fail closed", (t) => {
   assert.throws(() => validateReport(data.root), /unknown system\/suite policy/);
   data.metadata.provenance.system = "aarch64-darwin";
   for (const epoch of [undefined, 0, "-1", "1.2", "", "01"]) {
-    data.metadata.provenance.evidenceEpoch = epoch;
+    data.metadata.provenance.evidenceEpoch = corrupt<string>(epoch);
     data.save();
     assert.throws(() => validateReport(data.root), /invalid evidence epoch/);
   }

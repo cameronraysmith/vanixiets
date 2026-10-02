@@ -12,6 +12,7 @@
   dejavu_fonts,
   mesa,
   typstWithPackages,
+  typescript,
   vanixiets-docs-deps,
   evidenceEpoch ? lib.trim (builtins.readFile ./evidence-epoch),
   ...
@@ -175,7 +176,7 @@ stdenv.mkDerivation (finalAttrs: {
     buildPhase = ''
       runHook preBuild
       cd packages/docs
-      node --test tests/report-*.test.mjs
+      node --test tests/report-*.test.ts
       node ./node_modules/.bin/vitest run
       cd ../..
       runHook postBuild
@@ -186,6 +187,19 @@ stdenv.mkDerivation (finalAttrs: {
     '';
 
     meta.description = "Vitest unit tests for vanixiets-docs";
+  };
+
+  # Node strips the evidence tooling's types at load time and never checks
+  # them; this does, against the pinned Playwright and Node declarations.
+  passthru.tests.typecheck = finalAttrs.finalPackage.tests.unit.overrideAttrs {
+    pname = "vanixiets-docs-typecheck";
+    nativeBuildInputs = [ typescript ];
+    buildPhase = ''
+      runHook preBuild
+      tsc -p packages/docs/tests
+      runHook postBuild
+    '';
+    meta.description = "Type-check vanixiets-docs browser evidence tooling and tests";
   };
 
   passthru.tests.e2e-runner-controls = finalAttrs.finalPackage.tests.unit.overrideAttrs {
@@ -200,7 +214,7 @@ stdenv.mkDerivation (finalAttrs: {
     buildPhase = ''
       runHook preBuild
       cd packages/docs
-      node --test tests/browser-report.test.mjs
+      node --test tests/browser-report.test.ts
       cd ../..
       runHook postBuild
     '';
@@ -343,7 +357,7 @@ stdenv.mkDerivation (finalAttrs: {
         }}' > run.json
       # A completed assertion failure is evidence, not producer failure.
       # Missing/malformed/incomplete evidence or infrastructure failure is fatal.
-      node tests/report/validate-report.mjs validate .
+      node tests/report/validate-report.ts validate .
       cd ../..
 
       runHook postBuild
@@ -361,7 +375,7 @@ stdenv.mkDerivation (finalAttrs: {
   # Keep the existing required check name. This dependency consumes evidence;
   # it never launches Playwright or the docs server a second time.
   passthru.tests.e2e = runCommand "vanixiets-docs-e2e" { allowedReferences = [ ]; } ''
-    ${nodejs-slim}/bin/node ${../../../packages/docs/tests/report}/validate-report.mjs \
+    ${nodejs-slim}/bin/node ${../../../packages/docs/tests/report}/validate-report.ts \
       verdict ${finalAttrs.finalPackage.tests.e2e-report}
     mkdir -p "$out"
   '';
@@ -377,7 +391,7 @@ stdenv.mkDerivation (finalAttrs: {
       });
     in
     runCommand "vanixiets-docs-e2e-negative-control" { } ''
-      ${nodejs-slim}/bin/node ${../../../packages/docs/tests/report}/check-negative-report.mjs ${report}
+      ${nodejs-slim}/bin/node ${../../../packages/docs/tests/report}/check-negative-report.ts ${report}
       mkdir -p "$out"
       ln -s ${report} "$out/report"
     '';
@@ -393,7 +407,7 @@ stdenv.mkDerivation (finalAttrs: {
       });
     in
     runCommand "vanixiets-docs-e2e-action-negative-control" { } ''
-      ${nodejs-slim}/bin/node ${../../../packages/docs/tests/report}/check-negative-report.mjs ${report} removed-link
+      ${nodejs-slim}/bin/node ${../../../packages/docs/tests/report}/check-negative-report.ts ${report} removed-link
       mkdir -p "$out"
       ln -s ${report} "$out/report"
     '';

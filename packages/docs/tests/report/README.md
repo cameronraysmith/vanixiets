@@ -21,8 +21,8 @@ The independently enumerable producer gives nixbot a successful build artifact t
 This change does not publish artifacts or deploy the site.
 
 ```sh
-node packages/docs/tests/report/validate-report.mjs validate /nix/store/...-vanixiets-docs-e2e-report-...
-node packages/docs/tests/report/validate-report.mjs verdict /nix/store/...-vanixiets-docs-e2e-report-...
+node packages/docs/tests/report/validate-report.ts validate /nix/store/...-vanixiets-docs-e2e-report-...
+node packages/docs/tests/report/validate-report.ts verdict /nix/store/...-vanixiets-docs-e2e-report-...
 ```
 
 `validate` exits 0 for valid passing or product-failing evidence.
@@ -44,8 +44,9 @@ The producer retains:
   Each attempt records `status`, `retry`, `failureKind` (`null`, `product`, or `infrastructure`), and relative `attachments`.
 - `test-results/`: original traces, screenshots, videos, and error context; `runner.log`: original runner stdout/stderr.
 
-The validator reconciles the completion inventory, JSON report, exit status, per-attempt results, and counts.
-`policy.mjs` specifies the required scenario/project matrix independently of test discovery, including the reader journey.
+The validator first parses the three JSON files into types taken from the completion reporter and Playwright's published JSON report declarations, rejecting any value outside them, then reconciles the completion inventory, JSON report, exit status, per-attempt results, and counts.
+Each attempt is classified by an exhaustive match on Playwright's `TestStatus`: `passed`; a `failed` product failure; an infrastructure failure (`failed`, `timedOut`, or `interrupted` with an infrastructure kind); or invalid, which includes every `skipped` attempt.
+`policy.ts` specifies the required scenario/project matrix independently of test discovery, including the reader journey.
 Its independently declared engine policy requires Chromium and WebKit on Darwin, and Chromium, Firefox, and WebKit on Linux.
 Only the two named negative-control suites have a Chromium-only exception; unknown systems/configs fail closed.
 Narrowing both producer metadata and discovery cannot narrow the required matrix.
@@ -130,8 +131,9 @@ Invalid/incomplete runs fail the producer; they have Nix build logs, not a succe
 They must never be presented as a passing or product-failing completed report.
 Tests cover the local built site and synthetic failure controls, not a deployed site, live nixbot API retrieval, or the report publisher.
 
-Run the protocol tests with installed dependencies using `node --test tests/report-*.test.mjs` from `packages/docs`, or build `package-vanixiets-docs-test-unit`.
+Run the protocol tests with installed dependencies using `node --test tests/report-*.test.ts` from `packages/docs`, or build `package-vanixiets-docs-test-unit`; Node strips the types at load time.
 The unit check also runs the existing Vitest suite.
-Run `node --test tests/browser-report.test.mjs` with the pinned `PLAYWRIGHT_BROWSERS_PATH` for the separate native-browser controls, or build `package-vanixiets-docs-test-e2e-runner-controls`.
+`package-vanixiets-docs-test-typecheck` type-checks the tooling and tests with `tsc -p packages/docs/tests`.
+Run `node --test tests/browser-report.test.ts` with the pinned `PLAYWRIGHT_BROWSERS_PATH` for the separate native-browser controls, or build `package-vanixiets-docs-test-e2e-runner-controls`.
 Native Darwin checks use Chromium and WebKit; Linux checks use Chromium, Firefox, and WebKit.
 For Linux validation on this fleet, explicitly allow only magnetite and pyrite-builder; do not use Rosetta.

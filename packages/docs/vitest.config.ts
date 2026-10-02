@@ -17,8 +17,17 @@ export default getViteConfig({
     // Test file patterns
     include: ["src/**/*.{test,spec}.{ts,tsx}", "tests/**/*.{test,spec}.{ts,tsx}"],
 
-    // Files to exclude from test discovery
-    exclude: ["node_modules", "dist", ".astro", "e2e", "tests/negative-control"],
+    // Files to exclude from test discovery. The evidence protocol suites use
+    // node:test and run under `node --test` (see tests/report/README.md).
+    exclude: [
+      "node_modules",
+      "dist",
+      ".astro",
+      "e2e",
+      "tests/negative-control",
+      "tests/report-*.test.ts",
+      "tests/browser-report.test.ts",
+    ],
 
     // Coverage configuration
     coverage: {
