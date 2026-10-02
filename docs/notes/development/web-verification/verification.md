@@ -1,7 +1,7 @@
 # Verification ledger
 
 This file distinguishes inherited evidence, current implementation checks, and planned demonstrations.
-No entry below claims live deployment or evidence publication.
+No entry below claims live deployment or live evidence publication.
 
 ## Requirement traceability
 
@@ -10,9 +10,9 @@ No entry below claims live deployment or evidence publication.
 | R1 | Committed journey with independent expected outcomes and required verdict | Implemented; real browser checks pass |
 | R2 | Completed negative report retains attachments and is discoverable by named check | Report and negative control pass; live API retrieval pending |
 | R3 | CLI reproduction and reviewed correction followed by independent rerun | Mobile hero overflow reproduced with Playwright CLI; strengthened scenario fails the required gate on Linux with a kept report and passes after the CSS correction on Linux and Darwin; review pending |
-| R4 | Relevant-input identity and cache-reuse receipt | Pending; whole-build reuse does not emit build_finished |
+| R4 | Relevant-input identity and cache-reuse receipt | Receipts name the producing build; `main` landings publish the reused build's report through the onPush lookup; live run pending |
 | R5 | Isolated browser/profile/fixture cleanup checks | CLI smoke has isolation; harness integration pending |
-| R6 | Trusted publisher rehearsal, malformed metadata rejection, no PR evaluation | Loopback rehearsal passes on Darwin and Linux; live effect pending |
+| R6 | Trusted publisher rehearsal, malformed metadata rejection, no PR evaluation | Loopback rehearsal covers selection, rejection, upload, retry, prefix confinement, and the PR comment; live effect run pending |
 | R7 | Deliberate defect rejected for the expected reason | Damaged-guide and removed-link controls (Chromium) and a damaged-guide control (WebKit) rejected with retained trace and screenshot on both platforms |
 | R8 | Documented lifecycle seam, later exercised by a second application | Design only |
 
@@ -158,13 +158,17 @@ No correction adds a live publisher, deployment, or current-revision receipt for
 
 ## Evidence publisher
 
-`modules/apps/docs/publish-evidence.nix` exposes `nix run .#publish-evidence -- build-finished --out <dir>`, a `writeShellApplication` sidecar for a trusted default-branch `build_finished` event.
-No effect registers it; storage destination, retention, and access remain undecided, so publication ends at the local `--out` directory.
+`modules/apps/docs/publish-evidence.nix` exposes `nix run .#publish-evidence`, a `writeShellApplication` sidecar with two modes:
+
+- `build-finished [--out <dir>] [--upload]` for a `build_finished` event, evaluated from `main`;
+- `main --rev <commit> [--out <dir>] [--upload]` for the onPush run on `main`, which finds the commit's highest-numbered build through nixbot's builds API, because a fast-forward landing sends no `build_finished` ([D10](decisions.md#d10-publish-main-from-onpush-and-pull-requests-from-build_finished)).
+
+The `browser-evidence` effect registers both with `--upload`; storage, retention, and serving follow [D9](decisions.md#d9-publish-to-the-adopted-sciexp-bucket-under-a-confined-prefix).
 
 Implemented behavior:
 
-- The event supplies only data: `NIXBOT_EVENT_KIND` must be `build_finished`, and `.build.number`, `.build.rev`, `.build.status`, and `.build.url` are validated before any request.
-- The build is fetched from nixbot's build API by number; its number and `commit_sha` must equal the event's.
+- In `build-finished` mode the event supplies only data: `NIXBOT_EVENT_KIND` must be `build_finished`, and `.build.number`, `.build.rev`, `.build.status`, and `.build.url` are validated before any request.
+- The build is fetched from nixbot's build API by number, or in `main` mode by commit; its number and `commit_sha` must equal the event's or the selected build's.
   The aggregate build may have failed.
 - The `checks.x86_64-linux.package-vanixiets-docs-test-e2e-report` attribute must be `succeeded` or `skipped_local`, carry a boolean `cached`, and have a realisable store output.
   Otherwise the program prints `evidence unavailable` and exits 1 without evaluating or building anything.
@@ -172,19 +176,74 @@ Implemented behavior:
   Report provenance must name `x86_64-linux` and `playwright.config.ts`.
 - The program's own `validate-report.ts` copy then judges the report: a product-failing report is published with `verdict.passed: false` and exit 0; validator exit 2 is rejected.
 - The bundle holds `run.json`, `playwright-report/completion.json`, and the referenced PNG screenshots, without HTML, traces, or other attachments.
-  `receipt.json` records the build, attribute, output path, the API's `cached` value verbatim, report provenance, verdict, and per-file SHA-256 and size, with no timestamp.
-- Publication is staged beside `--out` and renamed into place, so a rejected run leaves no receipt.
-  A repeat for the same build, revision, attribute, and output path is a no-op when the bytes match; an existing receipt for another identity, or a non-empty directory without one, is refused.
+  `receipt.json`, schema version 3, is a pure function of the report: `identity` (attribute and output path), `obs`, system, config, report provenance, verdict, and per-file SHA-256 and size, with no build, revision, `cached` value, event, pull request, or timestamp; `destination` is added when uploaded.
+- With `--out`, publication is staged beside the directory and renamed into place, so a rejected run leaves no receipt.
+  A repeat for the same attribute and output path is a no-op when the bytes match; an existing receipt for another identity, or a non-empty directory without one, is refused.
+- With `--upload`, the program mints 15-minute credentials, read-write on the run's own tier and, for a pull request, read-only on `ttl-90d/`, unsets the parent secret, and uses only the temporary credentials; `receipt.json` goes last and create-only, so a tier receives each report at most once.
+- A pull request run first probes `ttl-90d/v1/<obs>/receipt.json`: if `main` already published the report, it uploads nothing and posts no comment, and supersedes an earlier comment recorded by its marker; otherwise it uploads to `ttl-30d` and upserts the comment ([D10](decisions.md#d10-publish-main-from-onpush-and-pull-requests-from-build_finished)).
 
 `publish-evidence-rehearsal` runs the real program against a loopback nixbot API and a chroot store with synthetic report fixtures generated from `policy.ts`.
 A control first runs the repository validator on every fixture, so the program, not the validator, makes each rejection except for the invalid and absolute-path fixtures.
-Its rows cover passing, product-failing, failed-aggregate, and `skipped_local`/cached publication; byte-identical repeat and fresh republication; another identity's destination; a non-empty destination; missing `--out`; missing, failed, unfetchable, and unrealisable outputs; traversal, absolute, symlinked, and non-PNG attachments; revision, system, and config mismatches; a wrong event kind; malformed build number and revision; and invalid evidence.
+Its rows cover passing, product-failing, failed-aggregate, and `skipped_local`/cached publication; byte-identical repeat and fresh republication; another identity's destination; a non-empty destination; neither `--out` nor `--upload`; missing, failed, unfetchable, and unrealisable outputs; traversal, absolute, symlinked, and non-PNG attachments; revision, system, and config mismatches; a wrong event kind; malformed build number and revision; and invalid evidence.
 Each rejection asserts its exit status, exact message, API requests, and the absence of a publication.
 
-`checks.aarch64-darwin.publish-evidence-rehearsal` passed natively, and `checks.x86_64-linux.publish-evidence-rehearsal` passed on Magnetite.
-`apps-build`, which runs shellcheck over the new program, passed on both platforms.
+`checks.aarch64-darwin.publish-evidence-rehearsal` passed natively, and `checks.x86_64-linux.publish-evidence-rehearsal` passed on Magnetite, for the `--out`-only program with the schema-version-2 receipt.
+`apps-build`, which runs shellcheck over the program, passed on both platforms for that version.
+No result is recorded yet for schema version 3.
 
-This rehearsal does not cover live nixbot delivery, an upload backend, HTML or trace hosting, or whole-build reuse.
+### Upload and comment rehearsal
+
+For `--upload`, the rehearsal points `PUBLISH_EVIDENCE_S3_ENDPOINT` at a loopback S3 stub and `NIXBOT_API_URL` at the stub nixbot API, which also serves `pr-comment`.
+The S3 stub verifies each request as R2 would accept it from a temporary credential:
+
+- the session token's HS256 JWT signature against the parent secret, its header, and its claims: bucket, scope, `sub`, `iss`, `aud` equal to the request's `Host`, a 900-second lifetime, and `paths`;
+- the full SigV4 signature, with the secret `sha256(jwt)` and the credential scope `<parent access key id>/…/auto/s3/aws4_request`;
+- the token's `scope`, refusing PUT and DELETE with 403 under `object-read-only`;
+- the key against the token's `prefixPaths`, refusing others with 403, and `If-None-Match: *` with 412 for an existing object.
+
+An unsigned control request (`unsigned-put`) receives 403.
+
+The stub serves HEAD, GET, and PUT.
+Each upload row asserts the exit status, the exact output lines, the S3 requests seen, the comments posted, and the marker contents:
+
+1. `main-upload`: a `ttl-90d` upload with the receipt last, and no comment.
+2. `main-repeat-other-build`: a different `main` build and revision with the same report output path reports `unchanged` with no PUT.
+3. `pr-unaffected`: with `main`'s receipt present in `ttl-90d`, no PUT, no comment, the `unaffected` line, and, with no marker, silence.
+4. `pr-affected`: with no such receipt, a `ttl-30d` upload, a comment carrying the marker and Worker URLs on `evidence.vanixiets.net`, and a `current` marker.
+5. `pr-affected-retry`: the same build again reports the upload `unchanged`, upserts the comment again, and leaves the marker's content unchanged.
+6. `pr-second-build-same-report`: a new build number with the same output path writes no new object, and the receipt is identical.
+7. `pr-reverted`: with a `current` marker and `main`'s receipt present, the superseded body is posted, the marker becomes `superseded`, and the run logs `superseded #N`; `pr-reverted-again`, a further unaffected run, does nothing.
+8. `pr-credential-confinement`: the stub refuses with 403 a PUT to `ttl-90d` under the read-only credential and a PUT outside `ttl-30d/` under the read-write one, recorded as negative controls; across every `pr-*` row the program never attempts a write into `ttl-90d` and reaches it only with the read-only credential.
+9. `non-pr-build-finished`: a build without a pull request, also with `--out`, publishes to `ttl-90d` with no probe and no comment.
+10. No raw request bytes in any row contain the parent secret.
+11. `pr-probe-500`: a baseline probe answered with 500 exits 1 naming the key, with no upload and no comment.
+
+Further rows cover `main` mode's lookups (`main-no-build`, `main-no-api-url`, `main-missing-rev`, `rev-outside-main`), `missing-r2-env`, `upload-500`, a refused comment (`pr-comment-refused`), a corrupted remote receipt (`pr-receipt-conflict`), a superseding run without `NIXBOT_API_TOKEN` (`pr-reverted-no-token`), and a malformed marker (`pr-marker-malformed`).
+
+The stub verifies the claims and signature and enforces the scope and prefix itself; it does not show that R2 enforces them.
+R2's own enforcement was checked only by hand, for schema version 2, with a read-write credential on the earlier whole-evidence prefix `projects/vanixiets/browser-evidence/`: it wrote, read, and deleted `projects/vanixiets/browser-evidence/ttl-30d/v1/_token-check/probe.txt` and was refused for `projects/vanixiets/x` and `omnigraph/x`.
+The per-tier prefixes and the read-only scope have not been checked against R2.
+
+For schema version 2, before the rows above, the parent ran:
+
+```sh
+nix build .#checks.aarch64-darwin.publish-evidence-rehearsal \
+  .#checks.x86_64-linux.publish-evidence-rehearsal
+```
+
+Both passed, together with `effects-interpreter` and `terraform-validate` on both systems and `nixbot-wiring` on x86_64-linux.
+A mutation that derives the temporary secret as `sha256(jwt + "x")` made the stub return 403 and that version's `pr-upload` row fail, so the rehearsal detected a wrongly derived credential.
+These results are for schema version 2; no result is recorded for the schema-version-3 rows.
+
+Not yet verified live:
+
+- nixbot delivering `build_finished` to the effect, with the `when` filters and permission matcher applied, and the onPush run on `main` receiving `NIXBOT_API_URL` and `NIXBOT_API_TOKEN`;
+- a real upload to `sciexp`, and the Terraform plan and apply that adopt the bucket and set its lifecycle rules;
+- the wrangler deployment of `packages/evidence-worker/` and its responses and headers on `evidence.vanixiets.net`;
+- lifecycle deletion of each tier;
+- the comment as rendered on GitHub, its upsert across builds, and its superseded body;
+- nixbot running a changed effect only after it lands on the default branch;
+- HTML or trace hosting, and whole-build reuse on branches other than `main`.
 
 ## Increment 7: mobile hero overflow repair
 
@@ -292,4 +351,4 @@ The fixed check passed 8 runs on Linux and 3 on Darwin.
 
 For each completed increment, record the command, platform, relevant input or derivation identity, observed outcome, and remaining limitations here.
 Keep large reports, recordings, credentials, and mutable remote URLs out of this source tree.
-Link durable evidence only after its storage and access policy is approved.
+Evidence URLs under `evidence.vanixiets.net` stop resolving when their tier's lifecycle rule deletes the objects, so cite a build number and receipt identity alongside any such link.

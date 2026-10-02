@@ -10,8 +10,8 @@ The GitHub Actions release and docs-deploy workflows are archived under `.github
 
 ## The rule: secrets are only held by code from main
 
-Effects are the only CI programs that receive deploy secrets (the Cloudflare API token and the GitHub release token).
-onPush effects run only for pushes to `main`, and onEvent effects are always evaluated from `main`, so the code that holds a secret has always already been reviewed and landed.
+Effects are the only CI programs that receive deploy secrets (the Cloudflare API token, the GitHub release token, and the R2 token for browser evidence).
+onPush effects run only for pushes to `main`, and onEvent effects, including `build_finished`, are always evaluated from `main`, so the code that holds a secret has always already been reviewed and landed.
 Secrets are declared per trigger, so a pull request trigger receives only the secrets it declares: the `release-packages` pull request trigger declares none.
 
 An effect contains no behaviour of its own.
@@ -49,9 +49,10 @@ The required contexts are `nixbot/nix-eval`, `nixbot/nix-build`, and `nixbot/eff
 Each effect lists the rehearsal checks for its program among its inputs, so every pull request and batch builds them as part of the required `nixbot/effects` gate:
 
 - `checks.<system>.deploy-docs-rehearsal` runs every `deploy-docs` mode (`production`, `preview`, `pull-request`, `pull-request-closed`, `versions`, and `deployments`) against a stub wrangler that also executes each invocation with the real pinned wrangler and the identical argv: `deploy` with `--dry-run`, and `preview`, `preview delete`, `versions list`, and `deployments list` against a loopback fake Cloudflare API, so an argv wrangler would reject fails the check. It covers the superseded production run; the untrusted `--payload` hardening, including symlink refusal and a payload build command that never runs; the pull request trust rule (a same-repository bot pull request and fork pull requests with a writer as actor or author preview, an untrusted fork is skipped as `neutral`, and a missing `isFork` fails); `succeeded`, `skipped_local`, failed, and missing docs attributes, a malformed event, a failed deploy, and the `docs-preview` check-run lifecycle; a pull request found closed or superseded before the upload, which is skipped without any Cloudflare or nixbot API request, one closed during the upload, whose Preview is withdrawn, and a failed pull request state lookup; teardown of an existing Preview, of one that never existed, and a failed delete; `--limit` truncation of the listings; and missing secrets failing before any network call;
-- `checks.<system>.release-rehearsal` runs `release-packages --rev` with the production semantic-release plugin list against a local git fixture and a stub GitHub API, including the floating major and minor tags from `semantic-release-major-tag`, a superseded rev that main has moved past, and a diverged rev outside main's history; it also runs `release-packages plan` on fixture pull requests through the installation-token path, covering a minor, a major, and no bump, a pull request that edits the release configuration (forecast from main's configuration, its plugin never run), a closed or superseded pull request, which is skipped without cloning, a failed pull request state lookup, a merge conflict, a head mismatch, a missing forge token, and a release PAT in the environment that is never used, and it asserts that a forecast leaves the fixture remote's tags and refs untouched and creates no release.
+- `checks.<system>.release-rehearsal` runs `release-packages --rev` with the production semantic-release plugin list against a local git fixture and a stub GitHub API, including the floating major and minor tags from `semantic-release-major-tag`, a superseded rev that main has moved past, and a diverged rev outside main's history; it also runs `release-packages plan` on fixture pull requests through the installation-token path, covering a minor, a major, and no bump, a pull request that edits the release configuration (forecast from main's configuration, its plugin never run), a closed or superseded pull request, which is skipped without cloning, a failed pull request state lookup, a merge conflict, a head mismatch, a missing forge token, and a release PAT in the environment that is never used, and it asserts that a forecast leaves the fixture remote's tags and refs untouched and creates no release;
+- `checks.<system>.publish-evidence-rehearsal` runs `publish-evidence build-finished` and `publish-evidence main` against a loopback nixbot API, a chroot store, a stub comment endpoint, and a stub S3 endpoint that verifies the temporary credentials' JWT claims and SigV4 signature, refuses writes under a read-only credential, and refuses keys outside each credential's prefix. It covers report selection and validation; a `main` upload to `ttl-90d` with the receipt last and create-only, and a later `main` build with the same report that uploads nothing; `main` mode's lookup failures (a commit with no build, a missing `NIXBOT_API_URL`, and a missing or non-`main` `--rev`); an unaffected pull request whose report `main` already published, which uploads and comments nothing; an affected pull request uploaded to `ttl-30d` with a comment and marker, its retry, and a second build with the same report; a refused comment, a corrupted remote receipt, and a failed upload; a pull request that returns to `main`'s report and supersedes its comment, also without an API token and with a malformed marker; credential confinement, including that no pull request run writes into `ttl-90d`; a build without a pull request; a failing baseline probe; missing R2 secrets; and the parent secret's absence from every request.
 
-The `docs` effect lists `deploy-docs-rehearsal` and `release-packages` lists `release-rehearsal`.
+The `docs` effect lists `deploy-docs-rehearsal`, `release-packages` lists `release-rehearsal`, and `browser-evidence` lists `publish-evidence-rehearsal`.
 The rehearsals run the real programs without a token or network access, so a change that breaks the release, deploy, preview, or teardown path fails before it reaches `main`.
 
 `checks.<system>.effects-interpreter` covers the one piece of code between nixbot and a program: the script the interpreter generates for each effect trigger.
@@ -79,14 +80,16 @@ The resulting push to `main` reuses the batch's build, and nixbot then runs the 
 
 Batches can land in quick succession, so an effect may start after `main` has already moved past the commit it was built for.
 The production deploy and the release handle this the same way: a `lock` orders runs across builds, and the program exits 0 without acting when its `--rev` is no longer `main`'s head, leaving the work to the run for the newer commit.
+The `browser-evidence` effect does not skip a superseded commit: evidence for each landed commit is kept under its own build's keys, and its lock only serialises runs.
 
 ## Effects
 
 Effects are data.
 `modules/effects/vanixiets/effects.nix` declares them as entries of the flake option `vanixiets.effects.<name>`, each naming its program, its rehearsals, and its `triggers`.
-An entry has at least one of the triggers `main`, `pullRequest`, and `pullRequestClosed`, and each trigger sets the program's literal arguments, the secrets it reads, its lock, and whether it receives nixbot's forge token.
+An entry has at least one of the triggers `main`, `pullRequest`, `pullRequestClosed`, and `buildFinished`, and each trigger sets the program's literal arguments, the secrets it reads, its lock, and whether it receives nixbot's forge token.
 
-One interpreter, `modules/effects/vanixiets/registry.nix`, turns each trigger into a nixbot effect: `main` into `herculesCI.onPush.default.outputs.effects.<name>`, `pullRequest` into `herculesCI.onEvent.pull_request.<name>`, and `pullRequestClosed` into `herculesCI.onEvent.pull_request_closed.<name>`.
+One interpreter, `modules/effects/vanixiets/registry.nix`, turns each trigger into a nixbot effect: `main` into `herculesCI.onPush.default.outputs.effects.<name>`, `pullRequest` into `herculesCI.onEvent.pull_request.<name>`, `pullRequestClosed` into `herculesCI.onEvent.pull_request_closed.<name>`, and `buildFinished` into `herculesCI.onEvent.build_finished.<name>`.
+A `buildFinished` trigger also carries nixbot's delivery conditions (`when`); one that reads a secret must require `write` or `admin` permission, since branch and status filters select builds rather than authorize anyone.
 The script it generates for each trigger does three things, in order:
 
 1. for `main` triggers, runs the fail-closed guard (`mainOnlyGuard` from `modules/lib/effect-run-context.nix`), which asks nixbot for an identity token and refuses to run unless the token says the event is a push to `refs/heads/main`: any other run is skipped with exit 0 before a secret is read, and a missing or unreadable token fails the effect;
@@ -175,6 +178,37 @@ The release PAT is never given to this trigger and plan mode never reads it.
 The forecast is informational and never blocks a merge.
 See [Semantic Release Preview](/about/contributing/semantic-release-preview/) for reading the forecast and previewing a release locally.
 
+### browser-evidence
+
+The `browser-evidence` effect runs the `publish-evidence` program, which publishes the docs browser report nixbot already built (`checks.x86_64-linux.package-vanixiets-docs-test-e2e-report`) as screenshots and JSON metadata:
+
+| Trigger | nixbot effect | Program | Lock |
+|---------|---------------|---------|------|
+| `main` | `herculesCI.onPush.default.outputs.effects.browser-evidence` | `publish-evidence main --upload --rev <commit>` | `browser-evidence` |
+| `buildFinished` | `herculesCI.onEvent.build_finished.browser-evidence` | `publish-evidence build-finished --upload` | `browser-evidence` |
+
+The `buildFinished` trigger is delivered for succeeded and failed builds, since a failing suite still leaves a report, and only when the build's actor or pull request author has `write` permission or above.
+A landing on `main` reuses the merge-queue build and nixbot sends no `build_finished` for a reused build, so the `main` trigger looks the landed commit up in nixbot's builds API instead.
+
+Neither mode evaluates or builds anything: both realise the recorded report output, validate it with the program's own validator, and upload only `run.json`, `completion.json`, the referenced PNG screenshots, and a `receipt.json` (schema version 3) that identifies the report by attribute and output path and names no build.
+Objects go to the R2 bucket `sciexp` under `projects/vanixiets/browser-evidence/<tier>/v1/<obs>/`, where `<obs>` is derived from the report's attribute and Nix output path only; every build with the same report writes the same keys, each tier receives a report at most once, and an identical existing receipt logs `PUBLISH-EVIDENCE: unchanged`.
+`main` and other builds without a pull request use the `ttl-90d` tier; bucket lifecycle rules in `modules/terranix/cloudflare.nix` delete each tier's objects by age.
+
+A pull request build first checks whether `main` has already published this exact report, by probing for its receipt under `ttl-90d`.
+If so, the pull request is unaffected: the program uploads nothing, posts no comment, and logs `PUBLISH-EVIDENCE: unaffected (report <obs> already published from main)`.
+Otherwise it uploads to `ttl-30d` and posts one comment through nixbot's `pr-comment` API with the verdict, the build, links to the screenshots and receipt, the retention, and a note that no identical report has been published from `main` in the last 90 days; it edits that same comment on later builds.
+A report that differs from every report published from `main` in the last 90 days is treated as affected, for example when `main`'s evidence has expired or its publish run failed.
+Because `pr-comment` can only upsert, the program records its comment in a marker object under `ttl-30d/pr/`; a later unaffected build that finds a current marker replaces the comment with a superseded note and logs `PUBLISH-EVIDENCE: superseded #<number>`.
+When two builds of one pull request finish out of order, the one that finishes last decides the comment.
+
+The program never uses the R2 token for requests: each run signs temporary credentials valid for 15 minutes, read-write on its own tier's prefix and, for a pull request, read-only on `projects/vanixiets/browser-evidence/ttl-90d/`, then unsets the token, so a pull request run cannot write into `main`'s tier.
+The Worker `sciexp-evidence` (`packages/evidence-worker/`, deployed with wrangler) serves the evidence read-only at `https://evidence.vanixiets.net/vanixiets/browser-evidence/<tier>/v1/<obs>/<file>`, the object key after `projects/`: GET and HEAD only, `.png` and `.json` only, no directory listing, with `nosniff` and a sandboxing content security policy.
+`vanixiets.net` is dedicated to untrusted CI content and hosts no authentication, sessions, or cookies.
+
+A failed upload or comment fails the effect run.
+nixbot runs event effects from the default branch and posts no forge status for them (`nixbot/nixbot/event_effects.py`), so a pull request that changes this effect or its program is first exercised after it lands, and a failed `buildFinished` run never blocks a merge; a failed `main` run fails `nixbot/effects` on the `main` push.
+See [Docs browser evidence](https://github.com/cameronraysmith/vanixiets/blob/main/packages/docs/tests/report/README.md#publication) for reading the evidence.
+
 ## Secrets
 
 Effect secrets are declared once, in `flake.lib.vanixietsEffectSecrets` (`modules/effects/vanixiets/secrets.nix`).
@@ -184,10 +218,13 @@ Each trigger's `secrets` is typed as an enum of the schema's names, and the inte
 
 | Secret | Used by |
 |--------|---------|
-| `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` | `docs`: `main`, `pullRequest`, and `pullRequestClosed` |
+| `CLOUDFLARE_API_TOKEN` | `docs`: `main`, `pullRequest`, and `pullRequestClosed` |
+| `CLOUDFLARE_ACCOUNT_ID` | `docs`: `main`, `pullRequest`, and `pullRequestClosed`; `browser-evidence`: `main` and `buildFinished` |
 | `GITHUB_TOKEN` (fine-grained PAT, read and write) | `release-packages`: `main` only |
+| `R2_EVIDENCE_ACCESS_KEY_ID`, `R2_EVIDENCE_SECRET_ACCESS_KEY` (R2 token, Object Read & Write on `sciexp` only) | `browser-evidence`: `main` and `buildFinished` |
 
 The `pullRequest` triggers of `docs` and `release-packages` also set `forgeToken = true`, which gives them nixbot's per-run GitHub App installation token as `GITHUB_FORGE_TOKEN` for their `docs-preview` and `release-plan` check runs; that token is not an entry of the schema.
+The `browser-evidence` program also reads `NIXBOT_API_URL` and `NIXBOT_API_TOKEN`, which nixbot sets for each effect run, to query its build API and post the pull request comment; neither is an entry of the schema.
 
 To rotate a value, regenerate the generator's prompts with `clan vars generate --regenerate` and redeploy magnetite.
 

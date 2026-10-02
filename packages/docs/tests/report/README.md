@@ -83,12 +83,52 @@ The validator still rejects any empty attachment.
 
 ## Publication
 
-`nix run .#publish-evidence -- build-finished --out <dir>` is the trusted `build_finished` sidecar for this contract; `modules/apps/docs/publish-evidence.sh` documents its interface.
-It looks up `checks.x86_64-linux.package-vanixiets-docs-test-e2e-report` through nixbot's build API by the event's build number and realises the recorded output; a missing, failed, or unrealisable output is reported as unavailable evidence, never rebuilt.
-It validates the report with its own copy of `validate-report.ts` and copies only `run.json`, `playwright-report/completion.json`, and PNG screenshots referenced by attempts, beside a deterministic `receipt.json` carrying the build, output path, the API's `cached` field, provenance, verdict, and file digests.
+`publish-evidence` (`modules/apps/docs/publish-evidence.sh` documents its interface) publishes this contract's evidence; the `browser-evidence` effect runs it from `main`'s code.
+It has two modes:
+
+- `build-finished [--out <dir>] [--upload]`: the `build_finished` sidecar, which looks the event's build up by number; nixbot sends this for pull request builds and other newly finished builds, whether the aggregate succeeded or failed.
+- `main --rev <commit> [--out <dir>] [--upload]`: the onPush run for `main`, which looks up the highest-numbered build of that commit; a fast-forward landing reuses the merge-queue build and sends no `build_finished`.
+
+Both modes look up `checks.x86_64-linux.package-vanixiets-docs-test-e2e-report` through nixbot's build API and realise the recorded output; a missing, failed, or unrealisable output is reported as unavailable evidence, never rebuilt.
+They validate the report with the program's own copy of `validate-report.ts` and stage only `run.json`, `playwright-report/completion.json`, and PNG screenshots referenced by attempts, beside a deterministic `receipt.json` (schema version 3) carrying the report's identity (attribute and output path), provenance, verdict, and file digests, and nothing about the build that produced it.
 Product-failing reports are published with `passed: false`; invalid evidence, unsafe attachment paths, symlinks, non-PNG screenshots, and build/report identity mismatches are rejected.
-No effect runs it yet and the storage destination is undecided, so publication ends at the local `--out` directory.
-`publish-evidence-rehearsal` exercises it against a loopback nixbot API and a chroot store.
+`publish-evidence-rehearsal` exercises both modes against a loopback nixbot API, a chroot store, and stub storage and comment endpoints.
+
+### Where evidence goes
+
+With `--upload`, the bundle goes to the R2 bucket `sciexp` under `projects/vanixiets/browser-evidence/<tier>/v1/<obs>/`.
+`<obs>` is the first 32 hex digits of the SHA-256 of `[attribute, output path]`, so every build carrying the same report writes the same keys, and a repeat reports `unchanged` instead of uploading again.
+The tier sets retention: `ttl-90d` for `main` and other builds without a pull request, `ttl-30d` for a pull request whose report `main` has not published.
+Objects are deleted by age; nothing renews them.
+
+A pull request build first checks whether `main` has already published this exact report, that is, whether `ttl-90d/v1/<obs>/receipt.json` exists.
+If it has, the pull request does not change the docs browser evidence: nothing is uploaded, no comment is posted, and the log prints `PUBLISH-EVIDENCE: unaffected (report <obs> already published from main)`.
+Otherwise the build uploads to `ttl-30d` and comments.
+The report's Nix output path decides this, since it changes exactly when an input of the report changes.
+A report that differs from every report published from `main` in the last 90 days counts as a change, even when `main`'s evidence for it has expired or `main`'s publish run failed.
+
+Read evidence at `https://evidence.vanixiets.net/vanixiets/browser-evidence/<tier>/v1/<obs>/<file>`, for example `.../receipt.json` or a screenshot path from it; the URL path is the object key after `projects/`.
+The host serves only `.png` and `.json` files and does not list directories, so start from a link in a comment, a log line, or a receipt.
+The receipt's `destination` gives the bucket, key prefix, tier, and this base URL.
+The effect log prints `PUBLISH-EVIDENCE: uploaded <url>` for the base URL when the run wrote the receipt, and `PUBLISH-EVIDENCE: published` or `unchanged` with the report's `<obs>` and verdict.
+
+### Reading the pull request comment
+
+For a pull request whose report `main` has not published, the effect posts one comment through nixbot and edits it on later builds instead of adding another.
+It shows:
+
+- the verdict, passed or failed, with the expected, unexpected, skipped, and flaky counts;
+- the build number, linked to the build, and the first 12 hex digits of its revision;
+- a link to each screenshot of a failed attempt and to `receipt.json`;
+- that the evidence is kept 30 days;
+- that no report identical to this one has been published from `main` in the last 90 days, which is why it is shown.
+
+If a later build of the pull request produces the same report as `main`, the effect replaces the comment with a short note, without links, saying that the evidence previously linked no longer describes a change, and naming the shared report, the build, and the revision.
+When two builds of a pull request finish out of order, the comment reflects whichever finished last.
+
+The comment describes the build named in it, which may be older than the pull request's current head when the report was reused from cache; the receipt names no build, since one report serves every build that carries it.
+A passing verdict with no screenshots is expected: screenshots are taken only for failed attempts.
+For traces, the HTML report, and other attachments, build the named report attribute locally; they are not published.
 
 ## Failure classification boundary
 
