@@ -18,17 +18,17 @@ const completion = JSON.parse(readFileSync(join(root, "playwright-report/complet
 const [test] = completion.tests;
 const removedLink = process.argv[3] === "removed-link";
 assert.match(test.title, removedLink ? /removed homepage link is rejected/ : /damaged guide is rejected/);
-assert.equal(test.attempts.length, 1, "negative control must fail on the original attempt, without retry");
-assert.equal(test.attempts[0].status, "failed");
-assert.equal(test.attempts[0].failureKind, "product");
+// A deterministic defect must fail every attempt: the retries absorb a stalled
+// navigation on a busy host, never the product failure itself.
+assert(test.attempts.length >= 1, "missing attempt");
 assert(
-  test.attempts[0].attachments.some((name) => name.endsWith("/trace.zip")),
-  "original failure trace missing",
+  test.attempts.every((attempt) => attempt.status !== "passed"),
+  "a retry passed the deliberately broken journey",
 );
-assert(
-  test.attempts[0].attachments.some((name) => name.endsWith(".png")),
-  "failure screenshot missing",
-);
+const terminal = test.attempts.at(-1);
+assert.equal(terminal.failureKind, "product", "terminal attempt must be a completed product failure");
+assert(terminal.attachments.some((name) => name.endsWith("/trace.zip")), "failure trace missing");
+assert(terminal.attachments.some((name) => name.endsWith(".png")), "failure screenshot missing");
 const results = JSON.parse(readFileSync(join(root, "playwright-report/results.json"), "utf8"));
 assert.match(JSON.stringify(results), /Getting started/);
 assert.match(JSON.stringify(results), removedLink ? /locator.click: Timeout/ : /toBeVisible/);

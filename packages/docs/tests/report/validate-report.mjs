@@ -77,6 +77,7 @@ export function validateReport(root) {
   assert.equal(new Set(tests.map((test) => test.id)).size, tests.length, "duplicate test ID");
   assert.equal(new Set(serialized.map((test) => test.id)).size, tests.length, "duplicate JSON test ID");
   const counts = { expected: 0, unexpected: 0, skipped: 0, flaky: 0 };
+  let infrastructureRetries = 0;
   for (const test of tests) {
     assert(typeof test.id === "string" && test.id.length > 0, "missing test ID");
     assert(["expected", "unexpected", "flaky"].includes(test.outcome), "skipped/unknown outcome");
@@ -90,18 +91,30 @@ export function validateReport(root) {
     assert(attempts.length > 0, "missing attempt");
     assert.equal(array(json.results, "JSON results").length, attempts.length, "attempt count disagreement");
     for (const [index, attempt] of attempts.entries()) {
-      assert(["passed", "failed"].includes(attempt.status), "incomplete/skipped attempt");
+      assert(["passed", "failed", "timedOut"].includes(attempt.status), "incomplete/skipped attempt");
       assert.equal(attempt.retry, index, "missing/out-of-order attempt");
       assert.equal(json.results[index].status, attempt.status, "attempt status disagreement");
       assert.equal(json.results[index].retry, attempt.retry);
-      assert.equal(attempt.failureKind, attempt.status === "failed" ? "product" : null, "infrastructure failure");
+      // An infrastructure attempt, including a whole-test deadline, is
+      // tolerated only when the retry policy recovered from it: a later attempt
+      // of the same test completed as a pass or a product failure. A terminal
+      // one prevents a valid report.
+      if (attempt.status === "passed") {
+        assert.equal(attempt.failureKind, null, "passed attempt carries a failure kind");
+      } else if (attempt.failureKind === "infrastructure") {
+        assert(index < attempts.length - 1, `infrastructure failure${attempt.status === "timedOut" ? " (test deadline)" : ""}`);
+        infrastructureRetries++;
+      } else {
+        assert.equal(attempt.status, "failed", "incomplete/skipped attempt");
+        assert.equal(attempt.failureKind, "product", "unknown failure kind");
+      }
       const attachments = array(attempt.attachments, "attachments");
       const jsonAttachments = array(json.results[index].attachments, "JSON attachments")
         .filter((attachment) => attachment.path)
         .map((attachment) => attachment.path);
       assert.deepEqual(attachments, jsonAttachments, "attachment inventory disagreement");
       for (const attachment of attachments) file(root, attachment);
-      if (attempt.status === "failed") {
+      if (attempt.failureKind === "product") {
         assert(
           attachments.some((attachment) => attachment.endsWith("/trace.zip")),
           "original failure trace missing",
@@ -114,13 +127,13 @@ export function validateReport(root) {
     }
     const failed = attempts.at(-1).status === "failed";
     assert.equal(test.outcome === "unexpected", failed, "terminal outcome disagreement");
-    assert.equal(test.outcome === "flaky", !failed && attempts.some((attempt) => attempt.status === "failed"));
+    assert.equal(test.outcome === "flaky", !failed && attempts.some((attempt) => attempt.status !== "passed"));
   }
   for (const [key, count] of Object.entries(counts)) assert.equal(results.stats?.[key], count, `stats ${key}`);
   const passed = counts.unexpected === 0;
   assert.equal(completion.status, passed ? "passed" : "failed", "run status disagreement");
   assert.equal(metadata.exitCode, passed ? 0 : 1, "runner exit disagreement");
-  return { passed, counts };
+  return { passed, counts, infrastructureRetries };
 }
 
 if (process.argv[1] && realpathSync(process.argv[1]) === fileURLToPath(import.meta.url)) {

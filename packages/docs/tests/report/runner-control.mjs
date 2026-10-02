@@ -58,7 +58,10 @@ export function runControl(t, mode) {
     cwd: root,
     env: { ...process.env, CI: "true", PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1" },
     encoding: "utf8",
-    timeout: 30000,
+    // A hang guard only: each control is bounded by its own 5 s test deadline,
+    // but browser launch and worker restart share the builder with concurrent
+    // report builds, and a worker-exit control took 42 s in nixbot build 956.
+    timeout: 180000,
     maxBuffer: 8 * 1024 * 1024,
   });
   assert.ifError(child.error);

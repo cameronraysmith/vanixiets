@@ -60,6 +60,19 @@ Record the epoch in the report and preserve the old observation.
 Do not reuse an epoch or interpret a fresh pass as proof that an earlier failure was harmless.
 This provides a defined refresh mechanism; it does not make live or inherently time-dependent tests hermetic.
 
+## D8: bound report load and let retries recover infrastructure attempts
+
+nixbot build 951 failed correct docs changes with navigation timeouts while three PRs built on magnetite.
+The builders run `cores = 0`, so every concurrent report build received `NIX_BUILD_CORES=16` and started 16 workers against its own single-process `astro preview`.
+The validator then rejected the run even where retries recovered, because it required every failed attempt, not only the terminal one, to be a product failure.
+
+Bound each report build at four workers, since `NIX_BUILD_CORES` cannot see concurrent builds.
+Drop the separate navigation deadline: navigation failures are never product evidence, so the test deadline is the only bound that matters.
+Accept an infrastructure-class attempt, including a whole-test deadline, only when a later attempt of the same test completed; count it as `infrastructureRetries`.
+A terminal infrastructure attempt still prevents a valid report, and product attempts still require a trace and screenshot.
+Let the negative controls inherit the suite's retries and require every attempt to fail with a product-class terminal attempt, so host noise cannot mask the deliberate defect and a retry cannot pass it.
+This tolerates bounded host noise; it does not make the suite correct on an arbitrarily overloaded builder.
+
 ## Source grounding
 
 The research inspected nixbot at `2626aa2ca80b76ef894f4558635a3fdda1edd8b4` and hercules-ci-effects at `6c58de7236d1cd634deea07bd15d52c7ce470bd3`, matching the inputs at the start of this implementation.

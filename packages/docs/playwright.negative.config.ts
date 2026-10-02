@@ -5,7 +5,8 @@ import config from "./playwright.config";
 export default defineConfig(config, {
   testDir: "./tests/negative-control",
   testMatch: "reader-journey.spec.ts",
-  retries: 0,
+  // Inherit the suite's retries: a retry can only add failed attempts to a
+  // deterministic defect, and check-negative-report.mjs requires every one to fail.
   workers: 1,
   expect: { timeout: 1000 },
   projects: config.projects?.filter((project) => project.name === "chromium"),

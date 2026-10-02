@@ -224,11 +224,67 @@ for (const [name, mutate] of [
   });
 }
 
-test("non-assertion runner failure is not a valid report", (t) => {
+test("terminal infrastructure failure is not a valid report", (t) => {
   const data = fixture(t, true);
   data.completion.tests[0].attempts[0].failureKind = "infrastructure";
   data.save();
   assert.throws(() => validateReport(data.root), /infrastructure/);
+});
+
+function retried(data, first, final, firstStatus = "failed") {
+  const test = data.completion.tests[0];
+  const json = data.results.suites[0].specs[0].tests[0];
+  test.attempts[0].failureKind = first;
+  test.attempts[0].status = json.results[0].status = firstStatus;
+  const passed = final === null;
+  const attachments = passed ? [] : ["test-results/trace.zip", "test-results/failure.png"];
+  test.attempts.push({ status: passed ? "passed" : "failed", retry: 1, failureKind: final, attachments });
+  json.results.push({ status: passed ? "passed" : "failed", retry: 1, attachments: attachments.map((path) => ({ path })) });
+  test.outcome = json.status = passed ? "flaky" : "unexpected";
+  data.completion.status = passed ? "passed" : "failed";
+  data.metadata.exitCode = passed ? 0 : 1;
+  data.results.stats.unexpected = passed ? 0 : 1;
+  data.results.stats.flaky = passed ? 1 : 0;
+  data.save();
+}
+
+test("recovered infrastructure attempt passes and is counted", (t) => {
+  const data = fixture(t, true);
+  retried(data, "infrastructure", null);
+  assert.deepEqual(validateReport(data.root), {
+    passed: true,
+    counts: { expected: 0, unexpected: 0, skipped: 0, flaky: 1 },
+    infrastructureRetries: 1,
+  });
+});
+
+test("recovered test-deadline attempt passes and is counted", (t) => {
+  const data = fixture(t, true);
+  retried(data, "infrastructure", null, "timedOut");
+  assert.equal(validateReport(data.root).infrastructureRetries, 1);
+});
+
+test("terminal test-deadline attempt is not a valid report", (t) => {
+  const data = fixture(t, true);
+  const test = data.completion.tests[0];
+  test.attempts[0].status = data.results.suites[0].specs[0].tests[0].results[0].status = "timedOut";
+  test.attempts[0].failureKind = "infrastructure";
+  data.save();
+  assert.throws(() => validateReport(data.root), /test deadline/);
+});
+
+test("a product-classified test deadline is rejected", (t) => {
+  const data = fixture(t, true);
+  retried(data, "product", null, "timedOut");
+  assert.throws(() => validateReport(data.root), /incomplete/);
+});
+
+test("infrastructure attempt cannot hide a terminal product failure", (t) => {
+  const data = fixture(t, true);
+  retried(data, "infrastructure", "product");
+  const verdict = validateReport(data.root);
+  assert.equal(verdict.passed, false);
+  assert.equal(verdict.infrastructureRetries, 1);
 });
 
 test("missing or escaping attachment fails closed", (t) => {
@@ -257,6 +313,7 @@ test("retry-to-pass remains a passing verdict with an explicit flaky count", (t)
   assert.deepEqual(validateReport(data.root), {
     passed: true,
     counts: { expected: 0, unexpected: 0, skipped: 0, flaky: 1 },
+    infrastructureRetries: 0,
   });
 });
 

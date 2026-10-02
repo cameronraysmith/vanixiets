@@ -28,7 +28,7 @@ node packages/docs/tests/report/validate-report.mjs verdict /nix/store/...-vanix
 `validate` exits 0 for valid passing or product-failing evidence.
 `verdict` exits 0 for a passing suite and 1 for a completed product-failing suite.
 Both exit 2 for invalid evidence.
-Successful validation prints `{passed, counts: {expected, unexpected, skipped, flaky}}`.
+Successful validation prints `{passed, counts: {expected, unexpected, skipped, flaky}, infrastructureRetries}`.
 
 ## Artifact contract, version 1
 
@@ -50,14 +50,16 @@ Its independently declared engine policy requires Chromium and WebKit on Darwin,
 Only the two named negative-control suites have a Chromium-only exception; unknown systems/configs fail closed.
 Narrowing both producer metadata and discovery cannot narrow the required matrix.
 Update it deliberately when adding or removing a scenario; deleting a spec alone must fail validation.
-Zero tests, partial matrices, skips, expected failures, interrupted/timed-out attempts, global errors, unknown outcomes, and missing or empty referenced files fail closed.
+Zero tests, partial matrices, skips, expected failures, interrupted attempts, a terminal timed-out attempt, global errors, unknown outcomes, and missing or empty referenced files fail closed.
 Referenced attachment paths cannot escape the artifact, including through symlinks.
-Every failed attempt must have a trace and screenshot; every referenced video must exist, but a video is not mandatory if Playwright emitted none.
+Every product-failed attempt must have a trace and screenshot; every referenced video must exist, but a video is not mandatory if Playwright emitted none.
 Attachment validation checks containment, existence, and nonempty content, not archive/media decoding.
 
-The existing CI retry policy remains two retries.
+The existing CI retry policy remains two retries, for the positive suite and the negative controls alike.
 A recovered retry is accepted with a nonzero `flaky` count, not reported as clean first-attempt success.
-The negative control disables retries.
+An infrastructure-class attempt is accepted only when a later attempt of the same test completed, as a pass or a product failure; `infrastructureRetries` counts them, and a terminal infrastructure attempt is invalid evidence.
+The negative controls require every attempt to fail and the terminal attempt to be a product failure, so a retry can absorb a stalled navigation but never the deliberate defect.
+Report builds run at most four workers: CI builders grant every concurrent build all cores, so `NIX_BUILD_CORES` overstates what one build may use.
 `trace: "retain-on-failure"` captures the original failing attempt, unlike the previous `on-first-retry` policy.
 HTML/JSON serve artifact readers; the line reporter serves nixbot build logs without GitHub-specific annotations.
 
@@ -69,7 +71,7 @@ Locator actions require all three public metadata checks: category `pw:api`, a s
 They additionally require the serialized `TimeoutError:` type prefix, not a generic "timeout" substring; closed-page errors are rejected.
 Hook and fixture subtrees are excluded even when they contain assertions or locator actions.
 Only completed `failed` attempts qualify: whole-test deadlines (`timedOut`), launch, navigation, arbitrary API exceptions, and worker failures fail closed.
-Action and navigation budgets are 5 and 10 seconds respectively, below the 30-second test deadline.
+The action budget is 5 seconds, below the 30-second test deadline; navigations have no separate budget, since a failed navigation is never product evidence.
 Global reporter errors and nonstandard exit codes are always rejected.
 An infrastructure fault deliberately wrapped in an assertion can still appear as an assertion failure; this is not a perfect causal classifier.
 The browser-free native-runner controls exercise an absent browser executable, a throwing global setup, and an empty test selection.
