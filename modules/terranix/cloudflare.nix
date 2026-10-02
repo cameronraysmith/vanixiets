@@ -48,6 +48,71 @@ in
         location = "enam";
       };
 
+      # Shared R2 bucket `sciexp`, created outside terraform and adopted here.
+      import = [
+        {
+          to = "cloudflare_r2_bucket.sciexp";
+          id = "1ece4a9a8f092f8cbdd679d22b9ecb1f/sciexp/default";
+        }
+      ];
+
+      resource.cloudflare_r2_bucket.sciexp = {
+        account_id = config.data.cloudflare_zone.scientistexperience "account.id";
+        name = "sciexp";
+        location = "enam";
+        lifecycle.prevent_destroy = true;
+      };
+
+      # Object lifecycle rules for `sciexp`. These rules are bucket-wide and this
+      # resource owns ALL of them: any rule not listed here is removed on apply,
+      # so other sciexp writers add their rules here. The API returns rules sorted
+      # by id, so they are declared in that order to avoid a perpetual diff.
+      resource.cloudflare_r2_bucket_lifecycle.sciexp = {
+        account_id = config.data.cloudflare_zone.scientistexperience "account.id";
+        bucket_name = config.resource.cloudflare_r2_bucket.sciexp "name";
+        rules = lib.sort (a: b: a.id < b.id) (
+          [
+            {
+              id = "Default Multipart Abort Rule";
+              enabled = true;
+              conditions.prefix = "";
+              abort_multipart_uploads_transition.condition = {
+                type = "Age";
+                max_age = 604800; # 7 days
+              };
+            }
+          ]
+          ++
+            map
+              (
+                { tier, max_age }:
+                {
+                  id = "vanixiets browser evidence ${tier}";
+                  enabled = true;
+                  conditions.prefix = "projects/vanixiets/browser-evidence/${tier}/";
+                  delete_objects_transition.condition = {
+                    type = "Age";
+                    inherit max_age;
+                  };
+                }
+              )
+              [
+                {
+                  tier = "ttl-30d";
+                  max_age = 2592000;
+                }
+                {
+                  tier = "ttl-90d";
+                  max_age = 7776000;
+                }
+                {
+                  tier = "ttl-365d";
+                  max_age = 31536000;
+                }
+              ]
+        );
+      };
+
       # DNS CNAME record for niks3 cache endpoint (resolves to magnetite)
       resource.cloudflare_dns_record.niks3 = {
         zone_id = config.data.cloudflare_zone.scientistexperience "id";
