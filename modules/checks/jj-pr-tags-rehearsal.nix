@@ -3,13 +3,14 @@
 # Everything runs against a stubbed `gh` backed by fixture files, in scratch
 # jj repositories:
 # - jj-pr-sync registration and rendering: a reused branch resolves to its open
-#   PR, a merged slash-named branch is marked, a PR-less bookmark renders
-#   nothing, and the mapping stays inside its repository;
+#   PR, an open PR queued by auto-merge or by the merge-queue label is marked,
+#   a merged slash-named branch is marked, a PR-less bookmark renders nothing,
+#   and the mapping stays inside its repository;
 # - jj-pr-sync --all: refreshes every registered repository, keeps a file
 #   untouched when GitHub is unreachable for it, and unregisters a repository
 #   that no longer exists;
-# - jj-pr enqueue / enqueue-stack: the landing protocol's decisions, asserted
-#   on the gh calls actually made;
+# - jj-pr enqueue / enqueue-stack / dequeue: the landing protocol's decisions,
+#   asserted on the gh calls actually made;
 # - the jjui G-prefix sequences collide with no default binding of the
 #   packaged jjui, and the override still embeds jj's builtin labels alias.
 { self, ... }:
@@ -41,7 +42,7 @@
                 cat "$D/prs/open.json"
               fi
               ;;
-            "pr view") jaq --arg b "$3" '.[] | select(.headRefName == $b)' "$D/prs/open.json" ;;
+            "pr view") jaq -s --arg b "$3" 'add | .[] | select(.headRefName == $b)' "$D/prs/open.json" "$D/prs/merged.json" ;;
             "pr merge" | "pr edit") ;;
             *) echo "unexpected gh call: $*" >&2; exit 1 ;;
           esac
@@ -50,26 +51,40 @@
       sync = tags.mkSync pkgs ghStub;
       pr = tags.mkPr pkgs ghStub sync;
       fixtures = {
-        "o_synced.json" = [
+        "o_synced.json" =
+          let
+            pr' =
+              number: head: state: extra:
+              {
+                inherit number state;
+                headRefName = head;
+                autoMergeRequest = null;
+                labels = [ ];
+              }
+              // extra;
+          in
+          [
+            (pr' 10 "feature" "CLOSED" { labels = [ { name = "merge-queue"; } ]; })
+            (pr' 12 "feature" "OPEN" { })
+            (pr' 14 "feature" "CLOSED" { })
+            (pr' 20 "renovate/astro" "MERGED" { })
+            (pr' 21 "auto" "OPEN" { autoMergeRequest.mergeMethod = "REBASE"; })
+            (pr' 22 "stacked-base" "OPEN" { })
+            (pr' 23 "stacked-top" "OPEN" {
+              labels = [
+                { name = "dependencies"; }
+                { name = "merge-queue"; }
+              ];
+            })
+          ];
+        "merged.json" = [
           {
-            headRefName = "feature";
-            number = 10;
-            state = "CLOSED";
-          }
-          {
-            headRefName = "feature";
-            number = 12;
-            state = "OPEN";
-          }
-          {
-            headRefName = "feature";
-            number = 14;
-            state = "CLOSED";
-          }
-          {
-            headRefName = "renovate/astro";
-            number = 20;
+            number = 25;
+            headRefName = "landed";
             state = "MERGED";
+            mergedAt = "2026-09-30T12:00:00Z";
+            autoMergeRequest = null;
+            labels = [ ];
           }
         ];
         "open.json" =
@@ -94,6 +109,8 @@
             (pr' 40 "stack-bottom" "main" { })
             (pr' 41 "stack-middle" "stack-bottom" { })
             (pr' 42 "stack-top" "stack-middle" { })
+            (pr' 44 "lstack-bottom" "main" { })
+            (pr' 45 "lstack-top" "lstack-bottom" { labels = [ { name = "merge-queue"; } ]; })
           ];
       };
       fixtureDir = pkgs.linkFarm "jj-pr-fixtures" (
@@ -153,11 +170,15 @@
             jj new -m one >/dev/null 2>&1 && jj bookmark create feature -r @ >/dev/null
             jj new -m two >/dev/null 2>&1 && jj bookmark create renovate/astro -r @ >/dev/null
             jj new -m three >/dev/null 2>&1 && jj bookmark create untracked -r @ >/dev/null
+            jj new -m four >/dev/null 2>&1 && jj bookmark create auto -r @ >/dev/null
+            jj new -m five >/dev/null 2>&1 && jj bookmark create stacked-top -r @ >/dev/null
             jj-pr-sync
 
             [ "$(labels feature)" = "#12" ] || fail "reused branch: got '$(labels feature)'"
             [ "$(labels renovate/astro)" = "#20✓" ] || fail "merged slash branch: got '$(labels renovate/astro)'"
             [ -z "$(labels untracked)" ] || fail "PR-less bookmark: got '$(labels untracked)'"
+            [ "$(labels auto)" = "#21⇡" ] || fail "auto-merge queued single: got '$(labels auto)'"
+            [ "$(labels stacked-top)" = "#23⇡" ] || fail "labelled stack top: got '$(labels stacked-top)'"
 
             cd ..
             jj git init --colocate other >/dev/null 2>&1
@@ -200,6 +221,13 @@
             expect "pr edit 42 --add-label merge-queue" 0 enqueue-stack stack-top
             expect "" 1 enqueue-stack stack-middle
             expect "" 1 enqueue-stack single
+            expect "" 0 enqueue-stack lstack-top
+
+            expect "pr merge 31 --disable-auto" 0 dequeue queued
+            expect "pr edit 45 --remove-label merge-queue" 0 dequeue lstack-top
+            expect "" 0 dequeue single
+            expect "" 1 dequeue landed
+            [[ "$said" == *"merged at 2026-09-30T12:00:00Z"* ]] || fail "dequeue landed: '$said'"
 
             touch "$out"
           '';

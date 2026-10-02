@@ -1,5 +1,5 @@
 # Pull request numbers next to bookmarks in `jj log` and jjui, kept current in
-# the background, plus jjui keys to open and enqueue a bookmark's PR.
+# the background, plus jjui keys to open, enqueue, and dequeue a bookmark's PR.
 #
 # jj has no forge integration, so `jj-pr-sync` caches `gh pr list` as a jj
 # config file in conf.d scoped to one repository (`--when.repositories`); the
@@ -7,6 +7,9 @@
 # the repository; a user service then refreshes every registered repository
 # every five minutes. A failed refresh keeps the previous mapping, so being
 # offline or signed out leaves tags stale rather than gone.
+#
+# Tags read `#N` for an open PR, `#N⇡` for an open PR queued for gitea-mq
+# (auto-merge enabled or labelled merge-queue), `#N✓` merged, `#N✗` closed.
 { ... }:
 let
   # Verbatim body of jj's builtin `format_commit_labels(commit)` alias
@@ -77,7 +80,7 @@ let
         write_cache() {
           local slug="$1" repo="$2" out="$3" prs tmp
           if ! prs="$(gh pr list --repo "$slug" --state all --limit "''${JJ_PR_SYNC_LIMIT:-1000}" \
-            --json number,state,headRefName 2>/dev/null)"; then
+            --json number,state,headRefName,autoMergeRequest,labels 2>/dev/null)"; then
             log "jj-pr-sync: $slug: GitHub unreachable or not signed in; keeping the previous mapping"
             return 1
           fi
@@ -89,7 +92,11 @@ let
               group_by(.headRefName)
               | map((map(select(.state == "OPEN")) | max_by(.number)) // max_by(.number))
               | sort_by(.headRefName)[]
-              | "\(.headRefName | tojson) = \(("#\(.number)" + ({"OPEN": "", "MERGED": "✓", "CLOSED": "✗"}[.state])) | tojson)"
+              | "\(.headRefName | tojson) = \(("#\(.number)" + (
+                  if .state != "OPEN" then {"MERGED": "✓", "CLOSED": "✗"}[.state]
+                  elif .autoMergeRequest != null or ([(.labels // [])[].name] | index("merge-queue") != null) then "⇡"
+                  else "" end
+                )) | tojson)"
             '
           } >"$tmp"; then
             rm -f "$tmp"
@@ -132,10 +139,11 @@ let
       '';
     };
 
-  # `jj-pr open|enqueue|enqueue-stack BOOKMARK`, run from jjui. Enqueueing
-  # follows the landing protocol: a single PR gets auto-merge (rebase); a stack
-  # is authorized by the `merge-queue` label on its topmost PR only, and no
-  # stack member ever gets auto-merge.
+  # `jj-pr open|enqueue|enqueue-stack|dequeue BOOKMARK`, run from jjui.
+  # Enqueueing follows the landing protocol: a single PR gets auto-merge
+  # (rebase); a stack is authorized by the `merge-queue` label on its topmost PR
+  # only, and no stack member ever gets auto-merge. Dequeueing undoes either;
+  # gitea-mq treats auto_merge_disabled and unlabeled as a dequeue.
   mkPr =
     pkgs: gh: sync:
     pkgs.writeShellApplication {
@@ -148,15 +156,45 @@ let
         sync
       ];
       text = ''
-        [ $# -eq 2 ] || { echo "usage: jj-pr open|enqueue|enqueue-stack BOOKMARK" >&2; exit 2; }
+        usage="usage: jj-pr open|enqueue|enqueue-stack|dequeue BOOKMARK"
+        [ $# -eq 2 ] || { echo "$usage" >&2; exit 2; }
         cmd="$1" bookmark="$2"
 
-        if [ "$cmd" = open ]; then exec gh pr view "$bookmark" --web; fi
-        case "$cmd" in enqueue | enqueue-stack) ;; *) echo "jj-pr: unknown command $cmd" >&2; exit 2 ;; esac
+        case "$cmd" in
+          open) exec gh pr view "$bookmark" --web ;;
+          dequeue) json=number,state,mergedAt,autoMergeRequest,labels ;;
+          enqueue | enqueue-stack) json=number,state,isDraft,baseRefName,headRefName,autoMergeRequest,labels ;;
+          *) echo "jj-pr: unknown command $cmd" >&2; echo "$usage" >&2; exit 2 ;;
+        esac
 
-        pr="$(gh pr view "$bookmark" --json number,state,isDraft,baseRefName,headRefName,autoMergeRequest,labels)"
+        pr="$(gh pr view "$bookmark" --json "$json")"
         field() { printf '%s' "$pr" | jaq -r "$1"; }
         number="$(field .number)"
+        auto="$(field '.autoMergeRequest != null')"
+        labelled="$(field '[.labels[].name] | index("merge-queue") != null')"
+
+        if [ "$cmd" = dequeue ]; then
+          case "$(field .state)" in
+            MERGED) echo "#$number already merged at $(field .mergedAt); too late to dequeue." >&2; exit 1 ;;
+            OPEN) ;;
+            *) echo "#$number is $(field .state | tr '[:upper:]' '[:lower:]'); nothing to dequeue." >&2; exit 1 ;;
+          esac
+          if [ "$auto" != true ] && [ "$labelled" != true ]; then
+            echo "#$number is not queued; nothing to do."
+            exit 0
+          fi
+          if [ "$auto" = true ]; then
+            gh pr merge "$number" --disable-auto
+            echo "#$number: auto-merge disabled; gitea-mq drops it from the queue, including an in-flight batch."
+          fi
+          if [ "$labelled" = true ]; then
+            gh pr edit "$number" --remove-label merge-queue
+            echo "#$number: merge-queue label removed; gitea-mq drops the stack from the queue, including an in-flight batch."
+          fi
+          jj-pr-sync --quiet || true
+          exit 0
+        fi
+
         [ "$(field .state)" = OPEN ] || { echo "#$number is $(field .state | tr '[:upper:]' '[:lower:]'); nothing to enqueue." >&2; exit 1; }
         [ "$(field .isDraft)" = false ] || { echo "#$number is a draft; mark it ready first." >&2; exit 1; }
 
@@ -169,7 +207,7 @@ let
 
         if [ "$cmd" = enqueue ]; then
           [ "$stacked" = 0 ] || { echo "#$number is part of a stack; authorize the stack with G M on its topmost PR." >&2; exit 1; }
-          if [ "$(field '.autoMergeRequest != null')" = true ]; then
+          if [ "$auto" = true ]; then
             echo "#$number already has auto-merge ($(field .autoMergeRequest.mergeMethod | tr '[:upper:]' '[:lower:]')); nothing to do."
             exit 0
           fi
@@ -178,7 +216,7 @@ let
         else
           [ "$stacked" = 1 ] || { echo "#$number is a single PR, not a stack; use G m." >&2; exit 1; }
           [ -z "$children" ] || { echo "#$number is not the top of its stack ($children build on it); label the topmost PR." >&2; exit 1; }
-          if [ "$(field '[.labels[].name] | index("merge-queue") != null')" = true ]; then
+          if [ "$labelled" = true ]; then
             echo "#$number already carries merge-queue; nothing to do."
             exit 0
           fi
@@ -226,6 +264,7 @@ let
     (prAction "pr-enqueue-stack" "shift+m" "enqueue the stack topped by the bookmark's pull request"
       "enqueue-stack"
     )
+    (prAction "pr-dequeue" "d" "dequeue the bookmark's pull request" "dequeue")
   ];
 in
 {
