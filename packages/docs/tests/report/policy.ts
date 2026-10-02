@@ -1,6 +1,6 @@
 // Independent expected inventory: removing a spec must not silently reduce
 // coverage. Update this list deliberately when adding/removing a reader check.
-export const requiredCases = {
+export const requiredCases: Readonly<Record<string, readonly string[]>> = {
   "playwright.config.ts": [
     "homepage.spec.ts::has correct title and heading",
     "homepage.spec.ts::has accessible links",
@@ -19,18 +19,20 @@ export const requiredCases = {
   ],
 };
 
+export type Engine = "chromium" | "firefox" | "webkit";
+
 // Independent of PLAYWRIGHT_PROJECTS and of discovery: the producer cannot
 // redefine coverage by narrowing its own configuration and metadata together.
 // Darwin Firefox cannot launch in the Nix build environment; the package
 // documents the native-build experiments behind this explicit exception.
-export const requiredEngines = {
+export const requiredEngines: Readonly<Record<string, readonly Engine[]>> = {
   "aarch64-darwin": ["chromium", "webkit"],
   "x86_64-darwin": ["chromium", "webkit"],
   "x86_64-linux": ["chromium", "firefox", "webkit"],
   "aarch64-linux": ["chromium", "firefox", "webkit"],
 };
 
-export function requiredProjects(system, config) {
+export function requiredProjects(system: string, config: string): readonly Engine[] | undefined {
   if (!Object.hasOwn(requiredEngines, system)) return undefined;
   if (config === "playwright.negative.config.ts" || config === "playwright.action-negative.config.ts") {
     return ["chromium"];

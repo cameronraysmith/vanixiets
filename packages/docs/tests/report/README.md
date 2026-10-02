@@ -21,14 +21,14 @@ The independently enumerable producer gives nixbot a successful build artifact t
 This change does not publish artifacts or deploy the site.
 
 ```sh
-node packages/docs/tests/report/validate-report.mjs validate /nix/store/...-vanixiets-docs-e2e-report-...
-node packages/docs/tests/report/validate-report.mjs verdict /nix/store/...-vanixiets-docs-e2e-report-...
+node packages/docs/tests/report/validate-report.ts validate /nix/store/...-vanixiets-docs-e2e-report-...
+node packages/docs/tests/report/validate-report.ts verdict /nix/store/...-vanixiets-docs-e2e-report-...
 ```
 
 `validate` exits 0 for valid passing or product-failing evidence.
 `verdict` exits 0 for a passing suite and 1 for a completed product-failing suite.
 Both exit 2 for invalid evidence.
-Successful validation prints `{passed, counts: {expected, unexpected, skipped, flaky}}`.
+Successful validation prints `{passed, counts: {expected, unexpected, skipped, flaky}, infrastructureRetries}`.
 
 ## Artifact contract, version 1
 
@@ -44,20 +44,23 @@ The producer retains:
   Each attempt records `status`, `retry`, `failureKind` (`null`, `product`, or `infrastructure`), and relative `attachments`.
 - `test-results/`: original traces, screenshots, videos, and error context; `runner.log`: original runner stdout/stderr.
 
-The validator reconciles the completion inventory, JSON report, exit status, per-attempt results, and counts.
-`policy.mjs` specifies the required scenario/project matrix independently of test discovery, including the reader journey.
+The validator first parses the three JSON files into types taken from the completion reporter and Playwright's published JSON report declarations, rejecting any value outside them, then reconciles the completion inventory, JSON report, exit status, per-attempt results, and counts.
+Each attempt is classified by an exhaustive match on Playwright's `TestStatus`: `passed`; a `failed` product failure; an infrastructure failure (`failed`, `timedOut`, or `interrupted` with an infrastructure kind); or invalid, which includes every `skipped` attempt.
+`policy.ts` specifies the required scenario/project matrix independently of test discovery, including the reader journey.
 Its independently declared engine policy requires Chromium and WebKit on Darwin, and Chromium, Firefox, and WebKit on Linux.
 Only the two named negative-control suites have a Chromium-only exception; unknown systems/configs fail closed.
 Narrowing both producer metadata and discovery cannot narrow the required matrix.
 Update it deliberately when adding or removing a scenario; deleting a spec alone must fail validation.
-Zero tests, partial matrices, skips, expected failures, interrupted/timed-out attempts, global errors, unknown outcomes, and missing or empty referenced files fail closed.
+Zero tests, partial matrices, skips, expected failures, interrupted attempts, a terminal timed-out attempt, global errors, unknown outcomes, and missing or empty referenced files fail closed.
 Referenced attachment paths cannot escape the artifact, including through symlinks.
-Every failed attempt must have a trace and screenshot; every referenced video must exist, but a video is not mandatory if Playwright emitted none.
+Every product-failed attempt must have a trace and screenshot; every referenced video must exist, but a video is not mandatory if Playwright emitted none.
 Attachment validation checks containment, existence, and nonempty content, not archive/media decoding.
 
-The existing CI retry policy remains two retries.
+The existing CI retry policy remains two retries, for the positive suite and the negative controls alike.
 A recovered retry is accepted with a nonzero `flaky` count, not reported as clean first-attempt success.
-The negative control disables retries.
+An infrastructure-class attempt is accepted only when a later attempt of the same test completed, as a pass or a product failure; `infrastructureRetries` counts them, and a terminal infrastructure attempt is invalid evidence.
+The negative controls require every attempt to fail and the terminal attempt to be a product failure, so a retry can absorb a stalled navigation but never the deliberate defect.
+Report builds run at most four workers: CI builders grant every concurrent build all cores, so `NIX_BUILD_CORES` overstates what one build may use.
 `trace: "retain-on-failure"` captures the original failing attempt, unlike the previous `on-first-retry` policy.
 HTML/JSON serve artifact readers; the line reporter serves nixbot build logs without GitHub-specific annotations.
 
@@ -69,7 +72,7 @@ Locator actions require all three public metadata checks: category `pw:api`, a s
 They additionally require the serialized `TimeoutError:` type prefix, not a generic "timeout" substring; closed-page errors are rejected.
 Hook and fixture subtrees are excluded even when they contain assertions or locator actions.
 Only completed `failed` attempts qualify: whole-test deadlines (`timedOut`), launch, navigation, arbitrary API exceptions, and worker failures fail closed.
-Action and navigation budgets are 5 and 10 seconds respectively, below the 30-second test deadline.
+The action budget is 5 seconds, below the 30-second test deadline; navigations have no separate budget, since a failed navigation is never product evidence.
 Global reporter errors and nonstandard exit codes are always rejected.
 An infrastructure fault deliberately wrapped in an assertion can still appear as an assertion failure; this is not a perfect causal classifier.
 The browser-free native-runner controls exercise an absent browser executable, a throwing global setup, and an empty test selection.
@@ -128,8 +131,9 @@ Invalid/incomplete runs fail the producer; they have Nix build logs, not a succe
 They must never be presented as a passing or product-failing completed report.
 Tests cover the local built site and synthetic failure controls, not a deployed site, live nixbot API retrieval, or the report publisher.
 
-Run the protocol tests with installed dependencies using `node --test tests/report-*.test.mjs` from `packages/docs`, or build `package-vanixiets-docs-test-unit`.
+Run the protocol tests with installed dependencies using `node --test tests/report-*.test.ts` from `packages/docs`, or build `package-vanixiets-docs-test-unit`; Node strips the types at load time.
 The unit check also runs the existing Vitest suite.
-Run `node --test tests/browser-report.test.mjs` with the pinned `PLAYWRIGHT_BROWSERS_PATH` for the separate native-browser controls, or build `package-vanixiets-docs-test-e2e-runner-controls`.
+`package-vanixiets-docs-test-typecheck` type-checks the tooling and tests with `tsc -p packages/docs/tests`.
+Run `node --test tests/browser-report.test.ts` with the pinned `PLAYWRIGHT_BROWSERS_PATH` for the separate native-browser controls, or build `package-vanixiets-docs-test-e2e-runner-controls`.
 Native Darwin checks use Chromium and WebKit; Linux checks use Chromium, Firefox, and WebKit.
 For Linux validation on this fleet, explicitly allow only magnetite and pyrite-builder; do not use Rosetta.

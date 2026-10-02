@@ -4,14 +4,30 @@ import { mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { isAbsolute, join, relative } from "node:path";
+import type { TestContext } from "node:test";
 import { fileURLToPath } from "node:url";
+import type { Completion } from "./completion-reporter.ts";
 
 const require = createRequire(import.meta.url);
 const playwright = require.resolve("@playwright/test");
 const cli = require.resolve("@playwright/test/cli");
 const reporter = fileURLToPath(new URL("./completion-reporter.ts", import.meta.url));
 
-export function runControl(t, mode) {
+export type ControlMode =
+  | "action"
+  | "assertion"
+  | "hook"
+  | "hook-assertion"
+  | "deadline"
+  | "worker"
+  | "closed-page"
+  | "launch"
+  | "global"
+  | "empty";
+
+export type ControlRun = { root: string; results: unknown; completion: Completion };
+
+export function runControl(t: TestContext, mode: ControlMode): ControlRun {
   const root = mkdtempSync(join(tmpdir(), "docs-runner-control-"));
   t.after(() => rmSync(root, { recursive: true, force: true }));
   const config = {
@@ -58,13 +74,16 @@ export function runControl(t, mode) {
     cwd: root,
     env: { ...process.env, CI: "true", PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1" },
     encoding: "utf8",
-    timeout: 30000,
+    // A hang guard only: each control is bounded by its own 5 s test deadline,
+    // but browser launch and worker restart share the builder with concurrent
+    // report builds, and a worker-exit control took 42 s in nixbot build 956.
+    timeout: 180000,
     maxBuffer: 8 * 1024 * 1024,
   });
   assert.ifError(child.error);
   assert.equal(child.status, 1, child.stdout + child.stderr);
   const resultsPath = join(root, "playwright-report/results.json");
-  const results = JSON.parse(readFileSync(resultsPath, "utf8"), (key, value) =>
+  const results: unknown = JSON.parse(readFileSync(resultsPath, "utf8"), (key, value) =>
     key === "path" && typeof value === "string" && isAbsolute(value)
       ? relative(realpathSync(root), realpathSync(value))
       : value,
@@ -92,6 +111,7 @@ export function runControl(t, mode) {
   return {
     root,
     results,
-    completion: JSON.parse(readFileSync(join(root, "playwright-report/completion.json"), "utf8")),
+    // The control's own reporter output; the tests inspect it directly.
+    completion: JSON.parse(readFileSync(join(root, "playwright-report/completion.json"), "utf8")) as Completion,
   };
 }

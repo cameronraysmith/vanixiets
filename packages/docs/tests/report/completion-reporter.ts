@@ -7,8 +7,38 @@ import type {
   Suite,
   TestError,
   TestResult,
+  TestStatus,
   TestStep,
 } from "@playwright/test/reporter";
+
+// completion.json, schema version 1: the only producer of this shape, and the
+// type validate-report.ts parses untrusted JSON into.
+export type FailureKind = "product" | "infrastructure";
+// TestCase.outcome()'s values; the reporter assigns outcome() to this type,
+// so a new Playwright outcome fails the type check.
+export type TestOutcome = "skipped" | "expected" | "unexpected" | "flaky";
+export type CompletionAttempt = {
+  status: TestStatus;
+  retry: number;
+  failureKind: FailureKind | null;
+  attachments: string[];
+};
+export type CompletionTest = {
+  id: string;
+  project: string;
+  case: string;
+  title: string;
+  outcome: TestOutcome;
+  expectedStatus: TestStatus;
+  attempts: CompletionAttempt[];
+};
+export type Completion = {
+  schemaVersion: 1;
+  status: FullResult["status"];
+  projects: string[];
+  errors: TestError[];
+  tests: CompletionTest[];
+};
 
 function productErrors(steps: TestStep[]): TestError[] {
   return steps.flatMap((step) => {
@@ -32,7 +62,7 @@ function productErrors(steps: TestStep[]): TestError[] {
   });
 }
 
-function failureKind(result: TestResult) {
+function failureKind(result: TestResult): FailureKind | null {
   if (result.status === "passed" && result.errors.length === 0) return null;
   const failures = productErrors(result.steps);
   // Every reported error must have matching completed product-step evidence.
@@ -63,14 +93,15 @@ export default class CompletionReporter implements Reporter {
   }
 
   onEnd(result: FullResult) {
-    const completion = {
+    const completion: Completion = {
       schemaVersion: 1,
       status: result.status,
       projects: this.projects,
       errors: this.errors,
-      tests: this.suite?.allTests().map((test) => ({
+      tests: (this.suite?.allTests() ?? []).map((test) => ({
         id: test.id,
-        project: test.parent.project()?.name,
+        // A test always belongs to a project; an empty name fails validation.
+        project: test.parent.project()?.name ?? "",
         case: `${path.relative(this.rootDir, test.location.file)}::${test.title}`,
         title: test.titlePath().join(" > "),
         outcome: test.outcome(),
@@ -79,9 +110,9 @@ export default class CompletionReporter implements Reporter {
           status: attempt.status,
           retry: attempt.retry,
           failureKind: failureKind(attempt),
-          attachments: attempt.attachments
-            .filter((attachment) => attachment.path)
-            .map((attachment) => path.relative(process.cwd(), attachment.path as string)),
+          attachments: attempt.attachments.flatMap((attachment) =>
+            attachment.path ? [path.relative(process.cwd(), attachment.path)] : [],
+          ),
         })),
       })),
     };

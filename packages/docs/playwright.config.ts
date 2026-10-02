@@ -91,7 +91,9 @@ export default defineConfig({
     // Let a missing/unusable element complete as an action failure before the
     // whole-test deadline, leaving time for evidence and fixture teardown.
     actionTimeout: 5000,
-    navigationTimeout: 10000,
+    // No separate navigation deadline: a failed navigation is never product
+    // evidence, so a limit below the test deadline only turns a slow load on a
+    // busy builder into an infrastructure failure. The test deadline bounds it.
     // Base URL for page.goto() calls
     baseURL: process.env.BASE_URL ?? "http://localhost:4321",
 

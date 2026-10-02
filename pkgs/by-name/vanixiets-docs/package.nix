@@ -12,6 +12,7 @@
   dejavu_fonts,
   mesa,
   typstWithPackages,
+  typescript,
   vanixiets-docs-deps,
   evidenceEpoch ? lib.trim (builtins.readFile ./evidence-epoch),
   ...
@@ -175,7 +176,7 @@ stdenv.mkDerivation (finalAttrs: {
     buildPhase = ''
       runHook preBuild
       cd packages/docs
-      node --test tests/report-*.test.mjs
+      node --test tests/report-*.test.ts
       node ./node_modules/.bin/vitest run
       cd ../..
       runHook postBuild
@@ -186,6 +187,19 @@ stdenv.mkDerivation (finalAttrs: {
     '';
 
     meta.description = "Vitest unit tests for vanixiets-docs";
+  };
+
+  # Node strips the evidence tooling's types at load time and never checks
+  # them; this does, against the pinned Playwright and Node declarations.
+  passthru.tests.typecheck = finalAttrs.finalPackage.tests.unit.overrideAttrs {
+    pname = "vanixiets-docs-typecheck";
+    nativeBuildInputs = [ typescript ];
+    buildPhase = ''
+      runHook preBuild
+      tsc -p packages/docs/tests
+      runHook postBuild
+    '';
+    meta.description = "Type-check vanixiets-docs browser evidence tooling and tests";
   };
 
   passthru.tests.e2e-runner-controls = finalAttrs.finalPackage.tests.unit.overrideAttrs {
@@ -200,7 +214,7 @@ stdenv.mkDerivation (finalAttrs: {
     buildPhase = ''
       runHook preBuild
       cd packages/docs
-      node --test tests/browser-report.test.mjs
+      node --test tests/browser-report.test.ts
       cd ../..
       runHook postBuild
     '';
@@ -293,30 +307,23 @@ stdenv.mkDerivation (finalAttrs: {
       chmod -R u+w packages/docs/dist packages/docs/.wrangler
 
       cd packages/docs
-      # Size the worker pool to the cores nix actually granted this build
-      # (`--cores`, else every core on the builder) rather than a fixed 3.
-      # Historical pre-reader-journey measurements on magnetite (16 cores)
-      # over 27 tests: 3 workers 23.2-23.8s,
-      # 6 -> 20.3s, 9 -> 21.2s, 12 -> 18.4s, 16 -> 17.7-19.0s. The floor is the
-      # shared astro-preview/miniflare boot plus firefox and webkit cold start,
-      # so the curve flattens quickly, but nothing is gained by leaving cores idle.
+      # Bound the worker pool at four, below the cores nix grants when fewer.
+      # NIX_BUILD_CORES does not measure what this build may use: the CI
+      # builders run `cores = 0` with `max-jobs` near the CPU count, so every
+      # concurrent build is told it owns every core. Several PRs' report and
+      # negative-control builds then each start one worker per core against
+      # their own single-process astro preview, and navigations stall past
+      # any deadline (nixbot build 951: 16 workers per build on 16-vCPU
+      # magnetite, three PRs at once).
       #
-      # NIX_BUILD_CORES is a CPU quantity sizing a memory-bound workload, so the
-      # RAM arithmetic has to hold too. Peak resident set of every browser
-      # process during a full 27-test, three-engine run at 18 workers,
-      # sampled at 0.3 s on stibnite: 6.97 GiB across 54 processes, largest
-      # single process 0.54 GiB. That is ~0.39 GiB per worker, plus well under
-      # 1 GiB for node, astro preview and miniflare. Against the actual
-      # x86_64-linux builders: magnetite at 16 workers needs ~6.2 GiB of its
-      # 30.6 GiB (~20 GiB free at the 2026-09-02 audit), and pyrite-builder at
-      # 4 workers needs ~1.6 GiB of 15 GiB -- a run there passed at 4 workers
-      # in 29.2 s. The demand is ~0.4 GiB per core and both builders supply
-      # >= 1.9 GiB per core, a ~5x margin, so no ceiling is imposed here.
-      # Re-do this arithmetic (and consider min(NIX_BUILD_CORES, N)) before
-      # adding an x86_64-linux builder with less than ~0.5 GiB of RAM per core;
-      # on this fleet the failure past the memory edge is an unresponsive
-      # machine, not a slow build.
-      export PLAYWRIGHT_WORKERS="''${NIX_BUILD_CORES:-3}"
+      # Little is given up. Historical pre-reader-journey measurements on
+      # magnetite over 27 tests: 3 workers 23.2-23.8s, 6 -> 20.3s,
+      # 9 -> 21.2s, 12 -> 18.4s, 16 -> 17.7-19.0s. The floor is the shared
+      # astro-preview/miniflare boot plus firefox and webkit cold start.
+      # Memory follows the same bound: ~0.4 GiB per worker (6.97 GiB peak
+      # across 18 workers on stibnite).
+      cores="''${NIX_BUILD_CORES:-1}"
+      export PLAYWRIGHT_WORKERS=$(( cores < 4 ? cores : 4 ))
       # Run Playwright via node — bun's child_process.fork() IPC
       # is incompatible with Playwright's worker model.
       # PLAYWRIGHT_PROJECTS selects the engines; playwright manages the webServer
@@ -350,7 +357,7 @@ stdenv.mkDerivation (finalAttrs: {
         }}' > run.json
       # A completed assertion failure is evidence, not producer failure.
       # Missing/malformed/incomplete evidence or infrastructure failure is fatal.
-      node tests/report/validate-report.mjs validate .
+      node tests/report/validate-report.ts validate .
       cd ../..
 
       runHook postBuild
@@ -368,7 +375,7 @@ stdenv.mkDerivation (finalAttrs: {
   # Keep the existing required check name. This dependency consumes evidence;
   # it never launches Playwright or the docs server a second time.
   passthru.tests.e2e = runCommand "vanixiets-docs-e2e" { allowedReferences = [ ]; } ''
-    ${nodejs-slim}/bin/node ${../../../packages/docs/tests/report}/validate-report.mjs \
+    ${nodejs-slim}/bin/node ${../../../packages/docs/tests/report}/validate-report.ts \
       verdict ${finalAttrs.finalPackage.tests.e2e-report}
     mkdir -p "$out"
   '';
@@ -384,7 +391,7 @@ stdenv.mkDerivation (finalAttrs: {
       });
     in
     runCommand "vanixiets-docs-e2e-negative-control" { } ''
-      ${nodejs-slim}/bin/node ${../../../packages/docs/tests/report}/check-negative-report.mjs ${report}
+      ${nodejs-slim}/bin/node ${../../../packages/docs/tests/report}/check-negative-report.ts ${report}
       mkdir -p "$out"
       ln -s ${report} "$out/report"
     '';
@@ -400,7 +407,7 @@ stdenv.mkDerivation (finalAttrs: {
       });
     in
     runCommand "vanixiets-docs-e2e-action-negative-control" { } ''
-      ${nodejs-slim}/bin/node ${../../../packages/docs/tests/report}/check-negative-report.mjs ${report} removed-link
+      ${nodejs-slim}/bin/node ${../../../packages/docs/tests/report}/check-negative-report.ts ${report} removed-link
       mkdir -p "$out"
       ln -s ${report} "$out/report"
     '';

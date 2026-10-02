@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { runControl } from "./report/runner-control.mjs";
-import { validateReport } from "./report/validate-report.mjs";
+import { runControl } from "./report/runner-control.ts";
+import { validateReport } from "./report/validate-report.ts";
 
 test("actual Playwright browser launch failure is not accepted as product evidence", (t) => {
   const { root, completion } = runControl(t, "launch");
@@ -11,7 +11,7 @@ test("actual Playwright browser launch failure is not accepted as product eviden
 
 test("actual Playwright global setup failure fails closed", (t) => {
   const { root, completion } = runControl(t, "global");
-  assert.match(completion.errors[0].message, /controlled setup failure/);
+  assert.match(completion.errors[0]?.message ?? "", /controlled setup failure/);
   assert.throws(() => validateReport(root), /runner infrastructure error/);
 });
 
