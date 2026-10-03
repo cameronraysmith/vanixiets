@@ -723,7 +723,10 @@ if [[ "$upload" == true && -n "$pr_number" ]]; then
       # One row per failed attempt, built in jq from the report and the
       # bundled file set, so no test name passes through the shell. The
       # validator already confined case, project and failureKind; the
-      # sanitisation keeps each cell inside its code span and table cell.
+      # sanitisation keeps each name inside its code span, table cell, and
+      # summary element. The table is collapsed under a summary stated only
+      # from exact counts: per failing test, each browser's failed attempts
+      # out of its attempts.
       jq -r --arg base "$evidence_url" --slurpfile files "$tmpdir/files.jsonl" '
         ([$files[].path]) as $bundled
         | ["screenshot", "video", "context", "trace"] as $labels
@@ -732,19 +735,34 @@ if [[ "$upload" == true && -n "$pr_number" ]]; then
           def link: if .kind == 3
             then "[trace](\(@uri "https://trace.playwright.dev/?trace=\($base + .path)"))"
             else "[\($labels[.kind])](\($base + .path))" end;
-        [ .tests[] as $test
-          | $test.attempts[]
-          | select(.status != "passed")
+          def name: split("::") | last // "" | split("`") | join("") | .[:120];
+          def project: gsub("[^A-Za-z0-9._-]"; "");
+          def failed: [.attempts[] | select(.status != "passed")];
+        [.tests[] | select(failed != [])] as $failing
+        | ([$failing[] | failed[]] | length) as $count
+        | (reduce $failing[].case as $c ([]; if index([$c]) then . else . + [$c] end)) as $cases
+        | [ $cases[] as $c
+            | "`" + ($c | name | gsub("[<>]"; "")) + "` in "
+              + ([$failing[] | select(.case == $c) | "\(.project | project) \(failed | length)/\(.attempts | length)"] | join(", "))
+          ] as $parts
+        | [ $failing[] as $test
+          | $test | failed[]
           | [.attachments[] | select(IN($bundled[])) | {path: ., kind: kind} | select(.kind != null)] as $evidence
           | [range(4) as $k | $evidence[] | select(.kind == $k) | link] as $links
-          | "| `" + ($test.case | split("::") | last // "" | split("`") | join("") | split("|") | join("\\|") | .[:120]) + "`"
-            + " | " + ($test.project | gsub("[^A-Za-z0-9._-]"; ""))
+          | "| `" + ($test.case | name | split("|") | join("\\|")) + "`"
+            + " | " + ($test.project | project)
             + " | \(.retry + 1)"
             + " | " + (.failureKind // "unknown")
             + " | " + (if $links == [] then "—" else $links | join(" · ") end) + " |"
-        ]
-        | if . == [] then "No failed attempts."
-          else "Failed attempts:", "", "| Test | Browser | Attempt | Kind | Evidence |", "|---|---|---|---|---|", .[] end
+        ] as $rows
+        | if $rows == [] then "No failed attempts."
+          else
+            "<details><summary>\($count) failed attempt\(if $count == 1 then "" else "s" end): "
+              + ($parts[:3] | join("; "))
+              + (if ($parts | length) > 3 then "; +\(($parts | length) - 3) more tests" else "" end)
+              + "</summary>",
+            "", "| Test | Browser | Attempt | Kind | Evidence |", "|---|---|---|---|---|", $rows[], "", "</details>"
+          end
       ' "$report/playwright-report/completion.json"
       echo
       echo "Receipt: [receipt.json](${evidence_url}receipt.json)"

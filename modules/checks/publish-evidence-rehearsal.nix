@@ -51,9 +51,12 @@
 # ttl-30d with a credential confined to ttl-30d/, upserts one marker comment
 # and records a `current` marker at ttl-30d/pr/<n>.json; a probe failure
 # names its key. The comment is asserted byte for byte: its failed-attempt
-# table links each attempt's screenshot, video, context and trace (the trace
-# through trace.playwright.dev with the URI-encoded Worker URL), only for
-# the files published, with the test name sanitised; a report without a
+# table, collapsed in a <details> element under a summary naming each
+# failing test (at most three, then how many more) with each browser's
+# failed attempts out of its attempts, links each attempt's screenshot,
+# video, context and trace (the trace through trace.playwright.dev with the
+# URI-encoded Worker URL), only for the files published, with the test name
+# sanitised; a recovered attempt is still listed, and a report without a
 # failed attempt says `No failed attempts.`. Retries and later builds of one
 # report write no new objects. A reverted pull request supersedes its
 # current comment once. The stub
@@ -122,11 +125,13 @@
 
       # node fixture.mjs <variant> <out> <policy.ts>: one synthetic report.
       # The reader journey of the first project carries the failed attempt,
-      # retried to a pass (flaky) in `passing` and final everywhere else it
-      # fails; `steady` passes at the first attempt, so it has no
-      # attachments. The failed attempt references a screenshot, video,
-      # error context and trace, except in `unknown-extension`, whose attempt
-      # references a screenshot, a trace and notes.txt.
+      # retried to a pass (flaky) in `passing` and `recovered` (the same
+      # report under another store path, which main has not published) and
+      # final everywhere else it fails; in `cap` instead the first four cases
+      # fail in every project. `steady` passes at the first attempt, so it
+      # has no attachments. The failed attempt references a screenshot,
+      # video, error context and trace, except in `unknown-extension`, whose
+      # attempt references a screenshot, a trace and notes.txt.
       fixture = pkgs.writeText "publish-evidence-report-fixture.mjs" ''
         import { mkdirSync, symlinkSync, writeFileSync } from "node:fs";
         import { dirname, join } from "node:path";
@@ -159,6 +164,7 @@
           "symlink-video",
           "unknown-extension",
           "sanitised",
+          "cap",
         ].includes(variant);
         const dir = "${attemptDir}";
         const shot =
@@ -204,9 +210,11 @@
             const passed = { status: "passed", retry: 0, failureKind: null, attachments: [] };
             const failed = { status: "failed", retry: 0, failureKind: "product", attachments: failure };
             let attempts = [passed];
-            if (project === projects[0] && name.startsWith("reader-journey.spec.ts::")) {
+            if (variant === "cap") {
+              if (index < 4) attempts = [failed];
+            } else if (project === projects[0] && name.startsWith("reader-journey.spec.ts::")) {
               if (failing) attempts = [failed];
-              else if (variant === "passing") attempts = [failed, { ...passed, retry: 1 }];
+              else if (variant === "passing" || variant === "recovered") attempts = [failed, { ...passed, retry: 1 }];
             }
             const outcome =
               attempts.at(-1).status === "failed" ? "unexpected" : attempts.length > 1 ? "flaky" : "expected";
@@ -263,6 +271,7 @@
 
       variants = [
         "passing"
+        "recovered"
         "steady"
         "failing"
         "traversal"
@@ -276,6 +285,7 @@
         "symlink-video"
         "unknown-extension"
         "sanitised"
+        "cap"
         "darwin"
         "negative-config"
         "invalid"
@@ -647,6 +657,7 @@
             for report in ${
               lib.concatMapStringsSep " " (v: reports.${v}) [
                 "passing"
+                "recovered"
                 "steady"
                 "failing"
                 "traversal"
@@ -658,6 +669,7 @@
                 "md-nul"
                 "symlink-video"
                 "unknown-extension"
+                "cap"
                 "darwin"
                 "negative-config"
               ]
@@ -1170,15 +1182,29 @@
               done
               echo "$cell"
             }
-            # failed_table <test> <evidence>: the failed-attempt table of the
-            # fixtures' one failed attempt (chromium, attempt 1, product).
-            failed_table() {
+            # failed_block <summary> <row...>: the collapsed failed-attempt
+            # table under <summary>.
+            failed_block() {
+              local summary=$1
+              shift
               printf '%s\n' \
-                "Failed attempts:" \
+                "<details><summary>$summary</summary>" \
                 "" \
                 "| Test | Browser | Attempt | Kind | Evidence |" \
                 "|---|---|---|---|---|" \
-                "| \`$1\` | chromium | 1 | product | $2 |"
+                "$@" \
+                "" \
+                "</details>"
+            }
+            # failed_row <test> <browser> <attempt> <evidence>: the row of
+            # one product failure.
+            failed_row() {
+              echo "| \`$1\` | $2 | $3 | product | $4 |"
+            }
+            # failed_table <test> <evidence>: the failed-attempt table of the
+            # fixtures' one failed attempt (chromium, attempt 1 of 1, product).
+            failed_table() {
+              failed_block "1 failed attempt: \`$1\` in chromium 1/1" "$(failed_row "$1" chromium 1 "$2")"
             }
             # affected_comment <verdict> <build line> <url> <evidence block>:
             # the exact affected comment on the bundle at <url>, into
@@ -1512,9 +1538,9 @@
             diff -r "$TMPDIR/objects.malformed" "$objects" || fail "a malformed marker changed the bucket"
 
             # --- one run per settled pull request build, on pull request 9,
-            # then the unknown-extension and sanitised-name rows on pull
-            # requests 10 and 11, against main's bucket (only main's ttl-90d
-            # objects), set aside and restored around these rows.
+            # then the unknown-extension, sanitised-name and summary rows on
+            # pull requests 10 to 13, against main's bucket (only main's
+            # ttl-90d objects), set aside and restored around these rows.
             mv "$objects" "$TMPDIR/objects.v3"
             cp -a "$TMPDIR/objects.main" "$objects"
             NIXBOT_EVENT_KIND=pull_request
@@ -1632,7 +1658,8 @@
 
             # 5 pr-sanitised-test-name: the failing test is named
             # ${unsafeTestName}; its cell drops the backticks and escapes
-            # the `|`, so the name stays one code span in one table cell.
+            # the `|`, so the name stays one code span in one table cell,
+            # and the summary drops the backticks.
             z_obs="$(obs ${reports.sanitised})"
             z30=$ttl30/v1/$z_obs
             z_url="${evidenceOrigin}/ttl-30d/v1/$z_obs/"
@@ -1658,9 +1685,83 @@
             affected_comment failed \
               "[build 71](https://nixbot.example/builds/71) at \`${lib.substring 0 12 affectedRev}\`: 29 expected, 1 unexpected, 0 flaky, 0 skipped." \
               "$z_url" \
-              "$(failed_table 'reader finds a \| b path' "$(links ttl-30d "$z_obs" screenshot video context trace)")"
+              "$(failed_block '1 failed attempt: `reader finds a | b path` in chromium 1/1' \
+                "$(failed_row 'reader finds a \| b path' chromium 1 "$(links ttl-30d "$z_obs" screenshot video context trace)")")"
             expect_comment_body "$TMPDIR/expected-comment.md"
             expect_marker 11 current "$z_obs" 71 ${affectedRev}
+
+            # pr-summary-cap: four tests fail in every browser; the summary
+            # counts all twelve attempts but names the first three tests, in
+            # report order, then the one more; the table lists every attempt.
+            c_obs="$(obs ${reports.cap})"
+            c30=$ttl30/v1/$c_obs
+            c_url="${evidenceOrigin}/ttl-30d/v1/$c_obs/"
+            build 72 failed ${affectedRev} "[$(report succeeded ${reports.cap})]"
+            event 72 failed ${affectedRev} 12
+            run pr-summary-cap event --upload
+            expect_status 0
+            expect_lines \
+              "PUBLISH-EVIDENCE: uploaded $c_url" \
+              "PUBLISH-EVIDENCE: published (report $c_obs, passed=false)" \
+              "PUBLISH-EVIDENCE: commented #12"
+            expect_api "$(api_build 72)" "$api_comment"
+            expect_s3 \
+              "$(req HEAD 404 ro "$ttl90/v1/$c_obs/receipt.json")" \
+              "$(upload rw30 "$c30" "''${bundle[@]}")" \
+              "$(req PUT 200 rw30 "$(marker_key 12)" application/json)"
+            expect_bundle "$objects/$c30" ${reports.cap} "''${bundle[@]}"
+            expect_receipt "$objects/$c30/receipt.json" ${reports.cap} false \
+              '{"expected": 18, "unexpected": 12, "skipped": 0, "flaky": 0}' \
+              "$(destination ttl-30d "$c_obs")" "''${bundle[@]}"
+            expect_comments 1
+            c_links="$(links ttl-30d "$c_obs" screenshot video context trace)"
+            c_rows=()
+            for project in chromium firefox webkit; do
+              for test in "has correct title and heading" "has accessible links" \
+                "navigates to getting started guide" "is responsive on mobile"; do
+                c_rows+=("$(failed_row "$test" "$project" 1 "$c_links")")
+              done
+            done
+            affected_comment failed \
+              "[build 72](https://nixbot.example/builds/72) at \`${lib.substring 0 12 affectedRev}\`: 18 expected, 12 unexpected, 0 flaky, 0 skipped." \
+              "$c_url" \
+              "$(failed_block "12 failed attempts: \`has correct title and heading\` in chromium 1/1, firefox 1/1, webkit 1/1; \`has accessible links\` in chromium 1/1, firefox 1/1, webkit 1/1; \`navigates to getting started guide\` in chromium 1/1, firefox 1/1, webkit 1/1; +1 more tests" \
+                "''${c_rows[@]}")"
+            expect_comment_body "$TMPDIR/expected-comment.md"
+            expect_marker 12 current "$c_obs" 72 ${affectedRev}
+
+            # pr-summary-recovered: a failed attempt the retry recovered
+            # is still evidence; the summary counts it out of its project's
+            # two attempts, and the table lists only the failed attempt.
+            NIXBOT_EVENT_KIND=pull_request
+            r_obs="$(obs ${reports.recovered})"
+            r30=$ttl30/v1/$r_obs
+            r_url="${evidenceOrigin}/ttl-30d/v1/$r_obs/"
+            build 73 succeeded ${affectedRev} "[$(report succeeded ${reports.recovered})]"
+            event 73 succeeded ${affectedRev} 13
+            run pr-summary-recovered event --upload
+            expect_status 0
+            expect_lines \
+              "PUBLISH-EVIDENCE: uploaded $r_url" \
+              "PUBLISH-EVIDENCE: published (report $r_obs, passed=true)" \
+              "PUBLISH-EVIDENCE: commented #13"
+            expect_api "$(api_build 73)" "$api_comment"
+            expect_s3 \
+              "$(req HEAD 404 ro "$ttl90/v1/$r_obs/receipt.json")" \
+              "$(upload rw30 "$r30" "''${bundle[@]}")" \
+              "$(req PUT 200 rw30 "$(marker_key 13)" application/json)"
+            expect_bundle "$objects/$r30" ${reports.recovered} "''${bundle[@]}"
+            expect_receipt "$objects/$r30/receipt.json" ${reports.recovered} true "$passing_counts" \
+              "$(destination ttl-30d "$r_obs")" "''${bundle[@]}"
+            expect_comments 1
+            affected_comment passed \
+              "[build 73](https://nixbot.example/builds/73) at \`${lib.substring 0 12 affectedRev}\`: 29 expected, 0 unexpected, 1 flaky, 0 skipped." \
+              "$r_url" \
+              "$(failed_block "1 failed attempt: \`${testName}\` in chromium 1/2" \
+                "$(failed_row ${lib.escapeShellArg testName} chromium 1 "$(links ttl-30d "$r_obs" screenshot video context trace)")")"
+            expect_comment_body "$TMPDIR/expected-comment.md"
+            expect_marker 13 current "$r_obs" 73 ${affectedRev}
+            NIXBOT_EVENT_KIND=build_finished
 
             rm -rf "$objects"
             mv "$TMPDIR/objects.v3" "$objects"

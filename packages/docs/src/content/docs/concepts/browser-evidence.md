@@ -65,19 +65,24 @@ A comment for a pull request that changes the report shows:
 - the verdict, `Browser evidence: passed` or `Browser evidence: failed`;
 - the build number, linked to the build, and the first 12 hex digits of its revision, followed by `(reused for head <head>, same tree)` when the build was reused for a newer head;
 - the expected, unexpected, flaky, and skipped test counts;
-- a table of failed attempts, or `No failed attempts.`;
+- a table of failed attempts, collapsed under a summary, or `No failed attempts.`;
 - a link to `receipt.json`;
 - that no report identical to this one has been published from `main` in the last 90 days, which is why it is shown;
 - that the evidence is kept 30 days.
 
-The table has one row per failed attempt, in the order of `completion.json`:
+The table is collapsed in a `<details>` element under an exact summary: the number of failed attempts, then each failing test in the order it first appears in `completion.json`, with each browser's failed attempts out of its total attempts.
+The summary names at most three tests and ends with `+K more tests` when there are more.
+Expanded, the table has one row per failed attempt, in the order of `completion.json`:
 
 ```markdown
-Failed attempts:
+<details><summary>2 failed attempts: `shows the getting started guide` in chromium 1/2, webkit 1/1</summary>
 
 | Test | Browser | Attempt | Kind | Evidence |
 |---|---|---|---|---|
+| `shows the getting started guide` | chromium | 1 | product | [screenshot](<base>/test-results/<dir>/test-failed-1.png) · [video](<base>/test-results/<dir>/video.webm) · [context](<base>/test-results/<dir>/error-context.md) · [trace](https://trace.playwright.dev/?trace=<encoded base>%2Ftest-results%2F<dir>%2Ftrace.zip) |
 | `shows the getting started guide` | webkit | 1 | product | [screenshot](<base>/test-results/<dir>/test-failed-1.png) · [video](<base>/test-results/<dir>/video.webm) · [context](<base>/test-results/<dir>/error-context.md) · [trace](https://trace.playwright.dev/?trace=<encoded base>%2Ftest-results%2F<dir>%2Ftrace.zip) |
+
+</details>
 ```
 
 `<base>` is the bundle's URL, described [below](#url-layout).
