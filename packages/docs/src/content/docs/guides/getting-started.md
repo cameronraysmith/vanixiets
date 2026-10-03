@@ -1,5 +1,5 @@
 ---
-title: Getting started
+title: Getting started (evidence failure demo)
 description: Quick start guide for bootstrapping and using this configuration
 sidebar:
   order: 3
