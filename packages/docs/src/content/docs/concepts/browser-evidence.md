@@ -34,7 +34,14 @@ A pull request gets a comment only when it changes the report.
 The publisher detects that by the report's Nix output path, not by which files the diff touches.
 A path glob over the diff would miss changes that reach the report indirectly, such as a lock file or flake input update; the output path cannot drift, because it is the build's own identity.
 
-When a pull request build finishes, the publisher checks whether `main` has already published this exact report.
+Because the path is derived from inputs, a dependency bump inside the site's closure changes it, and the pull request gets a comment even when every screenshot is pixel-identical to `main`'s.
+The detector is also only as precise as the report's inputs.
+The site's dependencies (`vanixiets-docs-deps`) are built from the whole workspace `bun.lock`, so a dependency change in another workspace package, such as `@vanixiets/evidence-worker`, currently counts as changing the docs report.
+Building dependencies per application would remove that over-approximation.
+
+Another application would get its own report derivation, one per (project, kind), and be judged by its own output path, independently of the docs report.
+
+When a pull request build settles, the publisher checks whether `main` has already published this exact report.
 If it has, the pull request does not change the browser evidence: nothing is uploaded, no comment is posted, and the effect log prints `PUBLISH-EVIDENCE: unaffected (report <obs> already published from main)`.
 Otherwise the report is uploaded to the 30-day tier and the pull request gets one comment, which later builds edit instead of adding another.
 
@@ -55,7 +62,7 @@ When two builds of one pull request finish out of order, the comment reflects wh
 A comment for a pull request that changes the report shows:
 
 - the verdict, `Browser evidence: passed` or `Browser evidence: failed`;
-- the build number, linked to the build, and the first 12 hex digits of its revision;
+- the build number, linked to the build, and the first 12 hex digits of its revision, followed by `(reused for head <head>, same tree)` when the build was reused for a newer head;
 - the expected, unexpected, flaky, and skipped test counts;
 - a link to each screenshot, or `No screenshots.`;
 - a link to `receipt.json`;
@@ -66,7 +73,8 @@ Screenshots are taken only for failed attempts, so a passing run with no screens
 A passing run that had flaky tests is still a pass, and the `flaky` count says how many recovered on a retry.
 
 The comment describes the build named in it.
-That build may be older than the pull request's current head when the report was reused from cache, because one report serves every build that carries it.
+nixbot reuses a finished build for a new head whose tree is identical, without building again, and the comment then names both the reused build's revision and the head it was reused for.
+A reused build that failed sends no event, so its head gets no comment of its own; the comment keeps naming the earlier build with the same tree.
 
 ## Tiers and retention
 
@@ -75,7 +83,7 @@ Evidence is stored by retention tier, and objects are deleted by age; nothing re
 | Tier | Written for | Kept |
 |---|---|---|
 | `ttl-30d` | a pull request whose report `main` has not published | 30 days |
-| `ttl-90d` | `main`, and other builds without a pull request | 90 days |
+| `ttl-90d` | `main`, and failed builds without a pull request | 90 days |
 | `ttl-365d` | reserved for a later curation step; nothing writes to it | 365 days |
 
 Each tier receives a given report at most once.
@@ -137,9 +145,23 @@ The effect's code comes from `main`, and a pull request contributes only an untr
 A pull request that changes the effect or the publisher is therefore not exercised by its own build.
 It is exercised by builds after it lands, and before then only the `publish-evidence-rehearsal` check covers it.
 
-The effect has two triggers.
+The effect has three triggers, and every run takes the same `browser-evidence` lock, so runs never overlap.
 An onPush run for `main` publishes the newest build of the pushed commit to `ttl-90d` and never comments, because a fast-forward landing reuses the merge-queue build and nixbot sends no `build_finished` for it.
-A `build_finished` run handles pull request builds and other newly finished builds, whether they succeeded or failed, so a failing report reaches publication too.
+A `pull_request` run handles each pull request build that settles succeeded, freshly built or reused.
+A `build_finished` run handles builds that failed, so a failing report reaches publication too; for a build without a pull request it publishes to `ttl-90d` without a comment.
+Each pull request build therefore gets exactly one run:
+
+| Pull request build | Succeeded | Failed |
+|---|---|---|
+| freshly built | `pull_request` | `build_finished` |
+| reused | `pull_request` | none |
+
+nixbot's Event Effects list therefore shows `build_finished · browser-evidence — build is succeeded, needs failed` on every succeeded build.
+That is the filter working, not a failure: the `pull_request` run on the same build is the one that published.
+
+Neither run requires the pull request's author or actor to hold a repository permission.
+The trust gate is nixbot's CI approval: a pull request from outside the repository is not built until a maintainer approves it, and one whose branch lives in the repository is trusted because pushing it already needed write access.
+Bots report no permission, so a permission condition would have skipped Renovate's pull requests; without it, dependency updates get evidence too.
 
 The effect posts comments through nixbot's comment API and holds no GitHub token.
 Its storage credentials are temporary, last 15 minutes, and are confined to the run's own tier, so a pull request run cannot write into `main`'s `ttl-90d` tier.
