@@ -162,6 +162,7 @@ The `release-packages` effect runs the `release-packages` program on two trigger
 
 `release-packages --rev <commit>` clones the repository, checks out the commit as `main`, discovers packages with `list-packages-json`, and runs the `release` program for each, which runs semantic-release with the production plugins.
 It skips with exit 0 and logs `RELEASE-PACKAGES-ACTION: superseded` when `main` has moved past its commit, and refuses a commit outside `main`'s history.
+`list-packages-json` lists only packages whose `package.json` declares a non-null `release` key, so a workspace package opts in to releases explicitly; a `package.json` that fails to parse fails the run, naming the file.
 
 `release-packages plan` runs on every pull request once its head has built green, forks included once CI is approved for them, and reports the `release-plan` check run on the head commit:
 
