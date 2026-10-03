@@ -226,7 +226,7 @@ CI/CD operations, caching, and release management.
 | `test-cachix` | - | Test cachix push/pull with simple derivation | No |
 | `cache-darwin-system` | - | Build darwin system and push to cachix | No |
 | `list-packages` | - | List all packages in packages/ directory | No |
-| `list-packages-json` | `*ARGS` | List packages in JSON format | No |
+| `list-packages-json` | `*ARGS` | List, as JSON, the packages whose package.json declares a `release` configuration | No |
 | `validate-package` | `package` | Validate package structure | No |
 | `test-package` | `package` | Test package (install, tests, build) | No |
 | `release` | `*args` | Run the `release` flake app with passthrough arguments | No |

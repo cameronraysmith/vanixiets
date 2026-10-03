@@ -16,6 +16,12 @@
 # The release-packages effect entry lists this check in its rehearsals, so the
 # gated `nix build <effect>^*` on pull requests and merge-queue batches runs it.
 #
+# Asserted for list-packages-json, the list release-packages iterates: a
+# package whose package.json has no `release` key is excluded, both from the
+# list and from the releases release-packages cuts (the seed carries such a
+# package beside docs); a package with one is included; a malformed
+# package.json fails the list, naming the file.
+#
 # Asserted for `--rev`: a missing GITHUB_TOKEN fails before any clone; a rev
 # main has moved past is skipped as superseded and a rev outside main's
 # history is refused, neither touching tags or releases; the feat commit
@@ -47,6 +53,7 @@
     { pkgs, config, ... }:
     let
       releasePackagesProgram = config.apps.release-packages.program;
+      listPackagesProgram = config.apps.list-packages-json.program;
 
       repoUrl = "https://github.com/cameronraysmith/vanixiets";
       repoApi = "/repos/cameronraysmith/vanixiets";
@@ -152,10 +159,13 @@
 
             # History: the last docs release, then a feat commit under
             # packages/docs on main, and a side branch that diverges from main.
+            # packages/worker has a package.json without a `release` key, so
+            # it never opts in to semantic-release.
             seed="$TMPDIR/seed"
             git init --quiet -b main "$seed"
-            mkdir -p "$seed/packages/docs/src"
+            mkdir -p "$seed/packages/docs/src" "$seed/packages/worker"
             cp ${../../packages/docs/package.json} "$seed/packages/docs/package.json"
+            echo '{"name": "@vanixiets/worker", "private": true}' > "$seed/packages/worker/package.json"
             echo "# docs" > "$seed/packages/docs/src/index.md"
             git -C "$seed" add -A
             git -C "$seed" commit --quiet -m "chore(docs): initial"
@@ -257,6 +267,41 @@
                 || fail "$1 called the API: $(cat "$TMPDIR/requests.jsonl")"
             }
 
+            # Runs list-packages-json in a scratch repo whose packages/ holds
+            # one directory per <name>=<package.json content> argument.
+            list_packages() {
+              local scratch spec
+              scratch="$(mktemp -d "$TMPDIR/list.XXXXXX")"
+              git init --quiet -b main "$scratch"
+              mkdir -p "$scratch/packages"
+              for spec in "$@"; do
+                mkdir -p "$scratch/packages/''${spec%%=*}"
+                printf '%s\n' "''${spec#*=}" > "$scratch/packages/''${spec%%=*}/package.json"
+              done
+              (cd "$scratch" && ${listPackagesProgram})
+            }
+
+            echo "--- list-packages-json: only packages with a release key"
+            capture list_packages 'plain={"name": "plain"}' 'nullrel={"name": "nullrel", "release": null}' \
+              'opted={"name": "opted", "release": {"branches": ["main"]}}'
+            [ "$rc" = 0 ] || fail "list-packages-json exited $rc, expected 0"
+            [ "$(cat "$TMPDIR/stdout")" = '[{"name":"opted","path":"packages/opted"}]' ] \
+              || fail "list-packages-json listed: $(cat "$TMPDIR/stdout")"
+
+            echo "--- list-packages-json: no opted-in package lists []"
+            capture list_packages 'plain={"name": "plain"}'
+            [ "$rc" = 0 ] || fail "list-packages-json without opt-ins exited $rc, expected 0"
+            [ "$(cat "$TMPDIR/stdout")" = '[]' ] \
+              || fail "list-packages-json without opt-ins listed: $(cat "$TMPDIR/stdout")"
+
+            echo "--- list-packages-json: malformed package.json fails, naming it"
+            capture list_packages 'opted={"name": "opted", "release": {}}' 'broken={"name": "broken",'
+            [ "$rc" != 0 ] || fail "list-packages-json with a malformed package.json exited 0"
+            grep -qF "packages/broken/package.json" "$TMPDIR/stderr" \
+              || fail "list-packages-json did not name the malformed package.json"
+            [ ! -s "$TMPDIR/stdout" ] \
+              || fail "list-packages-json printed a list despite the malformed package.json"
+
             echo "--- missing GITHUB_TOKEN: fails before any clone"
             capture env -u GITHUB_TOKEN RELEASE_PACKAGES_REPO_URL="file://$TMPDIR/absent.git" \
               ${releasePackagesProgram} --rev "$feat_sha"
@@ -286,6 +331,10 @@
             [ "$rc" = 0 ] || fail "first run exited $rc"
             grep -qxF "RELEASE-PACKAGE-OK: packages/docs" "$TMPDIR/stdout" \
               || fail "first run did not release packages/docs"
+            grep -qxF 'packages discovered: [{"name":"docs","path":"packages/docs"}]' "$TMPDIR/stdout" \
+              || fail "first run discovered packages other than docs"
+            ! grep -q "packages/worker" "$TMPDIR/stdout" \
+              || fail "first run released packages/worker, which has no release key"
 
             for tag in @vanixiets/docs-v0.8.0 docs-v0 docs-v0.8; do
               sha="$(git -C "$remote" rev-parse --verify --quiet "refs/tags/$tag^{commit}")" \
