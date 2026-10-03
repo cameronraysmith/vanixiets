@@ -67,11 +67,18 @@ Evaluation cannot inspect a machine's device nodes, so the option is an operator
 Stibnite's `nix.buildMachines` mirror of the rosetta builder no longer advertises `kvm` either; the VM has no `/dev/kvm`, and Rosetta translates userspace rather than providing a hypervisor.
 Corrected advertisements take effect only after each machine is activated.
 
-Stibnite reaches Pyrite through `services.pyrite-builder`, whose entry advertises `kvm` and `nixos-test`.
-Pyrite is a laptop, so unreachability is ordinary, and nix 2.35 handles it in two distinct ways.
+Remote builders are one Clan service, `nix-builders` (`clan/services/nix-builders/`, instance in `clan/inventory/services/nix-builders.nix`).
+A machine in the `builder` role gets a build account, `builder` on NixOS and `nixbuild` on Darwin, which is a Nix trusted user and whose `authorized_keys` admits each dispatcher's `nix-remote-build` key only through a forced `nix-daemon --stdio`.
+A machine in the `dispatcher` role generates that key and gets an ssh alias and an entry in `services.nix-builders.buildMachines` for every builder it does not exclude; Stibnite splices that list after its rosetta-builder entries, and Magnetite uses it as `nix.buildMachines` unchanged.
+Stibnite dispatches x86_64-linux work to Magnetite and Pyrite, and Pyrite's entry is the only one advertising `kvm` for x86_64-linux.
+Magnetite dispatches aarch64-darwin work to Stibnite, Rosegold, and Argentum, and excludes Pyrite.
+The Darwin builders are laptops and serve builds opportunistically.
+Their forced command is a gate that declines with `on battery; declining remote builds` unless `pmset` reports AC power, and their nix-daemon runs at `Background` QoS with low-priority I/O so a dispatched build yields to the owner's work.
+Unreachability is therefore ordinary, and nix 2.35 handles it in two distinct ways; a builder declining on battery closes the connection and looks the same as an unreachable one.
 A build the caller or another builder can perform continues: the build hook logs `cannot build on '<store uri>'`, marks that machine disabled for the rest of its lifetime, and reconsiders the remaining machines or falls back to a local build.
-A build requiring `kvm` fails outright while Pyrite is the fleet's only `kvm` builder and is offline, reporting `missing system features` with `Required features: {kvm}`, and never degrades into an unaccelerated or emulated build.
+A build no remaining machine can perform fails outright, as an x86_64-linux build requiring `kvm` does while Pyrite is offline, reporting `missing system features` with `Required features: {kvm}`, and never degrades into an unaccelerated or emulated build.
 That second case is the intended behaviour: vmTests are opt-in and outside PR gating, so an offline laptop costs a manual re-run rather than a red pull request.
-The ssh alias sets `ConnectTimeout 5`, `BatchMode yes`, and a `ServerAliveInterval 15` / `ServerAliveCountMax 2` pair, so a sleeping or off-network laptop is declared unreachable in seconds instead of absorbing the kernel's SYN retry schedule or parking a build on a half-open connection.
-The builder is inert until Stibnite and Pyrite are activated.
+Every builder alias sets `ConnectTimeout 5`, `BatchMode yes`, and a `ServerAliveInterval 15` / `ServerAliveCountMax 2` pair, so a sleeping or off-network laptop is declared unreachable in seconds instead of absorbing the kernel's SYN retry schedule or parking a build on a half-open connection.
+`checks.<system>.nix-builders-wiring` pins the entries, aliases, forced commands, and key separation across machines, which no single machine's evaluation can see.
+A change takes effect only after both the dispatcher and the builder are activated.
 New VM test modules belong in `vm-tests/` and assign `perSystem.vmTests`, using the same automatically discovered flake-parts composition as the other module directories.
