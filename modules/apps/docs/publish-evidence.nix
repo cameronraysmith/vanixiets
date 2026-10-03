@@ -1,11 +1,13 @@
 # Publish the docs browser report nixbot built for a build.
 #
-#   nix run .#publish-evidence -- build-finished [--out <dir>] [--upload]
+#   nix run .#publish-evidence -- event [--out <dir>] [--upload]
 #   nix run .#publish-evidence -- main --rev <commit> [--out <dir>] [--upload]
 #
 # The browser-evidence effect (modules/effects/vanixiets/effects.nix) runs
-# `build-finished --upload` on nixbot's build_finished event and
-# `main --upload --rev <rev>` on default-branch pushes. Evidence is keyed by
+# `event --upload` on nixbot's pull_request event (a pull request's build
+# settled green, fresh or reused for its head) and on a failed
+# build_finished event, so each settled pull request build publishes once,
+# and `main --upload --rev <rev>` on default-branch pushes. Evidence is keyed by
 # the report's content (attribute and store path), so a report is uploaded
 # once per tier. --upload writes the bundle into the R2 evidence bucket,
 # served at https://evidence.vanixiets.net, with temporary credentials the

@@ -30,30 +30,45 @@ The required verdict check must remain independently enumerated in the CI gate.
 The [report policy](requirements.md#initial-report-and-verdict-policy) names the exports and requires an executable wiring check, including a missing-verdict negative fixture.
 Infrastructure failures that prevent a valid report remain producer failures.
 
-Publication is a separate runtime graph with two entry points, both evaluated from `main` ([D10](decisions.md#d10-publish-main-from-onpush-and-pull-requests-from-build_finished)):
+Publication is a separate runtime graph with three entry points, all evaluated from `main` ([D10](decisions.md#d10-publish-main-from-onpush-and-each-settled-pull-request-build-once)):
 
 ```text
-build_finished effect (pull request         onPush effect on main
-and other newly finished builds)              (publish-evidence main --rev)
-  -> query completed build by number            -> query builds by commit,
-                                                   take the highest number
-                    \                          /
-                     -> select successful named report attribute
-                     -> validate and realize recorded store output
-                     -> validate publishable evidence
-                     -> stage bundle and content-keyed receipt
-                     -> pull request only: probe ttl-90d for main's receipt
-                          (read-only credential); if present, upload
-                          nothing, supersede an earlier comment, stop
-                     -> mint temporary credential for the run's own tier
-                     -> upload files, receipt last and create-only
-                     -> pull request only: upsert one PR comment through
-                          nixbot and record the PR marker
+pull_request effect            build_finished effect      onPush effect on main
+(each succeeded PR build,      (failed builds only)       (publish-evidence
+ fresh or reused)                                          main --rev)
+                 all three share the lock browser-evidence
+  publish-evidence event         publish-evidence event
+  -> query build by number       -> query build by number  -> query builds by commit,
+                                                              take the highest number
+                  \                       |                  /
+                   -> select successful named report attribute
+                   -> validate and realize recorded store output
+                   -> validate publishable evidence
+                   -> stage bundle and content-keyed receipt
+                   -> pull request only: probe ttl-90d for main's receipt
+                        (read-only credential); if present, upload
+                        nothing, supersede an earlier comment, stop
+                   -> mint temporary credential for the run's own tier
+                   -> upload files, receipt last and create-only
+                   -> pull request only: upsert one PR comment through
+                        nixbot, naming the head when the build was reused,
+                        and record the PR marker
 ```
+
+Each settled pull request build reaches exactly one entry point:
+
+| Pull request build | Settles succeeded | Settles failed |
+| --- | --- | --- |
+| fresh | `pull_request` | `build_finished` |
+| reused | `pull_request` | none |
+
+A reused failed build delivers nothing; its report was published by the build it reuses, but no comment names the new head.
 
 Ordinary onPush effects run after successful builds and are unsuitable as the only failed-test diagnostic path.
 An effect ordered after a failing prerequisite is skipped, so the publisher must not depend on the failed verdict.
 A fast-forward landing reuses the batch build and sends no build_finished, so `main` needs the onPush entry point.
+A pull request head with the same tree as an earlier head reuses that build and also sends no build_finished, so succeeded pull request builds publish from `pull_request`, which nixbot delivers after every succeeded build, fresh or reused.
+Neither onEvent entry point sets `when.permission`; nixbot's CI approval (`prApproval` in `modules/nixos/nixbot.nix`) is the trust gate, so bot pull requests such as Renovate's are published too.
 
 ## Existing implementation anchors
 
@@ -64,8 +79,8 @@ A fast-forward landing reuses the batch build and sends no build_finished, so `m
 - `modules/apps/ci/github-check-run.nix`: reporting companion; GitHub API use does not imply Actions execution.
 - `modules/checks/deploy-docs-rehearsal.nix`: loopback rehearsal of artifact lookup and publication.
 - `modules/nixos/nixbot.nix`: best-effort cache-upload behavior.
-- `modules/apps/docs/publish-evidence.nix` and `publish-evidence.sh`: the publisher's `build-finished` and `main` modes.
-- `modules/effects/vanixiets/effects.nix`: the `browser-evidence` entry with `main` and `buildFinished` triggers.
+- `modules/apps/docs/publish-evidence.nix` and `publish-evidence.sh`: the publisher's `event` and `main` modes.
+- `modules/effects/vanixiets/effects.nix`: the `browser-evidence` entry with `main`, `pullRequest`, and `buildFinished` triggers.
 - `modules/terranix/cloudflare.nix`: the adopted bucket and its lifecycle rules.
 - `packages/evidence-worker/` (`@vanixiets/evidence-worker`): the serving Worker, deployed with wrangler.
 
@@ -81,11 +96,11 @@ Reusing an output is not a newly executed test, and the receipt claims no execut
 
 There are two different reuse paths.
 A newly completed nixbot build may realize the report from the Nix cache and still deliver build_finished.
-Whole-build reuse instead suppresses build_finished in pinned nixbot's `nixbot/nixbot/after_build.py:74-79`.
-The build_finished entry point therefore covers newly completed builds only.
+Whole-build reuse instead suppresses build_finished in pinned nixbot's `nixbot/nixbot/after_build.py:74-79`: nixbot reuses a terminal build for a commit with an identical tree (`nixbot/nixbot/build_reuse.py:126-180`) and records no build for the new commit.
 For `main`, the onPush entry point looks the landed commit up in nixbot's builds API and publishes the reused build's report.
+For a pull request, nixbot still delivers `pull_request` after a reused build settles succeeded, with `build` naming the reused build and `pullRequest.headRev` naming the head, so the comment names both.
 The receipt is keyed by the report's attribute and output path, so it claims no execution, fresh or reused, for any build or push.
-Whole-build reuse on branches other than `main` still has no publication path.
+A reused failed pull request build, and whole-build reuse on branches other than `main` and pull request heads, still have no publication path.
 Do not disable caching merely to manufacture publication events.
 Attribute-level availability accepts the API's succeeded and skipped_local states, and execution-versus-cache claims must inspect its cached field rather than infer freshness from succeeded.
 
@@ -105,7 +120,8 @@ Published evidence lives in the adopted R2 bucket `sciexp` under `projects/vanix
 `<obs>` derives from the report's attribute and output path, so every build carrying the same report writes the same keys and a tier receives each report at most once.
 The schema-version-3 receipt is uploaded last with `If-None-Match: *`; an existing identical receipt is reported unchanged, and a different one is a conflict.
 The tier selects retention: 90 days for `main` and other builds without a pull request, 30 days for a pull request whose report `main` has not published, and a reserved 365-day tier for later curation.
-A pull request whose report `main` already published uploads nothing and posts no comment ([D10](decisions.md#d10-publish-main-from-onpush-and-pull-requests-from-build_finished)).
+A non-pull-request build other than `main` reaches `ttl-90d` only when it fails, through build_finished.
+A pull request whose report `main` already published uploads nothing and posts no comment ([D10](decisions.md#d10-publish-main-from-onpush-and-each-settled-pull-request-build-once)).
 Terraform owns every lifecycle rule on the bucket, because R2 lifecycle configuration is bucket-wide.
 Evidence is read through `https://evidence.vanixiets.net/vanixiets/browser-evidence/<tier>/v1/<obs>/`, never through the S3 endpoint; the URL path is the key suffix after `projects/`.
 
@@ -113,6 +129,7 @@ Evidence is read through `https://evidence.vanixiets.net/vanixiets/browser-evide
 
 Pure checks use synthetic, credential-free content.
 The publisher receives credentials only at runtime and never evaluates or executes PR code.
+Its onEvent triggers carry no `when.permission`: nixbot's CI approval holds a pull request from outside the repository until a maintainer approves it, and the publisher reads only the recorded build's outputs.
 It validates artifact paths, report shape, and output identity.
 HTML reports are active untrusted content and need an appropriate isolated serving origin and content policy.
 Links, captions, archive contents, symlinks, and manifest paths require validation before publication.

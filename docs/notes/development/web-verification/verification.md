@@ -1,7 +1,7 @@
 # Verification ledger
 
 This file distinguishes inherited evidence, current implementation checks, and planned demonstrations.
-No entry below claims live deployment or live evidence publication.
+Only the [live publication](#live-publication) section records live evidence publication; no other entry claims live deployment or live publication.
 
 ## Requirement traceability
 
@@ -10,9 +10,9 @@ No entry below claims live deployment or live evidence publication.
 | R1 | Committed journey with independent expected outcomes and required verdict | Implemented; real browser checks pass |
 | R2 | Completed negative report retains attachments and is discoverable by named check | Report and negative control pass; live API retrieval pending |
 | R3 | CLI reproduction and reviewed correction followed by independent rerun | Mobile hero overflow reproduced with Playwright CLI; strengthened scenario fails the required gate on Linux with a kept report and passes after the CSS correction on Linux and Darwin; review pending |
-| R4 | Relevant-input identity and cache-reuse receipt | Receipts name the producing build; `main` landings publish the reused build's report through the onPush lookup; live run pending |
+| R4 | Relevant-input identity and cache-reuse receipt | Receipts name no build; `main` landings publish the reused build's report through the onPush lookup; a reused pull request build publishes from `pull_request` and its comment names the head; live: build 1014's reuse for #3304's head sent no build_finished |
 | R5 | Isolated browser/profile/fixture cleanup checks | CLI smoke has isolation; harness integration pending |
-| R6 | Trusted publisher rehearsal, malformed metadata rejection, no PR evaluation | Loopback rehearsal covers selection, rejection, upload, retry, prefix confinement, and the PR comment; live effect run pending |
+| R6 | Trusted publisher rehearsal, malformed metadata rejection, no PR evaluation | Loopback rehearsal covers selection, rejection, upload, retry, prefix confinement, the PR comment, both event kinds, and reused builds; live v3 runs on #3303, #3304, and #3305 uploaded and commented; the v4 triggers have not run live |
 | R7 | Deliberate defect rejected for the expected reason | Damaged-guide and removed-link controls (Chromium) and a damaged-guide control (WebKit) rejected with retained trace and screenshot on both platforms |
 | R8 | Documented lifecycle seam, later exercised by a second application | Design only |
 
@@ -118,9 +118,10 @@ nix build .#checks.aarch64-darwin.docs-e2e-wiring \
 - R2: the evidence-epoch check rejects invalid epochs, requires identical epochs to reuse the report, and requires a new epoch to change the report and verdict without changing the site derivation.
   Native report outputs for epochs `0` and `1` were realized and their provenance read back.
   Ordinary nixbot restart and Nix `--rebuild` semantics were inspected in pinned source; neither is documented as a replacement mechanism for an existing negative report.
-- R3: credentialed `buildFinished` definitions now require write/admin permission metadata.
-  Real registry evaluation covers unsafe configurations; seven direct assertions against the pinned nixbot matcher cover permission behavior.
+- R3: credentialed `buildFinished` definitions then required write/admin permission metadata.
+  Real registry evaluation covered unsafe configurations; seven direct assertions against the pinned nixbot matcher covered permission behavior.
   Those assertions ran without pytest, which was unavailable in the research Python environment.
+  The v4 triggers removed that requirement and its interpreter rows: nixbot's CI approval is the trust gate, and a permission condition skipped every Renovate pull request ([D10](decisions.md#d10-publish-main-from-onpush-and-each-settled-pull-request-build-once)).
 - R5: a successfully built verdict reading another producer is rejected despite matching enumeration identities.
   Removing the dependency predicate made the negative fixture fail, demonstrating that the fixture exercises that predicate.
 - R6: consumer tests evaluate the real `ai` and `agents` aggregates without named-user enrollment lists.
@@ -160,14 +161,16 @@ No correction adds a live publisher, deployment, or current-revision receipt for
 
 `modules/apps/docs/publish-evidence.nix` exposes `nix run .#publish-evidence`, a `writeShellApplication` sidecar with two modes:
 
-- `build-finished [--out <dir>] [--upload]` for a `build_finished` event, evaluated from `main`;
-- `main --rev <commit> [--out <dir>] [--upload]` for the onPush run on `main`, which finds the commit's highest-numbered build through nixbot's builds API, because a fast-forward landing sends no `build_finished` ([D10](decisions.md#d10-publish-main-from-onpush-and-pull-requests-from-build_finished)).
+- `event [--out <dir>] [--upload]` for a `pull_request` or `build_finished` event, evaluated from `main`;
+- `main --rev <commit> [--out <dir>] [--upload]` for the onPush run on `main`, which finds the commit's highest-numbered build through nixbot's builds API, because a fast-forward landing sends no `build_finished` ([D10](decisions.md#d10-publish-main-from-onpush-and-each-settled-pull-request-build-once)).
 
-The `browser-evidence` effect registers both with `--upload`; storage, retention, and serving follow [D9](decisions.md#d9-publish-to-the-adopted-sciexp-bucket-under-a-confined-prefix).
+The `browser-evidence` effect registers `event --upload` for its `pullRequest` trigger and for its `buildFinished` trigger, which is limited to failed builds, and `main --upload` for its `main` trigger, all under the one `browser-evidence` lock; storage, retention, and serving follow [D9](decisions.md#d9-publish-to-the-adopted-sciexp-bucket-under-a-confined-prefix).
 
 Implemented behavior:
 
-- In `build-finished` mode the event supplies only data: `NIXBOT_EVENT_KIND` must be `build_finished`, and `.build.number`, `.build.rev`, `.build.status`, and `.build.url` are validated before any request.
+- In `event` mode the event supplies only data: `NIXBOT_EVENT_KIND` must be `build_finished` or `pull_request`, any other kind failing with `expected a build_finished or pull_request event, got <kind>`, and `.build.number`, `.build.rev`, `.build.status`, and `.build.url` are validated before any request.
+  An event with a `.pullRequest` object takes the pull request path; one without takes the `ttl-90d` path with no probe or comment.
+  A 40-hex `.pullRequest.headRev` that differs from `.build.rev` marks a reused build: the comment's build line adds `(reused for head <head>, same tree)` and the marker records `head`.
 - The build is fetched from nixbot's build API by number, or in `main` mode by commit; its number and `commit_sha` must equal the event's or the selected build's.
   The aggregate build may have failed.
 - The `checks.x86_64-linux.package-vanixiets-docs-test-e2e-report` attribute must be `succeeded` or `skipped_local`, carry a boolean `cached`, and have a realisable store output.
@@ -180,7 +183,7 @@ Implemented behavior:
 - With `--out`, publication is staged beside the directory and renamed into place, so a rejected run leaves no receipt.
   A repeat for the same attribute and output path is a no-op when the bytes match; an existing receipt for another identity, or a non-empty directory without one, is refused.
 - With `--upload`, the program mints 15-minute credentials, read-write on the run's own tier and, for a pull request, read-only on `ttl-90d/`, unsets the parent secret, and uses only the temporary credentials; `receipt.json` goes last and create-only, so a tier receives each report at most once.
-- A pull request run first probes `ttl-90d/v1/<obs>/receipt.json`: if `main` already published the report, it uploads nothing and posts no comment, and supersedes an earlier comment recorded by its marker; otherwise it uploads to `ttl-30d` and upserts the comment ([D10](decisions.md#d10-publish-main-from-onpush-and-pull-requests-from-build_finished)).
+- A pull request run first probes `ttl-90d/v1/<obs>/receipt.json`: if `main` already published the report, it uploads nothing and posts no comment, and supersedes an earlier comment recorded by its marker; otherwise it uploads to `ttl-30d` and upserts the comment ([D10](decisions.md#d10-publish-main-from-onpush-and-each-settled-pull-request-build-once)).
 
 `publish-evidence-rehearsal` runs the real program against a loopback nixbot API and a chroot store with synthetic report fixtures generated from `policy.ts`.
 A control first runs the repository validator on every fixture, so the program, not the validator, makes each rejection except for the invalid and absolute-path fixtures.
@@ -217,6 +220,12 @@ Each upload row asserts the exit status, the exact output lines, the S3 requests
 9. `non-pr-build-finished`: a build without a pull request, also with `--out`, publishes to `ttl-90d` with no probe and no comment.
 10. No raw request bytes in any row contain the parent secret.
 11. `pr-probe-500`: a baseline probe answered with 500 exits 1 naming the key, with no upload and no comment.
+12. `pr-event-pull-request-kind`: `NIXBOT_EVENT_KIND=pull_request` with a succeeded build and a pull request behaves exactly as `pr-affected`: a `ttl-30d` upload and a comment.
+13. `pr-reused-head`: a `pull_request` event whose `.build.rev` differs from `.pullRequest.headRev` posts the comment with the `reused for head` wording, and the marker records `head`.
+14. `pr-reused-head-reverted-to-main`: a reused build whose report equals `main`'s baseline, with a `current` marker, supersedes the comment, the step 3 and step 4 sequence seen live on #3304.
+15. `wrong-kind`: kind `pull_request_closed` is rejected with `expected a build_finished or pull_request event, got pull_request_closed`.
+
+Every row now invokes the `event` subcommand in place of `build-finished`.
 
 Further rows cover `main` mode's lookups (`main-no-build`, `main-no-api-url`, `main-missing-rev`, `rev-outside-main`), `missing-r2-env`, `upload-500`, a refused comment (`pr-comment-refused`), a corrupted remote receipt (`pr-receipt-conflict`), a superseding run without `NIXBOT_API_TOKEN` (`pr-reverted-no-token`), and a malformed marker (`pr-marker-malformed`).
 
@@ -233,17 +242,34 @@ nix build .#checks.aarch64-darwin.publish-evidence-rehearsal \
 
 Both passed, together with `effects-interpreter` and `terraform-validate` on both systems and `nixbot-wiring` on x86_64-linux.
 A mutation that derives the temporary secret as `sha256(jwt + "x")` made the stub return 403 and that version's `pr-upload` row fail, so the rehearsal detected a wrongly derived credential.
-These results are for schema version 2; no result is recorded for the schema-version-3 rows.
+These results are for schema version 2; no result is recorded for the schema-version-3 rows or for the `event` rows above.
+
+### Live publication
+
+The v3 triggers ran live, with `buildFinished` under `when.permission = "write"`.
+After the GitHub App's permission was fixed, #3303 and #3304 posted affected comments.
+#3305 posted a failed comment with 9 screenshots, each served from `evidence.vanixiets.net` with status 200 and `image/png`.
+On #3304:
+
+- step 2, a change to `modules/nixos/nixbot.nix`, printed `unchanged` and refreshed the comment;
+- step 3, which removed a page, printed `unaffected` and then `superseded`;
+- step 4, whose tree was identical to step 2's, reused build 1014: nixbot sent no build_finished, so no publisher run described the new head, although the `pull_request` docs effect ran for it at 06:12:21.
+
+Step 4 is the gap the v4 triggers close: `pull_request` is delivered after every succeeded build, fresh or reused ([D10](decisions.md#d10-publish-main-from-onpush-and-each-settled-pull-request-build-once)).
+The v4 triggers have not yet run live.
+
+Operational prerequisite: nixbot's GitHub App needs the repository permission `Pull requests: Read and write` to post the comment.
+nixbot caches installation tokens for 48 minutes (`nixbot/nixbot/forge/github.py:153-154`), so a permission change takes effect only once the cached token expires or nixbot restarts.
 
 Not yet verified live:
 
-- nixbot delivering `build_finished` to the effect, with the `when` filters and permission matcher applied, and the onPush run on `main` receiving `NIXBOT_API_URL` and `NIXBOT_API_TOKEN`;
-- a real upload to `sciexp`, and the Terraform plan and apply that adopt the bucket and set its lifecycle rules;
-- the wrangler deployment of `packages/evidence-worker/` and its responses and headers on `evidence.vanixiets.net`;
+- nixbot delivering `pull_request` to the v4 `pullRequest` trigger and `build_finished` to the failed-only `buildFinished` trigger, under the shared lock and without `when.permission`, including a Renovate pull request and a reused failed build, which delivers nothing;
+- the onPush run on `main` receiving `NIXBOT_API_URL` and `NIXBOT_API_TOKEN`;
+- the Terraform plan and apply that adopt the bucket and set its lifecycle rules;
+- the Worker's response headers other than status and content type on `evidence.vanixiets.net`;
 - lifecycle deletion of each tier;
-- the comment as rendered on GitHub, its upsert across builds, and its superseded body;
 - nixbot running a changed effect only after it lands on the default branch;
-- HTML or trace hosting, and whole-build reuse on branches other than `main`.
+- HTML or trace hosting, and whole-build reuse on branches other than `main` and pull request heads.
 
 ## Increment 7: mobile hero overflow repair
 
