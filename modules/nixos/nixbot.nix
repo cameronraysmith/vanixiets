@@ -21,7 +21,9 @@
 #   - A dedicated GitHub App, not buildbot's (id 3305657, buildbot.nix:129):
 #     nixbot needs Checks write and the check_run/check_suite events, which
 #     buildbot-nix does not, so sharing would edit a running service's
-#     registration.
+#     registration. It also needs Pull requests: Read and write, because the
+#     browser-evidence effect comments through /api/v1/pr-comment and GitHub
+#     answers 403 to that comment with read-only access (nixbot docs/GITHUB.md).
 #
 # The webhook secret has two sources and they must agree. The application was
 # registered through GitHub's App manifest flow, which generated a webhook
