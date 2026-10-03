@@ -110,7 +110,8 @@ It answers GET and HEAD only and 405 for other methods; it accepts only allowlis
 Its path grammar rejects the pull request markers under `ttl-30d/pr/`, so they are never served.
 It serves `.png` as `image/png` and `.json` as `application/json`, 404s any other extension or missing object, and never lists.
 Content type comes from the extension, never from object metadata.
-Every response carries `Content-Disposition: inline`, `X-Content-Type-Options: nosniff`, `Content-Security-Policy: default-src 'none'; img-src 'self'; style-src 'none'; sandbox`, `Cache-Control: public, max-age=86400, immutable`, and `Referrer-Policy: no-referrer`.
+Every response carries `X-Content-Type-Options: nosniff`, `Content-Security-Policy: default-src 'none'; sandbox`, `Referrer-Policy: no-referrer`, and `Cross-Origin-Resource-Policy: same-origin`.
+Objects add `Content-Disposition: inline` and `Cache-Control: public, max-age=86400, immutable`; 404 and 405 responses carry `Cache-Control: no-store`.
 Evidence is public to anyone holding a URL; the publisher selects only metadata and raster screenshots, and HTML reports and traces stay unpublished.
 
 The hostname choice rests on three points:
