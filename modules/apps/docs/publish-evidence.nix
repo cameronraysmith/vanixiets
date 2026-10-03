@@ -34,12 +34,15 @@
             # The effect sandbox PATH is runtimeInputs only: curl reaches
             # nixbot's build API and R2's S3 API, nix provides nix-store to
             # realise the recorded report, node runs the validator and signs
-            # the temporary R2 credential.
+            # the temporary R2 credential, and iconv (glibc's on Linux,
+            # libiconv's on Darwin) checks that a selected error-context.md
+            # attachment is valid UTF-8.
             runtimeInputs = [
               pkgs.nodejs_24
               pkgs.curl
               pkgs.jq
               pkgs.nix
+              pkgs.iconv
               pkgs.coreutils
               pkgs.diffutils
               pkgs.findutils

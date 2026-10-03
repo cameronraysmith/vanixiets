@@ -175,24 +175,34 @@ Implemented behavior:
   The aggregate build may have failed.
 - The `checks.x86_64-linux.package-vanixiets-docs-test-e2e-report` attribute must be `succeeded` or `skipped_local`, carry a boolean `cached`, and have a realisable store output.
   Otherwise the program prints `evidence unavailable` and exits 1 without evaluating or building anything.
-- Before validation, attachment paths must be relative and normalised, selected files must be regular files with no symlinked path component, and referenced `.png` attachments must start with the PNG signature.
+- Before validation, attachment paths must be relative and normalised, and selected files must be regular files with no symlinked path component.
+  Attachments are selected by extension and must match their type: `.png` the PNG signature, `.webm` the EBML header `1a45dfa3`, `.zip` the ZIP local file header `504b0304`, and `.md` valid UTF-8 without a NUL byte; other extensions are ignored, and a selected file failing its check is rejected by name ([D9 amendment](decisions.md#amendment-failure-attachments)).
   Report provenance must name `x86_64-linux` and `playwright.config.ts`.
 - The program's own `validate-report.ts` copy then judges the report: a product-failing report is published with `verdict.passed: false` and exit 0; validator exit 2 is rejected.
-- The bundle holds `run.json`, `playwright-report/completion.json`, and the referenced PNG screenshots, without HTML, traces, or other attachments.
+- The bundle holds `run.json`, `playwright-report/completion.json`, and each failed attempt's selected screenshot, video, error context, and trace, without the HTML report; no file size is capped.
   `receipt.json`, schema version 3, is a pure function of the report: `identity` (attribute and output path), `obs`, system, config, report provenance, verdict, and per-file SHA-256 and size, with no build, revision, `cached` value, event, pull request, or timestamp; `destination` is added when uploaded.
 - With `--out`, publication is staged beside the directory and renamed into place, so a rejected run leaves no receipt.
   A repeat for the same attribute and output path is a no-op when the bytes match; an existing receipt for another identity, or a non-empty directory without one, is refused.
 - With `--upload`, the program mints 15-minute credentials, read-write on the run's own tier and, for a pull request, read-only on `ttl-90d/`, unsets the parent secret, and uses only the temporary credentials; `receipt.json` goes last and create-only, so a tier receives each report at most once.
-- A pull request run first probes `ttl-90d/v1/<obs>/receipt.json`: if `main` already published the report, it uploads nothing and posts no comment, and supersedes an earlier comment recorded by its marker; otherwise it uploads to `ttl-30d` and upserts the comment ([D10](decisions.md#d10-publish-main-from-onpush-and-each-settled-pull-request-build-once)).
+- A pull request run first probes `ttl-90d/v1/<obs>/receipt.json`: if `main` already published the report, it uploads nothing and posts no comment, and supersedes an earlier comment recorded by its marker; otherwise it uploads to `ttl-30d/v1/<obs>/` and upserts the comment ([D10](decisions.md#d10-publish-main-from-onpush-and-each-settled-pull-request-build-once)).
+- The comment lists failed attempts, those whose status is not `passed`, in a table of test, browser, attempt, failure kind, and links to the attempt's screenshot, video, context, and hosted-viewer trace, or `No failed attempts.`; it carries no error text from the report.
 
 `publish-evidence-rehearsal` runs the real program against a loopback nixbot API and a chroot store with synthetic report fixtures generated from `policy.ts`.
 A control first runs the repository validator on every fixture, so the program, not the validator, makes each rejection except for the invalid and absolute-path fixtures.
 Its rows cover passing, product-failing, failed-aggregate, and `skipped_local`/cached publication; byte-identical repeat and fresh republication; another identity's destination; a non-empty destination; neither `--out` nor `--upload`; missing, failed, unfetchable, and unrealisable outputs; traversal, absolute, symlinked, and non-PNG attachments; revision, system, and config mismatches; a wrong event kind; malformed build number and revision; and invalid evidence.
+Each fixture's failed attempt references `test-failed-1.png`, `video.webm`, `error-context.md`, and `trace.zip`, each with bytes of its type.
+The failure attachments add these rows:
+
+- `not-webm`, `not-zip`, and `not-utf8` reject a video without the EBML header, a trace without the ZIP header, and error context that is not valid UTF-8, with `evidence rejected: attachment is not WebM data "<path>"`, `... is not ZIP data "<path>"`, and `... is not UTF-8 text "<path>"`;
+- `md-nul` rejects error context containing a NUL byte with the UTF-8 message;
+- `symlink-video` rejects a symlinked video with `symlink in the report: <path>`;
+- `unknown-extension` publishes an attempt that also references `notes.txt`, and the bundle and receipt hold only the screenshot, the trace, `run.json`, and `completion.json`.
+
 Each rejection asserts its exit status, exact message, API requests, and the absence of a publication.
 
 `checks.aarch64-darwin.publish-evidence-rehearsal` passed natively, and `checks.x86_64-linux.publish-evidence-rehearsal` passed on Magnetite, for the `--out`-only program with the schema-version-2 receipt.
 `apps-build`, which runs shellcheck over the program, passed on both platforms for that version.
-No result is recorded yet for schema version 3.
+The schema-version-3, `event`, and failure-attachment rows passed on aarch64-darwin and x86_64-linux, together with `evidence-worker`, `effects-interpreter`, the docs build, and the link check on both systems.
 
 ### Upload and comment rehearsal
 
@@ -209,10 +219,10 @@ An unsigned control request (`unsigned-put`) receives 403.
 The stub serves HEAD, GET, and PUT.
 Each upload row asserts the exit status, the exact output lines, the S3 requests seen, the comments posted, and the marker contents:
 
-1. `main-upload`: a `ttl-90d` upload with the receipt last, and no comment.
+1. `main-upload`: a `ttl-90d/v1/` upload with the receipt last, every attachment type uploaded with its content type (`image/png`, `video/webm`, `application/zip`, `text/plain; charset=utf-8`, and `application/json` for metadata), and no comment.
 2. `main-repeat-other-build`: a different `main` build and revision with the same report output path reports `unchanged` with no PUT.
 3. `pr-unaffected`: with `main`'s receipt present in `ttl-90d`, no PUT, no comment, the `unaffected` line, and, with no marker, silence.
-4. `pr-affected`: with no such receipt, a `ttl-30d` upload, a comment carrying the marker and Worker URLs on `evidence.vanixiets.net`, and a `current` marker.
+4. `pr-affected`: with no such receipt, a `ttl-30d/v1/` upload of all four attachment types with their content types, the exact comment body, including the failed-attempt row and its trace link `https://trace.playwright.dev/?trace=<percent-encoded Worker URL>`, the marker and Worker URLs on `evidence.vanixiets.net`, and a `current` marker.
 5. `pr-affected-retry`: the same build again reports the upload `unchanged`, upserts the comment again, and leaves the marker's content unchanged.
 6. `pr-second-build-same-report`: a new build number with the same output path writes no new object, and the receipt is identical.
 7. `pr-reverted`: with a `current` marker and `main`'s receipt present, the superseded body is posted, the marker becomes `superseded`, and the run logs `superseded #N`; `pr-reverted-again`, a further unaffected run, does nothing.
@@ -220,10 +230,12 @@ Each upload row asserts the exit status, the exact output lines, the S3 requests
 9. `non-pr-build-finished`: a build without a pull request, also with `--out`, publishes to `ttl-90d` with no probe and no comment.
 10. No raw request bytes in any row contain the parent secret.
 11. `pr-probe-500`: a baseline probe answered with 500 exits 1 naming the key, with no upload and no comment.
-12. `pr-event-pull-request-kind`: `NIXBOT_EVENT_KIND=pull_request` with a succeeded build and a pull request behaves exactly as `pr-affected`: a `ttl-30d` upload and a comment.
-13. `pr-reused-head`: a `pull_request` event whose `.build.rev` differs from `.pullRequest.headRev` posts the comment with the `reused for head` wording, and the marker records `head`.
+12. `pr-event-pull-request-kind`: `NIXBOT_EVENT_KIND=pull_request` with a succeeded build and a pull request behaves exactly as `pr-affected`: a `ttl-30d` upload and a comment, which shows `No failed attempts.`.
+13. `pr-reused-head`: a `pull_request` event whose `.build.rev` differs from `.pullRequest.headRev` posts the comment with the `reused for head` wording and `No failed attempts.`, and the marker records `head`.
 14. `pr-reused-head-reverted-to-main`: a reused build whose report equals `main`'s baseline, with a `current` marker, supersedes the comment, the step 3 and step 4 sequence seen live on #3304.
 15. `wrong-kind`: kind `pull_request_closed` is rejected with `expected a build_finished or pull_request event, got pull_request_closed`.
+16. `pr-unknown-extension`: an attempt that also references `notes.txt` uploads exactly the screenshot as `image/png`, the trace as `application/zip`, and the JSON files, and its comment row links only `[screenshot] · [trace]`.
+17. `pr-sanitised-test-name`: a test named ``reader `finds` a | b path`` appears as the cell ``` `reader finds a \| b path` ```, in an exact comment body; the row runs the real publisher with its validator swapped for a copy whose `policy.ts` carries that name, because the real validator rejects such names.
 
 Every row now invokes the `event` subcommand in place of `build-finished`.
 
@@ -242,7 +254,7 @@ nix build .#checks.aarch64-darwin.publish-evidence-rehearsal \
 
 Both passed, together with `effects-interpreter` and `terraform-validate` on both systems and `nixbot-wiring` on x86_64-linux.
 A mutation that derives the temporary secret as `sha256(jwt + "x")` made the stub return 403 and that version's `pr-upload` row fail, so the rehearsal detected a wrongly derived credential.
-These results are for schema version 2; no result is recorded for the schema-version-3 rows or for the `event` rows above.
+These results are for schema version 2; the results for the schema-version-3, `event`, and failure-attachment rows are recorded above.
 
 ### Live publication
 
@@ -256,20 +268,30 @@ On #3304:
 - step 4, whose tree was identical to step 2's, reused build 1014: nixbot sent no build_finished, so no publisher run described the new head, although the `pull_request` docs effect ran for it at 06:12:21.
 
 Step 4 is the gap the v4 triggers close: `pull_request` is delivered after every succeeded build, fresh or reused ([D10](decisions.md#d10-publish-main-from-onpush-and-each-settled-pull-request-build-once)).
-The v4 triggers have not yet run live.
+The v4 triggers then ran live.
+On #3304 a head whose tree matched an earlier head reused build 1018; `pull_request` ran the publisher, which printed `unchanged`, and the comment named the reused build's revision and the new head.
+Renovate's #3276, which `when.permission` had skipped, received an affected comment through `pull_request`.
+The onPush run on `main` published `main`'s report to `ttl-90d` after each landing, and the Terraform apply adopted the bucket and set its lifecycle rules with a follow-up plan reporting no changes.
+A changed effect ran only after it landed on the default branch: #3300's own build did not run its new effect, and #3306's comment used `main`'s publisher.
+
+The failure attachments were published from build 1013's failing report by running the publisher locally against R2: every failed attempt's screenshot, video, `error-context.md`, and trace was uploaded with its content type.
+In Chromium, a directly opened video stayed at `readyState` 0 under the sandboxed policy and played under the media policy, and it could seek only after the Worker answered byte ranges.
+`https://trace.playwright.dev/?trace=<url>` opened a published trace with no preflight while `OPTIONS` stayed 405.
 
 Operational prerequisite: nixbot's GitHub App needs the repository permission `Pull requests: Read and write` to post the comment.
 nixbot caches installation tokens for 48 minutes (`nixbot/nixbot/forge/github.py:153-154`), so a permission change takes effect only once the cached token expires or nixbot restarts.
 
+Observed nixbot status behaviour, recorded rather than patched:
+
+- a pull request head that reuses a build receives `nix-eval` and `nix-build` but no `nixbot/effects` summary, so the required check never reports; push a real change or rebase rather than a head whose tree was already built;
+- a status POST that timed out (`httpx.ReadTimeout`) was applied by GitHub about six minutes later, creating a `nix-build` run in progress after the build had completed; restarting the build in nixbot's UI posted a fresh terminal run.
+
 Not yet verified live:
 
-- nixbot delivering `pull_request` to the v4 `pullRequest` trigger and `build_finished` to the failed-only `buildFinished` trigger, under the shared lock and without `when.permission`, including a Renovate pull request and a reused failed build, which delivers nothing;
-- the onPush run on `main` receiving `NIXBOT_API_URL` and `NIXBOT_API_TOKEN`;
-- the Terraform plan and apply that adopt the bucket and set its lifecycle rules;
-- the Worker's response headers other than status and content type on `evidence.vanixiets.net`;
+- a reused failed build, which delivers nothing;
 - lifecycle deletion of each tier;
-- nixbot running a changed effect only after it lands on the default branch;
-- HTML or trace hosting, and whole-build reuse on branches other than `main` and pull request heads.
+- HTML hosting, and whole-build reuse on branches other than `main` and pull request heads;
+- a failure comment's table posted by nixbot, which needs the failure attachments on `main`.
 
 ## Increment 7: mobile hero overflow repair
 

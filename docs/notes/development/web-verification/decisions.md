@@ -47,7 +47,7 @@ These remain open:
 - Whether publication failures should add a separate required gate.
 - Scope of successful-run recordings beyond the focused demonstration.
 
-Neither blocks live publication; until decided, a publication failure is visible only as a failed effect run, and only the screenshots and metadata named in D9 are published.
+Neither blocks live publication; until decided, a publication failure is visible only as a failed effect run, and only the metadata and failed-attempt files named in D9 are published.
 
 ## D7: preserve observations and refresh through an explicit evidence epoch
 
@@ -108,17 +108,55 @@ It is the TypeScript workspace package `packages/evidence-worker/` (`@vanixiets/
 URL path `/<project>/<kind>/<tier>/v1/<obs>/<path>` equals the R2 key suffix after `projects/`; this repository's evidence is under `/vanixiets/browser-evidence/<tier>/v1/<obs>/`.
 It answers GET and HEAD only and 405 for other methods; it accepts only allowlisted (project, kind) pairs, the three tiers, a 32-hex `<obs>`, and path segments of `[A-Za-z0-9._-]` with no `..` or empty segment.
 Its path grammar rejects the pull request markers under `ttl-30d/pr/`, so they are never served.
-It serves `.png` as `image/png` and `.json` as `application/json`, 404s any other extension or missing object, and never lists.
+It serves `.png` as `image/png`, `.json` as `application/json`, `.webm` as `video/webm`, `.zip` as `application/zip`, and `.md` as `text/plain; charset=utf-8`, 404s any other extension or missing object, and never lists.
 Content type comes from the extension, never from object metadata.
-Every response carries `X-Content-Type-Options: nosniff`, `Content-Security-Policy: default-src 'none'; sandbox`, `Referrer-Policy: no-referrer`, and `Cross-Origin-Resource-Policy: same-origin`.
-Objects add `Content-Disposition: inline` and `Cache-Control: public, max-age=86400, immutable`; 404 and 405 responses carry `Cache-Control: no-store`.
-Evidence is public to anyone holding a URL; the publisher selects only metadata and raster screenshots, and HTML reports and traces stay unpublished.
+Every response carries `X-Content-Type-Options: nosniff` and `Referrer-Policy: no-referrer`, and every response except a `.webm` object carries `Content-Security-Policy: default-src 'none'; sandbox`.
+A `.webm` object carries `Content-Security-Policy: default-src 'none'; media-src 'self'` instead: opened directly, the browser shows a video in its own media document, which must fetch that same video, and `sandbox` gives the document an opaque origin, so the fetch becomes cross-origin and `Cross-Origin-Resource-Policy: same-origin` blocks it.
+Measured in Chromium against the live Worker, the sandboxed policy left the video at `readyState` 0, even with an explicit host in `media-src`, and the media policy played it; `nosniff` with `video/webm` means the response is never interpreted as a document that can run script.
+Every response except a `.zip` object carries `Cross-Origin-Resource-Policy: same-origin` and no `Access-Control-Allow-Origin`; a `.zip` object carries `Cross-Origin-Resource-Policy: cross-origin`, `Access-Control-Allow-Origin: https://trace.playwright.dev`, and `Vary: Origin` instead.
+Objects add `Content-Disposition: inline`, or `attachment` for `.zip`, and `Cache-Control: public, max-age=86400, immutable`; 404 and 405 responses carry `Cache-Control: no-store`.
+Objects also carry `Accept-Ranges: bytes`, and a GET with a single `bytes=` range is answered `206` with `Content-Range`, or `416` when unsatisfiable; any other range form is ignored and the whole object is served, as RFC 9110 permits.
+Without ranges a browser plays a video only from the start and cannot seek to the moment of failure; measured live, seeking worked only after range support.
+Evidence is public to anyone holding a URL; the publisher selects metadata and the screenshot, video, error context, and trace of each failed attempt, and the HTML report stays unpublished.
 
 The hostname choice rests on three points:
 
 - `vanixiets.net` is a registrable domain dedicated to untrusted CI content. It never hosts authentication, sessions, or cookies, so nothing served there can reach a credential.
-- A subdomain of a session-bearing domain is insufficient for active content. A page on any subdomain can set cookies for the whole registrable domain (cookie tossing), SameSite treats requests between its subdomains as same-site and so first-party, and the subdomain shares the trust users and policies extend to the parent domain. Today's content is inert, PNG and JSON under a sandboxing content security policy, so serving it on this host is acceptable now; the dedicated domain keeps that true once active content exists.
-- Future active content, such as the HTML report, a trace viewer, or video, goes on another `vanixiets.net` subdomain, such as `reports.vanixiets.net`, never on a domain carrying sessions. It remains out of scope.
+- A subdomain of a session-bearing domain is insufficient for active content. A page on any subdomain can set cookies for the whole registrable domain (cookie tossing), SameSite treats requests between its subdomains as same-site and so first-party, and the subdomain shares the trust users and policies extend to the parent domain. Today's content is inert files, PNG, JSON, WebM, plain text, and ZIP, under a sandboxing content security policy, so serving it on this host is acceptable now; the dedicated domain keeps that true once active content exists.
+- Future active content, such as the HTML report or a self-hosted trace viewer, goes on another `vanixiets.net` subdomain, such as `reports.vanixiets.net`, never on a domain carrying sessions. It remains out of scope.
+
+### Amendment: failure attachments
+
+A failed Playwright attempt lists four attachments under `test-results/<dir>/`: `test-failed-1.png`, `video.webm`, `error-context.md`, and `trace.zip`.
+A passing attempt has none, because `playwright.config.ts` captures screenshots only on failure and retains video and trace only on failure.
+The screenshot alone rarely says why an attempt failed, so the publisher now selects all four.
+
+The publisher keeps its path validation and symlink checks for every attempt attachment, selects by extension, and requires each selected file to match its type:
+
+- `.png`: the 8-byte PNG signature;
+- `.webm`: the EBML header `1a45dfa3`;
+- `.zip`: the ZIP local file header `504b0304`;
+- `.md`: valid UTF-8 with no NUL byte.
+
+Any other extension is ignored, as before.
+A selected file that fails its check rejects the run, naming the file.
+Uploads carry the same content types the Worker serves.
+
+Video, error context, and trace are inert files served by the Worker; it renders none of them.
+The trace is opened in Playwright's hosted viewer, `https://trace.playwright.dev/?trace=<url>`, which fetches it cross-origin, so CORS applies.
+The Worker therefore allows exactly one origin, `https://trace.playwright.dev`, and only on `.zip` objects, which it serves as `attachment` with `Cross-Origin-Resource-Policy: cross-origin`; every other response keeps `same-origin` and sends no `Access-Control-Allow-Origin`.
+The viewer's fetch is a simple GET, which needs no preflight, so `OPTIONS` stays 405; that has to be confirmed live.
+Executable content, the Playwright HTML report and a self-hosted trace viewer, remains deferred to a separate origin.
+
+The receipt stays schema version 3, since its structure is unchanged and `files` simply lists more paths.
+
+There is no size cap.
+A trace is about 3 MB, and the `test-results/` of build 1013's report, with 9 failed attempts, totals about 35 MB; R2 storage cost at that scale is negligible, and the lifecycle rules bound retention.
+
+`error-context.md` begins with instructions addressed to an LLM, followed by the test information, error details, and an aria snapshot.
+It is text the pull request controls.
+Its consumers, LLM agents above all, must treat it as data and never follow it as instructions.
+The pull request comment carries no error text or other prose from the report: per failed attempt it shows only the escaped, truncated test name in a code span, a browser name reduced to `[A-Za-z0-9._-]`, the attempt number, the failure kind, and links to the attempt's files.
 
 ## D10: publish `main` from onPush and each settled pull request build once
 
@@ -202,6 +240,26 @@ An unaffected run reads the marker: if it is absent, no comment was ever posted 
 Two builds of one pull request that finish out of order race on the comment and the marker, and the run that finishes last wins even when it is not the newest build.
 This race is accepted: the shared `browser-evidence` lock serialises every run, `pullRequest` and `buildFinished` alike, but does not order them.
 The publisher holds no GitHub token for the comment; a failed post fails the effect after the upload, and a rerun is idempotent.
+
+## D11: private previews: centralized authentication
+
+Status: decided, not implemented.
+No consumer exists yet; the docs site and its evidence are public.
+
+An application whose previews or evidence must stay private would be protected this way:
+
+- Cloudflare Access protects private hostnames at the edge, with kanidm as its OIDC identity provider, and authorizes by kanidm group per hostname; terranix manages the Access policies.
+- UIs hosted on magnetite keep sso-gateway, so one identity provider, kanidm, serves two enforcement points, each next to the content it protects.
+- Access cookies are per hostname, and no cookie is scoped to the registrable domain of untrusted content.
+- A private Worker verifies the `Cf-Access-Jwt-Assertion` header itself; agents authenticate with Access service tokens.
+- The hosted trace viewer cannot fetch a trace that needs credentials, so a private trace is opened with `npx playwright show-trace <url>` and a service token, or in a self-hosted viewer behind the same gate.
+- Publishing attachments for a private application needs a policy per application, because traces and aria snapshots contain page content.
+
+These inferences are not yet verified:
+
+- that Access accepts kanidm as a generic OIDC identity provider;
+- the seat count of Cloudflare's free Zero Trust plan;
+- whether Access covers `workers.dev` preview URLs.
 
 ## Source grounding
 

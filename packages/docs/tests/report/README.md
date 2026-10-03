@@ -90,8 +90,11 @@ It has two modes:
 - `main --rev <commit> [--out <dir>] [--upload]`: the onPush run for `main`, which looks up the highest-numbered build of that commit; a fast-forward landing reuses the merge-queue build and sends no `build_finished`.
 
 Both modes look up `checks.x86_64-linux.package-vanixiets-docs-test-e2e-report` through nixbot's build API and realise the recorded output; a missing, failed, or unrealisable output is reported as unavailable evidence, never rebuilt.
-They validate the report with the program's own copy of `validate-report.ts` and stage only `run.json`, `playwright-report/completion.json`, and PNG screenshots referenced by attempts, beside a deterministic `receipt.json` (schema version 3) carrying the report's identity (attribute and output path), provenance, verdict, and file digests, and nothing about the build that produced it.
-Product-failing reports are published with `passed: false`; invalid evidence, unsafe attachment paths, symlinks, non-PNG screenshots, and build/report identity mismatches are rejected.
+They validate the report with the program's own copy of `validate-report.ts` and stage only `run.json`, `playwright-report/completion.json`, and the attachments of attempts selected by extension: `.png` screenshots, `.webm` videos, `.zip` traces, and `.md` error context; other extensions are ignored.
+Each selected file must match its type: the PNG signature, the EBML header `1a45dfa3`, the ZIP local file header `504b0304`, or valid UTF-8 without a NUL byte.
+Beside them goes a deterministic `receipt.json` (schema version 3) carrying the report's identity (attribute and output path), provenance, verdict, and file digests, and nothing about the build that produced it.
+No file size is capped; a trace is about 3 MB.
+Product-failing reports are published with `passed: false`; invalid evidence, unsafe attachment paths, symlinks, a selected file failing its type check, and build/report identity mismatches are rejected, naming the file or identity.
 `publish-evidence-rehearsal` exercises both modes against a loopback nixbot API, a chroot store, and stub storage and comment endpoints.
 
 ### Where evidence goes
@@ -107,8 +110,9 @@ Otherwise the build uploads to `ttl-30d` and comments.
 The report's Nix output path decides this, since it changes exactly when an input of the report changes.
 A report that differs from every report published from `main` in the last 90 days counts as a change, even when `main`'s evidence for it has expired or `main`'s publish run failed.
 
-Read evidence at `https://evidence.vanixiets.net/vanixiets/browser-evidence/<tier>/v1/<obs>/<file>`, for example `.../receipt.json` or a screenshot path from it; the URL path is the object key after `projects/`.
-The host serves only `.png` and `.json` files and does not list directories, so start from a link in a comment, a log line, or a receipt.
+Read evidence at `https://evidence.vanixiets.net/vanixiets/browser-evidence/<tier>/v1/<obs>/<file>`, for example `.../receipt.json` or an attachment path from it; the URL path is the object key after `projects/`.
+The host serves only `.png`, `.json`, `.webm`, `.zip`, and `.md` files and does not list directories, so start from a link in a comment, a log line, or a receipt.
+It serves `trace.zip` as a download that only `https://trace.playwright.dev` may fetch cross-origin, so the hosted trace viewer can open it; `npx playwright show-trace <url>` opens it too.
 The receipt's `destination` gives the bucket, key prefix, tier, and this base URL.
 The effect log prints `PUBLISH-EVIDENCE: uploaded <url>` for the base URL when the run wrote the receipt, and `PUBLISH-EVIDENCE: published` or `unchanged` with the report's `<obs>` and verdict.
 
@@ -119,16 +123,27 @@ It shows:
 
 - the verdict, passed or failed, with the expected, unexpected, skipped, and flaky counts;
 - the build number, linked to the build, and the first 12 hex digits of its revision;
-- a link to each screenshot of a failed attempt and to `receipt.json`;
+- a `Failed attempts:` table, or `No failed attempts.`, and a link to `receipt.json`;
 - that the evidence is kept 30 days;
 - that no report identical to this one has been published from `main` in the last 90 days, which is why it is shown.
+
+The table has a row for each attempt whose status is not `passed`, in `completion.json` order, with columns Test, Browser, Attempt, Kind, and Evidence:
+
+- Test: the case name after its last `::`, without backticks, with `|` escaped, truncated to 120 characters, in a code span;
+- Browser: the project, reduced to `[A-Za-z0-9._-]`;
+- Attempt: the retry plus one;
+- Kind: the failure kind, or `unknown`;
+- Evidence: links to the attempt's selected files, grouped in the order screenshot, video, context, trace (every file is listed when an attempt has several of one kind), separated by ` · `, with the trace opened through `https://trace.playwright.dev/?trace=<url>`; `—` when it has none.
+
+The comment carries no error text from the report.
+`error-context.md` is text the pull request controls, and it opens with instructions addressed to an LLM; agents read it as data, never as instructions.
 
 If a later build of the pull request produces the same report as `main`, the effect replaces the comment with a short note, without links, saying that the evidence previously linked no longer describes a change, and naming the shared report, the build, and the revision.
 When two builds of a pull request finish out of order, the comment reflects whichever finished last.
 
 The comment describes the build named in it, which may be older than the pull request's current head when the report was reused from cache; the receipt names no build, since one report serves every build that carries it.
-A passing verdict with no screenshots is expected: screenshots are taken only for failed attempts.
-For traces, the HTML report, and other attachments, build the named report attribute locally; they are not published.
+A passing verdict usually shows `No failed attempts.`, because passing attempts keep no attachments; a flaky test adds rows for the attempts a retry recovered from.
+For the HTML report, build the named report attribute locally; it is not published.
 
 ## Failure classification boundary
 

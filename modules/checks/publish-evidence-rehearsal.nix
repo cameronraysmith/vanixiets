@@ -13,36 +13,50 @@
 #
 # The report fixtures are synthetic trees in the artifact contract's shape
 # (packages/docs/tests/report/README.md), built from the repository's own
-# policy.ts matrix. A control first runs the repository validator on each:
-# the publisher's rejections below are then its own, not the validator's,
-# except for the invalid-evidence row and the absolute path, which the
-# validator would reject too.
+# policy.ts matrix. A failed attempt carries, as Playwright's does, a PNG
+# screenshot, video.webm, error-context.md and trace.zip. A control first
+# runs the repository validator on each: the publisher's rejections below
+# are then its own, not the validator's, except for the invalid-evidence row
+# and the absolute path, which the validator would reject too. One fixture
+# renames the failing test to hold a backtick and a `|`: the validator admits
+# only policy.ts's names, so that row runs the real publisher with its
+# validator path pointed at a copy of the report tools whose policy.ts holds
+# that name.
 #
 # Asserted: a passing and an assertion-failing report are published with the
-# exact bundle (run.json, completion.json, referenced PNG screenshots) and
-# the schemaVersion 3 receipt, a function of the report alone: its identity
+# exact bundle (run.json, completion.json, and every screenshot, video,
+# error context and trace the attempts reference) and the schemaVersion 3
+# receipt, a function of the report alone: its identity
 # is [attribute, outPath] and <obs> the first 32 hex of that identity's
 # compact JSON's SHA-256, so another build of the same report (a failed
 # aggregate, a skipped_local attribute) reproduces it byte for byte. A
 # repeat run is a no-op and a fresh destination receives identical bytes.
 # Every rejected run exits 1 with its exact message and leaves no receipt
 # or staging directory behind: another report's --out, a missing, failed,
-# unfetchable or unrealisable report, traversal, absolute, symlinked or
-# non-PNG attachments, build/report identity mismatches, a wrong event kind,
-# malformed events and invalid evidence. Rows rejected from the event alone
-# make no API request.
+# unfetchable or unrealisable report, traversal, absolute or symlinked
+# attachments (a screenshot, a video), a screenshot that is not PNG, a video
+# that is not EBML, a trace that is not a ZIP, an error context that is not
+# UTF-8 or holds a NUL, build/report identity mismatches, a wrong event
+# kind, malformed events and invalid evidence. Rows rejected from the event
+# alone make no API request. An attachment of any other extension (.txt) is
+# neither checked, uploaded, listed nor linked.
 #
 # Upload rows, each with its exact exit status, output lines, S3 requests
-# (method, key, status, credential scope and prefix), comments and marker:
-# main uploads to ttl-90d/v1/<obs>/ receipt last and never comments, and
-# another main build of the same report writes nothing. A pull request build
-# first probes ttl-90d for main's receipt of its report with a read-only
-# credential: present, it is unaffected and uploads nothing; absent, it
-# uploads to ttl-30d with a credential confined to ttl-30d/, upserts one
-# marker comment linking the Worker URLs on evidence.vanixiets.net and
-# records a `current` marker at ttl-30d/pr/<n>.json; a probe failure names
-# its key. Retries and later builds of one report write no new objects. A
-# reverted pull request supersedes its current comment once. The stub
+# (method, key, Content-Type, status, credential scope and prefix), comments
+# and marker: main uploads to ttl-90d/v1/<obs>/ receipt last and never
+# comments, and another main build of the same report writes nothing. A
+# pull request build first probes ttl-90d/v1/ for main's receipt of its
+# report with a read-only credential:
+# present, it is unaffected and uploads nothing; absent, it uploads to
+# ttl-30d with a credential confined to ttl-30d/, upserts one marker comment
+# and records a `current` marker at ttl-30d/pr/<n>.json; a probe failure
+# names its key. The comment is asserted byte for byte: its failed-attempt
+# table links each attempt's screenshot, video, context and trace (the trace
+# through trace.playwright.dev with the URI-encoded Worker URL), only for
+# the files published, with the test name sanitised; a report without a
+# failed attempt says `No failed attempts.`. Retries and later builds of one
+# report write no new objects. A reverted pull request supersedes its
+# current comment once. The stub
 # accepts only requests SigV4-signed with a temporary credential minted from
 # the parent secret, enforces the token's scope and prefixPaths (negative
 # controls sign their own read-only and ttl-30d credentials), no pull request
@@ -77,7 +91,16 @@
       otherRev = "fedcba9876543210fedcba9876543210fedcba98";
       reportAttr = "checks.x86_64-linux.package-vanixiets-docs-test-e2e-report";
       unrealisable = "/nix/store/zyxwvsrqpnmlkjihgfdcba9876543210-vanixiets-docs-e2e-report";
-      screenshot = "test-results/reader-journey-chromium/test-failed-1.png";
+      # The failed attempt's attachments, as Playwright names them.
+      attemptDir = "test-results/reader-journey-chromium";
+      screenshot = "${attemptDir}/test-failed-1.png";
+      video = "${attemptDir}/video.webm";
+      errorContext = "${attemptDir}/error-context.md";
+      trace = "${attemptDir}/trace.zip";
+      # The failing test's name in policy.ts, and the name the sanitised
+      # fixture's policy gives it instead.
+      testName = "reader finds bootstrap prerequisites and a guided reading path";
+      unsafeTestName = "reader `finds` a | b path";
 
       # Fixture credentials: the parent secret must never reach the stub.
       accountId = "abcdefabcdefabcdefabcdefabcdef01";
@@ -97,43 +120,79 @@
       # The Worker URL of evidenceKeyRoot: the key without `projects/`.
       evidenceOrigin = "https://evidence.vanixiets.net/vanixiets/browser-evidence";
 
-      # node fixture.mjs <variant> <out>: one synthetic report. The reader
-      # journey of the first project carries the failed attempt, retried to
-      # a pass (flaky) in `passing` and final everywhere else it fails;
-      # `steady` passes at the first attempt, so it has no screenshot.
+      # node fixture.mjs <variant> <out> <policy.ts>: one synthetic report.
+      # The reader journey of the first project carries the failed attempt,
+      # retried to a pass (flaky) in `passing` and final everywhere else it
+      # fails; `steady` passes at the first attempt, so it has no
+      # attachments. The failed attempt references a screenshot, video,
+      # error context and trace, except in `unknown-extension`, whose attempt
+      # references a screenshot, a trace and notes.txt.
       fixture = pkgs.writeText "publish-evidence-report-fixture.mjs" ''
         import { mkdirSync, symlinkSync, writeFileSync } from "node:fs";
         import { dirname, join } from "node:path";
-        import { requiredCases, requiredEngines } from "${reportTools}/policy.ts";
 
-        const [variant, root] = process.argv.slice(2);
-        // A 1x1 PNG: the publisher checks the signature, not the extension.
+        const [variant, root, policy] = process.argv.slice(2);
+        const { requiredCases, requiredEngines } = await import(policy);
+        // The publisher checks each attachment's leading bytes, not only its
+        // extension: a 1x1 PNG, an EBML header, a ZIP local file header,
+        // and UTF-8 text with non-ASCII characters.
         const png = Buffer.from(
           "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==",
           "base64",
         );
+        const webm = Buffer.concat([Buffer.from("1a45dfa3", "hex"), Buffer.from("video fixture")]);
+        const zip = Buffer.concat([Buffer.from("504b0304", "hex"), Buffer.from("trace fixture")]);
+        const markdown = "# Instructions\n\nTest info: reader journey \u2014 \u00fcn\u00efc\u00f6de\n";
         const system = variant === "darwin" ? "aarch64-darwin" : "x86_64-linux";
         const config = variant === "negative-config" ? "playwright.negative.config.ts" : "playwright.config.ts";
         const projects = config === "playwright.config.ts" ? requiredEngines[system] : ["chromium"];
-        const failing = ["failing", "traversal", "absolute", "symlink", "not-png"].includes(variant);
-        const dir = "test-results/reader-journey-chromium";
+        const failing = [
+          "failing",
+          "traversal",
+          "absolute",
+          "symlink",
+          "not-png",
+          "not-webm",
+          "not-zip",
+          "not-utf8",
+          "md-nul",
+          "symlink-video",
+          "unknown-extension",
+          "sanitised",
+        ].includes(variant);
+        const dir = "${attemptDir}";
         const shot =
           { traversal: dir + "/../reader-journey-chromium/test-failed-1.png", absolute: join(root, "${screenshot}") }[
             variant
           ] ?? "${screenshot}";
-        const failure = [dir + "/trace.zip", shot];
+        const failure =
+          variant === "unknown-extension"
+            ? [shot, dir + "/notes.txt", "${trace}"]
+            : [shot, "${video}", "${errorContext}", "${trace}"];
 
         function write(name, data) {
           mkdirSync(dirname(join(root, name)), { recursive: true });
           writeFileSync(join(root, name), data);
         }
         write("playwright-report/index.html", "<html>report</html>");
-        write(dir + "/trace.zip", "trace fixture");
+        write("${trace}", variant === "not-zip" ? "trace fixture" : zip);
+        write(
+          "${errorContext}",
+          // "# " then 0xc3 0x28, which is not UTF-8, then a newline.
+          { "not-utf8": Buffer.from("2320c3280a", "hex"), "md-nul": "# Context\0\n" }[variant] ?? markdown,
+        );
+        write(dir + "/notes.txt", "notes fixture\n");
         if (variant === "symlink") {
           write(dir + "/real.png", png);
           symlinkSync("real.png", join(root, "${screenshot}"));
         } else {
           write("${screenshot}", variant === "not-png" ? "screenshot fixture" : png);
+        }
+        if (variant === "symlink-video") {
+          write(dir + "/real.webm", webm);
+          symlinkSync("real.webm", join(root, "${video}"));
+        } else {
+          write("${video}", variant === "not-webm" ? "video fixture" : webm);
         }
 
         const counts = { expected: 0, unexpected: 0, skipped: 0, flaky: 0 };
@@ -210,15 +269,46 @@
         "absolute"
         "symlink"
         "not-png"
+        "not-webm"
+        "not-zip"
+        "not-utf8"
+        "md-nul"
+        "symlink-video"
+        "unknown-extension"
+        "sanitised"
         "darwin"
         "negative-config"
         "invalid"
       ];
+
+      # The report tools with the failing test renamed to unsafeTestName.
+      # The validator admits only policy.ts's names, none of which holds a
+      # backtick or a `|`, so the comment's sanitiser is otherwise
+      # unreachable from a valid report.
+      sanitisedTools = pkgs.runCommand "publish-evidence-sanitised-report-tools" { } ''
+        cp -r ${reportTools} $out
+        chmod -R u+w $out
+        substituteInPlace $out/policy.ts \
+          --replace-fail ${lib.escapeShellArg testName} ${lib.escapeShellArg unsafeTestName}
+      '';
+      # The real publisher with its interpolated validator path pointed at
+      # sanitisedTools: nothing else of the program changes, and
+      # --replace-fail proves the path it replaces is the validator's.
+      sanitisedPublisher = pkgs.runCommand "publish-evidence-sanitised-policy" { } ''
+        substitute ${publishEvidenceProgram} $out \
+          --replace-fail ${reportTools}/validate-report.ts ${sanitisedTools}/validate-report.ts
+        chmod +x $out
+      '';
+
       reports = lib.genAttrs variants (
         variant:
-        pkgs.runCommand "vanixiets-docs-e2e-report-${variant}" {
-          nativeBuildInputs = [ pkgs.nodejs_24 ];
-        } "node ${fixture} ${variant} $out"
+        pkgs.runCommand "vanixiets-docs-e2e-report-${variant}"
+          {
+            nativeBuildInputs = [ pkgs.nodejs_24 ];
+          }
+          "node ${fixture} ${variant} $out ${
+            if variant == "sanitised" then sanitisedTools else reportTools
+          }/policy.ts"
       );
 
       # The stub's S3 endpoint stands in for R2 at a path prefix: it accepts
@@ -562,6 +652,12 @@
                 "traversal"
                 "symlink"
                 "not-png"
+                "not-webm"
+                "not-zip"
+                "not-utf8"
+                "md-nul"
+                "symlink-video"
+                "unknown-extension"
                 "darwin"
                 "negative-config"
               ]
@@ -569,11 +665,14 @@
               node ${reportTools}/validate-report.ts validate "$report" > /dev/null \
                 || { echo "control: fixture $report is not valid evidence" >&2; exit 1; }
             done
-            for report in ${reports.invalid} ${reports.absolute}; do
+            for report in ${reports.invalid} ${reports.absolute} ${reports.sanitised}; do
               status=0
               node ${reportTools}/validate-report.ts validate "$report" > /dev/null 2>&1 || status=$?
               [ "$status" = 2 ] || { echo "control: validator exited $status for $report, expected 2" >&2; exit 1; }
             done
+            # The sanitised fixture is valid only under its own policy.
+            node ${sanitisedTools}/validate-report.ts validate ${reports.sanitised} > /dev/null \
+              || { echo "control: fixture ${reports.sanitised} is not valid evidence under its policy" >&2; exit 1; }
 
             export HOME=$TMPDIR
             export NIX_REMOTE="local?root=$TMPDIR/store-root"
@@ -628,9 +727,11 @@
               : > "$STUB_STATE/s3.jsonl"
               : > "$STUB_STATE/comments.jsonl"
             }
-            # run <name> <program args...>: runs publish-evidence with fresh
-            # logs and records the exit status. Each row's S3 requests are
-            # also kept, tagged with the row, for assertions across rows.
+            # run <name> <program args...>: runs $publisher (publish-evidence
+            # unless a row says otherwise) with fresh logs and records the
+            # exit status. Each row's S3 requests are also kept, tagged with
+            # the row, for assertions across rows.
+            publisher=${publishEvidenceProgram}
             run() {
               name=$1
               shift
@@ -639,7 +740,7 @@
               output="$TMPDIR/rows/$name"
               mkdir -p "$(dirname "$output")"
               status=0
-              ${publishEvidenceProgram} "$@" > "$output" 2>&1 || status=$?
+              "$publisher" "$@" > "$output" 2>&1 || status=$?
               cat "$output"
               jq -c --arg row "$name" '. + {row: $row}' "$STUB_STATE/s3.jsonl" >> "$TMPDIR/s3-rows.jsonl"
             }
@@ -768,7 +869,11 @@
                 cmp "$report/$file" "$dir/$file" || fail "$file differs from the report"
               done
             }
-            bundle=(playwright-report/completion.json run.json ${screenshot})
+            # Bundles in the publisher's order (LC_ALL=C), as the receipt
+            # lists them: every attachment of the failed attempt, a .txt
+            # never.
+            bundle=(playwright-report/completion.json run.json ${errorContext} ${screenshot} ${trace} ${video})
+            unknown_bundle=(playwright-report/completion.json run.json ${screenshot} ${trace})
             steady_bundle=(playwright-report/completion.json run.json)
             passing_counts='{"expected": 29, "unexpected": 0, "skipped": 0, "flaky": 1}'
             failing_counts='{"expected": 29, "unexpected": 1, "skipped": 0, "flaky": 0}'
@@ -888,12 +993,28 @@
               'absolute attachment path "${reports.absolute}/${screenshot}"'
             reject symlink 31 ${reports.symlink} "symlink in the report: ${screenshot}"
             reject not-png 32 ${reports.not-png} 'attachment is not PNG data "${screenshot}"'
+            # Each selected attachment's bytes must match its extension:
+            # EBML for .webm, a ZIP local file header for .zip, UTF-8
+            # without NUL for .md.
+            reject not-webm 60 ${reports.not-webm} 'attachment is not WebM data "${video}"'
+            reject not-zip 61 ${reports.not-zip} 'attachment is not ZIP data "${trace}"'
+            reject not-utf8 62 ${reports.not-utf8} 'attachment is not UTF-8 text "${errorContext}"'
+            reject md-nul 63 ${reports.md-nul} 'attachment is not UTF-8 text "${errorContext}"'
+            reject symlink-video 64 ${reports.symlink-video} "symlink in the report: ${video}"
             reject system-mismatch 33 ${reports.darwin} \
               'report provenance {"system":"aarch64-darwin","config":"playwright.config.ts"} does not match ${reportAttr} {"system":"x86_64-linux","config":"playwright.config.ts"}'
             reject config-mismatch 34 ${reports.negative-config} \
               'report provenance {"system":"x86_64-linux","config":"playwright.negative.config.ts"} does not match ${reportAttr} {"system":"x86_64-linux","config":"playwright.config.ts"}'
             reject invalid-evidence 35 ${reports.invalid} \
               "invalid report: Invalid Playwright evidence: runner infrastructure error"
+
+            # unknown-extension: an attachment of another extension is
+            # ignored; the bundle and receipt hold only the selected files.
+            build 65 failed ${rev} "[$(report succeeded ${reports.unknown-extension})]"
+            event 65 failed
+            run unknown-extension event --out "$pub/unknown-extension"
+            expect_published "$pub/unknown-extension" ${reports.unknown-extension} 65 false "$failing_counts" \
+              "''${unknown_bundle[@]}"
 
             build 36 succeeded ${otherRev} "[$(report succeeded ${reports.passing})]"
             event 36
@@ -967,8 +1088,8 @@
               [ "$(s3_log)" = "$expected" ] || fail "S3 requests $(s3_log), expected $expected"
             }
             # upload <credential> <prefix> <file...>: the requests of an
-            # upload to an empty prefix: the receipt read, every file, the
-            # receipt last and conditional.
+            # upload to an empty prefix: the receipt read, every file with
+            # its extension's Content-Type, the receipt last and conditional.
             upload() {
               local credential=$1 prefix=$2 file type
               shift 2
@@ -976,7 +1097,11 @@
               for file in "$@"; do
                 case "$file" in
                   *.png) type=image/png ;;
-                  *) type=application/json ;;
+                  *.webm) type=video/webm ;;
+                  *.zip) type=application/zip ;;
+                  *.md) type="text/plain; charset=utf-8" ;;
+                  *.json) type=application/json ;;
+                  *) fail "upload: no Content-Type for $file" ;;
                 esac
                 req PUT 200 "$credential" "$prefix/$file" "$type"
               done
@@ -1024,6 +1149,55 @@
             expect_comment_body() {
               jq -se --rawfile expected "$1" '.[0].body == $expected' "$STUB_STATE/comments.jsonl" > /dev/null \
                 || fail "comment body $(jq -sc '.[0].body' "$STUB_STATE/comments.jsonl"), expected $(jq -Rsc . "$1")"
+            }
+            # links <tier> <obs> <kind...>: the Evidence cell of the fixtures'
+            # failed attempt linking <kind...> (screenshot, video, context,
+            # trace) of the bundle at <tier>/v1/<obs>/. The trace opens in
+            # trace.playwright.dev with the Worker URL percent-encoded here
+            # by hand, independently of the publisher's encoder.
+            links() {
+              local tier=$1 obs=$2 base kind cell=""
+              shift 2
+              base="${evidenceOrigin}/$tier/v1/$obs/"
+              for kind in "$@"; do
+                [ -z "$cell" ] || cell+=" · "
+                case $kind in
+                  screenshot) cell+="[screenshot](''${base}${screenshot})" ;;
+                  video) cell+="[video](''${base}${video})" ;;
+                  context) cell+="[context](''${base}${errorContext})" ;;
+                  trace) cell+="[trace](https://trace.playwright.dev/?trace=https%3A%2F%2Fevidence.vanixiets.net%2Fvanixiets%2Fbrowser-evidence%2F$tier%2Fv1%2F$obs%2Ftest-results%2Freader-journey-chromium%2Ftrace.zip)" ;;
+                esac
+              done
+              echo "$cell"
+            }
+            # failed_table <test> <evidence>: the failed-attempt table of the
+            # fixtures' one failed attempt (chromium, attempt 1, product).
+            failed_table() {
+              printf '%s\n' \
+                "Failed attempts:" \
+                "" \
+                "| Test | Browser | Attempt | Kind | Evidence |" \
+                "|---|---|---|---|---|" \
+                "| \`$1\` | chromium | 1 | product | $2 |"
+            }
+            # affected_comment <verdict> <build line> <url> <evidence block>:
+            # the exact affected comment on the bundle at <url>, into
+            # $TMPDIR/expected-comment.md.
+            affected_comment() {
+              printf '%s\n' \
+                "### Browser evidence: $1" \
+                "" \
+                "This pull request changes the docs site's browser evidence." \
+                "" \
+                "$2" \
+                "" \
+                "$4" \
+                "" \
+                "Receipt: [receipt.json](''${3}receipt.json)" \
+                "" \
+                'No report identical to this one has been published from `main` in the last 90 days, so it is shown here.' \
+                "" \
+                "Evidence kept 30 days." > "$TMPDIR/expected-comment.md"
             }
             # marker_key <pr>: the pull request's marker object.
             marker_key() {
@@ -1195,19 +1369,12 @@
             expect_receipt "$objects/$f30/receipt.json" ${reports.failing} false "$failing_counts" \
               "$(destination ttl-30d "$f_obs")" "''${bundle[@]}"
             expect_comments 1
-            expect_comment_has \
-              "### Browser evidence: failed" \
-              "This pull request changes the docs site's browser evidence." \
-              "[build 51](https://nixbot.example/builds/51) at \`${lib.substring 0 12 affectedRev}\`" \
-              "29 expected, 1 unexpected, 0 flaky, 0 skipped" \
-              "[${screenshot}](''${f_url}${screenshot})" \
-              "[receipt.json](''${f_url}receipt.json)" \
-              'No report identical to this one has been published from `main` in the last 90 days, so it is shown here.' \
-              "kept 30 days"
-            jq -se '.[0].body | contains("](https://evidence.vanixiets.net/vanixiets/browser-evidence/ttl-30d/v1/")
-                and (contains("ttl-90d") or contains("scientistexperience") | not)' \
-              "$STUB_STATE/comments.jsonl" > /dev/null \
-              || fail "comment links: $(jq -sc . "$STUB_STATE/comments.jsonl")"
+            # The exact body: the failed attempt's row links all four files.
+            affected_comment failed \
+              "[build 51](https://nixbot.example/builds/51) at \`${lib.substring 0 12 affectedRev}\`: 29 expected, 1 unexpected, 0 flaky, 0 skipped." \
+              "$f_url" \
+              "$(failed_table ${lib.escapeShellArg testName} "$(links ttl-30d "$f_obs" screenshot video context trace)")"
+            expect_comment_body "$TMPDIR/expected-comment.md"
             expect_marker 7 current "$f_obs" 51 ${affectedRev}
             cp -a "$objects" "$TMPDIR/objects.affected"
             cp "$STUB_STATE/comments.jsonl" "$TMPDIR/comments.affected"
@@ -1344,31 +1511,19 @@
             expect_no_comment
             diff -r "$TMPDIR/objects.malformed" "$objects" || fail "a malformed marker changed the bucket"
 
-            # --- one run per settled pull request build, on pull request 9
-            # against main's bucket (only main's ttl-90d objects), set aside
-            # and restored around these rows.
+            # --- one run per settled pull request build, on pull request 9,
+            # then the unknown-extension and sanitised-name rows on pull
+            # requests 10 and 11, against main's bucket (only main's ttl-90d
+            # objects), set aside and restored around these rows.
             mv "$objects" "$TMPDIR/objects.v3"
             cp -a "$TMPDIR/objects.main" "$objects"
             NIXBOT_EVENT_KIND=pull_request
             s30=$ttl30/v1/$s_obs
             s_url="${evidenceOrigin}/ttl-30d/v1/$s_obs/"
             # steady_comment <build line>: the exact affected comment on the
-            # steady report, into $TMPDIR/expected-comment.md.
+            # steady report, which has no failed attempt.
             steady_comment() {
-              printf '%s\n' \
-                "### Browser evidence: passed" \
-                "" \
-                "This pull request changes the docs site's browser evidence." \
-                "" \
-                "$1" \
-                "" \
-                "No screenshots." \
-                "" \
-                "Receipt: [receipt.json](''${s_url}receipt.json)" \
-                "" \
-                'No report identical to this one has been published from `main` in the last 90 days, so it is shown here.' \
-                "" \
-                "Evidence kept 30 days." > "$TMPDIR/expected-comment.md"
+              affected_comment passed "$1" "$s_url" "No failed attempts."
             }
 
             # 1 pr-event-pull-request-kind: the pull_request event of a
@@ -1442,7 +1597,71 @@
             expect_marker 9 superseded "$p_obs" 57 ${prRev} ${revertedHeadRev}
             diff -r -x pr "$TMPDIR/objects.pull-request" "$objects" || fail "superseding wrote evidence objects"
 
+            # Failed builds below settle as build_finished events.
             NIXBOT_EVENT_KIND=build_finished
+
+            # 4 pr-unknown-extension: the attempt's notes.txt is neither
+            # uploaded, listed nor linked; its row links only the screenshot
+            # and trace it has.
+            u_obs="$(obs ${reports.unknown-extension})"
+            u30=$ttl30/v1/$u_obs
+            u_url="${evidenceOrigin}/ttl-30d/v1/$u_obs/"
+            build 70 failed ${affectedRev} "[$(report succeeded ${reports.unknown-extension})]"
+            event 70 failed ${affectedRev} 10
+            run pr-unknown-extension event --upload
+            expect_status 0
+            expect_lines \
+              "PUBLISH-EVIDENCE: uploaded $u_url" \
+              "PUBLISH-EVIDENCE: published (report $u_obs, passed=false)" \
+              "PUBLISH-EVIDENCE: commented #10"
+            expect_api "$(api_build 70)" "$api_comment"
+            expect_s3 \
+              "$(req HEAD 404 ro "$ttl90/v1/$u_obs/receipt.json")" \
+              "$(upload rw30 "$u30" "''${unknown_bundle[@]}")" \
+              "$(req PUT 200 rw30 "$(marker_key 10)" application/json)"
+            expect_bundle "$objects/$u30" ${reports.unknown-extension} "''${unknown_bundle[@]}"
+            expect_receipt "$objects/$u30/receipt.json" ${reports.unknown-extension} false "$failing_counts" \
+              "$(destination ttl-30d "$u_obs")" "''${unknown_bundle[@]}"
+            expect_comments 1
+            affected_comment failed \
+              "[build 70](https://nixbot.example/builds/70) at \`${lib.substring 0 12 affectedRev}\`: 29 expected, 1 unexpected, 0 flaky, 0 skipped." \
+              "$u_url" \
+              "$(failed_table ${lib.escapeShellArg testName} "$(links ttl-30d "$u_obs" screenshot trace)")"
+            expect_comment_body "$TMPDIR/expected-comment.md"
+            expect_marker 10 current "$u_obs" 70 ${affectedRev}
+
+            # 5 pr-sanitised-test-name: the failing test is named
+            # ${unsafeTestName}; its cell drops the backticks and escapes
+            # the `|`, so the name stays one code span in one table cell.
+            z_obs="$(obs ${reports.sanitised})"
+            z30=$ttl30/v1/$z_obs
+            z_url="${evidenceOrigin}/ttl-30d/v1/$z_obs/"
+            build 71 failed ${affectedRev} "[$(report succeeded ${reports.sanitised})]"
+            event 71 failed ${affectedRev} 11
+            publisher=${sanitisedPublisher}
+            run pr-sanitised-test-name event --upload
+            publisher=${publishEvidenceProgram}
+            expect_status 0
+            expect_lines \
+              "PUBLISH-EVIDENCE: uploaded $z_url" \
+              "PUBLISH-EVIDENCE: published (report $z_obs, passed=false)" \
+              "PUBLISH-EVIDENCE: commented #11"
+            expect_api "$(api_build 71)" "$api_comment"
+            expect_s3 \
+              "$(req HEAD 404 ro "$ttl90/v1/$z_obs/receipt.json")" \
+              "$(upload rw30 "$z30" "''${bundle[@]}")" \
+              "$(req PUT 200 rw30 "$(marker_key 11)" application/json)"
+            expect_bundle "$objects/$z30" ${reports.sanitised} "''${bundle[@]}"
+            expect_receipt "$objects/$z30/receipt.json" ${reports.sanitised} false "$failing_counts" \
+              "$(destination ttl-30d "$z_obs")" "''${bundle[@]}"
+            expect_comments 1
+            affected_comment failed \
+              "[build 71](https://nixbot.example/builds/71) at \`${lib.substring 0 12 affectedRev}\`: 29 expected, 1 unexpected, 0 flaky, 0 skipped." \
+              "$z_url" \
+              "$(failed_table 'reader finds a \| b path' "$(links ttl-30d "$z_obs" screenshot video context trace)")"
+            expect_comment_body "$TMPDIR/expected-comment.md"
+            expect_marker 11 current "$z_obs" 71 ${affectedRev}
+
             rm -rf "$objects"
             mv "$TMPDIR/objects.v3" "$objects"
 

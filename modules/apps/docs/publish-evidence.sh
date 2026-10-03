@@ -33,7 +33,9 @@ Subcommands:
                   checks.x86_64-linux.package-vanixiets-docs-test-e2e-report
                   attribute, realise its recorded output, validate it, and
                   publish run.json, playwright-report/completion.json, the
-                  PNG screenshots its attempts reference, and receipt.json.
+                  attachments its attempts reference (PNG screenshots, WebM
+                  videos, error-context Markdown and trace ZIPs, each only
+                  when its bytes are of that type), and receipt.json.
                   A report whose assertions failed is published with
                   passed=false. The aggregate build may have failed.
                   An event without a pull request publishes as main does.
@@ -49,8 +51,11 @@ Subcommands:
                              this program left on the pull request is
                              replaced once by a note that it is superseded
                     absent   affected: the report uploads to tier ttl-30d,
-                             then one comment on the pull request links its
-                             screenshots and receipt
+                             then one comment on the pull request tabulates
+                             its failed attempts with links to their
+                             screenshot, video, error context and trace (in
+                             Playwright's hosted trace viewer), and links
+                             its receipt
   main            default-branch push: resolve the newest nixbot build of
                   --rev through the build API, then publish as event does
                   without a pull request, to tier ttl-90d, without probe or
@@ -336,7 +341,10 @@ nix-store --realise "$report" >/dev/null ||
   unavailable "cannot realise $report"
 
 # --- the inert bundle: only regular, non-symlinked files at normalised
-# relative paths, and screenshots only when their bytes are PNG.
+# relative paths, and attachments only by extension and only when their
+# bytes are of that type: .png a PNG signature, .webm an EBML header, .zip a
+# ZIP local file header, .md UTF-8 text without NUL. Every other extension is
+# left out. No size cap.
 
 [[ ! -L "$report" && -d "$report" ]] || rejected "$report is not a directory"
 
@@ -362,7 +370,7 @@ attachments="$(jq -c '
   | if all(type == "string") then .[] else error("non-string attachment") end
 ' "$report/playwright-report/completion.json")" ||
   rejected "playwright-report/completion.json attachments are not strings in JSON"
-screenshots=()
+selected=()
 while IFS= read -r encoded; do
   [[ -n "$encoded" ]] || continue
   # The sentinel keeps a trailing newline in the decoded path.
@@ -373,15 +381,26 @@ while IFS= read -r encoded; do
   case "/$path/" in
     */../* | */./* | *//*) rejected "attachment path is not normalised $encoded" ;;
   esac
-  [[ "$path" == *.png ]] || continue
+  case "$path" in
+    *.png) magic=89504e470d0a1a0a type=PNG ;;
+    *.webm) magic=1a45dfa3 type=WebM ;;
+    *.zip) magic=504b0304 type=ZIP ;;
+    *.md) magic="" type="UTF-8 text" ;;
+    *) continue ;;
+  esac
   # The Worker serves only these segments, and they need no escaping in
   # an S3 key or a signed request.
   [[ "$upload" == false || "$path" =~ ^[A-Za-z0-9._-]+(/[A-Za-z0-9._-]+)*$ ]] ||
     rejected "attachment path is not servable from the evidence Worker $encoded"
   no_symlink "$path"
-  [[ "$(od -An -tx1 -N8 "$report/$path" | tr -d ' \n')" == 89504e470d0a1a0a ]] ||
-    rejected "attachment is not PNG data $encoded"
-  screenshots+=("$path")
+  if [[ -n "$magic" ]]; then
+    [[ "$(od -An -tx1 -N$((${#magic} / 2)) "$report/$path" | tr -d ' \n')" == "$magic" ]] ||
+      rejected "attachment is not $type data $encoded"
+  elif ! iconv -f UTF-8 -t UTF-8 "$report/$path" >/dev/null 2>&1 ||
+    (($(LC_ALL=C tr -cd '\000' <"$report/$path" | wc -c) != 0)); then
+    rejected "attachment is not $type $encoded"
+  fi
+  selected+=("$path")
 done <<<"$attachments"
 
 provenance="$(jq -c '.provenance | if type == "object" then . else error("no provenance") end' "$report/run.json")" ||
@@ -526,7 +545,7 @@ while IFS= read -r path; do
   mkdir -p "$stage/$(dirname -- "$path")"
   install -m 0644 "$report/$path" "$stage/$path"
   files+=("$path")
-done < <(printf '%s\n' run.json playwright-report/completion.json "${screenshots[@]}" | LC_ALL=C sort -u)
+done < <(printf '%s\n' run.json playwright-report/completion.json "${selected[@]}" | LC_ALL=C sort -u)
 
 for path in "${files[@]}"; do
   jq -nc --arg path "$path" --arg sha256 "$(sha256sum "$stage/$path" | cut -d' ' -f1)" \
@@ -598,6 +617,9 @@ if [[ "$upload" == true && "$unaffected" == false ]]; then
       for path in "${files[@]}"; do
         case "$path" in
           *.png) content_type=image/png ;;
+          *.webm) content_type=video/webm ;;
+          *.zip) content_type=application/zip ;;
+          *.md) content_type="text/plain; charset=utf-8" ;;
           *) content_type=application/json ;;
         esac
         code="$(s3 rw /dev/null "$prefix$path" --upload-file "$stage/$path" -H "Content-Type: $content_type")"
@@ -698,14 +720,32 @@ if [[ "$upload" == true && -n "$pr_number" ]]; then
         (.verdict.counts | "\(.expected) expected, \(.unexpected) unexpected, \(.flaky) flaky, \(.skipped) skipped.")
       ' "$stage/receipt.json"
       echo
-      if [[ ${#screenshots[@]} -gt 0 ]]; then
-        echo "Screenshots:"
-        for path in "${screenshots[@]}"; do
-          echo "- [$path]($evidence_url$path)"
-        done
-      else
-        echo "No screenshots."
-      fi
+      # One row per failed attempt, built in jq from the report and the
+      # bundled file set, so no test name passes through the shell. The
+      # validator already confined case, project and failureKind; the
+      # sanitisation keeps each cell inside its code span and table cell.
+      jq -r --arg base "$evidence_url" --slurpfile files "$tmpdir/files.jsonl" '
+        ([$files[].path]) as $bundled
+        | ["screenshot", "video", "context", "trace"] as $labels
+        | def kind: if endswith(".png") then 0 elif endswith(".webm") then 1
+            elif endswith(".md") then 2 elif endswith(".zip") then 3 else null end;
+          def link: if .kind == 3
+            then "[trace](\(@uri "https://trace.playwright.dev/?trace=\($base + .path)"))"
+            else "[\($labels[.kind])](\($base + .path))" end;
+        [ .tests[] as $test
+          | $test.attempts[]
+          | select(.status != "passed")
+          | [.attachments[] | select(IN($bundled[])) | {path: ., kind: kind} | select(.kind != null)] as $evidence
+          | [range(4) as $k | $evidence[] | select(.kind == $k) | link] as $links
+          | "| `" + ($test.case | split("::") | last // "" | split("`") | join("") | split("|") | join("\\|") | .[:120]) + "`"
+            + " | " + ($test.project | gsub("[^A-Za-z0-9._-]"; ""))
+            + " | \(.retry + 1)"
+            + " | " + (.failureKind // "unknown")
+            + " | " + (if $links == [] then "—" else $links | join(" · ") end) + " |"
+        ]
+        | if . == [] then "No failed attempts."
+          else "Failed attempts:", "", "| Test | Browser | Attempt | Kind | Evidence |", "|---|---|---|---|---|", .[] end
+      ' "$report/playwright-report/completion.json"
       echo
       echo "Receipt: [receipt.json](${evidence_url}receipt.json)"
       echo

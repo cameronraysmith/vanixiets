@@ -26,8 +26,8 @@ pull request / gitea-mq batch
 │                         per-package release forecast
 ├── browser-evidence      pull_request and build_finished       (no status)
 │                         effects; upload the browser report's
-│                         screenshots and comment on the pull
-│                         request
+│                         failure evidence and comment on the
+│                         pull request
 └── PR Check (GitHub Actions)
     ├── check-fast-forward
     └── playwright-drift-check
@@ -159,7 +159,7 @@ See [Semantic Release Preview](/about/contributing/semantic-release-preview/).
 
 ### browser-evidence
 
-Runs the `publish-evidence` program, which publishes the docs browser report nixbot already built (`checks.x86_64-linux.package-vanixiets-docs-test-e2e-report`): `run.json`, `completion.json`, the referenced PNG screenshots, and a `receipt.json`.
+Runs the `publish-evidence` program, which publishes the docs browser report nixbot already built (`checks.x86_64-linux.package-vanixiets-docs-test-e2e-report`): `run.json`, `completion.json`, each failed attempt's screenshot (`.png`), video (`.webm`), error context (`.md`), and trace (`.zip`), each checked against its type's leading bytes, and a `receipt.json`.
 
 | Attribute | Value |
 |-----------|-------|
@@ -189,7 +189,7 @@ Neither trigger sets `when.permission`: the trust gate is nixbot's CI approval, 
 Both run `publish-evidence event`, which accepts `NIXBOT_EVENT_KIND` `pull_request` or `build_finished` and fetches the event's build from nixbot's API.
 For a build without a pull request it uploads to the `ttl-90d` tier without a comment.
 For a pull request it first checks, with a read-only credential, whether `main` has already published this exact report (its receipt exists under `ttl-90d`); if so the pull request is unaffected, and the run uploads nothing, posts no comment, and logs `PUBLISH-EVIDENCE: unaffected (report <obs> already published from main)`.
-Otherwise it uploads to `ttl-30d` and posts or edits one comment through nixbot's `pr-comment` API with the verdict and counts, the build number and revision, links to the screenshots and receipt, the retention, and a note that no identical report has been published from `main` in the last 90 days.
+Otherwise it uploads to `ttl-30d` and posts or edits one comment through nixbot's `pr-comment` API with the verdict and counts, the build number and revision, a table of failed attempts linking each one's screenshot, video, error context, and trace (through `https://trace.playwright.dev`), a link to the receipt, the retention, and a note that no identical report has been published from `main` in the last 90 days.
 When the build was reused for a newer head, the build line adds `(reused for head <head>, same tree)` and the marker records the head.
 If an earlier build of the same pull request commented and a later one is unaffected, the run replaces the comment with a superseded note and logs `PUBLISH-EVIDENCE: superseded #<number>`; it tracks this in a marker object under `ttl-30d/pr/`, because `pr-comment` can only upsert.
 When two builds of one pull request finish out of order, the one that finishes last decides the comment.
@@ -205,7 +205,7 @@ An identical existing receipt (schema version 3) logs `PUBLISH-EVIDENCE: unchang
 Each run signs 15-minute temporary credentials with the R2 token, read-write on its own tier's prefix and, for a pull request, read-only on `ttl-90d/`, so a pull request run cannot write into `main`'s tier; it reads `NIXBOT_API_URL` and `NIXBOT_API_TOKEN` from nixbot rather than the secrets schema.
 The run log prints `PUBLISH-EVIDENCE: published|unchanged (report <obs>, passed=<bool>)`, `PUBLISH-EVIDENCE: uploaded <url>` when the run wrote the receipt, `PUBLISH-EVIDENCE: unaffected (report <obs> already published from main)`, and, for a pull request, `PUBLISH-EVIDENCE: commented #<number>` or `PUBLISH-EVIDENCE: superseded #<number>`.
 
-**Evidence URL:** `https://evidence.vanixiets.net/vanixiets/browser-evidence/<tier>/v1/<obs>/<file>` (the object key after `projects/`), served read-only by the Worker `sciexp-evidence` (`packages/evidence-worker/`, deployed with wrangler): GET and HEAD, `.png` and `.json` only, no listing.
+**Evidence URL:** `https://evidence.vanixiets.net/vanixiets/browser-evidence/<tier>/v1/<obs>/<file>` (the object key after `projects/`), served read-only by the Worker `sciexp-evidence` (`packages/evidence-worker/`, deployed with wrangler): GET and HEAD, `.png`, `.json`, `.webm`, `.zip`, and `.md` only, no listing; `.zip` traces are downloads that `https://trace.playwright.dev` alone may fetch cross-origin.
 Bucket lifecycle rules delete `ttl-30d` objects after 30 days and `ttl-90d` objects after 90 days.
 nixbot runs event effects from the default branch, so a pull request that changes this effect or `publish-evidence` is first exercised after it lands.
 nixbot posts no forge status for event effects, so a failed `pullRequest` or `buildFinished` run shows only in nixbot's effect log and never blocks a merge; a failed `main` run fails `nixbot/effects` on the `main` push.
