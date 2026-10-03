@@ -33,7 +33,13 @@ export function runControl(t: TestContext, mode: ControlMode): ControlRun {
   const config = {
     testDir: ".",
     testMatch: mode === "empty" ? "missing.spec.ts" : "reader-journey.spec.ts",
-    timeout: 5000,
+    // Playwright's test deadline also covers context and page setup, and a
+    // setup that outlives it is a test-level deadline, classified as
+    // infrastructure; on a loaded builder 5 s did not cover setup (nixbot
+    // builds 1000 and 1001), turning every control into a deadline failure.
+    // Each control's own failure is bounded separately: actionTimeout,
+    // the deadline control's test.setTimeout(100), or process.exit.
+    timeout: 60000,
     use: { actionTimeout: 250, trace: "retain-on-failure", screenshot: "only-on-failure" },
     workers: 1,
     retries: 0,
