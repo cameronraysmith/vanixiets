@@ -18,11 +18,14 @@
 #
 # buildFinished rows use the actual onEvent.build_finished effectScript from
 # an isolated registry evaluation, so a broken event mapping cannot pass by
-# testing the renderer alone. The live build_finished effects' `when`, read
-# from the flake's herculesCI output, is pinned too: browser-evidence holds
-# the R2 parent secret, so it must reach nixbot as write permission. Rows
-# passing nixbot's NIXBOT_API_URL/NIXBOT_API_TOKEN show the rendered script
-# leaves them in the program's environment.
+# testing the renderer alone. The live browser-evidence registration, read
+# from the flake's herculesCI output, is pinned too: it is an onEvent
+# pull_request and build_finished effect, its build_finished `when` selects
+# failed builds only, neither carries `when.permission` (trust is nixbot's CI
+# approval), and all three runs share one lock, since build_finished may
+# carry no pull request to expand {pr}. Rows passing nixbot's
+# NIXBOT_API_URL/NIXBOT_API_TOKEN show the rendered script leaves them in
+# the program's environment.
 #
 # The program is a stub that records its argv and the secret variables, and
 # curl is stubbed for the nixbot id-token endpoint the main guard calls,
@@ -138,19 +141,6 @@ in
         herculesCI = { };
       };
       finishedEffects = fixtureOutputs.onEvent.build_finished;
-      acceptsFinished =
-        trigger:
-        let
-          evaluated = fixture.extendModules {
-            modules = [
-              {
-                vanixiets.effects.finished.triggers.buildFinished = lib.mkForce ({ lock = "probe"; } // trigger);
-              }
-            ];
-          };
-          outputs = evaluated.config.herculesCI { config.repo = { inherit rev; }; };
-        in
-        (builtins.tryEval (builtins.deepSeq outputs.onEvent.build_finished.finished.when true)).success;
       structural = {
         eventNames = builtins.attrNames finishedEffects;
         mainNames = builtins.attrNames fixtureOutputs.onPush.default.outputs.effects;
@@ -164,37 +154,19 @@ in
         hasAudience = finishedEffects.finished ? idTokenAudiences;
         when = finishedEffects.finished.when;
         defaultWhen = finishedEffects.defaults.when;
-        authorization = map acceptsFinished [
-          { secrets = [ "GITHUB_TOKEN" ]; }
-          { forgeToken = true; }
-          {
-            forgeToken = true;
-            when.branches = [ "main" ];
-          }
-          {
-            secrets = [ "GITHUB_TOKEN" ];
-            when.status = [ "succeeded" ];
-          }
-          {
-            forgeToken = true;
-            when.permission = "read";
-          }
-          {
-            forgeToken = true;
-            when.permission = "write";
-          }
-          {
-            secrets = [ "GITHUB_TOKEN" ];
-            when.permission = "admin";
-          }
-          { when.branches = [ "main" ]; }
-        ];
         liveFinished = builtins.attrNames (
           lib.filterAttrs (_: entry: entry.triggers.buildFinished != null) registry
         );
-        # The delivery conditions the live build_finished effects hand nixbot,
-        # read from the flake's herculesCI output rather than the registry.
+        # The live browser-evidence registration nixbot receives, read from
+        # the flake's herculesCI output rather than the registry.
+        livePullRequest = builtins.attrNames liveOutputs.onEvent.pull_request;
         liveFinishedWhen = lib.mapAttrs (_: effect: effect.when) liveOutputs.onEvent.build_finished;
+        livePullRequestHasWhen = liveOutputs.onEvent.pull_request.browser-evidence ? when;
+        liveEvidenceLocks = {
+          pullRequest = liveOutputs.onEvent.pull_request.browser-evidence.lock;
+          buildFinished = liveOutputs.onEvent.build_finished.browser-evidence.lock;
+          main = liveOutputs.onPush.default.outputs.effects.browser-evidence.lock;
+        };
       };
       expectedStructural = {
         eventNames = [
@@ -239,23 +211,18 @@ in
           transition = "fixed";
         };
         defaultWhen = { };
-        authorization = [
-          false
-          false
-          false
-          false
-          false
-          true
-          true
-          true
-        ];
         liveFinished = [ "browser-evidence" ];
-        liveFinishedWhen.browser-evidence = {
-          permission = "write";
-          status = [
-            "succeeded"
-            "failed"
-          ];
+        livePullRequest = [
+          "browser-evidence"
+          "docs"
+          "release-packages"
+        ];
+        liveFinishedWhen.browser-evidence.status = [ "failed" ];
+        livePullRequestHasWhen = false;
+        liveEvidenceLocks = {
+          pullRequest = "browser-evidence";
+          buildFinished = "browser-evidence";
+          main = "browser-evidence";
         };
       };
 
@@ -390,6 +357,7 @@ in
             ];
           in
           {
+            pullRequest = r2Secrets;
             buildFinished = r2Secrets;
             main = r2Secrets;
           };
@@ -679,7 +647,7 @@ in
                 nixbotApi = true;
                 status = 0;
                 argv = [
-                  "build-finished"
+                  "event"
                   "--upload"
                 ];
                 env = r2Env;
@@ -687,6 +655,27 @@ in
               {
                 name = "registry: browser-evidence buildFinished without an R2 secret fails before the program runs";
                 kind = "buildFinished";
+                entry = registry.browser-evidence;
+                secretsJson = cloudflareAccount // forge;
+                status = 1;
+                expect = [ "error: R2_EVIDENCE_ACCESS_KEY_ID missing from $HERCULES_CI_SECRETS_JSON" ];
+              }
+              {
+                name = "registry: browser-evidence pullRequest uploads with the R2 secrets and nixbot's API token, without --rev";
+                kind = "pullRequest";
+                entry = registry.browser-evidence;
+                secretsJson = everySecret;
+                nixbotApi = true;
+                status = 0;
+                argv = [
+                  "event"
+                  "--upload"
+                ];
+                env = r2Env;
+              }
+              {
+                name = "registry: browser-evidence pullRequest without an R2 secret fails before the program runs";
+                kind = "pullRequest";
                 entry = registry.browser-evidence;
                 secretsJson = cloudflareAccount // forge;
                 status = 1;

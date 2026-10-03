@@ -19,16 +19,23 @@
 #
 # browser-evidence uploads the docs browser report nixbot built into R2 under
 # per-run temporary credentials, keyed by the report's attribute and output
-# path so each tier receives a report once. Its buildFinished run serves every
-# finished build, succeeded or failed, since the report exists either way;
-# nixbot only delivers it to a writer or a writer's pull request, which the R2
-# parent secret requires. A pull request whose report main already published
-# (probed read-only in ttl-90d) uploads and comments nothing, superseding any
-# earlier comment; otherwise it uploads to ttl-30d, writable only there, and
-# comments. Like every event effect it runs main's code, so a pull request
-# changing it is exercised only after landing. Its main run resolves the
-# build for `--rev` itself; both share one lock so a build's two runs never
-# upload concurrently.
+# path so each tier receives a report once. It runs once per settled pull
+# request build: nixbot delivers pull_request after every succeeded build,
+# fresh or reused for a head with an identical tree, and build_finished only
+# when a build finishes, so pullRequest serves succeeded builds and
+# buildFinished, filtered to failed, serves failed ones (and failed builds
+# outside a pull request). A reused failed build delivers neither, so a head
+# that reuses a failed build gets no evidence run: a known gap. Neither
+# trigger sets `when.permission`, which max(actor, author) satisfies and bots
+# such as renovate fail; trust is nixbot's CI approval, which holds an
+# outside pull request until approved, and the run executes main's code on
+# the built report, never the pull request's. A pull request whose report
+# main already published (probed read-only in ttl-90d) uploads and comments
+# nothing, superseding any earlier comment; otherwise it uploads to ttl-30d,
+# writable only there, and comments. All three runs share one lock, so a
+# pull request's failed and later succeeded builds never upload or comment
+# concurrently; a {pr} lock would not do, since nixbot skips it on an event
+# without a pull request. Under it main resolves the build for `--rev` itself.
 { withSystem, ... }:
 {
   vanixiets.effects = withSystem "x86_64-linux" (
@@ -76,20 +83,22 @@
             ];
           in
           {
-            buildFinished = {
+            pullRequest = {
               args = [
-                "build-finished"
+                "event"
                 "--upload"
               ];
               lock = "browser-evidence";
               inherit secrets;
-              when = {
-                permission = "write";
-                status = [
-                  "succeeded"
-                  "failed"
-                ];
-              };
+            };
+            buildFinished = {
+              args = [
+                "event"
+                "--upload"
+              ];
+              lock = "browser-evidence";
+              inherit secrets;
+              when.status = [ "failed" ];
             };
             main = {
               args = [

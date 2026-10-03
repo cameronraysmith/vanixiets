@@ -1,6 +1,7 @@
 # Behavioural check: the publish-evidence program, which otherwise only runs
-# as the browser-evidence nixbot effect (build_finished and default-branch
-# pushes) against nixbot, R2 and a pull request.
+# as the browser-evidence nixbot effect (`event`: pull_request after every
+# succeeded pull request build, build_finished after a failed one; and
+# `main` on default-branch pushes) against nixbot, R2 and a pull request.
 #
 # A python server stands in for nixbot's build API and pr-comment API and
 # for R2's S3 API at a path prefix, storing objects in $TMPDIR (where a row
@@ -50,6 +51,15 @@
 # PUT names its key and writes no receipt; a corrupted remote receipt
 # conflicts; missing R2 variables or NIXBOT_API_URL (main) fail before any
 # request.
+#
+# One run per settled pull request build: `event` takes both pull_request
+# and build_finished, and rejects any other kind. A pull_request event of a
+# succeeded build publishes as the affected row does. nixbot reuses a
+# terminal build for a head commit with an identical tree, so the event's
+# build rev may differ from pullRequest.headRev: the comment then names both
+# ("reused for head ..., same tree"), every marker records `head` (the build
+# rev when the event has no headRev), and a reused build of main's report
+# supersedes a current comment.
 { ... }:
 {
   perSystem =
@@ -80,6 +90,9 @@
       affectedRev = "4444444444444444444444444444444444444444";
       laterRev = "5555555555555555555555555555555555555555";
       revertedRev = "6666666666666666666666666666666666666666";
+      # Pull request heads whose tree an earlier build already built.
+      reusedHeadRev = "7777777777777777777777777777777777777777";
+      revertedHeadRev = "8888888888888888888888888888888888888888";
       evidenceKeyRoot = "projects/vanixiets/browser-evidence";
       # The Worker URL of evidenceKeyRoot: the key without `projects/`.
       evidenceOrigin = "https://evidence.vanixiets.net/vanixiets/browser-evidence";
@@ -534,7 +547,7 @@
             ];
             # The loopback API needs local networking in the darwin sandbox.
             __darwinAllowLocalNetworking = true;
-            meta.description = "behavioural check: publish-evidence build-finished against a loopback nixbot API and chroot store";
+            meta.description = "behavioural check: publish-evidence event and main against a loopback nixbot API and chroot store";
           }
           ''
             set -euo pipefail
@@ -675,14 +688,17 @@
             report() {
               attr ${reportAttr} "$@"
             }
-            # event <number json> [<status> [<rev> [<pull request number>]]]:
-            # the build_finished payload, with a pullRequest when numbered.
+            # event <number json> [<status> [<rev> [<pull request number>
+            # [<head rev>]]]]: the build_finished or pull_request payload, with
+            # a pullRequest when numbered whose headRev is <head rev>, by
+            # default the build's rev (a fresh build of the head).
             event() {
               jq -n --argjson n "$1" --arg status "''${2:-succeeded}" --arg rev "''${3:-${rev}}" --arg pr "''${4:-}" \
+                --arg head "''${5:-''${3:-${rev}}}" \
                 '{build: {number: $n, url: "https://nixbot.example/builds/\($n)", status: $status,
                   branch: "main", rev: $rev, previousStatus: "succeeded", failedAttrs: []}}
                 + if $pr == "" then {} else {pullRequest: {number: ($pr | tonumber), title: "evidence",
-                  url: "https://github.com/cameronraysmith/vanixiets/pull/\($pr)"}} end' \
+                  url: "https://github.com/cameronraysmith/vanixiets/pull/\($pr)", headRev: $head}} end' \
                 > "$NIXBOT_EVENT_JSON"
             }
             other="$(attr checks.x86_64-linux.other succeeded /nix/store/00000000000000000000000000000000-other)"
@@ -765,11 +781,11 @@
 
             build 21 succeeded ${rev} "[$other, $(report succeeded ${reports.passing})]"
             event 21
-            run passing build-finished --out "$pub/passing"
+            run passing event --out "$pub/passing"
             expect_published "$pub/passing" ${reports.passing} 21 true "$passing_counts" "''${bundle[@]}"
             cp -a "$pub/passing" "$TMPDIR/passing.snapshot"
 
-            run repeat build-finished --out "$pub/passing"
+            run repeat event --out "$pub/passing"
             expect_status 0
             expect_lines "PUBLISH-EVIDENCE: unchanged (report $p_obs, passed=true)"
             diff -r "$TMPDIR/passing.snapshot" "$pub/passing" || fail "repeat changed the publication"
@@ -777,7 +793,7 @@
             # An empty destination is accepted, and a fresh publication of the
             # same report reproduces the bytes.
             mkdir "$pub/fresh"
-            run fresh build-finished --out "$pub/fresh"
+            run fresh event --out "$pub/fresh"
             expect_status 0
             expect_lines "PUBLISH-EVIDENCE: published (report $p_obs, passed=true)"
             diff -r "$TMPDIR/passing.snapshot" "$pub/fresh" || fail "republication is not byte-identical"
@@ -786,14 +802,14 @@
             # aggregate build (the verdict attribute failed alongside it).
             build 22 failed ${rev} "[$(report succeeded ${reports.failing})]"
             event 22 failed
-            run failing build-finished --out "$pub/failing"
+            run failing event --out "$pub/failing"
             expect_published "$pub/failing" ${reports.failing} 22 false "$failing_counts" "''${bundle[@]}"
 
             # Another build of the same report, even a skipped_local
             # attribute's cached one, reproduces the receipt byte for byte.
             build 23 succeeded ${rev} "[$(report skipped_local ${reports.passing} true)]"
             event 23
-            run skipped-local-cached build-finished --out "$pub/cached"
+            run skipped-local-cached event --out "$pub/cached"
             expect_published "$pub/cached" ${reports.passing} 23 true "$passing_counts" "''${bundle[@]}"
             diff -r "$TMPDIR/passing.snapshot" "$pub/cached" || fail "another build's publication of the report differs"
 
@@ -801,14 +817,14 @@
 
             build 24 succeeded ${rev} "[$(report succeeded ${reports.passing})]"
             event 24
-            run other-build-same-report build-finished --out "$pub/passing"
+            run other-build-same-report event --out "$pub/passing"
             expect_status 0
             expect_lines "PUBLISH-EVIDENCE: unchanged (report $p_obs, passed=true)"
             diff -r "$TMPDIR/passing.snapshot" "$pub/passing" || fail "another build of the report changed the publication"
 
             build 37 succeeded ${rev} "[$(report succeeded ${reports.failing})]"
             event 37
-            run other-identity build-finished --out "$pub/passing"
+            run other-identity event --out "$pub/passing"
             expect_status 1
             expect_line "error: --out $pub/passing holds the receipt of another publication [\"${reportAttr}\",\"${reports.passing}\"]; refusing to overwrite it"
             diff -r "$TMPDIR/passing.snapshot" "$pub/passing" || fail "the existing publication changed"
@@ -818,19 +834,19 @@
             jq '.verdict.passed = false' "$TMPDIR/passing.snapshot/receipt.json" > "$pub/tampered/receipt.json"
             cp -a "$pub/tampered" "$TMPDIR/tampered.snapshot"
             event 21
-            run out-same-report-differs build-finished --out "$pub/tampered"
+            run out-same-report-differs event --out "$pub/tampered"
             expect_status 1
             expect_line "error: --out $pub/tampered holds a different publication of report $p_obs; refusing to overwrite it"
             diff -r "$TMPDIR/tampered.snapshot" "$pub/tampered" || fail "the tampered publication changed"
 
             mkdir "$pub/occupied"
             touch "$pub/occupied/unrelated"
-            run occupied build-finished --out "$pub/occupied"
+            run occupied event --out "$pub/occupied"
             expect_status 1
             expect_line "error: --out $pub/occupied is neither empty nor a publication; refusing to overwrite it"
             [ "$(ls -A "$pub/occupied")" = unrelated ] || fail "the occupied destination changed"
 
-            run missing-out build-finished
+            run missing-out event
             expect_status 2
             expect_line "error: one of --out or --upload is required"
             expect_build_requests none
@@ -839,21 +855,21 @@
 
             build 25 succeeded ${rev} "[$other]"
             event 25
-            run missing-attr build-finished --out "$pub/missing-attr"
+            run missing-attr event --out "$pub/missing-attr"
             rejected 25 "evidence unavailable: nixbot build 25 has no attribute ${reportAttr}" "$pub/missing-attr"
 
             build 26 failed ${rev} "[$(report failed ${reports.passing})]"
             event 26 failed
-            run failed-attr build-finished --out "$pub/failed-attr"
+            run failed-attr event --out "$pub/failed-attr"
             rejected 26 "evidence unavailable: nixbot build 26 attribute ${reportAttr} is \"failed\"" "$pub/failed-attr"
 
             build 27 succeeded ${rev} "[$(report succeeded ${unrealisable})]"
             event 27
-            run unrealisable build-finished --out "$pub/unrealisable"
+            run unrealisable event --out "$pub/unrealisable"
             rejected 27 "evidence unavailable: cannot realise ${unrealisable}" "$pub/unrealisable"
 
             event 28
-            run build-not-found build-finished --out "$pub/not-found"
+            run build-not-found event --out "$pub/not-found"
             rejected 28 "evidence unavailable: cannot fetch nixbot build 28 from $NIXBOT_API_URL/api/repos/github/cameronraysmith/vanixiets/builds/28" "$pub/not-found"
 
             # --- rejected evidence
@@ -863,7 +879,7 @@
             reject() {
               build "$2" succeeded ${rev} "[$(report succeeded "$3")]"
               event "$2"
-              run "$1" build-finished --out "$pub/$1"
+              run "$1" event --out "$pub/$1"
               rejected "$2" "evidence rejected: $4" "$pub/$1"
             }
             reject traversal 29 ${reports.traversal} \
@@ -881,24 +897,29 @@
 
             build 36 succeeded ${otherRev} "[$(report succeeded ${reports.passing})]"
             event 36
-            run rev-mismatch build-finished --out "$pub/rev-mismatch"
+            run rev-mismatch event --out "$pub/rev-mismatch"
             rejected 36 "evidence rejected: nixbot build 36 is {\"number\":36,\"rev\":\"${otherRev}\"}, not the event's build 36 at ${rev}" "$pub/rev-mismatch"
 
             # --- events rejected before any request
 
+            # wrong-kind: `event` takes build_finished and pull_request only.
             event 21
-            NIXBOT_EVENT_KIND=pull_request
-            run wrong-kind build-finished --out "$pub/wrong-kind"
-            rejected none "expected a build_finished event, got pull_request" "$pub/wrong-kind"
+            NIXBOT_EVENT_KIND=pull_request_closed
+            run wrong-kind event --out "$pub/wrong-kind"
+            rejected none "expected a build_finished or pull_request event, got pull_request_closed" "$pub/wrong-kind"
             NIXBOT_EVENT_KIND=build_finished
 
             event '"21; touch pwned"'
-            run malformed-number build-finished --out "$pub/malformed-number"
+            run malformed-number event --out "$pub/malformed-number"
             rejected none "malformed event (build=\"21; touch pwned\" rev=\"${rev}\")" "$pub/malformed-number"
 
             event 21 succeeded 0123456
-            run malformed-rev build-finished --out "$pub/malformed-rev"
+            run malformed-rev event --out "$pub/malformed-rev"
             rejected none "malformed event (build=21 rev=\"0123456\")" "$pub/malformed-rev"
+
+            event 21 succeeded ${rev} 9 abc
+            run malformed-head event --out "$pub/malformed-head"
+            rejected none "malformed event (pullRequest.headRev=\"abc\")" "$pub/malformed-head"
 
             # --- upload: the stub's S3 endpoint and nixbot's pr-comment API
 
@@ -998,14 +1019,22 @@
                 'all(inputs; . as $needle | $comments[0].body | contains($needle))' > /dev/null \
                 || fail "comment body lacks one of $(printf '%s\n' "$@" | jq -Rsc .): $(jq -sc . "$STUB_STATE/comments.jsonl")"
             }
+            # expect_comment_body <file>: the row's one comment body is
+            # exactly <file>.
+            expect_comment_body() {
+              jq -se --rawfile expected "$1" '.[0].body == $expected' "$STUB_STATE/comments.jsonl" > /dev/null \
+                || fail "comment body $(jq -sc '.[0].body' "$STUB_STATE/comments.jsonl"), expected $(jq -Rsc . "$1")"
+            }
             # marker_key <pr>: the pull request's marker object.
             marker_key() {
               echo "$ttl30/pr/$1.json"
             }
-            # marker <pr> <state> <obs> <build> <rev>: a marker's exact bytes.
+            # marker <pr> <state> <obs> <build> <rev> [<head>]: a marker's exact
+            # bytes; <head> defaults to <rev> (a fresh build of the head).
             marker() {
               jq -nc --argjson pr "$1" --arg state "$2" --arg obs "$3" --argjson build "$4" --arg rev "$5" \
-                '{schemaVersion: 1, pr: $pr, state: $state, obs: $obs, build: $build, rev: $rev}'
+                --arg head "''${6:-$5}" \
+                '{schemaVersion: 1, pr: $pr, state: $state, obs: $obs, build: $build, rev: $rev, head: $head}'
             }
             expect_marker() {
               local key
@@ -1125,7 +1154,7 @@
             expect_build_requests none
             export NIXBOT_EVENT_KIND=build_finished NIXBOT_EVENT_JSON=$TMPDIR/event.json
 
-            run rev-outside-main build-finished --rev ${mainRev} --upload
+            run rev-outside-main event --rev ${mainRev} --upload
             expect_status 2
             expect_line "error: --rev is only valid for main"
             expect_build_requests none
@@ -1135,7 +1164,7 @@
             # marker no comment was ever posted, so none is.
             build 50 succeeded ${prRev} "[$(report succeeded ${reports.passing})]"
             event 50 succeeded ${prRev} 7
-            run pr-unaffected build-finished --upload
+            run pr-unaffected event --upload
             expect_status 0
             expect_lines "PUBLISH-EVIDENCE: unaffected (report $p_obs already published from main)"
             expect_api "$(api_build 50)"
@@ -1149,7 +1178,7 @@
             # then the marker `current`.
             build 51 failed ${affectedRev} "[$(report succeeded ${reports.failing})]"
             event 51 failed ${affectedRev} 7
-            run pr-affected build-finished --upload
+            run pr-affected event --upload
             f30=$ttl30/v1/$f_obs
             f_url="${evidenceOrigin}/ttl-30d/v1/$f_obs/"
             expect_status 0
@@ -1186,7 +1215,7 @@
             # 5 pr-affected-retry: the same build again finds its receipt,
             # writes no evidence, upserts the same comment and rewrites the
             # same marker bytes.
-            run pr-affected-retry build-finished --upload
+            run pr-affected-retry event --upload
             expect_status 0
             expect_lines \
               "PUBLISH-EVIDENCE: unchanged (report $f_obs, passed=false)" \
@@ -1204,7 +1233,7 @@
             # writes no new objects; its comment and marker name the build.
             build 52 failed ${laterRev} "[$(report succeeded ${reports.failing})]"
             event 52 failed ${laterRev} 7
-            run pr-second-build-same-report build-finished --upload
+            run pr-second-build-same-report event --upload
             expect_status 0
             expect_lines \
               "PUBLISH-EVIDENCE: unchanged (report $f_obs, passed=false)" \
@@ -1226,7 +1255,7 @@
             # A refused comment fails the run after the (unchanged) upload,
             # and the marker is not advanced.
             NIXBOT_API_TOKEN=not-the-task-token
-            run pr-comment-refused build-finished --upload
+            run pr-comment-refused event --upload
             NIXBOT_API_TOKEN=${taskToken}
             expect_status 1
             expect_lines "PUBLISH-EVIDENCE: unchanged (report $f_obs, passed=false)"
@@ -1237,7 +1266,7 @@
             # A different receipt at the report's key (a corruption, or
             # another schema) conflicts and writes nothing.
             jq '.schemaVersion = 2' "$TMPDIR/objects.later/$f30/receipt.json" | seed "$f30/receipt.json"
-            run pr-receipt-conflict build-finished --upload
+            run pr-receipt-conflict event --upload
             cp "$TMPDIR/objects.later/$f30/receipt.json" "$objects/$f30/receipt.json"
             expect_status 1
             expect_lines
@@ -1249,7 +1278,7 @@
             # 11 pr-probe-500: a baseline probe that is neither 200 nor 404
             # names its key; nothing is uploaded or commented.
             echo "HEAD $ttl90/v1/$f_obs/receipt.json" > "$STUB_STATE/fail"
-            run pr-probe-500 build-finished --upload
+            run pr-probe-500 event --upload
             rm "$STUB_STATE/fail"
             expect_status 1
             expect_lines
@@ -1264,7 +1293,7 @@
             build 53 succeeded ${revertedRev} "[$(report succeeded ${reports.passing})]"
             event 53 succeeded ${revertedRev} 7
             unset NIXBOT_API_TOKEN
-            run pr-reverted-no-token build-finished --upload
+            run pr-reverted-no-token event --upload
             export NIXBOT_API_TOKEN=${taskToken}
             expect_status 0
             expect_lines \
@@ -1276,7 +1305,7 @@
 
             # 7 pr-reverted: the current comment is superseded once, without
             # links, and the marker records it; a further run does nothing.
-            run pr-reverted build-finished --upload
+            run pr-reverted event --upload
             expect_status 0
             expect_lines \
               "PUBLISH-EVIDENCE: unaffected (report $p_obs already published from main)" \
@@ -1295,7 +1324,7 @@
             diff -r -x pr "$TMPDIR/objects.later" "$objects" || fail "superseding wrote evidence objects"
             cp -a "$objects" "$TMPDIR/objects.superseded"
 
-            run pr-reverted-again build-finished --upload
+            run pr-reverted-again event --upload
             expect_status 0
             expect_lines "PUBLISH-EVIDENCE: unaffected (report $p_obs already published from main)"
             expect_s3 "$(req HEAD 200 ro "$p90/receipt.json")" "$(req GET 200 rw30 "$(marker_key 7)")"
@@ -1307,13 +1336,115 @@
             event 54 succeeded ${revertedRev} 8
             echo '{"schemaVersion":1,"pr":8,"state":"stale"}' | seed "$(marker_key 8)"
             cp -a "$objects" "$TMPDIR/objects.malformed"
-            run pr-marker-malformed build-finished --upload
+            run pr-marker-malformed event --upload
             expect_status 1
             grep -q '^error: ' "$output" || fail "no error line"
             grep -qE '^PUBLISH-EVIDENCE: (superseded|commented|published|uploaded)' "$output" && fail "acted on a malformed marker"
             expect_s3 "$(req HEAD 200 ro "$p90/receipt.json")" "$(req GET 200 rw30 "$(marker_key 8)")"
             expect_no_comment
             diff -r "$TMPDIR/objects.malformed" "$objects" || fail "a malformed marker changed the bucket"
+
+            # --- one run per settled pull request build, on pull request 9
+            # against main's bucket (only main's ttl-90d objects), set aside
+            # and restored around these rows.
+            mv "$objects" "$TMPDIR/objects.v3"
+            cp -a "$TMPDIR/objects.main" "$objects"
+            NIXBOT_EVENT_KIND=pull_request
+            s30=$ttl30/v1/$s_obs
+            s_url="${evidenceOrigin}/ttl-30d/v1/$s_obs/"
+            # steady_comment <build line>: the exact affected comment on the
+            # steady report, into $TMPDIR/expected-comment.md.
+            steady_comment() {
+              printf '%s\n' \
+                "### Browser evidence: passed" \
+                "" \
+                "This pull request changes the docs site's browser evidence." \
+                "" \
+                "$1" \
+                "" \
+                "No screenshots." \
+                "" \
+                "Receipt: [receipt.json](''${s_url}receipt.json)" \
+                "" \
+                'No report identical to this one has been published from `main` in the last 90 days, so it is shown here.' \
+                "" \
+                "Evidence kept 30 days." > "$TMPDIR/expected-comment.md"
+            }
+
+            # 1 pr-event-pull-request-kind: the pull_request event of a
+            # succeeded build with a report main has not published behaves
+            # as pr-affected: ttl-30d upload, receipt last, one comment,
+            # then the marker `current`.
+            build 55 succeeded ${affectedRev} "[$(report succeeded ${reports.steady})]"
+            event 55 succeeded ${affectedRev} 9
+            run pr-event-pull-request-kind event --upload
+            expect_status 0
+            expect_lines \
+              "PUBLISH-EVIDENCE: uploaded $s_url" \
+              "PUBLISH-EVIDENCE: published (report $s_obs, passed=true)" \
+              "PUBLISH-EVIDENCE: commented #9"
+            expect_api "$(api_build 55)" "$api_comment"
+            expect_s3 \
+              "$(req HEAD 404 ro "$ttl90/v1/$s_obs/receipt.json")" \
+              "$(upload rw30 "$s30" "''${steady_bundle[@]}")" \
+              "$(req PUT 200 rw30 "$(marker_key 9)" application/json)"
+            expect_bundle "$objects/$s30" ${reports.steady} "''${steady_bundle[@]}"
+            expect_receipt "$objects/$s30/receipt.json" ${reports.steady} true "$steady_counts" \
+              "$(destination ttl-30d "$s_obs")" "''${steady_bundle[@]}"
+            expect_comments 1
+            steady_comment "[build 55](https://nixbot.example/builds/55) at \`${lib.substring 0 12 affectedRev}\`: 30 expected, 0 unexpected, 0 flaky, 0 skipped."
+            expect_comment_body "$TMPDIR/expected-comment.md"
+            expect_marker 9 current "$s_obs" 55 ${affectedRev} ${affectedRev}
+            cp -a "$objects" "$TMPDIR/objects.pull-request"
+
+            # 2 pr-reused-head: a new head with the same tree reuses build
+            # 55, so the event's build rev is not the head. Nothing new is
+            # written; the comment names both revs and the marker the head.
+            event 55 succeeded ${affectedRev} 9 ${reusedHeadRev}
+            run pr-reused-head event --upload
+            expect_status 0
+            expect_lines \
+              "PUBLISH-EVIDENCE: unchanged (report $s_obs, passed=true)" \
+              "PUBLISH-EVIDENCE: commented #9"
+            expect_api "$(api_build 55)" "$api_comment"
+            expect_s3 \
+              "$(req HEAD 404 ro "$ttl90/v1/$s_obs/receipt.json")" \
+              "$(req GET 200 rw30 "$s30/receipt.json")" \
+              "$(req PUT 200 rw30 "$(marker_key 9)" application/json)"
+            expect_comments 1
+            steady_comment "[build 55](https://nixbot.example/builds/55) at \`${lib.substring 0 12 affectedRev}\` (reused for head \`${
+              lib.substring 0 12 reusedHeadRev
+            }\`, same tree): 30 expected, 0 unexpected, 0 flaky, 0 skipped."
+            expect_comment_body "$TMPDIR/expected-comment.md"
+            expect_marker 9 current "$s_obs" 55 ${affectedRev} ${reusedHeadRev}
+            diff -r -x pr "$TMPDIR/objects.pull-request" "$objects" || fail "a reused build wrote evidence objects"
+
+            # 3 pr-reused-head-reverted-to-main: the head reverts to a tree
+            # an earlier build (57) produced main's report from; the reused
+            # build supersedes the current comment, and the marker records
+            # the head.
+            build 57 succeeded ${prRev} "[$(report succeeded ${reports.passing})]"
+            event 57 succeeded ${prRev} 9 ${revertedHeadRev}
+            run pr-reused-head-reverted-to-main event --upload
+            expect_status 0
+            expect_lines \
+              "PUBLISH-EVIDENCE: unaffected (report $p_obs already published from main)" \
+              "PUBLISH-EVIDENCE: superseded #9"
+            expect_api "$(api_build 57)" "$api_comment"
+            expect_s3 \
+              "$(req HEAD 200 ro "$p90/receipt.json")" \
+              "$(req GET 200 rw30 "$(marker_key 9)")" \
+              "$(req PUT 200 rw30 "$(marker_key 9)" application/json)"
+            expect_comments 1
+            printf '### Browser evidence: superseded\n\nThe latest build of this pull request produces the same docs report as `main` (report `%s`), so the evidence previously linked here no longer describes a change. Build 57, rev `%s`.\n' \
+              "$p_obs" ${lib.substring 0 12 prRev} > "$TMPDIR/expected-comment.md"
+            expect_comment_body "$TMPDIR/expected-comment.md"
+            expect_marker 9 superseded "$p_obs" 57 ${prRev} ${revertedHeadRev}
+            diff -r -x pr "$TMPDIR/objects.pull-request" "$objects" || fail "superseding wrote evidence objects"
+
+            NIXBOT_EVENT_KIND=build_finished
+            rm -rf "$objects"
+            mv "$TMPDIR/objects.v3" "$objects"
 
             # 8 pr-credential-confinement, the program's half: across every
             # pull request row, ttl-90d was only probed (HEAD) and only with
@@ -1335,7 +1466,7 @@
             build 41 succeeded ${prRev} "[$(report succeeded ${reports.steady})]"
             event 41 succeeded ${prRev}
             echo "PUT $s90/run.json" > "$STUB_STATE/fail"
-            run upload-500 build-finished --upload
+            run upload-500 event --upload
             rm "$STUB_STATE/fail"
             expect_status 1
             expect_lines
@@ -1353,7 +1484,7 @@
             # is the uploaded one.
             build 42 succeeded ${prRev} "[$(report succeeded ${reports.steady})]"
             event 42 succeeded ${prRev}
-            run non-pr-build-finished build-finished --out "$pub/non-pr" --upload
+            run non-pr-build-finished event --out "$pub/non-pr" --upload
             expect_status 0
             expect_lines \
               "PUBLISH-EVIDENCE: uploaded ${evidenceOrigin}/ttl-90d/v1/$s_obs/" \
@@ -1371,7 +1502,7 @@
             # Missing upload credentials stop the run before any request.
             event 50 succeeded ${prRev} 7
             unset R2_EVIDENCE_SECRET_ACCESS_KEY
-            run missing-r2-env build-finished --upload
+            run missing-r2-env event --upload
             export R2_EVIDENCE_SECRET_ACCESS_KEY=${parentSecret}
             expect_status 1
             expect_line "error: R2_EVIDENCE_SECRET_ACCESS_KEY is not set (required by --upload)"
