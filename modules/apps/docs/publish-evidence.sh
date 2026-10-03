@@ -18,7 +18,7 @@ set -euo pipefail
 
 usage() {
   cat <<'EOF'
-usage: publish-evidence build-finished [--out <dir>] [--upload]
+usage: publish-evidence event [--out <dir>] [--upload]
        publish-evidence main --rev <commit> [--out <dir>] [--upload]
        publish-evidence --help
 
@@ -27,8 +27,9 @@ evidence bundle and receipt, into a local directory, the evidence bucket,
 or both.
 
 Subcommands:
-  build-finished  nixbot build_finished event: look up the event's build
-                  through nixbot's build API, select the
+  event           nixbot event of kind build_finished or pull_request
+                  (NIXBOT_EVENT_KIND; any other kind is an error): look up
+                  the event's build through nixbot's build API, select the
                   checks.x86_64-linux.package-vanixiets-docs-test-e2e-report
                   attribute, realise its recorded output, validate it, and
                   publish run.json, playwright-report/completion.json, the
@@ -36,6 +37,10 @@ Subcommands:
                   A report whose assertions failed is published with
                   passed=false. The aggregate build may have failed.
                   An event without a pull request publishes as main does.
+                  A pull_request event may name a build nixbot reused for
+                  the pull request's head (an identical tree): the build's
+                  commit then differs from pullRequest.headRev, and the
+                  comment says so.
                   With --upload, an event carrying a pull request first
                   probes tier ttl-90d, read-only, for this report:
                     present  unaffected: the identical report is already
@@ -47,8 +52,8 @@ Subcommands:
                              then one comment on the pull request links its
                              screenshots and receipt
   main            default-branch push: resolve the newest nixbot build of
-                  --rev through the build API, then publish as
-                  build-finished does, to tier ttl-90d, without probe or
+                  --rev through the build API, then publish as event does
+                  without a pull request, to tier ttl-90d, without probe or
                   comment.
 
 Flags:
@@ -70,7 +75,10 @@ At least one of --out and --upload is required.
 
 Pull request marker: the comment's state is recorded at
 projects/vanixiets/browser-evidence/ttl-30d/pr/<pr>.json as
-{"schemaVersion":1,"pr":N,"state":"current"|"superseded","obs","build","rev"},
+{"schemaVersion":1,"pr":N,"state":"current"|"superseded","obs","build","rev","head"},
+where rev is the build's commit and head the pull request head it settled
+for (pullRequest.headRev, or rev when the event names none); the two
+differ when nixbot reused a build of an identical tree. It is
 written current after each affected comment and superseded after the
 superseding comment. Two builds of one pull request finishing out of order
 race on it: the run that finishes last wins.
@@ -91,7 +99,7 @@ probe, upload, comment or marker update (a retry is idempotent); 2 usage
 error.
 
 Environment:
-  NIXBOT_EVENT_KIND, NIXBOT_EVENT_JSON  build-finished; set by nixbot
+  NIXBOT_EVENT_KIND, NIXBOT_EVENT_JSON  event; set by nixbot
   NIXBOT_API_URL                        set by nixbot
   NIXBOT_API_TOKEN                      set by nixbot; pull request comment
   R2_EVIDENCE_ACCESS_KEY_ID, R2_EVIDENCE_SECRET_ACCESS_KEY,
@@ -105,7 +113,7 @@ Environment:
   PUBLISH_EVIDENCE_DEBUG                optional
 
 Examples:
-  nix run .#publish-evidence -- build-finished --out ./evidence
+  nix run .#publish-evidence -- event --out ./evidence
   nix run .#publish-evidence -- main --rev <commit> --upload
 EOF
 }
@@ -127,7 +135,7 @@ case "$mode" in
     usage
     exit 0
     ;;
-  build-finished | main) ;;
+  event | main) ;;
   "") usage_error "missing subcommand" ;;
   *) usage_error "unknown subcommand '$mode'" ;;
 esac
@@ -234,9 +242,16 @@ rejected() {
 # main, from nixbot's builds of --rev.
 
 pr_number=""
-if [[ "$mode" == build-finished ]]; then
-  [[ "${NIXBOT_EVENT_KIND:-}" == build_finished ]] ||
-    die "expected a build_finished event, got ${NIXBOT_EVENT_KIND:-none}"
+pr_head=""
+if [[ "$mode" == event ]]; then
+  # build_finished: any build, though the effect subscribes to failed ones
+  # only; pull_request: a pull request's build settled green, fresh or
+  # reused for its head. Both carry the build; a pull request's also its
+  # head.
+  case "${NIXBOT_EVENT_KIND:-}" in
+    build_finished | pull_request) ;;
+    *) die "expected a build_finished or pull_request event, got ${NIXBOT_EVENT_KIND:-none}" ;;
+  esac
   for var in NIXBOT_API_URL NIXBOT_EVENT_JSON; do
     [[ -n "${!var:-}" ]] || die "$var is not set"
   done
@@ -261,6 +276,12 @@ if [[ "$mode" == build-finished ]]; then
     pr_number="$(jq -r '.pullRequest.number | if type == "number" then tostring else "" end' "$NIXBOT_EVENT_JSON")"
     [[ "$pr_number" =~ ^[0-9]+$ ]] ||
       die "malformed event (pullRequest.number=$(jq -c '.pullRequest.number' "$NIXBOT_EVENT_JSON"))"
+    # The head this build settled for: nixbot reuses a terminal build for
+    # a new commit with an identical tree, so it may differ from the
+    # build's commit. Absent or null names none.
+    pr_head="$(jq -r '.pullRequest.headRev // "" | if type == "string" then . else tojson end' "$NIXBOT_EVENT_JSON")"
+    [[ -z "$pr_head" || "$pr_head" =~ ^[0-9a-f]{40}$ ]] ||
+      die "malformed event (pullRequest.headRev=$(jq -c '.pullRequest.headRev' "$NIXBOT_EVENT_JSON"))"
     tier=ttl-30d
   else
     tier=ttl-90d
@@ -667,8 +688,13 @@ if [[ "$upload" == true && -n "$pr_number" ]]; then
       echo
       echo "This pull request changes the docs site's browser evidence."
       echo
-      jq -r --arg number "$build_number" --arg url "$build_event_url" --arg rev "${rev:0:12}" '
-        "[build \($number)](\($url)) at `\($rev)`: " +
+      # A build reused for a later head of an identical tree names both.
+      reused_head=""
+      [[ -z "$pr_head" || "$pr_head" == "$rev" ]] || reused_head="${pr_head:0:12}"
+      jq -r --arg number "$build_number" --arg url "$build_event_url" --arg rev "${rev:0:12}" \
+        --arg head "$reused_head" '
+        "[build \($number)](\($url)) at `\($rev)`" +
+        (if $head == "" then "" else " (reused for head `\($head)`, same tree)" end) + ": " +
         (.verdict.counts | "\(.expected) expected, \(.unexpected) unexpected, \(.flaky) flaky, \(.skipped) skipped.")
       ' "$stage/receipt.json"
       echo
@@ -703,8 +729,8 @@ EOF
     echo "PUBLISH-EVIDENCE: commented #$pr_number"
   fi
   jq -nc --argjson pr "$pr_number" --arg state "$marker_state" --arg obs "$obs" \
-    --argjson build "$build_number" --arg rev "$rev" \
-    '{schemaVersion: 1, pr: $pr, state: $state, obs: $obs, build: $build, rev: $rev}' >"$tmpdir/marker.json"
+    --argjson build "$build_number" --arg rev "$rev" --arg head "${pr_head:-$rev}" \
+    '{schemaVersion: 1, pr: $pr, state: $state, obs: $obs, build: $build, rev: $rev, head: $head}' >"$tmpdir/marker.json"
   code="$(s3 rw /dev/null "$marker_key" --upload-file "$tmpdir/marker.json" -H "Content-Type: application/json")"
   [[ "$code" == 2?? ]] || die "marker update failed: PUT $bucket/$marker_key returned HTTP $code"
 fi

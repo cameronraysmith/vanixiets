@@ -24,9 +24,10 @@ pull request / gitea-mq batch
 ├── release-plan          check run from the release-packages    (informational)
 │                         effect's pull request trigger; the
 │                         per-package release forecast
-├── browser-evidence      build_finished effect; uploads the     (no status)
-│                         browser report's screenshots and
-│                         comments on the pull request
+├── browser-evidence      pull_request and build_finished       (no status)
+│                         effects; upload the browser report's
+│                         screenshots and comment on the pull
+│                         request
 └── PR Check (GitHub Actions)
     ├── check-fast-forward
     └── playwright-drift-check
@@ -64,7 +65,7 @@ nixbot instead builds each effect's dependencies as a check, and every effect li
 |-------|--------------|-----------|
 | `checks.<system>.deploy-docs-rehearsal` | Every `deploy-docs` mode (`production`, `preview`, `pull-request`, `pull-request-closed`, `versions`, `deployments`) against a stub wrangler that also runs each invocation's identical argv through the real pinned wrangler (`deploy --dry-run`, the other commands against a loopback fake Cloudflare API), including a superseded production run, the untrusted `--payload` hardening, the same-repository-or-writer trust rule, each build status and failure path, the `docs-preview` check-run lifecycle, a pull request found closed or superseded before the upload (skipped, with no Cloudflare or nixbot API request) or closed during it (Preview withdrawn), a failed pull request state lookup, Preview teardown when deleted, absent, or failing, `--limit` truncation, and missing secrets | `docs` |
 | `checks.<system>.release-rehearsal` | `release-packages --rev` with the production semantic-release plugins against a local git fixture and a stub GitHub API, including the floating major and minor tags, a superseded rev, and a diverged rev; `release-packages plan` on fixture pull requests through the installation-token path, covering a minor, a major, and no bump, a release-configuration edit that is ignored in favour of `main`'s, a closed or superseded pull request (skipped without cloning), a failed pull request state lookup, a merge conflict, a head mismatch, a missing forge token, and an unused release PAT, with no write to the fixture remote and no release created | `release-packages` |
-| `checks.<system>.publish-evidence-rehearsal` | `publish-evidence build-finished` and `publish-evidence main` against a loopback nixbot API, a chroot store, a stub comment endpoint, and a stub S3 endpoint that verifies the temporary credential's JWT claims and SigV4 signature and refuses keys outside its prefix: report selection and validation, upload with the receipt last and create-only, tier selection, an identical retry, a conflicting receipt, a failed upload and its retry, a refused comment, the pull request comment, `main` mode's lookup of the newest build of exactly its commit, a commit with no build, a missing `NIXBOT_API_URL`, a missing or non-`main` `--rev`, missing R2 secrets, and the parent secret's absence from every request | `browser-evidence` |
+| `checks.<system>.publish-evidence-rehearsal` | `publish-evidence event` and `publish-evidence main` against a loopback nixbot API, a chroot store, a stub comment endpoint, and a stub S3 endpoint that verifies the temporary credential's JWT claims and SigV4 signature and refuses keys outside its prefix: report selection and validation, upload with the receipt last and create-only, tier selection, an identical retry, a conflicting receipt, a failed upload and its retry, a refused comment, the pull request comment from a `build_finished` or a `pull_request` event, a reused build's comment naming its head and its later return to `main`'s report, a rejected event kind, `main` mode's lookup of the newest build of exactly its commit, a commit with no build, a missing `NIXBOT_API_URL`, a missing or non-`main` `--rev`, missing R2 secrets, and the parent secret's absence from every request | `browser-evidence` |
 
 `checks.<system>.effects-interpreter`, built by `nixbot/nix-build`, checks the script the effects interpreter generates for each trigger kind (`main`, `pullRequest`, `pullRequestClosed`): the main-only guard, secret export, that a trigger never receives another trigger's secrets, the missing-secret failure, the per-trigger forge token, and the program's exact argv, including `--rev`.
 
@@ -81,7 +82,7 @@ On a push to `main` the same context reports the effect runs themselves.
 
 Effects are data entries of `vanixiets.effects` in `modules/effects/vanixiets/effects.nix`.
 Each entry names a program, its rehearsals, and one or more triggers (`main`, `pullRequest`, `pullRequestClosed`, `buildFinished`), each with its own arguments, secrets, lock, and forge-token setting; one interpreter, `modules/effects/vanixiets/registry.nix`, generates a nixbot effect per trigger.
-A `buildFinished` trigger becomes an onEvent `build_finished` effect, evaluated from `main` and delivered for builds matching its `when` conditions; one that reads a secret must require `write` or `admin` permission.
+A `buildFinished` trigger becomes an onEvent `build_finished` effect, evaluated from `main` and delivered for builds matching its `when` conditions; those conditions select builds and do not authorize anyone, since nixbot's CI approval (`prApproval`) holds a pull request from outside the repository until a maintainer approves it.
 The generated script for a `main` trigger starts with a fail-closed guard that refuses to run unless nixbot's identity token says the event is a push to `refs/heads/main`; any other run is skipped with exit 0 before a secret is read.
 It then exports the trigger's declared secrets, and only those, and execs the program, appending `--rev <commit>` for `main` triggers.
 
@@ -169,15 +170,33 @@ Runs the `publish-evidence` program, which publishes the docs browser report nix
 | Trigger | nixbot effect | Program | Lock | Forge token |
 |---------|---------------|---------|------|-------------|
 | `main` | `onPush.default.outputs.effects.browser-evidence` | `publish-evidence main --upload --rev <commit>` | `browser-evidence` | No |
-| `buildFinished` | `onEvent.build_finished.browser-evidence` | `publish-evidence build-finished --upload` | `browser-evidence` | No |
+| `pullRequest` | `onEvent.pull_request.browser-evidence` | `publish-evidence event --upload` | `browser-evidence` | No |
+| `buildFinished` | `onEvent.build_finished.browser-evidence` | `publish-evidence event --upload` | `browser-evidence` | No |
 
-**`buildFinished`:** delivered for succeeded and failed builds whose actor or pull request author has `write` permission or above; a failed aggregate build still publishes its report.
-It fetches the event's build from nixbot's API.
+All three triggers share the `browser-evidence` lock, so no two runs overlap on a pull request's comment and marker; a `{pr}` lock is not used because nixbot skips a `build_finished` event without a pull request whose lock names `{pr}`.
+Each settled pull request build gets exactly one run:
+
+| Pull request build | Succeeded | Failed |
+|--------------------|-----------|--------|
+| fresh | `pullRequest` | `buildFinished` |
+| reused (identical tree, no new build) | `pullRequest` | none |
+
+A reused failed build gets no run, so the comment keeps naming the earlier build with the same tree.
+Neither trigger sets `when.permission`: the trust gate is nixbot's CI approval, and bots such as Renovate, which report no permission, get evidence too.
+
+**`pullRequest`:** delivered after every pull request build that settles succeeded, freshly built or reused, and again when the pull request is labelled.
+**`buildFinished`:** delivered only for failed builds (`when.status = [ "failed" ]`), since a failing suite still leaves a report.
+Both run `publish-evidence event`, which accepts `NIXBOT_EVENT_KIND` `pull_request` or `build_finished` and fetches the event's build from nixbot's API.
 For a build without a pull request it uploads to the `ttl-90d` tier without a comment.
 For a pull request it first checks, with a read-only credential, whether `main` has already published this exact report (its receipt exists under `ttl-90d`); if so the pull request is unaffected, and the run uploads nothing, posts no comment, and logs `PUBLISH-EVIDENCE: unaffected (report <obs> already published from main)`.
 Otherwise it uploads to `ttl-30d` and posts or edits one comment through nixbot's `pr-comment` API with the verdict and counts, the build number and revision, links to the screenshots and receipt, the retention, and a note that no identical report has been published from `main` in the last 90 days.
+When the build was reused for a newer head, the build line adds `(reused for head <head>, same tree)` and the marker records the head.
 If an earlier build of the same pull request commented and a later one is unaffected, the run replaces the comment with a superseded note and logs `PUBLISH-EVIDENCE: superseded #<number>`; it tracks this in a marker object under `ttl-30d/pr/`, because `pr-comment` can only upsert.
 When two builds of one pull request finish out of order, the one that finishes last decides the comment.
+
+The report's output path is input-addressed, so a dependency bump in the site's closure is affected even when its screenshots are pixel-identical to `main`'s.
+`vanixiets-docs-deps` is built from the whole workspace `bun.lock`, so a dependency change in another workspace package, such as `@vanixiets/evidence-worker`, currently counts as affecting the docs report; per-application dependency derivations would remove that.
+Each further application would get its own report derivation per (project, kind), judged independently; the program's single report attribute is the extension point.
 
 **`main`:** a landing fast-forwards `main` to an already-built commit, and nixbot sends no `build_finished` for a reused build, so this trigger looks up the highest-numbered build of `<commit>` through nixbot's builds API and publishes its report to `ttl-90d`, without a comment.
 
@@ -189,8 +208,9 @@ The run log prints `PUBLISH-EVIDENCE: published|unchanged (report <obs>, passed=
 **Evidence URL:** `https://evidence.vanixiets.net/vanixiets/browser-evidence/<tier>/v1/<obs>/<file>` (the object key after `projects/`), served read-only by the Worker `sciexp-evidence` (`packages/evidence-worker/`, deployed with wrangler): GET and HEAD, `.png` and `.json` only, no listing.
 Bucket lifecycle rules delete `ttl-30d` objects after 30 days and `ttl-90d` objects after 90 days.
 nixbot runs event effects from the default branch, so a pull request that changes this effect or `publish-evidence` is first exercised after it lands.
-nixbot posts no forge status for event effects, so a failed `buildFinished` run shows only in nixbot's effect log and never blocks a merge; a failed `main` run fails `nixbot/effects` on the `main` push.
-Local equivalent: `nix run .#publish-evidence -- build-finished --out <dir>` with nixbot's event variables set, which stages the bundle without uploading.
+nixbot posts no forge status for event effects, so a failed `pullRequest` or `buildFinished` run shows only in nixbot's effect log and never blocks a merge; a failed `main` run fails `nixbot/effects` on the `main` push.
+The comment needs nixbot's GitHub App to hold `Pull requests: Read and write`; nixbot caches installation tokens for 48 minutes (`nixbot/nixbot/forge/github.py:153-154`), so a permission change takes effect after the cached token expires or nixbot restarts.
+Local equivalent: `nix run .#publish-evidence -- event --out <dir>` with nixbot's event variables set, which stages the bundle without uploading.
 
 ## GitHub Actions workflows
 
@@ -258,6 +278,7 @@ Build `deploy-docs-rehearsal`, `release-rehearsal`, or `publish-evidence-rehears
 
 **The browser-evidence run fails:** its log names the step; `evidence unavailable` means the build has no realisable report, `conflict` means another receipt already holds that key, and an upload or comment failure names the key or HTTP status.
 A rerun is idempotent: it finds the same receipt and logs `unchanged`.
+A comment the GitHub API refuses can mean nixbot's GitHub App lacks `Pull requests: Read and write`; after granting it, wait out nixbot's 48-minute installation token cache or restart nixbot before rerunning.
 
 **The docs-preview check run fails:** its summary carries the error, for example a docs attribute that did not build or a failed Preview deploy.
 

@@ -85,8 +85,8 @@ A tier therefore receives each report at most once: the receipt is uploaded last
 
 The tier is part of the key, and a lifecycle rule per tier prefix deletes objects by age:
 
-- `ttl-30d` for a pull request build whose report `main` has not published ([D10](#d10-publish-main-from-onpush-and-pull-requests-from-build_finished));
-- `ttl-90d` for `main` and other builds without a pull request;
+- `ttl-30d` for a pull request build whose report `main` has not published ([D10](#d10-publish-main-from-onpush-and-each-settled-pull-request-build-once));
+- `ttl-90d` for `main` and for failed builds without a pull request, which reach publication through build_finished;
 - `ttl-365d` for a later curation step; the rule exists, but nothing writes to it.
 
 R2 lifecycle rules are bucket-wide, so `cloudflare_r2_bucket_lifecycle.sciexp` holds every rule for the bucket, including the existing multipart-abort rule.
@@ -119,19 +119,50 @@ The hostname choice rests on three points:
 - A subdomain of a session-bearing domain is insufficient for active content. A page on any subdomain can set cookies for the whole registrable domain (cookie tossing), SameSite treats requests between its subdomains as same-site and so first-party, and the subdomain shares the trust users and policies extend to the parent domain. Today's content is inert, PNG and JSON under a sandboxing content security policy, so serving it on this host is acceptable now; the dedicated domain keeps that true once active content exists.
 - Future active content, such as the HTML report, a trace viewer, or video, goes on another `vanixiets.net` subdomain, such as `reports.vanixiets.net`, never on a domain carrying sessions. It remains out of scope.
 
-## D10: publish `main` from onPush and pull requests from build_finished
+## D10: publish `main` from onPush and each settled pull request build once
 
 gitea-mq lands a batch by fast-forwarding `main` to the tested commit, so the push to `main` reuses the batch's build.
 Pinned nixbot delivers build_finished only for a build that newly finished (`nixbot/nixbot/after_build.py:74-79`), so a landing sends none.
 build_finished alone would therefore never publish evidence for `main`.
 
-The `browser-evidence` effect has two triggers sharing the `browser-evidence` lock:
+Pull request heads are reused the same way.
+nixbot reuses a terminal build for a new commit whose tree is identical (`nixbot/nixbot/build_reuse.py:126-180`): it creates no build row for the new commit, so `builds?commit=<head>` returns nothing, and it sends no build_finished.
+Live, the head `bab7fb26` of #3304 reused build 1014; its `pull_request` docs effect ran at 06:12:21 and build_finished did not fire.
+After every pull request build settles SUCCEEDED, fresh or reused, nixbot delivers the onEvent kind `pull_request` (`nixbot/nixbot/orchestrator.py:432-451`, `service.py:296-324`).
+Its payload carries `build`, whose `rev` is the build's commit and so differs from the head for a reused build (`deliver.py:129-137`), and `pullRequest`, whose `headRev` is the head (`nixbot_effects/match.py:203-222` exposes it as `NIXBOT_PR_HEAD`).
+
+The `browser-evidence` effect has three triggers, all sharing the one `browser-evidence` lock:
 
 - `main`: an onPush effect running `publish-evidence main --upload --rev <commit>`; it finds the build for that commit through nixbot's builds API, takes the highest build number, and publishes its report to `ttl-90d` unless that report is already there. It never comments.
-- `buildFinished`: an onEvent effect running `publish-evidence build-finished --upload` for succeeded and failed builds, with `when.permission = "write"`; for a pull request build it applies the affected rule below, and for a build without a pull request it publishes to `ttl-90d` as `main` does, without a probe or comment.
+- `pullRequest`: an onEvent `pull_request` effect running `publish-evidence event --upload` for every succeeded pull request build, fresh or reused; it applies the affected rule below.
+- `buildFinished`: an onEvent `build_finished` effect running `publish-evidence event --upload` with `when.status = [ "failed" ]`; for a pull request build it applies the affected rule below, and for a build without a pull request it publishes to `ttl-90d` as `main` does, without a probe or comment.
+
+The result is one publisher run per settled pull request build:
+
+| Pull request build | Settles succeeded | Settles failed |
+| --- | --- | --- |
+| fresh | `pull_request` | `build_finished` |
+| reused | `pull_request` | none |
+
+A failed build never receives `pull_request`, and a succeeded one is filtered out of `buildFinished`, so no build is published twice.
+A label event also delivers `pull_request` against the pull request's latest build (`service.py:279-280`), and that extra run finds its receipt and marker already written.
+A reused failed build delivers nothing: its report was published by the failed build it reuses, but the comment keeps naming that build rather than the new head.
+This gap is accepted.
+
+The lock is one plain name rather than a per-pull-request `browser-evidence-{pr}`.
+A per-pull-request lock on `pullRequest` alone would let a failed build's `buildFinished` run and a later build's `pullRequest` run of the same pull request overlap on its comment and marker.
+A `{pr}` lock on `buildFinished` is not possible: nixbot also delivers build_finished for builds without a pull request, such as gitea-mq batch branches, and `expand_lock` refuses a `{pr}` lock for an event with no pull request (`nixbot_effects/match.py:194-201`), so nixbot would skip those events (`nixbot/nixbot/deliver.py:264-276`).
+
+When `pullRequest.headRev` is present and differs from `build.rev`, the comment names both: the build line reads ``[build N](url) at `<build rev>` (reused for head `<head>`, same tree)``, and the marker records `head`.
 
 onPush runs only after a successful build, so a failed report reaches publication only through build_finished.
 The receipt names no build, so a report reused by a later build or by a landing push is the same publication; the pull request comment names the build it describes.
+
+Neither onEvent trigger sets `when.permission`.
+nixbot satisfies it with the higher of the actor's and the author's permission (`nixbot_effects/match.py:41-62`), and bots such as Renovate (`app/renovate`) report none, so a permission condition skipped every Renovate pull request.
+The trust gate is nixbot's CI approval instead (`prApproval` in `modules/nixos/nixbot.nix`): a pull request from outside the repository is held until a maintainer approves it, and one whose head branch lives in the repository is trusted, since pushing that branch already required write access.
+The effect never executes pull request code; it reads the recorded build's output through nixbot's API.
+Bot pull requests, dependency bumps included, therefore get evidence.
 
 nixbot runs event effects from the default branch only (nixbot@2626aa2 `nixbot/nixbot/event_effects.py:1-4`): the effect code comes from a worktree of the default branch, and a pull request contributes only an untrusted clone of its head.
 A pull request that introduces or changes the `browser-evidence` effect or the publisher is therefore not exercised by its own build; it is exercised by builds after it lands, and before then only the rehearsal check covers it.
@@ -145,7 +176,16 @@ Any probe status other than 200 or 404 fails the run, naming the key, before any
 Nix's report output path is the change detector.
 It is derived from every input of the report derivation, including the site build, test sources, fixtures, Playwright configuration, browsers, runner, and evidence epoch, so two revisions share it exactly when nothing that the report depends on differs.
 Path globs over the diff would approximate that input set by hand, miss changes that reach the report indirectly, such as a lock file or flake input update, and drift as the build changes; the output path cannot drift, because it is the build's own identity.
-The rule carries to future applications unchanged: each (project, kind) has one report derivation, and that derivation's output path is its detector.
+
+The output path is input-addressed, so a dependency bump inside the application's closure changes it and the pull request is affected even when every screenshot is pixel-identical to `main`'s.
+That is the intended answer for a dependency bump: the evidence shows the bumped closure, not a claim that nothing moved.
+
+The detector is only as precise as the derivation's inputs.
+`vanixiets-docs-deps` is built from the whole workspace `bun.lock` (`pkgs/by-name/vanixiets-docs-deps/package.nix`), so a dependency change in another workspace package, such as `@vanixiets/evidence-worker`, currently changes the docs report's path and counts as affecting it.
+The remedy is a dependency derivation per application, built from that application's slice of the lock file.
+
+The rule carries to future applications unchanged: each (project, kind) has one report derivation, judged independently by its own output path.
+The publisher's single report attribute is the extension point: `<obs>` and the receipt already key on the attribute, so another application's report derivation becomes another attribute the publisher selects and judges on its own.
 
 The rule compares against what `main` has published, not against `main`'s source.
 A report that differs from every report published from `main` in the last 90 days is treated as affected, for example when `main`'s evidence for the same report has expired or `main`'s publish run failed.
@@ -159,7 +199,7 @@ The marker lies inside the pull request run's read-write prefix, the 30-day life
 An affected run writes `current` after a successful comment.
 An unaffected run reads the marker: if it is absent, no comment was ever posted and the run stays silent; if it is `current`, the run upserts the comment with a superseded body, which names the report shared with `main`, the build, and the revision and carries no links, writes `superseded`, and logs `PUBLISH-EVIDENCE: superseded #<number>`; if it is `superseded`, the run does nothing.
 Two builds of one pull request that finish out of order race on the comment and the marker, and the run that finishes last wins even when it is not the newest build.
-This race is accepted: the shared `browser-evidence` lock serialises the runs but does not order them.
+This race is accepted: the shared `browser-evidence` lock serialises every run, `pullRequest` and `buildFinished` alike, but does not order them.
 The publisher holds no GitHub token for the comment; a failed post fails the effect after the upload, and a rerun is idempotent.
 
 ## Source grounding

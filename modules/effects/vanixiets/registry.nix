@@ -20,9 +20,10 @@
 # Its effect code comes from the default branch; event data and build artifacts
 # remain untrusted. At nixbot 2626aa2, `when` is scheduler delivery metadata,
 # not a shell guard. Branch/status filters select builds, not authorized actors.
-# Credentialed buildFinished requires write/admin permission; missing actors
-# (including poll-originated builds without an actor) fail closed in nixbot's
-# matcher. A PR author's permission can also satisfy that matcher.
+# Who may build at all is nixbot's CI approval (modules/nixos/nixbot.nix
+# prApproval), which holds an outside pull request until approved; a
+# credentialed trigger relies on that, since `when.permission` is satisfied
+# by max(actor, PR author) and bots such as renovate report no level.
 #
 # The rendered script, in order: for main, the effectRunContext guard that
 # ends any run that is not a push to main before a secret is read; exports
@@ -106,7 +107,7 @@ let
               ]
             );
             default = null;
-            description = "Minimum actor or PR author permission. Credentialed runs require write or admin; an absent actor/author does not qualify.";
+            description = "Minimum actor or PR author permission; an absent actor/author does not qualify.";
           };
           branches = lib.mkOption {
             type = types.listOf types.str;
@@ -238,19 +239,7 @@ let
 
   requireTrigger =
     name: entry:
-    let
-      finished = entry.triggers.buildFinished;
-    in
-    if
-      finished != null
-      && (finished.secrets != [ ] || finished.forgeToken)
-      && !(builtins.elem finished.when.permission [
-        "write"
-        "admin"
-      ])
-    then
-      throw "vanixiets.effects.${name}: credentialed triggers.buildFinished requires when.permission = write or admin; branch/status filters are not authorization"
-    else if lib.any (trigger: trigger != null) (builtins.attrValues entry.triggers) then
+    if lib.any (trigger: trigger != null) (builtins.attrValues entry.triggers) then
       entry
     else
       throw "vanixiets.effects.${name}: declares no trigger; set at least one of triggers.{main,pullRequest,pullRequestClosed,buildFinished}";
