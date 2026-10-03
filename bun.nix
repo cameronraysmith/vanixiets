@@ -237,9 +237,9 @@
     url = "https://registry.npmjs.org/@cloudflare/unenv-preset/-/unenv-preset-2.16.2.tgz";
     hash = "sha512-JBP1+Z7ZSNG/d4mRP+y8VC5dka3tZVMLEZRvS+rzQ4DGV1EoxRFQckcJTTkXbHSQiTj0DtNI01Zwb/V2fX0mvQ==";
   };
-  "@cloudflare/vite-plugin@1.62.4" = fetchurl {
-    url = "https://registry.npmjs.org/@cloudflare/vite-plugin/-/vite-plugin-1.62.4.tgz";
-    hash = "sha512-6mJj8UwAiNNra8j3rC/uYwe8aYa2/tudFe2hbvY+WQ8RjONzNryVAoj7PkMgLPZKxxhShXwYdT4tCSxTB2CWow==";
+  "@cloudflare/vite-plugin@1.62.5" = fetchurl {
+    url = "https://registry.npmjs.org/@cloudflare/vite-plugin/-/vite-plugin-1.62.5.tgz";
+    hash = "sha512-qJJonL8EvKuSPfrwSMiDEPp+klxTU08pan1bgm/jc3LrYe9Hp4XUkIGAcQdgv7P9OZbe6AU+51iMUtQOt85J2w==";
   };
   "@cloudflare/vitest-plugin@1.3.6" = fetchurl {
     url = "https://registry.npmjs.org/@cloudflare/vitest-plugin/-/vitest-plugin-1.3.6.tgz";
@@ -4374,10 +4374,6 @@
   "workerd@1.20261001.1" = fetchurl {
     url = "https://registry.npmjs.org/workerd/-/workerd-1.20261001.1.tgz";
     hash = "sha512-d/SIYHFO0PT/wiFZg8in4NpRIxYuFwslX1HdylOtWkBIIUmSpkGFhK820cV84XACFylwJ48xuRoWW/8DWDPsPQ==";
-  };
-  "wrangler@4.146.0" = fetchurl {
-    url = "https://registry.npmjs.org/wrangler/-/wrangler-4.146.0.tgz";
-    hash = "sha512-c27eHUH0Isr8HTmgZ6cLtLr/0cxtiBoLren6ywBeTW8ZIzj/dINVNBcqsbZc+iETnI5jrzO7E7Z8mLgLZ/l9iw==";
   };
   "wrangler@4.147.0" = fetchurl {
     url = "https://registry.npmjs.org/wrangler/-/wrangler-4.147.0.tgz";
