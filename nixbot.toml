@@ -1,9 +1,15 @@
-# Scope nix-eval-jobs to x86_64-linux workers only.
-# Default "checks" evaluates all systems, and eval failures on unsupported
-# systems (aarch64-linux, aarch64-darwin) poison the build result.
-# See: https://www.github.com/nix-community/buildbot-nix/issues/302 (upstream issue)
-# See: https://www.github.com/nix-community/buildbot-nix/pull/318 (per-repo config support)
-attribute = "checks.x86_64-linux"
+# Build every system's checks that magnetite's nixbot evaluates. The system
+# scope is not set here: `attribute` is one attribute path, so it cannot name
+# two systems, and nixbot narrows "checks" to the instance's evalSystems
+# (x86_64-linux and aarch64-darwin, modules/nixos/nixbot.nix) before
+# evaluating anything (nixbot/nixbot/nix/select.nix:37-50). aarch64-linux is
+# never evaluated. aarch64-darwin checks are best-effort
+# (modules/checks/nixbot-best-effort-darwin.nix).
+#
+# nixbot reads `attribute` from the worktree being built, so a pull request
+# changing it is built with its own value; the effects keys below are read
+# from the default branch only.
+attribute = "checks"
 
 # herculesCI effects gating (nixbot, github:Mic92/nixbot)
 #
