@@ -76,7 +76,8 @@ Core nix operations for building, checking, and managing the flake.
 | `update` | - | Update all nix flake inputs | No |
 | `update-package` | `package` | Update a package using its updateScript | No |
 
-**CI:** nixbot builds `checks.x86_64-linux` directly rather than calling these recipes; `just check-fast auto off x86_64-linux` builds the same set.
+**CI:** nixbot builds `checks.x86_64-linux`, and `checks.aarch64-darwin` best-effort, directly rather than calling these recipes; `just check-fast auto off x86_64-linux` builds the same x86_64-linux set, and `just check-fast` on a Mac builds the darwin set.
+A failed darwin check is an ignored failure in CI, because nixbot cannot tell an absent Mac from a genuine regression, so local `just check-fast` on a Mac remains the gate for darwin.
 
 **check-fast:** parameters are positional (`nom push system remote`); `nom` is `auto|on|off`, `push=on` uploads built paths to niks3, and `system` defaults to the native system.
 A non-native `system` evaluates and builds on the `remote` host with `--no-download --retries 2`: `magnetite` adds `--remote magnetite.zt --eval-workers 4`, and `pyrite` adds `--remote pyrite.zt --eval-workers 2 --eval-max-memory-size 2048`.

@@ -12,8 +12,8 @@ All local commands run from the repository root.
 
 | CI context or job | Purpose | Local equivalent | Runs on |
 |-------------------|---------|------------------|---------|
-| nixbot/nix-eval | Evaluate `checks.x86_64-linux` | `nix eval .#checks.x86_64-linux --apply builtins.attrNames` | PR, batch, push |
-| nixbot/nix-build | Build `checks.x86_64-linux` | `just check-fast auto off x86_64-linux` | PR, batch, push |
+| nixbot/nix-eval | Evaluate `checks.x86_64-linux` and `checks.aarch64-darwin`; a darwin evaluation error fails it | `nix eval .#checks.<system> --apply builtins.attrNames` | PR, batch, push |
+| nixbot/nix-build | Build `checks.x86_64-linux`, and `checks.aarch64-darwin` best-effort | `just check-fast auto off x86_64-linux`; `just check-fast` on a Mac | PR, batch, push |
 | nixbot/effects (pre-merge) | Build each effect's dependencies, including the rehearsals | `nix build .#checks.x86_64-linux.deploy-docs-rehearsal .#checks.x86_64-linux.release-rehearsal` | PR, batch |
 | `docs` effect, `main` trigger | Production docs deploy (`deploy-docs production --rev <commit>`) | `just docs-deploy-production` | Push to `main` |
 | `release-packages` effect, `main` trigger | Semantic-release per package (`release-packages --rev <commit>`) | `just release-package <pkg> true` (dry run; needs `GITHUB_TOKEN`) | Push to `main` |
@@ -26,6 +26,10 @@ All local commands run from the repository root.
 
 `checks.x86_64-linux` covers the overlay packages, the docs package tests (`package-vanixiets-docs-test-*`), dev shells, the `nixos-*` and `home-manager-*` configurations, and the structure, secrets, and treefmt checks.
 From darwin, `just check-fast auto off x86_64-linux` routes the build to magnetite.
+
+`checks.aarch64-darwin`, the `darwin-<host>` machine checks included, is built best-effort on stibnite, the only Mac magnetite dispatches to (`modules/checks/nixbot-best-effort-darwin.nix`).
+A failed darwin attribute is an ignored failure: shown on the build, excluded from its aggregate status, and retried on the next build.
+nixbot cannot tell an absent Mac from a genuine darwin regression, so local `just check-fast` on a Mac remains the gate for darwin.
 
 ## Rehearsals
 
@@ -48,7 +52,7 @@ The following recipes are not exercised by CI:
 | Recipe | Rationale |
 |--------|-----------|
 | `activate*` | Requires physical machine access |
-| `darwin-*` | Requires darwin hardware; nixbot builds `checks.x86_64-linux` only |
+| `darwin-*` | Requires darwin hardware; nixbot builds the `darwin-<host>` checks best-effort and runs none of these recipes |
 | `nixos-bootstrap` | Destructive disk operations |
 | `cache-darwin-system` | Requires darwin hardware |
 | `scan-secrets` | Local gitleaks scan; no CI job runs it |

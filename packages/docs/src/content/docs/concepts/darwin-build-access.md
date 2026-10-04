@@ -9,6 +9,7 @@ Nix evaluation is portable and nix building is not.
 Magnetite, which carries both CI services, is x86_64-linux, so it can evaluate an aarch64-darwin derivation and cannot build one.
 Remote building is declared once for the whole fleet by the `nix-builders` clan service (`modules/clan/services/nix-builders/`, instance in `modules/clan/inventory/services/nix-builders.nix`), which gives each machine a `builder` role, a `dispatcher` role, or both.
 Stibnite is the primary aarch64-darwin builder, and rosegold and argentum are opportunistic ones: laptops that take darwin work when they are awake, on the mesh and on AC power.
+No dispatcher sends work to rosegold or argentum yet; their builder side is in place, and each dispatcher excludes them.
 Before that service, only stibnite was declared as a darwin build target, and before `stibnite-access.nix` nothing was, which left darwin derivations without a build target at all rather than with a slow one.
 
 ## Two mechanisms, two callers
@@ -30,7 +31,7 @@ Nothing lands locally, so a caller that needs the output path locally wants the 
 | Evaluation | caller | caller |
 | Build | the builder | the builder |
 | Output closure | copied back to the caller | stays in the builder's store |
-| Intended caller | a developer or operator who needs an aarch64-darwin result locally, such as building or testing Darwin configurations from magnetite | a machine whose store is empty and stays empty |
+| Intended caller | nixbot building `checks.aarch64-darwin`, or a developer or operator who needs an aarch64-darwin result locally, such as building or testing Darwin configurations from magnetite | a machine whose store is empty and stays empty |
 
 Both mechanisms speak `ssh-ng` to the same account through the same ssh alias, which is what the `nix-builders-wiring` check pins.
 Legacy `ssh://`, which would run `nix-store --serve` on the far side, is deliberately not served.
@@ -38,7 +39,8 @@ Legacy `ssh://`, which would run `nix-store --serve` on the far side, is deliber
 ## Who dispatches to whom
 
 Stibnite dispatches to magnetite and pyrite, for native x86_64-linux work and x86_64-linux kvm work respectively, and does not dispatch to rosegold or argentum.
-Magnetite dispatches to stibnite, rosegold and argentum for aarch64-darwin work, with `builders-use-substitutes` so a builder fetches from the shared binary cache what it can rather than receiving it over ZeroTier, and does not dispatch to pyrite.
+Magnetite dispatches aarch64-darwin work, nixbot's included, to stibnite only, with `builders-use-substitutes` so a builder fetches from the shared binary cache what it can rather than receiving it over ZeroTier, and does not dispatch to pyrite.
+Magnetite excludes rosegold and argentum until the binary cache holds nixbot's darwin outputs; re-admitting one means deleting its name from magnetite's `exclude` in `modules/clan/inventory/services/nix-builders.nix` and redeploying magnetite.
 Every builder authorizes every dispatcher's key, so an exclusion decides only where a dispatcher sends work, not who may connect.
 
 On a darwin builder the forced command is not `nix-daemon --stdio` directly but a small gate script in the store.
@@ -107,11 +109,22 @@ Each darwin builder's activation also adds `nixbuild` to macOS's `com.apple.acce
 That ACL nests only the admin group, so without the entry the build account is refused by sshd before the key is ever consulted, and the failure reads as `Permission denied (publickey)` with a correct key installed.
 The builder setting `authorizeSshAccessGroup = false` turns that step off for a host whose ACL is managed by hand.
 
-## What is deliberately not enabled
+## What CI asks of the darwin builders
 
-`nixbot.toml` sets `attribute = "checks.x86_64-linux"`, which prevents CI from evaluating or requesting aarch64-darwin work and makes the darwin builders unreachable from CI.
-The configurations in `modules/nixos/nixbot.nix` and `modules/nixos/buildbot.nix` each set `buildSystems = [ "x86_64-linux" ]` as an independent second layer.
-These controls remain because every darwin builder is a laptop without guaranteed availability and a sleeping machine could gate CI.
+nixbot on magnetite builds `checks.aarch64-darwin` alongside `checks.x86_64-linux`, as best-effort.
+`nixbot.toml` sets `attribute = "checks"`, and `modules/nixos/nixbot.nix` sets both `buildSystems` and `evalSystems` to `[ "x86_64-linux" "aarch64-darwin" ]`.
+`evalSystems` is what scopes the attribute, so aarch64-linux, which no builder here serves, is never evaluated.
+`modules/nixos/buildbot.nix` still sets `buildSystems = [ "x86_64-linux" ]`.
+
+Every darwin builder is a laptop without guaranteed availability, so a darwin build must not gate CI on whether a Mac is awake.
+`modules/checks/nixbot-best-effort-darwin.nix` gives every darwin check, the `darwin-<host>` machine checks included, hercules-ci's `ignoreFailure` modifier.
+A failed darwin attribute is therefore an ignored failure: shown on the build, excluded from the build's aggregate status, and retried on the next build.
+The cost is real: nixbot cannot tell an absent Mac from a genuine darwin regression, so local `just check-fast` on a Mac remains the gate for darwin.
+A darwin evaluation error is not covered and still fails the build.
+The modifier changes no drvPath, so nothing rebuilds and the binary cache is unaffected.
+
+The builds run on stibnite, the only Mac magnetite dispatches to, and like any dispatched build they run only on AC power and at Background QoS.
+The `nixbot-wiring` check pins CI's system scope and the best-effort marking.
 
 ## Related
 

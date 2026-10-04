@@ -45,7 +45,7 @@ Its foreign-input guards keep the ordinary-sized fixtures; the two 300,000-chara
 
 ## On-demand VM tests
 
-`nixbot.toml` evaluates `checks.x86_64-linux`; VM tests instead live under `vmTests` and are not part of pull-request coverage.
+`nixbot.toml` evaluates `checks`, which nixbot scopes to `checks.x86_64-linux` and, best-effort, `checks.aarch64-darwin`; VM tests instead live under `vmTests` and are not part of pull-request coverage.
 The independent `checks.<system>.zerotier-mss-clamp` structural check remains gated.
 Run a runtime test on a reachable KVM-capable Linux host, such as Pyrite, from its checkout of the intended revision:
 
@@ -71,7 +71,8 @@ Remote builders are one Clan service, `nix-builders` (`clan/services/nix-builder
 A machine in the `builder` role gets a build account, `builder` on NixOS and `nixbuild` on Darwin, which is a Nix trusted user and whose `authorized_keys` admits each dispatcher's `nix-remote-build` key only through a forced `nix-daemon --stdio`.
 A machine in the `dispatcher` role generates that key and gets an ssh alias and an entry in `services.nix-builders.buildMachines` for every builder it does not exclude; Stibnite splices that list after its rosetta-builder entries, and Magnetite uses it as `nix.buildMachines` unchanged.
 Stibnite dispatches x86_64-linux work to Magnetite and Pyrite, and Pyrite's entry is the only one advertising `kvm` for x86_64-linux.
-Magnetite dispatches aarch64-darwin work to Stibnite, Rosegold, and Argentum, and excludes Pyrite.
+Magnetite dispatches aarch64-darwin work, nixbot's best-effort darwin checks included, to Stibnite only, and excludes Pyrite.
+Rosegold and Argentum stay excluded from Magnetite until the binary cache holds nixbot's darwin outputs; deleting a name from Magnetite's `exclude` and redeploying Magnetite re-admits that machine, whose builder side is already in place.
 The Darwin builders are laptops and serve builds opportunistically.
 Their forced command is a gate that declines with `on battery; declining remote builds` unless `pmset` reports AC power, and their nix-daemon runs at `Background` QoS with low-priority I/O so a dispatched build yields to the owner's work.
 Unreachability is therefore ordinary, and nix 2.35 handles it in two distinct ways; a builder declining on battery closes the connection and looks the same as an unreachable one.

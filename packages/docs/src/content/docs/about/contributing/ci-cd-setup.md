@@ -23,7 +23,7 @@ There is no separate dry-run implementation of an effect; pre-merge confidence c
 `nixbot.toml` at the repository root sets:
 
 ```toml
-attribute = "checks.x86_64-linux"
+attribute = "checks"
 effects_on_pull_requests = false
 ```
 
@@ -38,7 +38,13 @@ The comments in `nixbot.toml` cite the nixbot functions that implement each rule
 
 ## What pull requests and merge-queue batches run
 
-A pull request or batch build evaluates and builds `checks.x86_64-linux`.
+A pull request or batch build evaluates and builds `checks`, scoped by `evalSystems` in `modules/nixos/nixbot.nix` to `checks.x86_64-linux` and `checks.aarch64-darwin`; aarch64-linux is never evaluated.
+The darwin checks, the `darwin-<host>` machine checks included, are best-effort (`modules/checks/nixbot-best-effort-darwin.nix`): magnetite dispatches them to stibnite, which builds only on AC power and at Background QoS.
+A failed darwin attribute is an ignored failure, shown on the build, excluded from its aggregate status, and retried on the next build.
+nixbot cannot tell an absent Mac from a genuine darwin regression, so local `just check-fast` on a Mac remains the gate for darwin.
+A darwin evaluation error still fails the build.
+The marking changes no drvPath, so the binary cache is unaffected.
+
 For each onPush effect gated off on that ref, nixbot builds the effect's dependencies as a check and still posts the `nixbot/effects` status.
 A required `nixbot/effects` context is therefore satisfied without running anything that reads a secret.
 
