@@ -86,7 +86,19 @@
 
         admins = [ "github:cameronraysmith" ];
 
-        buildSystems = [ "x86_64-linux" ];
+        # aarch64-darwin is built best-effort on whichever Mac magnetite can
+        # reach (modules/checks/nixbot-best-effort-darwin.nix). evalSystems
+        # matters because nixbot.toml's attribute is "checks": it is what
+        # keeps aarch64-linux, which no builder here serves, unevaluated
+        # (nixbot/nixbot/nix/select.nix:37-50).
+        buildSystems = [
+          "x86_64-linux"
+          "aarch64-darwin"
+        ];
+        evalSystems = [
+          "x86_64-linux"
+          "aarch64-darwin"
+        ];
 
         # 8 x 4096 MiB: 131.5 s for magnetite's 144 attributes, against 196.0 s
         # at 4 x 4096. The win is not parallelism. nix-eval-jobs recycles a

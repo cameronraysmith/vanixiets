@@ -10,7 +10,8 @@
 # rather than a transcription of it, and also pins the allowlists, the
 # binary-cache uploader set, the contributor approval gate, which service
 # holds which repository's secrets and which credentials vanixiets' carry, and
-# the deliberately empty sandbox options.
+# the deliberately empty sandbox options, CI's system scope, and that darwin
+# checks are best-effort without changing their derivations.
 #
 # The repository-root config file is nixbot.toml. nixbot prefers that name over
 # the legacy buildbot-nix.toml it also still reads
@@ -185,6 +186,28 @@
             extraSandboxPaths = nixbot.effects.extraSandboxPaths;
             mountables = sortedNames nixbot.effects.mountables;
             extraNixOptions = sortedNames nixbot.effects.extraNixOptions;
+
+            # CI's system scope. With nixbot.toml's attribute = "checks",
+            # evalSystems is what keeps aarch64-linux unevaluated
+            # (nixbot/nixbot/nix/select.nix:37-50).
+            inherit (nixbot) buildSystems evalSystems;
+
+            # Darwin checks are best-effort without changing what they build
+            # (modules/checks/nixbot-best-effort-darwin.nix). One mapAttrs
+            # marks every check, so the names and one representative prove it
+            # without forcing all darwin derivations here.
+            darwinCheckNamesUnchanged =
+              sortedNames self.checks.aarch64-darwin == sortedNames config.allSystems.aarch64-darwin.checks;
+            darwinRepresentative =
+              let
+                check = self.checks.aarch64-darwin.jj-pr-tags-rehearsal;
+              in
+              {
+                ignoreFailure = check.ignoreFailure or false;
+                sameDerivation =
+                  check.drvPath == config.allSystems.aarch64-darwin.checks.jj-pr-tags-rehearsal.drvPath;
+              };
+            linuxRepresentativeBestEffort = self.checks.x86_64-linux.jj-pr-tags-rehearsal ? ignoreFailure;
           };
           expected = {
             # Both repositories' secrets files are wired to nixbot's
@@ -243,6 +266,20 @@
             extraSandboxPaths = [ ];
             mountables = [ ];
             extraNixOptions = [ ];
+            buildSystems = [
+              "x86_64-linux"
+              "aarch64-darwin"
+            ];
+            evalSystems = [
+              "x86_64-linux"
+              "aarch64-darwin"
+            ];
+            darwinCheckNamesUnchanged = true;
+            darwinRepresentative = {
+              ignoreFailure = true;
+              sameDerivation = true;
+            };
+            linuxRepresentativeBestEffort = false;
           };
         };
       };

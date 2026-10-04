@@ -100,13 +100,12 @@ in
       #     the darwin result in magnetite's store.
       #   /etc/nix/<builder>-store-uri — a caller that wants the build to happen
       #     entirely in that builder's store with nothing copied back.
-      # nixbot.toml sets attribute = "checks.x86_64-linux", which prevents CI
-      # from evaluating or requesting aarch64-darwin work and makes these
-      # builders unreachable from CI. modules/nixos/nixbot.nix and
-      # modules/nixos/buildbot.nix each set buildSystems = [ "x86_64-linux" ]
-      # as an independent second layer. These controls remain because the
-      # darwin builders are laptops without guaranteed availability and a
-      # sleeping machine could gate CI.
+      # nixbot also builds checks.aarch64-darwin through these builders, as
+      # best-effort: the darwin builders are laptops without guaranteed
+      # availability, so each darwin check carries ignoreFailure and a
+      # sleeping machine leaves a notice rather than gating CI
+      # (modules/checks/nixbot-best-effort-darwin.nix). buildbot still builds
+      # x86_64-linux only.
       nix.buildMachines = config.services.nix-builders.buildMachines;
 
       # The build and session keys are separately authorized for independent
