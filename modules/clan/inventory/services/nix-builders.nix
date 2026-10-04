@@ -1,10 +1,11 @@
 # Who builds for whom. Addresses are the deterministic ZeroTier IPv6s pinned
 # in modules/system/ssh-known-hosts.nix.
 #
-# CI never reaches the darwin builders: nixbot.toml evaluates
-# checks.x86_64-linux only, and modules/nixos/{nixbot,buildbot}.nix each set
-# buildSystems = [ "x86_64-linux" ] as an independent second layer, because a
-# sleeping laptop must not gate CI.
+# nixbot on magnetite evaluates and builds checks.aarch64-darwin as
+# best-effort: every darwin check carries ignoreFailure
+# (modules/checks/nixbot-best-effort-darwin.nix), so a darwin builder that is
+# asleep, on battery, or unreachable leaves a notice on the build instead of
+# failing it. buildbot builds x86_64-linux only.
 let
   # Laptops in interactive use: a minority share of the machine, refused on
   # battery, and run at Background QoS so the owner's foreground work keeps
@@ -96,10 +97,17 @@ in
       # stibnite subscribes to the same binary cache, so a dependency a
       # builder can substitute itself is not worth shipping over ZeroTier.
       # pyrite is excluded: it is a laptop with two cores, and magnetite
-      # already builds x86_64-linux natively.
+      # already builds x86_64-linux natively. rosegold and argentum are
+      # excluded until nixbot's darwin builds have filled the binary cache
+      # from stibnite; deleting a name here and redeploying magnetite admits
+      # that machine, whose builder side is already in place.
       magnetite.settings = {
         buildersUseSubstitutes = true;
-        exclude = [ "pyrite" ];
+        exclude = [
+          "pyrite"
+          "rosegold"
+          "argentum"
+        ];
       };
     };
   };

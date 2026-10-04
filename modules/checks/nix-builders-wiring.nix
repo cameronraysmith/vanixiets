@@ -211,16 +211,6 @@
         argentum = "fddb:4344:343b:14b9:399:93f7:54d5:ad7e";
       };
 
-      darwinLaptopBuilder = dispatcher: builder: {
-        inherit dispatcher builder;
-        hostName = "${builder}-builder";
-        address = address.${builder};
-        systems = [ "aarch64-darwin" ];
-        maxJobs = 2;
-        speedFactor = 1;
-        supportedFeatures = [ "big-parallel" ];
-      };
-
       stibnite = configOf "stibnite";
       magnetite = configOf "magnetite";
 
@@ -427,13 +417,13 @@
                 magnetite = {
                   splice = {
                     order = [
-                      "argentum-builder"
-                      "rosegold-builder"
                       "stibnite-builder"
                     ];
                     fleetEntriesAreTheService = true;
                   };
                   # pyrite is excluded: magnetite builds x86_64-linux itself.
+                  # rosegold and argentum are excluded until the binary cache
+                  # holds nixbot's darwin outputs.
                   dispatch = builtins.listToAttrs [
                     (expectedDispatch {
                       dispatcher = "magnetite";
@@ -448,8 +438,6 @@
                         "big-parallel"
                       ];
                     })
-                    (expectedDispatch (darwinLaptopBuilder "magnetite" "rosegold"))
-                    (expectedDispatch (darwinLaptopBuilder "magnetite" "argentum"))
                   ];
                   storeUriNamesBuildAccount = true;
                 };
