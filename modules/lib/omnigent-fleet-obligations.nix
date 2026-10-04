@@ -243,6 +243,82 @@ let
       serverDomain = lib.all (domain: hostConfig.services.omnigent.domain == domain) (
         lib.optional (serverDomains ? ${machine}) serverDomains.${machine}
       );
+
+      # Real-host credential delivery lives here rather than in omnigent-worker-credentials
+      # because each host is evaluated once, by its own machine check. It is regex-free:
+      # libstdc++'s recursive std::regex overflows the evaluator stack on long patterns
+      # (store paths, commands), so text is split only on "\n", compared by whole line,
+      # and searched for a substring with builtins.replaceStrings rather than lib.hasInfix.
+      credentialDelivery =
+        let
+          credentialed = lib.filterAttrs (_: worker: selection worker.credentials != { }) workers;
+          linesOf = text: lib.splitString "\n" (builtins.unsafeDiscardStringContext text);
+          # Linux: SOPS installs secrets before the worker's Home Manager unit and host
+          # unit start, both of which run readiness over the delivered policy, which
+          # requires the rendered Linear template rather than the Home Manager link to it.
+          linux =
+            name: worker:
+            let
+              home = hostConfig.home-manager.users.${worker.user};
+              policy = home.programs.omnigent.workerCredentials;
+              readiness = home.home.activation.omnigentCredentialReadiness;
+              hostUnit = hostConfig.systemd.services."omnigent-host-${name}";
+              units = [
+                hostUnit
+                hostConfig.systemd.services."home-manager-${lib.replaceStrings [ "-" ] [ "\\x2d" ] worker.user}"
+              ];
+              installed =
+                if hostConfig.sops.useSystemdActivation then
+                  lib.all (
+                    unit:
+                    lib.elem "sops-install-secrets.service" unit.after
+                    && lib.elem "sops-install-secrets.service" unit.requires
+                  ) units
+                else
+                  hostConfig.system.activationScripts ? setupSecrets;
+              preStart = linesOf hostUnit.serviceConfig.ExecStartPre.text;
+              linear = hostConfig.sops.templates."omnigent-${worker.user}-linear".path;
+            in
+            installed
+            && readiness.before == [ "writeBoundary" ]
+            && lib.all (line: lib.elem line preStart) (lib.filter (line: line != "") (linesOf readiness.data))
+            && (
+              policy.linearApiKeys == { }
+              || (lib.elem linear policy.requiredFiles && !lib.elem policy.linearCredentials policy.requiredFiles)
+            );
+          # Darwin: the fail-closed SOPS installer runs in the launchd activation script
+          # before any worker launch daemon is loaded. The installer command is multi-line,
+          # so its lines, with " || exit 1" on the last, must occur as a contiguous run of
+          # whole lines, starting before nix-darwin's "setting up launchd services" banner
+          # and before the first "launchctl load". That user creation precedes launchd
+          # is nix-darwin's own fixed activation order, so it is not asserted here.
+          darwin =
+            let
+              lines = linesOf hostConfig.system.activationScripts.launchd.text;
+              installer = builtins.unsafeDiscardStringContext hostConfig.launchd.daemons.sops-install-secrets.command;
+              expected = lib.splitString "\n" (installer + " || exit 1");
+              n = lib.length expected;
+              installs =
+                if lib.length lines < n then
+                  null
+                else
+                  lib.lists.findFirstIndex (i: lib.sublist i n lines == expected) null (
+                    lib.range 0 (lib.length lines - n)
+                  );
+              contains = infix: line: builtins.replaceStrings [ infix ] [ "" ] line != line;
+              loads = lib.lists.findFirstIndex (
+                line: contains "setting up launchd services" line || contains "launchctl load" line
+              ) null lines;
+            in
+            installs != null && (loads == null || installs < loads);
+        in
+        credentialed == { }
+        || (
+          if isDarwin then
+            darwin
+          else
+            lib.all (name: linux name credentialed.${name}) (lib.attrNames credentialed)
+        );
     };
 in
 {

@@ -1181,74 +1181,6 @@
         disclosureSettings
         linearResolver
       ];
-      # Real hosts running credentialed workers, each checked on its own system.
-      deliveryHosts = lib.filter (machine: config.flake.lib.machineSystems.${machine} == system) (
-        lib.attrNames inventoryRoles.host.machines
-      );
-      # Linux: SOPS installs secrets before the worker's Home Manager unit and host unit
-      # start, both of which run readiness over the delivered policy, which requires the
-      # rendered Linear template rather than the Home Manager link to it.
-      linuxDelivery =
-        machine:
-        let
-          host = config.flake.nixosConfigurations.${machine}.config;
-          homeOf = worker: host.home-manager.users.${worker.user};
-          credentialed = lib.attrNames (
-            lib.filterAttrs (
-              _: worker: (homeOf worker).programs.omnigent.workerCredentials != null
-            ) host.services.omnigent-host.workers
-          );
-        in
-        credentialed != [ ]
-        && lib.all (
-          name:
-          let
-            worker = host.services.omnigent-host.workers.${name};
-            home = homeOf worker;
-            policy = home.programs.omnigent.workerCredentials;
-            readiness = home.home.activation.omnigentCredentialReadiness;
-            hostUnit = host.systemd.services."omnigent-host-${name}";
-            units = [
-              hostUnit
-              host.systemd.services."home-manager-${lib.replaceStrings [ "-" ] [ "\\x2d" ] worker.user}"
-            ];
-            installed =
-              if host.sops.useSystemdActivation then
-                lib.all (
-                  unit:
-                  lib.elem "sops-install-secrets.service" unit.after
-                  && lib.elem "sops-install-secrets.service" unit.requires
-                ) units
-              else
-                host.system.activationScripts ? setupSecrets;
-            linear = host.sops.templates."omnigent-${worker.user}-linear".path;
-          in
-          installed
-          && readiness.before == [ "writeBoundary" ]
-          && lib.hasInfix (builtins.unsafeDiscardStringContext readiness.data) (
-            builtins.unsafeDiscardStringContext hostUnit.serviceConfig.ExecStartPre.text
-          )
-          && (
-            policy.linearApiKeys == { }
-            || (lib.elem linear policy.requiredFiles && !lib.elem policy.linearCredentials policy.requiredFiles)
-          )
-        ) credentialed;
-      # Darwin: activation creates the worker accounts, then runs the fail-closed SOPS
-      # installer, and only then loads the worker launch daemons.
-      darwinDelivery =
-        machine:
-        let
-          host = config.flake.darwinConfigurations.${machine}.config;
-          installer = builtins.unsafeDiscardStringContext host.launchd.daemons.sops-install-secrets.command;
-          parts = lib.splitString installer (
-            builtins.unsafeDiscardStringContext host.system.activationScripts.script.text
-          );
-        in
-        lib.length parts == 2
-        && lib.hasInfix "setting up users" (lib.head parts)
-        && !lib.hasInfix "setting up launchd services" (lib.head parts)
-        && lib.hasPrefix " || exit 1\n" (lib.last parts)
-        && lib.hasInfix "setting up launchd services" (lib.last parts);
       credentialArtifact = pkgs.writeText "omnigent-credential-artifacts.json" (
         builtins.toJSON {
           root = credentialRoot;
@@ -1292,14 +1224,21 @@
               null;
         }
       );
-      credentialCases = {
+      # Pure, system-independent credential policy facts, built once as
+      # `omnigent-credential-policy` on x86_64-linux. Each probe forces only the values it
+      # asserts on. Real-host delivery facts are the fleet obligations' `credentialDelivery`
+      # case, asserted on each machine's own check.
+      credentialPolicyCases = {
+        # Only the masked labels are accepted; the option's `apply` rejects any other name.
         maskedLinearLabels =
           let
             accepts =
               label:
-              (builtins.tryEval (
-                builtins.deepSeq (credentialsOf { linearApiKeys.${label}.enable = false; }) true
-              )).success;
+              let
+                keys = (credentialsOf { linearApiKeys.${label}.enable = false; }).linearApiKeys;
+                probe = builtins.tryEval (builtins.attrNames keys == [ label ] && !keys.${label}.enable);
+              in
+              probe.success && probe.value;
           in
           accepts "personal" && accepts "work" && !accepts "synthetic-workspace-slug";
         defaultOff = config.flake.lib.omnigentCredentialSelection (credentialsOf { }) == { };
@@ -1351,35 +1290,27 @@
           && policy.linearCredentials == "${credentialHomePath}/.config/linear/credentials.toml"
           && !lib.elem policy.linearCredentials policy.requiredFiles;
         # Without Linear grants the host has no rendered template, so the policy must not read one.
+        # The probe forces exactly the fields that could read the throwing `linearRendered`.
         noLinearNoTemplate =
           let
             delivery = credentialPolicy (workerCredentials // { linearApiKeys = { }; }) (
               throw "rendered Linear template read without Linear grants"
             );
+            probe = builtins.tryEval (
+              delivery.policy.linearCredentials == null
+              && builtins.all builtins.isString delivery.policy.requiredFiles
+              && delivery.linearTemplate == null
+            );
           in
-          (builtins.tryEval (builtins.deepSeq delivery.policy true)).success
-          && delivery.policy.linearCredentials == null
-          && delivery.linearTemplate == null;
-      }
-      // lib.listToAttrs (
-        map (
-          machine:
-          lib.nameValuePair "delivery-${machine}" (
-            if config.flake.nixosConfigurations ? ${machine} then
-              linuxDelivery machine
-            else
-              darwinDelivery machine
-          )
-        ) deliveryHosts
-      );
+          probe.success && probe.value;
+      };
     in
     {
       checks = {
+        # Fixture runtime probes only: the generated generation's out-of-store Linear link,
+        # the Python owner/runtime fixtures and the disclosure audit. Policy facts are
+        # `omnigent-credential-policy`; real-host delivery is a fleet obligation.
         omnigent-worker-credentials =
-          assert lib.assertMsg (lib.all (ok: ok) (lib.attrValues credentialCases))
-            "Omnigent credential fixture failures: ${
-              builtins.toJSON (lib.attrNames (lib.filterAttrs (_: ok: !ok) credentialCases))
-            }";
           pkgs.runCommand "omnigent-worker-credentials"
             {
               nativeBuildInputs = [
@@ -1388,7 +1319,6 @@
                 pkgs.openssh
               ];
               fixtureDerivations = disclosureDerivations;
-              passthru.cases = credentialCases;
             }
             ''
               ${pkgs.python3.interpreter} - <<'PY'
@@ -1416,6 +1346,13 @@
             ''
               cp "$reportPath" "$out"
             '';
+      }
+      // lib.optionalAttrs (system == "x86_64-linux") {
+        omnigent-credential-policy = config.flake.lib.mkStructuralCheck pkgs {
+          name = "omnigent-credential-policy";
+          actual = credentialPolicyCases;
+          expected = lib.mapAttrs (_: _: true) credentialPolicyCases;
+        };
       }
       // lib.optionalAttrs pkgs.stdenv.hostPlatform.isDarwin {
         omnigent-worker-darwin =
