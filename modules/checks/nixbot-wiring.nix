@@ -95,11 +95,12 @@
             nixbotSecretKeys = sortedNames nixbot.effects.perRepoSecretFiles;
             buildbotSecretKeys = sortedNames buildbot.effects.perRepoSecretFiles;
 
-            # Eval throughput tuning, pinned because the pair is only safe
-            # together: 8 workers at 4096 MiB is 33 % faster than 4x4096 solely
-            # because MemoryHigh holds per-worker VmRSS under the restart
-            # threshold (logs/magnetite-zram-headroom-experiment.md), and the
-            # overflow needs magnetite's 150 % zram to land in.
+            # Eval throughput tuning, pinned because the triple is only safe
+            # together: at 6 x 3072 workers recycle and nix-eval-jobs' own budget
+            # bounds the two-system evaluation (peak 18.7 GB, 341 s); MemoryHigh
+            # must sit above that peak, since throttling evaluator heaps is what
+            # crawled to nixbot's timeout
+            # (logs/magnetite-two-system-eval-experiment.md).
             evalWorkerCount = nixbot.evalWorkerCount;
             evalMaxMemorySize = nixbot.evalMaxMemorySize;
             memoryAndOomKnobs = memoryAndOomKnobs;
@@ -226,10 +227,10 @@
             buildbotSecretKeys = [
               "github:sciexp/ironstar"
             ];
-            evalWorkerCount = 8;
-            evalMaxMemorySize = 4096;
+            evalWorkerCount = 6;
+            evalMaxMemorySize = 3072;
             memoryAndOomKnobs = [ "MemoryHigh" ];
-            memoryHigh = "12G";
+            memoryHigh = "20G";
             oneSecretsFileForBothServices = {
               "github:sciexp/ironstar" = true;
             };

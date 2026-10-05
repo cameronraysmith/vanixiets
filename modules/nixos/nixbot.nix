@@ -100,25 +100,30 @@
           "aarch64-darwin"
         ];
 
-        # 8 x 4096 MiB: 131.5 s for magnetite's 144 attributes, against 196.0 s
-        # at 4 x 4096. The win is not parallelism. nix-eval-jobs recycles a
-        # worker once its VmRSS passes --max-memory-size, and each restart
-        # redoes the flake-root evaluation on a cold heap; with MemoryHigh below
-        # holding resident memory down, per-worker VmRSS stays near 1.9 GiB and
-        # restarts go 12 -> 0. All three parts carry weight: the same cap on 4
-        # workers still restarted 11 times, and magnetite's 150 % zram is what
-        # absorbs the ~31.4 GiB of overflow.
+        # 6 x 3072 MiB, measured on the two-system scope (311 attributes, 75 GiB
+        # of evaluator allocation in total; nix-eval-jobs runs Boehm with
+        # GC_DONT_GC=1, so a worker's heap only grows until it is recycled):
         #
-        # Dispatch is gated by nix-eval-jobs' own budget, workers x
-        # max-memory-size. The cgroup ceiling nixbot derives from these is the
-        # larger of that budget plus a worker and a limit it recomputes per eval
-        # from live memory (25.6 GiB measured), so it is dynamic and usually
-        # above physical RAM -- MemoryHigh is what actually binds. Overlapping
-        # evaluations would need nixbot's eval_concurrency, which this module
-        # leaves unexposed rather than unreachable. Ladder and derivations:
-        # logs/magnetite-zram-headroom-experiment.md.
-        evalWorkerCount = 8;
-        evalMaxMemorySize = 4096;
+        #   6 x 3072   341 s   peak 18.7 GB   24 restarts   no swap   fastest
+        #   5 x 4096   419 s   peak 21.6 GB   20 restarts   no swap
+        #   4 x 4096   476 s   peak 16.0 GB   16 restarts   no swap
+        #   8 x 2048   505 s   peak 16.3 GB   42 restarts   no swap
+        #   8 x 1536   727 s   peak 12.9 GB   64 restarts   (MemoryHigh 12G)
+        #   8 x 4096   aborted at 186/311 after 163 s: 0 restarts, 42 GB in
+        #              zram (9.2 GB real), 2.7 GB left on the host
+        #
+        # The x86-only optimum (8 x 4096 under MemoryHigh 12G, 131.5 s for 144
+        # attributes) never recycled because resident memory was held below the
+        # limit and the heaps spilled ~31 GiB into zram. With aarch64-darwin the
+        # heaps need ~75-85 GiB, which no zram size can back in 30.6 GiB of RAM,
+        # and that regime crawled to nixbot's 60-minute timeout (build 1115).
+        # Here workers recycle instead, and nix-eval-jobs' own budget (workers x
+        # max-memory-size, plus the attribute in flight) is the bound, so
+        # MemoryHigh below sits above the measured peak and does not bind. At
+        # peak about 8 GB stays free for concurrent local builds.
+        # logs/magnetite-two-system-eval-experiment.md.
+        evalWorkerCount = 6;
+        evalMaxMemorySize = 3072;
 
         github = {
           enable = true;
@@ -194,16 +199,19 @@
         };
       };
 
-      # The limit that actually binds the evaluation. nixbot runs each eval in
-      # a delegated cgroup leaf whose own memory.max it sizes above physical
-      # RAM, and a cap on the service binds those leaves regardless. MemoryHigh
-      # throttles into zram and never kills. MemoryMax is deliberately absent:
-      # when the parent limit binds, the kernel declares OOM at the service and
-      # picks the largest process in the whole subtree, the nixbot daemon
-      # included — measured killing the daemon in a replica. MemoryAccounting
-      # is already yes (systemd's DefaultMemoryAccounting), so it is not
-      # restated. logs/nixbot-memorymax-oom-victim.md.
-      systemd.services.nixbot.serviceConfig.MemoryHigh = "12G";
+      # The service-wide backstop on the evaluation, set above its measured
+      # 18.7 GB peak at 6 x 3072 so that nix-eval-jobs' own budget binds first
+      # (the evaluator flags above). Throttling evaluator heaps at this limit is
+      # what crawled with two systems, so it must not bind in normal operation.
+      # MemoryMax is deliberately absent: nixbot runs each eval in a delegated
+      # cgroup leaf, and when a parent limit binds, the kernel declares OOM at
+      # the service and picks the largest process in the whole subtree, the
+      # nixbot daemon included (measured in a replica,
+      # logs/nixbot-memorymax-oom-victim.md).
+      # No ManagedOOM* knob either: systemd-oomd kills a descendant cgroup of
+      # the unit, and the daemon's own `main` sits beside the eval leaves, so the
+      # same victim risk applies and was not measured away.
+      systemd.services.nixbot.serviceConfig.MemoryHigh = "20G";
 
       # nixbot forwards NIX_* into its evaluator sandbox and has no option for
       # extra evaluation arguments; scoped here so buildbot-nix is unaffected.
