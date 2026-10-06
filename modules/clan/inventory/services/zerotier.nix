@@ -18,7 +18,8 @@
           "fddb:4344:343b:14b9:399:9324:19d9:3451" # stibnite (darwin, member ID: 2419d93451)
           "fddb:4344:343b:14b9:399:93f7:54d5:ad7e" # argentum (darwin, member ID: f754d5ad7e)
           "fddb:4344:343b:14b9:399:9315:3431:ee8" # rosegold (darwin, member ID: 1534310ee8)
-          "fddb:4344:343b:14b9:399:939f:c45d:577c" # android (member ID: 9fc45d577c)
+          "fddb:4344:343b:14b9:399:939f:c45d:577c" # pixel7 (android, member ID: 9fc45d577c)
+          "fddb:4344:343b:14b9:399:933c:8999:9bb8" # pixel11 (android, member ID: 3c89999bb8)
         ];
       };
     };
