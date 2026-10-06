@@ -8,7 +8,7 @@ sidebar:
 Nix evaluation is portable and nix building is not.
 Magnetite, which carries both CI services, is x86_64-linux, so it can evaluate an aarch64-darwin derivation and cannot build one.
 Remote building is declared once for the whole fleet by the `nix-builders` clan service (`modules/clan/services/nix-builders/`, instance in `modules/clan/inventory/services/nix-builders.nix`), which gives each machine a `builder` role, a `dispatcher` role, or both.
-Stibnite is the primary aarch64-darwin builder, and rosegold and argentum are opportunistic ones: laptops that take darwin work when they are awake, on the mesh and on AC power.
+Stibnite is the primary aarch64-darwin builder, and rosegold and argentum are opportunistic ones: laptops that take darwin work when they are awake and on the mesh.
 No dispatcher sends work to rosegold or argentum yet; their builder side is in place, and each dispatcher excludes them.
 Before that service, only stibnite was declared as a darwin build target, and before `stibnite-access.nix` nothing was, which left darwin derivations without a build target at all rather than with a slow one.
 
@@ -43,9 +43,8 @@ Magnetite dispatches aarch64-darwin work, nixbot's included, to stibnite only, w
 Magnetite excludes rosegold and argentum until the binary cache holds nixbot's darwin outputs; re-admitting one means deleting its name from magnetite's `exclude` in `modules/clan/inventory/services/nix-builders.nix` and redeploying magnetite.
 Every builder authorizes every dispatcher's key, so an exclusion decides only where a dispatcher sends work, not who may connect.
 
-On a darwin builder the forced command is not `nix-daemon --stdio` directly but a small gate script in the store.
-It runs `/usr/bin/pmset -g batt`, and unless the output reports `AC Power` it prints `on battery; declining remote builds` to stderr and exits 1; otherwise it execs `nix-daemon --stdio`.
-A laptop on battery therefore refuses remote work before the build protocol starts.
+On every builder, darwin included, the forced command is `nix-daemon --stdio` directly.
+A darwin laptop accepts dispatched builds on battery or AC.
 Darwin builders also run the nix daemon with `nix.daemonProcessType = "Background"` and `nix.daemonIOLowPriority = true`, so the owner's foreground work keeps the CPU and disk.
 Those two settings are host-wide and apply to the owner's local builds too.
 
@@ -123,7 +122,7 @@ The cost is real: nixbot cannot tell an absent Mac from a genuine darwin regress
 A darwin evaluation error is not covered and still fails the build.
 The modifier changes no drvPath, so nothing rebuilds and the binary cache is unaffected.
 
-The builds run on stibnite, the only Mac magnetite dispatches to, and like any dispatched build they run only on AC power and at Background QoS.
+The builds run on stibnite, the only Mac magnetite dispatches to, at Background QoS with low-priority I/O like all work on a darwin builder.
 The `nixbot-wiring` check pins CI's system scope and the best-effort marking.
 
 ## Related

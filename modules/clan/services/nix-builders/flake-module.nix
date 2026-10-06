@@ -68,18 +68,10 @@ in
             readOnly = true;
             description = "The program forced on every dispatcher key of this builder; null on non-builders.";
           };
-          acPowerGate = lib.mkOption {
-            type = lib.types.nullOr lib.types.package;
-            readOnly = true;
-            description = "The AC-power gate script forced on dispatcher keys, or null when the builder accepts work on battery.";
-          };
         };
         config.services.nix-builders =
           lib.optionalAttrs (!lib.elem "dispatcher" machineRoles) { buildMachines = [ ]; }
-          // lib.optionalAttrs (!lib.elem "builder" machineRoles) {
-            forcedCommand = null;
-            acPowerGate = null;
-          };
+          // lib.optionalAttrs (!lib.elem "builder" machineRoles) { forcedCommand = null; };
       };
 
       # Shared by both classes; the account itself differs per class.
@@ -89,27 +81,10 @@ in
           settings,
           machine,
         }:
-        { config, pkgs, ... }:
+        { config, ... }:
         let
           user = builderUser machine.name settings;
-          daemon = "${config.nix.package}/bin/nix-daemon --stdio";
-          # stdout carries the nix protocol, so the refusal goes to stderr,
-          # which ssh relays to the dispatcher's build log.
-          acPowerGate =
-            if settings.acceptOnBattery then
-              null
-            else
-              pkgs.writeShellScript "nix-builders-ac-power-gate" ''
-                case "$(/usr/bin/pmset -g batt)" in
-                  *"AC Power"*) ;;
-                  *)
-                    echo "on battery; declining remote builds" >&2
-                    exit 1
-                    ;;
-                esac
-                exec ${daemon}
-              '';
-          forcedCommand = if acPowerGate == null then daemon else "${acPowerGate}";
+          forcedCommand = "${config.nix.package}/bin/nix-daemon --stdio";
           dispatcherKeys = map (
             dispatcher:
             lib.removeSuffix "\n" (
@@ -123,7 +98,7 @@ in
           ) (lib.filter (d: d != machine.name) (lib.attrNames roles.dispatcher.machines));
         in
         {
-          services.nix-builders = { inherit forcedCommand acPowerGate; };
+          services.nix-builders = { inherit forcedCommand; };
 
           # sshd runs a forced command through the account's login shell, so
           # the shell must stay executable; a nologin shell would break the
@@ -195,16 +170,6 @@ in
               and the build account is not an admin, so without it every
               dispatch fails as `Permission denied (publickey)`. Set false to
               manage the ACL by hand.
-            '';
-          };
-          acceptOnBattery = lib.mkOption {
-            type = lib.types.bool;
-            default = true;
-            description = ''
-              darwin: false forces a gate in front of nix-daemon that refuses
-              the connection unless `pmset -g batt` reports AC Power, so a
-              laptop on battery declines remote work and dispatchers fall
-              back to their other builders.
             '';
           };
           daemonProcessType = lib.mkOption {
@@ -381,12 +346,6 @@ in
           {
             nixosModule = {
               imports = [ (mkBuilderModule { inherit roles settings machine; }) ];
-              assertions = [
-                {
-                  assertion = settings.acceptOnBattery;
-                  message = "nix-builders: acceptOnBattery = false relies on macOS pmset and is darwin-only (${machine.name}).";
-                }
-              ];
               users.users.${user} = {
                 isNormalUser = true;
                 description = "Remote nix build account";

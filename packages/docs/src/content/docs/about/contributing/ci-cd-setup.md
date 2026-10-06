@@ -39,7 +39,7 @@ The comments in `nixbot.toml` cite the nixbot functions that implement each rule
 ## What pull requests and merge-queue batches run
 
 A pull request or batch build evaluates and builds `checks`, scoped by `evalSystems` in `modules/nixos/nixbot.nix` to `checks.x86_64-linux` and `checks.aarch64-darwin`; aarch64-linux is never evaluated.
-The darwin checks, the `darwin-<host>` machine checks included, are best-effort (`modules/checks/nixbot-best-effort-darwin.nix`): magnetite dispatches them to stibnite, which builds only on AC power and at Background QoS.
+The darwin checks, the `darwin-<host>` machine checks included, are best-effort (`modules/checks/nixbot-best-effort-darwin.nix`): magnetite dispatches them to stibnite, which builds them on battery or AC at Background QoS.
 A failed darwin attribute is an ignored failure, shown on the build, excluded from its aggregate status, and retried on the next build.
 nixbot cannot tell an absent Mac from a genuine darwin regression, so local `just check-fast` on a Mac remains the gate for darwin.
 A darwin evaluation error still fails the build.

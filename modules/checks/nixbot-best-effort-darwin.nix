@@ -1,7 +1,7 @@
 # nixbot builds checks.aarch64-darwin as best-effort.
 #
 # Those builds can only run on a Mac reachable from magnetite, and the Macs are
-# laptops that sleep, travel, and refuse builds on battery
+# laptops that sleep, travel, and are often unreachable
 # (modules/clan/inventory/services/nix-builders.nix). Every darwin check
 # therefore carries hercules-ci's ignoreFailure modifier, which nixbot reads
 # from each job (nixbot/nixbot/nix/apply.nix:6): a failed darwin attribute is

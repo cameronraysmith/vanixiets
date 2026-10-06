@@ -246,7 +246,7 @@ in
       # service (modules/clan/inventory/services/nix-builders.nix): stibnite
       # dispatches native x86_64-linux work to magnetite and x86_64-linux kvm
       # work to pyrite, the fleet's only /dev/kvm, and serves aarch64-darwin
-      # builds to magnetite as `nixbuild` when on AC power.
+      # builds to magnetite as `nixbuild`, on battery or AC.
 
       # The session key from magnetite is authorized separately from its build
       # key for independent revocation and rotation. It is broad: it logs in as

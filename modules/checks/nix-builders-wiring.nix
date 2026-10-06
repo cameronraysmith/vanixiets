@@ -10,8 +10,8 @@
 #
 # It also pins what each dispatcher actually schedules (the entries, the ssh
 # alias that makes an unreachable builder fail in seconds rather than hang, and
-# the identity file each entry names) and that the darwin builders, which are
-# laptops, decline work on battery through their forced command.
+# the identity file each entry names) and the forced command every builder,
+# darwin laptops included, runs for dispatchers: the plain nix daemon.
 {
   self,
   lib,
@@ -24,8 +24,8 @@
       mkCheck = self.lib.mkStructuralCheck pkgs;
 
       # Assertions compare text, not store paths: the check must stay buildable
-      # on x86_64-linux even though the darwin forced command is a store path
-      # nothing on Linux can realise.
+      # on x86_64-linux even though a darwin forced command names a darwin
+      # store path nothing on Linux can realise.
       plain = builtins.unsafeDiscardStringContext;
       sortStrings = lib.sort lib.lessThan;
 
@@ -222,31 +222,15 @@
       ) null magnetite.nix.buildMachines;
 
       # The account side of one builder: the forced command and the lines its
-      # build account authorizes. A darwin builder's forced command is the
-      # AC-power gate, a store script; its text is read from the derivation.
+      # build account authorizes.
       builderSide =
         machine:
         let
           config = configOf machine;
           user = builders.${machine};
-          gate = config.services.nix-builders.acPowerGate;
         in
         {
           forcedCommand = plain config.services.nix-builders.forcedCommand;
-          forcedCommandIsGate =
-            gate != null && plain config.services.nix-builders.forcedCommand == plain "${gate}";
-          gate =
-            if gate == null then
-              null
-            else
-              {
-                readsPowerSource = lib.hasInfix "/usr/bin/pmset -g batt" gate.text;
-                requiresAcPower = lib.hasInfix "AC Power" gate.text;
-                declinesOnBattery = lib.hasInfix "exit 1" gate.text;
-                execsDaemon = lib.hasInfix "exec ${plain config.nix.package}/bin/nix-daemon --stdio" (
-                  plain gate.text
-                );
-              };
           authorizes = sortStrings (authorizedKeys machine user);
           trusted = builtins.elem user config.nix.settings.trusted-users;
           known = if isDarwin machine then builtins.elem user config.users.knownUsers else null;
@@ -256,28 +240,10 @@
         machine:
         let
           config = configOf machine;
-          daemon = "${plain config.nix.package}/bin/nix-daemon --stdio";
-          forcedCommand =
-            if !(isDarwin machine) then
-              daemon
-            else if config.services.nix-builders.acPowerGate == null then
-              "<AC-power gate>"
-            else
-              plain "${config.services.nix-builders.acPowerGate}";
+          forcedCommand = "${plain config.nix.package}/bin/nix-daemon --stdio";
         in
         {
           inherit forcedCommand;
-          forcedCommandIsGate = isDarwin machine;
-          gate =
-            if isDarwin machine then
-              {
-                readsPowerSource = true;
-                requiresAcPower = true;
-                declinesOnBattery = true;
-                execsDaemon = true;
-              }
-            else
-              null;
           # Every dispatcher but the builder itself; a dispatcher's exclude
           # narrows what it schedules, not what builders authorize.
           authorizes = sortStrings (

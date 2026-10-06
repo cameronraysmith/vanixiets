@@ -74,8 +74,8 @@ Stibnite dispatches x86_64-linux work to Magnetite and Pyrite, and Pyrite's entr
 Magnetite dispatches aarch64-darwin work, nixbot's best-effort darwin checks included, to Stibnite only, and excludes Pyrite.
 Rosegold and Argentum stay excluded from Magnetite until the binary cache holds nixbot's darwin outputs; deleting a name from Magnetite's `exclude` and redeploying Magnetite re-admits that machine, whose builder side is already in place.
 The Darwin builders are laptops and serve builds opportunistically.
-Their forced command is a gate that declines with `on battery; declining remote builds` unless `pmset` reports AC power, and their nix-daemon runs at `Background` QoS with low-priority I/O so a dispatched build yields to the owner's work.
-Unreachability is therefore ordinary, and nix 2.35 handles it in two distinct ways; a builder declining on battery closes the connection and looks the same as an unreachable one.
+Their forced command is `nix-daemon --stdio` like every other builder's, so they accept dispatched builds on battery or AC, and their nix-daemon runs at `Background` QoS with low-priority I/O so a dispatched build yields to the owner's work.
+Unreachability is therefore ordinary, and nix 2.35 handles it in two distinct ways.
 A build the caller or another builder can perform continues: the build hook logs `cannot build on '<store uri>'`, marks that machine disabled for the rest of its lifetime, and reconsiders the remaining machines or falls back to a local build.
 A build no remaining machine can perform fails outright, as an x86_64-linux build requiring `kvm` does while Pyrite is offline, reporting `missing system features` with `Required features: {kvm}`, and never degrades into an unaccelerated or emulated build.
 That second case is the intended behaviour: vmTests are opt-in and outside PR gating, so an offline laptop costs a manual re-run rather than a red pull request.

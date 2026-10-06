@@ -4,16 +4,14 @@
 # nixbot on magnetite evaluates and builds checks.aarch64-darwin as
 # best-effort: every darwin check carries ignoreFailure
 # (modules/checks/nixbot-best-effort-darwin.nix), so a darwin builder that is
-# asleep, on battery, or unreachable leaves a notice on the build instead of
-# failing it. buildbot builds x86_64-linux only.
+# asleep or unreachable leaves a notice on the build instead of failing it.
+# buildbot builds x86_64-linux only.
 let
-  # Laptops in interactive use: a minority share of the machine, refused on
-  # battery, and run at Background QoS so the owner's foreground work keeps
-  # the CPU and I/O.
+  # Laptops in interactive use: a minority share of the machine, run at
+  # Background QoS so the owner's foreground work keeps the CPU and I/O.
   darwinLaptop = {
     systems = [ "aarch64-darwin" ];
     uid = 530;
-    acceptOnBattery = false;
     daemonProcessType = "Background";
     daemonIOLowPriority = true;
   };
