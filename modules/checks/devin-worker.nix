@@ -52,12 +52,16 @@
 # paths and breaks claim 3. Weakening any assertion to a tautology empties its
 # fired-clause list, and strengthening one into an always-firing predicate
 # populates `wellFormed`, so claim 4 is falsifiable in both directions.
-{ inputs, self, ... }:
+{
+  inputs,
+  lib,
+  self,
+  ...
+}:
 {
   perSystem =
     { pkgs, system, ... }:
     let
-      lib = pkgs.lib;
       mkCheck = self.lib.mkStructuralCheck pkgs;
 
       # The same package set the home configurations get (see

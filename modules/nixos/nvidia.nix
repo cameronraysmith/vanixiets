@@ -10,15 +10,18 @@
   flake.modules.nixos.nvidia =
     { config, pkgs, ... }:
     {
-      # Allow unfree packages (required for NVIDIA proprietary drivers)
-      nixpkgs.config.allowUnfree = true;
-
+      # Unfree NVIDIA drivers are admitted by the fleet instance's allowUnfree
+      # (modules/nixpkgs/base-defaults.nix); nixpkgs.config cannot be set next
+      # to nixpkgs.pkgs.
+      #
       # IMPORTANT: We do NOT set nixpkgs.config.cudaSupport = true globally.
       # That would change derivation hashes for ALL packages, causing mass rebuilds
       # since cache.nixos.org doesn't build with cudaSupport enabled (unfree).
       #
       # Instead, enable CUDA support only for specific ML packages via overlays.
       # This preserves cache hits for system packages (nix, nixd, etc.)
+      # NixOS applies this as fleetPkgs.appendOverlays, so hosts importing this
+      # module get a dedicated nixpkgs instance.
       nixpkgs.overlays = [
         (final: prev: {
           pythonPackagesExtensions = prev.pythonPackagesExtensions ++ [

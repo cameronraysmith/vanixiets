@@ -1,5 +1,6 @@
 # Nix configuration for darwin systems
-# Note: overlays handled separately in modules/nixpkgs/
+# Note: nixpkgs instance (allowUnfree, overlays) comes from
+# modules/nixpkgs/base-defaults.nix via nixpkgs.pkgs
 { ... }:
 {
   flake.modules = {
@@ -12,13 +13,6 @@
         ...
       }:
       {
-        # Allow unfree packages (copilot, etc.)
-        nixpkgs.config = {
-          allowBroken = false;
-          allowUnsupportedSystem = false;
-          allowUnfree = true;
-        };
-
         nix = {
           # Enable `nix-shell -p ...` etc with pinned nixpkgs via NIX_PATH env var
           # Note: settings.nix-path below also needed for daemon/non-shell contexts

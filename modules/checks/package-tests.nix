@@ -1,20 +1,40 @@
 # Per-package passthru.tests build-realization checks.
 #
-# Iterates self'.packages and exposes each pkg.passthru.tests.<tname> as
-# package-${pname}-test-${tname}. Free coverage for any package that
-# declares passthru.tests in the standard nixpkgs convention. Notably
-# exercises vanixiets-docs's unit, linkcheck, e2e, e2e-report and negative-control
-# test set. e2e-report exposes cacheable evidence to nixbot independently of
-# the mandatory e2e verdict; a report artifact alone is not a passing test.
+# Exposes each declared pkg.passthru.tests.<tname> as
+# package-${pname}-test-${tname}. Notably exercises vanixiets-docs's unit,
+# linkcheck, e2e, e2e-report and negative-control test set. e2e-report exposes
+# cacheable evidence to nixbot independently of the mandatory e2e verdict; a
+# report artifact alone is not a passing test.
 #
-# Shares the packages.nix blacklist shape to skip entries that are
-# already exposed under another check name or are intentional
-# effect-input-wires.
+# The package and test names are declared here rather than read from
+# self'.packages, so the check names are static: computing them never
+# evaluates a package. Every check's value asserts that the declaration
+# matches the passthru.tests of every package outside the packages.nix-shaped
+# blacklist (entries already exposed under another check name or intentional
+# effect-input-wires), so adding, removing or renaming a test fails each
+# package test until this list is updated.
 { lib, ... }:
 {
   perSystem =
     { self', ... }:
     let
+      declared = {
+        atomic = [ "help" ];
+        playwright-cli = [ "smoke" ];
+        stack-land = [ "integration" ];
+        vanixiets-docs = [
+          "e2e"
+          "e2e-action-negative-control"
+          "e2e-negative-control"
+          "e2e-report"
+          "e2e-runner-controls"
+          "e2e-webkit-negative-control"
+          "linkcheck"
+          "typecheck"
+          "unit"
+        ];
+      };
+
       blacklist = [
         "k8s-manifests-local"
         "k8s-manifests-local-json"
@@ -33,15 +53,29 @@
         "nix-fast-build"
       ];
 
-      filtered = lib.filterAttrs (n: _v: !(builtins.elem n blacklist)) self'.packages;
-      packageTests = lib.concatMapAttrs (
-        pname: pkg:
-        lib.mapAttrs' (tname: lib.nameValuePair "package-${pname}-test-${tname}") (
-          pkg.passthru.tests or { }
+      actual = lib.filterAttrs (_: tests: tests != [ ]) (
+        lib.mapAttrs (_: pkg: builtins.attrNames (pkg.passthru.tests or { })) (
+          lib.filterAttrs (n: _: !(builtins.elem n blacklist)) self'.packages
         )
-      ) filtered;
+      );
+
+      declarationMatches = lib.assertMsg (actual == declared) (
+        "modules/checks/package-tests.nix declares ${builtins.toJSON declared} "
+        + "but the packages' passthru.tests are ${builtins.toJSON actual}"
+      );
     in
     {
-      checks = packageTests;
+      checks = lib.concatMapAttrs (
+        pname: tnames:
+        lib.listToAttrs (
+          map (
+            tname:
+            lib.nameValuePair "package-${pname}-test-${tname}" (
+              assert declarationMatches;
+              self'.packages.${pname}.passthru.tests.${tname}
+            )
+          ) tnames
+        )
+      ) declared;
     };
 }

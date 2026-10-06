@@ -782,7 +782,7 @@
             ${pkgs.coreutils}/bin/touch "$out"
           '';
       }
-      // lib.optionalAttrs pkgs.stdenv.hostPlatform.isDarwin {
+      // lib.optionalAttrs (lib.systems.elaborate system).isDarwin {
         omnigent-worker-darwin =
           assert lib.assertMsg (failedCases darwinCases == [ ])
             "Omnigent Darwin failures: ${builtins.toJSON (failedCases darwinCases)}; assertions: ${

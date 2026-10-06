@@ -6,7 +6,7 @@
 # The package is this repository's own pkgs/by-name/atomic rather than a flake
 # input, so lib.mkPackageOption resolves it: modules/nixpkgs/compose.nix merges
 # the perSystem packages set into flake.overlays.default, which
-# modules/nixpkgs/base-defaults.nix wires into every machine's nixpkgs.overlays.
+# modules/nixpkgs/base-defaults.nix applies to every machine's nixpkgs instance.
 #
 # settings.json is rendered by managedConfigs: every activation rewrites it from
 # the keys declared below, keeping only atomic's onboarding and changelog

@@ -7,8 +7,9 @@
 # - Option declaration (overlays-option.nix) enables list concatenation
 #
 # Sibling modules (overlays-option.nix, per-system.nix, compose.nix) are
-# auto-discovered by import-tree (see flake.nix). Machine configs reference
-# the composed result via `nixpkgs.overlays = [ inputs.self.overlays.default ]`.
+# auto-discovered by import-tree (see flake.nix). Machines and standalone homes
+# consume the composed result through the per-system fleetPkgs instance
+# (base-defaults.nix).
 { inputs, ... }:
 {
   imports = [

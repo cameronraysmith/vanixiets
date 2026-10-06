@@ -8,7 +8,8 @@
 # - This module composes that list with lib.composeManyExtensions
 # - External overlays and custom packages merged in composition order
 #
-# Machine configs reference: nixpkgs.overlays = [ inputs.self.overlays.default ];
+# Consumed by the per-system fleetPkgs instance in base-defaults.nix, which
+# machines and standalone homes share.
 #
 {
   config,

@@ -21,9 +21,11 @@
 # withholds the push. This check builds the one derivation on its own, so the
 # push is independent of the rest of the machine and costs nothing once cached.
 #
-# Derived, not hardcoded: any NixOS machine whose services.zerotierone.package
-# diverges from its own pkgs.zerotierone is by definition building a variant
-# cache.nixos.org cannot hold, so it gets a check.
+# Keyed by the zerotier instance's controller role in the clan inventory, so
+# the check's name is static data. The divergence that motivates the check is
+# asserted in the value: if clan stops overriding the controller's package,
+# the check fails rather than silently warming the free build cache.nixos.org
+# already carries.
 { self, lib, ... }:
 {
   perSystem =
@@ -31,18 +33,25 @@
     let
       machineSystems = self.lib.machineSystems;
 
-      onThisSystem = lib.filterAttrs (name: _: machineSystems.${name} == system) self.nixosConfigurations;
+      controllers = lib.filter (name: machineSystems.${name} == system) (
+        builtins.attrNames self.clan.inventory.instances.zerotier.roles.controller.machines
+      );
 
-      divergent = lib.filterAttrs (
-        _: machine:
-        machine.config.services.zerotierone.enable
-        && machine.config.services.zerotierone.package.drvPath != machine.pkgs.zerotierone.drvPath
-      ) onThisSystem;
+      controllerPackage =
+        name:
+        let
+          machine = self.nixosConfigurations.${name};
+          zerotierone = machine.config.services.zerotierone;
+        in
+        assert lib.assertMsg zerotierone.enable
+          "zerotier controller ${name} does not enable services.zerotierone";
+        assert lib.assertMsg (zerotierone.package.drvPath != machine.pkgs.zerotierone.drvPath)
+          "zerotier controller ${name}'s services.zerotierone.package no longer diverges from pkgs.zerotierone; cache.nixos.org already carries it and this check is obsolete";
+        zerotierone.package;
     in
     {
-      checks = lib.mapAttrs' (
-        name: machine:
-        lib.nameValuePair "zerotierone-controller-${name}" machine.config.services.zerotierone.package
-      ) divergent;
+      checks = lib.listToAttrs (
+        map (name: lib.nameValuePair "zerotierone-controller-${name}" (controllerPackage name)) controllers
+      );
     };
 }

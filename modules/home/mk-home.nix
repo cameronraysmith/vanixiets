@@ -1,6 +1,7 @@
 {
   config,
   inputs,
+  withSystem,
   ...
 }:
 {
@@ -10,16 +11,9 @@
       system ? builtins.currentSystem,
     }:
     inputs.home-manager.lib.homeManagerConfiguration {
-      pkgs = import inputs.nixpkgs {
-        inherit system;
-        config = {
-          allowUnfree = true;
-          inherit (config.flake.lib) permittedInsecurePackages;
-        };
-        overlays = [
-          config.flake.overlays.default
-        ];
-      };
+      # The per-system fleet instance from modules/nixpkgs/base-defaults.nix,
+      # shared with every machine and home of the same system.
+      pkgs = withSystem system ({ fleetPkgs, ... }: fleetPkgs);
       extraSpecialArgs = {
         flake = config.flake // {
           inherit inputs;
