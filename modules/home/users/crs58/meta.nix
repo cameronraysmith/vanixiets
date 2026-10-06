@@ -10,6 +10,7 @@
       sshKeys = [
         "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINdO9rInDa9HvdtZZxmkgeEdAlTupCy3BgA/sqSGyUH+"
         "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFXI36PvOzvuJQKVXWbfQE7Mdb6avTKU1+rV1kgy8tvp pixel7-termux"
+        "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGfLrd+a18Vg+gi3zG5bwGJGxANS0k/9SwSJfxaa1udV pixel11-moshi"
       ];
     };
     aggregates = with config.flake.modules.homeManager; [
