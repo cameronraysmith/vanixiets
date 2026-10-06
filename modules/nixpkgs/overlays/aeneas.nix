@@ -67,10 +67,13 @@
         isDarwin = prev.stdenv.hostPlatform.isDarwin;
         asset = assets.${system} or (throw "aeneas: unsupported system ${system}");
 
-        bundle = prev.fetchurl {
-          url = "https://github.com/AeneasVerif/aeneas/releases/download/${tag}/${asset.name}";
-          sha256 = asset.hash;
-        };
+        fetchAsset =
+          a:
+          prev.fetchurl {
+            url = "https://github.com/AeneasVerif/aeneas/releases/download/${tag}/${a.name}";
+            sha256 = a.hash;
+          };
+        bundle = fetchAsset asset;
 
         # Host-only slim nightly whose librustc_driver matches charon-driver byte-for-byte;
         # channel sourced from the committed marker beside this file.
@@ -170,11 +173,13 @@
             runtimeDependencies = lib.optionals prev.stdenv.hostPlatform.isLinux [ slimRustToolchain ];
 
             # Consumed by modules/checks/aeneas-toolchain.nix, which asserts the
-            # marker channel equals the channel inside this platform's bundle.
+            # marker channel equals the channel inside every platform's bundle.
             # Exposed here so the check reads the values this overlay actually
-            # uses rather than re-deriving them from the same sources.
+            # uses rather than re-deriving them from the same sources. The
+            # bundles are fixed-output downloads, so one builder can fetch all.
             passthru = {
-              inherit bundle rustChannel;
+              inherit rustChannel;
+              bundles = lib.mapAttrs (_: fetchAsset) assets;
             };
 
             meta = {

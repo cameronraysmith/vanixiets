@@ -40,13 +40,13 @@ Import the export matching the consumer's module class; package selection uses t
 The aggregate adds jq through its configured Home Manager module or as a system package.
 These exports are opt-in: Omnigent workers import `homeManager.cli-tools`, while human terminal declarations remain independent.
 Worker profiles prefer procps' `kill` over coreutils' overlapping executable, matching the existing supervisor PATH; the shared capabilities impose no worker-specific package priorities.
-`checks.<system>.omnigent-worker-capabilities` evaluates the matching system adapter and Home Manager adapter, then exercises file, text, archive, and JSON operations on the generated worker PATH without a login shell or network requests.
-Its foreign-input guards keep the ordinary-sized fixtures; the two 300,000-character settings fixtures that checked the same guards at size were removed for evaluation cost.
+`checks.<system>.omnigent-worker-capabilities` makes two Home Manager evaluations of the worker module: a positive worker home, whose assertions, generated PATH order, ACP settings, tools, skills and harnesses it compares, and one composite invalid home whose failed assertions must equal the four guard messages.
+Its build confirms that the harness executables exist in the generated profile and that `playwright-cli` reports its packaged version; it runs no CLI adapters, archive or file utilities, or workflow-tool smoke tests.
 
 ## On-demand VM tests
 
 `nixbot.toml` evaluates `checks`, which nixbot scopes to `checks.x86_64-linux` and, best-effort, `checks.aarch64-darwin`; VM tests instead live under `vmTests` and are not part of pull-request coverage.
-The independent `checks.<system>.zerotier-mss-clamp` structural check remains gated.
+The independent `checks.x86_64-linux.zerotier-mss-clamp` structural check remains gated; it compares zerotier controller and peer role membership with `TCPMSS --set-mss 1300` in each nixosConfiguration's firewall commands.
 Run a runtime test on a reachable KVM-capable Linux host, such as Pyrite, from its checkout of the intended revision:
 
 ```sh
@@ -56,7 +56,7 @@ nix build .#vmTests.x86_64-linux.omnigent-worker-isolation
 
 `omnigent-worker-isolation` establishes the runtime wiring of the Omnigent worker guards that no evaluation-time check can reach: that the private-home precondition is `ExecStartPre` on the real `omnigent-host-<owner>.service` and that violating the home's privacy at runtime prevents `ExecStart`, that the Nix daemon resolves a worker as untrusted, that two workers have separate accounts and mutually unreadable private homes, and that the unit's `User`, `UMask`, `NoNewPrivileges` and SSH-agent unsetting hold in the spawned process.
 It is not a sandbox and establishes nothing about confining hostile code inside a worker account, it stubs `ExecStart` so it is no evidence about the Omnigent client, it declares no credentials so the Clan-vars-to-sops delivery path is out of scope, and it says nothing about Stibnite or any Darwin host because there is no Darwin NixOS test node type.
-Because it lives in this lane and runs only when a KVM-capable builder is reachable, it is on-demand evidence and must not be described as coverage; `checks.<system>.omnigent-worker-linux` remains the fleet-wide regulator for the precondition script's own behaviour.
+Because it lives in this lane and runs only when a KVM-capable builder is reachable, it is on-demand evidence and must not be described as coverage; `checks.x86_64-linux.omnigent-worker-linux` remains the fleet-wide regulator for the precondition script's own behaviour.
 
 The test requires `kvm` and `nixos-test` builder features and forces KVM acceleration rather than falling back to TCG.
 Unavailable hardware is a build failure if this command is requested, not a passed or silently skipped test.

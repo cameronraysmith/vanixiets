@@ -104,20 +104,25 @@ let
   };
 in
 {
-  perSystem = { pkgs, ... }: {
-    checks.omnigent-worker-environment =
-      assert lib.assertMsg (
-        actual == [ ]
-      ) "Omnigent reserved environment failures: ${builtins.toJSON actual}";
-      assert lib.assertMsg (lib.all (mutant: failures mutant != [ ]) (
-        lib.attrValues mutants
-      )) "Omnigent environment oracle accepted a policy mutant";
-      pkgs.runCommand "omnigent-worker-environment"
-        {
-          passthru = { inherit failures; };
-        }
-        ''
-          touch "$out"
-        '';
-  };
+  # System-independent: both platforms' tables are evaluated above, so emit it once.
+  perSystem =
+    { pkgs, system, ... }:
+    {
+      checks = lib.optionalAttrs (system == "x86_64-linux") {
+        omnigent-worker-environment =
+          assert lib.assertMsg (
+            actual == [ ]
+          ) "Omnigent reserved environment failures: ${builtins.toJSON actual}";
+          assert lib.assertMsg (lib.all (mutant: failures mutant != [ ]) (
+            lib.attrValues mutants
+          )) "Omnigent environment oracle accepted a policy mutant";
+          pkgs.runCommand "omnigent-worker-environment"
+            {
+              passthru = { inherit failures; };
+            }
+            ''
+              touch "$out"
+            '';
+      };
+    };
 }

@@ -145,8 +145,8 @@ export function gateCommands(phase: Phase, source: Source): string[] {
   if (at >= phases.indexOf("darwin")) installables.push("checks.aarch64-darwin.omnigent-worker-darwin");
   // Identity fixtures must assert Janette's new Git/jj author mail and allowed_signers principal,
   // then compare all other human behavior in each source role; do not waive her whole projection.
-  if (at >= phases.indexOf("inventory")) installables.push("checks.x86_64-linux.omnigent-worker-inventory", "checks.aarch64-darwin.omnigent-worker-inventory");
-  if (at >= phases.indexOf("credentials")) installables.push("checks.x86_64-linux.omnigent-worker-credentials", "checks.aarch64-darwin.omnigent-worker-credentials");
+  if (at >= phases.indexOf("inventory")) installables.push("checks.x86_64-linux.omnigent-worker-inventory");
+  if (at >= phases.indexOf("credentials")) installables.push("checks.x86_64-linux.omnigent-credential-policy", "checks.x86_64-linux.omnigent-credentials-unit");
   return installables.map((attr) => `nix build --no-write-lock-file --no-link --print-out-paths ${quote(`${source.source}#${attr}`)}`);
 }
 export async function gates(ops: Operations, name: string, phase: Phase, source: Source) {

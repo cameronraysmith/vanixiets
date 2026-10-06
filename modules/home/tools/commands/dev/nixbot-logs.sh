@@ -97,7 +97,7 @@ Examples:
 
   # Find the build for a commit, then read one check's log
   nixbot-logs builds --commit ad6a9e5
-  nixbot-logs log checks.x86_64-linux.effect-run-context 1 --tail 200
+  nixbot-logs log checks.x86_64-linux.effects-interpreter 1 --tail 200
 
   # Effect logs; the 'effect:' attribute prefix is added for you
   nixbot-logs effect default.deploy-docs

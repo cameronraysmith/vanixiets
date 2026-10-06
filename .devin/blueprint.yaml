@@ -122,7 +122,7 @@ knowledge:
       # nothing here exercises kvm or nspawn yet; `just test-integration` targets
       # vm-test-framework and vm-boot-all-machines, neither of which the flake defines.
       direnv exec . just test-package docs # bun unit + coverage + build + e2e
-      # just test-quick is darwin-pinned (checks.aarch64-darwin.*) and cannot run here
+      direnv exec . just test-quick  # structure-fleet, home-module-exports, secrets-encryption-integrity, terraform-validate
   - name: build
     contents: |
       direnv exec . just docs-build             # typst diagrams + astro site

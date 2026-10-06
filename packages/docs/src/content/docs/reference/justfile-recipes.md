@@ -104,7 +104,7 @@ Commands for clan-based machine management.
 | Recipe | Arguments | Description | CI-tested |
 |--------|-----------|-------------|-----------|
 | `test` | - | Run all tests (nix flake check) | No |
-| `test-quick` | - | Run fast validation tests (nix-unit) | No |
+| `test-quick` | - | Build the fleet, home-export, secret-encryption and terraform validation checks | No |
 | `test-integration` | - | Run VM integration tests (Linux only) | No |
 | `build-all` | - | Build all machine configurations using nom | No |
 | `build-machine` | `machine` | Build a specific machine configuration | No |

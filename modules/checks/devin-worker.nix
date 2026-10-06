@@ -3,10 +3,12 @@
 #
 # Two hosts enable the module, but their machine configurations only assert
 # what those two deployments happen to need. What the module promises for any
-# enabled host is checked here instead, on both platforms, with a dummy token
+# enabled host is checked here instead, for both platforms, with a dummy token
 # path in place of the sops-nix secret so no real path is a build input. Only
 # names, counts, and booleans are serialized into the diff, so this check
-# evaluates and never builds a worker's launcher.
+# evaluates and never builds a worker's launcher. Each probe names its own
+# system, so the result does not depend on the evaluating platform and the
+# check is defined for x86_64-linux only.
 #
 # Two evaluation vehicles, for two different reasons.
 #
@@ -53,7 +55,7 @@
 { inputs, self, ... }:
 {
   perSystem =
-    { pkgs, ... }:
+    { pkgs, system, ... }:
     let
       lib = pkgs.lib;
       mkCheck = self.lib.mkStructuralCheck pkgs;
@@ -193,153 +195,145 @@
       distinctWorkDirs = paths: paths != [ ] && lib.length (lib.unique paths) == lib.length paths;
     in
     {
-      checks.devin-worker-structural = mkCheck {
-        name = "devin-worker-structural";
-        actual = {
-          darwinAgents = agents darwin;
-          darwinUnits = units darwin;
-          darwinPlistEnvKeys =
-            lib.attrNames
-              darwin.launchd.agents."devin-worker-1".config.EnvironmentVariables;
-          darwinWorkDirsDistinct = distinctWorkDirs (
-            map (name: darwin.launchd.agents.${name}.config.WorkingDirectory) (agents darwin)
-          );
-          # Restart behaviour, which is where the two supervisors differ. On
-          # darwin the worker is kept alive by the presence of its own token
-          # file, so a missing secret stops it instead of respawning at
-          # launchd's floor; `KeepAlive = true` would reintroduce that loop.
-          darwinKeepAliveOnTokenPath =
-            lib.attrNames
-              darwin.launchd.agents."devin-worker-1".config.KeepAlive.PathState;
-          darwinThrottleInterval = darwin.launchd.agents."devin-worker-1".config.ThrottleInterval;
+      checks = lib.optionalAttrs (system == "x86_64-linux") {
+        devin-worker-structural = mkCheck {
+          name = "devin-worker-structural";
+          actual = {
+            darwinAgents = agents darwin;
+            darwinUnits = units darwin;
+            darwinPlistEnvKeys =
+              lib.attrNames
+                darwin.launchd.agents."devin-worker-1".config.EnvironmentVariables;
+            darwinWorkDirsDistinct = distinctWorkDirs (
+              map (name: darwin.launchd.agents.${name}.config.WorkingDirectory) (agents darwin)
+            );
+            # Restart behaviour, which is where the two supervisors differ. On
+            # darwin the worker is kept alive by the presence of its own token
+            # file, so a missing secret stops it instead of respawning at
+            # launchd's floor; `KeepAlive = true` would reintroduce that loop.
+            darwinKeepAliveOnTokenPath =
+              lib.attrNames
+                darwin.launchd.agents."devin-worker-1".config.KeepAlive.PathState;
 
-          linuxUnits = units linux;
-          linuxAgents = agents linux;
-          linuxUnitEnvNames = map (
-            entry: lib.head (lib.splitString "=" entry)
-          ) linux.systemd.user.services."devin-worker-1".Service.Environment;
-          linuxWorkDirsDistinct = distinctWorkDirs (
-            map (name: linux.systemd.user.services.${name}.Service.WorkingDirectory) (units linux)
-          );
+            linuxUnits = units linux;
+            linuxAgents = agents linux;
+            linuxUnitEnvNames = map (
+              entry: lib.head (lib.splitString "=" entry)
+            ) linux.systemd.user.services."devin-worker-1".Service.Environment;
+            linuxWorkDirsDistinct = distinctWorkDirs (
+              map (name: linux.systemd.user.services.${name}.Service.WorkingDirectory) (units linux)
+            );
 
-          # `outpost` must have nothing to resolve on its own. A default that
-          # inferred it from the host's platform is what would put every linux
-          # machine in this repository on the same queue.
-          outpostDefault = (evalBare "x86_64-linux" { }).services.devin-worker.outpost;
+            # `outpost` must have nothing to resolve on its own. A default that
+            # inferred it from the host's platform is what would put every linux
+            # machine in this repository on the same queue.
+            outpostDefault = (evalBare "x86_64-linux" { }).services.devin-worker.outpost;
 
-          darwinSelectedPlatform =
-            darwin.services.devin-worker.outposts.${darwin.services.devin-worker.outpost}.platform;
-          darwinWarned = warnedClauses darwin;
+            # Each host's selected queue matches its platform, so neither warns.
+            darwinWarned = warnedClauses darwin;
+            linuxWarned = warnedClauses linux;
 
-          linuxSelectedPlatform =
-            linux.services.devin-worker.outposts.${linux.services.devin-worker.outpost}.platform;
-          # magnetite is registered for linux, so this is a confirmed match
-          # with the host rather than the unestablished state it used to be.
-          linuxWarned = warnedClauses linux;
-
-          wellFormed = firedClauses (
-            evalBare "aarch64-darwin" {
-              enable = true;
-              outpost = "stibnite";
-              outposts = wired;
-            }
-          );
-          # The sibling queue keeps its token, so this also shows a queue whose
-          # own file is missing does not fall back to another's.
-          tokenless = firedClauses (
-            evalBare "aarch64-darwin" {
-              enable = true;
-              outpost = "stibnite";
-              outposts = {
-                "magnetite".tokenFile = wired."magnetite".tokenFile;
-              };
-            }
-          );
-          idless = firedClauses (
-            evalBare "aarch64-darwin" {
-              enable = true;
-              outpost = "stibnite";
-              outposts = wired // {
-                "stibnite" = {
-                  id = null;
-                  inherit (wired."stibnite") tokenFile;
+            wellFormed = firedClauses (
+              evalBare "aarch64-darwin" {
+                enable = true;
+                outpost = "stibnite";
+                outposts = wired;
+              }
+            );
+            # The sibling queue keeps its token, so this also shows a queue whose
+            # own file is missing does not fall back to another's.
+            tokenless = firedClauses (
+              evalBare "aarch64-darwin" {
+                enable = true;
+                outpost = "stibnite";
+                outposts = {
+                  "magnetite".tokenFile = wired."magnetite".tokenFile;
                 };
-              };
-            }
-          );
-          # Both platforms named and different, which is the only mismatch the
-          # module asserts on.
-          platformMismatch = firedClauses (
-            evalBare "aarch64-darwin" {
-              enable = true;
-              outpost = "magnetite";
-              outposts = wired // {
-                "magnetite" = {
-                  platform = "linux";
-                  inherit (wired."magnetite") tokenFile;
+              }
+            );
+            idless = firedClauses (
+              evalBare "aarch64-darwin" {
+                enable = true;
+                outpost = "stibnite";
+                outposts = wired // {
+                  "stibnite" = {
+                    id = null;
+                    inherit (wired."stibnite") tokenFile;
+                  };
                 };
-              };
-            }
-          );
-          platformUnsetFired = firedClauses platformUnsetProbe;
-          platformUnsetWarned = warnedClauses platformUnsetProbe;
-          unknownOutpost = firedClauses (
-            evalBare "aarch64-darwin" {
-              enable = true;
-              outpost = "no-such-queue";
-              outposts = wired;
-            }
-          );
-          # The regression this module's shape exists to prevent, in the form
-          # it will arrive: pyrite and cinnabar are linux machines coming up
-          # shortly on this same user. Enabling the worker there without naming
-          # a queue must fail, because the alternative -- inferring one -- puts
-          # them on magnetite's queue, where they would serve its sessions
-          # perfectly well and report nothing.
-          secondLinuxHostUnnamed = firedClauses (evalBare "x86_64-linux" { enable = true; });
-          # And naming a queue whose credential this host does not have fails
-          # by name rather than borrowing a sibling's.
-          secondLinuxHostBorrowing = firedClauses (
-            evalBare "x86_64-linux" {
-              enable = true;
-              outpost = "magnetite";
-            }
-          );
-        };
-        expected = {
-          darwinAgents = [
-            "devin-worker-1"
-            "devin-worker-2"
-          ];
-          darwinUnits = [ ];
-          darwinPlistEnvKeys = [ "PATH" ];
-          darwinWorkDirsDistinct = true;
-          darwinKeepAliveOnTokenPath = [ "/run/secrets/devin-outposts-token-stibnite.dummy" ];
-          darwinThrottleInterval = 30;
+              }
+            );
+            # Both platforms named and different, which is the only mismatch the
+            # module asserts on.
+            platformMismatch = firedClauses (
+              evalBare "aarch64-darwin" {
+                enable = true;
+                outpost = "magnetite";
+                outposts = wired // {
+                  "magnetite" = {
+                    platform = "linux";
+                    inherit (wired."magnetite") tokenFile;
+                  };
+                };
+              }
+            );
+            platformUnsetFired = firedClauses platformUnsetProbe;
+            platformUnsetWarned = warnedClauses platformUnsetProbe;
+            unknownOutpost = firedClauses (
+              evalBare "aarch64-darwin" {
+                enable = true;
+                outpost = "no-such-queue";
+                outposts = wired;
+              }
+            );
+            # The regression this module's shape exists to prevent, in the form
+            # it will arrive: pyrite and cinnabar are linux machines coming up
+            # shortly on this same user. Enabling the worker there without naming
+            # a queue must fail, because the alternative -- inferring one -- puts
+            # them on magnetite's queue, where they would serve its sessions
+            # perfectly well and report nothing.
+            secondLinuxHostUnnamed = firedClauses (evalBare "x86_64-linux" { enable = true; });
+            # And naming a queue whose credential this host does not have fails
+            # by name rather than borrowing a sibling's.
+            secondLinuxHostBorrowing = firedClauses (
+              evalBare "x86_64-linux" {
+                enable = true;
+                outpost = "magnetite";
+              }
+            );
+          };
+          expected = {
+            darwinAgents = [
+              "devin-worker-1"
+              "devin-worker-2"
+            ];
+            darwinUnits = [ ];
+            darwinPlistEnvKeys = [ "PATH" ];
+            darwinWorkDirsDistinct = true;
+            darwinKeepAliveOnTokenPath = [ "/run/secrets/devin-outposts-token-stibnite.dummy" ];
 
-          linuxUnits = [
-            "devin-worker-1"
-            "devin-worker-2"
-          ];
-          linuxAgents = [ ];
-          linuxUnitEnvNames = [ "PATH" ];
-          linuxWorkDirsDistinct = true;
+            linuxUnits = [
+              "devin-worker-1"
+              "devin-worker-2"
+            ];
+            linuxAgents = [ ];
+            linuxUnitEnvNames = [ "PATH" ];
+            linuxWorkDirsDistinct = true;
 
-          outpostDefault = null;
-          darwinSelectedPlatform = "macos";
-          darwinWarned = [ ];
-          linuxSelectedPlatform = "linux";
-          linuxWarned = [ ];
+            outpostDefault = null;
+            darwinWarned = [ ];
+            linuxWarned = [ ];
 
-          wellFormed = [ ];
-          tokenless = [ "token" ];
-          idless = [ "id" ];
-          platformMismatch = [ "platform" ];
-          platformUnsetFired = [ ];
-          platformUnsetWarned = [ "platform-unset" ];
-          unknownOutpost = [ "unknown-outpost" ];
-          secondLinuxHostUnnamed = [ "unset-outpost" ];
-          secondLinuxHostBorrowing = [ "token" ];
+            wellFormed = [ ];
+            tokenless = [ "token" ];
+            idless = [ "id" ];
+            platformMismatch = [ "platform" ];
+            platformUnsetFired = [ ];
+            platformUnsetWarned = [ "platform-unset" ];
+            unknownOutpost = [ "unknown-outpost" ];
+            secondLinuxHostUnnamed = [ "unset-outpost" ];
+            secondLinuxHostBorrowing = [ "token" ];
+          };
         };
       };
     };

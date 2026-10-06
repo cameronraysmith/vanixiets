@@ -30,7 +30,7 @@
 #     builder is reachable, so it is on-demand evidence, not coverage.
 #
 # The evaluation-time siblings remain the cheap, fleet-wide regulators:
-# checks.<system>.omnigent-worker-linux already executes the emitted ExecStartPre
+# checks.x86_64-linux.omnigent-worker-linux already executes the emitted ExecStartPre
 # script under a private HOME and rejects a wrong-owner, world-readable, or
 # symlinked home, and the host module's assertions already require createHome with
 # homeMode 0700 and a worker absent from nix.settings.trusted-users on every real

@@ -54,6 +54,7 @@
       pkgs,
       lib,
       config,
+      system,
       ...
     }:
     let
@@ -379,9 +380,8 @@
           process.exitCode = status;
         });
       '';
-    in
-    {
-      checks.deploy-docs-rehearsal =
+
+      deploy-docs-rehearsal =
         pkgs.runCommand "deploy-docs-rehearsal"
           {
             nativeBuildInputs = [
@@ -392,8 +392,6 @@
               pkgs.nodejs_24
               pkgs.python3
             ];
-            # The loopback APIs need local networking in the darwin sandbox.
-            __darwinAllowLocalNetworking = true;
             meta.description = "behavioural check: every deploy-docs mode against the real wrangler and loopback APIs";
           }
           ''
@@ -1207,5 +1205,10 @@
 
             touch $out
           '';
+    in
+    {
+      checks = lib.optionalAttrs (system == "x86_64-linux") {
+        inherit deploy-docs-rehearsal;
+      };
     };
 }

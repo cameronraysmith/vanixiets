@@ -32,7 +32,7 @@
 { self, lib, ... }:
 {
   perSystem =
-    { pkgs, ... }:
+    { pkgs, system, ... }:
     let
       configDir = "/rehearsal/cluster-config";
       bucket = "rehearsal";
@@ -129,9 +129,8 @@
             f.write(str(server.server_port))
         server.serve_forever()
       '';
-    in
-    {
-      checks.omnigraph-bootstrap-rehearsal =
+
+      omnigraph-bootstrap-rehearsal =
         pkgs.runCommand "omnigraph-bootstrap-rehearsal"
           {
             nativeBuildInputs = [
@@ -140,8 +139,6 @@
               pkgs.coreutils
               pkgs.gnugrep
             ];
-            # The S3 stand-in listens on loopback, which the darwin sandbox otherwise denies.
-            __darwinAllowLocalNetworking = true;
             meta.description = "behavioural check: omnigraph cluster bootstrap's create-once truth table for S3 and local markers";
           }
           ''
@@ -337,5 +334,10 @@
 
             touch $out
           '';
+    in
+    {
+      checks = lib.optionalAttrs (system == "x86_64-linux") {
+        inherit omnigraph-bootstrap-rehearsal;
+      };
     };
 }

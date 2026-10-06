@@ -19,8 +19,12 @@
         };
         users = throw "worker imported a whole-user alias";
       };
-      profileOnly = pkgs.writeShellScriptBin "worker-profile-only" "echo worker-profile";
-      shadow = pkgs.writeShellScriptBin "node" "exit 99";
+      failedCases = cases: lib.attrNames (lib.filterAttrs (_: ok: !ok) cases);
+      sortedEqual = a: b: lib.sort builtins.lessThan a == lib.sort builtins.lessThan b;
+
+      # Capabilities: one positive worker home and one composite invalid home. The four
+      # worker guards hold positively on every real worker home through the machine checks;
+      # only the negative direction needs a fixture.
       mkHome =
         extra:
         inputs.home-manager.lib.homeManagerConfiguration {
@@ -40,37 +44,34 @@
           ]
           ++ extra;
         };
-      cleanHome = mkHome [ ];
-      humanACP =
-        (inputs.home-manager.lib.homeManagerConfiguration {
-          inherit pkgs;
-          modules = [
-            (import ../home/ai/omnigent/default.nix { inherit config; }).flake.modules.homeManager.ai
-            {
-              home = {
-                inherit (cleanHome.config.home) username homeDirectory stateVersion;
-              };
-            }
-          ];
-        }).config.programs.omnigent.settings.acp;
+      # An unsigned author, a documentation mention of a foreign path and a synthetic
+      # credential policy must all stay accepted by the guards.
       home = mkHome [
         {
-          programs.git.settings.user = {
-            name = "Worker fixture";
-            email = "worker@example.invalid";
+          _module.args.omnigentCredentialPolicy = {
+            signingKey = null;
+            githubTokens.fixture = {
+              path = "/synthetic-github-token";
+              expectedLogin = "fixture";
+            };
+            claudeSetupToken = "/synthetic-claude-token";
+            linearApiKeys = { };
+          };
+          programs.git.settings = {
+            user.name = "Worker fixture";
+            user.email = "worker@example.invalid";
+            commit.gpgSign = false;
+            tag.gpgSign = "off";
           };
           programs.jujutsu.settings.user = {
             name = "Worker fixture";
             email = "worker@example.invalid";
           };
-          home.packages = [
-            profileOnly
-            (lib.hiPrio shadow)
-          ];
+          home.file."example.md".text =
+            "Documentation example: /home/human/project is an example path, not an input.";
         }
       ];
       cfg = home.config;
-      valid = h: lib.all (a: a.assertion) h.config.assertions;
       # Home Manager throws on any failed assertion before `config` is readable, so the
       # failure set is only observable through an apply that neutralises the assertions.
       observedAssertions = {
@@ -85,206 +86,8 @@
           );
         };
       };
-      homeFailures =
-        extra:
-        map (a: a.message) (
-          lib.filter (a: a.failed) (mkHome (extra ++ [ observedAssertions ])).config.assertions
-        );
-      workerPath = config.flake.lib.omnigentWorkerPath {
-        inherit pkgs;
-        home = cfg;
-      };
-      managedConfig = config.flake.lib.managedConfigProgram pkgs;
-      managedConfigSpec =
-        name:
-        let
-          entry = cfg.managedConfigs.${name};
-        in
-        pkgs.writeText "worker-${name}-spec.json" (
-          builtins.toJSON {
-            inherit name;
-            inherit (entry)
-              target
-              format
-              fileMode
-              appOwned
-              externalPaths
-              ;
-            declared = (pkgs.formats.json { }).generate "worker-${name}-declared.json" entry.settings;
-          }
-        );
-      workflowFixture = pkgs.writeShellScript "worker-workflow-fixture" ''
-        set -euo pipefail
-        export HOME="$TMPDIR/workflow-home"
-        export XDG_CONFIG_HOME="$HOME/.config" XDG_DATA_HOME="$HOME/.local/share"
-        export OPENSPEC_TELEMETRY=0
-        mkdir -p "$XDG_CONFIG_HOME" "$XDG_DATA_HOME" "$HOME/work"
-        ${lib.concatMapStringsSep "\n"
-          (file: ''
-            target="$HOME"/${lib.escapeShellArg (lib.removePrefix "${cfg.home.homeDirectory}/" file.target)}
-            mkdir -p "$(dirname "$target")"
-            ln -s ${lib.escapeShellArg (toString file.source)} "$target"
-          '')
-          (
-            lib.filter (
-              file:
-              file.enable
-              && lib.elem (lib.removePrefix "${cfg.home.homeDirectory}/" file.target) [
-                ".config/git/config"
-                ".config/jj/config.toml"
-                ".local/share/openspec/schemas/superpowers-bridge"
-                ".local/share/openspec/schemas/superpowers-bridge-wrspm"
-              ]
-            ) (lib.attrValues cfg.home.file)
-          )
-        }
-        install -Dm644 ${
-          (pkgs.formats.json { }).generate "openspec-config.json" cfg.managedConfigs.openspec-config.settings
-        } "$XDG_CONFIG_HOME/openspec/config.json"
-        cd "$HOME/work"
-        for executable in ghq ghq-sync dependency-sources zoxide just shellcheck uncomment ratchet jc jaq yq nixfmt nil nixd openspec mergify nvim git-xet; do
-          test -x "$(command -v "$executable")"
-        done
-        test "$(git config get core.editor)" = nvim
-        test "$(jj config get ui.editor)" = nvim
-        timeout 15 "$(git var GIT_EDITOR)" --headless '+call writefile(["editor-ok"], "editor-result")' +qa
-        test "$(cat editor-result)" = editor-ok
-        "$(git config get lfs.customtransfer.xet.path)" --version
-        git init -q repository
-        cd repository
-        printf 'fixture\n' > tracked
-        git add tracked
-        git commit -qm 'Local fixture'
-        test "$(git show HEAD:tracked)" = fixture
-        jj git init --colocate
-        jj describe -m 'Local jj fixture'
-        jj log --no-graph -r @ -T description | grep 'Local jj fixture'
-        cd ..
-        mkdir -p "$HOME/ghq/example.test/fixture"
-        mv repository "$HOME/ghq/example.test/fixture/repository"
-        test "$(ghq root)" = "$HOME/ghq"
-        test "$(ghq list)" = example.test/fixture/repository
-        zoxide add "$HOME/ghq/example.test/fixture/repository"
-        test "$(zoxide query repository)" = "$HOME/ghq/example.test/fixture/repository"
-        openspec schemas --json > schemas.json
-        jaq -e 'map(.name) | index("superpowers-bridge") != null and index("superpowers-bridge-wrspm") != null' schemas.json
-        jaq -e '.profile == "custom" and .delivery == "skills" and (.workflows | length == 12)' "$XDG_CONFIG_HOME/openspec/config.json"
-        printf 'check:\n    printf "fixture-ok" > result\n' > justfile
-        just --shell ${pkgs.bash}/bin/bash check
-        test "$(cat result)" = fixture-ok
-        printf '#!/usr/bin/env bash\nprintf "fixture\\n"\n' > good.sh
-        shellcheck good.sh
-        printf '#!/usr/bin/env bash\necho $undefined\n' > bad.sh
-        if shellcheck bad.sh > diagnostic; then exit 1; fi
-        grep SC2154 diagnostic
-        printf 'answer: 42\n' | yq '.answer' | jaq -e '. == 42'
-        printf 'answer=42\n' | jc --ini | jaq -e '.answer == "42"'
-      '';
-      managedConfigTest = pkgs.writeText "worker-managed-config-test.py" ''
-        import json
-        import pathlib
-        import stat
-        import subprocess
-        import sys
-        import yaml
-
-        program, omnigent_template, atomic_template = sys.argv[1:]
-        sentinel = "sentinel-value"
-        state = pathlib.Path.cwd() / "state"
-
-        def localize(template, relative):
-            spec = json.loads(pathlib.Path(template).read_text())
-            spec["target"] = str(state / relative)
-            path = state.parent / (spec["name"] + ".json")
-            path.write_text(json.dumps(spec))
-            return spec, json.loads(pathlib.Path(spec["declared"]).read_text()), pathlib.Path(spec["target"]), path
-
-        def render(path):
-            return subprocess.run([program, str(path)], check=False, capture_output=True, text=True)
-
-        def rejects(spec_path, target, invalid):
-            for content in invalid:
-                target.write_text(content)
-                before = target.read_bytes()
-                assert render(spec_path).returncode != 0, ("accepted invalid", content)
-                assert target.read_bytes() == before, ("modified invalid", content)
-
-        spec, declared, target, spec_path = localize(omnigent_template, "omnigent/config.yaml")
-        assert spec["fileMode"] == "0600"
-        assert {"host.host_id", "server"} <= set(spec["appOwned"])
-        assert render(spec_path).returncode == 0
-        assert yaml.safe_load(target.read_text()) == declared, "invented app-owned keys"
-        target.write_text(yaml.safe_dump({"host": {"name": "old", "host_id": "fixture-id"}, "server": "https://fixture.invalid", "unknown": {"nested": sentinel}}))
-        result = render(spec_path)
-        assert result.returncode == 0, result.stderr
-        host = declared.get("host", {}) | {"host_id": "fixture-id"}
-        if "name" not in declared.get("host", {}):
-            host["name"] = "old"
-        assert yaml.safe_load(target.read_text()) == declared | {"host": host, "server": "https://fixture.invalid"}
-        assert "unknown.nested" in result.stderr and sentinel not in result.stderr, result.stderr
-        assert stat.S_IMODE(target.stat().st_mode) == 0o600
-        first = target.read_bytes()
-        assert render(spec_path).returncode == 0
-        assert target.read_bytes() == first
-        rejects(spec_path, target, ["[unterminated\n", "[sequence]\n", "scalar\n", "null\n"])
-
-        spec, declared, target, spec_path = localize(atomic_template, "atomic/settings.json")
-        target.parent.mkdir()
-        target.write_text(json.dumps({"onboardedVersion": "fixture", "workerFixture": {"nested": sentinel}, "theme": "old"}))
-        result = render(spec_path)
-        assert result.returncode == 0, result.stderr
-        assert json.loads(target.read_text()) == declared | {"onboardedVersion": "fixture"}
-        assert "workerFixture.nested" in result.stderr and sentinel not in result.stderr, result.stderr
-        assert stat.S_IMODE(target.stat().st_mode) == 0o644
-        first = target.read_bytes()
-        assert render(spec_path).returncode == 0
-        assert target.read_bytes() == first
-        rejects(spec_path, target, ['{"unfinished":', "[]", "null", '"scalar"'])
-      '';
-      cliHome = inputs.home-manager.lib.homeManagerConfiguration {
-        inherit pkgs;
-        modules = [
-          config.flake.modules.homeManager.cli-tools
-          {
-            home = {
-              inherit (cfg.home) username homeDirectory;
-              stateVersion = "25.11";
-            };
-          }
-        ];
-      };
-      cliSystem =
-        if pkgs.stdenv.hostPlatform.isDarwin then
-          (mkDarwin [ config.flake.modules.darwin.cli-tools ]).config
-        else
-          (mkLinux [ config.flake.modules.nixos.cli-tools ]).config;
-      cliProviders =
-        packages:
-        lib.all (p: lib.elem p packages) (
-          config.flake.lib.cliUnixPackages pkgs
-          ++ config.flake.lib.cliArchivePackages pkgs
-          ++ config.flake.lib.cliNetworkPackages pkgs
-          ++ [ pkgs.jq ]
-        );
-      wrappedHome =
-        (mkHome [
-          {
-            _module.args.omnigentCredentialPolicy = {
-              signingKey = null;
-              githubTokens.fixture = {
-                path = "/synthetic-github-token";
-                expectedLogin = "fixture";
-              };
-              claudeSetupToken = "/synthetic-claude-token";
-              linearApiKeys = { };
-            };
-          }
-        ]).config;
-      wrappedPath = config.flake.lib.omnigentWorkerPath {
-        inherit pkgs;
-        home = wrappedHome;
-      };
       capabilityInvalid = [
+        observedAssertions
         inputs.sops-nix.homeManagerModules.sops
         (
           { lib, ... }:
@@ -333,24 +136,31 @@
         "Omnigent worker capabilities must not inherit an SSH agent or signing socket."
         "Omnigent worker configuration must use its own home, not a foreign human home."
       ];
+      workerPath = lib.splitString ":" (
+        config.flake.lib.omnigentWorkerPath {
+          inherit pkgs;
+          home = cfg;
+        }
+      );
+      pathIndex = entry: lib.lists.findFirstIndex (e: e == entry) null workerPath;
+      acp = config.flake.lib.omnigentACP;
       cases = {
-        composition = valid home;
+        composition = lib.all (a: a.assertion) cfg.assertions;
+        compositeInvalid = sortedEqual (map (a: a.message) (
+          lib.filter (a: a.failed) (mkHome capabilityInvalid).config.assertions
+        )) capabilityMessages;
         workerACPApproval =
           cfg.programs.omnigent.settings.acp == {
             agents = [
-              (builtins.head humanACP.agents)
-              ((builtins.elemAt humanACP.agents 1) // { command = "omp acp --approval-mode yolo"; })
+              (builtins.head acp.agents)
+              ((builtins.elemAt acp.agents 1) // { command = "omp acp --approval-mode yolo"; })
             ];
-          }
-          && humanACP == config.flake.lib.omnigentACP
-          && (builtins.elemAt humanACP.agents 1).command == "omp acp"
-          && (builtins.elemAt humanACP.agents 1).env_passthrough == [ ];
-        cliHomeAdapter = cliHome.config.programs.jq.enable && cliProviders cliHome.config.home.packages;
-        cliSystemAdapter = cliProviders cliSystem.environment.systemPackages;
+          };
+        runtimeBeforeProfile = pathIndex "${pkgs.nodejs_22}/bin" < pathIndex "${cfg.home.path}/bin";
         credentialWrapperPrecedence =
-          lib.elem "${wrappedHome.programs.gh.package}/bin" (lib.splitString ":" wrappedPath)
-          && !lib.elem "${pkgs.gh}/bin" (lib.splitString ":" wrappedPath)
-          && lib.hasPrefix "${wrappedHome.programs.claude-code.package}/bin:" wrappedPath;
+          pathIndex "${cfg.programs.gh.package}/bin" != null
+          && pathIndex "${pkgs.gh}/bin" == null
+          && pathIndex "${cfg.programs.claude-code.package}/bin" == 0;
         tools = cfg.programs.ripgrep.enable && cfg.programs.fd.enable && cfg.programs.gh.enable;
         browserAutomation =
           lib.elem pkgs.playwright-cli cfg.home.packages
@@ -369,46 +179,6 @@
             pkgs.shellcheck
             pkgs.nixfmt
           ];
-        configuredDependencies =
-          cfg.programs.neovim.enable
-          && cfg.programs.git.settings.core.editor == "nvim"
-          && cfg.programs.jujutsu.settings.ui.editor == "nvim"
-          && lib.elem pkgs.git-xet cfg.home.packages;
-        plainEditor =
-          cfg.programs.neovim.plugins == [ ]
-          && cfg.programs.neovim.extraConfig == ""
-          && !(cfg.programs.lazyvim.enable or false);
-        xetOwnedByTransfer =
-          !lib.elem pkgs.git-xet
-            (mkHome [ { programs.git.lfs.enable = lib.mkForce false; } ]).config.home.packages
-          && !lib.elem pkgs.git-xet
-            (mkHome [
-              { programs.git.settings."lfs \"customtransfer.xet\"".path = lib.mkForce "another-transfer"; }
-            ]).config.home.packages;
-        duplicateCapabilities =
-          let
-            composed =
-              (mkHome (
-                map (name: config.flake.modules.homeManager.${name}) [
-                  "ai-capabilities"
-                  "repository-acquisition"
-                  "engineering-tools"
-                  "nix-development"
-                  "openspec"
-                  "mergify"
-                  "neovim"
-                ]
-              )).config;
-          in
-          lib.all (package: builtins.length (lib.filter (p: p == package) composed.home.packages) == 1) [
-            pkgs.ghq
-            pkgs.just
-            pkgs.nixfmt
-            pkgs.playwright-cli
-            composed.programs.openspec.package
-            composed.programs.mergify.package
-            composed.programs.neovim.finalPackage
-          ];
         harnesses =
           cfg.programs.atomic.enable
           && cfg.programs.omp.enable
@@ -417,98 +187,68 @@
         linear = lib.elem pkgs.linear-cli cfg.home.packages;
         skills = cfg.home.file."${cfg.home.homeDirectory}/.claude/skills/linear-cli".enable;
         githubHelper = cfg.programs.gh.gitCredentialHelper.enable;
-        compositeInvalid =
-          lib.sort builtins.lessThan (homeFailures capabilityInvalid)
-          == lib.sort builtins.lessThan capabilityMessages;
-        unsignedAuthor = valid (mkHome [
-          {
-            programs.git.settings = {
-              user.name = "Worker fixture";
-              user.email = "worker@example.invalid";
-              commit.gpgSign = false;
-              tag.gpgSign = "off";
-            };
-          }
-        ]);
-        benignDocumentation = valid (mkHome [
-          {
-            home.file."example.md".text =
-              "Documentation example: /home/human/project is an example path, not an input.";
-          }
-        ]);
       };
-      failed = lib.attrNames (lib.filterAttrs (_: ok: !ok) cases);
-      mkLinux =
-        extra:
-        inputs.nixpkgs.lib.nixosSystem {
+
+      # Linux: one container NixOS fixture. Cameron is enabled and violates the private
+      # home, admin-group, trusted-user and environment guards; Raquel stays disabled and
+      # aliases the wheel gid. The same evaluation supplies the composite message set, the
+      # disabled-worker preparation, Cameron's emitted ExecStartPre and his ACP settings.
+      linux =
+        (inputs.nixpkgs.lib.nixosSystem {
           system = "x86_64-linux";
           modules = [
             inputs.home-manager.nixosModules.home-manager
             config.flake.modules.nixos.omnigent-host
-            {
-              nixpkgs.pkgs = pkgs;
-              boot.isContainer = true;
-              system.stateVersion = "25.11";
-              networking.hostName = "fixture";
-              home-manager = {
-                useGlobalPkgs = true;
-                useUserPackages = true;
-                extraSpecialArgs = { inherit flake; };
-              };
-              users.users = lib.genAttrs [ "omnigent-cameron" "omnigent-raquel" ] (user: {
-                isNormalUser = true;
-                home = "/home/${user}";
-                group = user;
-              });
-              users.groups.omnigent-cameron = { };
-              users.groups.omnigent-raquel = { };
-              services.omnigent-host = {
-                serverUrl = "https://fixture.invalid";
-                workers = lib.genAttrs [ "cameron" "raquel" ] (owner: {
-                  inherit owner;
-                  user = "omnigent-${owner}";
-                  extraHomeModules = [
-                    {
-                      home.packages = [
-                        profileOnly
-                        (lib.hiPrio shadow)
-                      ];
-                    }
-                  ];
-                  extraPackages = [
-                    pkgs.hello
-                    shadow
-                  ];
-                });
-              };
-            }
-          ]
-          ++ extra;
-        };
-      prepared = (mkLinux [ ]).config;
-      activeModule.services.omnigent-host.workers = lib.genAttrs [ "cameron" "raquel" ] (_: {
-        enable = true;
-      });
-      linux = (mkLinux [ activeModule ]).config;
-      linuxFailures = c: map (a: a.message) (lib.filter (a: !a.assertion) c.assertions);
-      compositeInvalid = [
-        (
-          { config, ... }:
-          {
-            users.users.omnigent-cameron.homeMode = "0755";
-            users.users.omnigent-cameron.extraGroups = [ "wheel" ];
-            # NixOS rejects duplicate gids unless uniqueness enforcement is off, so this is the declarable form of the runtime alias.
-            users.enforceIdUniqueness = false;
-            users.groups.omnigent-raquel.gid = config.users.groups.wheel.gid;
-            nix.settings.trusted-users = [
-              "omnigent-cameron"
-              "@wheel"
-            ];
-            services.omnigent-host.workers.cameron.environment.NIX_CONFIG = "foreign";
-          }
-        )
-      ];
-      compositeMessages = [
+            (
+              { config, ... }:
+              {
+                nixpkgs.pkgs = pkgs;
+                boot.isContainer = true;
+                system.stateVersion = "25.11";
+                networking.hostName = "fixture";
+                home-manager = {
+                  useGlobalPkgs = true;
+                  useUserPackages = true;
+                  extraSpecialArgs = { inherit flake; };
+                };
+                users.users.omnigent-cameron = {
+                  isNormalUser = true;
+                  home = "/home/omnigent-cameron";
+                  group = "omnigent-cameron";
+                  homeMode = "0755";
+                  extraGroups = [ "wheel" ];
+                };
+                users.users.omnigent-raquel = {
+                  isNormalUser = true;
+                  home = "/home/omnigent-raquel";
+                  group = "omnigent-raquel";
+                };
+                users.groups.omnigent-cameron = { };
+                # NixOS rejects duplicate gids unless uniqueness enforcement is off, so this is the declarable form of the runtime alias.
+                users.enforceIdUniqueness = false;
+                users.groups.omnigent-raquel.gid = config.users.groups.wheel.gid;
+                nix.settings.trusted-users = [
+                  "omnigent-cameron"
+                  "@wheel"
+                ];
+                services.omnigent-host = {
+                  serverUrl = "https://fixture.invalid";
+                  workers.cameron = {
+                    enable = true;
+                    owner = "cameron";
+                    user = "omnigent-cameron";
+                    environment.NIX_CONFIG = "foreign";
+                  };
+                  workers.raquel = {
+                    owner = "raquel";
+                    user = "omnigent-raquel";
+                  };
+                };
+              }
+            )
+          ];
+        }).config;
+      linuxMessages = [
         "Omnigent worker cameron: requires a private distinct home and home-local workspace."
         "Omnigent worker cameron: administrative groups or sudo grants are prohibited."
         "Omnigent worker cameron: Nix trusted-user authority is prohibited."
@@ -517,72 +257,16 @@
         "Omnigent worker raquel: Nix trusted-user authority is prohibited."
       ];
       linuxCases = {
-        valid = linuxFailures linux == [ ];
-        compositeInvalid =
-          lib.sort builtins.lessThan (linuxFailures (mkLinux compositeInvalid).config)
-          == lib.sort builtins.lessThan compositeMessages;
+        compositeInvalid = sortedEqual (map (a: a.message) (
+          lib.filter (a: !a.assertion) linux.assertions
+        )) linuxMessages;
         disabledPrepared =
-          !(prepared.systemd.services ? omnigent-host-cameron)
-          && !(prepared.systemd.services ? omnigent-host-raquel)
-          && prepared.home-manager.users.omnigent-cameron.programs.omnigent.enable
-          && builtins.hasAttr "home-manager-omnigent\\x2dcameron" prepared.systemd.services;
+          !(linux.systemd.services ? omnigent-host-raquel)
+          && linux.home-manager.users.omnigent-raquel.programs.omnigent.enable
+          && builtins.hasAttr "home-manager-omnigent\\x2draquel" linux.systemd.services;
         noLegacyFallback = !(linux.systemd.services ? omnigent-host);
-        direnvOptIn =
-          prepared.home-manager.users.omnigent-cameron.programs.direnv.config.whitelist.prefix or [ ] == [ ];
-      }
-      // lib.mapAttrs' (
-        owner: worker:
-        let
-          unit = linux.systemd.services."omnigent-host-${owner}";
-          service = unit.serviceConfig;
-          h = linux.home-manager.users.${worker.user};
-          activation = "home-manager-omnigent\\x2d${owner}.service";
-        in
-        lib.nameValuePair "instance-${owner}" (
-          service.User == "omnigent-${owner}"
-          && service.Group == "omnigent-${owner}"
-          && service.WorkingDirectory == "/home/omnigent-${owner}"
-          && service.UMask == "0077"
-          && service.NoNewPrivileges
-          && linux.users.users.${worker.user}.homeMode == "700"
-          && service.Type == "simple"
-          && service.ExecStart == "${lib.getExe pkgs.omnigent} host --server https://fixture.invalid"
-          && service.Restart == "on-failure"
-          && service.RestartSec == 5
-          && service.MemoryHigh == "6G"
-          && service.MemoryMax == "8G"
-          && lib.elem activation unit.after
-          && unit.requires == [ activation ]
-          && unit.wants == [ "network-online.target" ]
-          && lib.elem "network-online.target" unit.after
-          && unit.bindsTo == [ ]
-          && unit.conflicts == [ ]
-          && lib.elem h.home.activationPackage unit.restartTriggers
-          && unit.environment.HOME == "/home/omnigent-${owner}"
-          && unit.environment.USER == worker.user
-          && unit.environment.LOGNAME == worker.user
-          && unit.environment.PI_CODING_AGENT_DIR == "/home/omnigent-${owner}/.atomic/agent"
-          && unit.environment.PI_ACP_PI_COMMAND == "atomic"
-          && unit.environment.OMNIGENT_RUNNER_ENV_PASSTHROUGH == "PI_ACP_PI_COMMAND,PI_CODING_AGENT_DIR"
-          && h.programs.omp.configDir == "/home/omnigent-${owner}/.omp/agent"
-          && (builtins.elemAt h.programs.omnigent.settings.acp.agents 1).env_passthrough == [ ]
-          && h.programs.omnigent.settings.host.name == "fixture-${owner}"
-          &&
-            unit.environment.PATH == lib.makeBinPath (
-              config.flake.lib.omnigentRuntimePackages pkgs
-              ++ [ h.home.path ]
-              ++ [
-                pkgs.hello
-                shadow
-              ]
-            )
-        )
-      ) linux.services.omnigent-host.workers;
-      linuxFailed =
-        if linuxFailures linux != [ ] then
-          [ "valid" ]
-        else
-          lib.attrNames (lib.filterAttrs (_: ok: !ok) linuxCases);
+      };
+      privateHome = linux.systemd.services.omnigent-host-cameron.serviceConfig.ExecStartPre;
       homeUidFixture = pkgs.writeShellScript "omnigent-home-uid-fixture" ''
         # Override only UID observation; source the emitted helper with real stat/mode checks, without chown.
         observedUid="$2"
@@ -618,9 +302,25 @@
             assert spec["os_env"] == {"type": "caller_process", "cwd": ".", "sandbox": {"type": "none"}}
         print("upstream native Pi and configured ACP select sandbox:none; no child path grants")
       '';
-      mkDarwin =
-        extra:
-        inputs.nix-darwin.lib.darwinSystem {
+
+      # Darwin: one nix-darwin fixture whose worker holds an administrative group and Nix
+      # trust, and whose omnigent package is a canary asserting the launch environment.
+      # Plist and account facts are fleet obligations on stibnite.
+      profileOnly = pkgs.writeShellScriptBin "worker-profile-only" "echo worker-profile";
+      shadow = pkgs.writeShellScriptBin "node" "exit 99";
+      darwinHostCanary = pkgs.writeShellScriptBin "omnigent" ''
+        set -eu
+        test "$*" = 'host --server https://fixture.invalid'
+        test -e "$HOME/activation-succeeded"
+        test "$(worker-profile-only)" = worker-profile
+        test "$(command -v node)" = ${pkgs.nodejs_22}/bin/node
+        test "$(command -v hello)" = ${pkgs.hello}/bin/hello
+        test "$(umask)" = 0077
+        test -z "''${SSH_AUTH_SOCK-}"
+        printf '%s\n' host-executed > "$HOME/host-executed"
+      '';
+      darwin =
+        (inputs.nix-darwin.lib.darwinSystem {
           modules = [
             inputs.home-manager.darwinModules.home-manager
             config.flake.modules.darwin.omnigent-host
@@ -631,14 +331,20 @@
               users.knownUsers = [ "omnigent-cameron" ];
               users.knownGroups = [ "omnigent-cameron" ];
               users.groups.omnigent-cameron.gid = 22001;
+              users.groups.admin = {
+                gid = 80;
+                members = [ "omnigent-cameron" ];
+              };
               users.users.omnigent-cameron = {
                 uid = 22001;
                 gid = 22001;
                 home = "/Users/omnigent-cameron";
                 createHome = true;
               };
+              nix.settings.trusted-users = [ "omnigent-cameron" ];
               services.omnigent-host = {
                 serverUrl = "https://fixture.invalid";
+                package = darwinHostCanary;
                 workers.cameron = {
                   enable = true;
                   owner = "cameron";
@@ -658,170 +364,34 @@
                 };
               };
             }
-          ]
-          ++ extra;
-        };
-      darwin = (mkDarwin [ ]).config;
-      darwinPrepared =
-        (mkDarwin [ { services.omnigent-host.workers.cameron.enable = lib.mkForce false; } ]).config;
-      darwinFailures = c: map (a: a.message) (lib.filter (a: !a.assertion) c.assertions);
+          ];
+        }).config;
+      darwinMessages = [
+        "Omnigent worker cameron: administrative groups are prohibited."
+        "Omnigent worker cameron: Nix trusted-user authority is prohibited."
+      ];
       darwinCases = {
-        valid = darwinFailures darwin == [ ];
-        disabledPrepared =
-          !(darwinPrepared.launchd.daemons ? omnigent-host-cameron)
-          && darwinPrepared.environment.etc ? "omnigent/workers/cameron"
-          && darwinPrepared.home-manager.users == { };
-        noLegacyFallback = darwin.home-manager.users == { };
+        compositeInvalid = sortedEqual (map (a: a.message) (
+          lib.filter (a: !a.assertion) darwin.assertions
+        )) darwinMessages;
       };
-      darwinHostCanary = pkgs.writeShellScriptBin "omnigent" ''
-        set -eu
-        test "$*" = 'host --server https://fixture.invalid'
-        test -e "$HOME/activation-succeeded"
-        test "$(worker-profile-only)" = worker-profile
-        test "$(command -v node)" = ${pkgs.nodejs_22}/bin/node
-        test "$(command -v hello)" = ${pkgs.hello}/bin/hello
-        test "$(umask)" = 0077
-        test -z "''${SSH_AUTH_SOCK-}"
-        printf '%s\n' host-executed > "$HOME/host-executed"
-      '';
-      darwinControl = (mkDarwin [ { services.omnigent-host.package = darwinHostCanary; } ]).config;
-      darwinArtifactTest = pkgs.writeText "omnigent-darwin-artifacts.py" ''
-        import json
+      darwinDaemon = darwin.launchd.daemons.omnigent-host-cameron;
+      darwinPrepareTest = pkgs.writeText "omnigent-darwin-prepare-home.py" ''
         import os
         from pathlib import Path
-        import plistlib
-        import re
         import shlex
-        import shutil
         import subprocess
         import sys
-        import tempfile
-        import yaml
-        from omnigent.cli import _materialize_harness_launcher_file
-        from omnigent.onboarding.acp_auth import acp_agents
-        from omnigent.harnesses.pi_native.main import _materialize_pi_agent_spec
 
-        label = "org.nixos.omnigent-host-cameron"
         worker_home = "/Users/omnigent-cameron"
-        required = ["atomic", "omp", "pi", "claude", "codex", "nix", "direnv", "gh", "linear", "rg", "fd"]
-
-        def inspect(root):
-            root = Path(root)
-            plist = root / "Library/LaunchDaemons" / (label + ".plist")
-            assert plist.is_file(), "wrong domain"
-            assert not (root / "Library/LaunchAgents" / plist.name).exists(), "duplicate agent"
-            p = plistlib.loads(plist.read_bytes())
-            assert p["Label"] == label
-            assert p["UserName"] == "omnigent-cameron", "wrong user"
-            assert p["WorkingDirectory"] == worker_home
-            assert p["Umask"] == 63
-            assert "SessionCreate" not in p
-            assert p["ProcessType"] == "Standard"
-            assert p["RunAtLoad"] and p["KeepAlive"] == {"SuccessfulExit": False}
-            assert p["ThrottleInterval"] == 5
-            assert not any(k in p for k in ["LimitLoadToSessionType", "LaunchOnlyOnce", "KeepAlivePathState"])
-            assert p["StandardOutPath"] == p["StandardErrorPath"] == worker_home + "/.omnigent/logs/host/service.log"
-            env = p["EnvironmentVariables"]
-            assert env["HOME"] == worker_home
-            assert env["USER"] == env["LOGNAME"] == "omnigent-cameron"
-            assert env["PI_ACP_PI_COMMAND"] == "atomic"
-            assert env["PI_CODING_AGENT_DIR"] == worker_home + "/.atomic/agent"
-            assert env["OMNIGENT_RUNNER_ENV_PASSTHROUGH"] == "PI_ACP_PI_COMMAND,PI_CODING_AGENT_DIR"
-            assert "OMP_CODING_AGENT_DIR" not in env and "ATOMIC_CODING_AGENT_DIR" not in env
-            argv = p["ProgramArguments"]
-            assert argv[:2] == ["/bin/sh", "-c"]
-            wait, store, conjunction, execute, launcher = shlex.split(argv[2])
-            assert [wait, store, conjunction, execute] == ["/bin/wait4path", "/nix/store", "&&", "exec"]
-            assert os.access(launcher, os.X_OK)
-            script = Path(launcher).read_text()
-            activations = re.findall(r"^(/nix/store/[^\n ]+/activate)$", script, re.M)
-            assert len(activations) == 1
-            activation = Path(activations[0])
-            assert os.access(activation, os.X_OK)
-            generation = activation.parent
-            profile = (generation / "home-path").resolve(strict=True)
-            assert shutil.which("node", path=env["PATH"]) == "${pkgs.nodejs_22}/bin/node", "missing runtime"
-            assert str(profile / "bin") in env["PATH"].split(":"), "missing profile"
-            assert env["PATH"].split(":").index("${pkgs.nodejs_22}/bin") < env["PATH"].split(":").index(str(profile / "bin"))
-            assert shutil.which("hello", path=env["PATH"]) == "${pkgs.hello}/bin/hello"
-            assert env["PATH"].endswith(":/usr/bin:/bin:/usr/sbin:/sbin")
-            assert subprocess.check_output([str(profile / "bin/worker-profile-only")], text=True).strip() == "worker-profile"
-            for exe in required:
-                resolved = shutil.which(exe, path=env["PATH"])
-                assert resolved and os.access(resolved, os.X_OK), exe
-            assert list((generation / "LaunchAgents").iterdir()) == []
-            actual_activation = activation.read_text()
-            assert "launchctl" not in actual_activation and "sw_vers" not in actual_activation
-            assert "checkStringEq UID" in actual_activation and "22001" in actual_activation
-            managed_lines = [line for line in actual_activation.splitlines() if line.startswith("run ") and "/bin/managed-config " in line]
-            assert len(managed_lines) == 1
-            _, program, *specs = shlex.split(managed_lines[0])
-            omnigent_specs = [spec for spec in specs if json.loads(Path(spec).read_text())["name"] == "omnigent-config"]
-            assert len(omnigent_specs) == 1
-            assert json.loads(Path(omnigent_specs[0]).read_text())["target"] == worker_home + "/.omnigent/config.yaml"
-            return p, launcher, str(activation), program, omnigent_specs[0]
-
-        production = inspect(sys.argv[1])
-        for reason in ["wrong user", "wrong domain", "missing runtime", "missing profile"]:
-            with tempfile.TemporaryDirectory() as directory:
-                root = Path(directory)
-                relative = Path("Library/LaunchDaemons") / (label + ".plist")
-                plist = root / relative
-                plist.parent.mkdir(parents=True)
-                p = plistlib.loads((Path(sys.argv[1]) / relative).read_bytes())
-                if reason == "wrong user":
-                    p["UserName"] = "root"
-                elif reason == "wrong domain":
-                    plist = root / "Library/LaunchAgents" / plist.name
-                    plist.parent.mkdir()
-                elif reason == "missing runtime":
-                    p["EnvironmentVariables"]["PATH"] = "/usr/bin:/bin"
-                else:
-                    p["EnvironmentVariables"]["PATH"] = "${lib.makeBinPath (config.flake.lib.omnigentRuntimePackages pkgs)}:/usr/bin:/bin:/usr/sbin:/sbin"
-                plist.write_bytes(plistlib.dumps(p))
-                try:
-                    inspect(root)
-                except AssertionError as error:
-                    assert str(error) == reason, (reason, str(error))
-                else:
-                    raise AssertionError("accepted " + reason)
-        control = inspect(sys.argv[2])
-        _, _, activation, program, spec_path = production
-        assert str(Path(activation).parent) == sys.argv[4], "enrollment generation differs from launched generation"
-        spec = json.loads(Path(spec_path).read_text())
-        settings = json.loads(Path(spec["declared"]).read_text())
-        assert settings["host"]["name"] == "fixture-cameron"
-        target = Path.cwd() / "worker-config.yaml"
-        local_spec = Path("worker-config-spec.json")
-        local_spec.write_text(json.dumps(spec | {"target": str(target)}))
-        target.write_text("host:\n  host_id: retained-worker-id\nunknown: retained\n")
-        subprocess.run([program, str(local_spec)], check=True)
-        assert yaml.safe_load(target.read_text()) == settings | {"host": settings["host"] | {"host_id": "retained-worker-id"}}
-        assert target.stat().st_mode & 0o777 == 0o600
-        os.environ["HOME"] = tempfile.mkdtemp()
-        entries = acp_agents(settings)
-        assert [entry.name for entry in entries] == ["Atomic", "Oh My Pi"]
-        assert entries[0].env_passthrough == ("PI_ACP_PI_COMMAND", "PI_CODING_AGENT_DIR")
-        assert entries[1].env_passthrough == ()
-        for entry in entries:
-            generated = _materialize_harness_launcher_file(harness="acp", model=None, system_prompt=None, acp_agent=entry)
-            spec = yaml.safe_load(generated.read_text())
-            assert spec["os_env"] == {"type": "caller_process", "sandbox": {"type": "none"}}
-            assert spec["executor"]["acp_agent"]["command"] == entry.command
-            assert spec["executor"]["acp_agent"].get("env_passthrough", []) == list(entry.env_passthrough)
-        with tempfile.TemporaryDirectory() as directory:
-            spec = yaml.safe_load(_materialize_pi_agent_spec(Path(directory)).read_text())
-            assert spec["os_env"] == {"type": "caller_process", "cwd": ".", "sandbox": {"type": "none"}}
-
-        system_activation = Path(sys.argv[3]).read_text()
-        preparation_lines = [line for line in system_activation.splitlines() if "-omnigent-prepare-darwin-home " in line]
+        launchd = Path(sys.argv[1]).read_text()
+        preparation_lines = [line for line in launchd.splitlines() if "-omnigent-prepare-darwin-home " in line]
         assert len(preparation_lines) == 1
         invocation = shlex.split(preparation_lines[0])
         assert invocation[:5] == ["/usr/bin/sudo", "-u", "omnigent-cameron", "--set-home", "--"], "preparation must run as the worker"
         prepare, user, uid, gid, home = invocation[5:]
         assert [user, uid, gid, home] == ["omnigent-cameron", "22001", "22001", worker_home]
-        assert system_activation.index("setting up users") < system_activation.index(preparation_lines[0])
-        assert system_activation.index(preparation_lines[0]) < system_activation.index("setting up launchd services")
+        assert launchd.index(preparation_lines[0]) < launchd.index("setting up launchd services")
         preparation_home = Path.cwd() / "prepared-home"
         actual_user = subprocess.check_output(["${pkgs.coreutils}/bin/id", "-un"], text=True).strip()
         def prepare_home(uid=os.getuid()):
@@ -837,19 +407,22 @@
         logs.rmdir()
         logs.symlink_to(preparation_home, target_is_directory=True)
         assert prepare_home().returncode != 0, "symlink log parent accepted"
-        print("Darwin realized plist/activation/profile, private preparation, and sandbox:none checked")
-        Path("artifacts.json").write_text(json.dumps({"production": production, "control": control}))
       '';
       darwinLauncherTest = pkgs.writeText "omnigent-darwin-launcher-test.py" ''
         import json
         import os
         from pathlib import Path
+        import re
         import shlex
         import subprocess
+        import sys
 
-        artifacts = json.loads(Path("artifacts.json").read_text())
-        plist, launcher, activation, _, _ = artifacts["control"]
-        env = os.environ | plist["EnvironmentVariables"]
+        launcher = sys.argv[1]
+        script = Path(launcher).read_text()
+        activations = re.findall(r"^(/nix/store/[^\n ]+/activate)$", script, re.M)
+        assert len(activations) == 1
+        activation = activations[0]
+        env = os.environ | json.loads(Path(sys.argv[2]).read_text())
         home = Path(os.environ["TMPDIR"]) / "worker-control"
         home.mkdir(mode=0o700)
         for suffix in [".omnigent", ".omnigent/logs", ".omnigent/logs/host"]:
@@ -896,14 +469,13 @@
         assert not (home / "host-executed").exists(), "symlink home accepted"
         env["HOME"] = str(home)
         mutant = home.parent / "unchecked-activation"
-        original = Path(launcher).read_text()
-        assert original.count(activation + "\n") == 1
-        mutant.write_text(original.replace(activation + "\n", activation + " || true\n"))
+        assert script.count(activation + "\n") == 1
+        mutant.write_text(script.replace(activation + "\n", activation + " || true\n"))
         assert run(42, source=str(mutant)).returncode == 0
         assert (home / "host-executed").exists(), "activation-failure mutant did not discriminate"
       '';
+
       inventoryRoles = config.flake.clan.inventory.instances.omnigent.roles;
-      stibnite = config.flake.darwinConfigurations.stibnite;
       expectedOwners = config.flake.lib.omnigentFleetObligations.expectedOwners;
       clanHostInterface =
         (
@@ -920,7 +492,6 @@
             inventoryRoles.host.machines.${machine}.settings
           ];
         }).config;
-      janetteMeta = config.flake.users.janettesmith.meta;
       metaFixture =
         extra:
         (lib.evalModules {
@@ -940,17 +511,6 @@
           ];
         }).config.flake.users.fixture.meta.gitEmail;
       inventoryCases = {
-        canonicalJanette =
-          janetteMeta.username == "janettesmith"
-          && janetteMeta.fullname == "Janette Smith"
-          && janetteMeta.email == "janette.a.smith@gmail.com"
-          && janetteMeta.githubUser == "janetteasmith"
-          && janetteMeta.gitEmail == "125711642+janetteasmith@users.noreply.github.com"
-          && janetteMeta.sopsAgeKeyId == null
-          &&
-            janetteMeta.sshKeys == [
-              "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIIePSVx5J/JJ5eN4PSryuL7iP8WXow/SsZOIr96qnKP0"
-            ];
         publicRecipient = lib.hasInfix "&janettesmith-user age1mqfqckczkulpne7265j5cxn0pspdlxd3d0kav368u2c2fwknnc4qe27dec" (
           builtins.readFile ../../.sops.yaml
         );
@@ -993,85 +553,13 @@
               true
           )).success;
       };
-      inventoryFailed = lib.attrNames (lib.filterAttrs (_: ok: !ok) inventoryCases);
-      credentialRoot = "/tmp/omnigent-worker-credentials-${system}";
-      credentialHomePath = "${credentialRoot}/home";
-      credentialMock =
-        tool:
-        pkgs.writeShellScriptBin tool ''
-          exec ${lib.getExe pkgs.python3} ${../home/ai/omnigent/credential-fixtures.py} mock-${tool} "$@"
-        '';
-      mockGh = credentialMock "gh";
-      linearResolver = pkgs.runCommand "omnigent-linear-resolver-fixture" { } ''
-        mkdir -p "$out"
-        cp -r ${pkgs.linear-cli.src}/. "$out/"
-        cp -r ${pkgs.linear-cli.denoDeps}/vendor "$out/vendor"
-        cp ${pkgs.writeText "linear-resolver-fixture.ts" ''
-          import { setCliWorkspace } from "./src/config.ts";
-          import { loadCredentials } from "./src/credentials.ts";
-          import { getGraphQLClient } from "./src/utils/graphql.ts";
-          import { _setBackend } from "./src/keyring/index.ts";
-          if (Deno.args[0] === "--prepare") Deno.exit(0);
 
-          _setBackend({
-            get: async () => { throw new Error("keyring forbidden in fixture"); },
-            set: async () => { throw new Error("keyring forbidden in fixture"); },
-            delete: async () => { throw new Error("keyring forbidden in fixture"); },
-            isAvailable: async () => false,
-          });
-          globalThis.fetch = async (input, init) => {
-            const request = new Request(input, init);
-            const expected = (await Deno.readTextFile(Deno.env.get("FIXTURE_LINEAR_GRANT_PATH")!)).trim();
-            if (request.headers.get("Authorization") !== expected) {
-              throw new Error("unexpected synthetic grant");
-            }
-            const data = {
-              viewer: { email: Deno.env.get("FIXTURE_LINEAR_VIEWER") ?? "fixture@example.invalid" },
-              organization: {
-                id: Deno.env.get("FIXTURE_LINEAR_WORKSPACE") ?? "workspace-id",
-                urlKey: "fixture",
-              },
-            };
-            return Response.json({ data });
-          };
-          try {
-            if (Deno.env.get("LINEAR_IGNORE_ENV_FILE") !== "1") throw new Error("dotenv enabled");
-            const [flag, workspace, command, query] = Deno.args;
-            if (flag !== "--workspace" || command !== "api") throw new Error("unexpected fixture argv");
-            setCliWorkspace(workspace);
-            await loadCredentials();
-            await Deno.writeTextFile(Deno.env.get("FIXTURE_ARGV")!, JSON.stringify(["linear", ...Deno.args]) + "\n", { append: true });
-            console.log(JSON.stringify({ data: await getGraphQLClient().request(query) }));
-          } catch {
-            console.error("synthetic Linear resolver rejected request");
-            Deno.exit(1);
-          }
-        ''} "$out/fixture.ts"
-        ${lib.getExe pkgs.python3} ${../home/ai/omnigent/credential-fixtures.py} prepare-linear "$out"
-        export DENO_DIR="$TMPDIR/deno"
-        mkdir -p "$DENO_DIR"
-        ln -s ${pkgs.linear-cli.denoDeps}/deno_dir/npm "$DENO_DIR/npm"
-        chmod u+w "$out/deno.lock"
-        export HOME="$TMPDIR/home" LINEAR_IGNORE_ENV_FILE=1
-        mkdir -p "$HOME"
-        ${lib.getExe pkgs.deno} run --quiet --cached-only --no-check --no-prompt --allow-read --allow-env --allow-sys --deny-run --deny-net "$out/fixture.ts" --prepare
-      '';
-      mockLinear =
-        (pkgs.writeShellScriptBin "linear" ''
-          export DENO_DIR="$HOME/.cache/linear-fixture"
-          ${pkgs.coreutils}/bin/mkdir -p "$DENO_DIR"
-          ${pkgs.coreutils}/bin/ln -sfn ${pkgs.linear-cli.denoDeps}/deno_dir/npm "$DENO_DIR/npm"
-          exec ${lib.getExe pkgs.deno} run --quiet --cached-only --frozen --no-check --allow-read --allow-write --allow-env --allow-sys --allow-run=git --deny-net ${linearResolver}/fixture.ts "$@"
-        '')
-        // {
-          inherit (pkgs.linear-cli) src;
-        };
-      credentialPkgs = pkgs.extend (
-        _: _: {
-          gh = mockGh;
-          linear-cli = mockLinear;
-        }
-      );
+      # Pure credential policy over a synthetic vars-shaped view, the form the host adapter
+      # derives from Clan generators and SOPS placeholders. Real-host delivery and Home
+      # Manager wiring are fleet obligations; the consumer's runtime logic is the
+      # in-process unit test `omnigent-credentials-unit`.
+      credentialRoot = "/synthetic/omnigent-credentials";
+      credentialHomePath = "${credentialRoot}/home";
       credentialsOf =
         definition:
         (lib.evalModules {
@@ -1088,13 +576,6 @@
         "first"
         "second"
       ];
-      credentialLinearFiles = [
-        "key"
-        "workspace"
-        "workspace-id"
-        "viewer-email"
-      ];
-      # Vars-shaped view the host adapter derives from Clan generators and SOPS placeholders.
       credentialVar = generator: file: {
         path = "${credentialRoot}/${generator}-${file}";
         placeholder = "<SYNTHETIC:${generator}/${file}>";
@@ -1109,15 +590,20 @@
               token = credentialVar generator "token";
             })
         // lib.genAttrs [ "omnigent-cameron-linear-personal" "omnigent-cameron-linear-work" ] (
-          generator: lib.genAttrs credentialLinearFiles (credentialVar generator)
+          generator:
+          lib.genAttrs [
+            "key"
+            "workspace"
+            "workspace-id"
+            "viewer-email"
+          ] (credentialVar generator)
         );
       credentialPolicy =
         definition: linearRendered:
         config.flake.lib.omnigentCredentialPolicy {
-          pkgs = credentialPkgs;
+          inherit pkgs linearRendered;
           credentials = credentialsOf definition;
           vars = credentialVars;
-          inherit linearRendered;
           home = credentialHomePath;
           serverUrl = "https://fixture.invalid";
         };
@@ -1148,86 +634,8 @@
       };
       credentialRendered = "${credentialRoot}/rendered-linear";
       credentialDelivery = credentialPolicy workerCredentials credentialRendered;
-      credentialHome = inputs.home-manager.lib.homeManagerConfiguration {
-        pkgs = credentialPkgs;
-        extraSpecialArgs = {
-          inherit flake;
-          osConfig = null;
-        };
-        modules = [
-          config.flake.modules.homeManager.omnigent-worker
-          {
-            _module.args.omnigentCredentialPolicy = credentialDelivery.policy;
-            home = {
-              username = "omnigent-cameron";
-              homeDirectory = credentialHomePath;
-              stateVersion = "25.11";
-            };
-            programs.omnigent.settings.host.name = "fixture";
-          }
-        ];
-      };
-      credentialGeneration = credentialHome.activationPackage;
-      evaluationMaterial = builtins.toFile "synthetic-evaluation-credential" (
-        builtins.hashString "sha256" "omnigent-evaluation-disclosure-fixture"
-      );
-      disclosureLeakControl = pkgs.writeText "omnigent-disclosure-leak-control" (
-        builtins.readFile evaluationMaterial
-      );
-      disclosureSettings = pkgs.writeText "omnigent-delivery-settings.json" (
-        builtins.toJSON { inherit (credentialDelivery) policy linearTemplate; }
-      );
-      disclosureDerivations = map (drv: builtins.unsafeDiscardOutputDependency drv.drvPath) [
-        disclosureSettings
-        linearResolver
-      ];
-      credentialArtifact = pkgs.writeText "omnigent-credential-artifacts.json" (
-        builtins.toJSON {
-          root = credentialRoot;
-          evaluationMaterial = toString evaluationMaterial;
-          derivationRoots = map builtins.unsafeDiscardStringContext disclosureDerivations;
-          generatedArtifacts = map toString [
-            credentialGeneration
-            disclosureSettings
-          ];
-          leakControl = toString disclosureLeakControl;
-          generation = toString credentialGeneration;
-          git = lib.getExe pkgs.git;
-          mockGh = lib.getExe mockGh;
-          linearTemplate = credentialDelivery.linearTemplate.content;
-          mockLinear = lib.getExe mockLinear;
-          linearPlaceholders = lib.genAttrs credentialLinearFiles (
-            file: credentialVars.omnigent-cameron-linear-personal.${file}.placeholder
-          );
-          runtimePath = config.flake.lib.omnigentWorkerPath {
-            pkgs = credentialPkgs;
-            home = credentialHome.config;
-          };
-          consumerSource = ../home/ai/omnigent/credentials.py;
-          deliverySource = ../home/ai/omnigent/delivery.py;
-          deliveryFixtures = ../home/ai/omnigent/delivery-fixtures.py;
-          keychainSource = ../home/ai/omnigent/keychain.py;
-          keychainFixtures = ../home/ai/omnigent/keychain-fixtures.py;
-          loginHelperSource = ../apps/omnigent-worker-login.sh;
-          # Stibnite's own worker generation, launch daemons and supervisor launcher.
-          hostGeneration =
-            if pkgs.stdenv.hostPlatform.isDarwin then
-              toString stibnite.config.environment.etc."omnigent/workers/cameron".source
-            else
-              null;
-          hostLaunchd =
-            if pkgs.stdenv.hostPlatform.isDarwin then toString stibnite.config.system.build.launchd else null;
-          hostLauncher =
-            if pkgs.stdenv.hostPlatform.isDarwin then
-              toString stibnite.config.launchd.daemons.omnigent-host-cameron.command
-            else
-              null;
-        }
-      );
-      # Pure, system-independent credential policy facts, built once as
-      # `omnigent-credential-policy` on x86_64-linux. Each probe forces only the values it
-      # asserts on. Real-host delivery facts are the fleet obligations' `credentialDelivery`
-      # case, asserted on each machine's own check.
+      loginHelper = builtins.readFile ../apps/omnigent-worker-login.sh;
+      offsetOf = infix: lib.stringLength (lib.head (lib.splitString infix loginHelper));
       credentialPolicyCases = {
         # Only the masked labels are accepted; the option's `apply` rejects any other name.
         maskedLinearLabels =
@@ -1303,191 +711,93 @@
             );
           in
           probe.success && probe.value;
+        # The interactive login helper unlocks the worker Keychain before running the command.
+        loginKeychainBeforeExec =
+          offsetOf "omnigent-worker-keychain || exit" < offsetOf ''exec "$@"''
+          && offsetOf ''exec "$@"'' < lib.stringLength loginHelper;
       };
     in
     {
       checks = {
-        # Fixture runtime probes only: the generated generation's out-of-store Linear link,
-        # the Python owner/runtime fixtures and the disclosure audit. Policy facts are
-        # `omnigent-credential-policy`; real-host delivery is a fleet obligation.
-        omnigent-worker-credentials =
-          pkgs.runCommand "omnigent-worker-credentials"
-            {
-              nativeBuildInputs = [
-                pkgs.python3
-                pkgs.git
-                pkgs.openssh
-              ];
-              fixtureDerivations = disclosureDerivations;
-            }
-            ''
-              ${pkgs.python3.interpreter} - <<'PY'
-              from pathlib import Path
-              link = Path("${credentialGeneration}/home-files/.config/linear/credentials.toml")
-              assert link.is_symlink()
-              target = link.resolve()
-              assert target == Path("${credentialRendered}").resolve()
-              assert not target.is_relative_to("/nix/store")
-              PY
-              ${pkgs.python3.interpreter} ${../home/ai/omnigent/credential-fixtures.py} owner-fixtures ${../home/ai/omnigent/credentials.py}
-              ${pkgs.omnigent.python.interpreter} ${../home/ai/omnigent/credential-fixtures.py} ${credentialArtifact}
-              touch "$out"
-            '';
-        omnigent-worker-inventory =
+        omnigent-worker-capabilities =
           assert lib.assertMsg (
-            inventoryFailed == [ ]
-          ) "Omnigent inventory failures: ${lib.concatStringsSep ", " inventoryFailed}";
-          pkgs.runCommand "omnigent-worker-inventory"
-            {
-              passthru.cases = inventoryCases;
-              passAsFile = [ "report" ];
-              report = builtins.toJSON inventoryCases;
-            }
-            ''
-              cp "$reportPath" "$out"
-            '';
+            failedCases cases == [ ]
+          ) "omnigent worker capability failures: ${lib.concatStringsSep ", " (failedCases cases)}";
+          pkgs.runCommand "omnigent-worker-capabilities" { passthru = { inherit cases; }; } ''
+            for executable in pi atomic omp claude; do
+              test -x ${cfg.home.path}/bin/$executable
+            done
+            ${lib.getExe pkgs.playwright-cli} --version | grep -Fx ${lib.escapeShellArg pkgs.playwright-cli.version}
+            touch "$out"
+          '';
       }
       // lib.optionalAttrs (system == "x86_64-linux") {
+        omnigent-worker-inventory = config.flake.lib.mkStructuralCheck pkgs {
+          name = "omnigent-worker-inventory";
+          actual = inventoryCases;
+          expected = lib.mapAttrs (_: _: true) inventoryCases;
+        };
         omnigent-credential-policy = config.flake.lib.mkStructuralCheck pkgs {
           name = "omnigent-credential-policy";
           actual = credentialPolicyCases;
           expected = lib.mapAttrs (_: _: true) credentialPolicyCases;
         };
+        omnigent-credentials-unit = pkgs.runCommand "omnigent-credentials-unit" { } ''
+          ${pkgs.python3.interpreter} ${../home/ai/omnigent/credentials-test.py} \
+            ${../home/ai/omnigent/credentials.py} \
+            ${../home/ai/omnigent/delivery.py} \
+            ${../home/ai/omnigent/delivery-fixtures.py} \
+            ${../home/ai/omnigent/keychain.py} \
+            ${../home/ai/omnigent/keychain-fixtures.py}
+          touch "$out"
+        '';
+        omnigent-worker-linux =
+          assert lib.assertMsg (failedCases linuxCases == [ ])
+            "Omnigent Linux failures: ${lib.concatStringsSep ", " (failedCases linuxCases)}; module assertions: ${
+              builtins.toJSON (map (a: a.message) (lib.filter (a: !a.assertion) linux.assertions))
+            }";
+          pkgs.runCommand "omnigent-worker-linux" { passthru.cases = linuxCases; } ''
+            export HOME="$TMPDIR/private"
+            ${pkgs.coreutils}/bin/mkdir -m 700 "$HOME"
+            ${privateHome}
+            uid="$(${pkgs.coreutils}/bin/id -u)"
+            ${homeUidFixture} ${privateHome} "$uid"
+            if ${homeUidFixture} ${privateHome} "$((uid + 1))"; then
+              echo "accepted a wrong-owner worker home (UID-observation fixture)" >&2
+              exit 1
+            fi
+            ${pkgs.coreutils}/bin/chmod 755 "$HOME"
+            if ${privateHome}; then
+              echo "accepted a public worker home" >&2
+              exit 1
+            fi
+            ${pkgs.coreutils}/bin/chmod 700 "$HOME"
+            ${pkgs.coreutils}/bin/ln -s "$HOME" "$TMPDIR/linked"
+            export HOME="$TMPDIR/linked"
+            if ${privateHome}; then
+              echo "accepted a symlinked worker home" >&2
+              exit 1
+            fi
+            ${pkgs.omnigent.python.interpreter} ${sandboxSelectionTest}
+            ${pkgs.coreutils}/bin/touch "$out"
+          '';
       }
       // lib.optionalAttrs pkgs.stdenv.hostPlatform.isDarwin {
         omnigent-worker-darwin =
-          assert lib.assertMsg (lib.all (ok: ok) (lib.attrValues darwinCases))
-            "Omnigent Darwin failures: ${
-              builtins.toJSON (lib.attrNames (lib.filterAttrs (_: ok: !ok) darwinCases))
-            }; assertions: ${builtins.toJSON (darwinFailures darwin)}";
+          assert lib.assertMsg (failedCases darwinCases == [ ])
+            "Omnigent Darwin failures: ${builtins.toJSON (failedCases darwinCases)}; assertions: ${
+              builtins.toJSON (map (a: a.message) (lib.filter (a: !a.assertion) darwin.assertions))
+            }";
           pkgs.runCommand "omnigent-worker-darwin"
             {
-              nativeBuildInputs = [
-                pkgs.python3
-                pkgs.coreutils
-              ];
+              nativeBuildInputs = [ pkgs.python3 ];
               passthru.cases = darwinCases;
+              passAsFile = [ "launchd" ];
+              launchd = darwin.system.activationScripts.launchd.text;
             }
             ''
-              ${pkgs.omnigent.python.interpreter} ${darwinArtifactTest} \
-                ${darwin.system.build.launchd} \
-                ${darwinControl.system.build.launchd} \
-                ${darwin.system.activationScripts.script.source} \
-                ${darwin.environment.etc."omnigent/workers/cameron".source}
-              python3 ${darwinLauncherTest}
-              mkdir "$out"
-              cp artifacts.json "$out/"
-            '';
-      }
-      // lib.optionalAttrs pkgs.stdenv.hostPlatform.isLinux {
-        omnigent-worker-linux =
-          assert lib.assertMsg (linuxFailed == [ ])
-            "Omnigent Linux failures: ${lib.concatStringsSep ", " linuxFailed}; module assertions: ${builtins.toJSON (linuxFailures linux)}";
-          pkgs.runCommand "omnigent-worker-linux"
-            {
-              passthru = {
-                cases = linuxCases;
-              };
-            }
-            ''
-              ${lib.concatMapStringsSep "\n"
-                (owner: ''
-                  export PATH=${lib.escapeShellArg linux.systemd.services."omnigent-host-${owner}".environment.PATH}
-                  test "$(worker-profile-only)" = worker-profile
-                  test "$(command -v node)" = ${pkgs.nodejs_22}/bin/node
-                  test "$(command -v hello)" = ${pkgs.hello}/bin/hello
-                  for executable in atomic omp pi claude codex nix direnv gh linear rg fd; do
-                    test -x "$(command -v "$executable")"
-                  done
-                  export HOME="$TMPDIR/private-${owner}"
-                  ${pkgs.coreutils}/bin/mkdir -m 700 "$HOME"
-                  ${linux.systemd.services."omnigent-host-${owner}".serviceConfig.ExecStartPre}
-                  uid="$(${pkgs.coreutils}/bin/id -u)"
-                  ${homeUidFixture} ${
-                    linux.systemd.services."omnigent-host-${owner}".serviceConfig.ExecStartPre
-                  } "$uid"
-                  if ${homeUidFixture} ${
-                    linux.systemd.services."omnigent-host-${owner}".serviceConfig.ExecStartPre
-                  } "$((uid + 1))"; then
-                    echo "accepted a wrong-owner worker home (UID-observation fixture)" >&2
-                    exit 1
-                  fi
-                  ${pkgs.coreutils}/bin/chmod 755 "$HOME"
-                  if ${linux.systemd.services."omnigent-host-${owner}".serviceConfig.ExecStartPre}; then
-                    echo "accepted a public worker home" >&2
-                    exit 1
-                  fi
-                  ${pkgs.coreutils}/bin/chmod 700 "$HOME"
-                  ${pkgs.coreutils}/bin/ln -s "$HOME" "$TMPDIR/linked-${owner}"
-                  export HOME="$TMPDIR/linked-${owner}"
-                  if ${linux.systemd.services."omnigent-host-${owner}".serviceConfig.ExecStartPre}; then
-                    echo "accepted a symlinked worker home" >&2
-                    exit 1
-                  fi
-                '')
-                [
-                  "cameron"
-                  "raquel"
-                ]
-              }
-              ${pkgs.omnigent.python.interpreter} ${sandboxSelectionTest}
-              ${pkgs.coreutils}/bin/touch "$out"
-            '';
-      }
-      // {
-        omnigent-worker-capabilities =
-          assert lib.assertMsg (
-            failed == [ ]
-          ) "omnigent worker capability failures: ${lib.concatStringsSep ", " failed}";
-          pkgs.runCommand "omnigent-worker-capabilities"
-            {
-              passthru = { inherit cases workerPath; };
-            }
-            ''
-              test -x ${cleanHome.config.home.path}/bin/pi
-              test -x ${cleanHome.config.home.path}/bin/atomic
-              export PATH=${lib.escapeShellArg workerPath}
-              test -x "$(command -v playwright-cli)"
-              playwright-cli --version | grep -Fx ${lib.escapeShellArg pkgs.playwright-cli.version}
-              id -u
-              ${lib.optionalString pkgs.stdenv.hostPlatform.isLinux "hostname"}
-              ${lib.optionalString pkgs.stdenv.hostPlatform.isLinux ''
-                test "$(type -P kill)" = ${pkgs.procps}/bin/kill
-                test "$(readlink -f ${cfg.home.path}/bin/kill)" = "$(readlink -f ${pkgs.procps}/bin/kill)"
-              ''}
-              mkdir -p cli-fixture/input cli-fixture/output
-              printf 'beta\nalpha\nalpha\n' > cli-fixture/input/text
-              test "$(find cli-fixture/input -type f | wc -l)" -eq 1
-              test "$(sort cli-fixture/input/text | uniq | grep alpha | sed s/alpha/42/ | awk '{print $1}')" = 42
-              cp cli-fixture/input/text cli-fixture/copy
-              cmp cli-fixture/input/text cli-fixture/copy
-              printf 'gamma\n' > cli-fixture/replacement
-              diff -u cli-fixture/copy cli-fixture/replacement > cli-fixture/change.patch || test "$?" -eq 1
-              patch cli-fixture/copy < cli-fixture/change.patch
-              cmp cli-fixture/copy cli-fixture/replacement
-              tar -czf cli-fixture/archive.tar.gz -C cli-fixture/input text
-              tar -xzf cli-fixture/archive.tar.gz -C cli-fixture/output
-              cmp cli-fixture/input/text cli-fixture/output/text
-              xz -c cli-fixture/input/text | xz -d | cmp - cli-fixture/input/text
-              zstd -q -c cli-fixture/input/text | zstd -q -d | cmp - cli-fixture/input/text
-              zip -q -j cli-fixture/archive.zip cli-fixture/input/text
-              unzip -p cli-fixture/archive.zip text | cmp - cli-fixture/input/text
-              printf '{"items":[1,2]}' | jq -e '.items | add == 3'
-              for executable in curl ssh scp sftp ssh-keygen openssl; do
-                test -x "$(command -v "$executable")"
-              done
-              test "$(worker-profile-only)" = worker-profile
-              if ${cfg.home.path}/bin/node; then exit 1; else test "$?" = 99; fi
-              test "$(command -v node)" = ${pkgs.nodejs_22}/bin/node
-              node --version
-              for executable in rg fd gh linear atomic omp pi claude codex nix direnv; do
-                test -x "$(command -v "$executable")"
-              done
-              ${pkgs.bash}/bin/bash --noprofile --norc ${workflowFixture}
-              export PATH=${lib.makeBinPath [ pkgs.coreutils ]}
-              ${
-                lib.getExe (pkgs.python3.withPackages (p: [ p.pyyaml ]))
-              } ${managedConfigTest} ${lib.getExe managedConfig} ${managedConfigSpec "omnigent-config"} ${managedConfigSpec "atomic-settings"}
+              python3 ${darwinPrepareTest} "$launchdPath"
+              python3 ${darwinLauncherTest} ${darwinDaemon.command} ${pkgs.writeText "omnigent-darwin-environment.json" (builtins.toJSON darwinDaemon.serviceConfig.EnvironmentVariables)}
               touch "$out"
             '';
       };

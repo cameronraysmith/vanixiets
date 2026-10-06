@@ -8,9 +8,14 @@
 { config, ... }:
 {
   perSystem =
-    { pkgs, ... }:
     {
-      checks.eval-md-format = config.flake.lib.mkEvalCheck pkgs {
+      pkgs,
+      lib,
+      system,
+      ...
+    }:
+    let
+      check = config.flake.lib.mkEvalCheck pkgs {
         name = "md-format";
         testFile = pkgs.writeText "md-format.tests.nix" ''
           let
@@ -49,5 +54,8 @@
           }
         '';
       };
+    in
+    {
+      checks = lib.optionalAttrs (system == "x86_64-linux") { eval-md-format = check; };
     };
 }

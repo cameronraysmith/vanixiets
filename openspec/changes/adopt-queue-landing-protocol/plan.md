@@ -48,8 +48,7 @@ A content search locates possible contradictions; read the surrounding section t
 ```sh
 rg --no-line-number 'stack-land|Mergify|mergify|author-approved|fast-forward|auto-merge' "$source"
 nix eval --raw .#darwinConfigurations.stibnite.config.home-manager.users.crs58.programs.agents-md.settings.body
-nix build .#checks.aarch64-darwin.structure-mergify-release-alignment \
-  .#checks.aarch64-darwin.structure-mergify-release-alignment-neg --no-link
+nix build .#checks.x86_64-linux.structure-mergify-release-alignment --no-link
 ```
 
 ## Task 1.1: Verify the source inventory

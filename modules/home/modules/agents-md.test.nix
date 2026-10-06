@@ -12,9 +12,14 @@
 { config, ... }:
 {
   perSystem =
-    { pkgs, ... }:
     {
-      checks.eval-agents-md = config.flake.lib.mkEvalCheck pkgs {
+      pkgs,
+      lib,
+      system,
+      ...
+    }:
+    let
+      check = config.flake.lib.mkEvalCheck pkgs {
         name = "agents-md";
         testFile = pkgs.writeText "agents-md.tests.nix" ''
           let
@@ -94,5 +99,8 @@
           }
         '';
       };
+    in
+    {
+      checks = lib.optionalAttrs (system == "x86_64-linux") { eval-agents-md = check; };
     };
 }

@@ -244,8 +244,110 @@ let
         lib.optional (serverDomains ? ${machine}) serverDomains.${machine}
       );
 
-      # Real-host credential delivery lives here rather than in omnigent-worker-credentials
-      # because each host is evaluated once, by its own machine check. It is regex-free:
+      # The supervisor runs each worker as itself, privately, with its own identity and
+      # harness selectors; on Linux it restarts with, and requires, the worker's Home
+      # Manager activation, and on Darwin it is a system daemon whose session is created
+      # only for a Keychain worker.
+      supervision = lib.all (
+        owner:
+        let
+          worker = workers.${owner};
+          user = worker.user;
+          home = toString hostConfig.users.users.${user}.home;
+          identity =
+            env:
+            env.HOME == home
+            && env.USER == user
+            && env.LOGNAME == user
+            && env.PI_ACP_PI_COMMAND == "atomic"
+            && env.PI_CODING_AGENT_DIR == "${home}/.atomic/agent"
+            && env.OMNIGENT_RUNNER_ENV_PASSTHROUGH == "PI_ACP_PI_COMMAND,PI_CODING_AGENT_DIR";
+        in
+        if isDarwin then
+          let
+            daemon = hostConfig.launchd.daemons."omnigent-host-${owner}".serviceConfig;
+            log = "${home}/.omnigent/logs/host/service.log";
+          in
+          daemon.UserName == user
+          && daemon.Umask == 63
+          && daemon.WorkingDirectory == home
+          && daemon.StandardOutPath == log
+          && daemon.StandardErrorPath == log
+          && daemon.SessionCreate == (if worker.keychainEnable then true else null)
+          && identity daemon.EnvironmentVariables
+          && !(hostConfig.launchd.agents ? "omnigent-host-${owner}")
+          && !(hostConfig.launchd.user.agents ? "omnigent-host-${owner}")
+        else
+          let
+            unit = hostConfig.systemd.services."omnigent-host-${owner}";
+            service = unit.serviceConfig;
+            activation = "home-manager-${lib.replaceStrings [ "-" ] [ "\\x2d" ] user}.service";
+          in
+          service.User == user
+          && service.Group == user
+          && service.WorkingDirectory == home
+          && service.UMask == "0077"
+          && service.NoNewPrivileges
+          && lib.elem "SSH_AUTH_SOCK" service.UnsetEnvironment
+          && lib.elem "SSH_AGENT_PID" service.UnsetEnvironment
+          && identity unit.environment
+          && lib.elem activation unit.requires
+          && lib.elem activation unit.after
+          && lib.elem hostConfig.home-manager.users.${user}.home.activationPackage unit.restartTriggers
+      ) declaredOwners;
+
+      # Worker Home Manager consumes the delivered policy: GitHub HTTPS goes through the
+      # gh credential wrapper, signing uses exactly the delivered key, Linear reads the
+      # linked rendered template, and no tool-owned OAuth state is declared. Darwin worker
+      # homes are standalone generations not exposed in the host configuration; the same
+      # Home Manager module is exercised here through the Linux hosts.
+      credentialWiring =
+        isDarwin
+        || lib.all (
+          worker:
+          let
+            h = hostConfig.home-manager.users.${worker.user};
+            policy = h.programs.omnigent.workerCredentials;
+            relative = target: lib.removePrefix "${h.home.homeDirectory}/" target;
+            oauth = [
+              ".atomic/agent/auth.json"
+              ".pi/agent/auth.json"
+              ".omp/agent/agent.db"
+              ".codex/auth.json"
+              ".claude/.credentials.json"
+              ".omnigent/auth_tokens.json"
+            ];
+            github = h.programs.git.settings.credential."https://github.com";
+          in
+          !lib.any (file: file.enable && lib.elem (relative file.target) oauth) (lib.attrValues h.home.file)
+          && !lib.any (spec: lib.elem (relative spec.target) oauth) (lib.attrValues h.managedConfigs)
+          && (
+            policy == null
+            || (
+              (
+                policy.githubTokens == { }
+                || (
+                  # The wrapper is named plainly "gh"; the upstream package carries its version.
+                  h.programs.gh.package.name == "gh"
+                  && github.useHttpPath
+                  && lib.elem "${h.programs.gh.package}/bin/gh auth git-credential" github.helper
+                )
+              )
+              && (
+                policy.signingKey == null
+                || (
+                  h.programs.git.signing.key == policy.signingKey
+                  && h.programs.git.signing.format == "ssh"
+                  && h.programs.git.settings.user.email == policy.expected.gitEmail
+                )
+              )
+              && (policy.linearApiKeys == { } || h.xdg.configFile."linear/credentials.toml".enable)
+            )
+          )
+        ) (lib.attrValues workers);
+
+      # Real-host credential delivery lives here rather than in a fixture check because
+      # each host is evaluated once, by its own machine check. It is regex-free:
       # libstdc++'s recursive std::regex overflows the evaluator stack on long patterns
       # (store paths, commands), so text is split only on "\n", compared by whole line,
       # and searched for a substring with builtins.replaceStrings rather than lib.hasInfix.

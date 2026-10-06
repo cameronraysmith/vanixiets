@@ -242,19 +242,15 @@ The cross-cutting clusters where one fix lands many entries:
 ### O12 [P4] [MEDIUM] Structure checks under `modules/checks/structure/` lack negative-control partners
 
 - Locations:
-  - `modules/checks/structure/flake-shape.nix:27-77` (4 mkCheck invocations: `inventory-machines`, `nixos-configurations`, `darwin-configurations`, `home-configurations`)
-  - `modules/checks/structure/inventory-class-discovery.nix:36-41` (`structure-inventory-class-discovery`)
-- Current shape: five structural checks under `modules/checks/structure/` without a `*-neg` partner. Compare against the post-PR pattern in `modules/checks/validation.nix:107-129` (`home-module-exports-neg`) and `modules/checks/hm-sops-bridge.nix:69-79` (`hm-sops-bridge-assertion-neg`), added in commits 532171fb / e39acd80 specifically because positive-only checks could pass given the codebase's actual configurations and never falsify the predicate they purport to test.
-- Why this matters: P4 — these checks compare the actual flake shape to the literal expected list, but if (for example) `lib.naturalSort` were silently broken or the `attrNames` accessor became case-insensitive, the check could pass for the wrong reason. A negative control would inject a phantom mismatch and verify the diff fails.
-- Approach: for each, add a `*-neg` sibling that constructs an artificial mismatch (e.g., feed `mkCheck` with a deliberately wrong `actual` and an `expected` that disagrees, asserting the check itself produces a failure derivation that we then capture). The `aggregate-eval-failure.nix` pattern (testing `tryEval` returns `success = false`) generalizes here.
-- Severity note: MEDIUM rather than HIGH because the checks have additional severity from their inputs (the `attrNames` of clan/inventory/machines is hardcoded against the inventory file, so a literal-vs-derived drift would surface other ways). Still falsifiability discipline cluster.
+  - `modules/checks/structure/flake-shape.nix:22-63` (2 mkCheck invocations: `structure-fleet`, `structure-home-configurations`)
+- Current shape: two literal pins under `modules/checks/structure/` without a negative control. The other falsifiability controls now live inside their positive checks rather than in `*-neg` siblings: `home-module-exports` compares `_phantomEmpty` and `_phantomAuthored` alongside the real users (`modules/checks/validation.nix:99-110`), and the hm-sops bridge assertion is a bridge-file existence test in `modules/nixos/hm-sops-bridge.nix:79-80`.
+- Why this matters: P4 — these checks compare the actual flake shape to the literal expected value, but if (for example) `lib.naturalSort` were silently broken or the `attrNames` accessor became case-insensitive, the check could pass for the wrong reason. A negative control would inject a phantom mismatch and verify the diff fails.
+- Approach: where a pin's comparison could be subtly wrong, add phantom entries to the same `mkCheck` comparison, following `home-module-exports`, rather than a separate derivation.
+- Severity note: MEDIUM rather than HIGH because the eval-time asserts in `modules/checks/machines.nix` already require the inventory, `clan.machines`, the per-class configurations and the machine directories to agree, so most drift surfaces without the pins. Still falsifiability discipline cluster.
 
-### O13 [P4] [LOW] `modules/checks/structure/aggregate-eval-failure.nix` accesses `self.modules.homeManager` rather than `config.flake.modules.homeManager`
+### O13 [P4] [RESOLVED] The structure check resolving a deliberately undeclared home module used `self.modules.homeManager`
 
-- Location: `modules/checks/structure/aggregate-eval-failure.nix:31-34`
-- Current shape: the check resolves `self.modules.homeManager.deliberately-undeclared`. Per the R5-B note, this is stylistically inconsistent with `validation.nix` which uses `config.flake.modules.homeManager`. The two reach the same value but via different evaluation contexts.
-- Why this matters: P4 (mild) — using `self.modules.homeManager` may evaluate against a different snapshot than the in-flake config; for falsifiability it's important the check is exercising the same registry the consumer reads.
-- Approach: switch to `config.flake.modules.homeManager.deliberately-undeclared or (throw "...")` for consistency.
+- Resolution: the check cleanup removed that check and its module from `modules/checks/structure/`; nothing remains to change.
 
 ### O14 [P1] [MEDIUM] `modules/checks/machines.nix` hardcodes the 4-machine NixOS list rather than deriving from registered configurations
 
@@ -473,7 +469,7 @@ Relabeling existing principles or splitting one principle into two with the same
 **Where the rubric may over-flag:**
 
 - P2 (no speculative slots) is sensitive to false positives via the import-tree auto-discovery indirection. Slots like `meta.githubUser` (O16) and `custom.profile.{isServer,isWorkstation,isHeadless}` (O05) might have planned consumers in flight (e.g., a beads epic in progress). O05 is MEDIUM partly hedging on this; O16 is genuinely consumer-less per `rg`.
-- P4 (negative controls) is a discipline that can balloon — every check could in principle have a negative-control sibling. O12 limits to the structure checks that match the new pattern's profile (those exercising a predicate or comparison that *could* be subtly wrong); pure existence checks (e.g., `home-configurations-exposed` at validation.nix:131-180) don't need negative controls.
+- P4 (negative controls) is a discipline that can balloon — every check could in principle have a negative-control sibling. O12 limits to the structure checks that match the new pattern's profile (those exercising a predicate or comparison that *could* be subtly wrong); pure existence checks don't need negative controls.
 - P3 (eager symmetry, single resolution) is hard to score for O21. The pattern is the *fixed* version per the cluster. WATCH is the right grade until/unless someone touches host files for an alias rotation and discovers friction.
 
 **Surfaced patterns that did not warrant new principles:**

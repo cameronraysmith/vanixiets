@@ -24,6 +24,13 @@
 # Consumers install the wrapper through services.nixEvalLock.wrap, which keeps
 # each service's own evaluator build underneath (nixbot and buildbot-nix ship
 # different ones).
+#
+# The failure the assertions guard is silent: a service or user resolving the
+# bare `nix-eval-jobs` to an unwrapped binary evaluates outside the lock, which
+# is exactly the overlap that OOM-killed magnetite, and nothing about the run
+# looks different. nixbot and buildbot-nix run the bare name from their unit
+# PATH, and `nix-fast-build --remote` runs it from the ssh user's PATH, where a
+# Home Manager or per-user package precedes the system profile.
 { config, ... }:
 let
   flakeLib = config.flake.lib;
@@ -32,12 +39,37 @@ in
   flake.modules.nixos.nix-eval-lock =
     {
       config,
+      options,
       lib,
       pkgs,
       ...
     }:
     let
       cfg = config.services.nixEvalLock;
+
+      # A wrapper carries the evaluator it wraps as `unwrapped`, and must
+      # forward that evaluator's nix CLI passthru (nixbot puts it on its
+      # service PATH).
+      evaluatorsOf = builtins.filter (
+        p: builtins.isAttrs p && (p.pname or p.name or "") == "nix-eval-jobs"
+      );
+      isWrapped =
+        p: p ? unwrapped && (!(p.unwrapped ? nix) || (p ? nix && p.nix.drvPath == p.unwrapped.nix.drvPath));
+      unwrappedIn =
+        lists: lib.attrNames (lib.filterAttrs (_: ps: !lib.all isWrapped (evaluatorsOf ps)) lists);
+
+      unwrappedProfiles = unwrappedIn (
+        lib.mapAttrs' (n: u: lib.nameValuePair "users.users.${n}.packages" u.packages) config.users.users
+        // lib.optionalAttrs (options ? home-manager) (
+          lib.mapAttrs' (
+            n: u: lib.nameValuePair "home-manager.users.${n}.home.packages" u.home.packages
+          ) config.home-manager.users
+        )
+        // {
+          "environment.systemPackages" = config.environment.systemPackages;
+        }
+      );
+      unwrappedServices = unwrappedIn (lib.mapAttrs (_: s: s.path) config.systemd.services);
     in
     {
       options.services.nixEvalLock = {
@@ -77,6 +109,25 @@ in
         # `nix-fast-build --remote` runs, is the wrapper even if some other
         # system package also ships the binary.
         environment.systemPackages = [ (lib.hiPrio cfg.package) ];
+
+        assertions = [
+          {
+            assertion = unwrappedProfiles == [ ];
+            message = "nix-eval-lock: unwrapped nix-eval-jobs (bypassing ${cfg.lockFile}) in: ${lib.concatStringsSep ", " unwrappedProfiles}";
+          }
+          {
+            assertion = unwrappedServices == [ ];
+            message = "nix-eval-lock: unwrapped nix-eval-jobs (bypassing ${cfg.lockFile}) on the PATH of systemd services: ${lib.concatStringsSep ", " unwrappedServices}";
+          }
+          {
+            # OpenSSH already holds its listener at -1000 and restores the
+            # unit's value in every session it forks, so setting one would make
+            # every ssh session, and the evaluator it runs, OOM-immune
+            # (modules/nixos/memory-pressure-guards.nix).
+            assertion = !((config.systemd.services.sshd.serviceConfig or { }) ? OOMScoreAdjust);
+            message = "nix-eval-lock: sshd must carry no OOMScoreAdjust; every ssh session would inherit it";
+          }
+        ];
       };
     };
 }

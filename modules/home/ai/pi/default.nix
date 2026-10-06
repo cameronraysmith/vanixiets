@@ -79,9 +79,7 @@ let
           # badlogic/pi-mono, which owns the theme format rather than this
           # content, so it is not the provenance. JSON admits no comment, so
           # these coordinates are recorded here and in
-          # openspec/specs/pi-agent-environment/spec.md; the content is pinned by
-          # the sha256 literal in modules/checks/pi-agent-environment.nix, which
-          # must be re-derived alongside any refresh of the copy.
+          # openspec/specs/pi-agent-environment/spec.md.
           "${cfg.configDir}/themes/catppuccin-mocha.json".source = ./themes/catppuccin-mocha.json;
           # permission-gate resolves this path itself rather than through pi's
           # configDir: its configDir() honours a ~/.pi/agent/pi-agent-extensions.json

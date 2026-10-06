@@ -14,6 +14,11 @@
         freshEpochChangesReport = first.tests.e2e-report.drvPath != refreshed.tests.e2e-report.drvPath;
         freshEpochChangesVerdict = first.tests.e2e.drvPath != refreshed.tests.e2e.drvPath;
         invalidEpochRejected = !invalid.success;
+        # The e2e verdict must judge the e2e-report it ships beside, not some
+        # other producer's results.
+        verdictConsumesReport = builtins.hasAttr (builtins.unsafeDiscardStringContext docs.tests.e2e-report.drvPath) (
+          builtins.getContext docs.tests.e2e.buildCommand
+        );
       };
     in
     {

@@ -55,6 +55,7 @@ Filtering each check to the files it reads, allow-listing the one whole-tree sca
 - Modify `modules/checks/security.nix` only to mark `gitleaks` as the allow-listed whole-tree scan; its `src = self` stays.
 - Modify `modules/formatting.nix` to set `treefmt.projectRoot` from the enabled formatters' `includes` globs.
 - Modify `modules/checks/validation.nix` so `vars-user-password-validation`, `secrets-tier-separation`, `secrets-encryption-integrity`, `machine-registry-completeness`, and `secrets-sops-roundtrip` each read a `lib.fileset.toSource` over their own subtree.
+  Superseded by the check cleanup: four of those checks were removed and `secrets-encryption-integrity` already reads a fileset restricted to its secret files.
 - Modify `modules/home/users/{christophersmith,crs58,janettesmith,raquel,tara,ubuntu}/default.nix`, `modules/nixos/hm-sops-bridge.nix`, and `modules/home/ai/openspec/default.nix` to replace `inputs.self + "/..."` coercions with path literals.
 - Add `modules/checks/structure/check-source-isolation.nix` registering `structure-check-source-isolation` and `structure-check-source-isolation-neg`, and holding the allow-list.
 - Add `scripts/check-source-audit.sh` and a `check-source-audit` recipe in the `justfile`.

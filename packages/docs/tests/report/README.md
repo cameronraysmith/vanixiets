@@ -5,7 +5,7 @@ A successful report build means that usable evidence exists, not that the site p
 
 ## Checks and consumption
 
-The package-test registry exposes these attributes under `checks.<system>`:
+The package-test registry and `modules/checks/docs-evidence-cache.nix` expose these attributes under `checks.<system>`:
 
 - `package-vanixiets-docs-test-e2e-report`: runs the browser suite once and retains a valid report, even when product checks fail.
 - `package-vanixiets-docs-test-e2e`: the existing mandatory verdict; validates the report dependency without running browsers again.
@@ -13,8 +13,7 @@ The package-test registry exposes these attributes under `checks.<system>`:
 - `package-vanixiets-docs-test-e2e-action-negative-control`: removes the homepage's Getting started links from the intercepted HTML, runs the unchanged reader journey, and verifies a completed locator timeout, verdict exit 1, and retained trace/screenshot.
 - `package-vanixiets-docs-test-e2e-webkit-negative-control`: runs the damaged-guide journey on WebKit alone, on every system, and verifies the completed failure, verdict exit 1, the trace, and a PNG screenshot with a valid nonzero-sized header.
 - `package-vanixiets-docs-test-e2e-runner-controls`: native-browser classification controls, separated from the browser-free unit check.
-- `docs-e2e-wiring`: asserts both public identities and the verdict's Nix dependency on that producer.
-  Its negative fixtures omit the verdict or supply a successfully built verdict consuming a different producer; both must fail the same predicate.
+- `docs-evidence-cache`: its `verdictConsumesReport` case asserts that the verdict's build command depends on the `e2e-report` it ships beside, not another producer; its other cases cover the evidence epoch.
 
 The verdict output is an empty success marker with no runtime store references.
 The negative-control output retains a `report` symlink for inspection.

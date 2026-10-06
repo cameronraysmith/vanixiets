@@ -17,7 +17,7 @@
 { self, lib, ... }:
 {
   perSystem =
-    { pkgs, ... }:
+    { pkgs, system, ... }:
     let
       mkProbe =
         args:
@@ -298,9 +298,8 @@
           minRequests = 2;
         }
       ];
-    in
-    {
-      checks.omnigraph-readiness-rehearsal =
+
+      omnigraph-readiness-rehearsal =
         pkgs.runCommand "omnigraph-readiness-rehearsal"
           {
             nativeBuildInputs = [
@@ -308,8 +307,6 @@
               pkgs.gnugrep
               pkgs.python3
             ];
-            # The stub listens on loopback, which the darwin sandbox otherwise denies.
-            __darwinAllowLocalNetworking = true;
             meta.description = "behavioural check: the omnigraph-server readiness probe fails fast on a dead server, quarantined or missing graphs, and waits out transient 503s";
           }
           ''
@@ -324,5 +321,10 @@
             ${lib.concatMapStrings row rows}
             touch "$out"
           '';
+    in
+    {
+      checks = lib.optionalAttrs (system == "x86_64-linux") {
+        inherit omnigraph-readiness-rehearsal;
+      };
     };
 }

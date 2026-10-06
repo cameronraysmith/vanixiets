@@ -124,13 +124,13 @@ This LUKS install is therefore the first exercise of the create path on this mac
 
 ### Requirement: The machine is registered across every hand-maintained list a new machine touches
 
-Registration SHALL cover the clan machine binding, the inventory entry, both hardcoded structure-check lists, the sops bridge recipient, and — after the ZeroTier address is known — the address records.
+Registration SHALL cover the clan machine binding, the inventory entry, the hardcoded `structure-fleet` pin, the sops bridge recipient, and — after the ZeroTier address is known — the address records.
 
-#### Scenario: both hardcoded structure-check lists are updated
+#### Scenario: the hardcoded fleet pin is updated
 
-- **WHEN** `modules/checks/structure/flake-shape.nix` carries two literal machine-name lists, one of nine inventory names and one of five `nixosConfigurations` names
-- **THEN** `pyrite` is added alphabetically to both, because omitting either hard-fails `structure-inventory-machines` or `structure-nixos-configurations`
-- **AND** `modules/checks/machines.nix` and `modules/checks/structure/inventory-class-discovery.nix` need no edit, because both are programmatic
+- **WHEN** `modules/checks/structure/flake-shape.nix` pins every inventory machine and its class in the `structure-fleet` literal
+- **THEN** `pyrite = "nixos"` is added alphabetically to it, because omitting it hard-fails `structure-fleet`
+- **AND** `modules/checks/machines.nix` needs no edit, because its eval-time asserts derive the inventory, `nixosConfigurations`, `clan.machines` and `modules/machines/nixos/` names programmatically and fail check evaluation when they disagree
 
 #### Scenario: sops ordering is driven by when the machine age key first exists
 

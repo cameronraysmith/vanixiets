@@ -1,45 +1,33 @@
-# Three independent regulators for the Pi coding-agent environment.
+# Two independent regulators for the Pi coding-agent environment.
 #
-# pi-agent-environment-structural, -policy and -smoke are separate derivations
-# with independent cache boundaries; co-location here groups related definitions
-# and nothing more. See D8 in
+# pi-agent-environment-policy and -smoke are separate derivations with
+# independent cache boundaries; co-location here groups related definitions and
+# nothing more. See D8 in
 # openspec/changes/archive/2026-08-15-configure-pi-agent-environment/design.md
-# for the decision record, kept there rather than restated here so a second copy
-# cannot drift from the first.
+# for the decision record.
 #
 # Mechanism per check:
-#   structural  mkStructuralCheck diffs eval-time home-manager values against a
-#               literal oracle. modules/lib/mk-eval-check.nix routes assertions
-#               that need full flake evaluation away from nix-unit, so a
-#               runCommand JSON diff is the available shape for these.
 #   policy      runCommand typechecks the deployed policy sources with tsc, then
 #               drives the case table through the pinned permission-gate parser
-#               under bun. No Pi process runs per row.
+#               under bun. No Pi process runs per row. The policy code is
+#               system-independent, so it is defined for x86_64-linux only.
 #   smoke       runCommand drives one deployed Pi wrapper over RPC in a hermetic
-#               $TMPDIR home.
+#               $TMPDIR home, on every system, because loading is what differs
+#               between platforms.
+#
+# The cross-agent declaration claims (atomic/pi selector divergence, pi-only
+# scope, absent ~/.pi/agent/skills sink) live in
+# modules/checks/atomic-agent-environment.nix.
 #
 # jj argv is asserted exactly rather than by outcome: a probe that silently
 # snapshotted the working copy would still return the correct decision, so
 # read-only-ness is observable only in the argument vector.
 #
-# Evidence boundary. Structural evidence claims declaration shape alone, not
-# runtime loading, live writability, upstream provenance from package metadata,
-# or package-output behavior. The "exactly one by-name package, no flake input"
-# claim comes from a separate pre-activation scope-and-diff scan, not from here,
-# and the theme digest proves checked-in content identity, not upstream fetch.
-# Smoke claims only successful get_state and get_commands responses, no
-# extension_error record, the synthetic smoke-local/smoke-model selection, and a
-# clean exit; its fixture never installs edit-write-policy.ts into the agent
-# extensions directory, so no check here covers that adapter registering against
-# a live host.
-#
-# Falsifiability: dropping a positive selector from modules/home/ai/pi/default.nix
-# flips actual.positiveExtensions against the six-path literal in the expected
-# attrset below.
-#
-# The decomposed conjuncts (contextNixOwned, immutableResourceTargets.*) are
-# per-claim diff granularity, not redundancy: a failure names the violated claim
-# instead of collapsing to one aggregate boolean.
+# Evidence boundary. Smoke claims only successful get_state and get_commands
+# responses, no extension_error record, the synthetic smoke-local/smoke-model
+# selection, and a clean exit; its fixture never installs edit-write-policy.ts
+# into the agent extensions directory, so no check here covers that adapter
+# registering against a live host.
 { self, lib, ... }:
 {
   perSystem =
@@ -50,48 +38,11 @@
       ...
     }:
     let
-      mkCheck = self.lib.mkStructuralCheck pkgs;
-      piModuleText = builtins.readFile ../home/ai/pi/default.nix;
-      # Anchored so a version-shaped 0.83 is distinguished from an incidental
-      # digit run: 10.83, 0.830 and 20.83% must not count as references.
-      pi083Pattern = "(.*[^0-9])?0\\.83([^0-9].*)?";
-      pi083References =
-        text:
-        lib.pipe (lib.splitString "\n" text) [
-          (lib.imap1 (index: line: { inherit index line; }))
-          (builtins.filter (entry: builtins.match pi083Pattern entry.line != null))
-          (map (entry: "${toString entry.index}: ${entry.line}"))
-        ];
-      # docs/notes/ is a lifecycle-managed working-notes tree, so guard the read:
-      # builtins.readFile on a missing path aborts evaluation of the whole check.
-      piReconnaissancePath = ../../docs/notes/development/ai-agents/pi-integration-reconnaissance.md;
-      piReconnaissancePresent = builtins.pathExists piReconnaissancePath;
-      piReconnaissanceText =
-        if piReconnaissancePresent then builtins.readFile piReconnaissancePath else "";
       homeConfig = self.homeConfigurations."crs58@${system}".config;
       piConfig = homeConfig.programs.pi-coding-agent;
-      extensionPackage = self'.packages.pi-agent-extensions or null;
-      extensionSource = if extensionPackage == null then null else toString extensionPackage;
-      compactionPackage = self'.packages.pi-openai-server-compaction or null;
-      compactionSource = if compactionPackage == null then null else toString compactionPackage;
-      vimPackage = self'.packages.pi-vim or null;
-      vimSource = if vimPackage == null then null else toString vimPackage;
+      extensionPackage = self'.packages.pi-agent-extensions;
       packageEntries = piConfig.settings.packages or [ ];
-      extensionEntry = lib.findFirst (
-        entry: builtins.isAttrs entry && (entry.source or null) == extensionSource
-      ) null packageEntries;
-      extensionSelectors = if extensionEntry == null then [ ] else extensionEntry.extensions or [ ];
-      positiveExtensions = builtins.filter (selector: !lib.hasPrefix "-" selector) extensionSelectors;
-      negativeExtensions = builtins.filter (selector: lib.hasPrefix "-" selector) extensionSelectors;
-      extensionSourceImmutable =
-        extensionEntry != null && lib.hasPrefix builtins.storeDir (toString extensionEntry.source);
       homeFileAt = target: lib.attrByPath [ target ] null homeConfig.home.file;
-      homeFileEnabled =
-        target:
-        let
-          file = homeFileAt target;
-        in
-        file != null && file.enable;
       homeFileImmutable =
         target:
         let
@@ -101,26 +52,8 @@
         && file.enable
         && file.source != null
         && lib.hasPrefix builtins.storeDir (toString file.source);
-      homeFileSourceIs =
-        target: expected:
-        let
-          file = homeFileAt target;
-        in
-        file != null && file.source != null && toString file.source == toString expected;
-      hasImmutableHomeFileAtOrBelow =
-        target:
-        lib.any (name: (name == target || lib.hasPrefix "${target}/" name) && homeFileImmutable name) (
-          builtins.attrNames homeConfig.home.file
-        );
-      settingsTarget = "${piConfig.configDir}/settings.json";
-      sessionsTarget = "${piConfig.configDir}/sessions";
-      authenticationTarget = "${piConfig.configDir}/auth.json";
-      projectTrustTarget = "${piConfig.configDir}/trust.json";
-      extensionStateTarget = "${piConfig.configDir}/packages";
-      settingsManaged = homeConfig.managedConfigs.pi-settings or null;
       # These stay total and defer their diagnostics to build-time guards in the
-      # smoke check: a `throw` here aborts evaluation of the whole flake-check
-      # set, which would preempt the structural check's readable diff.
+      # smoke check, which print a remediation rather than an evaluator trace.
       deployedPiCandidates = builtins.filter (
         package: (package.meta.mainProgram or null) == "pi"
       ) homeConfig.home.packages;
@@ -131,93 +64,8 @@
       deployedPiExecutable = if deployedPiIsOuterWrapper then lib.getExe deployedPiPackage else "";
       requiredHomeFileSource =
         target: if homeFileImmutable target then (homeFileAt target).source else null;
-      # Pi persists several runtime-state categories into one file: settings.json
-      # takes model selection, thinking preferences, and `pi install` extension
-      # state (see the managedConfigs comment in modules/home/ai/pi/default.nix), and
-      # sessions/ holds compaction state. The eight spec categories therefore
-      # reduce to five distinct probes, and rows sharing a probe cannot disagree
-      # by construction.
-      settingsFileDeclared = homeFileEnabled settingsTarget;
-      sessionsTreeImmutable = hasImmutableHomeFileAtOrBelow sessionsTarget;
-      runtimeStateCategories = [
-        {
-          name = "settings";
-          immutable = settingsFileDeclared;
-        }
-        {
-          name = "sessions";
-          immutable = sessionsTreeImmutable;
-        }
-        {
-          name = "compaction";
-          immutable = sessionsTreeImmutable;
-        }
-        {
-          name = "authentication";
-          immutable = homeFileImmutable authenticationTarget;
-        }
-        {
-          name = "project-trust";
-          immutable = homeFileImmutable projectTrustTarget;
-        }
-        {
-          name = "model-selection";
-          immutable = settingsFileDeclared;
-        }
-        {
-          name = "thinking-preferences";
-          immutable = settingsFileDeclared;
-        }
-        {
-          name = "extension-state";
-          immutable = settingsFileDeclared || hasImmutableHomeFileAtOrBelow extensionStateTarget;
-        }
-      ];
-      runtimeStateOutsideImmutableLinks = map (entry: entry.name) (
-        builtins.filter (entry: !entry.immutable) runtimeStateCategories
-      );
-      activationScripts = map (entry: entry.data or "") (builtins.attrValues homeConfig.home.activation);
-      canonicalSkillsScript = lib.findFirst (
-        script: lib.hasInfix "/.agents/skills" script
-      ) "" activationScripts;
-      piSpecificSkillsPresent =
-        lib.any (name: lib.hasInfix ".pi/agent/skills" name) (builtins.attrNames homeConfig.home.file)
-        || lib.any (script: lib.hasInfix ".pi/agent/skills" script) activationScripts;
-      contextTarget = "${piConfig.configDir}/AGENTS.md";
-      globalInstructionsNixOwned =
-        piConfig.context == homeConfig.programs.agents-md.settings.text && homeFileImmutable contextTarget;
-      themeTarget = "${piConfig.configDir}/themes/catppuccin-mocha.json";
-      themePath = "${toString ../home/ai/pi}/themes/catppuccin-mocha.json";
-      themePresent = builtins.pathExists themePath;
-      themeJson = if themePresent then builtins.fromJSON (builtins.readFile themePath) else { };
-      immutableExtensionTargets = lib.optionals extensionSourceImmutable (
-        map (selector: "pi-agent-extensions/${selector}") positiveExtensions
-      );
-      permissionRulesTarget = ".config/pi-agent-extensions/permission-gate/rules.ts";
-      editWritePolicyTarget = "${piConfig.configDir}/extensions/edit-write-policy.ts";
-      immutablePolicyTargets =
-        lib.optional (
-          extensionSourceImmutable && builtins.elem "permission-gate/index.ts" positiveExtensions
-        ) "pi-agent-extensions/permission-gate/index.ts"
-        ++ lib.optional (homeFileImmutable permissionRulesTarget) "~/.config/pi-agent-extensions/permission-gate/rules.ts"
-        ++ lib.optional (homeFileImmutable editWritePolicyTarget) "~/.pi/agent/extensions/edit-write-policy.ts";
-      permissionRulesPath = ../home/ai/pi/policy/permission-rules.ts;
-      editWritePolicyPath = ../home/ai/pi/policy/edit-write-policy.ts;
-      permissionRulesModule =
-        if builtins.pathExists permissionRulesPath then
-          permissionRulesPath
-        else
-          pkgs.writeText "missing-permission-rules.ts" ''
-            export const policyPresent = false;
-            export default function missingPermissionRules() { return {}; }
-          '';
-      editWritePolicyModule =
-        if builtins.pathExists editWritePolicyPath then
-          editWritePolicyPath
-        else
-          pkgs.writeText "missing-edit-write-policy.ts" ''
-            export const policyPresent = false;
-          '';
+      permissionRulesModule = ../home/ai/pi/policy/permission-rules.ts;
+      editWritePolicyModule = ../home/ai/pi/policy/edit-write-policy.ts;
       # A shell case without `custom` runs against the built-in ruleset: the
       # harness passes `{}` in place of the deployed customConfig when `custom` is
       # falsy, so builtinShell and customShell exercise different engines.
@@ -2159,238 +2007,6 @@
     in
     {
       checks = {
-        pi-agent-environment-structural = mkCheck {
-          name = "pi-agent-environment";
-          actual = {
-            piModulePi083References = pi083References piModuleText;
-            inherit piReconnaissancePresent;
-            piReconnaissancePi083References = pi083References piReconnaissanceText;
-            deployedPiCandidateCount = builtins.length deployedPiCandidates;
-            inherit deployedPiIsOuterWrapper;
-            canonicalSkillImmutable = homeFileImmutable ".factory/skills/using-superpowers";
-            extensionPackageName = if extensionPackage == null then null else lib.getName extensionPackage;
-            inherit positiveExtensions negativeExtensions;
-            packageSkills = if extensionEntry == null then [ ] else extensionEntry.skills or [ ];
-            packagePrompts = if extensionEntry == null then [ ] else extensionEntry.prompts or [ ];
-            packageThemes = if extensionEntry == null then [ ] else extensionEntry.themes or [ ];
-            # Presence of the three keys is load-bearing beyond their values:
-            # pi's package-manager treats an omitted key as autoload-everything
-            # and an empty list as disable-everything, so the `[ ]` declarations
-            # in modules/home/ai/pi/default.nix must survive a pin bump.
-            packageResourceKindsDeclared =
-              if extensionEntry == null then
-                [ ]
-              else
-                builtins.filter (kind: builtins.hasAttr kind extensionEntry) [
-                  "skills"
-                  "prompts"
-                  "themes"
-                ];
-            extraPackages = map lib.getName piConfig.extraPackages;
-            compactionRetained =
-              compactionSource != null
-              && lib.any (entry: !builtins.isAttrs entry && entry == compactionSource) packageEntries;
-            # pi's `packages` is the shared list plus aiAgentSettings.piOnlyPackages.
-            # This claims only that pi receives the vim entry through that channel;
-            # modules/checks/atomic-agent-environment.nix owns the other half, that
-            # atomic does not.
-            vimRetained =
-              vimSource != null && lib.any (entry: !builtins.isAttrs entry && entry == vimSource) packageEntries;
-            vimViaPiOnlyChannel = builtins.elem vimSource (
-              map toString homeConfig.aiAgentSettings.piOnlyPackages
-            );
-            inherit globalInstructionsNixOwned piSpecificSkillsPresent;
-            canonicalSkills = if canonicalSkillsScript == "" then null else "~/.agents/skills";
-            slowModeSettingsShape = builtins.attrNames piConfig.settings;
-            settingsDelivery = {
-              managed = settingsManaged != null;
-              format = settingsManaged.format or null;
-              declaredFromProgramSettings = (settingsManaged.settings or null) == piConfig.settings;
-              immutableHomeFileEnabled = homeFileEnabled settingsTarget;
-              target =
-                if (settingsManaged.target or null) == settingsTarget then "~/.pi/agent/settings.json" else null;
-            };
-            inherit runtimeStateOutsideImmutableLinks;
-            immutableResourceTargets = {
-              policy = immutablePolicyTargets;
-              theme = lib.optional (homeFileImmutable themeTarget) "~/.pi/agent/themes/catppuccin-mocha.json";
-              extensions = immutableExtensionTargets;
-              globalInstructions = lib.optional globalInstructionsNixOwned "~/.pi/agent/AGENTS.md";
-            };
-            policySourcesCheckedIn = {
-              permissionRules = homeFileSourceIs permissionRulesTarget permissionRulesPath;
-              editWritePolicy = homeFileSourceIs editWritePolicyTarget editWritePolicyPath;
-            };
-            # atomic inherits ~/.pi/agent as a configuration root unconditionally
-            # and scans its extensions directory, so a file written only for pi
-            # runs under atomic unless atomic's own settings refuse it by name.
-            # Nothing else in this repository observes that coupling, and the
-            # edit/write policy reached atomic through it for three days.
-            piOnlyExtensionScope =
-              let
-                declared = homeConfig.aiAgentSettings.piOnlyExtensions;
-                forceExcludes = homeConfig.programs.atomic.settings.extensions or [ ];
-              in
-              {
-                inherit declared;
-                atomicForceExcludes = forceExcludes;
-                everyDeclaredExcluded = lib.all (
-                  extension: builtins.elem "-extensions/${extension}" forceExcludes
-                ) declared;
-                # atomic matches a force-exclude against the path relative to the
-                # scanned configuration root, never the basename, so the bare
-                # spelling loads the extension it claims to refuse.
-                noBareBasenameSpelling =
-                  !lib.any (entry: lib.any (extension: entry == "-${extension}") declared) forceExcludes;
-              };
-            contextNixOwned = piConfig.context == homeConfig.programs.agents-md.settings.text;
-            theme = {
-              contentName = themeJson.name or null;
-              selected = piConfig.settings.theme or null;
-              target =
-                if homeFileAt themeTarget == null then null else "~/.pi/agent/themes/catppuccin-mocha.json";
-              targetImmutable = homeFileImmutable themeTarget;
-              sourceCheckedIn = homeFileSourceIs themeTarget themePath;
-              sha256 = if themePresent then builtins.hashFile "sha256" themePath else null;
-              standalonePackagePresent = lib.any (name: lib.hasInfix "catppuccin-mocha" name) (
-                builtins.attrNames self'.packages
-              );
-            };
-          };
-          expected = {
-            piModulePi083References = [ ];
-            piReconnaissancePresent = true;
-            piReconnaissancePi083References = [ ];
-            deployedPiCandidateCount = 1;
-            deployedPiIsOuterWrapper = true;
-            canonicalSkillImmutable = true;
-            extensionPackageName = "pi-agent-extensions";
-            positiveExtensions = [
-              "direnv/index.ts"
-              "permission-gate/index.ts"
-              "questionnaire/index.ts"
-              "slow-mode/index.ts"
-              "stash/index.ts"
-              "statusline/index.ts"
-            ];
-            negativeExtensions = [
-              "-fetch/index.ts"
-              "-notify/index.ts"
-            ];
-            packageSkills = [ ];
-            packagePrompts = [ ];
-            packageThemes = [ ];
-            packageResourceKindsDeclared = [
-              "skills"
-              "prompts"
-              "themes"
-            ];
-            extraPackages = [
-              "direnv"
-              "diffutils"
-              "git"
-              "jujutsu"
-              "rip2"
-            ];
-            compactionRetained = true;
-            vimRetained = true;
-            vimViaPiOnlyChannel = true;
-            globalInstructionsNixOwned = true;
-            canonicalSkills = "~/.agents/skills";
-            piSpecificSkillsPresent = false;
-            slowModeSettingsShape = [
-              "enableInstallTelemetry"
-              "hideThinkingBlock"
-              "packages"
-              "theme"
-            ];
-            settingsDelivery = {
-              managed = true;
-              format = "json";
-              declaredFromProgramSettings = true;
-              immutableHomeFileEnabled = false;
-              target = "~/.pi/agent/settings.json";
-            };
-            runtimeStateOutsideImmutableLinks = [
-              "settings"
-              "sessions"
-              "compaction"
-              "authentication"
-              "project-trust"
-              "model-selection"
-              "thinking-preferences"
-              "extension-state"
-            ];
-            immutableResourceTargets = {
-              policy = [
-                "pi-agent-extensions/permission-gate/index.ts"
-                "~/.config/pi-agent-extensions/permission-gate/rules.ts"
-                "~/.pi/agent/extensions/edit-write-policy.ts"
-              ];
-              theme = [ "~/.pi/agent/themes/catppuccin-mocha.json" ];
-              extensions = [
-                "pi-agent-extensions/direnv/index.ts"
-                "pi-agent-extensions/permission-gate/index.ts"
-                "pi-agent-extensions/questionnaire/index.ts"
-                "pi-agent-extensions/slow-mode/index.ts"
-                "pi-agent-extensions/stash/index.ts"
-                "pi-agent-extensions/statusline/index.ts"
-              ];
-              globalInstructions = [ "~/.pi/agent/AGENTS.md" ];
-            };
-            policySourcesCheckedIn = {
-              permissionRules = true;
-              editWritePolicy = true;
-            };
-            piOnlyExtensionScope = {
-              declared = [ "edit-write-policy.ts" ];
-              atomicForceExcludes = [ "-extensions/edit-write-policy.ts" ];
-              everyDeclaredExcluded = true;
-              noBareBasenameSpelling = true;
-            };
-            contextNixOwned = true;
-            theme = {
-              contentName = "catppuccin-mocha";
-              selected = "catppuccin-mocha";
-              target = "~/.pi/agent/themes/catppuccin-mocha.json";
-              targetImmutable = true;
-              sourceCheckedIn = true;
-              sha256 = "5858d086e155246d48e5b7a2ac372988fe2d1a028d2b77b5f0a7670088a8642b";
-              standalonePackagePresent = false;
-            };
-          };
-        };
-
-        pi-agent-environment-policy =
-          pkgs.runCommand "pi-agent-environment-policy"
-            {
-              nativeBuildInputs = [
-                pkgs.bun
-                pkgs.typescript
-              ];
-              BUN_CONFIG_NO_INSTALL = "1";
-              PERMISSION_GATE_ROOT = "${extensionPackage}/permission-gate";
-              PERMISSION_RULES_MODULE = permissionRulesModule;
-              EDIT_WRITE_POLICY_MODULE = editWritePolicyModule;
-              POLICY_CASES = policyCases;
-              POLICY_HARNESS = policyHarness;
-              POLICY_TYPE_DECLARATIONS = policyTypeDeclarations;
-              POLICY_TSCONFIG = policyTsconfig;
-            }
-            ''
-              set -o pipefail
-              mkdir typecheck
-              ln -s "$PERMISSION_GATE_ROOT" typecheck/permission-gate
-              ln -s "$PERMISSION_RULES_MODULE" typecheck/permission-rules.ts
-              ln -s "$EDIT_WRITE_POLICY_MODULE" typecheck/edit-write-policy.ts
-              ln -s "$POLICY_TYPE_DECLARATIONS" typecheck/external.d.ts
-              ln -s "$POLICY_HARNESS" typecheck/policy-test.ts
-              ln -s "$POLICY_TSCONFIG" typecheck/tsconfig.json
-              tsc -p typecheck/tsconfig.json
-              bun "$POLICY_HARNESS"
-              touch "$out"
-            '';
-
         pi-agent-environment-smoke =
           let
             jsonFormat = pkgs.formats.json { };
@@ -2605,6 +2221,37 @@
               SMOKE_PROJECT="$TMPDIR/project" \
               SMOKE_TMPDIR="$TMPDIR/pi-tmp" \
                 python3 ${smokeDriver} | tee "$out"
+            '';
+      }
+      // lib.optionalAttrs (system == "x86_64-linux") {
+        pi-agent-environment-policy =
+          pkgs.runCommand "pi-agent-environment-policy"
+            {
+              nativeBuildInputs = [
+                pkgs.bun
+                pkgs.typescript
+              ];
+              BUN_CONFIG_NO_INSTALL = "1";
+              PERMISSION_GATE_ROOT = "${extensionPackage}/permission-gate";
+              PERMISSION_RULES_MODULE = permissionRulesModule;
+              EDIT_WRITE_POLICY_MODULE = editWritePolicyModule;
+              POLICY_CASES = policyCases;
+              POLICY_HARNESS = policyHarness;
+              POLICY_TYPE_DECLARATIONS = policyTypeDeclarations;
+              POLICY_TSCONFIG = policyTsconfig;
+            }
+            ''
+              set -o pipefail
+              mkdir typecheck
+              ln -s "$PERMISSION_GATE_ROOT" typecheck/permission-gate
+              ln -s "$PERMISSION_RULES_MODULE" typecheck/permission-rules.ts
+              ln -s "$EDIT_WRITE_POLICY_MODULE" typecheck/edit-write-policy.ts
+              ln -s "$POLICY_TYPE_DECLARATIONS" typecheck/external.d.ts
+              ln -s "$POLICY_HARNESS" typecheck/policy-test.ts
+              ln -s "$POLICY_TSCONFIG" typecheck/tsconfig.json
+              tsc -p typecheck/tsconfig.json
+              bun "$POLICY_HARNESS"
+              touch "$out"
             '';
       };
     };

@@ -7,11 +7,13 @@
 # secrets, delivers an empty set, and every effect stops at its own
 # missing-secret guard — exactly what an unwired service does. The check reads
 # the name off the evaluated unit, so it exercises nixbot's own module code
-# rather than a transcription of it, and also pins the allowlists, the
-# binary-cache uploader set, the contributor approval gate, which service
-# holds which repository's secrets and which credentials vanixiets' carry, and
-# the deliberately empty sandbox options, CI's system scope, and that darwin
-# checks are best-effort without changing their derivations.
+# rather than a transcription of it. It also pins the facts that span modules
+# or upstream behaviour: the unit's memory/OOM knob set, the binary-cache
+# uploader set, that nixbot and buildbot share one secrets file and serve
+# disjoint repositories, that every declared effect secret is used, and that
+# darwin checks are best-effort without changing their derivations. Values
+# set as literals in modules/nixos/nixbot.nix and buildbot.nix are not
+# restated here.
 #
 # The repository-root config file is nixbot.toml. nixbot prefers that name over
 # the legacy buildbot-nix.toml it also still reads
@@ -33,7 +35,6 @@
       magnetite = self.nixosConfigurations.magnetite.config;
       nixbot = magnetite.services.nixbot;
       buildbot = magnetite.services.buildbot-nix.master;
-      vanixietsSecrets = magnetite.clan.core.vars.generators.vanixiets-effects-secrets;
 
       # LoadCredential entries are "<name>:<source path>". The name never
       # contains a colon, because the transform that builds it replaces every
@@ -92,19 +93,7 @@
           name = "nixbot-wiring";
           actual = {
             effectsCredentialNames = effectsCredentialNames;
-            nixbotSecretKeys = sortedNames nixbot.effects.perRepoSecretFiles;
-            buildbotSecretKeys = sortedNames buildbot.effects.perRepoSecretFiles;
-
-            # Eval throughput tuning, pinned because the triple is only safe
-            # together: at 6 x 3072 workers recycle and nix-eval-jobs' own budget
-            # bounds the two-system evaluation (peak 18.7 GB, 341 s); MemoryHigh
-            # must sit above that peak, since throttling evaluator heaps is what
-            # crawled to nixbot's timeout
-            # (logs/magnetite-two-system-eval-experiment.md).
-            evalWorkerCount = nixbot.evalWorkerCount;
-            evalMaxMemorySize = nixbot.evalMaxMemorySize;
             memoryAndOomKnobs = memoryAndOomKnobs;
-            memoryHigh = nixbotUnit.MemoryHigh or null;
 
             # Booleans rather than the paths themselves: the assertion is that
             # each repository buildbot still holds secrets for reads the same
@@ -113,22 +102,8 @@
             # repository so a failure names which one diverged. buildbot admits
             # neither repository, so its copies are inert; asserting them keeps
             # a later re-admission from silently reading a different file.
-            # Taken over buildbot's own keys, so a repository buildbot holds
-            # nothing for surfaces in buildbotSecretKeys instead of failing
-            # evaluation here.
             oneSecretsFileForBothServices = lib.genAttrs (sortedNames buildbot.effects.perRepoSecretFiles) (
               key: nixbot.effects.perRepoSecretFiles.${key} == buildbot.effects.perRepoSecretFiles.${key}
-            );
-
-            # The environment names the composed vanixiets file carries, by
-            # the labels of the prompts that feed it, and the one file of the
-            # generator that deploys. A credential no effect maps is a secret
-            # held for nothing, so adding one is a reviewable diff here.
-            vanixietsSecretNames = lib.naturalSort (
-              map (prompt: prompt.display.label) (builtins.attrValues vanixietsSecrets.prompts)
-            );
-            vanixietsDeployedFiles = sortedNames (
-              lib.filterAttrs (_: file: file.deploy) vanixietsSecrets.files
             );
 
             # Every declared effect secret is read by some trigger of some
@@ -145,12 +120,6 @@
               )
             );
 
-            # Outside pull requests build only once a maintainer approves them.
-            # CONTRIBUTOR, in upstream's default, would admit anyone with a
-            # previously merged pull request unreviewed.
-            prApprovalEnabled = nixbot.prApproval.enable;
-            prApprovalTrustedAssociations = nixbot.prApproval.trustedAssociations;
-
             # The cut itself. nixbot serves both repositories and buildbot
             # serves neither on GitHub, so the two selections are disjoint.
             buildbotAdmitsVanixiets = buildbotAdmits "cameronraysmith/vanixiets";
@@ -158,11 +127,6 @@
             nixbotAdmitsVanixiets = nixbotAdmits "cameronraysmith/vanixiets";
             nixbotAdmitsIronstar = nixbotAdmits "sciexp/ironstar";
 
-            # An owner allowlist would readmit both repositories regardless of
-            # the repository list, because the two are OR'd.
-            buildbotUserAllowlist = buildbot.github.userAllowlist;
-            buildbotRepoAllowlist = buildbot.github.repoAllowlist;
-            nixbotRepoAllowlist = nixbot.github.repoAllowlist;
             # Binary-cache upload is nixbot's uploader set since upstream's
             # niks3 integration stopped emitting a per-attribute post-build
             # step and started registering a whole-closure uploader instead
@@ -178,20 +142,6 @@
             uploaderNames = map (uploader: uploader.name) nixbot.uploaders;
             uploaderCommandsNonEmpty = lib.all (uploader: uploader.command != [ ]) nixbot.uploaders;
             legacyPostBuildStepNames = map (step: step.name) nixbot.postBuildSteps;
-            niks3ServerUrl = nixbot.niks3.serverUrl;
-
-            # Effects run in the sandbox the service configures. Nothing either
-            # repository's effects do needs widening it, and recording the empty
-            # state makes a later widening a reviewable diff rather than a
-            # silent grant.
-            extraSandboxPaths = nixbot.effects.extraSandboxPaths;
-            mountables = sortedNames nixbot.effects.mountables;
-            extraNixOptions = sortedNames nixbot.effects.extraNixOptions;
-
-            # CI's system scope. With nixbot.toml's attribute = "checks",
-            # evalSystems is what keeps aarch64-linux unevaluated
-            # (nixbot/nixbot/nix/select.nix:37-50).
-            inherit (nixbot) buildSystems evalSystems;
 
             # Darwin checks are best-effort without changing what they build
             # (modules/checks/nixbot-best-effort-darwin.nix). One mapAttrs
@@ -218,63 +168,19 @@
               "effects-secret__github_colon_cameronraysmith_slash_vanixiets"
               "effects-secret__github_colon_sciexp_slash_ironstar"
             ];
-            nixbotSecretKeys = [
-              "github:cameronraysmith/vanixiets"
-              "github:sciexp/ironstar"
-            ];
-            # buildbot serves neither GitHub repository. vanixiets' secrets
-            # were never read there and are withheld; ironstar's copy remains.
-            buildbotSecretKeys = [
-              "github:sciexp/ironstar"
-            ];
-            evalWorkerCount = 6;
-            evalMaxMemorySize = 3072;
             memoryAndOomKnobs = [ "MemoryHigh" ];
-            memoryHigh = "20G";
             oneSecretsFileForBothServices = {
               "github:sciexp/ironstar" = true;
             };
-            vanixietsSecretNames = [
-              "CLOUDFLARE_ACCOUNT_ID"
-              "CLOUDFLARE_API_TOKEN"
-              "GITHUB_TOKEN"
-              "R2_EVIDENCE_ACCESS_KEY_ID"
-              "R2_EVIDENCE_SECRET_ACCESS_KEY"
-            ];
-            vanixietsDeployedFiles = [ "secrets" ];
             effectSecretsUsed = sortedNames self.lib.vanixietsEffectSecrets;
-            prApprovalEnabled = true;
-            prApprovalTrustedAssociations = [
-              "OWNER"
-              "MEMBER"
-              "COLLABORATOR"
-            ];
             buildbotAdmitsVanixiets = false;
             buildbotAdmitsIronstar = false;
             nixbotAdmitsVanixiets = true;
             nixbotAdmitsIronstar = true;
-            buildbotUserAllowlist = null;
-            buildbotRepoAllowlist = [ ];
-            nixbotRepoAllowlist = [
-              "cameronraysmith/vanixiets"
-              "sciexp/ironstar"
-            ];
             uploadsSomewhere = true;
             uploaderNames = [ "niks3" ];
             uploaderCommandsNonEmpty = true;
             legacyPostBuildStepNames = [ ];
-            niks3ServerUrl = "https://niks3.scientistexperience.net";
-            extraSandboxPaths = [ ];
-            mountables = [ ];
-            extraNixOptions = [ ];
-            buildSystems = [
-              "x86_64-linux"
-              "aarch64-darwin"
-            ];
-            evalSystems = [
-              "x86_64-linux"
-              "aarch64-darwin"
-            ];
             darwinCheckNamesUnchanged = true;
             darwinRepresentative = {
               ignoreFailure = true;

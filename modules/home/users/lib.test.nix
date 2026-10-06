@@ -9,9 +9,14 @@
 { config, ... }:
 {
   perSystem =
-    { pkgs, ... }:
     {
-      checks.eval-users-lib = config.flake.lib.mkEvalCheck pkgs {
+      pkgs,
+      lib,
+      system,
+      ...
+    }:
+    let
+      check = config.flake.lib.mkEvalCheck pkgs {
         name = "users-lib";
         testFile = pkgs.writeText "users-lib.tests.nix" ''
           let
@@ -73,5 +78,8 @@
           }
         '';
       };
+    in
+    {
+      checks = lib.optionalAttrs (system == "x86_64-linux") { eval-users-lib = check; };
     };
 }

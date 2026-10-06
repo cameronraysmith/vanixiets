@@ -263,156 +263,152 @@
       sessionAuthorized = lib.concatStringsSep "\n" (authorizedKeys "stibnite" sessionUser);
     in
     {
-      checks =
-        lib.optionalAttrs
-          (builtins.elem system [
-            "x86_64-linux"
-            "aarch64-darwin"
-          ])
-          {
-            nix-builders-wiring = mkCheck {
-              name = "nix-builders-wiring";
-              actual = {
-                stibnite = {
-                  rosetta = map projectEntry rosettaEntries;
-                  # The rosetta entries come first and everything after them
-                  # is the service's list, unaltered.
-                  splice = splice "stibnite";
-                  dispatch = dispatched "stibnite";
-                };
-                magnetite = {
-                  splice = splice "magnetite";
-                  dispatch = dispatched "magnetite";
-                  # The remote store and the remote builder name one account
-                  # through one alias.
-                  storeUriNamesBuildAccount =
-                    stibniteBuilderEntry != null
-                    &&
-                      magnetite.environment.etc."nix/stibnite-store-uri".text
-                      == "ssh-ng://${stibniteBuilderEntry.sshUser}@${stibniteBuilderEntry.hostName}?ssh-key=${stibniteBuilderEntry.sshKey}\n";
-                };
-                builders = lib.genAttrs (builtins.attrNames builders) builderSide;
-                # Key separation, asserted in both directions.
-                sessionKeyIsNotABuildKey = lib.mapAttrs (
-                  machine: user: !(lib.hasInfix sessionKey (lib.concatStringsSep "\n" (authorizedKeys machine user)))
-                ) builders;
-                buildKeysAreNotSessionKeys = map (
-                  dispatcher: !(lib.hasInfix (dispatchKey dispatcher) sessionAuthorized)
-                ) dispatchers;
-                sessionKeyAuthorizedForSessions = lib.hasInfix sessionKey sessionAuthorized;
-              };
-              expected = {
-                stibnite = {
-                  rosetta = [
-                    {
-                      hostName = "rosetta-builder";
-                      protocol = "ssh-ng";
-                      systems = [ "aarch64-linux" ];
-                      maxJobs = 12;
-                      speedFactor = 1;
-                      sshUser = null;
-                      sshKey = null;
-                      supportedFeatures = [
-                        "benchmark"
-                        "big-parallel"
-                        "kvm"
-                        "nixos-test"
-                        "uid-range"
-                      ];
-                      mandatoryFeatures = [ ];
-                    }
-                    {
-                      hostName = "rosetta-builder";
-                      protocol = "ssh-ng";
-                      systems = [ "x86_64-linux" ];
-                      maxJobs = 12;
-                      speedFactor = 1;
-                      sshUser = null;
-                      sshKey = null;
-                      supportedFeatures = [
-                        "benchmark"
-                        "big-parallel"
-                        "nixos-test"
-                        "uid-range"
-                      ];
-                      mandatoryFeatures = [ ];
-                    }
-                  ];
-                  splice = {
-                    order = [
-                      "rosetta-builder"
-                      "rosetta-builder"
-                      "magnetite"
-                      "pyrite-builder"
-                    ];
-                    fleetEntriesAreTheService = true;
-                  };
-                  # rosegold and argentum are excluded: stibnite builds
-                  # aarch64-darwin itself.
-                  dispatch = builtins.listToAttrs [
-                    (expectedDispatch {
-                      dispatcher = "stibnite";
-                      builder = "magnetite";
-                      hostName = "magnetite";
-                      address = address.magnetite;
-                      systems = [ "x86_64-linux" ];
-                      maxJobs = 8;
-                      speedFactor = 2;
-                      supportedFeatures = [
-                        "big-parallel"
-                        "nixos-test"
-                        "uid-range"
-                        "recursive-nix"
-                      ];
-                    })
-                    (expectedDispatch {
-                      dispatcher = "stibnite";
-                      builder = "pyrite";
-                      hostName = "pyrite-builder";
-                      address = address.pyrite;
-                      systems = [ "x86_64-linux" ];
-                      maxJobs = 1;
-                      speedFactor = 1;
-                      supportedFeatures = [
-                        "kvm"
-                        "nixos-test"
-                      ];
-                    })
-                  ];
-                };
-                magnetite = {
-                  splice = {
-                    order = [
-                      "stibnite-builder"
-                    ];
-                    fleetEntriesAreTheService = true;
-                  };
-                  # pyrite is excluded: magnetite builds x86_64-linux itself.
-                  # rosegold and argentum are excluded until the binary cache
-                  # holds nixbot's darwin outputs.
-                  dispatch = builtins.listToAttrs [
-                    (expectedDispatch {
-                      dispatcher = "magnetite";
-                      builder = "stibnite";
-                      hostName = "stibnite-builder";
-                      address = address.stibnite;
-                      systems = [ "aarch64-darwin" ];
-                      maxJobs = 4;
-                      speedFactor = 1;
-                      supportedFeatures = [
-                        "apple-virt"
-                        "big-parallel"
-                      ];
-                    })
-                  ];
-                  storeUriNamesBuildAccount = true;
-                };
-                builders = lib.genAttrs (builtins.attrNames builders) expectedBuilderSide;
-                sessionKeyIsNotABuildKey = lib.mapAttrs (_: _: true) builders;
-                buildKeysAreNotSessionKeys = map (_: true) dispatchers;
-                sessionKeyAuthorizedForSessions = true;
-              };
+      # The fact is the same on every system and darwin builds are
+      # best-effort, so it is evaluated once, on x86_64-linux.
+      checks = lib.optionalAttrs (system == "x86_64-linux") {
+        nix-builders-wiring = mkCheck {
+          name = "nix-builders-wiring";
+          actual = {
+            stibnite = {
+              rosetta = map projectEntry rosettaEntries;
+              # The rosetta entries come first and everything after them
+              # is the service's list, unaltered.
+              splice = splice "stibnite";
+              dispatch = dispatched "stibnite";
             };
+            magnetite = {
+              splice = splice "magnetite";
+              dispatch = dispatched "magnetite";
+              # The remote store and the remote builder name one account
+              # through one alias.
+              storeUriNamesBuildAccount =
+                stibniteBuilderEntry != null
+                &&
+                  magnetite.environment.etc."nix/stibnite-store-uri".text
+                  == "ssh-ng://${stibniteBuilderEntry.sshUser}@${stibniteBuilderEntry.hostName}?ssh-key=${stibniteBuilderEntry.sshKey}\n";
+            };
+            builders = lib.genAttrs (builtins.attrNames builders) builderSide;
+            # Key separation, asserted in both directions.
+            sessionKeyIsNotABuildKey = lib.mapAttrs (
+              machine: user: !(lib.hasInfix sessionKey (lib.concatStringsSep "\n" (authorizedKeys machine user)))
+            ) builders;
+            buildKeysAreNotSessionKeys = map (
+              dispatcher: !(lib.hasInfix (dispatchKey dispatcher) sessionAuthorized)
+            ) dispatchers;
+            sessionKeyAuthorizedForSessions = lib.hasInfix sessionKey sessionAuthorized;
           };
+          expected = {
+            stibnite = {
+              rosetta = [
+                {
+                  hostName = "rosetta-builder";
+                  protocol = "ssh-ng";
+                  systems = [ "aarch64-linux" ];
+                  maxJobs = 12;
+                  speedFactor = 1;
+                  sshUser = null;
+                  sshKey = null;
+                  supportedFeatures = [
+                    "benchmark"
+                    "big-parallel"
+                    "kvm"
+                    "nixos-test"
+                    "uid-range"
+                  ];
+                  mandatoryFeatures = [ ];
+                }
+                {
+                  hostName = "rosetta-builder";
+                  protocol = "ssh-ng";
+                  systems = [ "x86_64-linux" ];
+                  maxJobs = 12;
+                  speedFactor = 1;
+                  sshUser = null;
+                  sshKey = null;
+                  supportedFeatures = [
+                    "benchmark"
+                    "big-parallel"
+                    "nixos-test"
+                    "uid-range"
+                  ];
+                  mandatoryFeatures = [ ];
+                }
+              ];
+              splice = {
+                order = [
+                  "rosetta-builder"
+                  "rosetta-builder"
+                  "magnetite"
+                  "pyrite-builder"
+                ];
+                fleetEntriesAreTheService = true;
+              };
+              # rosegold and argentum are excluded: stibnite builds
+              # aarch64-darwin itself.
+              dispatch = builtins.listToAttrs [
+                (expectedDispatch {
+                  dispatcher = "stibnite";
+                  builder = "magnetite";
+                  hostName = "magnetite";
+                  address = address.magnetite;
+                  systems = [ "x86_64-linux" ];
+                  maxJobs = 8;
+                  speedFactor = 2;
+                  supportedFeatures = [
+                    "big-parallel"
+                    "nixos-test"
+                    "uid-range"
+                    "recursive-nix"
+                  ];
+                })
+                (expectedDispatch {
+                  dispatcher = "stibnite";
+                  builder = "pyrite";
+                  hostName = "pyrite-builder";
+                  address = address.pyrite;
+                  systems = [ "x86_64-linux" ];
+                  maxJobs = 1;
+                  speedFactor = 1;
+                  supportedFeatures = [
+                    "kvm"
+                    "nixos-test"
+                  ];
+                })
+              ];
+            };
+            magnetite = {
+              splice = {
+                order = [
+                  "stibnite-builder"
+                ];
+                fleetEntriesAreTheService = true;
+              };
+              # pyrite is excluded: magnetite builds x86_64-linux itself.
+              # rosegold and argentum are excluded until the binary cache
+              # holds nixbot's darwin outputs.
+              dispatch = builtins.listToAttrs [
+                (expectedDispatch {
+                  dispatcher = "magnetite";
+                  builder = "stibnite";
+                  hostName = "stibnite-builder";
+                  address = address.stibnite;
+                  systems = [ "aarch64-darwin" ];
+                  maxJobs = 4;
+                  speedFactor = 1;
+                  supportedFeatures = [
+                    "apple-virt"
+                    "big-parallel"
+                  ];
+                })
+              ];
+              storeUriNamesBuildAccount = true;
+            };
+            builders = lib.genAttrs (builtins.attrNames builders) expectedBuilderSide;
+            sessionKeyIsNotABuildKey = lib.mapAttrs (_: _: true) builders;
+            buildKeysAreNotSessionKeys = map (_: true) dispatchers;
+            sessionKeyAuthorizedForSessions = true;
+          };
+        };
+      };
     };
 }

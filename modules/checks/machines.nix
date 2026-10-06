@@ -7,6 +7,12 @@
       inventory = self.clan.inventory.machines;
       machineSystems = self.lib.machineSystems;
 
+      machineDirs =
+        machineClass:
+        builtins.attrNames (
+          lib.filterAttrs (_: type: type == "directory") (builtins.readDir ../machines/${machineClass})
+        );
+
       inventoryNamesFor =
         machineClass:
         builtins.attrNames (lib.filterAttrs (_: machine: machine.machineClass == machineClass) inventory);
@@ -47,6 +53,15 @@
     assert lib.assertMsg (
       inventoryNamesFor "darwin" == builtins.attrNames self.darwinConfigurations
     ) "Darwin inventory names must match darwinConfigurations";
+    assert lib.assertMsg (
+      builtins.attrNames self.clan.machines == builtins.attrNames inventory
+    ) "clan.machines names must match clan.inventory.machines";
+    assert lib.assertMsg (
+      machineDirs "nixos" == inventoryNamesFor "nixos"
+    ) "modules/machines/nixos/ directories must match the NixOS inventory machines";
+    assert lib.assertMsg (
+      machineDirs "darwin" == inventoryNamesFor "darwin"
+    ) "modules/machines/darwin/ directories must match the Darwin inventory machines";
     assert lib.assertMsg (lib.all (name: inventory ? ${name} && !(builtins.elem name deferred)) (
       lib.attrNames obligations.expectedOwners
     )) "every machine carrying Omnigent fleet obligations must have a machine check to assert them";

@@ -42,10 +42,11 @@ The isolated registry worker reports exit status 0 for:
 ```sh
 nixfmt --check modules/effects/vanixiets/registry.nix modules/checks/effects-interpreter.nix
 nix build .#checks.aarch64-darwin.effects-interpreter \
-  .#checks.aarch64-darwin.effect-run-context --no-link --builders '' -L
+  --no-link --builders '' -L
 ```
 
-The effects interpreter rebuilt; effect-run-context was reused from cache.
+The command also selected the separate run-context check, whose rows the check cleanup later merged into `effects-interpreter`, now defined for x86_64-linux only.
+The effects interpreter rebuilt; the run-context check was reused from cache.
 The worker first observed the missing buildFinished option, then independently the missing build_finished mapping before implementing each.
 Its 18 script cases and two structural comparisons exercise the actual registry mapping, literal arguments, secret isolation, defaults, and absence of the main-only guard.
 Linux effect derivations were evaluated for metadata, not built or run.
@@ -56,7 +57,7 @@ This evidence does not cover artifact publication.
 ### APM skill integration
 
 The parent reviewed the source/manifest drift guards and confirmed that root `apm.lock.yaml` has no diff.
-After integration, native Darwin builds of `playwright-cli-consumers` and `omnigent-worker-capabilities` completed with exit status 0.
+After integration, native Darwin builds of the Playwright CLI consumer check, since removed, and `omnigent-worker-capabilities` completed with exit status 0.
 The worker additionally reports successful x86_64-linux versions using only Magnetite/Pyrite builders, clean frozen APM installation for both targets, recursive upstream skill/reference comparisons, and rejection of package-version and source-revision mutations.
 
 The planning plugin's generated lock migrated from APM 0.24 to 0.32.
@@ -70,13 +71,13 @@ This does not block local Nix composition or the plugin's frozen-install check.
 After integration and jj snapshotting of the new files, the parent ran:
 
 ```sh
-nix build .#checks.aarch64-darwin.docs-e2e-wiring \
-  .#checks.aarch64-darwin.package-vanixiets-docs-test-e2e \
+nix build .#checks.aarch64-darwin.package-vanixiets-docs-test-e2e \
   .#checks.aarch64-darwin.package-vanixiets-docs-test-e2e-negative-control \
   .#checks.aarch64-darwin.package-vanixiets-docs-test-unit \
   --no-link --builders '' --cores 4
 ```
 
+The selection also built the docs end-to-end wiring check, whose verdict-dependency assertion is now the `verdictConsumesReport` case of `docs-evidence-cache`.
 All passed using the worker's cached outputs.
 The initial parent evaluation correctly rejected untracked new files; snapshotting them made the flake complete.
 Integrated `just lint` and `git diff --check` passed.
@@ -106,14 +107,13 @@ This supplements the initial implementation history; it is not a full check swee
 The correction work has passed this integrated native Darwin selection, with remote builders disabled:
 
 ```sh
-nix build .#checks.aarch64-darwin.docs-e2e-wiring \
-  .#checks.aarch64-darwin.playwright-cli-consumers \
-  .#checks.aarch64-darwin.docs-evidence-cache \
+nix build .#checks.aarch64-darwin.docs-evidence-cache \
   .#checks.aarch64-darwin.effects-interpreter \
-  .#checks.aarch64-darwin.effect-run-context \
-  .#checks.aarch64-darwin.deployment-safety \
   --no-link --builders '' --cores 4
 ```
+
+The selection also named the docs end-to-end wiring, Playwright CLI consumer, run-context and terraform safety checks.
+The check cleanup later removed those four: the wiring assertion became the `verdictConsumesReport` case of `docs-evidence-cache`, and the run-context rows moved into `effects-interpreter`.
 
 - R2: the evidence-epoch check rejects invalid epochs, requires identical epochs to reuse the report, and requires a new epoch to change the report and verdict without changing the site derivation.
   Native report outputs for epochs `0` and `1` were realized and their provenance read back.

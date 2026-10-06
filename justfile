@@ -874,23 +874,15 @@ terraform-destroy *ARGS: terraform-init
 test:
   {{nix_cmd}} flake check
 
-# Run fast tests only (nix-unit + validation tests)
+# Run fast validation checks (fleet pins, home exports, secrets, terraform)
 [group('clan')]
 test-quick:
-  @echo "Running fast validation tests..."
-  @echo "TC-017: Naming conventions"
-  {{nix_cmd}} build .#checks.aarch64-darwin.naming-conventions --print-build-logs
-  @echo ""
-  @echo "TC-007: Secrets generation"
-  {{nix_cmd}} build .#checks.aarch64-darwin.secrets-generation --print-build-logs
-  @echo ""
-  @echo "TC-006: Deployment safety"
-  {{nix_cmd}} build .#checks.aarch64-darwin.deployment-safety --print-build-logs
-  @echo ""
-  @echo "TC-012: Terraform validation"
-  {{nix_cmd}} build .#checks.aarch64-darwin.terraform-validate --print-build-logs
-  @echo ""
-  @echo "✓ All validation tests passed"
+  @echo "Running fast validation checks..."
+  {{nix_cmd}} build .#checks.x86_64-linux.structure-fleet --print-build-logs
+  {{nix_cmd}} build .#checks.x86_64-linux.home-module-exports --print-build-logs
+  {{nix_cmd}} build .#checks.x86_64-linux.secrets-encryption-integrity --print-build-logs
+  {{nix_cmd}} build .#checks.x86_64-linux.terraform-validate --print-build-logs
+  @echo "✓ All validation checks passed"
 
 # Run integration tests (VM tests - Linux only)
 [group('clan')]

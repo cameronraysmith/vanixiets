@@ -84,6 +84,7 @@
       pkgs,
       lib,
       config,
+      system,
       ...
     }:
     let
@@ -630,9 +631,8 @@
         except urllib.error.HTTPError as e:
             print(e.code)
       '';
-    in
-    {
-      checks.publish-evidence-rehearsal =
+
+      publish-evidence-rehearsal =
         pkgs.runCommand "publish-evidence-rehearsal"
           {
             nativeBuildInputs = [
@@ -645,8 +645,6 @@
               pkgs.nodejs_24
               pkgs.python3
             ];
-            # The loopback API needs local networking in the darwin sandbox.
-            __darwinAllowLocalNetworking = true;
             meta.description = "behavioural check: publish-evidence event and main against a loopback nixbot API and chroot store";
           }
           ''
@@ -1853,5 +1851,10 @@
 
             touch $out
           '';
+    in
+    {
+      checks = lib.optionalAttrs (system == "x86_64-linux") {
+        inherit publish-evidence-rehearsal;
+      };
     };
 }

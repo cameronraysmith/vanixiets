@@ -76,17 +76,17 @@ flakeArgs@{ inputs, ... }:
       };
 
       config = lib.mkIf (cfg.users != { }) {
-        assertions = lib.mapAttrsToList (username: _userCfg: {
-          assertion =
-            (flakeUsers ? ${username}) && (flakeUsers.${username}.meta.sopsAgeKeyId or null) != null;
+        assertions = lib.mapAttrsToList (username: userCfg: {
+          assertion = builtins.pathExists (
+            inputs.self + "/secrets/bridge/${userCfg.sopsIdentity}-age-key.enc"
+          );
           message = ''
-            hm-sops-bridge.users.${username} is enabled but
-            flake.users.${username}.meta.sopsAgeKeyId is null or unset.
+            hm-sops-bridge.users.${username} uses sops identity "${userCfg.sopsIdentity}",
+            but secrets/bridge/${userCfg.sopsIdentity}-age-key.enc does not exist.
 
-            Set sopsAgeKeyId in modules/home/users/${username}/meta.nix (for
-            canonical users) or ensure the alias target has it set (alias-fold
-            inherits meta from the target). Alternatively, override
-            hm-sops-bridge.users.${username}.sopsIdentity at the host level.
+            Commit the bridge secret for that identity, or point
+            hm-sops-bridge.users.${username}.sopsIdentity (default:
+            flake.users.${username}.meta.sopsAgeKeyId) at an identity that has one.
           '';
         }) cfg.users;
 

@@ -197,9 +197,8 @@ in
       #
       # Nothing else can take that work. pyrite holds the fleet's only /dev/kvm
       # but builds x86_64-linux only, so an aarch64-linux kvm derivation has no
-      # other candidate, and checks.aarch64-darwin.darwin-stibnite and
-      # checks.aarch64-darwin.omnigent-worker-credentials both reach
-      # nixos-disk-image and stop being schedulable without it.
+      # other candidate, and checks.aarch64-darwin.darwin-stibnite reaches
+      # nixos-disk-image and stops being schedulable without it.
       #
       # The two systems are split across two entries for the same host so that
       # the claim is scoped to where it is the only route. x86_64-linux omits

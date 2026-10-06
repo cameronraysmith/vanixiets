@@ -225,12 +225,14 @@ The system MUST load slow-mode while leaving it inactive until the operator invo
 
 ### Requirement: Consolidated custom regulators
 
-The flake MUST expose exactly three custom Pi derivations named `pi-agent-environment-structural`, `pi-agent-environment-policy`, and `pi-agent-environment-smoke`, while the unmodified `modules/checks/packages.nix` automatically maps `pi-agent-extensions` to `package-pi-agent-extensions`.
+The flake MUST expose exactly two custom Pi derivations, `pi-agent-environment-policy` and `pi-agent-environment-smoke`, while the unmodified `modules/checks/packages.nix` automatically maps `pi-agent-extensions` to `package-pi-agent-extensions`.
+The policy regulator exercises system-independent decision code and MUST be defined for `x86_64-linux` only; the smoke regulator observes platform-dependent loading and MUST be defined on every checked system.
+Declaration claims that relate Pi's evaluated settings to atomic's, Pi-only scope, and the absent Pi-specific skill sink belong to `atomic-agent-environment-structural` rather than to a Pi-only structural derivation, and no check restates a literal oracle of the Pi module's own declared values.
 
 #### Scenario: Pi checks are enumerated
 
-- **WHEN** current-system checks are enumerated externally after all three derivations are defined
-- **THEN** the custom Pi check set equals the three-name oracle and ordinary package coverage includes `package-pi-agent-extensions`
+- **WHEN** `x86_64-linux` and `aarch64-darwin` checks are enumerated externally
+- **THEN** the `x86_64-linux` custom Pi check set equals the two-name oracle, the `aarch64-darwin` set contains only `pi-agent-environment-smoke`, and ordinary package coverage includes `package-pi-agent-extensions`
 
 ### Requirement: Offline aggregate smoke
 

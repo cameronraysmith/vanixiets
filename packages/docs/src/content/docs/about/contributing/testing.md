@@ -54,7 +54,7 @@ Infrastructure tests validate the nix flake structure, machine configurations, a
 | Category | File | Count | Purpose |
 |----------|------|-------|---------|
 | nix-unit | `modules/checks/nix-unit.nix` | 16 | Unit tests for flake structure and invariants |
-| validation | `modules/checks/validation.nix` | 10 | Configuration validation and naming conventions |
+| validation | `modules/checks/validation.nix` | 3 | Home content slots, terraform validity, secret encryption |
 | performance | `modules/checks/performance.nix` | 0 (planned: 4) | Performance benchmarks and optimization (planned) |
 | treefmt | (flake-parts) | 1 | Code formatting validation |
 | pre-commit | (flake-parts) | 1 | Pre-commit hook validation |
@@ -100,20 +100,17 @@ nix-unit tests validate flake structure and configuration invariants without bui
 
 ### Validation checks
 
-Validation checks run shell commands to verify configuration correctness.
+Validation checks run shell commands or structural comparisons to verify configuration correctness.
+They are defined on x86_64-linux only.
 
 | TC-ID | Check Name | Description |
 |-------|------------|-------------|
-| TC-020 | home-module-exports | Home modules exported to flake namespace |
-| TC-021 | home-configurations-exposed | Flat-tuple homeConfigurations exposed for nh CLI |
-| TC-022 | naming-conventions | Machine names follow kebab-case |
-| TC-023 | terraform-validate | Terraform configuration syntactically valid |
-| TC-024 | terraform-config-structure | Terraform config has expected resources |
-| TC-025 | vars-user-password-validation | Clan vars system for user passwords |
-| TC-026 | secrets-tier-separation | Secrets organized in correct tiers (vars vs secrets) |
-| TC-027 | clan-inventory-consistency | Inventory references only valid machines |
-| TC-028 | secrets-encryption-integrity | All secret files are SOPS-encrypted |
-| TC-029 | machine-registry-completeness | All machine modules registered in clan |
+| TC-020 | home-module-exports | Every primary user's `contentPrivate` slot resolves to a non-empty config |
+| TC-023 | terraform-validate | Generated terraform passes `tofu validate` |
+| TC-028 | secrets-encryption-integrity | Every file under `secrets/` and every clan vars `secret` file is sops-encrypted |
+
+`structure-fleet` and `structure-home-configurations` in `modules/checks/structure/flake-shape.nix` pin the machine classes and the `homeConfigurations` names.
+Eval-time asserts in `modules/checks/machines.nix` require the clan inventory, `clan.machines`, `nixosConfigurations`, `darwinConfigurations` and the `modules/machines/<class>/` directories to agree.
 
 ### Performance tests (planned)
 
@@ -378,8 +375,8 @@ Run specific test categories:
 nix build .#checks.aarch64-darwin.nix-unit
 
 # Validation checks only
-nix build .#checks.aarch64-darwin.naming-conventions
-nix build .#checks.aarch64-darwin.terraform-validate
+nix build .#checks.x86_64-linux.home-module-exports
+nix build .#checks.x86_64-linux.terraform-validate
 ```
 
 ## See also

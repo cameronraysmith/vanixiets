@@ -125,30 +125,22 @@ The key properties of a well-designed relational invariant are explicit enumerat
 
 ## Vanixiets infrastructure invariants
 
-The vanixiets repository defines 9 structural invariants specific to declarative infrastructure management.
+The vanixiets repository enforces structural invariants specific to declarative infrastructure management.
 These validate properties of the clan configuration, home-manager modules, secrets architecture, and machine fleet that are not exercised by building packages alone.
+The value-only checks are defined on x86_64-linux alone, because their result does not depend on the build system.
 
-*clan-inventory-consistency* verifies that every machine listed in the clan inventory has a corresponding NixOS or nix-darwin configuration, and vice versa.
-Drift between the inventory and the configuration tree means a machine is either declared but unconfigured or configured but invisible to clan provisioning.
+*Eval-time fleet asserts* in `modules/checks/machines.nix` require `flake.lib.machineSystems`, the clan inventory, `clan.machines`, `nixosConfigurations`, `darwinConfigurations` and the `modules/machines/<class>/` directories to name the same machines.
+They are `assert` expressions on the module that defines the per-machine checks, so drift fails check evaluation rather than producing a failing derivation.
 
-*deployment-safety* validates that deployment-critical configurations (disk layout, bootloader, network identity) do not change without explicit intent markers.
-This catches accidental changes to disko layouts or network addresses that could brick a remote machine.
+*structure-fleet* pins every inventory machine and its class to a literal, which catches a machine dropped from every source at once, a case the relational asserts cannot see.
 
-*home-configurations-exposed* verifies that home-manager configurations are exposed as flake outputs for independent building and testing.
+*structure-home-configurations* pins the flat-tuple `"<user>@<system>"` names of `homeConfigurations`.
 
-*home-module-exports* validates that home-manager modules defined in the module tree are actually imported by at least one machine or user configuration.
-Orphaned modules indicate either dead code or a missing import.
+*home-module-exports* verifies that every primary user's `contentPrivate` slot resolves to a non-empty config, with phantom empty and authored entries in the same comparison so a predicate that always answers true also fails.
 
-*machine-registry-completeness* verifies that every machine in the fleet documentation table has a corresponding entry in the configuration tree.
+*secrets-encryption-integrity* requires every file under `secrets/` and every clan vars `secret` file to be sops-encrypted: a mapping with top-level `sops` metadata, an `ENC[...]` MAC, and no plaintext value outside declared unencrypted keys.
 
-*naming-conventions* enforces consistent naming across machine hostnames, user identifiers, secret paths, and module filenames.
-
-*secrets-encryption-integrity* validates that all sops-encrypted files can be decrypted with the expected key set.
-A missing key in `.sops.yaml` means a secret is encrypted for a key set that does not include all intended recipients.
-
-*secrets-tier-separation* verifies that secrets are organized into the correct tier (machine-scoped, user-scoped, shared) and that cross-tier references do not exist.
-
-*vars-user-password-validation* validates that clan vars for user passwords are defined for all machines that have those users, preventing machines from being provisioned without authentication credentials.
+*zerotier-mss-clamp* is a relational invariant between clan role membership and NixOS firewall rules: a nixosConfiguration carries `TCPMSS --set-mss 1300` exactly when it is a zerotier controller or peer.
 
 
 ## When to add invariants vs rely on build/eval checks

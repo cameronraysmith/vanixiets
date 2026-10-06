@@ -56,6 +56,7 @@ nix eval --json .#checks.aarch64-darwin --apply 'cs: builtins.mapAttrs (_: c: c.
 ```
 
 Expected: 17 `whole-tree` rows, the list in tasks.md 1.1.
+Superseded by the check cleanup: the 17-row baseline predates the removal of four validation checks; re-record it at the current revision.
 The flake source path changes whenever the shared working copy changes, so re-read `SRC` in the same shell as the evaluation.
 
 - [ ] **Step 2: Write the failing structural check with an empty allow-list.**
@@ -105,6 +106,7 @@ At the baseline the allow-list above is intentionally narrower than the tree, so
 Run: `nix build --option builders '' .#checks.aarch64-darwin.structure-check-source-isolation --no-link -L`.
 
 Expected: nonzero exit, and the diff lists `machine-registry-completeness`, `secrets-encryption-integrity`, `secrets-sops-roundtrip`, `secrets-tier-separation`, `treefmt`, `vars-user-password-validation` as present in `actual` and absent in `expected`.
+Superseded by the check cleanup: only `treefmt` of those six remains a direct offender; the others were removed or, for `secrets-encryption-integrity`, already read a restricted fileset.
 Also run `nix eval --raw .#checks.aarch64-darwin.structure-check-source-isolation.drvPath` to confirm pure evaluation succeeds.
 
 - [ ] **Step 4: Seed the allow-list with the seven direct offenders so the baseline is green.**
@@ -156,8 +158,11 @@ Temporarily set `fixtureSelf`'s `src` to the filtered source, run the same build
 Run: `nix eval --raw .#checks.aarch64-darwin.structure-check-source-isolation.actualJson`.
 
 Expected: exactly the seven names from tasks.md 1.4.
+Superseded by the check cleanup: see tasks.md 1.4.
 
 ## Task 2: Filter the five validation checks
+
+Superseded by the check cleanup: four of the five checks were removed and `secrets-encryption-integrity` already reads a fileset restricted to its secret files, so every step of this task is void.
 
 **Files:**
 
@@ -377,6 +382,7 @@ Expected: both exit 0; `gitleaks` is the only `whole-tree` row (122 rows on darw
 - [ ] **Step 3: Prove the probe fails on a regression.**
 
 Temporarily add `src = self;` to the `home-configurations-exposed` `runCommand` attributes in `modules/checks/validation.nix`, run `just check-source-audit`, expect exit 1 with `home-configurations-exposed` marked `whole-tree`, then revert.
+Superseded by the check cleanup: `home-configurations-exposed` was removed; target another `runCommand` check, such as `terraform-validate`.
 
 ## Task 6: Integration verification
 

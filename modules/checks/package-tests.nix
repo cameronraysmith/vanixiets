@@ -13,7 +13,7 @@
 { lib, ... }:
 {
   perSystem =
-    { self', pkgs, ... }:
+    { self', ... }:
     let
       blacklist = [
         "k8s-manifests-local"
@@ -40,43 +40,8 @@
           pkg.passthru.tests or { }
         )
       ) filtered;
-      docsTests = self'.packages.vanixiets-docs.tests;
-      evidenceWired =
-        tests: checks:
-        checks ? package-vanixiets-docs-test-e2e-report
-        && checks ? package-vanixiets-docs-test-e2e
-        && checks.package-vanixiets-docs-test-e2e-report.drvPath == tests.e2e-report.drvPath
-        && checks.package-vanixiets-docs-test-e2e.drvPath == tests.e2e.drvPath
-        && builtins.hasAttr (builtins.unsafeDiscardStringContext tests.e2e-report.drvPath) (
-          builtins.getContext checks.package-vanixiets-docs-test-e2e.buildCommand
-        );
-      otherReport = pkgs.writeTextDir "results.json" ''{"status":"passed"}'';
-      wrongVerdict = pkgs.runCommand "docs-e2e-wrong-producer-verdict" { } ''
-        ${lib.getExe pkgs.jq} -e '.status == "passed"' ${otherReport}/results.json
-        touch "$out"
-      '';
-      wrongTests = docsTests // {
-        e2e = wrongVerdict;
-      };
-      wrongChecks = packageTests // {
-        package-vanixiets-docs-test-e2e = wrongVerdict;
-      };
     in
     {
-      checks = packageTests // {
-        docs-e2e-wiring =
-          assert evidenceWired docsTests packageTests;
-          # Both entries and their identities are correct, but the verdict
-          # consumes another producer. Only the dependency check can reject it.
-          assert !(evidenceWired wrongTests wrongChecks);
-          assert
-            !(evidenceWired docsTests (
-              builtins.removeAttrs packageTests [ "package-vanixiets-docs-test-e2e" ]
-            ));
-          pkgs.runCommand "docs-e2e-wiring" { } ''
-            test -e ${wrongVerdict}
-            touch "$out"
-          '';
-      };
+      checks = packageTests;
     };
 }

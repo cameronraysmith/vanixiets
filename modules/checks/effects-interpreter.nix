@@ -27,9 +27,15 @@
 # NIXBOT_API_URL/NIXBOT_API_TOKEN show the rendered script leaves them in
 # the program's environment.
 #
+# The main-only guard (modules/lib/effect-run-context.nix) is exercised on
+# each token nixbot might mint and each way the fetch can fail: a push to
+# main runs, a push elsewhere or a pull_request token is skipped, and a
+# missing id-token endpoint or a failed fetch is refused.
+#
 # The program is a stub that records its argv and the secret variables, and
-# curl is stubbed for the nixbot id-token endpoint the main guard calls,
-# as in checks.effect-run-context. Secret values are dummies.
+# curl is stubbed for the nixbot id-token endpoint the main guard calls.
+# Secret values are dummies. Defined for x86_64-linux only, the system the
+# effects are bound to (modules/effects/vanixiets/effects.nix).
 {
   config,
   self,
@@ -43,7 +49,7 @@ let
 in
 {
   perSystem =
-    { pkgs, ... }:
+    { pkgs, system, ... }:
     let
       rev = "0123456789abcdef0123456789abcdef01234567";
 
@@ -252,6 +258,7 @@ in
           argv ? null,
           env ? null,
           nixbotApi ? false,
+          idTokenEndpoint ? true,
         }:
         let
           defaultTrigger = {
@@ -284,7 +291,7 @@ in
           status=0
           env -i PATH="$PATH" HOME="$TMPDIR" \
             HERCULES_CI_SECRETS_JSON="$PWD/secrets.json" \
-            NIXBOT_ID_TOKEN_REQUEST_URL=https://nixbot.invalid/api/v1/id-token \
+            ${lib.optionalString idTokenEndpoint "NIXBOT_ID_TOKEN_REQUEST_URL=https://nixbot.invalid/api/v1/id-token"} \
             NIXBOT_ID_TOKEN_REQUEST_TOKEN=task-token \
             ${lib.optionalString nixbotApi "NIXBOT_API_URL=https://nixbot.invalid NIXBOT_API_TOKEN=task-token"} \
             effectScript="$(cat ${script})" \
@@ -381,9 +388,8 @@ in
           pullRequest = [ "GITHUB_FORGE_TOKEN" ];
         };
       };
-    in
-    {
-      checks.effects-interpreter =
+
+      effects-interpreter =
         pkgs.runCommand "effects-interpreter"
           {
             nativeBuildInputs = [
@@ -500,6 +506,38 @@ in
                 expect = [
                   "EFFECT-GUARD: skipping outside a push to main (event=push ref=refs/heads/gitea-mq/batch/7)"
                 ];
+              }
+              {
+                name = "main on a pull_request token is skipped";
+                kind = "main";
+                claims = {
+                  event = "pull_request";
+                  pr_number = 42;
+                  base_ref = "refs/heads/main";
+                };
+                secretsJson = { };
+                status = 0;
+                expect = [
+                  "EFFECT-GUARD: skipping outside a push to main (event=pull_request ref=)"
+                ];
+              }
+              {
+                name = "main without the id-token endpoint is refused";
+                kind = "main";
+                claims = mainClaims;
+                idTokenEndpoint = false;
+                secretsJson = { };
+                status = 1;
+                expect = [
+                  "EFFECT-GUARD: NIXBOT_ID_TOKEN_REQUEST_URL and NIXBOT_ID_TOKEN_REQUEST_TOKEN are required; declare idTokenAudiences on the effect"
+                ];
+              }
+              {
+                name = "main whose id-token fetch fails is refused";
+                kind = "main";
+                secretsJson = { };
+                status = 1;
+                expect = [ "EFFECT-GUARD: failed to obtain an id token from nixbot" ];
               }
               {
                 name = "missing secret fails before the program runs";
@@ -702,5 +740,10 @@ in
 
             touch $out
           '';
+    in
+    {
+      checks = lib.optionalAttrs (system == "x86_64-linux") {
+        inherit effects-interpreter;
+      };
     };
 }

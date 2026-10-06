@@ -50,7 +50,13 @@
 { ... }:
 {
   perSystem =
-    { pkgs, config, ... }:
+    {
+      pkgs,
+      lib,
+      config,
+      system,
+      ...
+    }:
     let
       releasePackagesProgram = config.apps.release-packages.program;
       listPackagesProgram = config.apps.list-packages-json.program;
@@ -121,9 +127,8 @@
             f.write(str(server.server_port))
         server.serve_forever()
       '';
-    in
-    {
-      checks.release-rehearsal =
+
+      release-rehearsal =
         pkgs.runCommand "release-rehearsal"
           {
             nativeBuildInputs = [
@@ -133,8 +138,6 @@
               pkgs.coreutils
               pkgs.gnugrep
             ];
-            # The stub listens on loopback, which the darwin sandbox otherwise denies.
-            __darwinAllowLocalNetworking = true;
             meta.description = "behavioural check: release-packages cuts a docs release and plans a PR's release against a local GitHub stand-in";
           }
           ''
@@ -533,5 +536,10 @@
 
             touch $out
           '';
+    in
+    {
+      checks = lib.optionalAttrs (system == "x86_64-linux") {
+        inherit release-rehearsal;
+      };
     };
 }

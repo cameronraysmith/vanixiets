@@ -99,17 +99,14 @@ Darwin configurations are not built in CI due to lack of macOS runners.
 
 The flake defines checks in `modules/checks/` that run during `nix flake check`:
 
-**Validation checks** (all platforms):
-- `home-module-exports` — validates home modules exported to flake.modules.homeManager namespace
-- `home-configurations-exposed` — validates flat-tuple homeConfigurations (`"<user>@<system>"`) exposed for nh CLI
-- `naming-conventions` — validates consistent kebab-case naming across machines
-- `terraform-validate` — validates generated terraform is syntactically correct
-- `deployment-safety` — verifies terraform configuration safety patterns
-- `vars-user-password-validation` — validates clan vars system for user password management
-- `secrets-tier-separation` — validates secrets tier separation (vars vs secrets)
-- `clan-inventory-consistency` — validates clan inventory references valid machines
-- `secrets-encryption-integrity` — validates all secrets are SOPS-encrypted
-- `machine-registry-completeness` — validates all machine modules are registered in clan
+**Validation checks** (x86_64-linux only):
+- `home-module-exports` — validates every primary user's `contentPrivate` slot resolves to a non-empty config
+- `terraform-validate` — validates generated terraform with `tofu validate`
+- `secrets-encryption-integrity` — validates every file under `secrets/` and every clan vars `secret` file is sops-encrypted
+- `structure-fleet` — pins every clan inventory machine and its class
+- `structure-home-configurations` — pins the flat-tuple homeConfigurations (`"<user>@<system>"`) names used by the nh CLI
+
+Eval-time asserts in `modules/checks/machines.nix` require the clan inventory, `clan.machines`, the per-class configurations and the `modules/machines/<class>/` directories to agree; check evaluation fails when they diverge.
 
 **Other checks**:
 - `nix-unit` — unit tests for flake structure and module exports

@@ -1,82 +1,66 @@
-# Structural shape checks for top-level flake outputs.
+# Literal pins on the fleet and home-configuration sets.
 #
-# These assertions enumerate machine and configuration sets and compare
-# attribute-name lists to a literal expectation. Failures point at silent
-# drift between the inventory (clan/inventory/machines.nix), the per-system
-# discovery namespaces, and the consumer-facing flake outputs.
+# The eval-time asserts in modules/checks/machines.nix already require the
+# inventory, clan.machines, the per-class nixos/darwinConfigurations and the
+# modules/machines/<class>/ directories to agree with each other. What they
+# cannot catch is a machine or user dropped from all of them at once: the
+# per-machine and per-user checks would simply disappear. These pins fail
+# in that case, and the fleet pin also fails when a machine's class flips.
 #
-# Implemented as runCommand JSON-diff (via flake.lib.mkStructuralCheck)
-# rather than nix-unit because the assertion target is a pure attribute-name
-# list computed at outer eval time. nix-unit's expression-evaluation harness
-# adds no value over `diff -u` here.
-{
-  self,
-  lib,
-  config,
-  ...
-}:
+# The values do not depend on the build system, so the checks exist only on
+# x86_64-linux. Update the literals deliberately when adding or retiring a
+# machine or user (`nix eval .#homeConfigurations --apply builtins.attrNames`).
+{ self, lib, ... }:
 {
   perSystem =
-    { pkgs, ... }:
+    { pkgs, system, ... }:
     let
       mkCheck = self.lib.mkStructuralCheck pkgs;
-      sortedNames = attrset: lib.naturalSort (builtins.attrNames attrset);
     in
     {
-      checks = {
-        structure-inventory-machines = mkCheck {
-          name = "inventory-machines";
-          actual = sortedNames self.clan.inventory.machines;
-          expected = [
-            "argentum"
-            "blackphos"
-            "cinnabar"
-            "electrum"
-            "galena"
-            "magnetite"
-            "pyrite"
-            "rosegold"
-            "scheelite"
-            "stibnite"
-          ];
-        };
-
-        structure-nixos-configurations = mkCheck {
-          name = "nixos-configurations";
-          actual = sortedNames self.nixosConfigurations;
-          expected = [
-            "cinnabar"
-            "electrum"
-            "galena"
-            "magnetite"
-            "pyrite"
-            "scheelite"
-          ];
-        };
-
-        structure-darwin-configurations = mkCheck {
-          name = "darwin-configurations";
-          actual = sortedNames self.darwinConfigurations;
-          expected = [
-            "argentum"
-            "blackphos"
-            "rosegold"
-            "stibnite"
-          ];
-        };
-
-        structure-home-configurations =
-          let
-            enumerableUsers = lib.attrNames (lib.filterAttrs (_: u: u.aggregates != [ ]) config.flake.users);
-            expectedKeys = lib.naturalSort (
-              lib.concatMap (u: map (s: "${u}@${s}") config.flake.users.${u}.systems) enumerableUsers
-            );
-          in
-          mkCheck {
-            name = "home-configurations";
-            actual = sortedNames self.homeConfigurations;
-            expected = expectedKeys;
+      checks = lib.optionalAttrs (system == "x86_64-linux") {
+        structure-fleet = mkCheck {
+          name = "fleet";
+          actual = lib.mapAttrs (_: m: m.machineClass) self.clan.inventory.machines;
+          expected = {
+            argentum = "darwin";
+            blackphos = "darwin";
+            cinnabar = "nixos";
+            electrum = "nixos";
+            galena = "nixos";
+            magnetite = "nixos";
+            pyrite = "nixos";
+            rosegold = "darwin";
+            scheelite = "nixos";
+            stibnite = "darwin";
           };
+        };
+
+        structure-home-configurations = mkCheck {
+          name = "home-configurations";
+          actual = builtins.attrNames self.homeConfigurations;
+          expected = [
+            "cameron@aarch64-darwin"
+            "cameron@aarch64-linux"
+            "cameron@x86_64-linux"
+            "christophersmith@aarch64-darwin"
+            "christophersmith@aarch64-linux"
+            "christophersmith@x86_64-linux"
+            "crs58@aarch64-darwin"
+            "crs58@aarch64-linux"
+            "crs58@x86_64-linux"
+            "janettesmith@aarch64-darwin"
+            "janettesmith@aarch64-linux"
+            "janettesmith@x86_64-linux"
+            "raquel@aarch64-darwin"
+            "raquel@aarch64-linux"
+            "raquel@x86_64-linux"
+            "tara@aarch64-darwin"
+            "tara@aarch64-linux"
+            "tara@x86_64-linux"
+            "ubuntu@x86_64-linux"
+          ];
+        };
       };
     };
 }

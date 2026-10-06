@@ -9,18 +9,16 @@
 # function the hosts use, around a stub evaluator that reports its arguments
 # and oom_score_adj and can be held open until the row releases it.
 #
-# Linux adds the rows that need /proc: the oom_score_adj the evaluator runs
-# at, the holder named from /proc/locks, and nixbot's situation reproduced
-# with bubblewrap — the lock reached through a read-only bind mount from a
-# separate PID namespace, in both directions. darwin runs the lock rows only;
-# the hosts that install the wrapper are Linux.
+# The rows that need /proc check the oom_score_adj the evaluator runs at, the
+# holder named from /proc/locks, and nixbot's situation reproduced with
+# bubblewrap — the lock reached through a read-only bind mount from a separate
+# PID namespace, in both directions. Defined for x86_64-linux only: the hosts
+# that install the wrapper are Linux.
 { self, lib, ... }:
 {
   perSystem =
-    { pkgs, ... }:
+    { pkgs, system, ... }:
     let
-      isLinux = pkgs.stdenv.hostPlatform.isLinux;
-
       stub = pkgs.writeScriptBin "nix-eval-jobs-stub" ''
         #!${pkgs.runtimeShell}
         echo "EVALUATOR: args=$*"
@@ -55,17 +53,16 @@
           --bind "$TMPDIR/work" "$TMPDIR/work" \
           --ro-bind "$TMPDIR/work/lock" "$TMPDIR/work/lock" \
           --chdir "$TMPDIR/work"'';
-    in
-    {
-      checks.nix-eval-lock-rehearsal =
+
+      nix-eval-lock-rehearsal =
         pkgs.runCommand "nix-eval-lock-rehearsal"
           {
             nativeBuildInputs = [
               wrapper
               pkgs.coreutils
               pkgs.gnugrep
-            ]
-            ++ lib.optional isLinux pkgs.bubblewrap;
+              pkgs.bubblewrap
+            ];
             meta.description = "behavioural check: host evaluation lock around nix-eval-jobs";
           }
           ''
@@ -102,7 +99,7 @@
             echo "--- uncontended: execs the evaluator with the arguments"
             nix-eval-jobs --flake '.#checks' --workers 2 > run/a.out 2> run/a.err
             expect_line run/a.out "EVALUATOR: args=--flake .#checks --workers 2"
-            ${lib.optionalString isLinux ''expect_line run/a.out "EVALUATOR: oom_score_adj=900"''}
+            expect_line run/a.out "EVALUATOR: oom_score_adj=900"
             [ ! -s run/a.err ] || { cat run/a.err; fail "uncontended run wrote to stderr"; }
 
             echo "--- exit status propagates"
@@ -124,17 +121,10 @@
             nix-eval-jobs waiter > run/w1.out 2> run/w1.err &
             waiter=$!
             await -F "nix-eval-jobs: waiting for the host evaluation lock" run/w1.err || fail "waiter printed no waiting line"
-            ${
-              if isLinux then
-                ''
-                  # Named from /proc/locks: the holder is the wrapper's own pid,
-                  # which exec handed to the evaluator.
-                  grep -qE "^nix-eval-jobs: waiting for the host evaluation lock held by $me pid $holder since [0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}[+-][0-9]{2}:[0-9]{2} \(bash .*/bin/nix-eval-jobs-stub holder\)${lib.escapeRegex waitingTail}$" run/w1.err \
-                    || { cat run/w1.err; fail "waiting line does not name the holder"; }
-                ''
-              else
-                "expect_line run/w1.err ${lib.escapeShellArg invisibleLine}"
-            }
+            # Named from /proc/locks: the holder is the wrapper's own pid,
+            # which exec handed to the evaluator.
+            grep -qE "^nix-eval-jobs: waiting for the host evaluation lock held by $me pid $holder since [0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}[+-][0-9]{2}:[0-9]{2} \(bash .*/bin/nix-eval-jobs-stub holder\)${lib.escapeRegex waitingTail}$" run/w1.err \
+              || { cat run/w1.err; fail "waiting line does not name the holder"; }
             sleep 1
             grep -q '^EVALUATOR' run/w1.out && fail "waiter ran its evaluator while the lock was held"
             : > run/release1
@@ -154,40 +144,43 @@
             wait "$waiter" || fail "waiter did not proceed after the holder was killed"
             expect_line run/w2.out "EVALUATOR: args=survivor"
 
-            ${lib.optionalString isLinux ''
-              echo "--- sandboxed waiter (nixbot's case): read-only lock, holder invisible"
-              HOLD_UNTIL=run/release3 nix-eval-jobs outside > /dev/null 2>&1 &
-              holder=$!
-              await_file run/release3.started || fail "holder never started"
-              ${bwrap} nix-eval-jobs inside > run/w3.out 2> run/w3.err &
-              waiter=$!
-              await -F "waiting for the host evaluation lock" run/w3.err || { cat run/w3.err; fail "sandboxed waiter printed no waiting line"; }
-              expect_line run/w3.err ${lib.escapeShellArg invisibleLine}
-              sleep 1
-              grep -q '^EVALUATOR' run/w3.out && fail "sandboxed waiter ran while the lock was held outside"
-              : > run/release3
-              wait "$holder" || fail "holder failed"
-              wait "$waiter" || { cat run/w3.err; fail "sandboxed waiter failed after release"; }
-              expect_line run/w3.out "EVALUATOR: args=inside"
-              expect_line run/w3.out "EVALUATOR: oom_score_adj=900"
+            echo "--- sandboxed waiter (nixbot's case): read-only lock, holder invisible"
+            HOLD_UNTIL=run/release3 nix-eval-jobs outside > /dev/null 2>&1 &
+            holder=$!
+            await_file run/release3.started || fail "holder never started"
+            ${bwrap} nix-eval-jobs inside > run/w3.out 2> run/w3.err &
+            waiter=$!
+            await -F "waiting for the host evaluation lock" run/w3.err || { cat run/w3.err; fail "sandboxed waiter printed no waiting line"; }
+            expect_line run/w3.err ${lib.escapeShellArg invisibleLine}
+            sleep 1
+            grep -q '^EVALUATOR' run/w3.out && fail "sandboxed waiter ran while the lock was held outside"
+            : > run/release3
+            wait "$holder" || fail "holder failed"
+            wait "$waiter" || { cat run/w3.err; fail "sandboxed waiter failed after release"; }
+            expect_line run/w3.out "EVALUATOR: args=inside"
+            expect_line run/w3.out "EVALUATOR: oom_score_adj=900"
 
-              echo "--- sandboxed holder: an outside waiter names it"
-              HOLD_UNTIL=run/release4 ${bwrap} nix-eval-jobs sandboxed > /dev/null 2>&1 &
-              holder=$!
-              await_file run/release4.started || fail "sandboxed holder never started"
-              nix-eval-jobs outside > run/w4.out 2> run/w4.err &
-              waiter=$!
-              await -F "waiting for the host evaluation lock" run/w4.err || fail "outside waiter printed no waiting line"
-              grep -qE "^nix-eval-jobs: waiting for the host evaluation lock held by $me pid [0-9]+ since .* \(bash .*/bin/nix-eval-jobs-stub sandboxed\)${lib.escapeRegex waitingTail}$" run/w4.err \
-                || { cat run/w4.err; fail "outside waiter does not name the sandboxed holder"; }
-              : > run/release4
-              wait "$holder" || fail "sandboxed holder failed"
-              wait "$waiter" || fail "outside waiter failed after release"
-              expect_line run/w4.out "EVALUATOR: args=outside"
-            ''}
+            echo "--- sandboxed holder: an outside waiter names it"
+            HOLD_UNTIL=run/release4 ${bwrap} nix-eval-jobs sandboxed > /dev/null 2>&1 &
+            holder=$!
+            await_file run/release4.started || fail "sandboxed holder never started"
+            nix-eval-jobs outside > run/w4.out 2> run/w4.err &
+            waiter=$!
+            await -F "waiting for the host evaluation lock" run/w4.err || fail "outside waiter printed no waiting line"
+            grep -qE "^nix-eval-jobs: waiting for the host evaluation lock held by $me pid [0-9]+ since .* \(bash .*/bin/nix-eval-jobs-stub sandboxed\)${lib.escapeRegex waitingTail}$" run/w4.err \
+              || { cat run/w4.err; fail "outside waiter does not name the sandboxed holder"; }
+            : > run/release4
+            wait "$holder" || fail "sandboxed holder failed"
+            wait "$waiter" || fail "outside waiter failed after release"
+            expect_line run/w4.out "EVALUATOR: args=outside"
 
             mkdir -p "$out"
             cp run/*.err "$out/"
           '';
+    in
+    {
+      checks = lib.optionalAttrs (system == "x86_64-linux") {
+        inherit nix-eval-lock-rehearsal;
+      };
     };
 }
