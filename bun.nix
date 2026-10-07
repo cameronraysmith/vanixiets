@@ -4407,10 +4407,6 @@
     url = "https://registry.npmjs.org/wrangler/-/wrangler-4.146.0.tgz";
     hash = "sha512-c27eHUH0Isr8HTmgZ6cLtLr/0cxtiBoLren6ywBeTW8ZIzj/dINVNBcqsbZc+iETnI5jrzO7E7Z8mLgLZ/l9iw==";
   };
-  "wrangler@4.147.0" = fetchurl {
-    url = "https://registry.npmjs.org/wrangler/-/wrangler-4.147.0.tgz";
-    hash = "sha512-pQYRoiq8PTAxphaG69z8+GC1DkSGd19EDZehQ8zxjo/Ko3mRB6Qs1mTrd8ZuKAarLklIjTqr1lUdCK9r4q2hUg==";
-  };
   "wrangler@4.148.0" = fetchurl {
     url = "https://registry.npmjs.org/wrangler/-/wrangler-4.148.0.tgz";
     hash = "sha512-wgbll8cA/7qOMJSoYQuJrw9M9lmedGzYtg6wvUK2p/7G1KaE88jFmQ/CvtQzVUF9C8PQtC4Y5p9vbpAsJGAlpA==";
