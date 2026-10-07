@@ -38,6 +38,14 @@ Individual checks are addressable, so the narrowest useful selection is usually 
 Check definitions live under `modules/checks/`.
 Many, particularly those built through `mkStructuralCheck` in `validation.nix`, carry a `passthru.meta.description` naming what they validate, but this is not universal — files such as `package-tests.nix`, `aeneas-toolchain.nix`, and `home.nix` define checks without that field, so consult the file directly rather than assuming the annotation is present.
 
+A check is not free once written: nixbot evaluates every check attribute on every system on every pull request, whether or not the derivation is cached, so evaluation rather than building is this repository's binding CI cost.
+Two invariants carry most of that cost and are easy to violate without noticing.
+A check module's attribute names must derive only from static data — literals, the `system` string, clan inventory metadata, flake-level `lib` — and never from an evaluated NixOS, nix-darwin, or home-manager configuration or an instantiated `pkgs`, because attribute sets are strict in their keys and every evaluator worker pays for the whole key set before it can select one check.
+A check whose derivation would be identical on every system belongs to exactly one of them, while a check whose derivation genuinely differs per platform must stay per system.
+Before adding, removing, or restructuring a check, read the `preferences-nix-checks-architecture` skill, whose `references/evaluation-cost.md` carries the measurement protocol and the derivation-path oracle that any evaluation refactor must pass, and whose `references/check-vacuity.md` carries the patterns that decide whether a proposed check can fail at all.
+
+`preferences-nix-development` governs the Nix code itself, including the rule that this repository instantiates one nixpkgs per system and the hard constraint that an upstream flake input's nixpkgs is never redirected with `follows`, because that changes the input's store paths and forfeits its binary cache.
+
 Documentation has its own lane under `packages/docs`: `just docs-lint`, `just docs-check`, and the `just docs-test-*` recipes.
 
 ## Version control
@@ -50,6 +58,10 @@ Approving a PR does not land it: no ruleset requires review, and the enqueue sig
 For an ordinary trunk-based PR, enqueue with `gh pr merge <PR> --auto --rebase`; for a registered stack, label the topmost intended PR `merge-queue` and never enable auto-merge on any member.
 `gh-queue-open-prs` evaluates every open PR against the ruleset-derived required set and enqueues the green ones in bulk; `gh-queue-open-prs -n` reports without acting.
 External handoff follows `git-stacked-pr-integration` §Queue authorization in every local VCS mode.
+
+A green `nixbot/nix-build` is not the same as every check having passed.
+The aarch64-darwin checks are best-effort through `modules/checks/nixbot-best-effort-darwin.nix`, which marks their failures `ignored_failure` so an asleep or unreachable Mac builder cannot block the queue; the flag concerns builder availability, never correctness.
+Read those failures before enqueueing rather than treating the aggregate status as the whole answer, because a genuine platform-specific break — an upstream package that compiles only with the other platform's toolchain, say — presents exactly as an ignored failure and would otherwise reach `main` unnoticed.
 
 Checkouts of this repository are commonly colocated with [jujutsu](https://jj-vcs.github.io/jj/), in which case a detached git `HEAD` is normal and must not be reattached.
 Because this is a flake repository, flake evaluation resolves the root through git, so a second working tree must be created with `git worktree add` rather than `jj workspace add`.
