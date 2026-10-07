@@ -9,8 +9,8 @@ let
   release = kernel.modDirVersion;
   kernelBuild = "${kernel.dev}/lib/modules/${release}/build";
 in
-assert lib.assertMsg (kernel.version == "6.18.53" && release == "6.18.53")
-  "hci-uart-macbook: only Linux 6.18.53 has been checked; revalidate source, prepared configuration, ABI and effective module selection before updating";
+assert lib.assertMsg (kernel.version == "6.18.55" && release == "6.18.55")
+  "hci-uart-macbook: only Linux 6.18.55 has been checked; revalidate source, prepared configuration, ABI and effective module selection before updating";
 kernel.stdenv.mkDerivation {
   pname = "hci-uart-macbook";
   version = "0-unstable-2026-09-14-${release}";
@@ -79,9 +79,9 @@ kernel.stdenv.mkDerivation {
     ln -s ${kernel.dev}/vmlinux prepared/vmlinux
     test "$(cat prepared/include/config/kernel.release)" = '${release}'
     sha256sum -c <<'HASHES'
-    e48aa54263727dd0fafc7a741bde1697786bb431bc549348054ed47e4c958497  prepared/.config
-    46b541c02d6c66f3465f494e94e15fd5bf48b020f497fd6a193e6b855a39f42f  prepared/Module.symvers
-    802e7e246db27a905af0ed1f64505e8bba7e89a7cdc73d0bb0ce2c1fe8f8cedc  prepared/include/generated/autoconf.h
+    25734de0f461a508cfb9b8276fb0525621b444b72e076491775fbda67052bf84  prepared/.config
+    904449eaf2d342156be0a1c78f798b6511fe99ed47e9f718f9e1e1f305e74335  prepared/Module.symvers
+    8219e2179a64e3ff447ac93ed579731c20699e5de22d9588d25692ca1e79e98b  prepared/include/generated/autoconf.h
     HASHES
     flagsArray=()
     concatTo flagsArray makeFlags makeFlagsArray
@@ -107,7 +107,7 @@ kernel.stdenv.mkDerivation {
     module="$out/lib/modules/${release}/updates/bluetooth/hci_uart.ko"
     test "$(find "$out" -type f | wc -l)" -eq 1
     test "$(modinfo -F name "$module")" = hci_uart
-    test "$(modinfo -F srcversion "$module")" = C2A6853CD07EA9F1F38B35A
+    test "$(modinfo -F srcversion "$module")" = 36378DEB88C10B003AC8D9B
     case "$(modinfo -F vermagic "$module")" in
       '${release} '*) ;;
       *) echo 'Module/kernel release mismatch' >&2; exit 1 ;;

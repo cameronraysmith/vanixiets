@@ -86,7 +86,6 @@
         settings = {
           server = {
             HTTP_PORT = 3002;
-            DOMAIN = "git.scientistexperience.net";
             ROOT_URL = "https://git.scientistexperience.net";
             LANDING_PAGE = "explore";
           };
