@@ -5,9 +5,11 @@ description: >
   and buildbot-nix. Use when designing CI pipelines for nix-based repositories,
   migrating from hand-crafted CI matrices to nix-native check fanout, configuring
   buildbot-nix project registration, or planning binary cache strategy. Also load
-  when the two-phase migration pattern (GHA+nix-fast-build to buildbot-nix delegation)
-  or the effect execution strategy decision (platform-native vs nix-native effects)
-  is relevant.
+  when sizing nix-eval-jobs evaluation workers and memory budgets, when reading
+  nix-eval/nix-build statuses, cached or best-effort (ignored-failure) attributes
+  before merging, when working with the merge queue, or when the two-phase
+  migration pattern (GHA+nix-fast-build to buildbot-nix delegation) or the effect
+  execution strategy decision (platform-native vs nix-native effects) is relevant.
 ---
 
 # Nix CI/CD integration
@@ -24,6 +26,7 @@ The two-phase migration pattern provides the transition path from existing CI to
 The effect execution strategies cover continuous delivery.
 The binary cache strategy covers build artifact management.
 Pipeline observability covers operational visibility.
+The merge-confidence feedback loop covers how those signals are read to decide that a pull request is safe to land.
 
 
 ## The nix-native CI principle
@@ -67,17 +70,45 @@ The tool handles failure isolation: when one derivation fails to build, other de
 This is a substantial improvement over `nix flake check`, which aborts on the first failure.
 The key flags for CI integration:
 
-- `--eval-workers N` controls the number of parallel evaluation workers. Setting this to 4 rather than the default reduces SQLite eval-cache contention, which manifests as lock timeout errors under high parallelism.
+- `--eval-workers N` and `--eval-max-memory-size MiB` together set the evaluator's parallelism and its memory budget. They are sized jointly by measurement on the host that runs them, as described below.
 - `--niks3-server URL` uploads built paths to a self-hosted niks3 cache. Cache lookups use nix's `substituters` configuration, which is separate.
 - `--result-format junit` produces JUnit XML output that CI platforms parse for per-check reporting in their dashboards.
 - `--skip-cached` avoids rebuilding derivations that already exist in the configured binary cache.
 - `--no-nom` forces the non-interactive per-build log renderer even on a terminal. The name is historical: since 2.0 nix-fast-build renders build logs itself and no longer uses nix output monitor (nom). The interactive renderer already disables itself when stderr or stdin is not a TTY, so CI log capture does not require the flag; passing it is explicit rather than necessary.
 
-The `--eval-workers` flag deserves elaboration because the default behavior can cause CI failures that are difficult to diagnose.
-nix-eval-jobs evaluates flake outputs by forking multiple worker processes, each of which accesses the nix eval cache (a SQLite database).
-Under high parallelism, SQLite write locks cause contention that manifests as "database is locked" errors or evaluation timeouts.
-Setting `--eval-workers 4` bounds the contention to a manageable level.
-The optimal value depends on the flake's evaluation complexity and the system's I/O performance, but 4 is a reliable default for CI.
+The `--eval-workers` flag deserves elaboration because both its rationale and its value are commonly copied from elsewhere, and neither transfers between hosts.
+nix-eval-jobs evaluates flake outputs by forking worker processes, each of which accesses the nix eval cache (a SQLite database).
+Under high parallelism, SQLite write locks can cause contention that manifests as "database is locked" errors or evaluation timeouts, and that is one reason to bound the worker count.
+It is not the constraint that governs sizing on a memory-bound CI host.
+
+The constraint that does govern it is memory.
+nix-eval-jobs documents in its README that `workers x max-memory-size` is a single shared memory budget for the whole evaluation.
+A worker whose heap exceeds its share is not killed mid-attribute; it finishes the attribute in flight, exits, and is replaced by a fresh worker before the next attribute.
+nix-eval-jobs runs the Boehm collector with `GC_DONT_GC=1`, so a worker's heap only grows until it is recycled.
+Sizing is therefore a tradeoff between parallelism and restart frequency: more workers each get a smaller share and recycle more often.
+The price of a restart is whatever fixed work a fresh worker must redo before it can evaluate its first attribute, which is at minimum the strict key set of the attribute set it is reaching into (see §"Key-set strictness" under §"Evaluation cost as a design constraint" in `preferences-nix-checks-architecture`).
+In this repository a check module once derived its key set from six evaluated NixOS machine configurations, so every fresh worker paid ~930 MiB and ~3 s before evaluating anything, and that cost was paid ~26 times per run; after the fix a trivial check costs 89 MiB and 0.27 s.
+Restart frequency is only cheap when that fixed cost is small, so the worker sizing and the flake's evaluation structure have to be read together.
+
+The measured sizing for this fleet's CI host (magnetite, 16 vCPU, 30.6 GiB RAM) over a 311-attribute, two-system scope (`x86_64-linux` and `aarch64-darwin`) is recorded in `modules/nixos/nixbot.nix`:
+
+| workers x max-memory-size | wall time | restarts |
+|---|---|---|
+| 6 x 3072 MiB | 341 s | 24 |
+| 5 x 4096 MiB | 419 s | 20 |
+| 4 x 4096 MiB | 476 s | 16 |
+| 8 x 2048 MiB | 505 s | 42 |
+
+6 x 3072 MiB was chosen.
+More parallelism won there because most attributes are small, so a worker evaluates many of them between restarts and the extra workers convert directly into throughput.
+Pushing to 8 workers shrank each share to 2048 MiB, which nearly doubled the restarts and lost more to repeated fixed work than the extra workers gained.
+A different host, a different attribute scope, or a flake with a heavier per-worker fixed cost would put the optimum elsewhere, which is why the table is evidence for a method rather than a constant to copy.
+The pyrite laptop, with 15.5 GiB, runs `--eval-workers 2 --eval-max-memory-size 2048` for the same reason (see `nix-flake-pr-cycle`).
+
+The method is to measure on the actual host rather than adopt a default: run the real attribute scope under a few candidate `workers x max-memory-size` products, record wall time, peak memory, and restart count, and choose the fastest configuration whose peak leaves headroom for concurrent builds.
+Any evaluation run on a production host must also keep a hard memory bound, both through the nix-eval-jobs budget and through the service's cgroup limits.
+The hazard is not hypothetical: an unbounded evaluation probe on this fleet's CI host exhausted memory and hard-reset the machine via the kernel watchdog.
+The host-wide evaluation lock that serializes remote `nix-eval-jobs` runs against nixbot's own evaluation exists for the same reason.
 
 Two execution modes serve different contexts in the justfile convention.
 `just check` runs sequential `nix flake check`, which is appropriate for local development where the developer watches output interactively and benefits from nom's progress display.
@@ -380,6 +411,38 @@ The three observability categories (cache hit rate, per-check timing, dogfooding
 CI platforms already provide the dashboards; the nix-native CI approach ensures the data feeding those dashboards is structured and per-attribute rather than monolithic.
 
 
+## The merge-confidence feedback loop
+
+Merging is safe in this repository because of a loop, not because of any single check.
+The loop is only as trustworthy as the reading of its signals, so this section separates what each signal is evidence of from what it is not.
+
+Every pull request gets one evaluation of the flake's check scope followed by per-attribute builds, and nixbot reports them as separate `nixbot/nix-eval` and `nixbot/nix-build` statuses alongside `nixbot/effects`.
+The split is deliberate.
+An evaluation error means the flake cannot even describe the derivation, which no builder could have caused and no retry will fix; a build failure means a described derivation failed to realize, which can be a regression, a flaky builder, or an absent one.
+Collapsing the two into one status would force a reader to open logs to learn which kind of failure they are looking at.
+
+An attribute reported as cached is not evidence that this run verified it.
+It is evidence that a derivation with the identical store path, and therefore identical inputs, was built and verified before, and content addressing is what makes that earlier verification transfer to the current commit.
+That is the point of the binary cache strategy above, and it is also its limit: a cached check is exactly as strong as the check was when it first ran, so a vacuous check stays vacuous at every cache hit (see §"Operationalizing integrity" in `preferences-nix-checks-architecture`).
+
+Best-effort attributes exist because some builders are not always present.
+The `aarch64-darwin` checks can only build on a Mac reachable from the CI host, and those Macs are laptops that sleep and travel, so `modules/checks/nixbot-best-effort-darwin.nix` marks every darwin check with `ignoreFailure`, which removes it from the aggregate build status.
+That marking must be a deliberate per-platform decision documented next to the code, never a way to make a red status go away.
+The ignore flag encodes availability, not correctness: the CI system cannot distinguish an absent builder from a genuine regression, so an ignored failure must still be read.
+The instance that justifies this rule: six Darwin closures failed as ignored failures, and the real cause was a genuine package break on that platform, which would have reached `main` unnoticed had the ignore flag been trusted.
+A darwin evaluation error is not covered by the flag at all, because it fails `nix-eval` before the modifier is read, which is correct for an error no builder could have caused.
+For darwin, local `just check-fast` on a Mac remains the gate the CI status cannot be.
+
+When every required status is green, the merge queue (`modules/nixos/gitea-mq.nix`, required checks `nixbot/nix-eval`, `nixbot/nix-build`, `nixbot/effects`) lands the pull request.
+The queue batches up to 20 pull requests and evaluates the batch once rather than each pull request separately, then fast-forwards the target to the exact tested batch commit.
+Stacking several green pull requests into one batch therefore costs one evaluation instead of one per pull request, which matters once a single evaluation is measured in minutes and tens of GiB.
+
+The loop only tightens if each run's cost is observable.
+An evaluation scope that grows by accretion is invisible in a pass/fail status: in this repository CI evaluated 311 check attributes at ~92 GiB of evaluator allocation and ~400 s before anyone measured it, and two corrective pull requests brought it to 235 attributes, ~45 GiB, and ~218 s with no coverage anyone wanted lost.
+Record evaluation wall time, peak memory, worker restarts, and attribute count per run alongside the cache hit rate and per-check timing described in §"Pipeline observability", and treat a rise in any of them as a regression to explain.
+What to measure and how to attribute the cost to individual attributes is covered in `references/evaluation-cost.md` of `preferences-nix-checks-architecture`.
+
+
 ## Cross-references
 
 This skill sits at the intersection of several other preference skills, each covering a complementary aspect of the nix-based development workflow.
@@ -388,6 +451,7 @@ This skill sits at the intersection of several other preference skills, each cov
 It answers *what* to build; this skill answers *where* and *how* to run it.
 The two skills are designed to be loaded together when working on CI pipeline design, as the check architecture directly determines the CI pipeline's structure.
 The §"Choosing among integration regulators" three-way framing (process-compose / nspawn container test / full QEMU VM test) is the input to the worker-capability fan-out planning described above.
+Its §"Evaluation cost as a design constraint" and `references/evaluation-cost.md` explain the per-worker fixed cost that drives `--eval-workers` sizing and that the merge-confidence loop must keep observable, and its §"Operationalizing integrity" and `references/check-vacuity.md` explain why a green or cached check is only evidence if the check could have failed.
 
 `preferences-nix-development` covers flake conventions, module structure, and derivation best practices that underpin both check derivation design and the flake outputs that CI tools consume.
 The `perSystem` convention from flake-parts determines the attribute paths that `buildbot-nix.toml`'s `attribute` field references.

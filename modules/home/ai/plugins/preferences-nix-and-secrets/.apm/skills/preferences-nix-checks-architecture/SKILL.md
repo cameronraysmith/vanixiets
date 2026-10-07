@@ -5,7 +5,11 @@ description: >
   Use when structuring checks in flake-parts modules, wrapping language tools as pure
   derivations, designing nix-unit structural invariants, or planning NixOS VM integration
   tests. Also load when the 8-category check taxonomy (format, secrets-scan, lint,
-  type-check, unit-test, integration/e2e, nix-infrastructure, build/eval) is relevant.
+  type-check, unit-test, integration/e2e, nix-infrastructure, build/eval) is relevant,
+  when adding, gating, or reviewing any check (evaluation cost, attribute key-set
+  strictness, nix-eval-jobs memory, per-system gating, nixpkgs instantiation count),
+  when measuring or benchmarking flake evaluation, or when judging whether a check is
+  vacuous, tautological, duplicated, or placed on the wrong rung.
 ---
 
 # Nix checks architecture
@@ -122,6 +126,95 @@ CI systems can distribute independent check derivations across multiple workers,
 A monolithic pre-commit derivation forces serial execution of all bundled tools on a single machine.
 
 See `references/derivation-patterns.md` for per-category derivation recipes.
+
+
+## Evaluation cost as a design constraint
+
+The derivation purity principle and the source filtering that follows it optimize what gets rebuilt.
+This section optimizes what gets evaluated, which is a separate resource with a separate failure mode.
+A cached derivation costs nothing to build, but its expression is still evaluated on every PR, for every attribute, on every system, whether or not anything changed.
+In a fleet repository evaluation is therefore the binding constraint: the build side is mostly cache hits, and the evaluator pays in full every time.
+
+The cost in this repository was measured rather than assumed.
+CI evaluated 311 check attributes at about 92 GiB of evaluator allocation and about 400 s on a 16-vCPU, 30.6 GiB host.
+Two corrective PRs brought it to 235 attributes, about 45 GiB, and about 218 s, and removed no coverage anyone wanted.
+Nothing in the check suite had treated evaluation as costed, so each addition looked free and the total degraded silently.
+The rules below are the constraints whose absence allowed that.
+See `references/evaluation-cost.md` for the measurement protocol, the benchmark discipline, and the drvPath-identity oracle that any evaluation refactor must pass.
+
+### Key-set strictness
+
+Nix attribute sets are lazy in their values and strict in their keys.
+Computing the attribute names of `checks.<system>` forces every expression those names depend on, for every check module, before any single check can be selected.
+An evaluator that wants one check therefore pays for the key set of all of them, and nix-eval-jobs pays it in every worker.
+
+The rule follows directly: a check module's key set must depend only on static data.
+Static data means literals, the `system` string, clan inventory metadata, and flake-level `lib` values such as `self.lib.machineSystems`.
+It never means evaluated NixOS, nix-darwin, or home-manager configurations, an instantiated `pkgs`, or package `passthru`, because each of those forces a module-system fixpoint or a nixpkgs instantiation just to learn a name.
+A predicate that needs a configuration belongs in the check's lazy value, as an `assert` inside the derivation expression or as a build-time comparison, never in its key set and never in the condition that gates whether the attribute exists.
+
+`modules/checks/zerotierone-controller.nix` is the measured instance.
+Its key set was derived from six evaluated machine configurations, filtering for those whose zerotier package diverged from `pkgs.zerotierone`:
+
+```nix
+# before (shape): names depend on evaluated configurations
+checks = lib.mapAttrs' (name: m: lib.nameValuePair "zerotierone-controller-${name}" m.config.services.zerotierone.package) (
+  lib.filterAttrs (_: m: m.config.services.zerotierone.package.drvPath != m.pkgs.zerotierone.drvPath)
+    self.nixosConfigurations
+);
+```
+
+The fix keys the attributes on the inventory role and moves the divergence predicate into the value, where it is evaluated only when that one check is:
+
+```nix
+# after: names depend on inventory metadata; the predicate is an assert in the value
+controllers = lib.filter (name: self.lib.machineSystems.${name} == system) (
+  builtins.attrNames self.clan.inventory.instances.zerotier.roles.controller.machines
+);
+checks = lib.listToAttrs (map (name: lib.nameValuePair "zerotierone-controller-${name}" (
+  let machine = self.nixosConfigurations.${name}; in
+  assert lib.assertMsg (machine.config.services.zerotierone.package.drvPath != machine.pkgs.zerotierone.drvPath)
+    "controller ${name} no longer diverges from pkgs.zerotierone";
+  machine.config.services.zerotierone.package
+)) controllers);
+```
+
+Before the fix, evaluating the drvPath of a trivial unrelated check cost about 934 MiB and 3 s, all of it spent computing names.
+After it, the same attribute costs 89 MiB and 0.27 s.
+The assertion still fails loudly if clan stops overriding the controller's package, so the change lost no failure mode; it only moved the work from every evaluation to the one that needs it.
+
+### Per-worker amortization
+
+nix-eval-jobs forks a pool of evaluator workers and recycles any worker whose heap exceeds `--max-memory-size`.
+Each fresh worker re-loads the flake and recomputes every strict prefix, including the key set, before it evaluates its first attribute.
+Any cost incurred before the first attribute is therefore paid once per worker per restart, not once per run.
+The zerotier key set above was paid about 26 times per CI run for this reason, which accounts for roughly 25 GiB of the original 92 GiB.
+A fixed cost that looks negligible in a single `nix eval` multiplies by the restart count in CI, and restarts are themselves driven by allocation, so the two compound.
+
+### One package set per system
+
+Instantiating nixpkgs is not free: each instantiation costs about 40 MiB and 0.1 to 0.2 s of evaluation before anything is built.
+This repository had about 29 instantiations, one per machine, home, and probe, where four (one per system) suffice.
+The package set must be instantiated once per system and consumed by machines and homes through `nixpkgs.pkgs`, not re-imported per configuration.
+`preferences-nix-development` documents the mechanism and the hard constraint that applies when an upstream input instantiates its own nixpkgs.
+
+### System gating
+
+A check whose derivation would be identical on every system belongs to exactly one system, gated with `lib.optionalAttrs (system == "x86_64-linux")`.
+Structural checks over inventory, configuration values, or repository files are of this kind, and the modules under `modules/checks/structure/` and most of `modules/checks/` are gated this way.
+A check whose derivation genuinely differs per platform must stay per system: packages, dev shells, built executables, and NixOS or home-manager module branches gated on platform all produce different derivations and can fail independently.
+
+Both error directions are real.
+Needless duplication evaluates the same expression once per system and buys no evidence for any of the repeats, which in a four-system flake is a fourfold tax on that check's evaluation.
+Wrongly dropping a platform is worse in kind: a real platform goes unverified, and the gap is invisible because the remaining systems pass.
+The decision is made by asking whether the derivation's inputs differ by system, not by asking where it is convenient to run.
+
+### Archetype coverage
+
+Standalone home-manager configurations are checked once per platform archetype, plus any user not already evaluated inside a host of that system.
+A user whose home is already built as part of a NixOS or nix-darwin toplevel on that system is already covered by the machine check, and a standalone evaluation of the same user on the same system repeats the module fixpoint without new evidence.
+Aliases of the same user, such as a second username pointing at the same module set, are not separate evidence and are not checked separately.
+
 
 
 ## Source filtering for cacheability
@@ -338,12 +431,34 @@ Their introduction is a deferred epic tracked separately when the per-artifact m
 This section establishes the discipline and the agent-side enumeration habit so that future work has a coherent target rather than a retrofit.
 
 
+## Operationalizing integrity
+
+The preceding section defines integrity as the property that a regulator would fail under mutation of its target, and defers the meta-check derivations that would measure it.
+The audit of this repository showed why the property cannot wait for that machinery.
+Of about 80 checks reviewed, about 60 were vacuous, tautological, duplicated, or used a mechanism out of proportion to what they tested.
+One of them, `secrets-encryption-integrity` in `modules/checks/validation.nix`, passed any file that was not JSON, so a plaintext YAML secret would have passed a check whose name promised protection against exactly that.
+A vacuous check is not neutral: it costs evaluation and build time, and it signals coverage that does not exist, which suppresses the search for the real gap.
+
+The governing principle is a placement ladder ordered by cost, and every check is placed on the lowest rung that can observe its failure mode.
+A fact about configuration values belongs in a module `assertions` entry, or in an existing fleet obligation that is already evaluated on real hosts, such as the machine toplevel checks in `modules/checks/machines.nix`.
+Such a fact is then checked as a side effect of evaluating the configuration that must be evaluated anyway, against the real values rather than a fixture.
+A fact about our own pure logic belongs in an in-process unit test of that function, such as the nix-unit suite in `modules/home/users/lib.test.nix` that sits beside the `lib.nix` it tests, or a language-native test runner for non-Nix code.
+Only behaviour, meaning what a built artifact does when executed, needs a build-time derivation, and only on the platforms where that behaviour actually differs.
+
+The corollary is the rule an agent applies in review: a check that can be replaced by a cheaper rung of the ladder without losing a failure mode must be.
+A check that cannot name a plausible incorrect implementation it would catch, and that nothing else catches, has no rung at all and is deleted rather than re-pinned.
+The question is the severity criterion from `preferences-validation-assurance`, applied to the check rather than to the code it targets.
+
+`references/check-vacuity.md` names the vacuity patterns found in this repository, each with its smell, the concrete instance, and the replacement, so that a reviewer can recognize them without re-deriving the argument.
+
+
 ## Cross-references
 
 The following skills provide complementary context:
 
-- `preferences-nix-development` covers flake conventions, module structure, and derivation best practices that underpin check derivation design.
-- `preferences-validation-assurance` provides the theoretical foundations for test design: the severity criterion (would this test fail under plausible incorrect implementations?) and the confidence promotion chain (how evidence accumulates across check categories). The 8 check categories in this skill map to confidence levels in the validation assurance framework: format and lint provide low confidence (style correctness), type-check and unit-test provide medium confidence (behavioral correctness), integration/e2e and nix-infrastructure provide high confidence (system-level correctness), and build/eval provides baseline confidence (the code compiles).
+- `preferences-nix-development` covers flake conventions, module structure, and derivation best practices that underpin check derivation design, the import-from-derivation prohibition that keeps evaluation free of builds, and the mechanism for instantiating one nixpkgs per system that "One package set per system" depends on.
+- `preferences-validation-assurance` provides the theoretical foundations for test design: the severity criterion (would this test fail under plausible incorrect implementations?) and the confidence promotion chain (how evidence accumulates across check categories). The 8 check categories in this skill map to confidence levels in the validation assurance framework: format and lint provide low confidence (style correctness), type-check and unit-test provide medium confidence (behavioral correctness), integration/e2e and nix-infrastructure provide high confidence (system-level correctness), and build/eval provides baseline confidence (the code compiles). "Operationalizing integrity" and `references/check-vacuity.md` apply the severity criterion to the checks themselves.
+- `preferences-nix-ci-cd-integration` covers nix-eval-jobs, nix-fast-build, and buildbot-nix, the pipeline in which the evaluation cost described in "Evaluation cost as a design constraint" is paid per worker; `references/evaluation-cost.md` gives the protocol for measuring it.
 - `preferences-algebraic-laws` covers property-based testing approaches for generating high-severity evidence, relevant when designing checks that go beyond example-based assertion. Property-based tests can be wrapped as nix check derivations using the same patterns described in `references/derivation-patterns.md`.
 - `preferences-production-readiness` covers CI/CD pipeline integration, progressive delivery, and how checks gate deployment. The composition rules in this skill (flake-check-native, fan-out, effect) align with the production readiness stages: local development uses flake-check-native, CI uses fan-out, and deployment uses effects gated by check success.
 - `preferences-compositional-continuous-verification` — theoretical anchor for the meta-property hierarchy and the closure-operator framing

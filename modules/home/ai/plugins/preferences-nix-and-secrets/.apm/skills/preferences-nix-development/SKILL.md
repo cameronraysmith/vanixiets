@@ -2,9 +2,12 @@
 name: preferences-nix-development
 description: >
   Nix development conventions for flakes, derivations, modules, and code style.
-  Use when authoring flake.nix files, writing derivations or builders, designing
-  NixOS/nix-darwin/home-manager modules, or following nix formatting and naming
-  conventions. For check architecture and CI integration, see
+  Use when authoring flake.nix files, writing derivations, builders or overlays,
+  designing NixOS/nix-darwin/home-manager modules, deciding how configurations
+  instantiate and share nixpkgs, editing flake input wiring or `follows`,
+  bumping pinned upstream versions guarded by assertions (kernel modules,
+  patched sources), or following nix formatting and naming conventions.
+  For check architecture and CI integration, see
   preferences-nix-checks-architecture and preferences-nix-ci-cd-integration.
 ---
 
@@ -60,7 +63,7 @@ An exception requires an argument in review showing that none of the patterns ab
 
 ## Best practices
 - Follow nixpkgs naming conventions and style
-- Use `inputs.*.follows = "nixpkgs"` to minimize flake input duplication
+- Do not add `inputs.<x>.inputs.nixpkgs.follows = "nixpkgs"` to upstream flakes; see "Never unify upstream inputs' nixpkgs"
 - Place system-level config in modules/darwin/ or modules/nixos/
 - Place user-level config in modules/home/all/ (cross-platform) or darwin-only.nix/linux-only.nix
 - Use home-manager.sharedModules for platform-specific home configuration
@@ -121,6 +124,30 @@ Prefer `pkgs-by-name-for-flake-parts` auto-discovery from `pkgs/by-name/` over m
 Each subdirectory under `pkgs/by-name/` contains a `package.nix` that receives `{ lib, pkgs, ... }` and returns a derivation, mirroring the nixpkgs `pkgs/by-name` convention.
 Use explicit overlays when modifying existing nixpkgs packages or when cross-package composition requires it.
 
+When an upstream package breaks on one platform, fix it locally with an overlay scoped to exactly that platform and leave every other platform's derivation untouched.
+`modules/nixpkgs/overlays/clipboard-jh.nix` is the instance: nixpkgs builds `clipboard-jh` with `gcc15Stdenv` on every platform, but its Darwin sources are Objective-C++ that need clang's `-fobjc-arc`, so the overlay replaces `gcc15Stdenv` with the default (clang) stdenv on Darwin only and returns `prev.clipboard-jh` unchanged elsewhere.
+Scoping the override keeps the Linux store path identical to upstream's, so the Linux build still substitutes from the public cache and the overlay's blast radius is the one platform that was broken.
+Per this repository's dependency policy, an upstream patch is not proposed until the local fix has been used through many real iterations; the overlay is where the fix earns that evidence.
+
+### Pinned external boundaries and their revalidation
+
+Some derivations deliberately `assert` the exact upstream state they were verified against and fail loudly when it moves.
+`pkgs/kernel-modules/snd-hda-macbookpro.nix` and `pkgs/kernel-modules/hci-uart-macbook.nix` are the instances.
+They pin the kernel version, the sha256 of the specific upstream source file they patch, hashes of the prepared kernel build tree, and the resulting module `srcversion`.
+An out-of-tree module patched against one kernel can compile cleanly against another and still misbehave, because the code around the patch or the configuration it was built with has changed; nothing in an ordinary build would notice.
+The guard converts that invisible silent-miscompilation risk into a visible, answerable question at bump time, which is why it is worth the maintenance of updating several pinned values on every kernel bump.
+
+When such a guard trips, gather the evidence the guard names and record it; never bump the pinned number just so the build proceeds.
+Bumping without the evidence turns the guard into a ritual that fails, gets edited, and passes, which is a vacuous check with extra steps.
+Each pinned value is a question: did the patch target move, did the build configuration that matters move, and did the produced module change for a reason that reaches the target hardware.
+
+The 6.18.53 -> 6.18.55 bump answered all three for `hci-uart-macbook.nix`.
+The patched file `drivers/bluetooth/hci_bcm.c` was byte-identical across the two releases, so the patch target had not moved.
+The prepared-tree hashes differed only in toolchain strings (GCC 15.3.0 -> 16.2.0, pahole 131 -> 132), while every Bluetooth, UART and serdev kernel option was unchanged.
+The `srcversion` moved only because `hci_qca.c` changed upstream with Qualcomm-only content that does not execute on the Broadcom target.
+With those three findings recorded alongside the new pins, the bump is a verified statement rather than an edit that silenced a failure.
+Had any finding come out differently, the right response would have been to re-examine the patch against the new source, not to update the pin.
+
 ### writeShellApplication enhancements
 
 Beyond the basic `text` attribute, `writeShellApplication` supports structured configuration.
@@ -128,6 +155,27 @@ Beyond the basic `text` attribute, `writeShellApplication` supports structured c
 `runtimeEnv` injects environment variables as shell assignments at the top of the script.
 The `env` attribute provides build-time environment variables visible during `checkPhase` as well.
 These mechanisms replace ad-hoc `export` statements and `makeWrapper` calls for simple shell scripts.
+
+## Nixpkgs instantiation
+
+Instantiate the root nixpkgs once per system and have every NixOS, nix-darwin and home-manager configuration consume that instance through `nixpkgs.pkgs` (or the `pkgs` argument of `homeManagerConfiguration`), rather than letting each configuration import nixpkgs again.
+Each `import inputs.nixpkgs { ... }` evaluates the whole package-set fixpoint anew, which costs roughly 40 MiB of evaluator allocation and 0.1-0.2 s, and the cost is not shared between instances even when their arguments are identical.
+This repository had about 29 instantiations, one per machine, home configuration and probe, where 4 (one per system) suffice.
+`modules/nixpkgs/base-defaults.nix` holds the shared instance: perSystem `fleetPkgs` instantiates nixpkgs once with the fleet configuration, the NixOS and nix-darwin `base` modules set `nixpkgs.pkgs` to it, `modules/home/mk-home.nix` passes it to standalone home-manager configurations, and home-manager users inside a machine inherit it through `useGlobalPkgs`.
+
+A machine that genuinely needs a different package set keeps its own instance, and the divergence is then explicit rather than silent.
+NixOS applies `cfg.pkgs.appendOverlays cfg.overlays`, so a host that sets `nixpkgs.overlays` next to the shared `nixpkgs.pkgs` gets a derived instance of its own; `modules/nixos/nvidia.nix` does this to enable CUDA for specific ML packages on the CUDA host.
+Setting `nixpkgs.config` next to `nixpkgs.pkgs` fails a nixpkgs-module assertion, so per-machine configuration belongs in the shared instance, in an overlay, or in a separately instantiated `pkgs` whose reason is written beside it.
+Every additional instance should be traceable to such a stated need; an instance that exists only because a configuration called `import inputs.nixpkgs` by default is pure evaluation cost.
+
+## Never unify upstream inputs' nixpkgs
+
+This is a hard constraint and the counter-rule to "Nixpkgs instantiation": instance sharing applies to this repository's own configurations only, never to upstream flake inputs.
+Setting `inputs.<x>.inputs.nixpkgs.follows = "nixpkgs"` on an upstream flake rebuilds that flake's derivations against our nixpkgs, which changes every one of their store paths and invalidates the upstream project's binary cache.
+The evaluation saved by dropping one nixpkgs copy is paid back many times over in local compilation of packages that would otherwise have been substituted.
+An input without a `follows` is therefore a deliberate choice, not an oversight: this repository intentionally carries 12 nixpkgs nodes among the 111 nodes of `flake.lock`.
+`flake.lock` and input wiring are out of scope for evaluation-cost work; reduce evaluation cost by sharing instances among our own configurations and by the measures in `preferences-nix-checks-architecture`, not by rewiring inputs.
+Adding or removing a `follows` on an existing input requires its own argument about that input's cache, made separately from any evaluation optimization.
 
 ## Module authoring patterns
 
@@ -168,6 +216,7 @@ See `preferences-nix-checks-architecture` for the full check derivation taxonomy
 
 ## Cross-references
 
-The check derivation taxonomy, NixOS VM test patterns, and nix-unit invariant testing are covered in `preferences-nix-checks-architecture`.
-CI pipeline integration with `nix-fast-build`, buildbot-nix, and GitHub Actions is documented in `preferences-nix-ci-cd-integration`.
+The check derivation taxonomy, NixOS VM test patterns, nix-unit invariant testing, and the evaluation cost and vacuity of checks are covered in `preferences-nix-checks-architecture`.
+CI pipeline integration with `nix-fast-build`, buildbot-nix, and GitHub Actions, including evaluation memory limits such as nix-eval-jobs `--max-memory-size`, is documented in `preferences-nix-ci-cd-integration`.
 Property-based testing of nix expressions and algebraic law verification are covered in `preferences-algebraic-laws`.
+The no-IFD rule in "No import-from-derivation" and the instance-sharing rule in "Nixpkgs instantiation" both treat evaluation as a costed resource; "Never unify upstream inputs' nixpkgs" bounds the second.
