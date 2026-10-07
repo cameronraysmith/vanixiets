@@ -68,18 +68,20 @@ Stibnite's `nix.buildMachines` mirror of the rosetta builder no longer advertise
 Corrected advertisements take effect only after each machine is activated.
 
 Remote builders are one Clan service, `nix-builders` (`clan/services/nix-builders/`, instance in `clan/inventory/services/nix-builders.nix`).
-A machine in the `builder` role gets a build account, `builder` on NixOS and `nixbuild` on Darwin, which is a Nix trusted user and whose `authorized_keys` admits each dispatcher's `nix-remote-build` key only through a forced `nix-daemon --stdio`.
-A machine in the `dispatcher` role generates that key and gets an ssh alias and an entry in `services.nix-builders.buildMachines` for every builder it does not exclude; Stibnite splices that list after its rosetta-builder entries, and Magnetite uses it as `nix.buildMachines` unchanged.
+A machine in the `builder` role runs `nix-grpc-daemon` from nix-grpc-store on TCP 50051 in front of its nix-daemon, reachable over ZeroTier only: NixOS opens the port on the `zt+` interfaces, and Darwin, which has no per-interface firewall, binds the daemon to its ZeroTier address.
+The daemon requires a client certificate signed by the instance CA and grants the `trusted` role to each dispatcher's certificate CN; `trustClients` makes its proxy user a Nix trusted user so builds can import the unsigned paths a dispatcher sends.
+The CA is the shared `nix-grpc-ca` clan var, whose private key is never deployed, and every machine of the service has a `nix-grpc-cert` var signed by it, named by machine name and, on builders, by ZeroTier address.
+A machine in the `dispatcher` role loads the `grpc://` store plugin and gets an entry in `services.nix-builders.buildMachines` naming `grpc://[<zerotier address>]:50051` with the CA and its own certificate for every builder it does not exclude; Stibnite splices that list after its rosetta-builder entries, and Magnetite uses it as `nix.buildMachines` unchanged.
 Stibnite dispatches x86_64-linux work to Magnetite and Pyrite, and Pyrite's entry is the only one advertising `kvm` for x86_64-linux.
 Magnetite dispatches aarch64-darwin work, nixbot's best-effort darwin checks included, to Stibnite only, and excludes Pyrite.
 Rosegold and Argentum stay excluded from Magnetite until the binary cache holds nixbot's darwin outputs; deleting a name from Magnetite's `exclude` and redeploying Magnetite re-admits that machine, whose builder side is already in place.
 The Darwin builders are laptops and serve builds opportunistically.
-Their forced command is `nix-daemon --stdio` like every other builder's, so they accept dispatched builds on battery or AC, and their nix-daemon runs at `Background` QoS with low-priority I/O so a dispatched build yields to the owner's work.
+They accept dispatched builds on battery or AC, and their nix-daemon runs at `Background` QoS with low-priority I/O so a dispatched build yields to the owner's work.
 Unreachability is therefore ordinary, and nix 2.35 handles it in two distinct ways.
 A build the caller or another builder can perform continues: the build hook logs `cannot build on '<store uri>'`, marks that machine disabled for the rest of its lifetime, and reconsiders the remaining machines or falls back to a local build.
 A build no remaining machine can perform fails outright, as an x86_64-linux build requiring `kvm` does while Pyrite is offline, reporting `missing system features` with `Required features: {kvm}`, and never degrades into an unaccelerated or emulated build.
 That second case is the intended behaviour: vmTests are opt-in and outside PR gating, so an offline laptop costs a manual re-run rather than a red pull request.
-Every builder alias sets `ConnectTimeout 5`, `BatchMode yes`, and a `ServerAliveInterval 15` / `ServerAliveCountMax 2` pair, so a sleeping or off-network laptop is declared unreachable in seconds instead of absorbing the kernel's SYN retry schedule or parking a build on a half-open connection.
-`checks.<system>.nix-builders-wiring` pins the entries, aliases, forced commands, and key separation across machines, which no single machine's evaluation can see.
+Every builder URI sets `connect-timeout=5`, so a sleeping or off-network laptop is declared unreachable in seconds instead of after the plugin's default 30; once a builder has answered, the plugin rides out a dropped connection for its default `restart-grace` of 120 seconds before failing the build.
+`checks.<system>.nix-builders-wiring` pins the entries, store URIs, daemon TLS and access rules, the ZeroTier-only port, and the absence of the retired ssh build accounts across machines, which no single machine's evaluation can see.
 A change takes effect only after both the dispatcher and the builder are activated.
 New VM test modules belong in `vm-tests/` and assign `perSystem.vmTests`, using the same automatically discovered flake-parts composition as the other module directories.
