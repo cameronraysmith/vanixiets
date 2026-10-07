@@ -603,16 +603,16 @@
     "gateway-api-src": {
       "flake": false,
       "locked": {
-        "lastModified": 1788448340,
-        "narHash": "sha256-kAwlhDCqWR189z9hbBdozHm53uTo/pTn1N5um4qCIyQ=",
+        "lastModified": 1791298841,
+        "narHash": "sha256-A+qBwg2fyY+1Is033LiOUgnvm3d5QxI2m2lrc+Y3M8g=",
         "owner": "kubernetes-sigs",
         "repo": "gateway-api",
-        "rev": "ca6c2a65454737236fb7a937bd9b17e42b07e9de",
+        "rev": "c0836133e24073fcdcdbb1713aba3cc73a89d0b5",
         "type": "github"
       },
       "original": {
         "owner": "kubernetes-sigs",
-        "ref": "v1.6.2",
+        "ref": "v1.6.3",
         "repo": "gateway-api",
         "type": "github"
       }
