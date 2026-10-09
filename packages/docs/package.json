@@ -59,7 +59,7 @@
     "semantic-release-monorepo": "^8.0.2",
     "sharp": "^0.35.5",
     "starlight-katex": "^0.0.4",
-    "starlight-links-validator": "0.26.0",
+    "starlight-links-validator": "0.27.0",
     "vitest": "^5.0.3",
     "wrangler": "^4.146.0"
   },
