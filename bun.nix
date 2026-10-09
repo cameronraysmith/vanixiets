@@ -1233,10 +1233,6 @@
     url = "https://registry.npmjs.org/@types/normalize-package-data/-/normalize-package-data-2.4.4.tgz";
     hash = "sha512-37i+OaWTh9qeK4LSHPsyRC7NahnGotNuZvjLSgcPzblpHB3rrCJxAOgI5gCdKm7coonsaX1Of0ILiTcnZjbfxA==";
   };
-  "@types/picomatch@4.0.3" = fetchurl {
-    url = "https://registry.npmjs.org/@types/picomatch/-/picomatch-4.0.3.tgz";
-    hash = "sha512-iG0T6+nYJ9FAPmx9SsUlnwcq1ZVRuCXcVEvWnntoPlrOpwtSTKNDC9uVAxTsC3PUvJ+99n4RpAcNgBbHX3JSnQ==";
-  };
   "@types/sax@1.2.7" = fetchurl {
     url = "https://registry.npmjs.org/@types/sax/-/sax-1.2.7.tgz";
     hash = "sha512-rO73L89PJxeYM3s3pPPjiPgVVcymqU490g0YO5n5By0k2Erzj6tay/4lr1CHAAU4JyOWd1rpQ8bCf6cZfHU96A==";
@@ -3939,9 +3935,9 @@
     url = "https://registry.npmjs.org/starlight-katex/-/starlight-katex-0.0.4.tgz";
     hash = "sha512-bb2oR/K4+wK61tZvOTSo9/zH7FI/+guwGLGgIuJSld8vKmcxeAG1kmde8CfH0IKohXlSwUYE3YCR/r6qd0jIEA==";
   };
-  "starlight-links-validator@0.26.0" = fetchurl {
-    url = "https://registry.npmjs.org/starlight-links-validator/-/starlight-links-validator-0.26.0.tgz";
-    hash = "sha512-b3JlzP5bczSDMQp10ST/Gldd6RNzcwpWfTrszzGPcqnuav2W31+MjyX92IXH+VCcG2pG9G1qyDcEcNuMRYi2ig==";
+  "starlight-links-validator@0.27.0" = fetchurl {
+    url = "https://registry.npmjs.org/starlight-links-validator/-/starlight-links-validator-0.27.0.tgz";
+    hash = "sha512-UvPl8L9hfWR+yWbLOEtljLmpJCGcM6AVseVy5IO9dmqdOjW4R+Y8FaYyVA5axCC8RvxM5xU7M1WTerpwU8rYbw==";
   };
   "std-env@4.2.0" = fetchurl {
     url = "https://registry.npmjs.org/std-env/-/std-env-4.2.0.tgz";
@@ -4406,10 +4402,6 @@
   "wrangler@4.146.0" = fetchurl {
     url = "https://registry.npmjs.org/wrangler/-/wrangler-4.146.0.tgz";
     hash = "sha512-c27eHUH0Isr8HTmgZ6cLtLr/0cxtiBoLren6ywBeTW8ZIzj/dINVNBcqsbZc+iETnI5jrzO7E7Z8mLgLZ/l9iw==";
-  };
-  "wrangler@4.147.0" = fetchurl {
-    url = "https://registry.npmjs.org/wrangler/-/wrangler-4.147.0.tgz";
-    hash = "sha512-pQYRoiq8PTAxphaG69z8+GC1DkSGd19EDZehQ8zxjo/Ko3mRB6Qs1mTrd8ZuKAarLklIjTqr1lUdCK9r4q2hUg==";
   };
   "wrangler@4.148.0" = fetchurl {
     url = "https://registry.npmjs.org/wrangler/-/wrangler-4.148.0.tgz";
