@@ -9,7 +9,7 @@
     "url": "https://github.com/cameronraysmith/vanixiets.git"
   },
   "license": "MIT",
-  "packageManager": "bun@1.4.2",
+  "packageManager": "bun@1.4.3",
   "scripts": {
     "clean": "bun run clean:dist && bun run clean:public && bun run clean:cache",
     "clean:cache": "astro sync --force",
