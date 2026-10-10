@@ -411,23 +411,38 @@ deploy_production() {
   fi
 
   # Cross-check server-side that the new version carries 100% of traffic.
-  # The `| cat >` routes wrangler's stdout through a pipe-shaped fd:
-  # `wrangler ... --json > file` was observed to intermittently produce
-  # zero bytes, whereas `| cat > file` reliably produces the full output.
+  # The deployments list lags the deploy that wrangler just reported, so a
+  # single immediate read can miss a deployment that did persist; poll it
+  # within a bounded budget. The `| cat >` routes wrangler's stdout through
+  # a pipe-shaped fd: `wrangler ... --json > file` was observed to
+  # intermittently produce zero bytes, whereas `| cat > file` reliably
+  # produces the full output.
   deployments_list_json="$tmpdir/wrangler-deployments-list.json"
-
-  run_wrangler deployments list --name "$worker_name" --json \
-    | cat > "$deployments_list_json"
-
-  found_count=$(jq --arg vid "$deploy_version_id" \
-    '[.[] | select((.versions // []) | any((.version_id // .id) == $vid and .percentage == 100))] | length' \
-    "$deployments_list_json" 2>/dev/null || echo 0)
-  if [[ "$found_count" -lt 1 ]]; then
+  verify_attempts="${DEPLOY_DOCS_VERIFY_ATTEMPTS:-12}"
+  verify_interval="${DEPLOY_DOCS_VERIFY_INTERVAL:-5}"
+  listed_percentage=""
+  for ((attempt = 1; attempt <= verify_attempts; attempt++)); do
+    run_wrangler deployments list --name "$worker_name" --json \
+      | cat > "$deployments_list_json"
+    listed_percentage=$(jq -r --arg vid "$deploy_version_id" '
+      [.[] | (.versions // [])[] | select((.version_id // .id) == $vid) | .percentage]
+      | max // empty
+    ' "$deployments_list_json" 2>/dev/null || true)
+    if [[ "$listed_percentage" == 100 ]]; then
+      break
+    fi
+    if ((attempt < verify_attempts)); then
+      sleep "$verify_interval"
+    fi
+  done
+  if [[ "$listed_percentage" != 100 ]]; then
     echo "" >&2
-    echo "error: version ${deploy_version_id} is not at 100% in deployments list" >&2
+    if [[ -z "$listed_percentage" ]]; then
+      echo "error: version ${deploy_version_id} is not in the deployments list after ${verify_attempts} reads" >&2
+    else
+      echo "error: version ${deploy_version_id} is at ${listed_percentage}% in the deployments list after ${verify_attempts} reads, expected 100%" >&2
+    fi
     echo "  raw deployments list output: $deployments_list_json" >&2
-    echo "  hint: wrangler reported a deploy locally but the Cloudflare API did" >&2
-    echo "        not persist it; inspect the raw deployments list for surrounding entries" >&2
     exit 1
   fi
 

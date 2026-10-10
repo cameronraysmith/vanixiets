@@ -33,8 +33,9 @@
 # main's head is a file:// URL.
 #
 # Asserted: production deploys the built-in payload's own config and
-# cross-checks the deployments list, a superseded run deploys nothing, and a
-# version not at 100% fails. A manual preview deploys a Preview from a config
+# cross-checks the deployments list, rereading a list that does not show the
+# deployment yet, a superseded run deploys nothing, and a version never listed
+# or not at 100% fails. A manual preview deploys a Preview from a config
 # synthesized from a fixed shape (previews {}, no main, build, bindings or
 # routes) with --ignore-base-config, prints the URL from wrangler's NDJSON
 # record, sanitizes its name, refuses a payload holding a symlink and never
@@ -120,8 +121,13 @@
         } for i in order]
 
 
+        # `percentage` is the deployed version's share, or `absent` while the
+        # list does not show its deployment yet; `percentage-next`, when
+        # present, replaces it after one read.
         def deployments():
-            percentage = int((state / "percentage").read_text())
+            current = (state / "percentage").read_text().strip()
+            if (state / "percentage-next").exists():
+                (state / "percentage-next").rename(state / "percentage")
             return [{
                 "id": "rehearsal-deployment-%02d" % i,
                 "created_on": created(i),
@@ -129,9 +135,9 @@
                 "strategy": "percentage",
                 "author_email": "rehearsal@example.com",
                 "annotations": {"workers/message": "deployment %02d" % i},
-                "versions": [{"version_id": "${versionId}", "percentage": percentage}] if i == 12
+                "versions": [{"version_id": "${versionId}", "percentage": int(current)}] if i == 12
                     else [{"version_id": "rehearsal-version-%02d" % i, "percentage": 100}],
-            } for i in order]
+            } for i in order if not (i == 12 and current == "absent")]
 
 
         def preview(name):
@@ -426,6 +432,8 @@
             export CLOUDFLARE_API_TOKEN=rehearsal-dummy-token
             export CLOUDFLARE_ACCOUNT_ID=rehearsal-dummy-account
             export DEPLOY_DOCS_MAIN_SHA_URL="file://$TMPDIR/main.json"
+            export DEPLOY_DOCS_VERIFY_ATTEMPTS=3
+            export DEPLOY_DOCS_VERIFY_INTERVAL=0
             export NIXBOT_API_URL="http://127.0.0.1:$port"
             export GITHUB_API_URL="http://127.0.0.1:$port"
             export GITHUB_FORGE_TOKEN=rehearsal-forge-token
@@ -606,12 +614,26 @@
             expect_offline
 
             main_is ${rev}
+            echo absent > "$STUB_STATE/percentage"
+            echo 100 > "$STUB_STATE/percentage-next"
+            run production-lagging-list production --rev ${rev}
+            expect_status 0
+            expect_line "DEPLOY-DOCS-ACTION: deploy (version ${versionId})"
+            expect_calls 3
+
+            echo absent > "$STUB_STATE/percentage"
+            run production-never-listed production --rev ${rev}
+            echo 100 > "$STUB_STATE/percentage"
+            expect_failure
+            expect_line "error: version ${versionId} is not in the deployments list after 3 reads"
+            expect_calls 4
+
             echo 50 > "$STUB_STATE/percentage"
             run production-partial production --rev ${rev}
             echo 100 > "$STUB_STATE/percentage"
             expect_failure
-            expect_line "error: version ${versionId} is not at 100% in deployments list"
-            expect_calls 2
+            expect_line "error: version ${versionId} is at 50% in the deployments list after 3 reads, expected 100%"
+            expect_calls 4
 
             run production-missing-rev production
             expect_status 2
