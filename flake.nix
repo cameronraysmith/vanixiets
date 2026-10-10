@@ -72,6 +72,15 @@
     niks3.inputs.nixpkgs.follows = "nixpkgs";
     niks3.inputs.treefmt-nix.follows = "treefmt-nix";
 
+    nix-tarmac.url = "github:Mic92/nix-tarmac";
+    nix-tarmac.inputs.nixpkgs.follows = "nixpkgs";
+
+    nix-grpc-store.url = "github:Mic92/nix-grpc-store";
+    nix-grpc-store.inputs.nixpkgs.follows = "nixpkgs";
+    nix-grpc-store.inputs.niks3.follows = "niks3";
+
+    harmonia.url = "github:nix-community/harmonia";
+
     cognee-nix.url = "github:cameronraysmith/cognee-nix/cognee-v112";
 
     buildbot-nix.url = "github:nix-community/buildbot-nix";
@@ -203,6 +212,7 @@
       "https://cache.nixos-cuda.org"
       "https://cache.scientistexperience.net?priority=45"
       "https://cameronraysmith.cachix.org?priority=50"
+      "https://cache.thalheim.io?priority=55"
     ];
     extra-trusted-public-keys = [
       "cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY="
@@ -210,6 +220,7 @@
       "niks3.numtide.com-1:DTx8wZduET09hRmMtKdQDxNNthLQETkc/yaX7M4qK0g="
       "cache.clan.lol-1:3KztgSAB5R1M+Dz7vzkBGzXdodizbgLXGXKXlcQLA28="
       "pyproject-nix.cachix.org-1:UNzugsOlQIu2iOz0VyZNBQm2JSrL/kwxeCcFGw+jMe0="
+      "cache.thalheim.io-1:R7msbosLEZKrxk/lKxf9BTjOOH7Ax3H0Qj0/6wiHOgc="
       "catppuccin.cachix.org-1:noG/4HkbhJb+lUAdKrph6LaozJvAeEEZj4N732IysmU="
       "cache.nixos-cuda.org:74DUi4Ye579gUqzH4ziL9IyiJBlDpMRn9MBN8oNan9M="
       "cache.scientistexperience.net-1:N9ZeWasooJLXEwaN+rd4MMyBuGpAtcUAXrEUPBT5cXI="

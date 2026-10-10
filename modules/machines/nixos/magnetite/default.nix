@@ -314,12 +314,6 @@ in
         max-substitution-jobs = 32;
       };
 
-      # base sets nix.gc.options fleet-wide as a plain string (modules/system/
-      # nix-optimization.nix), so this host-level tightening requires mkForce.
-      # Build outputs persist in the niks3 R2 cache; short local retention is
-      # safe on the build host.
-      nix.gc.options = lib.mkForce "--delete-older-than 7d";
-
       # Nix >= 2.30 keeps build sandboxes in /nix/var/nix/builds; the only
       # reaper is the Nix package's tmpfiles rule (nix-daemon.conf, age 7d).
       # A 7d window let a nix-daemon ENOSPC crash-loop orphan 201 sandboxes

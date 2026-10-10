@@ -10,6 +10,8 @@
     "https://cache.nixos-cuda.org"
     "https://cache.scientistexperience.net?priority=45"
     "https://cameronraysmith.cachix.org?priority=50"
+    # Serves harmonia, which keeps its own nixpkgs so these binaries substitute.
+    "https://cache.thalheim.io?priority=55"
   ];
 
   publicKeys = [
@@ -22,5 +24,6 @@
     "cache.nixos-cuda.org:74DUi4Ye579gUqzH4ziL9IyiJBlDpMRn9MBN8oNan9M="
     "cameronraysmith.cachix.org-1:aC8ZcRCVcQql77Qn//Q1jrKkiDGir+pIUjhUunN6aio="
     "cache.scientistexperience.net-1:N9ZeWasooJLXEwaN+rd4MMyBuGpAtcUAXrEUPBT5cXI="
+    "cache.thalheim.io-1:R7msbosLEZKrxk/lKxf9BTjOOH7Ax3H0Qj0/6wiHOgc="
   ];
 }

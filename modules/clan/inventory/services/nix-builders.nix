@@ -1,5 +1,6 @@
 # Who builds for whom. Addresses are the deterministic ZeroTier IPv6s pinned
-# in modules/system/ssh-known-hosts.nix.
+# in modules/system/ssh-known-hosts.nix; dispatchers connect to them directly
+# over grpc:// and each builder's certificate names its own.
 #
 # nixbot on magnetite evaluates and builds checks.aarch64-darwin as
 # best-effort: every darwin check carries ignoreFailure
@@ -9,9 +10,11 @@
 let
   # Laptops in interactive use: a minority share of the machine, run at
   # Background QoS so the owner's foreground work keeps the CPU and I/O.
+  # Their nix-grpc-daemon account takes the upstream darwin default uid and
+  # gid 450, clear of every declared account (501 crs58, 502 runner, 535
+  # _dnscrypt-proxy, 551 omnigent-cameron).
   darwinLaptop = {
     systems = [ "aarch64-darwin" ];
-    uid = 530;
     daemonProcessType = "Background";
     daemonIOLowPriority = true;
   };
@@ -39,7 +42,6 @@ in
           "recursive-nix"
         ];
         address = "fddb:4344:343b:14b9:399:930f:39db:40d2";
-        hostAlias = "magnetite";
       };
 
       # MacBookPro14,1: two cores, four threads, in interactive use, so one job
@@ -61,8 +63,6 @@ in
       # each claim when running, so 4 remote jobs. apple-virt is real and only
       # here; nixos-test (a Linux sandbox capability nix lists anyway) and
       # benchmark (laptop timings are not measurements) are not advertised.
-      # uid 530 was free on 2026-08-31 (501 crs58, 502 runner, 535
-      # _dnscrypt-proxy, 551 omnigent-cameron).
       stibnite.settings = darwinLaptop // {
         maxJobs = 4;
         supportedFeatures = [
@@ -73,8 +73,7 @@ in
       };
 
       # No hardware notes in their machine files, so the default share of 2
-      # jobs. uid 530 is clear of every declared account there (501, 502,
-      # 535 _dnscrypt-proxy).
+      # jobs.
       rosegold.settings = darwinLaptop // {
         maxJobs = 2;
         supportedFeatures = [ "big-parallel" ];

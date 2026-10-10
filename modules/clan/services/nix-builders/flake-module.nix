@@ -1,114 +1,198 @@
-# Remote nix builders as one fleet capability.
+# Remote nix builders as one fleet capability, over nix-grpc-store.
 #
-# roles.builder serves the nix build protocol: an account whose only
-# authorized keys are the dispatchers' `nix-remote-build` public keys, each
-# confined at the SSH boundary by `restrict` and a forced `nix-daemon --stdio`.
-# That account is a Nix trusted user, which is store-root-equivalent on the
-# builder: an untrusted account cannot receive the unsigned paths a caller
-# evaluated itself. The forced command restricts which program the key starts,
-# not that program's authority. Every dispatcher of the instance is authorized
-# on every builder; `exclude` only decides where a dispatcher sends work.
+# roles.builder runs nix-grpc-daemon on port 50051 in front of the local
+# nix-daemon, requiring mutual TLS against the instance CA and granting the
+# `trusted` role only to certificates whose CN names a dispatcher. trustClients
+# makes the proxy user a Nix trusted user, store-root-equivalent on the builder;
+# an untrusted user cannot receive unsigned paths the caller evaluated itself.
+# `exclude` decides where a dispatcher sends work, not who is authorized.
 #
-# roles.dispatcher owns the `nix-remote-build` keypair (clan vars, private
-# half encrypted for the machine) and, for each builder it does not exclude,
-# an ssh Host block plus an entry in the read-only
-# `services.nix-builders.buildMachines`. Machines splice that list into their
-# own nix.buildMachines; this service never assigns nix.buildMachines, because
-# stibnite has to merge it with nix-rosetta-builder's entries under mkForce.
+# The port is reachable only over ZeroTier. NixOS opens it on `zt+` and binds the
+# wildcard through socket activation. nix-darwin has no per-interface firewall,
+# so darwin builders bind their ZeroTier address and KeepAlive retries until that
+# address exists after boot; launchd has no socket activation, so idleTimeout is
+# null there.
 #
-# An unreachable builder (a sleeping laptop) is bounded by the ssh block:
-# BatchMode keeps the daemon off prompts it cannot answer, ConnectTimeout keeps
-# an absent host from absorbing the kernel's SYN retry schedule, and the
-# ServerAlive pair tears down a session to a host that suspends mid-transfer.
-# nix 2.35 then marks that machine disabled for the rest of the hook's
-# lifetime and reconsiders the others, falling back to a local build where the
-# caller can build; work only that builder could take fails with `missing
-# system features` rather than degrading.
-{ config, ... }:
-let
-  inventoryMachines = config.flake.clan.inventory.machines;
-in
+# Identities are clan vars: one shared CA whose private key is never deployed,
+# and one certificate per machine with the machine name as CN and both serverAuth
+# and clientAuth, so a builder presents it as server and a dispatcher as client.
+# Builder certificates carry the ZeroTier address as an IP SAN, because
+# dispatchers connect to that literal address rather than through DNS.
+#
+# roles.dispatcher exposes a read-only buildMachines list that machines splice
+# into their own nix.buildMachines; this service never assigns that option,
+# because stibnite merges it with nix-rosetta-builder's entries under mkForce.
+#
+# Nix names a per-builder lock file after the whole store URI, which overflows
+# NAME_MAX once the URI spells out store paths, so the URI carries only
+# `ca-cert`; putting the instance CA in the system bundle instead would make
+# every TLS client on the host trust it. The client certificate and key resolve
+# from the plugin's default directory, /run/nix-grpc-store, as symlinks that
+# survive secret regeneration. NixOS creates them with tmpfiles; darwin empties
+# /run at boot and reruns no activation script, so a RunAtLoad daemon does.
+#
+# An unreachable builder costs connection retries, after which nix marks it
+# disabled for the rest of the hook's lifetime and falls back to a local build;
+# work only that builder could take fails with `missing system features`.
+{ inputs, ... }:
 {
   clan.modules.nix-builders =
-    { lib, clanLib, ... }:
+    { lib, ... }:
     let
-      isDarwin = name: inventoryMachines.${name}.machineClass == "darwin";
+      port = 50051;
+      clientDir = "/run/nix-grpc-store";
 
-      builderUser =
-        name: settings:
-        if settings.user != null then
-          settings.user
-        else if isDarwin name then
-          "nixbuild"
-        else
-          "builder";
-
-      builderHostAlias =
-        name: settings: if settings.hostAlias != null then settings.hostAlias else "${name}-builder";
-
-      builderHostKeyAlias =
-        name: settings: if settings.hostKeyAlias != null then settings.hostKeyAlias else "${name}.zt";
-
-      # readOnly counts a default as a definition, so these options have none:
-      # the role that computes a value defines it once, and perMachine supplies
-      # the empty value on machines without that role.
-      outputModule = machineRoles: {
-        options.services.nix-builders = {
-          buildMachines = lib.mkOption {
-            type = lib.types.listOf (lib.types.attrsOf lib.types.anything);
-            readOnly = true;
-            description = ''
-              nix.buildMachines entries for every builder this machine
-              dispatches to; [] on non-dispatchers. Machines splice this into
-              their own nix.buildMachines; the service never sets that option.
-            '';
-          };
-          forcedCommand = lib.mkOption {
-            type = lib.types.nullOr lib.types.str;
-            readOnly = true;
-            description = "The program forced on every dispatcher key of this builder; null on non-builders.";
-          };
-        };
-        config.services.nix-builders =
-          lib.optionalAttrs (!lib.elem "dispatcher" machineRoles) { buildMachines = [ ]; }
-          // lib.optionalAttrs (!lib.elem "builder" machineRoles) { forcedCommand = null; };
+      # The plugin's default client file names, mapped to this machine's vars.
+      clientFiles = vars: {
+        "ca.crt" = vars.nix-grpc-ca.files."ca.crt".path;
+        "client.crt" = vars.nix-grpc-cert.files."cert.pem".path;
+        "client.key" = vars.nix-grpc-cert.files."key.pem".path;
       };
 
-      # Shared by both classes; the account itself differs per class.
-      mkBuilderModule =
-        {
-          roles,
-          settings,
-          machine,
-        }:
+      # Symlinks keep each target's owner and mode: the key stays 0400, owned
+      # by root, or by nix-grpc-daemon on a machine that also builds, and root
+      # reads it either way.
+      clientIdentityNixos =
         { config, ... }:
+        {
+          systemd.tmpfiles.rules = [
+            "d ${clientDir} 0755 root root - -"
+          ]
+          ++ lib.mapAttrsToList (name: target: "L+ ${clientDir}/${name} - - - - ${target}") (
+            clientFiles config.clan.core.vars.generators
+          );
+        };
+
+      # The links' targets are in the plist, so a changed target reloads the
+      # daemon and RunAtLoad recreates them on activation as well as at boot.
+      clientIdentityDarwin =
+        { config, ... }:
+        {
+          launchd.daemons.nix-grpc-client-identity = {
+            script = ''
+              install -d -m 0755 -o root -g wheel ${clientDir}
+            ''
+            + lib.concatStrings (
+              lib.mapAttrsToList (name: target: ''
+                ln -sfn ${target} ${clientDir}/${name}
+              '') (clientFiles config.clan.core.vars.generators)
+            );
+            serviceConfig.RunAtLoad = true;
+          };
+        };
+
+      # readOnly counts a default as a definition, so the option has none: the
+      # dispatcher role defines it once, and perMachine supplies the empty
+      # value on machines without that role.
+      outputModule = machineRoles: {
+        options.services.nix-builders.buildMachines = lib.mkOption {
+          type = lib.types.listOf (lib.types.attrsOf lib.types.anything);
+          readOnly = true;
+          description = ''
+            nix.buildMachines entries for every builder this machine
+            dispatches to; [] on non-dispatchers. Machines splice this into
+            their own nix.buildMachines; the service never sets that option.
+          '';
+        };
+        config.services.nix-builders = lib.optionalAttrs (!lib.elem "dispatcher" machineRoles) {
+          buildMachines = [ ];
+        };
+      };
+
+      # The CA and this machine's certificate, defined once per machine whatever
+      # its roles, so a machine that both builds and dispatches has one identity.
+      identityModule =
+        { machine, instances }:
+        { pkgs, ... }:
         let
-          user = builderUser machine.name settings;
-          forcedCommand = "${config.nix.package}/bin/nix-daemon --stdio";
-          dispatcherKeys = map (
-            dispatcher:
-            lib.removeSuffix "\n" (
-              clanLib.getPublicValue {
-                flake = config.clan.core.settings.directory;
-                machine = dispatcher;
-                generator = "nix-remote-build";
-                file = "key.pub";
-              }
-            )
-          ) (lib.filter (d: d != machine.name) (lib.attrNames roles.dispatcher.machines));
+          builderAddresses = lib.unique (
+            lib.concatMap (
+              instance:
+              lib.optional (
+                instance.roles ? builder && instance.roles.builder.machines ? ${machine.name}
+              ) instance.roles.builder.machines.${machine.name}.settings.address
+            ) (lib.attrValues instances)
+          );
+          subjectAltNames = [
+            "DNS:${machine.name}.zt"
+          ]
+          ++ map (address: "IP:${address}") builderAddresses;
         in
         {
-          services.nix-builders = { inherit forcedCommand; };
+          clan.core.vars.generators = {
+            # Shared: every machine of the instance trusts the same CA. The
+            # private key stays in the repository's encrypted vars and signs
+            # machine certificates at generation time only.
+            nix-grpc-ca = {
+              share = true;
+              files."ca.key".deploy = false;
+              files."ca.crt".secret = false;
+              runtimeInputs = [ pkgs.openssl ];
+              script = ''
+                openssl genpkey -algorithm EC -pkeyopt ec_paramgen_curve:P-256 -out "$out"/ca.key
+                openssl req -x509 -new -key "$out"/ca.key -sha256 -days 3650 \
+                  -subj "/CN=nix-builders CA" \
+                  -addext "basicConstraints=critical,CA:TRUE" \
+                  -addext "keyUsage=critical,keyCertSign,cRLSign" \
+                  -addext "subjectKeyIdentifier=hash" \
+                  -out "$out"/ca.crt
+              '';
+            };
 
-          # sshd runs a forced command through the account's login shell, so
-          # the shell must stay executable; a nologin shell would break the
-          # protocol rather than harden it. `ssh://`, which would run
-          # `nix-store --serve`, is deliberately not served.
-          users.users.${user}.openssh.authorizedKeys.keys = map (
-            key: ''restrict,command="${forcedCommand}" ${key}''
-          ) dispatcherKeys;
+            # The builder's daemon runs as nix-grpc-daemon and reads the key
+            # itself; a dispatcher's build hook runs as root inside nix-daemon.
+            # validation regenerates the certificate when its SANs change.
+            nix-grpc-cert = {
+              dependencies = [ "nix-grpc-ca" ];
+              files."key.pem" = lib.optionalAttrs (builderAddresses != [ ]) { owner = "nix-grpc-daemon"; };
+              files."cert.pem".secret = false;
+              # clan's validation accepts scalars, so the SAN list is joined into
+              # the same string the certificate extension uses.
+              validation.subjectAltNames = lib.concatStringsSep "," subjectAltNames;
+              runtimeInputs = [ pkgs.openssl ];
+              script = ''
+                openssl genpkey -algorithm EC -pkeyopt ec_paramgen_curve:P-256 -out "$out"/key.pem
+                openssl req -new -key "$out"/key.pem -subj "/CN=${machine.name}" -out cert.csr
+                cat > cert.ext <<'EOF'
+                basicConstraints=critical,CA:FALSE
+                keyUsage=critical,digitalSignature
+                extendedKeyUsage=serverAuth,clientAuth
+                subjectAltName=${lib.concatStringsSep "," subjectAltNames}
+                EOF
+                openssl x509 -req -in cert.csr \
+                  -CA "$in"/nix-grpc-ca/ca.crt -CAkey "$in"/nix-grpc-ca/ca.key \
+                  -set_serial "0x$(openssl rand -hex 16)" \
+                  -sha256 -days 3650 -extfile cert.ext \
+                  -out "$out"/cert.pem
+              '';
+            };
+          };
+        };
 
-          nix.settings.trusted-users = [ user ];
+      # Shared by both classes; listen address and activation differ per class.
+      mkBuilderModule =
+        { roles, machine }:
+        { config, ... }:
+        let
+          vars = config.clan.core.vars.generators;
+        in
+        {
+          services.nix-grpc-daemon = {
+            enable = true;
+            # Remote builds import unsigned store paths from the dispatcher.
+            trustClients = true;
+            tls = {
+              certFile = vars.nix-grpc-cert.files."cert.pem".path;
+              keyFile = vars.nix-grpc-cert.files."key.pem".path;
+              clientCaFile = vars.nix-grpc-ca.files."ca.crt".path;
+            };
+            # First match wins and a certificate matching no rule is denied,
+            # so a builder that does not dispatch cannot use its peers.
+            accessRules = map (dispatcher: {
+              cn = dispatcher;
+              role = "trusted";
+            }) (lib.filter (d: d != machine.name) (lib.attrNames roles.dispatcher.machines));
+          };
         };
 
       builderInterface = {
@@ -139,37 +223,9 @@ in
           };
           address = lib.mkOption {
             type = lib.types.str;
-            description = "Deterministic ZeroTier IPv6, matching modules/system/ssh-known-hosts.nix.";
-          };
-          hostAlias = lib.mkOption {
-            type = lib.types.nullOr lib.types.str;
-            default = null;
-            description = "ssh Host alias dispatchers resolve; null means `<machine>-builder`, distinct from interactive aliases.";
-          };
-          hostKeyAlias = lib.mkOption {
-            type = lib.types.nullOr lib.types.str;
-            default = null;
-            description = "known_hosts name the host key is pinned under; null means `<machine>.zt`.";
-          };
-          user = lib.mkOption {
-            type = lib.types.nullOr lib.types.str;
-            default = null;
-            description = "Build account; null means `builder` on NixOS and `nixbuild` on darwin.";
-          };
-          uid = lib.mkOption {
-            type = lib.types.nullOr lib.types.int;
-            default = null;
-            description = "UID of the build account; required on darwin, where accounts are created with a fixed uid.";
-          };
-          authorizeSshAccessGroup = lib.mkOption {
-            type = lib.types.bool;
-            default = true;
             description = ''
-              darwin: add the build account to macOS's `com.apple.access_ssh`
-              service ACL at activation. That ACL nests only the admin group
-              and the build account is not an admin, so without it every
-              dispatch fails as `Permission denied (publickey)`. Set false to
-              manage the ACL by hand.
+              Deterministic ZeroTier IPv6, matching modules/system/ssh-known-hosts.nix.
+              Dispatchers connect to it directly and the builder's certificate names it.
             '';
           };
           daemonProcessType = lib.mkOption {
@@ -194,21 +250,6 @@ in
 
       dispatcherInterface = {
         options = {
-          connectTimeout = lib.mkOption {
-            type = lib.types.ints.positive;
-            default = 5;
-            description = "ssh ConnectTimeout in seconds for every builder.";
-          };
-          serverAliveInterval = lib.mkOption {
-            type = lib.types.ints.positive;
-            default = 15;
-            description = "ssh ServerAliveInterval in seconds.";
-          };
-          serverAliveCountMax = lib.mkOption {
-            type = lib.types.ints.positive;
-            default = 2;
-            description = "ssh ServerAliveCountMax.";
-          };
           buildersUseSubstitutes = lib.mkOption {
             type = lib.types.bool;
             default = false;
@@ -223,89 +264,45 @@ in
       };
 
       mkDispatcher =
-        class:
         {
           roles,
           settings,
           machine,
         }:
-        { config, pkgs, ... }:
         let
-          sshKey = config.clan.core.vars.generators.nix-remote-build.files.key.path;
           builders = lib.filterAttrs (
             name: _: name != machine.name && !(lib.elem name settings.exclude)
           ) roles.builder.machines;
-          resolved = lib.mapAttrs (name: builder: {
-            inherit (builder) settings;
-            user = builderUser name builder.settings;
-            hostAlias = builderHostAlias name builder.settings;
-            hostKeyAlias = builderHostKeyAlias name builder.settings;
-          }) builders;
-          sshBlock = b: ''
-            Host ${b.hostAlias}
-              HostName ${b.settings.address}
-              User ${b.user}
-              IdentityFile ${sshKey}
-              IdentitiesOnly yes
-              HostKeyAlias ${b.hostKeyAlias}
-              BatchMode yes
-              ConnectTimeout ${toString settings.connectTimeout}
-              ServerAliveInterval ${toString settings.serverAliveInterval}
-              ServerAliveCountMax ${toString settings.serverAliveCountMax}
-          '';
+          # The client certificate and key resolve by default; the CA does
+          # not, because the plugin's default is the system bundle.
+          # connect-timeout stays well below the plugin's 30s default: laptops
+          # in this fleet are routinely asleep, and a build must not stall half
+          # a minute per unreachable builder before nix disables it.
+          storeUri =
+            builder:
+            "grpc://[${builder.settings.address}]:${toString port}?ca-cert=${clientDir}/ca.crt&connect-timeout=5";
         in
         {
-          # Generated rather than operator-populated: no plaintext private half
-          # leaves the machine. Builders read the public value at evaluation
-          # time through clanLib.getPublicValue.
-          clan.core.vars.generators.nix-remote-build = {
-            files.key = { };
-            files."key.pub".secret = false;
-            runtimeInputs = [ pkgs.openssh ];
-            script = ''
-              ssh-keygen -t ed25519 -N "" -C "nix-remote-build" -f "$out"/key
-            '';
-          };
+          # The flake exports the client only under nixosModules; it sets
+          # nix.settings alone, which nix-darwin provides too.
+          imports = [ inputs.nix-grpc-store.nixosModules.client ];
 
-          services.nix-builders.buildMachines = lib.mapAttrsToList (_: b: {
-            hostName = b.hostAlias;
-            protocol = "ssh-ng";
-            sshUser = b.user;
-            inherit sshKey;
-            inherit (b.settings)
+          programs.nix-grpc-store.enable = true;
+
+          services.nix-builders.buildMachines = lib.mapAttrsToList (_: builder: {
+            hostName = storeUri builder;
+            protocol = null;
+            inherit (builder.settings)
               systems
               maxJobs
               speedFactor
               supportedFeatures
               mandatoryFeatures
               ;
-          }) resolved;
+          }) builders;
 
           nix.distributedBuilds = true;
           nix.settings.builders-use-substitutes = lib.mkIf settings.buildersUseSubstitutes true;
-
-          # darwin keeps one ssh_config.d file per builder; NixOS has a single
-          # ssh_config assembled from programs.ssh.extraConfig.
-          programs.ssh.extraConfig = lib.mkIf (class == "nixos") (
-            lib.concatStrings (lib.mapAttrsToList (_: sshBlock) resolved)
-          );
-
-          environment.etc =
-            lib.optionalAttrs (class == "darwin") (
-              lib.mapAttrs' (
-                name: b: lib.nameValuePair "ssh/ssh_config.d/120-${name}.conf" { text = sshBlock b; }
-              ) resolved
-            )
-            # The other way to reach a builder's store: `nix build --store
-            # "$(cat /etc/nix/<builder>-store-uri)"` builds entirely there with
-            # nothing copied back. The key is root-owned, so a non-root caller
-            # needs `sudo -E`.
-            // lib.mapAttrs' (
-              name: b:
-              lib.nameValuePair "nix/${name}-store-uri" {
-                text = "ssh-ng://${b.user}@${b.hostAlias}?ssh-key=${sshKey}\n";
-              }
-            ) resolved;
         };
     in
     {
@@ -315,19 +312,37 @@ in
         description = "Remote nix builders and the machines that dispatch to them";
         categories = [ "System" ];
         readme = ''
-          Remote nix build capability across the fleet. `builder` machines
-          serve the nix build protocol to every dispatcher of the instance
-          under a forced, restricted `nix-daemon --stdio`; `dispatcher`
-          machines own the `nix-remote-build` key and expose
+          Remote nix build capability across the fleet over nix-grpc-store.
+          `builder` machines run nix-grpc-daemon on port 50051, reachable
+          over ZeroTier only, and grant the `trusted` role to every
+          dispatcher of the instance by mTLS certificate CN; `dispatcher`
+          machines load the grpc:// store plugin and expose
           `services.nix-builders.buildMachines` for their nix.buildMachines.
         '';
       };
 
+      # The client identity is per machine, like the vars it links, so a
+      # machine dispatching in several instances links it once.
       perMachine =
-        { machine, ... }:
+        { machine, instances, ... }:
+        let
+          dispatches = lib.elem "dispatcher" machine.roles;
+        in
         {
-          nixosModule = outputModule machine.roles;
-          darwinModule = outputModule machine.roles;
+          nixosModule = {
+            imports = [
+              (outputModule machine.roles)
+              (identityModule { inherit machine instances; })
+            ]
+            ++ lib.optional dispatches clientIdentityNixos;
+          };
+          darwinModule = {
+            imports = [
+              (outputModule machine.roles)
+              (identityModule { inherit machine instances; })
+            ]
+            ++ lib.optional dispatches clientIdentityDarwin;
+          };
         };
 
       roles.builder = {
@@ -340,47 +355,34 @@ in
             machine,
             ...
           }:
-          let
-            user = builderUser machine.name settings;
-          in
           {
             nixosModule = {
-              imports = [ (mkBuilderModule { inherit roles settings machine; }) ];
-              users.users.${user} = {
-                isNormalUser = true;
-                description = "Remote nix build account";
-                uid = lib.mkIf (settings.uid != null) settings.uid;
-              };
+              imports = [
+                inputs.nix-grpc-store.nixosModules.server
+                (mkBuilderModule { inherit roles machine; })
+              ];
+              # Socket activation binds the wildcard at boot, before ZeroTier
+              # is up; the firewall keeps the port off every other interface.
+              services.nix-grpc-daemon.listen = "[::]:${toString port}";
+              networking.firewall.interfaces."zt+".allowedTCPPorts = [ port ];
             };
 
             darwinModule = {
-              imports = [ (mkBuilderModule { inherit roles settings machine; }) ];
-              assertions = [
-                {
-                  assertion = settings.uid != null;
-                  message = "nix-builders: darwin builder ${machine.name} needs settings.uid.";
-                }
+              imports = [
+                inputs.nix-grpc-store.darwinModules.default
+                (mkBuilderModule { inherit roles machine; })
               ];
-              users.users.${user} = {
-                uid = settings.uid;
-                description = "Remote nix build account";
-                # nix-darwin's default for shell = null is /usr/bin/false,
-                # which would break the forced command rather than harden it.
-                shell = "/bin/sh";
+              services.nix-grpc-daemon = {
+                listen = "[${settings.address}]:${toString port}";
+                # The upstream darwin module asserts this: launchd provides
+                # no socket activation to restart an idle-exited daemon.
+                idleTimeout = null;
               };
-              users.knownUsers = [ user ];
 
               nix.daemonProcessType = lib.mkIf (settings.daemonProcessType != null) settings.daemonProcessType;
               nix.daemonIOLowPriority = lib.mkIf (
                 settings.daemonIOLowPriority != null
               ) settings.daemonIOLowPriority;
-
-              system.activationScripts.postActivation.text = lib.mkIf settings.authorizeSshAccessGroup ''
-                if ! /usr/sbin/dseditgroup -o checkmember -m ${user} com.apple.access_ssh >/dev/null 2>&1; then
-                  echo "Adding ${user} to the com.apple.access_ssh service ACL..."
-                  /usr/sbin/dseditgroup -o edit -a ${user} -t user com.apple.access_ssh
-                fi
-              '';
             };
           };
       };
@@ -396,8 +398,8 @@ in
             ...
           }:
           {
-            nixosModule = mkDispatcher "nixos" { inherit roles settings machine; };
-            darwinModule = mkDispatcher "darwin" { inherit roles settings machine; };
+            nixosModule = mkDispatcher { inherit roles settings machine; };
+            darwinModule = mkDispatcher { inherit roles settings machine; };
           };
       };
     };
