@@ -957,9 +957,9 @@
     url = "https://registry.npmjs.org/@pagefind/windows-x64/-/windows-x64-1.5.2.tgz";
     hash = "sha512-Fa2Iyw7kaDRzGMfNYNUXNW2zbL5FQVDgSOcbDHdzBrDEdpqOqg8TcZ68F22ol6NJ9IGzvUdmeyZypLW5dyhqsg==";
   };
-  "@playwright/test@1.63.0" = fetchurl {
-    url = "https://registry.npmjs.org/@playwright/test/-/test-1.63.0.tgz";
-    hash = "sha512-oxMK4vllB9RK5NQ2l1pq1IfOf2AvnEuj/vYGDj0H2nMtmtZpKtCwt/l00GEO6xjGfpBNAvjovvYdCm50dRQkpQ==";
+  "@playwright/test@1.64.0" = fetchurl {
+    url = "https://registry.npmjs.org/@playwright/test/-/test-1.64.0.tgz";
+    hash = "sha512-oTN9FNYuN6bqQMwiho6jJKLCG2/QOYCixGXuCjRmzOq23eODeukuY2XiAVoVpAECbuezMt1MHQjAiQxK8F+Y+g==";
   };
   "@pnpm/config.env-replace@1.1.0" = fetchurl {
     url = "https://registry.npmjs.org/@pnpm/config.env-replace/-/config.env-replace-1.1.0.tgz";
@@ -3491,13 +3491,13 @@
     url = "https://registry.npmjs.org/pkg-up/-/pkg-up-3.1.0.tgz";
     hash = "sha512-nDywThFk1i4BQK4twPQ6TA4RT8bDY96yeuCVBWL3ePARCiEKDRSrNGbFIgUJpLp+XeIR65v8ra7WuJOFUBtkMA==";
   };
-  "playwright-core@1.63.0" = fetchurl {
-    url = "https://registry.npmjs.org/playwright-core/-/playwright-core-1.63.0.tgz";
-    hash = "sha512-rYCsBF/M5HjUch52bbtVONEFjv6Xu8sm8h72dNlR5bzIE1fvC/bxgspzkjSfU+MweEMmPM8KJebG6nnyxo5mCg==";
+  "playwright-core@1.64.0" = fetchurl {
+    url = "https://registry.npmjs.org/playwright-core/-/playwright-core-1.64.0.tgz";
+    hash = "sha512-T9r+MZkTECl2+oUcZ26YgZzTrYidTsIhYYkJix+6iDOymOb1FB2RLLSOxRGnZGv5DStt+aduIVbt+E8WygXYpg==";
   };
-  "playwright@1.63.0" = fetchurl {
-    url = "https://registry.npmjs.org/playwright/-/playwright-1.63.0.tgz";
-    hash = "sha512-+7ziBLidS4NaNCdt57SUDT+wYmmd5fmiQejUic/kb+YsYSCPyOOE9sebzMjNmQrsnNpDJqd4WHvV/8lfKfUDUg==";
+  "playwright@1.64.0" = fetchurl {
+    url = "https://registry.npmjs.org/playwright/-/playwright-1.64.0.tgz";
+    hash = "sha512-kVzTnYFYEyQ9RGzBjNCd2+yEqWmVbxl3AHPynv3qQ6JTjv4a+kwRcnqQwIpuP3NnrnIrE/Q6wWAIAvMfIE2/Yg==";
   };
   "postcss-nested@6.2.0" = fetchurl {
     url = "https://registry.npmjs.org/postcss-nested/-/postcss-nested-6.2.0.tgz";
