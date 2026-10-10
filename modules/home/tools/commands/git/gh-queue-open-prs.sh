@@ -301,14 +301,42 @@ if $dry_run; then
   exit 0
 fi
 
-authorized=0
-failed=0
-for pr in "${candidates[@]}"; do
+enqueue_one() {
+  local pr=$1
   if $approve; then
     gh pr review "$pr" --approve || echo "Warning: failed to approve PR #$pr" >&2
   fi
+  gh pr merge "$pr" --auto "--$merge_method"
+}
+
+# gitea-mq forms a batch from whatever is queued at each poll tick, so a serial
+# wave lands its first PR in a batch of its own. Concurrent enqueues reach the
+# queue within one tick; the cap stays under GitHub's concurrent-mutation
+# throttling.
+max_parallel=8
+results=$(mktemp -d)
+trap 'rm -rf "$results"' EXIT
+running=0
+for pr in "${candidates[@]}"; do
+  (
+    rc=0
+    enqueue_one "$pr" >"$results/$pr.log" 2>&1 || rc=$?
+    echo "$rc" >"$results/$pr.rc"
+  ) &
+  running=$((running + 1))
+  if [[ $running -ge $max_parallel ]]; then
+    wait -n
+    running=$((running - 1))
+  fi
+done
+wait
+
+authorized=0
+failed=0
+for pr in "${candidates[@]}"; do
   echo "Enqueueing PR #$pr..."
-  if gh pr merge "$pr" --auto "--$merge_method"; then
+  cat "$results/$pr.log"
+  if [[ "$(cat "$results/$pr.rc")" == 0 ]]; then
     authorized=$((authorized + 1))
   else
     echo "Warning: failed to enable auto-merge on PR #$pr" >&2
