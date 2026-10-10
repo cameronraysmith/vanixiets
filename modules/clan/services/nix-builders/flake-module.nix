@@ -11,7 +11,9 @@
 # wildcard through socket activation. nix-darwin has no per-interface firewall,
 # so darwin builders bind their ZeroTier address and KeepAlive retries until that
 # address exists after boot; launchd has no socket activation, so idleTimeout is
-# null there.
+# null there. The upstream darwin module starts the daemon by its store path,
+# which launchd can try before the store volume is mounted and then never
+# retries, so the arguments are restated behind /bin/wait4path.
 #
 # Identities are clan vars: one shared CA whose private key is never deployed,
 # and one certificate per machine with the machine name as CN and both serverAuth
@@ -367,23 +369,39 @@
               networking.firewall.interfaces."zt+".allowedTCPPorts = [ port ];
             };
 
-            darwinModule = {
-              imports = [
-                inputs.nix-grpc-store.darwinModules.default
-                (mkBuilderModule { inherit roles machine; })
-              ];
-              services.nix-grpc-daemon = {
-                listen = "[${settings.address}]:${toString port}";
-                # The upstream darwin module asserts this: launchd provides
-                # no socket activation to restart an idle-exited daemon.
-                idleTimeout = null;
-              };
+            darwinModule =
+              { config, pkgs, ... }:
+              {
+                imports = [
+                  inputs.nix-grpc-store.darwinModules.default
+                  (mkBuilderModule { inherit roles machine; })
+                ];
+                services.nix-grpc-daemon = {
+                  listen = "[${settings.address}]:${toString port}";
+                  # The upstream darwin module asserts this: launchd provides
+                  # no socket activation to restart an idle-exited daemon.
+                  idleTimeout = null;
+                };
+                launchd.daemons.nix-grpc-daemon.serviceConfig.ProgramArguments = lib.mkForce (
+                  [
+                    "/bin/sh"
+                    "-c"
+                    ''/bin/wait4path /nix/store && exec "$@"''
+                    "sh"
+                  ]
+                  ++ map toString (
+                    import "${inputs.nix-grpc-store}/nixos/daemon-args.nix" {
+                      cfg = config.services.nix-grpc-daemon;
+                      inherit lib pkgs;
+                    }
+                  )
+                );
 
-              nix.daemonProcessType = lib.mkIf (settings.daemonProcessType != null) settings.daemonProcessType;
-              nix.daemonIOLowPriority = lib.mkIf (
-                settings.daemonIOLowPriority != null
-              ) settings.daemonIOLowPriority;
-            };
+                nix.daemonProcessType = lib.mkIf (settings.daemonProcessType != null) settings.daemonProcessType;
+                nix.daemonIOLowPriority = lib.mkIf (
+                  settings.daemonIOLowPriority != null
+                ) settings.daemonIOLowPriority;
+              };
           };
       };
 

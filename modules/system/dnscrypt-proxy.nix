@@ -288,12 +288,14 @@ in
         # whenever the network configuration changes: attaching an adapter for
         # the first time creates its service in the SystemConfiguration
         # preferences, which this watch picks up within seconds.
-        launchd.daemons.dnscrypt-pin-dns.serviceConfig = {
-          ProgramArguments = [ (lib.getExe pinDns) ];
-          RunAtLoad = true;
-          WatchPaths = [ "/Library/Preferences/SystemConfiguration/preferences.plist" ];
-          StandardOutPath = "/var/log/dnscrypt-pin-dns.log";
-          StandardErrorPath = "/var/log/dnscrypt-pin-dns.log";
+        launchd.daemons.dnscrypt-pin-dns = {
+          command = lib.getExe pinDns;
+          serviceConfig = {
+            RunAtLoad = true;
+            WatchPaths = [ "/Library/Preferences/SystemConfiguration/preferences.plist" ];
+            StandardOutPath = "/var/log/dnscrypt-pin-dns.log";
+            StandardErrorPath = "/var/log/dnscrypt-pin-dns.log";
+          };
         };
 
         # `dnscrypt-pin-dns --check` lists any service not pinned
