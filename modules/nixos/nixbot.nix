@@ -227,5 +227,13 @@
       services.nixbot.packages.nix-eval-jobs = lib.mkIf config.services.nixEvalLock.enable (
         config.services.nixEvalLock.wrap options.services.nixbot.packages.nix-eval-jobs.default
       );
+
+      # A merge-queue batch reusing its PR build would otherwise never get
+      # nixbot/effects, stalling gitea-mq until its check timeout.
+      services.nixbot.packages.nixbot =
+        options.services.nixbot.packages.nixbot.default.overridePythonAttrs
+          (old: {
+            patches = (old.patches or [ ]) ++ [ ./nixbot-gated-reuse-effects-summary.patch ];
+          });
     };
 }
