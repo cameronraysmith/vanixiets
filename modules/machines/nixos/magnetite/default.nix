@@ -312,6 +312,12 @@ in
         # as binding, because the wait above is evaluation-time narinfo
         # resolution rather than build-time substitution.
         max-substitution-jobs = 32;
+
+        # Trivial builders (bun2nix's per-package derivations, runCommandLocal)
+        # set allowSubstitutes = false because building locally is cheaper than
+        # fetching. magnetite cannot build their aarch64-darwin variants, so
+        # each one becomes a remote build; fetching from niks3 is far cheaper.
+        always-allow-substitutes = true;
       };
 
       # Nix >= 2.30 keeps build sandboxes in /nix/var/nix/builds; the only
