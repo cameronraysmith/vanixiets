@@ -7,7 +7,7 @@
 #
 # One python server stands in for the network: nixbot's build API from
 # fixture files, GitHub's check-runs and pulls APIs, and a Cloudflare API
-# implementing the endpoints wrangler@4.145.0 calls for `preview`
+# implementing the endpoints wrangler@4.149.0 calls for `preview`
 # (@cloudflare/deploy-helpers src/preview/api.ts and
 # src/deploy/helpers/assets.ts),
 # `preview delete`, `versions list` and `deployments list`
@@ -262,6 +262,18 @@
                     name = body["name"]
                     (previews / name).touch()
                     return self.ok(preview(name))
+                elif self.command == "GET" and route.startswith(prefix) and route.endswith("/deployments/latest"):
+                    # Since wrangler 4.149.0 a deployment to an existing Preview
+                    # first reads that Preview's latest deployment, to inherit
+                    # its secrets (deploy-helpers src/preview/preview.ts).
+                    name = route[len(prefix):-len("/deployments/latest")].removeprefix("rehearsal-preview-")
+                    if not (previews / name).exists():
+                        return self.fail(404, 10025, "Preview not found.")
+                    return self.ok({
+                        "id": "rehearsal-deployment-" + name,
+                        "preview_id": "rehearsal-preview-" + name,
+                        "env": {},
+                    })
                 elif self.command == "POST" and route.startswith(prefix) and route.endswith("/deployments"):
                     if (state / "cf-deploy-down").exists():
                         return self.fail(500, 10013, "rehearsal: the API is failing")
@@ -678,7 +690,7 @@
             expect_line "DEPLOY-DOCS-PREVIEW-URL: ${previewUrl}"
             expect_cloudflare "an existing Preview gets a new deployment, not a new Preview" \
               'map(select(.path | startswith("/workers/workers/infra-docs/previews"))) | map("\(.method) \(.path)")
-                == ["GET /workers/workers/infra-docs/previews/pr-7", "POST /workers/workers/infra-docs/previews/rehearsal-preview-pr-7/deployments"]'
+                == ["GET /workers/workers/infra-docs/previews/pr-7", "GET /workers/workers/infra-docs/previews/rehearsal-preview-pr-7/deployments/latest", "POST /workers/workers/infra-docs/previews/rehearsal-preview-pr-7/deployments"]'
             rm "$STUB_STATE/previews/pr-7"
 
             run preview-override preview --rev ${rev} --name feature/Some_Branch --payload "$TMPDIR/fixtures/override"
