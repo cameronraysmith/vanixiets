@@ -37,6 +37,13 @@
       "versioning": "regex:^argo-cd-(?<major>\\d+)\\.(?<minor>\\d+)\\.(?<patch>\\d+)$"
     },
     {
+      "description": "One non-major PR for the bun workspace. Every update of a dependency declared in package.json or packages/*/package.json regenerates the shared bun.lock (and, via regenerate-lock-files.yaml, bun.nix), so separate PRs conflict pairwise and land one per CI cycle. Matching the lock file rather than package names tracks the unit of conflict as dependencies come and go: the bun manager attaches the root bun.lock to every workspace member (lib/modules/manager/bun/extract.ts), and matchFileNames tests lock files as well as package files (lib/util/package-rules/files.ts). The coupled groups below override this one because later packageRules win, so a playwright, cloudflare-workers-tooling or astro update that breaks does not hold back routine ones; majors stay separate.",
+      "matchFileNames": ["bun.lock"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "groupName": "bun workspace non-major",
+      "groupSlug": "bun-workspace-non-major"
+    },
+    {
       "description": "Group playwright across npm and flake.nix into a single PR. The flake driver's browsers.json revision names the PLAYWRIGHT_BROWSERS_PATH directories that the npm playwright-core looks up from its own bundled revision, so the flake ref and both npm pins must move together or every browser test fails to launch. Both the upstream and the fork coordinates are listed so the group survives a fork-drop, and the fork's tags mirror upstream's exactly, so the two coordinates share one continuous version series.",
       "matchPackageNames": [
         "playwright",
