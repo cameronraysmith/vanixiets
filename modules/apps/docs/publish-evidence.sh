@@ -11,7 +11,8 @@
 # packages/docs/tests/report/validate-report.ts, never the report's).
 # Test seams: PUBLISH_EVIDENCE_DEBUG (keep the tmpdir),
 # PUBLISH_EVIDENCE_S3_ENDPOINT (the S3 API origin, optionally with a path
-# prefix). nix-store honours NIX_REMOTE, so a rehearsal realises reports
+# prefix), PUBLISH_EVIDENCE_GITHUB_API_URL (the GitHub API origin). nix-store
+# honours NIX_REMOTE, so a rehearsal realises reports
 # against a chroot store.
 
 set -euo pipefail
@@ -57,9 +58,12 @@ Subcommands:
                              Playwright's hosted trace viewer), and links
                              its receipt
   main            default-branch push: resolve the newest nixbot build of
-                  --rev through the build API, then publish as event does
-                  without a pull request, to tier ttl-90d, without probe or
-                  comment.
+                  --rev through the build API or, when nixbot reused a
+                  build of the same tree (none of --rev itself), the newest
+                  non-cancelled build of --rev's tree, read from the GitHub
+                  API, among the newest 200 builds; then publish as event
+                  does without a pull request, to tier ttl-90d, without
+                  probe or comment.
 
 Flags:
   --out <dir>     publication directory; it must not exist, be empty, or
@@ -116,6 +120,7 @@ Environment:
   PUBLISH_EVIDENCE_S3_ENDPOINT          optional, default
                                         https://<account>.r2.cloudflarestorage.com
   PUBLISH_EVIDENCE_DEBUG                optional
+  PUBLISH_EVIDENCE_GITHUB_API_URL       optional, default https://api.github.com
 
 Examples:
   nix run .#publish-evidence -- event --out ./evidence
@@ -292,6 +297,7 @@ if [[ "$mode" == event ]]; then
     tier=ttl-90d
   fi
   build_source="the event's build"
+  identity_key=commit_sha identity_label=rev identity="$rev"
 else
   [[ -n "${NIXBOT_API_URL:-}" ]] ||
     die "NIXBOT_API_URL is not set: main resolves the build of --rev through nixbot's build API, which nixbot exposes to an effect only with its task token"
@@ -303,7 +309,29 @@ else
   # The filter matches a commit prefix: keep exact commits, newest build.
   selected="$(jq -c --arg rev "$rev" '[.items[]? | select(.commit_sha == $rev)] | max_by(.number) // empty' <<<"$builds_json")" ||
     unavailable "nixbot builds of $rev response is not JSON"
-  [[ -n "$selected" ]] || unavailable "nixbot has no build of $rev"
+  identity_key=commit_sha identity_label=rev identity="$rev"
+  if [[ -z "$selected" ]]; then
+    # nixbot builds a tree once: a push whose tree an earlier build built,
+    # such as a merge-queue batch reusing its pull request's build, has no
+    # build of its own commit. Select what nixbot reused, by its own rule:
+    # the newest non-cancelled build of the same tree (FindReusableBuild).
+    commit_url="${PUBLISH_EVIDENCE_GITHUB_API_URL:-https://api.github.com}/repos/$repo/commits/$rev"
+    tree="$(curl -fsS --retry 3 -H 'Accept: application/vnd.github+json' "$commit_url" | jq -r '.commit.tree.sha // empty')" ||
+      unavailable "cannot read the tree of $rev from $commit_url"
+    [[ "$tree" =~ ^[0-9a-f]{40}$ ]] || unavailable "no tree for $rev from $commit_url"
+    tree_pages=4
+    for ((page = 1; page <= tree_pages; page++)); do
+      page_url="$NIXBOT_API_URL/api/repos/github/$repo/builds?page=$page"
+      page_json="$(curl -fsS --retry 3 "$page_url")" ||
+        unavailable "cannot list nixbot builds from $page_url"
+      selected="$(jq -c --arg tree "$tree" '[.items[]? | select(.tree_hash == $tree and .status != "cancelled")] | max_by(.number) // empty' <<<"$page_json")" ||
+        unavailable "nixbot builds page $page response is not JSON"
+      [[ -z "$selected" && "$(jq -r '.has_next' <<<"$page_json")" == true ]] || break
+    done
+    [[ -n "$selected" ]] ||
+      unavailable "nixbot has no build of $rev, nor of its tree $tree in the newest $tree_pages pages of builds"
+    identity_key=tree_hash identity_label=tree identity="$tree"
+  fi
   build_number="$(jq -r '.number | if type == "number" then tostring else "" end' <<<"$selected")"
   build_status="$(jq -r '.status | if type == "string" then . else "" end' <<<"$selected")"
   [[ "$build_number" =~ ^[0-9]+$ && "$build_status" =~ ^[a-z_]+$ ]] ||
@@ -322,10 +350,10 @@ echo "=== publish-evidence (build $build_number at ${rev:0:12}, $build_status) =
 build_url="$NIXBOT_API_URL/api/repos/github/$repo/builds/$build_number"
 build_json="$(curl -fsS --retry 3 "$build_url")" ||
   unavailable "cannot fetch nixbot build $build_number from $build_url"
-api_identity="$(jq -r '[.build.number, .build.commit_sha] | map(tostring) | join(" ")' <<<"$build_json")" ||
+api_identity="$(jq -r --arg key "$identity_key" '[.build.number, .build[$key]] | map(tostring) | join(" ")' <<<"$build_json")" ||
   unavailable "nixbot build $build_number response is not JSON"
-[[ "$api_identity" == "$build_number $rev" ]] ||
-  rejected "nixbot build $build_number is $(jq -c '{number: .build.number, rev: .build.commit_sha}' <<<"$build_json"), not $build_source $build_number at $rev"
+[[ "$api_identity" == "$build_number $identity" ]] ||
+  rejected "nixbot build $build_number is $(jq -c --arg key "$identity_key" --arg label "$identity_label" '{number: .build.number, ($label): .build[$key]}' <<<"$build_json"), not $build_source $build_number at $identity"
 attribute="$(jq -c --arg attr "$report_attr" 'first(.attributes[]? | select(.attr == $attr)) // empty' <<<"$build_json")"
 [[ -n "$attribute" ]] ||
   unavailable "nixbot build $build_number has no attribute $report_attr"

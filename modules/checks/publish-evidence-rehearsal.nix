@@ -120,6 +120,11 @@
       # Pull request heads whose tree an earlier build already built.
       reusedHeadRev = "7777777777777777777777777777777777777777";
       revertedHeadRev = "8888888888888888888888888888888888888888";
+      # A main commit whose tree a pull request build already built, so nixbot
+      # has no build of the commit itself, and that tree.
+      batchRev = "9999999999999999999999999999999999999999";
+      batchTree = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+      unbuiltTree = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
       evidenceKeyRoot = "projects/vanixiets/browser-evidence";
       # The Worker URL of evidenceKeyRoot: the key without `projects/`.
       evidenceOrigin = "https://evidence.vanixiets.net/vanixiets/browser-evidence";
@@ -393,11 +398,22 @@
                     return self.pr_comment(body)
                 if self.command != "GET":
                     return self.reply(405)
-                if url.path == repo and url.query:
-                    commit = urllib.parse.parse_qs(url.query).get("commit", [""])[0]
-                    fixture = state / "commits" / (commit + ".json")
-                    if commit.isalnum() and fixture.is_file():
+                if url.path.startswith("/github/repos/cameronraysmith/vanixiets/commits/"):
+                    fixture = state / "trees" / (url.path.rsplit("/", 1)[1] + ".json")
+                    if fixture.is_file():
                         return self.reply(200, fixture.read_bytes())
+                    return self.reply(404, b'{"message": "Not Found"}')
+                if url.path == repo and url.query:
+                    query = urllib.parse.parse_qs(url.query)
+                    if "commit" in query:
+                        commit = query["commit"][0]
+                        fixture = state / "commits" / (commit + ".json")
+                        if commit.isalnum() and fixture.is_file():
+                            return self.reply(200, fixture.read_bytes())
+                    elif "page" in query:
+                        fixture = state / "pages" / (query["page"][0] + ".json")
+                        if query["page"][0].isdigit() and fixture.is_file():
+                            return self.reply(200, fixture.read_bytes())
                     return self.reply(200, b'{"items": [], "page": 1, "has_next": false}')
                 if url.path.startswith(repo + "/"):
                     fixture = state / "builds" / (url.path[len(repo) + 1:] + ".json")
@@ -698,7 +714,7 @@
             fi
 
             export STUB_STATE=$TMPDIR/stub
-            mkdir -p "$STUB_STATE/builds" "$STUB_STATE/commits" "$STUB_STATE/objects"
+            mkdir -p "$STUB_STATE/builds" "$STUB_STATE/commits" "$STUB_STATE/objects" "$STUB_STATE/trees" "$STUB_STATE/pages"
             touch "$STUB_STATE/raw.log"
             STUB_ACCOUNT_ID=${accountId} STUB_ACCESS_KEY_ID=${accessKeyId} \
               STUB_PARENT_SECRET=${parentSecret} STUB_TASK_TOKEN=${taskToken} \
@@ -724,6 +740,7 @@
             export R2_EVIDENCE_SECRET_ACCESS_KEY=${parentSecret}
             export CLOUDFLARE_ACCOUNT_ID=${accountId}
             export PUBLISH_EVIDENCE_S3_ENDPOINT="http://127.0.0.1:$port/s3"
+            export PUBLISH_EVIDENCE_GITHUB_API_URL="http://127.0.0.1:$port/github"
             pub=$TMPDIR/pub
             mkdir "$pub"
 
@@ -785,10 +802,10 @@
               [ ! -e "$3" ] || fail "rejected run created $3"
             }
 
-            # build <number> <aggregate status> <commit> <attributes json>
+            # build <number> <aggregate status> <commit> <attributes json> [<tree>]
             build() {
-              jq -n --argjson n "$1" --arg status "$2" --arg rev "$3" --argjson attributes "$4" \
-                '{build: {number: $n, status: $status, commit_sha: $rev}, attributes: $attributes}' \
+              jq -n --argjson n "$1" --arg status "$2" --arg rev "$3" --argjson attributes "$4" --arg tree "''${5:-}" \
+                '{build: {number: $n, status: $status, commit_sha: $rev, tree_hash: (if $tree == "" then null else $tree end)}, attributes: $attributes}' \
                 > "$STUB_STATE/builds/$1.json"
             }
             # attr <name> <status> <out> [<cached>]: one attribute entry.
@@ -1333,9 +1350,49 @@
             expect_no_comment
             diff -r "$TMPDIR/objects.main" "$objects" || fail "another build of the report changed the bucket"
 
+            # main-reused-tree: no build of the commit itself (a batch that
+            # reused its pull request's build), so the build is the newest
+            # non-cancelled one of the commit's tree, paging past builds of
+            # other trees, as nixbot selects the build it reuses.
+            jq -n '{commit: {tree: {sha: "${batchTree}"}}}' > "$STUB_STATE/trees/${batchRev}.json"
+            jq -n '{items: [{number: 60, commit_sha: "${mainRev2}", tree_hash: "${unbuiltTree}", status: "succeeded"}], page: 1, has_next: true}' \
+              > "$STUB_STATE/pages/1.json"
+            jq -n '{items: [
+                {number: 59, commit_sha: "${prRev}", tree_hash: "${batchTree}", status: "cancelled"},
+                {number: 58, commit_sha: "${prRev}", tree_hash: "${batchTree}", status: "succeeded"},
+                {number: 57, commit_sha: "${prRev}", tree_hash: "${batchTree}", status: "succeeded"}
+              ], page: 2, has_next: false}' > "$STUB_STATE/pages/2.json"
+            build 58 succeeded ${prRev} "[$(report succeeded ${reports.passing})]" ${batchTree}
+            run main-reused-tree main --rev ${batchRev} --upload
+            expect_status 0
+            expect_lines "PUBLISH-EVIDENCE: unchanged (report $p_obs, passed=true)"
+            expect_api \
+              '{"method": "GET", "path": "/api/repos/github/cameronraysmith/vanixiets/builds?commit=${batchRev}"}' \
+              '{"method": "GET", "path": "/github/repos/cameronraysmith/vanixiets/commits/${batchRev}"}' \
+              '{"method": "GET", "path": "/api/repos/github/cameronraysmith/vanixiets/builds?page=1"}' \
+              '{"method": "GET", "path": "/api/repos/github/cameronraysmith/vanixiets/builds?page=2"}' \
+              "$(api_build 58)"
+            diff -r "$TMPDIR/objects.main" "$objects" || fail "the reused build of the same report changed the bucket"
+
+            # main-reused-tree-mismatch: a listed build whose own record names
+            # another tree is refused, as a build of another commit is.
+            jq -n '{items: [{number: 61, commit_sha: "${prRev}", tree_hash: "${batchTree}", status: "succeeded"}], page: 1, has_next: false}' \
+              > "$STUB_STATE/pages/1.json"
+            build 61 succeeded ${prRev} "[$(report succeeded ${reports.passing})]" ${unbuiltTree}
+            run main-reused-tree-mismatch main --rev ${batchRev} --upload
+            expect_status 1
+            expect_line "error: evidence rejected: nixbot build 61 is {\"number\":61,\"tree\":\"${unbuiltTree}\"}, not build 61 of --rev, 61 at ${batchTree}"
+            expect_s3
+
+            jq -n '{commit: {tree: {sha: "${unbuiltTree}"}}}' > "$STUB_STATE/trees/${otherRev}.json"
             run main-no-build main --rev ${otherRev} --upload
             expect_status 1
-            expect_line "error: evidence unavailable: nixbot has no build of ${otherRev}"
+            expect_line "error: evidence unavailable: nixbot has no build of ${otherRev}, nor of its tree ${unbuiltTree} in the newest 4 pages of builds"
+            expect_s3
+
+            run main-no-tree main --rev ${affectedRev} --upload
+            expect_status 1
+            expect_line "error: evidence unavailable: cannot read the tree of ${affectedRev} from $PUBLISH_EVIDENCE_GITHUB_API_URL/repos/cameronraysmith/vanixiets/commits/${affectedRev}"
             expect_s3
 
             api_url=$NIXBOT_API_URL
