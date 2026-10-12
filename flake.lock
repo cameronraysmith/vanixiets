@@ -20,16 +20,16 @@
     "argocd-src": {
       "flake": false,
       "locked": {
-        "lastModified": 1791316711,
-        "narHash": "sha256-9AeBLGMcfhNDWs54xSdD0HzEbLIDNRNfBSkdrbm/DvQ=",
+        "lastModified": 1791799473,
+        "narHash": "sha256-NYXFb/1Gjr9fR0iNysU2yii68CZQIRXpdyShW7p5yCU=",
         "owner": "argoproj",
         "repo": "argo-cd",
-        "rev": "d6d5b248ce00e1a2c512068002a93d3319767087",
+        "rev": "a5038b0e2bbac1715754380ae0084df8e3d5b48c",
         "type": "github"
       },
       "original": {
         "owner": "argoproj",
-        "ref": "v3.5.4",
+        "ref": "v3.5.5",
         "repo": "argo-cd",
         "type": "github"
       }
