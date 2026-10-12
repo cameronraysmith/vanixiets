@@ -59,12 +59,15 @@ in
         address = "fddb:4344:343b:14b9:399:937e:8067:8028";
       };
 
-      # 18 logical cores, 64 GiB, half of which the rosetta builder and colima
-      # each claim when running, so 4 remote jobs. apple-virt is real and only
+      # 18 logical cores, 64 GiB. Most dispatched darwin work is tiny
+      # derivations whose cost is per-build dispatch latency, not CPU: with 4
+      # jobs, nixbot build 1301 left stibnite busy ~15% of the time. 16 jobs
+      # can oversubscribe memory when the rosetta builder and colima (half of
+      # it each) run during several large builds. apple-virt is real and only
       # here; nixos-test (a Linux sandbox capability nix lists anyway) and
       # benchmark (laptop timings are not measurements) are not advertised.
       stibnite.settings = darwinLaptop // {
-        maxJobs = 4;
+        maxJobs = 16;
         supportedFeatures = [
           "apple-virt"
           "big-parallel"

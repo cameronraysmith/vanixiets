@@ -293,7 +293,7 @@
         (expectedDispatch {
           builder = "stibnite";
           systems = [ "aarch64-darwin" ];
-          maxJobs = 4;
+          maxJobs = 16;
           speedFactor = 1;
           supportedFeatures = [
             "apple-virt"
