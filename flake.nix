@@ -137,7 +137,7 @@
     # dropping the fork stays a one-word owner swap. Never bulk-push tags from a
     # fork clone: it creates upstream tags for versions we have not yet rebased
     # onto, which renovate's github-tags datasource then offers as newest.
-    playwright-web-flake.url = "github:cameronraysmith/playwright-web-flake/1.63.0";
+    playwright-web-flake.url = "github:cameronraysmith/playwright-web-flake/1.64.0";
     playwright-web-flake.inputs.nixpkgs.follows = "nixpkgs";
 
     # The agent CLI pins an alpha Playwright core; keep its browsers independent
