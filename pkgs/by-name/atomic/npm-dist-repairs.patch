@@ -2,87 +2,87 @@
 +++ b/npm-shrinkwrap.json
 @@ -434,6 +434,7 @@
  		"node_modules/@bastani/atomic-natives": {
- 			"version": "0.9.27",
- 			"resolved": "https://registry.npmjs.org/@bastani/atomic-natives/-/atomic-natives-0.9.27.tgz",
-+			"integrity": "sha512-D40+g20kuka1IMnyWiCjphP49WFNJOx5wD95Sw+6V0/sVp+pRHKUnGsGBcdby8gDX+QaiFY4Ngle7/rXmy6WZA==",
+ 			"version": "0.9.34",
+ 			"resolved": "https://registry.npmjs.org/@bastani/atomic-natives/-/atomic-natives-0.9.34.tgz",
++			"integrity": "sha512-+97azzDqnkvZ2fizQAu07i4HaTyYvnj8vyJbz1eOEAGafh4NPpLERo3hUfmdkjf6viSuvB4FsyNBMzdpYRBueA==",
  			"license": "MIT",
  			"optionalDependencies": {
- 				"@bastani/atomic-natives-darwin-arm64": "0.9.27",
+ 				"@bastani/atomic-natives-darwin-arm64": "0.9.34",
 @@ -453,6 +454,7 @@
  		"node_modules/@bastani/atomic-natives-darwin-arm64": {
- 			"version": "0.9.27",
- 			"resolved": "https://registry.npmjs.org/@bastani/atomic-natives-darwin-arm64/-/atomic-natives-darwin-arm64-0.9.27.tgz",
-+			"integrity": "sha512-c1PxD0iSNABi69Q/h+7V37MbkAc9tUHu7IGlm6ZflstiHz/XUVlUDo+3UHvTkUOpJVw0P0dTKSnj+3aa6pdOrw==",
+ 			"version": "0.9.34",
+ 			"resolved": "https://registry.npmjs.org/@bastani/atomic-natives-darwin-arm64/-/atomic-natives-darwin-arm64-0.9.34.tgz",
++			"integrity": "sha512-QAuY/7LbAba3R5hr/WyuD0lo2L9EIjuvn861f1b4c+mXyVq24oWIvR4I9pMsI9vVlmP6qV8w3fjAjQMYSHOLXA==",
  			"license": "MIT",
  			"os": [
  				"darwin"
 @@ -465,6 +467,7 @@
  		"node_modules/@bastani/atomic-natives-darwin-x64": {
- 			"version": "0.9.27",
- 			"resolved": "https://registry.npmjs.org/@bastani/atomic-natives-darwin-x64/-/atomic-natives-darwin-x64-0.9.27.tgz",
-+			"integrity": "sha512-cWdZvibAJzy75G6n5NsEYs4gm55RypenxaVZQqaJbxisXY1i9kf8JfPEJgV9xUwlRFyuemahR6be+GqZCOdiSA==",
+ 			"version": "0.9.34",
+ 			"resolved": "https://registry.npmjs.org/@bastani/atomic-natives-darwin-x64/-/atomic-natives-darwin-x64-0.9.34.tgz",
++			"integrity": "sha512-cNX53O+8vZDBH76T2yCGtauCE3jMhJu+SDlT6tQwkzi+YGAk2M4crlGvz+hXdVTDY7WHsWERM47stJDc7u3A5w==",
  			"license": "MIT",
  			"os": [
  				"darwin"
 @@ -477,6 +480,7 @@
  		"node_modules/@bastani/atomic-natives-linux-arm64-gnu": {
- 			"version": "0.9.27",
- 			"resolved": "https://registry.npmjs.org/@bastani/atomic-natives-linux-arm64-gnu/-/atomic-natives-linux-arm64-gnu-0.9.27.tgz",
-+			"integrity": "sha512-+MNaltU+D9iWWEQrncFQDJh/5LZYSY8J2pP+zoi2nv0Ka9HgKyvifO0a/U7x9zMxzKhXmP4Zp6GUmp9F9/lRhw==",
+ 			"version": "0.9.34",
+ 			"resolved": "https://registry.npmjs.org/@bastani/atomic-natives-linux-arm64-gnu/-/atomic-natives-linux-arm64-gnu-0.9.34.tgz",
++			"integrity": "sha512-WktoKw4Cb0bII5JmPZ0T/EnxnAap3v0Iy0jD0tSLOWzQTLv840ZpjvxDf/Mfx6lL2S1YvxdpgWrqhivIRvRSZA==",
  			"license": "MIT",
  			"os": [
  				"linux"
 @@ -492,6 +496,7 @@
  		"node_modules/@bastani/atomic-natives-linux-arm64-musl": {
- 			"version": "0.9.27",
- 			"resolved": "https://registry.npmjs.org/@bastani/atomic-natives-linux-arm64-musl/-/atomic-natives-linux-arm64-musl-0.9.27.tgz",
-+			"integrity": "sha512-CXKdaQ5pVp+Fq9jyyOOkQeDiepKoSCsDi4E51X8B5o27aLeoC7DHS6yVVZUz74d+ka4NanY5KEvbnOk/k+okcA==",
+ 			"version": "0.9.34",
+ 			"resolved": "https://registry.npmjs.org/@bastani/atomic-natives-linux-arm64-musl/-/atomic-natives-linux-arm64-musl-0.9.34.tgz",
++			"integrity": "sha512-dqj0roP9jjPTk/6+YMRwju3mV9bTOgVI7YTbefGLFLtFmCC7iy1o1OIZrPewdNWnsVAJ++GTXnEjyqMADJGZNA==",
  			"license": "MIT",
  			"os": [
  				"linux"
 @@ -507,6 +512,7 @@
  		"node_modules/@bastani/atomic-natives-linux-x64-gnu": {
- 			"version": "0.9.27",
- 			"resolved": "https://registry.npmjs.org/@bastani/atomic-natives-linux-x64-gnu/-/atomic-natives-linux-x64-gnu-0.9.27.tgz",
-+			"integrity": "sha512-AU4+P97UmTXqSukAHN/MgvszlJjw7aTG+xmZPBKRwMWkg1tbSlMDGIA2fzgk4w8E2yfr6U9WOfu9PBqtTqNswQ==",
+ 			"version": "0.9.34",
+ 			"resolved": "https://registry.npmjs.org/@bastani/atomic-natives-linux-x64-gnu/-/atomic-natives-linux-x64-gnu-0.9.34.tgz",
++			"integrity": "sha512-k0Hc8lLhWSB6eTxRHjpbC7Bi/+ELkzbkcePZoHK6FTqEYZpZ5oTsj6tSQmdKDv1jsN5CGOR0eN05ak0xyPGC2w==",
  			"license": "MIT",
  			"os": [
  				"linux"
 @@ -522,6 +528,7 @@
  		"node_modules/@bastani/atomic-natives-linux-x64-musl": {
- 			"version": "0.9.27",
- 			"resolved": "https://registry.npmjs.org/@bastani/atomic-natives-linux-x64-musl/-/atomic-natives-linux-x64-musl-0.9.27.tgz",
-+			"integrity": "sha512-pnMkTJ2NqdbiplKvbbKpboV0jvk5mcTAUqxxVk+GW1gH34S5Ni1/lTzMbSJpBji4ZbZMzlpdPDL3d6jOuZa4Jg==",
+ 			"version": "0.9.34",
+ 			"resolved": "https://registry.npmjs.org/@bastani/atomic-natives-linux-x64-musl/-/atomic-natives-linux-x64-musl-0.9.34.tgz",
++			"integrity": "sha512-kqRgCNOVIZQGCjfS/Mafuo2bquGc06jGElr/cQCQP4R+gljhEvaET+tizGi+T9kwn9k4CWqkCe1EMkrf3wBq1w==",
  			"license": "MIT",
  			"os": [
  				"linux"
 @@ -537,6 +544,7 @@
  		"node_modules/@bastani/atomic-natives-win32-arm64-msvc": {
- 			"version": "0.9.27",
- 			"resolved": "https://registry.npmjs.org/@bastani/atomic-natives-win32-arm64-msvc/-/atomic-natives-win32-arm64-msvc-0.9.27.tgz",
-+			"integrity": "sha512-4XMHfxXNtP7DuoZ9Dj/JqzbmXVUvGe6o9fI0NpxBT3spE5pzK0oAgGNkszRarAJVtdFIxQNcivlvMed6i9iFvQ==",
+ 			"version": "0.9.34",
+ 			"resolved": "https://registry.npmjs.org/@bastani/atomic-natives-win32-arm64-msvc/-/atomic-natives-win32-arm64-msvc-0.9.34.tgz",
++			"integrity": "sha512-fPc5wGzFpbr+qn4BCMy//GeCxtUJu22M9Uj+kAy57CUheUcYKCQZSTB4m6MCcxF0qEGaQLNxAJUP/Kczn9F5xg==",
  			"license": "MIT",
  			"os": [
  				"win32"
 @@ -549,6 +557,7 @@
  		"node_modules/@bastani/atomic-natives-win32-x64-msvc": {
- 			"version": "0.9.27",
- 			"resolved": "https://registry.npmjs.org/@bastani/atomic-natives-win32-x64-msvc/-/atomic-natives-win32-x64-msvc-0.9.27.tgz",
-+			"integrity": "sha512-cS5CXJQmmUa/A9kx+KGAZp+upJk7k6HE25eSt2mTOk2ZDif7dcrbEXPPP0FmzOQN5im7dt4gAD+aSgkLCyzmQg==",
+ 			"version": "0.9.34",
+ 			"resolved": "https://registry.npmjs.org/@bastani/atomic-natives-win32-x64-msvc/-/atomic-natives-win32-x64-msvc-0.9.34.tgz",
++			"integrity": "sha512-ptgXmCIvJ62a9rD1MW41MAA5kQsHxlsweRe7Qpl6S+OlM6rYfvHZ+E2sOm2TRrQln9XnRWVl2IDHNJ53LD2qjQ==",
  			"license": "MIT",
  			"os": [
  				"win32"
 @@ -561,6 +570,7 @@
  		"node_modules/@bastani/pi-ai": {
- 			"version": "0.9.27",
- 			"resolved": "https://registry.npmjs.org/@bastani/pi-ai/-/pi-ai-0.9.27.tgz",
-+			"integrity": "sha512-Ajv56E77ga6oKE8oS3QnBul0r2NQre6U2TEmiga86snI846UmupSHRyCamWl3DL1+QgY2KwHN2jueCsnrbOEwA==",
+ 			"version": "0.9.34",
+ 			"resolved": "https://registry.npmjs.org/@bastani/pi-ai/-/pi-ai-0.9.34.tgz",
++			"integrity": "sha512-BT1FL4mtQY30ZohQJxUVnxm0Zrwv31TrQHHj7fL31QiuD9YFmQVp4YuMeyHYUz9Nd2Z0vWHWlcri15fEMkYHiQ==",
  			"license": "MIT",
  			"dependencies": {
  				"@anthropic-ai/sdk": "0.129.0",
 --- a/package.json
 +++ b/package.json
-@@ -131,17 +131,7 @@
+@@ -133,17 +133,7 @@
    "optionalDependencies": {
      "@mariozechner/clipboard": "0.3.9"
    },
