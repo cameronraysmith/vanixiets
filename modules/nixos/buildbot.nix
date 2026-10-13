@@ -13,6 +13,11 @@
 # buildbot-nix serves only Gitea repositories and holds no GitHub effects
 # secrets; vanixiets' effects secrets (modules/effects/vanixiets/secrets.nix)
 # are consumed by nixbot alone.
+#
+# Disabled: nixbot serves both GitHub repositories and buildbot has built
+# nothing but its own project reloads since. `vanixiets.buildbot.enable`
+# restores all of its state below; the generated vars, buildbot's PostgreSQL
+# database and the buildbot CNAME are kept while it is off.
 {
   config,
   inputs,
@@ -28,212 +33,241 @@
       ...
     }:
     {
-      # GitHub App private key (populated manually via clan vars set)
-      clan.core.vars.generators.buildbot-github-app-secret-key = {
-        files."key.pem" = {
-          owner = "buildbot";
-        };
-        script = ''
-          echo "buildbot GitHub App private key: populate via clan vars set" >&2
-          exit 1
-        '';
-      };
+      options.vanixiets.buildbot.enable = lib.mkEnableOption "the buildbot-nix CI service (master, worker, its secrets and vhost)";
 
-      # GitHub OAuth secret (populated manually via clan vars set)
-      clan.core.vars.generators.buildbot-github-oauth-secret = {
-        files."secret" = {
-          owner = "buildbot";
+      config = lib.mkIf config.vanixiets.buildbot.enable {
+        # GitHub App private key (populated manually via clan vars set)
+        clan.core.vars.generators.buildbot-github-app-secret-key = {
+          files."key.pem" = {
+            owner = "buildbot";
+          };
+          script = ''
+            echo "buildbot GitHub App private key: populate via clan vars set" >&2
+            exit 1
+          '';
         };
-        script = ''
-          echo "buildbot GitHub OAuth secret: populate via clan vars set" >&2
-          exit 1
-        '';
-      };
 
-      clan.core.vars.generators.buildbot-github-webhook-secret = {
-        files."secret" = {
-          owner = "buildbot";
+        # GitHub OAuth secret (populated manually via clan vars set)
+        clan.core.vars.generators.buildbot-github-oauth-secret = {
+          files."secret" = {
+            owner = "buildbot";
+          };
+          script = ''
+            echo "buildbot GitHub OAuth secret: populate via clan vars set" >&2
+            exit 1
+          '';
         };
-        runtimeInputs = [ pkgs.openssl ];
-        script = ''
-          openssl rand -hex 32 > $out/secret
-        '';
-      };
 
-      # oauth2-proxy cookie encryption secret (auto-generated, must be 16 or 32 chars)
-      clan.core.vars.generators.buildbot-oauth2-cookie-secret = {
-        files."secret" = {
-          owner = "buildbot";
+        clan.core.vars.generators.buildbot-github-webhook-secret = {
+          files."secret" = {
+            owner = "buildbot";
+          };
+          runtimeInputs = [ pkgs.openssl ];
+          script = ''
+            openssl rand -hex 32 > $out/secret
+          '';
         };
-        runtimeInputs = [ pkgs.openssl ];
-        script = ''
-          openssl rand -base64 48 | tr -dc 'a-zA-Z0-9' | head -c 32 > $out/secret
-        '';
-      };
 
-      # HTTP basic auth password for oauth2-proxy to buildbot internal communication.
-      clan.core.vars.generators.buildbot-http-basic-auth-password = {
-        files."secret" = {
-          owner = "buildbot";
+        # oauth2-proxy cookie encryption secret (auto-generated, must be 16 or 32 chars)
+        clan.core.vars.generators.buildbot-oauth2-cookie-secret = {
+          files."secret" = {
+            owner = "buildbot";
+          };
+          runtimeInputs = [ pkgs.openssl ];
+          script = ''
+            openssl rand -base64 48 | tr -dc 'a-zA-Z0-9' | head -c 32 > $out/secret
+          '';
         };
-        runtimeInputs = [ pkgs.openssl ];
-        script = ''
-          openssl rand -hex 24 > $out/secret
-        '';
-      };
 
-      # Worker credentials (auto-generated password + workers.json)
-      # CX53: 16 logical CPUs (nproc) — cores must match for correct worker count
-      clan.core.vars.generators.buildbot-worker = {
-        files."password" = {
-          owner = "buildbot";
+        # HTTP basic auth password for oauth2-proxy to buildbot internal communication.
+        clan.core.vars.generators.buildbot-http-basic-auth-password = {
+          files."secret" = {
+            owner = "buildbot";
+          };
+          runtimeInputs = [ pkgs.openssl ];
+          script = ''
+            openssl rand -hex 24 > $out/secret
+          '';
         };
-        files."workers.json" = {
-          owner = "buildbot";
+
+        # Worker credentials (auto-generated password + workers.json)
+        # CX53: 16 logical CPUs (nproc) — cores must match for correct worker count
+        clan.core.vars.generators.buildbot-worker = {
+          files."password" = {
+            owner = "buildbot";
+          };
+          files."workers.json" = {
+            owner = "buildbot";
+          };
+          runtimeInputs = [
+            pkgs.openssl
+            pkgs.jq
+          ];
+          script = ''
+            password=$(openssl rand -hex 24)
+            echo -n "$password" > $out/password
+            jq -n --arg pass "$password" \
+              '[{"name": "magnetite", "pass": $pass, "cores": 16}]' > $out/workers.json
+          '';
         };
-        runtimeInputs = [
-          pkgs.openssl
-          pkgs.jq
+
+        # Gitea forge integration: webhook secret (auto-generated) and API token
+        # (populated manually via clan vars set after Gitea is deployed).
+        clan.core.vars.generators.buildbot-gitea-webhook-secret = {
+          files."secret" = {
+            owner = "buildbot";
+          };
+          runtimeInputs = [ pkgs.openssl ];
+          script = ''
+            openssl rand -hex 32 > $out/secret
+          '';
+        };
+
+        clan.core.vars.generators.buildbot-gitea-token = {
+          files."token" = {
+            owner = "buildbot";
+          };
+          script = ''
+            echo "buildbot Gitea API token: populate via clan vars set after Gitea is deployed" >&2
+            exit 1
+          '';
+        };
+
+        services.buildbot-nix.master = {
+          enable = true;
+          domain = "buildbot.scientistexperience.net";
+          useHTTPS = true;
+
+          workersFile = config.clan.core.vars.generators.buildbot-worker.files."workers.json".path;
+
+          buildSystems = [ "x86_64-linux" ];
+
+          admins = [ "cameronraysmith" ];
+
+          httpBasicAuthPasswordFile =
+            config.clan.core.vars.generators.buildbot-http-basic-auth-password.files."secret".path;
+
+          accessMode.fullyPrivate = {
+            backend = "github";
+            clientId = "Iv23liFu66NnDcfRGDHs";
+            clientSecretFile =
+              config.clan.core.vars.generators.buildbot-github-oauth-secret.files."secret".path;
+            cookieSecretFile =
+              config.clan.core.vars.generators.buildbot-oauth2-cookie-secret.files."secret".path;
+          };
+
+          github = {
+            enable = true;
+            appId = 3305657;
+            appSecretKeyFile =
+              config.clan.core.vars.generators.buildbot-github-app-secret-key.files."key.pem".path;
+            webhookSecretFile =
+              config.clan.core.vars.generators.buildbot-github-webhook-secret.files."secret".path;
+            topic = "build-with-buildbot";
+
+            # nixbot serves both GitHub repositories now, so this list is empty
+            # and buildbot discovers no GitHub project. The Gitea integration
+            # below is unaffected and keeps whatever repositories it serves.
+            #
+            # Selection is the topic and then the allowlists, but the two
+            # allowlists are OR'd against each other rather than intersected
+            # (buildbot_nix/buildbot_nix/common.py:138-148), so an owner
+            # allowlist naming either owner would readmit its repositories
+            # whatever this list said. An empty repository list with
+            # userAllowlist at its null default is what actually admits
+            # nothing. Entries, when there are any, are full names because the
+            # accessor is repo.full_name
+            # (buildbot_nix/buildbot_nix/github_projects.py:225).
+            repoAllowlist = [ ];
+          };
+
+          gitea = {
+            enable = true;
+            instanceUrl = "https://git.scientistexperience.net";
+            tokenFile = config.clan.core.vars.generators.buildbot-gitea-token.files."token".path;
+            webhookSecretFile =
+              config.clan.core.vars.generators.buildbot-gitea-webhook-secret.files."secret".path;
+            topic = "build-with-buildbot";
+          };
+
+          # Sized for Hetzner AMD CX53 (16 vCPU / 32 GB RAM / 320 GB SSD).
+          # 4 workers × 2 GiB = 8 GiB peak eval allocation. That is not headroom
+          # the host keeps free: nixbot's 8 × 4096 evaluation and remote
+          # check-fast evaluations draw on the same RAM and zram, so evaluations
+          # are serialised by the host evaluation lock (nix-eval-lock.nix) rather
+          # than budgeted side by side.
+          evalWorkerCount = 4;
+          evalMaxMemorySize = 2048;
+
+          # niks3 binary cache integration (push built paths after successful builds)
+          # Uses public URL to support future remote workers (e.g. cinnabar)
+          niks3 = {
+            enable = true;
+            serverUrl = "https://niks3.scientistexperience.net";
+            authTokenFile = config.clan.core.vars.generators.niks3-api-token.files."token".path;
+            package = inputs.niks3.packages.${config.nixpkgs.hostPlatform.system}.niks3;
+          };
+        };
+
+        # TLS termination via nginx reverse proxy
+        services.nginx.virtualHosts.${config.services.buildbot-nix.master.domain} = {
+          forceSSL = true;
+          enableACME = true;
+        };
+
+        # Local worker on magnetite (colocated with master). The worker is the
+        # buildbot process that runs nix-eval-jobs, from its service PATH; the
+        # wrapper queues it on the host evaluation lock
+        # (modules/nixos/nix-eval-lock.nix) over the package it would otherwise
+        # use, keeping the version buildbot-nix asserts on.
+        services.buildbot-nix.worker = {
+          enable = true;
+          workerPasswordFile = config.clan.core.vars.generators.buildbot-worker.files."password".path;
+          nixEvalJobs.package = lib.mkIf config.services.nixEvalLock.enable (
+            config.services.nixEvalLock.wrap options.services.buildbot-nix.worker.nixEvalJobs.package.default
+          );
+        };
+
+        # Effects reach the docker socket without sudo (modules/nixos/docker.nix).
+        users.users.buildbot-worker.extraGroups = lib.mkIf config.virtualisation.docker.enable [ "docker" ];
+
+        # Restart on failure (no default restart policy in upstream buildbot-nix or nixpkgs).
+        # 10s delay avoids tight restart loops while underlying issues are diagnosed.
+        systemd.services.buildbot-master.serviceConfig = {
+          Restart = "always";
+          RestartSec = "10s";
+        };
+        systemd.services.buildbot-worker.serviceConfig = {
+          Restart = "always";
+          RestartSec = "10s";
+        };
+
+        # buildbot-nix registers two gcroot families under
+        # /nix/var/nix/gcroots/per-user/buildbot-worker/<owner>/<repo>/:
+        # per-build drv roots in drvs/ and per-attr output roots as direct
+        # symlinks. Upstream's cleanup rule (master.nix) globs */drvs, one
+        # path component short of the nested <owner>/<repo> layout produced
+        # by unslugified GitHub full_name project names, so it never matches
+        # and drv roots accumulate unbounded (938 roots pinned the store in
+        # the 2026-06-10 incident). Output roots have no upstream expiry at
+        # all (FIXME in buildbot_nix/nix_gcroot.py). Depth-corrected reaping:
+        # drv roots at 7d (matching upstream intent), output roots at 30d
+        # (each rebuild rewrites the symlink, so active attrs stay fresh).
+        systemd.tmpfiles.rules = [
+          "e /nix/var/nix/gcroots/per-user/buildbot-worker/*/*/drvs - - - 7d -"
+          "e /nix/var/nix/gcroots/per-user/buildbot-worker/*/* - - - 30d -"
         ];
-        script = ''
-          password=$(openssl rand -hex 24)
-          echo -n "$password" > $out/password
-          jq -n --arg pass "$password" \
-            '[{"name": "magnetite", "pass": $pass, "cores": 16}]' > $out/workers.json
-        '';
-      };
 
-      services.buildbot-nix.master = {
-        enable = true;
-        domain = "buildbot.scientistexperience.net";
-        useHTTPS = true;
-
-        workersFile = config.clan.core.vars.generators.buildbot-worker.files."workers.json".path;
-
-        buildSystems = [ "x86_64-linux" ];
-
-        admins = [ "cameronraysmith" ];
-
-        httpBasicAuthPasswordFile =
-          config.clan.core.vars.generators.buildbot-http-basic-auth-password.files."secret".path;
-
-        accessMode.fullyPrivate = {
-          backend = "github";
-          clientId = "Iv23liFu66NnDcfRGDHs";
-          clientSecretFile =
-            config.clan.core.vars.generators.buildbot-github-oauth-secret.files."secret".path;
-          cookieSecretFile =
-            config.clan.core.vars.generators.buildbot-oauth2-cookie-secret.files."secret".path;
+        # Allow buildbot worker connections via ZeroTier (for remote workers)
+        networking.firewall.interfaces."zt+" = {
+          allowedTCPPorts = [ 9989 ];
         };
 
-        github = {
-          enable = true;
-          appId = 3305657;
-          appSecretKeyFile =
-            config.clan.core.vars.generators.buildbot-github-app-secret-key.files."key.pem".path;
-          webhookSecretFile =
-            config.clan.core.vars.generators.buildbot-github-webhook-secret.files."secret".path;
-          topic = "build-with-buildbot";
-
-          # nixbot serves both GitHub repositories now, so this list is empty
-          # and buildbot discovers no GitHub project. The Gitea integration
-          # below is unaffected and keeps whatever repositories it serves.
-          #
-          # Selection is the topic and then the allowlists, but the two
-          # allowlists are OR'd against each other rather than intersected
-          # (buildbot_nix/buildbot_nix/common.py:138-148), so an owner
-          # allowlist naming either owner would readmit its repositories
-          # whatever this list said. An empty repository list with
-          # userAllowlist at its null default is what actually admits
-          # nothing. Entries, when there are any, are full names because the
-          # accessor is repo.full_name
-          # (buildbot_nix/buildbot_nix/github_projects.py:225).
-          repoAllowlist = [ ];
-        };
-
-        gitea = {
-          enable = true;
-          instanceUrl = "https://git.scientistexperience.net";
-          tokenFile = config.clan.core.vars.generators.buildbot-gitea-token.files."token".path;
-          webhookSecretFile =
-            config.clan.core.vars.generators.buildbot-gitea-webhook-secret.files."secret".path;
-          topic = "build-with-buildbot";
-        };
-
-        # Sized for Hetzner AMD CX53 (16 vCPU / 32 GB RAM / 320 GB SSD).
-        # 4 workers × 2 GiB = 8 GiB peak eval allocation. That is not headroom
-        # the host keeps free: nixbot's 8 × 4096 evaluation and remote
-        # check-fast evaluations draw on the same RAM and zram, so evaluations
-        # are serialised by the host evaluation lock (nix-eval-lock.nix) rather
-        # than budgeted side by side.
-        evalWorkerCount = 4;
-        evalMaxMemorySize = 2048;
-
-        # niks3 binary cache integration (push built paths after successful builds)
-        # Uses public URL to support future remote workers (e.g. cinnabar)
-        niks3 = {
-          enable = true;
-          serverUrl = "https://niks3.scientistexperience.net";
-          authTokenFile = config.clan.core.vars.generators.niks3-api-token.files."token".path;
-          package = inputs.niks3.packages.${config.nixpkgs.hostPlatform.system}.niks3;
-        };
+        # CLI for local dispatch of hercules-ci-effects pipelines against this
+        # buildbot master.
+        environment.systemPackages = [
+          inputs.buildbot-nix.packages.${pkgs.stdenv.hostPlatform.system}.buildbot-effects
+        ];
       };
-
-      # TLS termination via nginx reverse proxy
-      services.nginx.virtualHosts.${config.services.buildbot-nix.master.domain} = {
-        forceSSL = true;
-        enableACME = true;
-      };
-
-      # Local worker on magnetite (colocated with master). The worker is the
-      # buildbot process that runs nix-eval-jobs, from its service PATH; the
-      # wrapper queues it on the host evaluation lock
-      # (modules/nixos/nix-eval-lock.nix) over the package it would otherwise
-      # use, keeping the version buildbot-nix asserts on.
-      services.buildbot-nix.worker = {
-        enable = true;
-        workerPasswordFile = config.clan.core.vars.generators.buildbot-worker.files."password".path;
-        nixEvalJobs.package = lib.mkIf config.services.nixEvalLock.enable (
-          config.services.nixEvalLock.wrap options.services.buildbot-nix.worker.nixEvalJobs.package.default
-        );
-      };
-
-      # Restart on failure (no default restart policy in upstream buildbot-nix or nixpkgs).
-      # 10s delay avoids tight restart loops while underlying issues are diagnosed.
-      systemd.services.buildbot-master.serviceConfig = {
-        Restart = "always";
-        RestartSec = "10s";
-      };
-      systemd.services.buildbot-worker.serviceConfig = {
-        Restart = "always";
-        RestartSec = "10s";
-      };
-
-      # buildbot-nix registers two gcroot families under
-      # /nix/var/nix/gcroots/per-user/buildbot-worker/<owner>/<repo>/:
-      # per-build drv roots in drvs/ and per-attr output roots as direct
-      # symlinks. Upstream's cleanup rule (master.nix) globs */drvs, one
-      # path component short of the nested <owner>/<repo> layout produced
-      # by unslugified GitHub full_name project names, so it never matches
-      # and drv roots accumulate unbounded (938 roots pinned the store in
-      # the 2026-06-10 incident). Output roots have no upstream expiry at
-      # all (FIXME in buildbot_nix/nix_gcroot.py). Depth-corrected reaping:
-      # drv roots at 7d (matching upstream intent), output roots at 30d
-      # (each rebuild rewrites the symlink, so active attrs stay fresh).
-      systemd.tmpfiles.rules = [
-        "e /nix/var/nix/gcroots/per-user/buildbot-worker/*/*/drvs - - - 7d -"
-        "e /nix/var/nix/gcroots/per-user/buildbot-worker/*/* - - - 30d -"
-      ];
-
-      # Allow buildbot worker connections via ZeroTier (for remote workers)
-      networking.firewall.interfaces."zt+" = {
-        allowedTCPPorts = [ 9989 ];
-      };
-
-      # CLI for local dispatch of hercules-ci-effects pipelines against this
-      # buildbot master.
-      environment.systemPackages = [
-        inputs.buildbot-nix.packages.${pkgs.stdenv.hostPlatform.system}.buildbot-effects
-      ];
     };
 }
