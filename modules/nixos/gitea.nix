@@ -6,8 +6,7 @@
 # Generators define the credential slots; values are populated via:
 #   - gitea-github-oauth: manual `clan vars set` (OAuth client credentials from GitHub)
 #   - gitea-admin-password: auto-generated (initial admin account password)
-#   - buildbot-gitea-webhook-secret: auto-generated (for buildbot-nix .11 integration)
-#   - buildbot-gitea-token: manual `clan vars set` (Gitea API token for buildbot, post-deploy)
+# buildbot's Gitea webhook secret and token are declared in buildbot.nix.
 {
   config,
   inputs,
@@ -47,33 +46,11 @@
         '';
       };
 
-      # Buildbot webhook secret for Gitea forge integration (auto-generated, consumed by .11)
-      clan.core.vars.generators.buildbot-gitea-webhook-secret = {
-        files."secret" = {
-          owner = "buildbot";
-        };
-        runtimeInputs = [ pkgs.openssl ];
-        script = ''
-          openssl rand -hex 32 > $out/secret
-        '';
-      };
-
-      # Buildbot Gitea API token (populated manually via clan vars set after Gitea deploy)
-      clan.core.vars.generators.buildbot-gitea-token = {
-        files."token" = {
-          owner = "buildbot";
-        };
-        script = ''
-          echo "buildbot Gitea API token: populate via clan vars set after Gitea is deployed" >&2
-          exit 1
-        '';
-      };
-
       # Gitea service configuration
       services.gitea = {
         enable = true;
 
-        # PostgreSQL database (shared instance, auto-merged with buildbot and niks3)
+        # PostgreSQL database (shared instance with nixbot and niks3)
         database = {
           type = "postgres";
           host = "/run/postgresql";

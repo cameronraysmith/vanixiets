@@ -68,14 +68,21 @@
 
       # buildbot_nix/buildbot_nix/common.py:138-148, with full_name as the
       # repo accessor (github_projects.py:225). The two allowlists are OR'd.
+      # A disabled master (vanixiets.buildbot.enable) serves nothing; its
+      # allowlists then fall back to the upstream null defaults, which would
+      # read as admitting everything.
       buildbotAdmits =
         fullName:
         let
           f = buildbot.github;
         in
-        (f.userAllowlist == null && f.repoAllowlist == null)
-        || (f.userAllowlist != null && builtins.elem (owner fullName) f.userAllowlist)
-        || (f.repoAllowlist != null && builtins.elem fullName f.repoAllowlist);
+        buildbot.enable
+        && f.enable
+        && (
+          (f.userAllowlist == null && f.repoAllowlist == null)
+          || (f.userAllowlist != null && builtins.elem (owner fullName) f.userAllowlist)
+          || (f.repoAllowlist != null && builtins.elem fullName f.repoAllowlist)
+        );
 
       # nixbot/nixbot/forge/base.py:128-141, the same shape.
       nixbotAdmits =

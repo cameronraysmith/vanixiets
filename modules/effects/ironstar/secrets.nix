@@ -12,6 +12,9 @@
       lib,
       ...
     }:
+    let
+      buildbot = config.vanixiets.buildbot.enable or false;
+    in
     {
       clan.core.vars.generators.ironstar-effects-secrets = {
         files.secrets = {
@@ -20,18 +23,16 @@
           # buildbot-master runs as this user and opens the path directly.
           # nixbot's unit runs as "nixbot" and never opens it: systemd loads
           # the file as a credential, which PID 1 reads as root before
-          # re-exposing a copy to the service user.
-          owner = "buildbot";
+          # re-exposing a copy to the service user, so root suffices without
+          # buildbot.
+          owner = if buildbot then "buildbot" else "root";
 
           # clan-vars plumbs restartUnits through to sops-nix's restartUnits,
           # which keys the unit's restartTriggers on the encrypted blob hash
-          # so the next deploy refreshes the credential snapshot. Both services
-          # snapshot the file at unit start, so a rotation that restarts only
+          # so the next deploy refreshes the credential snapshot. Each service
+          # snapshots the file at unit start, so a rotation that restarts only
           # one of them leaves the other serving the superseded value.
-          restartUnits = [
-            "buildbot-master.service"
-            "nixbot.service"
-          ];
+          restartUnits = [ "nixbot.service" ] ++ lib.optional buildbot "buildbot-master.service";
         };
 
         prompts.cloudflare-api-token = {

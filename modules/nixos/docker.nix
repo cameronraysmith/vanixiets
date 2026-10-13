@@ -5,9 +5,6 @@
 # Storage: docker's native ZFS storage driver (overlay2 does not layer cleanly
 # on ZFS); requires /var/lib/docker to be its own ZFS dataset, declared as
 # zroot/root/docker in modules/machines/nixos/magnetite/disko.nix.
-#
-# buildbot-worker joins the docker group so effects can reach the docker
-# socket without sudo.
 {
   ...
 }:
@@ -20,8 +17,5 @@
         # Native ZFS storage driver; requires /var/lib/docker to be its own ZFS dataset (disko.nix zroot/root/docker).
         storageDriver = "zfs";
       };
-
-      # Grant buildbot-worker docker socket access so effects can drive the daemon without sudo.
-      users.users.buildbot-worker.extraGroups = [ "docker" ];
     };
 }
