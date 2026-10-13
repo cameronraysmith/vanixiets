@@ -1,0 +1,458 @@
+Stop waiting for ignoreFailure attributes after a per-repo grace.
+
+nixbot finished a build only when every attribute had finished, so a
+best-effort (ignoreFailure) attribute on a builder that went away mid-build
+(a laptop asleep) held the build, its status, its effects and any merge
+queue until the 3 h build timeout. With `optional_build_grace` in the
+repository's nixbot.toml, once the eval has ended and only ignoreFailure
+attributes remain, nixbot waits at most that many seconds, then stops them
+through the per-attribute cancel and records them as ignored failures; the
+build then finishes normally. An attribute finishing within the grace ends
+the build as soon as it does. A build-level cancel stays cancelled.
+
+diff --git a/nixbot/build_run.py b/nixbot/build_run.py
+index b563d73b..7c43ee91 100644
+--- a/nixbot/build_run.py
++++ b/nixbot/build_run.py
+@@ -19,6 +19,7 @@ from typing import TYPE_CHECKING, Any
+ from . import db
+ from .after_build import after_build
+ from .build_scheduler import (
++    AbandonOptional,
+     AttributeResult,
+     AttributeStatus,
+     BuildOutcome,
+@@ -559,12 +560,19 @@ async def build_attributes(  # noqa: PLR0913
+     )
+     if failed_build_cache is not None and not cache_failures:
+         failed_build_cache = _ReadOnlyFailedBuildCache(failed_build_cache)
++    executor = _OrchestratorExecutor(o, event, build, worktree_path, cancel_event)
++    # The repository decides which attributes are best-effort
++    # (ignoreFailure), so it decides how long to wait for them.
++    optional_grace = BranchConfig.load(worktree_path).optional_build_grace
+     scheduler = JobScheduler(
+-        _OrchestratorExecutor(o, event, build, worktree_path, cancel_event),
++        executor,
+         o.config.build_systems,
+         failed_build_cache=failed_build_cache,
+         build_url=f"{o.config.url}/repos/{event.repo.forge}/{event.repo.name}/builds/{build.number}",
+         on_result=record_early,
++        abandon_optional=None
++        if optional_grace is None
++        else AbandonOptional(grace=optional_grace, abandon=executor.abandon),
+     )
+     if isinstance(jobs, asyncio.Queue):
+         schedule_result = await scheduler.run_incremental(jobs)
+@@ -656,6 +664,30 @@ class _OrchestratorExecutor:
+         self.build_record = build
+         self.worktree_path = worktree_path
+         self.cancel_event = cancel_event
++        # ignoreFailure attributes the scheduler stopped waiting for.
++        self.abandoned: set[str] = set()
++
++    def abandon(self, job: NixEvalJobSuccess) -> None:
++        self.abandoned.add(job.attr)
++        attr_cancel = self.o.attr_cancel_events.get((self.build_record.id_, job.attr))
++        if attr_cancel is not None:
++            attr_cancel.set()
++
++    async def _abandoned(
++        self, job: NixEvalJobSuccess, outcome: BuildOutcome, writer: LogWriter
++    ) -> BuildOutcome:
++        """A cancel the scheduler asked for (abandon) is an abandoned
++        build; a build-level cancel (superseded, closed) stays cancelled."""
++        if (
++            outcome != BuildOutcome.cancelled
++            or job.attr not in self.abandoned
++            or self.cancel_event.is_set()
++        ):
++            return outcome
++        await writer.write(
++            b"\nabandoned: not finished when the required attributes had settled\n"
++        )
++        return BuildOutcome.abandoned
+ 
+     async def build(self, job: NixEvalJobSuccess) -> BuildOutcome:
+         try:
+@@ -727,6 +759,8 @@ class _OrchestratorExecutor:
+         # mirror the build-level cancel into the attribute's own event.
+         attr_cancel = asyncio.Event()
+         self.o.attr_cancel_events[(self.build_record.id_, job.attr)] = attr_cancel
++        if job.attr in self.abandoned:
++            attr_cancel.set()  # abandoned before it registered
+ 
+         async def _mirror_build_cancel() -> None:
+             await self.cancel_event.wait()
+@@ -751,6 +785,7 @@ class _OrchestratorExecutor:
+                         self.event, "build", self.build_record.id_
+                     ),
+                 )
++                outcome = await self._abandoned(job, outcome, writer)
+                 if outcome == BuildOutcome.success:
+                     outcome = await self._after_success(job, writer)
+         finally:
+diff --git a/nixbot/build_scheduler.py b/nixbot/build_scheduler.py
+index c9804d56..3407774b 100644
+--- a/nixbot/build_scheduler.py
++++ b/nixbot/build_scheduler.py
+@@ -83,6 +83,9 @@ class BuildOutcome(StrEnum):
+     # dependents (the store path exists).
+     post_build_failure = "post_build_failure"
+     cancelled = "cancelled"
++    # An ignoreFailure job stopped because it was still unfinished when
++    # every other job had settled (AbandonOptional): ignored, not cached.
++    abandoned = "abandoned"
+ 
+ 
+ class BuildExecutor(Protocol):
+@@ -91,6 +94,18 @@ class BuildExecutor(Protocol):
+     async def build(self, job: NixEvalJobSuccess) -> BuildOutcome: ...
+ 
+ 
++@dataclass(frozen=True)
++class AbandonOptional:
++    """Stop ignoreFailure jobs still unfinished `grace` seconds after
++    every other job has settled, instead of waiting for them. `abandon`
++    asks the executor to stop a running job; its build then returns
++    BuildOutcome.abandoned. A job that finishes within the grace ends
++    the build as soon as it does."""
++
++    grace: float
++    abandon: Callable[[NixEvalJobSuccess], None]
++
++
+ @dataclass(frozen=True)
+ class CachedFailure:
+     drv_path: str
+@@ -252,6 +267,12 @@ class _ResultEmitter:
+                 await self.on_result(pending_result)
+ 
+ 
++def _only_optional_left(state: _State) -> bool:
++    """Every unsettled job carries ignoreFailure, so none can change the
++    build's outcome."""
++    return all(job.ignore_failure for job in (*state.pending, *state.running.values()))
++
++
+ def _fail_unresolvable(state: _State) -> None:
+     """Dependency cycle or external dep: should not happen. Fail the
+     remainder instead of spinning."""
+@@ -284,7 +305,11 @@ def outcome_status(
+             )
+         return AttributeStatus.failed, None
+     if failed and job.ignore_failure:
+-        return AttributeStatus.ignored_failure, None
++        return AttributeStatus.ignored_failure, (
++            "not finished when the required attributes had settled"
++            if outcome == BuildOutcome.abandoned
++            else None
++        )
+     return AttributeStatus.failed if failed else AttributeStatus.succeeded, None
+ 
+ 
+@@ -351,6 +376,10 @@ class _State:
+     # Delivery is at-least-once (final re-send): re-ingesting a seen
+     # attr must be a no-op or settled jobs build twice.
+     seen_attrs: set[str] = field(default_factory=set)
++    # Monotonic deadline for abandoning optional jobs (AbandonOptional),
++    # armed once only ignoreFailure jobs remain and the eval has ended.
++    abandon_at: float | None = None
++    abandoned: bool = False
+ 
+     def prune(self, drv_path: str) -> None:
+         for dependent in self.reverse_deps.get(drv_path, ()):
+@@ -380,7 +409,7 @@ class _State:
+ class JobScheduler:
+     """Schedules evaluated attributes in dependency order."""
+ 
+-    def __init__(
++    def __init__(  # noqa: PLR0913
+         self,
+         executor: BuildExecutor,
+         supported_systems: list[str],
+@@ -388,6 +417,7 @@ class JobScheduler:
+         *,
+         build_url: str = "",
+         on_result: Callable[[AttributeResult], Awaitable[None]] | None = None,
++        abandon_optional: AbandonOptional | None = None,
+     ) -> None:
+         self.executor = executor
+         self.supported_systems = supported_systems
+@@ -395,6 +425,7 @@ class JobScheduler:
+         self.build_url = build_url
+         # Called for each result as soon as it is known.
+         self.on_result = on_result
++        self.abandon_optional = abandon_optional
+ 
+     def _partition_jobs(
+         self, jobs: list[NixEvalJob], result: ScheduleResult
+@@ -477,11 +508,12 @@ class JobScheduler:
+         queue: asyncio.Queue[list[NixEvalJob] | None],
+         get_task: asyncio.Task[list[NixEvalJob] | None] | None,
+         flush: Callable[[], Awaitable[None]],
++        max_wait: float | None = None,
+     ) -> asyncio.Task[list[NixEvalJob] | None] | None:
+-        """Block until a new eval batch arrives or a running build
+-        finishes, then fold the outcome into the state. Returns the
+-        (possibly replaced) queue reader task; None after the
+-        end-of-input sentinel."""
++        """Block until a new eval batch arrives, a running build
++        finishes, or `max_wait` seconds elapse, then fold the outcome
++        into the state. Returns the (possibly replaced) queue reader
++        task; None after the end-of-input sentinel."""
+         waits: set[asyncio.Task[object]] = set()
+         if get_task is not None:
+             waits.add(get_task)
+@@ -492,7 +524,9 @@ class JobScheduler:
+             waits.add(done_get)
+         if not waits:
+             return get_task
+-        done_tasks, _ = await asyncio.wait(waits, return_when=asyncio.FIRST_COMPLETED)
++        done_tasks, _ = await asyncio.wait(
++            waits, timeout=max_wait, return_when=asyncio.FIRST_COMPLETED
++        )
+         if get_task is not None and get_task in done_tasks:
+             get_task = self._on_queue_item(state, queue, get_task.result())
+         if done_get is not None and done_get in done_tasks:
+@@ -504,7 +538,7 @@ class JobScheduler:
+                 await self._finish_job(state, state.running.pop(task), task.result())
+                 await flush()
+         elif done_get is not None:
+-            done_get.cancel()  # a batch arrived first. No build consumed
++            done_get.cancel()  # a batch arrived first or the timeout elapsed
+         return get_task
+ 
+     def _on_queue_item(
+@@ -597,7 +631,10 @@ class JobScheduler:
+                         _fail_unresolvable(state)
+                     continue
+ 
+-                get_task = await self._wait_for_progress(state, queue, get_task, flush)
++                max_wait = self._abandon_optional(state) if get_task is None else None
++                get_task = await self._wait_for_progress(
++                    state, queue, get_task, flush, max_wait
++                )
+         finally:
+             # On cancellation (eval failure, superseded build) stop the
+             # in-flight executor tasks instead of orphaning them.
+@@ -611,6 +648,26 @@ class JobScheduler:
+         await flush()
+         return result
+ 
++    def _abandon_optional(self, state: _State) -> float | None:
++        """After the eval ended: abandon the running jobs once only
++        ignoreFailure jobs remain and the grace has passed. Returns how
++        long to wait for progress before checking again; None waits
++        until a job finishes (which ends the grace early)."""
++        policy = self.abandon_optional
++        if policy is None or state.abandoned or not _only_optional_left(state):
++            return None
++        now = asyncio.get_running_loop().time()
++        if state.abandon_at is None:
++            state.abandon_at = now + policy.grace
++        if now < state.abandon_at:
++            return state.abandon_at - now
++        # Pending optional jobs wait on these: they settle as ignored
++        # when the abandoned ones finish.
++        for job in state.running.values():
++            policy.abandon(job)
++        state.abandoned = True
++        return None
++
+     async def _classify(self, job: NixEvalJobSuccess, result: ScheduleResult) -> str:
+         """Decide whether to run or skip a ready job, recording skip results."""
+         # requireFailure inverts the result, so a present output or a
+diff --git a/nixbot/repo_config.py b/nixbot/repo_config.py
+index accdb088..7735a53f 100644
+--- a/nixbot/repo_config.py
++++ b/nixbot/repo_config.py
+@@ -6,7 +6,7 @@ from __future__ import annotations
+ import tomllib
+ from typing import TYPE_CHECKING, Self
+ 
+-from pydantic import BaseModel, ValidationError
++from pydantic import BaseModel, Field, ValidationError
+ 
+ if TYPE_CHECKING:
+     from pathlib import Path
+@@ -41,6 +41,10 @@ class BranchConfig(BaseModel):
+     build_branches: list[str] | None = None
+     # False opts out of the instance-wide contributor approval gate.
+     require_approval: bool = True
++    # Seconds to keep waiting for ignoreFailure attributes once every
++    # other attribute has settled; then they are stopped and recorded as
++    # ignored failures. None waits for them to finish.
++    optional_build_grace: int | None = Field(default=None, ge=0)
+ 
+     @classmethod
+     def loads(cls, text: str | None) -> Self:
+diff --git a/nixbot/tests/test_build_scheduler.py b/nixbot/tests/test_build_scheduler.py
+index 0da009f8..ffe57d20 100644
+--- a/nixbot/tests/test_build_scheduler.py
++++ b/nixbot/tests/test_build_scheduler.py
+@@ -7,6 +7,7 @@ import asyncio
+ from datetime import UTC, datetime
+ 
+ from nixbot.build_scheduler import (
++    AbandonOptional,
+     AttributeResult,
+     AttributeStatus,
+     BuildOutcome,
+@@ -653,3 +654,94 @@ def test_deps_only_result_has_no_out_path() -> None:
+     job = _with_extra(mk_job("shell"), buildDependenciesOnly=True)
+     result = _success_result(job, AttributeStatus.succeeded)
+     assert result.out_path is None
++
++
++class TimedExecutor:
++    """Builds take `delays[attr]` seconds; attrs in `hang` run until
++    abandoned. Abandoning ends a build as abandoned, as the
++    orchestrator's executor does."""
++
++    def __init__(
++        self, delays: dict[str, float] | None = None, hang: set[str] | None = None
++    ) -> None:
++        self.delays = delays or {}
++        self.hang = hang or set()
++        self.stops: dict[str, asyncio.Event] = {}
++        self.abandoned: list[str] = []
++
++    def abandon(self, job: NixEvalJobSuccess) -> None:
++        self.abandoned.append(job.attr)
++        self.stops.setdefault(job.attr, asyncio.Event()).set()
++
++    async def build(self, job: NixEvalJobSuccess) -> BuildOutcome:
++        stop = self.stops.setdefault(job.attr, asyncio.Event())
++        if job.attr in self.hang:
++            await stop.wait()
++        else:
++            try:
++                await asyncio.wait_for(stop.wait(), self.delays.get(job.attr, 0))
++            except TimeoutError:
++                return BuildOutcome.success
++        return BuildOutcome.abandoned
++
++
++def _optional(attr: str, deps: list[str] | None = None) -> NixEvalJobSuccess:
++    return _with_extra(mk_job(attr, deps=deps or []), ignoreFailure=True)
++
++
++async def test_optional_job_within_grace_ends_build_when_it_finishes() -> None:
++    # The grace is a ceiling, not a wait: the build ends with the
++    # optional job, long before the grace would expire.
++    grace = 30.0
++    executor = TimedExecutor({"opt": 0.05})
++    scheduler = JobScheduler(
++        executor,
++        [SYSTEM],
++        abandon_optional=AbandonOptional(grace=grace, abandon=executor.abandon),
++    )
++    loop = asyncio.get_running_loop()
++    start = loop.time()
++    result = await run_scheduler(scheduler, [mk_job("req"), _optional("opt")])
++    assert loop.time() - start < grace
++    statuses = by_attr(result)
++    assert statuses["req"] == AttributeStatus.succeeded
++    assert statuses["opt"] == AttributeStatus.succeeded
++    assert executor.abandoned == []
++
++
++async def test_optional_jobs_unfinished_after_grace_are_abandoned() -> None:
++    executor = TimedExecutor(hang={"opt"})
++    scheduler = JobScheduler(
++        executor,
++        [SYSTEM],
++        abandon_optional=AbandonOptional(grace=0.05, abandon=executor.abandon),
++    )
++    result = await asyncio.wait_for(
++        run_scheduler(
++            scheduler, [mk_job("req"), _optional("opt"), _optional("top", ["opt"])]
++        ),
++        timeout=5,
++    )
++    statuses = by_attr(result)
++    assert statuses["req"] == AttributeStatus.succeeded
++    assert statuses["opt"] == AttributeStatus.ignored_failure
++    assert statuses["top"] == AttributeStatus.ignored_failure
++    assert executor.abandoned == ["opt"]
++    errors = {r.attr: r.error for r in result.results}
++    assert errors["opt"] == "not finished when the required attributes had settled"
++    assert result.success
++
++
++async def test_grace_starts_when_the_required_jobs_have_settled() -> None:
++    # Counted from t=0 the grace would expire at 0.3 s, before the
++    # optional job finishes at 0.45 s; counted from the required job
++    # settling at 0.3 s it expires at 0.6 s, after it.
++    executor = TimedExecutor({"req": 0.3, "opt": 0.45})
++    scheduler = JobScheduler(
++        executor,
++        [SYSTEM],
++        abandon_optional=AbandonOptional(grace=0.3, abandon=executor.abandon),
++    )
++    result = await run_scheduler(scheduler, [mk_job("req"), _optional("opt")])
++    assert by_attr(result)["opt"] == AttributeStatus.succeeded
++    assert executor.abandoned == []
+diff --git a/nixbot/tests/test_orchestrator.py b/nixbot/tests/test_orchestrator.py
+index bda4600e..47ee383a 100644
+--- a/nixbot/tests/test_orchestrator.py
++++ b/nixbot/tests/test_orchestrator.py
+@@ -115,6 +115,8 @@ class FakeExecutor:
+     # When set, builds wait on this gate (for in-flight tests).
+     gate: asyncio.Event | None = None
+     started: asyncio.Event = field(default_factory=asyncio.Event)
++    # Builds of these attrs run until their cancel event fires.
++    hang: set[str] = field(default_factory=set)
+ 
+     async def build_attribute(  # noqa: PLR0913
+         self,
+@@ -133,6 +135,10 @@ class FakeExecutor:
+         self.started.set()
+         if self.gate is not None:
+             await self.gate.wait()
++        if job.attr in self.hang:
++            assert cancel_event is not None
++            await cancel_event.wait()
++            return BuildOutcome.cancelled
+         await log_writer.write(b"fake build output\n")
+         return self.outcomes.get(job.attr, BuildOutcome.success)
+ 
+@@ -416,6 +422,38 @@ async def test_full_lifecycle(pool: asyncpg.Pool, run_event: EventRunner) -> Non
+     assert reporter.events[2][2] == BuildStatus.SUCCEEDED
+ 
+ 
++async def test_unfinished_optional_attribute_is_abandoned_after_grace(
++    pool: asyncpg.Pool, run_event: EventRunner, upstream: Path
++) -> None:
++    """With optional_build_grace set, an ignoreFailure attribute still
++    running after the others settled is stopped and ignored: the build
++    succeeds instead of waiting for it."""
++    (upstream / "nixbot.toml").write_text("optional_build_grace = 0\n")
++    git(upstream, "add", ".")
++    git(upstream, "commit", "-m", "do not wait for optional attributes")
++    hung = mk_job("darwin").model_copy(update={"extra_value": {"ignoreFailure": True}})
++    build, _ = await asyncio.wait_for(
++        run_event(
++            FakeEvalRunner([mk_job("linux"), hung]), FakeExecutor(hang={"darwin"})
++        ),
++        timeout=30,
++    )
++    assert build is not None
++    row = await pool.fetchrow("SELECT status FROM builds WHERE id = $1", build.id_)
++    assert row["status"] == BuildStatus.SUCCEEDED
++    attrs = await pool.fetch(
++        "SELECT attr, status, error FROM build_attributes WHERE build_id = $1",
++        build.id_,
++    )
++    assert {r["attr"]: (r["status"], r["error"]) for r in attrs} == {
++        "linux": ("succeeded", None),
++        "darwin": (
++            "ignored_failure",
++            "not finished when the required attributes had settled",
++        ),
++    }
++
++
+ async def test_failure_aggregation(
+     pool: asyncpg.Pool, run_event: EventRunner, upstream: Path
+ ) -> None:

@@ -5,11 +5,14 @@
 # (modules/clan/inventory/services/nix-builders.nix). Every darwin check
 # therefore carries hercules-ci's ignoreFailure modifier, which nixbot reads
 # from each job (nixbot/nixbot/nix/apply.nix:6): a failed darwin attribute,
-# or one whose failed dependency settled it (patched in
-# modules/nixos/nixbot.nix), is reported as an ignored failure, excluded from
-# the build's aggregate status, and kept out of the failed-build cache so the
-# next build retries it (nixbot/nixbot/build_scheduler.py:119-121, 286, 291, 461,
-# as patched).
+# or one whose failed dependency settled it, is reported as an ignored
+# failure, excluded from the build's aggregate status, and kept out of the
+# failed-build cache so the next build retries it (nixbot/build_scheduler.py
+# `outcome_status`, `dependency_failed_status`, `_finish_job`). Once every
+# other attribute has settled, a darwin attribute still unfinished after
+# `optional_build_grace` (nixbot.toml) is stopped and ignored the same way
+# (`JobScheduler._abandon_optional`), so a sleeping Mac never holds a build.
+# The last two behaviours are local patches (modules/nixos/nixbot.nix).
 #
 # The cost of that is real: nixbot cannot tell an absent builder from a
 # genuine darwin regression, so a broken darwin check is a notice in CI too.

@@ -11,6 +11,15 @@
 # from the default branch only.
 attribute = "checks"
 
+# The darwin checks run on laptops, which sleep. Once every x86_64-linux
+# check has settled, a darwin check still unfinished 5 minutes later is
+# stopped and recorded as an ignored failure, so the build's outcome, its
+# effects, and the merge queue never wait on a Mac (local nixbot patch,
+# modules/nixos/nixbot.nix). A darwin check finishing earlier ends the build
+# as soon as it does; the grace is a limit, not a wait. Read from the
+# worktree being built, like `attribute`.
+optional_build_grace = 300
+
 # herculesCI effects gating (nixbot, github:Mic92/nixbot)
 #
 # Deploy secrets are only ever held by code from main, so onPush effects run
