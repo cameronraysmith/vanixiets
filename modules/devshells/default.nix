@@ -148,11 +148,6 @@
           # here for `just renovate`, which previews the bot's decisions
           # against the working tree via the local platform.
           pkgs.renovate
-        ]
-        # buildbot-effects CLI for local dispatch of hercules-ci-effects
-        # (see buildbot-nix/docs/EFFECTS.md). Linux-only: depends on bwrap.
-        ++ lib.optionals pkgs.stdenv.hostPlatform.isLinux [
-          inputs'.buildbot-nix.packages.buildbot-effects
         ];
 
         passthru.meta.description = "Development environment with clan CLI and build tools";
