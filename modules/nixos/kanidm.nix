@@ -181,6 +181,16 @@ in
           # module treats as "backups disabled" (nixos/modules/services/security/
           # kanidm.nix: enableServerBackup gates on versions != 0).
           online_backup.versions = 7;
+
+          # nixpkgs sets this unconditionally to a derivation (the linkFarm of
+          # entryManagement.migrations), and its own null filter
+          # (filterAttrsRecursive) walks into that derivation's stdenv, raising
+          # every deprecated stdenv.is* warning on each evaluation. The same
+          # empty directory as a string renders the identical server.toml.
+          # Declaring migrations lifts this and restores nixpkgs' value.
+          migration_path = lib.mkIf (config.services.kanidm.server.entryManagement.migrations == { }) (
+            lib.mkForce "${pkgs.linkFarm "kanidm-entry-management" [ ]}"
+          );
         };
 
         provision = {
