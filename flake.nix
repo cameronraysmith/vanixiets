@@ -160,6 +160,14 @@
     hermes-agent.url = "github:NousResearch/hermes-agent/main";
     hermes-agent.inputs.nixpkgs.follows = "nixpkgs";
     hermes-agent.inputs.flake-parts.follows = "flake-parts";
+    # hermes-agent's own pin predates uv2nix 4b59abb2 (stdenv.is* ->
+    # stdenv.hostPlatform.is*), whose deprecation warnings it raised on every
+    # evaluation; the hermes-agent derivation is identical either way.
+    hermes-agent.inputs.uv2nix.follows = "uv2nix";
+
+    uv2nix.url = "github:pyproject-nix/uv2nix";
+    uv2nix.inputs.nixpkgs.follows = "nixpkgs";
+    uv2nix.inputs.pyproject-nix.follows = "hermes-agent/pyproject-nix";
 
     catppuccin.url = "github:catppuccin/nix";
 
