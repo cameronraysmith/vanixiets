@@ -1,0 +1,106 @@
+Honor ignoreFailure for attributes settled by a failed dependency.
+
+ignoreFailure kept an attribute's own build failure out of the
+aggregate, but a dependent settled by a failed dependency was recorded
+dependency_failed regardless of its own ignoreFailure, failing the build.
+
+diff --git a/nixbot/build_scheduler.py b/nixbot/build_scheduler.py
+index 20c34ce1..c9804d56 100644
+--- a/nixbot/build_scheduler.py
++++ b/nixbot/build_scheduler.py
+@@ -288,6 +288,15 @@ def outcome_status(
+     return AttributeStatus.failed if failed else AttributeStatus.succeeded, None
+ 
+ 
++def dependency_failed_status(job: NixEvalJobSuccess) -> AttributeStatus:
++    """Status of a job settled by a failed dependency. ignoreFailure
++    covers the attribute's failure whatever its cause, as it does for
++    its own build failure in outcome_status."""
++    if job.ignore_failure:
++        return AttributeStatus.ignored_failure
++    return AttributeStatus.dependency_failed
++
++
+ def _success_result(
+     job: NixEvalJobSuccess,
+     status: AttributeStatus,
+@@ -357,8 +366,13 @@ class _State:
+             self.cancelled_drvs |= settled
+         self.pending = [j for j in self.pending if j.drv_path not in settled]
+         for dependent in dependents:
++            dependent_status = (
++                status
++                if status != AttributeStatus.dependency_failed
++                else dependency_failed_status(dependent)
++            )
+             self.result.results.append(
+-                _success_result(dependent, status, dependency_attr=job.attr)
++                _success_result(dependent, dependent_status, dependency_attr=job.attr)
+             )
+             self.prune(dependent.drv_path)
+ 
+@@ -539,7 +553,7 @@ class JobScheduler:
+                         state.cancelled_drvs.add(job.drv_path)
+                         status = AttributeStatus.cancelled
+                     else:
+-                        status = AttributeStatus.dependency_failed
++                        status = dependency_failed_status(job)
+                     state.result.results.append(_success_result(job, status))
+                     settled_any = True
+                 else:
+diff --git a/nixbot/tests/test_build_scheduler.py b/nixbot/tests/test_build_scheduler.py
+index 2ea70f0f..0da009f8 100644
+--- a/nixbot/tests/test_build_scheduler.py
++++ b/nixbot/tests/test_build_scheduler.py
+@@ -604,6 +604,51 @@ def test_ignore_failure_status_is_not_a_failure() -> None:
+     assert "ignored_failure" in TERMINAL_ATTRIBUTE_STATUSES
+ 
+ 
++async def test_ignore_failure_dependents_of_a_failed_dependency() -> None:
++    # A best-effort attribute settled by a failed (also best-effort)
++    # dependency is ignored like its dependency, and the failure still
++    # settles its own dependents; a dependent without ignoreFailure
++    # still fails the build.
++    dep = _with_extra(mk_job("dep"), ignoreFailure=True)
++    soft = _with_extra(mk_job("soft", deps=["dep"]), ignoreFailure=True)
++    softer = _with_extra(mk_job("softer", deps=["soft"]), ignoreFailure=True)
++    executor = FakeExecutor({"dep": BuildOutcome.failure})
++    result = await run_scheduler(JobScheduler(executor, [SYSTEM]), [dep, soft, softer])
++    statuses = by_attr(result)
++    assert statuses["dep"] == AttributeStatus.ignored_failure
++    assert statuses["soft"] == AttributeStatus.ignored_failure
++    assert statuses["softer"] == AttributeStatus.ignored_failure
++    assert executor.built == ["dep"]
++    assert result.success
++
++    hard = mk_job("hard", deps=["dep"])
++    executor = FakeExecutor({"dep": BuildOutcome.failure})
++    result = await run_scheduler(JobScheduler(executor, [SYSTEM]), [dep, hard])
++    assert by_attr(result)["hard"] == AttributeStatus.dependency_failed
++    assert not result.success
++
++
++async def test_streaming_ignore_failure_late_dependent_is_ignored() -> None:
++    dep_failed = asyncio.Event()
++
++    async def on_result(result: AttributeResult) -> None:
++        if result.attr == "dep":
++            dep_failed.set()
++
++    executor = FakeExecutor({"dep": BuildOutcome.failure})
++    scheduler = JobScheduler(executor, [SYSTEM], on_result=on_result)
++    queue: asyncio.Queue[list[NixEvalJob] | None] = asyncio.Queue()
++    await queue.put([_with_extra(mk_job("dep"), ignoreFailure=True)])
++    run_task = asyncio.create_task(scheduler.run_incremental(queue))
++    await asyncio.wait_for(dep_failed.wait(), timeout=5)
++    await queue.put([_with_extra(mk_job("top", deps=["dep"]), ignoreFailure=True)])
++    await queue.put(None)
++    result = await asyncio.wait_for(run_task, timeout=5)
++    assert by_attr(result)["top"] == AttributeStatus.ignored_failure
++    assert "top" not in executor.built
++    assert result.success
++
++
+ def test_deps_only_result_has_no_out_path() -> None:
+     job = _with_extra(mk_job("shell"), buildDependenciesOnly=True)
+     result = _success_result(job, AttributeStatus.succeeded)

@@ -229,11 +229,16 @@
       );
 
       # A merge-queue batch reusing its PR build would otherwise never get
-      # nixbot/effects, stalling gitea-mq until its check timeout.
+      # nixbot/effects, stalling gitea-mq until its check timeout. An
+      # ignoreFailure attribute whose dependency failed would otherwise fail
+      # the build (dependency_failed) instead of being ignored.
       services.nixbot.packages.nixbot =
         options.services.nixbot.packages.nixbot.default.overridePythonAttrs
           (old: {
-            patches = (old.patches or [ ]) ++ [ ./nixbot-gated-reuse-effects-summary.patch ];
+            patches = (old.patches or [ ]) ++ [
+              ./nixbot-gated-reuse-effects-summary.patch
+              ./nixbot-ignore-failure-dependents.patch
+            ];
           });
     };
 }
