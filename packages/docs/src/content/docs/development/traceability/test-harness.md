@@ -21,7 +21,6 @@ All local commands run from the repository root.
 | `docs` effect, `pullRequest` trigger | Cloudflare Preview `pr-<number>` for a pull request (`deploy-docs pull-request`), reported as the `docs-preview` check run whose details link is the Preview URL | `just docs-deploy-preview pr-<number>` | PR (informational) |
 | `docs` effect, `pullRequestClosed` trigger | Delete the pull request's Preview (`deploy-docs pull-request-closed`) | None | PR closed or merged |
 | PR Check: `check-fast-forward` | Fast-forward merge is possible | `git merge-base --is-ancestor origin/main HEAD` | PR |
-| PR Check: `playwright-drift-check` | Playwright pins match the flake input | `just bun-drift-check` | PR |
 | CD: `bootstrap-verification` | Makefile bootstrap on clean Ubuntu | `make bootstrap && make verify && make setup-user` | Manual dispatch |
 
 `checks.x86_64-linux` covers the overlay packages, the docs package tests (`package-vanixiets-docs-test-*`), dev shells, the `nixos-*` and `home-manager-*` configurations, and the structure, secrets, and treefmt checks.

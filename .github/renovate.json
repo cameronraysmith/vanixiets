@@ -44,7 +44,7 @@
       "groupSlug": "bun-workspace-non-major"
     },
     {
-      "description": "Group playwright across npm and flake.nix into a single PR. The flake driver's browsers.json revision names the PLAYWRIGHT_BROWSERS_PATH directories that the npm playwright-core looks up from its own bundled revision, so the flake ref and both npm pins must move together or every browser test fails to launch. Both the upstream and the fork coordinates are listed so the group survives a fork-drop, and the fork's tags mirror upstream's exactly, so the two coordinates share one continuous version series.",
+      "description": "Group playwright across npm and flake.nix into a single PR. The flake driver's browsers.json revision names the PLAYWRIGHT_BROWSERS_PATH directories that the npm playwright-core looks up from its own bundled revision, so when a release changes a browser revision the flake ref and both npm pins must move together; otherwise the docs e2e build stops naming the missing directories. A patch release that keeps every revision may land npm-only while the fork's tag lags. Both the upstream and the fork coordinates are listed so the group survives a fork-drop, and the fork's tags mirror upstream's exactly, so the two coordinates share one continuous version series.",
       "matchPackageNames": [
         "playwright",
         "@playwright/test",

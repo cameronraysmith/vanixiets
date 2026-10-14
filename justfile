@@ -577,26 +577,8 @@ regenerate-bun-nix:
   bun2nix --lock-file bun.lock --output-file bun.nix
   treefmt bun.nix
 
-# Fail if the npm playwright version drifts from the flake-provided playwright version.
-# Run standalone as a sanity check or let the composite gate on it.
-[group('bun')]
-bun-drift-check:
-  #!/usr/bin/env bash
-  set -euo pipefail
-  FLAKE_PW=$(nix eval --raw --inputs-from . "playwright-web-flake#packages.$(nix eval --impure --raw --expr builtins.currentSystem).playwright-driver.version")
-  NPM_PW=$(jq -r '.devDependencies."playwright"' packages/docs/package.json)
-  NPM_PWT=$(jq -r '.devDependencies."@playwright/test"' packages/docs/package.json)
-  if [[ "$NPM_PW" != "$FLAKE_PW" || "$NPM_PWT" != "$FLAKE_PW" ]]; then
-    echo "ERROR: playwright drift detected." >&2
-    echo "  flake playwright-web-flake: $FLAKE_PW" >&2
-    echo "  npm playwright:             $NPM_PW" >&2
-    echo "  npm @playwright/test:       $NPM_PWT" >&2
-    exit 1
-  fi
-  echo "playwright in sync at $FLAKE_PW"
-
 # Bulk-bump every dep in every workspace to latest stable (playwright included;
-# reverted by bun-repin-playwright in the composite flow). Hits the npm registry.
+# its pins are restored by the composite flow). Hits the npm registry.
 [group('bun')]
 bun-bump-all:
   #!/usr/bin/env bash
@@ -606,9 +588,9 @@ bun-bump-all:
   echo "Bumping packages/docs..."
   (cd packages/docs && bun update --latest)
 
-# Overwrite playwright + @playwright/test in packages/docs/package.json to the
-# exact version pinned by the playwright-web-flake flake input. Preserves the
-# rangeStrategy=pin invariant that Renovate enforces.
+# Overwrite playwright + @playwright/test in packages/docs/package.json with the
+# exact version of the playwright-web-flake flake input, whose browsers then
+# match by construction. Remediation for the e2e browser revision check.
 [group('bun')]
 bun-repin-playwright:
   #!/usr/bin/env bash
@@ -647,7 +629,7 @@ bun-holds:
 # workspace package.json. `bun update --latest` has no package-name exclusion --
 # -F/--filter selects workspaces, and `--latest` is rejected outright when
 # combined with a version spec -- so the bump cannot be prevented at the source.
-# This mirrors what bun-repin-playwright already does for the flake ceiling:
+# This mirrors how the composite restores the playwright pins:
 # let the bulk bump overshoot, then restore the constrained ranges before the
 # lockfile is reconciled, so no broken lockfile is ever produced.
 [private]
@@ -741,43 +723,46 @@ bun-lockfile-reconcile:
   bun install --lockfile-only
 
 # Preview outdated deps across all workspaces that bun-update-latest-stable
-# would bump. Excludes playwright per the flake-is-version-ceiling invariant.
+# would bump. Excludes playwright, which moves only with Renovate's playwright
+# group because its browsers come from the playwright-web-flake input.
 # The "Latest" column maps to what --latest bumps; "Update" to plain bun update.
 [group('bun')]
 bun-outdated:
   bun outdated --recursive '!playwright' '!@playwright/test'
 
 # Bump all non-playwright deps to latest stable, then reconcile bun.lock and
-# regenerate bun.nix. Playwright stays pinned to the playwright-web-flake version
-# per the flake-is-version-ceiling invariant, and any dependency Renovate holds
-# back via allowedVersions is restored to the newest version that hold permits.
+# regenerate bun.nix. Playwright keeps its current pins (see bun-outdated), and
+# any dependency Renovate holds back via allowedVersions is restored to the
+# newest version that hold permits.
 [group('bun')]
 bun-update-latest-stable:
   #!/usr/bin/env bash
   set -euo pipefail
 
-  echo "=== Phase 1: Playwright drift check ==="
-  just bun-drift-check
+  pkg=packages/docs/package.json
+  pw_pins=$(jq -c '.devDependencies | {playwright, "@playwright/test"}' "$pkg")
 
-  echo "=== Phase 2: Renovate version holds in force ==="
+  echo "=== Phase 1: Renovate version holds in force ==="
   just bun-holds
 
-  echo "=== Phase 3: Bump all deps to latest stable ==="
+  echo "=== Phase 2: Bump all deps to latest stable ==="
   just bun-bump-all
 
-  echo "=== Phase 4: Re-pin playwright to flake version ==="
-  just bun-repin-playwright
+  echo "=== Phase 3: Restore playwright pins ==="
+  tmp=$(mktemp)
+  jq --argjson pins "$pw_pins" '.devDependencies += $pins' "$pkg" > "$tmp"
+  mv "$tmp" "$pkg"
 
-  echo "=== Phase 5: Re-pin held deps within Renovate's allowedVersions ==="
+  echo "=== Phase 4: Re-pin held deps within Renovate's allowedVersions ==="
   just bun-repin-holds
 
-  echo "=== Phase 6: Reconcile bun.lock ==="
+  echo "=== Phase 5: Reconcile bun.lock ==="
   just bun-lockfile-reconcile
 
-  echo "=== Phase 7: Regenerate bun.nix ==="
+  echo "=== Phase 6: Regenerate bun.nix ==="
   just regenerate-bun-nix
 
-  echo "=== Phase 8: Assert holds survived the reconcile ==="
+  echo "=== Phase 7: Assert holds survived the reconcile ==="
   just bun-check-holds
 
   echo "=== Done ==="
