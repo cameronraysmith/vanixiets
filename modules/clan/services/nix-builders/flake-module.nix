@@ -381,6 +381,14 @@
                   # The upstream darwin module asserts this: launchd provides
                   # no socket activation to restart an idle-exited daemon.
                   idleTimeout = null;
+                  # nix-grpc-store's Seatbelt profile (474723d) is applied
+                  # before the listening port is added and denies binding an
+                  # IPv6 address, which is the only kind a darwin builder
+                  # listens on (its ZeroTier address): with --sandbox the daemon
+                  # exits with "Address family not supported by protocol
+                  # family" on [::1] as on the ZeroTier address, and binds
+                  # without it.
+                  sandbox.enable = false;
                 };
                 launchd.daemons.nix-grpc-daemon.serviceConfig.ProgramArguments = lib.mkForce (
                   [
