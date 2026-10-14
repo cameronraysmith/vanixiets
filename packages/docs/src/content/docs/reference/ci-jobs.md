@@ -29,8 +29,7 @@ pull request / gitea-mq batch
 │                         failure evidence and comment on the
 │                         pull request
 └── PR Check (GitHub Actions)
-    ├── check-fast-forward
-    └── playwright-drift-check
+    └── check-fast-forward
 
 push to main
 ├── nixbot/nix-eval, nixbot/nix-build
@@ -223,7 +222,6 @@ Runs on pull request open, reopen, and synchronize.
 | Job | Purpose | Local equivalent |
 |-----|---------|------------------|
 | `check-fast-forward` | Verifies the pull request can be fast-forward merged | `git merge-base --is-ancestor origin/main HEAD` |
-| `playwright-drift-check` | Asserts the npm playwright pins match the `playwright-web-flake` input | `just bun-drift-check` |
 
 ### PR Fast-forward Merge (`pr-merge.yaml`)
 

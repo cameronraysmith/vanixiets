@@ -314,6 +314,33 @@ stdenv.mkDerivation (finalAttrs: {
       chmod -R u+w packages/docs/dist packages/docs/.wrangler
 
       cd packages/docs
+      # npm playwright-core looks up each browser in a directory named by its
+      # own bundled browsers.json revision; PLAYWRIGHT_BROWSERS_PATH holds the
+      # playwright-web-flake revisions. Those revisions must agree, the package
+      # versions need not: patch releases usually ship identical browsers.
+      # `install --dry-run` reports the directories playwright will open,
+      # host-platform and revisionOverrides applied, so a mismatch stops here
+      # with its cause instead of as every spec failing to launch (#3097).
+      # Only the browsers tree comes from the flake; nothing here runs the
+      # fork's own playwright-driver CLI, whose version may differ.
+      locations=$(${nodejs-slim}/bin/node ./node_modules/@playwright/test/cli.js \
+        install --dry-run ''${PLAYWRIGHT_PROJECTS//,/ } | sed -n 's/^ *Install location: *//p')
+      if [ -z "$locations" ]; then
+        echo "playwright install --dry-run named no browser directories for: $PLAYWRIGHT_PROJECTS" >&2
+        exit 1
+      fi
+      missing=
+      while IFS= read -r dir; do
+        if [ "''${dir%/*}" != "$PLAYWRIGHT_BROWSERS_PATH" ] || [ ! -e "$dir" ]; then
+          missing="$missing ''${dir##*/}"
+        fi
+      done <<< "$locations"
+      if [ -n "$missing" ]; then
+        echo "npm @playwright/test ($(${nodejs-slim}/bin/node ./node_modules/@playwright/test/cli.js --version)) expects browser directories absent from playwright-web-flake:$missing" >&2
+        echo "playwright-web-flake provides: $(ls "$PLAYWRIGHT_BROWSERS_PATH" | tr '\n' ' ')" >&2
+        echo "Move the flake input to the playwright release whose browsers.json matches, or pin npm playwright back (just bun-repin-playwright)." >&2
+        exit 1
+      fi
       # Bound the worker pool at four, below the cores nix grants when fewer.
       # NIX_BUILD_CORES does not measure what this build may use: the CI
       # builders run `cores = 0` with `max-jobs` near the CPU count, so every
