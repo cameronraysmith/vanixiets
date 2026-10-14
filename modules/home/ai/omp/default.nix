@@ -19,12 +19,14 @@
 # project-level roster rather than overridden by it (src/advisor/watchdog.ts
 # collectConfigCandidates), so what is declared here is the fleet-wide baseline.
 #
-# Nothing else is written. omp resolves .omp, .claude, .codex, and .gemini as
-# configuration bases at both user and project level and scans each for
-# commands, agents, and skills (packages/coding-agent/src/config.ts), so the
-# skills delivered to ~/.claude/skills reach it with nothing declared. It does
-# not inherit ~/.pi/agent as a configuration root the way atomic does; only the
-# LSP loader consults ~/.pi/agent/lsp.* (src/lsp/config.ts), so
+# Nothing else is written here. Since omp 18.1.5 user-level configuration under
+# other tools' directories (~/.claude, ~/.codex, ~/.gemini, ...) loads only when
+# opted in through enabledProviders (src/capability/index.ts
+# isUserSourceEnabled); only ~/.omp/agent and ~/.agents load by default. Skills
+# therefore reach omp through ~/.agents/skills, and its user-level context file
+# is ~/.omp/agent/AGENTS.md, written by programs.agents-md. It does not inherit
+# ~/.pi/agent as a configuration root the way atomic does; only the LSP loader
+# consults ~/.pi/agent/lsp.* (src/lsp/config.ts), so
 # aiAgentSettings.piOnlyExtensions has no bearing on it.
 #
 # LSP servers are not declared here either. omp auto-detects them from its

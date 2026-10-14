@@ -1,7 +1,8 @@
 # AI agent documentation generation
 # Generates ~/.claude/CLAUDE.md, ~/.codex/AGENTS.md, ~/.factory/AGENTS.md,
-# ~/.gemini/GEMINI.md, ~/.hermes/SOUL.md, ~/.config/crush/CRUSH.md, and
-# ~/.config/opencode/AGENTS.md (plus pi via programs.pi-coding-agent.context)
+# ~/.gemini/GEMINI.md, ~/.hermes/SOUL.md, ~/.omp/agent/AGENTS.md,
+# ~/.config/crush/CRUSH.md, and ~/.config/opencode/AGENTS.md (plus pi via
+# programs.pi-coding-agent.context)
 # from shared configuration with references to preference documents
 { ... }:
 let
@@ -62,15 +63,14 @@ let
         ];
     in
     {
-      # Two harness hazards worth recording here rather than fixing: omp
+      # Two omp hazards worth recording here rather than fixing: omp
       # resolves exactly one user-level context file by provider priority,
-      # and ~/.omp/agent/AGENTS.md at priority 100 would outrank
-      # ~/.claude/CLAUDE.md at priority 80, so adding an ~/.omp/agent/
-      # destination would silently shadow this file rather than add a
-      # fourth surface. Omp's containment de-duplication also drops the
-      # user-level file entirely when a project file's full paragraph
-      # sequence contains it, so a project-level context file must never
-      # be a superset of this one.
+      # and since 18.1.5 it reads ~/.claude and ~/.codex only when opted in
+      # through enabledProviders, so its user-level file is
+      # ~/.omp/agent/AGENTS.md (priority 100) rather than ~/.claude/CLAUDE.md.
+      # Omp's containment de-duplication also drops the user-level file
+      # entirely when a project file's full paragraph sequence contains it,
+      # so a project-level context file must never be a superset of this one.
       programs.agents-md = {
         enable = lib.mkDefault true;
         settings.body = lib.concatMapStringsSep "\n" stripFrontmatter fragments;

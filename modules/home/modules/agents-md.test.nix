@@ -2,9 +2,9 @@
 # (modules/home/modules/agents-md.nix).
 #
 # The module's `config.enable = true` branch composes two filesets via
-# module-system merging: home.file (5 paths) and xdg.configFile (2 paths),
-# producing the documented seven AGENTS-style files for Claude Code, Codex,
-# Droid, Gemini, Hermes, Crush, and Opencode.
+# module-system merging: home.file (6 paths) and xdg.configFile (2 paths),
+# producing the documented eight AGENTS-style files for Claude Code, Codex,
+# Droid, Gemini, Hermes, omp, Crush, and Opencode.
 #
 # Catches accidental rename or removal of any vendor's config file path
 # during refactoring — failures of that kind would silently drop a vendor's
@@ -62,7 +62,7 @@
             };
           in
           {
-            testEnabledRegistersFiveHomeFiles = {
+            testEnabledRegistersSixHomeFiles = {
               expr = builtins.sort builtins.lessThan (builtins.attrNames enabled.home.file);
               expected = [
                 ".claude/CLAUDE.md"
@@ -70,6 +70,7 @@
                 ".factory/AGENTS.md"
                 ".gemini/GEMINI.md"
                 ".hermes/SOUL.md"
+                ".omp/agent/AGENTS.md"
               ];
             };
 
