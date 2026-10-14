@@ -244,6 +244,12 @@
       # the build (dependency_failed) instead of being ignored. Without
       # optional_build_grace (nixbot.toml) a build waits for every
       # ignoreFailure attribute, up to the 3 h build timeout on a sleeping Mac.
+      #
+      # Not patched: _dispatch_build (orchestrator.py) checks ancestry, awaits,
+      # then registers, so gitea-mq's back-to-back pushes of one batch ref can
+      # cancel the newest build as "superseded"; gitea-mq then bisects and the
+      # batch reports flaky=true. Fails safe; seen once in 27 multi-PR batches
+      # (2026-09-20..10-14), against a hot upstream file to carry a patch on.
       services.nixbot.packages.nixbot =
         options.services.nixbot.packages.nixbot.default.overridePythonAttrs
           (old: {
