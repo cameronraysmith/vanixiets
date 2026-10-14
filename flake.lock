@@ -1209,11 +1209,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1791174105,
-        "narHash": "sha256-HelezFNBcmlQmmWNY5Vak/T7zDqExHAoFyRfZ54t2Zc=",
+        "lastModified": 1791779126,
+        "narHash": "sha256-jjf6sYeZuMS6bKxsMb4EZLcjqPLr7vYeVkMvcBYkb0s=",
         "owner": "Mic92",
         "repo": "nix-tarmac",
-        "rev": "a3c3c23a903ecd97f08f41e1dc2aaeaab993ed96",
+        "rev": "c1ab570b5925b1bf6b682e508d5e649e9ffceff1",
         "type": "github"
       },
       "original": {
