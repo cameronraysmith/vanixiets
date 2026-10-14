@@ -100,6 +100,16 @@
           "aarch64-darwin"
         ];
 
+        # Caps concurrent `nix build` client processes, not CPU: the default
+        # (the 16 cores) let best-effort darwin attributes, which wait on a
+        # remote Mac, hold every slot while stibnite slept, so no
+        # x86_64-linux attribute started for 2.5 h (builds 1381-1388). Local
+        # CPU is capped by the daemon's max-jobs and each builder by its
+        # nix.buildMachines maxJobs. Each attribute build holds one
+        # auto-allocated uid range, so the bound is id-count / 65536
+        # (8388608 / 65536 = 128).
+        buildConcurrency = 128;
+
         # 6 x 3072 MiB, measured on the two-system scope (311 attributes, 75 GiB
         # of evaluator allocation in total; nix-eval-jobs runs Boehm with
         # GC_DONT_GC=1, so a worker's heap only grows until it is recycled):
