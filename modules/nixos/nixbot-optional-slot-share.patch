@@ -1,0 +1,272 @@
+Serve required attributes first and cap optional ones at half the slots.
+
+Every attribute holds a global build slot while it runs, including a
+best-effort (ignoreFailure) one waiting on a remote builder. During a
+nixpkgs bump the darwin attributes held all 16 slots for hours, so the
+required x86_64-linux attributes never started and the grace that stops
+optional attributes never armed. The pool now serves required waiters
+before optional ones and lets optional jobs hold at most half the slots
+(at least one).
+
+diff --git a/nixbot/executor.py b/nixbot/executor.py
+index 86842535..b0decf4d 100644
+--- a/nixbot/executor.py
++++ b/nixbot/executor.py
+@@ -4,7 +4,8 @@ Runs `nix build` per derivation with:
+ 
+ - a global concurrency cap, dequeued fairly round-robin across builds
+   (FIFO within one build) so huge matrices cannot head-of-line block
+-  other projects,
++  other projects; optional (ignoreFailure) attributes are served after
++  required ones and hold at most half the slots,
+ - per-attribute timeout (default 3h) plus nix's --max-silent-time
+   (default 20min),
+ - one automatic retry on transient infrastructure errors, suppressed
+@@ -125,65 +126,114 @@ TRANSIENT_ERROR_MARKERS = (
+ )
+ 
+ 
++class _Lane:
++    """Waiters of one priority class: round-robin across keys (builds),
++    FIFO within a key."""
++
++    def __init__(self) -> None:
++        # key -> FIFO of waiter futures; OrderedDict gives stable rotation.
++        self.waiters: OrderedDict[object, deque[asyncio.Future[None]]] = OrderedDict()
++        self.rotation: deque[object] = deque()
++
++    def __bool__(self) -> bool:
++        return bool(self.waiters)
++
++    def enqueue(self, key: object, future: asyncio.Future[None]) -> None:
++        if key not in self.waiters:
++            self.waiters[key] = deque()
++            self.rotation.append(key)
++        self.waiters[key].append(future)
++
++    def discard(self, key: object, future: asyncio.Future[None]) -> None:
++        queue = self.waiters.get(key)
++        if queue is not None and future in queue:
++            queue.remove(future)
++            if not queue:
++                del self.waiters[key]
++                self.rotation.remove(key)
++
++    def pop(self) -> asyncio.Future[None] | None:
++        """Next waiter, rotating to the next build; None when empty."""
++        while self.rotation:
++            key = self.rotation[0]
++            queue = self.waiters.get(key)
++            if not queue:
++                self.rotation.popleft()
++                self.waiters.pop(key, None)
++                continue
++            future = queue.popleft()
++            self.rotation.rotate(-1)
++            if not queue:
++                del self.waiters[key]
++                self.rotation.remove(key)
++            return future
++        return None
++
++
+ class FairScheduler:
+     """Global slot pool with round-robin dequeue across keys (builds)
+-    and FIFO order within a key."""
++    and FIFO order within a key.
++
++    Optional jobs (ignoreFailure) never hold more than half the slots
++    (at least one), and required waiters are served before optional
++    ones, so best-effort work on a slow or unreachable builder cannot
++    starve the attributes that decide a build's outcome."""
+ 
+     def __init__(self, capacity: int) -> None:
+         if capacity < 1:
+             msg = f"capacity must be >= 1, got {capacity}"
+             raise ValueError(msg)
+         self.capacity = capacity
++        self.optional_capacity = max(1, capacity // 2)
+         self._active = 0
+-        # key -> FIFO of waiter futures; OrderedDict gives stable rotation.
+-        self._waiters: OrderedDict[object, deque[asyncio.Future[None]]] = OrderedDict()
+-        self._rotation: deque[object] = deque()
+-
+-    async def acquire(self, key: object) -> None:
+-        if self._active < self.capacity and not self._waiters:
+-            self._active += 1
++        self._active_optional = 0
++        self._required = _Lane()
++        self._optional = _Lane()
++
++    def _has_slot(self, optional: bool) -> bool:
++        if self._active >= self.capacity:
++            return False
++        return not optional or self._active_optional < self.optional_capacity
++
++    async def acquire(self, key: object, *, optional: bool = False) -> None:
++        lane = self._optional if optional else self._required
++        # Never overtake waiters this class would be served behind.
++        ahead = bool(self._required) or (optional and bool(self._optional))
++        if self._has_slot(optional) and not ahead:
++            self._grant(optional)
+             return
+         future: asyncio.Future[None] = asyncio.get_running_loop().create_future()
+-        if key not in self._waiters:
+-            self._waiters[key] = deque()
+-            self._rotation.append(key)
+-        self._waiters[key].append(future)
++        lane.enqueue(key, future)
+         try:
+             await future
+         except asyncio.CancelledError:
+-            queue = self._waiters.get(key)
+-            if queue is not None and future in queue:
+-                queue.remove(future)
+-                if not queue:
+-                    del self._waiters[key]
+-                    self._rotation.remove(key)
++            lane.discard(key, future)
+             if future.cancelled() or not future.done():
+                 raise
+             # Granted concurrently with cancellation: give the slot back.
+-            self.release()
++            self.release(optional=optional)
+             raise
+ 
+-    def release(self) -> None:
++    def release(self, *, optional: bool = False) -> None:
+         self._active -= 1
++        if optional:
++            self._active_optional -= 1
+         self._dispatch()
+ 
++    def _grant(self, optional: bool) -> None:
++        self._active += 1
++        if optional:
++            self._active_optional += 1
++
+     def _dispatch(self) -> None:
+-        while self._active < self.capacity and self._rotation:
+-            key = self._rotation[0]
+-            queue = self._waiters.get(key)
+-            if not queue:
+-                self._rotation.popleft()
+-                self._waiters.pop(key, None)
+-                continue
+-            future = queue.popleft()
+-            # Rotate: next grant goes to the next build.
+-            self._rotation.rotate(-1)
+-            if not queue:
+-                del self._waiters[key]
+-                self._rotation.remove(key)
+-            if not future.done():
+-                self._active += 1
+-                future.set_result(None)
++        for optional, lane in ((False, self._required), (True, self._optional)):
++            while lane and self._has_slot(optional):
++                future = lane.pop()
++                if future is None:
++                    break
++                if not future.done():
++                    self._grant(optional)
++                    future.set_result(None)
+ 
+ 
+ @dataclass
+@@ -824,7 +874,10 @@ class NixBuildExecutor:
+             return BuildOutcome.success
+         # A superseded build must not sit "building" until an unrelated
+         # build frees a slot: race the acquisition against the cancel.
+-        acquire_task = asyncio.create_task(self.queue.acquire(build_key))
++        optional = job.ignore_failure
++        acquire_task = asyncio.create_task(
++            self.queue.acquire(build_key, optional=optional)
++        )
+         cancel_task = asyncio.create_task(cancel_event.wait())
+         try:
+             await asyncio.wait(
+@@ -834,7 +887,7 @@ class NixBuildExecutor:
+             # Cancelled in the same turn the slot was granted: give it
+             # back, nobody will run the build.
+             if acquire_task.done() and not acquire_task.cancelled():
+-                self.queue.release()
++                self.queue.release(optional=optional)
+             raise
+         finally:
+             # Also runs on cancellation of this coroutine: a pending
+@@ -869,7 +922,7 @@ class NixBuildExecutor:
+                 )
+             return outcome
+         finally:
+-            self.queue.release()
++            self.queue.release(optional=optional)
+ 
+     @contextlib.asynccontextmanager
+     async def _store_env(
+diff --git a/nixbot/tests/test_executor.py b/nixbot/tests/test_executor.py
+index bf8aaaa1..8629e106 100644
+--- a/nixbot/tests/test_executor.py
++++ b/nixbot/tests/test_executor.py
+@@ -104,6 +104,62 @@ async def test_fair_scheduler_cancelled_waiter() -> None:
+     await asyncio.wait_for(queue.acquire("C"), timeout=1)
+ 
+ 
++async def test_fair_scheduler_serves_required_before_optional() -> None:
++    queue = FairScheduler(1)
++    order: list[str] = []
++    await queue.acquire("seed")
++
++    async def worker(name: str, key: str, *, optional: bool) -> None:
++        await queue.acquire(key, optional=optional)
++        order.append(name)
++        queue.release(optional=optional)
++
++    # The optional waiter queued first, from another build, still waits.
++    tasks = [
++        asyncio.create_task(worker("o1", "A", optional=True)),
++        asyncio.create_task(worker("r1", "B", optional=False)),
++        asyncio.create_task(worker("r2", "C", optional=False)),
++    ]
++    await asyncio.sleep(0)
++    queue.release()
++    await asyncio.gather(*tasks)
++    assert order == ["r1", "r2", "o1"]
++
++
++async def test_optional_jobs_cannot_starve_required_ones() -> None:
++    # Optional builds hung on an unreachable builder fill at most half
++    # the pool; required builds still get the rest immediately.
++    queue = FairScheduler(4)
++    hung = [
++        asyncio.create_task(queue.acquire(f"b{i}", optional=True)) for i in range(4)
++    ]
++    await asyncio.sleep(0)
++    assert sum(t.done() for t in hung) == 2
++    await asyncio.wait_for(queue.acquire("req"), timeout=1)
++    await asyncio.wait_for(queue.acquire("req"), timeout=1)
++    blocked = asyncio.create_task(queue.acquire("req"))
++    await asyncio.sleep(0)
++    assert not blocked.done()  # the pool is full, not reserved
++    queue.release(optional=True)
++    await asyncio.wait_for(blocked, timeout=1)  # required first
++    assert sum(t.done() for t in hung) == 2
++    for task in hung:
++        task.cancel()
++    await asyncio.gather(*hung, return_exceptions=True)
++
++
++async def test_cancelled_optional_waiter_returns_its_class_slot() -> None:
++    queue = FairScheduler(2)  # one optional slot
++    await queue.acquire("A", optional=True)
++    waiter = asyncio.create_task(queue.acquire("B", optional=True))
++    await asyncio.sleep(0)
++    waiter.cancel()
++    with pytest.raises(asyncio.CancelledError):
++        await waiter
++    queue.release(optional=True)
++    await asyncio.wait_for(queue.acquire("C", optional=True), timeout=1)
++
++
+ # --- LogWriter --------------------------------------------------------------
+ 
+ 

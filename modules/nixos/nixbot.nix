@@ -234,6 +234,9 @@
       # the build (dependency_failed) instead of being ignored. Without
       # optional_build_grace (nixbot.toml) a build waits for every
       # ignoreFailure attribute, up to the 3 h build timeout on a sleeping Mac.
+      # Without the slot share, ignoreFailure attributes waiting on a slow or
+      # unreachable Mac can hold every global build slot, so required
+      # attributes never start and the grace never arms.
       services.nixbot.packages.nixbot =
         options.services.nixbot.packages.nixbot.default.overridePythonAttrs
           (old: {
@@ -241,6 +244,7 @@
               ./nixbot-gated-reuse-effects-summary.patch
               ./nixbot-ignore-failure-dependents.patch
               ./nixbot-abandon-optional-attributes.patch
+              ./nixbot-optional-slot-share.patch
             ];
           });
     };
