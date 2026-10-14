@@ -493,10 +493,17 @@
               [ "$calls" = "$1" ] || fail "wrangler invoked $calls times, expected $1"
             }
             # expect <description> <log> <jq filter over its entries> [jq args...]
+            # A failure prints the log, uploaded asset contents reduced to
+            # their paths, so the build log shows what was actually sent.
             expect() {
               local description=$1 log=$2 filter=$3
               shift 3
-              jq -se "$@" "$filter" "$log" > /dev/null || fail "$description"
+              jq -se "$@" "$filter" "$log" > /dev/null || {
+                echo "row '$name': ''${log##*/}:" >&2
+                jq -c 'if (.body | type) == "object" and (.body.files | type) == "object"
+                  then .body.files |= keys else . end' "$log" >&2 || true
+                fail "$description"
+              }
             }
             expect_wrangler() {
               local description=$1
@@ -559,8 +566,9 @@
             # only the fixed shape.
             expect_preview_config() {
               expect_wrangler "preview config is the fixed assets-only shape with previews {}" \
-                '.[0].config | (keys | sort) == ["assets", "compatibility_date", "compatibility_flags", "name", "preview_urls", "previews", "workers_dev"]
+                '.[0].config | (keys | sort) == ["assets", "compatibility_date", "compatibility_flags", "name", "preview_urls", "previews", "upload_source_maps", "workers_dev"]
                   and .name == "infra-docs" and .previews == {} and .workers_dev == false and .preview_urls == true
+                  and .upload_source_maps == false
                   and (.assets | keys) == ["directory"] and (.assets.directory | startswith("/"))'
             }
 

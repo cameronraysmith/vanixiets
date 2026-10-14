@@ -68,11 +68,12 @@
       "dependencyDashboardApproval": true
     },
     {
-      "description": "@cloudflare/vite-plugin bundles an exact wrangler and emits config fields that a mismatched wrangler CLI rejects; bumping either alone breaks the docs build",
+      "description": "@cloudflare/vite-plugin bundles an exact wrangler and emits config fields that a mismatched wrangler CLI rejects; bumping either alone breaks the docs build. Both are pinned exactly, the root override included: under a range, regenerating bun.lock for any other update re-resolves them, so a nested newer wrangler (as @cloudflare/vitest-plugin brings) can be hoisted into the CLI that deploy-docs runs and an unrelated PR inherits its behaviour changes. Pinned, only this group moves the deploy toolchain, and the deploy-docs rehearsal judges it here.",
       "matchPackageNames": [
         "wrangler",
         "@cloudflare/vite-plugin"
       ],
+      "rangeStrategy": "pin",
       "groupName": "cloudflare-workers-tooling"
     },
     {

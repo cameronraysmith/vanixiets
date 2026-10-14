@@ -256,7 +256,9 @@ check_payload() {
 # static assets are taken from the payload. The config is written here from
 # a fixed shape; the compatibility settings carry no code and are taken from
 # the payload so they follow packages/docs/wrangler.jsonc, but only after
-# their shape is checked. `--ignore-base-config` keeps the dashboard's
+# their shape is checked. `upload_source_maps: false` holds the upload to
+# assets and wrangler's no-op Worker: since 4.150 wrangler otherwise adds the
+# no-op Worker's source map. `--ignore-base-config` keeps the dashboard's
 # Preview base config from merging bindings into the Preview.
 # Sets preview_url.
 deploy_preview() {
@@ -281,6 +283,7 @@ deploy_preview() {
         assets: { directory: $dir },
         workers_dev: false,
         preview_urls: true,
+        upload_source_maps: false,
         previews: {}
       }
     else
