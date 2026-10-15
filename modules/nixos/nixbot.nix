@@ -234,9 +234,33 @@
       # service PATH and the nixbot package itself are unchanged. nixbot runs
       # the bare name from the service PATH inside its bwrap sandbox, which is
       # why the lock lives under /etc/nix.
-      services.nixbot.packages.nix-eval-jobs = lib.mkIf config.services.nixEvalLock.enable (
-        config.services.nixEvalLock.wrap options.services.nixbot.packages.nix-eval-jobs.default
-      );
+      services.nixbot.packages.nix-eval-jobs =
+        let
+          upstream = options.services.nixbot.packages.nix-eval-jobs.default;
+          components = pkgs.nixVersions.nixComponents_2_35;
+          # nixbot's packages/nix-eval-jobs.nix appends three Nix patches
+          # below 2.36, but 2.35.3 already carries all three (NixOS/nix#16190,
+          # #16373, #16487 backports), so they fail to apply there. Once nixpkgs
+          # has Nix 2.35.3 and nix-eval-jobs at upstream's pinned 2.35.3, its
+          # only remaining change is the passthru nix CLI, so build that here
+          # from the unpatched components.
+          evaluator =
+            if
+              lib.versionAtLeast components.version "2.35.3"
+              && lib.versionAtLeast pkgs.nix-eval-jobs.version "2.35.3"
+            then
+              (pkgs.nix-eval-jobs.override { nixComponents = components; }).overrideAttrs (old: {
+                passthru = old.passthru // {
+                  nix = components.nix-cli;
+                };
+              })
+            else
+              upstream;
+        in
+        if config.services.nixEvalLock.enable then
+          config.services.nixEvalLock.wrap evaluator
+        else
+          evaluator;
 
       # A merge-queue batch reusing its PR build would otherwise never get
       # nixbot/effects, stalling gitea-mq until its check timeout. An
