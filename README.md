@@ -8,7 +8,7 @@
   <img alt="Nix Flakes Ready" src="https://img.shields.io/static/v1?logo=nixos&logoColor=d8dee9&label=Nix%20Flakes&labelColor=5e81ac&message=infrastructure&color=d8dee9&style=for-the-badge">
 </a>
 
-[![CD][cd-badge]][cd-link] [![Docs][docs-badge]][docs-link] [![License][license-badge]][license-link]
+[![nixbot][nixbot-badge]][nixbot-link] [![Docs][docs-badge]][docs-link] [![License][license-badge]][license-link]
 
 **declarative, reproducible, type-safe infrastructure with nix flake modules**
 
@@ -107,8 +107,8 @@ The name pays homage to Eelco Dolstra's etymology for Nix itself:
 
 </details>
 
-[cd-badge]: https://github.com/cameronraysmith/vanixiets/actions/workflows/cd.yaml/badge.svg
-[cd-link]: https://github.com/cameronraysmith/vanixiets/actions/workflows/cd.yaml
+[nixbot-badge]: https://nixbot.scientistexperience.net/badge/0a739af5-1328-49f1-bdaf-655a79191ec5.svg
+[nixbot-link]: https://nixbot.scientistexperience.net/repos/github/cameronraysmith/vanixiets
 [docs-badge]: https://img.shields.io/badge/docs-infra.cameronraysmith.net-blue
 [docs-link]: https://infra.cameronraysmith.net
 [license-badge]: https://img.shields.io/badge/license-MIT-blue
