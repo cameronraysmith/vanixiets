@@ -339,6 +339,8 @@ nix run .#omnigent-worker-login -- stibnite cameron codex
 ```
 
 `claude` starts subscription login; `codex` starts device login.
+`omnigent` renews the worker's own Omnigent login: it runs `omnigent login` against the server role's domain and prints a `/auth/login` URL to open within five minutes, signing in through Kanidm as the worker's owner.
+The login's refresh grant expires 30 days after that login (`OMNIGENT_GRANT_MAX_LIFETIME_DAYS` on the server overrides it), after which the host fails with "stored login session … has EXPIRED" and needs this renewal again.
 `atomic`, `omp` and `pi` open their interactive interfaces, where `/login` selects the intended provider.
 Each login receives its own refresh state even when the underlying subscription is shared.
 `verify` runs the GitHub, Linear, signing-key and Omnigent identity verifier; it does not attest model login or a model turn.

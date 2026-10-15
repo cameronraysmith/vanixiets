@@ -1,7 +1,7 @@
 if [[ $# != 3 ]]; then
   echo "Usage: omnigent-worker-login HOST OWNER TOOL" >&2
   echo "Hosts: magnetite, pyrite, stibnite; owners: cameron, janettesmith" >&2
-  echo "Tools: claude, codex, atomic, omp, pi, verify" >&2
+  echo "Tools: claude, codex, atomic, omp, pi, omnigent, verify" >&2
   exit 2
 fi
 host=$1 owner=$2 tool=$3
@@ -24,6 +24,10 @@ case "$tool" in
   atomic|omp|pi)
     arguments=("$tool")
     printf 'In %s, enter /login and select the intended subscription provider. Exit when login completes.\n' "$tool"
+    ;;
+  omnigent)
+    arguments=(omnigent login "$OMNIGENT_SERVER_URL")
+    printf 'Open the printed %s/auth/login URL in your browser within 5 minutes and sign in as the worker owner.\n' "$OMNIGENT_SERVER_URL"
     ;;
   verify) arguments=(omnigent-worker-verify) ;;
   *) echo "Unsupported tool: $tool" >&2; exit 2 ;;
