@@ -175,16 +175,16 @@
     "cilium-src": {
       "flake": false,
       "locked": {
-        "lastModified": 1789498357,
-        "narHash": "sha256-F8zFd3jsvgn64WnYgzGQPUIt6b8l4/yUlncTyVLCQCc=",
+        "lastModified": 1792073252,
+        "narHash": "sha256-3pGgJjCYmN6tC7emy7inlxl+6ydV3LhFO+FtQ7HCUnQ=",
         "owner": "cilium",
         "repo": "cilium",
-        "rev": "e0dc92bd6dac33d7ba3b5eace82a0448bbb13aac",
+        "rev": "bf1aba7b34ab6d9c711315d78d8eefbea81962d1",
         "type": "github"
       },
       "original": {
         "owner": "cilium",
-        "ref": "v1.20.2",
+        "ref": "v1.20.3",
         "repo": "cilium",
         "type": "github"
       }
