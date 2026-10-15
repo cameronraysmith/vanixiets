@@ -1,12 +1,12 @@
 ---
 title: Fleet observability and CCV feedback-loop charter
-status: charter v1
-date: 2026-09-18
+status: charter v5
+date: 2026-10-15
 ---
 
 # Fleet observability and CCV feedback-loop charter
 
-Charter version: v1.
+Charter version: v5.
 A revision is a version bump with a dated entry under "Revision history"; the text of an earlier version is never edited in place.
 
 ## Objective
@@ -32,36 +32,59 @@ Without that channel the apparatus can only ever confirm the envelopes we alread
 In scope: fleet infrastructure telemetry, development-loop telemetry, the store and query layer, the dashboard layer, and the feedback path from runtime observation back into the coverage model.
 Development-loop telemetry is the primary consumer and drives retention, cardinality, and schema decisions where the two consumers conflict.
 
-Out of scope for this charter: implementation, any `clan vars` mutation, any deployment, and any change to the in-flight `omnigent-magnetite` chain.
+Out of scope for this charter: implementation, any `clan vars` mutation, and any deployment.
+Corrected in v5: v1 also excluded any change to the in-flight `omnigent-magnetite` chain, which has since merged to `main` (`cameronraysmith/vanixiets@a12b3c6c5`, `cameronraysmith/vanixiets@2931154b1`), so no chain remains in flight.
 
 ## Superseded inputs
 
 The `nix-mpe-signoz-module` chain is deprecated and discarded as a design input.
 It seeded a consideration of SigNoz that predates the recognition that an FDAP-aligned stack fits this repository's data-stack preferences better.
 Its only commit is an empty seed (`tktswmrx`), but it currently participates in the diamond joins alongside `omnigent-magnetite`; the jj-level abandonment is deferred until that chain merges, so that the other agent's join topology and gate baselines are not disturbed mid-flight.
+Corrected in v5: the `omnigent-magnetite` chain has merged to `main` (`cameronraysmith/vanixiets@a12b3c6c5`, `cameronraysmith/vanixiets@2931154b1`), so the deferred abandonment is now dischargeable.
 
 `sciexp/ironstar`'s SigNoz work is superseded in part by this design.
 Its artifacts remain readable prior art — `modules/services/signoz.nix` and `docs/notes/development/observability-migration-agent-prompt.md` — and its process-compose boundary argument is retained as evidence, not as a decision.
 
 ## World assumptions (indicative)
 
-- W1 The fleet is the inventory in `modules/clan/inventory/machines.nix`: ten machines, NixOS and nix-darwin, meshed over ZeroTier, with `magnetite` the always-on Hetzner `cx53` VPS already running Kanidm, matrix-synapse, Gitea, buildbot, niks3, nginx and PostgreSQL.
+- W1 The fleet is the inventory in `modules/clan/inventory/machines.nix`: ten machines, NixOS and nix-darwin, meshed over ZeroTier, with `magnetite` the always-on Hetzner `cx53` VPS already running Kanidm, matrix-synapse with LiveKit and coturn, Gitea, gitea-actions-runner, docker, nixbot, gitea-mq, niks3, the Omnigent server and two omnigent-host workers, omnigraph, nix-grpc-daemon, nginx and PostgreSQL.
+  buildbot is disabled behind `vanixiets.buildbot.enable`, which defaults to false, and runs no unit on `magnetite`, although its module, generated vars and PostgreSQL database are retained (`cameronraysmith/vanixiets@109c67346:modules/nixos/buildbot.nix:17-20`, `:36-38`).
+  Corrected in v4 after `research/fleet-emitter-inventory.md` (refresh R2, R4, R10, R11 and its charter reconciliation); v1 listed buildbot as running and omitted the services added since.
 - W2 `magnetite` has no headroom guarantee; an observability store co-located there competes with services already recorded as saturating its resources under `docs/notes/development/incidents/`.
+  The incident corpus now records two resource classes: storage exhaustion in the 2026-06-10 events and the 2026-09-02 audit, and whole-host memory exhaustion on 2026-09-27 and 2026-10-01, when nixbot's evaluation overlapped a second `nix-eval-jobs` evaluation until RAM and zram were both full (`cameronraysmith/vanixiets@109c67346:docs/notes/development/incidents/2026-10-01-magnetite-concurrent-eval-oom.md:5-6`).
+  Corrected in v4 after `research/fleet-emitter-inventory.md` (refresh R16).
 - W3 No observability module, collector, store, or dashboard exists in `modules/` today, and nothing is collected.
-  Emission is not zero, however: `research/fleet-emitter-inventory.md` establishes that gitea, nixbot and niks3 each already expose an unauthenticated Prometheus `/metrics` endpoint reachable over public TLS.
+  Emission is not zero, however: `research/fleet-emitter-inventory.md` establishes that gitea, nixbot and niks3 each already expose an unauthenticated Prometheus `/metrics` endpoint, which their vhosts served over public TLS until 2026-10-15.
   Corrected in v2; v1 stated the stronger and false claim that no exporter exists.
-- W4 `perses` is packaged in nixpkgs at version 0.53.1 against this repository's root `nixpkgs` input.
-  `flake.lock` holds two distinct nixpkgs tarball nodes and citations must name which: the root input is the node `nixpkgs_9` at rev `85f62611fa3f3eacbcfe3bc7a6d6518b443ca442` (`releases.nixos.org/.../nixos-26.11pre1047825.85f62611fa3f`), while the node named `nixpkgs`, at rev `044bfe75bfe4c7bbe043dc17b5e42ea823b84a09`, is what other inputs resolve to.
+  Since #3447, merged 2026-10-15, those three vhosts serve `/metrics` only to loopback and the ZeroTier mesh range (`cameronraysmith/vanixiets@02432c594:modules/lib/nginx-metrics-location.nix`).
+  Two further emitters are live without any repository change: zerotierone's bearer-token-authenticated `localhost:9993/metrics` on every NixOS machine, and nginx's `stub_status` at `127.0.0.1/nginx_status` on `magnetite`.
+  omp is a native OpenTelemetry emitter of traces, metrics and logs whenever an `OTEL_EXPORTER_OTLP_*ENDPOINT` variable is set, and this repository sets none.
+  Corrected in v4 after `research/fleet-emitter-inventory.md` (refresh R13, R14, C6) and `research/dev-loop-signals.md` (refresh RF11); the loopback-and-ZeroTier restriction postdates both refreshes and is cited to #3447 directly.
+- W4 `perses` is packaged in nixpkgs at version 0.54.0 against this repository's root `nixpkgs` input, together with a `services.perses` NixOS module (`NixOS/nixpkgs@ac1faec4:nixos/modules/services/monitoring/perses.nix`).
+  `flake.lock` holds six distinct nixpkgs tarball nodes, none a git checkout, and citations must name which.
+  The root input `nixpkgs` resolves to the node `nixpkgs_10` at rev `ac1faec44836a722f7b003834f367486ff9adfd1` (`releases.nixos.org/.../nixos-26.11pre1086968.ac1faec44836`).
+  The root inputs `nixpkgs-darwin-stable` and `nixpkgs-linux-stable` are nodes of the same names, at revs `240fddad86d7a0520319f21d8be1b43db426b18d` and `7993f34ee47e28a3d607a525aadc6c94b73be728`.
+  The remaining three nodes each serve one other input: the node named `nixpkgs`, at rev `b6c8664de9b6cc07fe5666a29f91884ba81197c4`, only `catppuccin`; `nixpkgs_2`, at rev `8edc0c72e3a38faf5434e40d1f19431125fe4b30`, `clan-core`; and `nixpkgs_3`, at rev `7bd229cbe77d7746d64a1e8c1a6f6cc08f606fc4`, `cognee-nix`.
   Clarified in v2 by triangulating `research/store-alternatives.md` FL1 against `research/nix-packaging-status.md`: both revisions are real, v1 named only one, and neither node is a git checkout.
-- W5 `greptimedb` is absent from the root pin, but present in nixpkgs `master` as `pkgs/by-name/gr/greptimedb/package.nix`, initialized at 1.1.4 on 2026-08-30, which is 26 days after the root pin and not an ancestor of it.
-  The consequence recorded in v1 — that a first-party derivation is required — is therefore wrong; bumping the pin or selecting the attribute through a second nixpkgs input are both cheaper routes, and no NixOS module exists in any nixpkgs revision either way.
+  Corrected in v4 after `research/perses.md` (refresh R11, R13) and `research/nix-packaging-status.md` (refresh R1, R13); the rev of the node named `nixpkgs` is read from `flake.lock` directly, because no refresh restates it.
+  Corrected in v5 after reading `flake.lock` directly: v2 and v4 counted two tarball nodes and described the node named `nixpkgs` as what other inputs resolve to, whereas `flake.lock` holds six and only `catppuccin` resolves to that node.
+- W5 `greptimedb` is present at the root pin as version 1.1.4 (`NixOS/nixpkgs@ac1faec4:pkgs/by-name/gr/greptimedb/package.nix:15`), substituted from cache.nixos.org on both `x86_64-linux` and `aarch64-darwin`.
+  The nixpkgs derivation builds without the `servers/dashboard` Cargo feature, so it ships no embedded web dashboard, whereas upstream release tarballs embed one (`NixOS/nixpkgs@cbffcb10:pkgs/by-name/gr/greptimedb/package.nix:66`; `GreptimeTeam/greptimedb@179ff8e50:.github/workflows/release.yml:236`).
+  Upstream's latest stable release is v1.2.1 of 2026-09-16, and an automated nixpkgs bump to 1.2.1 is open as https://github.com/NixOS/nixpkgs/pull/574558 (fetched 2026-10-15).
+  The consequence recorded in v1 — that a first-party derivation is required — is wrong, and no NixOS module exists in any nixpkgs revision either way.
   Corrected in v2 after `research/nix-packaging-status.md`.
-- W6 `opentelemetry-collector-contrib` 0.155.0, `vector` 0.57.0 and `grafana-alloy` 1.17.1 are available from the pinned nixpkgs.
+  Corrected in v4 after `research/nix-packaging-status.md` (refresh R2, R4, R6, R8, R9, R15); v2 placed the attribute on nixpkgs `master` only, 26 days after a pin that the bump to `nixpkgs_10` has since overtaken.
+- W6 `opentelemetry-collector-contrib` 0.155.0, `vector` 0.59.0 and `grafana-alloy` 1.17.1 are available from the root nixpkgs node `nixpkgs_10`.
   The bare `alloy` attribute at 5.1.0 is the AlloyTools relational modeling language, not Grafana Alloy, and is not a telemetry agent; `services.alloy.package` defaults to `grafana-alloy`.
   Corrected in v2 after `research/otel-collector-topology.md` established the mistake in v1.
+  Upstream is ahead for two of the three: collector-contrib is at v0.163.0 (2026-10-14) and Grafana Alloy at v1.20.1 (2026-09-28), while vector's latest release is the packaged 0.59.0.
+  Corrected in v4 after `research/otel-collector-topology.md` (refresh R2, R3, C2); v1 and v2 recorded vector as 0.57.0.
 - W7 GreptimeDB ships both `LICENSE` and `LICENSE-ENTERPRISE`; enterprise files are gated behind the `enterprise` Cargo feature, which is not in the default feature set, so published binaries are the open build.
   The gated set is enumerated in `licenserc-enterprise.toml` and covers in-database trigger DDL, undrop/recycle-bin retention, the `purge_table` admin function, and a mito2 scan-extension hook; nothing else in D1–D8 depends on those.
   Corrected in v2 after `research/greptimedb.md` settled the boundary that v1 recorded as unverified.
+  The open/enterprise boundary now touches D8 through partitioned authorization: upstream advertises per-database and per-table authorization only for GreptimeDB Enterprise, through `greptime_ee_user_provider`, which ships in a separate Enterprise binary rather than behind the open repository's `enterprise` Cargo feature (https://docs.greptime.com/enterprise/user, fetched 2026-10-15).
+  On `main` after v1.2.1, tracked flow writes, a retry-safe write protocol between flownode, frontend and datanode, moved into the `enterprise` feature set; ordinary Flow remains open and the change is in no tagged release (`GreptimeTeam/greptimedb@c3469fad5`).
+  Corrected in v4 after `research/telemetry-security-and-tenancy.md` (refresh R3, R4) and `research/greptimedb.md` (refresh R37, R38).
 - W8 `preferences-data-modeling` establishes Arrow, Parquet, DuckDB and DuckLake as this repository's analytics substrate, and does not currently mention FDAP or DataFusion.
 - W9 Agent sessions are a telemetry subject: traces and logs from omnigent workers and local harnesses can carry prompt content and repository contents.
 
@@ -104,7 +127,8 @@ Its artifacts remain readable prior art — `modules/services/signoz.nix` and `d
 - C2 GreptimeDB plus Perses is the leading candidate stack, evaluated rather than assumed, on the stated grounds of OpenTelemetry-forward design and FDAP-stack fit.
 - C3 Governance and sponsor control are explicit evaluation axes: SigNoz and OpenObserve are disfavored for corporate control of the project, and the Prometheus/Grafana/Loki/promtail assembly is disfavored as the legacy shape, but each must still be weighed on evidence rather than dismissed by assertion.
 - C4 Planning only: no deploys, no `clan` mutation commands, no secret generation.
-- C5 No edits to files the in-flight `omnigent-magnetite` chain owns; new files under the two new `docs/notes/development/` trees are the safe lane.
+- C5 [retired in v5] No edits to files the in-flight `omnigent-magnetite` chain owns; new files under the two new `docs/notes/development/` trees are the safe lane.
+  Retired in v5: the chain merged to `main` (`cameronraysmith/vanixiets@a12b3c6c5`, `cameronraysmith/vanixiets@2931154b1`), so no file is owned by an in-flight chain.
 - C6 Package ownership follows repository convention: `pkgs/by-name/<name>/`, with a `-bin` proxy derivation only where upstream ships reliable release artifacts.
 
 ## Decisions to be made
@@ -123,7 +147,7 @@ Its artifacts remain readable prior art — `modules/services/signoz.nix` and `d
 | Criterion | Regulator | Kind |
 |---|---|---|
 | A1 Deliverable structure matches S1 | file-existence check over the named paths | deterministic |
-| A2 Every `owner/repo@rev:path` citation resolves | per-citation `git cat-file -e` in the referenced checkout; for the two tarball nixpkgs nodes of W4, which have no git checkout, resolution is by `nix eval` against the named node instead, and the citation must name the node | deterministic |
+| A2 Every `owner/repo@rev:path` citation resolves | per-citation `git cat-file -e` in the referenced checkout; for every nixpkgs tarball node of W4, none of which has a git checkout, resolution is by `nix eval` against the named node instead, and the citation must name the node; corrected in v5 from "the two tarball nixpkgs nodes of W4" | deterministic |
 | A3 One sentence per line (S4) | grep for `[a-z]\. [A-Z]` outside tables and fences prints nothing | deterministic, approximate |
 | A4 No machine-local paths, tokens or session links (S5) | grep for `(^\|[[:space:]"'(=])/(Users\|home)/`, `ghp_`, `/attachments/` prints nothing; the leading-delimiter class is required so that in-repo citation paths such as `modules/home/...` do not false-positive | deterministic |
 | A5 Each decision D1–D8 has a rationale and every rejected alternative (R1) | review plus human gate | recorded human judgment |
@@ -140,8 +164,12 @@ Its artifacts remain readable prior art — `modules/services/signoz.nix` and `d
 - RK2 [retired in v2] Perses cannot query the chosen store without a plugin we would have to write and maintain.
   `research/perses.md` established that a stock `PrometheusDatasource` reaches GreptimeDB's PromQL router at `/v1/prometheus` with every required `/api/v1/*` path registered, at the packaged 0.53.1.
   Superseded by RK7, which is the constraint that actually binds.
-- RK3 `magnetite` lacks headroom for a telemetry store alongside its current services (W2).
+  Corrected in v5: the packaged version at the root pin is now 0.54.0 (W4); this retirement rests on the reading at 0.53.1.
+- RK3 [fired in v4 for memory] `magnetite` lacks headroom for a telemetry store alongside its current services (W2).
   Confirming observation: the incident notes record saturation on the same resources the store requires.
+  `research/fleet-emitter-inventory.md` refresh R16 established that the observation is satisfied for memory: the 2026-10-01 note records RAM and zram both exhausted, and on 2026-09-27 the kernel OOM killer took roughly 47 processes across services before it reached an evaluator.
+  No `MemoryLow` floor protects any service today, so a co-located store process would be an ordinary OOM candidate alongside PostgreSQL and kanidm.
+  Corrected in v4 after `research/fleet-emitter-inventory.md` (refresh R16 and its RK3 reconciliation).
 - RK4 Dev-loop telemetry proves to need a different store than fleet telemetry, splitting D1.
   Confirming observation: the cardinality or retention budget in D4 is unsatisfiable by one system under C1.
 - RK5 [fired in v2] Agent-session telemetry leaks prompt or repository content into a fleet-readable store (W9).
@@ -150,15 +178,23 @@ Its artifacts remain readable prior art — `modules/services/signoz.nix` and `d
 - RK6 [retired in v2] GreptimeDB being absent from nixpkgs makes us the maintainer of a large Rust derivation.
   `research/nix-packaging-status.md` established that upstream ships checksummed linux-amd64/arm64 and darwin-arm64/amd64 release tarballs across the last six releases and that nixpkgs `master` already carries a from-source derivation.
   Residual risk, narrowed: the root pin predates that derivation by 26 days, and no NixOS module exists in any nixpkgs revision, so the module is ours to write regardless.
-- RK7 [new in v2] The store holds all three signals but the dashboard layer can only render one of them.
-  `research/perses.md` established that Perses binds query plugins to datasource kinds, that its log and trace panels are backed only by Loki and Tempo query plugins at 0.53.1, and that the native GreptimeDB plugin is SQL-based and first enters the default plugin set at 0.55.0-beta.0.
-  Confirming observation: a D2 design that promises trace or log dashboards over a GreptimeDB-only store without naming the plugin and version that serves them.
-- RK8 [new in v2] A regulator built on `percli lint` is tautologically green.
+  Corrected in v5: W5 (v4) places greptimedb 1.1.4 in the root pin, so the 26-day gap no longer applies, and the only residual risk is that the NixOS module is ours to write.
+- RK7 [resolved in v4] The store holds all three signals but the dashboard layer can only render one of them.
+  `research/perses.md` refresh R3, R5 and R12 established that the stable Perses 0.54.0 default plugin set, and the nixpkgs vendored set at `nixpkgs_10`, contain the GreptimeDB plugin 0.1.0 with `GreptimeDBLogQuery` and `GreptimeDBTraceQuery`, whose generic `LogQuery` and `TraceQuery` kinds the stock log and trace panels render.
+  Confirming observation, retained: a D2 design that promises trace or log dashboards over a GreptimeDB-only store without naming the plugin and version that serves them.
+  Residual risk: the trace query maps result columns by name (refresh R8), and log and trace rendering has not been exercised against a live GreptimeDB.
+  Corrected in v4 after `research/perses.md` (refresh R3, C1); v2 recorded the GreptimeDB plugin as first entering the default set at 0.55.0-beta.0.
+- RK8 [narrowed in v4] A regulator built on `percli lint` is tautologically green.
   `research/perses.md` established that without `--plugin.path` and without `--online`, `percli lint` validates nothing beyond unmarshalling, skips custom lint rules, and still reports success.
   This is a direct CCV integrity failure of exactly the kind the closure operator is supposed to exclude, so any dashboard regulator must be demonstrated to fail on a mutant before it is accepted.
-- RK9 [new in v2] The store authenticates but does not authorize.
+  `research/perses.md` refresh R17 and R18 reconfirmed this at 0.54.0 for bare lint and for `--custom-rule.path` alone, and refresh R21, R22 and R24 showed that lint with `--plugin.path` pointing at a directory of extracted plugins, or `--online` against a server with the plugin archives loaded, rejects schema and custom-rule mutants.
+  `--plugin.path` pointing at the directory of plugin archives fails every input, valid or not, and is equally non-discriminating (refresh R19, R20).
+  Corrected in v4 after `research/perses.md` (refresh R21, R24).
+- RK9 [strengthened in v4] The store authenticates but does not authorize.
   `research/telemetry-security-and-tenancy.md` established that GreptimeDB's open-build user providers implement `authorize` as allow-all, that the only lever is a per-user `rw`/`ro`/`wo` mode, and that the table-target `PermissionChecker` trait has no in-tree implementation.
-  Consequence for D8: per-person read partitioning cannot be enforced by the store and must be enforced by the dashboard layer's project RBAC gating its datasource proxy.
+  Consequence for D8: per-person read partitioning cannot be enforced by the store, and Perses project RBAC gating its datasource proxy cannot enforce it either, because a project reader can send arbitrary SQL under the datasource's stored credential.
+  Reversal is unlikely rather than pending: upstream advertises per-database and per-table authorization only for GreptimeDB Enterprise, whose user provider is absent from the open repository.
+  Corrected in v4 after `research/telemetry-security-and-tenancy.md` (refresh R1–R4, C2) and `research/perses.md` (refresh R27–R29, C8); v2 assigned per-person read partitioning to Perses project RBAC.
 
 ## Rule
 
@@ -186,3 +222,23 @@ A research unit that meets ambiguity returns it in its questions section; the or
   A vacuous regulator is precisely what CCV's integrity property exists to exclude, so A7 is marked rather than counted, and A7a records that A1, A3 and A4 are the only deterministic regulators binding on this corpus.
   Rebinding A7 requires adding a markdown formatter to `modules/formatting.nix`, which is outside this work's safe lane under C5 and is therefore deferred to the same window as the other `modules/` follow-ups.
   `modules/lib/md-format.nix` was considered and rejected as the binding: it is a submodule type that generates markdown with YAML frontmatter for `modules/home/modules/agents-md.nix`, not a linter, and has no path over `docs/notes/`.
+- v4 (2026-10-15): revision after the eight research units gained `## Refresh (2026-10-15)` sections; the body corrections below are the only edits to earlier text, and D1–D8, the requirements and the acceptance criteria are unchanged.
+  - W1 corrected: `magnetite` now runs nixbot, gitea-mq, the Omnigent server, omnigraph and nix-grpc-daemon among others, and buildbot is disabled behind `vanixiets.buildbot.enable` rather than running.
+  - W2 corrected: the incident corpus records whole-host memory exhaustion on 2026-09-27 and 2026-10-01 in addition to storage exhaustion.
+  - W3 corrected: zerotierone and nginx `stub_status` already emit on loopback, omp is a native OpenTelemetry emitter, and #3447 restricted the three `/metrics` endpoints to loopback and ZeroTier on 2026-10-15.
+  - W4 corrected: the root nixpkgs node is now `nixpkgs_10` at `ac1faec4`, which packages perses 0.54.0 with a `services.perses` NixOS module; the node named `nixpkgs` moved to `b6c8664d`.
+  - W5 corrected: greptimedb 1.1.4 is in the root pin, the nixpkgs build omits the embedded dashboard, and upstream's latest stable release is v1.2.1.
+  - W6 corrected: at the new pin the versions are otel-collector-contrib 0.155.0, vector 0.59.0 and grafana-alloy 1.17.1, with upstream ahead for contrib and Alloy.
+  - W7 corrected: the enterprise boundary now touches D8 through partitioned authorization, and tracked flow writes moved to the enterprise set on `main` after v1.2.1.
+  - RK3 recorded as fired for memory.
+  - RK7 resolved: the GreptimeDB plugin 0.1.0 with log and trace query plugins is in Perses 0.54.0's default set and in the nixpkgs vendored set.
+  - RK8 narrowed: lint fails mutants when given an extracted plugin directory or `--online`, while bare lint and the archive-directory form remain non-discriminating.
+  - RK9 strengthened: reversal through an open store implementation is unlikely, and Perses project RBAC cannot partition reads per person either.
+- v5 (2026-10-15): consistency revision after the eight decision records were drafted at Proposed; the body corrections below are the only edits to earlier text, and D1–D8, the requirements and the acceptance criteria other than A2's scope are unchanged.
+  - Frontmatter corrected: `status` and `date` had stayed at v1 values while the body reached v4.
+  - Scope corrected and C5 retired: the `omnigent-magnetite` chain merged to `main` (`cameronraysmith/vanixiets@a12b3c6c5`, `cameronraysmith/vanixiets@2931154b1`), so no chain is in flight.
+  - Superseded inputs annotated: the deferred abandonment of the `nix-mpe-signoz-module` seed is now dischargeable.
+  - W4 corrected: `flake.lock` holds six nixpkgs tarball nodes, the root input resolves to `nixpkgs_10`, and the node named `nixpkgs` is consumed only by `catppuccin`.
+  - A2 corrected: `nix eval` resolution applies to every nixpkgs tarball node of W4, not to two.
+  - RK2 annotated: the packaged Perses version is now 0.54.0.
+  - RK6 annotated: the residual risk is only that the GreptimeDB NixOS module is ours to write.

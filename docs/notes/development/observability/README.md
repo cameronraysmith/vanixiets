@@ -11,9 +11,10 @@ Read [charter.md](charter.md) first, because every artifact below is scoped by i
 
 ## Current status
 
-The charter is accepted at v2, revised on 2026-09-18 after the research phase landed.
+The charter is at v5, revised on 2026-10-15 for consistency with the decision records; v4 followed the research refresh the same day, and v2 followed the research phase on 2026-09-18.
 The research phase is complete: eight artifacts under [research/](research/) cover the store, the dashboard layer, the collection topology, the rejected store alternatives, the fleet's existing emitters, the development-loop signal set, the Nix packaging position, and telemetry access control.
-Decisions D1 through D8 are all open; no ADR has been written and none of the `architecture/`, `components/` or `decisions/` trees that charter deliverable S1 names exists yet.
+Each artifact ends with a `## Refresh (2026-10-15)` section that re-reads its sources at current revisions and supersedes its stale claims; where the findings below conflict with a refresh section, the refresh wins.
+Decisions D1 through D8 each have a decision record under [decisions/](decisions/) at status Proposed, pending the human gate; the `architecture/` and `components/` trees that charter deliverable S1 names do not exist yet.
 No implementation work has begun, and charter constraint C4 forbids it until the decisions land.
 Roughly thirty-six questions were carried to the human gate rather than answered by inference, per the charter's standing rule; they are aggregated below.
 
@@ -30,26 +31,37 @@ Roughly thirty-six questions were carried to the human gate rather than answered
 | Dev-loop signals | [research/dev-loop-signals.md](research/dev-loop-signals.md) | Which development-loop signals exist, which are missing, and which coverage-model decision each one feeds |
 | Nix packaging status | [research/nix-packaging-status.md](research/nix-packaging-status.md) | Which candidate is packaged where, which NixOS and nix-darwin modules exist, and the routes to a GreptimeDB derivation |
 | Telemetry security and tenancy | [research/telemetry-security-and-tenancy.md](research/telemetry-security-and-tenancy.md) | What agent-session telemetry carries, where redaction can be enforced, and what the store, the dashboard layer and the mesh do and do not authorize |
+| Decision records | [decisions/](decisions/) | Where each of D1 through D8 is recorded, one decision per file, per charter S1 |
+| ADR-001: store (D1) | [decisions/ADR-001-store.md](decisions/ADR-001-store.md) | Which system durably holds telemetry and answers queries over it |
+| ADR-002: dashboard layer (D2) | [decisions/ADR-002-dashboard-layer.md](decisions/ADR-002-dashboard-layer.md) | Which dashboard layer renders the store's signals, and in which as-code format |
+| ADR-003: collection topology (D3) | [decisions/ADR-003-collection-topology.md](decisions/ADR-003-collection-topology.md) | How telemetry travels from emitters to the store, and how transport is authenticated |
+| ADR-004: signal scope and schema (D4) | [decisions/ADR-004-signal-scope-and-schema.md](decisions/ADR-004-signal-scope-and-schema.md) | Which signals exist, under which conventions, and within which cardinality and retention budget |
+| ADR-005: dev-loop instrumentation (D5) | [decisions/ADR-005-dev-loop-instrumentation.md](decisions/ADR-005-dev-loop-instrumentation.md) | What the development loop emits, and which coverage-model decision each signal feeds |
+| ADR-006: storage substrate and lakehouse seam (D6) | [decisions/ADR-006-storage-substrate-and-lakehouse-seam.md](decisions/ADR-006-storage-substrate-and-lakehouse-seam.md) | Where telemetry lands durably, and whether the DuckDB and DuckLake analytics path can read it |
+| ADR-007: packaging, placement and clan service (D7) | [decisions/ADR-007-packaging-placement-and-clan-service.md](decisions/ADR-007-packaging-placement-and-clan-service.md) | How each component is packaged, which host runs it, and what shape its clan service takes |
+| ADR-008: access control and tenancy (D8) | [decisions/ADR-008-access-control-and-tenancy.md](decisions/ADR-008-access-control-and-tenancy.md) | Who may write and read which telemetry, and how the prompt-content hazard is contained |
 
 ## Findings that change the design
 
 These are the cross-artifact conclusions a reader needs before opening any ADR.
 Each is traceable to an artifact and its finding numbers.
 
-### 1. Emission is not zero, and three unauthenticated metrics endpoints are already public
+### 1. Emission is not zero, and three unauthenticated metrics endpoints already exist
 
 Charter v1 claimed nothing was emitted; that is false.
-`gitea`, `nixbot` and `niks3` each serve a Prometheus `/metrics` endpoint with no authentication, and each is reachable over public TLS because the service vhosts proxy `/` wholesale (`research/fleet-emitter-inventory.md` F9).
+`gitea`, `nixbot` and `niks3` each serve a Prometheus `/metrics` endpoint with no authentication (`research/fleet-emitter-inventory.md` F9).
+Their vhosts served those endpoints over public TLS until #3447 restricted them to loopback and the ZeroTier mesh range on 2026-10-15 (charter W3).
+zerotierone and nginx `stub_status` also emit on loopback, and omp is a native OpenTelemetry emitter that this repository does not yet configure (charter W3).
 Only nixbot's endpoint carries an upstream-declared containment property, aggregating by status and never labelling by project (`research/fleet-emitter-inventory.md` F10).
-The accurate statement is zero collection with three unintended public endpoints, and the charter's W3 is corrected to say so.
-This is a tightening argument that exists independently of which store is chosen.
+The accurate statement is zero collection over emitters that are already live, and the charter's W3 is corrected to say so.
 
-### 2. The non-metric signals are constrained at both ends of the pipeline
+### 2. The non-metric signals are constrained at ingest, and their rendering is unexercised
 
 At the ingest end, GreptimeDB registers no standard OTLP gRPC trace or logs service; the only OpenTelemetry gRPC service is an OTel-Arrow metrics service, so a collector must use the HTTP exporter for logs and traces, and the trace handler accepts protobuf only (`research/greptimedb.md` F12, F13, F14, corroborated by `research/otel-collector-topology.md` F25).
-At the rendering end, Perses binds query plugins to datasource kinds, and the packaged 0.53.1 plugin set contains log and trace query plugins only for Loki, Tempo, VictoriaLogs and Pyroscope, so a GreptimeDB-only store has no log or trace query path at that version (`research/perses.md` F13, F39, F40, F41).
+At the rendering end, Perses 0.54.0's default plugin set and the nixpkgs vendored set at `nixpkgs_10` contain the GreptimeDB plugin 0.1.0 with `GreptimeDBLogQuery` and `GreptimeDBTraceQuery`, which the stock log and trace panels render (charter RK7; `research/perses.md` refresh R3, R5, R12).
+That log and trace path has not been exercised against a live GreptimeDB, and the trace query maps result columns by name (charter RK7; `research/perses.md` refresh R8).
 Metrics are the exception in both directions: a stock `PrometheusDatasource` pointed at `/v1/prometheus` matches GreptimeDB's Prometheus router on every path and method the plugin uses (`research/perses.md` F17, F18, F19, F20).
-The native GreptimeDB plugin exists upstream, is SQL-based rather than PromQL-based, and is absent from both the 0.53.1 default set and the nixpkgs vendored set (`research/perses.md` F14, F21).
+The native GreptimeDB plugin is SQL-based rather than PromQL-based (`research/perses.md` F14, F21).
 
 ### 3. The store authenticates but does not authorize, and unauthenticated is its default state
 
@@ -75,26 +87,26 @@ Any dashboard or coverage regulator proposed in an ADR therefore has to be demon
 
 ### 6. The packaging position is not where the charter's risk framing put it
 
-`greptimedb` is absent at the repository's root nixpkgs pin, but it was added to nixpkgs `master` at 1.1.4 on 2026-08-30, twenty-six days after the pin's commit date, and neither that commit nor its follow-up is an ancestor of the pin (`research/nix-packaging-status.md` F9, F10).
+`greptimedb` 1.1.4 is present at the repository's root nixpkgs pin `nixpkgs_10` and substituted from cache.nixos.org, although the nixpkgs build omits the embedded web dashboard (charter W5; `research/nix-packaging-status.md` refresh R2, R4, R6).
 Upstream also ships checksummed Linux and Darwin release tarballs across its six most recent releases, so a from-source build is not forced into the critical path (`research/nix-packaging-status.md` F15).
 What remains is module work rather than derivation work: no GreptimeDB NixOS module exists at the pin or on `master`, no third-party flake supplies one, and nix-darwin ships no OpenTelemetry Collector, Vector or Alloy module at the locked revision, so a first-party launchd module is unavoidable for whichever collector is chosen (`research/nix-packaging-status.md` F17, F25, F27, corroborated by `research/otel-collector-topology.md` F8).
-Citations into nixpkgs must name the lock node, because `flake.lock` holds two distinct nixpkgs tarball nodes and neither is a git checkout (charter W4, `research/nix-packaging-status.md` F1, F2).
+Citations into nixpkgs must name the lock node, because `flake.lock` holds six distinct nixpkgs tarball nodes and none is a git checkout; the root input resolves to `nixpkgs_10` (charter W4).
 
 ## Decision status
 
-All eight decisions are open.
+All eight decisions are Proposed: each has a decision record under [decisions/](decisions/) awaiting the human gate.
 The bearing column names the artifacts that supply evidence for that decision, not a recommendation.
 
 | Decision | Subject | Status | Bearing artifacts |
 |---|---|---|---|
-| D1 | Store, including the open/enterprise boundary and single-node versus clustered | open | `greptimedb.md`, `store-alternatives.md`, `nix-packaging-status.md`, `telemetry-security-and-tenancy.md`, `perses.md` |
-| D2 | Dashboard layer, its as-code format, and datasource reachability | open | `perses.md`, `telemetry-security-and-tenancy.md`, `store-alternatives.md`, `nix-packaging-status.md` |
-| D3 | Collection topology, transport authentication, and ingress | open | `otel-collector-topology.md`, `fleet-emitter-inventory.md`, `dev-loop-signals.md`, `telemetry-security-and-tenancy.md`, `nix-packaging-status.md`, `greptimedb.md` |
-| D4 | Signal scope, schema, cardinality and retention budgets | open | `fleet-emitter-inventory.md`, `dev-loop-signals.md`, `otel-collector-topology.md`, `greptimedb.md`, `telemetry-security-and-tenancy.md`, `perses.md` |
-| D5 | Dev-loop instrumentation and the coverage-model decision each signal feeds | open | `dev-loop-signals.md`, `fleet-emitter-inventory.md` |
-| D6 | Storage substrate and the lakehouse seam | open | `greptimedb.md`, `store-alternatives.md`, `dev-loop-signals.md` |
-| D7 | Packaging, host placement, and clan service shape | open | `nix-packaging-status.md`, `greptimedb.md`, `otel-collector-topology.md`, `fleet-emitter-inventory.md`, `store-alternatives.md`, `telemetry-security-and-tenancy.md`, `perses.md` |
-| D8 | Access control and tenancy, including the prompt-content hazard | open | `telemetry-security-and-tenancy.md`, `fleet-emitter-inventory.md`, `greptimedb.md`, `perses.md`, `store-alternatives.md`, `otel-collector-topology.md`, `dev-loop-signals.md` |
+| D1 | Store, including the open/enterprise boundary and single-node versus clustered | Proposed ([ADR-001](decisions/ADR-001-store.md)) | `greptimedb.md`, `store-alternatives.md`, `nix-packaging-status.md`, `telemetry-security-and-tenancy.md`, `perses.md` |
+| D2 | Dashboard layer, its as-code format, and datasource reachability | Proposed ([ADR-002](decisions/ADR-002-dashboard-layer.md)) | `perses.md`, `telemetry-security-and-tenancy.md`, `store-alternatives.md`, `nix-packaging-status.md` |
+| D3 | Collection topology, transport authentication, and ingress | Proposed ([ADR-003](decisions/ADR-003-collection-topology.md)) | `otel-collector-topology.md`, `fleet-emitter-inventory.md`, `dev-loop-signals.md`, `telemetry-security-and-tenancy.md`, `nix-packaging-status.md`, `greptimedb.md` |
+| D4 | Signal scope, schema, cardinality and retention budgets | Proposed ([ADR-004](decisions/ADR-004-signal-scope-and-schema.md)) | `fleet-emitter-inventory.md`, `dev-loop-signals.md`, `otel-collector-topology.md`, `greptimedb.md`, `telemetry-security-and-tenancy.md`, `perses.md` |
+| D5 | Dev-loop instrumentation and the coverage-model decision each signal feeds | Proposed ([ADR-005](decisions/ADR-005-dev-loop-instrumentation.md)) | `dev-loop-signals.md`, `fleet-emitter-inventory.md` |
+| D6 | Storage substrate and the lakehouse seam | Proposed ([ADR-006](decisions/ADR-006-storage-substrate-and-lakehouse-seam.md)) | `greptimedb.md`, `store-alternatives.md`, `dev-loop-signals.md` |
+| D7 | Packaging, host placement, and clan service shape | Proposed ([ADR-007](decisions/ADR-007-packaging-placement-and-clan-service.md)) | `nix-packaging-status.md`, `greptimedb.md`, `otel-collector-topology.md`, `fleet-emitter-inventory.md`, `store-alternatives.md`, `telemetry-security-and-tenancy.md`, `perses.md` |
+| D8 | Access control and tenancy, including the prompt-content hazard | Proposed ([ADR-008](decisions/ADR-008-access-control-and-tenancy.md)) | `telemetry-security-and-tenancy.md`, `fleet-emitter-inventory.md`, `greptimedb.md`, `perses.md`, `store-alternatives.md`, `otel-collector-topology.md`, `dev-loop-signals.md` |
 
 ## Open questions for the human gate
 
@@ -107,7 +119,7 @@ Each is attributed to the artifact that raised it; where two artifacts raised th
 - Are the three darwin machines belonging to other people in scope as telemetry subjects at all (`otel-collector-topology.md`)?
 - Are `cognee` and `k3s-server` intended to be deployed, or retained as unimported definitions, since that decides whether they enter the D4 scope (`fleet-emitter-inventory.md` Q4)?
 - Is re-enabling the disabled `sso-gateway` on `magnetite` in scope, or must the dashboard layer work with it disabled (`telemetry-security-and-tenancy.md` Q4)?
-- Is bumping the root nixpkgs pin in scope, or must the design assume the current pin (`nix-packaging-status.md` question 1)?
+- Is bumping the root nixpkgs pin in scope, or must the design assume the current pin (`nix-packaging-status.md` question 1), settled because the pin has since been bumped to `nixpkgs_10` and ADR-001 and ADR-007 take further version steps through root-pin bumps (ADR-001 Q1).
 - Is darwin continuous-integration coverage in scope, or is the local-run channel the accepted permanent answer for four of ten machines (`dev-loop-signals.md` Q4)?
 
 ### Store selection and versions
@@ -127,14 +139,14 @@ Each is attributed to the artifact that raised it; where two artifacts raised th
 ### Dashboard layer
 
 - Does the dashboard layer have to render logs and traces from the chosen store, or are metrics-only dashboards acceptable for the first deployment (`perses.md`)?
-- Should the design target the packaged 0.53.1 or a newer Perses, since every plugin-set, provisioning-watch, `dac watch` and software-development-kit import-path difference follows from that one choice (`perses.md`)?
+- Should the design target the packaged 0.54.0 or the 0.55 line (`perses.md`), carried forward as ADR-002 Q1.
 - Which plugin, if any, declares the SQL proxy, and would the MySQL or PostgreSQL wire route be preferable for analytical dev-loop queries (`perses.md`)?
 
 ### Collection topology and darwin
 
 - Does any pinned collector read the macOS unified log, which is the only source for the highest-value darwin signal class (`fleet-emitter-inventory.md` Q1)?
 - Which collectors does node-exporter implement on `aarch64-darwin` at the packaged version (`fleet-emitter-inventory.md` Q2)?
-- Does Vector's OTLP source cover all three signals at 0.57.0, the single criterion that could eliminate it outright (`otel-collector-topology.md`)?
+- Does Vector's OTLP source cover all three signals (`otel-collector-topology.md`), settled because at 0.59.0 it does (`otel-collector-topology.md` refresh R13, C8), while ADR-003 rejects vector on other grounds.
 - May the gateway collector be co-resident on `magnetite` given its recorded storage-exhaustion history, or must it sit elsewhere, which needs the store placement decision first (`otel-collector-topology.md`)?
 - Must the store itself run on `aarch64-darwin`, since that decides whether a `-bin` proxy's darwin asset matters (`nix-packaging-status.md` question 3)?
 
@@ -150,9 +162,9 @@ Each is attributed to the artifact that raised it; where two artifacts raised th
 - Is prompt or tool content ever wanted, even opt-in for one named session, or is content exclusion absolute so the collector allow-list can be fixed once (`telemetry-security-and-tenancy.md` Q3)?
 - Should the store credential be held only by a per-host collector, which requires deciding whether nix-darwin hosts run one as root, or may worker-adjacent processes hold a write-only credential directly (`telemetry-security-and-tenancy.md` Q5)?
 - What retention applies to the identifying attributes that survive redaction, which are also the fields that make the store a personal-activity record (`telemetry-security-and-tenancy.md` Q6)?
-- Should the three already-public metrics endpoints be closed behind the gateway, moved to a mesh-only listener, or left open because their label sets are aggregate-only (`fleet-emitter-inventory.md` Q3)?
+- Should the three formerly public metrics endpoints be closed behind the gateway, moved to a mesh-only listener, or left open (`fleet-emitter-inventory.md` Q3), settled because #3447 restricted them to loopback and ZeroTier (charter W3) and ADR-003 scrapes them over loopback.
 - Should the design carry an upstream patch to obtain redaction-safe tool-call error classes, accept failure rates without classes, or enable content capture behind an access boundary (`dev-loop-signals.md` Q3)?
-- Is Kanidm the intended identity provider for the dashboard layer, and do agent-session dashboards live in a separate project or a separate instance (`perses.md`)?
+- Is Kanidm the intended identity provider for the dashboard layer (`perses.md`), carried forward as ADR-002 Q4 and ADR-008's direct Kanidm OIDC client; the original choice between a separate project and a separate instance for agent-session dashboards is superseded by ADR-008's shared read zone (ADR-008 Q1).
 
 ### Coverage model and regulators
 
@@ -162,8 +174,8 @@ Each is attributed to the artifact that raised it; where two artifacts raised th
 
 ## Next steps
 
-The charter's S1 names one file per decision under `decisions/`, so the eight open decisions imply eight decision records, plus `architecture/reference-architecture.md` and a `components/<component>.md` per chosen component.
-The charter's S2 sequences the continuous-verification half after the store and topology decisions land, which orders the store decision and the collection-topology decision ahead of the rest.
-Its standing rule and requirement R7 put the questions above at a human gate before any record is written, because several of them decide the shape of the record rather than a detail inside it.
+The eight decision records exist under `decisions/` at status Proposed, one per decision as the charter's S1 requires; within this tree only `architecture/reference-architecture.md` and a `components/<component>.md` per chosen component remain to be written.
+The charter's S2 sequences the continuous-verification half after the store and topology decisions land, so it follows the human gate on ADR-001 and ADR-003.
+Each record ends with its own questions for the human gate, per the charter's standing rule and requirement R7; the questions above are the research-phase inputs those records answer or carry forward.
 Charter acceptance criteria A5, A6 and A8 bind every record: a rationale with each rejected alternative in one line, a declared operating envelope with a named regulator, and a named failure for each proposed layer.
 Finding 5 above adds a precondition to A6 in practice, since a regulator that cannot be shown to fail on a mutant does not discharge it.

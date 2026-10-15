@@ -1,0 +1,193 @@
+---
+title: "ADR-005: Dev-loop instrumentation"
+---
+
+## Status
+
+Proposed
+
+## Context
+
+Charter R2 requires every development-loop signal to close onto a coverage-model decision rather than onto a chart, and C1 requires the smallest apparatus that closes that loop.
+Under CCV, a coverage-model update is a change to a declared envelope or bin set caused by a runtime observation (charter Designations), so a signal is admitted here only if a named decision rule reads it.
+
+The evidence base is `research/dev-loop-signals.md`, whose `## Refresh (2026-10-15)` supersedes its original findings where they conflict.
+Most of the relevant data is already produced and merely uncollected.
+
+The CI backend in service is nixbot, not buildbot-nix (`research/dev-loop-signals.md` RF1, RC3).
+nixbot persists per-build rows (`commit_sha`, `branch`, `pr_number`, `status`, `created_at`, `started_at`, `finished_at`, `eval_duration_ms`) and per-attribute rows (`attr`, `system`, `drv_path`, `outputs`, `status`, boolean `cached`, `error`, `started_at`, `finished_at`, `eval_wall_ms`, `eval_alloc_bytes`) in its own PostgreSQL database (`Mic92/nixbot@3c432d593:nixbot/nixbot/migrations/0001_initial.sql:25-77`, `Mic92/nixbot@3c432d593:nixbot/nixbot/migrations/0027_eval_stats.sql:2-6`; `research/dev-loop-signals.md` RF2).
+Those rows are deleted 90 days after the build finishes, and this repository does not override the default (`Mic92/nixbot@3c432d593:nixbot/nixbot/config.py:427-428`, `Mic92/nixbot@3c432d593:nixbot/nixbot/db_gen/maintenance.py:232-238`; `research/dev-loop-signals.md` RF3).
+The same `retention_days` setting is documented upstream as the build and log retention horizon (`Mic92/nixbot@3c432d593:nixbot/nixbot/config.py:427`).
+nixbot's `/metrics` endpoint carries only status-level gauges whose duration sums are recomputed over retained rows and fall when the prune runs, so per-attribute status, timing, cache and evaluation cost exist only as rows (`Mic92/nixbot@3c432d593:nixbot/nixbot/web/metrics.py:1-4`, `Mic92/nixbot@3c432d593:nixbot/nixbot/db_gen/web.py:636-639`; `research/dev-loop-signals.md` RF4).
+nixbot contains no OpenTelemetry or OTLP code at `Mic92/nixbot@3c432d593`.
+Per-attribute evaluation cost reaches those rows from nix-eval-jobs `stats.wallMs` and `stats.allocBytes`, which locate outliers rather than giving exact cost because shared values are billed to the first attribute that forces them (`nixos/nix-eval-jobs@9f1553afa:README.md:139-145`; `research/dev-loop-signals.md` RF7, RC2).
+
+Our local patch records an optional attribute abandoned after `optional_build_grace` as `ignored_failure` with the error text `not finished when the required attributes had settled`, so abandonment is distinguishable from a genuine ignored failure only by that text (`cameronraysmith/vanixiets@109c67346:modules/nixos/nixbot-abandon-optional-attributes.patch:138-152`; `research/dev-loop-signals.md` RF5).
+Every `checks.aarch64-darwin` attribute is best-effort with `ignoreFailure = true` (`research/dev-loop-signals.md` RF6, RC5).
+
+gitea-mq's `batches` table has no completion timestamp, and the `queue_entries` rows that hold PR numbers are deleted on dequeue (`research/dev-loop-signals.md` RF9).
+Its batch lifecycle is logged through `slog`'s text handler as `batch formed`, `batch built`, `batch bisecting` (with `failed_check`), `batch landed` and `batch done` (with `landed`, `ejected`, `builds`, `flaky`) (`Mic92/gitea-mq@9bad60d8f:internal/batch/batch.go:143`, `:228`, `:328`, `:391`, `:568`; `Mic92/gitea-mq@9bad60d8f:cmd/gitea-mq/main.go:52`).
+gitea-mq exposes no metrics surface (`research/dev-loop-signals.md` RF9; `research/fleet-emitter-inventory.md` R6).
+Batch branches are named `gitea-mq/batch/<id>` (`Mic92/gitea-mq@9bad60d8f:internal/merge/merge.go:18`, `Mic92/gitea-mq@9bad60d8f:internal/batch/batch.go:30`), so nixbot's `builds.branch` already links every batch to its CI builds.
+
+Deploys record no commit: `clan machines update` writes no deployment record, and `system.configurationRevision` is set nowhere in `modules/` (`research/dev-loop-signals.md` RF10, RC7).
+Each machine's system toplevel is itself a flake check, `checks.<system>.nixos-<name>` or `darwin-<name>` (`cameronraysmith/vanixiets@02432c594:modules/checks/machines.nix:72-74`, `:79`), with `scheelite` deferred (`cameronraysmith/vanixiets@02432c594:modules/checks/machines.nix:6`), so nixbot's `build_attributes.outputs` already maps every CI-built toplevel store path to a `commit_sha`.
+Both activation scripts run before `/run/current-system` is relinked, so an activation snippet can read the previous closure and knows the new one as `$systemConfig` (`NixOS/nixpkgs@ac1faec44836:nixos/modules/system/activation/activation-script.nix:55`, `:79`, root node `nixpkgs_10`; `nix-darwin/nix-darwin@4cff07de:modules/system/activation-scripts.nix:102`, `:140`, `:146`).
+
+omp emits OTLP traces, logs and metrics natively over `http/protobuf` when an endpoint is set (`research/dev-loop-signals.md` RF11).
+Its metrics include `omp.agent.tool.calls` labelled by `gen_ai.tool.name` and `omp.tool.status`, and `omp.agent.errors` labelled by `error.type` (`can1357/oh-my-pi@c2cb79e4c:packages/coding-agent/src/telemetry-export-otlp.ts:220-256`, `:300-305`).
+Its log signal forwards free-form logger messages outside any content gate, and `OTEL_LOGS_EXPORTER=none` disables that signal (`research/dev-loop-signals.md` RF11, RC8; `can1357/oh-my-pi@c2cb79e4c:docs/environment-variables.md:659`).
+Omnigent as packaged cannot export, because its SDK and exporters sit in the unpackaged `tracing` extra and a master switch `OMNIGENT_TELEMETRY_ENABLED` gates all export (`research/dev-loop-signals.md` RF12, RC1).
+
+## Decision
+
+The development loop emits four signal families, each bound to a declared coverage-model decision rule, and no upstream emitter is patched:
+
+1. CI attribute outcomes, copied continuously from nixbot's PostgreSQL by magnetite's collector through the contrib `sqlquery` receiver, one log row per finished attribute joined to its build.
+2. Merge-queue batch events, parsed from gitea-mq's journal by magnetite's collector through the `journald` receiver and the `key_value_parser` operator.
+3. A deploy record, one JSON line per system activation written by an activation snippet on every machine and shipped by the collector of each host ADR-003 places in scope, with commit attribution obtained by joining the activated closure against signal 1.
+4. omp tool-outcome metrics, `omp.agent.tool.calls` and `omp.agent.errors`, exported by omp itself to the host's collector, with omp's log signal disabled at the emitter.
+
+| Signal | Source | Transport | Coverage decision fed | Retention |
+|---|---|---|---|---|
+| CI attribute outcome: `attr`, `system`, `status`, `cached`, derived `abandoned`, `drv_path`, `outputs.out`, `started_at`, `finished_at`, `eval_wall_ms`, `eval_alloc_bytes`, joined to build `commit_sha`, `branch`, `pr_number`, project name | nixbot `build_attributes` joined to `builds` and `projects` | magnetite collector `sqlquery` receiver, peer-authenticated SELECT over the local socket, cursor on `finished_at` held in `file_storage`, OTLP log rows into the `devloop` database (ADR-003) | D5-R1 lane partition, D5-R2 vacuity audit, D5-R3 evaluation-memory envelope, D5-R5 darwin best-effort disposition | nixbot rows 90 days, unchanged; store `devloop` 365 days (ADR-004); beyond that, ADR-006 |
+| CI build timing: `created_at`, `started_at`, `finished_at`, `eval_duration_ms`, `status` per build | nixbot `builds` | same receiver, second query, cursor on `finished_at` | D5-R4 closure-operator throughput envelope | as above |
+| Merge-queue batch event: `batch`, event name, `build`, `sha`, `failed_check`, `members`, `landed`, `ejected`, `builds`, `flaky`, journal timestamp | gitea-mq journal on magnetite | magnetite collector `journald` receiver, `units` = `gitea-mq.service`, `grep` on the five `msg` values, `key_value_parser`, cursor in `file_storage`, log rows into `devloop` | D5-R6 required-check and batching envelope | journal per host default; store `devloop` 365 days; beyond that, ADR-006 |
+| Deploy record: `host`, `closure`, `previous_closure` (absent at boot), activation timestamp | activation snippet on every NixOS and darwin machine, appending to `/var/log/deploy-record.jsonl` | per-host collector `filelog` receiver with `json_parser` on ADR-003's in-scope hosts, log rows into `devloop` (ADR-003) | D5-R7 deploy attribution and out-of-band deploy | local file unbounded but one line per activation; store `devloop` 365 days; beyond that, ADR-006 |
+| omp tool outcome: `omp.agent.tool.calls` by `gen_ai.tool.name` and `omp.tool.status`; `omp.agent.errors` by `error.type` | omp on human accounts | OTLP/HTTP metrics to `127.0.0.1:4318` on the same host, metric names allow-listed by ADR-004 and applied at the collector (ADR-003, ADR-008), into the `agent` database | D5-R8 harness-surface regulator | store `agent` 90 days (ADR-004) |
+
+The decision rules each signal feeds are part of the decision, because R2 is satisfied by the rule and not by the series:
+
+- D5-R1 lane partition: an attribute whose non-cached build duration, summed over pull-request builds in a 30-day window, exceeds its share of the per-pull-request budget, and which caught no failure that its scheduled run would not also have caught, moves to the scheduled lane or behind a canary-per-shape, which is the lever the 2026-09-02 audit computed once by hand (`research/dev-loop-signals.md` F18).
+- D5-R2 vacuity audit: an attribute that recorded zero `failed` outcomes across at least 20 distinct `drv_path` values in 365 days is flagged for a mutation demonstration under the CCV integrity property, and is retired or strengthened if no mutant makes it fail.
+- D5-R3 evaluation-memory envelope: an attribute whose `eval_alloc_bytes` rises above the 99th percentile of its own 30-day history for three consecutive builds is flagged for splitting or lane change, because evaluation overlap has OOM-killed magnetite twice (`research/fleet-emitter-inventory.md` R16).
+- D5-R4 throughput envelope: if the 90th percentile of `started_at - created_at` for pull-request builds exceeds the declared queue-wait bound, the per-pull-request bin set is reduced through D5-R1 rather than by adding evaluators, since the evaluator is memory-bound (`research/dev-loop-signals.md` F17; `research/fleet-emitter-inventory.md` R16).
+- D5-R5 darwin best-effort disposition: a `checks.aarch64-darwin` attribute abandoned in at least half of its builds over 30 days observes nothing and is either moved to the scheduled lane or recorded as an exemption with an owner and an expiry; one that completes and has never been abandoned or failed over the same window is proposed for promotion to required.
+- D5-R6 required-check and batching envelope: the distribution of `failed_check` over `batch bisecting` events identifies which required context rejects merges, and a `flaky` rate above the hand-counted one in 27 multi-PR batches (`cameronraysmith/vanixiets@109c67346:modules/nixos/nixbot.nix:248-252`) is the trigger for carrying a patch for nixbot's supersede race; a rising mean of `builds` per `batch done` triggers review of the settle window and `batchMax`.
+- D5-R7 deploy attribution: on ADR-003's in-scope hosts, a deploy is a record whose `closure` differs from the host's previous record; its commit is every `commit_sha` whose `nixos-<host>` or `darwin-<host>` attribute succeeded with that `outputs.out`, and a deploy with no such row is an activation outside the closure operator, which either adds the missing regulator or records an exemption with an owner and an expiry, as `scheelite`'s deferral would require.
+  blackphos, rosegold and argentum run no collector until their primary users consent (ADR-003 Q3), so D5-R7 records each as an exemption owned by that machine's primary user and expiring when that user consents under ADR-003 Q3.
+- D5-R8 harness-surface regulator: a tool whose `error` status share over 30 days exceeds its declared envelope, or whose `error.type` distribution gains a new class, is a candidate for a regulator of its own in `modules/checks/`.
+
+The magnetite collector derives `abandoned` in its query as `status = 'ignored_failure' AND error = <marker>`, where `<marker>` is a single Nix value shared with a flake check over the patch text.
+The query selects no free-form `error` text, so CI error messages do not reach the store.
+
+## Rationale
+
+Signals 1 and 2 already exist in structured form on magnetite, so collecting them costs receiver configuration on a collector that ADR-003 places there anyway, and costs no new process, no patch and no credential, because PostgreSQL's default `local all all peer` rule admits a role named after the collector's unit user (`NixOS/nixpkgs@ac1faec44836:nixos/modules/services/databases/postgresql.nix:693`, root node `nixpkgs_10`), the same coupling `modules/nixos/gitea-mq.nix` already relies on (`cameronraysmith/vanixiets@02432c594:modules/nixos/gitea-mq.nix:13-14`).
+The `sqlquery` receiver supplies the two properties a periodic copy needs, an incremental cursor through `tracking_column` and persistence of that cursor across restarts through a `storage` extension (`open-telemetry/opentelemetry-collector-contrib@aaf5045a2:receiver/sqlqueryreceiver/README.md:79-82`, `:167-173`).
+The `journald` receiver filters by unit and by `MESSAGE` regular expression and persists its cursor (`open-telemetry/opentelemetry-collector-contrib@aaf5045a2:receiver/journaldreceiver/README.md:41`, `:45`, `:47`), and `key_value_parser` handles the quoted values `slog` writes (`open-telemetry/opentelemetry-collector-contrib@aaf5045a2:pkg/stanza/operator/parser/keyvalue/parser_test.go:522`).
+Copying rows within minutes of completion makes nixbot's 90-day prune irrelevant to history, which closes `research/dev-loop-signals.md` RQ1 without touching nixbot's log retention.
+
+Joining CI rows by the batch branch name and by `commit_sha` reconstructs everything the gitea-mq `batches` table loses, so the journal is read only for the five facts that exist nowhere else: formation size, bisection with its failed check, landed and ejected counts, and `flaky`.
+
+The deploy record is written at activation rather than by a deploy tool, so `clan machines update` on NixOS, `darwin-rebuild` on darwin and the `just activate*` recipes are all covered by one snippet, which answers the "deploy of record" half of `research/dev-loop-signals.md` RQ3 by making the question moot.
+Commit attribution by joining the activated closure against CI `outputs` needs no change to any closure, and an activation that does not join is itself the coverage signal that a closure reached a machine without passing the closure operator.
+
+omp's tool-outcome metrics need only environment variables on the emitting account, carry tool name, status and error class as bounded labels, and carry no content, so they meet D8's allow-list without redaction logic; `OTEL_LOGS_EXPORTER=none` removes the one ungated content path at the emitter, and ADR-003's local receiver, which has no logs pipeline, removes it a second time.
+
+Each admitted signal names a rule that changes an envelope, a lane or a regulator, which is what distinguishes it from the chart-only signals rejected below.
+
+## Rejected alternatives
+
+- Patch nixbot to emit OTel natively: carries a Python patch against an input that moved 43 commits between the two research pins (`research/fleet-emitter-inventory.md` R7) to emit data already present as rows.
+- Read nixbot's `/metrics` as the CI source: status-level gauges with no per-attribute dimension that fall when rows are pruned (`research/dev-loop-signals.md` RF4).
+- Raise nixbot `retention_days`: also extends build-log retention on a storage-constrained host (W2) and leaves history in a database no dashboard reads.
+- A systemd timer running `psql` into GreptimeDB: a second process, a second cursor and a second store credential duplicating what the collector receiver already provides.
+- Patch gitea-mq to emit metrics or OTel: carries a Go patch to restate five log lines that are already structured.
+- `sqlquery` over gitea-mq's `batches` table: no completion time, out-of-order completion defeats an id cursor, and the failed check is absent (`research/dev-loop-signals.md` RF9).
+- `system.configurationRevision = self.rev`: substitutes the revision into `nixos-version` (`NixOS/nixpkgs@ac1faec44836:nixos/modules/installer/tools/tools.nix:59`, root node `nixpkgs_10`), so every commit changes every machine's toplevel and no-op commits become deploys, and dirty trees carry no revision.
+- Record deploys in the `just activate*` recipes or a `clan` wrapper: covers one deploy path and misses the other.
+- `nix-fast-build --result-file` from `just check-fast`: deferred, because with darwin built in CI (`research/dev-loop-signals.md` RC5) local runs feed no rule that CI rows do not, and shipping them adds a laptop-side file path for other people's machines (Q6).
+- Omnigent OTLP export: deferred, because it needs the `tracing` extra packaged plus worker environment that the fleet obligation keeps empty (`research/telemetry-security-and-tenancy.md` R21) (Q5).
+- omp spans: deferred, because `error.type` on `omp.agent.errors` already gives the failure class D5-R8 reads.
+- omp logs: rejected under W9, because the log body is ungated and string-body redaction fails open (`research/telemetry-security-and-tenancy.md` R25, R26).
+- omp token and cost metrics: not admitted, because no coverage decision reads them (Q7).
+- Untraced-artifact count, bin saturation, mutation-kill rate and the exemption ledger as telemetry: these are meta-check derivations of the CCV half (charter S2) that consume D5 signals, not signals to emit.
+- Raw check-attribute count and harness turn latency: chart-only, rejected under C1 (`research/dev-loop-signals.md` ranked items 15 and 16).
+
+## Consequences
+
+The CI history in the store becomes the only copy older than 90 days, so a gap in the copy is unrecoverable once nixbot prunes, which is why the reconciliation regulator below runs daily.
+The receiver's queries are coupled to nixbot's schema, so a nixbot input bump that renames a column breaks collection; the VM regulator below builds the schema from the nixbot input's own migrations so that this coupling fails at check time.
+The `sqlquery` receiver's logs mode is at development stability and its metrics mode at alpha (`open-telemetry/opentelemetry-collector-contrib@aaf5045a2:receiver/sqlqueryreceiver/metadata.yaml:10-11`), and the collector distribution must be contrib (`research/otel-collector-topology.md` C7).
+The gitea-mq parse is coupled to upstream log message text, which no schema protects, so only the runtime cross-check against batch-branch builds detects a silent rename.
+A cursor on `finished_at` re-emits an attribute whenever a restart re-finishes it, which records retries as distinct outcomes.
+A row whose transaction commits after the cursor has passed its `finished_at` would be skipped, so each query re-reads a five-minute overlap behind the cursor and relies on ADR-004 keying the table on `(build_id, attr)` with `finished_at` as time index, so that GreptimeDB's default deduplication of non-append tables collapses the re-read rows `[INFERENCE]`; the reconciliation counts distinct `(build_id, attr, finished_at)` either way.
+Every activation, including each NixOS boot, appends a line, and consumers treat a record whose `previous_closure` is absent as a boot rather than a deploy.
+Deploys of `scheelite` never join a CI row while it stays deferred, so D5-R7 reports it as out-of-band until its exemption is owned or its check restored.
+omp telemetry on omnigent worker accounts is not collected in this slice, because ADR-008 gives no omnigent worker account an OTLP endpoint or credential, and the ACP row passes no environment through to omp (`cameronraysmith/vanixiets@02432c594:modules/clan/services/omnigent/README.md:35`).
+Unbounded identifiers (`commit_sha`, `pr_number`, `drv_path`, store paths, build ids) appear only on log rows, never as metric labels, which conforms to ADR-004's label ban.
+
+Assumptions this decision depends on:
+
+- ADR-003 runs the contrib collector as the NixOS module's `opentelemetry-collector` unit on magnetite with a `file_storage` extension, a per-host collector on each of its in-scope hosts (the six NixOS machines and stibnite) with an OTLP/HTTP receiver on `127.0.0.1:4318` wired to metrics and traces only, a `filelog` receiver on the deploy-record file, and the `journald` receiver over an allow-listed unit set that includes `gitea-mq`.
+- ADR-004 provides the `devloop` database with a 365-day TTL and the `agent` database with a 90-day TTL, and owns the `devloop` column allow-list, primary key and time index of each event table, keying the CI attribute table on `(build_id, attr)` with `finished_at` as time index.
+- ADR-006 exports the `devloop` event tables to Parquet before their TTL expires, which is the only path to CI history older than one year.
+- ADR-004 admits the two omp metric names on its metric-name allow-list, which ADR-008's redaction stage applies.
+- ADR-007 defines the `regulator:ro` store user in its `greptimedb-users` generator, as which the reconciliation job reads the store.
+- ADR-003 defines the `observability-notify@%n.service` ntfy notifier that the reconciliation job's `OnFailure=` triggers.
+
+## Operating envelope and regulator
+
+| Artifact | Declared envelope | Regulator | Shown able to fail by |
+|---|---|---|---|
+| nixbot export queries in the magnetite collector | every `build_attributes` row with `finished_at` in a closed 24-hour window ending one hour ago appears once in `devloop`, distinct on `(build_id, attr, finished_at)`; every finished build likewise | `devloop-reconcile` daily timer on magnetite, which counts both sides over the window and exits non-zero on any difference, surfacing as a failed unit | VM check `devloop-ingest` running the reconcile job against a collector whose query omits `cached = true` rows, and requiring a non-zero exit |
+| nixbot schema coupling | the export queries execute against the schema the pinned nixbot input creates | VM check `devloop-ingest`, which applies the nixbot input's `nixbot/nixbot/migrations` in lexical order, inserts fixture builds and attributes, and asserts their rows in a GreptimeDB under the same collector config | a fixture migration renaming `cached`, which must fail the check; applying the migrations in lexical order reproduces nixbot's schema `[INFERENCE]`, and if it does not the VM starts the nixbot service instead |
+| `abandoned` derivation | the marker the query matches is byte-identical to the error text in `nixbot-abandon-optional-attributes.patch` | flake check `devloop-signals` asserting the shared Nix marker occurs in the patch text | an in-check negative control evaluating the same assertion with a mutated marker and requiring it to be false, following the embedded-mutant pattern of `modules/checks/omnigent-environment.nix` (`research/dev-loop-signals.md` F12) |
+| gitea-mq journal parse | each `batch done` journal line yields one row with integer `landed`, `ejected`, `builds` and boolean `flaky`; any 24-hour window containing a nixbot build on a `gitea-mq/batch/` branch contains at least one `batch built` row | `devloop-reconcile`, comparing `journalctl -u gitea-mq --grep` counts with store rows and checking the cross-signal liveness condition | VM check `devloop-ingest` running a stub `gitea-mq` unit that prints fixture lines, with a mutant collector config lacking `key_value_parser` that must fail; the liveness condition is the runtime guard against an upstream message rename that fixtures cannot see |
+| deploy-record activation snippet | every machine in the inventory appends one valid JSON line per activation with `host`, `closure` and, outside boot, `previous_closure` | flake check `devloop-signals` asserting the snippet is present in every `nixosConfigurations` and `darwinConfigurations` activation text, plus `devloop-reconcile` asserting magnetite's latest stored record equals its current system | the flake check's negative control over a configuration without the module; the VM check switching a test node between two specialisations and requiring exactly one new line naming both closures |
+| omp emitter configuration | human-account sessions export metrics only, `OTEL_LOGS_EXPORTER=none` is set, and no content-capture variable is set | flake check `devloop-signals` over the evaluated home configuration's session variables, plus `devloop-reconcile` asserting at least one `omp.agent.tool.calls` sample in the last seven days | the check's negative control with `OTEL_LOGS_EXPORTER` removed |
+| `devloop-reconcile` itself | runs daily and fails on any envelope breach above | the VM mutants listed in this table, each of which must make it exit non-zero | itself: a reconcile job that passes every mutant is rejected under RK8 |
+
+`devloop-reconcile` samples one host of ten for the deploy record, and this envelope declares that limit rather than claiming fleet coverage; the other nine are covered at build time only.
+A failed `devloop-reconcile` unit notifies a human through `OnFailure=observability-notify@%n.service`, the ntfy notifier ADR-003 defines (ADR-003 Q9).
+
+## Failure prevented
+
+- CI attribute export: loss of per-attribute CI history at nixbot's 90-day prune, which would leave D5-R1 to D5-R5 recomputable only by hand as in the 2026-09-02 audit.
+- `abandoned` derivation: darwin best-effort checks that never complete being counted as ordinary ignored failures, which hides vacuous regulators from D5-R5.
+- CI build timing: a per-pull-request bin set that silently exceeds the evaluator's throughput, measured once at 3 h 08 m of queue wait and never since (`research/dev-loop-signals.md` F17).
+- Merge-queue batch events: a flaky or rejecting required context going unnoticed because its evidence exists only in rotated journal text and in rows that lose PR identity.
+- Deploy record: an incident on a machine that cannot be attributed to a closure or a commit, and a closure activated without ever passing the closure operator going unnoticed.
+- omp tool outcomes: a harness tool failing repeatedly across sessions without any regulator being proposed for it.
+- omp log disablement: prompt or repository content reaching the store through the one omp signal that has no emitter-side gate.
+- `devloop-reconcile`: a collection gap that becomes permanent once the source prunes or the journal rotates.
+- VM check `devloop-ingest`: a nixbot or gitea-mq input bump that breaks collection without failing the closure operator.
+
+## Implementation surface
+
+Files to add:
+
+- `modules/nixos/devloop-collection.nix`: magnetite-only contributions to ADR-003's collector settings, namely the two `sqlquery` queries, the gitea-mq `journald` receiver with its `key_value_parser` operator, routing to the `devloop` database, the shared abandonment marker, the `opentelemetry-collector` PostgreSQL role with column-level `SELECT` on nixbot's `builds`, `build_attributes` and `projects`, and the `devloop-reconcile` service and timer, the service reading `regulator-password` from ADR-007's generator and setting `OnFailure=observability-notify@%n.service` (ADR-003).
+- `modules/system/deploy-record.nix`: `flake.modules.nixos.deploy-record` as a `system.activationScripts` entry and `flake.modules.darwin.deploy-record` as a `system.activationScripts.postActivation` addition, each appending `{host, closure, previous_closure, ts}` to `/var/log/deploy-record.jsonl` at mode 0644, following the two-platform shape of `modules/system/zt-dns.nix`.
+- `modules/checks/devloop-signals.nix`: eval-time checks for the abandonment marker, deploy-record presence on every machine and the omp session variables, each with an embedded negative control.
+- `modules/checks/devloop-ingest.nix`: `checks.x86_64-linux.devloop-ingest`, a NixOS VM test with PostgreSQL, GreptimeDB from `pkgs.greptimedb`, the collector, a stub `gitea-mq` unit and the reconcile job, including the mutants listed above.
+
+Files to modify:
+
+- `modules/machines/nixos/magnetite/default.nix`: import `devloop-collection`.
+- The NixOS and darwin machine aggregates that import fleet-wide `modules/system/` modules: import `deploy-record` on all ten machines.
+- `modules/home/ai/omp/default.nix`: set `OTEL_EXPORTER_OTLP_METRICS_ENDPOINT` to the local collector, `OTEL_TRACES_EXPORTER=none`, `OTEL_LOGS_EXPORTER=none`, `OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf` and `OTEL_SERVICE_NAME=omp` in the human-account session variables only.
+
+Files deliberately not modified: `justfile` (Q6), `pkgs/by-name/omnigent/package.nix` and the omnigent modules (Q5), `nixbot.toml`, and the nixbot and gitea-mq patches (Q2).
+
+Flake inputs: none added; `nixbot` and `gitea-mq` are existing inputs, and the VM check reads the `nixbot` input's migrations directory.
+
+Clan vars generators and sops entries:
+
+- No PostgreSQL credential, because the reader authenticates by peer.
+- No store credential generator: `devloop-reconcile` reads as the `regulator:ro` user that ADR-007's `greptimedb-users` generator defines, through its `regulator-password` secret file.
+
+## Questions for the human gate
+
+Q1. Keep CI history beyond nixbot's 90 days by copying rows into `devloop` within minutes? Recommended: yes, with ADR-006 beyond 365 days; the alternative of raising `retention_days` also lengthens build-log retention on magnetite and keeps history out of the dashboard.
+Q2. Make abandonment a distinct nixbot status in our patch? Recommended: no, keep the error-text marker under the `devloop-signals` equality check; the alternative extends the local patch into nixbot's aggregation, forge-status and UI handling of statuses.
+Q3. Record deploys at activation and attribute commits by joining closures against CI outputs, leaving `system.configurationRevision` unset? Recommended: yes; the alternative makes every commit change all ten toplevels.
+Q4. Disable omp's log signal at the emitter while ADR-003's local receiver also has no logs pipeline? Recommended: yes; the alternative needs string-body redaction that fails open.
+Q5. Package Omnigent's `tracing` extra and enable its export now? Recommended: defer to ADR-008, which in this slice gives no omnigent worker account an OTLP endpoint or credential and reserves `OTEL_` in the worker environment; enabling export requires revising ADR-008.
+Q6. Add `--result-file` to `just check-fast` and ship local results? Recommended: no, until a rule needs data CI rows lack; the alternative adds a shipped file on laptops including other people's.
+Q7. Admit omp token and cost metrics? Recommended: no; admitting them requires naming the decision they feed, such as planning-unit sizing, which the human would commit to making from them.
+Q8. Accept the `sqlquery` receiver at development stability for logs? Recommended: yes, under `devloop-reconcile` and `devloop-ingest`; the alternative is the rejected timer script with its own credential and cursor.
+Q9. Which store user does `devloop-reconcile` use? Answered by ADR-007: the shared `regulator:ro` user of the read-only regulators, kept separate from the dashboard's `perses:ro` credential so their rotation and holders stay decoupled.
+Q10. Adopt the starting thresholds of D5-R1 to D5-R8 (30-day windows, 20 distinct `drv_path` values, the 99th percentile for three builds, half of builds abandoned)? Recommended: yes as initial envelopes revised by the same coverage-model loop; without numbers each rule degrades to a chart.
+Q11. Should D5-R4's queue-wait bound be one hour at the 90th percentile? Recommended: yes, as one third of the 3 h 08 m measured worst case; a looser bound lets the per-pull-request bin set grow unchecked.
