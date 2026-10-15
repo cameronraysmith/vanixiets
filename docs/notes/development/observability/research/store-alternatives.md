@@ -189,3 +189,66 @@ The answer reorders the entire storage column of the comparison table.
 
 Q5 Should the paid-tier access-control finding (F15, F34-F35) be applied as a hard admissibility filter rather than as one axis among several?
 If it is a filter, SigNoz and OpenObserve are excluded before any other axis is weighed, and the same filter must then be applied to the leading candidate once W7 is resolved.
+
+## Refresh (2026-10-15)
+
+Scope: material changes since 2026-09-18 in license, governance, major or minor release, and nixpkgs availability that could reopen a rejection.
+nixpkgs facts below are evaluated for `aarch64-darwin` against this flake's root `nixpkgs` input, which is now the lock node `nixpkgs_10` at rev `ac1faec44836a722f7b003834f367486ff9adfd1`; nixpkgs `master` at `cbffcb102` carries the same version for every attribute checked.
+Upstream release dates and repository licenses come from the GitHub API (fetched 2026-10-15).
+
+### What changed
+
+#### Repository-wide
+
+R1 The root `nixpkgs` input moved: `jq -r '.nodes.root.inputs.nixpkgs' flake.lock` now returns `nixpkgs_10`, at rev `ac1faec4` (`nixos-26.11pre1086968`), so every nixpkgs finding in this file that names `nixpkgs_9` at `85f62611` describes a superseded pin.
+R2 The leading stack's packaging position changed under the same bump: `greptimedb` 1.1.4 and `perses` 0.54.0 are both in the root pin, and a NixOS module for Perses now exists at `nixos/modules/services/monitoring/perses.nix`, while GreptimeDB still has none (`NixOS/nixpkgs@ac1faec4:pkgs/by-name/gr/greptimedb/package.nix:15`, `NixOS/nixpkgs@ac1faec4:pkgs/by-name/pe/perses/package.nix:31`, root node `nixpkgs_10`).
+
+#### SigNoz plus ClickHouse
+
+R3 Nothing material changed: SigNoz published v0.143.0 through v0.146.0 between 2026-09-23 and 2026-10-13, the root `LICENSE` and `ee/LICENSE` are byte-identical to `57268e5`, `ee/` still holds `authn`, `authz`, `auditor`, `licensing` and `gateway`, and no `GOVERNANCE.md` was added (`signoz/signoz@65ad9b5f3:ee/`).
+R4 SigNoz remains absent from the root pin, with no package and no NixOS module (root node `nixpkgs_10`).
+
+#### Prometheus, Grafana, Loki, Tempo, Mimir
+
+R5 Version movement only in nixpkgs: `prometheus` 3.15.0, `grafana` 13.2.3, `grafana-loki` 3.7.8, `tempo` 3.0.3, `mimir` 3.2.1 and `grafana-alloy` 1.17.1, all non-broken with `aarch64-darwin` in `meta.platforms`, and all six NixOS module paths of F19 still present (`NixOS/nixpkgs@ac1faec4:pkgs/by-name/gr/grafana/package.nix:24`, `NixOS/nixpkgs@ac1faec4:pkgs/by-name/mi/mimir/package.nix:10`, `NixOS/nixpkgs@ac1faec4:pkgs/by-name/te/tempo/package.nix:10`, root node `nixpkgs_10`).
+R6 Tempo 3.1.0, released upstream on 2026-09-29 and not yet in the root pin, makes `vParquet5` the default block format for new blocks, still reads `vParquet4` and `vParquet3`, and refuses to start when configured to write `vParquet3` (https://github.com/grafana/tempo/releases/tag/v3.1.0, fetched 2026-10-15).
+R7 No license or governance change: GitHub reports AGPL-3.0 for `grafana/grafana`, `grafana/loki`, `grafana/tempo` and `grafana/mimir`, and Apache-2.0 for `prometheus/prometheus`.
+
+#### VictoriaMetrics, VictoriaLogs, VictoriaTraces
+
+R8 Version movement only: the root pin carries `victoriametrics` 1.153.0, `victorialogs` 1.53.0 and `victoriatraces` 0.11.1, all Apache-2.0, non-broken and `aarch64-darwin`-capable, against upstream releases v1.154.0 (2026-10-12), v1.53.0 (2026-10-01) and v0.12.0 (2026-09-29) (`NixOS/nixpkgs@ac1faec4:pkgs/by-name/vi/victoriametrics/package.nix:17`, root node `nixpkgs_10`).
+R9 GitHub still reports Apache-2.0 for all three repositories, so nothing changed that bears on F25 through F30.
+
+#### OpenObserve
+
+R10 The nixpkgs staleness in F36 has mostly closed: the root pin carries `openobserve` 1.0.4, one minor release behind upstream v1.1.0 published 2026-10-14, and still no NixOS module exists (`NixOS/nixpkgs@ac1faec4:pkgs/by-name/op/openobserve/package.nix:25`, root node `nixpkgs_10`).
+R11 The default nixpkgs build now evaluates to `meta.license` `AGPL-3.0-or-later`, and the same expression adds an opt-in `enableEnterprise` variant that installs a prebuilt binary under the unfree, non-redistributable "OpenObserve Enterprise Edition License Agreement", restricted to `x86_64-linux` (`NixOS/nixpkgs@ac1faec4:pkgs/by-name/op/openobserve/package.nix:20-21,75-82`, root node `nixpkgs_10`).
+R12 The private-crate boundary of F34 and F35 is unchanged at v1.1.0: `src/enterprise/o2_dex` still contains only `Cargo.toml` and a `lib.rs` documented as "Cargo dependency-resolution stub for the private `o2_dex` crate" (`openobserve/openobserve@ed07b6e28:src/enterprise/o2_dex/lib.rs:16`).
+R13 The v1.1.0 release notes add an organization ingestion token for Splunk HEC senders and Slack OAuth setup, and name no change to SSO or RBAC availability (https://github.com/openobserve/openobserve/releases/tag/v1.1.0, fetched 2026-10-15).
+
+#### ClickHouse-direct
+
+R14 Version movement only: the root pin carries `clickhouse` 26.8.7.19-lts, Apache-2.0, non-broken and `aarch64-darwin`-capable, and the license on `ClickHouse/ClickHouse` is unchanged (`NixOS/nixpkgs@ac1faec4:pkgs/by-name/cl/clickhouse/package.nix:2`, root node `nixpkgs_10`).
+
+### Bearing on D1, D2, D6 and D8
+
+No rejection is reopened by a change since 2026-09-18.
+SigNoz, the VictoriaMetrics family and ClickHouse-direct changed only by version, so their rejections stand on the original evidence.
+The Grafana assembly changed only by version; R6 alters the D6 Parquet seam's format version but not its existence, so Q3 is unaffected in substance.
+OpenObserve's rejection loses one of its two legs: F36's nine-minor-release staleness no longer holds (R10), so the rejection now rests on the private SSO and RBAC crates (R12) and on the missing NixOS module alone.
+The D2 advantage this file credited to the Grafana assembly narrowed: Perses now has a nixpkgs NixOS module (R2), so the dashboard layer of the leading stack no longer needs a first-party module.
+The D8 symmetric test this file proposed for the leading candidate now has an answer that applies it: GreptimeDB's per-database and per-table authorization is advertised only for GreptimeDB Enterprise (https://docs.greptime.com/enterprise/user, fetched 2026-10-15), so authentication is open while partitioned authorization is paid, the same shape as SigNoz's custom roles and OpenObserve's `o2_openfga`.
+Under Q5 as a hard filter, GreptimeDB is therefore excluded only if the filter is drawn at authorization rather than at authentication.
+
+### Corrections
+
+C1 Supersedes FL1's statement that "The node `nixpkgs_9`, at rev `85f62611fa3f3eacbcfe3bc7a6d6518b443ca442`, is this repository's root `nixpkgs` input": the root input is now `nixpkgs_10` at `ac1faec4` (R1), and every version in F17 through F19, F23, F36, F37, the D3 paragraph and the comparison table is superseded by R4, R5, R8, R10 and R14.
+C2 Supersedes F36's "the root-pinned nixpkgs carries `openobserve` 0.91.5 while upstream's latest release is v1.0.3": the root pin carries 1.0.4 and upstream's latest is v1.1.0 (R10).
+C3 Resolves FL3 and Q1: the `v0.91.5` tag was AGPL-3.0, not Apache-2.0, so nixpkgs' earlier `meta.license = Apache-2.0` was stale metadata and the open build was never Apache-licensed (`openobserve/openobserve@fed9187bf:LICENSE:1-2`); the current nixpkgs default now declares `AGPL-3.0-or-later` (R11).
+C4 Refines F15's "authentication, authorization and audit are the specific capabilities behind the paid boundary": the community build already wires an OpenFGA authorization provider from the MIT-licensed `pkg/authz` tree, and what is withheld is custom roles, whose create, update and delete return "not implemented" in that provider, together with OIDC and SAML callback authentication under `ee/authn` (`signoz/signoz@57268e5:cmd/community/server.go:110`, `signoz/signoz@57268e5:pkg/authz/openfgaauthz/provider.go:180-189`, `signoz/signoz@57268e5:ee/authn/callbackauthn/`).
+C5 Qualifies the comparison table's "Grafana Labs, AGPL-3.0 core" cell for Tempo: the root pin's `tempo` declares `meta.license = asl20`, while GitHub reports AGPL-3.0 for `grafana/tempo`, so nixpkgs metadata for Tempo disagrees with upstream the way FL3 recorded for OpenObserve (`NixOS/nixpkgs@ac1faec4:pkgs/by-name/te/tempo/package.nix:45`, root node `nixpkgs_10`).
+
+### Questions
+
+Q6 Should D8's admissibility filter (Q5) be drawn at authentication or at partitioned authorization, given that GreptimeDB, SigNoz and OpenObserve all keep partitioned authorization behind a paid tier while their open builds authenticate?
+Q7 Should the Tempo `meta.license` discrepancy (C5) be reported to nixpkgs, or only recorded here?

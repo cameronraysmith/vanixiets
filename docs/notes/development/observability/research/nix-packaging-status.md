@@ -150,3 +150,51 @@ Absences reported explicitly: no GreptimeDB NixOS module upstream, no third-part
 2. If a first-party derivation is chosen, does C6's "reliable upstream release artifacts" test pass on artifacts produced by a conditionally-skipped CI job (F16), or does that conditionality force the from-source route?
 3. Must the store run on `aarch64-darwin` at all, or is Darwin only an emitter host, since the answer decides whether a `-bin` proxy's Darwin asset matters?
 4. Should a new `package-greptimedb` check be blacklisted under the existing "thin upstream re-package" category if the derivation is a `-bin` proxy, or is a half-hour source build acceptable inside the closure operator?
+
+## Refresh (2026-10-15)
+
+Revisions read for this refresh: the flake's root `nixpkgs` input, now lock node `nixpkgs_10` at `NixOS/nixpkgs@ac1faec4` (`nixos-unstable-small` tarball `nixos-26.11pre1086968.ac1faec44836`, commit date 2026-10-07); nixpkgs `master` at `NixOS/nixpkgs@cbffcb10` (fetched 2026-10-15); `GreptimeTeam/greptimedb@179ff8e50` (`v1.2.1`); `GreptimeTeam/dashboard@29d13a5` (`v0.14.2`).
+
+### What changed since the original findings
+
+R1 The root `nixpkgs` input moved from lock node `nixpkgs_9` at `85f62611` to lock node `nixpkgs_10` at `ac1faec4`, whose commit date is 2026-10-07 (`flake.lock`).
+R2 `greptimedb` now exists at the root pin as version 1.1.4, not broken, with `aarch64-darwin` in `meta.platforms`, evaluated for both `x86_64-linux` and `aarch64-darwin` (`NixOS/nixpkgs@ac1faec4:pkgs/by-name/gr/greptimedb/package.nix:15`).
+R3 Both the init commit `c6b2f0a1dd0c` and the debug-info commit `9c9437c2c279` are ancestors of `ac1faec4` (`git merge-base --is-ancestor` in a nixpkgs checkout).
+R4 The root pin's `greptimedb` output is substituted from cache.nixos.org on both `x86_64-linux` (`97n9bs69…-greptimedb-1.1.4`, 135MB compressed, 504MB unpacked) and `aarch64-darwin` (`xh8mkbk3…-greptimedb-1.1.4`), so consuming it costs no local build (https://cache.nixos.org narinfo lookups, fetched 2026-10-15).
+R5 nixpkgs `master` still carries 1.1.4, and the `greptimedb` derivation and Perses files are byte-identical between the root pin and `master` (`git diff --stat ac1faec4 origin/master`).
+R6 An automated bump `greptimedb: 1.1.4 -> 1.2.1` was opened on 2026-10-15 as https://github.com/NixOS/nixpkgs/pull/574558, built on `x86_64-linux` by nixpkgs-review, and is open and merge-bot eligible (fetched 2026-10-15).
+R7 An older competing init PR, https://github.com/NixOS/nixpkgs/pull/491552 (`greptimedb: init at 1.0.0-rc.1`), is still open and is superseded in practice by the merged init (fetched 2026-10-15).
+R8 No NixOS module for GreptimeDB exists at the root pin or on `master`; `nixos/modules` matches only `services/monitoring/perses.nix` for `greptime|perses` at both revisions.
+R9 The nixpkgs derivation builds `--package cmd` with no `buildFeatures`, so it omits the `servers/dashboard` feature and ships no embedded web dashboard (`NixOS/nixpkgs@cbffcb10:pkgs/by-name/gr/greptimedb/package.nix:66`, `GreptimeTeam/greptimedb@179ff8e50:src/cmd/Cargo.toml:23`, `GreptimeTeam/greptimedb@179ff8e50:src/servers/Cargo.toml:9`).
+R10 Upstream release tarballs are built with `features: servers/dashboard`, embedding the dashboard version named in `src/servers/dashboard/VERSION`, which is `v0.13.13` at `v1.2.1` and `v0.14.2` on `main` (`GreptimeTeam/greptimedb@179ff8e50:.github/workflows/release.yml:236`, `GreptimeTeam/greptimedb@179ff8e50:src/servers/dashboard/VERSION`, `GreptimeTeam/greptimedb@4859e57e0:src/servers/dashboard/VERSION`).
+R11 Enabling that feature inside a Nix build is not a flag flip: `build.rs` downloads the dashboard assets from GitHub with `curl` unless `src/servers/dashboard/dist/index.html` already exists, so a sandboxed build must pre-populate `dist` from a fixed-output fetch (`GreptimeTeam/greptimedb@179ff8e50:src/servers/build.rs:21`, `GreptimeTeam/greptimedb@179ff8e50:scripts/fetch-dashboard-assets.sh:37`).
+R12 `GreptimeTeam/dashboard` is not packaged in nixpkgs under any attribute at the root pin or on `master`; its latest release `v0.14.2` (2026-10-14) publishes a static `build.tar.gz` with a `sha256.txt` alongside desktop installers (https://api.github.com/repos/GreptimeTeam/dashboard/releases/latest, fetched 2026-10-15).
+R13 `perses` is 0.54.0 at the root pin and on `master`, which equals upstream's latest release `v0.54.0` of 2026-07-29, and the 131-line `services.perses` module is present at both revisions (https://api.github.com/repos/perses/perses/releases/latest, fetched 2026-10-15; `NixOS/nixpkgs@cbffcb10:nixos/modules/services/monitoring/perses.nix`).
+R14 The nixpkgs `perses` derivation embeds a plugin archive built from `plugins.nix` and sets `DefaultArchivePluginPath` to it, so the Prometheus datasource plugin arrives without a runtime download (`NixOS/nixpkgs@cbffcb10:pkgs/by-name/pe/perses/package.nix:19`, `NixOS/nixpkgs@cbffcb10:pkgs/by-name/pe/perses/package.nix:76`).
+R15 Upstream GreptimeDB's latest stable release is still `v1.2.1` of 2026-09-16, with `greptime-linux-amd64-v1.2.1.tar.gz` (168,792,815 bytes) and its published sha256 `062d5beb13de4991c4fec201b2e5071518bf4ca8f0d52947eba757a74c2a5420`, matching GitHub's asset digest (https://github.com/GreptimeTeam/greptimedb/releases/download/v1.2.1/greptime-linux-amd64-v1.2.1.sha256sum, fetched 2026-10-15).
+R16 `v1.2.1` also publishes `darwin-arm64` (sha256 `1b76a689541cbb0f30760d217bf27f17d467178db57c101aa873f874382baa81`), `darwin-amd64`, `linux-arm64`, `linux-amd64-centos`, `android-arm64` and `windows-amd64` tarballs, each with a `.sha256sum` (https://api.github.com/repos/GreptimeTeam/greptimedb/releases/tags/v1.2.1, fetched 2026-10-15).
+R17 Tagged releases and scheduled nightlies carry darwin assets, but the manually dispatched `v1.3.0-alpha.1-…-20260928` and `v1.4.0-alpha.0-…-20261007` builds carry only Linux and Android assets, which is the conditional macOS job of F16 observed in practice (https://api.github.com/repos/GreptimeTeam/greptimedb/releases, fetched 2026-10-15; `GreptimeTeam/greptimedb@179ff8e50:.github/workflows/release.yml:248`).
+R18 Upstream `main` and `v1.3.0-beta.2` moved from `nightly-2026-03-21` to stable Rust `1.98.1`, so a future nixpkgs derivation for 1.3.x may be able to drop `RUSTC_BOOTSTRAP = 1`; `v1.2.1` is still nightly-pinned (`GreptimeTeam/greptimedb@a788cd977:rust-toolchain.toml`, `GreptimeTeam/greptimedb@179ff8e50:rust-toolchain.toml`, `NixOS/nixpkgs@cbffcb10:pkgs/by-name/gr/greptimedb/package.nix:61`).
+R19 This repository contains no `greptime` reference under `modules/` or `pkgs/`, so no first-party package, overlay or module exists yet.
+
+### Corrections
+
+C1 F1 is superseded: the root `nixpkgs` input is lock node `nixpkgs_10` at `ac1faec4`, not `nixpkgs_9` at `85f62611` (R1).
+C2 F9 and the matrix row "`greptimedb` absent at pin" are superseded: `pkgs.greptimedb` 1.1.4 is at the root pin and cache-resident on both required platforms (R2, R4).
+C3 Question 1 ("is bumping the root pin past 2026-08-30 in scope") is resolved by events: the pin was bumped past that date, so the cheapest route of D7 is already taken.
+C4 The D7 paragraph's ranking of three routes is superseded: the route is now "consume `pkgs.greptimedb`", with the residual choices being whether 1.1.4 is acceptable until https://github.com/NixOS/nixpkgs/pull/574558 lands and whether the missing dashboard feature matters (R6, R9).
+C5 F15's "darwin-arm64 tarball is present in each of the six most recent releases" is superseded: two of the eight most recent release objects lack darwin assets (R17).
+C6 The matrix row for `perses` is superseded: the version at the pin is 0.54.0, not 0.53.1 (R13).
+
+### Charter reconciliation
+
+W5 is superseded: `greptimedb` is present at the root pin (1.1.4), not only on `master`, and no NixOS module exists in any nixpkgs revision (R2, R8).
+W5 should also record that the nixpkgs build lacks the embedded dashboard (R9).
+RK6 stays retired, and its residual risk narrows further: the pin no longer predates the derivation, and the remaining first-party work is the NixOS or clan service module plus, if the built-in dashboard is wanted, either a `-bin` route or a dashboard-asset override (R2, R8, R11).
+RK6 gains a version-lag residual: nixpkgs ships 1.1.4 while upstream stable is 1.2.1, and 1.1.4 shares `v1.2.1`'s exponential-histogram and Prometheus `/metadata` gaps (see `greptimedb.md` Refresh R7, R12).
+
+### Questions
+
+5. Is the GreptimeDB built-in dashboard needed at all, given that Perses is the leading dashboard candidate, or is the nixpkgs build without it acceptable?
+6. If the built-in dashboard is needed, should the design override `pkgs.greptimedb` with pre-fetched dashboard assets, package `GreptimeTeam/dashboard`'s `build.tar.gz` separately behind nginx, or switch to a `-bin` derivation over the release tarball?
+7. Should the design wait for https://github.com/NixOS/nixpkgs/pull/574558 to reach the root pin, or overlay 1.2.1 now?

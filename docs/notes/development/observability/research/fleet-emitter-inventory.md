@@ -238,3 +238,201 @@ This is an access decision with a live exposure attached, and it belongs to D8 r
 Q4.
 Are `cognee` and `k3s-server` intended to be deployed, or are they retained as unimported definitions?
 Their rows are "no telemetry surface by non-deployment", and whether they enter the D4 scope depends on an intent this repository does not state.
+
+## Refresh (2026-10-15)
+
+Sources for this section: `cameronraysmith/vanixiets@109c67346` (`main`), the root nixpkgs input node `nixpkgs_10` at `NixOS/nixpkgs@ac1faec44` (`nixos-26.11pre1086968`), `Mic92/nixbot@3c432d593`, `Mic92/gitea-mq@9bad60d8f`, `Mic92/nix-grpc-store@8d0368860`, `Mic92/niks3@2d5a6b14e`, `nix-community/harmonia@c1be8eba7`, `nix-community/srvos@2b29c5442`, `kanidm/kanidm@547933867` (tag `v1.11.2`), `omnigent-ai/omnigent@a8676d23e` (tag `v0.18.0`), `ModernRelay/omnigraph@1523b4ab4` (tag `v0.11.0`), `matrix-construct/tuwunel@7801b8ec6` (tag `v1.9.3`) and `NousResearch/hermes-agent@d97007c32`.
+Every upstream revision above is the one this repository's `flake.lock` or `pkgs/by-name` derivation pins at `main`.
+nixpkgs `master` at `NixOS/nixpkgs@fe1324228` carries the same `zerotierone` 1.16.0 and moves `matrix-tuwunel` only from 1.9.3 to 1.9.4, so no row below changes against `master`.
+
+### What changed since the original findings
+
+R1.
+The root nixpkgs input moved from `85f62611f` to `ac1faec44`, and the node that `flake.lock` names for it is now `nixpkgs_10`.
+Deployed versions at that pin, read by evaluating the machine configurations: gitea 28.0.0, matrix-synapse 1.162.0, PostgreSQL 16.15, kanidm 1.11.2 (`kanidmWithSecretProvisioning_1_11`), zerotierone 1.16.0, matrix-tuwunel 1.9.3, ntfy-sh 2.28.0, caddy 2.11.7 and dnsmasq 2.93 (`cameronraysmith/vanixiets@109c67346:modules/nixos/kanidm.nix:155`).
+
+R2.
+buildbot is disabled, not removed.
+#3394 wraps the whole module in `lib.mkIf config.vanixiets.buildbot.enable`, which defaults to false, and keeps its generated vars, its PostgreSQL database and its CNAME (`cameronraysmith/vanixiets@109c67346:modules/nixos/buildbot.nix:17-20`, `:36-38`).
+magnetite still imports the buildbot-nix master and worker modules and the `buildbot` flake module, so the definitions remain evaluated but produce no unit (`cameronraysmith/vanixiets@109c67346:modules/machines/nixos/magnetite/default.nix:35-36`, `:50`).
+
+R3.
+The sso-gateway is imported but disabled on magnetite with `sso.enable = false`, so the oauth2-proxy unit whose `--metrics-address` the original table listed does not run (`cameronraysmith/vanixiets@109c67346:modules/machines/nixos/magnetite/default.nix:133`; `:modules/nixos/sso-gateway.nix:365`).
+
+R4.
+nix-grpc-store is a new emitter class.
+The `nix-builders` clan service runs `nix-grpc-daemon` on port 50051 on five builders: magnetite and pyrite bind `[::]:50051` behind a `zt+`-only firewall rule, and stibnite, rosegold and argentum bind their ZeroTier address because nix-darwin has no per-interface firewall (`cameronraysmith/vanixiets@109c67346:modules/clan/inventory/services/nix-builders.nix:29-90`; `:modules/clan/services/nix-builders/flake-module.nix:344-345`, `:355-359`).
+Upstream ships a Prometheus `/metrics` listener behind `services.nix-grpc-daemon.metricsListen`, defaulting to null, and the same option is shared by the NixOS and darwin modules (`Mic92/nix-grpc-store@8d0368860:nixos/common.nix:77-82`).
+The listener is a prometheus-cpp `Exposer` with no authentication of its own, separate from the mTLS gRPC port (`Mic92/nix-grpc-store@8d0368860:src/daemon/metrics.hh:257-261`).
+Its series are counters by method and certificate CN, histograms for phase, queue and build-input durations, scheduler gauges and build failures by Nix failure status (`Mic92/nix-grpc-store@8d0368860:src/daemon/metrics.hh:26-82`; `:README.md:391-407`).
+Upstream states that only CA-issued CNs appear as labels, so cardinality is bounded by the number of dispatcher certificates (`Mic92/nix-grpc-store@8d0368860:README.md:407`).
+Independently of the listener, the daemon writes one logfmt line per RPC to stderr carrying CN, peer, duration and byte counts (`Mic92/nix-grpc-store@8d0368860:README.md:375-389`).
+On magnetite and pyrite the evaluated `idleTimeout` is 600 s, which makes the daemon socket-activated and lets it exit when idle (`Mic92/nix-grpc-store@8d0368860:nixos/server.nix:11-13`); a scrape target there therefore disappears between builds and its counters restart from zero on each activation.
+No machine sets `metricsListen` today, by evaluation of magnetite, pyrite and stibnite.
+
+R5.
+harmonia-gc replaced the nixpkgs and nix-darwin garbage collectors on every host, daily at 04:00 America/New_York with a 5 min jitter on NixOS and at 03:00 through `StartCalendarInterval` on darwin (`cameronraysmith/vanixiets@109c67346:modules/system/harmonia-gc.nix:13-34`).
+It emits no metrics; its result is one plain-text line of paths deleted and bytes freed on stdout plus `tracing` events on stderr (`nix-community/harmonia@c1be8eba7:harmonia-store-gc/src/bin/harmonia-gc.rs:208-211`, `:335-342`).
+On NixOS that output reaches journald through the `harmonia-gc` oneshot unit (`nix-community/harmonia@c1be8eba7:nix/module.nix:238-248`).
+On darwin the launchd daemon declares no `StandardOutPath` or `StandardErrorPath` in upstream or in this repository, by evaluation of stibnite, so its report is discarded (`nix-community/harmonia@c1be8eba7:nix/darwin-module.nix:40-52`).
+harmonia's binary-cache server does carry a Prometheus dependency, but neither `services.harmonia-dev.cache` nor `services.harmonia-dev.daemon` is enabled on any evaluated machine (`nix-community/harmonia@c1be8eba7:harmonia-cache/Cargo.toml:54`).
+
+R6.
+gitea-mq now carries a local settle-window patch, and still exposes no metrics at the new pin (`cameronraysmith/vanixiets@109c67346:modules/nixos/gitea-mq.nix:88`).
+It logs through `slog.NewTextHandler` to stderr, so its journald lines are `key=value` structured text (`Mic92/gitea-mq@9bad60d8f:cmd/gitea-mq/main.go:52-54`).
+The patch adds `batch_settle` and `batch_settle_max` to the startup line and a debug-level `batch settling` line with branch and queue length (`cameronraysmith/vanixiets@109c67346:modules/nixos/gitea-mq-batch-settle.patch`).
+Its HTTP mux serves `/healthz` and an HTML queue dashboard at `/` with no authentication, and the vhost `mq.scientistexperience.net` proxies `/` wholesale (`Mic92/gitea-mq@9bad60d8f:cmd/gitea-mq/main.go:174-195`; `cameronraysmith/vanixiets@109c67346:modules/nixos/gitea-mq.nix:107-110`).
+Queue state is otherwise reachable only as rows in its `gitea-mq` PostgreSQL database.
+
+R7.
+nixbot moved 43 commits to `3c432d593`, and `metrics.py` is byte-identical between the two pins, so F6, F7 and F10 stand unchanged (`Mic92/nixbot@3c432d593:nixbot/nixbot/web/metrics.py:1-4`, `:167-169`).
+The three local patches (`abandon-optional-attributes`, `gated-reuse-effects-summary`, `ignore-failure-dependents`) contain no metrics change.
+The upstream vhost still proxies `/` wholesale to the web socket (`Mic92/nixbot@3c432d593:nixosModules/nixbot.nix:1255-1257`).
+The evaluation is now sized `6 x 3072` MiB under `MemoryHigh = "20G"` (`cameronraysmith/vanixiets@109c67346:modules/nixos/nixbot.nix:135-136`, `:224`).
+
+R8.
+niks3 moved 159 commits to `2d5a6b14e`; `/metrics` is still registered on the main mux without an auth wrapper and the vhost still proxies `/` (`Mic92/niks3@2d5a6b14e:server/server.go:336`; `:nix/nixosModules/niks3.nix:909-910`).
+New series since the original pin: `niks3_gc_runs_total`, `niks3_gc_objects_deleted_total`, `niks3_gc_last_run_timestamp_seconds`, a `niks3_commit_duration_seconds` histogram and `niks3_commit_objects_total` (`Mic92/niks3@2d5a6b14e:server/metrics.go:94-126`).
+
+R9.
+kanidm 1.11.2 still accepts `otel_grpc_endpoint` and this repository still leaves it unset (`kanidm/kanidm@547933867:server/core/src/config.rs:349`).
+
+R10.
+omnigent is packaged at 0.18.0 and the derivation still takes `opentelemetry-api` without the SDK or any OTLP exporter (`cameronraysmith/vanixiets@109c67346:pkgs/by-name/omnigent/package.nix:8`, `:70`).
+Upstream 0.18.0 creates OTel counters and histograms for database retries and skill invocations, and selects the `otlp` metrics exporter only when `OTEL_EXPORTER_OTLP_ENDPOINT` is set (`omnigent-ai/omnigent@a8676d23e:omnigent/db/metrics.py:46-47`; `:omnigent/runtime/skill_metrics.py:53-59`; `:omnigent/runtime/telemetry.py:985-987`).
+The SDK and exporters ship in the upstream `all` and `tracing` extras (`omnigent-ai/omnigent@a8676d23e:pyproject.toml:148-155`, `:217`).
+The server runs on magnetite at `127.0.0.1:6767` behind `omni.scientistexperience.net`, and hosts run on magnetite, pyrite and stibnite (`cameronraysmith/vanixiets@109c67346:modules/nixos/omnigent.nix:31`, `:126`, `:171`; `:modules/clan/inventory/services/omnigent.nix:47-101`).
+Each NixOS worker is its own systemd unit `omnigent-host-<name>`, and magnetite runs the `cameron` and `janettesmith` workers (`cameronraysmith/vanixiets@109c67346:modules/nixos/omnigent-host.nix:337`).
+On darwin each worker's launchd job writes stdout and stderr to a `service.log` file under that worker's home directory rather than to the unified log (`cameronraysmith/vanixiets@109c67346:modules/darwin/omnigent-host.nix:453-454`).
+
+R11.
+omnigraph is packaged at 0.11.0 and still has no metrics endpoint and no OTLP layer: the server installs `tracing_subscriber::fmt` and wraps the router in tower-http's `TraceLayer` (`ModernRelay/omnigraph@1523b4ab4:crates/omnigraph-server/src/lib.rs:1839`, `:1990-1992`).
+It now serves unauthenticated `/healthz` and `/readyz` outside the bearer-auth layer, bound to magnetite's ZeroTier address on port 8090 (`ModernRelay/omnigraph@1523b4ab4:crates/omnigraph-server/src/lib.rs:1986-1989`; `cameronraysmith/vanixiets@109c67346:modules/machines/nixos/magnetite/default.nix:406-407`).
+
+R12.
+cinnabar's services were absent from the original table.
+tuwunel's OTLP export sits behind the `perf_measurements` Cargo feature, which the nixpkgs build does not enable, so it emits journald logs only (`matrix-construct/tuwunel@7801b8ec6:src/main/Cargo.toml:166-172`).
+hermes-agent's OTLP gateway-health export needs the `otlp` extra, which upstream keeps out of `all` and lazy-installs at runtime, and this repository's clan service adds no extra (`NousResearch/hermes-agent@d97007c32:pyproject.toml:425-432`).
+ntfy serves Prometheus metrics only when `enable-metrics` or `metrics-listen-http` is set, and this repository sets neither (`cameronraysmith/vanixiets@109c67346:modules/machines/nixos/cinnabar/ntfy.nix:4-9`; https://docs.ntfy.sh/config/ (fetched 2026-10-15)).
+caddy serves Prometheus metrics on its admin endpoint `localhost:2019/metrics` only when the Caddyfile's global options enable `metrics`, and cinnabar's global config sets only a log level (https://caddyserver.com/docs/metrics (fetched 2026-10-15)).
+dnsmasq serves `.zt` DNS on cinnabar's ZeroTier addresses and has no native exporter; the root nixpkgs ships an exporter module `prometheus.exporters.dnsmasq` and the package `prometheus-dnsmasq-exporter` 0.3.0 (`cameronraysmith/vanixiets@109c67346:modules/machines/nixos/cinnabar/zt-dns.nix:20`; `NixOS/nixpkgs@ac1faec44:nixos/modules/services/monitoring/prometheus/exporters/dnsmasq.nix`).
+openclaw is disabled on cinnabar (`cameronraysmith/vanixiets@109c67346:modules/clan/inventory/services/openclaw.nix:13`).
+
+R13.
+zerotierone is an emitter on every NixOS machine by default.
+ZeroTier documents that versions 1.14.0 through 1.16.0 enable metrics by default at `http://localhost:9993/metrics`, authenticated by a bearer token in `metricstoken.secret`, and also write them to `metrics.prom` in the ZeroTier home directory; from 1.16.1 the default is off and `allowMetrics` in `local.conf` turns it on (https://docs.zerotier.com/metrics-monitoring/ (fetched 2026-10-15)).
+magnetite and cinnabar evaluate to zerotierone 1.16.0 with a `localConf` that does not set `allowMetrics`.
+The series include `zt_peer_latency` as a histogram labelled by node ID, which is bounded by fleet size.
+The darwin machines run an externally installed zerotier-one whose version this repository does not pin (`cameronraysmith/vanixiets@109c67346:modules/clan/inventory/services/zerotier.nix:15`, `:26`).
+
+R14.
+nginx on magnetite already serves `stub_status` at `http://127.0.0.1/nginx_status`, because the srvos nginx mixin sets `statusPage` by default (`nix-community/srvos@2b29c5442:nixos/mixins/nginx.nix:12`; `NixOS/nixpkgs@ac1faec44:nixos/modules/services/web-servers/nginx/default.nix:1544-1546`).
+
+R15.
+PostgreSQL on magnetite listens on `localhost` only and serves six databases: `gitea`, `niks3`, `nixbot`, `gitea-mq`, `omnigent` and `matrix-synapse`, by evaluation of `services.postgresql`.
+No PostgreSQL exporter is configured; the root nixpkgs ships `prometheus-postgres-exporter` 0.20.1.
+
+R16.
+The incident corpus now holds two notes.
+The new note records two host-wide kernel OOMs on magnetite, on 2026-09-27 and 2026-10-01, each caused by nixbot's evaluation overlapping a second `nix-eval-jobs` evaluation until RAM and zram were both full (`cameronraysmith/vanixiets@109c67346:docs/notes/development/incidents/2026-10-01-magnetite-concurrent-eval-oom.md:5-6`, `:32`).
+The OOM killer took roughly 47 processes on 2026-09-27, including nix-daemon workers and processes from an interactive session, before it reached an evaluator (`:36`).
+The mitigations are a host-wide evaluation lock and MGLRU thrash protection, and `MemoryLow` floors for sshd, postgresql, kanidm, nginx and nix-daemon are recorded as deferred to a second phase (`:58-76`, `:84`).
+
+### Updated emitter table (main at `109c67346`)
+
+Rows the original table carries for gitea-actions-runner, docker, livekit, coturn, nvidia, cognee, k3s-server, hm-sops-bridge, app and zerotier-mss-clamp are unchanged and are not repeated; docker's evaluated `metrics-addr` is still null.
+
+| Service | Host | Endpoint | Protocol | Auth | Notes |
+|---|---|---|---|---|---|
+| gitea 28.0.0 | magnetite | `127.0.0.1:3002/metrics`; public at `git.scientistexperience.net/metrics` | Prometheus | none; `metricsTokenFile` unset | `NixOS/nixpkgs@ac1faec44:nixos/modules/services/misc/gitea.nix:717`; `cameronraysmith/vanixiets@109c67346:modules/nixos/gitea.nix:102`, `:107-111` |
+| nixbot | magnetite | `/run/nixbot/web.sock` `/metrics`; public at `nixbot.scientistexperience.net/metrics` | Prometheus, gauges only, 15 s cache | none, by upstream design | R7 |
+| niks3 | magnetite | `127.0.0.1:5752/metrics`; public at `niks3.scientistexperience.net/metrics` | Prometheus with histograms | none | R8 |
+| gitea-mq | magnetite | `127.0.0.1:8092` `/healthz` and HTML dashboard; public at `mq.scientistexperience.net` | no metrics; `key=value` text logs to journald | none | R6 |
+| nix-grpc-daemon | magnetite, pyrite (`[::]:50051`, `zt+` only, socket-activated); stibnite, rosegold, argentum (ZeroTier address) | `/metrics` on `metricsListen`, unset on every host | Prometheus when set; logfmt access log per RPC always | none on the metrics listener; mTLS on gRPC | R4 |
+| harmonia-gc | every NixOS and darwin machine | none | plain-text result line plus `tracing` text | not applicable | darwin output discarded; R5 |
+| kanidm 1.11.2 | magnetite | `127.0.0.1:8443` behind nginx | OTLP gRPC available, `otel_grpc_endpoint` unset | not applicable | R9 |
+| matrix-synapse 1.162.0 | magnetite | `127.0.0.1:8008` | Prometheus available; evaluated `enable_metrics = false` | not applicable | original row stands |
+| sso-gateway (oauth2-proxy) | magnetite | none; `sso.enable = false` | none running | not applicable | R3 |
+| omnigraph 0.11.0 | magnetite | ZeroTier address `:8090` `/healthz`, `/readyz` | journald `tracing` text including tower-http request spans; no metrics | none on health routes; bearer elsewhere | R11 |
+| omnigent server 0.18.0 | magnetite | `127.0.0.1:6767` behind `omni.scientistexperience.net` | OTLP traces and metrics in code, inert as packaged | not applicable | R10 |
+| omnigent-host workers | magnetite, pyrite (systemd `omnigent-host-<name>`); stibnite (launchd) | none | journald on NixOS; a per-user `service.log` file on darwin; OTLP inert | not applicable | R10 |
+| PostgreSQL 16.15 | magnetite | `localhost:5432` and unix socket | journald logs; no exporter configured | not applicable | R15 |
+| nginx | magnetite | `http://127.0.0.1/nginx_status` | `stub_status` text, scrapable by `prometheus.exporters.nginx` | loopback only | R14 |
+| zerotierone 1.16.0 | every NixOS machine; darwin externally installed | `localhost:9993/metrics` and `metrics.prom` file | Prometheus | bearer token `metricstoken.secret` | on by default at 1.16.0 only; R13 |
+| tuwunel 1.9.3 | cinnabar | `[::1]:8008` and `127.0.0.1:8008` behind caddy `matrix.zt` | journald logs only | not applicable | R12 |
+| hermes-agent | cinnabar | dashboard `127.0.0.1:18790` behind caddy `hermes.zt` | OTLP/HTTP gateway-health export needs the unpackaged `otlp` extra | not applicable | R12 |
+| ntfy-sh 2.28.0 | cinnabar | `[::1]:2586` behind caddy `ntfy.zt` | Prometheus available, unset | not applicable | R12 |
+| caddy 2.11.7 | cinnabar | admin `localhost:2019/metrics` | Prometheus available behind global `metrics`, unset | admin endpoint loopback | R12 |
+| dnsmasq 2.93 | cinnabar | ZeroTier addresses `:53` | none native; nixpkgs exporter module exists | not applicable | R12 |
+| buildbot | magnetite | none; `vanixiets.buildbot.enable = false` | none running | not applicable | R2 |
+
+### Corrections
+
+C1.
+Supersedes F2 and the buildbot row of the original table.
+buildbot is disabled behind `vanixiets.buildbot.enable` and runs no unit, while its module, vars and database are retained (R2).
+F22's gcroot SLI therefore has no live source, although the retained buildbot gcroots remain on disk until removed.
+
+C2.
+Supersedes the sso-gateway row of the original table and the D4 sentence that oauth2-proxy needs one option.
+The gateway is disabled, so its metrics listener is not available without first enabling the gateway (R3).
+
+C3.
+Supersedes the claim in "Absences, reported explicitly" that the gitea-mq checkout has no Prometheus or OTLP surface, by narrowing it.
+That remains true at `9bad60d8f`, but gitea-mq is not silent: it emits structured `key=value` logs and serves an unauthenticated public `/healthz` and HTML dashboard (R6).
+
+C4.
+Supersedes F24's reliance on `nix-gc` and `nix-optimise` timers.
+Garbage collection is now harmonia-gc on every host, its bytes-freed signal is a single text line in journald on NixOS, and on darwin the line is discarded (R5).
+
+C5.
+Supersedes D7's statement that the omnigent `tracing` extra is one of only two packaging items.
+At 0.18.0 the SDK and OTLP exporters live in the `all` and `tracing` extras, and hermes-agent's `otlp` extra is a third packaging item for any agent-side OTLP (R10, R12).
+
+C6.
+Supersedes the claim that the fleet has exactly three metrics endpoints emitting today.
+At `main` the three public endpoints remain, and two further emitters are live without any repository change: zerotierone's token-authenticated loopback `/metrics` on every NixOS machine and nginx's loopback `stub_status` on magnetite (R13, R14).
+
+C7.
+Supersedes "The incident corpus contains exactly one note".
+It holds two, and the second records memory exhaustion on magnetite rather than storage exhaustion (R16).
+
+C8.
+Supersedes the `nixpkgs@85f62611f` citations of the original findings for every version-dependent claim; the root input is now `nixpkgs_10` at `ac1faec44` (R1).
+
+### Reconciliation with the charter
+
+W1 needs updating.
+magnetite is still a Hetzner `cx53`, declared as 16 vCPU, 32 GB RAM and 320 GB SSD, and the 2026-10-01 note measures 30.6 GiB of usable RAM (`cameronraysmith/vanixiets@109c67346:modules/terranix/hetzner.nix:24-30`; `:docs/notes/development/incidents/2026-10-01-magnetite-concurrent-eval-oom.md:12`).
+Its running set is now Kanidm, matrix-synapse with LiveKit and coturn, Gitea, gitea-actions-runner, docker, nixbot, gitea-mq, niks3, the omnigent server and two omnigent-host workers, omnigraph, nix-grpc-daemon, nginx and PostgreSQL; buildbot is disabled, not running.
+cinnabar, a Hetzner `cx43` declared as 8 vCPU and 16 GB RAM, runs tuwunel, hermes-agent, ntfy, caddy, dnsmasq and the ZeroTier controller (`cameronraysmith/vanixiets@109c67346:modules/terranix/hetzner.nix:10-16`).
+The inventory is still ten machines.
+
+W2 is now confirmed by two incidents rather than one.
+The 2026-09-02 audit and the 2026-06-10 events were storage exhaustion; the 2026-09-27 and 2026-10-01 events were whole-host memory exhaustion (R16).
+
+W3 holds for collection and is too weak for emission.
+Nothing is collected, but beyond the three public endpoints zerotierone and nginx already emit on loopback, and nix-grpc-store, kanidm, synapse, ntfy and caddy each need one option (C6, table).
+
+RK3 has fired for memory.
+Its confirming observation is that incident notes record saturation on the resources a store needs, and the 2026-10-01 note records RAM and zram both exhausted with the kernel OOM killer taking roughly 47 processes across services (R16).
+The current evaluator sizing leaves about 8 GB free at its measured 18.7 GB peak, which is the headroom a co-located store would draw on during an evaluation (`cameronraysmith/vanixiets@109c67346:modules/nixos/nixbot.nix:113-133`).
+No `MemoryLow` floor protects any service today, so a store process would be an ordinary OOM candidate alongside PostgreSQL and kanidm (R16).
+Disabling buildbot removes its master and worker from the host, but no measurement of the freed memory exists in the repository.
+
+### Questions
+
+Q5.
+Should `metricsListen` be set on the nix-grpc-daemon builders, and if so should magnetite's daemon stop exiting after 600 s idle so that its counters persist between builds?
+
+Q6.
+Should the collector read zerotierone's bearer-token endpoint or its `metrics.prom` file, and should `allowMetrics` be set explicitly now so that an upgrade past 1.16.0 does not silently turn the emitter off?
+
+Q7.
+Does the unauthenticated public gitea-mq dashboard, which shows pull-request titles and authors for the queued repositories, belong to the D8 access decision alongside the three `/metrics` endpoints?
+
+Q8.
+Given RK3 firing for memory, should a GreptimeDB unit on magnetite carry an explicit `MemoryLow`, `MemoryMax` and `OOMScoreAdjust` as a condition of placement, or should the deferred phase-two floors for the existing services land first?
+
+Q9.
+Should darwin's harmonia-gc launchd daemon be given a `StandardOutPath` so that its bytes-freed result is recorded on darwin, where argentum reached 235 MB free on 2026-10-07 (`cameronraysmith/vanixiets@109c67346:modules/darwin/nix-settings.nix:62`)?

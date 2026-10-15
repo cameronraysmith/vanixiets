@@ -187,3 +187,78 @@ Q4 Is re-enabling `sso.enable` on magnetite in scope for this design, or must th
 Q5 Should the store credential be held only by a per-host collector, which requires deciding whether nix-darwin hosts run a collector as root, or may worker-adjacent processes hold a write-only credential directly?
 
 Q6 What retention applies to the identifying attributes that survive redaction, specifically `user.email` and `session.id`, which are the fields that make a partition meaningful and also the fields that make the store a personal-activity record?
+
+## Refresh (2026-10-15)
+
+Revisions read for this refresh: `GreptimeTeam/greptimedb@4859e57e0` (main, 2026-10-15), its release tags `v1.1.4` (`16e9abe4a`), `v1.2.1` (`179ff8e50`, latest stable) and `v1.3.0-beta.2` (`a788cd977`); `perses/perses@4c719fc1` (`v0.54.0`, latest stable) and `perses/perses@021f2d8f` (`v0.55.0-rc.0`); `cameronraysmith/vanixiets@b62ba051a`.
+nixpkgs facts are evaluated against this flake's root `nixpkgs` input, which is now the lock node `nixpkgs_10` at rev `ac1faec44836a722f7b003834f367486ff9adfd1`, not the `nixpkgs_9` node the original corpus named; nixpkgs `master` at `cbffcb102` carries the same versions for every attribute cited here.
+
+### What changed
+
+#### GreptimeDB authorization (RK9)
+
+R1 The open-build user providers still authorize nothing: `StaticUserProvider::authorize` and the watch-file provider's `authorize` return `Ok(())` under the comment "default allow all" at the packaged release, at the latest stable release and at current main (`GreptimeTeam/greptimedb@16e9abe4a:src/auth/src/user_provider/static_user_provider.rs:75-77`, `GreptimeTeam/greptimedb@179ff8e50:src/auth/src/user_provider/watch_file_user_provider.rs:94-96`, `GreptimeTeam/greptimedb@4859e57e0:src/auth/src/user_provider/static_user_provider.rs:78-86`).
+R2 The per-user `rw`, `ro` and `wo` mode parsed from `username:permission_mode=password` is present unchanged at all three revisions, and `DefaultPermissionChecker` remains the only non-test implementor of `PermissionChecker` in the open tree (`GreptimeTeam/greptimedb@16e9abe4a:src/auth/src/permission.rs:112-121`, `GreptimeTeam/greptimedb@4859e57e0:src/auth/src/user_provider.rs:482-498`, `GreptimeTeam/greptimedb@4859e57e0:src/auth/src/permission.rs:325-347`).
+R3 Upstream documents per-database and per-table authorization as an Enterprise product: `greptime_ee_user_provider` provides RBAC roles, global privileges and table-level ACLs by exact name or regular expression, stored in the Metasrv (https://docs.greptime.com/enterprise/user, fetched 2026-10-15).
+R4 That provider is absent from the open repository: no `greptime_ee_user_provider` string and no ACL entry in `licenserc-enterprise.toml` exist at `GreptimeTeam/greptimedb@4859e57e0`, so it ships in a separate Enterprise binary rather than behind the open repository's `enterprise` Cargo feature.
+R5 The HTTP bearer-token path now exists in the request pipeline but remains unusable in the open build: `inner_auth` routes an `Authorization: Bearer` header to `auth_bearer_token` and returns an error on failure instead of falling back to Basic, while the trait default for `authenticate_bearer_token` still fails with `UnsupportedAuthMethod` and no in-tree provider overrides it (`GreptimeTeam/greptimedb@4859e57e0:src/servers/src/http/authorize.rs:83-110`, `GreptimeTeam/greptimedb@4859e57e0:src/auth/src/user_provider.rs:90-107`).
+R6 The packaged release predates that path entirely: `v1.1.4` has no `authenticate_bearer_token` in `src/auth`, so a collector sending a bearer header to the packaged store is rejected rather than authenticated.
+R7 Credential-file rotation through sops-nix symlink swaps is fixed only from `v1.3.0-beta.1` onward: the watch-file provider previously watched only the immediate parent directory, so an `ln -sfn` swap elsewhere in the path chain "never produced an event" and the new users file was not loaded until restart (`GreptimeTeam/greptimedb@d5a6a9ac0`, commit message of #9365).
+R8 Decompression-amplification bounds on compressed ingest requests landed on main after the latest beta and are not in any stable release: handler-level decompression gains a 512 MiB decoded-size cap charged to the server memory limiter (`GreptimeTeam/greptimedb@3131cdbcb`, commit message of #9264; first tag `v1.4.0-alpha.0`).
+R9 `greptimedb` 1.1.4 is now in the root nixpkgs pin, `asl20`, built from tag `v1.1.4` with no NixOS module (`NixOS/nixpkgs@ac1faec4:pkgs/by-name/gr/greptimedb/package.nix:15,22,84`, root node `nixpkgs_10`).
+
+#### Perses RBAC and datasource-proxy enforcement
+
+R10 The packaged release is `perses` 0.54.0 and the root pin now ships a NixOS module for it at `nixos/modules/services/monitoring/perses.nix`, which runs the unit with `DynamicUser = true` and materializes `_secret` file references through `LoadCredential` (`NixOS/nixpkgs@ac1faec4:pkgs/by-name/pe/perses/package.nix:31`, `NixOS/nixpkgs@ac1faec4:nixos/modules/services/monitoring/perses.nix:24-25,91,98`, root node `nixpkgs_10`).
+R11 The F19 and F20 model holds at both 0.54.0 and 0.55.0-rc.0: enabling auth without the Kubernetes provider forces native authorization on, and every proxy endpoint calls `checkPermission` with the project, scope and action (`perses/perses@021f2d8f:pkg/model/api/config/security.go:204-210`, `perses/perses@021f2d8f:internal/api/impl/proxy/proxy.go:165-182`, `perses/perses@4c719fc1:pkg/model/api/config/security.go:195`).
+R12 The unsaved-datasource proxy, which lets a caller supply an arbitrary target, requires `create` on the datasource scope and `read` on the secret scope when a secret is referenced, so a role holding only `read` on datasources cannot point the proxy at a new target (`perses/perses@021f2d8f:internal/api/impl/proxy/localdatasource.go:48,60,69`, `perses/perses@021f2d8f:internal/api/impl/proxy/projectdatasource.go:47,59,68`).
+R13 Five security changes landed after 0.54.0 and first appear in 0.55.0 pre-releases, so none is in the packaged binary.
+R14 Since 0.55.0-rc.0 the proxy no longer forwards the caller's Perses session token to the datasource when native authorization is enabled, because "anyone controlling or observing the datasource would be able to impersonate the caller" (`perses/perses@021f2d8f:internal/api/impl/proxy/proxy.go:184-191`, `perses/perses@835dc355`).
+R15 Since 0.55.0-rc.0, enabling auth without `encryption_key` or `encryption_key_file` is a startup error rather than a warning plus a default key, which converts the F22 hazard into a configuration failure (`perses/perses@021f2d8f:pkg/model/api/config/security.go:174-179`, `perses/perses@e799e7cb`).
+R16 Since 0.55.0-beta.4 secrets may reference files only under `security.secret_file_allowed_directories`, closing a path by which a user able to create a secret could "exfiltrate arbitrary files through the datasource proxy" (`perses/perses@bb8fd345`, commit message of #4503).
+R17 Since 0.55.0-rc.0 a connect-time network guard restricts proxy targets: loopback, link-local and cloud-metadata ranges are denied by default, `allowed_hosts` when non-empty is the exhaustive list of reachable hosts, `allowed_networks` overrides denials by longest prefix, and `fc00::/7` is denied only when `deny_private_networks` is true (`perses/perses@021f2d8f:internal/api/netguard/netguard.go:14-30,99-122`, `perses/perses@021f2d8f:pkg/model/api/config/datasource.go:207-223`, `perses/perses@d5cbc44e`).
+R18 Since 0.55.0-beta.4 the SQL proxy executes queries in a read-only transaction and accepts only statements beginning with a read keyword, replacing a blocklist the commit records as bypassable (`perses/perses@379673eb`, commit message of #4522).
+
+#### Omnigent worker isolation and the prompt-content hazard (W9, RK5)
+
+R19 The five dedicated worker accounts are unchanged in shape: separate accounts with locked passwords and `0700` homes, each supervised as `omnigent-host-<key>` with `UMask=0077` and `NoNewPrivileges` (`cameronraysmith/vanixiets@b62ba051a:modules/clan/services/omnigent/README.md:123,185`).
+R20 The worker boundary is still the Unix account and nothing narrower, with `sandbox: none` accepted and "same-UID/admin access and shared-store visibility for approved projects" (`cameronraysmith/vanixiets@b62ba051a:modules/clan/services/omnigent/README.md:193-195,316`).
+R21 The fleet obligations now assert that every declared worker's supervisor-level `environment` is empty (`cameronraysmith/vanixiets@b62ba051a:modules/lib/omnigent-fleet-obligations.nix:73`).
+R22 The reserved-environment policy rejects names with the prefixes `CLAUDE_`, `OMNIGENT_`, `PI_`, `OMP_` and others, but reserves no `OTEL_` name, so `OTEL_LOG_USER_PROMPTS`, `OTEL_LOG_TOOL_DETAILS` and `OTEL_LOG_RAW_API_BODIES` are not covered by that policy (`cameronraysmith/vanixiets@b62ba051a:modules/lib/omnigent-environment.nix:26-39`).
+R23 The repository still declares no OpenTelemetry emitter, collector, redaction rule or store credential, and the `omnigent_users` Kanidm group is still a stub with `members = [ ]`, so F13 and the original absence flag stand (`cameronraysmith/vanixiets@b62ba051a:modules/nixos/kanidm.nix:218-224`).
+
+#### Collector redaction processor, now read at source
+
+R24 The `redaction` processor's stability is unchanged at alpha for logs and metrics and beta for traces (`open-telemetry/opentelemetry-collector-contrib@cd37ea9:processor/redactionprocessor/metadata.yaml:12-14`).
+R25 A string log body does pass through the processor, but only through value-pattern masking: the non-map, non-slice branch converts the body to a string and applies `processStringValueForLogBody`, with no key allow-list involved (`open-telemetry/opentelemetry-collector-contrib@cd37ea9:processor/redactionprocessor/processor.go:191-235`).
+R26 That branch fails open: a prompt in a string body survives unless a configured blocked-value pattern happens to match it, so the fail-closed property of F10 does not extend to string bodies.
+
+### Bearing on D8 and D3
+
+Worker isolation does not change what an agent session emits, so it does not narrow W9 or discharge the RK5 obligation.
+It changes three things about where the hazard can be contained.
+First, the account boundary partitions harness configuration by person, so one person's worker cannot alter another person's emitter gates, but under R20 any code a worker runs, including prompt-injected code, can set its own `OTEL_*` variables and edit its own harness settings, so F9 still holds within each account.
+Second, the supervisor-level environment assertion in R21 guarantees only that the fleet configuration does not itself turn content gates on; it is not an enforcement point against the worker, and R22 shows the reserved policy would not reject an `OTEL_` content gate added later through role settings.
+Third, the account boundary makes the collector placement enforceable: a collector running under a system account outside every worker's UID, with its configuration in the Nix store, is configuration no worker can modify.
+Collector-side redaction must therefore sit in a per-host collector that runs outside every worker account, with the F10 allow-list and the F3 to F6 filter stages applied before the exporter.
+On magnetite the store and two worker accounts share a host, so the store's listener must require credentials even on loopback, because loopback is reachable by every local UID.
+Under R20 any credential delivered to a worker account, including a write-only one at mode `0400`, is usable by code that worker runs, so this evidence strengthens the Q5 option in which only the per-host collector holds a store credential and workers reach only that collector.
+Per-person read partitioning still cannot be enforced in the open store (R1, R2), and R3 and R4 show that the capability which would enforce it exists upstream only as a paid product, so the original D8 reversal condition, a usable open `PermissionChecker` implementation, should be treated as unlikely rather than pending.
+Enforcement therefore stays on Perses project role bindings, and R13 through R18 make the Perses version a security decision: 0.54.0, the packaged version, forwards the caller's session token to the datasource, accepts a default encryption key with auth enabled, and has no proxy target guard.
+If Perses and GreptimeDB are co-located on magnetite, R17 means the 0.55 line denies the loopback target by default, so the configuration must set `allowed_hosts` to the store host alone and allow only the specific loopback or mesh address, rather than allowing all of `127.0.0.0/8`, which would expose every loopback service on magnetite to any role with datasource `create`.
+
+### Corrections
+
+C1 Supersedes the Flags paragraph's statement that "whether upstream documentation advertises role-based access control for the open build is not verified": upstream advertises RBAC and table-level ACLs only for GreptimeDB Enterprise (R3), and the open build has none (R1, R2, R4).
+C2 Supersedes the D8 reversal sentence "evidence that the open build's `PermissionChecker` seam has a usable in-tree or first-party open implementation (F29) would move partition enforcement down into the store": the first-party implementation exists and is closed (R3, R4), so that reversal now requires either buying the Enterprise build or writing a provider ourselves.
+C3 Qualifies F42: watch-file reload survives a sops-nix symlink swap only from `v1.3.0-beta.1`, and the packaged 1.1.4 and the stable 1.2.1 need the `restartUnits` pattern of F41 for rotation to take effect (R7).
+C4 Qualifies F22 and the D2 sentence calling `encryption_key_file` "a requirement, not a hardening option": that requirement is enforced by Perses itself only from 0.55.0-rc.0 (R15), and at the packaged 0.54.0 it remains a requirement the configuration must impose.
+C5 Qualifies F20: the per-project gate holds at 0.54.0, but at that version the proxy also forwards the caller's Perses session token to the datasource (R14), so the store, or anyone observing traffic to it, receives a replayable Perses credential.
+C6 Corrects F11's "a log record with a plain string body has no documented redaction path": a code path exists but masks only by value pattern and fails open (R25, R26), so the conclusion that string bodies need a `filter` or `transform` stage stands, now on source evidence rather than documentation.
+
+### Questions
+
+Q7 Is buying or trialing GreptimeDB Enterprise in scope, given that its user provider is the only first-party route to per-database read partitioning in the store (R3)?
+Q8 Should the dashboard layer wait for Perses 0.55.0, which carries R14 through R18, or deploy the packaged 0.54.0 with a compensating configuration and a recorded upgrade obligation?
+Q9 Should `OTEL_` be added to the reserved worker-environment prefixes so that no role setting can enable a content gate, accepting that this constrains the supervisor and not the worker's own code (R22)?
+Q10 Should the store's ingest endpoint on magnetite be reachable only from the local collector over loopback, with remote hosts' collectors authenticating over the mesh, or should every host's collector, including magnetite's, use the mesh address?
