@@ -1,12 +1,12 @@
 ---
 title: Fleet observability and CCV feedback-loop charter
-status: charter v5
+status: charter v6
 date: 2026-10-15
 ---
 
 # Fleet observability and CCV feedback-loop charter
 
-Charter version: v5.
+Charter version: v6.
 A revision is a version bump with a dated entry under "Revision history"; the text of an earlier version is never edited in place.
 
 ## Objective
@@ -74,6 +74,7 @@ Its artifacts remain readable prior art — `modules/services/signoz.nix` and `d
   The consequence recorded in v1 — that a first-party derivation is required — is wrong, and no NixOS module exists in any nixpkgs revision either way.
   Corrected in v2 after `research/nix-packaging-status.md`.
   Corrected in v4 after `research/nix-packaging-status.md` (refresh R2, R4, R6, R8, R9, R15); v2 placed the attribute on nixpkgs `master` only, 26 days after a pin that the bump to `nixpkgs_10` has since overtaken.
+  Corrected in v6: https://github.com/NixOS/nixpkgs/pull/574558 merged on 2026-10-15, so 1.2.1 reaches the root pin with the next channel update and ADR-001 deploys 1.2.1 rather than 1.1.4.
 - W6 `opentelemetry-collector-contrib` 0.155.0, `vector` 0.59.0 and `grafana-alloy` 1.17.1 are available from the root nixpkgs node `nixpkgs_10`.
   The bare `alloy` attribute at 5.1.0 is the AlloyTools relational modeling language, not Grafana Alloy, and is not a telemetry agent; `services.alloy.package` defaults to `grafana-alloy`.
   Corrected in v2 after `research/otel-collector-topology.md` established the mistake in v1.
@@ -242,3 +243,5 @@ A research unit that meets ambiguity returns it in its questions section; the or
   - A2 corrected: `nix eval` resolution applies to every nixpkgs tarball node of W4, not to two.
   - RK2 annotated: the packaged Perses version is now 0.54.0.
   - RK6 annotated: the residual risk is only that the GreptimeDB NixOS module is ours to write.
+- v6 (2026-10-15): the body correction below is the only edit to earlier text.
+  - W5 corrected: the nixpkgs bump to GreptimeDB 1.2.1 (https://github.com/NixOS/nixpkgs/pull/574558) merged on 2026-10-15; ADR-001 and ADR-007 now deploy 1.2.1 through a root-pin bump, with a `greptimedb-bin` fallback only for a channel delay at implementation time.

@@ -18,7 +18,7 @@ This record depends on four of their assumptions: only the `ingress` collector o
 `pkgs.greptimedb` is 1.1.4 at the root pin, lock node `nixpkgs_10` at `ac1faec4`, with `mainProgram = "greptime"`, and its outputs are cache-resident for `x86_64-linux` and `aarch64-darwin` (`NixOS/nixpkgs@ac1faec4:pkgs/by-name/gr/greptimedb/package.nix:15`, `:85`, root node `nixpkgs_10`; `research/nix-packaging-status.md` R2, R4).
 The derivation is a from-source `buildRustPackage` with a pinned `cargoHash` and `RUSTC_BOOTSTRAP = 1` (`NixOS/nixpkgs@ac1faec4:pkgs/by-name/gr/greptimedb/package.nix:26`, `:61`, root node `nixpkgs_10`), so changing its version changes both the source hash and the vendored-crate hash and forfeits the cache.
 A source build of this workspace takes about 34 minutes on eight cores (`research/nix-packaging-status.md` F14).
-The bump to 1.2.1 is open upstream as https://github.com/NixOS/nixpkgs/pull/574558 (`research/nix-packaging-status.md` R6).
+The bump to 1.2.1, https://github.com/NixOS/nixpkgs/pull/574558, merged on 2026-10-15 and reaches the root pin with the next channel update (`research/nix-packaging-status.md` R6).
 Upstream publishes a checksummed `greptime-linux-amd64-v1.2.1.tar.gz` (`research/nix-packaging-status.md` R15), and the house `-bin` convention exists (`research/nix-packaging-status.md` F18, F19).
 The nixpkgs build omits the embedded dashboard (`research/nix-packaging-status.md` R9), which ADR-002 does not need.
 No NixOS module for GreptimeDB exists in any nixpkgs revision, so the module is ours to write (`research/nix-packaging-status.md` R8).
@@ -57,7 +57,7 @@ The repository's generator patterns are `omnigraph-bearer-tokens` for generated 
 
 ## Decision
 
-Packaging: the store package is `pkgs.greptimedb` from the root nixpkgs input with no overlay, no `-bin` derivation and no second nixpkgs input; version steps arrive by root-pin bumps as ADR-001 states.
+Packaging: the store package is `pkgs.greptimedb` 1.2.1 from the root nixpkgs input with no overlay and no second nixpkgs input; version steps arrive by root-pin bumps as ADR-001 states, and a `greptimedb-bin` derivation is the fallback only for a channel that still lacks 1.2.1 when implementation starts (Q2).
 
 Placement: the store runs on `magnetite`, as the human chose, inside an explicit memory and disk containment rather than on host defaults.
 The unit sets `MemoryHigh = "3G"`, `MemoryMax = "4G"`, `MemorySwapMax = "0"` and `OOMScoreAdjust = 500`, with `Restart = "on-failure"`, `RestartSec = 30` and `StartLimitIntervalSec = 0`.
@@ -85,7 +85,7 @@ The `greptimedb-schema`, `greptimedb-export` and `greptimedb-envelope` units set
 
 Consuming the pinned attribute is the only route with no first-party build and no first-party package: the output is substituted (`research/nix-packaging-status.md` R4), and the `package-<attr>` flake check that every `pkgs/by-name` entry produces does not arise (`research/nix-packaging-status.md` F22).
 An `overrideAttrs` to 1.2.1 would put a 34-minute Rust build into the closure operator (`research/nix-packaging-status.md` F14), and the x86_64-linux builders that would run it are `magnetite` and `pyrite`, the two hosts whose memory incidents this record is containing.
-A `-bin` derivation over the 1.2.1 tarball is admissible under C6 on Linux, but it adds a package, an update script and a flake check to buy PromQL fixes that a pin bump will deliver once https://github.com/NixOS/nixpkgs/pull/574558 merges.
+A `-bin` derivation over the 1.2.1 tarball is admissible under C6 on Linux, but with https://github.com/NixOS/nixpkgs/pull/574558 merged a pin bump delivers the same version Hydra-built and cache-resident, so the `-bin` route is held only as the fallback for a channel delay at implementation time.
 
 `magnetite` is kept because both alternatives are worse on the axis that matters.
 `cinnabar` has about half of `magnetite`'s RAM, and placing the store there would make one host the ZeroTier controller, the fleet's `.zt` resolver and the telemetry store, so a single fault would take out mesh control, name resolution and the observation of that fault.
@@ -108,7 +108,7 @@ The store is not a clan service role because it has one instance, no per-machine
 ## Rejected alternatives
 
 - `overrideAttrs` overlay to 1.2.1: forfeits the cache and adds a 34-minute Rust build on memory-constrained builders (`research/nix-packaging-status.md` F14).
-- `pkgs/by-name/greptimedb-bin` over the 1.2.1 tarball: admissible under C6 but adds a package, an updater and a flake check that a pin bump makes redundant (`research/nix-packaging-status.md` R15, F22).
+- `pkgs/by-name/greptimedb-bin` over the 1.2.1 tarball as the primary route: admissible under C6 but adds a package, an updater and a flake check that the merged nixpkgs bump makes redundant; kept only as the Q2 fallback (`research/nix-packaging-status.md` R15, F22).
 - A second nixpkgs input for one attribute: adds a third nixpkgs node to a lock whose two nodes already caused misattributed findings (`research/store-alternatives.md` FL1).
 - Building with the `servers/dashboard` feature: needs a fixed-output asset fetch to pre-populate `dist` and ADR-002 does not use the embedded UI (`research/nix-packaging-status.md` R11).
 - Placement on `cinnabar`: half the RAM and co-locates telemetry with the mesh controller and the fleet resolver.
@@ -171,7 +171,7 @@ Keeping the store out of the clan inventory prevents an inventory instance whose
 ## Questions for the human gate
 
 Q1 Keep the store on `magnetite` despite RK3 having fired? Recommended: yes, with the containment above; the alternative `cinnabar` concentrates mesh control, name resolution and telemetry on one half-sized host.
-Q2 Reach 1.2.1 through the root-pin bump rather than an overlay or `-bin`, without delaying first deployment on 1.1.4 (ADR-001 Q1)? Recommended: yes; the alternative is a 34-minute source build or a redundant first-party package.
+Q2 Take 1.2.1 through a root-pin bump that includes https://github.com/NixOS/nixpkgs/pull/574558, with a `greptimedb-bin` over the upstream checksummed 1.2.1 tarball only if the channel still lacks it when implementation starts? Recommended: yes; an `overrideAttrs` to 1.2.1 is a 34-minute source build on the memory-constrained builders.
 Q3 Are `MemoryHigh = 3G` and `MemoryMax = 4G` acceptable as the store's share of `magnetite`? Recommended: yes, revised only by R7.2 evidence; a larger ceiling eats into the free memory the evaluator needs, a smaller one risks scan failures on dashboards.
 Q4 Should the store die first under host OOM (`OOMScoreAdjust = 500`), ahead of the ADR-003 `ingress` collector (`OOMScoreAdjust = 300`) and `nix-daemon` workers? Recommended: yes; the collector survives to queue, and the alternative lets a host OOM fail CI to keep telemetry ingesting.
 Q5 Is a 16 GiB dataset with 4 GiB read and write caches acceptable instead of the roughly 10 GB default cache floor? Recommended: yes; larger caches reduce R2 reads but enlarge the reservation on a pool with a starvation history.

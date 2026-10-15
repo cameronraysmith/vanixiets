@@ -10,7 +10,7 @@ Proposed
 
 Charter D2 asks for one dashboard layer, its dashboards-as-code format, and datasource reachability against the chosen store.
 The human gate of 2026-10-06 named GreptimeDB on `magnetite` backed by Cloudflare R2 as the store, and GreptimeTeam/dashboard "or better" as the dashboard layer, with Perses the leading "or better" candidate.
-This ADR assumes the store decision of ADR-001 and the placement of ADR-007: GreptimeDB standalone on `magnetite`, consumed as `pkgs.greptimedb` 1.1.4 from the root pin and then 1.2.1 when the pin carries it, listening for HTTP on `127.0.0.1:4000` (ADR-007), with the read-only `perses` user that ADR-007 enumerates among the store users.
+This ADR assumes the store decision of ADR-001 and the placement of ADR-007: GreptimeDB 1.2.1 standalone on `magnetite`, consumed as `pkgs.greptimedb` from the root pin, listening for HTTP on `127.0.0.1:4000` (ADR-007), with the read-only `perses` user that ADR-007 enumerates among the store users.
 This ADR assumes the access model of ADR-008: content exclusion at the collector, one shared read zone of admitted humans, no per-person read partition, and a direct Kanidm OIDC client for the dashboard; the store users, including `perses:ro`, are those enumerated in ADR-007.
 
 The facts that bind this decision are these.

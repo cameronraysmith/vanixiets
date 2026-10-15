@@ -23,7 +23,7 @@ On governance (C3) GreptimeDB has single-company control, a CLA and company-appo
 
 Three versions are in play.
 `pkgs.greptimedb` at the root pin, lock node `nixpkgs_10` at `ac1faec4`, is 1.1.4 and is substituted from cache.nixos.org on both required platforms (`research/nix-packaging-status.md` R2, R4).
-The latest stable release is `v1.2.1` of 2026-09-16, and the nixpkgs bump to it is open as https://github.com/NixOS/nixpkgs/pull/574558 (`research/greptimedb.md` R1, `research/nix-packaging-status.md` R6).
+The latest stable release is `v1.2.1` of 2026-09-16, and the nixpkgs bump to it, https://github.com/NixOS/nixpkgs/pull/574558, merged on 2026-10-15 and reaches the root pin with the next channel update (`research/greptimedb.md` R1, `research/nix-packaging-status.md` R6).
 The `v1.3.0` line is at `v1.3.0-beta.2`, published 2026-10-15 with no assets attached at fetch time (`research/greptimedb.md` R1).
 
 The functional differences between those versions that bear on this design are enumerated below.
@@ -43,7 +43,8 @@ The fleet's volume estimate is roughly 3,000 metric series and under 60,000 dev-
 ## Decision
 
 The store is the open build of GreptimeDB, run as one standalone process, consumed as `pkgs.greptimedb` from the root nixpkgs input and never from a prerelease.
-The first deployment uses the highest stable version present at the root pin when implementation starts, which is 1.1.4 today and 1.2.1 once https://github.com/NixOS/nixpkgs/pull/574558 reaches the pin.
+The first deployment uses `v1.2.1`, the latest stable release; 1.1.4 is not deployed.
+If the root pin does not yet carry 1.2.1 when implementation starts, the pin is bumped first, which is a channel delay of days rather than a dependency on unreleased work, because https://github.com/NixOS/nixpkgs/pull/574558 has merged.
 The `v1.3.x` line is adopted only when a stable `v1.3` tag reaches the root pin, and is not a precondition for deployment.
 Until the deployed version ingests exponential histograms, the collector that writes to the store converts them to explicit-bucket histograms with the contrib `transform` processor's `convert_exponential_histogram_to_histogram` function (`research/greptimedb.md` "Charter reconciliation", `open-telemetry/opentelemetry-collector-contrib@aaf5045a2:processor/transformprocessor/README.md:475-479`); the collector configuration belongs to ADR-003.
 Alerting is external to the store, so no enterprise-gated trigger DDL is relied on and RK1 stays retired.
@@ -62,7 +63,7 @@ The unconditional flownode in standalone is accepted rather than avoided, becaus
 The version policy follows the packaging evidence.
 Consuming the root-pin attribute costs no build, because the output is cache-resident (`research/nix-packaging-status.md` R4).
 Every route to 1.2.1 ahead of nixpkgs adds either a roughly half-hour eight-core Rust build (`research/nix-packaging-status.md` F14) or a second packaging convention for one package (see ADR-007).
-The 1.1.4-to-1.2.1 delta is PromQL correctness, which is why 1.2.1 is preferred for the first deployment when it is available, but no 1.2.1 change closes a gap the design depends on, because exponential histograms, `/metadata`, bearer tokens and hot credential reload are absent from both.
+The 1.1.4-to-1.2.1 delta is PromQL correctness, so a first deployment on 1.1.4 would start a new store on a superseded release with known rate-window defects; no 1.2.1 change closes the gaps listed above, which remain until `v1.3`.
 Waiting for `v1.3.x` would block deployment on a beta line with no stated release date while its two material gains have workarounds: exponential histograms by collector-side conversion, and credential rotation by `restartUnits` (`research/telemetry-security-and-tenancy.md` C3).
 The missing `/metadata` route costs metric help text and type hints in the Perses Prometheus plugin, not query results; ADR-002 owns that consequence.
 
@@ -82,7 +83,7 @@ The missing `/metadata` route costs metric help text and type hints in the Perse
 
 The store is a single point of failure for telemetry, and a store outage is survivable only to the depth of the collector's sending queue, which ADR-003 sizes.
 Exponential-histogram precision is reduced to the declared explicit bucket bounds until a `v1.3` stable reaches the pin, and the bucket bounds become part of ADR-004's schema.
-Each later version step, 1.1.4 to 1.2.1 to `v1.3`, arrives through a root-pin bump and therefore through the closure operator, with no first-party derivation to maintain.
+Each later version step, 1.2.1 to `v1.3`, arrives through a root-pin bump and therefore through the closure operator, with no first-party derivation to maintain.
 When the deployed version reaches `v1.3.0-beta.1` or later, the collector conversion and the restart-on-rotation coupling can be removed; both removals are tracked by the regulators below rather than by memory.
 Per-person read isolation is not a store property, and any design text that treats a GreptimeDB schema as a tenant boundary is wrong (`research/telemetry-security-and-tenancy.md` F30).
 Alerting needs a component outside the store, which this record does not choose.
@@ -119,7 +120,7 @@ External alerting prevents a design that silently depends on an enterprise-only 
 
 ## Questions for the human gate
 
-Q1 Should the first deployment wait for https://github.com/NixOS/nixpkgs/pull/574558 to reach the root pin? Recommended: no, deploy whichever stable version is at the pin when implementation starts; the alternative delays the loop for PromQL fixes that dashboards over a new store will not yet exercise.
+Q1 Deploy `v1.2.1` first, taken through a root-pin bump that includes https://github.com/NixOS/nixpkgs/pull/574558 (merged 2026-10-15)? Recommended: yes; deploying 1.1.4 first starts the store on a superseded release, and the `greptimedb-bin` fallback of ADR-007 Q2 applies only if the channel still lacks 1.2.1 when implementation starts.
 Q2 Is the governance objection C3 a disqualifier for single-vendor stores, or an axis? Recommended: an axis, because every candidate in the evidence base is single-vendor (`research/store-alternatives.md` F22, F30); treating it as a disqualifier leaves no admissible store.
 Q3 Is in-database alerting wanted? Recommended: no, alerting stays external; the alternative is an Enterprise dependency and reopens RK1.
 Q4 Is store-side per-person read partitioning required, which only GreptimeDB Enterprise provides? Recommended: no; ADR-008 adopts a shared read zone, because neither the store nor Perses can partition reads; the alternative is a commercial agreement or a first-party `PermissionChecker` provider.
