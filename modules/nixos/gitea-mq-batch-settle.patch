@@ -1,0 +1,330 @@
+diff --git a/cmd/gitea-mq/main.go b/cmd/gitea-mq/main.go
+index 7dc131f..7392da0 100644
+--- a/cmd/gitea-mq/main.go
++++ b/cmd/gitea-mq/main.go
+@@ -63,6 +63,8 @@ func run() error {
+ 		"idle_poll_interval", cfg.IdlePollInterval,
+ 		"check_timeout", cfg.CheckTimeout,
+ 		"batch_max", cfg.BatchMax,
++		"batch_settle", cfg.BatchSettle,
++		"batch_settle_max", cfg.BatchSettleMax,
+ 	)
+ 
+ 	// Graceful shutdown context.
+@@ -131,6 +133,8 @@ func run() error {
+ 		SkipQueueIfUpToDate: cfg.SkipQueueIfUpToDate,
+ 		BatchMax:            cfg.BatchMax,
+ 		BisectMaxSteps:      cfg.BisectMaxSteps,
++		BatchSettle:         cfg.BatchSettle,
++		BatchSettleMax:      cfg.BatchSettleMax,
+ 	})
+ 
+ 	discTrigger := make(chan struct{}, 1)
+diff --git a/internal/batch/batch.go b/internal/batch/batch.go
+index d1a22eb..e00be53 100644
+--- a/internal/batch/batch.go
++++ b/internal/batch/batch.go
+@@ -53,6 +53,15 @@ type Engine struct {
+ 	// SkipIfUpToDate lands a single up-to-date PR by fast-forwarding to its
+ 	// head instead of building a batch branch.
+ 	SkipIfUpToDate bool
++	// Settle delays forming a new root batch until no PR has been enqueued
++	// for this long, so PRs enqueued in quick succession share one CI run.
++	// Zero forms on the first tick that sees a queued entry.
++	Settle time.Duration
++	// SettleMax bounds Settle: once the oldest queued entry has waited this
++	// long the batch forms even if enqueues keep arriving. Zero = no bound.
++	SettleMax time.Duration
++	// Now is the clock used for settle decisions. Defaults to time.Now.
++	Now func() time.Time
+ 
+ 	// MergedPoll controls ensureMergedOrClose. Defaults: 200ms × 50 = 10s.
+ 	MergedPollInterval time.Duration
+@@ -120,8 +129,9 @@ func (p pendingStack) drop(id int64) pendingStack {
+ }
+ 
+ // FormAndBuild forms a new root batch from the queued head and builds its
+-// branch. Returns nil when there is nothing to do (queue empty or a live
+-// batch already exists). Safe to call on every poll tick.
++// branch. Returns nil when there is nothing to do (queue empty, a live
++// batch already exists, or the queue is still settling). Safe to call on
++// every poll tick.
+ func (e *Engine) FormAndBuild(ctx context.Context, targetBranch string) (*pg.Batch, error) {
+ 	defer e.lock(targetBranch)()
+ 	live, err := e.Queue.GetLiveBatch(ctx, e.RepoID, targetBranch)
+@@ -136,6 +146,9 @@ func (e *Engine) FormAndBuild(ctx context.Context, targetBranch string) (*pg.Bat
+ 		}
+ 		return nil, nil
+ 	}
++	if ok, err := e.settled(ctx, targetBranch); err != nil || !ok {
++		return nil, err
++	}
+ 	b, err := e.Queue.FormBatch(ctx, e.RepoID, targetBranch, e.BatchMax)
+ 	if err != nil || b == nil {
+ 		return nil, err
+@@ -144,6 +157,35 @@ func (e *Engine) FormAndBuild(ctx context.Context, targetBranch string) (*pg.Bat
+ 	return b, e.Build(ctx, b)
+ }
+ 
++// settled reports whether the queued entries for targetBranch may form a new
++// root batch now. It returns false while the queue is still receiving
++// enqueues within the Settle window; the next poll tick or webhook retries.
++func (e *Engine) settled(ctx context.Context, targetBranch string) (bool, error) {
++	if e.Settle <= 0 {
++		return true, nil
++	}
++	entries, err := e.Queue.List(ctx, e.RepoID, targetBranch)
++	if err != nil {
++		return false, err
++	}
++	queued := slices.DeleteFunc(entries, func(q pg.QueueEntry) bool { return q.State != pg.EntryStateQueued })
++	if len(queued) == 0 || (e.BatchMax > 0 && len(queued) >= e.BatchMax) {
++		return true, nil
++	}
++	now := time.Now()
++	if e.Now != nil {
++		now = e.Now()
++	}
++	// ListQueue orders by enqueued_at ascending.
++	oldest, newest := queued[0].EnqueuedAt.Time, queued[len(queued)-1].EnqueuedAt.Time
++	if now.Sub(newest) >= e.Settle || (e.SettleMax > 0 && now.Sub(oldest) >= e.SettleMax) {
++		return true, nil
++	}
++	slog.Debug("batch settling", "branch", targetBranch, "queued", len(queued),
++		"since_newest", now.Sub(newest), "since_oldest", now.Sub(oldest))
++	return false, nil
++}
++
+ // Build constructs the batch branch by merging current_ids onto the target
+ // tip. Conflicting members are ejected and construction continues. On success
+ // the batch transitions to testing and every current entry's merge_branch_*
+diff --git a/internal/batch/batch_test.go b/internal/batch/batch_test.go
+index b33944a..e6f4cd9 100644
+--- a/internal/batch/batch_test.go
++++ b/internal/batch/batch_test.go
+@@ -7,6 +7,7 @@ import (
+ 	"slices"
+ 	"strings"
+ 	"testing"
++	"time"
+ 
+ 	"github.com/Mic92/gitea-mq/internal/batch"
+ 	"github.com/Mic92/gitea-mq/internal/forge"
+@@ -573,3 +574,130 @@ func TestPendingDrop(t *testing.T) {
+ 		t.Fatalf("expected done, got %+v", b)
+ 	}
+ }
++
++// settleQueue is setup with a controllable clock and enqueue times: each PR
++// is enqueued and its enqueued_at pinned to t0+offset.
++type settleQueue struct {
++	t   *testing.T
++	ctx context.Context
++	e   *batch.Engine
++	svc *queue.Service
++	t0  time.Time
++	now time.Time
++	pin func(pr int64, at time.Time)
++}
++
++func setupSettle(t *testing.T, batchMax int, settle, settleMax time.Duration) *settleQueue {
++	t.Helper()
++	pool := testutil.TestDB(t)
++	svc := queue.NewService(pool)
++	ctx := t.Context()
++	repo, err := svc.GetOrCreateRepo(ctx, "gitea", "org", "app")
++	if err != nil {
++		t.Fatal(err)
++	}
++	s := &settleQueue{t: t, ctx: ctx, svc: svc, t0: time.Now().Truncate(time.Second)}
++	s.now = s.t0
++	s.pin = func(pr int64, at time.Time) {
++		if _, err := pool.Exec(ctx, "UPDATE queue_entries SET enqueued_at = $1 WHERE repo_id = $2 AND pr_number = $3", at, repo.ID, pr); err != nil {
++			t.Fatal(err)
++		}
++	}
++	s.e = &batch.Engine{
++		Forge:              newFakeForge().MockForge,
++		Queue:              svc,
++		Owner:              "org",
++		Repo:               "app",
++		RepoID:             repo.ID,
++		ExternalURL:        "http://mq",
++		BatchMax:           batchMax,
++		Settle:             settle,
++		SettleMax:          settleMax,
++		Now:                func() time.Time { return s.now },
++		MergedPollInterval: 1,
++		MergedPollAttempts: 1,
++	}
++	return s
++}
++
++// enqueue adds pr with enqueued_at = t0+offset.
++func (s *settleQueue) enqueue(pr int64, offset time.Duration) {
++	s.t.Helper()
++	if _, err := s.svc.Enqueue(s.ctx, s.e.RepoID, pr, fmt.Sprintf("sha%d", pr), "main"); err != nil {
++		s.t.Fatal(err)
++	}
++	s.pin(pr, s.t0.Add(offset))
++}
++
++// formAt runs FormAndBuild with the clock at t0+offset.
++func (s *settleQueue) formAt(offset time.Duration) *pg.Batch {
++	s.t.Helper()
++	s.now = s.t0.Add(offset)
++	b, err := s.e.FormAndBuild(s.ctx, "main")
++	if err != nil {
++		s.t.Fatal(err)
++	}
++	return b
++}
++
++func (s *settleQueue) wantNoBatch(offset time.Duration) {
++	s.t.Helper()
++	if b := s.formAt(offset); b != nil {
++		s.t.Fatalf("t0+%v: formed batch %d with %d members while settling", offset, b.ID, len(b.MemberIds))
++	}
++	if live, err := s.svc.GetLiveBatch(s.ctx, s.e.RepoID, "main"); err != nil || live != nil {
++		s.t.Fatalf("t0+%v: live batch %v (err %v) while settling", offset, live, err)
++	}
++}
++
++func (s *settleQueue) wantBatch(offset time.Duration, members int) {
++	s.t.Helper()
++	b := s.formAt(offset)
++	if b == nil {
++		s.t.Fatalf("t0+%v: no batch formed", offset)
++	}
++	if len(b.MemberIds) != members || b.State != pg.BatchStateTesting {
++		s.t.Fatalf("t0+%v: batch members=%d state=%s, want %d testing", offset, len(b.MemberIds), b.State, members)
++	}
++}
++
++// Serial enqueues 2s apart share one batch once the queue is quiet for Settle.
++func TestFormAndBuild_SettleWaitsForQuietQueue(t *testing.T) {
++	s := setupSettle(t, 20, 15*time.Second, 0)
++	for i, pr := range []int64{10, 20, 30, 40} {
++		s.enqueue(pr, time.Duration(2*i)*time.Second)
++	}
++	s.wantNoBatch(6 * time.Second)
++	s.wantNoBatch(20 * time.Second)
++	s.wantBatch(21*time.Second, 4)
++}
++
++// A full batch does not wait for the queue to go quiet.
++func TestFormAndBuild_SettleSkippedAtBatchMax(t *testing.T) {
++	s := setupSettle(t, 4, 15*time.Second, 0)
++	for i, pr := range []int64{10, 20, 30, 40} {
++		s.enqueue(pr, time.Duration(2*i)*time.Second)
++	}
++	s.wantBatch(6*time.Second, 4)
++}
++
++// SettleMax forms the batch even though enqueues keep resetting Settle.
++func TestFormAndBuild_SettleMaxBoundsWait(t *testing.T) {
++	s := setupSettle(t, 20, 15*time.Second, 2*time.Minute)
++	s.enqueue(10, 0)
++	for i, pr := range []int64{20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120} {
++		at := time.Duration(10*(i+1)) * time.Second // t0+10s … t0+110s
++		s.enqueue(pr, at)
++		s.wantNoBatch(at + 5*time.Second)
++	}
++	s.enqueue(130, 118*time.Second)
++	s.wantNoBatch(119 * time.Second)
++	s.wantBatch(120*time.Second, 13)
++}
++
++// Settle=0 keeps the immediate formation of the unpatched engine.
++func TestFormAndBuild_SettleZeroFormsImmediately(t *testing.T) {
++	s := setupSettle(t, 20, 0, 0)
++	s.enqueue(10, 0)
++	s.wantBatch(0, 1)
++}
+diff --git a/internal/config/config.go b/internal/config/config.go
+index 6330c7a..87470d6 100644
+--- a/internal/config/config.go
++++ b/internal/config/config.go
+@@ -31,6 +31,8 @@ type Config struct {
+ 	SkipQueueIfUpToDate bool
+ 	BatchMax            int
+ 	BisectMaxSteps      int
++	BatchSettle         time.Duration
++	BatchSettleMax      time.Duration
+ 	RefreshInterval     time.Duration
+ 	DiscoveryInterval   time.Duration
+ 	LogLevel            string
+@@ -173,6 +175,14 @@ func Load() (*Config, error) {
+ 	if err != nil {
+ 		return nil, err
+ 	}
++	cfg.BatchSettle, err = parseDurationOrDefault("GITEA_MQ_BATCH_SETTLE", 0)
++	if err != nil {
++		return nil, err
++	}
++	cfg.BatchSettleMax, err = parseDurationOrDefault("GITEA_MQ_BATCH_SETTLE_MAX", 0)
++	if err != nil {
++		return nil, err
++	}
+ 
+ 	cfg.CacheDir = os.Getenv("GITEA_MQ_CACHE_DIR")
+ 	if cfg.CacheDir == "" {
+diff --git a/internal/config/config_test.go b/internal/config/config_test.go
+index 13f7372..b9996ab 100644
+--- a/internal/config/config_test.go
++++ b/internal/config/config_test.go
+@@ -98,6 +98,32 @@ func TestLoad_BatchMax(t *testing.T) {
+ 	}
+ }
+ 
++func TestLoad_BatchSettle(t *testing.T) {
++	setEnv(t, giteaEnv)
++	cfg, err := Load()
++	if err != nil {
++		t.Fatal(err)
++	}
++	if cfg.BatchSettle != 0 || cfg.BatchSettleMax != 0 {
++		t.Fatalf("defaults: BatchSettle=%v BatchSettleMax=%v", cfg.BatchSettle, cfg.BatchSettleMax)
++	}
++
++	t.Setenv("GITEA_MQ_BATCH_SETTLE", "15s")
++	t.Setenv("GITEA_MQ_BATCH_SETTLE_MAX", "2m")
++	cfg, err = Load()
++	if err != nil {
++		t.Fatal(err)
++	}
++	if cfg.BatchSettle != 15*time.Second || cfg.BatchSettleMax != 2*time.Minute {
++		t.Fatalf("override: BatchSettle=%v BatchSettleMax=%v", cfg.BatchSettle, cfg.BatchSettleMax)
++	}
++
++	t.Setenv("GITEA_MQ_BATCH_SETTLE", "soon")
++	if _, err := Load(); err == nil {
++		t.Fatal("expected error for invalid BATCH_SETTLE")
++	}
++}
++
+ func TestLoad_LabelPrefix(t *testing.T) {
+ 	setEnv(t, giteaEnv)
+ 	for _, tc := range []struct{ env, want string }{
+diff --git a/internal/registry/registry.go b/internal/registry/registry.go
+index 4e5dea7..98a6da5 100644
+--- a/internal/registry/registry.go
++++ b/internal/registry/registry.go
+@@ -43,6 +43,8 @@ type Deps struct {
+ 	SkipQueueIfUpToDate bool
+ 	BatchMax            int
+ 	BisectMaxSteps      int
++	BatchSettle         time.Duration
++	BatchSettleMax      time.Duration
+ }
+ 
+ // RepoRegistry manages the set of active repos. Thread-safe for concurrent
+@@ -118,6 +120,8 @@ func (r *RepoRegistry) Add(ctx context.Context, ref forge.RepoRef) error {
+ 			ExternalURL:    r.deps.ExternalURL,
+ 			BatchMax:       r.deps.BatchMax,
+ 			BisectMaxSteps: r.deps.BisectMaxSteps,
++			Settle:         r.deps.BatchSettle,
++			SettleMax:      r.deps.BatchSettleMax,
+ 			CheckTimeout:   r.deps.CheckTimeout,
+ 			FallbackChecks: r.deps.FallbackChecks,
+ 			MergeLabel:     r.deps.MergeLabel,

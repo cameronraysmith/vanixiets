@@ -36,6 +36,7 @@
   flake.modules.nixos.gitea-mq =
     {
       config,
+      options,
       pkgs,
       ...
     }:
@@ -79,6 +80,18 @@
           "nixbot/nix-build"
           "nixbot/effects"
         ];
+        # Settle window (local patch): wait 15 s after the newest enqueue
+        # before forming a batch, capped at 2 min from the oldest. Unpatched,
+        # batch 120 formed 1.4 s after the first of four serial enqueues
+        # (members=1), costing the other three a second full CI run.
+        package = options.services.gitea-mq.package.default.overrideAttrs (old: {
+          patches = (old.patches or [ ]) ++ [ ./gitea-mq-batch-settle.patch ];
+        });
+      };
+
+      systemd.services.gitea-mq.environment = {
+        GITEA_MQ_BATCH_SETTLE = "15s";
+        GITEA_MQ_BATCH_SETTLE_MAX = "2m";
       };
 
       services.postgresql = {
