@@ -46,6 +46,7 @@ in
         nix-eval-lock
         ssh-known-hosts
         stibnite-session
+        zt-dns
         buildbot
         nixbot
         gitea-mq
