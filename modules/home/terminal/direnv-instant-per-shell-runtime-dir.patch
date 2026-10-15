@@ -1,0 +1,25 @@
+diff --git a/src/daemon.rs b/src/daemon.rs
+index ebbacea..8cfd9a9 100644
+--- a/src/daemon.rs
++++ b/src/daemon.rs
+@@ -35,6 +35,7 @@ const PTY_WINSIZE: Winsize = Winsize {
+ pub fn get_runtime_dir(envrc_dir: &Path) -> PathBuf {
+     let mut hasher = DefaultHasher::new();
+     envrc_dir.hash(&mut hasher);
++    Shell::from_env().hash(&mut hasher);
+     let dir_hash = hasher.finish();
+ 
+     let cache_base = env::var("XDG_CACHE_HOME")
+diff --git a/src/shell.rs b/src/shell.rs
+index 88d9db8..55400ba 100644
+--- a/src/shell.rs
++++ b/src/shell.rs
+@@ -8,7 +8,7 @@ pub fn emit(args: std::fmt::Arguments) {
+     let _ = writeln!(std::io::stdout(), "{}", args);
+ }
+ 
+-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
++#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+ pub enum Shell {
+     #[default]
+     Bash,

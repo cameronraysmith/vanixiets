@@ -6,7 +6,12 @@
 { ... }:
 let
   content =
-    { flake, pkgs, ... }:
+    {
+      flake,
+      lib,
+      pkgs,
+      ...
+    }:
     {
       # Import direnv-instant home-manager module
       # Provides programs.direnv-instant options and shell integration
@@ -26,6 +31,10 @@ let
         package =
           flake.inputs.direnv-instant.packages.${pkgs.stdenv.hostPlatform.system}.default.overrideAttrs
             (old: {
+              # One daemon and env file per directory would serve every shell
+              # in the format of whichever started it; keying the runtime dir
+              # by shell too keeps fish and zsh in one project apart.
+              patches = (old.patches or [ ]) ++ [ ./direnv-instant-per-shell-runtime-dir.patch ];
               # blocking_envrc_calls_tmux hangs in the darwin nix sandbox under nixpkgs 26.05; no upstream fix or CI exists
               checkFlags = (old.checkFlags or [ ]) ++ [
                 "--skip"
@@ -39,6 +48,12 @@ let
           mux_delay = 5;
         };
       };
+
+      # direnv-instant formats its output for DIRENV_INSTANT_SHELL, which its
+      # fish hook exports and its bash and zsh hooks never set, so a bash or
+      # zsh started under fish evals fish syntax (`(eval):1: unmatched "`).
+      programs.zsh.initContent = lib.mkBefore "export DIRENV_INSTANT_SHELL=zsh";
+      programs.bash.initExtra = lib.mkBefore "export DIRENV_INSTANT_SHELL=bash";
     };
 in
 {
