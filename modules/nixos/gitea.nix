@@ -12,6 +12,9 @@
   inputs,
   ...
 }:
+let
+  flakeLib = config.flake.lib;
+in
 {
   flake.modules.nixos.gitea =
     {
@@ -107,9 +110,13 @@
       services.nginx.virtualHosts."git.scientistexperience.net" = {
         forceSSL = true;
         enableACME = true;
-        locations."/".extraConfig = ''
-          proxy_pass http://localhost:3002;
-        '';
+        locations = {
+          "/".extraConfig = ''
+            proxy_pass http://localhost:3002;
+          '';
+        }
+        # Prometheus endpoint: loopback and ZeroTier mesh only
+        // flakeLib.nginxMetricsLocation config.services.nginx.virtualHosts."git.scientistexperience.net";
       };
 
       # Post-start: create admin user and GitHub OAuth auth source (idempotent)

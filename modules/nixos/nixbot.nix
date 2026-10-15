@@ -32,9 +32,13 @@
 # the application's webhook secret must be replaced with its value at
 # deployment, or every delivery fails signature validation.
 {
+  config,
   inputs,
   ...
 }:
+let
+  flakeLib = config.flake.lib;
+in
 {
   flake.modules.nixos.nixbot =
     {
@@ -208,6 +212,11 @@
           package = inputs.niks3.packages.${config.nixpkgs.hostPlatform.system}.niks3;
         };
       };
+
+      # Prometheus endpoint: loopback and ZeroTier mesh only
+      services.nginx.virtualHosts.${config.services.nixbot.domain}.locations =
+        flakeLib.nginxMetricsLocation
+          config.services.nginx.virtualHosts.${config.services.nixbot.domain};
 
       # The service-wide backstop on the evaluation, set above its measured
       # 18.7 GB peak at 6 x 3072 so that nix-eval-jobs' own budget binds first

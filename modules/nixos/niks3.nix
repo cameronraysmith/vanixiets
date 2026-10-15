@@ -11,6 +11,9 @@
   inputs,
   ...
 }:
+let
+  flakeLib = config.flake.lib;
+in
 {
   flake.modules.nixos.niks3 =
     {
@@ -90,5 +93,10 @@
         nginx.enable = true;
         nginx.domain = "niks3.scientistexperience.net";
       };
+
+      # Prometheus endpoint: loopback and ZeroTier mesh only
+      services.nginx.virtualHosts.${config.services.niks3.nginx.domain}.locations =
+        flakeLib.nginxMetricsLocation
+          config.services.nginx.virtualHosts.${config.services.niks3.nginx.domain};
     };
 }
