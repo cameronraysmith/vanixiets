@@ -64,14 +64,13 @@ Leaving this output outside PR gating allows operators to run it when a suitable
 Registering Pyrite as a remote builder does not put this output back into PR gating; automatic opportunistic scheduling remains deferred.
 Every NixOS host imports `system/kvm-declaration.nix` and states `declaredKvm.present` explicitly, because NixOS advertises `kvm` in `nix.settings.system-features` unconditionally and that claim is true only on Pyrite: Cinnabar, Electrum, Galena, Magnetite, and Scheelite are cloud VMs without nested virtualisation.
 Evaluation cannot inspect a machine's device nodes, so the option is an operator declaration rather than a detection, and a wrong declaration is visible at one line per host instead of inherited silently.
-Stibnite's `nix.buildMachines` mirror of the rosetta builder no longer advertises `kvm` either; the VM has no `/dev/kvm`, and Rosetta translates userspace rather than providing a hypervisor.
 Corrected advertisements take effect only after each machine is activated.
 
 Remote builders are one Clan service, `nix-builders` (`clan/services/nix-builders/`, instance in `clan/inventory/services/nix-builders.nix`).
 A machine in the `builder` role runs `nix-grpc-daemon` from nix-grpc-store on TCP 50051 in front of its nix-daemon, reachable over ZeroTier only: NixOS opens the port on the `zt+` interfaces, and Darwin, which has no per-interface firewall, binds the daemon to its ZeroTier address.
 The daemon requires a client certificate signed by the instance CA and grants the `trusted` role to each dispatcher's certificate CN; `trustClients` makes its proxy user a Nix trusted user so builds can import the unsigned paths a dispatcher sends.
 The CA is the shared `nix-grpc-ca` clan var, whose private key is never deployed, and every machine of the service has a `nix-grpc-cert` var signed by it, named by machine name and, on builders, by ZeroTier address.
-A machine in the `dispatcher` role loads the `grpc://` store plugin and gets an entry in `services.nix-builders.buildMachines` naming `grpc://[<zerotier address>]:50051` with the CA and its own certificate for every builder it does not exclude; Stibnite splices that list after its rosetta-builder entries, and Magnetite uses it as `nix.buildMachines` unchanged.
+A machine in the `dispatcher` role loads the `grpc://` store plugin and gets a `nix.buildMachines` entry naming `grpc://[<zerotier address>]:50051` with the CA and its own certificate for every builder it does not exclude.
 Stibnite dispatches x86_64-linux work to Magnetite and Pyrite, and Pyrite's entry is the only one advertising `kvm` for x86_64-linux.
 Magnetite dispatches aarch64-darwin work, nixbot's best-effort darwin checks included, to Stibnite only, and excludes Pyrite.
 Rosegold and Argentum stay excluded from Magnetite until the binary cache holds nixbot's darwin outputs; deleting a name from Magnetite's `exclude` and redeploying Magnetite re-admits that machine, whose builder side is already in place.

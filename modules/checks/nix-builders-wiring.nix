@@ -78,32 +78,18 @@
         mandatoryFeatures = sortStrings entry.mandatoryFeatures;
       };
 
-      # The fleet entries a dispatcher schedules, read from nix.buildMachines
-      # itself so the splice is under test, keyed by store URI.
-      fleetEntries =
-        machine:
-        builtins.filter (entry: entry.hostName != "rosetta-builder") (configOf machine).nix.buildMachines;
+      # What a dispatcher schedules, read from nix.buildMachines itself and
+      # keyed by store URI; `hosts` keeps the duplicates that keying merges.
+      buildMachines = machine: (configOf machine).nix.buildMachines;
       dispatched =
         machine:
         builtins.listToAttrs (
           map (entry: {
             name = plain entry.hostName;
             value = projectEntry entry;
-          }) (fleetEntries machine)
+          }) (buildMachines machine)
         );
-      # Rosetta entries keep their place; the fleet's follow in any order.
-      splice =
-        machine:
-        let
-          names = map (entry: plain entry.hostName) (configOf machine).nix.buildMachines;
-          rosetta = builtins.filter (name: name == "rosetta-builder") names;
-        in
-        {
-          order = rosetta ++ sortStrings (lib.drop (builtins.length rosetta) names);
-          fleetEntriesAreTheService =
-            map projectEntry (fleetEntries machine)
-            == map projectEntry (configOf machine).services.nix-builders.buildMachines;
-        };
+      hosts = machine: sortStrings (map (entry: plain entry.hostName) (buildMachines machine));
 
       # The URI a dispatcher names for a builder: the builder's ZeroTier
       # address and the CA the dispatcher links at the plugin's default
@@ -250,10 +236,6 @@
       stibnite = configOf "stibnite";
       magnetite = configOf "magnetite";
 
-      rosettaEntries = builtins.filter (
-        entry: entry.hostName == "rosetta-builder"
-      ) stibnite.nix.buildMachines;
-
       # stibnite's interactive session identity, generated on magnetite. It
       # is ssh and unrelated to the build transport; the check keeps pinning
       # its authorization because nothing else does.
@@ -310,14 +292,11 @@
           name = "nix-builders-wiring";
           actual = {
             stibnite = {
-              rosetta = map projectEntry rosettaEntries;
-              # The rosetta entries come first and everything after them
-              # is the service's list, unaltered.
-              splice = splice "stibnite";
+              hosts = hosts "stibnite";
               dispatch = dispatched "stibnite";
             };
             magnetite = {
-              splice = splice "magnetite";
+              hosts = hosts "magnetite";
               dispatch = dispatched "magnetite";
             };
             dispatchers = lib.genAttrs dispatchers dispatcherSide;
@@ -326,59 +305,13 @@
           };
           expected = {
             stibnite = {
-              # nix-rosetta-builder's local VM keeps its own ssh-ng transport.
-              rosetta = [
-                {
-                  hostName = "rosetta-builder";
-                  protocol = "ssh-ng";
-                  systems = [ "aarch64-linux" ];
-                  maxJobs = 12;
-                  speedFactor = 1;
-                  sshUser = null;
-                  sshKey = null;
-                  supportedFeatures = [
-                    "benchmark"
-                    "big-parallel"
-                    "kvm"
-                    "nixos-test"
-                    "uid-range"
-                  ];
-                  mandatoryFeatures = [ ];
-                }
-                {
-                  hostName = "rosetta-builder";
-                  protocol = "ssh-ng";
-                  systems = [ "x86_64-linux" ];
-                  maxJobs = 12;
-                  speedFactor = 1;
-                  sshUser = null;
-                  sshKey = null;
-                  supportedFeatures = [
-                    "benchmark"
-                    "big-parallel"
-                    "nixos-test"
-                    "uid-range"
-                  ];
-                  mandatoryFeatures = [ ];
-                }
-              ];
-              splice = {
-                order = [
-                  "rosetta-builder"
-                  "rosetta-builder"
-                ]
-                ++ sortStrings (map (entry: entry.name) stibniteDispatch);
-                fleetEntriesAreTheService = true;
-              };
+              hosts = sortStrings (map (entry: entry.name) stibniteDispatch);
               # rosegold and argentum are excluded: stibnite builds
               # aarch64-darwin itself.
               dispatch = builtins.listToAttrs stibniteDispatch;
             };
             magnetite = {
-              splice = {
-                order = map (entry: entry.name) magnetiteDispatch;
-                fleetEntriesAreTheService = true;
-              };
+              hosts = sortStrings (map (entry: entry.name) magnetiteDispatch);
               # pyrite is excluded: magnetite builds x86_64-linux itself.
               # rosegold and argentum are excluded until the binary cache
               # holds nixbot's darwin outputs.

@@ -30,7 +30,7 @@ in
       # Hetzner CX53. kvm is not advertised: there is no /dev/kvm (see
       # declaredKvm there), so QEMU VM tests must not route here, while
       # nspawn container tests needing only uid-range still do. speedFactor 2
-      # puts it ahead of the rosetta builder and pyrite for x86_64-linux.
+      # puts it ahead of pyrite for x86_64-linux.
       magnetite.settings = {
         systems = [ "x86_64-linux" ];
         maxJobs = 8;
@@ -62,10 +62,10 @@ in
       # 18 logical cores, 64 GiB. Most dispatched darwin work is tiny
       # derivations whose cost is per-build dispatch latency, not CPU: with 4
       # jobs, nixbot build 1301 left stibnite busy ~15% of the time. 16 jobs
-      # can oversubscribe memory when the rosetta builder and colima (half of
-      # it each) run during several large builds. apple-virt is real and only
-      # here; nixos-test (a Linux sandbox capability nix lists anyway) and
-      # benchmark (laptop timings are not measurements) are not advertised.
+      # can oversubscribe memory when colima (48 GiB) runs during several
+      # large builds. apple-virt is real and only here; nixos-test (a Linux
+      # sandbox capability nix lists anyway) and benchmark (laptop timings are
+      # not measurements) are not advertised.
       stibnite.settings = darwinLaptop // {
         maxJobs = 16;
         supportedFeatures = [

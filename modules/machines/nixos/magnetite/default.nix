@@ -97,8 +97,8 @@ in
       # nix-builders clan service (modules/clan/inventory/services/nix-builders.nix),
       # which also makes magnetite the builder stibnite sends x86_64-linux work
       # to. Two mechanisms, two callers:
-      #   nix.buildMachines below — a local nix build by an operator who wants
-      #     the darwin result in magnetite's store.
+      #   nix.buildMachines, set by the service — a local nix build by an
+      #     operator who wants the darwin result in magnetite's store.
       #   /etc/nix/<builder>-store-uri — a caller that wants the build to happen
       #     entirely in that builder's store with nothing copied back.
       # nixbot also builds checks.aarch64-darwin through these builders, as
@@ -107,7 +107,6 @@ in
       # sleeping machine leaves a notice rather than gating CI
       # (modules/checks/nixbot-best-effort-darwin.nix). buildbot still builds
       # x86_64-linux only.
-      nix.buildMachines = config.services.nix-builders.buildMachines;
 
       # The build and session keys are separately authorized for independent
       # revocation and rotation. Only the build key is confined to the Nix

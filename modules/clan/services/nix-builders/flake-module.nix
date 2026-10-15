@@ -21,10 +21,6 @@
 # Builder certificates carry the ZeroTier address as an IP SAN, because
 # dispatchers connect to that literal address rather than through DNS.
 #
-# roles.dispatcher exposes a read-only buildMachines list that machines splice
-# into their own nix.buildMachines; this service never assigns that option,
-# because stibnite merges it with nix-rosetta-builder's entries under mkForce.
-#
 # Nix names a per-builder lock file after the whole store URI, which overflows
 # NAME_MAX once the URI spells out store paths, so the URI carries only
 # `ca-cert`; putting the instance CA in the system bundle instead would make
@@ -82,24 +78,6 @@
             serviceConfig.RunAtLoad = true;
           };
         };
-
-      # readOnly counts a default as a definition, so the option has none: the
-      # dispatcher role defines it once, and perMachine supplies the empty
-      # value on machines without that role.
-      outputModule = machineRoles: {
-        options.services.nix-builders.buildMachines = lib.mkOption {
-          type = lib.types.listOf (lib.types.attrsOf lib.types.anything);
-          readOnly = true;
-          description = ''
-            nix.buildMachines entries for every builder this machine
-            dispatches to; [] on non-dispatchers. Machines splice this into
-            their own nix.buildMachines; the service never sets that option.
-          '';
-        };
-        config.services.nix-builders = lib.optionalAttrs (!lib.elem "dispatcher" machineRoles) {
-          buildMachines = [ ];
-        };
-      };
 
       # The CA and this machine's certificate, defined once per machine whatever
       # its roles, so a machine that both builds and dispatches has one identity.
@@ -291,7 +269,7 @@
 
           programs.nix-grpc-store.enable = true;
 
-          services.nix-builders.buildMachines = lib.mapAttrsToList (_: builder: {
+          nix.buildMachines = lib.mapAttrsToList (_: builder: {
             hostName = storeUri builder;
             protocol = null;
             inherit (builder.settings)
@@ -318,8 +296,8 @@
           `builder` machines run nix-grpc-daemon on port 50051, reachable
           over ZeroTier only, and grant the `trusted` role to every
           dispatcher of the instance by mTLS certificate CN; `dispatcher`
-          machines load the grpc:// store plugin and expose
-          `services.nix-builders.buildMachines` for their nix.buildMachines.
+          machines load the grpc:// store plugin and add a nix.buildMachines
+          entry for every builder they do not exclude.
         '';
       };
 
@@ -333,14 +311,12 @@
         {
           nixosModule = {
             imports = [
-              (outputModule machine.roles)
               (identityModule { inherit machine instances; })
             ]
             ++ lib.optional dispatches clientIdentityNixos;
           };
           darwinModule = {
             imports = [
-              (outputModule machine.roles)
               (identityModule { inherit machine instances; })
             ]
             ++ lib.optional dispatches clientIdentityDarwin;

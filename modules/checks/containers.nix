@@ -6,9 +6,8 @@
 # ironstar's package-as-check inheritance idiom (modules/rust.nix:249-251)
 # rather than aggregating into a linkFarm.
 #
-# Phase 1 (nix-144.1) binds on x86_64-linux only. aarch64-darwin exposes the
-# packages via pkgsCross + rosetta-builder, but evaluating those during
-# CI requires the rosetta emulator which is not assumed present here.
+# Bound on x86_64-linux only: aarch64-darwin exposes these same x86_64-linux
+# derivations under legacyPackages, so a darwin binding would duplicate them.
 # Manifest push variants (fdManifest*, rgManifest*) are intentionally dropped
 # as effect-input-wire per the coverage map (impure ghcr.io push).
 { lib, ... }:

@@ -18,7 +18,7 @@ initialize: |
   # short-circuits on `command -v nix`; the only content thereby dropped is the
   # installer's copy of trusted-users, still in force from nix.conf.
   # auto-allocate-uids + cgroups are what systemd-nspawn-flavor NixOS tests need,
-  # matching magnetite's and the rosetta builder's nix.settings. Their uid-range is
+  # matching magnetite's nix.settings. Their uid-range is
   # not repeated here: nix inserts it into the default system-features on every
   # linux (nix src/libstore/globals.cc:217-239, `nix config show system-features`).
   printf 'accept-flake-config = true\nauto-allocate-uids = true\nextra-experimental-features = auto-allocate-uids cgroups\n' | sudo tee /etc/nix/nix.custom.conf

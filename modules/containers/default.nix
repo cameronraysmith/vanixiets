@@ -8,12 +8,14 @@
 # Platform behavior:
 # - x86_64-linux host: x86_64 native, aarch64 cross-compiled
 # - aarch64-linux host: aarch64 native, x86_64 cross-compiled
-# - aarch64-darwin host: both via rosetta-builder
+# - aarch64-darwin host: the x86_64-linux images, built on its remote builders;
+#   push and manifest apps run natively
 #
 # Performance: cross-compilation at native speed (no QEMU), push skips unchanged layers
 {
   inputs,
   lib,
+  withSystem,
   ...
 }:
 let
@@ -119,7 +121,7 @@ in
       getContainerTargets = def: def.targets or defaultTargetNames;
 
       # Generates: fdContainer-x86_64, fdContainer-aarch64, rgContainer-x86_64, etc.
-      containerPackages = lib.listToAttrs (
+      definedContainerPackages = lib.listToAttrs (
         lib.flatten (
           lib.mapAttrsToList (
             containerName: def:
@@ -134,6 +136,39 @@ in
           ) containerDefs
         )
       );
+
+      # pkgsCross from darwin pkgs is a darwin-hosted cross toolchain that no
+      # Linux builder can take, so darwin uses the x86_64-linux definitions.
+      # Only attribute names are read here; the darwin definitions stay unforced.
+      # nix2container's copy apps are passthru of the image, built for the
+      # image's system, so they are rebound to darwin's skopeo to run here.
+      containerPackages =
+        if isDarwin then
+          lib.mapAttrs (
+            name: _: withNativeCopyApps (withSystem "x86_64-linux" ({ config, ... }: config.packages.${name}))
+          ) definedContainerPackages
+        else
+          definedContainerPackages;
+
+      withNativeCopyApps =
+        image:
+        let
+          ref = "${image.imageName}:${image.imageTag}";
+          copyApp =
+            name: destination:
+            pkgs.writeShellApplication {
+              inherit name;
+              runtimeInputs = [ skopeo-nix2container ];
+              text = ''skopeo --insecure-policy copy nix:${image} ${destination} "$@"'';
+            };
+        in
+        image
+        // {
+          copyToDockerDaemon = copyApp "copy-to-docker-daemon" "docker-daemon:${ref}";
+          copyToRegistry = copyApp "copy-to-registry" "docker://${ref}";
+          copyToPodman = copyApp "copy-to-podman" "containers-storage:${ref}";
+          copyTo = copyApp "copy-to" "";
+        };
 
       # Env var helpers (require --impure)
       getEnvOr =
@@ -210,20 +245,14 @@ in
       # appropriate) realize them. These packages target *-linux derivations and
       # build natively on a matching Linux host.
       #
-      # Darwin hosts expose the same attributes under legacyPackages.<system>.*
-      # because every container's resolved package set forces aarch64-linux
-      # cross-derivations whose installCheckPhase calls
-      # `stdenv.hostPlatform.emulator buildPackages`, which throws on Darwin
-      # without an aarch64-linux emulator. `nix flake check` walks packages.*
-      # strictly (per `man nix3-flake-check`) but legacyPackages.* lazily, so
-      # routing the Darwin exposure through legacyPackages avoids forcing
-      # installCheckPhase at eval time. Realization is unaffected: Nix's
-      # remote-builder selection keys off derivation.system, so rosetta-builder
-      # serves these aarch64-linux derivations regardless of which output set
-      # the attribute lives in. `nix build .#fdContainer-aarch64` continues to
-      # resolve via the standard installable lookup chain
-      # (packages.<sys>.X -> legacyPackages.<sys>.X -> X), so justfile recipes
-      # need no edits.
+      # Darwin hosts expose the same attributes under legacyPackages.<system>.*.
+      # The images are the x86_64-linux derivations, so nix dispatches them to
+      # the x86_64-linux remote builders; keeping them out of packages.* keeps
+      # darwin's `nix flake check` and the packages overlay from carrying a
+      # second copy of packages.x86_64-linux. The manifest and copy apps are
+      # darwin derivations (skopeo, crane) that reference those images. `nix build
+      # .#fdContainer-aarch64` resolves via the standard installable lookup chain
+      # (packages.<sys>.X -> legacyPackages.<sys>.X -> X).
       #
       # Usage: VERSION=1.0.0 nix run --impure .#fdManifest
       packages = lib.mkMerge [

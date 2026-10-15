@@ -4,10 +4,8 @@ sidebar:
   order: 9
 ---
 
-This configuration uses a hybrid approach for optimal container and VM management on macOS:
-
-- **nix-rosetta-builder**: Linux builds for Nix packages
-- **Colima + Incus**: OCI container management (Docker Desktop replacement)
+This configuration uses Colima with the Incus runtime for OCI container and VM management on macOS, as a Docker Desktop replacement.
+Nix builds of Linux packages, including container images, run on the fleet's x86_64-linux remote builders rather than in a local VM.
 
 ## Architecture
 
@@ -15,9 +13,6 @@ This configuration uses a hybrid approach for optimal container and VM managemen
 ┌─────────────────────────────────────────┐
 │         macOS (aarch64-darwin)          │
 ├─────────────────────────────────────────┤
-│                                         │
-│  nix-rosetta-builder (Lima + QEMU)     │
-│  └─ Nix builds (aarch64/x86_64-linux)  │
 │                                         │
 │  Colima (Lima + Virtualization.framework)│
 │  └─ Incus runtime                       │
@@ -271,20 +266,6 @@ colima delete --profile x86
 
 Additional profiles are not declared in your system configuration but work fine alongside the managed profile.
 
-## Comparison with nix-rosetta-builder
-
-| Feature         | nix-rosetta-builder     | Colima                    |
-|-----------------|-------------------------|---------------------------|
-| Purpose         | Nix package builds      | OCI containers            |
-| Use case        | nix build               | incus launch / docker run |
-| Auto-configured | Yes (as remote builder) | Manual runtime            |
-| Boot time       | ~10-15s                 | ~15-20s                   |
-| Resources       | 8 cores, 6GB RAM        | 4 cores, 4GB RAM          |
-| Primary use     | nixpkgs development     | Container workloads       |
-
-Both can run simultaneously with different resource profiles.
-They use separate VMs and don't interfere with each other.
-
 ## Troubleshooting
 
 ### Colima won't start
@@ -334,11 +315,10 @@ colima-restart
 
 ### Resource conflicts
 
-If both nix-rosetta-builder and Colima consume too many resources:
+If Colima consumes too many resources:
 
-1. Adjust allocations in `configurations/darwin/stibnite.nix`
-2. Enable `onDemand` for nix-rosetta-builder (already enabled)
-3. Keep Colima stopped when not needed (`autoStart = false`)
+1. Adjust allocations in `modules/machines/darwin/stibnite/default.nix`
+2. Keep Colima stopped when not needed (`autoStart = false`)
 
 ### Shell completions not working
 

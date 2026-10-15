@@ -825,14 +825,12 @@ openwiki-refresh:
 # Run terraform via terranix flake app (init + apply, arguments not supported)
 [group('terraform')]
 terraform:
-  rosetta-manage --stop
   rm -f terraform/.terraform.lock.hcl
   {{nix_cmd}} run .#terraform
 
 # Initialize terraform
 [group('terraform')]
 terraform-init:
-  rosetta-manage --stop
   rm -f terraform/.terraform.lock.hcl
   {{nix_cmd}} run .#terraform.terraform -- init -input=false
 
@@ -1639,93 +1637,6 @@ ratchet-update:
 [group('CI/CD')]
 ratchet-upgrade:
     @RATCHET_BASE="{{ratchet_base}}" GHA_WORKFLOWS="{{gha_workflows}}" ./scripts/ci/ratchet-workflow.sh upgrade
-
-# Push nix-rosetta-builder VM image to Cachix and pin it (run after system updates)
-[group('CI/CD')]
-cache-rosetta-builder:
-    #!/usr/bin/env bash
-    set -euo pipefail
-
-    echo "Finding nix-rosetta-builder VM image in current system..."
-
-    YAML_PATH=$(nix-store --query --requisites /run/current-system | grep 'rosetta-builder.yaml$' || true)
-
-    if [ -z "$YAML_PATH" ]; then
-        echo "⊘ nix-rosetta-builder not found in current system"
-        echo "   Is nix-rosetta-builder.enable = true in your configuration?"
-        exit 1
-    fi
-
-    echo "Found config: $YAML_PATH"
-
-    # Extract VM image path from YAML (format: "- location: /path/to/image")
-    IMAGE_PATH=$(grep -A1 "images:" "$YAML_PATH" | grep "location:" | awk '{print $3}')
-
-    if [ -z "$IMAGE_PATH" ]; then
-        echo "⊘ Could not extract image path from $YAML_PATH"
-        exit 1
-    fi
-
-    echo "VM image: $IMAGE_PATH"
-    IMAGE_SIZE=$(du -h "$IMAGE_PATH" | cut -f1)
-    echo "Size: $IMAGE_SIZE"
-
-    echo ""
-    echo "Pushing to Cachix (this may take a few minutes for ~2GB image)..."
-    sops exec-env secrets/shared.yaml "cachix push \$CACHIX_CACHE_NAME $IMAGE_PATH"
-
-    # Pin the image to prevent garbage collection
-    echo ""
-    echo "Pinning image to prevent garbage collection..."
-    SHORT_HASH=$(echo "$IMAGE_PATH" | cut -d'/' -f4 | cut -d'-' -f1 | head -c8)
-    PIN_NAME="nix-rosetta-builder-$SHORT_HASH"
-    sops exec-env secrets/shared.yaml "cachix pin \$CACHIX_CACHE_NAME $PIN_NAME $IMAGE_PATH --keep-forever"
-
-    echo ""
-    echo "● Successfully pushed and pinned nix-rosetta-builder to Cachix"
-    CACHE_NAME=$(sops exec-env secrets/shared.yaml 'echo $CACHIX_CACHE_NAME')
-    echo "   View at: https://app.cachix.org/cache/$CACHE_NAME"
-    echo "   Image: $IMAGE_PATH"
-    echo "   Pin: $PIN_NAME"
-
-# Check if nix-rosetta-builder image is in Cachix
-[group('CI/CD')]
-check-rosetta-cache:
-    #!/usr/bin/env bash
-    set -euo pipefail
-
-    echo "Checking if nix-rosetta-builder image is cached..."
-
-    YAML_PATH=$(nix-store --query --requisites /run/current-system | grep 'rosetta-builder.yaml$' || true)
-
-    if [ -z "$YAML_PATH" ]; then
-        echo "⚠️  nix-rosetta-builder not enabled in current system"
-        exit 0
-    fi
-
-    echo "Found config: $YAML_PATH"
-
-    IMAGE_PATH=$(grep -A1 "images:" "$YAML_PATH" | grep "location:" | awk '{print $3}')
-
-    if [ -z "$IMAGE_PATH" ]; then
-        echo "⊘ Could not extract image path"
-        exit 1
-    fi
-
-    echo "Checking cache for: $IMAGE_PATH"
-
-    CACHE_NAME=$(sops exec-env secrets/shared.yaml 'echo $CACHIX_CACHE_NAME')
-
-    if {{nix_cmd}} path-info --store "https://$CACHE_NAME.cachix.org" "$IMAGE_PATH" &>/dev/null; then
-        echo "● Image is cached"
-        echo "   Cache: https://$CACHE_NAME.cachix.org"
-        echo "   Path: $IMAGE_PATH"
-    else
-        echo "⊘ Image NOT in cache"
-        echo "   Path: $IMAGE_PATH"
-        echo "   Run: just cache-rosetta-builder"
-        exit 1
-    fi
 
 # Test cachix push/pull with a simple derivation
 [group('CI/CD')]

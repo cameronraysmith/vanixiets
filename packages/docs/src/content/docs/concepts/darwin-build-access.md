@@ -27,7 +27,7 @@ Nothing lands locally, so a caller that needs the output path locally wants the 
 
 | | Remote builder | Remote store |
 |---|---|---|
-| Configured as | `services.nix-builders.buildMachines`, spliced into `nix.buildMachines` | `/etc/nix/<builder>-store-uri` on each dispatcher, one per builder it uses |
+| Configured as | `nix.buildMachines`, set by the service's `dispatcher` role | `/etc/nix/<builder>-store-uri` on each dispatcher, one per builder it uses |
 | Evaluation | caller | caller |
 | Build | the builder | the builder |
 | Output closure | copied back to the caller | stays in the builder's store |
@@ -59,7 +59,7 @@ Work that only the missing builder could take fails as `missing system features`
 `nix config show extra-platforms` on stibnite reports `aarch64-darwin` and nothing else, so advertising `x86_64-darwin` would route derivations the machine refuses to build.
 
 Stibnite's `maxJobs` is 4.
-Stibnite has 18 logical cores, 12 performance and 6 efficiency, and 64 GiB of memory, and it is also a laptop in interactive use that commits 12 cores and 48 GiB to the rosetta builder VM and the same again to colima when either runs.
+Stibnite has 18 logical cores, 12 performance and 6 efficiency, and 64 GiB of memory, and it is also a laptop in interactive use that commits 12 cores and 48 GiB to colima when it runs.
 The remote share is deliberately a minority of the machine.
 
 Rosegold's and argentum's `maxJobs` is 2.

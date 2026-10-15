@@ -28,7 +28,7 @@ The system adapts to the host platform:
 
 On x86_64-linux hosts, x86_64 containers build natively while aarch64 containers are cross-compiled.
 On aarch64-linux hosts, aarch64 containers build natively while x86_64 containers are cross-compiled.
-On aarch64-darwin hosts, both architectures require remote Linux builds (see nix-rosetta-builder section below).
+On aarch64-darwin hosts, both architectures build on the fleet's x86_64-linux remote builders (see Darwin hosts below).
 
 CI uses ubuntu-latest (x86_64) runners and builds both architectures through a combination of native and cross-compilation.
 
@@ -272,71 +272,27 @@ For releases, enable push and set appropriate version and tags.
 The CI workflow automatically discovers containers from containerMatrix, so adding a new container definition in modules/containers/default.nix is sufficient.
 No workflow file changes are needed.
 
-## nix-rosetta-builder for Darwin
+## Darwin hosts
 
-On Darwin (macOS) systems, Linux container builds require a remote Linux builder.
-The nix-rosetta-builder provides fast Linux builds on Apple Silicon through a NixOS VM.
+On aarch64-darwin, the container outputs are the x86_64-linux definitions, exposed under `legacyPackages.aarch64-darwin`.
+The x86_64 image builds natively for x86_64-linux and the aarch64 image cross-compiles through `pkgsCross.aarch64-multiplatform`, so every image derivation has `system = "x86_64-linux"`.
+Nix dispatches those derivations to the fleet's x86_64-linux remote builders, magnetite and pyrite, which the `nix-builders` clan service configures as `grpc://` stores; most of their inputs substitute from the binary cache.
+Defining the images from darwin's own package set would instead produce a darwin-hosted cross toolchain that no Linux builder can build.
 
-This builder is only necessary for Darwin hosts.
-Linux hosts (including CI runners) build containers directly using pkgsCross without any remote builder configuration.
+The manifest apps (`fdManifest`, `rgManifest`, and their single-arch variants) and each image's `copyToDockerDaemon`, `copyToRegistry`, `copyToPodman`, and `copyTo` apps are darwin derivations, so skopeo and crane run natively while pushing the Linux-built images.
 
-### Initial setup
+Linux hosts, including CI runners, build containers directly with pkgsCross and need no remote builder.
 
-The nix-rosetta-builder VM image is automatically fetched from the cameronraysmith.cachix.org cache during system build.
+### Running images locally with Colima or OrbStack
 
-On a fresh macOS machine:
-
-```bash
-cd ~/projects/nix-workspace/vanixiets
-just activate --ask
-```
-
-The VM image (approximately 2GB) downloads from cache automatically, which is significantly faster than building it locally.
-
-### VM configuration
-
-The builder VM is configured with:
-
-- onDemand: Powers off when idle to conserve resources
-- cores: 8 CPU cores
-- memory: 6GiB RAM
-- diskSize: 100GiB disk
-
-### Maintaining the cache
-
-Update the cached image after changing the nix-rosetta-builder flake input or module configuration:
+The arm64 image runs natively in the Colima or OrbStack Linux VM on Apple Silicon.
+For running and managing OCI containers, see the Colima configuration documented in [container runtime setup](/about/contributing/container-runtime-setup/).
 
 ```bash
-nix flake lock --update-input nix-rosetta-builder
-darwin-rebuild switch
-just cache-rosetta-builder
-```
+# Build on the remote builders
+just container-build fd aarch64
 
-Check if your current system's image is cached:
-
-```bash
-just check-rosetta-cache
-```
-
-The VM uses pinned nixpkgs and evolves independently from your system nixpkgs, so infra nixpkgs updates do not require cache updates.
-
-### Container management with Colima
-
-The nix-rosetta-builder focuses on building container images from Nix expressions.
-For running and managing OCI containers, see the complementary Colima configuration documented in colima-container-management.md.
-
-Both can run simultaneously:
-
-- nix-rosetta-builder: 8 cores, 6GB RAM (on-demand)
-- Colima: 4 cores, 4GB RAM (manual control)
-
-Example workflow combining both:
-
-```bash
-# Build with nix-rosetta-builder
-just container-all fdContainer fd
-
-# Load into Colima's Docker runtime
+# Load into the local Docker runtime
 nix run '.#fdContainer-aarch64.copyToDockerDaemon'
 docker run --rm fd:latest --help
 ```

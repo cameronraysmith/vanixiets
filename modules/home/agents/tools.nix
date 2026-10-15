@@ -12,7 +12,7 @@
       gemini-cli = flake.inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.gemini-cli;
     in
     {
-      # backlog-md is absent: auto-patchelf fails on rosetta-builder
+      # backlog-md is absent: its build failed in auto-patchelf (2025-11)
       home.packages = with pkgs; [
         claude-monitor
         apm

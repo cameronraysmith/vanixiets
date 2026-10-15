@@ -95,7 +95,7 @@ Recipes manage Hetzner VPS infrastructure through terranix-generated configurati
 | `terraform-plan` | `*ARGS` | Run terraform plan only | No |
 | `terraform-destroy` | `*ARGS` | Run terraform destroy | No |
 
-**Note:** These recipes stop the rosetta-manager service before running to avoid conflicts, and remove stale `.terraform.lock.hcl` files to sync with nix-provided providers.
+**Note:** These recipes remove stale `.terraform.lock.hcl` files to sync with nix-provided providers.
 
 ## Clan
 
@@ -222,8 +222,6 @@ CI/CD operations, caching, and release management.
 | `ratchet-unpin` | - | Unpin workflow versions to semantic values | No |
 | `ratchet-update` | - | Update GitHub Actions to latest versions | No |
 | `ratchet-upgrade` | - | Upgrade GitHub Actions across major versions | No |
-| `cache-rosetta-builder` | - | Push nix-rosetta-builder VM image to cachix | No |
-| `check-rosetta-cache` | - | Check if rosetta-builder image is cached | No |
 | `test-cachix` | - | Test cachix push/pull with simple derivation | No |
 | `cache-darwin-system` | - | Build darwin system and push to cachix | No |
 | `list-packages` | - | List all packages in packages/ directory | No |

@@ -27,7 +27,6 @@ in
       imports = [
         inputs.home-manager.darwinModules.home-manager
         inputs.srvos.darwinModules.server
-        inputs.nix-rosetta-builder.darwinModules.default
       ]
       ++ (with flakeModules; [
         base
@@ -111,16 +110,6 @@ in
       # SSH for remote deployment and as the fleet's darwin build host.
       declaredSshd.serving = true;
 
-      # SSH client fix for nix-rosetta-builder
-      # The nix-rosetta-builder module generates 100-rosetta-builder.conf without IdentitiesOnly
-      # When Bitwarden SSH agent has many keys loaded, SSH tries all agent keys first and
-      # hits "too many authentication failures" before trying the rosetta-builder identity file.
-      # This config comes BEFORE (050 < 100) and adds IdentitiesOnly to fix the issue.
-      environment.etc."ssh/ssh_config.d/050-rosetta-builder-identities.conf".text = ''
-        Host "rosetta-builder"
-          IdentitiesOnly yes
-      '';
-
       # crs58: admin AND primary user (UID 501 - matches existing stibnite system)
       users.users.crs58 = {
         uid = 501;
@@ -148,99 +137,6 @@ in
         "omnigent-cameron"
       ];
 
-      # Disable native linux-builder (replaced by nix-rosetta-builder)
-      # Bootstrap step 1 complete - see docs/notes/containers/multi-arch-container-builds.md
-      nix.linux-builder.enable = false;
-
-      # nix-rosetta-builder for cross-platform Linux builds on Apple Silicon
-      # Provides x86_64-linux builder via Rosetta 2 translation
-      nix-rosetta-builder = {
-        enable = true;
-        onDemand = true; # VM powers off when idle to save resources
-        permitNonRootSshAccess = true; # Allow nix-daemon to read SSH key (safe for localhost-only VM)
-        cores = 12;
-        memory = "48GiB";
-        diskSize = "500GiB";
-
-        # systemd-nspawn-flavor NixOS tests require uid-range, auto-allocate-uids, and cgroups.
-        # See nixos/doc/manual/development/running-nixos-tests.section.md in nixpkgs.
-        potentiallyInsecureExtraNixosModule = {
-          nix.settings = {
-            auto-allocate-uids = true;
-            extra-system-features = [ "uid-range" ];
-            experimental-features = [
-              "auto-allocate-uids"
-              "cgroups"
-            ];
-          };
-        };
-      };
-
-      # nix-rosetta-builder's emitted nix.buildMachines entry omits "uid-range",
-      # blocking dispatch of systemd-nspawn-flavor NixOS tests. Replace it with
-      # a mirror of the upstream entry that additionally advertises uid-range.
-      # Connection details (sshUser/sshKey/publicHostKey) are null in upstream
-      # too; ssh resolution is handled by /etc/ssh/ssh_config.d/100-rosetta-builder.conf.
-      # Remove once nix-rosetta-builder advertises uid-range upstream.
-      #
-      # "kvm" is advertised for aarch64-linux here although the guest has no
-      # /dev/kvm. One nix feature name carries two claims: "can accelerate a
-      # guest" and "can run a derivation that starts a VM at all". Only the
-      # first is false here. `ls -l /dev/kvm` in the VM reports no such file,
-      # so qemu logs `Could not access KVM kernel module` and `falling back to
-      # tcg`, then completes the build emulated. Verified 2026-09-19 by
-      # building this guest's own nixos-disk-image, aarch64-linux with
-      # requiredSystemFeatures ["kvm"], on it in 1m18s. Upstream hardcodes the
-      # same claim (module.nix:403 in nix-rosetta-builder, no option, no stated
-      # rationale) and its README relies on it: the builder rebuilds its own
-      # next-generation image.
-      #
-      # Nothing else can take that work. pyrite holds the fleet's only /dev/kvm
-      # but builds x86_64-linux only, so an aarch64-linux kvm derivation has no
-      # other candidate, and checks.aarch64-darwin.darwin-stibnite reaches
-      # nixos-disk-image and stops being schedulable without it.
-      #
-      # The two systems are split across two entries for the same host so that
-      # the claim is scoped to where it is the only route. x86_64-linux omits
-      # kvm, leaving pyrite — which has real acceleration — the sole candidate
-      # for x86_64-linux kvm work instead of tying with TCG under Rosetta at
-      # equal speedFactor. x86_64-linux work that does not require kvm still
-      # routes here as before.
-      nix.buildMachines = lib.mkForce (
-        [
-          {
-            hostName = "rosetta-builder";
-            systems = [ "aarch64-linux" ];
-            maxJobs = 12;
-            speedFactor = 1;
-            protocol = "ssh-ng";
-            supportedFeatures = [
-              "benchmark"
-              "big-parallel"
-              "kvm"
-              "nixos-test"
-              "uid-range"
-            ];
-            mandatoryFeatures = [ ];
-          }
-          {
-            hostName = "rosetta-builder";
-            systems = [ "x86_64-linux" ];
-            maxJobs = 12;
-            speedFactor = 1;
-            protocol = "ssh-ng";
-            supportedFeatures = [
-              "benchmark"
-              "big-parallel"
-              "nixos-test"
-              "uid-range"
-            ];
-            mandatoryFeatures = [ ];
-          }
-        ]
-        ++ config.services.nix-builders.buildMachines
-      );
-
       # Remote builders, both directions, come from the nix-builders clan
       # service (modules/clan/inventory/services/nix-builders.nix): stibnite
       # dispatches native x86_64-linux work to magnetite and x86_64-linux kvm
@@ -259,7 +155,7 @@ in
         ];
       };
 
-      # Colima for OCI container management (complementary to nix-rosetta-builder)
+      # Colima for OCI container management
       services.colima = {
         enable = true;
         runtime = "incus";
