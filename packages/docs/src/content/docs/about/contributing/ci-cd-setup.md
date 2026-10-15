@@ -84,6 +84,10 @@ A held pull request is approved with its check run's button.
 gitea-mq tests batches of queued pull requests and lands a batch by fast-forwarding `main` to the exact tested commit.
 The resulting push to `main` reuses the batch's build, and nixbot then runs the effects for that commit.
 
+A batch forms once the queue has settled: 15 seconds with no new enqueue (`GITEA_MQ_BATCH_SETTLE`, a local patch in `modules/nixos/gitea-mq-batch-settle.patch`), at once when 20 pull requests are queued (`batchMax`), and at most 2 minutes after the oldest queued pull request (`GITEA_MQ_BATCH_SETTLE_MAX`).
+So pull requests enqueued together, such as one `gh-queue-open-prs` run, share one build instead of the first one forming a batch of its own.
+A pull request that does not merge cleanly onto the batch is ejected while the batch is built, and gitea-mq removes its auto-merge; it re-enters the queue only when enqueued again.
+
 Batches can land in quick succession, so an effect may start after `main` has already moved past the commit it was built for.
 The production deploy and the release handle this the same way: a `lock` orders runs across builds, and the program exits 0 without acting when its `--rev` is no longer `main`'s head, leaving the work to the run for the newer commit.
 The `browser-evidence` effect does not skip a superseded commit: evidence for each landed commit is kept under its own build's keys, and its lock only serialises runs.
