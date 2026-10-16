@@ -20,7 +20,7 @@
     let
       declared = {
         atomic = [ "help" ];
-        ntfy-send = [ "token-transport" ];
+        ghq-shared = [ "handler" ];
         playwright-cli = [ "smoke" ];
         stack-land = [ "integration" ];
         vanixiets-docs = [
