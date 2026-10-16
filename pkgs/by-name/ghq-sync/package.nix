@@ -5,6 +5,7 @@
   git,
   coreutils,
   zoxide,
+  delegate ? null,
 }:
 writeShellApplication {
   name = "ghq-sync";
@@ -14,7 +15,11 @@ writeShellApplication {
     coreutils
     zoxide
   ];
-  text = builtins.readFile ./ghq-sync.sh;
+  text =
+    lib.optionalString (delegate != null) ''
+      GHQ_SYNC_DELEGATE=${lib.escapeShellArg delegate}
+    ''
+    + builtins.readFile ./ghq-sync.sh;
   meta = {
     description = "Lazy, partial-clone-aware ghq wrapper for fetching, updating, deepening, and promoting reference repositories";
     license = lib.licenses.mit;

@@ -49,6 +49,12 @@ Repositories fetched, updated, deepened, or promoted are also registered with
 zoxide as a silent side effect; fetch mode stays output-transparent, so
 `ghq-sync ... | cb copy` still captures exactly ghq's own output. --seed-zoxide
 prints one `added: <path>` line per indexed repo.
+
+Environment:
+  GHQ_SYNC_DELEGATE  Executable that carries out --deepen and in-place --full
+                     work on a host-shared tree this account cannot write; it
+                     is called as `deepen N PATH` or `promote PATH`.
+  GHQ_SYNC_NO_ZOXIDE Skip zoxide registration (the shared tree's writer).
 USAGE
 }
 
@@ -82,7 +88,7 @@ register_targets() {
   # read-modify-write lost-update race when deepen/full workers run in parallel.
   # Silent: stdout stays empty so fetch mode's `... | cb copy` pipe is
   # unaffected, and a zoxide failure never aborts ghq-sync.
-  if [ "$dry_run" = 1 ]; then return 0; fi
+  if [ "$dry_run" = 1 ] || [ -n "${GHQ_SYNC_NO_ZOXIDE:-}" ]; then return 0; fi
   local target path
   local paths=()
   for target in "$@"; do
@@ -103,6 +109,10 @@ deepen_one() {
   fi
   if [ "$dry_run" = 1 ]; then
     printf 'would deepen by %s: %s\n' "$deepen_n" "$path"
+    return 0
+  fi
+  if [ -n "${GHQ_SYNC_DELEGATE:-}" ]; then
+    "$GHQ_SYNC_DELEGATE" deepen "$deepen_n" "$path" || printf 'failed: %s\n' "$path"
     return 0
   fi
   if git -C "$path" fetch --deepen="$deepen_n" >/dev/null 2>&1; then
@@ -159,6 +169,10 @@ full_one() {
   fi
   if [ "$dry_run" = 1 ]; then
     printf 'would promote to full: %s\n' "$path"
+    return 0
+  fi
+  if [ -n "${GHQ_SYNC_DELEGATE:-}" ]; then
+    "$GHQ_SYNC_DELEGATE" promote "$path" || printf 'failed: %s\n' "$path"
     return 0
   fi
   if promote_inplace "$path"; then
