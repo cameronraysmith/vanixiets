@@ -27,7 +27,7 @@ The collector on magnetite SHALL reach every metrics source it scrapes on a loop
 #### Scenario: The scrape targets are evaluated
 
 - **WHEN** the evaluation-time collector check (R3.1) reads magnetite's collector configuration
-- **THEN** it finds node_exporter on `127.0.0.1:9100`, gitea on `127.0.0.1:3002`, niks3 on `127.0.0.1:5752`, nixbot on `127.0.0.1:9180`, nginx's `stub_status`, zerotierone's metrics and the telemetry store's own `/metrics` on `127.0.0.1:4000`, each on loopback
+- **THEN** it finds node_exporter on `127.0.0.1:9100`, gitea on `127.0.0.1:3002`, niks3 on `127.0.0.1:5752`, nixbot on `127.0.0.1:9180`, nginx's `stub_status`, zerotierone's metrics with `enableMetrics = true` in zerotierone's `local.conf`, and the telemetry store's own `/metrics` on `127.0.0.1:4000`, each on loopback
 
 #### Scenario: A scrape target is configured off loopback
 
@@ -47,7 +47,7 @@ The machine SHALL require one of these accounts on every `/v1/` path, loopback i
 #### Scenario: The authorization matrix runs
 
 - **WHEN** the container test presents each account to the write and read paths
-- **THEN** `collector` writes and is refused a read with HTTP 401, `perses` and `regulator` read and are refused a write, `admin` reads and writes, and a request with no credential is refused
+- **THEN** a request with no credential and one with a wrong password are answered HTTP 401, `collector` writes with 200 and is refused a read with HTTP 403, `perses` reads with 200 and is refused a write with HTTP 403, `regulator` reads with 200, and `admin` reads and writes with 200
 
 #### Scenario: The user provider is removed
 
@@ -77,7 +77,7 @@ The collector SHALL carry no logs or traces pipeline into the telemetry store.
 #### Scenario: The collector configuration is validated at build time
 
 - **WHEN** the collector's configuration is validated during the build, before `/run/credentials` exists
-- **THEN** validation runs against placeholder basic-authentication credentials supplied for validation only, and the running collector reads the real `collector` password from its credential directory
+- **THEN** validation passes without a placeholder credential, because `basicauth` reads the `collector` password through `client_auth.password_file`, which validation does not open; the one validation override removes the `authorization` of the zerotierone scrape job, whose credential file the prometheus receiver's validation stats, and the evaluation-time collector check (R3.1) fails when an override touches anything else
 
 ### Requirement: Reads are PromQL and SQL over HTTP with a database header
 
@@ -158,10 +158,19 @@ Replacing the account file SHALL restart the telemetry store, and replacing the 
 - **WHEN** magnetite's configuration drops `greptimedb.service` from the account file's restart list
 - **THEN** the evaluation-time envelope check (R7.1) fails, which is one of its mutants
 
+### Requirement: The account file the telemetry store loaded is recorded
+
+The machine SHALL publish the sha256 of the account file as the non-secret generator file `users-sha256`, and `greptimedb.service` SHALL record, before it starts, the sha256 of the account file it loaded in `/run/greptimedb/loaded-users.sha256`.
+
 #### Scenario: The telemetry store runs on a superseded account file
 
-- **WHEN** the account file's modification time is later than the telemetry store's start time
+- **WHEN** the sha256 in `/run/greptimedb/loaded-users.sha256` differs from the generator's `users-sha256`, or either file is missing
 - **THEN** the hourly envelope regulator fails (R7.4)
+
+#### Scenario: An activation rewrites the account file unchanged
+
+- **WHEN** an activation rewrites the account file with a new modification time and the same content, and the telemetry store is not restarted
+- **THEN** the hourly envelope regulator does not fail on credential freshness (R7.4), because it compares hashes rather than times
 
 ### Requirement: The telemetry store and the collector run inside a declared envelope
 
@@ -175,7 +184,7 @@ The dataset `zroot/root/greptimedb` SHALL carry `quota=16G`, `reservation=12G` a
 
 #### Scenario: The hourly envelope regulator finds the store over its envelope
 
-- **WHEN** `greptimedb-envelope` runs as `regulator` and the store's cgroup `memory.peak` has reached `MemoryHigh`, its `memory.events` `oom_kill` or `max` counters have increased (R7.2), the dataset's used space has reached 80% of its quota or the quota or reservation no longer holds (R7.3), or the summed SST size in `information_schema.region_statistics` has reached 50 GiB (R6.2)
+- **WHEN** `greptimedb-envelope` runs as `regulator` and the store's cgroup `memory.peak` has reached `MemoryHigh`, its `memory.events` `oom_kill` or `max` counters have increased within one store invocation, or, across invocations, the journal for `greptimedb.service` records a kernel OOM kill (`MESSAGE_ID=fe6faa94e7774663a0da52717891d8ef`) or `NRestarts` has increased (R7.2), the dataset's used space has reached 80% of its quota or the quota or reservation differs from its declared value (R7.3), or the summed SST size in `information_schema.region_statistics` has reached 50 GiB (R6.2)
 - **THEN** the unit fails
 
 #### Scenario: The memory regulator is shown able to fail
@@ -186,12 +195,12 @@ The dataset `zroot/root/greptimedb` SHALL carry `quota=16G`, `reservation=12G` a
 #### Scenario: The OOM kill order is exercised
 
 - **WHEN** the on-demand QEMU VM test on pyrite exhausts memory with processes at `OOMScoreAdjust` 900, 500 and 300
-- **THEN** the kernel kills them in that order
+- **THEN** the kernel kills them in that order in host-wide OOM kills whose victim lines carry `,global_oom,`, each of the three units logs systemd's OOM-kill message, and `greptimedb.service` ends with result `oom-kill`
 
 #### Scenario: The dataset properties are applied at boot and confirmed on magnetite
 
 - **WHEN** magnetite boots, and when the operator reads the dataset's properties at first activation
-- **THEN** `zfs-set-root-greptimedb-quota`, `zfs-set-root-greptimedb-reservation` and `zfs-assert-root-greptimedb-noautosnap` succeed or fail visibly, and the operator records `quota`, `reservation` and `com.sun:auto-snapshot` on `zroot/root/greptimedb`
+- **THEN** `zfs-set-root-greptimedb-quota`, `zfs-set-root-greptimedb-reservation` and `zfs-assert-root-greptimedb-noautosnap`, built from magnetite's `greptimedbDataset` binding, whose values the envelope check finds in `disko.nix` as well, succeed or fail visibly, and the operator records `quota`, `reservation` and `com.sun:auto-snapshot` on `zroot/root/greptimedb`
 
 ### Requirement: Runtime regulators treat absent evidence as failure
 
@@ -229,12 +238,13 @@ The machine SHALL run a telemetry store package whose version matches `^[0-9]+\.
 
 ### Requirement: The collector's configuration bounds what it gathers
 
-The machine SHALL configure magnetite's collector so that per-process memory carries no per-process identifier and covers at most 30 process names of at least 64 MiB, per-unit signals cover exactly the `schema.nix` allow-list of at most 40 units, paging reports usage only, and node_exporter's series pass a keep-list.
+The machine SHALL configure magnetite's collector so that per-process memory carries no per-process identifier and covers only executables holding at least 64 MiB, per-unit signals cover exactly the `schema.nix` allow-list of at most 40 units, paging reports usage only, and node_exporter's series pass a keep-list.
+`schema.nix` declares the 30-name per-host bound as `process.maxNames`, which no collector stage enforces; it is observed at first activation and regulated from slice S4.
 
 #### Scenario: The collector check runs with its mutants
 
 - **WHEN** the evaluation-time collector check (R3.1) runs against magnetite's collector configuration and its mutants
-- **THEN** it passes `otelcol-contrib validate`, finds `process.pid`, `process.parent_pid`, `process.command`, `process.command_line`, `process.executable.path` and `process.owner` disabled at source, finds the paging scraper limited to `system.paging.usage` and `system.linux.memory.available` enabled, finds the `systemd` receiver's `units` equal to the `schema.nix` allow-list, finds node_exporter limited to its `zfs` collector and its `vmstat` collector filtered to `oom_kill`, and fails on every mutant
+- **THEN** it passes `otelcol-contrib validate`, finds `process.pid`, `process.parent_pid`, `process.command`, `process.command_line`, `process.executable.path` and `process.owner` disabled at source, finds the 64 MiB filter and `process.maxNames = 30`, finds the paging scraper limited to `system.paging.usage` and `system.linux.memory.available` enabled, finds the `systemd` receiver's `units` equal to the `schema.nix` allow-list, finds node_exporter limited to its `zfs` collector and its `vmstat` collector filtered to `oom_kill`, and fails on every mutant
 
 #### Scenario: The systemd receiver reaches D-Bus
 
@@ -246,14 +256,33 @@ The machine SHALL configure magnetite's collector so that per-process memory car
 - **WHEN** magnetite has run the collector for one collection interval after first activation
 - **THEN** the operator finds `system_paging_usage_bytes` for `/dev/zram0` in `fleet` and records it
 
+### Requirement: Omnigent unit names are stored under aliases
+
+The machine SHALL rewrite each `omnigent-host-<owner>.service` unit name to `omnigent-host-<alias>.service` from `ownerAliases` in `schema.nix`, `{ cameron = "owner-1"; janettesmith = "owner-2"; }` in S1, before any exporter.
+
+#### Scenario: An Omnigent owner has no alias
+
+- **WHEN** a mutant removes an owner whose `omnigent-host-<owner>` unit magnetite evaluates from `ownerAliases`
+- **THEN** the evaluation-time collector check (R3.1) fails on its alias clause
+
+#### Scenario: Stored unit names are read back in the container test
+
+- **WHEN** the container test reads the stored `systemd_unit_name` values after the collector has reported an `omnigent-host-<owner>` unit
+- **THEN** the unit appears under its alias, and no stored value contains the owner's name
+
 ### Requirement: The collector's queue persists across a telemetry store restart
 
-The machine SHALL back each exporter's sending queue in magnetite's collector with a `file_storage` extension sized for at least 24 hours of collection and less than 512 MiB.
+The machine SHALL back each exporter's sending queue in magnetite's collector with a `file_storage` extension using the `bytes` sizer, 400 MiB for `fleet` and 48 MiB each for `devloop` and `agent` in one directory, so that the queues sum to less than 512 MiB and the `fleet` queue holds at least 24 hours at an assumed 256,000 bytes per minute, a rate measured at first activation.
 
 #### Scenario: The persistent queue is removed
 
-- **WHEN** a mutant of magnetite's collector configuration drops the `file_storage` queue or sizes it below 24 hours or at or above 512 MiB
+- **WHEN** a mutant of magnetite's collector configuration drops the `file_storage` queue, sizes the `fleet` queue below 24 hours at the assumed rate, or brings the queues' sum to 512 MiB or more
 - **THEN** the evaluation-time collector check (R3.1) fails on its queue clause
+
+#### Scenario: The `fleet` queue rate is measured at first activation
+
+- **WHEN** the operator stops `greptimedb.service` for ten minutes on magnetite and measures the bytes the `fleet` queue accumulates
+- **THEN** the operator records the measured rate beside the assumed 256,000 bytes per minute, and a measured rate under which the 400 MiB queue holds less than 24 hours is a finding that resizes the queues
 
 #### Scenario: The store restarts during collection
 

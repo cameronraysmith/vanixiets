@@ -4,7 +4,7 @@ title: "ADR-003: Collection topology"
 
 ## Status
 
-Accepted (human gate, 2026-10-15)
+Accepted (human gate, 2026-10-15), and amended in place under charter v12 (2026-10-16): zerotierone's metrics key is `enableMetrics`, not `allowMetrics`, item 17 names the owner-to-alias attrset with its values, and the ingress reads the `collector` password through `client_auth.password_file`
 
 ## Context
 
@@ -33,7 +33,7 @@ magnetite has been OOM-killed twice by evaluation overlap (`research/otel-collec
 Existing scrape targets on magnetite: gitea at `127.0.0.1:3002/metrics`, niks3 at `127.0.0.1:5752/metrics`, nixbot only through `/run/nixbot/web.sock` behind nginx (`research/fleet-emitter-inventory.md` updated emitter table).
 Their public `/metrics` locations now admit only loopback and the ZeroTier /64 (`cameronraysmith/vanixiets@02432c594:modules/lib/nginx-metrics-location.nix`).
 nginx `stub_status` is served at `http://127.0.0.1/nginx_status` (`research/fleet-emitter-inventory.md` R14).
-zerotierone 1.16.0 serves `localhost:9993/metrics` behind a bearer token in `metricstoken.secret`, and from 1.16.1 metrics default to off unless `allowMetrics` is set (`research/fleet-emitter-inventory.md` R13).
+zerotierone 1.16.0 serves `localhost:9993/metrics` behind a bearer token in `metricstoken.secret`, and from 1.16.1 metrics default to off unless enabled through the `local.conf` key `enableMetrics` (`research/fleet-emitter-inventory.md` R13, which names the key `allowMetrics`; `zerotier/ZeroTierOne@899352e38:service/OneService.cpp:3292`).
 nix-grpc-daemon metrics are off by default, and on magnetite and pyrite the daemon idle-exits after 600 s, resetting its counters (`research/fleet-emitter-inventory.md` R4).
 
 Host-level signals each answer a failure this fleet has had: magnetite's host-wide OOM kills of 2026-09-27 and 2026-10-01 left no record of which process grew, two `omnigent-host-*` units on magnetite restart-looped about 3,200 times overnight on 2026-10-15 unnoticed, and magnetite has a storage-exhaustion history (charter W2).
@@ -80,7 +80,7 @@ Run `opentelemetry-collector-contrib` 0.155.0 from the root nixpkgs pin as one p
 2. In scope initially: the six NixOS machines and stibnite; blackphos, rosegold and argentum join only after their primary users consent (Q3).
 3. Each agent listens for local emitters on `127.0.0.1:4318` (OTLP/HTTP) only; that receiver is wired into the traces and metrics pipelines and into no logs pipeline, so OTLP log records are rejected (see ADR-008).
 4. Each agent collects `host_metrics` at a 60 s interval; NixOS agents also read `journald` restricted to the unit allow-list of ADR-004, and every agent tails `/var/log/deploy-record.jsonl` with the `filelog` receiver for the deploy record of ADR-005.
-5. Each NixOS agent scrapes zerotierone at `localhost:9993/metrics` with the token delivered by `LoadCredential`, and `allowMetrics = true` is set explicitly in zerotierone's `localConf` so an upgrade past 1.16.0 does not silently stop the emitter.
+5. Each NixOS agent scrapes zerotierone at `localhost:9993/metrics` with the token delivered by `LoadCredential`, and `enableMetrics = true` is set explicitly in zerotierone's `localConf` so an upgrade past 1.16.0 does not silently stop the emitter.
 6. magnetite's agent also scrapes gitea at `127.0.0.1:3002`, niks3 at `127.0.0.1:5752`, nixbot through a new loopback-only nginx server on `127.0.0.1:9180` that proxies `/metrics` to `/run/nixbot/web.sock`, and nginx through the `nginx` receiver at `http://127.0.0.1/nginx_status`; it also hosts the on-host PostgreSQL reader of ADR-005.
 7. Every agent applies the redaction stages of ADR-008 and the signal allow-list of ADR-004 before any exporter, stamps `host.name` and a routing attribute naming the target database, and exports with `otlp_http` to `https://magnetite.zt:4318` presenting a client certificate.
 8. Every agent's exporter uses a `sending_queue` backed by the `file_storage` extension, and every pipeline begins with `memory_limiter`.
@@ -94,7 +94,7 @@ Run `opentelemetry-collector-contrib` 0.155.0 from the root nixpkgs pin as one p
 16. Per-process memory, NixOS agents (darwin agents per item 22): a second `host_metrics` receiver runs the `process` scraper at 60 s over all processes with `process.pid`, `process.parent_pid`, `process.command`, `process.command_line`, `process.executable.path` and `process.owner` disabled at the source, so the only resource attribute left is `process.executable.name`, and only `process.memory.usage` enabled.
     Its pipeline merges same-named processes with `groupbyattrs` compaction and a `metricstransform` `aggregate_labels` sum (`open-telemetry/opentelemetry-collector-contrib@795558312:processor/groupbyattrsprocessor/README.md:27`; `open-telemetry/opentelemetry-collector-contrib@795558312:processor/metricstransformprocessor/README.md:107-110`), then a `filter` drops every summed point below 64 MiB, so a series exists only for an executable that holds real memory.
 17. systemd unit state, NixOS agents (darwin launchd job state per item 23): the `systemd` receiver at 60 s with `scope: system`, `units` set to ADR-004's systemd unit allow-list, `systemd.service.restarts` enabled and `systemd.service.cpu.time` disabled.
-    A `transform` stage rewrites each `omnigent-host-<owner>.service` unit name to `omnigent-host-<alias>.service`, where `<alias>` comes from an explicit owner-to-alias attrset in ADR-004's `schema.nix`, so adding or removing an owner never renames another owner's series (Q12).
+    A `transform` stage rewrites each `omnigent-host-<owner>.service` unit name to `omnigent-host-<alias>.service`, where `<alias>` comes from an explicit owner-to-alias attrset in ADR-004's `schema.nix`, `flake.lib.otelCollectorSchema.ownerAliases = { cameron = "owner-1"; janettesmith = "owner-2"; }`, in which a new owner takes the next number, so adding or removing an owner never renames another owner's series (Q12).
 18. Storage, OOM and swap, NixOS agents only: `services.prometheus.exporters.node` on `127.0.0.1:9100` with `--collector.disable-defaults --collector.zfs --collector.vmstat --collector.vmstat.fields=^oom_kill$`, scraped by the agent's `prometheus` receiver at 60 s with a `metric_relabel_configs` keep-list of ADR-004's node_exporter metric names; the agent also enables `system.linux.memory.available` in the memory scraper, and adds the `host_metrics` `paging` scraper with only `system.paging.usage` enabled, which reports used and free bytes of each `/proc/swaps` device, `/dev/zram0` on every NixOS host (ADR-004).
     Per-process swap is not collected because the `process` scraper defines no swap metric at 0.155.0, and the `systemd` receiver defines no memory metric (ADR-004 Context), so swapped-out pages are seen only in the host-level paging series.
 19. Disk health on NixOS, pyrite only: `services.prometheus.exporters.smartctl` on `127.0.0.1:9633` with `devices = [ "/dev/nvme0" ]`, scraped at 60 s with a keep-list of ADR-004's smartctl metric names that excludes the `smartctl_device` info series; the KVM and cloud guests run no SMART exporter because their disks are emulated, and darwin disk health is item 24.
@@ -210,7 +210,7 @@ Per-process series are bounded by the memory floor rather than by a count, so a 
 Summed resident memory also omits swapped-out pages, which on magnetite left resident memory at about 35 % of the evaluator's true footprint (`cameronraysmith/vanixiets@f55c27adb:docs/notes/development/incidents/2026-10-01-magnetite-concurrent-eval-oom.md:44-51`), so the per-process series name which executable holds RAM but can understate the one that grew into zram; `system_paging_usage_bytes` shows the swap growth per host only.
 A failing unit outside the systemd allow-list is not seen through the store.
 No pool capacity or fragmentation series exists; pool free space is read from the root dataset's filesystem series.
-Adding an Omnigent owner requires adding an alias to `schema.nix`, and ADR-004's R4.1 fails the build until it is added.
+Adding an Omnigent owner requires adding an alias to `schema.nix`, and ADR-004's R4.1 fails the build until it is added; from S1, R3.1 also fails when an evaluated `omnigent-host-<owner>` unit has no alias.
 Whether pyrite's Apple NVMe controller answers smartctl's health log is unverified until acceptance (Q15).
 
 ## Operating envelope and regulator
@@ -253,7 +253,7 @@ It is shown able to fail at acceptance by the R3.2 stopped-agent test producing 
 - `file_storage` queue: data is lost while magnetite is down or OOM-killed, or while a laptop is offline.
 - `memory_limiter`, `MemoryMax` and `OOMScoreAdjust`: the collector contributes to a magnetite OOM, dies before the store and so stops queueing, or survives ahead of PostgreSQL (`research/otel-collector-topology.md` R21).
 - Exponential-histogram transform: histogram data is silently discarded by GreptimeDB below 1.3.0.
-- Explicit `allowMetrics`: an upgrade past zerotierone 1.16.0 silently removes the mesh-health signal.
+- Explicit `enableMetrics`: an upgrade past zerotierone 1.16.0 silently removes the mesh-health signal.
 - Loopback nginx block for nixbot: nixbot's metrics have no scrape path, because its public location denies magnetite's public address.
 - R3.1: a configuration that does not parse or that binds publicly ships to a host, including a darwin host whose check is non-gating.
 - R3.2 and the notifier: a host silently stops delivering, queues grow until data is dropped, or any observability regulator or oneshot fails, with nobody told.
@@ -281,11 +281,11 @@ It is shown able to fail at acceptance by the R3.2 stopped-agent test producing 
 - Add the `otel-envelope` service and timer to the `ingress` role's NixOS module: regulator R3.2.
 - Add the `observability-notify@` template unit to the `agent` role's NixOS module, so every in-scope NixOS host has it, cinnabar included, and `OnFailure=observability-notify@%n.service` on `otel-envelope`; ADR-005 sets the same `OnFailure=` on its unit, ADR-007 on its units and on magnetite's nine `zfs-assert-*` and `zfs-set-*` oneshots, and ADR-009 on `fleet-alert.service` and `fleet-deadman.service`.
 - Modify `modules/nixos/nixbot.nix`: a loopback-only nginx server on `127.0.0.1:9180` proxying `/metrics` to the nixbot socket.
-- Modify `modules/clan/inventory/services/zerotier.nix` or the zerotier NixOS configuration it applies: `services.zerotierone.localConf.settings.allowMetrics = true`.
+- Modify `modules/clan/inventory/services/zerotier.nix` or the zerotier NixOS configuration it applies: `services.zerotierone.localConf.settings.enableMetrics = true`.
 - No flake input is added; `opentelemetry-collector-contrib` comes from the root `nixpkgs` input.
 - Clan vars generator `otel-ca`: `share = true`, `files."ca.key".deploy = false`, `files."ca.crt".secret = false`, openssl P-256 self-signed CA, after `nix-grpc-ca` (`cameronraysmith/vanixiets@109c67346:modules/clan/services/nix-builders/flake-module.nix:106-120`).
 - Clan vars generator `otel-cert`: per machine, depends on `otel-ca`, CN the machine name, `extendedKeyUsage=clientAuth` on agents and additionally `serverAuth` with `flake.lib.hosts.magnetite.zt` as IP SAN and `magnetite.zt` as DNS SAN on magnetite, key owned by `_otelcol` on darwin and consumed by `LoadCredential` on NixOS.
-- Consumed, not created here: the `collector-password` and `regulator-password` files of ADR-007's `greptimedb-users` generator, read by the ingress and by `otel-envelope` through `LoadCredential` (the ingress through a `${file:...}` reference).
+- Consumed, not created here: the `collector-password` and `regulator-password` files of ADR-007's `greptimedb-users` generator, read by the ingress and by `otel-envelope` through `LoadCredential` (the ingress through `basicauth`'s `client_auth.password_file`, which build-time validation does not open, so no placeholder credential is needed).
 
 ## Questions for the human gate
 

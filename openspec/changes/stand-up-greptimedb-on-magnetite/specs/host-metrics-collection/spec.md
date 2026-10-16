@@ -41,13 +41,19 @@ Every series the collector writes SHALL carry the name of the host it was gather
 ### Requirement: Series cardinality stays bounded
 
 The collector SHALL bound how many series each signal produces on magnetite, and no per-process signal SHALL carry an identifier that changes with each process started, such as its process number or command line.
+Per-process memory is bounded by a memory floor rather than by a count: no stage of the pinned collector limits the number of distinct process names, so the bound of 30 names per host is declared at evaluation, observed at first activation, and regulated at runtime from slice S4.
 
-**Discharged by**: `telemetry-store-interface` requirement `The collector's configuration bounds what it gathers`; the evaluation-time regulator over magnetite's collector configuration and its mutants discharge it.
+**Discharged by**: `telemetry-store-interface` requirement `The collector's configuration bounds what it gathers`; the evaluation-time regulator over magnetite's collector configuration and its mutants, and the operator's count of distinct process names at first activation, discharge it.
 
 #### Scenario: The bounds are evaluated
 
 - **WHEN** the evaluation-time collector regulator reads magnetite's collector configuration
-- **THEN** it finds per-process memory recorded only for processes using at least 64 MiB and for no more than 30 distinct process names, per-unit signals recorded only for units on the fleet's watched list of no more than 40 units, and only the named storage-pool and out-of-memory signals kept from the host's own probe
+- **THEN** it finds per-process memory recorded only for processes using at least 64 MiB, the bound of 30 distinct process names declared beside the watched list, per-unit signals recorded only for units on the fleet's watched list of no more than 40 units, and only the named storage-pool and out-of-memory signals kept from the host's own probe
+
+#### Scenario: Distinct process names are counted at first activation
+
+- **WHEN** magnetite has run the collector for an hour after first activation
+- **THEN** the operator counts the distinct process names stored for magnetite and records the count, and a count above 30 is a finding against the declared bound
 
 #### Scenario: A per-process identifier is turned back on
 
@@ -63,7 +69,7 @@ The collector SHALL bound how many series each signal produces on magnetite, and
 
 When the telemetry store is unavailable, the collector SHALL hold the queued interval on disk, for at least 24 hours of collection and in less than 512 MiB, and SHALL write it to the telemetry store once the telemetry store accepts series again, so that a restart of the telemetry store leaves no gap in the series.
 
-**Discharged by**: `telemetry-store-interface` requirement `The collector's queue persists across a telemetry store restart`; the evaluation-time collector regulator's queue case with its mutant, and the container runtime test's restart case, discharge it.
+**Discharged by**: `telemetry-store-interface` requirement `The collector's queue persists across a telemetry store restart`; the evaluation-time collector regulator's queue case with its mutant, the container runtime test's restart case, and the operator's measurement at first activation of the rate the queue fills, which the 24-hour bound otherwise assumes, discharge it.
 
 #### Scenario: magnetite's collector configuration loses its persistent queue
 
@@ -74,6 +80,22 @@ When the telemetry store is unavailable, the collector SHALL hold the queued int
 
 - **WHEN** the container runtime test stops the telemetry store, lets the collector gather, and starts the telemetry store again
 - **THEN** the measurements gathered while the telemetry store was stopped are read back from the telemetry store
+
+### Requirement: Stored unit names carry no owner's name
+
+The collector SHALL store the name of each Omnigent worker unit, which carries the name of the person it runs for, under a fixed alias of that person instead, so that no series in the telemetry store carries a person's name and adding or removing a person never renames another person's series.
+
+**Discharged by**: `telemetry-store-interface` requirement `Omnigent unit names are stored under aliases`; the evaluation-time collector regulator's alias case with its mutant, the container runtime test's alias read-back, and the operator's query at first activation discharge it.
+
+#### Scenario: A worker unit has no alias
+
+- **WHEN** magnetite's configuration runs an Omnigent worker unit for a person who has no alias
+- **THEN** the evaluation-time collector regulator fails before any activation, which its mutant shows
+
+#### Scenario: A worker unit's state is read back
+
+- **WHEN** the container runtime test, or the operator at first activation, reads the unit names stored for magnetite
+- **THEN** each Omnigent worker unit appears under its alias, and no stored unit name contains the person's name
 
 ### Requirement: A failed collection or store job notifies a person
 

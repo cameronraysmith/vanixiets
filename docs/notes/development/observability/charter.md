@@ -1,12 +1,12 @@
 ---
 title: Fleet observability and CCV feedback-loop charter
-status: charter v11
+status: charter v12
 date: 2026-10-16
 ---
 
 # Fleet observability and CCV feedback-loop charter
 
-Charter version: v11.
+Charter version: v12.
 A revision is a version bump with a dated entry under "Revision history"; the text of an earlier version is never edited in place.
 
 ## Objective
@@ -279,3 +279,12 @@ A research unit that meets ambiguity returns it in its questions section; the or
   - ADR-007 amended: `greptimedb-bin` replaces the root-pin route and is no longer a channel-delay fallback; gRPC is bound to `127.0.0.1:4001`, because `v1.2.1` has no `[grpc] enable`; the `perses-password` consumer becomes nginx from S6; `components/greptimedb.md` follows.
   - ADR-008 amended on the read side: admission through `sso-gateway` rather than a direct Kanidm client, which follows web-verification D11 instead of excepting it, and readers hold the `perses:ro` credential only through nginx.
   - Reference architecture: the `observability-notify@` notifier moves from S3 to S1, S6 is rewritten to the embedded dashboard, the root-pin precondition gives way to `greptimedb-bin`, the consolidated surface's change column is renumbered to slices S1 to S8, and the deferred list gains the standalone Perses fallback.
+- v12 (2026-10-16): corrections found from source while S1's implementation plan (`openspec/changes/stand-up-greptimedb-on-magnetite/plan.md`) was written; no earlier text is edited beyond the status and version lines, and D1–D9, the requirements and the acceptance criteria are unchanged.
+  - ADR-007 E7.4 and R7.4 amended: credential freshness compares hashes, not times, because sops-nix rewrites every secret with a new modification time on each activation, so a start-time comparison fails after any deployment; `greptimedb-users` gains the public file `users-sha256`, `greptimedb.service` writes the sha256 of the users file it loaded to `/run/greptimedb/loaded-users.sha256`, and the envelope fails when the two differ or either is missing.
+  - ADR-007 E7.2, R7.2 and R7.3 amended: the cgroup counters restart with each store invocation, so R7.2 keeps a baseline keyed by `InvocationID` and, across invocations, fails on systemd's kernel-OOM journal message (`MESSAGE_ID=fe6faa94e7774663a0da52717891d8ef`) or a rise in `NRestarts`, reading the journal unprivileged through `SupplementaryGroups = systemd-journal`; R7.3 reads used space, quota and reservation.
+  - ADR-007's memory-knob list gains `prefilter_result_cache_size = "32MB"`, and its empty event-recorder list is written `event_recorder.event_types = [ ]`.
+  - ADR-007 packaging amended: `greptimedb-bin` exists on `x86_64-linux` only, and `apps.update-greptimedb-bin` exists on every system and runs the update script directly.
+  - ADR-003 amended: zerotierone's `local.conf` key is `enableMetrics`, not `allowMetrics` (`zerotier/ZeroTierOne@899352e38:service/OneService.cpp:3292`); item 17's owner-to-alias attrset is `flake.lib.otelCollectorSchema.ownerAliases = { cameron = "owner-1"; janettesmith = "owner-2"; }`, which S1's R3.1 requires to cover every evaluated `omnigent-host-<owner>` unit; and the ingress reads the `collector` password through `basicauth`'s `client_auth.password_file`, which build-time validation does not open, in place of a `${file:...}` reference.
+  - ADR-009 amended: `ntfy-send` is the package `pkgs/by-name/ntfy-send`, added by S1, so S3's evaluator consumes it instead of building its own.
+  - Components and reference architecture follow: `components/greptimedb.md` takes the R7.2 to R7.4, knob, event-recorder and packaging amendments; `components/otel-collector.md` takes `enableMetrics`, the owner aliases, the `client_auth.password_file` credential whose file build-time validation does not open, a single validation override removing the zerotierone job's `authorization`, magnetite's byte-sized queues of 400, 48 and 48 MiB, and the statement that no collector stage caps distinct process names, so the 30-name bound is declared in `schema.nix`, observed at S1's deployment and regulated by R4.2 from S4; `components/fleet-alert.md`, `components/host-probes.md` and the reference architecture's consolidated surface follow ADR-009, ADR-003 and ADR-007.
+  - S1's brainstorm, design, specs and tasks carry the same corrections, together with the auth matrix's 403 for a `collector:wo` read and the OOM-order test asserting the `oom-kill` result for `greptimedb.service` only.

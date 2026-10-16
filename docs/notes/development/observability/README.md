@@ -11,7 +11,8 @@ Read [charter.md](charter.md) first, because every artifact below is scoped by i
 
 ## Current status
 
-The charter is at v11, which records the amendments slice S1 carries: the dashboard layer is the Perses dashboard GreptimeDB embeds, served behind `sso-gateway` from slice S6, the store package is `greptimedb-bin` because its release tarball embeds that dashboard, gRPC is bound to loopback, and the failure notifier lands in S1.
+The charter is at v12, which records the corrections found while S1's implementation plan was written: credential freshness compares the sha256 of the users file the store loaded with a public hash, R7.2 holds its baseline across store restarts, zerotierone's metrics key is `enableMetrics`, the owner-to-alias attrset is named with its values, and `ntfy-send` becomes the package S1 adds.
+v11 records the amendments slice S1 carries: the dashboard layer is the Perses dashboard GreptimeDB embeds, served behind `sso-gateway` from slice S6, the store package is `greptimedb-bin` because its release tarball embeds that dashboard, gRPC is bound to loopback, and the failure notifier lands in S1.
 v10 re-cut implementation into the vertical slices S1 to S8, and v9 recorded the human gate of 2026-10-15: every decision record is Accepted, and acceptance criteria A5, A6 and A8 are discharged as recorded human judgment.
 v8 reconciled the decision records the same day with conventions already decided elsewhere in the repository: implementation proceeds through OpenSpec changes following the `openspec/changes/stand-up-*` precedent, and R2 storage follows web-verification D9.
 v7 extended the charter the same day with decision D9 on alerting after the human approved host-level signals and an alerting decision; v6 recorded the GreptimeDB 1.2.1 nixpkgs bump, v5 revised the charter for consistency with the decision records, v4 followed the research refresh the same day, and v2 followed the research phase on 2026-09-18.

@@ -4,7 +4,7 @@ title: "ADR-009: Alerting"
 
 ## Status
 
-Accepted (human gate, 2026-10-15), except Q5, deferred to the end of implementation
+Accepted (human gate, 2026-10-15), except Q5, deferred to the end of implementation, and amended in place under charter v12 (2026-10-16): `ntfy-send` is the package `pkgs/by-name/ntfy-send`, added by slice S1, which the evaluator consumes instead of building its own
 
 ## Context
 
@@ -41,7 +41,7 @@ vmalert sends notifications only to an Alertmanager-compatible endpoint named by
 cinnabar runs ntfy-sh 2.28.0 on `[::1]:2586` behind caddy as `https://ntfy.zt` (`cameronraysmith/vanixiets@ff2ca5c77:modules/machines/nixos/cinnabar/ntfy.nix:4-9`, `cameronraysmith/vanixiets@ff2ca5c77:modules/machines/nixos/cinnabar/caddy.nix:29-32`; `research/fleet-emitter-inventory.md` R12).
 The NixOS module sets `auth-file` and a persistent `cache-file` by default and accepts an `environmentFile` for declarative users and tokens (`NixOS/nixpkgs@ac1faec44836:nixos/modules/services/misc/ntfy-sh.nix:86-96`, `:110-115`, root node `nixpkgs_10`).
 The repository sets no `auth-default-access`, so ntfy's default of `read-write` for anonymous clients applies, and every fleet `ntfy-send` and agent hook publishes anonymously to a topic named after the local host (`cameronraysmith/vanixiets@ff2ca5c77:modules/home/tools/commands/system/ntfy-send.sh:30-34`).
-`ntfy.zt` is served by caddy with `tls internal`, and `ntfy-send` reaches it with `curl -sfk -m 5`, skipping certificate verification, and passes any further arguments, such as `-H` headers, through to curl (`modules/home/tools/commands/system/ntfy-send.sh:10-15`, `:33-34`; `modules/machines/nixos/cinnabar/caddy.nix:29-32`).
+`ntfy.zt` is served by caddy with `tls internal`, and `ntfy-send` reaches it with `curl -sfk -m 5`, skipping certificate verification, and passes any further arguments, such as `-H` headers, through to curl (`modules/home/tools/commands/system/ntfy-send.sh:10-15`, `:33-34`, which slice S1 moves unchanged to `pkgs/by-name/ntfy-send/ntfy-send.sh`; `modules/machines/nixos/cinnabar/caddy.nix:29-32`).
 ntfy 2.14.0 added declarative users, ACL entries and tokens through `auth-users`, `auth-access` and `auth-tokens`, and ACL entries can name a provisioned user or `*` for anonymous clients (https://docs.ntfy.sh/config/ and https://docs.ntfy.sh/releases/ (fetched 2026-10-15)).
 ntfy keeps published messages for `cache-duration`, 12 h by default, and serves them to `GET /<topic>/json?poll=1&since=<duration>` (https://docs.ntfy.sh/config/ and https://docs.ntfy.sh/subscribe/api/ (fetched 2026-10-15)).
 From 2.14.0 ntfy also renders Alertmanager webhook payloads with the built-in `?template=alertmanager`, so Alertmanager needs no bridge to reach it (https://docs.ntfy.sh/publish/ (fetched 2026-10-15)).
@@ -204,7 +204,7 @@ Regulator R9.5: an evaluation-time assertion in the module that both limits are 
 
 ## Implementation surface
 
-- Add `modules/nixos/fleet-alert.nix`: `flake.modules.nixos.fleet-alert` with options `services.fleet-alert.evaluator` and `services.fleet-alert.deadman`; the evaluator script as a `pkgs.writeShellApplication` over `curl` and `jq` after the `ntfy-send` precedent (`cameronraysmith/vanixiets@ff2ca5c77:modules/home/tools/commands/system/ntfy-send.nix`), posting through an `ntfy-send` package built in the module from `modules/home/tools/commands/system/ntfy-send.sh`; `fleet-alert.service` and `.timer` with `StateDirectory = "fleet-alert"`, `LoadCredential` for the `regulator-password` of ADR-007 and the `alerter` token, `MemoryMax = 64M` and `TimeoutStartSec = 50s`; `fleet-deadman.service` and `.timer` with `StateDirectory = "fleet-deadman"`; and the R9.5 assertion.
+- Add `modules/nixos/fleet-alert.nix`: `flake.modules.nixos.fleet-alert` with options `services.fleet-alert.evaluator` and `services.fleet-alert.deadman`; the evaluator script as a `pkgs.writeShellApplication` over `curl` and `jq` after the `ntfy-send` precedent (`cameronraysmith/vanixiets@ff2ca5c77:modules/home/tools/commands/system/ntfy-send.nix`), posting through `pkgs.ntfy-send`, the `pkgs/by-name/ntfy-send` package slice S1 adds, rather than a package built in the module; `fleet-alert.service` and `.timer` with `StateDirectory = "fleet-alert"`, `LoadCredential` for the `regulator-password` of ADR-007 and the `alerter` token, `MemoryMax = 64M` and `TimeoutStartSec = 50s`; `fleet-deadman.service` and `.timer` with `StateDirectory = "fleet-deadman"`; and the R9.5 assertion.
 - Add `modules/nixos/fleet-alert/rules.nix`: the rule table as Prometheus-format rules with presence selectors and their expected hosts, annotation queries, the `WeeklyPipelineTest` window, and the kept-alive launchd labels read from ADR-004's `schema.nix`, rendered to JSON for the evaluator and YAML for `promtool`.
 - Add `modules/checks/fleet-alert.nix`: regulator R9.2 with its fixtures and mutants, using `promtool` from the `cli` output of the root pin's `prometheus` package (`NixOS/nixpkgs@ac1faec44836:pkgs/by-name/pr/prometheus/package.nix:210`, root node `nixpkgs_10`).
 - Modify `modules/machines/nixos/magnetite/default.nix`: import `fleet-alert` and enable the evaluator, and add `onFailure = [ "observability-notify@%n.service" ]` to the six existing `zfs-assert-*` and `zfs-set-*` oneshots and to ADR-007's three new ones.

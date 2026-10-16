@@ -53,12 +53,12 @@ The telemetry store SHALL refuse the collector any read, SHALL answer queries on
 
 A replaced store credential SHALL take effect on the running telemetry store rather than leaving the superseded value valid.
 
-**Discharged by**: `telemetry-store-interface` requirement `Credentials exist only as activation-resolved files owned by non-worker users`; the evaluation-time envelope regulator's restart-on-rotation mutant and the hourly envelope regulator's credential-freshness case discharge it.
+**Discharged by**: `telemetry-store-interface` requirements `Credentials exist only as activation-resolved files owned by non-worker users` and `The account file the telemetry store loaded is recorded`; the evaluation-time envelope regulator's restart-on-rotation mutant and the hourly envelope regulator's credential-freshness case discharge it.
 
 #### Scenario: A store credential is replaced
 
 - **WHEN** the operator replaces the store credentials and magnetite is activated
-- **THEN** the telemetry store is running on the new values, and the hourly envelope regulator fails if the telemetry store was last started before they were written
+- **THEN** the telemetry store is running on the new values, and the hourly envelope regulator fails if the account file the running telemetry store loaded is not the one now deployed
 
 #### Scenario: The restart on replacement is dropped from magnetite's configuration
 

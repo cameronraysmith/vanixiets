@@ -3,7 +3,7 @@
 This change is slice S1 of the fleet observability implementation (`docs/notes/development/observability/architecture/reference-architecture.md`, "Implementation sequencing"; Linear CAM-68).
 It stands up the telemetry store that slices S2 to S8 read from or write to, and feeds it magnetite's own metrics.
 The accepted inputs are ADR-001, ADR-003, ADR-004, ADR-006, ADR-007, ADR-008 and ADR-009 under `docs/notes/development/observability/decisions/`, ADR-002 as revised in charter v11, and the `greptimedb`, `otel-collector` and `host-probes` components.
-`brainstorm.md` records the decision chain (Q1 to Q8), the prior-art findings (F1 to F11) and the charter v11 amendments; this document develops that direction into the technical design.
+`brainstorm.md` records the decision chain (Q1 to Q8), the prior-art findings (F1 to F11), the charter v11 amendments and the decisions made while writing `plan.md` (P1 to P13); this document develops that direction into the technical design, and `plan.md` is the authority for exact names.
 Citations of the form A7:63 mean ADR-007 line 63, A3 means ADR-003, and so on; GC, OC and HP are the three component documents and RA is the reference architecture, all under `docs/notes/development/observability/`.
 
 The current state on magnetite:
@@ -34,7 +34,7 @@ Stakeholders are the fleet operator, who reads the store and receives failure no
 - Collect magnetite's host, unit, process-memory, ZFS, OOM-kill and service metrics into `fleet` through one collector process that already has the shape S4 extends.
 - Report every failure of the store, its schema and envelope jobs and its ZFS jobs to a human through ntfy from the first deployment.
 - Back every envelope claim with a regulator that is shown able to fail: evaluation-time checks with mutants, an hourly runtime envelope, and two on-demand runtime tests.
-- Amend in place the decision records that contradict the deployed shape (charter v11).
+- Amend in place the decision records that contradict the deployed shape (charter v11, and charter v12 for the corrections found while writing `plan.md`).
 
 **Non-Goals:**
 
@@ -55,8 +55,8 @@ New files:
 | `pkgs/by-name/greptimedb-bin/{package.nix,update.sh}` | Upstream binary package (D1) |
 | `pkgs/by-name/ntfy-send/` | The `ntfy-send` script and package, moved from `modules/home/tools/commands/system/` (D2) |
 | `modules/nixos/greptimedb.nix` | `flake.modules.nixos.greptimedb`: `greptimedb.service`, `greptimedb-schema.service`, `greptimedb-envelope.{service,timer}` and their assertions (D3 to D7, D12) |
-| `modules/clan/services/otel-collector/flake-module.nix` | Clan service with `agent` and `ingress` roles, node_exporter and the `observability-notify@` template (D8 to D10) |
-| `modules/clan/services/otel-collector/schema.nix` | The single source of allow-lists: systemd units, promoted resource attributes, process and node_exporter keep-lists, database names (A4:214) |
+| `modules/clan/services/otel-collector/flake-module.nix` | Clan service with `agent` and `ingress` roles backed by the plain NixOS modules `flake.modules.nixos.otel-collector-agent` and `flake.modules.nixos.otel-collector-ingress`, node_exporter, the `observability-notify@` template and its `services.observability-notify.units` option (D8 to D10) |
+| `modules/clan/services/otel-collector/schema.nix` | A flake-parts module defining `flake.lib.otelCollectorSchema`, the single source of allow-lists: systemd units including `omnigent-host-*.service`, the owner aliases `ownerAliases`, promoted resource attributes, process bounds `process = { minBytes; maxNames; }`, the node_exporter keep-list, database names (A4:214) |
 | `modules/clan/inventory/services/otel-collector.nix` | Instance with both roles on magnetite |
 | `modules/checks/greptimedb-envelope.nix`, `modules/checks/otel-collector-config.nix` | Evaluation-time regulators with mutants (D11) |
 | `modules/vm-tests/greptimedb-pipeline.nix`, `modules/vm-tests/greptimedb-oom-order.nix` | On-demand runtime tests (D13) |
@@ -65,12 +65,12 @@ Changed files:
 
 | Path | Change |
 |---|---|
-| `modules/machines/nixos/magnetite/default.nix` | Import `greptimedb`, set `services.greptimedb`, declare `greptimedb-users` and `greptimedb-r2` beside `omnigraph-r2` (`:337-376`), add three ZFS oneshots beside the existing six (`:193-263`), and set `OnFailure=` on all nine |
+| `modules/machines/nixos/magnetite/default.nix` | Import `greptimedb`, set `services.greptimedb`, declare `greptimedb-users` and `greptimedb-r2` beside `omnigraph-r2` (`:337-376`), bind `greptimedbDataset`, add three ZFS oneshots beside the existing six (`:193-263`), and list the units the notifier covers in `services.observability-notify.units` |
 | `modules/machines/nixos/magnetite/disko.nix` | Dataset `root/greptimedb` beside `root/cognee` (`:76-80`) |
 | `modules/nixos/nixbot.nix` | Loopback nginx server on `127.0.0.1:9180` proxying `/metrics` to `/run/nixbot/web.sock` |
-| `modules/apps/updates.nix` | `apps.update-greptimedb-bin` (`:43-81` pattern) |
-| `modules/home/tools/commands/system/ntfy-send.nix` | Consumes `pkgs/by-name/ntfy-send` instead of packaging the script |
-| Observability decision records, components, reference architecture, charter | Charter v11 amendments, made in the planning step and verified by a task (D14) |
+| `modules/apps/updates.nix` | `apps.update-greptimedb-bin` on every system, running `update.sh` directly (`:43-81` pattern) |
+| `modules/home/tools/commands/system/ntfy-send.nix` | Moved to `modules/home/tools/ntfy-send.nix`, which installs `pkgs.ntfy-send` instead of packaging the script |
+| Observability decision records, components, reference architecture, charter | Charter v11 amendments made in the planning step and charter v12 corrections from writing `plan.md`, verified by a task (D14) |
 
 Units on magnetite after deployment:
 
@@ -112,8 +112,9 @@ Reads go through PromQL at `/v1/prometheus/api/v1` with the `x-greptime-db-name`
 | Generator | Files | Delivered as | Consumer |
 |---|---|---|---|
 | `greptimedb-users` (openssl, hex passwords) | `users` (owner `greptimedb`, `0400`, `restartUnits` `greptimedb.service`) | `LoadCredential=users` → `/run/credentials/greptimedb.service/users`, named by `user_provider = "static_user_provider:file:..."` in the TOML | `greptimedb.service` |
+| | `users-sha256` (public, `secret = false`, the sha256 of `users`) | read by path through the envelope's `Environment=` | `greptimedb-envelope.service` (R7.4) |
 | | `admin-password` (`0400`) | `LoadCredential` | `greptimedb-schema.service` |
-| | `collector-password` (`0400`, `restartUnits` `opentelemetry-collector.service`) | `LoadCredential`, read by `basicauth` through `${file:...}` | `opentelemetry-collector.service` |
+| | `collector-password` (`0400`, `restartUnits` `opentelemetry-collector.service`) | `LoadCredential`, read by `basicauth` through `client_auth.password_file` | `opentelemetry-collector.service` |
 | | `perses-password` (`0400`) | none in S1 | S6 |
 | | `regulator-password` (`0400`, no `restartUnits`) | `LoadCredential` | `greptimedb-envelope.service` |
 | `greptimedb-r2` (hidden prompts `access-key`, `secret-key`; `persist = true`; prompt files `deploy = false`) | rendered `env` with `GREPTIMEDB_STANDALONE__STORAGE__ACCESS_KEY_ID` and `GREPTIMEDB_STANDALONE__STORAGE__SECRET_ACCESS_KEY` (`restartUnits` `greptimedb.service`) | `EnvironmentFile` | `greptimedb.service` |
@@ -124,7 +125,7 @@ No worker holds any credential (A8:91).
 ### Failure path
 
 `greptimedb.service`, `greptimedb-schema.service`, `greptimedb-envelope.service`, `opentelemetry-collector.service` and the nine `zfs-assert-*` and `zfs-set-*` oneshots set `OnFailure=observability-notify@%n.service`.
-The collector's `OnFailure=` is set in the `agent` role's NixOS module beside the template; the others are set where their units are defined.
+magnetite's host configuration lists these units in `services.observability-notify.units`, which the `agent` role's module declares; for each listed unit the module sets `OnFailure=` and the `RESOLVED` `ExecStopPost=` described below, and it lists `opentelemetry-collector` itself, so `greptimedb.nix` never references the notifier.
 The template instance runs `ntfy-send` with the failed unit's name and the host, posting to the topic `fleet-alerts` at `https://ntfy.zt` on cinnabar (ADR-009 item 11).
 It posts once per failure episode: it writes a stamp file per unit under `/var/lib/observability-notify` and skips the post while that stamp exists.
 Each notified unit carries an `ExecStopPost=` hook that, when the unit next exits successfully and its stamp exists, posts one `RESOLVED` message and removes the stamp.
@@ -133,6 +134,7 @@ ntfy has no authentication (`modules/machines/nixos/cinnabar/ntfy.nix`), so Zero
 ### D1: Package GreptimeDB 1.2.1 from the upstream binary as `greptimedb-bin`
 
 - **Choice**: `pkgs/by-name/greptimedb-bin` in the `golem-binary` shape (`pkgs/by-name/golem-binary/package.nix:23-104`): `passthru.sources.x86_64-linux = fetchurl` of `greptime-linux-amd64-v1.2.1.tar.gz` (sha256 `062d5beb13de4991c4fec201b2e5071518bf4ca8f0d52947eba757a74c2a5420`), `autoPatchelfHook` with `stdenv.cc.cc.lib`, `versionCheckHook`, `sourceProvenance = [ binaryNativeCode ]`, `mainProgram = "greptime"`, `passthru.embedsDashboard = true`, an `update.sh` that tracks stable upstream releases and `apps.update-greptimedb-bin`.
+  The package exists on `x86_64-linux` only and is `null` elsewhere, after the `radicle-desktop` precedent; `apps.<system>.update-greptimedb-bin` exists on every system and runs `update.sh` directly, because updates are run from stibnite.
   The module's `package` option defaults to it, and R1.1 (D11) requires the deployed package to be a stable release carrying `passthru.embedsDashboard = true`.
 - **Boundary**: vendored versus first-party.
   The binary is vendored and unmodified; the derivation around it is first-party.
@@ -147,7 +149,7 @@ ntfy has no authentication (`modules/machines/nixos/cinnabar/ntfy.nix`), so Zero
 
 ### D2: Move `ntfy-send` to `pkgs/by-name/ntfy-send`
 
-- **Choice**: the script and its package move from `modules/home/tools/commands/system/ntfy-send.nix` to `pkgs/by-name/ntfy-send`; the home-manager command and the notifier both consume the package.
+- **Choice**: the script and its package move to `pkgs/by-name/ntfy-send`, and the home-manager module moves from `modules/home/tools/commands/system/ntfy-send.nix` to `modules/home/tools/ntfy-send.nix`, following the convention in `modules/home/tools/repo-sync.nix:1-3`; the home-manager command, the notifier and S3's evaluator consume the package.
 - **Boundary**: source versus delivered.
   One source now delivers to two places, a user's profile and a system unit's `ExecStart`, so behaviour such as the `-k` TLS convention (`ntfy-send.sh:30-34`) stays identical in both.
 - **Rationale**: ADR-003 and ADR-009 require the notifier to call the existing `ntfy-send` rather than a second client (A3:241; ADR-009 item 10).
@@ -157,9 +159,10 @@ ntfy has no authentication (`modules/machines/nixos/cinnabar/ntfy.nix`), so Zero
 
 - **Choice**: `flake.modules.nixos.greptimedb` with options `services.greptimedb.{enable,package,settings,databases}`, imported by magnetite; no clan role or inventory instance (A7:78,163,171).
   `greptimedb.service` runs as static user and group `greptimedb` with `MemoryHigh = "3G"`, `MemoryMax = "4G"`, `MemorySwapMax = "0"`, `OOMScoreAdjust = 500`, `Restart = "on-failure"`, `RestartSec = 30`, `StartLimitIntervalSec = 0` (A7:63), and a lower `CPUWeight` following cognee (`modules/nixos/cognee.nix:229-235`, `CPUWeight = 20`).
-  The TOML sets `[runtime] global_rt_size = 4` and `compact_rt_size = 2` against magnetite's 16 vCPUs, the ADR-007 memory knobs (A7:64-65), `logging.dir = ""` and `enable_telemetry = false`.
+  The TOML sets `[runtime] global_rt_size = 4` and `compact_rt_size = 2` against magnetite's 16 vCPUs, the ADR-007 memory knobs (A7:64-65) with `prefilter_result_cache_size = "32MB"` pinned beside the other caches, `event_recorder.event_types = [ ]`, `logging.dir = ""` and `enable_telemetry = false`.
   Hardening follows the static-user variant in `modules/nixos/omnigent.nix:136-153`.
   `unitConfig.RequiresMountsFor = "/var/lib/greptimedb"` makes the unit fail, and so notify, when the dataset is not mounted, instead of writing into the root dataset.
+  An `ExecStartPre` writes the sha256 of `$CREDENTIALS_DIRECTORY/users` to `/run/greptimedb/loaded-users.sha256` (`0444`), recording which users file the running store loaded (D12).
 - **Rationale**: a static user owns the users credential and the dataset across restarts (A7:66).
   The kill order evaluator 900, store 500, collector 300 means a memory squeeze costs a store restart with WAL replay while the collector queues, never a CI evaluation worker (A7:100,127).
   Unbounded worker pools starved GreptimeDB's own health handler on a 192-core host in `MathisWellmann/nixos-config` (F6), so pool sizes and CPU share are set explicitly.
@@ -183,6 +186,7 @@ ntfy has no authentication (`modules/machines/nixos/cinnabar/ntfy.nix`), so Zero
   On the installed host it is created once by hand before the first deployment, as `zroot/root/cognee` was (it exists on magnetite with no record in the repository of its creation).
   The `disko.nix` declaration is kept so a reinstall creates it.
   The boot oneshots `zfs-set-root-greptimedb-quota`, `zfs-set-root-greptimedb-reservation` and `zfs-assert-root-greptimedb-noautosnap`, in the pattern of `zfs-set-root-nix-quota` (`default.nix:232`), enforce the properties on every boot.
+  They are built from magnetite's `greptimedbDataset` binding, the single source of the dataset's name, mountpoint, quota and reservation, which the envelope's environment also reads; the `greptimedb-envelope` check asserts that `disko.nix` declares the same values.
   `storage.data_home` is the dataset mount, because the WAL and caches stay local with object storage (F6).
   The `[storage]` stanza sets `type = "S3"`, `bucket = "sciexp"`, `root = "projects/vanixiets/observability/store/"`, `region = "auto"`, `enable_virtual_host_style = false`, `disable_ec2_metadata = true`, and the endpoint `omnigraph-r2` already uses (`default.nix:402`); credentials come from the environment (D6).
   Every table uses the flat SST format (A6:62).
@@ -199,9 +203,9 @@ ntfy has no authentication (`modules/machines/nixos/cinnabar/ntfy.nix`), so Zero
   `user_provider` stays a top-level TOML key, valid in standalone mode (F11, `src/cmd/src/standalone.rs:354,472`).
 - **Boundary**: source versus delivered.
   The generator scripts are source; the values exist only as activation-resolved files and `/run/credentials/<unit>/` copies.
-  This is why the collector's build-time validation needs placeholders (D8).
+  This is why the collector reads its password through `client_auth.password_file`, which build-time validation does not open (D8).
 - **Rationale**: the users file format requires exactly one `=` per line and silently skips malformed lines (F2); base64 padding contains `=`, hex does not.
-  Restart-on-rotation through `restartUnits` keeps R7.4 (store start later than users-file mtime) true after a rotation.
+  Restart-on-rotation through `restartUnits` makes the running store load the rotated users file, which R7.4 checks by comparing the sha256 the store recorded at start with the generator's public `users-sha256` (D12).
 - **Alternatives considered**: base64 passwords, rejected by F2; one generator per user as in `cinnabar/matrix.nix:49`, rejected because the users file must be written whole from all four passwords; passing the users file through `--user-provider` on the command line, unnecessary given F11.
 
 ### D7: Schema oneshot creates databases, then alters their TTL; no logs table
@@ -216,14 +220,16 @@ ntfy has no authentication (`modules/machines/nixos/cinnabar/ntfy.nix`), so Zero
 
 - **Choice**: the `otel-collector` clan service with `agent` and `ingress` roles, both assigned to magnetite in `modules/clan/inventory/services/otel-collector.nix`, following `modules/clan/services/nix-builders/flake-module.nix:283-408`.
   The two roles' NixOS fragments merge into one `services.opentelemetry-collector` configuration with `package = pkgs.opentelemetry-collector-contrib`.
+  The roles import the plain NixOS modules `flake.modules.nixos.otel-collector-agent` and `flake.modules.nixos.otel-collector-ingress`; `schema.nix` is a flake-parts module defining `flake.lib.otelCollectorSchema`, because import-tree imports every `.nix` file under `modules/`.
   Agent pipelines export to a `forward` connector that the ingress pipelines receive from.
   The ingress runs `memory_limiter` first, `convert_exponential_histogram_to_histogram` while the store is below 1.3 (A1:49; A3:89), a `routing` connector on `vanixiets.database`, and one `otlp_http` exporter per database to `http://127.0.0.1:4000/v1/otlp` with `x-greptime-db-name` and `x-greptime-otlp-metric-promote-resource-attrs` generated from `schema.nix`.
   The promote list stays short and stable: `host.name`, `systemd.unit.name`, `process.executable.name` (A3:93).
-  Each exporter authenticates with a `basicauth` client reading `collector-password` and uses a `file_storage` sending queue sized for at least 24 hours and under 512 MiB (A3:222).
+  Each exporter authenticates with a `basicauth` client whose `client_auth.password_file` names `collector-password` in the unit's credentials directory, and uses a `file_storage` sending queue with `sizer: bytes`: 400 MiB for `fleet` and 48 MiB each for `devloop` and `agent`, in one `file_storage` directory, so the sum stays under 512 MiB and `fleet` holds at least 24 hours at an assumed `fleetBytesPerMinute = 256000` (A3:222).
+  That rate is explicit and unmeasured; S1's deployment measures the real rate (tasks 8.5).
   The process envelope is `memory_limiter` 384 MiB, `MemoryMax = "512M"`, `OOMScoreAdjust = 300` (A3:220).
-  `validateConfigOverrides` substitutes placeholder `basicauth` credentials (F4).
+  `validateConfigOverrides` holds one entry, which removes the `authorization` of the `prometheus/zerotier` receiver's scrape job, because the prometheus receiver's validation stats its `credentials_file`; `basicauth`'s validation does not open `password_file`, so no placeholder credential is needed (P3, superseding F4).
 - **Boundary**: source versus delivered.
-  The nixpkgs module validates the rendered configuration at build time, before `/run/credentials` exists, so the validated file differs from the delivered one only in the placeholder credentials.
+  The nixpkgs module validates the rendered configuration at build time, before `/run/credentials` exists, so the validated file differs from the delivered one only in the zerotierone job's `authorization`, and R3.1 asserts the override touches nothing else.
 - **Rationale**: the NixOS module allows one collector per host, so two role instances on magnetite must share a process (Q2).
   S4 then adds only `otel-ca`, the mTLS ZeroTier receiver on the ingress fragment and the agent role on other hosts; nothing S1 deploys is restructured.
 - **Alternatives considered**: O2, both roles with the notifier left in S3, rejected because S1's units would then ship without failure notification; O3, ingress only with magnetite's receivers inside it, rejected because S4 would have to split them back out into the agent role; an agent-to-ingress hop over loopback OTLP, rejected as a network hop inside one process.
@@ -232,9 +238,11 @@ ntfy has no authentication (`modules/machines/nixos/cinnabar/ntfy.nix`), so Zero
 
 - **Choice**: the agent role collects into `fleet`:
   - `host_metrics` at 60s: memory including `system.linux.memory.available`, and the `paging` scraper with `system.paging.usage` only (A3:98).
-  - A second `host_metrics` receiver running the `process` scraper with `process.pid`, `.parent_pid`, `.command`, `.command_line`, `.executable.path` and `.owner` disabled at source, `process.memory.usage` aggregated by executable name, a filter dropping points under 64 MiB, and at most 30 names per host (A3:94-95; A4:86).
-  - The systemd receiver with `units` equal to the `schema.nix` allow-list, capped at 40 units, restarts on and CPU time off (A3:96-97; A4:110,112,146).
-  - A `prometheus` receiver at 60s scraping node_exporter on `127.0.0.1:9100` (`--collector.disable-defaults --collector.zfs --collector.vmstat --collector.vmstat.fields=^oom_kill$`, `listenAddress = "127.0.0.1"`, `openFirewall = false`, with the A4:88 keep-list), gitea on `127.0.0.1:3002`, niks3 on `127.0.0.1:5752`, nixbot on `127.0.0.1:9180`, nginx `stub_status`, zerotierone metrics, and GreptimeDB's own `127.0.0.1:4000/metrics`.
+  - A second `host_metrics` receiver running the `process` scraper with `process.pid`, `.parent_pid`, `.command`, `.command_line`, `.executable.path` and `.owner` disabled at source, `process.memory.usage` aggregated by executable name, and a filter dropping points under 64 MiB (A3:94-95; A4:86).
+    `schema.nix` declares `process.maxNames = 30` as the per-host bound on distinct names; no collector stage at contrib 0.155.0 enforces it, so S1 records the observed count at deployment and S4's `otel-envelope` regulates it (ADR-004 R4.2).
+  - The systemd receiver with `units` equal to the `schema.nix` allow-list, capped at 40 units and including `omnigent-host-*.service`, restarts on and CPU time off (A3:96-97; A4:110,112,146).
+    The `transform/omnigent-alias` stage rewrites `omnigent-host-<owner>.service` to `omnigent-host-<alias>.service` from `ownerAliases = { cameron = "owner-1"; janettesmith = "owner-2"; }` (ADR-003 item 17), so no stored unit name carries an owner's name.
+  - A `prometheus` receiver at 60s scraping node_exporter on `127.0.0.1:9100` (`--collector.disable-defaults --collector.zfs --collector.vmstat --collector.vmstat.fields=^oom_kill$`, `listenAddress = "127.0.0.1"`, `openFirewall = false`, with the A4:88 keep-list), gitea on `127.0.0.1:3002`, niks3 on `127.0.0.1:5752`, nixbot on `127.0.0.1:9180`, nginx `stub_status`, zerotierone metrics with `services.zerotierone.localConf.settings.enableMetrics = true`, and GreptimeDB's own `127.0.0.1:4000/metrics`.
   - Every series carries `host.name`.
 - `modules/nixos/nixbot.nix` gains a loopback nginx server on `127.0.0.1:9180` proxying `/metrics` to `/run/nixbot/web.sock`.
 - **Rationale**: these are ADR-003's magnetite set (A3:83-84) plus the store, which `quentinmit/isz` scrapes (Q5).
@@ -244,7 +252,7 @@ ntfy has no authentication (`modules/machines/nixos/cinnabar/ntfy.nix`), so Zero
 
 ### D10: The failure notifier lands in S1
 
-- **Choice**: the `observability-notify@.service` template sits in the `agent` role's NixOS module (A3:241), runs `ntfy-send` from D2 against `https://ntfy.zt`, and is the `OnFailure=` target of every unit in the failure path above.
+- **Choice**: the `observability-notify@.service` template sits in the `agent` role's NixOS module (A3:241), runs `ntfy-send` from D2 against `https://ntfy.zt`, and is the `OnFailure=` target of every unit in the failure path above, wired through `services.observability-notify.units`.
   It ships in its final ADR-009 item 11 form: topic `fleet-alerts`, one post per failure episode guarded by the per-unit stamp file, and the `ExecStopPost=` `RESOLVED` hook on each notified unit.
   S3 adds only the `alerter` credential if it turns on ntfy access control, and does not rewrite the template.
 - **Rationale**: S1's own units then report failures from their first deployment, and R7.2 needs no alerting component (A7:140).
@@ -262,9 +270,9 @@ ntfy has no authentication (`modules/machines/nixos/cinnabar/ntfy.nix`), so Zero
 | R1.1 (amended) | The package version is stable semver (`^[0-9]+\.[0-9]+\.[0-9]+$`), and the package declares that it embeds the dashboard: `cfg.package.passthru.embedsDashboard == true`, set on `greptimedb-bin`; `pkgs.greptimedb` passes only if it carries the dashboard and declares it | a prerelease version (`1.3.0-beta.2`) via `overrideAttrs`; `package` set to the pinned `pkgs.greptimedb`, which lacks `passthru.embedsDashboard` |
 | R1.2 | A store below 1.3.0 requires the exponential-histogram conversion in magnetite's collector configuration (A1:96-97) | statement removed |
 | R1.4 | `enable_telemetry = false` (A1:103-104) | key omitted |
-| R7.1 | The full envelope: `MemoryMax`, `MemoryHigh`, `MemorySwapMax = 0`, `OOMScoreAdjust`, every memory knob, listeners in `127.0.0.0/8`, protocols disabled, `user_provider`, `enable_telemetry = false`, `restartUnits` containing `greptimedb.service` (A7:135) | seven: drop `MemoryMax`; drop `page_cache_size`; HTTP on `0.0.0.0`; MySQL re-enabled; `user_provider` removed; `enable_telemetry` omitted; `restartUnits` removed (A7:136) |
+| R7.1 | The full envelope: `MemoryMax`, `MemoryHigh`, `MemorySwapMax = 0`, `OOMScoreAdjust`, every memory knob, `prefilter_result_cache_size = "32MB"` included, listeners in `127.0.0.0/8`, protocols disabled, `user_provider`, `enable_telemetry = false`, `restartUnits` containing `greptimedb.service` (A7:135) | seven: drop `MemoryMax`; drop `page_cache_size`; HTTP on `0.0.0.0`; MySQL re-enabled; `user_provider` removed; `enable_telemetry` omitted; `restartUnits` removed (A7:136) |
 | R6.4 (storage clause) | `disable_ec2_metadata`, `region = "auto"`, `enable_virtual_host_style = false`, `bucket`, `root` (A6:138) | drop `disable_ec2_metadata`; `root = ""` |
-| R3.1 | magnetite's collector configuration validates, endpoints and scrape targets on loopback, the six process attributes off, paging usage only, systemd `units` equal to `schema.nix` (A3:229-230); queue clause: every exporter's sending queue uses `file_storage`, sized for at least 24 hours and under 512 MiB (A3:222); failure-wiring clause: every unit the failure path wires sets `OnFailure=observability-notify@%n.service`, namely `greptimedb`, `greptimedb-schema`, `greptimedb-envelope`, `opentelemetry-collector`, the three new oneshots `zfs-set-root-greptimedb-quota`, `zfs-set-root-greptimedb-reservation` and `zfs-assert-root-greptimedb-noautosnap`, and the six existing `zfs-assert-root-{nix,docker,podman}-noautosnap`, `zfs-set-root-nix-quota` and `zfs-set-root-{nixos,home}-reservation` (`default.nix:193-263`) | the five of A3:233 that apply without S4's ZeroTier ingress; an exporter whose sending queue lacks `file_storage`; one named unit with its `OnFailure=` dropped |
+| R3.1 | magnetite's collector configuration validates, endpoints and scrape targets on loopback, the six process attributes off, paging usage only, systemd `units` equal to `schema.nix` (A3:229-230); process clause: the 64 MiB filter and `process.maxNames = 30`; alias clause: every evaluated `omnigent-host-<owner>` unit has an entry in `ownerAliases`, the alias stage is in the host pipeline, and no alias contains an owner's name; override clause: `validateConfigOverrides` removes only the zerotierone job's `authorization`; queue clause: every exporter's sending queue uses `file_storage` with `sizer: bytes`, the queues sum to under 512 MiB, and `fleet` holds at least 24 hours at `fleetBytesPerMinute = 256000` (A3:222); failure-wiring clause: every unit the failure path wires sets `OnFailure=observability-notify@%n.service`, namely `greptimedb`, `greptimedb-schema`, `greptimedb-envelope`, `opentelemetry-collector`, the three new oneshots `zfs-set-root-greptimedb-quota`, `zfs-set-root-greptimedb-reservation` and `zfs-assert-root-greptimedb-noautosnap`, and the six existing `zfs-assert-root-{nix,docker,podman}-noautosnap`, `zfs-set-root-nix-quota` and `zfs-set-root-{nixos,home}-reservation` (`default.nix:193-263`) | the four of A3:233 that apply without S4's ZeroTier ingress or S5's darwin agent; a scrape target off loopback; a systemd unit list that diverges from `schema.nix` or exceeds 40 units; an `omnigent-host` owner missing from `ownerAliases`; an exporter whose sending queue lacks `file_storage`; a `fleet` queue under 24 hours; queues at or above 512 MiB; an override that touches another receiver; one named unit with its `OnFailure=` dropped |
 | R8.2 | `greptimedb-users` files owned by a non-worker with `0400`; store HTTP bind on loopback (A8:139); credential-holder clause: across magnetite's evaluated units, only `greptimedb-schema` loads `admin-password` (S8 adds `greptimedb-export`), only `opentelemetry-collector` loads `collector-password`, and only the regulator units load `regulator-password` (in S1, `greptimedb-envelope`) | a worker owning `collector-password` (A8:140); a second unit loading `admin-password` |
 | Users file | The generator script, run in the build sandbox, emits exactly four lines each matching `<user>:(rw\|ro\|wo)=<hex>` for `admin:rw`, `collector:wo`, `perses:ro`, `regulator:ro` (F2) | a fifth line; a password containing `=` |
 
@@ -273,7 +281,10 @@ ntfy has no authentication (`modules/machines/nixos/cinnabar/ntfy.nix`), so Zero
 
 ### D12: Hourly runtime envelope
 
-- **Choice**: `greptimedb-envelope.timer` runs `greptimedb-envelope.service` hourly with the `regulator` credential, asserting R6.2 (sum of `sst_size` under 50 GiB), R6.3 (no legacy `sst_format`), R6.4's readiness probe, R7.2 (cgroup `memory.peak` below `MemoryHigh`, `memory.events` `oom_kill` and `max` not increasing), R7.3 (used under 80% of quota; quota and reservation hold), R7.4 (store start later than users-file mtime), and that no table carries its own TTL overriding its database's (F1).
+- **Choice**: `greptimedb-envelope.timer` runs `greptimedb-envelope.service` hourly with the `regulator` credential, asserting R6.2 (sum of `sst_size` under 50 GiB), R6.3 (no legacy `sst_format`), R6.4's readiness probe, R7.2 (cgroup `memory.peak` below `MemoryHigh`, `memory.events` `oom_kill` and `max` not increasing), R7.3 (used under 80% of quota; quota and reservation equal the declared values), R7.4 (the sha256 in `/run/greptimedb/loaded-users.sha256` equals the generator's public `users-sha256`; a mismatch or a missing file fails), and that no table carries its own TTL overriding its database's (F1).
+  R7.2's cgroup counters restart with each store invocation, so the envelope keeps its baseline keyed by `InvocationID`; a new invocation fails the run if the journal for `greptimedb.service` since the baseline holds `MESSAGE_ID=fe6faa94e7774663a0da52717891d8ef`, systemd 261.3's "The kernel OOM killer killed some processes in this unit.", or if `NRestarts` increased.
+  The unit runs unprivileged under `DynamicUser` with `SupplementaryGroups = systemd-journal`, and R7.3 reads used space, quota and reservation with `zfs get -Hp`.
+  R7.4 compares hashes rather than the store's start time with the users file's modification time, because sops-nix rewrites every secret with a new modification time on each activation (P1).
   Every query treats an empty result or a missing table as failure; a mutant renames the queried table and must fail (F3).
 - **Rationale**: these properties exist only at runtime.
   `MathisWellmann/nixos-config`'s `GreptimeDBDown` alert queries a job that does not exist and can never fire (F3).
@@ -283,10 +294,10 @@ ntfy has no authentication (`modules/machines/nixos/cinnabar/ntfy.nix`), so Zero
 
 - **Choice**:
   - Evaluation-time (D11) covers the envelope, listeners, users file, telemetry, storage stanza and collector configuration.
-  - A systemd-nspawn `containers` test (`pkgs.testers.runNixOSTest`, `nixos/lib/testing/driver-configuration.nix:68-71`), requiring `nixos-test` and `uid-range` and therefore buildable on magnetite, covers the pipeline: readiness, the schema oneshot's create and alter of TTL, the auth matrix including a `collector:wo` read answered 401, OTLP ingest through the routing connector, a PromQL read back with `x-greptime-db-name`, the systemd receiver reaching D-Bus under `DynamicUser`, a store restart (stop `greptimedb.service`, emit, start it, and read the emitted interval back), and R1.1's runtime side: `GET http://127.0.0.1:4000/dashboard/` returns 200.
+  - A systemd-nspawn `containers` test (`pkgs.testers.runNixOSTest`, `nixos/lib/testing/driver-configuration.nix:68-71`), requiring `nixos-test` and `uid-range` and therefore buildable on magnetite, covers the pipeline: readiness, the schema oneshot's create and alter of TTL, the auth matrix (no credential 401, wrong password 401, `collector:wo` read 403, `collector:wo` write 200, `perses:ro` read 200, `perses:ro` write 403, `regulator:ro` read 200, `admin` read and write 200), OTLP ingest through the routing connector, a PromQL read back with `x-greptime-db-name`, the systemd receiver reaching D-Bus under `DynamicUser`, the owner alias (the stored `systemd_unit_name` is the alias, and no stored value contains the owner), a store restart (stop `greptimedb.service`, emit, start it, and read the emitted interval back), and R1.1's runtime side: `GET http://127.0.0.1:4000/dashboard/` returns 200.
   - Survival of a store restart is discharged twice: R3.1's queue clause proves the configuration persists the queue, and the container test's restart case proves the queued interval reaches the store.
-  - A QEMU `nodes` test requiring `kvm` and `nixos-test` with `qemu.forceAccel`, which routes only to pyrite, covers the OOM kill order evaluator 900, store 500, collector 300.
-  - Deployment on magnetite covers what needs the real host, recorded in `verify.md`: R2 works, ZFS quota and reservation are enforced, the zram paging series exists, R7.2 fails when its threshold is set below the observed peak (A7:141), `host.name` series answer through SQL and PromQL, and no log or trace tables exist.
+  - A QEMU `nodes` test requiring `kvm` and `nixos-test` with `qemu.forceAccel`, which routes only to pyrite, covers the OOM kill order evaluator 900, store 500, collector 300: the kernel's victim lines, each carrying `,global_oom,`, name the three units in that order, all three units log systemd's OOM-kill message, and only `greptimedb.service` is asserted to end with result `oom-kill`, because a unit whose only process was the victim may record `signal` instead.
+  - Deployment on magnetite covers what needs the real host, recorded in `verify.md`: R2 works, ZFS quota and reservation are enforced, the zram paging series exists, R7.2 fails when its threshold is set below the observed peak (A7:141), `host.name` series answer through SQL and PromQL, no log or trace tables exist, the observed count of distinct process names is at most 30, and the measured `fleet` queue rate is compared with the assumed `fleetBytesPerMinute`.
   - Both runtime tests live in the on-demand `vmTests` lane (`modules/vm-tests/default.nix`), outside `checks`.
 - **Rationale**: a container shares the host kernel, so the OOM killer in a container is the host's; only a VM can test the kill order.
   Everything else in the pipeline needs only process isolation, which nspawn gives on magnetite without KVM.
@@ -298,6 +309,7 @@ ntfy has no authentication (`modules/machines/nixos/cinnabar/ntfy.nix`), so Zero
 
 - **Choice**: revise ADR-002 so the dashboard layer is GreptimeDB's embedded Perses dashboard, correcting its premise that `/v1/dashboards` first appears in v1.3.0-alpha.1 (ADR-002:29, :99, :185 and research R39), and keep standalone Perses as `percli migrate` and `percli lint` tooling and as the fallback; amend R1.1 and the "no `pkgs/by-name` entry" lines of ADR-001, ADR-007 and the `greptimedb` component so the store package must be a stable release that serves the embedded dashboard, which makes `greptimedb-bin` the intended package; amend ADR-007's "gRPC disabled" to "gRPC bound to loopback"; move the `observability-notify@` template from S3 to S1 in the reference architecture's sequencing; record each in a charter v11 entry dated 2026-10-16.
   These amendments are made in the planning step, before implementation; task 7.1 verifies they are present.
+  Charter v12 records the corrections found while writing `plan.md` (brainstorm P1 to P13) that amend ADR-003, ADR-007 and ADR-009 and their components.
 - **Rationale**: the decision records must describe what is deployed; these four are the places where the deployed shape departs from accepted text.
 - **Alternatives considered**: superseding ADRs, rejected because each amendment changes one clause and leaves the record's decision intact.
 

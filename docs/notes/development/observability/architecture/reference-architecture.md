@@ -187,7 +187,8 @@ Change numbers refer to the slices S1 to S8 of the next section.
 | Item | Kind | Action | Owning ADR | Change |
 |---|---|---|---|---|
 | root `nixpkgs` input | flake input | no change for the store, and no new flake input is added by any record | ADR-001; ADR-007 | none |
-| `pkgs/by-name/greptimedb-bin` | package | add: the upstream release tarball with `passthru.embedsDashboard = true`, `update.sh` and `apps.update-greptimedb-bin`; S6 adds `passthru.dashboardVersion` | ADR-001 R1.1; ADR-007; ADR-002 | 1, 6 |
+| `pkgs/by-name/greptimedb-bin` | package | add: the upstream release tarball on `x86_64-linux` only, with `passthru.embedsDashboard = true`, `update.sh` and `apps.update-greptimedb-bin` on every system; S6 adds `passthru.dashboardVersion` | ADR-001 R1.1; ADR-007; ADR-002 | 1, 6 |
+| `pkgs/by-name/ntfy-send` | package | add: the existing `ntfy-send` script as a package, consumed by the home-manager command, the `observability-notify@` template and the S3 evaluator | ADR-009; ADR-003 | 1 |
 | `modules/nixos/greptimedb.nix` | file | add: `services.greptimedb`, TOML generation with gRPC bound to `127.0.0.1:4001`, `greptimedb` user, `greptimedb.service`, `greptimedb-schema.service`, export service and timer, `greptimedb-envelope` service and timer, assertions R1.1, R1.2, R1.4 and R6.4 | ADR-007; ADR-001; ADR-006 | 1, 8 |
 | `modules/checks/greptimedb-envelope.nix` | file | add: R7.1 with its mutants | ADR-007 | 1 |
 | `modules/machines/nixos/magnetite/disko.nix` | file | modify: `root/greptimedb` dataset at `/var/lib/greptimedb` | ADR-007 | 1 |
@@ -202,7 +203,7 @@ Change numbers refer to the slices S1 to S8 of the next section.
 | `modules/checks/otel-collector-config.nix` | file | add: R3.1 with recorded `launchctl print` fixtures | ADR-003 | 1, 4, 5 |
 | `modules/checks/otel-redaction.nix` | file | add: R8.1 with ADR-004's R4.1 fixtures | ADR-008; ADR-004 | 7 |
 | `modules/nixos/nixbot.nix` | file | modify: loopback nginx server on `127.0.0.1:9180` proxying `/metrics` to the nixbot socket | ADR-003 | 1 |
-| `modules/clan/inventory/services/zerotier.nix` or the zerotier configuration it applies | file | modify: `allowMetrics = true` | ADR-003 | 1 |
+| `modules/clan/inventory/services/zerotier.nix` or the zerotier configuration it applies | file | modify: `enableMetrics = true` | ADR-003 | 1 |
 | `modules/lib/omnigent-environment.nix` | file | modify: add `OTEL_` to the reserved prefixes | ADR-008 | 7 |
 | `modules/checks/omnigent-environment.nix` | file | modify: add an `OTEL_` policy mutant | ADR-008 | 7 |
 | `modules/machines/nixos/cinnabar/ntfy.nix` | file | modify: `auth-access` entries and `environmentFile` from `ntfy-alerter`; until then the S1 notifier posts anonymously | ADR-009 | 3 |
@@ -226,7 +227,7 @@ Change numbers refer to the slices S1 to S8 of the next section.
 | `modules/vm-tests/devloop-ingest.nix` | file | add: on-demand VM test with mutants | ADR-005 | 2 |
 | `modules/home/ai/omp/default.nix` | file | modify: OTLP metrics endpoint, `OTEL_TRACES_EXPORTER=none`, `OTEL_LOGS_EXPORTER=none`, protocol and service name for human accounts | ADR-005; ADR-008 | 7 |
 | reader command on each analytics host | file | add: signs the export read credential and prints DuckDB `CREATE SECRET`; ADR-006 fixes no path | ADR-006 | 8 |
-| `greptimedb-users` | clan vars generator | add on magnetite: four users, five files | ADR-007 | 1 |
+| `greptimedb-users` | clan vars generator | add on magnetite: four users, five secret files and the public `users-sha256` | ADR-007 | 1 |
 | `greptimedb-r2` | clan vars generator | add on magnetite: hidden prompts for the `sciexp` token, `env` file | ADR-006 | 1 |
 | `otel-ca` | clan vars generator | add, `share = true` | ADR-003 | 4 |
 | `otel-cert` | clan vars generator | add, per machine | ADR-003 | 4 |

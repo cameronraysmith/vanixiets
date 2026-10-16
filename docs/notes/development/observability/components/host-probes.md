@@ -51,7 +51,7 @@ Series written (ADR-004 keep-lists):
 Probe output rules (ADR-003 item 23):
 
 - A label that `launchctl` cannot find is written with state `unloaded`.
-- Each `org.nixos.omnigent-host-<owner>` label is written as `org.nixos.omnigent-host-<alias>` from the owner-to-alias attrset in `schema.nix`.
+- Each `org.nixos.omnigent-host-<owner>` label is written as `org.nixos.omnigent-host-<alias>` from the owner-to-alias attrset in `schema.nix`, `flake.lib.otelCollectorSchema.ownerAliases = { cameron = "owner-1"; janettesmith = "owner-2"; }` (ADR-003 item 17).
 - `pid` is never written.
 - `(never exited)` is written as exit code 0, and any exit-code field that is not an integer as -1.
 
