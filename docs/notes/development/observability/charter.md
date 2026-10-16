@@ -1,12 +1,12 @@
 ---
 title: Fleet observability and CCV feedback-loop charter
-status: charter v6
+status: charter v7
 date: 2026-10-15
 ---
 
 # Fleet observability and CCV feedback-loop charter
 
-Charter version: v6.
+Charter version: v7.
 A revision is a version bump with a dated entry under "Revision history"; the text of an earlier version is never edited in place.
 
 ## Objective
@@ -142,6 +142,7 @@ Its artifacts remain readable prior art — `modules/services/signoz.nix` and `d
 - D6 Storage substrate and lakehouse seam: whether telemetry lands as Parquet reachable by the repository's existing DuckDB/DuckLake analytics path, or in a separate silo.
 - D7 Packaging, host placement, and clan service shape.
 - D8 Access control and tenancy, including the prompt-content hazard in W9 and the relationship to the omnigent worker-isolation boundary.
+- D9 Alerting: how fleet conditions become human notifications, including watching the store itself; added in v7.
 
 ## Acceptance criteria and regulators
 
@@ -151,7 +152,7 @@ Its artifacts remain readable prior art — `modules/services/signoz.nix` and `d
 | A2 Every `owner/repo@rev:path` citation resolves | per-citation `git cat-file -e` in the referenced checkout; for every nixpkgs tarball node of W4, none of which has a git checkout, resolution is by `nix eval` against the named node instead, and the citation must name the node; corrected in v5 from "the two tarball nixpkgs nodes of W4" | deterministic |
 | A3 One sentence per line (S4) | grep for `[a-z]\. [A-Z]` outside tables and fences prints nothing | deterministic, approximate |
 | A4 No machine-local paths, tokens or session links (S5) | grep for `(^\|[[:space:]"'(=])/(Users\|home)/`, `ghp_`, `/attachments/` prints nothing; the leading-delimiter class is required so that in-repo citation paths such as `modules/home/...` do not false-positive | deterministic |
-| A5 Each decision D1–D8 has a rationale and every rejected alternative (R1) | review plus human gate | recorded human judgment |
+| A5 Each decision D1–D9 has a rationale and every rejected alternative (R1); extended in v7 from D1–D8 | review plus human gate | recorded human judgment |
 | A6 Each proposed artifact names an envelope and a regulator (R5) | review plus human gate | recorded human judgment |
 | A7 [vacuous as written; see v3] Formatting | `nix fmt -- --ci` exits 0, but `modules/formatting.nix:13` enables `nixfmt` alone, so treefmt traverses this corpus and emits zero of its files for processing: the regulator passes without sampling anything | vacuous, pending rebinding |
 | A7a Markdown well-formedness | until a markdown formatter is added to the treefmt set, A1, A3 and A4 are the only deterministic regulators that actually bind on this corpus, and A7 must not be cited as formatting evidence | deterministic, by substitution |
@@ -245,3 +246,7 @@ A research unit that meets ambiguity returns it in its questions section; the or
   - RK6 annotated: the residual risk is only that the GreptimeDB NixOS module is ours to write.
 - v6 (2026-10-15): the body correction below is the only edit to earlier text.
   - W5 corrected: the nixpkgs bump to GreptimeDB 1.2.1 (https://github.com/NixOS/nixpkgs/pull/574558) merged on 2026-10-15; ADR-001 and ADR-007 now deploy 1.2.1 through a root-pin bump, with a `greptimedb-bin` fallback only for a channel delay at implementation time.
+- v7 (2026-10-15): extension after the human approved host-level signals and an alerting decision; the body corrections below are the only edits to earlier text, and D1–D8 and the requirements are unchanged.
+  - D9 added: alerting, because ADR-001 placed alerting outside the store and no decision record chose it, so per-process memory growth, systemd restart loops and storage degradation are visible today only to someone watching a dashboard.
+  - A5 extended from D1–D8 to D1–D9.
+  - The host-level signal additions (per-process metrics, systemd unit state and restart counts, ZFS and disk health) fall under D3 and D4 and are recorded in ADR-003 and ADR-004 rather than as new decisions.

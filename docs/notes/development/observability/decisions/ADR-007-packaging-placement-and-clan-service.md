@@ -78,6 +78,7 @@ The R2 credentials are the `greptimedb-r2` and `greptimedb-r2-export` generators
 Clan service shape: the store is a NixOS module, `flake.modules.nixos.greptimedb` with options under `services.greptimedb`, imported by `magnetite` the way `omnigraph` is, and is not a clan service role.
 Perses is likewise a plain NixOS module, `modules/nixos/perses.nix` of ADR-002, imported by `magnetite` and not a clan service role; its memory envelope is ADR-002's verbatim: plugin archives restricted to the ten-plugin subset, measured at 84 MiB against 257 MiB for the full vendored set, with `/run/perses/plugins` held at or below 96 MiB.
 Collectors are the `otel-collector` clan service with roles `agent` and `ingress` and generators `otel-ca` and `otel-cert`, as ADR-003 defines; the store module exposes nothing that role needs other than the loopback endpoint and the `collector-password` path.
+The loopback exporters that ADR-003 adds for host-level signals belong to that same `agent` role rather than to any machine module: `prometheus-node-exporter.service` on every NixOS host and `prometheus-smartctl-exporter.service` on `pyrite` only, both from the root pin's `services.prometheus.exporters.{node,smartctl}` modules with `listenAddress` set to `127.0.0.1` (`NixOS/nixpkgs@ac1faec4:nixos/modules/services/monitoring/prometheus/exporters/node.nix:23`, `NixOS/nixpkgs@ac1faec4:nixos/modules/services/monitoring/prometheus/exporters/smartctl.nix:25`, `NixOS/nixpkgs@ac1faec4:nixos/modules/services/monitoring/prometheus/exporters.nix:209-211`).
 A oneshot `greptimedb-schema.service`, ordered after the store reports ready, idempotently creates the `fleet`, `devloop` and `agent` databases with ADR-004's TTL defaults of 30, 365 and 90 days, and sets the TTL of the `fleet` logs table to ADR-004's 14 days.
 The `greptimedb-schema`, `greptimedb-export` and `greptimedb-envelope` units set `OnFailure=observability-notify@%n.service`, the shared ntfy notifier that ADR-003 defines (ADR-003 Q9).
 
@@ -127,6 +128,7 @@ Under host-wide memory exhaustion the store is killed first and the ADR-003 `ing
 Queries that need more than 512 MB of scan or query memory fail rather than wait, which bounds dashboard and export load and makes heavy analytics a job for the ADR-006 export.
 Rotating any store credential restarts the store and the consuming unit, which costs a WAL replay and a collector retry cycle.
 If the R2 stanza fails and ADR-006's fallback to local `File` storage applies, the dataset quota must be raised to hold the SSTs.
+The host-level signals of ADR-003 and ADR-004 raise the `fleet` active-series budget from 6,000 to 8,000 and change neither the store's memory ceiling nor its dataset quota, because every memory knob above is a fixed size rather than a function of series count and SSTs live in R2; R7.2 and R7.3, not this argument, are what would show otherwise.
 
 ## Operating envelope and regulator
 
@@ -165,7 +167,7 @@ Keeping the store out of the clan inventory prevents an inventory instance whose
 - Clan vars generator `greptimedb-users` on `magnetite`: `runtimeInputs` openssl; users `admin:rw`, `collector:wo`, `perses:ro` and `regulator:ro`; files `users` (owner `greptimedb`, mode `0400`, `restartUnits = [ "greptimedb.service" ]`), `admin-password` (mode `0400`), `collector-password` (mode `0400`, `restartUnits` naming the ADR-003 ingress collector unit), `perses-password` (mode `0400`, `restartUnits = [ "perses.service" ]`), and `regulator-password` (mode `0400`).
 - Perses on `magnetite`: the plain NixOS module `modules/nixos/perses.nix` specified in ADR-002, with ADR-002's plugin-subset envelope, imported by `magnetite` and not a clan service role.
 - Clan vars generators `greptimedb-r2` and `greptimedb-r2-export`: specified in ADR-006.
-- The `otel-collector` clan service files and its `otel-ca` and `otel-cert` generators: listed in ADR-003.
+- The `otel-collector` clan service files, its `otel-ca` and `otel-cert` generators, and the `agent` role's loopback node and smartctl exporters with the `smartDevices` role option set for `pyrite`: listed in ADR-003.
 - No flake input, no overlay, no `pkgs/by-name` entry, and no clan inventory instance for the store.
 
 ## Questions for the human gate

@@ -22,6 +22,7 @@ Signals available without new emitter code:
 - nixbot per-attribute rows in PostgreSQL, pruned after 90 days (`research/dev-loop-signals.md` RF2, RF3).
 - omp OTLP metrics, spans and logs when an endpoint is set, with message content gated by `OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT` and the log signal under no content gate (`research/dev-loop-signals.md` RF11).
 - Omnigent OTLP, inert as packaged until the SDK and exporters are added (`research/dev-loop-signals.md` RF12, RC1).
+- Host-level signals added on 2026-10-15, each tied to a failure this fleet has had (ADR-003 Context): per-process memory from the `host_metrics` `process` scraper, systemd unit state and restart counts from the contrib `systemd` receiver, ZFS pool state, ARC and the kernel `oom_kill` count from a loopback node_exporter, and NVMe health on pyrite from a loopback smartctl_exporter (ADR-003 items 16 to 19).
 
 omp's metric attributes are `gen_ai.operation.name`, `gen_ai.provider.name`, `gen_ai.request.model`, `gen_ai.response.service_tier`, `omp.gen_ai.agent.id` and `omp.gen_ai.agent.name` on every point, plus `gen_ai.token.type`, `gen_ai.response.finish_reason`, `gen_ai.tool.name`, `omp.tool.status` and `error.type` per instrument (`can1357/oh-my-pi@c2cb79e4c:packages/coding-agent/src/telemetry-export-otlp.ts:259-266`, `:296-315`).
 Run-level points also carry five numeric `omp.agent.*.count` attributes that are spread into every tool-call and error point (`can1357/oh-my-pi@c2cb79e4c:packages/coding-agent/src/telemetry-export-otlp.ts:282-286`, `:300`).
@@ -45,6 +46,10 @@ Signal scope for the first deployment:
 | Host metrics, 60 s | `host_metrics` on every agent (ADR-003) | fleet | `fleet` |
 | Service metrics, 60 s | gitea, niks3, nixbot, nginx, zerotierone (ADR-003) | fleet, dev-loop for nixbot aggregates | `fleet` |
 | Unit logs | `journald` on NixOS, allow-listed units only | fleet | `fleet` |
+| Per-process memory, 60 s | `process` scraper on NixOS agents, summed per executable, points below 64 MiB dropped (ADR-003) | fleet | `fleet` |
+| systemd unit state and restarts, 60 s | `systemd` receiver on NixOS agents, allow-listed units only (ADR-003) | fleet | `fleet` |
+| ZFS pool state, ARC, OOM-kill count, 60 s | loopback node_exporter on NixOS agents (ADR-003) | fleet | `fleet` |
+| NVMe health, 60 s | loopback smartctl_exporter on pyrite (ADR-003) | fleet | `fleet` |
 | Batch lifecycle | gitea-mq journal lines beginning `batch ` | dev-loop | `devloop` |
 | Per-attribute CI outcomes | nixbot rows read on magnetite (ADR-005) | dev-loop | `devloop` |
 | Deploy records | `/var/log/deploy-record.jsonl` on every agent (ADR-005) | dev-loop | `devloop` |
@@ -61,16 +66,24 @@ Semantic-convention adherence:
 3. Prometheus-scraped metrics keep their native names; renaming them to conventions prevents no failure.
 4. `gen_ai.*` names are accepted exactly as emitters send them and are allow-listed by exact key, with the `open-telemetry/semantic-conventions-genai` repository recorded as their reference; no attribute is renamed in the collector.
 5. One non-convention resource attribute, `vanixiets.database`, is stamped by the agent to route to a database and removed by the ingress before export.
+6. `process.*` and `systemd.*` metrics keep the names their receivers emit, and node_exporter and smartctl_exporter metrics keep their native names.
+7. GreptimeDB's default translation stores OTLP names and keys with dots replaced by underscores and unit and `_total` suffixes appended, and the ingress promotes every allow-listed resource key to a label (ADR-003 item 15), so the names visible to PromQL are those listed below.
 
 Attribute allow-list (single source of truth for the collector and for the regulator).
 Key-level attribute redaction, `allow_all_keys: false`, applies only to the omp agent pipeline; Prometheus-scraped and `host_metrics` points keep their native label keys, bounded by the label bans and the per-label value cap below.
 
-- Resource, every signal: `service.name`, `service.version`, `host.name`, `host.arch`, `os.type`.
+- Resource, every signal: `service.name`, `service.version`, `host.name`, `host.arch`, `os.type`; additionally `systemd.unit.name` on systemd receiver points and `process.executable.name` on process scraper points.
 - omp metric names: exactly `omp.agent.tool.calls` and `omp.agent.errors`; every other omp metric, including token and cost metrics, is dropped (ADR-005 Q7).
 - omp metric points: `gen_ai.operation.name`, `gen_ai.provider.name`, `gen_ai.request.model`, `gen_ai.response.service_tier`, `gen_ai.response.finish_reason`, `gen_ai.tool.name`, `omp.tool.status`, `omp.gen_ai.agent.name`, `error.type`.
 - omp spans, when wired: the metric keys above plus `gen_ai.conversation.id`, `gen_ai.usage.input_tokens`, `gen_ai.usage.output_tokens` and their cache variants.
 - journald records: `MESSAGE` as the body, `_SYSTEMD_UNIT`, `PRIORITY` and `_HOSTNAME`; every other journal field is dropped.
 - Prometheus-scraped and `host_metrics` points: their native label keys, not key-redacted, subject to the label bans below.
+- Process scraper: metric `process.memory.usage` only, stored as `process_memory_usage_bytes{host_name, process_executable_name}`; the resource attributes `process.pid`, `process.parent_pid`, `process.command`, `process.command_line`, `process.executable.path` and `process.owner` are disabled at the source (ADR-003 item 16).
+- systemd receiver: `systemd.unit.state` with point key `systemd.unit.active_state`, stored as `systemd_unit_state{host_name, systemd_unit_name, systemd_unit_active_state}`, and `systemd.service.restarts`, stored as `systemd_service_restarts_total{host_name, systemd_unit_name}`; `systemd.service.cpu.time` is disabled.
+- node_exporter keep-list: `node_zfs_zpool_state` with labels `zpool` and `state`, `node_zfs_arc_size`, `node_zfs_arc_c`, `node_zfs_arc_c_min`, `node_zfs_arc_c_max`, `node_zfs_arc_hits`, `node_zfs_arc_misses`, `node_zfs_arc_memory_throttle_count` and `node_vmstat_oom_kill`; every other node_exporter series, including per-dataset `node_zfs_zpool_dataset_*`, is dropped.
+- smartctl_exporter keep-list: `smartctl_device_smart_status`, `smartctl_device_critical_warning`, `smartctl_device_media_errors`, `smartctl_device_percentage_used`, `smartctl_device_available_spare`, `smartctl_device_available_spare_threshold`, `smartctl_device_num_err_log_entries` and `smartctl_device_temperature`, with labels `device` and `temperature_type`; `smartctl_device` and `smartctl_version` are dropped.
+- Prometheus scrape metadata: `up` is kept and `scrape_*` series are dropped for the node_exporter and smartctl_exporter targets.
+- Memory scraper: `system.linux.memory.available` is enabled on NixOS agents, stored as `system_linux_memory_available_bytes`.
 
 `devloop` column allow-list, per signal, using ADR-005's field names; any other column is dropped:
 
@@ -86,15 +99,19 @@ This list documents intent; enforcement is the allow-lists, so on the omp pipeli
 
 journald unit allow-list: `gitea`, `gitea-mq`, `nixbot*`, `niks3*`, `nix-daemon`, `nix-grpc-daemon`, `harmonia-gc`, `postgresql`, `nginx`, `greptimedb`, `opentelemetry-collector`, `zerotierone`.
 Never on the list: `omnigent*`, `omnigent-host-*`, `omnigraph`, `user@*`, and session scopes, because their output can carry agent or user content.
+systemd unit allow-list, `.service` units only: the journald allow-list above, `omnigent-host-*`, `omnigraph`, `otel-envelope`, `devloop-reconcile`, `greptimedb-envelope`, `greptimedb-export`, `greptimedb-schema`, `prometheus-node-exporter` and `prometheus-smartctl-exporter`.
+Unit state carries no journal content, so `omnigent*` units are on this list while staying off the journald list; journald collection is unchanged by the host-level signals.
+Each `omnigent-host-<owner>.service` name is rewritten to `omnigent-host-<alias>.service` from an explicit owner-to-alias attrset in `schema.nix`, so no owner's name becomes a label value and adding or removing an owner never renames another owner's series (ADR-003 Q12).
 
-Metric label bans: pull-request number, commit SHA, derivation or store path, build id, `gen_ai.conversation.id`, `session.id`, trace or span id, `omp.gen_ai.agent.id`, the five `omp.agent.*.count` attributes, and any person identifier.
+Metric label bans: pull-request number, commit SHA, derivation or store path, build id, `gen_ai.conversation.id`, `session.id`, trace or span id, `omp.gen_ai.agent.id`, the five `omp.agent.*.count` attributes, any person identifier, `process.pid`, `process.parent_pid`, `process.command`, `process.command_line`, `process.executable.path`, `process.owner`, smartctl's `serial_number`, and zerotierone's per-peer `node_id`.
+Process command lines are banned because they can carry secrets passed as arguments and agent prompt content, and the other process keys are banned because a pid changes on every restart, so a restart-looping unit would mint one series per restart.
 These may appear as span or log-row columns in `devloop` and `agent`, where they do not create series.
 
 Budget per consumer:
 
 | Consumer | Database | Cardinality envelope | Volume envelope | Retention |
 |---|---|---|---|---|
-| Fleet | `fleet` | at most 6,000 active series; at most 200 distinct values per label key per metric | journald at most 100 MB per host per day, provisional | metrics 30 d; logs table 14 d |
+| Fleet | `fleet` | at most 8,000 active series; at most 200 distinct values per label key per metric; per host at most 30 `process_executable_name` values and 30 `systemd_unit_name` values | journald at most 100 MB per host per day, provisional | metrics 30 d; logs table 14 d |
 | Dev-loop | `devloop` | no metric series; rows only | at most 100,000 rows per day | 365 d |
 | Agent harness | `agent` | at most 2,000 active series; `gen_ai.tool.name` at most 200 values | at most 200,000 span rows per day when spans are wired | 90 d |
 
@@ -110,7 +127,11 @@ Fleet metrics at 30 d cover the incident-review windows recorded so far; fleet l
 Agent-harness data at 90 d covers planning-unit sizing over a quarter, while limiting how long a personal activity record persists (`research/telemetry-security-and-tenancy.md` Q6).
 Banning unbounded domains from metric labels is the single rule that keeps the budget satisfiable in one store, so RK4 does not fire (`research/otel-collector-topology.md` Bearing on D4).
 `omp.gen_ai.agent.id` and the `omp.agent.*.count` attributes are dropped because the first is per-instance and the second multiplies every tool series by run shape while feeding no decision in ADR-005.
-The fleet envelope is the measured 392 points per host at seven hosts plus service endpoints, with headroom.
+The fleet envelope was 6,000 series: the measured 392 points per host at seven hosts plus service endpoints, with headroom.
+The host-level signals add, per NixOS host, at most 30 process series, at most 30 units at nine series each (eight `systemd_unit_state` states plus one restart counter), 7 pool-state series for the single pool `zroot`, 7 ARC series, 1 `oom_kill` series, 1 `up` series and 1 memory-available series, which is 30 + 270 + 7 + 7 + 1 + 1 + 1 = 317.
+pyrite adds 10 more for smartctl: 7 single-series metrics and `smartctl_device_temperature` with up to 2 `temperature_type` values on one controller, plus 1 `up`; stibnite adds none.
+Six NixOS hosts therefore add 5 × 317 + 327 = 1,912 series, and the budget rises from 6,000 to 8,000, keeping the previous headroom.
+The per-host caps of 30 keep each of `process_executable_name` and `systemd_unit_name` at no more than 180 values across six hosts, inside the 200-value cap.
 
 ## Rejected alternatives
 
@@ -122,6 +143,8 @@ The fleet envelope is the measured 392 points per host at seven hosts plus servi
 - Separate store for dev-loop telemetry: the budget is satisfiable in one store once metric labels are bounded (RK4 not confirmed).
 - Collecting omp OTLP logs through a redaction stage: the log signal has no emitter-side content gate and string bodies defeat the redaction processor (see ADR-008).
 - Person identifiers as attributes: no decision in ADR-005 needs them, and they make the store a personal-activity record.
+- Admitting `process.command_line` or `process.pid` under a redaction stage: a command line is content that a redaction pattern cannot enumerate, and a pid mints a series per restart; disabling them at the source keeps them out of collector memory.
+- Verbatim `omnigent-host-<owner>` unit names: each owner's name becomes a label value in `fleet` (ADR-003 Q12).
 
 ## Consequences
 
@@ -131,18 +154,20 @@ Failure classes for omp come only from `error.type`, and Omnigent tool failure c
 Per-person cost attribution is not possible from the store; attribution is per host and per service.
 The metric engine's metadata region and pipeline table never expire (`research/greptimedb.md` F36), so the store is not fully self-expiring.
 The journald volume envelope is provisional until a week of measurement exists (Q4).
+Process executable names are set by the running program, so a worker can choose them; the 64 MiB floor, the per-host cap of 30 values and R4.2 bound what that admits.
 
 ## Operating envelope and regulator
 
 Envelope: the budget table above, plus the rule that every stored attribute key is on the allow-list.
 
-Regulator R4.1, deterministic, build time: the flake check `checks.x86_64-linux.otel-redaction` defined in ADR-008 also feeds fixtures carrying a banned metric label, an unknown attribute key, an `omp.agent.*.count` attribute and a journald record from `omnigent-host-cameron`, and asserts that the output contains only allow-listed keys and no record from a non-listed unit.
+Regulator R4.1, deterministic, build time: the flake check `checks.x86_64-linux.otel-redaction` defined in ADR-008 also feeds fixtures carrying a banned metric label, an unknown attribute key, an `omp.agent.*.count` attribute, a journald record from `omnigent-host-cameron`, a process resource carrying `process.command_line` and `process.pid`, a `systemd.unit.name` of `omnigent-host-cameron.service`, and a `smartctl_device` series with `serial_number`, and asserts that the output contains only allow-listed keys and names, no record from a non-listed unit, and no owner name in any unit label.
+It also fails evaluation when an enabled Omnigent worker has no entry in the owner-to-alias attrset.
 It reads the same `schema.nix` file the collector configuration is generated from, so configuration and check cannot diverge.
 It is shown able to fail at acceptance by deleting the label-ban stage from the generated configuration and observing the banned label in the output.
 
-Regulator R4.2, runtime: the `otel-envelope` timer of ADR-003 additionally queries, per database, active series, the maximum distinct values of any label key per metric, rows ingested in the last 24 h, and journald bytes per host, and fails when any bound in the budget table is breached.
+Regulator R4.2, runtime: the `otel-envelope` timer of ADR-003 additionally queries, per database, active series, the maximum distinct values of any label key per metric, per host the distinct values of `process_executable_name` and `systemd_unit_name`, rows ingested in the last 24 h, and journald bytes per host, and fails when any bound in the budget table is breached.
 It is shown able to fail at acceptance by pushing one synthetic metric with 300 distinct values of one label into `fleet` and observing the unit fail.
-A failed `otel-envelope` unit reaches a human through ADR-003's `OnFailure=observability-notify@%n.service` notifier; this decision defines no unit-state signal in the store.
+A failed `otel-envelope` unit reaches a human through ADR-003's `OnFailure=observability-notify@%n.service` notifier; the systemd unit-state series in `fleet` are a stored signal, and alerting over them belongs to ADR-009.
 TTLs are asserted, not only set: ADR-007's `greptimedb-schema` oneshot enforces them, and R4.2 also compares each database's and the fleet logs table's `ttl` option against this table.
 
 ## Failure prevented
@@ -154,10 +179,13 @@ TTLs are asserted, not only set: ADR-007's `greptimedb-schema` oneshot enforces 
 - Single schema file: the regulator tests a different allow-list from the one deployed.
 - R4.1: a configuration change that admits a banned label or a content key ships.
 - R4.2: an emitter upgrade introduces an unbounded label, or a TTL drifts, with nobody told.
+- Process attribute bans: a command line carrying a secret or prompt content reaches the store, or a restart-looping unit mints a new series on every restart.
+- Per-host value caps: an unexpected set of large executables or a widened unit pattern pushes `fleet` past its series budget.
+- Owner-to-alias attrset: a person's name enters `fleet` as a unit label value.
 
 ## Implementation surface
 
-- Add `modules/clan/services/otel-collector/schema.nix`: attribute allow-list, omp metric-name allow-list, per-signal `devloop` column allow-list with each table's primary key and time index, never-stored list, journald unit allow-list, metric label bans, signal-to-database map, and the budget numbers used by R4.2.
+- Add `modules/clan/services/otel-collector/schema.nix`: attribute allow-list, omp metric-name allow-list, per-signal `devloop` column allow-list with each table's primary key and time index, never-stored list, journald unit allow-list, systemd unit allow-list, Omnigent owner-to-alias attrset, node_exporter and smartctl_exporter metric keep-lists, metric label bans, signal-to-database map, and the budget numbers used by R4.2.
 - Modify the collector configuration generated by `modules/clan/services/otel-collector/flake-module.nix` (ADR-003) to build `redaction`, `filter`, `transform` and `resource` stages from `schema.nix`.
 - Modify `modules/checks/otel-redaction.nix` (ADR-008) to add the R4.1 fixtures.
 - Add the R4.2 queries to the `otel-envelope` unit of ADR-003.
@@ -173,3 +201,5 @@ TTLs are asserted, not only set: ADR-007's `greptimedb-schema` oneshot enforces 
 5. Q5: Should Omnigent's package gain its `tracing` extra so its metrics enter `agent`? Recommended: defer to ADR-008, under which no omnigent worker account receives an OTLP endpoint or credential in this slice; until ADR-008 is revised Omnigent contributes nothing.
 6. Q6: Is agent-harness retention 90 d? Recommended: yes; longer keeps a personal-activity record longer than any listed decision needs.
 7. Q7: Should the allow-list admit `omp.gen_ai.agent.name`? Recommended: yes, it is bounded by the agent roster; dropping it loses the per-subagent breakdown of tool calls and errors.
+8. Q8: Raise the `fleet` active-series budget from 6,000 to 8,000 for the host-level signals? Recommended: yes, per the per-host arithmetic in Rationale; the alternative keeps 6,000 and leaves about 1,000 series of headroom over the estimated 3,000 base plus 1,912.
+9. Q9: Admit `process.executable.name` as a label? Recommended: yes, bounded by the 64 MiB floor and a cap of 30 values per host; dropping it leaves a per-host total that cannot say which process grew.

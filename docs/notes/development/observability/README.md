@@ -7,14 +7,16 @@ title: Fleet observability documentation map
 This tree holds the design work for a fleet observability platform and the continuous-feedback loop that consumes it.
 It is a design corpus, not an implementation: nothing here is deployed, and no module, collector, store or dashboard exists in `modules/` today.
 
-Read [charter.md](charter.md) first, because every artifact below is scoped by its world assumptions W1 through W9 and answers to its decision list D1 through D8.
+Read [charter.md](charter.md) first, because every artifact below is scoped by its world assumptions W1 through W9 and answers to its decision list D1 through D9.
 
 ## Current status
 
-The charter is at v5, revised on 2026-10-15 for consistency with the decision records; v4 followed the research refresh the same day, and v2 followed the research phase on 2026-09-18.
+The charter is at v7, extended on 2026-10-15 with decision D9 on alerting after the human approved host-level signals and an alerting decision; v6 recorded the GreptimeDB 1.2.1 nixpkgs bump, v5 revised the charter for consistency with the decision records, v4 followed the research refresh the same day, and v2 followed the research phase on 2026-09-18.
 The research phase is complete: eight artifacts under [research/](research/) cover the store, the dashboard layer, the collection topology, the rejected store alternatives, the fleet's existing emitters, the development-loop signal set, the Nix packaging position, and telemetry access control.
 Each artifact ends with a `## Refresh (2026-10-15)` section that re-reads its sources at current revisions and supersedes its stale claims; where the findings below conflict with a refresh section, the refresh wins.
-Decisions D1 through D8 each have a decision record under [decisions/](decisions/) at status Proposed, pending the human gate; the `architecture/` and `components/` trees that charter deliverable S1 names do not exist yet.
+Decisions D1 through D9 each have a decision record under [decisions/](decisions/) at status Proposed, pending the human gate; the `architecture/` and `components/` trees that charter deliverable S1 names do not exist yet.
+ADR-003 and ADR-004 now also cover host-level signals, each tied to a failure this fleet has had: bounded per-process metrics for the `magnetite` OOM kills of 2026-09-27 and 2026-10-01, systemd unit state and restart counts for the two omnigent-host units that restart-looped about 3,200 times overnight on 2026-10-15, and ZFS pool and ARC state, with NVMe SMART on `pyrite` only, for `magnetite`'s storage-starvation history.
+Continuous profiling, laptop battery, thermal and sleep-wake state, and per-host ZeroTier peer latency and path state are documented in the "Future extensions (not adopted)" subsection of ADR-003's Decision, each with the trigger that would justify adopting it and what it would require.
 No implementation work has begun, and charter constraint C4 forbids it until the decisions land.
 Roughly thirty-six questions were carried to the human gate rather than answered by inference, per the charter's standing rule; they are aggregated below.
 
@@ -22,7 +24,7 @@ Roughly thirty-six questions were carried to the human gate rather than answered
 
 | Document | Path | Question it answers |
 |---|---|---|
-| Charter | [charter.md](charter.md) | What is being designed, under what world assumptions, against which requirements, and which eight decisions remain open |
+| Charter | [charter.md](charter.md) | What is being designed, under what world assumptions, against which requirements, and which nine decisions remain open |
 | GreptimeDB as observability store | [research/greptimedb.md](research/greptimedb.md) | What the leading store candidate can actually do: engines, OTLP ingest paths, query surfaces, SST layout, deployment floor, and where the open/enterprise line falls |
 | Perses as dashboard layer | [research/perses.md](research/perses.md) | Whether the packaged Perses can query the candidate store, what dashboards-as-code costs, and what its CLI validates |
 | Collection topology decision space | [research/otel-collector-topology.md](research/otel-collector-topology.md) | Per-host agent versus central gateway for this fleet's shape, what a nix-darwin host can run, which transport and ingress paths exist, and the volume budget |
@@ -31,7 +33,7 @@ Roughly thirty-six questions were carried to the human gate rather than answered
 | Dev-loop signals | [research/dev-loop-signals.md](research/dev-loop-signals.md) | Which development-loop signals exist, which are missing, and which coverage-model decision each one feeds |
 | Nix packaging status | [research/nix-packaging-status.md](research/nix-packaging-status.md) | Which candidate is packaged where, which NixOS and nix-darwin modules exist, and the routes to a GreptimeDB derivation |
 | Telemetry security and tenancy | [research/telemetry-security-and-tenancy.md](research/telemetry-security-and-tenancy.md) | What agent-session telemetry carries, where redaction can be enforced, and what the store, the dashboard layer and the mesh do and do not authorize |
-| Decision records | [decisions/](decisions/) | Where each of D1 through D8 is recorded, one decision per file, per charter S1 |
+| Decision records | [decisions/](decisions/) | Where each of D1 through D9 is recorded, one decision per file, per charter S1 |
 | ADR-001: store (D1) | [decisions/ADR-001-store.md](decisions/ADR-001-store.md) | Which system durably holds telemetry and answers queries over it |
 | ADR-002: dashboard layer (D2) | [decisions/ADR-002-dashboard-layer.md](decisions/ADR-002-dashboard-layer.md) | Which dashboard layer renders the store's signals, and in which as-code format |
 | ADR-003: collection topology (D3) | [decisions/ADR-003-collection-topology.md](decisions/ADR-003-collection-topology.md) | How telemetry travels from emitters to the store, and how transport is authenticated |
@@ -40,6 +42,7 @@ Roughly thirty-six questions were carried to the human gate rather than answered
 | ADR-006: storage substrate and lakehouse seam (D6) | [decisions/ADR-006-storage-substrate-and-lakehouse-seam.md](decisions/ADR-006-storage-substrate-and-lakehouse-seam.md) | Where telemetry lands durably, and whether the DuckDB and DuckLake analytics path can read it |
 | ADR-007: packaging, placement and clan service (D7) | [decisions/ADR-007-packaging-placement-and-clan-service.md](decisions/ADR-007-packaging-placement-and-clan-service.md) | How each component is packaged, which host runs it, and what shape its clan service takes |
 | ADR-008: access control and tenancy (D8) | [decisions/ADR-008-access-control-and-tenancy.md](decisions/ADR-008-access-control-and-tenancy.md) | Who may write and read which telemetry, and how the prompt-content hazard is contained |
+| ADR-009: alerting (D9) | [decisions/ADR-009-alerting.md](decisions/ADR-009-alerting.md) | How fleet conditions become human notifications, including watching the store itself |
 
 ## Findings that change the design
 
@@ -94,7 +97,7 @@ Citations into nixpkgs must name the lock node, because `flake.lock` holds six d
 
 ## Decision status
 
-All eight decisions are Proposed: each has a decision record under [decisions/](decisions/) awaiting the human gate.
+All nine decisions are Proposed: each has a decision record under [decisions/](decisions/) awaiting the human gate.
 The bearing column names the artifacts that supply evidence for that decision, not a recommendation.
 
 | Decision | Subject | Status | Bearing artifacts |
@@ -107,6 +110,7 @@ The bearing column names the artifacts that supply evidence for that decision, n
 | D6 | Storage substrate and the lakehouse seam | Proposed ([ADR-006](decisions/ADR-006-storage-substrate-and-lakehouse-seam.md)) | `greptimedb.md`, `store-alternatives.md`, `dev-loop-signals.md` |
 | D7 | Packaging, host placement, and clan service shape | Proposed ([ADR-007](decisions/ADR-007-packaging-placement-and-clan-service.md)) | `nix-packaging-status.md`, `greptimedb.md`, `otel-collector-topology.md`, `fleet-emitter-inventory.md`, `store-alternatives.md`, `telemetry-security-and-tenancy.md`, `perses.md` |
 | D8 | Access control and tenancy, including the prompt-content hazard | Proposed ([ADR-008](decisions/ADR-008-access-control-and-tenancy.md)) | `telemetry-security-and-tenancy.md`, `fleet-emitter-inventory.md`, `greptimedb.md`, `perses.md`, `store-alternatives.md`, `otel-collector-topology.md`, `dev-loop-signals.md` |
+| D9 | Alerting, including watching the store itself | Proposed ([ADR-009](decisions/ADR-009-alerting.md)) | `greptimedb.md`, `fleet-emitter-inventory.md`, `perses.md` |
 
 ## Open questions for the human gate
 
@@ -115,7 +119,7 @@ Each is attributed to the artifact that raised it; where two artifacts raised th
 
 ### Scope and consent
 
-- Is in-database alerting wanted at all, given that trigger DDL is enterprise-gated and external alerting is therefore the open-build answer (`greptimedb.md` Q1)?
+- Is in-database alerting wanted at all, given that trigger DDL is enterprise-gated and external alerting is therefore the open-build answer (`greptimedb.md` Q1), answered by ADR-009, which evaluates rules outside the store through a timer that queries `/v1/prometheus` and posts to ntfy.
 - Are the three darwin machines belonging to other people in scope as telemetry subjects at all (`otel-collector-topology.md`)?
 - Are `cognee` and `k3s-server` intended to be deployed, or retained as unimported definitions, since that decides whether they enter the D4 scope (`fleet-emitter-inventory.md` Q4)?
 - Is re-enabling the disabled `sso-gateway` on `magnetite` in scope, or must the dashboard layer work with it disabled (`telemetry-security-and-tenancy.md` Q4)?
@@ -174,7 +178,7 @@ Each is attributed to the artifact that raised it; where two artifacts raised th
 
 ## Next steps
 
-The eight decision records exist under `decisions/` at status Proposed, one per decision as the charter's S1 requires; within this tree only `architecture/reference-architecture.md` and a `components/<component>.md` per chosen component remain to be written.
+The nine decision records exist under `decisions/` at status Proposed, one per decision as the charter's S1 requires; within this tree only `architecture/reference-architecture.md` and a `components/<component>.md` per chosen component remain to be written.
 The charter's S2 sequences the continuous-verification half after the store and topology decisions land, so it follows the human gate on ADR-001 and ADR-003.
 Each record ends with its own questions for the human gate, per the charter's standing rule and requirement R7; the questions above are the research-phase inputs those records answer or carry forward.
 Charter acceptance criteria A5, A6 and A8 bind every record: a rationale with each rejected alternative in one line, a declared operating envelope with a named regulator, and a named failure for each proposed layer.
