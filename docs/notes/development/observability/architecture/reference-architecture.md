@@ -238,32 +238,42 @@ Change numbers refer to the sequencing in the next section.
 
 ## Implementation sequencing
 
-The proposed order follows dependency: each change consumes only what earlier changes deploy.
-Each change carries `proposal.md`, `design.md`, `tasks.md` and `specs/` under `openspec/changes/`, as the `stand-up-*` precedent does (charter, Scope).
-The change names below are proposals for that tree, not decisions of any record.
+Implementation proceeds in vertical slices: each slice is one OpenSpec change that closes a feedback loop end to end, from deployment to its own regulators, and each is bound to one issue of the Linear project `Fleet observability` (`openspec/linear.yaml` key `fleet-observability`).
+Each change carries the artifacts of the repository's OpenSpec schema under `openspec/changes/`, as the `stand-up-*` precedent does (charter, Scope), and its tasks carry the deployment acceptance items of the decisions it realizes.
+Slice status is not recorded here: it is derived from the change's files by `openspec list` and mirrored to its issue by openspec-linear-sync.
+Slices S1 to S5 are metrics-only, with no logs pipeline, so no content-bearing record enters the store before S7 brings the content stages and their regulator.
+Change names are chosen in each slice's proposal.
 
-0. Precondition, root-pin bump: the root `nixpkgs` pin carries `pkgs.greptimedb` 1.2.1, with `greptimedb-bin` only as the channel-delay fallback (ADR-001 Q1; ADR-007 Q2).
-1. `stand-up-greptimedb-on-magnetite`: the store, its containment, its dataset, its users, its R2 substrate under the store prefix, `greptimedb-schema` and `greptimedb-envelope`.
-   Realizes ADR-001, ADR-007, the store side of ADR-006 (E6.2 to E6.4) and the databases and TTLs of ADR-004.
-   Component: [greptimedb](../components/greptimedb.md).
-2. `stand-up-otel-collector-fleet`: the `otel-collector` clan service on the seven in-scope hosts, the ingress and mTLS, `schema.nix`, the content stages, the host probes, `otel-envelope`, the `observability-notify@` template with its ntfy `alerter` access, and the `OnFailure=` wiring on change 1's units and magnetite's dataset oneshots.
-   Realizes ADR-003, ADR-004, the collector and worker-environment side of ADR-008, and ADR-009 items 11 to 13.
-   Components: [otel-collector](../components/otel-collector.md), [host-probes](../components/host-probes.md), and the notifier part of [fleet-alert](../components/fleet-alert.md).
-3. `stand-up-perses-on-magnetite`: Perses, its resources and checks, the Kanidm client and group, and the DNS record.
+0. Precondition, root-pin bump: the root `nixpkgs` pin carries `pkgs.greptimedb` 1.2.1, with `greptimedb-bin` only as the channel-delay fallback (ADR-001 Q1; ADR-007 Q2); it lands inside S1.
+1. S1, CAM-68: the store with its containment, dataset, users, R2 store prefix, `greptimedb-schema` and `greptimedb-envelope`, fed metrics-only by magnetite's own collector in the `ingress` role writing to the loopback store.
+   Realizes ADR-001, ADR-007, the store side of ADR-006, the databases and retention of ADR-004, and magnetite's metrics from ADR-003.
+   Components: [greptimedb](../components/greptimedb.md), [otel-collector](../components/otel-collector.md), [host-probes](../components/host-probes.md).
+2. S2, CAM-69: the nixbot reader, the gitea-mq journal parse, the deploy record, `devloop-reconcile` and the `devloop-queries` check.
+   Realizes ADR-005 except the omp emitter, which moves to S7.
+   Component: [devloop-exporters](../components/devloop-exporters.md).
+3. S3, CAM-70: the `observability-notify@` template, the evaluator on magnetite, the rules whose signals S1 provides, the dead-man on cinnabar and the rule check; the dev-loop SLO burn rule lands with the later of S2 and S3.
+   Realizes ADR-009 and the notifier of ADR-003.
+   Component: [fleet-alert](../components/fleet-alert.md).
+4. S4, CAM-71: `otel-ca`, the mTLS ingress on ZeroTier, and the agent role on the other in-scope NixOS hosts, with the SMART exporter on pyrite and `otel-envelope`.
+   Realizes the rest of ADR-003 for NixOS and its metrics in ADR-004.
+   Components: [otel-collector](../components/otel-collector.md), [host-probes](../components/host-probes.md).
+5. S5, CAM-72: stibnite on darwin, with the root `otelcol-process` collector, the `otel-host-probe` job for launchd state and SMART, and the darwin rules of ADR-009.
+   Realizes ADR-003 items 21 to 25.
+   Component: [host-probes](../components/host-probes.md).
+6. S6, CAM-73: Perses, its resources and checks, the Kanidm client and `perses_users`, and the DNS record.
    Realizes ADR-002 and the read side of ADR-008.
    Component: [perses](../components/perses.md).
-4. `stand-up-fleet-alert`: the evaluator on magnetite, the rule table, the dead-man on cinnabar and the R9.2 check.
-   Realizes ADR-009 items 1 to 10 and 14 to 17.
-   Component: [fleet-alert](../components/fleet-alert.md).
-5. `stand-up-devloop-collection`: the nixbot reader, the gitea-mq journal parse, the deploy record, omp metrics and `devloop-reconcile`.
-   Realizes ADR-005 and the omp emitter posture of ADR-008.
-   Component: [devloop-exporters](../components/devloop-exporters.md).
-6. `stand-up-devloop-parquet-export`: `greptimedb-export`, R6.1, the `telemetry-export-reader` generator and the reader command.
+7. S7, CAM-74: omp telemetry and journald logs behind the content stages, `OTEL_` reserved in worker environments, and the R8.1 and R8.3 regulators.
+   Realizes the collector side of ADR-008, the omp emitter of ADR-005, and the agent and journald schema of ADR-004.
+   Component: [otel-collector](../components/otel-collector.md).
+8. S8, CAM-75: `greptimedb-export`, R6.1, the `telemetry-export-reader` generator and the reader command.
    Realizes the export side of ADR-006.
    Component: [parquet-export](../components/parquet-export.md).
 
-Changes 3 and 4 depend only on changes 1 and 2 and may proceed in either order.
-Change 6 follows change 5 because R6.1 fails on an empty partition, and `devloop` holds rows only once change 5 deploys (ADR-006 E6.1).
+S2, S3, S4 and S6 depend only on S1 and may proceed in any order; S5 follows S4, which provides the ingress it reports to, and S7 follows S5, because omp's interactive sessions run on stibnite.
+S8 follows S2 because R6.1 fails on an empty partition, and `devloop` holds rows only once S2 deploys (ADR-006 E6.1).
+The deferred decision ADR-009 Q5 is CAM-76, after S8.
+A slice whose deployment refutes a detail of a decision record amends that record in place with a charter version entry, and every artifact citing the amended identifier is updated in the same pull request.
 
 ## Deferred and future extensions
 

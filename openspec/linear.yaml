@@ -74,3 +74,9 @@ projects:
     name: "omnigent-magnetite"
     teams: ["CAM"]
     archive_documents: {}
+  "fleet-observability":
+    # slugId, for the reason recorded on the sibling entries.
+    id: "aeed302bea3b"
+    name: "Fleet observability"
+    teams: ["CAM"]
+    archive_documents: {}

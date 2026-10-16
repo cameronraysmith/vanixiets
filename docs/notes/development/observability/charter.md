@@ -1,12 +1,12 @@
 ---
 title: Fleet observability and CCV feedback-loop charter
-status: charter v9
-date: 2026-10-15
+status: charter v10
+date: 2026-10-16
 ---
 
 # Fleet observability and CCV feedback-loop charter
 
-Charter version: v9.
+Charter version: v10.
 A revision is a version bump with a dated entry under "Revision history"; the text of an earlier version is never edited in place.
 
 ## Objective
@@ -267,3 +267,7 @@ A research unit that meets ambiguity returns it in its questions section; the or
     - `admin:rw` holders are the `greptimedb-schema` and `greptimedb-export` oneshots only, per ADR-007; ADR-008's list no longer names the envelope oneshot, which uses `regulator`.
     - The `observability-notify@` template moves from the `ingress` role to the `agent` role of ADR-003, so every in-scope NixOS host has it, cinnabar included, because ADR-009's `fleet-deadman` on cinnabar notifies through it; it calls the existing `ntfy-send` against `ntfy.zt`, ADR-003's `OnFailure=` list adds `fleet-alert.service` and `fleet-deadman.service`, and ADR-009's file list names the `agent` role.
     - Restart-on-rotation stays after GreptimeDB 1.3, per ADR-007 Q6, because `LoadCredential` snapshots credentials at start; ADR-001 and ADR-008 now say so, and only the collector's histogram conversion is removed at 1.3.
+- v10 (2026-10-16): implementation sequencing re-cut into vertical slices; no earlier text is edited beyond the status, date and version lines, and D1–D9, the requirements and the acceptance criteria are unchanged.
+  - The six changes the reference architecture proposed become eight slices S1 to S8, each one OpenSpec change closing a feedback loop with its own regulators, ordered by value and by which deployment-only assumptions each settles first; dev-loop collection moves from fifth to second, because the dev loop is the primary consumer (Objective).
+  - Slices S1 to S5 are metrics-only, so the content stages and their regulator arrive with the first content-bearing pipeline in S7.
+  - The slices are tracked as CAM-68 to CAM-75 in the Linear project `Fleet observability`, registered as `fleet-observability` in `openspec/linear.yaml`, and the deferred ADR-009 Q5 as CAM-76; slice status is derived from the OpenSpec changes, not recorded in this tree.
