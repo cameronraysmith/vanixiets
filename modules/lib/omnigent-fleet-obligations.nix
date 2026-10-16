@@ -64,6 +64,11 @@ let
       memberships = lib.attrNames (
         lib.filterAttrs (_: g: lib.elem user g.members) hostConfig.users.groups
       );
+      sharing = hostConfig.services.shared-reference-tree or { enable = false; };
+      admittedGroups = [
+        user
+      ]
+      ++ lib.optional (sharing.enable && lib.elem user sharing.participants) sharing.writer;
     in
     worker.owner == owner
     && worker.user == user
@@ -76,7 +81,7 @@ let
     && account.createHome
     && account.openssh.authorizedKeys.keys == [ ]
     && account.openssh.authorizedKeys.keyFiles == [ ]
-    && lib.all (name: name == user) memberships
+    && lib.all (name: lib.elem name admittedGroups) memberships
     && lib.all (name: name == user) group.members
     && lib.all (other: other.name == user || other.home != account.home) (
       lib.attrValues hostConfig.users.users
