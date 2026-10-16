@@ -16,7 +16,7 @@ Tasks marked *gated* wait for the named approval.
 
 ## 3. Root, link and trust in each participating account
 
-- [ ] 3.1 Add `programs.ghq-shared.root` (null default), declared in one module imported by `homeManager.ghq` and `homeManager.ghq-sync`; when set it adds `ghq.root`, one `safe.directory = <root>/*`, an activation step that links `~/ghq` to the root only when `~/ghq` is absent or already a link, and an assertion that `programs.git.enable` is true — verify: every host's sharing projection is identical at `B` and `T`.
+- [x] 3.1 Add `programs.ghq-shared.root` (null default), declared in one module imported by `homeManager.ghq` and `homeManager.ghq-sync`; when set it adds `ghq.root`, one `safe.directory = <root>/*`, an activation step that links `~/ghq` to the root only when `~/ghq` is absent or already a link, and an assertion that `programs.git.enable` is true — verify: every host's sharing projection is identical at `B` and `T`.
 - [ ] 3.2 Set `programs.ghq-shared.root` from the NixOS adapter for every participant's `home-manager.users` entry — verify: `nix eval --json "$T#nixosConfigurations.magnetite.config.home-manager.users.<u>.programs.git.settings"` shows `ghq.root = "/var/lib/ghq"` and `safe.directory` containing `/var/lib/ghq/*` for `cameron`, `omnigent-cameron` and `omnigent-janettesmith`, and likewise on pyrite.
 
 ## 4. Delegated acquisition
