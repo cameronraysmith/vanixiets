@@ -28,7 +28,7 @@ Tasks marked *gated* wait for the named approval.
 
 ## 5. Linux checks
 
-- [ ] 5.1 Add the D7 module assertions to the NixOS adapter — verify: magnetite's check drvPath evaluates, and each of four `extendModules` mutations (`safe.directory = [ "*" ]` on `cameron`; an extra member of group `ghq`; writer `extraGroups = [ "wheel" ]`; a participant's `programs.ghq-shared.root = null`) fails evaluation with its assertion's message.
+- [x] 5.1 Add the D7 module assertions to the NixOS adapter — verify: magnetite's check drvPath evaluates, and each of four `extendModules` mutations (`safe.directory = [ "*" ]` on `cameron`; an extra member of group `ghq`; writer `extraGroups = [ "wheel" ]`; a participant's `programs.ghq-shared.root = null`) fails evaluation with its assertion's message.
 - [ ] 5.2 Add `vmTests.x86_64-linux.shared-reference-tree` in `modules/vm-tests/` per D8 — verify: `nix build "$T#vmTests.x86_64-linux.shared-reference-tree"` succeeds on pyrite's KVM builder; with the tmpfiles mode changed to `0770` and the writer umask to `0007`, the reader write-refusal assertions fail; with the writer-write control replaced by a constant failure, the control assertion fails.
 - [ ] 5.3 Build the magnetite and pyrite machine checks in full — verify: `nix build "$T#checks.x86_64-linux.nixos-magnetite" "$T#checks.x86_64-linux.nixos-pyrite" --no-link` succeeds.
 
