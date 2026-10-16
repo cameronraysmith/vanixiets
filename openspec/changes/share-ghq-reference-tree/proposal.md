@@ -4,17 +4,25 @@ linear_story_id: "8e3dbe06-1450-440f-80c8-8bb6b9593665"
 linear_story_identifier: CAM-77
 linear_story_title: Share one ghq reference tree per host
 linear_story_url: https://linear.app/cameronraysmith/issue/CAM-77/share-one-ghq-reference-tree-per-host
-linear_story_state: Todo
+linear_story_state: In Progress
 linear_team: CAM
 linear_project: omnigent-magnetite
-last_synced_state: Todo
-last_synced_at: "2026-10-16T17:06:03Z"
+last_synced_state: In Progress
+last_synced_at: "2026-10-16T17:31:47Z"
 review_round: 0
 attempt_log:
   - at: "2026-10-16T17:06:03Z"
     transition: Backlog->Todo
     outcome: posted
     note: Created CAM-77 in Backlog in the existing omnigent-magnetite project with the business description seeded from this proposal, moved it to Todo, confirmed Todo by readback, and posted the binding comment.
+  - at: "2026-10-16T17:29:46Z"
+    transition: description-sync
+    outcome: posted
+    note: Re-synced the business description after the transport, migration and darwin-writer decisions.
+  - at: "2026-10-16T17:31:47Z"
+    transition: Todo->In Progress
+    outcome: posted
+    note: T2 on the first checked tasks.md box (1.1); state confirmed In Progress by readback and comment posted.
 ---
 
 ## Why

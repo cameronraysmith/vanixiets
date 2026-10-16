@@ -74,7 +74,17 @@ in
         ntfy-alerter
         effects-vanixiets-secrets
         effects-ironstar-secrets
+        shared-reference-tree
       ]);
+
+      services.shared-reference-tree = {
+        enable = true;
+        participants = [
+          "cameron"
+          "omnigent-cameron"
+          "omnigent-janettesmith"
+        ];
+      };
 
       # Make flake available to all modules (required by ssh-known-hosts)
       _module.args.flake = inputs.self;

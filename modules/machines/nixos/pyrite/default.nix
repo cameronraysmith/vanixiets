@@ -54,9 +54,19 @@ in
         kvm-declaration
         memory-pressure-guards
         nix-eval-lock
+        shared-reference-tree
         ssh-known-hosts
         zt-dns
       ]);
+
+      services.shared-reference-tree = {
+        enable = true;
+        participants = [
+          "cameron"
+          "omnigent-cameron"
+          "omnigent-janettesmith"
+        ];
+      };
 
       # A disabledModules path that matches nothing is silently ignored, so a
       # nixos-hardware bump that moves or renames this module would restore the duplicate

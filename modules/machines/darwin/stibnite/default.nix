@@ -38,7 +38,16 @@ in
         zt-dns
         zt-services-trust
         stibnite-session-host
+        shared-reference-tree
       ]);
+
+      services.shared-reference-tree = {
+        enable = true;
+        participants = [
+          "crs58"
+          "omnigent-cameron"
+        ];
+      };
 
       # Re-enable documentation for laptop use
       # Override both srvos and clan-core defaults
