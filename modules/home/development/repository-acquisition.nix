@@ -30,7 +30,7 @@ in
       key = "vanixiets/ghq-home-module";
       imports = [ homeModules.ghq-shared-option ];
       config = lib.mkMerge [
-        { home.packages = [ pkgs.ghq ]; }
+        { home.packages = [ (if root == null then pkgs.ghq else pkgs.ghq-shared) ]; }
         (lib.mkIf (root != null) {
           assertions = [
             {
@@ -41,6 +41,10 @@ in
           programs.git.settings = {
             ghq.root = root;
             safe.directory = [ "${root}/*" ];
+            # The shared tree may hold bare repositories (upstream fixtures,
+            # caches) whose config and hooks no migration sanitises; git then
+            # uses a bare repository only when named with --git-dir.
+            safe.bareRepository = "explicit";
           };
           # Activation rather than home.file: Home Manager refuses to replace an
           # existing ~/ghq directory, which stays until ghq-shared-migrate moves it.
