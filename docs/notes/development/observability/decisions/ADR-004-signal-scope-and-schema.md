@@ -4,7 +4,7 @@ title: "ADR-004: Signal scope and schema"
 
 ## Status
 
-Proposed
+Accepted (human gate, 2026-10-15)
 
 ## Context
 
@@ -221,14 +221,26 @@ TTLs are asserted, not only set: ADR-007's `greptimedb-schema` oneshot enforces 
 ## Questions for the human gate
 
 1. Q1: Is the dev-loop in-store retention 365 d? Recommended: yes; shorter loses year-over-year comparison, longer grows store caches without a named decision.
+   Resolution: recommended answer accepted at the 2026-10-15 gate.
 2. Q2: Are person identifiers excluded from the store entirely? Recommended: yes; keeping them enables per-person cost attribution and makes the store a personal-activity record readable by every admitted reader.
+   Resolution: recommended answer accepted at the 2026-10-15 gate.
 3. Q3: Are omp spans in scope for the first deployment? Recommended: no, metrics only, per ADR-005; enabling them adds `gen_ai.conversation.id` rows to `agent` under the same allow-list.
+   Resolution: recommended answer accepted at the 2026-10-15 gate.
 4. Q4: Is the 100 MB per host per day journald envelope accepted as provisional pending one week of measurement? Recommended: yes; the alternative is deferring the log leg until measured.
+   Resolution: recommended answer accepted at the 2026-10-15 gate.
 5. Q5: Should Omnigent's package gain its `tracing` extra so its metrics enter `agent`? Recommended: defer to ADR-008, under which no omnigent worker account receives an OTLP endpoint or credential in this slice; until ADR-008 is revised Omnigent contributes nothing.
+   Resolution: recommended answer accepted at the 2026-10-15 gate.
 6. Q6: Is agent-harness retention 90 d? Recommended: yes; longer keeps a personal-activity record longer than any listed decision needs.
+   Resolution: recommended answer accepted at the 2026-10-15 gate.
 7. Q7: Should the allow-list admit `omp.gen_ai.agent.name`? Recommended: yes, it is bounded by the agent roster; dropping it loses the per-subagent breakdown of tool calls and errors.
+   Resolution: recommended answer accepted at the 2026-10-15 gate.
 8. Q8: Raise the `fleet` active-series budget from 6,000 to 8,000 for the host-level signals? Recommended: yes, per the per-host arithmetic in Rationale, which with stibnite's 222 series reaches about 5,686 and leaves 2,314 of headroom; the alternative keeps 6,000 and leaves about 314 series of headroom over the estimated 3,000 base plus 2,464 plus 222.
+   Resolution: recommended answer accepted at the 2026-10-15 gate.
 9. Q9: Admit `process.executable.name` as a label? Recommended: yes, bounded by the 64 MiB floor and a cap of 30 values per host; dropping it leaves a per-host total that cannot say which process grew.
+   Resolution: recommended answer accepted at the 2026-10-15 gate.
 10. Q10: Bound `process_executable_name` fleet-wide by 30 values per agent host, 210 at seven hosts, instead of the general 200-value cap? Recommended: yes, because the key is already capped per host and its worst case grows only with consenting hosts; the alternative lowers every host's cap to 28 now and again at each new darwin host.
+    Resolution: recommended answer accepted at the 2026-10-15 gate.
 11. Q11: Name the darwin job metrics `launchd_job_state`, `launchd_job_last_exit_code` and `launchd_job_runs_total` with labels `launchd_label` and `launchd_state`? Recommended: yes, parallel to the systemd names without sharing them; the alternative reuses `systemd_*` names for series with different meanings.
+    Resolution: recommended answer accepted at the 2026-10-15 gate.
 12. Q12: Raise the per-host `systemd_unit_name` cap from 30 to 40 and bound the key fleet-wide by 40 values per NixOS agent host, 240 at six hosts, instead of the general 200-value cap? Recommended: yes, because magnetite reaches exactly 30 allow-listed units with the dataset oneshots and this design's own units, and each unit costs nine series; the alternative keeps 30 and drops the zfs oneshots from the allow-list, leaving their failures visible only through `OnFailure=`.
+    Resolution: recommended answer accepted at the 2026-10-15 gate.

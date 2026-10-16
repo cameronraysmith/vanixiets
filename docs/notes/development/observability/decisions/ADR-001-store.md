@@ -4,7 +4,7 @@ title: "ADR-001: Telemetry store"
 
 ## Status
 
-Proposed
+Accepted (human gate, 2026-10-15)
 
 ## Context
 
@@ -84,7 +84,7 @@ The missing `/metadata` route costs metric help text and type hints in the Perse
 The store is a single point of failure for telemetry, and a store outage is survivable only to the depth of the collector's sending queue, which ADR-003 sizes.
 Exponential-histogram precision is reduced to the declared explicit bucket bounds until a `v1.3` stable reaches the pin, and the bucket bounds become part of ADR-004's schema.
 Each later version step, 1.2.1 to `v1.3`, arrives through a root-pin bump and therefore through the closure operator, with no first-party derivation to maintain.
-When the deployed version reaches `v1.3.0-beta.1` or later, the collector conversion and the restart-on-rotation coupling can be removed; both removals are tracked by the regulators below rather than by memory.
+When the deployed version reaches `v1.3.0-beta.1` or later, the collector conversion can be removed, a removal tracked by the regulators below rather than by memory; the restart-on-rotation coupling stays, because `LoadCredential` snapshots credentials at start (ADR-007 Q6).
 Per-person read isolation is not a store property, and any design text that treats a GreptimeDB schema as a tenant boundary is wrong (`research/telemetry-security-and-tenancy.md` F30).
 Alerting needs a component outside the store, which this record does not choose.
 
@@ -121,8 +121,14 @@ External alerting prevents a design that silently depends on an enterprise-only 
 ## Questions for the human gate
 
 Q1 Deploy `v1.2.1` first, taken through a root-pin bump that includes https://github.com/NixOS/nixpkgs/pull/574558 (merged 2026-10-15)? Recommended: yes; deploying 1.1.4 first starts the store on a superseded release, and the `greptimedb-bin` fallback of ADR-007 Q2 applies only if the channel still lacks 1.2.1 when implementation starts.
+Resolution: recommended answer accepted at the 2026-10-15 gate.
 Q2 Is the governance objection C3 a disqualifier for single-vendor stores, or an axis? Recommended: an axis, because every candidate in the evidence base is single-vendor (`research/store-alternatives.md` F22, F30); treating it as a disqualifier leaves no admissible store.
+Resolution: recommended answer accepted at the 2026-10-15 gate.
 Q3 Is in-database alerting wanted? Recommended: no, alerting stays external; the alternative is an Enterprise dependency and reopens RK1.
+Resolution: recommended answer accepted at the 2026-10-15 gate.
 Q4 Is store-side per-person read partitioning required, which only GreptimeDB Enterprise provides? Recommended: no; ADR-008 adopts a shared read zone, because neither the store nor Perses can partition reads; the alternative is a commercial agreement or a first-party `PermissionChecker` provider.
+Resolution: recommended answer accepted at the 2026-10-15 gate.
 Q5 Is the unconditional flownode in standalone acceptable under C1? Recommended: yes; the alternative is the distributed shape with three more units.
+Resolution: recommended answer accepted at the 2026-10-15 gate.
 Q6 Should a `v1.3` stable be adopted through an overlay ahead of nixpkgs once it is tagged? Recommended: no, wait for the root pin; the alternative is a local half-hour Rust build in the closure operator or a `-bin` derivation (see ADR-007).
+Resolution: recommended answer accepted at the 2026-10-15 gate.

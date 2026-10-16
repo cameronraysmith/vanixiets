@@ -11,22 +11,25 @@ Read [charter.md](charter.md) first, because every artifact below is scoped by i
 
 ## Current status
 
-The charter is at v8, revised on 2026-10-15 to reconcile the decision records with conventions already decided elsewhere in the repository: implementation proceeds through OpenSpec changes following the `openspec/changes/stand-up-*` precedent, `architecture/` and `components/` remain pending deliverables, and R2 storage follows web-verification D9.
+The charter is at v9, which records the human gate of 2026-10-15: every decision record is Accepted, and acceptance criteria A5, A6 and A8 are discharged as recorded human judgment.
+v8 reconciled the decision records the same day with conventions already decided elsewhere in the repository: implementation proceeds through OpenSpec changes following the `openspec/changes/stand-up-*` precedent, and R2 storage follows web-verification D9.
 v7 extended the charter the same day with decision D9 on alerting after the human approved host-level signals and an alerting decision; v6 recorded the GreptimeDB 1.2.1 nixpkgs bump, v5 revised the charter for consistency with the decision records, v4 followed the research refresh the same day, and v2 followed the research phase on 2026-09-18.
 The research phase is complete: eight artifacts under [research/](research/) cover the store, the dashboard layer, the collection topology, the rejected store alternatives, the fleet's existing emitters, the development-loop signal set, the Nix packaging position, and telemetry access control.
 Each artifact ends with a `## Refresh (2026-10-15)` section that re-reads its sources at current revisions and supersedes its stale claims; where the findings below conflict with a refresh section, the refresh wins.
-Decisions D1 through D9 each have a decision record under [decisions/](decisions/) at status Proposed, pending the human gate; the `architecture/` and `components/` trees that charter deliverable S1 names do not exist yet, so acceptance criterion A1 is not satisfied (charter v8).
+Decisions D1 through D9 each have a decision record under [decisions/](decisions/) at status Accepted (human gate, 2026-10-15); ADR-009 is Accepted except its Q5, which is deferred to the end of implementation.
+The gate accepted the recommended answer of every question in every record, with ADR-002 Q6 answered as `perses.scientistexperience.net` behind Kanidm and ADR-003 Q15 as SMART on pyrite and stibnite, and each question line records its resolution.
+The `architecture/` and `components/` trees that charter deliverable S1 names are listed in the map below; acceptance criterion A1 is satisfied once those files exist.
 ADR-006 now places the store and the lakehouse export in the existing R2 bucket `sciexp` under `projects/vanixiets/observability/store/` and `projects/vanixiets/observability/export/`, following web-verification D9, in place of the two dedicated buckets it first proposed.
-ADR-003 and ADR-004 now also cover host-level signals, each tied to a failure this fleet has had: bounded per-process metrics for the `magnetite` OOM kills of 2026-09-27 and 2026-10-01, systemd unit state and restart counts for the two omnigent-host units that restart-looped about 3,200 times overnight on 2026-10-15 (recorded in `docs/notes/development/incidents/2026-10-15-omnigent-host-restart-loop.md` and cited by ADR-009), and ZFS pool and ARC state, with NVMe SMART on `pyrite` only, for `magnetite`'s storage-starvation history.
+ADR-003 and ADR-004 now also cover host-level signals, each tied to a failure this fleet has had: bounded per-process metrics for the `magnetite` OOM kills of 2026-09-27 and 2026-10-01, systemd unit state and restart counts for the two omnigent-host units that restart-looped about 3,200 times overnight on 2026-10-15 (recorded in `docs/notes/development/incidents/2026-10-15-omnigent-host-restart-loop.md` and cited by ADR-009), and ZFS pool and ARC state, with NVMe SMART on `pyrite` and `stibnite`, for `magnetite`'s storage-starvation history.
 Continuous profiling, laptop battery, thermal and sleep-wake state, and per-host ZeroTier peer latency and path state are documented in the "Future extensions (not adopted)" subsection of ADR-003's Decision, each with the trigger that would justify adopting it and what it would require.
-No implementation work has begun, and charter constraint C4 forbids it until the decisions land.
+No implementation work has begun; it proceeds through OpenSpec changes, and charter constraint C4 keeps this tree planning-only.
 Roughly thirty-six questions were carried to the human gate rather than answered by inference, per the charter's standing rule; they are aggregated below.
 
 ## Documentation map
 
 | Document | Path | Question it answers |
 |---|---|---|
-| Charter | [charter.md](charter.md) | What is being designed, under what world assumptions, against which requirements, and which nine decisions remain open |
+| Charter | [charter.md](charter.md) | What is being designed, under what world assumptions, against which requirements, and which nine decisions it requires |
 | GreptimeDB as observability store | [research/greptimedb.md](research/greptimedb.md) | What the leading store candidate can actually do: engines, OTLP ingest paths, query surfaces, SST layout, deployment floor, and where the open/enterprise line falls |
 | Perses as dashboard layer | [research/perses.md](research/perses.md) | Whether the packaged Perses can query the candidate store, what dashboards-as-code costs, and what its CLI validates |
 | Collection topology decision space | [research/otel-collector-topology.md](research/otel-collector-topology.md) | Per-host agent versus central gateway for this fleet's shape, what a nix-darwin host can run, which transport and ingress paths exist, and the volume budget |
@@ -45,6 +48,14 @@ Roughly thirty-six questions were carried to the human gate rather than answered
 | ADR-007: packaging, placement and clan service (D7) | [decisions/ADR-007-packaging-placement-and-clan-service.md](decisions/ADR-007-packaging-placement-and-clan-service.md) | How each component is packaged, which host runs it, and what shape its clan service takes |
 | ADR-008: access control and tenancy (D8) | [decisions/ADR-008-access-control-and-tenancy.md](decisions/ADR-008-access-control-and-tenancy.md) | Who may write and read which telemetry, and how the prompt-content hazard is contained |
 | ADR-009: alerting (D9) | [decisions/ADR-009-alerting.md](decisions/ADR-009-alerting.md) | How fleet conditions become human notifications, including watching the store itself |
+| Reference architecture | [architecture/reference-architecture.md](architecture/reference-architecture.md) | How the accepted decisions compose into one fleet design, per charter S1 |
+| Component: GreptimeDB | [components/greptimedb.md](components/greptimedb.md) | How the store is placed, configured and regulated (ADR-001, ADR-006 store side, ADR-007) |
+| Component: Parquet export | [components/parquet-export.md](components/parquet-export.md) | How the daily `devloop` Parquet export reaches R2 and its DuckDB readers (ADR-006) |
+| Component: Perses | [components/perses.md](components/perses.md) | How the dashboard layer is placed, configured and regulated (ADR-002, ADR-008 read side) |
+| Component: fleet-alert | [components/fleet-alert.md](components/fleet-alert.md) | How the alert evaluator, dead-man and ntfy delivery work (ADR-009, ADR-003 notifier) |
+| Component: OpenTelemetry Collector | [components/otel-collector.md](components/otel-collector.md) | How per-host agents, `magnetite` ingress, the darwin root process collector and redaction are configured (ADR-003, ADR-004, ADR-008) |
+| Component: host probes | [components/host-probes.md](components/host-probes.md) | How loopback node_exporter, the smartctl exporter and the darwin `otel-host-probe` launchd job supply host signals (ADR-003, ADR-004) |
+| Component: dev-loop exporters | [components/devloop-exporters.md](components/devloop-exporters.md) | How nixbot PostgreSQL rows, gitea-mq journal events, deploy records and omp metrics enter `devloop` (ADR-005) |
 | Omnigent host restart-loop incident | [../incidents/2026-10-15-omnigent-host-restart-loop.md](../incidents/2026-10-15-omnigent-host-restart-loop.md) | What failed when the omnigent-host units restart-looped on 2026-10-15 without any alert, which is the detection gap ADR-009 closes |
 
 ## Findings that change the design
@@ -100,20 +111,20 @@ Citations into nixpkgs must name the lock node, because `flake.lock` holds six d
 
 ## Decision status
 
-All nine decisions are Proposed: each has a decision record under [decisions/](decisions/) awaiting the human gate.
+All nine decisions are Accepted at the human gate of 2026-10-15, ADR-009 with its Q5 deferred to the end of implementation.
 The bearing column names the artifacts that supply evidence for that decision, not a recommendation.
 
 | Decision | Subject | Status | Bearing artifacts |
 |---|---|---|---|
-| D1 | Store, including the open/enterprise boundary and single-node versus clustered | Proposed ([ADR-001](decisions/ADR-001-store.md)) | `greptimedb.md`, `store-alternatives.md`, `nix-packaging-status.md`, `telemetry-security-and-tenancy.md`, `perses.md` |
-| D2 | Dashboard layer, its as-code format, and datasource reachability | Proposed ([ADR-002](decisions/ADR-002-dashboard-layer.md)) | `perses.md`, `telemetry-security-and-tenancy.md`, `store-alternatives.md`, `nix-packaging-status.md` |
-| D3 | Collection topology, transport authentication, and ingress | Proposed ([ADR-003](decisions/ADR-003-collection-topology.md)) | `otel-collector-topology.md`, `fleet-emitter-inventory.md`, `dev-loop-signals.md`, `telemetry-security-and-tenancy.md`, `nix-packaging-status.md`, `greptimedb.md` |
-| D4 | Signal scope, schema, cardinality and retention budgets | Proposed ([ADR-004](decisions/ADR-004-signal-scope-and-schema.md)) | `fleet-emitter-inventory.md`, `dev-loop-signals.md`, `otel-collector-topology.md`, `greptimedb.md`, `telemetry-security-and-tenancy.md`, `perses.md` |
-| D5 | Dev-loop instrumentation and the coverage-model decision each signal feeds | Proposed ([ADR-005](decisions/ADR-005-dev-loop-instrumentation.md)) | `dev-loop-signals.md`, `fleet-emitter-inventory.md` |
-| D6 | Storage substrate and the lakehouse seam | Proposed ([ADR-006](decisions/ADR-006-storage-substrate-and-lakehouse-seam.md)) | `greptimedb.md`, `store-alternatives.md`, `dev-loop-signals.md` |
-| D7 | Packaging, host placement, and clan service shape | Proposed ([ADR-007](decisions/ADR-007-packaging-placement-and-clan-service.md)) | `nix-packaging-status.md`, `greptimedb.md`, `otel-collector-topology.md`, `fleet-emitter-inventory.md`, `store-alternatives.md`, `telemetry-security-and-tenancy.md`, `perses.md` |
-| D8 | Access control and tenancy, including the prompt-content hazard | Proposed ([ADR-008](decisions/ADR-008-access-control-and-tenancy.md)) | `telemetry-security-and-tenancy.md`, `fleet-emitter-inventory.md`, `greptimedb.md`, `perses.md`, `store-alternatives.md`, `otel-collector-topology.md`, `dev-loop-signals.md` |
-| D9 | Alerting, including watching the store itself | Proposed ([ADR-009](decisions/ADR-009-alerting.md)) | `greptimedb.md`, `fleet-emitter-inventory.md`, `perses.md` |
+| D1 | Store, including the open/enterprise boundary and single-node versus clustered | Accepted ([ADR-001](decisions/ADR-001-store.md)) | `greptimedb.md`, `store-alternatives.md`, `nix-packaging-status.md`, `telemetry-security-and-tenancy.md`, `perses.md` |
+| D2 | Dashboard layer, its as-code format, and datasource reachability | Accepted ([ADR-002](decisions/ADR-002-dashboard-layer.md)) | `perses.md`, `telemetry-security-and-tenancy.md`, `store-alternatives.md`, `nix-packaging-status.md` |
+| D3 | Collection topology, transport authentication, and ingress | Accepted ([ADR-003](decisions/ADR-003-collection-topology.md)) | `otel-collector-topology.md`, `fleet-emitter-inventory.md`, `dev-loop-signals.md`, `telemetry-security-and-tenancy.md`, `nix-packaging-status.md`, `greptimedb.md` |
+| D4 | Signal scope, schema, cardinality and retention budgets | Accepted ([ADR-004](decisions/ADR-004-signal-scope-and-schema.md)) | `fleet-emitter-inventory.md`, `dev-loop-signals.md`, `otel-collector-topology.md`, `greptimedb.md`, `telemetry-security-and-tenancy.md`, `perses.md` |
+| D5 | Dev-loop instrumentation and the coverage-model decision each signal feeds | Accepted ([ADR-005](decisions/ADR-005-dev-loop-instrumentation.md)) | `dev-loop-signals.md`, `fleet-emitter-inventory.md` |
+| D6 | Storage substrate and the lakehouse seam | Accepted ([ADR-006](decisions/ADR-006-storage-substrate-and-lakehouse-seam.md)) | `greptimedb.md`, `store-alternatives.md`, `dev-loop-signals.md` |
+| D7 | Packaging, host placement, and clan service shape | Accepted ([ADR-007](decisions/ADR-007-packaging-placement-and-clan-service.md)) | `nix-packaging-status.md`, `greptimedb.md`, `otel-collector-topology.md`, `fleet-emitter-inventory.md`, `store-alternatives.md`, `telemetry-security-and-tenancy.md`, `perses.md` |
+| D8 | Access control and tenancy, including the prompt-content hazard | Accepted ([ADR-008](decisions/ADR-008-access-control-and-tenancy.md)) | `telemetry-security-and-tenancy.md`, `fleet-emitter-inventory.md`, `greptimedb.md`, `perses.md`, `store-alternatives.md`, `otel-collector-topology.md`, `dev-loop-signals.md` |
+| D9 | Alerting, including watching the store itself | Accepted, except Q5, deferred to the end of implementation ([ADR-009](decisions/ADR-009-alerting.md)) | `greptimedb.md`, `fleet-emitter-inventory.md`, `perses.md` |
 
 ## Open questions for the human gate
 
@@ -181,9 +192,9 @@ Each is attributed to the artifact that raised it; where two artifacts raised th
 
 ## Next steps
 
-The nine decision records exist under `decisions/` at status Proposed, one per decision as the charter's S1 requires; within this tree `architecture/reference-architecture.md` and a `components/<component>.md` per chosen component remain pending deliverables, and A1 is not satisfied until they exist.
-Implementation, once the human gate approves the records, proceeds through one or more OpenSpec changes under `openspec/changes/`, following the precedent of `openspec/changes/stand-up-nixbot-on-magnetite/` and `openspec/changes/stand-up-gitea-mq-on-magnetite/`, with the decision records as their design input (charter v8).
-The charter's S2 sequences the continuous-verification half after the store and topology decisions land, so it follows the human gate on ADR-001 and ADR-003.
-Each record ends with its own questions for the human gate, per the charter's standing rule and requirement R7; the questions above are the research-phase inputs those records answer or carry forward.
-Charter acceptance criteria A5, A6 and A8 bind every record: a rationale with each rejected alternative in one line, a declared operating envelope with a named regulator, and a named failure for each proposed layer.
+The nine decision records are Accepted at the human gate of 2026-10-15, and charter v9 records A5, A6 and A8 as discharged by that recorded human judgment.
+A1 is satisfied once `architecture/reference-architecture.md` and the seven `components/*.md` files listed in the map exist.
+Next, implementation proceeds through one or more OpenSpec changes under `openspec/changes/`, following the precedent of `openspec/changes/stand-up-nixbot-on-magnetite/` and `openspec/changes/stand-up-gitea-mq-on-magnetite/`, with the decision records, the reference architecture and the component documents as their design input (charter v8).
+The charter's S2 sequences the continuous-verification half after the store and topology decisions land, so it follows the store and collection work of ADR-001 and ADR-003.
+ADR-009 Q5, whether an external dead-man service watches cinnabar itself, is revisited at the end of implementation; the candidate is an external heartbeat from a free uptime service, weighed against the third-party dependency.
 Finding 5 above adds a precondition to A6 in practice, since a regulator that cannot be shown to fail on a mutant does not discharge it.

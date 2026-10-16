@@ -4,7 +4,7 @@ title: "ADR-009: Alerting"
 
 ## Status
 
-Proposed
+Accepted (human gate, 2026-10-15), except Q5, deferred to the end of implementation
 
 ## Context
 
@@ -209,19 +209,29 @@ Regulator R9.5: an evaluation-time assertion in the module that both limits are 
 - Add `modules/checks/fleet-alert.nix`: regulator R9.2 with its fixtures and mutants, using `promtool` from the `cli` output of the root pin's `prometheus` package (`NixOS/nixpkgs@ac1faec44836:pkgs/by-name/pr/prometheus/package.nix:210`, root node `nixpkgs_10`).
 - Modify `modules/machines/nixos/magnetite/default.nix`: import `fleet-alert` and enable the evaluator, and add `onFailure = [ "observability-notify@%n.service" ]` to the six existing `zfs-assert-*` and `zfs-set-*` oneshots and to ADR-007's three new ones.
 - Modify `modules/machines/nixos/cinnabar/ntfy.nix`: set `auth-access` to `alerter:fleet-*:rw` and `*:fleet-*:ro`, set `services.ntfy-sh.environmentFile` to the generator's `ntfy-env` file, and import `fleet-alert` with the dead-man enabled.
-- Modify the `observability-notify@` template unit of ADR-003, in the `ingress` role's NixOS module: post to `fleet-alerts` with the `alerter` token, keep the per-unit stamp, and add the `ExecStopPost=` recovery hook to each notified unit.
+- Modify the `observability-notify@` template unit of ADR-003, in the `agent` role's NixOS module on every in-scope NixOS host, cinnabar included: post to `fleet-alerts` with the `alerter` token, keep the per-unit stamp, and add the `ExecStopPost=` recovery hook to each notified unit.
 - Clan vars generator `ntfy-alerter`, `share = true`, declared on magnetite and cinnabar: `runtimeInputs` `ntfy-sh` and openssl; files `token` (secret, a `tk_`-prefixed token from `ntfy token generate`, mode `0400`, written with `printf '%s'`), and `ntfy-env` (secret, `NTFY_AUTH_USERS=alerter:<bcrypt hash from ntfy user hash>:user` and `NTFY_AUTH_TOKENS=alerter:<token>`, `restartUnits = [ "ntfy-sh.service" ]`, deployed only to cinnabar).
 - No flake input, no overlay, no new long-running service and no new listener.
 
 ## Questions for the human gate
 
 1. Q1: Is a first-party timer evaluator acceptable instead of vmalert and Alertmanager? Recommended: yes; it adds no daemon to magnetite, and the alternative adds two to obtain silencing and grouping that eighteen rules do not need.
+   Resolution: recommended answer accepted at the 2026-10-15 gate.
 2. Q2: Are the `fleet-alerts` subscribers the human's phone and desktop, subscribing anonymously with read-only access? Recommended: yes; the alternative requires a subscriber login on every device for messages that carry no content.
+   Resolution: recommended answer accepted at the 2026-10-15 gate.
 3. Q3: What triggers adopting Alertmanager? Recommended: E9.1 breached in two separate weeks after threshold review, or the rule set passing 30 rules; at that point vmalert loads the same Prometheus-format rules and Alertmanager posts to `fleet-alerts` through `?template=alertmanager`, and the alternative keeps growing the evaluator into an Alertmanager.
+   Resolution: recommended answer accepted at the 2026-10-15 gate.
 4. Q4: Is the noise envelope of 10 firings per 24 h, at most 3 from any one laptop, right? Recommended: yes for the first month, then revised from the counts R9.1 records; a higher bound tolerates the muting failure this record exists to prevent, and without the laptop sub-bound stibnite's activation and sleep churn could spend the fleet's budget.
+   Resolution: recommended answer accepted at the 2026-10-15 gate.
 5. Q5: Should cinnabar itself be watched by an external dead-man service? Recommended: no for now; a cinnabar outage also takes down `.zt` resolution and the ZeroTier controller, which the human notices in ordinary use, and the alternative adds a third-party account and egress.
+   Resolution: deferred to the end of implementation; candidate is an external heartbeat from a free uptime service, weighed against the third-party dependency.
 6. Q6: Should a merge-queue stall rule, a `batch formed` with no `batch done` within 2 h, be added over ADR-005's `devloop` events? Recommended: no until ADR-005 names a decision that needs it within hours; the alternative alerts on a signal whose consumer is a 30-day review.
+   Resolution: recommended answer accepted at the 2026-10-15 gate.
 7. Q7: Should `warning` alerts stay single-shot with no daily reminder? Recommended: yes; reminders for accepted conditions are the noise that leads to muting, and `critical` alerts keep a 24 h reminder.
+   Resolution: recommended answer accepted at the 2026-10-15 gate.
 8. Q8: Is restricting publishing on `fleet-*` to the `alerter` user, while leaving every other topic anonymous read-write, acceptable? Recommended: yes; it protects the dead-man from spoofed heartbeats without changing any existing `ntfy-send` or hook caller, and the alternative of `deny-all` requires a credential on every host and agent hook.
+   Resolution: recommended answer accepted at the 2026-10-15 gate.
 9. Q9: Should host absence alert only for always-on hosts, cinnabar and magnetite plus any cloud host while terranix provisions it, and never for stibnite or pyrite? Recommended: yes, with the absence freeze of item 17; the alternative fires whenever a laptop sleeps or travels.
+   Resolution: recommended answer accepted at the 2026-10-15 gate.
 10. Q10: Should `LaunchdJobFailed` fire on any non-zero last exit code of an allow-listed job, including calendar and run-at-load jobs? Recommended: yes, as a single-shot `warning`; the alternative watches only kept-alive jobs and misses a failed `harmonia-gc` or `sops-install-secrets` run.
+    Resolution: recommended answer accepted at the 2026-10-15 gate.

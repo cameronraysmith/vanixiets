@@ -4,7 +4,7 @@ title: "ADR-005: Dev-loop instrumentation"
 
 ## Status
 
-Proposed
+Accepted (human gate, 2026-10-15)
 
 ## Context
 
@@ -200,15 +200,28 @@ Clan vars generators and sops entries:
 ## Questions for the human gate
 
 Q1. Keep CI history beyond nixbot's 90 days by copying rows into `devloop` within minutes? Recommended: yes, with ADR-006 beyond 365 days; the alternative of raising `retention_days` also lengthens build-log retention on magnetite and keeps history out of the dashboard.
+Resolution: recommended answer accepted at the 2026-10-15 gate.
 Q2. Make abandonment a distinct nixbot status in our patch? Recommended: no, keep the error-text marker under the `devloop-signals` equality check; the alternative extends the local patch into nixbot's aggregation, forge-status and UI handling of statuses.
+Resolution: recommended answer accepted at the 2026-10-15 gate.
 Q3. Record deploys at activation and attribute commits by joining closures against CI outputs, leaving `system.configurationRevision` unset? Recommended: yes; the alternative makes every commit change all ten toplevels.
+Resolution: recommended answer accepted at the 2026-10-15 gate.
 Q4. Disable omp's log signal at the emitter while ADR-003's local receiver also has no logs pipeline? Recommended: yes; the alternative needs string-body redaction that fails open.
+Resolution: recommended answer accepted at the 2026-10-15 gate.
 Q5. Package Omnigent's `tracing` extra and enable its export now? Recommended: defer to ADR-008, which in this slice gives no omnigent worker account an OTLP endpoint or credential and reserves `OTEL_` in the worker environment; enabling export requires revising ADR-008.
+Resolution: recommended answer accepted at the 2026-10-15 gate.
 Q6. Add `--result-file` to `just check-fast` and ship local results? Recommended: no, until a rule needs data CI rows lack; the alternative adds a shipped file on laptops including other people's.
+Resolution: recommended answer accepted at the 2026-10-15 gate.
 Q7. Admit omp token and cost metrics? Recommended: no; admitting them requires naming the decision they feed, such as planning-unit sizing, which the human would commit to making from them.
+Resolution: recommended answer accepted at the 2026-10-15 gate.
 Q8. Accept the `sqlquery` receiver at development stability for logs? Recommended: yes, under `devloop-reconcile`, the gating `devloop-queries` check and the on-demand `devloop-ingest`; the alternative is the rejected timer script with its own credential and cursor.
+Resolution: recommended answer accepted at the 2026-10-15 gate.
 Q9. Which store user does `devloop-reconcile` use? Answered by ADR-007: the shared `regulator:ro` user of the read-only regulators, kept separate from the dashboard's `perses:ro` credential so their rotation and holders stay decoupled.
+Resolution: recommended answer accepted at the 2026-10-15 gate.
 Q10. Adopt the starting thresholds of D5-R1 to D5-R8 (30-day windows, 20 distinct `drv_path` values, the 99th percentile for three builds, half of builds abandoned)? Recommended: yes as initial envelopes revised by the same coverage-model loop; without numbers each rule degrades to a chart.
+Resolution: recommended answer accepted at the 2026-10-15 gate.
 Q11. Should D5-R4's queue-wait bound be one hour at the 90th percentile? Recommended: yes, as one third of the 3 h 08 m measured worst case; a looser bound lets the per-pull-request bin set grow unchecked.
+Resolution: recommended answer accepted at the 2026-10-15 gate.
 Q12. Read nixbot's PostgreSQL directly, departing from web-verification D4 and D10, which route the evidence publisher through nixbot's events and API? Recommended: yes, because the copy needs one cursor across all builds, which neither the `build_finished` effect nor the API provides; the alternative is a per-build effect or API poller holding its own cursor and credential.
+Resolution: recommended answer accepted at the 2026-10-15 gate.
 Q13. Accept that the collector end-to-end path, the gitea-mq parser and the reconcile job's mutants are shown only by the on-demand `vmTests.x86_64-linux.devloop-ingest`? Recommended: yes, while no gating container-test pattern exists and magnetite lacks KVM; the alternative is to establish a gating nspawn check on magnetite's `uid-range`, which this repository has not yet done.
+Resolution: recommended answer accepted at the 2026-10-15 gate.

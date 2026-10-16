@@ -1,12 +1,12 @@
 ---
 title: Fleet observability and CCV feedback-loop charter
-status: charter v8
+status: charter v9
 date: 2026-10-15
 ---
 
 # Fleet observability and CCV feedback-loop charter
 
-Charter version: v8.
+Charter version: v9.
 A revision is a version bump with a dated entry under "Revision history"; the text of an earlier version is never edited in place.
 
 ## Objective
@@ -257,3 +257,13 @@ A research unit that meets ambiguity returns it in its questions section; the or
   - Scope clarified: implementation proceeds through OpenSpec changes following the `openspec/changes/stand-up-*` precedent, so the decision records feed a proposal, design and task list rather than being implemented directly.
   - S1 clarified: `architecture/` and `components/` remain pending deliverables, and A1 is not yet satisfied.
   - D6 clarified: R2 storage follows web-verification D9, a single adopted `sciexp` bucket with `projects/vanixiets/observability/{store,export}/` prefixes, replacing the separate buckets ADR-006 first proposed.
+- v9 (2026-10-15): record of the human gate; no earlier text is edited beyond the status and version lines, and D1–D9, the requirements and the acceptance criteria are unchanged.
+  - The human gate accepted the recommended answer of every question in ADR-001 to ADR-009, with exactly one exception, and each decision record now reads Accepted with a per-question resolution, ADR-009 with that exception noted.
+  - ADR-002 Q6 is answered as `perses.scientistexperience.net` behind Kanidm, and ADR-003 Q15 as SMART on pyrite and stibnite.
+  - ADR-009 Q5, whether an external dead-man service watches cinnabar itself, is deferred to the end of implementation; the candidate is an external heartbeat from a free uptime service, weighed against the third-party dependency.
+  - A5, A6 and A8 are discharged as recorded human judgment on 2026-10-15.
+  - Consistency corrections with no new decision, aligning the decision records to ADR-009, the later and more specific record, and to the accepted ADR-007 Q6:
+    - `regulator:ro` holders are `otel-envelope`, `devloop-reconcile`, `greptimedb-envelope` and `fleet-alert.service`, which ADR-009 has load `regulator-password`; ADR-007 and ADR-008 now list `fleet-alert.service`.
+    - `admin:rw` holders are the `greptimedb-schema` and `greptimedb-export` oneshots only, per ADR-007; ADR-008's list no longer names the envelope oneshot, which uses `regulator`.
+    - The `observability-notify@` template moves from the `ingress` role to the `agent` role of ADR-003, so every in-scope NixOS host has it, cinnabar included, because ADR-009's `fleet-deadman` on cinnabar notifies through it; it calls the existing `ntfy-send` against `ntfy.zt`, ADR-003's `OnFailure=` list adds `fleet-alert.service` and `fleet-deadman.service`, and ADR-009's file list names the `agent` role.
+    - Restart-on-rotation stays after GreptimeDB 1.3, per ADR-007 Q6, because `LoadCredential` snapshots credentials at start; ADR-001 and ADR-008 now say so, and only the collector's histogram conversion is removed at 1.3.

@@ -4,7 +4,7 @@ title: "ADR-008: Access control and tenancy"
 
 ## Status
 
-Proposed
+Accepted (human gate, 2026-10-15)
 
 ## Context
 
@@ -20,7 +20,7 @@ What the open GreptimeDB build does:
 - The one enforced lever is a per-user `rw`, `ro` or `wo` mode, checked against whether a request reads or writes (`research/telemetry-security-and-tenancy.md` R2; `research/greptimedb.md` R26, R27).
 - The database is selected by the caller through `x-greptime-db-name` or `db`, so a database is a label, not a boundary (`research/telemetry-security-and-tenancy.md` F30).
 - Per-database and per-table authorization exists only in the separate Enterprise binary's `greptime_ee_user_provider` (`research/telemetry-security-and-tenancy.md` R3, R4).
-- The watched credential file does not follow a sops-nix symlink swap before 1.3.0-beta.1, so rotation needs a restart (`research/telemetry-security-and-tenancy.md` R7).
+- The watched credential file does not follow a sops-nix symlink swap before 1.3.0-beta.1, so rotation needs a restart (`research/telemetry-security-and-tenancy.md` R7); the restart stays after 1.3 because `LoadCredential` snapshots credentials at start (ADR-007 Q6).
 
 What Perses does:
 
@@ -51,7 +51,7 @@ Adopt a content-free shared read zone: the per-host collector is the only conten
 What is enforceable with the open build, and is enforced:
 
 1. Authentication on every store request, by configuring the user provider from ADR-007's `greptimedb-users` file; the store listener requires credentials even on loopback because loopback is reachable by every local UID, including magnetite's two worker accounts.
-2. Read/write separation by user mode, with the four users ADR-007 enumerates: `collector` is `wo` and held only by the ingress collector on magnetite (ADR-003); `perses` is `ro` and held only by Perses (ADR-002); `regulator` is `ro` and held only by the read-only regulator units `otel-envelope` (ADR-003, ADR-004, this record), `devloop-reconcile` (ADR-005) and `greptimedb-envelope` (ADR-007); `admin` is `rw` and held only by the local schema, export and envelope oneshots of ADR-007 and ADR-006.
+2. Read/write separation by user mode, with the four users ADR-007 enumerates: `collector` is `wo` and held only by the ingress collector on magnetite (ADR-003); `perses` is `ro` and held only by Perses (ADR-002); `regulator` is `ro` and held only by the read-only regulator units `otel-envelope` (ADR-003, ADR-004, this record), `devloop-reconcile` (ADR-005), `greptimedb-envelope` (ADR-007) and `fleet-alert.service` (ADR-009); `admin` is `rw` and held only by the local `greptimedb-schema` and `greptimedb-export` oneshots of ADR-007 and ADR-006.
 3. Network placement: the store's HTTP port binds loopback only for ingest (ADR-007), and the only mesh-facing telemetry listener is the mTLS ingress receiver (ADR-003).
 4. Configuration immutability against workers: each collector runs under a system account outside every worker UID, NixOS `DynamicUser` or darwin `_otelcol`, except the darwin `otelcol-process` collector, which runs as root because process inspection requires it, has no receiver endpoint and holds no credential (ADR-003 item 22); every collector's configuration is in the Nix store and its credentials, where it has any, are delivered by `LoadCredential` or as `0400` files owned by that account.
 5. Content exclusion at that collector, fail-closed, as follows.
@@ -78,7 +78,7 @@ What is not enforceable with the open build, and is therefore not promised:
 3. Write partitioning: the `wo` credential can insert into any database.
 4. Attribution of a local OTLP write to the Unix account that sent it: the agent's loopback receiver cannot see the sender's UID, so a worker can inject telemetry attributed to its host.
 5. Emitter-side content gates: every gate is an environment variable or setting under the worker's control.
-6. Credential rotation without restart on GreptimeDB below 1.3.0-beta.1.
+6. Credential rotation without restart, also after GreptimeDB 1.3, because `LoadCredential` snapshots credentials at start (ADR-007 Q6).
 7. Identity-provider login to the store: no OIDC, LDAP or mTLS provider exists in the open build.
 
 Readers and admission:
@@ -125,7 +125,7 @@ Content-bearing diagnostics, such as error messages and exception text, are unav
 A worker can inject misleading telemetry for its own host; the dev-loop consumer must treat agent-harness metrics as emitter-claimed.
 Raising the content bar later, for example admitting a single opt-in content session, requires a separate store or the Enterprise provider, not a configuration change.
 Perses 0.54.0 forwards the reader's Perses session token on proxy requests, but it does not reach the store in the `Authorization` header, because the datasource's `basicAuth` makes `SetBasicAuth` replace that header; whether the session cookies are also forwarded is not established, and their only receiver is the loopback store on magnetite (ADR-002, which decides the version).
-Rotation of store credentials requires `restartUnits` on the store, the ingress collector and Perses until GreptimeDB 1.3.0-beta.1 or later is deployed.
+Rotation of store credentials requires `restartUnits` on the store, the ingress collector and Perses, also after GreptimeDB 1.3, because `LoadCredential` snapshots credentials at start (ADR-007 Q6).
 The relationship to worker isolation is that the worker account boundary protects the collector's configuration and credentials, not the emitter's output, which remains untrusted.
 
 ## Operating envelope and regulator
@@ -173,10 +173,18 @@ Perses' own configuration regulator, covering `guest_permissions`, auth and `rea
 ## Questions for the human gate
 
 1. Q1: Accept the shared read zone and drop per-person partitioning? Recommended: yes; the alternative requires a second store, the Enterprise build, or a SQL-rewriting proxy.
+   Resolution: recommended answer accepted at the 2026-10-15 gate.
 2. Q2: Who is admitted to `perses_users`? Recommended: Cameron only at first, Janette when she chooses; admitting both makes each person's harness metrics readable by the other.
+   Resolution: recommended answer accepted at the 2026-10-15 gate.
 3. Q3: If worker telemetry is later enabled (ADR-005 Q5), do Janette's worker sessions emit it? Recommended: no until she consents; the alternative records her agent activity in a store Cameron reads.
+   Resolution: recommended answer accepted at the 2026-10-15 gate.
 4. Q4: Add `OTEL_` to the reserved worker-environment prefixes? Recommended: yes; the alternative lets a role setting enable a content gate, though the collector still drops the content.
+   Resolution: recommended answer accepted at the 2026-10-15 gate.
 5. Q5: Is content exclusion absolute, with no opt-in content session? Recommended: yes; the alternative needs a separate store with its own access model.
+   Resolution: recommended answer accepted at the 2026-10-15 gate.
 6. Q6: Disable omp's log signal at the emitter with `OTEL_LOGS_EXPORTER=none`? Recommended: yes, in addition to the collector refusing OTLP logs; the alternative sends records that are refused and logged as export errors.
+   Resolution: recommended answer accepted at the 2026-10-15 gate.
 7. Q7: Keep the gitea-mq dashboard public? Recommended: yes while only public repositories are queued; restricting it breaks commit-status links and webhook delivery.
+   Resolution: recommended answer accepted at the 2026-10-15 gate.
 8. Q8: Buy or trial GreptimeDB Enterprise for table ACLs? Recommended: no; nothing in the content-free store needs partitioning.
+   Resolution: recommended answer accepted at the 2026-10-15 gate.

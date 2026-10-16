@@ -4,7 +4,7 @@ title: "ADR-002: Dashboard layer"
 
 ## Status
 
-Proposed
+Accepted (human gate, 2026-10-15)
 
 ## Context
 
@@ -181,12 +181,20 @@ Clan vars generators:
 ## Questions for the human gate
 
 Q1 Perses 0.54.0 or the 0.55 line? Recommended: 0.54.0 from the root pin with the compensating configuration above and an upgrade obligation at 0.55.0 final in nixpkgs; choosing 0.55 now means a first-party override of a release candidate, a re-vendored plugin set, and an explicit loopback allowance.
+Resolution: recommended answer accepted at the 2026-10-15 gate.
 Q2 Disposition of GreptimeTeam/dashboard? Recommended: rejected as the dashboard layer and deferred as an exploration console, not deployed; deploying it now requires a GreptimeDB 1.3 prerelease built with `servers/dashboard` and a store password held in browser storage.
+Resolution: recommended answer accepted at the 2026-10-15 gate.
 Q3 Keep the Prometheus datasource beside the GreptimeDB datasource? Recommended: yes; dropping it removes one plugin (11 MiB) and moves every fleet counter panel into SQL.
+Resolution: recommended answer accepted at the 2026-10-15 gate.
 Q4 Is one recorded manual Kanidm login at first deploy acceptable as the OIDC regulator? Recommended: yes; the alternative is adding a Kanidm node to the VM test, which roughly doubles its cost to sample a path exercised once per login.
+Resolution: recommended answer accepted at the 2026-10-15 gate.
 Q5 Is an on-demand, non-gating NixOS VM test the right home for the data-path regulator? Recommended: yes, under `modules/vm-tests/` per `modules/README.md:32`, `:86`, because `magnetite` has no KVM and the gating set stays the lint and configuration checks; the alternative is a new gating nspawn container test on `magnetite`'s `uid-range` builder, which no existing check establishes.
+Resolution: recommended answer accepted at the 2026-10-15 gate.
 Q6 Public hostname behind Kanidm, or a mesh-only `.zt` vhost? Recommended: public `perses.scientistexperience.net` behind the direct Kanidm client.
+Resolution: perses.scientistexperience.net behind Kanidm, accepted at the 2026-10-15 gate.
 Public `perses.scientistexperience.net`: follows `omni.scientistexperience.net` with an ACME certificate any browser trusts, at the cost of an internet-reachable login surface.
 Mesh-only `perses.zt`: removes the public surface by following cinnabar's `tls internal` caddy vhosts (`modules/machines/nixos/cinnabar/caddy.nix:14-82`), at the cost of either Perses listening beyond loopback for cinnabar to proxy or a first caddy on `magnetite`, plus every reader's browser trusting caddy's internal root CA.
 Q7 Plugin subset of ten? Recommended: yes, at an envelope of 96 MiB; the full vendored set costs 257 MiB of tmpfs on `magnetite` under RK3 and adds panel types no dashboard uses.
+Resolution: recommended answer accepted at the 2026-10-15 gate.
 Q8 Plain resource YAML as the dashboards-as-code format? Recommended: yes; the Go SDK adds a Go module and a build step, and the CUE SDK has no GreptimeDB support.
+Resolution: recommended answer accepted at the 2026-10-15 gate.

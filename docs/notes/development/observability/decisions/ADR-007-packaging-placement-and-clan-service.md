@@ -4,7 +4,7 @@ title: "ADR-007: Packaging, host placement and clan service shape"
 
 ## Status
 
-Proposed
+Accepted (human gate, 2026-10-15)
 
 ## Context
 
@@ -51,7 +51,7 @@ Configuration values can be supplied through environment variables prefixed `GRE
 ### Credential evidence
 
 The open build authenticates HTTP Basic against a static user file whose lines may carry `ro`, `wo` or `rw` (`research/greptimedb.md` R26, R27).
-The watch-file provider survives a sops-nix symlink swap only from `v1.3.0-beta.1`, so 1.1.4 and 1.2.1 need `restartUnits` for rotation (`research/telemetry-security-and-tenancy.md` C3).
+The watch-file provider survives a sops-nix symlink swap only from `v1.3.0-beta.1`, so 1.1.4 and 1.2.1 need `restartUnits` for rotation (`research/telemetry-security-and-tenancy.md` C3), and the restart stays after 1.3 as well, because `LoadCredential` snapshots credentials at start (Q6).
 `LoadCredential` snapshots the file at unit start regardless of provider (`research/telemetry-security-and-tenancy.md` F41).
 The repository's generator patterns are `omnigraph-bearer-tokens` for generated secrets and `omnigraph-r2` for externally minted ones, both with `restartUnits` (`research/telemetry-security-and-tenancy.md` F37, F38), and a verbatim-reading consumer needs the trailing newline stripped (`research/telemetry-security-and-tenancy.md` F40).
 
@@ -72,7 +72,7 @@ Its secret files are `admin-password`, `collector-password`, `perses-password` a
 The `collector-password`, `perses-password` and `regulator-password` files are written with `printf '%s'` and mode `0400`; the first two carry `restartUnits` for the ADR-003 `ingress` collector unit and the ADR-002 Perses unit respectively, and `regulator-password` needs none because its consumers are timer-driven oneshots that load it at each start.
 `admin` is used only by the local `greptimedb-schema` and `greptimedb-export` oneshots of this record and ADR-006.
 `collector` is used only by the ADR-003 `ingress` collector, and `perses` only by the ADR-002 Perses service.
-`regulator` is used only by the read-only regulators: the `otel-envelope` oneshot of ADR-003, ADR-004 and ADR-008, the `devloop-reconcile` oneshot of ADR-005, and the `greptimedb-envelope` oneshot of this record.
+`regulator` is used only by the read-only regulators: the `otel-envelope` oneshot of ADR-003, ADR-004 and ADR-008, the `devloop-reconcile` oneshot of ADR-005, the `greptimedb-envelope` oneshot of this record, and the `fleet-alert.service` evaluator of ADR-009.
 The R2 credential is the `greptimedb-r2` generator of ADR-006: one Object Read & Write token on the existing `sciexp` bucket, which the store reads through `EnvironmentFile` for its `projects/vanixiets/observability/store/` root and from which the `greptimedb-export` and `greptimedb-envelope` oneshots sign prefix-confined temporary credentials for `projects/vanixiets/observability/export/`.
 
 Clan service shape: the store is a NixOS module, `flake.modules.nixos.greptimedb` with options under `services.greptimedb`, imported by `magnetite` the way `omnigraph` is, and is not a clan service role.
@@ -132,7 +132,7 @@ The host-level signals of ADR-003 and ADR-004 raise the `fleet` active-series bu
 
 ## Operating envelope and regulator
 
-Envelope E7.1, configuration: the store unit has `MemoryMax`, `MemoryHigh`, `MemorySwapMax = 0` and `OOMScoreAdjust` set; every memory knob listed in the Decision is present in the generated TOML; every listener address is in `127.0.0.0/8`; gRPC, MySQL, PostgreSQL, OpenTSDB, InfluxDB, Prometheus remote storage and the Jaeger query API are disabled; `user_provider` is set; `enable_telemetry = false`; and, while the package version is below `1.3.0-beta.1`, the users-file generator's `restartUnits` contains `greptimedb.service`.
+Envelope E7.1, configuration: the store unit has `MemoryMax`, `MemoryHigh`, `MemorySwapMax = 0` and `OOMScoreAdjust` set; every memory knob listed in the Decision is present in the generated TOML; every listener address is in `127.0.0.0/8`; gRPC, MySQL, PostgreSQL, OpenTSDB, InfluxDB, Prometheus remote storage and the Jaeger query API are disabled; `user_provider` is set; `enable_telemetry = false`; and the users-file generator's `restartUnits` contains `greptimedb.service` at every package version (Q6).
 Regulator R7.1: a flake check, `modules/checks/greptimedb-envelope.nix`, evaluates `magnetite`'s configuration and asserts each clause, and also evaluates an enumerated mutant per clause, one dropping `MemoryMax`, one dropping `page_cache_size`, one binding HTTP to `0.0.0.0`, one re-enabling MySQL, one removing `user_provider`, one omitting `enable_telemetry`, and one removing `restartUnits`, asserting that each mutant produces a non-empty failure list, following `modules/checks/omnigent-environment.nix` (`research/dev-loop-signals.md` F12).
 
 Envelope E7.2, runtime memory: the store cgroup's `memory.peak` stays below `MemoryHigh`, and its `memory.events` `oom_kill` and `max` counters do not increase between samples.
@@ -173,10 +173,18 @@ Keeping the store out of the clan inventory prevents an inventory instance whose
 ## Questions for the human gate
 
 Q1 Keep the store on `magnetite` despite RK3 having fired? Recommended: yes, with the containment above; the alternative `cinnabar` concentrates mesh control, name resolution and telemetry on one half-sized host.
+Resolution: recommended answer accepted at the 2026-10-15 gate.
 Q2 Take 1.2.1 through a root-pin bump that includes https://github.com/NixOS/nixpkgs/pull/574558, with a `greptimedb-bin` over the upstream checksummed 1.2.1 tarball only if the channel still lacks it when implementation starts? Recommended: yes; an `overrideAttrs` to 1.2.1 is a 34-minute source build on the memory-constrained builders.
+Resolution: recommended answer accepted at the 2026-10-15 gate.
 Q3 Are `MemoryHigh = 3G` and `MemoryMax = 4G` acceptable as the store's share of `magnetite`? Recommended: yes, revised only by R7.2 evidence; a larger ceiling eats into the free memory the evaluator needs, a smaller one risks scan failures on dashboards.
+Resolution: recommended answer accepted at the 2026-10-15 gate.
 Q4 Should the store die first under host OOM (`OOMScoreAdjust = 500`), ahead of the ADR-003 `ingress` collector (`OOMScoreAdjust = 300`) and `nix-daemon` workers? Recommended: yes; the collector survives to queue, and the alternative lets a host OOM fail CI to keep telemetry ingesting.
+Resolution: recommended answer accepted at the 2026-10-15 gate.
 Q5 Is a 16 GiB dataset with 4 GiB read and write caches acceptable instead of the roughly 10 GB default cache floor? Recommended: yes; larger caches reduce R2 reads but enlarge the reservation on a pool with a starvation history.
+Resolution: recommended answer accepted at the 2026-10-15 gate.
 Q6 Should restart-on-rotation remain after a `v1.3` release reaches the pin? Recommended: yes, because `LoadCredential` snapshots at start; the alternative reads the secret path directly and drops credentials-directory isolation.
+Resolution: recommended answer accepted at the 2026-10-15 gate.
 Q7 Should a local `admin:rw` user exist for the schema and export oneshots? Recommended: yes, root-owned and loopback-only; the alternative runs those tasks with the collector, Perses or regulator credential, whose modes forbid them.
+Resolution: recommended answer accepted at the 2026-10-15 gate.
 Q8 Should the store's phase-2 memory work wait for the incident note's phase-2 `MemoryLow` and oomd measurements? Recommended: no, ship the store's own ceiling now and fold it into that work when it lands; the alternative blocks the store on measurements with no scheduled date.
+Resolution: recommended answer accepted at the 2026-10-15 gate.

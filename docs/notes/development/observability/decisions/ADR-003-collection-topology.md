@@ -4,7 +4,7 @@ title: "ADR-003: Collection topology"
 
 ## Status
 
-Proposed
+Accepted (human gate, 2026-10-15)
 
 ## Context
 
@@ -237,7 +237,8 @@ Regulator R3.2, runtime: a systemd timer `otel-envelope` on magnetite queries th
 Per-host last-seen time fails the unit only for always-on hosts, those with `enabled = true` in the terranix machine tables, currently cinnabar and magnetite; a laptop's silence, or that of a cloud host destroyed on demand, fails nothing, because sleep, travel and teardown are normal (`cameronraysmith/vanixiets@eee06596a:modules/terranix/hetzner.nix:11`, `:18`, `:25`; `cameronraysmith/vanixiets@eee06596a:modules/terranix/gcp.nix:32`, `:40`).
 It is shown able to fail at acceptance by stopping one online host's agent and observing the unit fail within 10 min, and by stopping one host's `prometheus-node-exporter` and observing the same.
 
-Failure notification, owned by this record for every regulator and oneshot unit of the observability decisions: `otel-envelope` (this record), `devloop-reconcile` (ADR-005), `greptimedb-envelope`, `greptimedb-export` and `greptimedb-schema` (ADR-007), and every `zfs-assert-*` and `zfs-set-*` dataset-property oneshot, magnetite's existing six (`cameronraysmith/vanixiets@f55c27adb:modules/machines/nixos/magnetite/default.nix:193-263`) and ADR-007's three, each set `OnFailure=` to a shared notifier unit `observability-notify@%n.service` that posts the failed unit's name and host to the existing ntfy on cinnabar (Q9).
+Failure notification, owned by this record for every regulator and oneshot unit of the observability decisions: `otel-envelope` (this record), `devloop-reconcile` (ADR-005), `greptimedb-envelope`, `greptimedb-export` and `greptimedb-schema` (ADR-007), `fleet-alert.service` and `fleet-deadman.service` (ADR-009), and every `zfs-assert-*` and `zfs-set-*` dataset-property oneshot, magnetite's existing six (`cameronraysmith/vanixiets@f55c27adb:modules/machines/nixos/magnetite/default.nix:193-263`) and ADR-007's three, each set `OnFailure=` to a shared notifier unit `observability-notify@%n.service` that posts the failed unit's name and host to the existing ntfy on cinnabar (Q9).
+The template unit lives in the `agent` role's NixOS module, so every in-scope NixOS host has it, cinnabar included, and it calls the existing `ntfy-send` against `ntfy.zt`.
 ADR-009 defines the notifier's delivery topic, authentication and deduplication.
 The notifier is the only path from a failed regulator to a human; the unit-state series of item 17 and the launchd job series of item 23 are written to the store, and alerting over them belongs to ADR-009.
 It is shown able to fail at acceptance by the R3.2 stopped-agent test producing a ntfy message naming `otel-envelope.service`.
@@ -278,7 +279,7 @@ It is shown able to fail at acceptance by the R3.2 stopped-agent test producing 
 - In the `ingress` role: the second OTLP receiver's endpoint built from `config.flake.lib.hosts.magnetite.zt` as `magnetite/default.nix` already inherits it, and the `x-greptime-otlp-metric-promote-resource-attrs` header on every `otlp_http` exporter, generated from the resource allow-list in `schema.nix`.
 - Add `modules/checks/otel-collector-config.nix`: regulator R3.1, with the recorded `launchctl print` fixtures it feeds to the probe's parser.
 - Add the `otel-envelope` service and timer to the `ingress` role's NixOS module: regulator R3.2.
-- Add the `observability-notify@` template unit to the `ingress` role's NixOS module, and `OnFailure=observability-notify@%n.service` on `otel-envelope`; ADR-005 sets the same `OnFailure=` on its unit, and ADR-007 on its units and on magnetite's nine `zfs-assert-*` and `zfs-set-*` oneshots.
+- Add the `observability-notify@` template unit to the `agent` role's NixOS module, so every in-scope NixOS host has it, cinnabar included, and `OnFailure=observability-notify@%n.service` on `otel-envelope`; ADR-005 sets the same `OnFailure=` on its unit, ADR-007 on its units and on magnetite's nine `zfs-assert-*` and `zfs-set-*` oneshots, and ADR-009 on `fleet-alert.service` and `fleet-deadman.service`.
 - Modify `modules/nixos/nixbot.nix`: a loopback-only nginx server on `127.0.0.1:9180` proxying `/metrics` to the nixbot socket.
 - Modify `modules/clan/inventory/services/zerotier.nix` or the zerotier NixOS configuration it applies: `services.zerotierone.localConf.settings.allowMetrics = true`.
 - No flake input is added; `opentelemetry-collector-contrib` comes from the root `nixpkgs` input.
@@ -289,20 +290,38 @@ It is shown able to fail at acceptance by the R3.2 stopped-agent test producing 
 ## Questions for the human gate
 
 1. Q1: Is the ingress role on magnetite's agent acceptable rather than a separate gateway? Recommended: yes; the alternative adds a process or a host to every delivery path.
+   Resolution: recommended answer accepted at the 2026-10-15 gate.
 2. Q2: Reuse `nix-grpc-ca` or mint `otel-ca`? Recommended: mint `otel-ca`; reuse makes a telemetry key a trusted remote-build credential for dispatcher CNs.
+   Resolution: recommended answer accepted at the 2026-10-15 gate.
 3. Q3: Are blackphos, rosegold and argentum telemetry subjects? Recommended: no until each primary user consents; the alternative collects host data from other people's laptops without consent.
+   Resolution: recommended answer accepted at the 2026-10-15 gate.
 4. Q4: Are the Android ZeroTier members telemetry subjects? Recommended: no, they are refused by mTLS; the alternative needs a certificate path for unmanaged devices.
+   Resolution: recommended answer accepted at the 2026-10-15 gate.
 5. Q5: Is a darwin agent acceptable while nixbot's darwin checks are non-gating? Recommended: yes, with R3.1 validating darwin configuration on `x86_64-linux`; the alternative requires a gating darwin builder first.
+   Resolution: recommended answer accepted at the 2026-10-15 gate.
 6. Q6: Enable nix-grpc-daemon `metricsListen` and disable its idle exit? Recommended: no; its per-RPC logfmt line already reaches journald, and the alternative keeps an idle daemon resident on magnetite.
+   Resolution: recommended answer accepted at the 2026-10-15 gate.
 7. Q7: Collect macOS unified logging with the alpha `macos_unified_logging` receiver? Recommended: no in this decision; the alternative ships an alpha receiver over a log stream with no content allow-list.
+   Resolution: recommended answer accepted at the 2026-10-15 gate.
 8. Q8: Accept the pinned collector 0.155.0 against upstream 0.163.0? Recommended: yes, take upgrades through pin bumps; the alternative carries an override derivation.
+   Resolution: recommended answer accepted at the 2026-10-15 gate.
 9. Q9: How does a failed regulator or oneshot unit notify a human? Recommended: `OnFailure=observability-notify@%n.service` on `otel-envelope`, `devloop-reconcile`, `greptimedb-envelope`, `greptimedb-export`, `greptimedb-schema` and every `zfs-assert-*` and `zfs-set-*` oneshot on magnetite, posting to the existing ntfy on cinnabar, with topic, authentication and deduplication per ADR-009; the alternative leaves those failures visible only in `systemctl --failed`.
+   Resolution: recommended answer accepted at the 2026-10-15 gate.
 10. Q10: Run the `process` scraper on stibnite? Recommended: yes, as item 22's root `otelcol-process` with the 64 MiB floor and 30-name cap; stibnite runs Nix builds, the nix-grpc builder daemon and an Omnigent worker beside its user's applications, and the alternative leaves a stibnite memory incident with no record of which process grew, at the cost that its user's large applications become label values readable by every `fleet` reader.
+    Resolution: recommended answer accepted at the 2026-10-15 gate.
 11. Q11: Bound per-process metrics by a 64 MiB floor over per-executable sums, rather than an include-list or per-unit cgroup memory? Recommended: yes at 0.155.0, and revisit per-unit memory when the pin reaches `v0.160.0`, noting that cgroup memory still omits the zram pool, which is charged to no cgroup; the include-list alternative misses unexpected growers, and the cgroup alternative needs an override derivation.
+    Resolution: recommended answer accepted at the 2026-10-15 gate.
 12. Q12: Rewrite `omnigent-host-<owner>.service` to `omnigent-host-<alias>.service` from an explicit owner-to-alias attrset in `schema.nix`? Recommended: yes, which keeps ADR-004's ban on person identifiers and keeps each worker's series stable when owners change; the alternative admits the verbatim unit names, so each owner's name becomes a label value in `fleet`.
+    Resolution: recommended answer accepted at the 2026-10-15 gate.
 13. Q13: Restrict the `systemd` receiver to an allow-list? Recommended: yes; the alternative, every `*.service` unit, sees failures of any unit but costs eight series per unit on every host.
+    Resolution: recommended answer accepted at the 2026-10-15 gate.
 14. Q14: node_exporter with only `zfs` and `vmstat` on loopback, rather than zfs_exporter? Recommended: yes, for ARC and `oom_kill`; the alternative adds pool capacity and fragmentation but loses ARC and spawns `zpool` each scrape.
+    Resolution: recommended answer accepted at the 2026-10-15 gate.
 15. Q15: Collect SMART on pyrite from `/dev/nvme0` and on stibnite from `disk0`? Recommended: yes, and remove pyrite's exporter if acceptance shows its Apple controller returns no health log; stibnite's health log was read on 2026-10-15, and the alternative leaves a physical SSD unwatched or collects emulated SMART data from virtual disks.
+    Resolution: SMART on pyrite and stibnite, accepted at the 2026-10-15 gate.
 16. Q16: Collect launchd job state with item 23's 60 s probe writing a textfile read by a loopback node_exporter? Recommended: yes; the alternatives are a first-party exporter with its own listener and code, or the alpha `otlp_json_file` receiver fed OTLP JSON from a shell script.
+    Resolution: recommended answer accepted at the 2026-10-15 gate.
 17. Q17: Run darwin process scraping in a separate root collector rather than in the `_otelcol` agent? Recommended: yes; under `_otelcol` every other account's process reads 0 bytes silently, and running the whole agent as root puts the OTLP receiver, the export queue and the client key in a root process.
+    Resolution: recommended answer accepted at the 2026-10-15 gate.
 18. Q18: Read stibnite's SMART data with the probe and smartctl 7.5 rather than smartctl_exporter? Recommended: yes, with acceptance confirming that `_prometheus-node-exporter` reads `disk0`'s health log as `nobody` did; the alternative overrides the exporter's Linux-only `platforms` and adds a long-running process.
+    Resolution: recommended answer accepted at the 2026-10-15 gate.

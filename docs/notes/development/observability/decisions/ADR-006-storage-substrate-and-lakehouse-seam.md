@@ -4,7 +4,7 @@ title: "ADR-006: Storage substrate and lakehouse seam"
 
 ## Status
 
-Proposed
+Accepted (human gate, 2026-10-15)
 
 ## Context
 
@@ -160,11 +160,20 @@ Placing the export rule in `cloudflare_r2_bucket_lifecycle.sciexp` prevents a se
 ## Questions for the human gate
 
 Q1 Does the seam mean in-place reads of the store's SSTs or a scheduled export? Recommended: scheduled export; the alternative couples every consumer to the store's manifest format (`research/greptimedb.md` Q2, `research/store-alternatives.md` Q4).
+Resolution: recommended answer accepted at the 2026-10-15 gate.
 Q2 Should `fleet` or `agent` also be exported? Recommended: neither; exporting `agent` moves identifying data outside ADR-008's boundary, and exporting `fleet` doubles its R2 footprint for operational data with a 30-day horizon.
+Resolution: recommended answer accepted at the 2026-10-15 gate.
 Q3 Which hosts hold the `telemetry-export-reader` parent and sign export read credentials? Recommended: the human operators' primary workstations only, since the parent reads all of `sciexp`; the alternative of every host widens read access to dev-loop history and to the rest of the bucket to worker accounts.
+Resolution: recommended answer accepted at the 2026-10-15 gate.
 Q4 Should the export prefix carry an R2 lifecycle expiry, as a rule in `cloudflare_r2_bucket_lifecycle.sciexp`? Recommended: no expiry until a year of data exists and its size is measured; the alternative caps history before its value is known.
+Resolution: recommended answer accepted at the 2026-10-15 gate.
 Q5 Should a DuckLake catalog be added now? Recommended: no, defer until a second consumer needs snapshots; the alternative adds a catalog file and its ownership with no failure prevented.
+Resolution: recommended answer accepted at the 2026-10-15 gate.
 Q6 Do the store and the export live in the existing `sciexp` bucket under `projects/vanixiets/observability/store/` and `projects/vanixiets/observability/export/`, approving R2 storage cost bounded by ADR-004's retention for the store and growing at the `devloop` export rate until Q4 sets an expiry? Recommended: yes; R2 bills stored data and operations rather than buckets, and D9 already fixes the bucket, key layout and lifecycle resource, so a new bucket would add a second convention with no cost saving.
+Resolution: recommended answer accepted at the 2026-10-15 gate.
 Q7 Is local `File` storage acceptable as the fallback if the R2 stanza fails its first deployment? Recommended: yes; the alternative blocks the store on debugging an untested S3-compatible path.
+Resolution: recommended answer accepted at the 2026-10-15 gate.
 Q8 How nixbot rows reach `devloop` is decided by ADR-005 Q1, which owns that signal; no question remains here.
+Resolution: recommended answer accepted at the 2026-10-15 gate.
 Q9 Is one long-lived `sciexp` read-write token for the store acceptable, given that GreptimeDB's `[storage]` takes only static credentials? Recommended: yes, as a recorded limitation with the blast radius `omnigraph-r2` already has on `magnetite`; the alternative is local `File` storage, which overrides the human's R2 choice.
+Resolution: recommended answer accepted at the 2026-10-15 gate.
