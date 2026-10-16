@@ -27,6 +27,8 @@ in
           description = "Sole writer of the shared ghq reference tree";
         };
         users.groups.${cfg.writer}.members = cfg.participants;
+
+        systemd.tmpfiles.rules = [ "d ${cfg.root} 0750 ${cfg.writer} ${cfg.writer} -" ];
       };
     };
 }

@@ -12,7 +12,7 @@ Tasks marked *gated* wait for the named approval.
 
 ## 2. Linux shared root
 
-- [ ] 2.1 Provision `/var/lib/ghq` with a tmpfiles rule `d <root> 0750 ghq ghq -` — verify: the magnetite and pyrite `systemd.tmpfiles.rules` filtered for `/var/lib/ghq` evaluate to exactly that rule; cinnabar's sharing projection is identical at `B` and `T`.
+- [x] 2.1 Provision `/var/lib/ghq` with a tmpfiles rule `d <root> 0750 ghq ghq -` — verify: the magnetite and pyrite `systemd.tmpfiles.rules` filtered for `/var/lib/ghq` evaluate to exactly that rule; cinnabar's sharing projection is identical at `B` and `T`.
 
 ## 3. Root, link and trust in each participating account
 
