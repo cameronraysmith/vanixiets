@@ -253,9 +253,9 @@
     url = "https://registry.npmjs.org/@cloudflare/vite-plugin/-/vite-plugin-1.64.0.tgz";
     hash = "sha512-h7Tunx9Ou5fUoao8O9jYTH0ParfrtNZzZVPA0IS19O7AoWA1SpYjwzDA6pZC78qzuV8sQSEOpYCN/yTShmd+gg==";
   };
-  "@cloudflare/vitest-plugin@1.4.3" = fetchurl {
-    url = "https://registry.npmjs.org/@cloudflare/vitest-plugin/-/vitest-plugin-1.4.3.tgz";
-    hash = "sha512-GA0735VV3HgWRCO4sIXUL4uPDXbsaM4hA3Kj+8MqaLTgodeGt+VpcZYQUPg0hXBzkPeT/lxORPnWwIHRAmTavQ==";
+  "@cloudflare/vitest-plugin@1.4.4" = fetchurl {
+    url = "https://registry.npmjs.org/@cloudflare/vitest-plugin/-/vitest-plugin-1.4.4.tgz";
+    hash = "sha512-nXNIlPiLvYFx/AH4/Bb/yntVkeloYcf1+tBi3l6Gp3TDCDtLxXAugrUtO7eTOWbHP6UIx5f9npy05OrACbZ5wg==";
   };
   "@cloudflare/workerd-darwin-64@1.20261012.1" = fetchurl {
     url = "https://registry.npmjs.org/@cloudflare/workerd-darwin-64/-/workerd-darwin-64-1.20261012.1.tgz";
