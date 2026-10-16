@@ -83,7 +83,8 @@ What is not enforceable with the open build, and is therefore not promised:
 
 Readers and admission:
 
-1. Humans read only through Perses, authenticated by a direct Kanidm OIDC client rather than `sso-gateway` (`research/telemetry-security-and-tenancy.md` F16), with a Kanidm scope map restricting login to one group.
+1. Humans read only through Perses at `perses.scientistexperience.net` (ADR-002), authenticated by a direct Kanidm OIDC client rather than `sso-gateway` (`research/telemetry-security-and-tenancy.md` F16), with a Kanidm scope map restricting login to the group `perses_users`.
+   This follows the gateway module's rule that a service with built-in OIDC defines its own Kanidm client (`modules/nixos/sso-gateway.nix:291-296`), and it is a recorded exception to web-verification D11, which keeps `sso-gateway` for UIs hosted on `magnetite` (`docs/notes/development/web-verification/decisions.md:252`), and to the gateway design's consumer plan (`openspec/changes/sso-gateway/design.md:17`); ADR-002 states the reasons.
 2. Perses runs with auth enabled, `guest_permissions` empty, `security.readonly: true`, `security.encryption_key` from a clan vars secret, one project, and RoleBindings naming each admitted person explicitly, because 0.54.0 has no claim-based roles (ADR-002).
 3. Every admitted person reads every stored signal, including the other person's harness metrics; the boundary that makes this acceptable is that the store holds no content and no person identifier (ADR-004).
 4. GreptimeTeam/dashboard is not deployed, because it keeps a store password in browser storage and has no authorization of its own (`research/perses.md` R41; ADR-002).
@@ -113,13 +114,13 @@ A shared read zone among admitted people is the smallest model that is true as s
 - Write-only store credentials in worker accounts: usable by any code the worker runs and able to write into any database.
 - Redacting omp OTLP logs instead of refusing them: string bodies pass the redaction processor by value-pattern only.
 - Trusting emitter content gates: each is an environment variable the worker controls.
-- Admission through `sso-gateway`: disabled, redirect-based, and double-gates a service with native OIDC.
+- Admission through `sso-gateway`: disabled, redirect-based, and double-gates a service with native OIDC, which the gateway module itself says to authenticate natively (`modules/nixos/sso-gateway.nix:291-296`); this is an exception to D11 (`docs/notes/development/web-verification/decisions.md:252`) and `openspec/changes/sso-gateway/design.md:17`.
 - Deploying GreptimeTeam/dashboard for exploration: browser-stored store password and the store's allow-all authorization.
 - Closing the gitea-mq dashboard now: breaks commit-status links and webhooks while showing only a public repository's pull requests.
 
 ## Consequences
 
-Every admitted reader sees all telemetry, so admission to the Kanidm group is the only read decision, and its membership lives in the running Kanidm database rather than in the repository (`research/telemetry-security-and-tenancy.md` F13, R23).
+Every admitted reader sees all telemetry, so admission to the Kanidm group `perses_users` is the only read decision, and its membership lives in the running Kanidm database rather than in the repository (`research/telemetry-security-and-tenancy.md` F13, R23).
 Content-bearing diagnostics, such as error messages and exception text, are unavailable from the store; failure classes come from `error.type` only (ADR-004).
 A worker can inject misleading telemetry for its own host; the dev-loop consumer must treat agent-harness metrics as emitter-claimed.
 Raising the content bar later, for example admitting a single opt-in content session, requires a separate store or the Enterprise provider, not a configuration change.
@@ -163,7 +164,7 @@ Perses' own configuration regulator, covering `guest_permissions`, auth and `rea
 - Modify `modules/clan/services/otel-collector/flake-module.nix` (ADR-003): the content stages above, the absence of a logs pipeline on the local OTLP receiver, and the R8.2 ownership assertions for `otel-cert`.
 - Modify `modules/lib/omnigent-environment.nix`: add `OTEL_` to the reserved prefixes, if Q4 is accepted.
 - Modify `modules/checks/omnigent-environment.nix`: add an `OTEL_` policy mutant, if Q4 is accepted.
-- Modify `modules/nixos/kanidm.nix`: a group for observability readers, members operational as for `omnigent_users`, and an OAuth2 client for Perses with a scope map for that group (ADR-002 owns the Perses side).
+- Modify `modules/nixos/kanidm.nix`: the group stub `perses_users` with `members = [ ]` and `overwriteMembers = false`, members managed operationally as for `omnigent_users` (`modules/nixos/kanidm.nix:208-225`), and an OAuth2 client for Perses with `scopeMaps.perses_users` (ADR-002 owns the Perses side).
 - Add the R8.3 query to the `otel-envelope` unit of ADR-003.
 - Modify `modules/home/ai/omp/default.nix`: `OTEL_LOGS_EXPORTER=none` alongside the endpoint ADR-005 sets.
 - Consumed, not created here: the `greptimedb-users` generator of ADR-007 with users `admin` (`rw`), `collector` (`wo`), `perses` (`ro`) and `regulator` (`ro`), and the Perses OIDC client secret and encryption key generators of ADR-002.
@@ -172,7 +173,7 @@ Perses' own configuration regulator, covering `guest_permissions`, auth and `rea
 ## Questions for the human gate
 
 1. Q1: Accept the shared read zone and drop per-person partitioning? Recommended: yes; the alternative requires a second store, the Enterprise build, or a SQL-rewriting proxy.
-2. Q2: Who is admitted to the observability reader group? Recommended: Cameron only at first, Janette when she chooses; admitting both makes each person's harness metrics readable by the other.
+2. Q2: Who is admitted to `perses_users`? Recommended: Cameron only at first, Janette when she chooses; admitting both makes each person's harness metrics readable by the other.
 3. Q3: If worker telemetry is later enabled (ADR-005 Q5), do Janette's worker sessions emit it? Recommended: no until she consents; the alternative records her agent activity in a store Cameron reads.
 4. Q4: Add `OTEL_` to the reserved worker-environment prefixes? Recommended: yes; the alternative lets a role setting enable a content gate, though the collector still drops the content.
 5. Q5: Is content exclusion absolute, with no opt-in content session? Recommended: yes; the alternative needs a separate store with its own access model.

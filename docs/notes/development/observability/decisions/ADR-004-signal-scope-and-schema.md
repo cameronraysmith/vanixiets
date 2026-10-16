@@ -22,7 +22,9 @@ Signals available without new emitter code:
 - nixbot per-attribute rows in PostgreSQL, pruned after 90 days (`research/dev-loop-signals.md` RF2, RF3).
 - omp OTLP metrics, spans and logs when an endpoint is set, with message content gated by `OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT` and the log signal under no content gate (`research/dev-loop-signals.md` RF11).
 - Omnigent OTLP, inert as packaged until the SDK and exporters are added (`research/dev-loop-signals.md` RF12, RC1).
-- Host-level signals added on 2026-10-15, each tied to a failure this fleet has had (ADR-003 Context): per-process memory from the `host_metrics` `process` scraper, systemd unit state and restart counts from the contrib `systemd` receiver, ZFS pool state, ARC and the kernel `oom_kill` count from a loopback node_exporter, and NVMe health on pyrite from a loopback smartctl_exporter (ADR-003 items 16 to 19).
+- Host-level signals added on 2026-10-15, each tied to a failure this fleet has had (ADR-003 Context): per-process memory from the `host_metrics` `process` scraper, systemd unit state and restart counts from the contrib `systemd` receiver, ZFS pool state, ARC and the kernel `oom_kill` count from a loopback node_exporter, swap usage of the zram device from the `host_metrics` `paging` scraper, and NVMe health on pyrite from a loopback smartctl_exporter (ADR-003 items 16 to 19).
+- No per-process or per-unit swap signal exists at the pinned collector: the `process` scraper's `process.memory.usage` is resident memory and the scraper defines no swap metric, and the `systemd` receiver defines only `systemd.service.cpu.time`, `systemd.service.restarts` and `systemd.unit.state` (`open-telemetry/opentelemetry-collector-contrib@aaf5045a2:receiver/hostmetricsreceiver/internal/scraper/processscraper/metadata.yaml:151-159`; `open-telemetry/opentelemetry-collector-contrib@aaf5045a2:receiver/systemdreceiver/metadata.yaml:43-78`).
+- On magnetite, with `swappiness = 100`, resident memory was about 35 % of the evaluator's true footprint, and the zram pool is charged to no cgroup (`cameronraysmith/vanixiets@f55c27adb:docs/notes/development/incidents/2026-10-01-magnetite-concurrent-eval-oom.md:44-51`).
 - Their darwin counterparts on stibnite, added the same day after the unnoticed exit 78 of `org.nixos.omnigent-host-cameron` there: bounded disk and APFS container metrics, per-process memory from a root `process` scraper, launchd job state and launch counts from a probe read through node_exporter's textfile collector, and NVMe health from the same probe (ADR-003 items 21 to 24).
 
 omp's metric attributes are `gen_ai.operation.name`, `gen_ai.provider.name`, `gen_ai.request.model`, `gen_ai.response.service_tier`, `omp.gen_ai.agent.id` and `omp.gen_ai.agent.name` on every point, plus `gen_ai.token.type`, `gen_ai.response.finish_reason`, `gen_ai.tool.name`, `omp.tool.status` and `error.type` per instrument (`can1357/oh-my-pi@c2cb79e4c:packages/coding-agent/src/telemetry-export-otlp.ts:259-266`, `:296-315`).
@@ -51,6 +53,7 @@ Signal scope for the first deployment:
 | systemd unit state and restarts, 60 s | `systemd` receiver on NixOS agents, allow-listed units only (ADR-003) | fleet | `fleet` |
 | launchd job state, last exit code and launches, 60 s | `otel-host-probe` textfile through a loopback node_exporter on darwin agents, allow-listed jobs only (ADR-003) | fleet | `fleet` |
 | ZFS pool state, ARC, OOM-kill count, 60 s | loopback node_exporter on NixOS agents (ADR-003) | fleet | `fleet` |
+| Swap usage per swap device, 60 s | `host_metrics` `paging` scraper on NixOS agents (ADR-003 item 18) | fleet | `fleet` |
 | NVMe health, 60 s | loopback smartctl_exporter on pyrite and `otel-host-probe` on stibnite (ADR-003) | fleet | `fleet` |
 | Batch lifecycle | gitea-mq journal lines beginning `batch ` | dev-loop | `devloop` |
 | Per-attribute CI outcomes | nixbot rows read on magnetite (ADR-005) | dev-loop | `devloop` |
@@ -89,6 +92,7 @@ Key-level attribute redaction, `allow_all_keys: false`, applies only to the omp 
 - Textfile metadata, darwin: `node_textfile_mtime_seconds` with label `file` and `node_textfile_scrape_error`; every other node_exporter series on darwin is dropped.
 - Prometheus scrape metadata: `up` is kept and `scrape_*` series are dropped for the node_exporter and smartctl_exporter targets on every host.
 - Memory scraper: `system.linux.memory.available` is enabled on NixOS agents, stored as `system_linux_memory_available_bytes`.
+- Paging scraper, NixOS agents: metric `system.paging.usage` only, stored as `system_paging_usage_bytes{host_name, device, state}`, with `state` one of `used` and `free` and `device` the `/proc/swaps` filename, `/dev/zram0` on every NixOS host; `system.paging.operations` and `system.paging.faults` are disabled (`open-telemetry/opentelemetry-collector-contrib@aaf5045a2:receiver/hostmetricsreceiver/internal/scraper/pagingscraper/metadata.yaml:38-68`; `open-telemetry/opentelemetry-collector-contrib@aaf5045a2:receiver/hostmetricsreceiver/internal/scraper/pagingscraper/pagefile_linux.go:17`, `:82`; `open-telemetry/opentelemetry-collector-contrib@aaf5045a2:receiver/hostmetricsreceiver/internal/scraper/pagingscraper/paging_scraper_others.go:90-98`).
 - Darwin `disk` and `filesystem` scrapers: device `disk0` and mountpoint `/System/Volumes/Data` only, with `system.disk.io_time` and `system.disk.pending_operations` disabled (ADR-003 item 21).
 
 `devloop` column allow-list, per signal, using ADR-005's field names; any other column is dropped:
@@ -105,8 +109,9 @@ This list documents intent; enforcement is the allow-lists, so on the omp pipeli
 
 journald unit allow-list: `gitea`, `gitea-mq`, `nixbot*`, `niks3*`, `nix-daemon`, `nix-grpc-daemon`, `harmonia-gc`, `postgresql`, `nginx`, `greptimedb`, `opentelemetry-collector`, `zerotierone`.
 Never on the list: `omnigent*`, `omnigent-host-*`, `omnigraph`, `user@*`, and session scopes, because their output can carry agent or user content.
-systemd unit allow-list, `.service` units only: the journald allow-list above, `omnigent-host-*`, `omnigraph`, `otel-envelope`, `devloop-reconcile`, `greptimedb-envelope`, `greptimedb-export`, `greptimedb-schema`, `prometheus-node-exporter` and `prometheus-smartctl-exporter`.
+systemd unit allow-list, `.service` units only: the journald allow-list above, `omnigent-host-*`, `omnigraph`, `otel-envelope`, `devloop-reconcile`, `greptimedb-envelope`, `greptimedb-export`, `greptimedb-schema`, `prometheus-node-exporter`, `prometheus-smartctl-exporter`, `zfs-assert-*` and `zfs-set-*`.
 Unit state carries no journal content, so `omnigent*` units are on this list while staying off the journald list; journald collection is unchanged by the host-level signals.
+`zfs-assert-*` and `zfs-set-*` cover magnetite's six existing dataset-property oneshots and ADR-007's three `greptimedb` ones (`cameronraysmith/vanixiets@f55c27adb:modules/machines/nixos/magnetite/default.nix:193-263`; ADR-007), whose failure would otherwise leave a quota or reservation unenforced with nobody told; each also sets `OnFailure=observability-notify@%n.service` (ADR-003, ADR-007).
 Each `omnigent-host-<owner>.service` name is rewritten to `omnigent-host-<alias>.service` from an explicit owner-to-alias attrset in `schema.nix`, so no owner's name becomes a label value and adding or removing an owner never renames another owner's series (ADR-003 Q12).
 launchd job allow-list, darwin, by label: `org.nixos.nix-daemon`, `org.nixos.nix-grpc-daemon`, `org.nixos.harmonia-gc`, `org.nixos.nix-cleanup-gcroots`, `org.nixos.sops-install-secrets`, `org.nixos.dnscrypt-proxy`, `org.nixos.otelcol`, `org.nixos.otelcol-process`, `org.nixos.prometheus-node-exporter` and `org.nixos.omnigent-host-*`; each host's probe reads the labels on this list that its evaluated `launchd.daemons` defines.
 The probe writes each `org.nixos.omnigent-host-<owner>` label as `org.nixos.omnigent-host-<alias>` from the same owner-to-alias attrset.
@@ -120,7 +125,7 @@ Budget per consumer:
 
 | Consumer | Database | Cardinality envelope | Volume envelope | Retention |
 |---|---|---|---|---|
-| Fleet | `fleet` | at most 8,000 active series; at most 200 distinct values per label key per metric, except `process_executable_name`, which is bounded instead by 30 values per agent host (Q10); per host at most 30 `process_executable_name` values, 30 `systemd_unit_name` values and 30 `launchd_label` values | journald at most 100 MB per host per day, provisional | metrics 30 d; logs table 14 d |
+| Fleet | `fleet` | at most 8,000 active series; at most 200 distinct values per label key per metric, except `process_executable_name`, bounded instead by 30 values per agent host (Q10), and `systemd_unit_name`, bounded instead by 40 values per NixOS agent host (Q12); per host at most 30 `process_executable_name` values, 40 `systemd_unit_name` values and 30 `launchd_label` values | journald at most 100 MB per host per day, provisional | metrics 30 d; logs table 14 d |
 | Dev-loop | `devloop` | no metric series; rows only | at most 100,000 rows per day | 365 d |
 | Agent harness | `agent` | at most 2,000 active series; `gen_ai.tool.name` at most 200 values | at most 200,000 span rows per day when spans are wired | 90 d |
 
@@ -137,14 +142,17 @@ Agent-harness data at 90 d covers planning-unit sizing over a quarter, while lim
 Banning unbounded domains from metric labels is the single rule that keeps the budget satisfiable in one store, so RK4 does not fire (`research/otel-collector-topology.md` Bearing on D4).
 `omp.gen_ai.agent.id` and the `omp.agent.*.count` attributes are dropped because the first is per-instance and the second multiplies every tool series by run shape while feeding no decision in ADR-005.
 The fleet envelope was 6,000 series: the measured 392 points per host at seven hosts plus service endpoints, with headroom.
-The host-level signals add, per NixOS host, at most 30 process series, at most 30 units at nine series each (eight `systemd_unit_state` states plus one restart counter), 7 pool-state series for the single pool `zroot`, 7 ARC series, 1 `oom_kill` series, 1 `up` series and 1 memory-available series, which is 30 + 270 + 7 + 7 + 1 + 1 + 1 = 317.
+The host-level signals add, per NixOS host, at most 30 process series, at most 40 units at nine series each (eight `systemd_unit_state` states plus one restart counter), 7 pool-state series for the single pool `zroot`, 7 ARC series, 1 `oom_kill` series, 1 `up` series, 1 memory-available series and 2 paging series for the one zram device, which is 30 + 360 + 7 + 7 + 1 + 1 + 1 + 2 = 409.
+The unit cap is 40 rather than 30 because magnetite reaches 30 allow-listed units once these decisions land: 19 matched its evaluated configuration at `cameronraysmith/vanixiets@f55c27adb` (six of them `zfs-assert-*` and `zfs-set-*`), and ADR-003, ADR-005 and ADR-007 add `opentelemetry-collector`, `prometheus-node-exporter`, `otel-envelope`, `devloop-reconcile`, `greptimedb`, `greptimedb-schema`, `greptimedb-export`, `greptimedb-envelope` and three `greptimedb` dataset oneshots, so one further Omnigent owner would breach a cap of 30.
 pyrite adds 10 more for smartctl: 7 single-series metrics and `smartctl_device_temperature` with up to 2 `temperature_type` values on one controller, plus 1 `up`.
-Six NixOS hosts therefore add 5 × 317 + 327 = 1,912 series, and the budget rises from 6,000 to 8,000, keeping the previous headroom.
-stibnite's base host metrics are already inside the 392 points per host counted above, and item 21's device and mountpoint bounds only shrink them.
+Six NixOS hosts therefore add 5 × 409 + 419 = 2,464 series, and the budget rises from 6,000 to 8,000.
+stibnite's base host metrics are already inside the 392 points per host counted above, and item 21's device and mountpoint bounds only shrink them; darwin agents collect no paging series (ADR-003 item 25).
 Its host-level signals add at most 30 process series, at most 30 jobs at six series each (four `launchd_job_state` states, one exit code and one launch counter), 8 SMART series for `disk0`, 2 `node_textfile_mtime_seconds` series for `launchd.prom` and `smartctl.prom`, 1 `node_textfile_scrape_error` series and 1 `up` series, which is 30 + 180 + 8 + 2 + 1 + 1 = 222.
-The estimated base of 3,000 plus 1,912 plus 222 is 5,134 series, inside the 8,000 budget with 2,866 to spare, so the budget is not raised; each further consenting darwin host would add at most 222 plus its own base of about 392.
-The per-host caps of 30 keep `systemd_unit_name` at no more than 180 values across six hosts and `launchd_label` at no more than 30 values on stibnite, inside the 200-value cap.
-`process_executable_name` could reach 7 × 30 = 210 values if no executable name were shared between hosts, which exceeds the 200-value cap, so its fleet-wide bound is the per-host cap of 30 times the number of agent hosts (Q10).
+The estimated base of 3,000 plus 2,464 plus 222 is 5,686 series, inside the 8,000 budget with 2,314 to spare; each further consenting darwin host would add at most 222 plus its own base of about 392.
+The per-host cap of 30 keeps `launchd_label` at no more than 30 values on stibnite, inside the 200-value cap.
+`systemd_unit_name` could reach 6 × 40 = 240 values if no unit name were shared between hosts, and `process_executable_name` 7 × 30 = 210, both above the 200-value cap, so their fleet-wide bounds are the per-host caps times the number of agent hosts (Q10, Q12).
+Swap is collected per host rather than per process because no pinned receiver attributes it lower: `system_paging_usage_bytes` with `state="used"` is the uncompressed size of the pages swapped out to zram, read from the `Used` column of `/proc/swaps`, and with `system_linux_memory_available_bytes` it is the memory-pressure input ADR-009 consumes.
+The RAM that zram's compressed pool occupies is not exported by any pinned collector, because node_exporter at `prometheus/node_exporter@6044da783` has no zram collector (`collector/` contains only the `swap` collector's `/dev/zram0` fixture), and that RAM is already absent from available memory `[INFERENCE: zram's zsmalloc pages are not reclaimable, so the kernel's MemAvailable excludes them]`.
 
 ## Rejected alternatives
 
@@ -170,6 +178,7 @@ Per-person cost attribution is not possible from the store; attribution is per h
 The metric engine's metadata region and pipeline table never expire (`research/greptimedb.md` F36), so the store is not fully self-expiring.
 The journald volume envelope is provisional until a week of measurement exists (Q4).
 Process executable names are set by the running program, so a worker can choose them; the 64 MiB floor, the per-host cap of 30 values and R4.2 bound what that admits.
+Per-process attribution is by resident memory only, so a process's swapped-out pages are missing from its `process_memory_usage_bytes` series, and a swap-heavy evaluator on magnetite can show about a third of its true footprint; swap pressure is visible only per host, through `system_paging_usage_bytes`, and per-unit memory waits on a pin at or past `v0.160.0` (ADR-003 Q11), whose cgroup figures would still omit the uncharged zram pool.
 
 ## Operating envelope and regulator
 
@@ -202,7 +211,7 @@ TTLs are asserted, not only set: ADR-007's `greptimedb-schema` oneshot enforces 
 
 ## Implementation surface
 
-- Add `modules/clan/services/otel-collector/schema.nix`: attribute allow-list, omp metric-name allow-list, per-signal `devloop` column allow-list with each table's primary key and time index, never-stored list, journald unit allow-list, systemd unit allow-list, launchd job allow-list, Omnigent owner-to-alias attrset, node_exporter, darwin textfile and smartctl_exporter metric keep-lists, metric label bans, signal-to-database map, and the budget numbers used by R4.2.
+- Add `modules/clan/services/otel-collector/schema.nix`: attribute allow-list, omp metric-name allow-list, per-signal `devloop` column allow-list with each table's primary key and time index, never-stored list, journald unit allow-list, systemd unit allow-list, launchd job allow-list, Omnigent owner-to-alias attrset, node_exporter, darwin textfile and smartctl_exporter metric keep-lists, the enabled `paging` and memory scraper metrics, metric label bans, signal-to-database map, and the budget numbers used by R4.2.
 - Modify the collector configuration generated by `modules/clan/services/otel-collector/flake-module.nix` (ADR-003) to build `redaction`, `filter`, `transform` and `resource` stages from `schema.nix`.
 - Modify `modules/checks/otel-redaction.nix` (ADR-008) to add the R4.1 fixtures.
 - Add the R4.2 queries to the `otel-envelope` unit of ADR-003.
@@ -218,7 +227,8 @@ TTLs are asserted, not only set: ADR-007's `greptimedb-schema` oneshot enforces 
 5. Q5: Should Omnigent's package gain its `tracing` extra so its metrics enter `agent`? Recommended: defer to ADR-008, under which no omnigent worker account receives an OTLP endpoint or credential in this slice; until ADR-008 is revised Omnigent contributes nothing.
 6. Q6: Is agent-harness retention 90 d? Recommended: yes; longer keeps a personal-activity record longer than any listed decision needs.
 7. Q7: Should the allow-list admit `omp.gen_ai.agent.name`? Recommended: yes, it is bounded by the agent roster; dropping it loses the per-subagent breakdown of tool calls and errors.
-8. Q8: Raise the `fleet` active-series budget from 6,000 to 8,000 for the host-level signals? Recommended: yes, per the per-host arithmetic in Rationale, which with stibnite's 222 series reaches about 5,134 and leaves 2,866 of headroom; the alternative keeps 6,000 and leaves about 866 series of headroom over the estimated 3,000 base plus 1,912 plus 222.
+8. Q8: Raise the `fleet` active-series budget from 6,000 to 8,000 for the host-level signals? Recommended: yes, per the per-host arithmetic in Rationale, which with stibnite's 222 series reaches about 5,686 and leaves 2,314 of headroom; the alternative keeps 6,000 and leaves about 314 series of headroom over the estimated 3,000 base plus 2,464 plus 222.
 9. Q9: Admit `process.executable.name` as a label? Recommended: yes, bounded by the 64 MiB floor and a cap of 30 values per host; dropping it leaves a per-host total that cannot say which process grew.
 10. Q10: Bound `process_executable_name` fleet-wide by 30 values per agent host, 210 at seven hosts, instead of the general 200-value cap? Recommended: yes, because the key is already capped per host and its worst case grows only with consenting hosts; the alternative lowers every host's cap to 28 now and again at each new darwin host.
 11. Q11: Name the darwin job metrics `launchd_job_state`, `launchd_job_last_exit_code` and `launchd_job_runs_total` with labels `launchd_label` and `launchd_state`? Recommended: yes, parallel to the systemd names without sharing them; the alternative reuses `systemd_*` names for series with different meanings.
+12. Q12: Raise the per-host `systemd_unit_name` cap from 30 to 40 and bound the key fleet-wide by 40 values per NixOS agent host, 240 at six hosts, instead of the general 200-value cap? Recommended: yes, because magnetite reaches exactly 30 allow-listed units with the dataset oneshots and this design's own units, and each unit costs nine series; the alternative keeps 30 and drops the zfs oneshots from the allow-list, leaving their failures visible only through `OnFailure=`.

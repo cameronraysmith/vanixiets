@@ -1,12 +1,12 @@
 ---
 title: Fleet observability and CCV feedback-loop charter
-status: charter v7
+status: charter v8
 date: 2026-10-15
 ---
 
 # Fleet observability and CCV feedback-loop charter
 
-Charter version: v7.
+Charter version: v8.
 A revision is a version bump with a dated entry under "Revision history"; the text of an earlier version is never edited in place.
 
 ## Objective
@@ -34,6 +34,7 @@ Development-loop telemetry is the primary consumer and drives retention, cardina
 
 Out of scope for this charter: implementation, any `clan vars` mutation, and any deployment.
 Corrected in v5: v1 also excluded any change to the in-flight `omnigent-magnetite` chain, which has since merged to `main` (`cameronraysmith/vanixiets@a12b3c6c5`, `cameronraysmith/vanixiets@2931154b1`), so no chain remains in flight.
+Clarified in v8: when implementation is authorized it proceeds through one or more OpenSpec changes under `openspec/changes/`, following the precedent of `openspec/changes/stand-up-nixbot-on-magnetite/` and `openspec/changes/stand-up-gitea-mq-on-magnetite/`, each with `proposal.md`, `design.md`, `tasks.md` and `specs/`; this tree remains the design input those changes cite, not their substitute.
 
 ## Superseded inputs
 
@@ -102,6 +103,7 @@ Its artifacts remain readable prior art — `modules/services/signoz.nix` and `d
 ## Specification (shared phenomena)
 
 - S1 Deliverables live under `docs/notes/development/observability/` as `charter.md` (this file), `README.md` as the documentation map, `architecture/reference-architecture.md`, `components/<component>.md`, `decisions/ADR-NNN-<slug>.md` one decision per file, and `research/<source-slug>.md` one artifact per source.
+  Clarified in v8: `architecture/reference-architecture.md` and `components/<component>.md` do not exist yet and remain pending deliverables, so A1 is not satisfied.
 - S2 The CCV half lives under `docs/notes/development/continuous-verification/` and is authored after the store and topology decisions land.
 - S3 Every factual claim about a reference cites `owner/repo@<short-rev>:<path>` and, where a line matters, `:<line>`; published documentation may be cited by URL followed by `(fetched YYYY-MM-DD)`.
 - S4 Prose is one sentence per line, declarative, without marketing language; designation-table terms are used with the meanings given there.
@@ -140,6 +142,7 @@ Its artifacts remain readable prior art — `modules/services/signoz.nix` and `d
 - D4 Signal scope and schema: which signals exist, semantic-convention adherence, and an explicit cardinality and retention budget per consumer.
 - D5 Dev-loop instrumentation: what the development loop emits, and for each signal the coverage-model decision it feeds.
 - D6 Storage substrate and lakehouse seam: whether telemetry lands as Parquet reachable by the repository's existing DuckDB/DuckLake analytics path, or in a separate silo.
+  Clarified in v8: R2 storage follows web-verification D9 (`docs/notes/development/web-verification/decisions.md:77-104`), using the existing bucket `sciexp` under the prefixes `projects/vanixiets/observability/store/` and `projects/vanixiets/observability/export/`, with no new bucket and no second lifecycle resource (ADR-006).
 - D7 Packaging, host placement, and clan service shape.
 - D8 Access control and tenancy, including the prompt-content hazard in W9 and the relationship to the omnigent worker-isolation boundary.
 - D9 Alerting: how fleet conditions become human notifications, including watching the store itself; added in v7.
@@ -250,3 +253,7 @@ A research unit that meets ambiguity returns it in its questions section; the or
   - D9 added: alerting, because ADR-001 placed alerting outside the store and no decision record chose it, so per-process memory growth, systemd restart loops and storage degradation are visible today only to someone watching a dashboard.
   - A5 extended from D1–D8 to D1–D9.
   - The host-level signal additions (per-process metrics, systemd unit state and restart counts, ZFS and disk health) fall under D3 and D4 and are recorded in ADR-003 and ADR-004 rather than as new decisions.
+- v8 (2026-10-15): convention reconciliation after an audit of the decision records against conventions already decided elsewhere in the repository; the body clarifications below are the only edits to earlier text, and D1–D9, the requirements and the acceptance criteria are unchanged.
+  - Scope clarified: implementation proceeds through OpenSpec changes following the `openspec/changes/stand-up-*` precedent, so the decision records feed a proposal, design and task list rather than being implemented directly.
+  - S1 clarified: `architecture/` and `components/` remain pending deliverables, and A1 is not yet satisfied.
+  - D6 clarified: R2 storage follows web-verification D9, a single adopted `sciexp` bucket with `projects/vanixiets/observability/{store,export}/` prefixes, replacing the separate buckets ADR-006 first proposed.

@@ -73,14 +73,14 @@ The `collector-password`, `perses-password` and `regulator-password` files are w
 `admin` is used only by the local `greptimedb-schema` and `greptimedb-export` oneshots of this record and ADR-006.
 `collector` is used only by the ADR-003 `ingress` collector, and `perses` only by the ADR-002 Perses service.
 `regulator` is used only by the read-only regulators: the `otel-envelope` oneshot of ADR-003, ADR-004 and ADR-008, the `devloop-reconcile` oneshot of ADR-005, and the `greptimedb-envelope` oneshot of this record.
-The R2 credentials are the `greptimedb-r2` and `greptimedb-r2-export` generators of ADR-006.
+The R2 credential is the `greptimedb-r2` generator of ADR-006: one Object Read & Write token on the existing `sciexp` bucket, which the store reads through `EnvironmentFile` for its `projects/vanixiets/observability/store/` root and from which the `greptimedb-export` and `greptimedb-envelope` oneshots sign prefix-confined temporary credentials for `projects/vanixiets/observability/export/`.
 
 Clan service shape: the store is a NixOS module, `flake.modules.nixos.greptimedb` with options under `services.greptimedb`, imported by `magnetite` the way `omnigraph` is, and is not a clan service role.
 Perses is likewise a plain NixOS module, `modules/nixos/perses.nix` of ADR-002, imported by `magnetite` and not a clan service role; its memory envelope is ADR-002's verbatim: plugin archives restricted to the ten-plugin subset, measured at 84 MiB against 257 MiB for the full vendored set, with `/run/perses/plugins` held at or below 96 MiB.
 Collectors are the `otel-collector` clan service with roles `agent` and `ingress` and generators `otel-ca` and `otel-cert`, as ADR-003 defines; the store module exposes nothing that role needs other than the loopback endpoint and the `collector-password` path.
 The loopback exporters that ADR-003 adds for host-level signals belong to that same `agent` role rather than to any machine module: `prometheus-node-exporter.service` on every NixOS host and `prometheus-smartctl-exporter.service` on `pyrite` only, both from the root pin's `services.prometheus.exporters.{node,smartctl}` modules with `listenAddress` set to `127.0.0.1` (`NixOS/nixpkgs@ac1faec4:nixos/modules/services/monitoring/prometheus/exporters/node.nix:23`, `NixOS/nixpkgs@ac1faec4:nixos/modules/services/monitoring/prometheus/exporters/smartctl.nix:25`, `NixOS/nixpkgs@ac1faec4:nixos/modules/services/monitoring/prometheus/exporters.nix:209-211`); on darwin the role adds a loopback node_exporter serving only the textfile collector, the `otel-host-probe` job that also reads SMART with smartctl, and the root `otelcol-process` collector (ADR-003 items 21 to 23).
 A oneshot `greptimedb-schema.service`, ordered after the store reports ready, idempotently creates the `fleet`, `devloop` and `agent` databases with ADR-004's TTL defaults of 30, 365 and 90 days, and sets the TTL of the `fleet` logs table to ADR-004's 14 days.
-The `greptimedb-schema`, `greptimedb-export` and `greptimedb-envelope` units set `OnFailure=observability-notify@%n.service`, the shared ntfy notifier that ADR-003 defines (ADR-003 Q9).
+The `greptimedb-schema`, `greptimedb-export` and `greptimedb-envelope` units, and the three `greptimedb` dataset oneshots below together with magnetite's six existing `zfs-assert-*` and `zfs-set-*` oneshots (`cameronraysmith/vanixiets@f55c27adb:modules/machines/nixos/magnetite/default.nix:193-263`), set `OnFailure=observability-notify@%n.service`, the shared ntfy notifier that ADR-003 defines (ADR-003 Q9); the dataset oneshots are also on ADR-004's systemd unit allow-list as `zfs-assert-*` and `zfs-set-*`.
 
 ## Rationale
 
@@ -124,7 +124,7 @@ The store is not a clan service role because it has one instance, no per-machine
 ## Consequences
 
 `magnetite` gains one service with a hard 4 GiB ceiling and a 12 GiB disk reservation drawn from a pool that was 24% allocated (`research/otel-collector-topology.md` F39).
-Under host-wide memory exhaustion the store is killed first and the ADR-003 `ingress` collector second, both before `nix-daemon` workers and PostgreSQL, so telemetry ingestion pauses and the collector, while it survives, queues during exactly the incidents the store exists to observe; the collector's queue depth is therefore the store's real availability bound.
+Under host-wide memory exhaustion the running evaluator is killed first (`oom_score_adj` 900), the store second and the ADR-003 `ingress` collector third, all before `nix-daemon` workers and PostgreSQL, so telemetry ingestion pauses and the collector, while it survives, queues during exactly the incidents the store exists to observe; the collector's queue depth is therefore the store's real availability bound.
 Queries that need more than 512 MB of scan or query memory fail rather than wait, which bounds dashboard and export load and makes heavy analytics a job for the ADR-006 export.
 Rotating any store credential restarts the store and the consuming unit, which costs a WAL replay and a collector retry cycle.
 If the R2 stanza fails and ADR-006's fallback to local `File` storage applies, the dataset quota must be raised to hold the SSTs.
@@ -141,7 +141,7 @@ A failed oneshot is a failed systemd unit, whose `OnFailure=` notifier is ADR-00
 It is shown able to fail by running it once with the `memory.peak` threshold set below the observed value and recording the failed unit in the implementing change.
 
 Envelope E7.3, disk: `zroot/root/greptimedb` used bytes stay below 80% of its quota, and the quota and reservation hold their declared values.
-Regulator R7.3: the boot-time `zfs set` oneshots enforce the values, and the envelope oneshot reads `zfs get -Hp used,quota zroot/root/greptimedb` and fails above 80%.
+Regulator R7.3: the boot-time `zfs set` oneshots enforce the values and notify through `OnFailure=` when a `zfs set` fails, and the envelope oneshot reads `zfs get -Hp used,quota zroot/root/greptimedb` and fails above 80%.
 
 Envelope E7.4, credential freshness: the store unit's start time is later than the users file's modification time.
 Regulator R7.4: the envelope oneshot compares the two and fails if the file is newer, which is the rotation-staleness SLI (`research/fleet-emitter-inventory.md` F26).
@@ -161,12 +161,12 @@ Keeping the store out of the clan inventory prevents an inventory instance whose
 ## Implementation surface
 
 - Add `modules/nixos/greptimedb.nix`: `flake.modules.nixos.greptimedb` with `services.greptimedb.{enable,package,settings,databases,export}`, TOML generation, the `greptimedb` system user and group, `greptimedb.service` with the unit limits above and `LoadCredential` for the users file, `EnvironmentFile` for the R2 env file, `greptimedb-schema.service`, the ADR-006 export service and timer, `greptimedb-envelope.service` and `.timer`, and the ADR-001 and ADR-006 evaluation-time assertions.
-- Modify `modules/machines/nixos/magnetite/default.nix`: import `greptimedb` and the ADR-002 `perses` module from `flakeModules`, set `services.greptimedb`, declare the `greptimedb-users`, `greptimedb-r2` and `greptimedb-r2-export` generators beside the existing `omnigraph-r2`, and add `zfs-set-root-greptimedb-quota`, `zfs-set-root-greptimedb-reservation` and `zfs-assert-root-greptimedb-noautosnap` oneshots in the existing pattern.
+- Modify `modules/machines/nixos/magnetite/default.nix`: import `greptimedb` and the ADR-002 `perses` module from `flakeModules`, set `services.greptimedb`, declare the `greptimedb-users` and `greptimedb-r2` generators beside the existing `omnigraph-r2`, add `zfs-set-root-greptimedb-quota`, `zfs-set-root-greptimedb-reservation` and `zfs-assert-root-greptimedb-noautosnap` oneshots in the existing pattern, and give these three and the six existing `zfs-assert-*` and `zfs-set-*` oneshots `unitConfig.OnFailure = [ "observability-notify@%n.service" ]`.
 - Modify `modules/machines/nixos/magnetite/disko.nix`: add the `root/greptimedb` dataset with mountpoint `/var/lib/greptimedb`, `quota = "16G"`, `reservation = "12G"` and `com.sun:auto-snapshot = "false"`.
 - Add `modules/checks/greptimedb-envelope.nix`: the R7.1 check and its mutants.
 - Clan vars generator `greptimedb-users` on `magnetite`: `runtimeInputs` openssl; users `admin:rw`, `collector:wo`, `perses:ro` and `regulator:ro`; files `users` (owner `greptimedb`, mode `0400`, `restartUnits = [ "greptimedb.service" ]`), `admin-password` (mode `0400`), `collector-password` (mode `0400`, `restartUnits` naming the ADR-003 ingress collector unit), `perses-password` (mode `0400`, `restartUnits = [ "perses.service" ]`), and `regulator-password` (mode `0400`).
 - Perses on `magnetite`: the plain NixOS module `modules/nixos/perses.nix` specified in ADR-002, with ADR-002's plugin-subset envelope, imported by `magnetite` and not a clan service role.
-- Clan vars generators `greptimedb-r2` and `greptimedb-r2-export`: specified in ADR-006.
+- Clan vars generator `greptimedb-r2`, the `sciexp` prefixes and the `cloudflare_r2_bucket_lifecycle.sciexp` rule placement: specified in ADR-006; no R2 bucket is created.
 - The `otel-collector` clan service files, its `otel-ca` and `otel-cert` generators, the `agent` role's loopback node and smartctl exporters with the `smartDevices` role option set for `pyrite`, and the darwin `otelcol-process`, `otel-host-probe` and loopback node_exporter daemons: listed in ADR-003.
 - No flake input, no overlay, no `pkgs/by-name` entry, and no clan inventory instance for the store.
 
