@@ -7,7 +7,7 @@ compatibility: Requires openspec CLI.
 metadata:
   author: openspec
   version: "1.0"
-  generatedBy: "1.14.0"
+  generatedBy: "1.14.2"
 ---
 
 Archive multiple completed changes in a single operation.

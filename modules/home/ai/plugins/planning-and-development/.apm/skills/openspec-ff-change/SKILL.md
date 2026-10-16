@@ -7,7 +7,7 @@ compatibility: Requires openspec CLI.
 metadata:
   author: openspec
   version: "1.0"
-  generatedBy: "1.14.0"
+  generatedBy: "1.14.2"
 ---
 
 Fast-forward through artifact creation - generate everything needed to start implementation in one go.
