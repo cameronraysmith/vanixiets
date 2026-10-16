@@ -193,7 +193,7 @@ ntfy-send "vanixiets PR #<N> nixbot feedback available"
 ntfy-send "vanixiets PR #<N> authorized; queue owns landing"
 ```
 
-The wrapper script lives at `modules/home/tools/commands/system/ntfy-send.sh` and uses `/usr/bin/curl` on Darwin to satisfy endpoint-security restrictions on ad-hoc-signed Nix store binaries; the topic argument is positional and defaults to the local hostname so the same script works unmodified across the fleet.
+The wrapper script lives at `pkgs/by-name/ntfy-send/ntfy-send.sh` (package `ntfy-send`) and uses `/usr/bin/curl` on Darwin to satisfy endpoint-security restrictions on ad-hoc-signed Nix store binaries; the topic argument is positional and defaults to the local hostname so the same script works unmodified across the fleet.
 Suppress NOTICEs during dense local iteration (rapid push-monitor-fix cycles) and re-enable them once the cadence drops to integration-significant transitions, so the notification stream stays signal-rich.
 
 ## Caveats and known scope

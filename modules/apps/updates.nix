@@ -45,6 +45,14 @@
         program = "${config.packages.golem-binary.updateScript}";
       };
 
+      # greptimedb-bin exists only on x86_64-linux (its package.nix yields null
+      # elsewhere); the updater is host-agnostic, so the app runs the script
+      # itself and is available on every system, stibnite included.
+      apps.update-greptimedb-bin = {
+        type = "app";
+        program = "${../../pkgs/by-name/greptimedb-bin/update.sh}";
+      };
+
       apps.update-linear-cli = {
         type = "app";
         program = "${config.packages.linear-cli.updateScript}";
