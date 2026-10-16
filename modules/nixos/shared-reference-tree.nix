@@ -29,6 +29,10 @@ in
         users.groups.${cfg.writer}.members = cfg.participants;
 
         systemd.tmpfiles.rules = [ "d ${cfg.root} 0750 ${cfg.writer} ${cfg.writer} -" ];
+
+        home-manager.users = lib.genAttrs cfg.participants (_: {
+          programs.ghq-shared.root = cfg.root;
+        });
       };
     };
 }
