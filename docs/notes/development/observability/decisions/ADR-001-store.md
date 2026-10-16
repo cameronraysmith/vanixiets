@@ -4,7 +4,8 @@ title: "ADR-001: Telemetry store"
 
 ## Status
 
-Accepted (human gate, 2026-10-15)
+Accepted (human gate, 2026-10-15).
+Amended in place under charter v11 (2026-10-16): the store package is `greptimedb-bin` because its upstream release tarball embeds the dashboard ADR-002 adopts, and R1.1 requires a stable release that serves that dashboard.
 
 ## Context
 
@@ -23,7 +24,9 @@ On governance (C3) GreptimeDB has single-company control, a CLA and company-appo
 
 Three versions are in play.
 `pkgs.greptimedb` at the root pin, lock node `nixpkgs_10` at `ac1faec4`, is 1.1.4 and is substituted from cache.nixos.org on both required platforms (`research/nix-packaging-status.md` R2, R4).
-The latest stable release is `v1.2.1` of 2026-09-16, and the nixpkgs bump to it, https://github.com/NixOS/nixpkgs/pull/574558, merged on 2026-10-15 and reaches the root pin with the next channel update (`research/greptimedb.md` R1, `research/nix-packaging-status.md` R6).
+The latest stable release is `v1.2.1` of 2026-09-16, and the nixpkgs bump to it, https://github.com/NixOS/nixpkgs/pull/574558, merged on 2026-10-15 (`research/greptimedb.md` R1, `research/nix-packaging-status.md` R6).
+The nixpkgs derivation builds without the `servers/dashboard` feature, so `pkgs.greptimedb` ships neither the embedded dashboard nor the dashboards API at any version, whereas upstream release tarballs are built with that feature (`research/nix-packaging-status.md` R9, R10).
+Upstream publishes a checksummed `greptime-linux-amd64-v1.2.1.tar.gz` (`research/nix-packaging-status.md` R15).
 The `v1.3.0` line is at `v1.3.0-beta.2`, published 2026-10-15 with no assets attached at fetch time (`research/greptimedb.md` R1).
 
 The functional differences between those versions that bear on this design are enumerated below.
@@ -42,10 +45,11 @@ The fleet's volume estimate is roughly 3,000 metric series and under 60,000 dev-
 
 ## Decision
 
-The store is the open build of GreptimeDB, run as one standalone process, consumed as `pkgs.greptimedb` from the root nixpkgs input and never from a prerelease.
+The store is the open build of GreptimeDB, run as one standalone process, consumed as `greptimedb-bin`, a first-party package of the upstream release tarball under `pkgs/by-name/greptimedb-bin`, and never from a prerelease.
+`greptimedb-bin` is the intended package, not a stopgap: the release tarball embeds the dashboard that ADR-002 adopts as the dashboard layer, and the package tracks stable upstream releases through its `update.sh`.
+`pkgs.greptimedb` is acceptable only if it carries the embedded dashboard.
 The first deployment uses `v1.2.1`, the latest stable release; 1.1.4 is not deployed.
-If the root pin does not yet carry 1.2.1 when implementation starts, the pin is bumped first, which is a channel delay of days rather than a dependency on unreleased work, because https://github.com/NixOS/nixpkgs/pull/574558 has merged.
-The `v1.3.x` line is adopted only when a stable `v1.3` tag reaches the root pin, and is not a precondition for deployment.
+The `v1.3.x` line is adopted only when a stable `v1.3` release is published, and is not a precondition for deployment.
 Until the deployed version ingests exponential histograms, the collector that writes to the store converts them to explicit-bucket histograms with the contrib `transform` processor's `convert_exponential_histogram_to_histogram` function (`research/greptimedb.md` "Charter reconciliation", `open-telemetry/opentelemetry-collector-contrib@aaf5045a2:processor/transformprocessor/README.md:475-479`); the collector configuration belongs to ADR-003.
 Alerting is external to the store, so no enterprise-gated trigger DDL is relied on and RK1 stays retired.
 The store's anonymous usage reporting to `telemetry.greptimestats.com`, on by default, is disabled (`GreptimeTeam/greptimedb@179ff8e50:config/standalone.example.toml:51`, `GreptimeTeam/greptimedb@179ff8e50:src/common/greptimedb-telemetry/src/lib.rs:30`).
@@ -60,17 +64,19 @@ The governance objection under C3 is real and is recorded rather than dismissed;
 Standalone is chosen because distributed mode quadruples the process count for a workload of a few thousand series, and under C1 that apparatus prevents no failure this fleet has.
 The unconditional flownode in standalone is accepted rather than avoided, because removing it requires the distributed shape, which costs three more units to remove one idle in-process component.
 
-The version policy follows the packaging evidence.
-Consuming the root-pin attribute costs no build, because the output is cache-resident (`research/nix-packaging-status.md` R4).
-Every route to 1.2.1 ahead of nixpkgs adds either a roughly half-hour eight-core Rust build (`research/nix-packaging-status.md` F14) or a second packaging convention for one package (see ADR-007).
+The version policy follows the packaging evidence and ADR-002.
+Consuming the root-pin attribute costs no build, because the output is cache-resident (`research/nix-packaging-status.md` R4), but it omits the dashboard ADR-002 depends on (`research/nix-packaging-status.md` R9).
+Building the dashboard into a source build needs a fixed-output fetch of the dashboard assets and a roughly half-hour eight-core Rust build (`research/nix-packaging-status.md` R11, F14).
+The release tarball already carries the dashboard and is checksummed upstream, so packaging it costs a download and no build (`research/nix-packaging-status.md` R10, R15; ADR-007).
 The 1.1.4-to-1.2.1 delta is PromQL correctness, so a first deployment on 1.1.4 would start a new store on a superseded release with known rate-window defects; no 1.2.1 change closes the gaps listed above, which remain until `v1.3`.
 Waiting for `v1.3.x` would block deployment on a beta line with no stated release date while its two material gains have workarounds: exponential histograms by collector-side conversion, and credential rotation by `restartUnits` (`research/telemetry-security-and-tenancy.md` C3).
-The missing `/metadata` route costs metric help text and type hints in the Perses Prometheus plugin, not query results; ADR-002 owns that consequence.
+The missing `/metadata` route costs metric help text and type hints in the Prometheus plugin of the embedded dashboard, not query results; ADR-002 owns that consequence.
 
 ## Rejected alternatives
 
 - GreptimeDB distributed mode: four units for a single-host, few-thousand-series workload, with no failure prevented that standalone admits (`research/greptimedb.md` F29).
 - GreptimeDB `v1.3.0-beta.x` now: prerelease with no published assets at `beta.2`, and its gains have workarounds on stable (`research/greptimedb.md` R1, R7, R8).
+- `pkgs.greptimedb` from the root pin: omits the embedded dashboard and the dashboards API, so the dashboard layer of ADR-002 would not exist (`research/nix-packaging-status.md` R9).
 - Waiting for a stable `v1.3` before any deployment: blocks the observability loop on an undated release for gains the collector and `restartUnits` already cover.
 - GreptimeDB Enterprise: the only gain is store-enforced partitioning, which ADR-008 does not require because it adopts a content-free shared read zone, and it is a per-customer commercial agreement (`research/greptimedb.md` F52, `research/telemetry-security-and-tenancy.md` R3).
 - VictoriaMetrics, VictoriaLogs and VictoriaTraces: strongest rejected operator floor, but OTLP is adapter-shaped and storage is opaque to the W8 substrate (`research/store-alternatives.md` F25, F29).
@@ -82,16 +88,17 @@ The missing `/metadata` route costs metric help text and type hints in the Perse
 ## Consequences
 
 The store is a single point of failure for telemetry, and a store outage is survivable only to the depth of the collector's sending queue, which ADR-003 sizes.
-Exponential-histogram precision is reduced to the declared explicit bucket bounds until a `v1.3` stable reaches the pin, and the bucket bounds become part of ADR-004's schema.
-Each later version step, 1.2.1 to `v1.3`, arrives through a root-pin bump and therefore through the closure operator, with no first-party derivation to maintain.
+Exponential-histogram precision is reduced to the declared explicit bucket bounds until a `v1.3` stable release is deployed, and the bucket bounds become part of ADR-004's schema.
+Each later version step, 1.2.1 to `v1.3`, arrives through `greptimedb-bin`'s `update.sh` and therefore through the closure operator; the derivation and its updater are first-party and ours to maintain.
 When the deployed version reaches `v1.3.0-beta.1` or later, the collector conversion can be removed, a removal tracked by the regulators below rather than by memory; the restart-on-rotation coupling stays, because `LoadCredential` snapshots credentials at start (ADR-007 Q6).
 Per-person read isolation is not a store property, and any design text that treats a GreptimeDB schema as a tenant boundary is wrong (`research/telemetry-security-and-tenancy.md` F30).
 Alerting needs a component outside the store, which this record does not choose.
 
 ## Operating envelope and regulator
 
-Envelope E1.1, version: the deployed store package is `pkgs.greptimedb` from the root nixpkgs input, its version is a stable `MAJOR.MINOR.PATCH` with no prerelease suffix, and no overlay or first-party derivation shadows the attribute.
-Regulator R1.1: an evaluation-time assertion in the store module (ADR-007) that `cfg.package.version` matches `^[0-9]+\.[0-9]+\.[0-9]+$` and that `cfg.package` is `pkgs.greptimedb`; it fails on a mutant that sets `package` to an `overrideAttrs` with version `1.3.0-beta.2`, and that mutant is enumerated in the check per the existing mutant-asserting pattern (`research/dev-loop-signals.md` F12).
+Envelope E1.1, version and dashboard: the deployed store package's version is a stable `MAJOR.MINOR.PATCH` with no prerelease suffix, and the package serves the embedded dashboard; `greptimedb-bin` is the package, and `pkgs.greptimedb` qualifies only if it carries the dashboard.
+Regulator R1.1, amended under charter v11: an evaluation-time assertion in the store module (ADR-007) that `cfg.package.version` matches `^[0-9]+\.[0-9]+\.[0-9]+$` and that `cfg.package.passthru.embedsDashboard` is `true`, which `greptimedb-bin` sets; it fails on two mutants enumerated in the check per the existing mutant-asserting pattern (`research/dev-loop-signals.md` F12): `package` set to an `overrideAttrs` with version `1.3.0-beta.2`, and `package` set to the pinned `pkgs.greptimedb`, which lacks `passthru.embedsDashboard`.
+The runtime half of R1.1 is a case of S1's on-demand container test `vmTests.x86_64-linux.greptimedb-pipeline`: `GET http://127.0.0.1:4000/dashboard/` returns 200, so a package whose attribute claims the dashboard without serving it is caught when the test runs.
 
 Envelope E1.2, histogram compatibility: while the deployed version is below `1.3.0`, every collector pipeline that exports metrics to the store contains the exponential-to-explicit histogram conversion.
 Regulator R1.2: an evaluation-time assertion that reads both the store package version and the magnetite collector's generated configuration and fails if the version is below `1.3.0` and the conversion statement is absent; its mutant removes the statement.
@@ -107,21 +114,25 @@ Regulator R1.4: an evaluation-time assertion that the generated TOML sets `enabl
 
 Standalone instead of distributed prevents three additional units, each with its own memory floor, on a host that has OOM-killed twice (`research/otel-collector-topology.md` R21).
 The no-prerelease version rule prevents a beta store, with release artifacts not yet published, from becoming a fleet dependency through an overlay.
+The dashboard clause of R1.1 prevents a package switch that silently removes the dashboard layer and the dashboards API from the store.
 The histogram conversion prevents silent loss of every exponential-histogram series, which the store drops without error (`research/greptimedb.md` R7).
 Disabling usage reporting prevents an undeclared outbound connection from the host that holds agent-session telemetry.
 External alerting prevents a design that silently depends on an enterprise-only feature and reopens RK1.
 
 ## Implementation surface
 
-- No new flake input: `pkgs.greptimedb` comes from the existing root `nixpkgs` input.
+- No new flake input.
+- `pkgs/by-name/greptimedb-bin/{package.nix,update.sh}`: the upstream release tarball for `x86_64-linux`, with `passthru.embedsDashboard = true`, and `apps.update-greptimedb-bin`; its build details are specified in ADR-007.
 - `modules/nixos/greptimedb.nix`: the store module and the assertions R1.1, R1.2 and R1.4; its file list, options and secrets are specified in ADR-007.
+- `modules/vm-tests/greptimedb-pipeline.nix`: S1's on-demand container test, carrying the runtime case of R1.1.
 - The magnetite collector configuration that carries the histogram conversion is listed in ADR-003.
 - No clan vars generator is introduced by this record; the credential generators are in ADR-007 and the R2 generators are in ADR-006.
 
 ## Questions for the human gate
 
-Q1 Deploy `v1.2.1` first, taken through a root-pin bump that includes https://github.com/NixOS/nixpkgs/pull/574558 (merged 2026-10-15)? Recommended: yes; deploying 1.1.4 first starts the store on a superseded release, and the `greptimedb-bin` fallback of ADR-007 Q2 applies only if the channel still lacks 1.2.1 when implementation starts.
+Q1 Deploy `v1.2.1` first? Recommended at the gate: yes, through a root-pin bump that includes https://github.com/NixOS/nixpkgs/pull/574558 (merged 2026-10-15), with `greptimedb-bin` held for a channel delay; deploying 1.1.4 first starts the store on a superseded release.
 Resolution: recommended answer accepted at the 2026-10-15 gate.
+Amended under charter v11: `v1.2.1` is deployed as `greptimedb-bin`, the intended package rather than a fallback, because the nixpkgs build omits the dashboard ADR-002 adopts.
 Q2 Is the governance objection C3 a disqualifier for single-vendor stores, or an axis? Recommended: an axis, because every candidate in the evidence base is single-vendor (`research/store-alternatives.md` F22, F30); treating it as a disqualifier leaves no admissible store.
 Resolution: recommended answer accepted at the 2026-10-15 gate.
 Q3 Is in-database alerting wanted? Recommended: no, alerting stays external; the alternative is an Enterprise dependency and reopens RK1.

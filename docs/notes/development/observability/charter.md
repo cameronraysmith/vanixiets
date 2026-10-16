@@ -1,12 +1,12 @@
 ---
 title: Fleet observability and CCV feedback-loop charter
-status: charter v10
+status: charter v11
 date: 2026-10-16
 ---
 
 # Fleet observability and CCV feedback-loop charter
 
-Charter version: v10.
+Charter version: v11.
 A revision is a version bump with a dated entry under "Revision history"; the text of an earlier version is never edited in place.
 
 ## Objective
@@ -271,3 +271,11 @@ A research unit that meets ambiguity returns it in its questions section; the or
   - The six changes the reference architecture proposed become eight slices S1 to S8, each one OpenSpec change closing a feedback loop with its own regulators, ordered by value and by which deployment-only assumptions each settles first; dev-loop collection moves from fifth to second, because the dev loop is the primary consumer (Objective).
   - Slices S1 to S5 are metrics-only, so the content stages and their regulator arrive with the first content-bearing pipeline in S7.
   - The slices are tracked as CAM-68 to CAM-75 in the Linear project `Fleet observability`, registered as `fleet-observability` in `openspec/linear.yaml`, and the deferred ADR-009 Q5 as CAM-76; slice status is derived from the OpenSpec changes, not recorded in this tree.
+- v11 (2026-10-16): amendments carried by slice S1 (`openspec/changes/stand-up-greptimedb-on-magnetite/`); no earlier text is edited beyond the status and version lines, and D1–D9, the requirements and the acceptance criteria are unchanged.
+  - ADR-002 revised in place: the dashboard layer is the Perses dashboard GreptimeDB embeds, not a standalone Perses server, which is kept as `percli` tooling and as a fallback for features the embedded dashboard lacks.
+  - ADR-002's premises corrected: GreptimeDB `v1.2.1` carries the `/v1/dashboards` API and embeds dashboard `v0.13.13` with Perses 0.53.1, so `research/perses.md` R39 is superseded; Q2 is amended, Q1, Q7 and Q8 are superseded, and Q9 and Q10 are open for S6.
+  - ADR-002's S6 design: `perses.scientistexperience.net` behind `sso-gateway` with the group `perses_users`, nginx proxying to the API listener `127.0.0.1:4006` with the `perses:ro` credential injected, and dashboard JSON reconciled through `/v1/dashboards`; `components/perses.md` is rewritten to match.
+  - ADR-001 E1.1 and R1.1 amended: the store package is a stable release that serves the embedded dashboard, so `greptimedb-bin` is the intended package, asserted through `passthru.embedsDashboard` and checked at runtime by `GET /dashboard/` returning 200 in S1's container test; `pkgs.greptimedb` qualifies only if it carries the dashboard.
+  - ADR-007 amended: `greptimedb-bin` replaces the root-pin route and is no longer a channel-delay fallback; gRPC is bound to `127.0.0.1:4001`, because `v1.2.1` has no `[grpc] enable`; the `perses-password` consumer becomes nginx from S6; `components/greptimedb.md` follows.
+  - ADR-008 amended on the read side: admission through `sso-gateway` rather than a direct Kanidm client, which follows web-verification D11 instead of excepting it, and readers hold the `perses:ro` credential only through nginx.
+  - Reference architecture: the `observability-notify@` notifier moves from S3 to S1, S6 is rewritten to the embedded dashboard, the root-pin precondition gives way to `greptimedb-bin`, the consolidated surface's change column is renumbered to slices S1 to S8, and the deferred list gains the standalone Perses fallback.

@@ -39,13 +39,13 @@ flowchart LR
     dev["nixbot PostgreSQL rows, gitea-mq journal"]
     ingress["otel-collector ingress role on magnetite.zt:4318, mTLS from otel-ca, routing connector"]
     store[("GreptimeDB 1.2.1 standalone, 127.0.0.1:4000, databases fleet, devloop, agent")]
-    perses["Perses 0.54.0, perses.scientistexperience.net behind Kanidm"]
+    perses["Embedded Perses dashboard, served by the store, nginx vhost perses.scientistexperience.net behind sso-gateway"]
     alert["fleet-alert.timer, every 60 s"]
     regs["otel-envelope, devloop-reconcile, greptimedb-envelope"]
     export["greptimedb-export.timer, daily"]
     dev -->|"sqlquery peer auth, journald key_value_parser"| ingress
     ingress -->|"OTLP/HTTP protobuf, collector wo, x-greptime-db-name"| store
-    perses -->|"SQL and PromQL, perses ro"| store
+    perses -->|"SQL and PromQL to 127.0.0.1:4006, perses ro injected by nginx"| store
     alert -->|"PromQL instant queries, regulator ro"| store
     regs -->|"SQL and PromQL, regulator ro"| store
     export -->|"COPY DATABASE devloop, admin rw"| store
@@ -69,7 +69,7 @@ flowchart LR
   alert -->|"FIRING, RESOLVED, heartbeat, alerter token"| ntfy
   regs -->|"OnFailure observability-notify@"| ntfy
   ntfy -->|"anonymous read-only subscription"| phone["Human phone and desktop"]
-  perses -->|"OIDC login, perses_users"| human["Admitted readers"]
+  perses -->|"sso-gateway login, perses_users"| human["Admitted readers"]
   ext["External watcher of cinnabar, deferred"] -.->|"ADR-009 Q5"| ntfy
 ```
 
@@ -80,9 +80,9 @@ Ingest uses OTLP over HTTP with protobuf, because GreptimeDB serves no OTLP gRPC
 
 | Host | Kind | Components | Notes |
 |---|---|---|---|
-| magnetite | NixOS, always on, Hetzner `cx53` | `opentelemetry-collector.service` with `agent` and `ingress` roles, devloop collection (`sqlquery`, gitea-mq `journald`), loopback `prometheus-node-exporter`, `greptimedb.service`, `greptimedb-schema.service`, `greptimedb-export.service` and `.timer`, `greptimedb-envelope.service` and `.timer`, `perses.service` behind the nginx vhost `perses.scientistexperience.net`, `fleet-alert.service` and `.timer`, `otel-envelope` service and timer, `devloop-reconcile` service and timer, `observability-notify@` template, loopback nginx server `127.0.0.1:9180` for nixbot `/metrics`, deploy-record snippet | store placement and containment per ADR-007; Kanidm's `perses` OAuth2 client per ADR-002 |
+| magnetite | NixOS, always on, Hetzner `cx53` | `opentelemetry-collector.service` with `agent` and `ingress` roles, devloop collection (`sqlquery`, gitea-mq `journald`), loopback `prometheus-node-exporter`, `greptimedb.service` serving the embedded dashboard, `greptimedb-schema.service`, `greptimedb-export.service` and `.timer`, `greptimedb-envelope.service` and `.timer`, the nginx vhost `perses.scientistexperience.net` registered with `sso-gateway` and proxying to the store's API listener `127.0.0.1:4006`, `perses-dashboards.service`, `fleet-alert.service` and `.timer`, `otel-envelope` service and timer, `devloop-reconcile` service and timer, `observability-notify@` template, loopback nginx server `127.0.0.1:9180` for nixbot `/metrics`, deploy-record snippet | store placement and containment per ADR-007; dashboard admission through the shared `sso-gateway` Kanidm client per ADR-002 |
 | cinnabar | NixOS, always on, Hetzner `cx43` | collector `agent`, loopback `prometheus-node-exporter`, `observability-notify@` template, `ntfy-sh` with `auth-access` and `environmentFile`, `fleet-deadman.service` and `.timer`, deploy-record snippet | ZeroTier controller and `.zt` resolver; not a store host (ADR-007 Rationale) |
-| pyrite | NixOS, laptop, bare metal | collector `agent`, loopback `prometheus-node-exporter`, `prometheus-smartctl-exporter` on `127.0.0.1:9633` with `smartDevices = [ "/dev/nvme0" ]`, `observability-notify@` template, deploy-record snippet | KVM-capable host for the on-demand `vmTests` (ADR-002, ADR-005); silence raises nothing (ADR-009 item 16) |
+| pyrite | NixOS, laptop, bare metal | collector `agent`, loopback `prometheus-node-exporter`, `prometheus-smartctl-exporter` on `127.0.0.1:9633` with `smartDevices = [ "/dev/nvme0" ]`, `observability-notify@` template, deploy-record snippet | KVM-capable host for the on-demand QEMU `vmTests` (ADR-005; S1's OOM-order test); silence raises nothing (ADR-009 item 16) |
 | electrum, galena, scheelite | NixOS, cloud hosts provisioned on demand | collector `agent`, loopback `prometheus-node-exporter`, `observability-notify@` template, deploy-record snippet | silence fails R3.2 only while terranix provisions them (ADR-003 R3.2; ADR-009 item 16); `scheelite` deploys report as out-of-band under D5-R7 while its machine check stays deferred (ADR-005 Consequences) |
 | stibnite | nix-darwin, laptop | `launchd.daemons.otelcol` as `_otelcol`, `launchd.daemons.otelcol-process` as root, `launchd.daemons.otel-host-probe` as `_prometheus-node-exporter` with `smartDevices = [ "disk0" ]`, loopback node_exporter with only the `textfile` collector, deploy-record snippet | darwin configuration is made gating through R3.1 on `x86_64-linux` (ADR-003 Q5) |
 | blackphos, rosegold, argentum | nix-darwin, other people's primary laptops | deploy-record snippet only, no collector | excluded until each primary user consents (ADR-003 Q3); D5-R7 records each as an exemption owned by that user (ADR-005 Decision) |
@@ -108,21 +108,21 @@ The `greptimedb-users` generator holds exactly four users (ADR-007 Decision):
 |---|---|---|
 | `admin` | `rw` | `greptimedb-schema` and `greptimedb-export` only (ADR-007) |
 | `collector` | `wo` | the `ingress` collector on magnetite only (ADR-003 item 10; ADR-007) |
-| `perses` | `ro` | `perses.service` only (ADR-002; ADR-007) |
+| `perses` | `ro` | nginx on magnetite from S6, injecting it into dashboard readers' requests (ADR-002; ADR-007) |
 | `regulator` | `ro` | `otel-envelope`, `devloop-reconcile`, `greptimedb-envelope` and `fleet-alert.service` (ADR-007; ADR-009 item 1) |
 
-No worker account and no worker-run process holds any store credential or Perses datasource secret (ADR-008 Readers and admission item 5).
+No worker account and no worker-run process holds any store credential (ADR-008 Readers and admission item 5).
 Rotating a store credential restarts the store and the consuming unit through `restartUnits` (ADR-007 Consequences).
-Restart on rotation stays after a `v1.3` release reaches the pin, because `LoadCredential` snapshots credentials at unit start (ADR-007 Q6).
+Restart on rotation stays after a `v1.3` release is deployed, because `LoadCredential` snapshots credentials at unit start (ADR-007 Q6).
 
 The store holds one long-lived Object Read & Write token on the whole `sciexp` bucket, `greptimedb-r2`, because `[storage]` takes only static credentials; its blast radius equals that of `omnigraph-r2` on the same host (ADR-006 Decision, Q9).
 The export oneshot and the envelope probe sign 15-minute temporary credentials confined to the export prefix from that token and unset the parent after signing (ADR-006 Decision, R6.1).
 Readers sign one-hour `object-read-only` credentials for the export prefix locally from the `telemetry-export-reader` parent, which can read all of `sciexp` (ADR-006 Decision, Consequences).
 
-Humans read only through Perses at `perses.scientistexperience.net`, authenticated by a direct Kanidm OIDC client whose scope map admits the group `perses_users` (ADR-002 Decision; ADR-008 Readers and admission item 1).
-The direct client is a recorded exception to web-verification D11 (ADR-002 Rationale).
-Perses runs with auth enabled, empty `guest_permissions`, `security.readonly: true`, `security.encryption_key` from `perses-encryption-key`, one project, and explicit role bindings (ADR-002 Decision; ADR-008 Readers and admission item 2).
-Any Perses reader can send arbitrary SQL to the store under the `perses` credential, which the shared read zone accepts (ADR-002 Consequences; ADR-008 Q1).
+Humans read only through the dashboard GreptimeDB embeds, at `perses.scientistexperience.net`, admitted by `sso-gateway` with `allowedGroups = [ "perses_users" ]` (ADR-002 Decision; ADR-008 Readers and admission item 1).
+nginx proxies only `/dashboard/` and `/v1/` to the store's API listener `127.0.0.1:4006` and overwrites `Authorization` with the `perses:ro` credential, so no reader's browser holds a store password and the store rejects every dashboard save or delete a reader attempts (ADR-002 Decision; ADR-008 Readers and admission item 2).
+Dashboards change only through the reconcile oneshot `perses-dashboards.service`, whose `rw` credential holder is open (ADR-002 Q9).
+Any admitted reader can send arbitrary SQL and PromQL to the store under the `perses` credential, which the shared read zone accepts (ADR-002 Consequences; ADR-008 Q1).
 
 The per-host collector is the only content boundary and the only path into the store (ADR-008 Decision).
 No logs pipeline consumes the local OTLP receiver, so OTLP log records are refused whatever the emitter sets (ADR-008 content stage 1; ADR-003 item 3).
@@ -182,59 +182,56 @@ An external watcher of cinnabar is deferred to the end of implementation, with a
 
 ## Consolidated implementation surface
 
-Change numbers refer to the sequencing in the next section.
+Change numbers refer to the slices S1 to S8 of the next section.
 
 | Item | Kind | Action | Owning ADR | Change |
 |---|---|---|---|---|
-| root `nixpkgs` input | flake input | bump the pin so `pkgs.greptimedb` is 1.2.1; no new flake input is added by any record | ADR-001 Q1; ADR-007 Q2 | 0 |
-| `pkgs/by-name/greptimedb-bin` | package | add only if the channel still lacks 1.2.1 when implementation starts | ADR-007 Q2 | 0 |
-| `modules/nixos/greptimedb.nix` | file | add: `services.greptimedb`, TOML generation, `greptimedb` user, `greptimedb.service`, `greptimedb-schema.service`, export service and timer, `greptimedb-envelope` service and timer, assertions R1.1, R1.2, R1.4 and R6.4 | ADR-007; ADR-001; ADR-006 | 1, 6 |
+| root `nixpkgs` input | flake input | no change for the store, and no new flake input is added by any record | ADR-001; ADR-007 | none |
+| `pkgs/by-name/greptimedb-bin` | package | add: the upstream release tarball with `passthru.embedsDashboard = true`, `update.sh` and `apps.update-greptimedb-bin`; S6 adds `passthru.dashboardVersion` | ADR-001 R1.1; ADR-007; ADR-002 | 1, 6 |
+| `modules/nixos/greptimedb.nix` | file | add: `services.greptimedb`, TOML generation with gRPC bound to `127.0.0.1:4001`, `greptimedb` user, `greptimedb.service`, `greptimedb-schema.service`, export service and timer, `greptimedb-envelope` service and timer, assertions R1.1, R1.2, R1.4 and R6.4 | ADR-007; ADR-001; ADR-006 | 1, 8 |
 | `modules/checks/greptimedb-envelope.nix` | file | add: R7.1 with its mutants | ADR-007 | 1 |
 | `modules/machines/nixos/magnetite/disko.nix` | file | modify: `root/greptimedb` dataset at `/var/lib/greptimedb` | ADR-007 | 1 |
 | `modules/machines/nixos/magnetite/default.nix` | file | modify: import `greptimedb`, set `services.greptimedb`, declare `greptimedb-users` and `greptimedb-r2`, add the three `greptimedb` dataset oneshots | ADR-007; ADR-006 | 1 |
-| `modules/machines/nixos/magnetite/default.nix` | file | modify: `OnFailure=observability-notify@%n.service` on the six existing and three new dataset oneshots | ADR-007; ADR-009 | 2 |
-| `modules/machines/nixos/magnetite/default.nix` | file | modify: import `perses` | ADR-002; ADR-007 | 3 |
-| `modules/machines/nixos/magnetite/default.nix` | file | modify: import `fleet-alert` with the evaluator enabled | ADR-009 | 4 |
-| `modules/machines/nixos/magnetite/default.nix` | file | modify: import `devloop-collection` | ADR-005 | 5 |
-| `modules/clan/services/otel-collector/flake-module.nix` | file | add: clan service `otel-collector` with roles `agent` and `ingress`, NixOS and darwin modules, `otel-envelope`, `observability-notify@` in the `agent` role, content stages, R8.2 ownership assertions | ADR-003; ADR-004; ADR-008; ADR-009 | 2 |
-| `modules/clan/inventory/services/otel-collector.nix` | file | add: one instance, `agent` on the seven in-scope hosts, `ingress` on magnetite, `smartDevices` on pyrite and stibnite | ADR-003 | 2 |
-| `modules/clan/services/otel-collector/schema.nix` | file | add: allow-lists, keep-lists, label bans, owner-to-alias attrset, signal-to-database map, budget numbers | ADR-004 | 2 |
-| `modules/checks/otel-collector-config.nix` | file | add: R3.1 with recorded `launchctl print` fixtures | ADR-003 | 2 |
-| `modules/checks/otel-redaction.nix` | file | add: R8.1 with ADR-004's R4.1 fixtures | ADR-008; ADR-004 | 2 |
-| `modules/nixos/nixbot.nix` | file | modify: loopback nginx server on `127.0.0.1:9180` proxying `/metrics` to the nixbot socket | ADR-003 | 2 |
-| `modules/clan/inventory/services/zerotier.nix` or the zerotier configuration it applies | file | modify: `allowMetrics = true` | ADR-003 | 2 |
-| `modules/lib/omnigent-environment.nix` | file | modify: add `OTEL_` to the reserved prefixes | ADR-008 | 2 |
-| `modules/checks/omnigent-environment.nix` | file | modify: add an `OTEL_` policy mutant | ADR-008 | 2 |
-| `modules/machines/nixos/cinnabar/ntfy.nix` | file | modify: `auth-access` entries and `environmentFile` from `ntfy-alerter` | ADR-009 | 2 |
-| `modules/machines/nixos/cinnabar/ntfy.nix` | file | modify: import `fleet-alert` with the dead-man enabled | ADR-009 | 4 |
-| `modules/nixos/perses.nix` | file | add: `services.perses`, vhost, settings, assertions | ADR-002 | 3 |
-| `modules/nixos/perses/resources/project.yaml`, `datasources.yaml`, `secrets.yaml`, `roles.yaml`, `dashboards/*.yaml` | file | add: provisioned Perses resources | ADR-002 | 3 |
-| `modules/nixos/perses/lint-rules.yaml`, `modules/nixos/perses/mutants/*.yaml` | file | add: custom lint rules and mutant set | ADR-002 | 3 |
-| `modules/checks/perses-resources.nix` | file | add: lint check over the ten-plugin subset | ADR-002 | 3 |
-| `modules/checks/perses-config.nix` | file | add: configuration mutant check | ADR-002 | 3 |
-| `modules/vm-tests/perses-greptimedb.nix` | file | add: on-demand VM test | ADR-002 | 3 |
-| `modules/nixos/kanidm.nix` | file | modify: group `perses_users`, `kanidm-oauth2-perses`, `systems.oauth2.perses` | ADR-002; ADR-008 | 3 |
-| `modules/terranix/cloudflare.nix` | Terraform resource | modify: one unproxied `CNAME` `perses.scientistexperience.net` to `magnetite.scientistexperience.net` | ADR-002 | 3 |
+| `modules/machines/nixos/magnetite/default.nix` | file | modify: `OnFailure=observability-notify@%n.service` on the six existing and three new dataset oneshots | ADR-007; ADR-009 | 1 |
+| `modules/machines/nixos/magnetite/default.nix` | file | modify: import `perses` and enable `sso-gateway`, which is disabled today | ADR-002; ADR-007 | 6 |
+| `modules/machines/nixos/magnetite/default.nix` | file | modify: import `fleet-alert` with the evaluator enabled | ADR-009 | 3 |
+| `modules/machines/nixos/magnetite/default.nix` | file | modify: import `devloop-collection` | ADR-005 | 2 |
+| `modules/clan/services/otel-collector/flake-module.nix` | file | add: clan service `otel-collector` with roles `agent` and `ingress`, NixOS and darwin modules, `otel-envelope`, `observability-notify@` in the `agent` role, content stages, R8.2 ownership assertions | ADR-003; ADR-004; ADR-008; ADR-009 | 1, 4, 5, 7 |
+| `modules/clan/inventory/services/otel-collector.nix` | file | add: one instance, `agent` on the seven in-scope hosts, `ingress` on magnetite, `smartDevices` on pyrite and stibnite | ADR-003 | 1, 4, 5 |
+| `modules/clan/services/otel-collector/schema.nix` | file | add: allow-lists, keep-lists, label bans, owner-to-alias attrset, signal-to-database map, budget numbers | ADR-004 | 1, 7 |
+| `modules/checks/otel-collector-config.nix` | file | add: R3.1 with recorded `launchctl print` fixtures | ADR-003 | 1, 4, 5 |
+| `modules/checks/otel-redaction.nix` | file | add: R8.1 with ADR-004's R4.1 fixtures | ADR-008; ADR-004 | 7 |
+| `modules/nixos/nixbot.nix` | file | modify: loopback nginx server on `127.0.0.1:9180` proxying `/metrics` to the nixbot socket | ADR-003 | 1 |
+| `modules/clan/inventory/services/zerotier.nix` or the zerotier configuration it applies | file | modify: `allowMetrics = true` | ADR-003 | 1 |
+| `modules/lib/omnigent-environment.nix` | file | modify: add `OTEL_` to the reserved prefixes | ADR-008 | 7 |
+| `modules/checks/omnigent-environment.nix` | file | modify: add an `OTEL_` policy mutant | ADR-008 | 7 |
+| `modules/machines/nixos/cinnabar/ntfy.nix` | file | modify: `auth-access` entries and `environmentFile` from `ntfy-alerter`; until then the S1 notifier posts anonymously | ADR-009 | 3 |
+| `modules/machines/nixos/cinnabar/ntfy.nix` | file | modify: import `fleet-alert` with the dead-man enabled | ADR-009 | 3 |
+| `modules/nixos/perses.nix` | file | add: `sso.services.perses` registration with `allowedGroups = [ "perses_users" ]`, `/dashboard/` and `/v1/` proxied to `127.0.0.1:4006` with the `Authorization` overwrite, `http.enable_api_server = true`, `perses-dashboards.service`, assertions | ADR-002 | 6 |
+| `modules/nixos/perses/dashboards/*.json` | file | add: Perses `Dashboard` JSON reconciled through `/v1/dashboards` | ADR-002 | 6 |
+| `modules/nixos/perses/lint-rules.yaml`, `modules/nixos/perses/mutants/*.json` | file | add: custom lint rules and mutant set | ADR-002 | 6 |
+| `modules/checks/perses-lint.nix` | file | add: `percli lint` at the embedded dashboard's Perses and plugin versions, with the tooling-version assertion | ADR-002 | 6 |
+| `modules/checks/perses-config.nix` | file | add: serving-configuration mutant check | ADR-002 | 6 |
+| `modules/vm-tests/perses-greptimedb.nix` | file | add: on-demand container test of the vhost-to-store data path | ADR-002 | 6 |
+| `modules/terranix/cloudflare.nix` | Terraform resource | modify: one unproxied `CNAME` `perses.scientistexperience.net` to `magnetite.scientistexperience.net` | ADR-002 | 6 |
 | `modules/terranix/cloudflare.nix` | Terraform resource | no bucket resource; a rule in `cloudflare_r2_bucket_lifecycle.sciexp` only when an export expiry is decided | ADR-006 Q4 | none now |
-| `modules/nixos/fleet-alert.nix` | file | add: evaluator and dead-man services and timers, R9.5 assertion | ADR-009 | 4 |
-| `modules/nixos/fleet-alert/rules.nix` | file | add: rule table rendered to JSON and YAML | ADR-009 | 4 |
-| `modules/checks/fleet-alert.nix` | file | add: R9.2 with fixtures and mutants | ADR-009 | 4 |
-| `modules/nixos/devloop-collection.nix` | file | add: `sqlquery` queries, gitea-mq `journald` receiver, PostgreSQL role, `devloop-reconcile` | ADR-005 | 5 |
-| `modules/system/deploy-record.nix` | file | add: NixOS and darwin activation snippets | ADR-005 | 5 |
-| NixOS and darwin machine aggregates importing `modules/system/` | file | modify: import `deploy-record` on all ten machines | ADR-005 | 5 |
-| `modules/checks/devloop-signals.nix` | file | add: marker, deploy-record and omp session-variable checks | ADR-005 | 5 |
-| `modules/checks/devloop-queries.nix` | file | add: queries against nixbot's migrations under `postgresqlTestHook` | ADR-005 | 5 |
-| `modules/vm-tests/devloop-ingest.nix` | file | add: on-demand VM test with mutants | ADR-005 | 5 |
-| `modules/home/ai/omp/default.nix` | file | modify: OTLP metrics endpoint, `OTEL_TRACES_EXPORTER=none`, `OTEL_LOGS_EXPORTER=none`, protocol and service name for human accounts | ADR-005; ADR-008 | 5 |
-| reader command on each analytics host | file | add: signs the export read credential and prints DuckDB `CREATE SECRET`; ADR-006 fixes no path | ADR-006 | 6 |
+| `modules/nixos/fleet-alert.nix` | file | add: evaluator and dead-man services and timers, R9.5 assertion | ADR-009 | 3 |
+| `modules/nixos/fleet-alert/rules.nix` | file | add: rule table rendered to JSON and YAML | ADR-009 | 3, 5 |
+| `modules/checks/fleet-alert.nix` | file | add: R9.2 with fixtures and mutants | ADR-009 | 3 |
+| `modules/nixos/devloop-collection.nix` | file | add: `sqlquery` queries, gitea-mq `journald` receiver, PostgreSQL role, `devloop-reconcile` | ADR-005 | 2 |
+| `modules/system/deploy-record.nix` | file | add: NixOS and darwin activation snippets | ADR-005 | 2 |
+| NixOS and darwin machine aggregates importing `modules/system/` | file | modify: import `deploy-record` on all ten machines | ADR-005 | 2 |
+| `modules/checks/devloop-signals.nix` | file | add: marker, deploy-record and omp session-variable checks | ADR-005 | 2, 7 |
+| `modules/checks/devloop-queries.nix` | file | add: queries against nixbot's migrations under `postgresqlTestHook` | ADR-005 | 2 |
+| `modules/vm-tests/devloop-ingest.nix` | file | add: on-demand VM test with mutants | ADR-005 | 2 |
+| `modules/home/ai/omp/default.nix` | file | modify: OTLP metrics endpoint, `OTEL_TRACES_EXPORTER=none`, `OTEL_LOGS_EXPORTER=none`, protocol and service name for human accounts | ADR-005; ADR-008 | 7 |
+| reader command on each analytics host | file | add: signs the export read credential and prints DuckDB `CREATE SECRET`; ADR-006 fixes no path | ADR-006 | 8 |
 | `greptimedb-users` | clan vars generator | add on magnetite: four users, five files | ADR-007 | 1 |
 | `greptimedb-r2` | clan vars generator | add on magnetite: hidden prompts for the `sciexp` token, `env` file | ADR-006 | 1 |
-| `otel-ca` | clan vars generator | add, `share = true` | ADR-003 | 2 |
-| `otel-cert` | clan vars generator | add, per machine | ADR-003 | 2 |
-| `ntfy-alerter` | clan vars generator | add, `share = true`, on magnetite and cinnabar | ADR-009 | 2 |
-| `perses-encryption-key` | clan vars generator | add on magnetite | ADR-002 | 3 |
-| `kanidm-oauth2-perses` | clan vars generator | add on magnetite | ADR-002 | 3 |
-| `telemetry-export-reader` | clan vars generator | add, `share = true`, on the operators' primary workstations | ADR-006 | 6 |
+| `otel-ca` | clan vars generator | add, `share = true` | ADR-003 | 4 |
+| `otel-cert` | clan vars generator | add, per machine | ADR-003 | 4 |
+| `ntfy-alerter` | clan vars generator | add, `share = true`, on magnetite and cinnabar | ADR-009 | 3 |
+| `telemetry-export-reader` | clan vars generator | add, `share = true`, on the operators' primary workstations | ADR-006 | 8 |
 
 ## Implementation sequencing
 
@@ -244,15 +241,15 @@ Slice status is not recorded here: it is derived from the change's files by `ope
 Slices S1 to S5 are metrics-only, with no logs pipeline, so no content-bearing record enters the store before S7 brings the content stages and their regulator.
 Change names are chosen in each slice's proposal.
 
-0. Precondition, root-pin bump: the root `nixpkgs` pin carries `pkgs.greptimedb` 1.2.1, with `greptimedb-bin` only as the channel-delay fallback (ADR-001 Q1; ADR-007 Q2); it lands inside S1.
-1. S1, CAM-68: the store with its containment, dataset, users, R2 store prefix, `greptimedb-schema` and `greptimedb-envelope`, fed metrics-only by magnetite's own collector in the `ingress` role writing to the loopback store.
-   Realizes ADR-001, ADR-007, the store side of ADR-006, the databases and retention of ADR-004, and magnetite's metrics from ADR-003.
+0. Package: the store package is `greptimedb-bin`, packaged from the upstream release tarball because it embeds the dashboard ADR-002 adopts; it lands inside S1, and the root pin is not bumped for the store (ADR-001 R1.1; ADR-007 Q2).
+1. S1, CAM-68: the store with its containment, dataset, users, R2 store prefix, `greptimedb-schema` and `greptimedb-envelope`, fed metrics-only by magnetite's own collector in the `ingress` role writing to the loopback store, and the `observability-notify@` template with `OnFailure=` on S1's units and magnetite's dataset oneshots, posting anonymously until S3.
+   Realizes ADR-001, ADR-007, the store side of ADR-006, the databases and retention of ADR-004, magnetite's metrics from ADR-003, and the notifier of ADR-003; the embedded dashboard is reachable only through `ssh -L 4000:127.0.0.1:4000 magnetite.zt`.
    Components: [greptimedb](../components/greptimedb.md), [otel-collector](../components/otel-collector.md), [host-probes](../components/host-probes.md).
 2. S2, CAM-69: the nixbot reader, the gitea-mq journal parse, the deploy record, `devloop-reconcile` and the `devloop-queries` check.
    Realizes ADR-005 except the omp emitter, which moves to S7.
    Component: [devloop-exporters](../components/devloop-exporters.md).
-3. S3, CAM-70: the `observability-notify@` template, the evaluator on magnetite, the rules whose signals S1 provides, the dead-man on cinnabar and the rule check; the dev-loop SLO burn rule lands with the later of S2 and S3.
-   Realizes ADR-009 and the notifier of ADR-003.
+3. S3, CAM-70: the evaluator on magnetite, the rules whose signals S1 provides, the dead-man on cinnabar, the `alerter` credential and the rule check; the dev-loop SLO burn rule lands with the later of S2 and S3.
+   Realizes ADR-009.
    Component: [fleet-alert](../components/fleet-alert.md).
 4. S4, CAM-71: `otel-ca`, the mTLS ingress on ZeroTier, and the agent role on the other in-scope NixOS hosts, with the SMART exporter on pyrite and `otel-envelope`.
    Realizes the rest of ADR-003 for NixOS and its metrics in ADR-004.
@@ -260,8 +257,8 @@ Change names are chosen in each slice's proposal.
 5. S5, CAM-72: stibnite on darwin, with the root `otelcol-process` collector, the `otel-host-probe` job for launchd state and SMART, and the darwin rules of ADR-009.
    Realizes ADR-003 items 21 to 25.
    Component: [host-probes](../components/host-probes.md).
-6. S6, CAM-73: Perses, its resources and checks, the Kanidm client and `perses_users`, and the DNS record.
-   Realizes ADR-002 and the read side of ADR-008.
+6. S6, CAM-73: the `perses.scientistexperience.net` vhost behind `sso-gateway` with the group `perses_users`, nginx proxying to the store's API listener `127.0.0.1:4006` with the `perses:ro` credential injected, the dashboard JSON files and their reconcile oneshot, the `perses-lint` and `perses-config` checks, the container test and the DNS record.
+   Realizes ADR-002 and the read side of ADR-008; the holder of the reconcile oneshot's `rw` credential and per-dashboard database selection are decided here (ADR-002 Q9, Q10).
    Component: [perses](../components/perses.md).
 7. S7, CAM-74: omp telemetry and journald logs behind the content stages, `OTEL_` reserved in worker environments, and the R8.1 and R8.3 regulators.
    Realizes the collector side of ADR-008, the omp emitter of ADR-005, and the agent and journald schema of ADR-004.
@@ -282,8 +279,8 @@ A slice whose deployment refutes a detail of a decision record amends that recor
 - Laptop battery, thermal and sleep-wake state on stibnite and pyrite: trigger is an incident in which a laptop's thermal throttling, battery wear or sleep-wake cycle explains lost builds, stale deploy records or queue replay gaps; adoption needs node_exporter collectors, a sleep-wake source and consent framing (ADR-003 future extension 6).
 - ZeroTier peer latency and path state: trigger is a cross-host failure attributed to mesh path degradation, relay fallback or peer flapping; adoption needs a `node_id` keep-list of fleet members and an ADR-004 budget increase (ADR-003 future extension 7).
 - Exponential-histogram conversion removal: when the deployed store reaches `1.3.0`, R1.2 tracks removing the collector conversion (ADR-001 E1.2).
-- Perses 0.55 line: an upgrade obligation triggered when Perses 0.55.0 final reaches the root pin (ADR-002 Decision).
-- GreptimeTeam/dashboard: deferred as an exploration console, not deployed (ADR-002 Q2).
+- Standalone Perses server: deployed only if a dashboard needs a feature the embedded dashboard lacks, such as `StaticListVariable` or projects with RBAC (ADR-002 Decision).
+- Perses 0.54.0 in the dashboard: arrives when a stable GreptimeDB release embeds dashboard `v0.14.2`, moving the lint tooling in the same commit (ADR-002 Consequences).
 - Per-unit cgroup memory: revisit when the collector pin reaches `v0.160.0` (ADR-003 Q11).
 - blackphos, rosegold and argentum: join the collector topology when each primary user consents (ADR-003 Q3).
 - Omnigent and worker telemetry: requires revising ADR-008 (ADR-004 Q5; ADR-005 Q5; ADR-008 Q3).

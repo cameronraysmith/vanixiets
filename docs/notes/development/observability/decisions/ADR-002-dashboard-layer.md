@@ -4,197 +4,196 @@ title: "ADR-002: Dashboard layer"
 
 ## Status
 
-Accepted (human gate, 2026-10-15)
+Accepted (human gate, 2026-10-15).
+Amended in place under charter v11 (2026-10-16): the dashboard layer moved from a standalone Perses server to the Perses dashboard GreptimeDB embeds, after the premise that GreptimeDB 1.2.1 lacks the dashboards API was found false.
 
 ## Context
 
 Charter D2 asks for one dashboard layer, its dashboards-as-code format, and datasource reachability against the chosen store.
 The human gate of 2026-10-06 named GreptimeDB on `magnetite` backed by Cloudflare R2 as the store, and GreptimeTeam/dashboard "or better" as the dashboard layer, with Perses the leading "or better" candidate.
-This ADR assumes the store decision of ADR-001 and the placement of ADR-007: GreptimeDB 1.2.1 standalone on `magnetite`, consumed as `pkgs.greptimedb` from the root pin, listening for HTTP on `127.0.0.1:4000` (ADR-007), with the read-only `perses` user that ADR-007 enumerates among the store users.
-This ADR assumes the access model of ADR-008: content exclusion at the collector, one shared read zone of admitted humans, no per-person read partition, and a direct Kanidm OIDC client for the dashboard; the store users, including `perses:ro`, are those enumerated in ADR-007.
+This ADR assumes the store decision of ADR-001 and the placement of ADR-007: GreptimeDB 1.2.1 standalone on `magnetite`, consumed as `greptimedb-bin` built from the upstream release tarball (ADR-001 R1.1), listening for HTTP on `127.0.0.1:4000` (ADR-007), with the read-only `perses` user that ADR-007 enumerates among the store users.
+This ADR assumes the access model of ADR-008: content exclusion at the collector, and one shared read zone of admitted humans with no per-person read partition.
 
-The facts that bind this decision are these.
-The root pin is lock node `nixpkgs_10` at `NixOS/nixpkgs@ac1faec4`, and it packages Perses 0.54.0, the latest stable upstream release, together with the NixOS module `services.perses` (`research/perses.md` R11, R13; `research/nix-packaging-status.md` R13).
-The vendored plugin set at that pin contains the native GreptimeDB plugin at 0.1.0 (`NixOS/nixpkgs@ac1faec4:pkgs/by-name/pe/perses/plugins.nix:34-36`, root node `nixpkgs_10`).
-That plugin declares `GreptimeDBDatasource`, `GreptimeDBTimeSeriesQuery`, `GreptimeDBLogQuery` and `GreptimeDBTraceQuery`, the last two of the generic `LogQuery` and `TraceQuery` kinds, so the stock `LogsTable`, `TraceTable` and `TracingGanttChart` panels render them (`perses/plugins@a62049f:greptimedb/package.json:50-77`; `research/perses.md` R5, R6).
-Every GreptimeDB query is SQL sent as `POST <datasource url>/v1/sql` through the server-side `HTTPProxy` (`perses/plugins@a62049f:greptimedb/src/model/greptimedb-client.ts:89`; `research/perses.md` R7, R31).
-The stock Prometheus plugin also reaches GreptimeDB's PromQL router at `/v1/prometheus` (`research/perses.md` F20), except that the Prometheus `/metadata` route is absent at GreptimeDB 1.1.4 and 1.2.1 (`research/greptimedb.md` R12).
-RK7 therefore does not fire for a design that names the GreptimeDB plugin at 0.1.0, with the residual that trace rendering depends on stored column names matching the plugin's heuristics (`research/perses.md` R8 and its Reconciliation section).
+The facts about the embedded dashboard that bind this decision are these.
+GreptimeDB `v1.2.1` embeds GreptimeTeam/dashboard `v0.13.13` (`GreptimeTeam/greptimedb@179ff8e50:src/servers/dashboard/VERSION`), and that release runs Perses 0.53.1 with the Prometheus plugin 0.57.1 and the GreptimeDB plugin `0.1.0-beta.0` (`GreptimeTeam/dashboard@7b4b275a:package.json:59-79`).
+Perses 0.54.0 arrives only with dashboard `v0.14.2`, which GreptimeDB `main` embeds and no stable GreptimeDB release does yet (`research/perses.md` R37, R42).
+The dashboards API `GET /v1/dashboards`, `POST /v1/dashboards/{name}` and `DELETE /v1/dashboards/{name}` exists at `v1.2.1` (`GreptimeTeam/greptimedb@179ff8e50:src/servers/src/http.rs:829-836`, `:1437-1444`; `GreptimeTeam/greptimedb@179ff8e50:src/frontend/src/instance/dashboard.rs`).
+It stores each request body verbatim as `definition` in the table `greptime_private.dashboard`, keyed by the dashboard name as its primary-key tag (`GreptimeTeam/greptimedb@179ff8e50:src/frontend/src/instance/dashboard.rs:51-54`); the UI posts `{"content": <dashboard JSON as a string>}` (`GreptimeTeam/dashboard@7b4b275a:src/views/dashboard/perses/index.vue:388`).
+`research/perses.md` R39, which says the API is absent from `v1.2.1` and appears only in the `v1.3` prereleases, is superseded by these citations, and this ADR's version before charter v11 rested on R39.
+The dashboards API and the UI are compiled only with the `dashboard` Cargo feature (`GreptimeTeam/greptimedb@179ff8e50:src/servers/src/http.rs:959-988`, `:1437`), which upstream release tarballs enable and the nixpkgs derivation does not (`research/nix-packaging-status.md` R9, R10).
 
-The 0.55 line is at `v0.55.0-rc.0` and is not in nixpkgs (`research/perses.md` R1).
-It carries five security changes absent from 0.54.0 (`research/telemetry-security-and-tenancy.md` R13 through R18): the proxy stops forwarding the caller's Perses session token (`perses/perses@835dc355`), auth without an encryption key becomes a startup error (`perses/perses@e799e7cb`), secret files are confined to allowed directories (`perses/perses@bb8fd345`), a connect-time network guard denies loopback, link-local and metadata targets by default (`perses/perses@d5cbc44e`), and the SQL proxy runs read-only (`perses/perses@379673eb`).
-It also adds `provisioning.enable_watch` and claim-based role assignment, both absent from 0.54.0 (`research/perses.md` R15).
+The UI is served at `/dashboard/` on the main HTTP listener, and also on a dedicated API listener when `http.enable_api_server = true`, which binds `http.api_server_addr`, `127.0.0.1:4006` by default (`GreptimeTeam/greptimedb@179ff8e50:config/standalone.example.toml:96`, `:99`).
+The dedicated listener serves only the `/v1` interfaces and `/dashboard` (`GreptimeTeam/greptimedb@179ff8e50:src/servers/src/http.rs:213-216`).
+The UI has no base-path option, and its datasources use root-absolute URLs, so it needs a vhost of its own with `/v1` at the root `[INFERENCE]`.
+It declares exactly two datasources, which the user cannot change: `promql-default`, a `PrometheusDatasource` at `/v1/prometheus`, and `sql-default`, a `GreptimeDBDatasource` posting to `/v1/sql` (`GreptimeTeam/dashboard@7b4b275a:src/perses-dashboard/react/DashboardView.tsx:41-97`).
+Both send a Basic `Authorization` header and an `x-greptime-db-name` header built from the connection settings the browser keeps in `localStorage` (`GreptimeTeam/dashboard@7b4b275a:src/perses-dashboard/react/DashboardView.tsx:41-97`; `research/perses.md` R41).
+Its panels are TimeSeries, Gauge, Stat, Table, Histogram, HeatMap, Markdown, Scatter, Bar, Pie, LogsTable, TraceTable, TracingGantt and TimeSeriesTable, and it registers no `StaticListVariable` (`GreptimeTeam/dashboard@7b4b275a:src/perses-dashboard/react/plugin.ts`).
+It imports Perses dashboard JSON but not Grafana JSON; the upstream skill converts a Grafana dashboard with `percli migrate --online` against a standalone Perses server (`GreptimeTeam/dashboard@7b4b275a:skills/greptimedb-perses-dashboard/reference.md:562`).
+The store, not the UI, enforces read-only access: saving and deleting a dashboard are write actions (`GreptimeTeam/greptimedb@179ff8e50:src/auth/src/permission.rs:150-152`), and the permission checker installed with the user provider rejects writes from `ro` users, so the `perses:ro` user can view dashboards and cannot save or delete them.
+The UI has no OIDC login, no project model and no RBAC of its own (`research/perses.md` R41).
 
-GreptimeTeam/dashboard is a Vue application served by GreptimeDB at `:4000/dashboard` whose "Visualization" section embeds Perses 0.54.0 with the GreptimeDB plugin and stores Perses `Dashboard` JSON in GreptimeDB through `/v1/dashboards` (`research/perses.md` R36 through R38).
-That API first appears in GreptimeDB `v1.3.0-alpha.1`, and the UI is compiled only with the `servers/dashboard` Cargo feature, which the nixpkgs derivation does not enable (`research/perses.md` R39, R40; `research/nix-packaging-status.md` R9, R11).
-It authenticates with HTTP Basic credentials typed into the browser and persists the password in `localStorage`, with no OIDC, no project model and no RBAC (`research/perses.md` R41).
-It has no CLI, no lint, no file provisioning and no read-only mode (`research/perses.md` R44).
-At the definition level it is not an alternative to Perses, because both render the same Perses dashboard JSON through the same GreptimeDB plugin (`research/perses.md` R45).
-
+The facts about standalone Perses that bind this decision are these.
+The root pin, lock node `nixpkgs_10` at `NixOS/nixpkgs@ac1faec4`, packages Perses and `percli` 0.54.0 with the NixOS module `services.perses` (`research/perses.md` R11, R13; `research/nix-packaging-status.md` R13).
+The stock Prometheus plugin reaches GreptimeDB's PromQL router at `/v1/prometheus` (`research/perses.md` F20), except that the Prometheus `/metadata` route is absent at GreptimeDB 1.1.4 and 1.2.1 (`research/greptimedb.md` R12).
 `percli lint` is tautologically green without plugin schemas (charter RK8; `research/perses.md` R17, R18).
 With `--plugin.path` pointed at the archive directory it fails closed on every input because of the `ArchivePath`/`ArchivePaths` mismatch (`research/perses.md` R19, R20).
 With `--plugin.path` pointed at a directory of extracted plugins, or with `--online`, it rejects schema mutants and custom-rule mutants while accepting valid files (`research/perses.md` R21, R22, R24).
-
-The nixpkgs package extracts every vendored plugin archive into `/run/perses/plugins` on a tmpfs, about 260 MiB at 0.54.0 (`NixOS/nixpkgs@ac1faec4:nixos/tests/perses.nix:15-17`, root node `nixpkgs_10`).
-Extracting the 30 vendored archives of the root pin measured 257 MiB, and the ten-plugin subset named below measured 84 MiB, each plugin between 2 MiB and 11 MiB (local extraction of `perses.pluginsArchive` from root node `nixpkgs_10`, 2026-10-15).
-`plugin.enabled` filters plugins at load time only; `UnzipArchives` extracts every archive found under `archive_paths` regardless (`perses/perses@4c719fc1:internal/api/plugin/plugin.go:72`, `perses/perses@4c719fc1:internal/api/plugin/plugin.go:283-296`).
+A standalone Perses server from the root pin extracts its plugin archives into `/run/perses/plugins` on a tmpfs, 257 MiB for the full vendored set and 84 MiB for a ten-plugin subset (local extraction of `perses.pluginsArchive` from root node `nixpkgs_10`, 2026-10-15).
 `magnetite` has 30.6 GiB of RAM and was OOM-killed twice by overlapping evaluations (`cameronraysmith/vanixiets@a8e72d185:docs/notes/development/incidents/2026-10-01-magnetite-concurrent-eval-oom.md:5`, `:12`), which is charter RK3.
 
 The repository's conventions also bind this decision.
-NixOS VM tests live under `modules/vm-tests/` as `vmTests.<system>.<name>`, run on demand on a KVM-capable host, and are outside pull-request gating (`modules/README.md:32`, `:48`, `:86`).
-`magnetite` has no `/dev/kvm` (`modules/machines/nixos/magnetite/default.nix:81-82`); it advertises `uid-range` for nspawn container tests (`modules/machines/nixos/magnetite/default.nix:84-93`; `modules/clan/inventory/services/nix-builders.nix:30-43`), but no check under `modules/checks/` uses a container test, so there is no gating nspawn pattern to follow.
-`vanixiets.net` never hosts authentication, sessions or cookies (web-verification D9, `docs/notes/development/web-verification/decisions.md:124`), while Kanidm-backed services on `magnetite` already use `*.scientistexperience.net` names such as `omni.scientistexperience.net` (`modules/terranix/cloudflare.nix:186-191`; `modules/nixos/kanidm.nix:259-277`).
-cinnabar's caddy serves five mesh-only `.zt` vhosts with `tls internal`, each reverse-proxying a service on cinnabar's own loopback (`modules/machines/nixos/cinnabar/caddy.nix:14-82`).
-The `sso-gateway` module directs a service with built-in OIDC to define its own Kanidm client rather than register with the gateway (`modules/nixos/sso-gateway.nix:291-296`), while web-verification D11 says UIs hosted on `magnetite` keep `sso-gateway` (`docs/notes/development/web-verification/decisions.md:252`) and the gateway's design names magnetite UIs as its consumers (`openspec/changes/sso-gateway/design.md:3-5`, `:17`).
+NixOS VM tests live under `modules/vm-tests/` as `vmTests.<system>.<name>`, run on demand, and are outside pull-request gating (`modules/README.md:32`, `:48`, `:86`).
+`magnetite` has no `/dev/kvm` but advertises `uid-range` for nspawn container tests (`modules/machines/nixos/magnetite/default.nix:81-93`; `modules/clan/inventory/services/nix-builders.nix:30-43`), and slice S1 adds the first such container test, `vmTests.x86_64-linux.greptimedb-pipeline`, to the same on-demand lane (`openspec/changes/stand-up-greptimedb-on-magnetite/tasks.md:43`).
+`vanixiets.net` never hosts authentication, sessions or cookies (web-verification D9, `docs/notes/development/web-verification/decisions.md:124`), while Kanidm-backed services on `magnetite` use `*.scientistexperience.net` names.
+The `sso-gateway` module registers a service with no OIDC of its own as a `forceSSL` nginx vhost gated by `auth_request` against the shared oauth2-proxy at `auth.scientistexperience.net`, and derives the Kanidm group stub and scope map from the service's `allowedGroups` (`modules/nixos/sso-gateway.nix:80-96`, `:288-324`, `:459-476`).
+Web-verification D11 says UIs hosted on `magnetite` keep `sso-gateway` (`docs/notes/development/web-verification/decisions.md:252`), and the gateway's design names magnetite UIs as its consumers (`openspec/changes/sso-gateway/design.md:3-5`, `:17`).
+The gateway is declared on `magnetite` but disabled today (`modules/machines/nixos/magnetite/default.nix:133`).
 
 ## Decision
 
-The dashboard layer is Perses 0.54.0 from the root nixpkgs pin, run through `services.perses` on `magnetite`, with the GreptimeDB plugin 0.1.0 as its primary datasource.
-Two datasources, both proxied server-side with the `perses:ro` credential to `http://127.0.0.1:4000`, are declared in one Perses project: a `GreptimeDBDatasource` for SQL time series, logs and traces, and a `PrometheusDatasource` at `/v1/prometheus` for PromQL metric panels.
-The dashboards-as-code format is plain Perses resource YAML (`Project`, `Datasource`, `Secret`, `Dashboard`, `Role`, `RoleBinding`) committed to this repository and provisioned from a Nix store path, with `security.readonly: true` so that provisioning is the only write path.
-The plugin set is a first-party archive subset of ten vendored plugins wired through `plugin.archive_paths`: `GreptimeDB`, `Prometheus`, `TimeSeriesChart`, `Table`, `StatChart`, `LogsTable`, `TraceTable`, `TracingGanttChart`, `Markdown` and `StaticListVariable`.
-The regulator for the resource files is a flake check that runs `percli` 0.54.0 `lint` with `--plugin.path` pointed at a Nix-extracted directory of exactly that subset and with `--custom-rule.path`, and that also asserts every enumerated mutant is rejected.
-Authentication is a direct Kanidm OIDC client using the authorization-code flow with PKCE, which is on by default at 0.54.0, admitting members of the Kanidm group `perses_users` (ADR-008).
-Perses is served at `perses.scientistexperience.net` through a `magnetite` nginx TLS vhost in front of its loopback listener.
-GreptimeTeam/dashboard is rejected as the dashboard layer and deferred, not deployed, as an exploration console.
-The upgrade to the 0.55 line is a recorded obligation, triggered when Perses 0.55.0 final reaches the root pin.
+The dashboard layer is the Perses dashboard that GreptimeDB embeds, served by `greptimedb.service` on `magnetite` at `/dashboard/`, using its two fixed datasources `promql-default` and `sql-default`.
+No standalone Perses server is deployed.
+Standalone Perses is kept as tooling only: `percli migrate` with an ephemeral local Perses server converts Grafana community dashboards into Perses JSON, and `percli lint` against the Perses schema version the embedded dashboard runs is a flake check.
+A deployed standalone Perses server is the fallback only if a dashboard needs a feature the embedded dashboard lacks, such as `StaticListVariable` or projects with RBAC.
+
+Slice S6 serves the dashboard at `perses.scientistexperience.net`, a `magnetite` vhost registered with `sso-gateway` and admitting the Kanidm group `perses_users`.
+nginx proxies `/dashboard/` and `/v1/` on that vhost to the store's API listener at `127.0.0.1:4006`, enabled by `http.enable_api_server = true` in S6, not in S1.
+nginx overwrites the `Authorization` header on those locations with the `perses:ro` Basic credential, so no store password reaches the browser.
+The dashboards-as-code format is Perses `Dashboard` JSON files committed to this repository and reconciled by a oneshot through `/v1/dashboards`: it posts every file in the repository and deletes every stored dashboard absent from it, using a `rw` store credential whose holder is open (Q9).
+Slice S1 exposes nothing new publicly: the dashboard is reachable from the first deployment only through `ssh -L 4000:127.0.0.1:4000 magnetite.zt`.
 
 ## Rationale
 
-Perses 0.54.0 is the only candidate that satisfies all three D2 conditions at the root pin without packaging work: it renders metrics, logs and traces from GreptimeDB (`research/perses.md` R5, R6, R12), its definitions are files that a server-free regulator can discriminate (`research/perses.md` R21), and it has a module whose freeform `settings` and `_secret` credential substitution cover every configuration value this ADR needs (`research/perses.md` R13).
-The GreptimeDB plugin is the primary datasource because it is the only packaged path to logs and traces, and because the plugin's history between 0.1.0 and `0.2.0-rc.0` shows framework changes only, so staying on 0.1.0 forgoes no query semantics (`research/perses.md` R9).
-The Prometheus datasource is retained because the fleet's existing emitters are Prometheus `/metrics` endpoints (charter W3), PromQL expresses counter rates over them directly, and GreptimeDB serves PromQL on every path the plugin uses except `/metadata`, whose absence degrades only the query editor's metric help (`research/perses.md` F17 through F20; `research/greptimedb.md` R12).
-Plain resource YAML is the as-code format because it is what the server, the provisioning loader, `percli lint` and the GreptimeTeam dashboard skill all consume directly (`research/perses.md` F4, F24; R43), so it adds no build step between the reviewed file and the deployed resource.
-The Go SDK is not chosen because it adds a Go module and a `dac build` step whose only output is the same YAML, and the CUE SDK is not chosen because the GreptimeDB plugin ships no CUE SDK (`research/perses.md` R10).
-`security.readonly: true` with Nix-store provisioning gives a declarative-only deployment: provisioning writes through the service manager and is unaffected by the switch, while every resource POST, PUT and DELETE route is removed (`research/perses.md` F25 through F27; `perses/perses@4c719fc1:internal/api/generate.go:80`).
-The proxy routes are not resource routes, so read-only mode does not stop dashboards from querying (`perses/perses@4c719fc1:internal/api/generate.go:80`, which gates only the generated resource endpoints).
+The embedded dashboard satisfies the three D2 conditions with no service beyond the store.
+It renders metrics, logs and traces from GreptimeDB through the PromQL datasource and the GreptimeDB plugin's log and trace queries in the LogsTable, TraceTable and TracingGantt panels, so RK7 stays resolved.
+Its definitions are Perses dashboard JSON, the format `percli lint` checks offline and the upstream dashboard skill generates (`research/perses.md` R43, R45).
+Its write path is an HTTP API whose writes the store authorizes by user mode, which gives a declarative deployment: the reconcile oneshot is the only `rw` writer, and readers hold `ro`.
 
-Perses 0.54.0 is chosen over the 0.55 line because each of the five 0.55 security changes is either compensated by this configuration or does not apply to it.
-The session-token forward does not reach GreptimeDB in the `Authorization` header, because the datasource `Secret` carries `basicAuth` and `setupAuthentication` calls `SetBasicAuth`, which replaces that header (`perses/perses@4c719fc1:internal/api/impl/proxy/proxy.go:369-375`); whether the session cookies are also forwarded is not established, and their only receiver is the loopback GreptimeDB on the same host `[INFERENCE]`.
-The default encryption key is excluded by setting `security.encryption_key` from a clan vars secret and asserting it at evaluation time, which is the requirement 0.55 enforces at startup (`research/telemetry-security-and-tenancy.md` C4).
-Secret-file exfiltration and arbitrary proxy targets both require creating a `Secret` or a `Datasource`, which read-only mode removes for every caller, and no role binding grants `create` on either scope (`research/perses.md` R30; `research/telemetry-security-and-tenancy.md` R12).
-The SQL proxy fix does not apply, because no plugin declares `SQLProxy` and the GreptimeDB plugin uses `HTTPProxy` (`research/perses.md` R31).
-`provisioning.enable_watch` buys nothing under Nix, because the provisioning folder is a store path inside the generated configuration file passed on `ExecStart`, so any dashboard change changes the unit and restarts it on activation (`NixOS/nixpkgs@ac1faec4:nixos/modules/services/monitoring/perses.nix:81-85`, root node `nixpkgs_10`).
-Claim-based roles would remove two explicit role bindings, but they snapshot claims at login and do not revoke on group removal until the refresh chain ends (`research/perses.md` R35), which is not an improvement for a two-person read zone.
-The 0.55 network guard denies the loopback target this ADR uses, so adopting it requires `datasource.proxy.allowed_hosts` naming the store address and `allowed_networks` containing `127.0.0.1/32` only (`research/perses.md` R32; `research/telemetry-security-and-tenancy.md` R17).
-Adopting 0.55 now would mean a first-party override of a release candidate, its npm and Go vendor hashes, and a re-vendored plugin set at `0.2.0-rc.0`, which is packaging work on the critical path for no capability this design uses.
+The version before charter v11 rejected the embedded dashboard for four reasons, and each has been re-examined.
+The premise that it needs a GreptimeDB 1.3 prerelease is false, because `v1.2.1` carries the dashboards API (Context).
+The premise that it has no file provisioning overlooked the dashboards API combined with the store's `ro`/`rw` enforcement.
+The premise that it stores a password in the browser holds only if the browser authenticates; with nginx injecting the credential, the browser holds none `[INFERENCE]`.
+The objection that it has no authorization of its own still holds, and `sso-gateway` supplies admission while the store's user mode supplies read-only enforcement.
 
-The plugin subset exists because extraction is all-or-nothing per archive directory and `plugin.enabled` does not reduce it, so the only lever on the tmpfs footprint is which archives `archive_paths` names (`perses/perses@4c719fc1:internal/api/plugin/plugin.go:72`).
-The same subset feeds the lint regulator, so the plugins the server loads and the schemas the check validates against cannot drift apart.
+The standalone server is not deployed because it costs a second service, a tmpfs of at least 84 MiB on a host already OOM-killed twice (RK3), its own Kanidm client, an encryption key, and an upgrade obligation to the 0.55 line.
+It buys capabilities this design does not use: projects and RBAC do not partition reads under ADR-008's shared read zone (charter RK9), and of the ten plugins the earlier decision selected, the embedded dashboard lacks only `StaticListVariable`.
+`percli` stays useful without the server, because lint and migrate run on files.
 
-The regulator is offline lint over an extracted directory rather than `--online`, because the offline form runs inside `nix flake check` on nixbot's `x86_64-linux` builders with no running server, and because `--online` and `--custom-rule.path` are mutually exclusive, which would move the custom rules into server configuration (`research/perses.md` R25).
-Offline lint does not parse SQL, check table existence or check datasource existence (`research/perses.md` R26), so a NixOS VM test samples the data path that lint cannot.
-That VM test follows the repository's pattern: it lives under `modules/vm-tests/` as `vmTests.x86_64-linux.perses-greptimedb`, runs on demand on a KVM-capable host such as Pyrite, and does not gate pull requests (`modules/README.md:32`, `:48`, `:86`).
-The gating regulators are the evaluation-time and build-time checks `perses-resources` and `perses-config`, which need no VM.
-An nspawn container test on `magnetite` could gate without KVM, but no existing check uses that pattern, so this ADR does not introduce it.
+The API listener on `127.0.0.1:4006` is the upstream rather than `127.0.0.1:4000`, because it serves only `/v1` and `/dashboard` (Context), so the public vhost cannot reach `/metrics`, `/health` or any other route of the main listener.
+`sso-gateway` admits readers, rather than a direct Kanidm client, because the embedded dashboard has no OIDC login, and the gateway module directs services without OIDC to register with it (`modules/nixos/sso-gateway.nix:288-298`); this follows web-verification D11 rather than excepting it.
+nginx overwrites `Authorization` rather than letting each reader type the `perses:ro` password into the UI, because a typed password would persist in `localStorage` on every reader's machine (`research/perses.md` R41).
+The hostname stays `perses.scientistexperience.net`, accepted at the 2026-10-15 gate as Q6, because nothing in the change of dashboard host bears on the name: the vhost still sits behind a Kanidm-backed login, which D9 keeps off `vanixiets.net`.
 
-The hostname is `perses.scientistexperience.net` because Perses holds Kanidm sessions, which D9 keeps off `vanixiets.net`, and because the name follows the existing `omni.scientistexperience.net` pattern of a public `magnetite` vhost behind a direct Kanidm client.
+Reconciling through `/v1/dashboards` is the as-code path because the API stores the posted body verbatim (Context), so the reviewed file is the stored definition.
+The oneshot deletes dashboards absent from the repository because the API has no bulk replace, and a dashboard saved under any `rw` credential outside the repository would otherwise persist.
+The lint check runs against the embedded Perses version rather than the root pin's 0.54.0, because the embedded dashboard parses the stored JSON with Perses 0.53.1 and its plugin versions, and a lint against other schemas could accept a file the deployed renderer rejects or the reverse `[INFERENCE]`.
 
-The direct Kanidm client is an exception to web-verification D11, which says UIs hosted on `magnetite` keep `sso-gateway` (`docs/notes/development/web-verification/decisions.md:252`), and to the gateway design's intent to front magnetite UIs (`openspec/changes/sso-gateway/design.md:3-5`, `:17`).
-The exception follows the gateway module's own rule that a service with built-in OIDC defines its own Kanidm client and authenticates natively (`modules/nixos/sso-gateway.nix:291-296`), as `omnigent` already does (`modules/nixos/kanidm.nix:259-277`).
-Routing Perses through the gateway would double-gate it and require disabling the Perses RBAC that gates the datasource proxy (`research/telemetry-security-and-tenancy.md` F16, F19, F20).
-
-GreptimeTeam/dashboard is rejected as the dashboard layer because it fails every D2 and D8 condition this ADR depends on: no as-code path, no regulator surface, Basic credentials stored in the browser, and no authorization of its own over an allow-all store (`research/perses.md` R41, R44; charter RK9).
-It is deferred rather than rejected outright as an exploration console, because it is actively maintained and offers SQL, PromQL, log and trace exploration that Perses' explore view only partly covers (`research/perses.md` R42, R46).
-Deploying it would need GreptimeDB at or above `v1.3.0-alpha.1` built with `servers/dashboard` from pre-fetched assets, or a separately served `build.tar.gz`, plus a read-capable store credential held in a browser (`research/nix-packaging-status.md` R11, R12), and ADR-001 deploys neither that version nor that feature.
+The dashboard is reachable over an SSH tunnel from S1 because the release tarball serves it on the loopback listener S1 already configures, so S1 can use it for its own read-back checks without any public surface.
 
 ## Rejected alternatives
 
-- GreptimeTeam/dashboard as the dashboard layer: no dashboards-as-code, lint or provisioning, store password in browser `localStorage`, no RBAC or OIDC, and absent from the nixpkgs GreptimeDB build (`research/perses.md` R40, R41, R44).
-- Perses 0.55 line now: release candidate absent from nixpkgs whose security changes this configuration compensates, at the cost of first-party packaging on the critical path (Rationale above).
+- Standalone Perses 0.54.0 server, the decision before charter v11: a second service with an 84 MiB tmpfs under RK3, its own Kanidm client and encryption key, and an upgrade obligation, for projects and RBAC that ADR-008's shared read zone does not use; kept as the fallback named in the Decision.
+- Perses 0.55 line as a standalone server: a release candidate absent from nixpkgs, with the same costs as the standalone server.
 - Grafana 13.1.1: packaged with a module, but AGPL under a single corporate sponsor (C3), with no first-party GreptimeDB log or trace datasource evidenced in this corpus and a dashboard JSON format that is not the one GreptimeDB's own tooling emits (`research/store-alternatives.md` F18, F22; `research/perses.md` R43).
-- Prometheus datasource only: no path to logs or traces from GreptimeDB, which re-fires RK7 (`research/perses.md` F41, C1).
-- GreptimeDB datasource only: forces PromQL-native counter-rate panels over the fleet's Prometheus endpoints into hand-written SQL for no saving in credentials or hosts.
-- Go dashboards-as-code SDK: adds a Go module and a build step whose output is the YAML this ADR commits directly.
-- CUE dashboards-as-code SDK: the GreptimeDB plugin ships no CUE SDK, and the CUE builders require the `explicitopen` experiment (`research/perses.md` R10, F10).
-- Dashboards authored in the UI and exported: exports embed server-assigned metadata and bypass review (`research/perses.md` F5).
+- Building `pkgs.greptimedb` with the `dashboard` feature: needs a fixed-output fetch of the dashboard assets and a 34-minute source build, while the release tarball already carries the feature (`research/nix-packaging-status.md` R11, F14; ADR-007).
+- Serving the dashboard as a static `build.tar.gz` beside the store: a second artifact to version against the store, for the same UI the store already serves (`research/nix-packaging-status.md` R12).
+- Proxying the vhost to the main listener `127.0.0.1:4000`: exposes `/metrics`, `/health` and every other route of the main listener to admitted browsers.
+- Readers typing the `perses:ro` password into the UI: persists the password in `localStorage` on every reader's machine (`research/perses.md` R41).
+- A direct Kanidm OIDC client: the embedded dashboard has no OIDC login to use it.
+- Dashboards edited in the deployed UI: `perses:ro` cannot save, a save under a `rw` credential bypasses review, and the reconcile oneshot deletes or overwrites it.
+- Go or CUE dashboards-as-code SDK: adds a build step whose output is the JSON this ADR commits directly, and the GreptimeDB plugin ships no CUE SDK (`research/perses.md` R10).
 - Bare `percli lint`: validates nothing beyond unmarshalling and reports success (charter RK8; `research/perses.md` R17).
 - `percli lint --plugin.path <archive directory>`: fails closed on valid files, so it does not discriminate (`research/perses.md` R19, R20).
-- `percli lint --online` as the gating regulator: needs a running server inside the check and excludes `--custom-rule.path` (`research/perses.md` R25).
-- Full vendored plugin set on `magnetite`: 257 MiB of tmpfs against 84 MiB for the subset, under RK3.
-- `plugin.enabled` as the footprint lever: it filters loading only, after every archive is extracted (`perses/perses@4c719fc1:internal/api/plugin/plugin.go:283-296`).
-- `sso-gateway` in front of Perses: double-gates a service with native OIDC and disables the RBAC that gates the datasource proxy (`research/telemetry-security-and-tenancy.md` F16, F19, F20); the gateway module itself directs natively-OIDC services to their own Kanidm client (`modules/nixos/sso-gateway.nix:291-296`), so this ADR records an exception to D11 (`docs/notes/development/web-verification/decisions.md:252`) and to `openspec/changes/sso-gateway/design.md:17` (Rationale above).
-- An nspawn container test as a gating data-path regulator: no check in `modules/checks/` uses a container test today, so it would introduce a new gating pattern rather than follow one.
-- Browser `directUrl` datasources: expose the store credential and the store endpoint to the browser (`research/perses.md` F16, F34).
-- MySQL or PostgreSQL wire route through `SQLProxy`: no plugin declares it, and it adds a second listener on the store (`research/perses.md` R31).
+- `percli lint --online` as the gating regulator: needs a running Perses server inside the check and excludes `--custom-rule.path` (`research/perses.md` R25).
+- MySQL or PostgreSQL wire route to the store: the embedded datasources do not use it, and it adds a second listener on the store (`research/perses.md` R31).
 
 ## Consequences
 
-Dashboards change only by commit and deploy; nobody, including the operator, edits a dashboard in the UI.
-A dashboard edit restarts `perses.service` on activation, which re-extracts the 84 MiB plugin subset.
-Role bindings must name the two admitted users explicitly, because claim-based roles do not exist at 0.54.0 (`research/perses.md` R15).
-A role binding's role is immutable after creation (`research/perses.md` F32), so changing a provisioned binding's role requires renaming the binding resource.
-No Perses user holds `create` on `Datasource` or `Secret`, so ad hoc datasources are impossible by design.
-Any dashboard reader can send arbitrary SQL to GreptimeDB under the `perses:ro` credential (`research/perses.md` R29), which is acceptable only because ADR-008 places every admitted human in one read zone and excludes content at the collector.
+Dashboards change only by commit and deploy; the reconcile oneshot overwrites or deletes any dashboard that differs from the repository.
+The UI may still show edit controls to `perses:ro` readers, because the client decides that independently of the store, but every save fails at the store `[INFERENCE]`.
+Any admitted reader can send arbitrary SQL and PromQL from the browser to the store's `/v1` routes under `perses:ro`, which is acceptable only because ADR-008 places every admitted human in one read zone and excludes content at the collector.
+There is one global dashboard list, with no projects and no per-dashboard permissions.
+Dashboards cannot use `StaticListVariable`; a dashboard that needs it triggers the standalone-server fallback or is rewritten with the variables the embedded dashboard registers.
+The Perses version follows the store: 0.53.1 at GreptimeDB `v1.2.1`, and 0.54.0 once a stable GreptimeDB release embeds dashboard `v0.14.2`; each store upgrade that changes the embedded dashboard version must move the lint tooling in the same commit.
+The datasources take the database from the `x-greptime-db-name` header the browser sends, so a PromQL panel reads the database set in the reader's connection settings rather than one the dashboard file names (Q10).
+Grafana community dashboards reach the repository only through `percli migrate --online` against a local Perses server, followed by rewriting their datasources to `promql-default` and `sql-default`.
 The query editor shows no PromQL metric help until GreptimeDB serves `/metadata`, which first ships in the 1.3 line (`research/greptimedb.md` R12).
-Trace panels depend on GreptimeDB's stored trace columns matching the plugin's names, which the on-demand VM test samples only when run and which a store upgrade that changes the trace pipeline can break (`research/perses.md` R8).
-The data path from store to panel is not sampled by any gating check, so a lint-clean dashboard that renders empty can merge unless someone runs the VM test.
-OIDC against Kanidm has not been exercised live; PKCE is on by default and the OIDC client adopts the provider's advertised signing algorithms, so ES256 tokens are expected to verify `[INFERENCE]` (`research/perses.md` R34).
-The 0.55 upgrade will require `datasource.proxy.allowed_hosts` and a `/32` loopback entry in `allowed_networks`, an extension of `secret_file_allowed_directories` to the credentials directory, and the GreptimeDB plugin at `0.2.0` or later.
+Trace panels depend on GreptimeDB's stored trace columns matching the plugin's names (`research/perses.md` R8).
+The dashboard is unavailable whenever the store is, and dashboard queries count against the store's own memory ceiling (ADR-007).
+S6 must enable `sso-gateway` on `magnetite`, which is disabled today (Context), and the gateway then also admits the services already registered with it.
+Kanidm login is exercised only through the gateway, so the OIDC path is the gateway's, already in use by its other consumers rather than new to this ADR.
 
 ## Operating envelope and regulator
 
 | Artifact | Envelope | Regulator | Shown able to fail by |
 |---|---|---|---|
-| Perses resource files | Every file under the resource tree lints clean against the ten-plugin subset at the versions the root pin vendors, and against custom rules forbidding `SELECT *` and any datasource name outside the two declared ones, each rule targeting a scalar (`research/perses.md` R23) | flake check `perses-resources`: `percli lint --plugin.path <extracted subset> --custom-rule.path <rules>` over each file; deterministic, nixbot `x86_64-linux` | an enumerated mutant set built in the same derivation (empty `query`, extra field in a query spec, unknown query kind, `SELECT *`) each of which must exit non-zero, plus the valid set which must exit zero, so both the tautological pass of RK8 and the fail-closed archive form of R19 turn the check red |
-| Perses service configuration | `security.enable_auth` true, `authorization.guest_permissions` empty, `security.readonly` true, `security.encryption_key` from a secret, `listenAddress` `127.0.0.1`, `plugin.archive_paths` exactly the subset, no `GlobalRoleBinding` granting `create` or `*` on `Datasource` or `Secret` | evaluation-time assertions in the Perses module, plus a mutant check in the shape of `cameronraysmith/vanixiets@a8e72d185:modules/checks/omnigent-environment.nix:98-118` | each named mutant (auth off, guest read granted, readonly off, key unset, listener `0.0.0.0`, full plugin set) must produce a non-empty failure list, or the check fails with "accepted a policy mutant" |
-| Data path, store to panel | One provisioned time-series, log and trace query each returns at least one row through the Perses proxy over loopback with the `ro` credential, a resource `POST` returns 405 or 404, and `/run/perses/plugins` stays at or below 96 MiB | on-demand NixOS VM test `vmTests.x86_64-linux.perses-greptimedb`, outside PR gating, run on a KVM-capable host such as Pyrite (`modules/README.md:48-64`): GreptimeDB plus Perses, OTLP samples written with the `wo` credential, queries issued through `/proxy/projects/<project>/datasources/<name>` | the same test issues one query against a nonexistent table and one write through the `ro` credential and asserts both are rejected, so a probe that cannot see failures turns the test red; because it does not gate, this row is evidence only when run |
-| Kanidm OIDC login | Login via Kanidm completes and yields a Perses session holding only the provisioned read role | one recorded manual login at first deploy, carried as Q4 because no automated regulator over a live Kanidm exists in this repository | not shown; this row is the incomplete regulator R5 requires this ADR to name |
+| Dashboard files | Every file under the dashboard tree lints clean against the Perses version and plugin set the deployed store embeds, and against custom rules forbidding `SELECT *` and any datasource name other than `promql-default` and `sql-default`, each rule targeting a scalar (`research/perses.md` R23) | flake check `perses-lint`: `percli lint --plugin.path <extracted plugins> --custom-rule.path <rules>` over each file, with `percli` and the plugins at the versions `greptimedb-bin`'s embedded dashboard pins; deterministic, nixbot `x86_64-linux` | an enumerated mutant set built in the same derivation (empty `query`, extra field in a query spec, unknown query kind, a `StaticListVariable`, `SELECT *`, a third datasource name) each of which must exit non-zero, plus the valid set which must exit zero, so both the tautological pass of RK8 and the fail-closed archive form of R19 turn the check red |
+| Lint tooling version | The Perses and plugin versions the lint check uses equal those of the dashboard version the store package embeds | evaluation-time assertion in `perses-lint` comparing its tooling versions against the store package's `passthru.dashboardVersion` | a mutant that sets `passthru.dashboardVersion` to `v0.14.2` must fail the assertion |
+| Serving configuration | `http.enable_api_server` true with `http.api_server_addr` in `127.0.0.0/8`; the vhost registered with `sso-gateway` with `allowedGroups = [ "perses_users" ]`; its `/dashboard/` and `/v1/` locations proxy to the API listener and overwrite `Authorization`; no other location proxies to the store | evaluation-time assertions in the dashboard module, plus the mutant check `perses-config` in the shape of `cameronraysmith/vanixiets@a8e72d185:modules/checks/omnigent-environment.nix:98-118` | each named mutant (API server off, API listener on `0.0.0.0`, `allowedGroups` empty, a location proxying to `127.0.0.1:4000`, the `Authorization` override removed) must produce a non-empty failure list, or the check fails with "accepted a policy mutant" |
+| Reconciled dashboard set | After each run, the names `GET /v1/dashboards` returns equal the repository's file names, and each stored definition equals its file | the reconcile oneshot `perses-dashboards.service` re-reads the list after writing and exits non-zero on any difference, with `OnFailure=observability-notify@%n.service` | the on-demand container test below seeds one extra stored dashboard and one altered definition and asserts the oneshot removes and rewrites them, and that a run whose re-read is forced to differ exits non-zero |
+| Data path, vhost to store | Through nginx with the injected credential, `/dashboard/` returns 200, one PromQL, one SQL time-series, one log and one trace query each return at least one row, and a `POST /v1/dashboards/<name>` is refused | on-demand container test `vmTests.x86_64-linux.perses-greptimedb` in the lane S1 establishes, with the gateway's `auth_request` stubbed: GreptimeDB plus nginx, OTLP samples written with the `wo` credential | the same test issues one query against a nonexistent table and asserts it is rejected, and asserts the refused `POST` leaves the stored set unchanged; because it does not gate, this row is evidence only when run |
+| Kanidm login through the gateway | Login completes for a member of `perses_users` and is refused for an authenticated non-member | one recorded manual login of each kind at first deploy, carried as Q4 because no automated regulator over a live Kanidm exists in this repository | not shown; this row is the incomplete regulator R5 requires this ADR to name |
 
-The 96 MiB bound is the measured 84 MiB subset plus headroom for plugin patch releases; a plugin added to the subset must raise the bound in the same commit.
+The runtime half of the store package envelope, `GET /dashboard/` returning 200 on `127.0.0.1:4000`, is a case of S1's container test under ADR-001 R1.1.
 
 ## Failure prevented
 
-- Perses itself: a GreptimeDB store whose logs and traces nobody can see, which is charter RK7.
-- GreptimeDB plugin: the same RK7 failure for logs and traces, which the Prometheus plugin alone leaves open.
-- Prometheus datasource: fleet counter panels whose rates are hand-written in SQL and silently wrong across counter resets `[INFERENCE]`.
-- Committed resource YAML with read-only provisioning: dashboards and datasources drifting from the repository through UI edits that no review sees.
-- Plugin subset: 173 MiB of avoidable tmpfs on a host already OOM-killed twice (RK3).
+- Embedded dashboard: a GreptimeDB store whose logs and traces nobody can see, which is charter RK7, without a second service on a memory-constrained host (RK3).
+- Reconcile oneshot with deletion: dashboards drifting from the repository through saves that no review sees.
+- `perses:ro` for readers: a reader deleting or overwriting a dashboard, because the store rejects the write.
+- Credential overwrite at nginx: a store password persisted in browser storage on readers' machines (`research/perses.md` R41).
+- API listener as the upstream: store routes beyond `/v1` and `/dashboard` reachable from the public vhost.
 - Lint check with mutants: a schema-invalid dashboard reaching `magnetite` behind a regulator that reports success on everything (RK8).
-- Configuration assertions with mutants: guests reading every project, a default encryption key, or a listener beyond loopback reaching deployment unnoticed (`research/perses.md` R33, F36).
-- On-demand VM test: dashboards that lint clean but render empty because a table or column name is wrong, when the test is run before deploy (`research/perses.md` R8, R26).
-- Direct Kanidm client: a second identity store, and the shared-secret blast radius of the gateway (`research/telemetry-security-and-tenancy.md` F17).
-- Not deploying GreptimeTeam/dashboard: a store password persisted in browser storage on laptops (`research/perses.md` R41).
+- Lint tooling version assertion: a lint that passes files the deployed renderer's Perses version rejects.
+- Configuration assertions with mutants: an unauthenticated vhost, a vhost admitting every Kanidm user, or a listener beyond loopback reaching deployment unnoticed.
+- On-demand container test: dashboards that lint clean but render empty because a table or column name is wrong, when the test is run before deploy (`research/perses.md` R8, R26).
+- `sso-gateway` admission: a second Kanidm client and a second login surface for one more `magnetite` UI.
 
 ## Implementation surface
 
+This surface belongs to slice S6 except where it names S1.
+
 Files to add:
-- `modules/nixos/perses.nix`: enables `services.perses` on `magnetite` at `127.0.0.1`, sets the security, authentication, authorization, plugin and provisioning settings above, binds secrets through `_secret`, declares the `forceSSL` and `enableACME` nginx vhost `perses.scientistexperience.net`, the `perses-encryption-key` generator below, and the evaluation-time assertions; placement and clan-service wrapping follow ADR-007.
-- `modules/nixos/perses/resources/project.yaml`, `datasources.yaml`, `secrets.yaml`, `roles.yaml` and `dashboards/*.yaml`: the provisioned Perses resources; `secrets.yaml` references the store password by `basicAuth.passwordFile` under the unit's credentials directory (`perses/perses@4c719fc1:pkg/model/api/v1/secret/basic_auth.go:45`).
-- `modules/nixos/perses/lint-rules.yaml` and `modules/nixos/perses/mutants/*.yaml`: the custom lint rules and the enumerated mutant set.
-- `modules/checks/perses-resources.nix`: the lint check with its valid and mutant legs, built from the same subset derivation the service uses.
-- `modules/checks/perses-config.nix`: the configuration mutant check.
-- `modules/vm-tests/perses-greptimedb.nix`: the NixOS VM test, assigning `perSystem.vmTests` on `x86_64-linux` only with `requiredFeatures.kvm`, in the shape of `modules/vm-tests/zerotier-mss-clamp-runtime.nix:6-10`.
+- `modules/nixos/perses.nix`: registers `sso.services.perses` with `domain = "perses.scientistexperience.net"`, `allowedGroups = [ "perses_users" ]` and `upstream` mapping `/dashboard/` and `/v1/` to `http://127.0.0.1:4006`; adds the `Authorization` overwrite to those two locations from the `perses-password` file, read by nginx outside the Nix store; sets `services.greptimedb.settings.http.enable_api_server = true`; defines `perses-dashboards.service`, ordered after `greptimedb.service` and triggered on activation when the dashboard tree changes, with `OnFailure=observability-notify@%n.service`; and declares the evaluation-time assertions above.
+- `modules/nixos/perses/dashboards/*.json`: the Perses `Dashboard` JSON files.
+- `modules/nixos/perses/lint-rules.yaml` and `modules/nixos/perses/mutants/*.json`: the custom lint rules and the enumerated mutant set.
+- `modules/checks/perses-lint.nix`: the lint check with its valid and mutant legs and the tooling-version assertion.
+- `modules/checks/perses-config.nix`: the serving-configuration mutant check.
+- `modules/vm-tests/perses-greptimedb.nix`: the on-demand container test, assigning `perSystem.vmTests` on `x86_64-linux`, in the shape of S1's `modules/vm-tests/greptimedb-pipeline.nix`.
+- `percli` and plugin archives at the embedded dashboard's versions, for the lint check; the root pin carries `percli` 0.54.0, so the check either packages 0.53.1 or shows by its mutant legs that the root pin's tooling discriminates the same set.
 
 Files to modify:
-- `modules/nixos/kanidm.nix`: declare the group stub `perses_users` with `members = [ ]` and `overwriteMembers = false` beside `omnigent_users` (`modules/nixos/kanidm.nix:208-225`), add the `kanidm-oauth2-perses` generator below beside `kanidm-oauth2-omnigent` (`modules/nixos/kanidm.nix:123-152`), and add `systems.oauth2.perses` beside `systems.oauth2.omnigent` (`cameronraysmith/vanixiets@a8e72d185:modules/nixos/kanidm.nix:259-277`), with `originUrl` `https://perses.scientistexperience.net/api/auth/providers/oidc/kanidm/callback` (`perses/perses@4c719fc1:docs/configuration/configuration.md:261`), `originLanding` `https://perses.scientistexperience.net`, and `scopeMaps.perses_users` (ADR-008).
+- `pkgs/by-name/greptimedb-bin/package.nix`: add `passthru.dashboardVersion`, beside the `passthru.embedsDashboard` that S1 sets for ADR-001 R1.1.
+- `modules/machines/nixos/magnetite/default.nix`: import the dashboard module and enable `sso-gateway` (`modules/machines/nixos/magnetite/default.nix:133`).
 - `modules/terranix/cloudflare.nix`: one `CNAME` `perses.scientistexperience.net` to `magnetite.scientistexperience.net`, unproxied, mirroring the `omni` record (`modules/terranix/cloudflare.nix:186-193`).
-- `modules/machines/nixos/magnetite/default.nix`: import the Perses module, if ADR-007 places it as a plain NixOS module rather than a clan service role.
+- No change to `modules/nixos/kanidm.nix`: the gateway derives the `perses_users` group stub with `overwriteMembers = false` and its scope map from `allowedGroups` (`modules/nixos/sso-gateway.nix:459-476`).
 
-Flake inputs: none; Perses, `percli`, the module and the plugin archives all come from the root `nixpkgs` input, and the subset reuses the vendored URLs and hashes from `pkgs/by-name/pe/perses/plugins.nix`.
+Flake inputs: none.
 
 Clan vars generators:
-- `perses-encryption-key`: one secret file of exactly 32 bytes written with `printf '%s'` so no newline is appended, `mode = "0400"`, `restartUnits = [ "perses.service" ]` (`research/telemetry-security-and-tenancy.md` F40, F41).
-- `kanidm-oauth2-perses`: the client secret, shaped like `kanidm-oauth2-omnigent` with one file for Kanidm and one for Perses, each with `restartUnits` naming both units (`cameronraysmith/vanixiets@a8e72d185:modules/nixos/kanidm.nix:123-152`).
-- The store password is consumed from the `greptimedb-users` generator's `perses-password` file that ADR-007 declares; this ADR adds no generator for it.
+- None added by this ADR.
+- The `perses-password` file of ADR-007's `greptimedb-users` generator is consumed by nginx from S6, with `restartUnits = [ "nginx.service" ]`.
+- The reconcile oneshot's `rw` credential comes from whichever holder Q9 selects.
 
 ## Questions for the human gate
 
-Q1 Perses 0.54.0 or the 0.55 line? Recommended: 0.54.0 from the root pin with the compensating configuration above and an upgrade obligation at 0.55.0 final in nixpkgs; choosing 0.55 now means a first-party override of a release candidate, a re-vendored plugin set, and an explicit loopback allowance.
-Resolution: recommended answer accepted at the 2026-10-15 gate.
-Q2 Disposition of GreptimeTeam/dashboard? Recommended: rejected as the dashboard layer and deferred as an exploration console, not deployed; deploying it now requires a GreptimeDB 1.3 prerelease built with `servers/dashboard` and a store password held in browser storage.
-Resolution: recommended answer accepted at the 2026-10-15 gate.
-Q3 Keep the Prometheus datasource beside the GreptimeDB datasource? Recommended: yes; dropping it removes one plugin (11 MiB) and moves every fleet counter panel into SQL.
-Resolution: recommended answer accepted at the 2026-10-15 gate.
-Q4 Is one recorded manual Kanidm login at first deploy acceptable as the OIDC regulator? Recommended: yes; the alternative is adding a Kanidm node to the VM test, which roughly doubles its cost to sample a path exercised once per login.
-Resolution: recommended answer accepted at the 2026-10-15 gate.
-Q5 Is an on-demand, non-gating NixOS VM test the right home for the data-path regulator? Recommended: yes, under `modules/vm-tests/` per `modules/README.md:32`, `:86`, because `magnetite` has no KVM and the gating set stays the lint and configuration checks; the alternative is a new gating nspawn container test on `magnetite`'s `uid-range` builder, which no existing check establishes.
-Resolution: recommended answer accepted at the 2026-10-15 gate.
-Q6 Public hostname behind Kanidm, or a mesh-only `.zt` vhost? Recommended: public `perses.scientistexperience.net` behind the direct Kanidm client.
-Resolution: perses.scientistexperience.net behind Kanidm, accepted at the 2026-10-15 gate.
-Public `perses.scientistexperience.net`: follows `omni.scientistexperience.net` with an ACME certificate any browser trusts, at the cost of an internet-reachable login surface.
-Mesh-only `perses.zt`: removes the public surface by following cinnabar's `tls internal` caddy vhosts (`modules/machines/nixos/cinnabar/caddy.nix:14-82`), at the cost of either Perses listening beyond loopback for cinnabar to proxy or a first caddy on `magnetite`, plus every reader's browser trusting caddy's internal root CA.
-Q7 Plugin subset of ten? Recommended: yes, at an envelope of 96 MiB; the full vendored set costs 257 MiB of tmpfs on `magnetite` under RK3 and adds panel types no dashboard uses.
-Resolution: recommended answer accepted at the 2026-10-15 gate.
-Q8 Plain resource YAML as the dashboards-as-code format? Recommended: yes; the Go SDK adds a Go module and a build step, and the CUE SDK has no GreptimeDB support.
-Resolution: recommended answer accepted at the 2026-10-15 gate.
+Q1 Perses 0.54.0 or the 0.55 line? Recommended: 0.54.0 from the root pin with an upgrade obligation at 0.55.0 final in nixpkgs.
+Resolution: recommended answer accepted at the 2026-10-15 gate; superseded under charter v11, because no standalone server is deployed and the Perses version follows the dashboard the store embeds.
+Q2 Disposition of GreptimeTeam/dashboard? Recommended at the gate: rejected as the dashboard layer and deferred as an exploration console, on the premise that it required a GreptimeDB 1.3 prerelease and a store password held in browser storage.
+Resolution: accepted at the 2026-10-15 gate; amended under charter v11, after both premises were found not to hold: GreptimeDB's embedded dashboard is the dashboard layer, per the Decision.
+Q3 Keep a PromQL datasource beside the GreptimeDB datasource? Recommended: yes.
+Resolution: recommended answer accepted at the 2026-10-15 gate; under charter v11 the embedded dashboard fixes both datasources, so the answer holds without configuration.
+Q4 Is one recorded manual Kanidm login at first deploy acceptable as the login regulator? Recommended: yes; the alternative is adding a Kanidm node to the container test, which roughly doubles its cost to sample a path exercised once per login.
+Resolution: recommended answer accepted at the 2026-10-15 gate; under charter v11 the login is the gateway's, recorded once for a member and once for a non-member.
+Q5 Is an on-demand, non-gating runtime test the right home for the data-path regulator? Recommended: yes, under `modules/vm-tests/` per `modules/README.md:32`, `:86`, with the gating set the lint and configuration checks.
+Resolution: recommended answer accepted at the 2026-10-15 gate; under charter v11 the test is an nspawn container test in the lane S1 establishes, rather than a QEMU VM test.
+Q6 Public hostname behind Kanidm, or a mesh-only `.zt` vhost? Recommended: public `perses.scientistexperience.net` behind Kanidm.
+Resolution: perses.scientistexperience.net behind Kanidm, accepted at the 2026-10-15 gate; under charter v11 Kanidm admits through `sso-gateway`.
+Q7 Plugin subset of ten? Recommended: yes, at an envelope of 96 MiB.
+Resolution: recommended answer accepted at the 2026-10-15 gate; superseded under charter v11, because the embedded dashboard compiles its plugins into the store binary and extracts nothing to a tmpfs.
+Q8 Plain resource YAML as the dashboards-as-code format? Recommended: yes.
+Resolution: recommended answer accepted at the 2026-10-15 gate; superseded under charter v11 by Perses `Dashboard` JSON reconciled through `/v1/dashboards`, because the embedded dashboard has no resource provisioning.
+Q9 Which `rw` store credential does the reconcile oneshot hold? Options: the existing `admin` user, which ADR-007 restricts to the schema and export oneshots; a fifth `rw` user for the oneshot alone; or folding the reconcile into `greptimedb-schema`, which already holds `admin`.
+Resolution: open, decided in S6.
+Q10 How does a dashboard select among `fleet`, `devloop` and `agent`, given that both datasources take the database from the browser's connection settings? SQL panels can qualify table names with the database; PromQL panels cannot, so options include nginx setting `x-greptime-db-name` per location, restricting PromQL panels to one database, or the standalone-server fallback.
+Resolution: open, decided in S6.

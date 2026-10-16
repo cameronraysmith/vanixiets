@@ -4,23 +4,24 @@ title: "ADR-007: Packaging, host placement and clan service shape"
 
 ## Status
 
-Accepted (human gate, 2026-10-15)
+Accepted (human gate, 2026-10-15).
+Amended in place under charter v11 (2026-10-16): the store package is `greptimedb-bin`, the intended package because its release tarball embeds the dashboard ADR-002 adopts; gRPC is bound to loopback because `v1.2.1` cannot disable it; and the `perses` credential is held by nginx rather than a Perses server.
 
 ## Context
 
 Charter D7 asks for one packaging strategy, one host placement and the clan service shape.
 The human gate of 2026-10-06 placed GreptimeDB on `magnetite`; this record confirms that placement against the memory evidence that has accumulated since, and states the containment it requires.
-ADR-001 fixes the store as GreptimeDB standalone consumed from the root nixpkgs pin, ADR-006 fixes R2 as its substrate and a daily Parquet export, ADR-003 fixes the collection topology, and ADR-002 fixes the dashboard layer.
-This record depends on four of their assumptions: only the `ingress` collector on `magnetite` writes to the store, over loopback (ADR-003); Perses on `magnetite` reads the store over loopback with a read-only credential (ADR-002); no MySQL or PostgreSQL wire port is needed (ADR-002); and the databases are `fleet`, `devloop` and `agent` with TTLs of 30, 365 and 90 days (ADR-004).
+ADR-001 fixes the store as GreptimeDB standalone consumed as `greptimedb-bin`, ADR-006 fixes R2 as its substrate and a daily Parquet export, ADR-003 fixes the collection topology, and ADR-002 fixes the dashboard layer as the dashboard the store itself embeds.
+This record depends on four of their assumptions: only the `ingress` collector on `magnetite` writes to the store, over loopback (ADR-003); dashboard readers reach the store only through nginx on `magnetite`, over loopback with a read-only credential (ADR-002); no MySQL or PostgreSQL wire port is needed (ADR-002); and the databases are `fleet`, `devloop` and `agent` with TTLs of 30, 365 and 90 days (ADR-004).
 
 ### Packaging evidence
 
 `pkgs.greptimedb` is 1.1.4 at the root pin, lock node `nixpkgs_10` at `ac1faec4`, with `mainProgram = "greptime"`, and its outputs are cache-resident for `x86_64-linux` and `aarch64-darwin` (`NixOS/nixpkgs@ac1faec4:pkgs/by-name/gr/greptimedb/package.nix:15`, `:85`, root node `nixpkgs_10`; `research/nix-packaging-status.md` R2, R4).
 The derivation is a from-source `buildRustPackage` with a pinned `cargoHash` and `RUSTC_BOOTSTRAP = 1` (`NixOS/nixpkgs@ac1faec4:pkgs/by-name/gr/greptimedb/package.nix:26`, `:61`, root node `nixpkgs_10`), so changing its version changes both the source hash and the vendored-crate hash and forfeits the cache.
 A source build of this workspace takes about 34 minutes on eight cores (`research/nix-packaging-status.md` F14).
-The bump to 1.2.1, https://github.com/NixOS/nixpkgs/pull/574558, merged on 2026-10-15 and reaches the root pin with the next channel update (`research/nix-packaging-status.md` R6).
+The bump to 1.2.1, https://github.com/NixOS/nixpkgs/pull/574558, merged on 2026-10-15 (`research/nix-packaging-status.md` R6).
 Upstream publishes a checksummed `greptime-linux-amd64-v1.2.1.tar.gz` (`research/nix-packaging-status.md` R15), and the house `-bin` convention exists (`research/nix-packaging-status.md` F18, F19).
-The nixpkgs build omits the embedded dashboard (`research/nix-packaging-status.md` R9), which ADR-002 does not need.
+The nixpkgs build omits the embedded dashboard and the dashboards API (`research/nix-packaging-status.md` R9), which ADR-002 depends on, while upstream release tarballs are built with the `servers/dashboard` feature that provides both (`research/nix-packaging-status.md` R10).
 No NixOS module for GreptimeDB exists in any nixpkgs revision, so the module is ours to write (`research/nix-packaging-status.md` R8).
 
 ### Placement evidence
@@ -44,6 +45,7 @@ Disko options apply only at dataset creation, so the host asserts quotas and res
 ### Default listeners and egress
 
 At `v1.2.1` the HTTP, gRPC, MySQL and PostgreSQL servers bind `127.0.0.1` on ports 4000 to 4003, and MySQL, PostgreSQL, OpenTSDB, InfluxDB and Prometheus remote storage are enabled by default (`GreptimeTeam/greptimedb@179ff8e50:config/standalone.example.toml:66`, `:104`, `:133-135`, `:168-170`, `:196`, `:201`, `:221`).
+At `v1.2.1` gRPC has a `bind_addr` and no setting that disables it (`GreptimeTeam/greptimedb@179ff8e50:config/standalone.example.toml:104`), and `http.enable_api_server` adds a second HTTP listener at `http.api_server_addr`, `127.0.0.1:4006` by default, serving only `/v1` and `/dashboard` (`GreptimeTeam/greptimedb@179ff8e50:config/standalone.example.toml:96`, `:99`).
 Loopback is reachable by every local UID on `magnetite`, including two worker accounts, so the store must require credentials on loopback (`research/telemetry-security-and-tenancy.md` "Bearing on D8 and D3").
 Anonymous usage reporting is on by default (`GreptimeTeam/greptimedb@179ff8e50:config/standalone.example.toml:51`), and the event recorder creates a 90-day table unless its event list is empty (`GreptimeTeam/greptimedb@179ff8e50:config/standalone.example.toml:920-929`).
 Configuration values can be supplied through environment variables prefixed `GREPTIMEDB_STANDALONE` with `__` as the separator (`GreptimeTeam/greptimedb@179ff8e50:src/cmd/src/standalone.rs:287`, `GreptimeTeam/greptimedb@179ff8e50:src/common/config/src/config.rs:23`).
@@ -57,7 +59,8 @@ The repository's generator patterns are `omnigraph-bearer-tokens` for generated 
 
 ## Decision
 
-Packaging: the store package is `pkgs.greptimedb` 1.2.1 from the root nixpkgs input with no overlay and no second nixpkgs input; version steps arrive by root-pin bumps as ADR-001 states, and a `greptimedb-bin` derivation is the fallback only for a channel that still lacks 1.2.1 when implementation starts (Q2).
+Packaging: the store package is `greptimedb-bin` 1.2.1, a first-party `pkgs/by-name/greptimedb-bin` package of the upstream release tarball for `x86_64-linux` with `passthru.embedsDashboard = true`, an `update.sh` and `apps.update-greptimedb-bin`, with no overlay and no second nixpkgs input.
+It is the intended package, not a stopgap, because its tarball embeds the dashboard ADR-002 adopts; version steps arrive through its `update.sh`, and `pkgs.greptimedb` is acceptable only if it carries the dashboard (ADR-001 R1.1).
 
 Placement: the store runs on `magnetite`, as the human chose, inside an explicit memory and disk containment rather than on host defaults.
 The unit sets `MemoryHigh = "3G"`, `MemoryMax = "4G"`, `MemorySwapMax = "0"` and `OOMScoreAdjust = 500`, with `Restart = "on-failure"`, `RestartSec = 30` and `StartLimitIntervalSec = 0`.
@@ -65,18 +68,18 @@ Every GreptimeDB memory knob is set explicitly, so the process does not size its
 Local state lives on a new ZFS dataset `zroot/root/greptimedb` mounted at `/var/lib/greptimedb`, with `quota = 16G`, `reservation = 12G` and `com.sun:auto-snapshot = false`, asserted by boot-time oneshots in the existing pattern; the write cache and the read cache are each capped at 4 GiB.
 The process runs as a static system user `greptimedb`, not `DynamicUser`, because its state is a persistent dataset.
 
-Listeners and egress: HTTP binds `127.0.0.1:4000`; gRPC, MySQL, PostgreSQL, OpenTSDB, InfluxDB, Prometheus remote storage and the Jaeger query API are disabled; OTLP, the PromQL API and SQL over HTTP stay enabled; no firewall port is opened; `enable_telemetry = false`; the event recorder's event list is empty.
+Listeners and egress: HTTP binds `127.0.0.1:4000`; gRPC binds `127.0.0.1:4001`, because `v1.2.1` offers no switch to disable it; from slice S6, the API listener binds `127.0.0.1:4006` for the dashboard vhost (ADR-002); MySQL, PostgreSQL, OpenTSDB, InfluxDB, Prometheus remote storage and the Jaeger query API are disabled; OTLP, the PromQL API, SQL over HTTP and the embedded dashboard stay enabled; no firewall port is opened; `enable_telemetry = false`; the event recorder's event list is empty.
 
 Credentials: one clan vars generator, `greptimedb-users`, writes four random passwords and a users file with exactly four lines, `admin:rw=…`, `collector:wo=…`, `perses:ro=…` and `regulator:ro=…`, consumed by the store through `LoadCredential` and `static_user_provider:file:` at the unit's credentials directory, with `restartUnits = [ "greptimedb.service" ]` on the users file.
 Its secret files are `admin-password`, `collector-password`, `perses-password` and `regulator-password`.
-The `collector-password`, `perses-password` and `regulator-password` files are written with `printf '%s'` and mode `0400`; the first two carry `restartUnits` for the ADR-003 `ingress` collector unit and the ADR-002 Perses unit respectively, and `regulator-password` needs none because its consumers are timer-driven oneshots that load it at each start.
-`admin` is used only by the local `greptimedb-schema` and `greptimedb-export` oneshots of this record and ADR-006.
-`collector` is used only by the ADR-003 `ingress` collector, and `perses` only by the ADR-002 Perses service.
+The `collector-password`, `perses-password` and `regulator-password` files are written with `printf '%s'` and mode `0400`; `collector-password` carries `restartUnits` for the ADR-003 `ingress` collector unit, `perses-password` carries `restartUnits = [ "nginx.service" ]` from S6, when nginx becomes its consumer, and `regulator-password` needs none because its consumers are timer-driven oneshots that load it at each start.
+`admin` is used only by the local `greptimedb-schema` and `greptimedb-export` oneshots of this record and ADR-006; whether ADR-002's dashboard reconcile oneshot also uses it is open (ADR-002 Q9).
+`collector` is used only by the ADR-003 `ingress` collector, and `perses` only by nginx on `magnetite`, which injects it into dashboard readers' requests (ADR-002).
 `regulator` is used only by the read-only regulators: the `otel-envelope` oneshot of ADR-003, ADR-004 and ADR-008, the `devloop-reconcile` oneshot of ADR-005, the `greptimedb-envelope` oneshot of this record, and the `fleet-alert.service` evaluator of ADR-009.
 The R2 credential is the `greptimedb-r2` generator of ADR-006: one Object Read & Write token on the existing `sciexp` bucket, which the store reads through `EnvironmentFile` for its `projects/vanixiets/observability/store/` root and from which the `greptimedb-export` and `greptimedb-envelope` oneshots sign prefix-confined temporary credentials for `projects/vanixiets/observability/export/`.
 
 Clan service shape: the store is a NixOS module, `flake.modules.nixos.greptimedb` with options under `services.greptimedb`, imported by `magnetite` the way `omnigraph` is, and is not a clan service role.
-Perses is likewise a plain NixOS module, `modules/nixos/perses.nix` of ADR-002, imported by `magnetite` and not a clan service role; its memory envelope is ADR-002's verbatim: plugin archives restricted to the ten-plugin subset, measured at 84 MiB against 257 MiB for the full vendored set, with `/run/perses/plugins` held at or below 96 MiB.
+The dashboard layer adds no service of its own: the store serves it, so the store's memory envelope covers it, and ADR-002's `modules/nixos/perses.nix` is a plain NixOS module imported by `magnetite` and not a clan service role.
 Collectors are the `otel-collector` clan service with roles `agent` and `ingress` and generators `otel-ca` and `otel-cert`, as ADR-003 defines; the store module exposes nothing that role needs other than the loopback endpoint and the `collector-password` path.
 The loopback exporters that ADR-003 adds for host-level signals belong to that same `agent` role rather than to any machine module: `prometheus-node-exporter.service` on every NixOS host and `prometheus-smartctl-exporter.service` on `pyrite` only, both from the root pin's `services.prometheus.exporters.{node,smartctl}` modules with `listenAddress` set to `127.0.0.1` (`NixOS/nixpkgs@ac1faec4:nixos/modules/services/monitoring/prometheus/exporters/node.nix:23`, `NixOS/nixpkgs@ac1faec4:nixos/modules/services/monitoring/prometheus/exporters/smartctl.nix:25`, `NixOS/nixpkgs@ac1faec4:nixos/modules/services/monitoring/prometheus/exporters.nix:209-211`); on darwin the role adds a loopback node_exporter serving only the textfile collector, the `otel-host-probe` job that also reads SMART with smartctl, and the root `otelcol-process` collector (ADR-003 items 21 to 23).
 A oneshot `greptimedb-schema.service`, ordered after the store reports ready, idempotently creates the `fleet`, `devloop` and `agent` databases with ADR-004's TTL defaults of 30, 365 and 90 days, and sets the TTL of the `fleet` logs table to ADR-004's 14 days.
@@ -84,9 +87,11 @@ The `greptimedb-schema`, `greptimedb-export` and `greptimedb-envelope` units, an
 
 ## Rationale
 
-Consuming the pinned attribute is the only route with no first-party build and no first-party package: the output is substituted (`research/nix-packaging-status.md` R4), and the `package-<attr>` flake check that every `pkgs/by-name` entry produces does not arise (`research/nix-packaging-status.md` F22).
+`greptimedb-bin` is the only route that delivers the embedded dashboard with no source build: upstream builds the release tarball with `servers/dashboard` (`research/nix-packaging-status.md` R10), and the package only fetches and patches it.
+Its cost is a first-party package, its updater and the `package-greptimedb-bin` flake check that every `pkgs/by-name` entry produces (`research/nix-packaging-status.md` F22).
+It is admissible under C6 on Linux, where upstream publishes checksums for every release, and `magnetite` is the only host that runs it (`research/nix-packaging-status.md` R15, F16).
 An `overrideAttrs` to 1.2.1 would put a 34-minute Rust build into the closure operator (`research/nix-packaging-status.md` F14), and the x86_64-linux builders that would run it are `magnetite` and `pyrite`, the two hosts whose memory incidents this record is containing.
-A `-bin` derivation over the 1.2.1 tarball is admissible under C6 on Linux, but with https://github.com/NixOS/nixpkgs/pull/574558 merged a pin bump delivers the same version Hydra-built and cache-resident, so the `-bin` route is held only as the fallback for a channel delay at implementation time.
+The pinned `pkgs.greptimedb` costs no build, but it omits the dashboard, so it qualifies only if a later nixpkgs build enables the feature.
 
 `magnetite` is kept because both alternatives are worse on the axis that matters.
 `cinnabar` has about half of `magnetite`'s RAM, and placing the store there would make one host the ZeroTier controller, the fleet's `.zt` resolver and the telemetry store, so a single fault would take out mesh control, name resolution and the observation of that fault.
@@ -101,7 +106,7 @@ Against the measured 7.89 GiB minimum free during a nixbot evaluation, a 4 GiB m
 
 The dataset with quota and reservation follows the host's own response to pool starvation (`research/fleet-emitter-inventory.md` F20); a retention policy alone does not bound WAL and cache growth.
 Capping both caches at 4 GiB rather than the default 5 GB and 5 GiB brings the local floor under the 16 GiB quota with room for the 1 GB WAL purge threshold and the metadata store; the cost is more R2 reads for queries over data older than the write cache's 8-hour TTL (`research/greptimedb.md` R22).
-Disabling the wire protocols, gRPC, the Jaeger query API and unused ingest protocols removes listeners that every local UID could reach and that no ADR consumes.
+Disabling the wire protocols, the Jaeger query API and unused ingest protocols removes listeners that every local UID could reach and that no ADR consumes; gRPC cannot be disabled at `v1.2.1`, so it is held on loopback and inside R7.1's listener clause.
 
 Restart on rotation is kept even after a `v1.3` release, because `LoadCredential` snapshots at start, so the hot-reloading provider would only help if the store read the secret path directly, which would drop the credentials-directory isolation.
 The store is not a clan service role because it has one instance, no per-machine vars and only loopback consumers; a clan role would add an inventory instance that relates nothing.
@@ -109,9 +114,10 @@ The store is not a clan service role because it has one instance, no per-machine
 ## Rejected alternatives
 
 - `overrideAttrs` overlay to 1.2.1: forfeits the cache and adds a 34-minute Rust build on memory-constrained builders (`research/nix-packaging-status.md` F14).
-- `pkgs/by-name/greptimedb-bin` over the 1.2.1 tarball as the primary route: admissible under C6 but adds a package, an updater and a flake check that the merged nixpkgs bump makes redundant; kept only as the Q2 fallback (`research/nix-packaging-status.md` R15, F22).
-- A second nixpkgs input for one attribute: adds a third nixpkgs node to a lock whose two nodes already caused misattributed findings (`research/store-alternatives.md` FL1).
-- Building with the `servers/dashboard` feature: needs a fixed-output asset fetch to pre-populate `dist` and ADR-002 does not use the embedded UI (`research/nix-packaging-status.md` R11).
+- `pkgs.greptimedb` from the root pin: cache-resident, but omits the embedded dashboard and the dashboards API that ADR-002 depends on (`research/nix-packaging-status.md` R9).
+- A second nixpkgs input for one attribute: adds a third nixpkgs node to a lock whose two nodes already caused misattributed findings (`research/store-alternatives.md` FL1), and no nixpkgs build carries the dashboard.
+- Building from source with the `servers/dashboard` feature: needs a fixed-output asset fetch to pre-populate `dist` plus a 34-minute Rust build, for the same binary the release tarball already provides (`research/nix-packaging-status.md` R11, F14).
+- Leaving gRPC at its default: the bind would sit outside every assertion; an upstream switch to disable it does not exist at `v1.2.1`.
 - Placement on `cinnabar`: half the RAM and co-locates telemetry with the mesh controller and the fleet resolver.
 - Placement on `pyrite`: an intermittent daily-driver laptop with 15.5 GiB and a zram livelock history.
 - A new dedicated host: contradicts the human's placement and adds a machine to observe a ten-machine fleet, with no failure prevented that containment on `magnetite` does not also prevent.
@@ -132,7 +138,7 @@ The host-level signals of ADR-003 and ADR-004 raise the `fleet` active-series bu
 
 ## Operating envelope and regulator
 
-Envelope E7.1, configuration: the store unit has `MemoryMax`, `MemoryHigh`, `MemorySwapMax = 0` and `OOMScoreAdjust` set; every memory knob listed in the Decision is present in the generated TOML; every listener address is in `127.0.0.0/8`; gRPC, MySQL, PostgreSQL, OpenTSDB, InfluxDB, Prometheus remote storage and the Jaeger query API are disabled; `user_provider` is set; `enable_telemetry = false`; and the users-file generator's `restartUnits` contains `greptimedb.service` at every package version (Q6).
+Envelope E7.1, configuration: the store unit has `MemoryMax`, `MemoryHigh`, `MemorySwapMax = 0` and `OOMScoreAdjust` set; every memory knob listed in the Decision is present in the generated TOML; every listener address, gRPC's and the API listener's included, is in `127.0.0.0/8`; MySQL, PostgreSQL, OpenTSDB, InfluxDB, Prometheus remote storage and the Jaeger query API are disabled; `user_provider` is set; `enable_telemetry = false`; and the users-file generator's `restartUnits` contains `greptimedb.service` at every package version (Q6).
 Regulator R7.1: a flake check, `modules/checks/greptimedb-envelope.nix`, evaluates `magnetite`'s configuration and asserts each clause, and also evaluates an enumerated mutant per clause, one dropping `MemoryMax`, one dropping `page_cache_size`, one binding HTTP to `0.0.0.0`, one re-enabling MySQL, one removing `user_provider`, one omitting `enable_telemetry`, and one removing `restartUnits`, asserting that each mutant produces a non-empty failure list, following `modules/checks/omnigent-environment.nix` (`research/dev-loop-signals.md` F12).
 
 Envelope E7.2, runtime memory: the store cgroup's `memory.peak` stays below `MemoryHigh`, and its `memory.events` `oom_kill` and `max` counters do not increase between samples.
@@ -148,12 +154,12 @@ Regulator R7.4: the envelope oneshot compares the two and fails if the file is n
 
 ## Failure prevented
 
-Consuming the pinned attribute prevents a first-party Rust build of the store from entering the closure operator on the hosts that have run out of memory.
+Packaging the upstream release tarball prevents a first-party Rust build of the store from entering the closure operator on the hosts that have run out of memory, while keeping the dashboard that ADR-002 depends on.
 The memory knobs and `MemoryMax` prevent the store from sizing itself from `magnetite`'s RAM and competing with nixbot's evaluation, which is RK3's confirming observation.
 `MemorySwapMax = 0` prevents the store's footprint from moving into the uncharged zram pool, the mechanism that let two evaluations exhaust the host.
 `OOMScoreAdjust = 500` prevents a host OOM from killing `nix-daemon` workers ahead of the store and failing CI.
 The dedicated dataset with quota and reservation prevents store WAL and cache growth from starving `/nix`, `/` or `/home`, the 2026-06-10 failure.
-Disabling unused listeners prevents worker accounts on `magnetite` from reaching wire protocols no consumer uses.
+Disabling unused listeners, and holding gRPC on loopback, prevents worker accounts on `magnetite` from reaching wire protocols no consumer uses and prevents any store listener from leaving the host.
 Disabling usage reporting and the event recorder prevents an undeclared outbound connection and an unrequested 90-day table.
 `restartUnits` on the users file prevents a rotated credential from leaving the store authenticating against the superseded file.
 Keeping the store out of the clan inventory prevents an inventory instance whose roles relate nothing.
@@ -161,21 +167,23 @@ Keeping the store out of the clan inventory prevents an inventory instance whose
 ## Implementation surface
 
 - Add `modules/nixos/greptimedb.nix`: `flake.modules.nixos.greptimedb` with `services.greptimedb.{enable,package,settings,databases,export}`, TOML generation, the `greptimedb` system user and group, `greptimedb.service` with the unit limits above and `LoadCredential` for the users file, `EnvironmentFile` for the R2 env file, `greptimedb-schema.service`, the ADR-006 export service and timer, `greptimedb-envelope.service` and `.timer`, and the ADR-001 and ADR-006 evaluation-time assertions.
-- Modify `modules/machines/nixos/magnetite/default.nix`: import `greptimedb` and the ADR-002 `perses` module from `flakeModules`, set `services.greptimedb`, declare the `greptimedb-users` and `greptimedb-r2` generators beside the existing `omnigraph-r2`, add `zfs-set-root-greptimedb-quota`, `zfs-set-root-greptimedb-reservation` and `zfs-assert-root-greptimedb-noautosnap` oneshots in the existing pattern, and give these three and the six existing `zfs-assert-*` and `zfs-set-*` oneshots `unitConfig.OnFailure = [ "observability-notify@%n.service" ]`.
+- Modify `modules/machines/nixos/magnetite/default.nix`: import `greptimedb` from `flakeModules`, and from S6 the ADR-002 `perses` module, set `services.greptimedb`, declare the `greptimedb-users` and `greptimedb-r2` generators beside the existing `omnigraph-r2`, add `zfs-set-root-greptimedb-quota`, `zfs-set-root-greptimedb-reservation` and `zfs-assert-root-greptimedb-noautosnap` oneshots in the existing pattern, and give these three and the six existing `zfs-assert-*` and `zfs-set-*` oneshots `unitConfig.OnFailure = [ "observability-notify@%n.service" ]`.
 - Modify `modules/machines/nixos/magnetite/disko.nix`: add the `root/greptimedb` dataset with mountpoint `/var/lib/greptimedb`, `quota = "16G"`, `reservation = "12G"` and `com.sun:auto-snapshot = "false"`.
 - Add `modules/checks/greptimedb-envelope.nix`: the R7.1 check and its mutants.
-- Clan vars generator `greptimedb-users` on `magnetite`: `runtimeInputs` openssl; users `admin:rw`, `collector:wo`, `perses:ro` and `regulator:ro`; files `users` (owner `greptimedb`, mode `0400`, `restartUnits = [ "greptimedb.service" ]`), `admin-password` (mode `0400`), `collector-password` (mode `0400`, `restartUnits` naming the ADR-003 ingress collector unit), `perses-password` (mode `0400`, `restartUnits = [ "perses.service" ]`), and `regulator-password` (mode `0400`).
-- Perses on `magnetite`: the plain NixOS module `modules/nixos/perses.nix` specified in ADR-002, with ADR-002's plugin-subset envelope, imported by `magnetite` and not a clan service role.
+- Clan vars generator `greptimedb-users` on `magnetite`: `runtimeInputs` openssl; users `admin:rw`, `collector:wo`, `perses:ro` and `regulator:ro`; files `users` (owner `greptimedb`, mode `0400`, `restartUnits = [ "greptimedb.service" ]`), `admin-password` (mode `0400`), `collector-password` (mode `0400`, `restartUnits` naming the ADR-003 ingress collector unit), `perses-password` (mode `0400`, no consumer in S1, `restartUnits = [ "nginx.service" ]` from S6), and `regulator-password` (mode `0400`).
+- The dashboard layer on `magnetite`: the plain NixOS module `modules/nixos/perses.nix` specified in ADR-002, imported by `magnetite` from S6 and not a clan service role.
 - Clan vars generator `greptimedb-r2`, the `sciexp` prefixes and the `cloudflare_r2_bucket_lifecycle.sciexp` rule placement: specified in ADR-006; no R2 bucket is created.
 - The `otel-collector` clan service files, its `otel-ca` and `otel-cert` generators, the `agent` role's loopback node and smartctl exporters with the `smartDevices` role option set for `pyrite`, and the darwin `otelcol-process`, `otel-host-probe` and loopback node_exporter daemons: listed in ADR-003.
-- No flake input, no overlay, no `pkgs/by-name` entry, and no clan inventory instance for the store.
+- Add `pkgs/by-name/greptimedb-bin/{package.nix,update.sh}`: a per-system `fetchurl` of `greptime-linux-amd64-v1.2.1.tar.gz` with its upstream sha256, `autoPatchelfHook`, `mainProgram = "greptime"` and `passthru.embedsDashboard = true`, plus `apps.update-greptimedb-bin` in `modules/apps/updates.nix`.
+- No flake input, no overlay, and no clan inventory instance for the store.
 
 ## Questions for the human gate
 
 Q1 Keep the store on `magnetite` despite RK3 having fired? Recommended: yes, with the containment above; the alternative `cinnabar` concentrates mesh control, name resolution and telemetry on one half-sized host.
 Resolution: recommended answer accepted at the 2026-10-15 gate.
-Q2 Take 1.2.1 through a root-pin bump that includes https://github.com/NixOS/nixpkgs/pull/574558, with a `greptimedb-bin` over the upstream checksummed 1.2.1 tarball only if the channel still lacks it when implementation starts? Recommended: yes; an `overrideAttrs` to 1.2.1 is a 34-minute source build on the memory-constrained builders.
+Q2 How is 1.2.1 taken? Recommended at the gate: through a root-pin bump that includes https://github.com/NixOS/nixpkgs/pull/574558, with a `greptimedb-bin` over the upstream checksummed 1.2.1 tarball held for a channel delay; an `overrideAttrs` to 1.2.1 is a 34-minute source build on the memory-constrained builders.
 Resolution: recommended answer accepted at the 2026-10-15 gate.
+Amended under charter v11: `greptimedb-bin` is the intended package rather than a channel-delay fallback, because the nixpkgs build omits the dashboard ADR-002 adopts.
 Q3 Are `MemoryHigh = 3G` and `MemoryMax = 4G` acceptable as the store's share of `magnetite`? Recommended: yes, revised only by R7.2 evidence; a larger ceiling eats into the free memory the evaluator needs, a smaller one risks scan failures on dashboards.
 Resolution: recommended answer accepted at the 2026-10-15 gate.
 Q4 Should the store die first under host OOM (`OOMScoreAdjust = 500`), ahead of the ADR-003 `ingress` collector (`OOMScoreAdjust = 300`) and `nix-daemon` workers? Recommended: yes; the collector survives to queue, and the alternative lets a host OOM fail CI to keep telemetry ingesting.

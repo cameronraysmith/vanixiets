@@ -11,13 +11,14 @@ Read [charter.md](charter.md) first, because every artifact below is scoped by i
 
 ## Current status
 
-The charter is at v9, which records the human gate of 2026-10-15: every decision record is Accepted, and acceptance criteria A5, A6 and A8 are discharged as recorded human judgment.
+The charter is at v11, which records the amendments slice S1 carries: the dashboard layer is the Perses dashboard GreptimeDB embeds, served behind `sso-gateway` from slice S6, the store package is `greptimedb-bin` because its release tarball embeds that dashboard, gRPC is bound to loopback, and the failure notifier lands in S1.
+v10 re-cut implementation into the vertical slices S1 to S8, and v9 recorded the human gate of 2026-10-15: every decision record is Accepted, and acceptance criteria A5, A6 and A8 are discharged as recorded human judgment.
 v8 reconciled the decision records the same day with conventions already decided elsewhere in the repository: implementation proceeds through OpenSpec changes following the `openspec/changes/stand-up-*` precedent, and R2 storage follows web-verification D9.
 v7 extended the charter the same day with decision D9 on alerting after the human approved host-level signals and an alerting decision; v6 recorded the GreptimeDB 1.2.1 nixpkgs bump, v5 revised the charter for consistency with the decision records, v4 followed the research refresh the same day, and v2 followed the research phase on 2026-09-18.
 The research phase is complete: eight artifacts under [research/](research/) cover the store, the dashboard layer, the collection topology, the rejected store alternatives, the fleet's existing emitters, the development-loop signal set, the Nix packaging position, and telemetry access control.
 Each artifact ends with a `## Refresh (2026-10-15)` section that re-reads its sources at current revisions and supersedes its stale claims; where the findings below conflict with a refresh section, the refresh wins.
 Decisions D1 through D9 each have a decision record under [decisions/](decisions/) at status Accepted (human gate, 2026-10-15); ADR-009 is Accepted except its Q5, which is deferred to the end of implementation.
-The gate accepted the recommended answer of every question in every record, with ADR-002 Q6 answered as `perses.scientistexperience.net` behind Kanidm and ADR-003 Q15 as SMART on pyrite and stibnite, and each question line records its resolution.
+The gate accepted the recommended answer of every question in every record, with ADR-002 Q6 answered as `perses.scientistexperience.net` behind Kanidm and ADR-003 Q15 as SMART on pyrite and stibnite, and each question line records its resolution; charter v11 amended ADR-002 Q2 and superseded ADR-002 Q1, Q7 and Q8.
 The `architecture/` and `components/` trees that charter deliverable S1 names are listed in the map below; acceptance criterion A1 is satisfied once those files exist.
 ADR-006 now places the store and the lakehouse export in the existing R2 bucket `sciexp` under `projects/vanixiets/observability/store/` and `projects/vanixiets/observability/export/`, following web-verification D9, in place of the two dedicated buckets it first proposed.
 ADR-003 and ADR-004 now also cover host-level signals, each tied to a failure this fleet has had: bounded per-process metrics for the `magnetite` OOM kills of 2026-09-27 and 2026-10-01, systemd unit state and restart counts for the two omnigent-host units that restart-looped about 3,200 times overnight on 2026-10-15 (recorded in `docs/notes/development/incidents/2026-10-15-omnigent-host-restart-loop.md` and cited by ADR-009), and ZFS pool and ARC state, with NVMe SMART on `pyrite` and `stibnite`, for `magnetite`'s storage-starvation history.
@@ -136,8 +137,8 @@ Each is attributed to the artifact that raised it; where two artifacts raised th
 - Is in-database alerting wanted at all, given that trigger DDL is enterprise-gated and external alerting is therefore the open-build answer (`greptimedb.md` Q1), answered by ADR-009, which evaluates rules outside the store through a timer that queries `/v1/prometheus` and posts to ntfy.
 - Are the three darwin machines belonging to other people in scope as telemetry subjects at all (`otel-collector-topology.md`)?
 - Are `cognee` and `k3s-server` intended to be deployed, or retained as unimported definitions, since that decides whether they enter the D4 scope (`fleet-emitter-inventory.md` Q4)?
-- Is re-enabling the disabled `sso-gateway` on `magnetite` in scope, or must the dashboard layer work with it disabled (`telemetry-security-and-tenancy.md` Q4)?
-- Is bumping the root nixpkgs pin in scope, or must the design assume the current pin (`nix-packaging-status.md` question 1), settled because the pin has since been bumped to `nixpkgs_10` and ADR-001 and ADR-007 take further version steps through root-pin bumps (ADR-001 Q1).
+- Is re-enabling the disabled `sso-gateway` on `magnetite` in scope, or must the dashboard layer work with it disabled (`telemetry-security-and-tenancy.md` Q4), settled by charter v11: ADR-002 admits dashboard readers through the gateway, so S6 enables it.
+- Is bumping the root nixpkgs pin in scope, or must the design assume the current pin (`nix-packaging-status.md` question 1), settled because the pin has since been bumped to `nixpkgs_10`, and since charter v11 the store comes from `greptimedb-bin` rather than the pin (ADR-001 Decision).
 - Is darwin continuous-integration coverage in scope, or is the local-run channel the accepted permanent answer for four of ten machines (`dev-loop-signals.md` Q4)?
 
 ### Store selection and versions
@@ -157,7 +158,7 @@ Each is attributed to the artifact that raised it; where two artifacts raised th
 ### Dashboard layer
 
 - Does the dashboard layer have to render logs and traces from the chosen store, or are metrics-only dashboards acceptable for the first deployment (`perses.md`)?
-- Should the design target the packaged 0.54.0 or the 0.55 line (`perses.md`), carried forward as ADR-002 Q1.
+- Should the design target the packaged 0.54.0 or the 0.55 line (`perses.md`), carried forward as ADR-002 Q1 and superseded in charter v11, because the Perses version now follows the dashboard the store embeds.
 - Which plugin, if any, declares the SQL proxy, and would the MySQL or PostgreSQL wire route be preferable for analytical dev-loop queries (`perses.md`)?
 
 ### Collection topology and darwin
@@ -182,7 +183,7 @@ Each is attributed to the artifact that raised it; where two artifacts raised th
 - What retention applies to the identifying attributes that survive redaction, which are also the fields that make the store a personal-activity record (`telemetry-security-and-tenancy.md` Q6)?
 - Should the three formerly public metrics endpoints be closed behind the gateway, moved to a mesh-only listener, or left open (`fleet-emitter-inventory.md` Q3), settled because #3447 restricted them to loopback and ZeroTier (charter W3) and ADR-003 scrapes them over loopback.
 - Should the design carry an upstream patch to obtain redaction-safe tool-call error classes, accept failure rates without classes, or enable content capture behind an access boundary (`dev-loop-signals.md` Q3)?
-- Is Kanidm the intended identity provider for the dashboard layer (`perses.md`), carried forward as ADR-002 Q4 and ADR-008's direct Kanidm OIDC client; the original choice between a separate project and a separate instance for agent-session dashboards is superseded by ADR-008's shared read zone (ADR-008 Q1).
+- Is Kanidm the intended identity provider for the dashboard layer (`perses.md`), carried forward as ADR-002 Q4 and, since charter v11, served through `sso-gateway`'s Kanidm client; the original choice between a separate project and a separate instance for agent-session dashboards is superseded by ADR-008's shared read zone (ADR-008 Q1).
 
 ### Coverage model and regulators
 
