@@ -1,3 +1,18 @@
 name: preferences-operations-and-reliability
 version: 0.0.0
 description: Operations and reliability preferences — observability engineering, production readiness, distributed systems, validation assurance, compositional continuous verification, adaptive planning.
+dependencies:
+  apm:
+    # GreptimeTeam/dashboard is the GreptimeDB web dashboard repo; it also ships
+    # one agent skill under skills/greptimedb-perses-dashboard/. apm types it
+    # SKILL_BUNDLE (nested skills/<name>/SKILL.md, no plugin manifest and no
+    # apm.yml) and installs the skill directory with its reference.md, catalog.md
+    # and scripts/ siblings. The nix compose pre-seeds apm's git checkout cache from
+    # the flake-pinned tree, and the full 40-char SHA is required because a short
+    # ref forces a network fetch. The skill targets the dashboard's current Perses
+    # version, while the GreptimeDB store embeds dashboard v0.13.13 (Perses
+    # 0.53.1); dashboards it generates are linted against the embedded version in
+    # S6.
+    - git: GreptimeTeam/dashboard
+      ref: cdbf50395574c0d52fd4286e53b039c0633a5abf
+      skills: [greptimedb-perses-dashboard]

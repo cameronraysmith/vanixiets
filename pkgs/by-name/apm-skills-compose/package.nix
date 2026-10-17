@@ -72,6 +72,14 @@
   mergifyCliSrc ? inputs.self.packages.${stdenv.hostPlatform.system}.agent-plugins-mergify-cli,
   mergifyCliRev ? mergifyCliSrc.rev,
 
+  # Flake-pinned GreptimeTeam/dashboard tree feeding apm's git checkout cache so the
+  # skill-bundle remote dep resolves with zero network. greptimedbDashboardRev is
+  # the single SHA source of truth (the fetchFromGitHub rev), reconciled against the
+  # apm.yml pin by the drift guard in the build script.
+  greptimedbDashboardSrc ?
+    inputs.self.packages.${stdenv.hostPlatform.system}.agent-plugins-greptimedb-dashboard,
+  greptimedbDashboardRev ? greptimedbDashboardSrc.rev,
+
   # Flake-pinned schpet/linear-cli source tree feeding apm's git checkout cache so
   # the skill-bundle remote dep resolves with zero network. linearCliRev (the v tag
   # commit pinned by pkgs.linear-cli.src) is the single SHA source of truth,
@@ -277,6 +285,24 @@ runCommandLocal "apm-skills-compose"
       exit 1
     fi
 
+    # Same offline pre-seed for the GreptimeTeam/dashboard remote dep declared in
+    # preferences-operations-and-reliability/apm.yml. apm types it SKILL_BUNDLE and
+    # installs the skills/greptimedb-perses-dashboard/ directory with its
+    # reference.md, catalog.md and scripts/ siblings.
+    GD_SHA=${greptimedbDashboardRev}
+    SHARD_GD=$(printf '%s' 'https://github.com/greptimeteam/dashboard' | sha256sum | cut -c1-16)
+    CK_GD="$APM_CACHE_DIR/git/checkouts_v1/$SHARD_GD/$GD_SHA/full"
+    mkdir -p "$CK_GD"
+    cp -RL ${greptimedbDashboardSrc}/. "$CK_GD"/
+    chmod -R u+w "$CK_GD"
+    mkdir -p "$CK_GD/.git"
+    printf '%s\n' "$GD_SHA" > "$CK_GD/.git/HEAD"
+
+    if ! rg -q "ref: $GD_SHA" ./preferences-operations-and-reliability/apm.yml; then
+      echo "apm-skills-compose: greptimedb-dashboard SHA drift — preferences-operations-and-reliability/apm.yml does not pin $GD_SHA" >&2
+      exit 1
+    fi
+
     # Same offline pre-seed for the linear-cli skills-subset remote dep declared in
     # planning-and-development/apm.yml; apm installs only skills/linear-cli/.
     LC_SHA=${linearCliRev}
@@ -316,7 +342,7 @@ runCommandLocal "apm-skills-compose"
     printf '%s\n' "$PW_SHA" > "$CK_PW/.git/HEAD"
 
     # APM 0.31 rejects HEAD-only cache seeds to rematerialize older CRLF checkouts.
-    for checkout in "$CK" "$CK_AG" "$CK_WT" "$CK_MP" "$CK_US" "$CK_GH" "$CK_MF" "$CK_LC" "$CK_PW"; do
+    for checkout in "$CK" "$CK_AG" "$CK_WT" "$CK_MP" "$CK_US" "$CK_GH" "$CK_MF" "$CK_GD" "$CK_LC" "$CK_PW"; do
       printf '[core]\n\tautocrlf = false\n' > "$checkout/.git/config"
     done
 
@@ -349,6 +375,11 @@ runCommandLocal "apm-skills-compose"
       "$out/.claude/skills/gh-stack/references/commands.md" \
       "$out/.claude/skills/mergify-stack/SKILL.md" \
       "$out/.agents/skills/mergify-stack/SKILL.md" \
+      "$out/.claude/skills/greptimedb-perses-dashboard/SKILL.md" \
+      "$out/.agents/skills/greptimedb-perses-dashboard/SKILL.md" \
+      "$out/.claude/skills/greptimedb-perses-dashboard/reference.md" \
+      "$out/.claude/skills/greptimedb-perses-dashboard/catalog.md" \
+      "$out/.claude/skills/greptimedb-perses-dashboard/scripts/save-dashboard.sh" \
       "$out/.claude/skills/linear-cli/SKILL.md" \
       "$out/.agents/skills/linear-cli/SKILL.md" \
       "$out/.claude/skills/playwright-cli/SKILL.md" \
