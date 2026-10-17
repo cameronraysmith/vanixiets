@@ -122,6 +122,7 @@ The inventory prepares Cameron and Janette on magnetite and pyrite, and Cameron 
 All five workers are currently enabled; disabled preparation remains covered by platform fixtures rather than the live inventory.
 Linux account declarations live in `inventory/services/users/omnigent-workers.nix` and use normal UID/private-group allocation with locked passwords and `0700` homes.
 Stibnite declares `omnigent-cameron` with UID/GID `551` and a private `/Users/omnigent-cameron` home, without changing `system.primaryUser`.
+On a host that shares one ghq tree (`services.shared-reference-tree`), a participating worker is also a member of the tree's writer group (`ghq`, or `_ghq` on darwin), which grants read access to that tree and nothing else; the fleet obligations admit exactly that group beside the worker's private group and reject any other.
 The deployment plan records the operator's allocation approval and separate declared/live collision evidence.
 No provider identity, model grant, SSH key or signing credential is inherited or enrolled by these declarations.
 

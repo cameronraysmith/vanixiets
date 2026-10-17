@@ -37,6 +37,8 @@ Neither Den (drupol's aspect framework over dendritic flake-parts) nor `flake-fi
 It uses `programs.zoxide.package` directly when the program module is disabled; when that module is enabled, it owns both installation and shell integration.
 This deliberate raw-package exception allows noninteractive lookup without changing the terminal aggregate's behavior.
 The `ghq`, `ghq-sync` and `dependency-sources` constituent exports preserve the existing split: `development` selects only `ghq`, while `tools` selects the two wrappers.
+`programs.ghq-shared.root`, declared by `ghq-shared-option` and imported by both `ghq` and `ghq-sync`, defaults to null and leaves both unchanged.
+A host that shares one ghq tree (`services.shared-reference-tree`, `modules/system/shared-reference-tree.nix`) sets it for each participating account; it then sets `ghq.root`, one `safe.directory = <root>/*`, links `~/ghq` to the root once no directory is in the way, and swaps `ghq` for `pkgs.ghq-shared`'s read-only wrapper and `ghq-sync` for a build that hands `--deepen` and `--full` to the tree's writer.
 
 `engineering-tools` groups recipe execution, edit checking and structured-output inspection through `just`, `shellcheck`, `uncomment` (from `uncomment-bin`), `ratchet`, `jc`, `jaq` and `yq`.
 `nix-development` exposes the existing group in `development/nix-tools.nix` intact.
