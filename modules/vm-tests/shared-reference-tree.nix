@@ -182,6 +182,89 @@
                 machine.succeed(as_user("cameron", f"git -C {P} status"))
                 assert machine.succeed("stat -c %U /tmp/fsmonitor-ran").strip() == "cameron"
                 machine.succeed(as_writer(f"git -C {P} config --unset core.fsmonitor"))
+
+            migrate = "${nodePkgs.ghq-shared}/bin/ghq-shared-migrate"
+            M = f"{R}/localhost/fixture/mig"
+            H = f"{R}/localhost/fixture/hello"
+
+            with subtest("migration moves trees in, sanitises them, and rolls back"):
+                # The primary account's tree is renamed whole only into an empty root.
+                machine.succeed(as_writer(f"rm -rf {R}/localhost"))
+                machine.succeed(
+                    "git init -q --bare -b main /srv/git/fixture/mig.git"
+                    " && git -C /srv/git/fixture/mig.git config uploadpack.allowFilter true"
+                    " && git init -q -b main /tmp/mig && echo one > /tmp/mig/f"
+                    " && git -C /tmp/mig add f && git -C /tmp/mig -c user.name=t -c user.email=t@t commit -q -m one"
+                    " && echo two >> /tmp/mig/f && git -C /tmp/mig -c user.name=t -c user.email=t@t commit -q -am two"
+                    " && git -C /tmp/mig push -q /srv/git/fixture/mig.git main"
+                    " && chown -R git:git /srv/git"
+                )
+                # cameron: a full clone carrying planted configuration, a hook,
+                # an uncommitted change and a local-only commit.
+                machine.succeed(as_user("cameron",
+                    "rm ~/ghq && git clone -q git://localhost/fixture/mig ~/ghq/localhost/fixture/mig"
+                    " && cd ~/ghq/localhost/fixture/mig"
+                    " && git config core.fsmonitor 'touch /tmp/planted-fsmonitor'"
+                    " && git config core.hooksPath .git/hooks"
+                    " && printf '#!/bin/sh\\ntouch /tmp/planted-hook\\n' > .git/hooks/post-checkout"
+                    " && chmod +x .git/hooks/post-checkout"
+                    " && git -c user.name=c -c user.email=c@c commit -q --allow-empty -m local-only"
+                    " && echo dirty >> f"))
+                # omnigent-cameron: its home on another filesystem, a shallow copy of
+                # the same repository (the shallower loses) and one of its own.
+                uid = machine.succeed("id -u omnigent-cameron").strip()
+                # The tmpfs hides the account's Home Manager files; its git configuration,
+                # which carries safe.directory, is linked back in.
+                gitconfig = machine.succeed("readlink /home/omnigent-cameron/.config/git/config").strip()
+                machine.succeed(f"mount -t tmpfs -o mode=0700,uid={uid},gid={uid} tmpfs /home/omnigent-cameron")
+                machine.succeed(as_user("omnigent-cameron", f"mkdir -p ~/.config/git && ln -s {gitconfig} ~/.config/git/config"))
+                machine.succeed(as_user("omnigent-cameron",
+                    "git clone -q --depth 1 git://localhost/fixture/mig ~/ghq/localhost/fixture/mig"
+                    " && git clone -q --depth 1 git://localhost/fixture/hello ~/ghq/localhost/fixture/hello"))
+                before = machine.succeed("find /home/cameron/ghq /home/omnigent-cameron/ghq \\( -type f -printf '%p %u %m %s\\n' \\) -o -printf '%p %u %m\\n' | sort")
+
+                plan = machine.succeed(f"{migrate} cameron omnigent-cameron")
+                for expected in ["rename whole tree", "copy per repository", "uncommitted changes",
+                                 "commits on no remote", "kept aside; cameron holds the deeper clone", "dry run"]:
+                    assert expected in plan, (expected, plan)
+                after = machine.succeed("find /home/cameron/ghq /home/omnigent-cameron/ghq \\( -type f -printf '%p %u %m %s\\n' \\) -o -printf '%p %u %m\\n' | sort")
+                assert before == after, "the dry run changed a tree"
+
+                machine.succeed(f"{migrate} --apply cameron omnigent-cameron")
+                # Inspection runs git as each account itself, so a planted program may
+                # run as its own account; it must never run as root or as the writer.
+                assert machine.succeed("stat -c %U /tmp/planted-fsmonitor 2>/dev/null || echo cameron").strip() == "cameron"
+                machine.succeed("rm -f /tmp/planted-fsmonitor")
+                assert machine.succeed(f"stat -c '%U %a' {R}").strip() == "ghq 750"
+                assert machine.succeed(f"find {R} ! -user ghq | wc -l").strip() == "0"
+                assert machine.succeed(f"find {R} -perm -g+w ! -type l | wc -l").strip() == "0"
+                machine.fail(as_writer(f"git -C {M} config --get core.fsmonitor"))
+                machine.fail(as_writer(f"git -C {M} config --get core.hooksPath"))
+                machine.succeed(f"test ! -e {M}/.git/hooks/post-checkout")
+                kept = "/var/lib/ghq-migration/cameron/repos/localhost/fixture/mig/git"
+                machine.succeed(f"grep -q planted-fsmonitor {kept}/config && test -x {kept}/hooks/post-checkout")
+                assert machine.succeed("stat -c '%U %a' /var/lib/ghq-migration").strip() == "root 700"
+                assert "f" in machine.succeed(as_writer(f"git --no-optional-locks -C {M} status --porcelain"))
+                assert machine.succeed(as_writer(f"git -C {M} log -1 --format=%s")).strip() == "local-only"
+                assert machine.succeed(as_writer(f"git -C {H} rev-parse --is-shallow-repository")).strip() == "true"
+                machine.succeed("test -d /home/omnigent-cameron/ghq.pre-shared-*/localhost/fixture/mig")
+                machine.succeed("test -d /home/omnigent-cameron/ghq.pre-shared-*/localhost/fixture/hello")
+                for user in readers:
+                    assert machine.succeed(as_user(user, "readlink ~/ghq")).strip() == R
+                    machine.succeed(as_user(user, f"git -C {M} log -1 && git --no-optional-locks -C {M} status"))
+                    machine.fail(as_user(user, f"touch {M}/probe"))
+                machine.succeed("test ! -e /tmp/planted-fsmonitor && test ! -e /tmp/planted-hook")
+
+                machine.fail(f"{migrate} --rollback cameron")
+                machine.succeed(f"{migrate} --rollback cameron omnigent-cameron")
+                restored = machine.succeed("find /home/cameron/ghq /home/omnigent-cameron/ghq \\( -type f -printf '%p %u %m %s\\n' \\) -o -printf '%p %u %m\\n' | sort")
+                assert restored == before, "rollback did not restore the trees exactly"
+                assert machine.succeed(f"stat -c '%U %a' {R}").strip() == "ghq 750"
+                assert machine.succeed(f"ls -A {R} | wc -l").strip() == "0"
+
+                machine.succeed("umount /home/omnigent-cameron")
+                machine.succeed(as_user("cameron", f"rm -rf ~/ghq && ln -s {R} ~/ghq"))
+                machine.succeed("rm -f /tmp/planted-fsmonitor /tmp/planted-hook")
           '';
         };
     in

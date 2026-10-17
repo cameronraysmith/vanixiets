@@ -22,6 +22,7 @@ stdenvNoCC.mkDerivation (finalAttrs: {
     root = ./.;
     fileset = lib.fileset.unions [
       ./ghq.sh
+      ./ghq-shared-migrate.py
       ./ghq-writer-client.py
       ./ghq-writer-handler.py
     ];
@@ -33,7 +34,8 @@ stdenvNoCC.mkDerivation (finalAttrs: {
     install -Dm755 ghq-writer-handler.py $libexec/ghq-writer-handler
     install -Dm755 ghq-writer-client.py $libexec/ghq-writer-client
     install -Dm755 ghq.sh $out/bin/ghq
-    sed -i '1i #!${python3}/bin/python3' $libexec/ghq-writer-handler $libexec/ghq-writer-client
+    install -Dm755 ghq-shared-migrate.py $out/bin/ghq-shared-migrate
+    sed -i '1i #!${python3}/bin/python3' $libexec/ghq-writer-handler $libexec/ghq-writer-client $out/bin/ghq-shared-migrate
     sed -i '1i #!${bash}/bin/bash\nset -euo pipefail' $out/bin/ghq
     substituteInPlace $libexec/ghq-writer-handler \
       --replace-fail @ghq@ ${ghq}/bin/ghq \
@@ -45,6 +47,9 @@ stdenvNoCC.mkDerivation (finalAttrs: {
         ]
       }
     substituteInPlace $libexec/ghq-writer-client --replace-fail @socket@ ${socket}
+    substituteInPlace $out/bin/ghq-shared-migrate \
+      --replace-fail @git@ ${git}/bin/git \
+      --replace-fail @cp@ ${coreutils}/bin/cp
     substituteInPlace $out/bin/ghq \
       --replace-fail @ghq@ ${ghq}/bin/ghq \
       --replace-fail @client@ $libexec/ghq-writer-client
@@ -59,7 +64,8 @@ stdenvNoCC.mkDerivation (finalAttrs: {
   installCheckPhase = ''
     shellcheck $out/bin/ghq
     python3 -c 'import ast, sys; [ast.parse(open(f).read()) for f in sys.argv[1:]]' \
-      $out/libexec/ghq-shared/ghq-writer-handler $out/libexec/ghq-shared/ghq-writer-client
+      $out/libexec/ghq-shared/ghq-writer-handler $out/libexec/ghq-shared/ghq-writer-client \
+      $out/bin/ghq-shared-migrate
   '';
 
   passthru = {
@@ -68,7 +74,7 @@ stdenvNoCC.mkDerivation (finalAttrs: {
   };
 
   meta = {
-    description = "Read-only ghq wrapper and single-writer request handler for a host-shared ghq tree";
+    description = "Read-only ghq wrapper, single-writer request handler and migration tool for a host-shared ghq tree";
     license = lib.licenses.mit;
     mainProgram = "ghq";
     platforms = lib.platforms.unix;
