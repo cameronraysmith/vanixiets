@@ -7,7 +7,10 @@
 # uses GreptimeDB's local `File` storage under data_home. The memory envelope,
 # listeners, worker pools and usage reporting are fixed here, and R7.1
 # (modules/checks/greptimedb-envelope.nix) asserts them on magnetite.
-{ ... }:
+{ config, ... }:
+let
+  flakeLib = config.flake.lib;
+in
 {
   flake.modules.nixos.greptimedb =
     {
@@ -20,6 +23,20 @@
       cfg = config.services.greptimedb;
       settingsFormat = pkgs.formats.toml { };
       configFile = settingsFormat.generate "greptimedb.toml" cfg.settings;
+
+      # MemoryHigh as systemd parses it: a G suffix is a power of 1024.
+      memoryHigh = config.systemd.services.greptimedb.serviceConfig.MemoryHigh;
+      memoryHighGiB = builtins.match "([0-9]+)G" memoryHigh;
+
+      envelope = flakeLib.greptimedbEnvelope pkgs {
+        url = "http://${cfg.settings.http.addr}";
+        databases = lib.attrNames cfg.databases;
+        unit = "greptimedb.service";
+        loadedUsersHashFile = "/run/greptimedb/loaded-users.sha256";
+        zfsPackage = config.boot.zfs.package;
+        systemdPackage = config.systemd.package;
+      };
+
       httpUrl = "http://${cfg.settings.http.addr}";
 
       # Static-user hardening following modules/nixos/omnigent.nix:147-161.
@@ -121,6 +138,10 @@
             assertion = lib.hasPrefix "127." cfg.settings.grpc.bind_addr;
             message = "services.greptimedb.settings.grpc.bind_addr must be in 127.0.0.0/8: GreptimeDB 1.2.1 has no switch to disable gRPC (design D4).";
           }
+          {
+            assertion = memoryHighGiB != null;
+            message = "services.greptimedb: greptimedb.service MemoryHigh must be whole gibibytes (\"<n>G\"); greptimedb-envelope derives its memory.peak threshold from it";
+          }
         ];
 
         users.users.greptimedb = {
@@ -218,6 +239,56 @@
             ExecStart = lib.getExe schema;
             User = "greptimedb";
             Group = "greptimedb";
+          };
+        };
+
+        # Runtime envelope (design D12), run hourly as the regulator account.
+        # The host supplies LoadCredential=regulator-password and the
+        # GREPTIMEDB_ENVELOPE_{DATASET,QUOTA_BYTES,RESERVATION_BYTES,USERS_SHA256_FILE}
+        # environment, so this module stays free of clan vars. /dev/zfs stays
+        # visible (no PrivateDevices) for `zfs get`, and systemd-journal lets
+        # the run read the unit's OOM records.
+        systemd.services.greptimedb-envelope = {
+          description = "GreptimeDB runtime envelope";
+          after = [ "greptimedb.service" ];
+          environment = {
+            GREPTIMEDB_ENVELOPE_MEMORY_PEAK_MAX_BYTES = toString (
+              lib.toInt (builtins.head memoryHighGiB) * 1024 * 1024 * 1024
+            );
+            GREPTIMEDB_ENVELOPE_DISK_USED_MAX_PERCENT = "80";
+            GREPTIMEDB_ENVELOPE_SST_MAX_BYTES = toString (50 * 1024 * 1024 * 1024);
+          };
+          serviceConfig = {
+            Type = "oneshot";
+            ExecStart = lib.getExe envelope;
+            DynamicUser = true;
+            SupplementaryGroups = [ "systemd-journal" ];
+            StateDirectory = "greptimedb-envelope";
+            UMask = "0077";
+            NoNewPrivileges = true;
+            PrivateTmp = true;
+            ProtectSystem = "strict";
+            ProtectHome = true;
+            ProtectKernelTunables = true;
+            ProtectKernelModules = true;
+            ProtectKernelLogs = true;
+            ProtectControlGroups = true;
+            RestrictSUIDSGID = true;
+            RestrictAddressFamilies = [
+              "AF_UNIX"
+              "AF_INET"
+              "AF_INET6"
+            ];
+          };
+        };
+
+        systemd.timers.greptimedb-envelope = {
+          description = "Hourly GreptimeDB runtime envelope";
+          wantedBy = [ "timers.target" ];
+          timerConfig = {
+            OnCalendar = "hourly";
+            Persistent = true;
+            RandomizedDelaySec = "5m";
           };
         };
       };

@@ -32,6 +32,7 @@
       # so dropping a unit from services.observability-notify.units fails.
       notifiedUnits = [
         "greptimedb"
+        "greptimedb-envelope"
         "greptimedb-schema"
         "opentelemetry-collector"
         "zfs-assert-root-docker-noautosnap"

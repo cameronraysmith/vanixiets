@@ -315,6 +315,7 @@ in
       # so greptimedb.nix never references the notifier.
       services.observability-notify.units = [
         "greptimedb"
+        "greptimedb-envelope"
         "greptimedb-schema"
         "zfs-assert-root-docker-noautosnap"
         "zfs-assert-root-greptimedb-noautosnap"
@@ -619,6 +620,35 @@ in
       systemd.services.greptimedb-schema.serviceConfig.LoadCredential = [
         "admin-password:${config.clan.core.vars.generators.greptimedb-users.files.admin-password.path}"
       ];
+
+      # The regulator credential and the host facts greptimedb-envelope checks.
+      # Quota and reservation come from greptimedbDataset, the binding the
+      # zfs-set-root-greptimedb-{quota,reservation} oneshots apply, so R7.3
+      # compares the dataset against the value this host declares.
+      systemd.services.greptimedb-envelope = {
+        serviceConfig.LoadCredential = [
+          "regulator-password:${config.clan.core.vars.generators.greptimedb-users.files.regulator-password.path}"
+        ];
+        environment =
+          let
+            gibibytes =
+              size:
+              let
+                m = builtins.match "([0-9]+)G" size;
+              in
+              assert lib.assertMsg (
+                m != null
+              ) "greptimedbDataset sizes must be whole gibibytes (\"<n>G\"), got ${size}";
+              toString (lib.toInt (builtins.head m) * 1024 * 1024 * 1024);
+          in
+          {
+            GREPTIMEDB_ENVELOPE_DATASET = greptimedbDataset.name;
+            GREPTIMEDB_ENVELOPE_QUOTA_BYTES = gibibytes greptimedbDataset.quota;
+            GREPTIMEDB_ENVELOPE_RESERVATION_BYTES = gibibytes greptimedbDataset.reservation;
+            GREPTIMEDB_ENVELOPE_USERS_SHA256_FILE = "${config.clan.core.vars.generators.greptimedb-users.files.users-sha256.path
+            }";
+          };
+      };
 
       # nixbot's `8 x 4096` nix-eval-jobs configuration peaks at 31.4 GiB of
       # swap (logs/magnetite-zram-headroom-experiment.md §6.2), above the
