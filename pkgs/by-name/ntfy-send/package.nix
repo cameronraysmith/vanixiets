@@ -5,14 +5,16 @@
 # Endpoint security software on Darwin blocks ad-hoc signed (Nix store)
 # binaries from TCP connections over ZeroTier. The preamble injects
 # NTFY_CURL_BIN, the eval-time-resolved curl path, so Darwin uses /usr/bin/curl
-# while Linux uses PATH curl.
+# while Linux uses the curl from runtimeInputs.
 {
   lib,
   stdenv,
+  curl,
   writeShellApplication,
 }:
 writeShellApplication {
   name = "ntfy-send";
+  runtimeInputs = lib.optional (!stdenv.hostPlatform.isDarwin) curl;
   text = ''
     export NTFY_CURL_BIN=${if stdenv.hostPlatform.isDarwin then "/usr/bin/curl" else "curl"}
     ${builtins.readFile ./ntfy-send.sh}

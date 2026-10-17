@@ -210,6 +210,150 @@
             touch "$out"
           '';
 
+      # R7.2 (review F2) over cgroup files recorded on magnetite on 2026-10-17
+      # (memory.stat through `hugetlb`;
+      # logs/s1-evidence/review-a-f2-recorded-cgroup-*.log): memory.peak
+      # counts page cache and never falls within an invocation, so the
+      # regulator reads throttling (memory.events `high`) and anonymous memory
+      # (memory.stat `anon`) instead. Rows run in order against one state
+      # directory, so each row's baseline is the previous row's run.
+      recordedInvocation = "dbfc4564fbfb4623a29cb478c5e0cdf3";
+      recordedAnon = 104235008;
+      recordedPeak = 168730624;
+      recordedMemoryEvents = high: ''
+        low 0
+        high ${toString high}
+        max 0
+        oom 0
+        oom_kill 0
+        oom_group_kill 0
+      '';
+      recordedMemoryStat = ''
+        anon ${toString recordedAnon}
+        file 42446848
+        kernel 3784704
+        kernel_stack 950272
+        pagetables 2179072
+        sec_pagetables 0
+        percpu 8712
+        sock 0
+        vmalloc 53248
+        shmem 8192
+        zswap 0
+        zswapped 0
+        file_mapped 42422272
+        file_dirty 0
+        file_writeback 0
+        swapcached 0
+        anon_thp 0
+        file_thp 0
+        shmem_thp 0
+        inactive_anon 30785536
+        active_anon 73449472
+        inactive_file 27271168
+        active_file 15171584
+        unevictable 4096
+        slab_reclaimable 104616
+        slab_unreclaimable 488752
+        slab 593368
+        hugetlb 0
+      '';
+      # Answers the two `systemctl show` queries for one running invocation.
+      systemdStub = pkgs.writeShellScriptBin "systemctl" ''
+        case "$*" in
+          *--property=InvocationID*) echo ${recordedInvocation} ;;
+          *--property=NRestarts*) echo 0 ;;
+          *) exit 1 ;;
+        esac
+      '';
+      memoryRegulator = self.lib.greptimedbEnvelopeMemory pkgs {
+        unit = "greptimedb.service";
+        systemdPackage = systemdStub;
+      };
+      gib = n: n * 1024 * 1024 * 1024;
+      memoryRows = [
+        {
+          name = "a first run records a baseline and passes";
+          high = 0;
+          anonMax = gib 3;
+          exit = 0;
+          expect = [ ];
+        }
+        {
+          name = "unchanged throttling passes while page cache lifts memory.peak over the threshold";
+          high = 0;
+          anonMax = recordedAnon + 1;
+          exit = 0;
+          expect = [ ];
+        }
+        {
+          name = "a rise of memory.events high within one invocation fails";
+          high = 3;
+          anonMax = gib 3;
+          exit = 1;
+          expect = [
+            "FAIL R7.2: memory.events high rose from 0 to 3; the store was throttled at MemoryHigh"
+          ];
+        }
+        {
+          name = "anonymous memory at the threshold fails";
+          high = 3;
+          anonMax = recordedAnon;
+          exit = 1;
+          expect = [
+            "FAIL R7.2: memory.stat anon ${toString recordedAnon} >= GREPTIMEDB_ENVELOPE_ANON_MAX_BYTES ${toString recordedAnon}"
+          ];
+        }
+      ];
+      memoryRow =
+        {
+          name,
+          high,
+          anonMax,
+          exit,
+          expect,
+        }:
+        ''
+          echo "--- ${name}"
+          printf '%s' ${lib.escapeShellArg (recordedMemoryEvents high)} > "$cgroup/memory.events"
+          code=0
+          GREPTIMEDB_ENVELOPE_ANON_MAX_BYTES=${toString anonMax} STATE_DIRECTORY="$TMPDIR/state" \
+            ${lib.getExe memoryRegulator} "$cgroup" > "$TMPDIR/output" 2>&1 || code=$?
+          cat "$TMPDIR/output"
+          [ "$code" = ${toString exit} ] || miss "${name}: exit status $code, expected ${toString exit}"
+          [ "$(grep -c '^FAIL ' "$TMPDIR/output")" = ${toString (builtins.length expect)} ] \
+            || miss "${name}: expected ${toString (builtins.length expect)} FAIL line(s)"
+          ${lib.concatMapStrings (line: ''
+            grep -qxF -- ${lib.escapeShellArg line} "$TMPDIR/output" \
+              || miss ${lib.escapeShellArg "${name}: output lacks: ${line}"}
+          '') expect}
+        '';
+      greptimedbMemoryRehearsal =
+        pkgs.runCommand "greptimedb-memory-rehearsal"
+          {
+            nativeBuildInputs = [
+              pkgs.coreutils
+              pkgs.gnugrep
+            ];
+            meta.description = "behavioural check: R7.2 fails on throttling and on anonymous memory, not on page cache";
+          }
+          ''
+            set -euo pipefail
+            missed=0
+            miss() {
+              echo "MISS: $*" >&2
+              missed=1
+            }
+            cgroup="$TMPDIR/cgroup"
+            mkdir "$cgroup" "$TMPDIR/state"
+            printf '%s' ${lib.escapeShellArg recordedMemoryStat} > "$cgroup/memory.stat"
+            echo ${toString recordedPeak} > "$cgroup/memory.peak"
+
+            ${lib.concatMapStrings memoryRow memoryRows}
+            [ "$missed" = 0 ]
+            touch "$out"
+          '';
+
       # LoadCredential entries are "<id>:<source path>". Holders are matched on
       # the source path, because each unit chooses its own id, and an unrelated
       # unit (kanidm-site-branding) already loads an "admin-password" id.
@@ -533,6 +677,8 @@
             ${usersFileCheck}
             # 5.2: the envelope's SQL helper fails on absent evidence.
             test -e ${greptimedbSqlRehearsal}
+            # R7.2 regulates throttling and anonymous memory.
+            test -e ${greptimedbMemoryRehearsal}
             touch "$out"
           '';
       };

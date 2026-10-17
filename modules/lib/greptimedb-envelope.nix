@@ -21,14 +21,15 @@
 # - R6.3 and per-table retention: the base tables of `databases` exist, none
 #   sets sst_format=primary_key (the legacy format) and none sets a ttl of
 #   its own, which would override its database's (F1).
-# - R7.2: the unit cgroup's memory.peak is under
-#   GREPTIMEDB_ENVELOPE_MEMORY_PEAK_MAX_BYTES; memory.events oom_kill and max
-#   have not risen since the last run of the same invocation. Both files
-#   restart from zero with each invocation, so across invocations the run
-#   instead fails if systemd logged a kernel OOM kill in the unit since the
-#   last run, or if NRestarts rose (an automatic restart). The baseline is
-#   rewritten on every run, so one rise fails one run. The first run only
-#   records a baseline.
+# - R7.2 (greptimedbEnvelopeMemory): the unit cgroup's anonymous memory
+#   (memory.stat anon) is under GREPTIMEDB_ENVELOPE_ANON_MAX_BYTES, and
+#   memory.events high, oom_kill and max have not risen since the last run of
+#   the same invocation. memory.peak is not used: it counts page cache and
+#   never falls within an invocation. The events restart from zero with each
+#   invocation, so across invocations the run instead fails if systemd logged
+#   a kernel OOM kill in the unit since the last run, or if NRestarts rose (an
+#   automatic restart). The baseline is rewritten on every run, so one rise
+#   fails one run. The first run only records a baseline.
 # - R7.3: the dataset's quota and reservation equal
 #   GREPTIMEDB_ENVELOPE_{QUOTA,RESERVATION}_BYTES and used space is under
 #   GREPTIMEDB_ENVELOPE_DISK_USED_MAX_PERCENT of the quota.
@@ -89,6 +90,85 @@ let
   # src/core/cgroup.c:3099-3102 when the kernel OOM killer kills in a unit.
   unitOutOfMemoryMessageId = "fe6faa94e7774663a0da52717891d8ef";
 
+  # R7.2 over one cgroup directory, its first argument, so
+  # modules/checks/greptimedb-envelope.nix can run it on recorded files.
+  greptimedbEnvelopeMemory =
+    pkgs:
+    { unit, systemdPackage }:
+    pkgs.writeShellApplication {
+      name = "greptimedb-envelope-memory";
+      runtimeInputs = [
+        pkgs.coreutils
+        pkgs.gawk
+        pkgs.gnugrep
+        pkgs.jq
+        systemdPackage
+      ];
+      text = ''
+        cgroup=''${1:?usage: greptimedb-envelope-memory CGROUP_DIR}
+        : "''${GREPTIMEDB_ENVELOPE_ANON_MAX_BYTES:?}"
+        : "''${STATE_DIRECTORY:?}"
+
+        failed=0
+        fail() {
+          printf 'FAIL %s\n' "$*" >&2
+          failed=1
+        }
+        field() {
+          awk -v key="$1" '$1 == key { print $2 }'
+        }
+
+        anon=$(field anon < "$cgroup/memory.stat" || true)
+        if [ -z "$anon" ]; then
+          fail "R7.2: $cgroup/memory.stat lacks anon"
+        elif [ "$anon" -ge "$GREPTIMEDB_ENVELOPE_ANON_MAX_BYTES" ]; then
+          fail "R7.2: memory.stat anon $anon >= GREPTIMEDB_ENVELOPE_ANON_MAX_BYTES $GREPTIMEDB_ENVELOPE_ANON_MAX_BYTES"
+        fi
+        oom_kill=$(field oom_kill < "$cgroup/memory.events" || true)
+        max=$(field max < "$cgroup/memory.events" || true)
+        high=$(field high < "$cgroup/memory.events" || true)
+        invocation=$(systemctl show --property=InvocationID --value ${unit} || true)
+        nrestarts=$(systemctl show --property=NRestarts --value ${unit} || true)
+        now=$(date +%s)
+        if [ -z "$oom_kill" ] || [ -z "$max" ] || [ -z "$high" ]; then
+          fail "R7.2: $cgroup/memory.events lacks oom_kill, max or high"
+        elif [ -z "$invocation" ] || [ -z "$nrestarts" ]; then
+          fail "R7.2: ${unit} has no current invocation"
+        else
+          baseline="$STATE_DIRECTORY/memory-baseline"
+          if [ -s "$baseline" ]; then
+            read -r base_invocation base_oom_kill base_max base_nrestarts base_time base_high < "$baseline"
+            if [ "$invocation" = "$base_invocation" ]; then
+              if [ "$oom_kill" -gt "$base_oom_kill" ]; then
+                fail "R7.2: memory.events oom_kill rose from $base_oom_kill to $oom_kill"
+              fi
+              if [ "$max" -gt "$base_max" ]; then
+                fail "R7.2: memory.events max rose from $base_max to $max"
+              fi
+              # A baseline written before `high` was recorded has five fields.
+              if [ -n "''${base_high:-}" ] && [ "$high" -gt "$base_high" ]; then
+                fail "R7.2: memory.events high rose from $base_high to $high; the store was throttled at MemoryHigh"
+              fi
+            else
+              # systemd logged the new invocation's start with UNIT=, so an
+              # empty answer means the journal is unreadable, not quiet.
+              if ! ids=$(journalctl --quiet --since "@$base_time" --output=json --output-fields=MESSAGE_ID UNIT=${unit} | jq -r '.MESSAGE_ID // "-"') || [ -z "$ids" ]; then
+                fail "R7.2: no journal entries for ${unit} since @$base_time; the journal is unreadable"
+              elif grep -qx ${unitOutOfMemoryMessageId} <<< "$ids"; then
+                fail "R7.2: the kernel OOM killer killed processes in ${unit} since @$base_time"
+              fi
+              if [ "$nrestarts" -gt "$base_nrestarts" ]; then
+                fail "R7.2: ${unit} restarted automatically since @$base_time (NRestarts $base_nrestarts -> $nrestarts)"
+              fi
+            fi
+          fi
+          printf '%s %s %s %s %s %s\n' "$invocation" "$oom_kill" "$max" "$nrestarts" "$now" "$high" > "$baseline"
+        fi
+
+        exit "$failed"
+      '';
+    };
+
   greptimedbEnvelope =
     pkgs:
     {
@@ -104,22 +184,21 @@ let
         inherit url;
         user = "regulator";
       };
+      memory = greptimedbEnvelopeMemory pkgs { inherit unit systemdPackage; };
       schemaList = lib.concatMapStringsSep ", " (db: "'${db}'") databases;
     in
     pkgs.writeShellApplication {
       name = "greptimedb-envelope";
       runtimeInputs = [
         sql
+        memory
         pkgs.coreutils
         pkgs.curl
         pkgs.gawk
-        pkgs.gnugrep
-        pkgs.jq
         zfsPackage
-        systemdPackage
       ];
       text = ''
-        : "''${GREPTIMEDB_ENVELOPE_MEMORY_PEAK_MAX_BYTES:?}"
+        : "''${GREPTIMEDB_ENVELOPE_ANON_MAX_BYTES:?}"
         : "''${GREPTIMEDB_ENVELOPE_DISK_USED_MAX_PERCENT:?}"
         : "''${GREPTIMEDB_ENVELOPE_SST_MAX_BYTES:?}"
         : "''${GREPTIMEDB_ENVELOPE_DATASET:?}"
@@ -169,46 +248,8 @@ let
         fi
 
         # R7.2
-        cgroup=/sys/fs/cgroup/system.slice/${unit}
-        if ! peak=$(< "$cgroup/memory.peak"); then
-          fail "R7.2: cannot read $cgroup/memory.peak"
-        elif [ "$peak" -ge "$GREPTIMEDB_ENVELOPE_MEMORY_PEAK_MAX_BYTES" ]; then
-          fail "R7.2: memory.peak $peak >= GREPTIMEDB_ENVELOPE_MEMORY_PEAK_MAX_BYTES $GREPTIMEDB_ENVELOPE_MEMORY_PEAK_MAX_BYTES"
-        fi
-        oom_kill=$(field oom_kill < "$cgroup/memory.events" || true)
-        max=$(field max < "$cgroup/memory.events" || true)
-        invocation=$(systemctl show --property=InvocationID --value ${unit} || true)
-        nrestarts=$(systemctl show --property=NRestarts --value ${unit} || true)
-        now=$(date +%s)
-        if [ -z "$oom_kill" ] || [ -z "$max" ]; then
-          fail "R7.2: $cgroup/memory.events lacks oom_kill or max"
-        elif [ -z "$invocation" ] || [ -z "$nrestarts" ]; then
-          fail "R7.2: ${unit} has no current invocation"
-        else
-          baseline="$STATE_DIRECTORY/memory-baseline"
-          if [ -s "$baseline" ]; then
-            read -r base_invocation base_oom_kill base_max base_nrestarts base_time < "$baseline"
-            if [ "$invocation" = "$base_invocation" ]; then
-              if [ "$oom_kill" -gt "$base_oom_kill" ]; then
-                fail "R7.2: memory.events oom_kill rose from $base_oom_kill to $oom_kill"
-              fi
-              if [ "$max" -gt "$base_max" ]; then
-                fail "R7.2: memory.events max rose from $base_max to $max"
-              fi
-            else
-              # systemd logged the new invocation's start with UNIT=, so an
-              # empty answer means the journal is unreadable, not quiet.
-              if ! ids=$(journalctl --quiet --since "@$base_time" --output=json --output-fields=MESSAGE_ID UNIT=${unit} | jq -r '.MESSAGE_ID // "-"') || [ -z "$ids" ]; then
-                fail "R7.2: no journal entries for ${unit} since @$base_time; the journal is unreadable"
-              elif grep -qx ${unitOutOfMemoryMessageId} <<< "$ids"; then
-                fail "R7.2: the kernel OOM killer killed processes in ${unit} since @$base_time"
-              fi
-              if [ "$nrestarts" -gt "$base_nrestarts" ]; then
-                fail "R7.2: ${unit} restarted automatically since @$base_time (NRestarts $base_nrestarts -> $nrestarts)"
-              fi
-            fi
-          fi
-          printf '%s %s %s %s %s\n' "$invocation" "$oom_kill" "$max" "$nrestarts" "$now" > "$baseline"
+        if ! greptimedb-envelope-memory /sys/fs/cgroup/system.slice/${unit}; then
+          failed=1
         fi
 
         # R7.3
@@ -251,6 +292,6 @@ let
 in
 {
   flake.lib = {
-    inherit greptimedbSql greptimedbEnvelope;
+    inherit greptimedbSql greptimedbEnvelopeMemory greptimedbEnvelope;
   };
 }

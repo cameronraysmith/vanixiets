@@ -16,9 +16,11 @@
 # The agent also owns the failure notifier (ADR-009 item 11):
 # observability-notify@.service posts once per failure episode to ntfy's
 # fleet-alerts topic, guarded by a stamp per unit, and every unit listed in
-# services.observability-notify.units gets OnFailure= and an ExecStopPost=
-# hook that posts RESOLVED on the unit's next successful exit. ntfy has no
-# authentication, so the notifier holds no credential.
+# services.observability-notify.units gets OnFailure= and two hooks that post
+# RESOLVED and remove the stamp: ExecStartPost= on the unit's next successful
+# start, which ends an episode across automatic restarts, and ExecStopPost= on
+# its next successful exit. ntfy has no authentication, so the notifier holds
+# no credential.
 #
 # Build-time validation (nixpkgs' `otelcol-contrib validate`) runs before
 # /run/credentials exists. basicauth's password_file is not opened by
@@ -62,12 +64,76 @@ let
               limit_mib = 384;
             };
           };
+          # nixpkgs restarts the collector after 100 ms, so five quick start
+          # failures would hit systemd's default start limit and leave it
+          # failed for good.
+          systemd.services.opentelemetry-collector = {
+            startLimitIntervalSec = 0;
+            serviceConfig.RestartSec = "5s";
+          };
         }
       )
     ];
   };
+
+  # The notifier's two scripts, a function so that
+  # checks.x86_64-linux.otel-collector-config can rehearse them against a
+  # temporary stamp directory and a recording ntfy-send.
+  observabilityNotifyScripts =
+    pkgs:
+    {
+      ntfySend,
+      stampDir,
+      hostName,
+    }:
+    {
+      # One post per failure episode: skip while the stamp exists. A unit
+      # whose last FAILED was posted less than OBSERVABILITY_NOTIFY_MIN_INTERVAL_SEC
+      # ago opens a `suppressed` episode instead, which the resolve hooks end
+      # without a post. A persistent crash loop therefore yields one
+      # FAILED/RESOLVED pair, then at most one new pair per interval per unit;
+      # detecting crash loops by restart rate belongs to S3. A failed post
+      # writes no stamp, so the next failure posts again.
+      failed = pkgs.writeShellScript "observability-notify-failed" ''
+        : "''${OBSERVABILITY_NOTIFY_MIN_INTERVAL_SEC:?}"
+        unit="$1"
+        stamp="${stampDir}/$unit"
+        last="${stampDir}/last-failed/$unit"
+        if [ -e "$stamp" ]; then
+          exit 0
+        fi
+        now=$(${pkgs.coreutils}/bin/date +%s)
+        if [ -s "$last" ] && [ $((now - $(< "$last"))) -lt "$OBSERVABILITY_NOTIFY_MIN_INTERVAL_SEC" ]; then
+          echo suppressed > "$stamp"
+          exit 0
+        fi
+        ${ntfySend} "FAILED $unit on ${hostName}" fleet-alerts || exit 1
+        echo posted > "$stamp"
+        ${pkgs.coreutils}/bin/mkdir -p "${stampDir}/last-failed"
+        echo "$now" > "$last"
+      '';
+
+      # Runs as root (`+`) after a notified unit starts (`start`) or stops
+      # (`stop`); a failed post leaves the stamp for the next chance and never
+      # fails the unit.
+      resolved = pkgs.writeShellScript "observability-notify-resolved" ''
+        mode="$1"
+        unit="$2"
+        stamp="${stampDir}/$unit"
+        if [ -e "$stamp" ] && { [ "$mode" = start ] || [ "''${SERVICE_RESULT:-}" = success ]; }; then
+          if [ "$(< "$stamp")" = suppressed ]; then
+            ${pkgs.coreutils}/bin/rm -f "$stamp"
+          else
+            ${ntfySend} "RESOLVED $unit on ${hostName}" fleet-alerts && ${pkgs.coreutils}/bin/rm -f "$stamp"
+          fi
+        fi
+        exit 0
+      '';
+    };
 in
 {
+  flake.lib = { inherit observabilityNotifyScripts; };
+
   flake.modules.nixos.otel-collector-agent =
     {
       config,
@@ -79,24 +145,11 @@ in
       cfg = config.services.observability-notify;
       hostName = config.networking.hostName;
       stampDir = "/var/lib/observability-notify";
-      ntfySend = lib.getExe pkgs.ntfy-send;
-
-      # Runs as root (`+`) after every stop of a notified unit; a failed post
-      # leaves the stamp for the next successful exit and never fails the unit.
-      resolved = pkgs.writeShellScript "observability-notify-resolved" ''
-        export PATH=${
-          lib.makeBinPath [
-            pkgs.curl
-            pkgs.coreutils
-          ]
-        }:$PATH
-        unit="$1"
-        stamp="${stampDir}/$unit"
-        if [ "''${SERVICE_RESULT:-}" = success ] && [ -e "$stamp" ]; then
-          ${ntfySend} "RESOLVED $unit on ${hostName}" fleet-alerts && rm -f "$stamp"
-        fi
-        exit 0
-      '';
+      notifyScripts = observabilityNotifyScripts pkgs {
+        ntfySend = lib.getExe pkgs.ntfy-send;
+        inherit stampDir hostName;
+      };
+      resolved = notifyScripts.resolved;
 
       scrape =
         job: target: extra:
@@ -131,8 +184,8 @@ in
         description = ''
           systemd.services attribute names (without `.service`) whose failure
           posts a notice to ntfy's fleet-alerts topic through
-          observability-notify@.service, and whose next successful exit after
-          a notice posts RESOLVED.
+          observability-notify@.service, and whose next successful start or
+          exit after a notice posts RESOLVED.
         '';
       };
 
@@ -290,21 +343,26 @@ in
           systemd.services = lib.mkMerge [
             (lib.genAttrs cfg.units (_: {
               unitConfig.OnFailure = [ "observability-notify@%n.service" ];
-              serviceConfig.ExecStopPost = [ "-+${resolved} %n" ];
+              serviceConfig = {
+                # An automatic restart's stop is never a success, so the
+                # episode ends at the next start. systemd runs ExecStartPost
+                # before ExecStopPost and both run the one script, so a
+                # oneshot's stop hook finds the stamp gone and posts no second
+                # RESOLVED.
+                ExecStartPost = [ "-+${resolved} start %n" ];
+                ExecStopPost = [ "-+${resolved} stop %n" ];
+              };
             }))
             {
               prometheus-node-exporter.serviceConfig.MemoryMax = "64M";
 
               "observability-notify@" = {
+                environment.OBSERVABILITY_NOTIFY_MIN_INTERVAL_SEC = "900";
                 description = "Post a failure notice for %i to ntfy";
-                path = [ pkgs.curl ];
                 serviceConfig = {
                   Type = "oneshot";
                   StateDirectory = "observability-notify";
-                  # One post per failure episode: skip while the stamp exists.
-                  ExecCondition = "${pkgs.coreutils}/bin/test ! -e ${stampDir}/%i";
-                  ExecStart = ''${ntfySend} "FAILED %i on ${hostName}" fleet-alerts'';
-                  ExecStartPost = "${pkgs.coreutils}/bin/touch ${stampDir}/%i";
+                  ExecStart = "${notifyScripts.failed} %i";
                 };
               };
             }

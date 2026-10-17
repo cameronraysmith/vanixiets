@@ -1,12 +1,12 @@
 ---
 title: Fleet observability and CCV feedback-loop charter
-status: charter v13
+status: charter v14
 date: 2026-10-17
 ---
 
 # Fleet observability and CCV feedback-loop charter
 
-Charter version: v13.
+Charter version: v14.
 A revision is a version bump with a dated entry under "Revision history"; the text of an earlier version is never edited in place.
 
 ## Objective
@@ -293,3 +293,12 @@ A research unit that meets ambiguity returns it in its questions section; the or
   - ADR-007 amended: Prometheus remote read and write stay enabled because the PromQL query API depends on them; they are served on the loopback listener, require credentials, and accept writes only from `collector` (`wo`) and `admin` (`rw`); E7.1 no longer lists Prometheus remote storage among the disabled protocols, and the envelope check asserts `prom_store.enable = true` with a mutant that disables it, beside R7.1's seven mutants.
   - ADR-009's Prometheus-server alternative and `components/greptimedb.md` follow ADR-007.
   - S1's design, plan, specs and tasks carry the same amendment, and `modules/nixos/greptimedb.nix` sets `prom_store.enable = true`.
+- v14 (2026-10-17): three defects found by the S1 holistic review (`logs/s1-evidence/review-findings.md` F1, F2 and F12); no earlier text is edited beyond the status, date and version lines, and D1–D9, the requirements and the acceptance criteria are unchanged.
+  - F1, the notifier's failure episode across automatic restarts: the stamp under `/var/lib/observability-notify` was cleared only by the `ExecStopPost=` hook when `SERVICE_RESULT=success`, and systemd 261 passes a failed result to the stop of an automatic restart (`src/core/service.c:98`), so after a restarting unit's first crash every later crash was skipped and no `RESOLVED` followed recovery (`modules/clan/services/otel-collector/flake-module.nix:305` and `:95` before this revision).
+    ADR-009 item 11 amended: every notified unit also carries an `ExecStartPost=` hook running the same script, which posts one `RESOLVED` and removes the stamp on the unit's next successful start; systemd runs it before `ExecStopPost=`, so a oneshot's stop hook finds no stamp and posts no second `RESOLVED`.
+    Because that would post a pair per crash in a crash loop, a per-unit `last-failed` timestamp rate-limits the notifier: a failure within `OBSERVABILITY_NOTIFY_MIN_INTERVAL_SEC` (900 s) of the last posted `FAILED` opens a suppressed episode that the hooks end silently, so a persistent crash loop yields one pair, then at most one new pair per 15 minutes per unit; restart-rate detection belongs to S3.
+    The collector, observed live with `Restart=always`, `RestartUSec=100ms` and `StartLimitBurst=5` per 10 s, gains `RestartSec = 5s` and `StartLimitIntervalSec = 0`, so it cannot end up permanently failed after five quick start failures; `components/otel-collector.md` and `components/fleet-alert.md` follow.
+  - F2, R7.2's ratcheting peak: the envelope compared cgroup `memory.peak` with `MemoryHigh` (`modules/lib/greptimedb-envelope.nix:176` before this revision), but `memory.peak` counts page cache and never decreases within an invocation; magnetite's live store showed `anon` 104 MB, `file` 42 MB and `memory.peak` 169 MB, so once caches filled the hourly run would fail for good.
+    ADR-007 E7.2 and R7.2 amended: R7.2 fails when `memory.events` `high` rises within one invocation, meaning the kernel throttled the store at `MemoryHigh`, tracked like `oom_kill` and `max`, and when `memory.stat` `anon` reaches `GREPTIMEDB_ENVELOPE_ANON_MAX_BYTES`, set from `MemoryHigh`, which keeps the forced-failure method of a runtime drop-in lowering the threshold; the cross-invocation OOM-journal and `NRestarts` clauses are unchanged, and `components/greptimedb.md` follows.
+  - F12, curl on the notifier's path: `ntfy-send` carries curl through `runtimeInputs` on Linux, while darwin keeps `/usr/bin/curl` through `NTFY_CURL_BIN`, so the notifier template's `path = [ curl ]` and the `RESOLVED` hook's own `PATH` export are deleted.
+  - S1's design, specs and tasks carry the same amendments, with tasks.md section 10 recording their verification.

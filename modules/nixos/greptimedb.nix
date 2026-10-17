@@ -140,7 +140,7 @@ in
           }
           {
             assertion = memoryHighGiB != null;
-            message = "services.greptimedb: greptimedb.service MemoryHigh must be whole gibibytes (\"<n>G\"); greptimedb-envelope derives its memory.peak threshold from it";
+            message = "services.greptimedb: greptimedb.service MemoryHigh must be whole gibibytes (\"<n>G\"); greptimedb-envelope derives its anonymous-memory threshold from it";
           }
         ];
 
@@ -253,7 +253,7 @@ in
           description = "GreptimeDB runtime envelope";
           after = [ "greptimedb.service" ];
           environment = {
-            GREPTIMEDB_ENVELOPE_MEMORY_PEAK_MAX_BYTES = toString (
+            GREPTIMEDB_ENVELOPE_ANON_MAX_BYTES = toString (
               lib.toInt (builtins.head memoryHighGiB) * 1024 * 1024 * 1024
             );
             GREPTIMEDB_ENVELOPE_DISK_USED_MAX_PERCENT = "80";

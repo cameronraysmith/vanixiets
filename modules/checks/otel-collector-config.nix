@@ -96,7 +96,7 @@
       matchesAllowList =
         patterns: name: lib.any (p: builtins.match (unitRegex p) "${name}.service" != null) patterns;
 
-      resolvedHook = "-\\+/nix/store/[a-z0-9]{32}-observability-notify-resolved %n";
+      resolvedHook = mode: "-\\+(/nix/store/[a-z0-9]{32}-observability-notify-resolved) ${mode} %n";
 
       input = {
         settings = collector.settings;
@@ -110,7 +110,66 @@
         notifyUnits = magnetite.services.observability-notify.units;
         schema = self.lib.otelCollectorSchema;
         storeVersion = magnetite.services.greptimedb.package.version;
+        notifierInterval =
+          magnetite.systemd.services."observability-notify@".environment.OBSERVABILITY_NOTIFY_MIN_INTERVAL_SEC
+            or null;
       };
+
+      # The notifier magnetite deploys, built from the same function the
+      # rehearsal below runs.
+      deployedNotify = self.lib.observabilityNotifyScripts self.nixosConfigurations.magnetite.pkgs {
+        ntfySend = lib.getExe self.nixosConfigurations.magnetite.pkgs.ntfy-send;
+        stampDir = "/var/lib/observability-notify";
+        hostName = "magnetite";
+      };
+
+      # The notifier's scripts against a temporary stamp directory (`$TMPDIR`
+      # expands when they run) and an ntfy-send that records each post.
+      ntfyStub = pkgs.writeShellScript "ntfy-send-stub" ''
+        printf '%s|%s\n' "$1" "$2" >> "$NTFY_STUB_LOG"
+      '';
+      rehearsedNotify = self.lib.observabilityNotifyScripts pkgs {
+        ntfySend = "${ntfyStub}";
+        stampDir = "$TMPDIR/notify";
+        hostName = "rehearsal";
+      };
+      notifierRehearsal =
+        pkgs.runCommand "observability-notify-rehearsal"
+          {
+            nativeBuildInputs = [ pkgs.coreutils ];
+            meta.description = "behavioural check: a crash loop yields one FAILED/RESOLVED pair per interval";
+          }
+          ''
+            set -euo pipefail
+            export NTFY_STUB_LOG="$TMPDIR/posts" OBSERVABILITY_NOTIFY_MIN_INTERVAL_SEC=900
+            mkdir "$TMPDIR/notify"
+            touch "$NTFY_STUB_LOG"
+            unit=opentelemetry-collector.service
+            # systemd's order for a crash with automatic restart: the stop
+            # hook with a failed result, OnFailure's notifier, then the start.
+            crash() { SERVICE_RESULT=exit-code ${rehearsedNotify.resolved} stop "$unit"; ${rehearsedNotify.failed} "$unit"; }
+            start() { ${rehearsedNotify.resolved} start "$unit"; }
+            expect() {
+              if [ "$(cat "$NTFY_STUB_LOG")" != "$2" ]; then
+                echo "FAIL: $1; posts were:" >&2
+                cat "$NTFY_STUB_LOG" >&2
+                exit 1
+              fi
+              echo "ok: $1"
+            }
+            failed="FAILED $unit on rehearsal|fleet-alerts"
+            resolved="RESOLVED $unit on rehearsal|fleet-alerts"
+
+            crash; start; crash; start
+            expect "crash, start, crash, start within the interval posts one pair" "$failed"$'\n'"$resolved"
+
+            mkdir -p "$TMPDIR/notify/last-failed"
+            echo $(( $(date +%s) - 901 )) > "$TMPDIR/notify/last-failed/$unit"
+            crash; ${rehearsedNotify.failed} "$unit"; start
+            SERVICE_RESULT=success ${rehearsedNotify.resolved} stop "$unit"
+            expect "a crash after the interval posts a new pair, once" "$failed"$'\n'"$resolved"$'\n'"$failed"$'\n'"$resolved"
+            touch "$out"
+          '';
 
       failures =
         i:
@@ -159,9 +218,24 @@
                 };
             in
             (u.unitConfig.OnFailure or null) == [ "observability-notify@%n.service" ]
-            && lib.any (hook: builtins.match resolvedHook hook != null) (
+            && lib.any (hook: builtins.match (resolvedHook "stop") hook != null) (
               lib.toList (u.serviceConfig.ExecStopPost or [ ])
             );
+          hookScripts =
+            mode: hooks:
+            lib.unique (
+              lib.concatMap (hook: lib.toList (builtins.match (resolvedHook mode) hook)) (lib.toList hooks)
+            );
+          # One script removes the one stamp, and systemd runs ExecStartPost
+          # before ExecStopPost, so a oneshot's stop hook finds no stamp after
+          # its start hook resolved and never posts RESOLVED a second time.
+          startResolves =
+            name:
+            let
+              u = i.services.${name};
+              start = hookScripts "start" (u.serviceConfig.ExecStartPost or [ ]);
+            in
+            start != [ ] && start == hookScripts "stop" (u.serviceConfig.ExecStopPost or [ ]);
           notifier = i.services."observability-notify@".serviceConfig.ExecStart or "";
           exphist = p."transform/exphist".metric_statements or [ ];
         in
@@ -326,9 +400,13 @@
           # Failure wiring (telemetry-store-interface "Failure notices are posted to one topic").
           (check "R3.1: notified units differ" (lib.naturalSort i.notifyUnits == notifiedUnits))
           (check "R3.1: a named unit is not wired to the notifier" (lib.all unitWired notifiedUnits))
-          (check "R3.1: notifier does not post to fleet-alerts with ntfy-send" (
-            lib.hasInfix "/bin/ntfy-send " notifier && lib.hasInfix " fleet-alerts" notifier
+          (check "R3.1: a notified unit lacks the start-time RESOLVED hook sharing its stop hook's script" (
+            lib.all startResolves i.notifyUnits
           ))
+          (check
+            "R3.1: notifier is not the rehearsed observability-notify-failed script with a 900 s interval"
+            (notifier == "${deployedNotify.failed} %i" && i.notifierInterval == "900")
+          )
 
           # Startup (host-metrics-collection "The collector starts after the databases exist").
           (check "R3.1: collector not ordered after the schema job" (
@@ -433,6 +511,31 @@
               };
             };
           };
+        startHookDropped =
+          i:
+          i
+          // {
+            services = i.services // {
+              opentelemetry-collector = lib.recursiveUpdate i.services.opentelemetry-collector {
+                serviceConfig.ExecStartPost = builtins.filter (
+                  hook: builtins.match (resolvedHook "start") hook == null
+                ) (lib.toList (i.services.opentelemetry-collector.serviceConfig.ExecStartPost or [ ]));
+              };
+            };
+          };
+        # A oneshot whose start hook is another script could post RESOLVED twice.
+        oneshotStartHookOtherScript =
+          i:
+          i
+          // {
+            services = i.services // {
+              greptimedb-schema = lib.recursiveUpdate i.services.greptimedb-schema {
+                serviceConfig.ExecStartPost = [
+                  "-+/nix/store/${lib.fixedWidthString 32 "0" ""}-observability-notify-resolved start %n"
+                ];
+              };
+            };
+          };
         schemaOrderDropped =
           i:
           i
@@ -482,6 +585,8 @@
                 printf '%s\n' "$result" >&2
                 exit 1
               fi
+              # The notifier's rate limit (review F1).
+              test -e ${notifierRehearsal}
               touch "$out"
             '';
       };

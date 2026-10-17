@@ -79,7 +79,7 @@ Under memory pressure on magnetite the kernel SHALL kill the build service's eva
 
 #### Scenario: The telemetry store reaches its throttle in operation
 
-- **WHEN** the telemetry store's peak memory reaches the level at which it is throttled, or the kernel kills it for exceeding its ceiling
+- **WHEN** the telemetry store is throttled at its memory level, its own memory, excluding cached file data, reaches that level, or the kernel kills it for exceeding its ceiling
 - **THEN** the hourly envelope regulator fails and a failure notice reaches a person, and at magnetite's first activation a deliberately lowered threshold is shown to make that regulator fail
 
 #### Scenario: Memory runs out with all three services drawing
@@ -149,7 +149,7 @@ A failure of the telemetry store, of the unit that sets up its databases, of its
 
 #### Scenario: The hourly envelope regulator is made to fail at first activation
 
-- **WHEN** at magnetite's first activation the hourly envelope regulator's memory threshold is set below the telemetry store's observed peak and the regulator runs
+- **WHEN** at magnetite's first activation the hourly envelope regulator's memory threshold is set below the telemetry store's observed memory and the regulator runs
 - **THEN** the regulator fails, a failure notice naming it and magnetite appears on the fleet's notification service, and the operator records that notice
 
 #### Scenario: The notification service is unreachable

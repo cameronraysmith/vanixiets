@@ -194,13 +194,18 @@ The dataset `zroot/root/greptimedb` SHALL carry `quota=16G`, `reservation=12G` a
 
 #### Scenario: The hourly envelope regulator finds the store over its envelope
 
-- **WHEN** `greptimedb-envelope` runs as `regulator` and the store's cgroup `memory.peak` has reached `MemoryHigh`, its `memory.events` `oom_kill` or `max` counters have increased within one store invocation, or, across invocations, the journal for `greptimedb.service` records a kernel OOM kill (`MESSAGE_ID=fe6faa94e7774663a0da52717891d8ef`) or `NRestarts` has increased (R7.2), the dataset's used space has reached 80% of its quota or the quota or reservation differs from its declared value (R7.3), or the summed SST size in `information_schema.region_statistics` has reached 50 GiB (R6.2)
+- **WHEN** `greptimedb-envelope` runs as `regulator` and the store's cgroup `memory.stat` `anon` has reached `GREPTIMEDB_ENVELOPE_ANON_MAX_BYTES`, which is set from `MemoryHigh`, its `memory.events` `high`, `oom_kill` or `max` counters have increased within one store invocation, or, across invocations, the journal for `greptimedb.service` records a kernel OOM kill (`MESSAGE_ID=fe6faa94e7774663a0da52717891d8ef`) or `NRestarts` has increased (R7.2), the dataset's used space has reached 80% of its quota or the quota or reservation differs from its declared value (R7.3), or the summed SST size in `information_schema.region_statistics` has reached 50 GiB (R6.2)
 - **THEN** the unit fails
 
 #### Scenario: The memory regulator is shown able to fail
 
-- **WHEN** at first activation the `memory.peak` threshold is set below the observed peak and `greptimedb-envelope` runs
+- **WHEN** at first activation the anonymous-memory threshold is set below the observed value and `greptimedb-envelope` runs
 - **THEN** the unit fails, and the operator records the failed run
+
+#### Scenario: Page cache alone does not fail the memory regulator
+
+- **WHEN** the envelope's build-time rehearsal runs the R7.2 regulator over `memory.events` and `memory.stat` recorded on magnetite, with a threshold above `anon` but below `memory.peak`, and then with `memory.events` `high` raised within the same invocation
+- **THEN** the first run passes and the second fails naming `high`, its baseline and its new value
 
 #### Scenario: The OOM kill order is exercised
 
@@ -322,6 +327,25 @@ The machine SHALL provide the template `observability-notify@.service` in the co
 
 - **WHEN** `greptimedb-envelope` is made to fail at first activation
 - **THEN** a message naming `greptimedb-envelope.service` and magnetite appears on `fleet-alerts`, and the operator records it
+
+### Requirement: A failure episode ends at the unit's next successful start or exit
+
+Each unit that sets `OnFailure=observability-notify@%n.service` SHALL carry an `ExecStartPost=` and an `ExecStopPost=` hook running one script that posts one `RESOLVED` and ends the failure episode at the unit's next successful start or exit.
+
+#### Scenario: Failure notices continue across automatic restarts
+
+- **WHEN** a notified unit fails, systemd restarts it automatically, it starts successfully, and it later fails again
+- **THEN** the successful start posts one `RESOLVED` and ends the episode, so the later failure posts a new notice, and a oneshot posts no second `RESOLVED` on its stop because its start hook already removed the stamp
+
+#### Scenario: A unit's start-time recovery hook is removed
+
+- **WHEN** a mutant of magnetite's configuration drops the `RESOLVED` `ExecStartPost=` hook from one notified unit, or gives a oneshot's start hook a script other than its stop hook's
+- **THEN** the evaluation-time collector check (R3.1) fails on its failure-wiring clause
+
+#### Scenario: A crash loop is rate-limited
+
+- **WHEN** the collector check's rehearsal runs the notifier's scripts against a temporary stamp directory and a recording `ntfy-send`, with a crash, a start, a crash and a start within 15 minutes, then a crash after 15 minutes
+- **THEN** the first two crashes post exactly one `FAILED` and one `RESOLVED`, and the later crash posts a new `FAILED` and `RESOLVED`, so a persistent crash loop yields one pair, then at most one new pair per 15 minutes per unit
 
 ### Requirement: This capability states its own trust boundary
 

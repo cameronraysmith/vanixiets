@@ -125,10 +125,15 @@ No worker holds any credential (A8:91).
 ### Failure path
 
 `greptimedb.service`, `greptimedb-schema.service`, `greptimedb-envelope.service`, `opentelemetry-collector.service` and the nine `zfs-assert-*` and `zfs-set-*` oneshots set `OnFailure=observability-notify@%n.service`.
-magnetite's host configuration lists these units in `services.observability-notify.units`, which the `agent` role's module declares; for each listed unit the module sets `OnFailure=` and the `RESOLVED` `ExecStopPost=` described below, and it lists `opentelemetry-collector` itself, so `greptimedb.nix` never references the notifier.
+magnetite's host configuration lists these units in `services.observability-notify.units`, which the `agent` role's module declares; for each listed unit the module sets `OnFailure=` and the `RESOLVED` `ExecStartPost=` and `ExecStopPost=` hooks described below, and it lists `opentelemetry-collector` itself, so `greptimedb.nix` never references the notifier.
 The template instance runs `ntfy-send` with the failed unit's name and the host, posting to the topic `fleet-alerts` at `https://ntfy.zt` on cinnabar (ADR-009 item 11).
 It posts once per failure episode: it writes a stamp file per unit under `/var/lib/observability-notify` and skips the post while that stamp exists.
-Each notified unit carries an `ExecStopPost=` hook that, when the unit next exits successfully and its stamp exists, posts one `RESOLVED` message and removes the stamp.
+Each notified unit carries an `ExecStartPost=` and an `ExecStopPost=` hook running one script that, when the unit next starts or exits successfully and its stamp exists, posts one `RESOLVED` message and removes the stamp.
+The start hook ends an episode across automatic restarts, because systemd reports an automatic restart's stop as a failure, so a stop-only hook never resolved a restarting unit and its stamp silenced every later crash (charter v14, review F1).
+systemd runs `ExecStartPost=` before `ExecStopPost=`, so a oneshot's stop hook finds no stamp and posts no second `RESOLVED`.
+A per-unit `last-failed` timestamp under `/var/lib/observability-notify/last-failed/`, which no resolve removes, rate-limits the notifier: a failure within `OBSERVABILITY_NOTIFY_MIN_INTERVAL_SEC` (900 s) of the last posted `FAILED` opens a `suppressed` episode, which the hooks end silently.
+A persistent crash loop therefore yields one `FAILED`/`RESOLVED` pair, then at most one new pair per 15 minutes per unit; detecting crash loops by restart rate belongs to S3.
+The collector sets `RestartSec = 5s` and `StartLimitIntervalSec = 0`, as the store does, so five quick start failures cannot leave it permanently failed.
 ntfy has no authentication (`modules/machines/nixos/cinnabar/ntfy.nix`), so ZeroTier membership is the access boundary and the notifier holds no credential.
 
 ### D1: Package GreptimeDB 1.2.1 from the upstream binary as `greptimedb-bin`
@@ -152,6 +157,7 @@ ntfy has no authentication (`modules/machines/nixos/cinnabar/ntfy.nix`), so Zero
 - **Choice**: the script and its package move to `pkgs/by-name/ntfy-send`, and the home-manager module moves from `modules/home/tools/commands/system/ntfy-send.nix` to `modules/home/tools/ntfy-send.nix`, following the convention in `modules/home/tools/repo-sync.nix:1-3`; the home-manager command, the notifier and S3's evaluator consume the package.
 - **Boundary**: source versus delivered.
   One source now delivers to two places, a user's profile and a system unit's `ExecStart`, so behaviour such as the `-k` TLS convention (`ntfy-send.sh:30-34`) stays identical in both.
+  On Linux the package carries curl through `runtimeInputs`, and darwin keeps `/usr/bin/curl` through `NTFY_CURL_BIN`, so a unit running it needs no `path` of its own (charter v14, review F12).
 - **Rationale**: ADR-003 and ADR-009 require the notifier to call the existing `ntfy-send` rather than a second client (A3:241; ADR-009 item 10).
 - **Alternatives considered**: a second curl wrapper inside the collector module, rejected because two senders would diverge.
 
@@ -257,7 +263,7 @@ ntfy has no authentication (`modules/machines/nixos/cinnabar/ntfy.nix`), so Zero
 ### D10: The failure notifier lands in S1
 
 - **Choice**: the `observability-notify@.service` template sits in the `agent` role's NixOS module (A3:241), runs `ntfy-send` from D2 against `https://ntfy.zt`, and is the `OnFailure=` target of every unit in the failure path above, wired through `services.observability-notify.units`.
-  It ships in its final ADR-009 item 11 form: topic `fleet-alerts`, one post per failure episode guarded by the per-unit stamp file, and the `ExecStopPost=` `RESOLVED` hook on each notified unit.
+  It ships in its final ADR-009 item 11 form: topic `fleet-alerts`, one post per failure episode guarded by the per-unit stamp file, and the `ExecStartPost=` and `ExecStopPost=` `RESOLVED` hooks on each notified unit.
   S3 adds only the `alerter` credential if it turns on ntfy access control, and does not rewrite the template.
 - **Rationale**: S1's own units then report failures from their first deployment, and R7.2 needs no alerting component (A7:140).
   The collector is wired too, because a collector that stops exporting leaves the store silent with no other S1 signal to show it.
@@ -285,7 +291,8 @@ ntfy has no authentication (`modules/machines/nixos/cinnabar/ntfy.nix`), so Zero
 
 ### D12: Hourly runtime envelope
 
-- **Choice**: `greptimedb-envelope.timer` runs `greptimedb-envelope.service` hourly with the `regulator` credential, asserting R6.2 (sum of `sst_size` under 50 GiB), R6.3 (no legacy `sst_format`), R6.4's readiness probe, R7.2 (cgroup `memory.peak` below `MemoryHigh`, `memory.events` `oom_kill` and `max` not increasing), R7.3 (used under 80% of quota; quota and reservation equal the declared values), R7.4 (the sha256 in `/run/greptimedb/loaded-users.sha256` equals the generator's public `users-sha256`; a mismatch or a missing file fails), and that no table carries its own TTL overriding its database's (F1).
+- **Choice**: `greptimedb-envelope.timer` runs `greptimedb-envelope.service` hourly with the `regulator` credential, asserting R6.2 (sum of `sst_size` under 50 GiB), R6.3 (no legacy `sst_format`), R6.4's readiness probe, R7.2 (cgroup `memory.stat` `anon` below `GREPTIMEDB_ENVELOPE_ANON_MAX_BYTES`, set from `MemoryHigh`; `memory.events` `high`, `oom_kill` and `max` not increasing), R7.3 (used under 80% of quota; quota and reservation equal the declared values), R7.4 (the sha256 in `/run/greptimedb/loaded-users.sha256` equals the generator's public `users-sha256`; a mismatch or a missing file fails), and that no table carries its own TTL overriding its database's (F1).
+  R7.2 does not bound `memory.peak`, because it counts page cache and never decreases within an invocation, so it would fail every run once caches fill; a rise in `high` means the kernel throttled the store at `MemoryHigh` (charter v14, review F2).
   R7.2's cgroup counters restart with each store invocation, so the envelope keeps its baseline keyed by `InvocationID`; a new invocation fails the run if the journal for `greptimedb.service` since the baseline holds `MESSAGE_ID=fe6faa94e7774663a0da52717891d8ef`, systemd 261.3's "The kernel OOM killer killed some processes in this unit.", or if `NRestarts` increased.
   The unit runs unprivileged under `DynamicUser` with `SupplementaryGroups = systemd-journal`, and R7.3 reads used space, quota and reservation with `zfs get -Hp`.
   R7.4 compares hashes rather than the store's start time with the users file's modification time, because sops-nix rewrites every secret with a new modification time on each activation (P1).
@@ -301,7 +308,7 @@ ntfy has no authentication (`modules/machines/nixos/cinnabar/ntfy.nix`), so Zero
   - A systemd-nspawn `containers` test (`pkgs.testers.runNixOSTest`, `nixos/lib/testing/driver-configuration.nix:68-71`), requiring `nixos-test` and `uid-range` and therefore buildable on magnetite, covers the pipeline: readiness, the schema oneshot's create and alter of TTL, the auth matrix (no credential 401, wrong password 401, `collector:wo` read 403, `collector:wo` write 200, `perses:ro` read 200, `perses:ro` write 403, `regulator:ro` read 200, `admin` read and write 200), OTLP ingest through the routing connector, a PromQL read back with `x-greptime-db-name`, the systemd receiver reaching D-Bus under `DynamicUser`, the owner alias (the stored `systemd_unit_name` is the alias, and no stored value contains the owner), a store restart (stop `greptimedb.service`, emit, start it, and read the emitted interval back), and R1.1's runtime side: `GET http://127.0.0.1:4000/dashboard/` returns 200.
   - Survival of a store restart is discharged twice: R3.1's queue clause proves the configuration persists the queue, and the container test's restart case proves the queued interval reaches the store.
   - A QEMU `nodes` test requiring `kvm` and `nixos-test` with `qemu.forceAccel`, which routes only to pyrite, covers the OOM kill order evaluator 900, store 500, collector 300: the kernel's victim lines, each carrying `,global_oom,`, name the three units in that order, all three units log systemd's OOM-kill message, and only `greptimedb.service` is asserted to end with result `oom-kill`, because a unit whose only process was the victim may record `signal` instead.
-  - Deployment on magnetite covers what needs the real host, recorded in `verify.md`: R2 works, ZFS quota and reservation are enforced, the zram paging series exists, R7.2 fails when its threshold is set below the observed peak (A7:141), `host.name` series answer through SQL and PromQL, no log or trace tables exist, the observed count of distinct process names is at most 30, and the measured `fleet` queue rate is compared with the assumed `fleetBytesPerMinute`.
+  - Deployment on magnetite covers what needs the real host, recorded in `verify.md`: R2 works, ZFS quota and reservation are enforced, the zram paging series exists, R7.2 fails when its threshold is set below the observed value (A7:141), `host.name` series answer through SQL and PromQL, no log or trace tables exist, the observed count of distinct process names is at most 30, and the measured `fleet` queue rate is compared with the assumed `fleetBytesPerMinute`.
   - Both runtime tests live in the on-demand `vmTests` lane (`modules/vm-tests/default.nix`), outside `checks`.
 - **Rationale**: a container shares the host kernel, so the OOM killer in a container is the host's; only a VM can test the kill order.
   Everything else in the pipeline needs only process isolation, which nspawn gives on magnetite without KVM.
@@ -320,7 +327,7 @@ ntfy has no authentication (`modules/machines/nixos/cinnabar/ntfy.nix`), so Zero
 ## Risks / Trade-offs
 
 - [Risk] The R2 stanza is unexercised and may fail on first write (A6:31; GC:154 item a). → Mitigation: R6.4's readiness probe surfaces it; the fallback is local `File` storage with a quota increase (A6:85,123), recorded in `verify.md`.
-- [Risk] The store's real peak RSS is unmeasured (A7:102). → Mitigation: R7.2 measures `memory.peak` hourly against `MemoryHigh`, and `MemoryMax` bounds the damage; the ceiling is revised only on R7.2 evidence (A7:179).
+- [Risk] The store's real peak RSS is unmeasured (A7:102). → Mitigation: R7.2 measures anonymous memory and throttling at `MemoryHigh` hourly, and `MemoryMax` bounds the damage; the ceiling is revised only on R7.2 evidence (A7:179).
 - [Risk] The systemd receiver is alpha and may not reach D-Bus under `DynamicUser`. → Mitigation: the container test asserts unit-state series arrive; on failure the collector unit gains the D-Bus access it needs.
 - [Risk] `greptimedb-bin` falls behind upstream's stable releases. → Mitigation: `update.sh` and `apps.update-greptimedb-bin` track stable releases, and R1.1 rejects a prerelease.
 - [Risk] A malformed users line is skipped silently and a user loses access without an error (F2). → Mitigation: hex passwords and the four-line check.
