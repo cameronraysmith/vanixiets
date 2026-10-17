@@ -62,7 +62,8 @@ Runtime VM tests that need KVM live in the non-gating `vmTests` lane because the
 - **Alternatives considered**: O2, every member writes the tree (setgid `2775`, default ACL, `core.sharedRepository=group`, `safe.directory` admitting the root). Rejected: any member, including an agent working as `omnigent-cameron`, could plant configuration that runs as `cameron` or `crs58`, who hold signing keys, secrets and sudo. O3, human accounts write and agent accounts read. Rejected: it removes the agent-to-human direction but keeps every human able to plant configuration that runs as the other human and as every agent, and it still admits the tree through `safe.directory`.
 - **Accepted costs**: every acquisition, update, deepen and promotion is delegated (D5); readers' `git fetch` and `git gc` fail; `git status` cannot refresh the index and reports from the stale one.
 - **Condition**: the user's approval is conditional on runtime evidence that the model works as intended (D8, D9).
-- **Darwin naming — decided 2026-10-16**: the darwin writer is `_ghq`, following the macOS convention for system accounts. Its UID/GID is chosen at apply time from live `dscl` collision evidence and committed only after the user approves it.
+- **Darwin naming — decided 2026-10-16**: the darwin writer is `_ghq`, following the macOS convention for system accounts.
+- **Darwin UID/GID — approved by the user 2026-10-17**: `_ghq` takes UID 460 and GID 460 on stibnite, declared as `services.shared-reference-tree.writerId`. Live `dscl` evidence on stibnite (recorded in `logs/ghq-dscl-evidence-20261017-*.log`, outside version control) showed 460 free as both UID and GID; in use nearby were Apple system accounts 200–308, rosettabuilder 349, nixbld 350–382, `com.apple.access_*` groups 395–400, `_oahd` 441, nix-grpc-daemon 450, crs58 501, runner 502, nixbuild 530, `_dnscrypt-proxy` 535 and omnigent-cameron 551. 460 sits below 500, in the macOS system-account range the `_` prefix denotes, clear of Apple's growing range, the nix build users and the nix-grpc-daemon default.
 - **Boundary**: first-party. No vendored module is modified; the writer, group and directory are first-party NixOS and nix-darwin declarations.
 
 ### D4: Participation is a platform-neutral host option consumed by a Home Manager option
@@ -180,5 +181,4 @@ No row carries an `est-property`, `est-contract`, or `est-symbolic` modality, so
 
 ## Open Questions
 
-- Darwin writer UID/GID: chosen at apply time from live `dscl` collision evidence (existing: 501 `crs58`, 551 `omnigent-cameron`, 450 nix-grpc-daemon, 535 `_dnscrypt-proxy`) and committed only after the user approves it.
 - Whether `vmTests.x86_64-linux.shared-reference-tree` should become merge-gating once a KVM-capable CI builder exists.

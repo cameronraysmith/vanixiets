@@ -41,6 +41,14 @@ in
           exec ${lib.getExe pkgs.python3} ${../home/ai/omnigent/keychain.py} ${policy}
         ''
       ) keychains;
+      # The worker's own private group, by its primary gid. Membership-derived
+      # groups (groupsFor) sort by name, so a shared group such as _ghq would
+      # otherwise sort first and become the group of the worker's secrets.
+      primaryGroup =
+        worker:
+        lib.findFirst (name: config.users.groups.${name}.gid == (account worker).gid)
+          (throw "Omnigent worker ${worker.user}: no declared group carries its primary gid")
+          (lib.attrNames config.users.groups);
       groupsFor =
         worker:
         lib.attrNames (
@@ -54,7 +62,7 @@ in
           inherit pkgs worker;
           osConfig = config;
           home = homeFor worker;
-          group = lib.head (groupsFor worker);
+          group = primaryGroup worker;
           serverUrl = cfg.serverUrl;
         }
       ) workers;
@@ -469,7 +477,7 @@ in
                       secret = true;
                       neededFor = "services";
                       owner = worker.user;
-                      group = lib.head (groupsFor worker);
+                      group = primaryGroup worker;
                       mode = "0400";
                     };
                     runtimeInputs = [ pkgs.openssl ];

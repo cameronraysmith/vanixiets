@@ -25,6 +25,11 @@ let
           default = "/var/lib/ghq";
           description = "Shared ghq root.";
         };
+        writerId = lib.mkOption {
+          type = lib.types.nullOr lib.types.ints.positive;
+          default = null;
+          description = "Darwin only: the operator-approved UID, also used as GID, of the writer account; NixOS allocates its own.";
+        };
         allowedProtocols = lib.mkOption {
           type = lib.types.listOf (lib.types.strMatching "[a-z][a-z0-9+.-]*");
           default = [ "https" ];

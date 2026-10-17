@@ -47,6 +47,9 @@ in
           "crs58"
           "omnigent-cameron"
         ];
+        # Approved 2026-10-17 from live dscl collision evidence on stibnite;
+        # see openspec/changes/share-ghq-reference-tree/design.md (D3).
+        writerId = 460;
       };
 
       # Re-enable documentation for laptop use
