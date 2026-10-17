@@ -46,6 +46,7 @@ esac
 
 lazy=0
 update=0
+tags=0
 targets=()
 while [ "$#" -gt 0 ]; do
   case "$1" in
@@ -57,6 +58,7 @@ while [ "$#" -gt 0 ]; do
     --partial=blobless) ;;
     --no-recursive | -P | --parallel | -s | --silent) ;;
     -u | --update) update=1 ;;
+    --tags) tags=1 ;;
     --)
       shift
       targets+=("$@")
@@ -77,11 +79,14 @@ fi
 flags=()
 if [ "$lazy" = 1 ]; then flags+=(--lazy); fi
 if [ "$update" = 1 ]; then flags+=(--update); fi
+if [ "$tags" = 1 ]; then flags+=(--tags); fi
 
 # A directory inside the shared root names the repository that contains it, as
-# host/owner/repo; the writer only ever receives that form. An explicit path
-# outside the root is an error; a bare name that happens to exist locally is a
-# ghq target, as it is for ghq itself.
+# host/owner/repo; the writer only ever receives that form. A submodule's
+# working tree has a .git file, not a directory, so the walk passes it and names
+# the superproject, which is what ghq clones. An explicit path outside the root
+# is an error; a bare name that happens to exist locally is a ghq target, as it
+# is for ghq itself.
 root_real=$("$realpath" -m -- "$shared_root")
 normalize() {
   local target=$1 dir
@@ -102,7 +107,7 @@ normalize() {
       return 0
       ;;
   esac
-  while [ "$dir" != "$root_real" ] && [ ! -e "$dir/.git" ]; do
+  while [ "$dir" != "$root_real" ] && [ ! -d "$dir/.git" ]; do
     dir=$(dirname -- "$dir")
   done
   [ "$dir" != "$root_real" ] || refuse "$target is not inside a repository under $shared_root"

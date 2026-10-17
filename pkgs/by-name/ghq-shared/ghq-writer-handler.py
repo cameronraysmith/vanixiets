@@ -24,9 +24,15 @@ GHQ_SYNC = "@ghqSync@"
 TOOL_PATH = "@toolPath@"
 
 MAX_REQUEST = 4096
+READ_TIMEOUT = 30
 TARGET = re.compile(r"[A-Za-z0-9][A-Za-z0-9._~:/@+%-]*\Z")
 SCHEME = re.compile(r"([A-Za-z][A-Za-z0-9+.-]*)://")
-ACTIONS = {"get", "deepen", "promote"}
+FIELDS = {
+    "get": {"action", "target", "lazy", "update", "tags"},
+    "deepen": {"action", "depth", "path"},
+    "promote": {"action", "path"},
+}
+BOOLEANS = ("lazy", "update", "tags")
 
 
 class Refused(Exception):
@@ -60,6 +66,8 @@ def check_target(target, allowed):
     scheme = SCHEME.match(target)
     if scheme and scheme.group(1).lower() not in allowed:
         raise Refused(f"protocol {scheme.group(1)!r} is not allowed")
+    if scheme and not target[scheme.end():].split("/", 1)[0].rpartition("@")[2]:
+        raise Refused("target URL has no host")
     return target
 
 
@@ -73,9 +81,15 @@ def check_path(path, root):
 
 
 def command(request, config):
-    if not isinstance(request, dict) or request.get("action") not in ACTIONS:
+    if not isinstance(request, dict) or request.get("action") not in FIELDS:
         raise Refused("action must be one of get, deepen, promote")
     action = request["action"]
+    unknown = set(request) - FIELDS[action]
+    if unknown:
+        raise Refused(f"unknown field(s) for {action}: {', '.join(sorted(unknown))}")
+    for flag in BOOLEANS:
+        if flag in request and type(request[flag]) is not bool:
+            raise Refused(f"{flag} must be a boolean")
     if action == "get":
         argv = [GHQ, "get"]
         if request.get("lazy") is True:
@@ -112,24 +126,120 @@ def environment(config):
     return env
 
 
+def repo_dir(target, root):
+    """The clone directory ghq uses for target, or None when it is not cloned."""
+    name = re.sub(r"^[A-Za-z][A-Za-z0-9+.-]*://", "", target)
+    if "://" not in target and re.match(r"^[^/]+@[^/:]+:", name):
+        name = name.split("@", 1)[1].replace(":", "/", 1)
+    name = name.split("@", 1)[-1] if "@" in name.split("/", 1)[0] else name
+    name = re.sub(r"\.git/?$", "", name).rstrip("/")
+    if name.count("/") == 1:
+        name = "github.com/" + name
+    # ghq resolves a name without "/" under its github.com user owner, not <root>/<name>.
+    if "/" not in name:
+        return None
+    path = os.path.realpath(os.path.join(root, name))
+    if not path.startswith(os.path.realpath(root) + os.sep):
+        return None
+    return path if os.path.isdir(os.path.join(path, ".git")) else None
+
+
+def git(path, env, *args, stdin=None):
+    return subprocess.run(["git", "-C", path, *args], env=env, input=stdin, capture_output=True, timeout=3600)
+
+
+def shallow_tags(path, env):
+    """Fetch remote tags into a shallow clone without moving its history boundary.
+
+    A tags-only fetch at --depth=1 marks every fetched tag commit as a shallow
+    boundary, including tags inside the history already present, which cuts a
+    deepened branch back to depth 1. So tags whose commits are present are fetched
+    without --depth (only the tag objects travel), and only tags whose commits are
+    absent are fetched at depth 1. A tag that moved upstream is not forced,
+    matching plain `git fetch --tags`, which rejects it as clobbering.
+    """
+    listed = git(path, env, "ls-remote", "--tags", "origin")
+    if listed.returncode:
+        return [listed]
+    tag_object, tag_commit = {}, {}
+    for line in listed.stdout.decode().splitlines():
+        sha, tab, ref = line.partition("\t")
+        if not tab:
+            message = f"ghq-writer: unexpected ls-remote output: {line!r}\n"
+            return [subprocess.CompletedProcess(listed.args, 1, b"", message.encode())]
+        if ref.endswith("^{}"):
+            tag_commit[ref[:-3]] = sha
+        else:
+            tag_object[ref] = sha
+            tag_commit.setdefault(ref, sha)
+    if not tag_object:
+        return []
+    local = git(path, env, "for-each-ref", "--format=%(refname) %(objectname)", "refs/tags")
+    have = dict(line.split(" ", 1) for line in local.stdout.decode().splitlines() if line)
+    wanted = sorted(ref for ref, sha in tag_object.items() if have.get(ref) != sha)
+    if not wanted:
+        return []
+    # In a partial clone, asking about a missing object would fetch it from the
+    # promisor remote and make every tag look present.
+    probe = git(path, {**env, "GIT_NO_LAZY_FETCH": "1"}, "cat-file", "--batch-check=%(objectname)",
+                stdin="".join(f"{tag_commit[ref]}^{{commit}}\n" for ref in wanted).encode())
+    present = set(probe.stdout.decode().split())
+    near = [ref for ref in wanted if tag_commit[ref] in present]
+    far = [ref for ref in wanted if tag_commit[ref] not in present]
+    results = []
+    for refs, depth in ((near, []), (far, ["--depth=1"])):
+        if refs:
+            spec = "".join(f"{ref}:{ref}\n" for ref in refs).encode()
+            results.append(git(path, env, "fetch", "--no-tags", *depth, "--stdin", "origin", stdin=spec))
+    return results
+
+
+def run_get(request, argv, config, env):
+    """ghq get, with the tag fetches the request and clone shape call for."""
+    results = []
+    path = repo_dir(request["target"], config["root"])
+    full = path and git(path, env, "rev-parse", "--is-shallow-repository").stdout.strip() == b"false"
+    if path and full and request.get("update") is True:
+        results.append(git(path, env, "fetch", "--tags", "origin"))
+    results.append(subprocess.run(argv, env=env, stdin=subprocess.DEVNULL, capture_output=True, timeout=3600))
+    if request.get("tags") is True:
+        path = repo_dir(request["target"], config["root"])
+        if path and git(path, env, "rev-parse", "--is-shallow-repository").stdout.strip() == b"true":
+            results.extend(shallow_tags(path, env))
+        elif path and not (full and request.get("update") is True):
+            results.append(git(path, env, "fetch", "--tags", "origin"))
+    return results
+
+
 def serve(conn, config):
     uid = peer_uid(conn)
+    # Under per-connection activation an idle connection holds a handler process.
+    conn.settimeout(READ_TIMEOUT)
     # Read before refusing, so an unauthorized caller gets a reply rather than a reset.
-    raw = conn.makefile("rb").readline(MAX_REQUEST + 1)
+    try:
+        raw = conn.makefile("rb").readline(MAX_REQUEST + 1)
+    except TimeoutError:
+        raw = None
     if not authorized(uid, config["group"]):
         return {"stdout": "", "stderr": f"ghq-writer: uid {uid} is not a member of {config['group']}\n", "exit": 13}, uid, None
     try:
+        if raw is None:
+            raise Refused(f"no complete request within {READ_TIMEOUT} s")
         if len(raw) > MAX_REQUEST:
             raise Refused("request exceeds 4 KiB")
         request = json.loads(raw)
         argv = command(request, config)
     except (Refused, ValueError) as refusal:
         return {"stdout": "", "stderr": f"ghq-writer: refused: {refusal}\n", "exit": 2}, uid, None
-    result = subprocess.run(argv, env=environment(config), stdin=subprocess.DEVNULL, capture_output=True, timeout=3600)
+    env = environment(config)
+    if request["action"] == "get":
+        results = run_get(request, argv, config, env)
+    else:
+        results = [subprocess.run(argv, env=env, stdin=subprocess.DEVNULL, capture_output=True, timeout=3600)]
     reply = {
-        "stdout": result.stdout.decode(errors="replace"),
-        "stderr": result.stderr.decode(errors="replace"),
-        "exit": result.returncode,
+        "stdout": "".join(r.stdout.decode(errors="replace") for r in results),
+        "stderr": "".join(r.stderr.decode(errors="replace") for r in results),
+        "exit": next((r.returncode for r in results if r.returncode), 0),
     }
     return reply, uid, argv
 

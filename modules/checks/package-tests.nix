@@ -21,9 +21,11 @@
       declared = {
         atomic = [ "help" ];
         ghq-shared = [
+          "acl"
           "handler"
           "wrapper"
         ];
+        ntfy-send = [ "token-transport" ];
         playwright-cli = [ "smoke" ];
         stack-land = [ "integration" ];
         vanixiets-docs = [

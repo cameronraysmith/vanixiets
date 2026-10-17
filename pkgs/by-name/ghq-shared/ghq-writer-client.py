@@ -1,7 +1,7 @@
 """Send one request to the shared ghq tree's writer and relay its reply.
 
 Usage:
-  ghq-writer-client get [--lazy] [--update] TARGET
+  ghq-writer-client get [--lazy] [--update] [--tags] TARGET
   ghq-writer-client deepen N PATH
   ghq-writer-client promote PATH
 """
@@ -17,9 +17,15 @@ SOCKET = "@socket@"
 def request(argv):
     if argv[:1] == ["get"]:
         flags, target = argv[1:-1], argv[-1:]
-        if not target or any(flag not in ("--lazy", "--update") for flag in flags):
+        if not target or any(flag not in ("--lazy", "--update", "--tags") for flag in flags):
             raise SystemExit(__doc__)
-        return {"action": "get", "target": target[0], "lazy": "--lazy" in flags, "update": "--update" in flags}
+        return {
+            "action": "get",
+            "target": target[0],
+            "lazy": "--lazy" in flags,
+            "update": "--update" in flags,
+            "tags": "--tags" in flags,
+        }
     if len(argv) == 3 and argv[0] == "deepen" and argv[1].isdigit():
         return {"action": "deepen", "depth": int(argv[1]), "path": os.path.realpath(argv[2])}
     if len(argv) == 2 and argv[0] == "promote":

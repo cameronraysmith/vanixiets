@@ -37,6 +37,9 @@ Options:
   --all [QUERY]    Use `ghq list [QUERY]` as the target set. The single optional
                    positional is the ghq list QUERY.
   -u, --update     Pass ghq's -u to update already-cloned repos (fetch mode).
+  --tags           On a host-shared tree, also fetch the remote's tags; full clones
+                   always fetch tags on update, shallow clones fetch absent tags at
+                   depth 1 without moving their history boundary (fetch mode).
   -j, --jobs N     Bounded concurrency for --deepen/--full (default: 6).
   -n, --dry-run    Print intended actions for --deepen/--full/--all/--seed-zoxide;
                    no mutation.
@@ -71,7 +74,8 @@ is_pos_int() {
 }
 
 # An existing directory under $(ghq root) becomes its repository's
-# host/owner/project for ghq get; anything else passes through unchanged.
+# host/owner/project for ghq get; anything else passes through unchanged. A
+# submodule's working tree has a .git file, so the walk names its superproject.
 normalize_target() {
   local target="$1" root dir
   if [ ! -d "$target" ]; then
@@ -87,7 +91,7 @@ normalize_target() {
       return 0
       ;;
   esac
-  while [ "$dir" != "$root" ] && [ ! -e "$dir/.git" ]; do
+  while [ "$dir" != "$root" ] && [ ! -d "$dir/.git" ]; do
     dir="$(dirname -- "$dir")"
   done
   if [ "$dir" = "$root" ]; then
@@ -227,6 +231,7 @@ run_pool() {
 
 mode=fetch
 update=0
+tags=0
 all=0
 dry_run=0
 jobs=6
@@ -236,6 +241,7 @@ targets=()
 while [ "$#" -gt 0 ]; do
   case "$1" in
     -u | --update) update=1 ;;
+    --tags) tags=1 ;;
     --full) mode=full ;;
     --seed-zoxide) mode=seed ;;
     --all) all=1 ;;
@@ -281,6 +287,9 @@ fi
 if [ "$mode" = deepen ] && ! is_pos_int "$deepen_n"; then
   die "--deepen requires a positive integer: $deepen_n"
 fi
+if [ "$tags" = 1 ] && { [ "$mode" = deepen ] || [ "$mode" = full ]; }; then
+  die "--tags cannot be combined with --deepen or --full"
+fi
 
 if [ "$all" = 1 ]; then
   if [ "${#targets[@]}" -gt 1 ]; then
@@ -307,6 +316,10 @@ case "$mode" in
     done
     getflags=(get --shallow --partial blobless --no-recursive -P)
     if [ "$update" = 1 ]; then getflags+=(-u); fi
+    if [ "$tags" = 1 ]; then
+      [ -n "${GHQ_SYNC_DELEGATE:-}" ] || die "--tags needs a host-shared ghq tree; elsewhere run git fetch --tags in the clone"
+      getflags+=(--tags)
+    fi
     if [ "$all" = 1 ] && [ "${#targets[@]}" -eq 0 ]; then
       exit 0
     fi

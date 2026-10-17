@@ -7,6 +7,7 @@
   ghq-sync,
   git,
   coreutils,
+  acl,
   shellcheck,
   callPackage,
   sharedRoot ? "/var/lib/ghq",
@@ -50,7 +51,11 @@ stdenvNoCC.mkDerivation (finalAttrs: {
     substituteInPlace $libexec/ghq-writer-client --replace-fail @socket@ ${socket}
     substituteInPlace $out/bin/ghq-shared-migrate \
       --replace-fail @git@ ${git}/bin/git \
-      --replace-fail @cp@ ${coreutils}/bin/cp
+      --replace-fail @cp@ ${coreutils}/bin/cp \
+      --replace-fail @getfacl@ ${
+        # darwin probes ACLs with its own find(1); getfacl is Linux-only.
+        if stdenvNoCC.hostPlatform.isLinux then "${acl}/bin/getfacl" else "/usr/bin/false"
+      }
     substituteInPlace $out/bin/ghq \
       --replace-fail @ghq@ ${ghq}/bin/ghq \
       --replace-fail @client@ $libexec/ghq-writer-client \
@@ -75,7 +80,8 @@ stdenvNoCC.mkDerivation (finalAttrs: {
   passthru = {
     inherit socket;
     tests.handler = callPackage ./test-handler.nix { ghq-shared = finalAttrs.finalPackage; };
-    tests.wrapper = callPackage ./test-wrapper.nix { };
+    tests.wrapper = callPackage ./test-wrapper.nix { ghq-shared = finalAttrs.finalPackage; };
+    tests.acl = callPackage ./test-acl.nix { ghq-shared = finalAttrs.finalPackage; };
   };
 
   meta = {
