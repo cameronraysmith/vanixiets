@@ -9,6 +9,7 @@
   coreutils,
   shellcheck,
   callPackage,
+  sharedRoot ? "/var/lib/ghq",
 }:
 let
   socket =
@@ -52,7 +53,10 @@ stdenvNoCC.mkDerivation (finalAttrs: {
       --replace-fail @cp@ ${coreutils}/bin/cp
     substituteInPlace $out/bin/ghq \
       --replace-fail @ghq@ ${ghq}/bin/ghq \
-      --replace-fail @client@ $libexec/ghq-writer-client
+      --replace-fail @client@ $libexec/ghq-writer-client \
+      --replace-fail @root@ ${lib.escapeShellArg sharedRoot} \
+      --replace-fail @git@ ${git}/bin/git \
+      --replace-fail @realpath@ ${coreutils}/bin/realpath
     runHook postInstall
   '';
 
@@ -71,6 +75,7 @@ stdenvNoCC.mkDerivation (finalAttrs: {
   passthru = {
     inherit socket;
     tests.handler = callPackage ./test-handler.nix { ghq-shared = finalAttrs.finalPackage; };
+    tests.wrapper = callPackage ./test-wrapper.nix { };
   };
 
   meta = {

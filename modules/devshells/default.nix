@@ -134,7 +134,7 @@
           # and then dies on its first command. duckdb here is the CLI; the
           # python binding above is a separate output.
           pkgs.jujutsu
-          pkgs.ghq
+          self'.packages.ghq-shared
           pkgs.jaq
           pkgs.duckdb
           self'.packages.linear-cli

@@ -20,7 +20,10 @@
     let
       declared = {
         atomic = [ "help" ];
-        ghq-shared = [ "handler" ];
+        ghq-shared = [
+          "handler"
+          "wrapper"
+        ];
         playwright-cli = [ "smoke" ];
         stack-land = [ "integration" ];
         vanixiets-docs = [

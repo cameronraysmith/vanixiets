@@ -1,14 +1,31 @@
-# ghq for an account that reads a host-shared, read-only ghq tree.
-# Read-only subcommands run nixpkgs ghq directly; `get` is carried out by the
-# tree's writer account, one request per target.
+# ghq that defers to a host-shared, read-only ghq tree when, and only when, the
+# caller's effective ghq root is that tree. Then read-only subcommands run
+# nixpkgs ghq directly and `get` is carried out by the tree's writer account,
+# one request per target; an unreachable writer fails. For any other root this
+# is plain nixpkgs ghq, so it is safe on a PATH outside a sharing host.
 
 real=@ghq@
 client=@client@
+shared_root=@root@
+git=@git@
+realpath=@realpath@
 
 refuse() {
   printf 'ghq: %s\n' "$1" >&2
   exit 2
 }
+
+# ghq's own precedence: a nonempty GHQ_ROOT (first entry) wins over the last
+# ghq.root in git configuration.
+if [ -n "${GHQ_ROOT:-}" ]; then
+  effective_root=${GHQ_ROOT%%:*}
+else
+  effective_root=$("$git" config --path --get ghq.root 2>/dev/null || true)
+fi
+if [ -z "$effective_root" ] \
+  || [ "$("$realpath" -m -- "$effective_root")" != "$("$realpath" -m -- "$shared_root")" ]; then
+  exec "$real" "$@"
+fi
 
 if [ "$#" -eq 0 ]; then
   exec "$real"
