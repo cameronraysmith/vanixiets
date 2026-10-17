@@ -1258,6 +1258,34 @@ cebb618c8 feat(greptimedb): hourly runtime envelope for the store
 f9451f3ef feat(pkgs): add greptimedb-bin 1.2.1 and move ntfy-send to pkgs/by-name
 ```
 
+## 11. Review follow-ups (tasks.md section 10)
+
+The roborev sub-gate (plan.md Task 7 Step 15) was replaced at the operator's direction by a holistic subagent review, recorded in `review.md`: nothing critical, twelve findings, all applied.
+They landed in three pull requests, each with its checks red before and green after as tasks.md 10.1 to 10.10 record: #3497 (F1, F2, F12; charter v14), #3498 (F3, F4, F6; charter v15) and #3499 (F5, F7 to F11; charter v16).
+magnetite was redeployed from `origin/main` after #3497 and again after #3499, each time with an empty build queue, and has no failed units.
+
+### 11.1 Live behaviour of the notifier and R7.2 after #3497
+
+`fleet-alerts` received exactly these six messages, and nothing in the 12 hours before:
+
+```text
+20:45:59Z FAILED opentelemetry-collector.service on magnetite      (SIGKILL; RESOLVED 5 s later at the restart)
+20:46:04Z RESOLVED opentelemetry-collector.service on magnetite
+20:47:25Z FAILED greptimedb-envelope.service on magnetite          (runtime drop-in ANON_MAX_BYTES=1: "FAIL R7.2: memory.stat anon 74153984 >= GREPTIMEDB_ENVELOPE_ANON_MAX_BYTES 1")
+20:47:32Z RESOLVED greptimedb-envelope.service on magnetite        (drop-in reverted, rerun passed)
+21:01:17Z FAILED opentelemetry-collector.service on magnetite      (917 s after the first; the rate-limit window had passed)
+21:01:23Z RESOLVED opentelemetry-collector.service on magnetite
+```
+
+A second SIGKILL at 20:46:41Z, 43 s after the first, posted nothing: the notifier wrote a `suppressed` stamp, and the start hook removed it silently at the restart.
+The drop-in was reverted, no episode stamp remained, and the next scheduled envelope run passed.
+
+### 11.2 After #3498 and #3499
+
+The envelope runs with `GREPTIMEDB_ENVELOPE_TABLE_TTLS_FILE` set to the empty declared map and an on-demand run ended `Result=success`, `ExecMainStatus=0`.
+The pipeline container test passed after each pull request, including the F8 negative controls: an undeclared `ttl='1d'` table and an `sst_format='primary_key'` table each made the envelope's table clause fail, and it passed once both were dropped.
+The envelope check's evaluation fell from about 2.04 GiB and 9.2 s to about 0.41 GiB and 1.6 s (review F5).
+
 ---
 
 ## Overall Decision
@@ -1272,4 +1300,4 @@ No 8.x or 9.1 expectation failed.
 
 **Next step**:
 
-plan.md Task 7 Step 15 onwards: the roborev and documenter sub-gates, the retrospective, then archive.
+plan.md Task 7 Step 16, the documenter sub-gate, then the retrospective and archive; Step 15's roborev gate is replaced by `review.md` (§11).
