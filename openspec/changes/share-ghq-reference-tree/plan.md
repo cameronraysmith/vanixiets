@@ -13,7 +13,7 @@
 ## Global Constraints
 
 - Sharing hosts are exactly magnetite, pyrite and stibnite. Participants: magnetite and pyrite `cameron`, `omnigent-cameron`, `omnigent-janettesmith`; stibnite `crs58`, `omnigent-cameron`.
-- Roots `/var/lib/ghq` (NixOS) and `/Users/Shared/ghq` (darwin), mode `0750`, owner and group the writer. Writer umask `0027`.
+- Root `/var/lib/ghq` on every sharing host, mode `0750`, owner and group the writer. Writer umask `0027`.
 - Each participant's git settings: `ghq.root = <root>`; `safe.directory` gains exactly `<root>/*`; never `*`.
 - The writer has no password, `nologin` shell, no SSH keys, no extra groups, no sudo rule, no trusted-user entry, no credentials.
 - Sockets: `/run/ghq-writer.sock` (NixOS) and `/var/run/ghq-writer.sock` (darwin), group the writer's, mode `0660`; one handler per connection.
@@ -64,7 +64,7 @@ Task numbers match `tasks.md`; each task's verify line there is its acceptance t
 
 5.1 Assertions in the NixOS adapter; mutations through `extendModules`. 5.2 One node, `services.gitDaemon` serving `/srv/git`, `allowedProtocols = [ "https" "git" ]`, readers `cameron` and `omnigent-cameron`, an outsider; the assertions of D8. 5.3 Full builds.
 
-6.1 `ghq-shared-migrate` per D10; the NixOS test seeds a tree for `cameron` and asserts list, move, ownership, sanitisation, sidecar and rollback.
+6.1 `ghq-shared-migrate` per D10; the NixOS test seeds a tree for `cameron` and asserts list, move, ownership and rollback (sanitisation was dropped by the decision of 2026-10-17, tasks 6.5–6.7).
 
 7.1–7.3 Documentation edits at their sources.
 

@@ -131,3 +131,8 @@ Move everything as it is, including repositories with uncommitted changes or loc
 ## Q8 [user]: execution
 
 HIL; `tasks.md` is the ledger; one task is one commit on the change's chain.
+
+## Q9 [user, 2026-10-17]: darwin root
+
+`/var/lib/ghq`, the same path as Linux, replacing `/Users/Shared/ghq`.
+`/Users/Shared/ghq` tripped the worker guard against foreign `/Users/` paths, which stays as it is; `/var/lib` on stibnite is root-owned and on the same volume as `/Users/crs58`, so the move stays O(1).

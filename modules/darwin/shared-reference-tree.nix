@@ -35,6 +35,26 @@ in
         };
         users.knownUsers = [ cfg.writer ];
         users.knownGroups = [ cfg.writer ];
+
+        # /Users/Shared is world-writable with the sticky bit, so any account could
+        # have created the root first. An empty directory is taken over; anything
+        # else that the writer does not already own stops activation rather than
+        # trusting entries another account controls.
+        system.activationScripts.postActivation.text = lib.mkBefore ''
+          ghqRoot=${lib.escapeShellArg cfg.root}
+          if [ -L "$ghqRoot" ] || { [ -e "$ghqRoot" ] && [ ! -d "$ghqRoot" ]; }; then
+            echo "shared-reference-tree: $ghqRoot exists and is not a directory; refusing to provision it" >&2
+            exit 1
+          elif [ ! -e "$ghqRoot" ]; then
+            /usr/bin/install -d -m 0750 -o ${cfg.writer} -g ${cfg.writer} "$ghqRoot"
+          elif [ "$(/usr/bin/stat -f %Su "$ghqRoot")" != ${cfg.writer} ] && [ -n "$(/bin/ls -A "$ghqRoot")" ]; then
+            echo "shared-reference-tree: $ghqRoot is not empty and not owned by ${cfg.writer}; refusing to adopt it" >&2
+            exit 1
+          else
+            /usr/sbin/chown ${cfg.writer}:${cfg.writer} "$ghqRoot"
+            /bin/chmod 0750 "$ghqRoot"
+          fi
+        '';
       };
     };
 }

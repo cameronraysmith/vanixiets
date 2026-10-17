@@ -18,14 +18,14 @@ Linux worker homes are `home-manager.users.<worker>` entries (`modules/nixos/omn
 `checks.<system>.omnigent-worker-capabilities` asserts `pkgs.ghq` and `pkgs.ghq-sync` are in a fixture worker's home packages (`modules/checks/omnigent-workers.nix:171-181`).
 
 On magnetite, `/var/lib` sits on the `zroot/root/nixos` dataset, which carries a 10G reservation and the host's auto-snapshot policy, in a 304G pool where `/nix` is capped at 250G (`modules/machines/nixos/magnetite/default.nix:171-252`).
-On magnetite and pyrite `/home` and `/var/lib` are separate ZFS datasets (`modules/machines/nixos/*/disko.nix`), so a tree cannot be renamed from a home into the shared root there; on stibnite `/Users/crs58` and `/Users/Shared` are on the same APFS data volume, where a rename is O(1).
+On magnetite and pyrite `/home` and `/var/lib` are separate ZFS datasets (`modules/machines/nixos/*/disko.nix`), so a tree cannot be renamed from a home into the shared root there; on stibnite `/Users/crs58` and `/var/lib` (`/private/var/lib`, root-owned `0755`) are on the same APFS data volume, where a rename is O(1).
 Runtime VM tests that need KVM live in the non-gating `vmTests` lane because the CI builder exposes no `/dev/kvm`; pyrite does (`modules/vm-tests/omnigent-worker-isolation.nix`).
 
 ## Goals / Non-Goals
 
 **Goals:**
 
-- One reference tree per sharing host, at `/var/lib/ghq` (NixOS) or `/Users/Shared/ghq` (darwin), read by every participating account.
+- One reference tree per sharing host, at `/var/lib/ghq` on every sharing host, read by every participating account.
 - A single writer account, so no participating account can plant repository-local configuration that runs as another.
 - Acquisition, update, deepen and promotion keep working for every participating account through the existing `ghq` and `ghq-sync` commands, delegated to the writer.
 - Every security property maps to a check that fails under a plausible incorrect implementation: module assertions on the real machine checks, an executed NixOS test with a negative control, and recorded post-activation inspection on each host.
@@ -41,11 +41,11 @@ Runtime VM tests that need KVM live in the non-gating `vmTests` lane because the
 
 ## Decisions
 
-### D1: Shared root location
+### D1: Shared root location — revised 2026-10-17
 
-- **Choice**: `/var/lib/ghq` on NixOS, `/Users/Shared/ghq` on darwin; each participating account's `~/ghq` is a symbolic link to it.
-- **Rationale**: `/var/lib` is the NixOS location for service-owned state; `/Users/Shared` is the darwin location for data shared between local accounts and sits on the same APFS volume as `/Users/crs58`, which makes D10's rename O(1) there. The `~/ghq` link keeps every existing `~/ghq/<host>/<org>/<repo>` reference resolving.
-- **Alternatives considered**: a dedicated ZFS dataset on magnetite (rejected for now: disko applies dataset options only at creation, so it is a manual pool operation; revisit if the tree's size or snapshot churn becomes a problem, see Risks).
+- **Choice**: `/var/lib/ghq` on every sharing host, NixOS and darwin alike; each participating account's `~/ghq` is a symbolic link to it.
+- **Rationale**: `/var/lib` is the NixOS location for service-owned state, and on stibnite `/var/lib` (`/private/var/lib`) is root-owned `0755` on the same APFS volume as `/Users/crs58`, which keeps D10's rename O(1). One path on every host removes per-platform branches from the options, the migration tool and the documentation.
+- **Alternatives considered**: `/Users/Shared/ghq` on darwin, the original choice, rejected by the user on 2026-10-17. It trips the worker guard in `modules/home/ai/omnigent/worker.nix` that rejects any `/Users/` path outside the worker's own home, which the user chose to keep untouched, and its parent is world-writable with the sticky bit, so any account could create the root first. A dedicated ZFS dataset on magnetite was also deferred: disko applies dataset options only at creation, so it is a manual pool operation; revisit if the tree's size or snapshot churn becomes a problem (see Risks).
 - **Boundary**: source-versus-delivered. The directory is created by activation (tmpfiles on NixOS, `postActivation` on darwin), so its existence and mode are observed after activation, not by reading the module.
 
 ### D2: Root reaches ghq through git configuration
@@ -112,7 +112,7 @@ Runtime VM tests that need KVM live in the non-gating `vmTests` lane because the
   - Across volumes (magnetite and pyrite, whose `/home` and `/var/lib` are separate datasets): repositories are copied with `cp -a --reflink=auto` (`cp -c` on darwin), and the source tree is renamed to `~/ghq.pre-shared-<date>` rather than deleted.
   - Further accounts on the same host are merged per repository. A repository absent from the root is moved in. A repository present in both keeps the deeper clone (full over partial over shallow, then more commits), and the other is moved to `~/ghq.set-aside-<date>/<host>/<owner>/<repo>` in its account's home, unchanged.
   - Ownership: `chown -R -h` to the writer and its group, then `chmod -R g+rX,g-w,o-rwx`; metadata only.
-  - Sanitisation, because the writer runs `git fetch` in these repositories and readers run git in them: every `.git/config`, `.git/config.worktree` and `.git/modules/**/config` is rewritten to an allow-list (`core.repositoryformatversion`, `core.bare`, `core.filemode`, `core.logallrefupdates`, `core.ignorecase`, `core.precomposeunicode`, `core.symlinks`, `extensions.*`, `remote.*.url`, `remote.*.fetch`, `remote.*.promisor`, `remote.*.partialclonefilter`, `remote.*.tagopt`, `branch.*.remote`, `branch.*.merge`, `submodule.*.url`, `submodule.*.active`), and every hook other than git's `*.sample` files is removed. The original files are recorded in a per-repository sidecar under `/var/lib/ghq-migration/` (NixOS) or `/var/db/ghq-migration/` (darwin), root-owned `0700`, outside the root, so nothing is lost.
+  - Sanitisation, because the writer runs `git fetch` in these repositories and readers run git in them: every `.git/config`, `.git/config.worktree` and `.git/modules/**/config` is rewritten to an allow-list (`core.repositoryformatversion`, `core.bare`, `core.filemode`, `core.logallrefupdates`, `core.ignorecase`, `core.precomposeunicode`, `core.symlinks`, `extensions.*`, `remote.*.url`, `remote.*.fetch`, `remote.*.promisor`, `remote.*.partialclonefilter`, `remote.*.tagopt`, `branch.*.remote`, `branch.*.merge`, `submodule.*.url`, `submodule.*.active`), and every hook other than git's `*.sample` files is removed. The original files are recorded in a per-repository sidecar under `/var/lib/ghq-migration/`, root-owned `0700`, outside the root, so nothing is lost.
   - Every repository moves as it is, including ones with uncommitted changes or commits that exist on no remote. The tool lists them before `--apply` changes anything.
   - The tool writes a manifest of every rename, copy, chown and rewrite to the sidecar directory. `--rollback` replays it in reverse per account: renames back, copies removed, ownership and mode restored, sanitised files restored from the sidecar, and `~/ghq` made a directory again.
   - After an account's tree is moved, the tool replaces its `~/ghq` with a link to the root.
@@ -147,6 +147,10 @@ Runtime VM tests that need KVM live in the non-gating `vmTests` lane because the
 3. After the `_ghq` UID/GID is approved, land and verify group 8 (darwin).
 4. Per host (pyrite, then magnetite, then stibnite), as human-gated steps: activate; run `ghq-shared-migrate` as a dry run and present its dirty and local-only list; run it with `--apply`; run D9's smoke as each account; on failure run `--rollback` for the affected account.
 5. Delete each set-aside or pre-shared copy and each sidecar only on the operator's explicit authorization.
+
+## Delivery
+
+- **Approved by the user 2026-10-17**: the change is activated host by host from the chain-tip commit (pyrite, then magnetite, then stibnite, where the user runs activation), and lands as one pull request for the whole chain after group 9 passes. This is an explicit exception to the fleet's one-pull-request-per-commit practice: the hosts must run the same reviewed revision, and group 9's runtime evidence covers the chain as a whole.
 
 ## Gate 1 modality verdicts
 

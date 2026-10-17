@@ -18,9 +18,9 @@ A host not declared as sharing SHALL evaluate to a configuration with no writer 
 
 ### Requirement: The shared root is owned by the writer and closed to everyone else
 
-Each sharing host SHALL provision its shared root at `/var/lib/ghq` on NixOS and `/Users/Shared/ghq` on darwin, owned by a dedicated writer system account, `ghq` on NixOS and `_ghq` on darwin, with a same-named primary group, with mode `0750`.
+Each sharing host SHALL provision its shared root at `/var/lib/ghq`, owned by a dedicated writer system account, `ghq` on NixOS and `_ghq` on darwin, with a same-named primary group, with mode `0750`.
 The writer account SHALL have no password, no interactive login shell, no SSH keys, no administrative group, no sudo grant, no Nix trusted-user standing and no credentials.
-Every entry the writer creates beneath the shared root SHALL carry no group-write and no other-write permission bit.
+Every entry beneath the shared root other than a symbolic link SHALL carry no group-write bit and no permission bit for others; a symbolic link's own mode bits are exempt, because changing what a link points to requires write permission on its directory, which no participating account has.
 No participating account SHALL own any entry beneath the shared root.
 
 #### Scenario: A participating account attempts to write beneath the shared root
@@ -57,6 +57,8 @@ The discharge of this requirement depends on assumption A35.
 ### Requirement: Readers trust the writer's tree and nothing broader
 
 Each participating account's git configuration SHALL contain exactly one `safe.directory` entry introduced by this capability, with the value `<shared root>/*`, and SHALL NOT contain `safe.directory = *`.
+No other account's git configuration SHALL contain `safe.directory = *` or a `<dir>/*` entry whose `<dir>` is a proper prefix of the shared root or of its real path.
+Each participating account's git configuration SHALL set `safe.bareRepository` to `explicit`, so a bare repository inside the shared tree is used only when named explicitly; the setting is global to that account's git use, so any bare repository it uses must be named with `--git-dir` or `GIT_DIR`.
 The writer's own git invocations SHALL run with no system or global configuration, and therefore with no `safe.directory` entry.
 The discharge of this requirement depends on assumption A34.
 
@@ -98,41 +100,78 @@ Requests SHALL reach the writer only through a socket at `/run/ghq-writer.sock` 
 
 ### Requirement: The writer accepts only constrained requests
 
-The writer SHALL accept one request per connection, at most 4 KiB, naming exactly one of `get` (a target, whether lazy, whether an update), `deepen` (a positive depth and a path) or `promote` (a path).
+The writer SHALL accept one request per connection, at most 4 KiB, naming exactly one of `get` (a target, whether lazy, whether an update, whether every tag), `deepen` (a positive depth and a path) or `promote` (a path).
 It SHALL refuse a target that begins with `-`, contains `..` as a path segment or `::`, contains a character outside `A-Za-z0-9._~:/@+%-`, or names a scheme outside its allowed protocols, and a path that does not resolve inside the shared root.
 It SHALL run git and ghq without a shell, with no system or global git configuration, and with `protocol.allow=never` except for its allowed protocols, which default to `https`.
+On an update of a full clone it SHALL fetch every remote tag.
+On a `get` that asks for every tag in a shallow clone it SHALL fetch the tags whose commits are present without a depth limit and the tags whose commits are absent at depth 1, so no existing shallow boundary is removed and the branch's depth is unchanged.
+It SHALL NOT force a local tag that moved upstream.
 
 #### Scenario: A request carries an option, an unknown action, or a disallowed protocol
 
 - **WHEN** a request reaches the writer whose target begins with `-`, whose action is outside the fixed set, whose depth is not a positive integer, or whose URL uses a protocol outside the allowed set, such as `ext::` or `file://`
 - **THEN** the writer refuses it, the requester exits non-zero, and the shared root is unchanged
 
+#### Scenario: A request asks for every tag in a shallow clone
+
+- **WHEN** a `get` request with an update and every tag names a shallow clone whose branch was deepened
+- **THEN** every remote tag is present afterwards, every shallow boundary present before remains, and the branch's depth is unchanged
+
 #### Scenario: A request names a path outside the shared root
 
 - **WHEN** a `deepen` or `promote` request names a path that resolves outside the shared root
 - **THEN** the writer refuses it without running git
 
-### Requirement: Migration moves trees, sanitises repository-local configuration, and can be rolled back
+### Requirement: Migration moves only administrators' trees in place, sets other trees aside, and can be rolled back
 
-Migration SHALL move each participating account's existing tree into the shared root without re-fetching: by rename when the root is empty and on the same filesystem as the account's home, otherwise by copy followed by renaming the source to `~/ghq.pre-shared-<date>`.
-Where two accounts hold the same repository, the deeper clone SHALL be kept and the other moved to `~/ghq.set-aside-<date>/` in its own account's home.
-Every repository brought in SHALL be owned by the writer, SHALL have each `.git/config`, `.git/config.worktree` and `.git/modules/**/config` rewritten to an allow-list of keys, and SHALL carry no hook other than git's samples; the originals SHALL be kept in a root-owned `0700` sidecar outside the shared root.
-Migration SHALL list repositories with uncommitted changes or commits on no remote before applying, SHALL move them as they are, and SHALL record a manifest from which `--rollback` restores each account's prior tree, ownership, modes and configuration.
+Migration SHALL move an account's existing tree into the shared root in place only when that account is a member of the host's administrator group (`wheel` on NixOS, `admin` on darwin) at the time of the move; for any other account, and for a tree holding any entry owned by an account other than that administrator or root, writable by every account, group-writable for a group with other members, a non-directory with a hard link outside the tree, or carrying an ACL, an in-place move SHALL be refused with nothing changed, and the plan SHALL list each such entry.
+While a tree moves, it and the shared root SHALL be reachable by no account but root and the writer SHALL be stopped, until the root is opened to the writer's group at the end.
+An in-place move SHALL be made without re-fetching: by rename when the root is empty and on the same filesystem as the account's home, otherwise by copy followed by renaming the source to `~/ghq.pre-shared-<date>`.
+Where two administrators hold the same repository, the deeper clone SHALL be kept and the other SHALL stay in that account's `~/ghq.pre-shared-<date>/`.
+Every entry moved in SHALL be owned by the writer, SHALL NOT be group-writable or carry any permission for others, and SHALL carry no setuid, setgid or sticky bit; nothing else in a moved tree is changed.
+Setting a tree aside SHALL rename that account's `~/ghq` to `~/ghq.pre-shared-<date>`, still owned by the account, and SHALL list each repository's upstream URL with the `ghq-sync` command that reacquires it through the writer as that account.
+Migration SHALL list repositories with uncommitted changes or commits on no remote before applying, SHALL record each step, with prior ownership and modes, in a root-owned `0700` directory outside the shared root before taking it, and SHALL refuse an account whose record has not been rolled back.
+`--rollback` SHALL restore each account's prior tree, ownership and modes, give the account every entry the writer created in that tree after migration, and read the records of earlier versions of the tool; a rollback that stopped part way SHALL resume when run again.
 
-#### Scenario: A per-account repository carries `core.fsmonitor`
+#### Scenario: A non-administrator's tree is to be moved in place
 
-- **WHEN** a per-account repository whose `.git/config` sets `core.fsmonitor` or `core.hooksPath`, or whose `.git/hooks` holds a non-sample hook, is brought into the shared root
-- **THEN** the shared copy sets neither key and holds no such hook, and the sidecar holds the original configuration and hook
+- **WHEN** `--apply` names an account that is not an administrator of the host
+- **THEN** the tool refuses, and no account's tree, the shared root and the record directory are unchanged
+
+#### Scenario: Another account could have written an administrator's tree
+
+- **WHEN** an entry in an administrator's tree carries an ACL, is writable by every account, is owned by another account, or is a hard link to a file outside the tree
+- **THEN** the plan lists that entry, `--apply` refuses, and no tree, the shared root and the record directory are changed
+
+#### Scenario: A tree is moving
+
+- **WHEN** an administrator's tree is being moved into the shared root
+- **THEN** an account without administrative authority cannot read the shared root, and the writer accepts no request
+
+#### Scenario: A non-administrator's tree is set aside
+
+- **WHEN** `--set-aside` names an account
+- **THEN** its tree is at `~/ghq.pre-shared-<date>`, still owned by it, `~/ghq` links to the shared root, and each repository's reacquisition command is printed
+
+#### Scenario: An administrator's tree carries a setuid file
+
+- **WHEN** an administrator's tree holding a setuid file is moved in place
+- **THEN** nothing in the shared root carries a setuid, setgid or sticky bit
 
 #### Scenario: A dry run is taken
 
-- **WHEN** migration runs without `--apply`
-- **THEN** it lists the planned moves and the repositories with uncommitted changes or local-only commits, and changes nothing on disk
+- **WHEN** migration runs without `--apply` or `--set-aside`
+- **THEN** it lists the planned moves, the repositories with uncommitted changes or local-only commits, and the refusal and reacquisition commands for each non-administrator, and changes nothing on disk
 
 #### Scenario: Migration is rolled back for one account
 
 - **WHEN** the rollback for one account is run before anything set aside is deleted
-- **THEN** that account's `~/ghq` is again its own directory with its prior contents, ownership and configuration
+- **THEN** that account's `~/ghq` is again its own directory with its prior contents, ownership and modes
+
+#### Scenario: A rollback stops part way
+
+- **WHEN** a rollback fails after undoing some steps, and is run again once the cause is removed
+- **THEN** it completes, and the account's tree is as it was before migration
 
 ### Requirement: Each property is backed by evidence that can fail
 
