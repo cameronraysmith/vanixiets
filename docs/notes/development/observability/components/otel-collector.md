@@ -22,7 +22,7 @@ It also runs the runtime regulator `otel-envelope` and hosts the shared failure 
 - ADR-003 items 16 to 18 and 20 to 22: the collector-side host signals, namely per-process memory, systemd unit state and restarts, available memory and paging, the `prometheus` receiver scrapes of the loopback exporters, the `zt_peer_.*` drop, darwin `disk` and `filesystem` bounds, and the darwin root `otelcol-process` collector; the exporters and the darwin probe are `components/host-probes.md`.
 - ADR-003 R3.1, R3.2 and the failure notifier (ADR-003 Q9), as corrected by the 2026-10-15 conflict resolution: the `observability-notify@` template belongs to the `agent` role on every in-scope NixOS host, cinnabar included, and its delivery discipline is ADR-009 item 11.
 - ADR-004: the attribute, metric-name, journald-field and `devloop` column allow-lists and label bans applied in the collector from one `schema.nix`, the per-host value caps `schema.nix` declares, and regulators R4.1 and R4.2.
-  No collector stage at contrib 0.155.0 caps the number of distinct process names, so the 30-name bound is declared as `process.maxNames` in `schema.nix`, observed at S1's deployment, and regulated at runtime by R4.2 from S4.
+  No collector stage at contrib 0.155.0 caps the number of distinct process names, so the 30-name bound is observed at S1's deployment and regulated at runtime by R4.2 from S4; `schema.nix` carries no `process.maxNames` until a consumer exists (charter v16).
 - ADR-008 Decision items 3 to 5: the mesh-facing ingress as the only telemetry listener beyond loopback, collectors under accounts outside every worker UID, and the six collector content stages.
 - ADR-008 R8.1, R8.2 and R8.3.
 
@@ -117,8 +117,8 @@ Envelopes (ADR-004, ADR-008):
 
 Regulators:
 
-- R3.1, deterministic, build time: `checks.x86_64-linux.otel-collector-config` runs `otelcol-contrib validate` over every agent's generated configuration, darwin included, asserts with the cognee predicate that every receiver endpoint is loopback or ZeroTier-prefixed, and asserts the exporter, ingress, process-attribute, paging, systemd-unit, darwin node_exporter, `otelcol-process`, probe-label and darwin scraper clauses of ADR-003 R3.1 (`cameronraysmith/vanixiets@109c67346:modules/nixos/cognee.nix:26-27`).
-- The NixOS module's own `otelcol validate` remains in force for NixOS hosts (ADR-003 R3.1).
+- R3.1, deterministic, build time: `checks.x86_64-linux.otel-collector-config` asserts with the cognee predicate that every receiver endpoint is loopback or ZeroTier-prefixed, and asserts the scrape-target, exporter, ingress, unit-cap, darwin node_exporter, `otelcol-process`, probe-label and darwin scraper clauses of ADR-003 R3.1 (`cameronraysmith/vanixiets@109c67346:modules/nixos/cognee.nix:26-27`); the agent module asserts the six process identity attributes off and node_exporter's `openFirewall = false` (charter v16).
+- The NixOS module's own `otelcol validate` validates NixOS hosts' configurations when they build, and from S5 the check validates darwin agents' (ADR-003 R3.1).
 - R3.2, runtime: `otel-envelope` on magnetite queries the store every 5 min as `regulator` for per-host last-seen time of host metrics, `up` of every declared exporter target on each online host, `otelcol_exporter_queue_size`, `otelcol_exporter_send_failed_*` and `memory_limiter` refusal counters, and fails on any breach; last-seen time fails only for always-on hosts, currently cinnabar and magnetite (ADR-003).
 - R4.1, deterministic, build time: R8.1's check also feeds ADR-004's banned-label, unknown-key, `omp.agent.*.count`, `omnigent-host-cameron` journald, process-identity, unit-name, launchd-label, `/Volumes/` mountpoint and `serial_number` fixtures, and fails evaluation when an enabled Omnigent worker has no entry in the owner-to-alias attrset (ADR-004).
 - R4.2, runtime: `otel-envelope` also queries active series, maximum distinct label values per metric, per-host distinct values of `process_executable_name`, `systemd_unit_name` and `launchd_label`, rows ingested in 24 h, journald bytes per host, and each database's and the fleet logs table's `ttl`, and fails on any breach (ADR-004).
@@ -154,7 +154,7 @@ Regulators:
 
 ## Deployment acceptance items
 
-- R3.1 fails on each of five mutants: an unknown component key, a receiver endpoint of `0.0.0.0:4318`, an exporter `listenAddress` of `0.0.0.0`, `process.command_line` enabled, and a darwin node_exporter `listenAddress` of the empty string (ADR-003).
+- R3.1 fails on each of three mutants, a receiver endpoint of `0.0.0.0:4318`, an exporter `listenAddress` of `0.0.0.0` and a darwin node_exporter `listenAddress` of the empty string, and the agent's assertion fails with `process.command_line` enabled (ADR-003).
 - R3.2 fails within 10 min after one online host's agent is stopped (ADR-003).
 - The stopped-agent test produces a ntfy message naming `otel-envelope.service` (ADR-003 failure notification).
 - R4.1 fails when the label-ban stage is deleted from the generated configuration (ADR-004).

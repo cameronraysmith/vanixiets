@@ -21,7 +21,7 @@ A changed retention SHALL take effect on a database that already exists.
 
 No part of a database SHALL keep its series on a retention other than the database's own unless the fleet's configuration declares a retention for that part, and a part with a declared retention SHALL keep its series on exactly that retention.
 
-**Discharged by**: `telemetry-store-interface` requirement `Tables allowed a retention of their own are declared`; the hourly envelope regulator's table-retention clause and the envelope check's recorded-answer rehearsal discharge it.
+**Discharged by**: `telemetry-store-interface` requirement `Tables allowed a retention of their own are declared`; the hourly envelope regulator's table-retention clause, the envelope check's recorded-answer rehearsal and the container runtime test's undeclared-retention control against the real telemetry store discharge it.
 
 #### Scenario: Part of a database carries an undeclared retention of its own
 
@@ -43,12 +43,12 @@ No part of a database SHALL keep its series on a retention other than the databa
 Only the collector SHALL write series to the telemetry store, and only the unit that sets up the databases SHALL hold the operator's administrative store account, the one account that may both read and write.
 The telemetry store SHALL refuse the collector any read, SHALL answer queries only from the administrative, the dashboard's and the regulators' store accounts, and SHALL refuse writes from the dashboard's and the regulators' store accounts.
 
-**Discharged by**: `telemetry-store-interface` requirements `Store accounts carry fixed permission modes`, `Listeners are bound to loopback only` and `Credentials exist only as activation-resolved files owned by non-worker users`; the evaluation-time ownership regulator's credential-holder case with its mutant, the container runtime test's authorization matrix, the evaluation-time regulator that the account list holds exactly four valid entries, and the evaluation-time ownership regulator discharge it.
+**Discharged by**: `telemetry-store-interface` requirements `Store accounts carry fixed permission modes`, `Listeners are bound to loopback only` and `Credentials exist only as activation-resolved files owned by non-worker users`; magnetite's credential-holder assertion, the container runtime test's authorization matrix, the evaluation-time regulator that the account list holds exactly four valid entries, and the evaluation-time ownership regulator discharge it.
 
 #### Scenario: A second unit takes the administrative store account
 
 - **WHEN** magnetite's configuration gives a unit other than the one that sets up the databases the administrative store account's credential
-- **THEN** the evaluation-time ownership regulator fails before any activation, which its mutant shows
+- **THEN** magnetite's evaluation fails before any activation on its credential-holder assertion, as an evaluation with that change shows
 
 #### Scenario: The collector attempts a read
 
@@ -79,19 +79,19 @@ A replaced store credential SHALL take effect on the running telemetry store rat
 #### Scenario: The restart on replacement is dropped from magnetite's configuration
 
 - **WHEN** magnetite's configuration no longer restarts the telemetry store when its store credentials are replaced
-- **THEN** the evaluation-time envelope regulator fails before any activation, which one of its seven mutants shows
+- **THEN** the evaluation-time envelope regulator fails before any activation, which one of its mutants shows
 
 ### Requirement: The telemetry store stays inside a memory envelope that leaves build capacity to the build service
 
 The telemetry store SHALL draw at most 4 GiB of magnetite's memory, SHALL be throttled before that ceiling, SHALL stay out of compressed swap, and SHALL run at a reduced processor share with fixed parallelism, so that the build service's evaluation keeps its build capacity.
 Under memory pressure on magnetite the kernel SHALL kill the build service's evaluation first, the telemetry store second and the collector, which draws at most 512 MiB, third.
 
-**Discharged by**: `telemetry-store-interface` requirement `The telemetry store and the collector run inside a declared envelope`, resting on world assumptions `A31 — magnetite's memory is finite and shared with the build service's evaluation work` and `A32 — magnetite has no /dev/kvm, and the kernel's kill order does not depend on the host it runs on`; the evaluation-time envelope regulator with its seven mutants, the hourly envelope regulator's memory case, and the on-demand virtual-machine runtime test of the kill order on pyrite discharge it.
+**Discharged by**: `telemetry-store-interface` requirement `The telemetry store and the collector run inside a declared envelope`, resting on world assumptions `A31 — magnetite's memory is finite and shared with the build service's evaluation work` and `A32 — magnetite has no /dev/kvm, and the kernel's kill order does not depend on the host it runs on`; the evaluation-time envelope regulator's ceiling and kill-order cases with their mutants, the hourly envelope regulator's memory case, and the on-demand virtual-machine runtime test of the kill order on pyrite discharge it.
 
 #### Scenario: magnetite's configuration drops a memory ceiling
 
-- **WHEN** magnetite's configuration is changed so that the telemetry store loses its memory ceiling or one of its memory limits
-- **THEN** the evaluation-time envelope regulator fails before any activation, and each of its seven mutants is shown to make it fail
+- **WHEN** magnetite's configuration is changed so that the telemetry store loses its memory ceiling, its throttle no longer sits below the ceiling, it may use compressed swap, or its kill preference no longer sits between the evaluation's and the collector's
+- **THEN** the evaluation-time envelope regulator fails before any activation, which its mutants dropping the ceiling and swapping the store's and the collector's kill preferences show
 
 #### Scenario: The telemetry store reaches its throttle in operation
 
@@ -128,12 +128,12 @@ The telemetry store SHALL keep its local state in a share of magnetite's disk ca
 
 The telemetry store SHALL NOT send a usage report to its vendor.
 
-**Discharged by**: `telemetry-store-interface` requirement `The telemetry store's release and usage reporting are fixed at evaluation`; the evaluation-time usage-report regulator and its mutant discharge it.
+**Discharged by**: `telemetry-store-interface` requirement `The telemetry store's release and usage reporting are fixed at evaluation`; the telemetry store module's usage-report assertion discharges it.
 
 #### Scenario: magnetite's configuration omits the usage-report setting
 
 - **WHEN** magnetite's configuration no longer turns the telemetry store's usage report off
-- **THEN** the evaluation-time usage-report regulator fails before any activation, which its mutant shows
+- **THEN** magnetite's evaluation fails before any activation on the telemetry store module's usage-report assertion, as an evaluation with the usage report turned on shows
 
 ### Requirement: The telemetry store runs a stable vendor release that serves its dashboard
 
@@ -161,7 +161,7 @@ The fleet SHALL run the vendor's own published build of that release unless the 
 
 A failure of the telemetry store, of the unit that sets up its databases, of its hourly envelope regulator, or of any unit that applies or confirms a disk-share setting on magnetite SHALL produce a failure notice naming the failed unit and magnetite on the fleet's notification service.
 
-**Discharged by**: `telemetry-store-interface` requirement `Failure notices are posted to one topic`, resting on world assumption `A33 — The fleet's notification service on cinnabar is reachable over ZeroTier and accepts anonymous publishing`; the evaluation-time collector regulator's failure-wiring case with its mutant discharges that each of these units hands its failure to the notifier, and the operator's deliberately failed envelope regulator at first activation discharges delivery.
+**Discharged by**: `telemetry-store-interface` requirement `Failure notices are posted to one topic`, resting on world assumption `A33 — The fleet's notification service on cinnabar is reachable over ZeroTier and accepts anonymous publishing`; the evaluation-time collector regulator's failure-wiring case with its mutants discharges that each of these units, and any unit of these kinds added later, hands its failure to the notifier, and the operator's deliberately failed envelope regulator at first activation discharges delivery.
 
 #### Scenario: The hourly envelope regulator is made to fail at first activation
 

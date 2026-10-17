@@ -16,7 +16,11 @@
 #   5. the systemd receiver reaches D-Bus under DynamicUser, and an
 #      omnigent-host-<owner> unit is stored only under its alias;
 #   6. a point emitted while greptimedb.service is stopped reaches the store
-#      once it starts again.
+#      once it starts again;
+#   7. the hourly envelope's table clause, run as the regulator against this
+#      store, fails on a table created with an undeclared ttl and on one
+#      created with sst_format='primary_key' (R6.3), and passes once both
+#      are dropped (review F8).
 #
 # What it does not establish: R2 storage (the S3 stanza is magnetite's host
 # configuration; the store here uses its default File storage), the ZFS
@@ -73,6 +77,7 @@
             node.pkgs = lib.mkForce nodePkgs;
             containers.store =
               {
+                config,
                 extendModules,
                 pkgs,
                 ...
@@ -85,6 +90,22 @@
                   (extendModules {
                     modules = [ { services.greptimedb.databases.fleet = lib.mkForce changedTtl; } ];
                   }).config.systemd.services.greptimedb-schema.serviceConfig.ExecStart;
+
+                # The hourly envelope's table clause (R6.3 and declared table
+                # TTLs) as greptimedb-envelope.service runs it, with this
+                # container's declared TTLs, reading as the regulator account.
+                envelopeTables = pkgs.writeShellScriptBin "greptimedb-test-envelope-tables" ''
+                  export CREDENTIALS_DIRECTORY=${vars}
+                  export GREPTIMEDB_ENVELOPE_TABLE_TTLS_FILE=${config.systemd.services.greptimedb-envelope.environment.GREPTIMEDB_ENVELOPE_TABLE_TTLS_FILE}
+                  exec ${
+                    lib.getExe (
+                      self.lib.greptimedbEnvelopeTables pkgs {
+                        url = "http://${config.services.greptimedb.settings.http.addr}";
+                        databases = lib.attrNames config.services.greptimedb.databases;
+                      }
+                    )
+                  }
+                '';
               in
               {
                 imports = [
@@ -93,7 +114,10 @@
                   self.modules.nixos.otel-collector-ingress
                 ];
                 system.stateVersion = lib.trivial.release;
-                environment.systemPackages = [ pkgs.curl ];
+                environment.systemPackages = [
+                  pkgs.curl
+                  envelopeTables
+                ];
 
                 services.greptimedb = {
                   enable = true;
@@ -316,6 +340,37 @@
                       if db != "fleet":
                           tables = [row[0] for row in sql(db, "SHOW TABLES")]
                           assert "s1_probe" not in tables, (db, tables)
+
+              with subtest("the envelope's table clause fails on an undeclared table TTL and on the legacy format"):
+
+                  def envelope_tables():
+                      return store.execute("greptimedb-test-envelope-tables 2>&1")
+
+                  def passes(stage):
+                      code, output = envelope_tables()
+                      assert code == 0 and "FAIL" not in output, (stage, code, output)
+
+                  def fails_with(stage, line):
+                      code, output = envelope_tables()
+                      print(f"{stage}: exit {code}: {output.strip()}")
+                      assert code == 1, (stage, code, output)
+                      fails = [l for l in output.splitlines() if l.startswith("FAIL ")]
+                      assert len(fails) == 1 and fails[0].startswith(line), (stage, output)
+
+                  passes("before the controls")
+                  sql("fleet", "CREATE TABLE s1_ttl_control (ts TIMESTAMP TIME INDEX, v DOUBLE) WITH (ttl = '1d')")
+                  fails_with("undeclared ttl", "FAIL TTL: fleet.s1_ttl_control sets ttl=")
+                  sql("fleet", "DROP TABLE s1_ttl_control")
+                  sql(
+                      "fleet",
+                      "CREATE TABLE s1_format_control (ts TIMESTAMP TIME INDEX, v DOUBLE) WITH (sst_format = 'primary_key')",
+                  )
+                  fails_with(
+                      "legacy format",
+                      "FAIL R6.3: fleet.s1_format_control uses the legacy sst_format=primary_key",
+                  )
+                  sql("fleet", "DROP TABLE s1_format_control")
+                  passes("after both controls are dropped")
 
               with subtest("the systemd receiver stores unit state under DynamicUser, owners only as aliases"):
                   dynamic = store.succeed("systemctl show -P DynamicUser opentelemetry-collector.service")

@@ -6,8 +6,10 @@
 # [storage] object-store stanza, `databases` and any `tableTtls`; without a
 # stanza the store uses GreptimeDB's local `File` storage under data_home.
 # The memory envelope, listeners, worker pools and usage reporting are fixed
-# here, and R7.1 (modules/checks/greptimedb-envelope.nix) asserts them on
-# magnetite.
+# here. The listeners, protocols, user provider and usage reporting are
+# assertions below, so every host and test importing the module is held to
+# them; R7.1 (modules/checks/greptimedb-envelope.nix) judges magnetite's
+# memory and kill-order relations.
 { config, ... }:
 let
   flakeLib = config.flake.lib;
@@ -24,6 +26,16 @@ in
       cfg = config.services.greptimedb;
       settingsFormat = pkgs.formats.toml { };
       configFile = settingsFormat.generate "greptimedb.toml" cfg.settings;
+
+      isLoopback = addr: lib.hasPrefix "127." addr;
+      # GreptimeDB enables a protocol whose `enable` key is absent.
+      enabledProtocols = builtins.filter (protocol: (cfg.settings.${protocol}.enable or true) != false) [
+        "mysql"
+        "postgres"
+        "opentsdb"
+        "influxdb"
+        "jaeger"
+      ];
 
       # MemoryHigh as systemd parses it: a G suffix is a power of 1024.
       memoryHigh = config.systemd.services.greptimedb.serviceConfig.MemoryHigh;
@@ -144,8 +156,29 @@ in
       config = lib.mkIf cfg.enable {
         assertions = [
           {
-            assertion = lib.hasPrefix "127." cfg.settings.grpc.bind_addr;
+            assertion =
+              isLoopback cfg.settings.http.addr
+              && (
+                !(cfg.settings.http.enable_api_server or false)
+                || isLoopback (cfg.settings.http.api_server_addr or "")
+              );
+            message = "services.greptimedb.settings.http.addr (and api_server_addr when enable_api_server) must be in 127.0.0.0/8 (ADR-007 E7.1).";
+          }
+          {
+            assertion = isLoopback cfg.settings.grpc.bind_addr;
             message = "services.greptimedb.settings.grpc.bind_addr must be in 127.0.0.0/8: GreptimeDB 1.2.1 has no switch to disable gRPC (design D4).";
+          }
+          {
+            assertion = enabledProtocols == [ ];
+            message = "services.greptimedb: ${lib.concatStringsSep ", " enabledProtocols} must be disabled (`enable = false`); no ADR consumes them and each adds a listener (ADR-007 E7.1).";
+          }
+          {
+            assertion = lib.hasPrefix "static_user_provider:" (cfg.settings.user_provider or "");
+            message = "services.greptimedb.settings.user_provider must name a static user provider; without one every /v1/ path answers unauthenticated (ADR-007 E7.1).";
+          }
+          {
+            assertion = (cfg.settings.enable_telemetry or true) == false;
+            message = "services.greptimedb.settings.enable_telemetry must be false; GreptimeDB reports usage to its vendor when the key is absent (ADR-001 R1.4).";
           }
           {
             assertion = memoryHighGiB != null;

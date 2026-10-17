@@ -1,12 +1,12 @@
 ---
 title: Fleet observability and CCV feedback-loop charter
-status: charter v15
+status: charter v16
 date: 2026-10-17
 ---
 
 # Fleet observability and CCV feedback-loop charter
 
-Charter version: v15.
+Charter version: v16.
 A revision is a version bump with a dated entry under "Revision history"; the text of an earlier version is never edited in place.
 
 ## Objective
@@ -293,7 +293,7 @@ A research unit that meets ambiguity returns it in its questions section; the or
   - ADR-007 amended: Prometheus remote read and write stay enabled because the PromQL query API depends on them; they are served on the loopback listener, require credentials, and accept writes only from `collector` (`wo`) and `admin` (`rw`); E7.1 no longer lists Prometheus remote storage among the disabled protocols, and the envelope check asserts `prom_store.enable = true` with a mutant that disables it, beside R7.1's seven mutants.
   - ADR-009's Prometheus-server alternative and `components/greptimedb.md` follow ADR-007.
   - S1's design, plan, specs and tasks carry the same amendment, and `modules/nixos/greptimedb.nix` sets `prom_store.enable = true`.
-- v14 (2026-10-17): three defects found by the S1 holistic review (`logs/s1-evidence/review-findings.md` F1, F2 and F12); no earlier text is edited beyond the status, date and version lines, and D1–D9, the requirements and the acceptance criteria are unchanged.
+- v14 (2026-10-17): three defects found by the S1 holistic review (`openspec/changes/stand-up-greptimedb-on-magnetite/review.md` F1, F2 and F12); no earlier text is edited beyond the status, date and version lines, and D1–D9, the requirements and the acceptance criteria are unchanged.
   - F1, the notifier's failure episode across automatic restarts: the stamp under `/var/lib/observability-notify` was cleared only by the `ExecStopPost=` hook when `SERVICE_RESULT=success`, and systemd 261 passes a failed result to the stop of an automatic restart (`src/core/service.c:98`), so after a restarting unit's first crash every later crash was skipped and no `RESOLVED` followed recovery (`modules/clan/services/otel-collector/flake-module.nix:305` and `:95` before this revision).
     ADR-009 item 11 amended: every notified unit also carries an `ExecStartPost=` hook running the same script, which posts one `RESOLVED` and removes the stamp on the unit's next successful start; systemd runs it before `ExecStopPost=`, so a oneshot's stop hook finds no stamp and posts no second `RESOLVED`.
     Because that would post a pair per crash in a crash loop, a per-unit `last-failed` timestamp rate-limits the notifier: a failure within `OBSERVABILITY_NOTIFY_MIN_INTERVAL_SEC` (900 s) of the last posted `FAILED` opens a suppressed episode that the hooks end silently, so a persistent crash loop yields one pair, then at most one new pair per 15 minutes per unit; restart-rate detection belongs to S3.
@@ -302,10 +302,22 @@ A research unit that meets ambiguity returns it in its questions section; the or
     ADR-007 E7.2 and R7.2 amended: R7.2 fails when `memory.events` `high` rises within one invocation, meaning the kernel throttled the store at `MemoryHigh`, tracked like `oom_kill` and `max`, and when `memory.stat` `anon` reaches `GREPTIMEDB_ENVELOPE_ANON_MAX_BYTES`, set from `MemoryHigh`, which keeps the forced-failure method of a runtime drop-in lowering the threshold; the cross-invocation OOM-journal and `NRestarts` clauses are unchanged, and `components/greptimedb.md` follows.
   - F12, curl on the notifier's path: `ntfy-send` carries curl through `runtimeInputs` on Linux, while darwin keeps `/usr/bin/curl` through `NTFY_CURL_BIN`, so the notifier template's `path = [ curl ]` and the `RESOLVED` hook's own `PATH` export are deleted.
   - S1's design, specs and tasks carry the same amendments, with tasks.md section 10 recording their verification.
-- v15 (2026-10-17): three further findings of the S1 holistic review (`logs/s1-evidence/review-findings.md` F3, F4 and F6); no earlier text is edited beyond the status, date and version lines, and D1–D9, the requirements and the acceptance criteria are unchanged.
+- v15 (2026-10-17): three further findings of the S1 holistic review (`openspec/changes/stand-up-greptimedb-on-magnetite/review.md` F3, F4 and F6); no earlier text is edited beyond the status, date and version lines, and D1–D9, the requirements and the acceptance criteria are unchanged.
   - F3, table TTLs: the hourly envelope failed on any table that set a `ttl` of its own (`modules/lib/greptimedb-envelope.nix:242` before this revision), while ADR-004, ADR-007 and `components/greptimedb.md` plan a 14-day `fleet` logs table for S7, so S7's own table would have failed the envelope.
     ADR-007 amended: tables allowed a TTL of their own are declared in `services.greptimedb.tableTtls`, empty in S1, and the envelope fails on a table TTL the map does not declare, on one that differs from the declared duration, and on a declared table that runs on its database's TTL, while a declared table that does not exist yet is not judged; ADR-004 and `components/greptimedb.md` follow.
     GreptimeDB `v1.2.1` renders a table's TTL through humantime 2.2.0, so `365d` reads back as `11months 30days 3h 50m 24s`, and the envelope compares declared and rendered TTLs as durations.
   - F4, one source for databases and retention: `flake.lib.otelCollectorSchema.databases` becomes the map of database names to TTLs that magnetite's `services.greptimedb.databases` reads, in place of a separate literal, and the ingress role asserts that the store's database names equal the schema's whenever its host runs the store.
   - F6, the agent's exporter in S4: the agent pipelines export to the in-process `forward` connector, which only a co-located ingress pipeline receives from, so S4 chooses the agent's exporter by role, `forward` beside the ingress and an OTLP exporter to the ingress elsewhere; the reference architecture's sequencing note does not claim otherwise and is unchanged.
+  - S1's design, specs and tasks carry the same amendments, with tasks.md section 10 recording their verification.
+- v16 (2026-10-17): the remaining findings of the S1 holistic review (`openspec/changes/stand-up-greptimedb-on-magnetite/review.md` F5, F7, F8, F9, F10 and F11), which change how S1's evaluation-time regulators discharge their properties; no earlier text is edited beyond the status, date and version lines and the review citation in v14 and v15, which pointed at an uncommitted file and now points at the committed review, and D1–D9, the requirements and the acceptance criteria are unchanged.
+  - F9, clauses that could not fail: about half of R3.1's and R7.1's clauses copied a module literal or rebuilt the module's own expression, so they failed only when that literal was deliberately edited.
+    A check clause now judges a relation an edit could break silently, and a property of one module's own settings is an assertion in that module.
+    ADR-007 R7.1 amended: the listener, protocol, `user_provider` and `enable_telemetry` clauses are assertions in the store module, and the check asserts `MemoryHigh` below `MemoryMax`, `MemorySwapMax = 0`, the kill order evaluator above store above collector and `restartUnits`, with mutants dropping `MemoryMax`, swapping two `OOMScoreAdjust` values and removing `restartUnits`; the memory knobs stay module literals whose effect R7.2 and the OOM-order test regulate.
+    ADR-003 R3.1 amended: scrape targets and exporter listeners join the loopback clause, the six process identity attributes and node_exporter's `openFirewall = false` are assertions in the agent module, and the unit cap is judged against the receiver's evaluated `units`; `components/otel-collector.md` follows.
+    ADR-006 R6.4 amended: the S3 stanza's values are confirmed at deployment, not copied into a check, and the export-prefix assertion arrives with S8; `components/greptimedb.md` follows.
+    `schema.nix` drops `process.maxNames`, which nothing consumed: the 30-name bound is observed at S1's deployment and S4's `otel-envelope` adds its regulator.
+  - F5, evaluation cost: R8.2's credential-holder clause projected `LoadCredential` over every magnetite unit inside the envelope check; it is now an assertion in magnetite's configuration, whose toplevel already forces every unit, and the envelope check's `drvPath` evaluation falls from about 2.04 GiB and 9.2 s to about 0.41 GiB and 1.6 s, while magnetite's toplevel stays at about 2.61 GiB.
+  - F7, failure wiring: the clause compared `services.observability-notify.units` with a literal copy, so a new disk-share unit passed both; it now requires every magnetite service named `greptimedb*`, `zfs-set-*`, `zfs-assert-*` or `opentelemetry-collector` to be listed, and every listed name to be a unit with an `ExecStart`.
+  - F10 and F11, checks of upstream or of themselves: the probe that `otelcol-contrib validate` rejects an unknown key, the check's own copy of the validated configuration, and the users-file oracle's mutants are deleted; ADR-003 R3.1's unknown-key mutant goes with them, and the validator still runs when a host's configuration builds.
+  - F8, negative controls: the pipeline container test runs the envelope's table clause against the real store, failing on a table created with an undeclared `ttl` and on one created with `sst_format = 'primary_key'`, and passing once both are dropped.
   - S1's design, specs and tasks carry the same amendments, with tasks.md section 10 recording their verification.

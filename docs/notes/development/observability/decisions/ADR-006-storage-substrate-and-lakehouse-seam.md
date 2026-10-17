@@ -135,7 +135,8 @@ Envelope E6.3, readable format: no table in any database has `sst_format` set to
 Regulator R6.3: the same probe queries the `create_options` column of `information_schema.tables` (`GreptimeTeam/greptimedb@179ff8e50:src/catalog/src/system_schema/information_schema/tables.rs:67`) and fails on any legacy-format table; its negative control is a scratch table created with the legacy option during the implementing change.
 
 Envelope E6.4, R2 substrate reachability: the store can write and list its manifest objects on R2.
-Regulator R6.4: the store's `/ready` endpoint after start, checked by the probe, plus a NixOS evaluation-time assertion that, when `type = "S3"`, `disable_ec2_metadata = true`, `region = "auto"`, `enable_virtual_host_style = false`, `bucket = "sciexp"` and `root = "projects/vanixiets/observability/store/"` are set and the export location lies under `projects/vanixiets/observability/export/`; the assertion's mutants drop `disable_ec2_metadata` and set `root` to the empty string.
+Regulator R6.4 (amended in charter v16): the store's `/ready` endpoint after start, checked by the probe, and from S8 a NixOS evaluation-time assertion that the export location lies under `projects/vanixiets/observability/export/`, outside the store's `root`.
+The S3 stanza's values (`type = "S3"`, `disable_ec2_metadata = true`, `region = "auto"`, `enable_virtual_host_style = false`, `bucket = "sciexp"`, `root = "projects/vanixiets/observability/store/"`) are literals of `magnetite`'s configuration with no copy in a check, because a copy fails only when the literal itself is edited; deployment confirms them by the store's objects appearing under the store prefix, and the readiness probe fails when R2 is unreachable.
 
 ## Failure prevented
 

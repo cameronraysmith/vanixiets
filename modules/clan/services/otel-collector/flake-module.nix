@@ -174,6 +174,19 @@ in
           }
         ];
       };
+
+      # ADR-003 item 16: a process identifier or command line could carry a
+      # secret or prompt content into collector memory and the store.
+      processAttributes =
+        config.services.opentelemetry-collector.settings.receivers."host_metrics/process".scrapers.process.resource_attributes;
+      enabledProcessAttributes = builtins.filter (a: (processAttributes.${a}.enabled or true) != false) [
+        "process.pid"
+        "process.parent_pid"
+        "process.command"
+        "process.command_line"
+        "process.executable.path"
+        "process.owner"
+      ];
     in
     {
       imports = [ collectorCore ];
@@ -191,6 +204,17 @@ in
 
       config = lib.mkMerge [
         {
+          assertions = [
+            {
+              assertion = enabledProcessAttributes == [ ];
+              message = "otel-collector agent: the process scraper must disable ${lib.concatStringsSep ", " enabledProcessAttributes} at source (ADR-003 item 16).";
+            }
+            {
+              assertion = !config.services.prometheus.exporters.node.openFirewall;
+              message = "otel-collector agent: node_exporter must not open the firewall; it is scraped on loopback (ADR-003 item 18).";
+            }
+          ];
+
           services.opentelemetry-collector = {
             settings = {
               processors = {

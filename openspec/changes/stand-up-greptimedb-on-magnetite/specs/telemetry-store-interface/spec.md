@@ -8,17 +8,17 @@ gRPC is bound to loopback rather than disabled, because the telemetry store's v1
 #### Scenario: The HTTP listener is configured on a non-loopback address
 
 - **WHEN** magnetite's configuration binds the telemetry store's HTTP listener to `0.0.0.0`
-- **THEN** the evaluation-time envelope check (R7.1) fails, which is one of its seven mutants, and the evaluation-time ownership and bind check (R8.2) fails as well
+- **THEN** magnetite's evaluation fails on the store module's listener assertion (R7.1, which R8.2's bind clause also names), as an evaluation with that override shows
 
 #### Scenario: A disabled protocol is re-enabled
 
 - **WHEN** magnetite's configuration re-enables the MySQL listener
-- **THEN** the evaluation-time envelope check (R7.1) fails, which is another of its mutants
+- **THEN** magnetite's evaluation fails on the store module's protocol assertion (R7.1), as an evaluation with that override shows
 
 #### Scenario: The gRPC listener leaves loopback
 
 - **WHEN** magnetite's configuration sets the gRPC `bind_addr` outside `127.0.0.0/8`
-- **THEN** the evaluation-time envelope check (R7.1) fails
+- **THEN** magnetite's evaluation fails on the store module's gRPC assertion (R7.1)
 
 ### Requirement: Prometheus remote storage stays enabled for the PromQL query API
 
@@ -37,7 +37,7 @@ The collector on magnetite SHALL reach every metrics source it scrapes on a loop
 #### Scenario: The scrape targets are evaluated
 
 - **WHEN** the evaluation-time collector check (R3.1) reads magnetite's collector configuration
-- **THEN** it finds node_exporter on `127.0.0.1:9100`, gitea on `127.0.0.1:3002`, niks3 on `127.0.0.1:5752`, nixbot on `127.0.0.1:9180`, nginx's `stub_status`, zerotierone's metrics with `enableMetrics = true` in zerotierone's `local.conf`, and the telemetry store's own `/metrics` on `127.0.0.1:4000`, each on loopback
+- **THEN** it finds every scrape target, including node_exporter's, gitea's, niks3's, nixbot's, nginx's `stub_status`, zerotierone's and the telemetry store's own `/metrics`, and node_exporter's listener on loopback, and the agent module's assertion holds node_exporter's firewall closed
 
 #### Scenario: A scrape target is configured off loopback
 
@@ -61,8 +61,8 @@ The machine SHALL require one of these accounts on every `/v1/` path, loopback i
 
 #### Scenario: The user provider is removed
 
-- **WHEN** magnetite's configuration drops the `user_provider` setting
-- **THEN** the evaluation-time envelope check (R7.1) fails, which is one of its mutants
+- **WHEN** magnetite's configuration empties the `user_provider` setting
+- **THEN** magnetite's evaluation fails on the store module's user-provider assertion (R7.1), as an evaluation with that override shows
 
 ### Requirement: Ingest is OTLP over HTTP with a database header
 
@@ -74,10 +74,10 @@ The collector SHALL carry no logs or traces pipeline into the telemetry store.
 - **WHEN** the container test emits a metric to the collector's local receiver
 - **THEN** the metric passes from the agent pipeline to the ingress pipeline through an in-process `forward` connector, arrives in the database the routing connector selects, and carries `host_name` as a promoted label
 
-#### Scenario: The promoted attributes are evaluated
+#### Scenario: The promoted attributes are read back
 
-- **WHEN** the evaluation-time collector check (R3.1) reads each exporter's headers
-- **THEN** `x-greptime-otlp-metric-promote-resource-attrs` equals the resource allow-list in `schema.nix`, which includes `host.name`, and `x-greptime-db-name` names the exporter's database
+- **WHEN** the container test reads back the metric it emitted
+- **THEN** the metric carries `host_name`, promoted through the `x-greptime-otlp-metric-promote-resource-attrs` header the ingress builds from the resource allow-list in `schema.nix`, and appears only in the database whose name the exporter's `x-greptime-db-name` header carries
 
 #### Scenario: The histogram conversion is removed while the store is below 1.3.0
 
@@ -120,7 +120,7 @@ The machine SHALL read the tables allowed a `ttl` of their own from `services.gr
 #### Scenario: A table carries an undeclared ttl
 
 - **WHEN** any table in the three databases carries a `ttl` of its own and `services.greptimedb.tableTtls` does not declare it
-- **THEN** the hourly envelope regulator `greptimedb-envelope` fails, which the envelope check's recorded-answer rehearsal confirms
+- **THEN** the hourly envelope regulator `greptimedb-envelope` fails, which the envelope check's recorded-answer rehearsal confirms, and which the container test confirms against the real store with a `fleet` table created `WITH (ttl = '1d')`
 
 #### Scenario: A table carries a declared ttl
 
@@ -146,15 +146,10 @@ The machine SHALL take magnetite's databases and their TTLs from `flake.lib.otel
 The machine SHALL configure the telemetry store's storage as type `S3` with bucket `sciexp` and root `projects/vanixiets/observability/store/`, at the R2 account endpoint the `omnigraph-r2` generator already uses, with `storage.data_home` on the dataset `zroot/root/greptimedb`, and every table SHALL use the flat SST format.
 The R2 access key and secret SHALL reach the telemetry store only through an environment file rendered by the `greptimedb-r2` generator.
 
-#### Scenario: The storage stanza is evaluated
+#### Scenario: The storage stanza is confirmed at first activation
 
-- **WHEN** the evaluation-time storage check (R6.4's storage clause) reads magnetite's configuration
-- **THEN** it finds region `auto`, `enable_virtual_host_style = false`, `disable_ec2_metadata = true`, bucket `sciexp` and the stated root, and the environment file carries only `GREPTIMEDB_STANDALONE__STORAGE__ACCESS_KEY_ID` and `GREPTIMEDB_STANDALONE__STORAGE__SECRET_ACCESS_KEY`
-
-#### Scenario: The storage stanza is weakened
-
-- **WHEN** magnetite's configuration drops `disable_ec2_metadata` or sets the storage root to the empty string
-- **THEN** the evaluation-time storage check fails, which its two mutants show
+- **WHEN** the operator lists `sciexp` after magnetite's first activation
+- **THEN** the telemetry store's objects appear under `projects/vanixiets/observability/store/`, which `verify.md` records, and the `greptimedb-r2` generator's script renders only `GREPTIMEDB_STANDALONE__STORAGE__ACCESS_KEY_ID` and `GREPTIMEDB_STANDALONE__STORAGE__SECRET_ACCESS_KEY`; no evaluation-time check copies the stanza's values, because a copy fails only when the value itself is edited
 
 #### Scenario: The telemetry store starts against R2
 
@@ -163,8 +158,8 @@ The R2 access key and secret SHALL reach the telemetry store only through an env
 
 #### Scenario: A table uses the legacy format
 
-- **WHEN** any table's create options name a legacy `sst_format`
-- **THEN** the hourly envelope regulator fails (R6.3)
+- **WHEN** any table's create options name the legacy `sst_format=primary_key`
+- **THEN** the hourly envelope regulator fails (R6.3), which the container test confirms against the real store with a `fleet` table created `WITH (sst_format = 'primary_key')`, and the regulator passes again once that table is dropped
 
 ### Requirement: Credentials exist only as activation-resolved files owned by non-worker users
 
@@ -183,8 +178,8 @@ Replacing the account file SHALL restart the telemetry store, and replacing the 
 
 #### Scenario: A credential is loaded by a unit outside its holders
 
-- **WHEN** the evaluation-time ownership check (R8.2) reads which of magnetite's evaluated units load each password file
-- **THEN** its credential-holder clause finds `admin-password` loaded only by `greptimedb-schema`, `collector-password` only by `opentelemetry-collector` and `regulator-password` only by the regulator units, and a mutant in which a second unit loads `admin-password` makes it fail
+- **WHEN** magnetite's configuration is evaluated, which loads each password file into the units that name it
+- **THEN** magnetite's credential-holder assertion (R8.2) finds `users` loaded only by `greptimedb`, `admin-password` only by `greptimedb-schema`, `collector-password` only by `opentelemetry-collector`, `regulator-password` only by the regulator units and `perses-password` by none, and an evaluation with a second unit loading `admin-password` fails on it
 
 #### Scenario: The restart on rotation is removed
 
@@ -212,8 +207,8 @@ The dataset `zroot/root/greptimedb` SHALL carry `quota=16G`, `reservation=12G` a
 
 #### Scenario: The evaluation-time envelope check runs with its mutants
 
-- **WHEN** the evaluation-time envelope check (R7.1) runs against magnetite's configuration and against each of its seven mutants, which drop `MemoryMax`, drop `page_cache_size`, bind HTTP to `0.0.0.0`, re-enable MySQL, remove `user_provider`, omit `enable_telemetry` and remove the restart on rotation
-- **THEN** it passes on magnetite's configuration, where it also finds `[runtime] global_rt_size = 4`, `compact_rt_size = 2`, the memory knobs ADR-007 names, `logging.dir = ""` and a collector `memory_limiter` of 384 MiB, and it fails on every mutant
+- **WHEN** the evaluation-time envelope check (R7.1) runs against magnetite's configuration and against each of its mutants, which drop `MemoryMax`, swap the store's and the collector's `OOMScoreAdjust`, and remove the restart on rotation
+- **THEN** it passes on magnetite's configuration, where it finds `MemoryHigh` below `MemoryMax`, `MemorySwapMax=0`, the evaluator's `oom_score_adj` above the store's and the store's above the collector's, and the collector's `memory_limiter` below the collector's `MemoryMax`, and it fails on every mutant; the listener, protocol, user-provider and usage-report properties are the store module's assertions, and the memory knobs ADR-007 names are literals of the store module whose effect R7.2 and the OOM-order test regulate
 
 #### Scenario: The hourly envelope regulator finds the store over its envelope
 
@@ -256,8 +251,8 @@ The machine SHALL run a telemetry store package whose version matches `^[0-9]+\.
 
 #### Scenario: The usage-report setting is omitted
 
-- **WHEN** magnetite's configuration omits `enable_telemetry`
-- **THEN** the evaluation-time telemetry check (R1.4) fails, which its mutant shows
+- **WHEN** magnetite's configuration omits `enable_telemetry` or sets it to `true`
+- **THEN** magnetite's evaluation fails on the store module's usage-report assertion (R1.4), as an evaluation with `enable_telemetry = true` shows
 
 #### Scenario: A prerelease version is configured
 
@@ -277,12 +272,12 @@ The machine SHALL run a telemetry store package whose version matches `^[0-9]+\.
 ### Requirement: The collector's configuration bounds what it gathers
 
 The machine SHALL configure magnetite's collector so that per-process memory carries no per-process identifier and covers only executables holding at least 64 MiB, per-unit signals cover exactly the `schema.nix` allow-list of at most 40 units, paging reports usage only, and node_exporter's series pass a keep-list.
-`schema.nix` declares the 30-name per-host bound as `process.maxNames`, which no collector stage enforces; it is observed at first activation and regulated from slice S4.
+No collector stage enforces ADR-004's bound of 30 distinct process names per host; it is observed at first activation and regulated from slice S4.
 
 #### Scenario: The collector check runs with its mutants
 
-- **WHEN** the evaluation-time collector check (R3.1) runs against magnetite's collector configuration and its mutants
-- **THEN** it passes `otelcol-contrib validate`, finds `process.pid`, `process.parent_pid`, `process.command`, `process.command_line`, `process.executable.path` and `process.owner` disabled at source, finds the 64 MiB filter and `process.maxNames = 30`, finds the paging scraper limited to `system.paging.usage` and `system.linux.memory.available` enabled, finds the `systemd` receiver's `units` equal to the `schema.nix` allow-list, finds node_exporter limited to its `zfs` collector and its `vmstat` collector filtered to `oom_kill`, and fails on every mutant
+- **WHEN** the evaluation-time collector check (R3.1) runs against magnetite's collector configuration and its mutants, and magnetite's configuration is evaluated and built
+- **THEN** the agent module's assertion finds `process.pid`, `process.parent_pid`, `process.command`, `process.command_line`, `process.executable.path` and `process.owner` disabled at source, the check finds the 64 MiB floor stage in the process pipeline and no more than 40 of magnetite's units matching the `systemd` receiver's `units`, which the agent builds from the `schema.nix` allow-list, nixpkgs' build-time `otelcol-contrib validate` passes, and the check fails on every mutant; the paging metrics, the node_exporter collectors and its keep-list are literals of the agent module with no copy in the check
 
 #### Scenario: The systemd receiver reaches D-Bus
 
@@ -334,7 +329,17 @@ The machine SHALL provide the template `observability-notify@.service` in the co
 #### Scenario: The failure wiring is evaluated
 
 - **WHEN** the evaluation-time collector check (R3.1) reads magnetite's configuration
-- **THEN** its failure-wiring clause finds `OnFailure=observability-notify@%n.service` on `greptimedb.service`, `greptimedb-schema.service`, `greptimedb-envelope.service`, `opentelemetry-collector.service`, `zfs-set-root-greptimedb-quota`, `zfs-set-root-greptimedb-reservation`, `zfs-assert-root-greptimedb-noautosnap`, `zfs-assert-root-nix-noautosnap`, `zfs-assert-root-docker-noautosnap`, `zfs-assert-root-podman-noautosnap`, `zfs-set-root-nix-quota`, `zfs-set-root-nixos-reservation` and `zfs-set-root-home-reservation`
+- **THEN** its failure-wiring clause finds every magnetite service named `greptimedb*`, `zfs-set-*`, `zfs-assert-*` or `opentelemetry-collector` listed in `services.observability-notify.units`, which today is `greptimedb.service`, `greptimedb-schema.service`, `greptimedb-envelope.service`, `opentelemetry-collector.service`, `zfs-set-root-greptimedb-quota`, `zfs-set-root-greptimedb-reservation`, `zfs-assert-root-greptimedb-noautosnap`, `zfs-assert-root-nix-noautosnap`, `zfs-assert-root-docker-noautosnap`, `zfs-assert-root-podman-noautosnap`, `zfs-set-root-nix-quota`, `zfs-set-root-nixos-reservation` and `zfs-set-root-home-reservation`, finds each listed name to be a unit with an `ExecStart`, and finds `OnFailure=observability-notify@%n.service` on each
+
+#### Scenario: A new disk-share unit is not listed
+
+- **WHEN** a mutant of magnetite's configuration adds a `zfs-set-root-foo-quota` service that `services.observability-notify.units` does not list
+- **THEN** the evaluation-time collector check (R3.1) fails on its failure-wiring clause
+
+#### Scenario: A listed name is not a unit
+
+- **WHEN** a mutant lists a name in `services.observability-notify.units` for which magnetite defines no service of its own, so the wiring creates a unit with no `ExecStart`
+- **THEN** the evaluation-time collector check (R3.1) fails on its failure-wiring clause
 
 #### Scenario: A unit's failure handler is removed
 

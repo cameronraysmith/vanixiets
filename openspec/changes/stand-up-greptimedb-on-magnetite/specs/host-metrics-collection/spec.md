@@ -10,7 +10,7 @@ The collector SHALL write series only, and SHALL write no log records and no tra
 #### Scenario: magnetite's collector configuration is evaluated
 
 - **WHEN** magnetite's collector configuration is evaluated
-- **THEN** the evaluation-time collector regulator finds configured magnetite's available memory, its compressed swap use, the memory of each process large enough to matter, the running state and restart count of each unit on the fleet's watched list, its storage pool's health and cache size, the kernel's count of processes killed for want of memory, and the signals the forge, the build service, the binary cache, the web front end, the overlay network and the telemetry store itself publish, each reached only from magnetite itself, and its mutants show it fails when one is broken
+- **THEN** the evaluation-time collector regulator finds every source the collector reaches for these signals, node_exporter's storage-pool and out-of-memory signals and the endpoints the forge, the build service, the binary cache, the web front end, the overlay network and the telemetry store itself publish, on loopback, so each is reached only from magnetite itself, and its mutants show it fails when one leaves loopback; which signals are gathered is set by the collector's module, with no copy in the regulator, and the container test and the first activation observe the series that arrive
 
 #### Scenario: The collector runs beside the telemetry store in the container runtime test
 
@@ -46,14 +46,14 @@ Every series the collector writes SHALL carry the name of the host it was gather
 ### Requirement: Series cardinality stays bounded
 
 The collector SHALL bound how many series each signal produces on magnetite, and no per-process signal SHALL carry an identifier that changes with each process started, such as its process number or command line.
-Per-process memory is bounded by a memory floor rather than by a count: no stage of the pinned collector limits the number of distinct process names, so the bound of 30 names per host is declared at evaluation, observed at first activation, and regulated at runtime from slice S4.
+Per-process memory is bounded by a memory floor rather than by a count: no stage of the pinned collector limits the number of distinct process names, so the bound of 30 names per host is observed at first activation and regulated at runtime from slice S4.
 
-**Discharged by**: `telemetry-store-interface` requirement `The collector's configuration bounds what it gathers`; the evaluation-time regulator over magnetite's collector configuration and its mutants, and the operator's count of distinct process names at first activation, discharge it.
+**Discharged by**: `telemetry-store-interface` requirement `The collector's configuration bounds what it gathers`; the evaluation-time regulator over magnetite's collector configuration and its mutants, the collector module's assertion that the per-process identifiers are disabled, and the operator's count of distinct process names at first activation discharge it.
 
 #### Scenario: The bounds are evaluated
 
 - **WHEN** the evaluation-time collector regulator reads magnetite's collector configuration
-- **THEN** it finds per-process memory recorded only for processes using at least 64 MiB, the bound of 30 distinct process names declared beside the watched list, per-unit signals recorded only for units on the fleet's watched list of no more than 40 units, and only the named storage-pool and out-of-memory signals kept from the host's own probe
+- **THEN** it finds the 64 MiB per-process memory floor in the process pipeline and no more than 40 of magnetite's units on the collector's watched-unit list, which the collector builds from the fleet's watched list, and its mutants show it fails when the floor leaves the pipeline or the list grows past 40 units; the storage-pool and out-of-memory keep-list is a literal of the collector's module with no copy in the regulator
 
 #### Scenario: Distinct process names are counted at first activation
 
@@ -63,12 +63,12 @@ Per-process memory is bounded by a memory floor rather than by a count: no stage
 #### Scenario: A per-process identifier is turned back on
 
 - **WHEN** magnetite's collector configuration is changed so that any of the six disabled per-process identifiers is gathered again
-- **THEN** the evaluation-time collector regulator fails before any activation
+- **THEN** magnetite's evaluation fails before any activation on the collector module's assertion, as an evaluation with `process.command_line` enabled shows
 
-#### Scenario: The watched list and the collector's unit list diverge
+#### Scenario: The watched-unit list grows past its bound
 
-- **WHEN** the units the collector watches differ from the fleet's watched list, or that list exceeds 40 units
-- **THEN** the evaluation-time collector regulator fails before any activation
+- **WHEN** more than 40 of magnetite's units match the units the collector watches, or the list itself exceeds 40 entries
+- **THEN** the evaluation-time collector regulator fails before any activation, which its mutant shows
 
 ### Requirement: Collection survives a telemetry store restart without losing the queued interval
 
@@ -106,7 +106,7 @@ The collector SHALL store the name of each Omnigent worker unit, which carries t
 
 A failure of the collector, of the telemetry store, of the unit that sets up its databases, of its hourly envelope regulator, or of any unit that applies or confirms a disk-share setting on magnetite SHALL produce, from magnetite, a failure notice on the fleet's notification service naming the failed unit and magnetite, without the notifier holding any credential for that service.
 
-**Discharged by**: `telemetry-store-interface` requirement `Failure notices are posted to one topic`, resting on world assumption `A33 — The fleet's notification service on cinnabar is reachable over ZeroTier and accepts anonymous publishing`; the evaluation-time collector regulator's failure-wiring case with its mutant discharges that every named unit hands its failure to the notifier, and the operator's deliberately failed envelope regulator at first activation discharges delivery from magnetite.
+**Discharged by**: `telemetry-store-interface` requirement `Failure notices are posted to one topic`, resting on world assumption `A33 — The fleet's notification service on cinnabar is reachable over ZeroTier and accepts anonymous publishing`; the evaluation-time collector regulator's failure-wiring case with its mutants discharges that every unit of the kinds named here, present or added later, hands its failure to the notifier, and the operator's deliberately failed envelope regulator at first activation discharges delivery from magnetite.
 
 #### Scenario: A watched unit fails at first activation
 
@@ -117,3 +117,8 @@ A failure of the collector, of the telemetry store, of the unit that sets up its
 
 - **WHEN** magnetite's configuration is changed so that the collector, or any other unit this requirement names, no longer hands its failure to the notifier
 - **THEN** the evaluation-time collector regulator fails before any activation, which its mutant shows, so a broken collection is reported rather than noticed as an absence of series
+
+#### Scenario: A new disk-share unit is added
+
+- **WHEN** magnetite's configuration gains a unit that applies or confirms a disk-share setting and does not list it for notification
+- **THEN** the evaluation-time collector regulator fails before any activation, which its mutant shows

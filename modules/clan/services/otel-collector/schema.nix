@@ -1,8 +1,8 @@
 # Single source of the collector's allow-lists and bounds (ADR-004
 # "Implementation surface"; design D8, D9). The otel-collector clan service
 # builds its receivers, transforms and exporter headers from it, and
-# checks.x86_64-linux.otel-collector-config compares magnetite's evaluated
-# configuration against it. import-tree loads every .nix file under
+# checks.x86_64-linux.otel-collector-config reads its owner aliases and
+# databases. import-tree loads every .nix file under
 # modules/, so this is a flake-parts module exposing the data as
 # flake.lib.otelCollectorSchema; nothing imports it by path. S1 carries the
 # keys S1 deploys; later slices add theirs here.
@@ -66,13 +66,11 @@
     ];
 
     # process.memory.usage is stored only for executables holding at least
-    # minBytes after same-name aggregation (ADR-003 item 16). maxNames is the
-    # per-host bound on distinct names (ADR-004), observed at deployment and
-    # regulated at runtime from S4; no collector stage enforces it.
-    process = {
-      minBytes = 67108864;
-      maxNames = 30;
-    };
+    # minBytes after same-name aggregation (ADR-003 item 16). ADR-004's
+    # per-host bound of 30 distinct names has no collector stage at contrib
+    # 0.155.0; S1 records the observed count at deployment and S4's
+    # otel-envelope adds its regulator.
+    process.minBytes = 67108864;
 
     # Store databases and their retention, one otlp_http exporter each
     # (design D8). magnetite's services.greptimedb.databases reads this map,

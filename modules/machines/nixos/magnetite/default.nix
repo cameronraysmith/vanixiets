@@ -619,6 +619,45 @@ in
         "admin-password:${config.clan.core.vars.generators.greptimedb-users.files.admin-password.path}"
       ];
 
+      # R8.2 credential holders (ADR-008; review F5): for each greptimedb-users
+      # secret, the units allowed to load it, and no others. Entries are
+      # "<id>:<source path>" and matched on the path, because each unit
+      # chooses its own id and kanidm-site-branding already loads an unrelated
+      # "admin-password" id. An assertion rather than a flake check, because
+      # the toplevel already forces every unit's LoadCredential, while a check
+      # forcing them again cost about 1.6 GiB of evaluation.
+      assertions =
+        let
+          usersFiles = config.clan.core.vars.generators.greptimedb-users.files;
+          allowed = {
+            users = [ "greptimedb" ];
+            admin-password = [ "greptimedb-schema" ];
+            collector-password = [ "opentelemetry-collector" ];
+            perses-password = [ ];
+            regulator-password = [ "greptimedb-envelope" ];
+          };
+          credentialSource = entry: lib.concatStringsSep ":" (lib.drop 1 (lib.splitString ":" entry));
+          holdersOf =
+            path:
+            lib.naturalSort (
+              lib.attrNames (
+                lib.filterAttrs (
+                  _: service:
+                  lib.any (entry: credentialSource entry == path) (
+                    lib.toList (service.serviceConfig.LoadCredential or [ ])
+                  )
+                ) config.systemd.services
+              )
+            );
+          actual = lib.mapAttrs (name: _: holdersOf usersFiles.${name}.path) allowed;
+        in
+        [
+          {
+            assertion = actual == allowed;
+            message = "magnetite: greptimedb-users credentials are loaded by ${builtins.toJSON actual}; R8.2 allows only ${builtins.toJSON allowed}";
+          }
+        ];
+
       # The regulator credential and the host facts greptimedb-envelope checks.
       # Quota and reservation come from greptimedbDataset, the binding the
       # zfs-set-root-greptimedb-{quota,reservation} oneshots apply, so R7.3
