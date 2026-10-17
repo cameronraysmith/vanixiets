@@ -218,6 +218,19 @@ in
         flakeLib.nginxMetricsLocation
           config.services.nginx.virtualHosts.${config.services.nixbot.domain};
 
+      # Loopback-only scrape endpoint for magnetite's collector (design D9).
+      # nixbot binds no TCP port, and a scrape through the public vhost's
+      # /metrics would not arrive from loopback.
+      services.nginx.virtualHosts."nixbot-metrics-loopback" = {
+        listen = [
+          {
+            addr = "127.0.0.1";
+            port = 9180;
+          }
+        ];
+        locations."/metrics".proxyPass = "http://unix:/run/nixbot/web.sock";
+      };
+
       # The service-wide backstop on the evaluation, set above its measured
       # 18.7 GB peak at 6 x 3072 so that nix-eval-jobs' own budget binds first
       # (the evaluator flags above). Throttling evaluator heaps at this limit is

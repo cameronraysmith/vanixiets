@@ -2194,8 +2194,9 @@ Four of ADR-003's five R3.1 mutants (A3:233) apply here: the unknown component k
         conversionRemoved = onSettings { processors."transform/exphist".metric_statements = [ ]; };
       };
 
+      # hostmetricsreceiver ignores unknown top-level keys (receiver/hostmetricsreceiver/config.go Unmarshal, WithIgnoreUnused, v0.155.0), so the probe targets a strictly decoded component.
       unknownKeyConfig = (pkgs.formats.yaml { }).generate "otel-collector-unknown-key.yaml" (
-        lib.recursiveUpdate collector.settings { receivers."host_metrics/memory".unknown_key = true; }
+        lib.recursiveUpdate collector.settings { processors.memory_limiter.unknown_key = true; }
       );
     in
     {

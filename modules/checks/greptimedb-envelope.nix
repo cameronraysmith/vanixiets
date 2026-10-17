@@ -32,7 +32,7 @@
       credentialHolders = {
         users = [ "greptimedb" ];
         admin-password = [ "greptimedb-schema" ];
-        collector-password = [ ];
+        collector-password = [ "opentelemetry-collector" ];
         perses-password = [ ];
         regulator-password = [ ];
       };
