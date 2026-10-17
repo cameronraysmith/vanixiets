@@ -4,7 +4,7 @@ title: "ADR-009: Alerting"
 
 ## Status
 
-Accepted (human gate, 2026-10-15), except Q5, deferred to the end of implementation, and amended in place under charter v12 (2026-10-16): `ntfy-send` is the package `pkgs/by-name/ntfy-send`, added by slice S1, which the evaluator consumes instead of building its own
+Accepted (human gate, 2026-10-15), except Q5, deferred to the end of implementation, and amended in place under charter v12 (2026-10-16): `ntfy-send` is the package `pkgs/by-name/ntfy-send`, added by slice S1, which the evaluator consumes instead of building its own; and under charter v13 (2026-10-17): the Prometheus-server alternative now records that ADR-007 keeps Prometheus remote read enabled
 
 ## Context
 
@@ -138,7 +138,7 @@ The absence freeze is the per-host form of item 6's store freeze: without it eve
 - vmalert 1.153.0 with Alertmanager 0.33.1 posting to ntfy's `?template=alertmanager`: two daemons on magnetite to obtain grouping, silencing and inhibition that eighteen rules do not need, and vmalert compatibility with GreptimeDB's Prometheus API is unverified; adopted only on the trigger in Q3.
 - vmalert alone: notifies only an Alertmanager-compatible endpoint, so it cannot post to ntfy.
 - `alertmanager-ntfy` 1.2.1 as a bridge: ntfy 2.28.0 renders Alertmanager webhooks natively, so the bridge is a third process with no failure prevented.
-- Prometheus server as the rule evaluator: agent mode disables alerting, and server mode evaluates against its own storage, which makes it a second store `[INFERENCE: server mode could also read GreptimeDB through Prometheus remote read, which ADR-007 disables]`.
+- Prometheus server as the rule evaluator: agent mode disables alerting, and server mode evaluates against its own storage, which makes it a second store `[INFERENCE: server mode could also read GreptimeDB through Prometheus remote read, which ADR-007 keeps enabled only because the PromQL query API depends on it]`.
 - Grafana alerting: a second dashboard stack beside Perses, which ADR-002 rejected.
 - Perses: evaluates no rules at 0.54.0.
 - GreptimeDB triggers: enterprise-only (`research/greptimedb.md` F41).

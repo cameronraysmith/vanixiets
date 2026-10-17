@@ -169,7 +169,8 @@ in
           postgres.enable = false;
           opentsdb.enable = false;
           influxdb.enable = false;
-          prom_store.enable = false;
+          # The PromQL query API is registered only with prom_store (v1.2.1 src/frontend/src/server.rs:130-158).
+          prom_store.enable = true;
           jaeger.enable = false;
           query.memory_pool_size = "512MB";
           storage.data_home = "/var/lib/greptimedb";

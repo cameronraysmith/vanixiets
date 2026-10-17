@@ -17,7 +17,7 @@ Evaluation-time checks with mutants, an hourly envelope oneshot and two on-deman
 - Repository: `/Users/crs58/projects/vanixiets`, jj-colocated; never relocate `@`; commit each plan task as one change off `main@origin` per the repository's jj workflow.
 - Each plan task is one pull request, in the order below; each lands through the merge queue before the next task's PR is enqueued.
 - Store version 1.2.1 from `greptime-linux-amd64-v1.2.1.tar.gz`, sha256 `062d5beb13de4991c4fec201b2e5071518bf4ca8f0d52947eba757a74c2a5420`; never a prerelease.
-- Store listeners: HTTP `127.0.0.1:4000`, gRPC `127.0.0.1:4001`; MySQL, PostgreSQL, InfluxDB, OpenTSDB, Prometheus remote storage and Jaeger disabled; no firewall port; `http.enable_api_server` stays off in S1.
+- Store listeners: HTTP `127.0.0.1:4000`, gRPC `127.0.0.1:4001`; MySQL, PostgreSQL, InfluxDB, OpenTSDB and Jaeger disabled; Prometheus remote read and write at `/v1/prometheus/{read,write}` enabled, because v1.2.1 registers the PromQL query API only together with them (`src/frontend/src/server.rs:130-158`, charter v13), loopback-only and authenticated, with only `collector` (`wo`) and `admin` (`rw`) able to write; no firewall port; `http.enable_api_server` stays off in S1.
 - Store envelope: `MemoryHigh = "3G"`, `MemoryMax = "4G"`, `MemorySwapMax = "0"`, `OOMScoreAdjust = 500`, `CPUWeight = 20`, `[runtime] global_rt_size = 4`, `compact_rt_size = 2`.
 - Collector envelope: `memory_limiter` 384 MiB, `MemoryMax = "512M"`, `OOMScoreAdjust = 300`; sending queue in `file_storage`, at least 24 h, under 512 MiB.
 - Databases and retention: `fleet` 30d, `devloop` 365d, `agent` 90d; no logs or traces table in S1.
@@ -680,8 +680,8 @@ Create `modules/checks/greptimedb-envelope.nix` with exactly this content:
 
 ```nix
 # Evaluation-time regulator for the telemetry store on magnetite (design D11):
-# R7.1, R1.1 (amended), R1.4, R6.4's storage clause, R8.2 and the users-file
-# check.
+# R7.1, R1.1 (amended), R1.4, R6.4's storage clause, R8.2, the PromQL read
+# path (charter v13) and the users-file check.
 #
 # Every clause reads magnetite's evaluated configuration, so it judges what
 # deploys rather than a transcription of it. Mutants are pure functions over
@@ -811,7 +811,6 @@ Create `modules/checks/greptimedb-envelope.nix` with exactly this content:
             "postgres"
             "opentsdb"
             "influxdb"
-            "prom_store"
             "jaeger"
           ];
           userProvider =
@@ -852,6 +851,11 @@ Create `modules/checks/greptimedb-envelope.nix` with exactly this content:
             lib.mapAttrs (
               name: _: holdersOf v.loadCredentials usersGenerator.files.${name}.path
             ) credentialHolders == credentialHolders;
+
+          # PromQL read path (charter v13): GreptimeDB v1.2.1 registers the
+          # PromQL query API only when prom_store is enabled
+          # (src/frontend/src/server.rs:130-158).
+          promqlApi = (s.prom_store.enable or false) == true;
         };
 
       failures = v: lib.attrNames (lib.filterAttrs (_: holds: !holds) (clauses v));
@@ -951,6 +955,12 @@ Create `modules/checks/greptimedb-envelope.nix` with exactly this content:
                 nixbot = v.loadCredentials.nixbot ++ [ "admin-password:${usersGenerator.files.admin-password.path}" ];
               };
             };
+        };
+
+        # PromQL read path
+        promStoreDisabled = {
+          clause = "promqlApi";
+          apply = withSettings (settings: lib.recursiveUpdate settings { prom_store.enable = false; });
         };
       };
 
@@ -1186,7 +1196,8 @@ Create `modules/nixos/greptimedb.nix` with exactly this content:
           postgres.enable = false;
           opentsdb.enable = false;
           influxdb.enable = false;
-          prom_store.enable = false;
+          # The PromQL query API is registered only with prom_store (v1.2.1 src/frontend/src/server.rs:130-158).
+          prom_store.enable = true;
           jaeger.enable = false;
           query.memory_pool_size = "512MB";
           storage.data_home = "/var/lib/greptimedb";
@@ -1482,7 +1493,7 @@ In `modules/machines/nixos/magnetite/default.nix`, after the `services.omnigraph
 Run: `jj st --no-pager >/dev/null && nix build .#checks.x86_64-linux.greptimedb-envelope -L 2>&1 | tee logs/greptimedb-envelope-green-$(date +%Y%m%d-%H%M%S).log`
 Expected: the build succeeds and prints no `greptimedb envelope clauses failed` or `oracle accepted mutants` message.
 The `jj st` snapshot makes the new `modules/nixos/greptimedb.nix` visible to the flake.
-Success means the real configuration fails no clause, each of the fourteen mutants fails the clause it targets, the generator emits four valid lines with matching password files and hash, and both users-file mutants are rejected.
+Success means the real configuration fails no clause, each of the fifteen mutants fails the clause it targets, the generator emits four valid lines with matching password files and hash, and both users-file mutants are rejected.
 
 - [ ] **Step 10: Show one clause can fail its mutant**
 
@@ -1511,7 +1522,7 @@ jq -S . > logs/greptimedb-settings-expected.json <<'EOF'
   "mysql": { "enable": false },
   "opentsdb": { "enable": false },
   "postgres": { "enable": false },
-  "prom_store": { "enable": false },
+  "prom_store": { "enable": true },
   "query": { "memory_pool_size": "512MB" },
   "region_engine": [
     {
@@ -1564,7 +1575,7 @@ toml="$(grep '^ExecStart=' "$unit/greptimedb.service" | sed 's/.*--config-file /
 grep -nE '^\[|^(enable_telemetry|user_provider|addr|bind_addr|enable|page_cache_size|global_rt_size|compact_rt_size|dir|type|root|disable_ec2_metadata) ' "$toml"
 ```
 
-Expected: `ExecStart=/nix/store/…-greptimedb-bin-1.2.1/bin/greptime standalone start --config-file /nix/store/…-greptimedb.toml`; the grep shows `enable_telemetry = false`, `user_provider = "static_user_provider:file:/run/credentials/greptimedb.service/users"`, `[http]` with `addr = "127.0.0.1:4000"`, `[grpc]` with `bind_addr = "127.0.0.1:4001"`, `enable = false` under each of `[influxdb]`, `[jaeger]`, `[mysql]`, `[opentsdb]`, `[postgres]`, `[prom_store]`, `[[region_engine]]` followed by `[region_engine.mito]` with `page_cache_size = "256MB"`, `[runtime]` with `compact_rt_size = 2` and `global_rt_size = 4`, `[logging]` with `dir = ""`, and `[storage]` with `type = "S3"`, `root = "projects/vanixiets/observability/store/"` and `disable_ec2_metadata = true`.
+Expected: `ExecStart=/nix/store/…-greptimedb-bin-1.2.1/bin/greptime standalone start --config-file /nix/store/…-greptimedb.toml`; the grep shows `enable_telemetry = false`, `user_provider = "static_user_provider:file:/run/credentials/greptimedb.service/users"`, `[http]` with `addr = "127.0.0.1:4000"`, `[grpc]` with `bind_addr = "127.0.0.1:4001"`, `enable = false` under each of `[influxdb]`, `[jaeger]`, `[mysql]`, `[opentsdb]`, `[postgres]`, `enable = true` under `[prom_store]`, `[[region_engine]]` followed by `[region_engine.mito]` with `page_cache_size = "256MB"`, `[runtime]` with `compact_rt_size = 2` and `global_rt_size = 4`, `[logging]` with `dir = ""`, and `[storage]` with `type = "S3"`, `root = "projects/vanixiets/observability/store/"` and `disable_ec2_metadata = true`.
 
 - [ ] **Step 13: Verify the store unit**
 

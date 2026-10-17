@@ -56,7 +56,8 @@ Listener:
 - PromQL at `/v1/prometheus/api/v1`, including `/query` and `/query_range`; the Prometheus `/metadata` route is absent at 1.2.1 (ADR-001 Context, ADR-009 Context).
 - SQL over HTTP at `/v1/sql` (ADR-002 Context).
 - `/ready`, read by the envelope probe after start (ADR-006 R6.4).
-- Disabled: MySQL, PostgreSQL, OpenTSDB, InfluxDB, Prometheus remote storage and the Jaeger query API (ADR-007 Decision).
+- Prometheus remote read and write at `/v1/prometheus/{read,write}`, enabled because `v1.2.1` registers the PromQL query API only together with them (`GreptimeTeam/greptimedb@179ff8e50:src/frontend/src/server.rs:130-158`); loopback-only and authenticated, and only `collector` (`wo`) and `admin` (`rw`) can write (ADR-007 Decision, charter v13).
+- Disabled: MySQL, PostgreSQL, OpenTSDB, InfluxDB and the Jaeger query API (ADR-007 Decision).
 - Every path under `/v1/`, including the OTLP routes, requires credentials once the user provider is configured, and loopback is not trusted because every local UID on `magnetite`, including two worker accounts, can reach it (ADR-007 Context, ADR-008 Context and Decision item 1).
 - A database is selected by the caller through `x-greptime-db-name` or `db`, so a database is a label, not an access boundary (ADR-008 Context).
 

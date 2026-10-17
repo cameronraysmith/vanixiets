@@ -26,7 +26,7 @@ The collector SHALL write series only, and SHALL write no log records and no tra
 
 Every series the collector writes SHALL carry the name of the host it was gathered on, and a reader SHALL be able to select series by that name through both of the telemetry store's query languages.
 
-**Discharged by**: `telemetry-store-interface` requirements `Ingest is OTLP over HTTP with a database header` and `Reads are PromQL and SQL over HTTP with a database header`; the container runtime test's read-back case and the operator's confirmation at first activation discharge it.
+**Discharged by**: `telemetry-store-interface` requirements `Ingest is OTLP over HTTP with a database header`, `Reads are PromQL and SQL over HTTP with a database header` and `Prometheus remote storage stays enabled for the PromQL query API`; the container runtime test's read-back case and the operator's confirmation at first activation discharge it.
 
 #### Scenario: A series is read back in the container runtime test
 

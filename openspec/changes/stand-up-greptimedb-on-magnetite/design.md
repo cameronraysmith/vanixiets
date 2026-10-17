@@ -173,7 +173,9 @@ ntfy has no authentication (`modules/machines/nixos/cinnabar/ntfy.nix`), so Zero
 
 - **Choice**: `[http] addr = "127.0.0.1:4000"` carries OTLP, PromQL, SQL, `/health`, `/ready` and `/metrics`.
   `[grpc] bind_addr = "127.0.0.1:4001"`, with an assertion that it stays in `127.0.0.0/8`.
-  MySQL, PostgreSQL, InfluxDB, OpenTSDB, Prometheus remote storage and the Jaeger query API are disabled; no firewall port opens (A7:68).
+  MySQL, PostgreSQL, InfluxDB, OpenTSDB and the Jaeger query API are disabled; no firewall port opens (A7:68).
+  Prometheus remote read and write at `/v1/prometheus/{read,write}` stay enabled, because v1.2.1 registers the PromQL query API only together with them (`src/frontend/src/server.rs:130-158`, charter v13).
+  They are loopback-only and authenticated, and only `collector` (`wo`) and `admin` (`rw`) can write through them.
   Credentials are required on every `/v1/` path, loopback included (A8:53).
 - **Rationale**: v1.2.1's configuration has no gRPC switch (F5), so binding it to loopback is the closest available setting to ADR-007's "disabled".
   The embedded dashboard is served at `/dashboard/` on the same loopback listener, so S1 opens nothing for it; the operator reaches it from a workstation over `ssh -L 4000:127.0.0.1:4000 magnetite.zt` from the first deployment (Q8).

@@ -1,6 +1,6 @@
 # Evaluation-time regulator for the telemetry store on magnetite (design D11):
-# R7.1, R1.1 (amended), R1.4, R6.4's storage clause, R8.2 and the users-file
-# check.
+# R7.1, R1.1 (amended), R1.4, R6.4's storage clause, R8.2, the PromQL read
+# path (charter v13) and the users-file check.
 #
 # Every clause reads magnetite's evaluated configuration, so it judges what
 # deploys rather than a transcription of it. Mutants are pure functions over
@@ -303,7 +303,6 @@
             "postgres"
             "opentsdb"
             "influxdb"
-            "prom_store"
             "jaeger"
           ];
           userProvider =
@@ -344,6 +343,11 @@
             lib.mapAttrs (
               name: _: holdersOf v.loadCredentials usersGenerator.files.${name}.path
             ) credentialHolders == credentialHolders;
+
+          # PromQL read path (charter v13): GreptimeDB v1.2.1 registers the
+          # PromQL query API only when prom_store is enabled
+          # (src/frontend/src/server.rs:130-158).
+          promqlApi = (s.prom_store.enable or false) == true;
         };
 
       failures = v: lib.attrNames (lib.filterAttrs (_: holds: !holds) (clauses v));
@@ -460,6 +464,12 @@
                 ];
               };
             };
+        };
+
+        # PromQL read path
+        promStoreDisabled = {
+          clause = "promqlApi";
+          apply = withSettings (settings: lib.recursiveUpdate settings { prom_store.enable = false; });
         };
       };
 

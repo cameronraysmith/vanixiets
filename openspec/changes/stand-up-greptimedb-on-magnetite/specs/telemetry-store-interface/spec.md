@@ -2,7 +2,7 @@
 
 ### Requirement: Listeners are bound to loopback only
 
-The machine SHALL bind the telemetry store's HTTP listener to `127.0.0.1:4000` and its gRPC listener to `127.0.0.1:4001`, SHALL disable its MySQL, PostgreSQL, InfluxDB, OpenTSDB, Prometheus remote-storage and Jaeger listeners, and SHALL open no firewall port for the telemetry store.
+The machine SHALL bind the telemetry store's HTTP listener to `127.0.0.1:4000` and its gRPC listener to `127.0.0.1:4001`, SHALL disable its MySQL, PostgreSQL, InfluxDB, OpenTSDB and Jaeger listeners, and SHALL open no firewall port for the telemetry store.
 gRPC is bound to loopback rather than disabled, because the telemetry store's v1.2.1 configuration offers no setting that disables it.
 
 #### Scenario: The HTTP listener is configured on a non-loopback address
@@ -19,6 +19,16 @@ gRPC is bound to loopback rather than disabled, because the telemetry store's v1
 
 - **WHEN** magnetite's configuration sets the gRPC `bind_addr` outside `127.0.0.0/8`
 - **THEN** the evaluation-time envelope check (R7.1) fails
+
+### Requirement: Prometheus remote storage stays enabled for the PromQL query API
+
+The machine SHALL keep the telemetry store's Prometheus remote read and write at `/v1/prometheus/{read,write}` enabled, because its v1.2.1 registers the PromQL query API only together with them (`src/frontend/src/server.rs:130-158`).
+They are served on the loopback HTTP listener, require credentials, and accept writes only from `collector` (`wo`) and `admin` (`rw`).
+
+#### Scenario: Prometheus remote storage is disabled
+
+- **WHEN** magnetite's configuration sets `prom_store.enable = false`
+- **THEN** the evaluation-time envelope check fails, because the PromQL query API would then be absent
 
 ### Requirement: Scrape targets are reached on loopback
 

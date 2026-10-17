@@ -1,12 +1,12 @@
 ---
 title: Fleet observability and CCV feedback-loop charter
-status: charter v12
-date: 2026-10-16
+status: charter v13
+date: 2026-10-17
 ---
 
 # Fleet observability and CCV feedback-loop charter
 
-Charter version: v12.
+Charter version: v13.
 A revision is a version bump with a dated entry under "Revision history"; the text of an earlier version is never edited in place.
 
 ## Objective
@@ -288,3 +288,8 @@ A research unit that meets ambiguity returns it in its questions section; the or
   - ADR-009 amended: `ntfy-send` is the package `pkgs/by-name/ntfy-send`, added by S1, so S3's evaluator consumes it instead of building its own.
   - Components and reference architecture follow: `components/greptimedb.md` takes the R7.2 to R7.4, knob, event-recorder and packaging amendments; `components/otel-collector.md` takes `enableMetrics`, the owner aliases, the `client_auth.password_file` credential whose file build-time validation does not open, a single validation override removing the zerotierone job's `authorization`, magnetite's byte-sized queues of 400, 48 and 48 MiB, and the statement that no collector stage caps distinct process names, so the 30-name bound is declared in `schema.nix`, observed at S1's deployment and regulated by R4.2 from S4; `components/fleet-alert.md`, `components/host-probes.md` and the reference architecture's consolidated surface follow ADR-009, ADR-003 and ADR-007.
   - S1's brainstorm, design, specs and tasks carry the same corrections, together with the auth matrix's 403 for a `collector:wo` read and the OOM-order test asserting the `oom-kill` result for `greptimedb.service` only.
+- v13 (2026-10-17): a defect found by S1's container test; no earlier text is edited beyond the status, date and version lines, and D1–D9, the requirements and the acceptance criteria are unchanged.
+  - GreptimeDB `v1.2.1` registers Prometheus remote read and write (`/v1/prometheus/{read,write}`) and the PromQL query API (`/v1/prometheus/api/v1`) only inside `if opts.prom_store.enable` (`GreptimeTeam/greptimedb@179ff8e50:src/frontend/src/server.rs:130-158`, `GreptimeTeam/greptimedb@179ff8e50:src/servers/src/http.rs:722-726`), and no setting disables remote storage alone, so the disabled `prom_store` that ADR-007 required left every PromQL query unanswered with 404, while ADR-009's evaluator, ADR-002's dashboard datasource and S1's verification read PromQL.
+  - ADR-007 amended: Prometheus remote read and write stay enabled because the PromQL query API depends on them; they are served on the loopback listener, require credentials, and accept writes only from `collector` (`wo`) and `admin` (`rw`); E7.1 no longer lists Prometheus remote storage among the disabled protocols, and the envelope check asserts `prom_store.enable = true` with a mutant that disables it, beside R7.1's seven mutants.
+  - ADR-009's Prometheus-server alternative and `components/greptimedb.md` follow ADR-007.
+  - S1's design, plan, specs and tasks carry the same amendment, and `modules/nixos/greptimedb.nix` sets `prom_store.enable = true`.
