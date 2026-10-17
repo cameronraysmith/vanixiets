@@ -4,8 +4,8 @@ description: vanixiets reference repositories — the ghq lookup mechanism, fork
 
 ## Reference repositories
 
-Local copies of upstream sources live under `~/ghq/<host>/<org>/<repo>`.
-On magnetite, pyrite and stibnite `~/ghq` is a link to the host's one shared read-only tree, so `ghq list -p` prints the shared root, `/var/lib/ghq`, and acquisition, update, deepening and promotion are carried out by that tree's writer account.
+Local copies of upstream sources live under `$(ghq root)/<host>/<org>/<repo>`, which is `~/ghq` unless a host shares one tree.
+Magnetite, pyrite and stibnite do: their root is the read-only `/var/lib/ghq`, which `~/ghq` links to and whose real path `ghq list -p` prints (`/private/var/lib/ghq` on stibnite), and its writer account carries out acquisition, update, deepening and promotion.
 `ghq list -p <name>` is the authority for whether a copy exists, because it walks the filesystem rather than consulting an index; `zoxide query -l <name>` is a fast path only and must be validated against `ghq list -p` before it is relied on.
 On a miss, `ghq-sync <url>` clones shallow and blobless and registers the path with the caller's zoxide.
 `ghq-sync` is built from `pkgs/by-name/` in this repository.

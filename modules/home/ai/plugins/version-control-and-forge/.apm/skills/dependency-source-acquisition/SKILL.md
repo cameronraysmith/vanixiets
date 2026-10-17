@@ -1,6 +1,6 @@
 ---
 name: dependency-source-acquisition
-description: Resolve a named repository to a local copy before reasoning about it, and acquire one when missing. Covers two lookup kinds, maintained repositories under ~/projects/<repo> and reference repositories under ~/ghq via ghq. Use whenever a repository is named in a task, when about to state a substantive technical claim grounded in a project's source, options, defaults, API, or upstream documentation, when resolving a package's source-repository URL from cargo/uv/bun/nix metadata, when a "(see local)" marker is appended to a name, or when given a GitHub file, issue, or PR URL.
+description: Resolve a named repository to a local copy before reasoning about it, and acquire one when missing. Covers two lookup kinds, maintained repositories under ~/projects/<repo> and reference repositories under $(ghq root) via ghq. Use whenever a repository is named in a task, when about to state a substantive technical claim grounded in a project's source, options, defaults, API, or upstream documentation, when resolving a package's source-repository URL from cargo/uv/bun/nix metadata, when a "(see local)" marker is appended to a name, or when given a GitHub file, issue, or PR URL.
 ---
 
 # Dependency source acquisition
@@ -37,9 +37,11 @@ The gate is `ghq list -p <name>` (under "Engine: ghq" below): authoritative beca
 On a miss, acquire the repository with `ghq-sync <url>`, which clones shallow and blobless and registers the path with zoxide; a raw `ghq get` clone does not register.
 Prefer the canonical upstream; acquire a personal fork only when contribution back to upstream is anticipated.
 A shallow clone sits at HEAD, which is usually not the revision we pin — read at the pinned revision or every line anchor you cite will be wrong.
-On magnetite, pyrite and stibnite every account's `$(ghq root)` is the host's one shared tree, `/var/lib/ghq`, and `~/ghq` is a link to it, so `ghq list -p` prints paths under the shared root rather than under `~/ghq`; elsewhere the root is ghq's default `~/ghq`.
-The shared tree has a single writer account and is read-only to you: `ghq get`, `ghq-sync`, `ghq-sync --deepen` and `ghq-sync --full` are carried out by that account on your behalf, and `git fetch`, `git gc`, editing a file or setting configuration inside a reference repository fail with a permission error by design.
-To change a reference repository's working tree, copy it out with `git clone <path> <dir>` into a directory you own.
+On magnetite, pyrite and stibnite every account's `$(ghq root)` is the host's one shared tree, `/var/lib/ghq`, and `~/ghq` is a link to it, so `ghq list -p` prints paths under the shared root's real path (`/private/var/lib/ghq` on stibnite) rather than under `~/ghq`; elsewhere the root is ghq's default `~/ghq`.
+The shared tree has a single writer account and is read-only to you: `ghq get`, `ghq-sync`, `ghq-sync -u`, `ghq-sync --deepen` and `ghq-sync --full` are carried out by that account on your behalf, and `git fetch`, `git gc`, editing a file or setting configuration inside a reference repository fail with a permission error by design.
+Update a reference copy with `ghq-sync -u <path-or-name>`, where a path such as `.` inside the repository names it; add `--tags` to fetch every tag, which a full clone does on every update anyway.
+To change a reference repository's working tree, clone it into `~/projects` with `git clone <path> ~/projects/<repo>`.
+On those hosts git is configured with `safe.bareRepository = explicit` for every repository, not only reference ones, so git refuses to work inside a bare repository it discovers from the current directory ("cannot use bare repository"); name it with `git --git-dir=<path>` or `GIT_DIR=<path>` instead.
 
 ## The `(see local)` marker
 
