@@ -4,6 +4,7 @@
   git,
   coreutils,
   shellcheck,
+  ghq-sync,
 }:
 # Delegation depends only on the caller's effective ghq root: plain nixpkgs ghq
 # unless that root resolves to the shared root, including through a symbolic
@@ -41,6 +42,7 @@ runCommand "ghq-shared-test-wrapper"
       local want=$1; shift
       local got
       got=$("$work/ghq" "$@" 2>&1) || true
+      got=$(printf '%s' "$got" | head -n1)
       if [ "$got" != "$want" ]; then
         echo "FAIL: ghq $* -> '$got', want '$want'"
         exit 1
@@ -62,6 +64,22 @@ runCommand "ghq-shared-test-wrapper"
     expect "client get --lazy github.com/a/b" get --shallow --partial blobless github.com/a/b
     expect "real list" list
     expect "ghq: create is unavailable: this host's ghq tree is shared and only its writer account changes it" create x
+
+    echo "case: a directory under the shared root names its repository"
+    mkdir -p "$work/shared/github.com/o/r/.git" "$work/shared/github.com/o/r/sub/dir" "$work/outside"
+    (cd "$work/shared/github.com/o/r" && expect "client get --update github.com/o/r" get -u .)
+    (cd "$work/shared/github.com/o/r/sub/dir" && expect "client get github.com/o/r" get .)
+    expect "client get github.com/o/r" get "$work/shared/github.com/o/r/sub"
+    expect "client get github.com/o/r" get "$work/shared-link/github.com/o/r/sub"
+    expect "ghq: $work/outside is outside the shared ghq root $work/shared-link" get "$work/outside"
+    (cd "$work/outside" && expect "ghq: . is outside the shared ghq root $work/shared-link" get .)
+    expect "ghq: $work/shared/github.com is not inside a repository under $work/shared-link" get "$work/shared/github.com"
+
+    echo "case: ghq-sync names the repository for a directory under ghq root"
+    got=$(cd "$work/shared-link/github.com/o/r/sub" && GHQ_ROOT="$work/shared-link" ${ghq-sync}/bin/ghq-sync -n -u .)
+    want="would run: ghq get --shallow --partial blobless --no-recursive -P -u github.com/o/r"
+    [ "$got" = "$want" ] || { echo "FAIL: ghq-sync -> '$got', want '$want'"; exit 1; }
+    echo "ok: ghq-sync -n -u . -> $got"
 
     echo "case: GHQ_ROOT overrides git configuration"
     GHQ_ROOT="$work/other" expect "real get github.com/a/b" get github.com/a/b

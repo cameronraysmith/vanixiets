@@ -19,7 +19,9 @@ Usage:
 
 Targets:
   A TARGET is anything ghq get accepts (a user/project, host/user/project, or
-  URL) or, for --deepen/--full, a path to an already-cloned local git repo. With
+  URL) or a path to a directory inside an already-cloned repository under
+  $(ghq root), such as `.`; fetch mode turns such a path into the repository's
+  host/user/project before calling ghq get, and --deepen/--full act on it. With
   no positional targets the fetch mode reads targets from stdin, one per line
   (piped straight through to ghq); --deepen/--full likewise read stdin.
 
@@ -66,6 +68,33 @@ die() {
 
 is_pos_int() {
   [[ "$1" =~ ^[1-9][0-9]*$ ]]
+}
+
+# An existing directory under $(ghq root) becomes its repository's
+# host/owner/project for ghq get; anything else passes through unchanged.
+normalize_target() {
+  local target="$1" root dir
+  if [ ! -d "$target" ]; then
+    printf '%s\n' "$target"
+    return 0
+  fi
+  root="$(realpath -m -- "$(ghq root)")"
+  dir="$(realpath -- "$target")"
+  case "$dir/" in
+    "$root"/*/) ;;
+    *)
+      printf '%s\n' "$target"
+      return 0
+      ;;
+  esac
+  while [ "$dir" != "$root" ] && [ ! -e "$dir/.git" ]; do
+    dir="$(dirname -- "$dir")"
+  done
+  if [ "$dir" = "$root" ]; then
+    printf '%s\n' "$target"
+  else
+    printf '%s\n' "${dir#"$root"/}"
+  fi
 }
 
 resolve_repo() {
@@ -270,6 +299,12 @@ fi
 
 case "$mode" in
   fetch)
+    if [ "${#targets[@]}" -eq 0 ] && [ "$all" != 1 ] && [ "$dry_run" != 1 ]; then
+      mapfile -t targets
+    fi
+    for i in "${!targets[@]}"; do
+      targets[i]="$(normalize_target "${targets[i]}")"
+    done
     getflags=(get --shallow --partial blobless --no-recursive -P)
     if [ "$update" = 1 ]; then getflags+=(-u); fi
     if [ "$all" = 1 ] && [ "${#targets[@]}" -eq 0 ]; then

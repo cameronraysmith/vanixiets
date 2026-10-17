@@ -78,8 +78,44 @@ flags=()
 if [ "$lazy" = 1 ]; then flags+=(--lazy); fi
 if [ "$update" = 1 ]; then flags+=(--update); fi
 
-rc=0
+# A directory inside the shared root names the repository that contains it, as
+# host/owner/repo; the writer only ever receives that form. An explicit path
+# outside the root is an error; a bare name that happens to exist locally is a
+# ghq target, as it is for ghq itself.
+root_real=$("$realpath" -m -- "$shared_root")
+normalize() {
+  local target=$1 dir
+  if [ ! -d "$target" ]; then
+    printf '%s\n' "$target"
+    return 0
+  fi
+  dir=$("$realpath" -- "$target")
+  case "$dir/" in
+    "$root_real"/*/) ;;
+    *)
+      case "$target" in
+        . | .. | /* | ./* | ../*)
+          refuse "$target is outside the shared ghq root $shared_root"
+          ;;
+      esac
+      printf '%s\n' "$target"
+      return 0
+      ;;
+  esac
+  while [ "$dir" != "$root_real" ] && [ ! -e "$dir/.git" ]; do
+    dir=$(dirname -- "$dir")
+  done
+  [ "$dir" != "$root_real" ] || refuse "$target is not inside a repository under $shared_root"
+  printf '%s\n' "${dir#"$root_real"/}"
+}
+
+resolved=()
 for target in "${targets[@]}"; do
+  resolved+=("$(normalize "$target")") || exit 2
+done
+
+rc=0
+for target in "${resolved[@]}"; do
   "$client" get "${flags[@]}" "$target" || rc=$?
 done
 exit "$rc"
