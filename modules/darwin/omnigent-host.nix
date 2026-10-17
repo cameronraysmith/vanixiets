@@ -144,6 +144,10 @@ in
               targets.darwin.linkApps.enable = false;
             })
           ]
+          ++ lib.optional (
+            (config.services.shared-reference-tree.enable or false)
+            && lib.elem worker.user config.services.shared-reference-tree.participants
+          ) { programs.ghq-shared.root = config.services.shared-reference-tree.root; }
           ++ worker.extraHomeModules;
         }
       ) workers;

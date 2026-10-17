@@ -7,6 +7,12 @@ in
     { config, lib, ... }:
     let
       cfg = config.services.shared-reference-tree;
+      # Darwin Omnigent workers have standalone Home Manager configurations built
+      # by the omnigent-host adapter, which sets their root itself.
+      workerUsers = map (worker: worker.user) (
+        lib.attrValues (config.services.omnigent-host.workers or { })
+      );
+      humanParticipants = lib.subtractLists workerUsers cfg.participants;
     in
     {
       imports = [ flakeConfig.flake.modules.darwin.shared-reference-tree-options ];
@@ -36,10 +42,14 @@ in
         users.knownUsers = [ cfg.writer ];
         users.knownGroups = [ cfg.writer ];
 
-        # /Users/Shared is world-writable with the sticky bit, so any account could
-        # have created the root first. An empty directory is taken over; anything
-        # else that the writer does not already own stops activation rather than
-        # trusting entries another account controls.
+        home-manager.users = lib.genAttrs humanParticipants (_: {
+          programs.ghq-shared.root = cfg.root;
+        });
+
+        # The root's parent is root-owned, so only an administrator can have put
+        # something at the root before the writer existed. An empty directory is
+        # taken over; anything else the writer does not already own stops
+        # activation rather than trusting entries another account controls.
         system.activationScripts.postActivation.text = lib.mkBefore ''
           ghqRoot=${lib.escapeShellArg cfg.root}
           if [ -L "$ghqRoot" ] || { [ -e "$ghqRoot" ] && [ ! -d "$ghqRoot" ]; }; then
