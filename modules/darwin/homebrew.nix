@@ -131,7 +131,8 @@
               # brew bundle self-updating in-process races its own long install run;
               # `just activate-darwin` runs `brew update` as a separate step first
               autoUpdate = false;
-              upgrade = true;
+              # activation must not depend on upstream cask availability; upgrade deliberately with `brew upgrade`
+              upgrade = false;
               # https://nix-darwin.github.io/nix-darwin/manual/#opt-homebrew.onActivation.cleanup
               cleanup = "uninstall";
               # homebrew >=6.0 tap-trust gate reads per-user trust.json which activation's env-scrubbed sudo never sees
