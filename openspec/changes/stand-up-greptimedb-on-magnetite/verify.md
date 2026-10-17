@@ -46,7 +46,7 @@ Task 7 ticked 7.1, 8.4, 8.5, 8.6 and 9.1; Tasks 1–5 had ticked the rest, and T
 After the ticks, `rg -n '^- \[ \]' openspec/changes/stand-up-greptimedb-on-magnetite/tasks.md` prints nothing.
 8.5 is ticked because every item its wording lists has evidence in §9.4.
 Its wording does not include the dashboard.
-The authenticated dashboard check, Task 6 Step 15's `[operator]` line in `8.5-dashboard.log`, is still owed by the operator and is recorded as pending in §9.4 and under Overall Decision.
+The authenticated dashboard check, Task 6 Step 15's `[operator]` line in `8.5-dashboard.log`, was made by the operator on 2026-10-17 and is recorded in §9.4.
 
 ---
 
@@ -454,9 +454,10 @@ The measured `fleet` queue rate is 76538 bytes per minute, about 30% of the assu
 A day at the measured rate is 110214720 bytes, inside the 419430400-byte (400 MiB) `fleet` queue, so no follow-up change is needed.
 `8.5-promql-host-name.log` and the queue and journal reads in §9.5 carry Task 6's recorded adaptations of plan commands: `__name__=~".+"` added because v1.2.1 rejects a selector with no metric matcher, `sudo` on journal reads, the notifier instance name `observability-notify@greptimedb-envelope.service.service` (systemd expands `%n` to the full unit name), counter names without `_total` in collector 0.155, and non-interactive snapshot values in place of `read -p`.
 
-The authenticated dashboard check is pending.
-`8.5-dashboard.log` shows `200` over the tunnel and the page rendered in headless Chromium, marked `[agent S1Task6Verify, not operator]`; the `[operator]` line, an authenticated query viewed by the operator, is owed.
-This check is not part of tasks.md 8.5's wording; the dashboard requirement's scenario is discharged by the container test's dashboard case.
+The authenticated dashboard check passed.
+`8.5-dashboard.log` first shows `200` over the tunnel and the page rendered in headless Chromium, marked `[agent S1Task6Verify, not operator]`, then the operator's `[operator]` line: signed in as `perses` with the connection database `fleet`, PromQL `count(up)` returned 6 at every step and SQL `SELECT count(*) FROM fleet.up` returned 4091.
+The dashboard selects its query database in the connection settings, not in the Tables panel; a query run while the connection database is `public` returns no rows, which is ADR-002 Q10 and an S6 concern.
+This check is not part of tasks.md 8.5's wording; the dashboard requirement's scenario is also discharged by the container test's dashboard case.
 
 `8.5-r2.log`:
 
@@ -923,6 +924,7 @@ $ gq.sh sql fleet "SELECT table_schema, count(*) FROM information_schema.tables 
 $ curl -s -o /dev/null -w "%{http_code}\n" http://127.0.0.1:4000/dashboard/
 200
 [agent S1Task6Verify, not operator] 2026-10-17T07:22:55Z: dashboard at http://127.0.0.1:4000/dashboard/ rendered over ssh -L 4000:127.0.0.1:4000 magnetite.zt in headless Chromium (in place of `open`); observed: title "Dashboard | Greptime", redirected to #/dashboard/query, nav shows Table Query / Metrics Query / Logs Query / Traces Query / Ingest / Flow; connection panel shows host http://127.0.0.1:4000, database public, status Disconnected with "Not found http or grpc authorization header" (store requires auth; no credential entered because credentials must not leave magnetite). Operator observation of an authenticated query is still owed.
+[operator] 2026-10-17T18:42:25Z: signed in to http://127.0.0.1:4000/dashboard/ over ssh -L 4000:127.0.0.1:4000 magnetite.zt as perses (ro), connection database fleet, status Connected; PromQL count(up) over the last 5 minutes at 30s step returned 6 at each of 11 steps (14:37:04 to 14:42:04 UTC-4); SQL SELECT count(*) FROM fleet.up returned 4091. Observed and reported by the operator in session with screenshots.
 ```
 
 ### 9.5 R7.2 shown able to fail, with one notice and one RESOLVED (tasks.md 8.6)
@@ -1261,16 +1263,13 @@ f9451f3ef feat(pkgs): add greptimedb-bin 1.2.1 and move ntfy-send to pkgs/by-nam
 ## Overall Decision
 
 - [ ] (pass) PASS — may proceed to finishing-a-development-branch and archive
-- [x] (warn) PASS WITH WARNINGS — may proceed to subsequent steps but note: the operator's authenticated dashboard check (Task 6 Step 15 `[operator]` line) is owed; §8a and §8c record designation and alphabet findings
+- [x] (warn) PASS WITH WARNINGS — may proceed to subsequent steps but note: §8a and §8c record designation and alphabet findings
 - [ ] (fail) FAIL — return to the failed artifact, correct it, then re-run verify
 
-The only open item is the operator's authenticated dashboard check.
-The dashboard's serving is evidenced: HTTP 200 over the tunnel and the page rendered headless (§9.4).
-Authenticated reads are evidenced through the same HTTP API by `gq.sh` (§9.4, §10).
-The open item is therefore the operator's own look, not an unproven function.
-§8a lists nouns without a designation row and §8c records two non-world phenomena in a behavioral requirement; both are non-blocking findings for the retrospective.
+The operator's authenticated dashboard check, the one item previously open, passed on 2026-10-17 (§9.4).
+The remaining warnings are §8a, nouns without a designation row, and §8c, two non-world phenomena in a behavioral requirement; both are non-blocking findings for the retrospective.
 No 8.x or 9.1 expectation failed.
 
 **Next step**:
 
-The operator appends the `[operator]` line to `logs/s1-evidence/8.5-dashboard.log` after an authenticated dashboard query; then plan.md Task 7 Step 11 onwards.
+plan.md Task 7 Step 15 onwards: the roborev and documenter sub-gates, the retrospective, then archive.
