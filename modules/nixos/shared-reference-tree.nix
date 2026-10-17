@@ -29,6 +29,12 @@ in
             writer = config.users.users.${cfg.writer};
             sorted = lib.sort lib.lessThan;
             safeDirectories = user: lib.toList (hm.${user}.programs.git.settings.safe.directory or [ ]);
+            conforms =
+              user:
+              flakeConfig.flake.lib.sharedReferenceTreeSafeDirectoriesConform {
+                roots = cfg.rootForms;
+                participant = lib.elem user cfg.participants;
+              } (safeDirectories user);
             rootRules = lib.filter (
               rule:
               let
@@ -55,8 +61,14 @@ in
               message = "shared-reference-tree: the writer ${cfg.writer} must have no password, login shell, keys, extra groups, sudo rule or Nix trust.";
             }
             {
-              assertion = lib.all (user: !(lib.elem "*" (safeDirectories user))) (lib.attrNames hm);
-              message = "shared-reference-tree: no account may set safe.directory = *.";
+              assertion = lib.all conforms (lib.attrNames hm);
+              message = "shared-reference-tree: each participant's safe.directory must be exactly ${cfg.root}/*, and no account's may be * or enclose ${cfg.root}.";
+            }
+            {
+              assertion = lib.all (
+                user: (hm.${user}.programs.git.settings.safe.bareRepository or null) == "explicit"
+              ) cfg.participants;
+              message = "shared-reference-tree: every participant's safe.bareRepository must be explicit.";
             }
             {
               assertion = lib.all (
@@ -69,6 +81,8 @@ in
               message = "shared-reference-tree: ${cfg.root} must be provisioned exactly once, mode 0750, owned by ${cfg.writer}.";
             }
           ];
+
+        services.shared-reference-tree.rootForms = [ cfg.root ];
 
         users.users.${cfg.writer} = {
           isSystemUser = true;

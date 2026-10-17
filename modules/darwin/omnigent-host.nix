@@ -417,6 +417,31 @@ in
                   == (if deliveries.${name}.enabled then deliveries.${name}.policy else null);
                 message = "Omnigent worker ${name}: Home Manager credential paths must match the host adapter's allow-list.";
               }
+              {
+                assertion =
+                  let
+                    sharing = config.services.shared-reference-tree or { enable = false; };
+                    home = workerHomes.${name}.config;
+                    participant = lib.elem worker.user sharing.participants;
+                  in
+                  !sharing.enable
+                  || (
+                    (
+                      !participant
+                      || (
+                        home.programs.ghq-shared.root == sharing.root
+                        && (home.programs.git.settings.safe.bareRepository or null) == "explicit"
+                      )
+                    )
+                    && flakeConfig.flake.lib.sharedReferenceTreeSafeDirectoriesConform {
+                      roots = sharing.rootForms;
+                      inherit participant;
+                    } (lib.toList (home.programs.git.settings.safe.directory or [ ]))
+                  );
+                message = "Omnigent worker ${name}: a shared-reference-tree participant must read ${
+                  config.services.shared-reference-tree.root or "the shared root"
+                } with safe.directory exactly that root's /* and safe.bareRepository explicit, and no worker's safe.directory may be * or enclose it.";
+              }
             ]) workers
           );
           environment.etc = lib.mapAttrs' (

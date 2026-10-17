@@ -25,6 +25,12 @@ let
           default = "/var/lib/ghq";
           description = "Shared ghq root.";
         };
+        rootForms = lib.mkOption {
+          type = lib.types.listOf lib.types.str;
+          internal = true;
+          readOnly = true;
+          description = "Every path git may resolve the root to, canonical form first; each adapter defines it.";
+        };
         writerId = lib.mkOption {
           type = lib.types.nullOr lib.types.ints.positive;
           default = null;
@@ -37,8 +43,34 @@ let
         };
       };
     };
+  # A safe.directory entry trusts the shared tree's repositories, written by
+  # another account, whenever it is `*` or a `<dir>/*` whose `<dir>` encloses the
+  # root. `roots` lists every path form git may resolve the root to, canonical
+  # form first; a participant must carry exactly the canonical root wildcard.
+  safeDirectoriesConform =
+    {
+      roots,
+      participant,
+    }:
+    entries:
+    let
+      encloses =
+        entry:
+        entry == "*"
+        ||
+          lib.hasSuffix "/*" entry
+          && lib.any (
+            root:
+            let
+              dir = lib.removeSuffix "*" entry;
+            in
+            dir != "${root}/" && lib.hasPrefix dir "${root}/"
+          ) roots;
+    in
+    if participant then entries == [ "${lib.head roots}/*" ] else !(lib.any encloses entries);
 in
 {
   flake.modules.nixos.shared-reference-tree-options = options false;
   flake.modules.darwin.shared-reference-tree-options = options true;
+  flake.lib.sharedReferenceTreeSafeDirectoriesConform = safeDirectoriesConform;
 }
