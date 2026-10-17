@@ -37,7 +37,9 @@ The gate is `ghq list -p <name>` (under "Engine: ghq" below): authoritative beca
 On a miss, acquire the repository with `ghq-sync <url>`, which clones shallow and blobless and registers the path with zoxide; a raw `ghq get` clone does not register.
 Prefer the canonical upstream; acquire a personal fork only when contribution back to upstream is anticipated.
 A shallow clone sits at HEAD, which is usually not the revision we pin — read at the pinned revision or every line anchor you cite will be wrong.
-This fleet configures `ghq root` to `~/ghq`, so `$(ghq root)/<host>/<org>/<repo>` and `~/ghq/<host>/<org>/<repo>` coincide.
+On magnetite, pyrite and stibnite every account's `$(ghq root)` is the host's one shared tree, `/var/lib/ghq`, and `~/ghq` is a link to it, so `ghq list -p` prints paths under the shared root rather than under `~/ghq`; elsewhere the root is ghq's default `~/ghq`.
+The shared tree has a single writer account and is read-only to you: `ghq get`, `ghq-sync`, `ghq-sync --deepen` and `ghq-sync --full` are carried out by that account on your behalf, and `git fetch`, `git gc`, editing a file or setting configuration inside a reference repository fail with a permission error by design.
+To change a reference repository's working tree, copy it out with `git clone <path> <dir>` into a directory you own.
 
 ## The `(see local)` marker
 
@@ -53,7 +55,7 @@ Given an issue or PR URL (e.g. `https://github.com/org/repo/issues/2491`), use `
 
 `ghq` is both the acquisition engine and the catalog.
 It clones into a predictable path derived from the remote URL — `$(ghq root)/<host>/<owner>/<repo>` — so the same repository always resolves to the same location regardless of who runs it.
-The root is always `$(ghq root)`; the default root is `~/ghq`, but never hardcode a path.
+The root is always `$(ghq root)`; the default root is `~/ghq`, a host-shared tree changes it, so never hardcode a path.
 
 Check first, then fetch.
 The idempotency gate is `ghq list`:
