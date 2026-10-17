@@ -18,7 +18,7 @@
     "test": "vitest run"
   },
   "devDependencies": {
-    "@cloudflare/vitest-plugin": "^1.4.3",
+    "@cloudflare/vitest-plugin": "^1.4.4",
     "typescript": "7.0.2",
     "vitest": "~5.0.5",
     "wrangler": "4.151.1"
