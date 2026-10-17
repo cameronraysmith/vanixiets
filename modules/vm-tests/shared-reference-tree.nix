@@ -209,6 +209,7 @@
                     " && printf '#!/bin/sh\\ntouch /tmp/planted-hook\\n' > .git/hooks/post-checkout"
                     " && chmod +x .git/hooks/post-checkout"
                     " && git -c user.name=c -c user.email=c@c commit -q --allow-empty -m local-only"
+                    " && touch world-writable && chmod 0666 world-writable"
                     " && echo dirty >> f"))
                 # omnigent-cameron: its home on another filesystem, a shallow copy of
                 # the same repository (the shallower loses) and one of its own.
@@ -223,14 +224,21 @@
                     " && git clone -q --depth 1 git://localhost/fixture/hello ~/ghq/localhost/fixture/hello"))
                 before = machine.succeed("find /home/cameron/ghq /home/omnigent-cameron/ghq \\( -type f -printf '%p %u %m %s\\n' \\) -o -printf '%p %u %m\\n' | sort")
 
-                plan = machine.succeed(f"{migrate} cameron omnigent-cameron")
-                for expected in ["rename whole tree", "copy per repository", "uncommitted changes",
+                plan = machine.succeed(f"{migrate} cameron omnigent-cameron 2>&1")
+                for expected in ["plan cameron: start", "plan cameron: inspected 1/1 repositories",
+                                 "plan omnigent-cameron: inspected 2/2 repositories", "plan omnigent-cameron: done in",
+                                 "rename whole tree", "copy per repository", "uncommitted changes",
                                  "commits on no remote", "kept aside; cameron holds the deeper clone", "dry run"]:
                     assert expected in plan, (expected, plan)
                 after = machine.succeed("find /home/cameron/ghq /home/omnigent-cameron/ghq \\( -type f -printf '%p %u %m %s\\n' \\) -o -printf '%p %u %m\\n' | sort")
                 assert before == after, "the dry run changed a tree"
 
-                machine.succeed(f"{migrate} --apply cameron omnigent-cameron")
+                applied = machine.succeed(f"{migrate} --apply cameron omnigent-cameron 2>&1")
+                for expected in ["rename cameron: start", "ownership cameron: done in",
+                                 "copy and ownership omnigent-cameron: done in",
+                                 "sanitise cameron: 1/1 repositories", "sanitise omnigent-cameron: 1/1 repositories",
+                                 "link cameron: done in", "link omnigent-cameron: done in"]:
+                    assert expected in applied, (expected, applied)
                 # Inspection runs git as each account itself, so a planted program may
                 # run as its own account; it must never run as root or as the writer.
                 assert machine.succeed("stat -c %U /tmp/planted-fsmonitor 2>/dev/null || echo cameron").strip() == "cameron"
@@ -238,6 +246,7 @@
                 assert machine.succeed(f"stat -c '%U %a' {R}").strip() == "ghq 750"
                 assert machine.succeed(f"find {R} ! -user ghq | wc -l").strip() == "0"
                 assert machine.succeed(f"find {R} -perm -g+w ! -type l | wc -l").strip() == "0"
+                assert machine.succeed(f"find {R} -perm /o=rwx ! -type l | wc -l").strip() == "0"
                 machine.fail(as_writer(f"git -C {M} config --get core.fsmonitor"))
                 machine.fail(as_writer(f"git -C {M} config --get core.hooksPath"))
                 machine.succeed(f"test ! -e {M}/.git/hooks/post-checkout")
@@ -256,7 +265,9 @@
                 machine.succeed("test ! -e /tmp/planted-fsmonitor && test ! -e /tmp/planted-hook")
 
                 machine.fail(f"{migrate} --rollback cameron")
-                machine.succeed(f"{migrate} --rollback cameron omnigent-cameron")
+                rolled = machine.succeed(f"{migrate} --rollback cameron omnigent-cameron 2>&1")
+                for expected in ["rollback omnigent-cameron: done in", "rollback cameron: done in", "cameron: rolled back"]:
+                    assert expected in rolled, (expected, rolled)
                 restored = machine.succeed("find /home/cameron/ghq /home/omnigent-cameron/ghq \\( -type f -printf '%p %u %m %s\\n' \\) -o -printf '%p %u %m\\n' | sort")
                 assert restored == before, "rollback did not restore the trees exactly"
                 assert machine.succeed(f"stat -c '%U %a' {R}").strip() == "ghq 750"

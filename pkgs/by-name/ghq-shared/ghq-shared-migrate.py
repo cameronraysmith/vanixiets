@@ -12,7 +12,7 @@ filesystems. Where accounts hold the same repository, the deeper clone is kept.
 Whatever is not moved in stays in ~/ghq.pre-shared-<date>, untouched.
 
 Everything moved in becomes owned by the writer, gains group read, loses group
-write, and has every .git/config (and config.worktree, and submodule configs)
+write and every permission for others, and has every .git/config (and config.worktree, and submodule configs)
 rewritten to an allow-list of keys and every non-sample hook removed. Originals,
 a manifest of every step and the prior ownership and modes are kept under the
 state directory, root-owned 0700, outside the shared root, so --rollback
@@ -33,6 +33,7 @@ import shutil
 import stat
 import subprocess
 import sys
+import time
 
 DARWIN = sys.platform == "darwin"
 ROOT = os.environ.get("GHQ_SHARED_ROOT", "/var/lib/ghq")
@@ -64,6 +65,49 @@ ALLOWED_KEYS = [
 
 def say(*parts):
     print(*parts, flush=True)
+
+
+def progress(message):
+    print(f"ghq-shared-migrate: {message}", file=sys.stderr, flush=True)
+
+
+class Phase:
+    """Announce a phase's start and end, with elapsed time, on stderr."""
+
+    def __init__(self, name):
+        self.name = name
+
+    def __enter__(self):
+        self.start = time.monotonic()
+        progress(f"{self.name}: start")
+        return self
+
+    def __exit__(self, *_):
+        progress(f"{self.name}: done in {time.monotonic() - self.start:.1f}s")
+
+
+class Walk:
+    """Count entries in a long walk; the clock is read only every 4096 entries."""
+
+    CHECK = 4096
+    INTERVAL = 5.0
+
+    def __init__(self, name, root):
+        self.name, self.root, self.count = name, root, 0
+        self.start = self.last = time.monotonic()
+
+    def tick(self, path):
+        self.count += 1
+        if self.count % self.CHECK:
+            return
+        now = time.monotonic()
+        if now - self.last < self.INTERVAL:
+            return
+        self.last = now
+        rel = os.path.relpath(path, self.root).split(os.sep)
+        where = os.sep.join(rel[:3]) if rel[0] != "." else "."
+        rate = self.count / (now - self.start)
+        progress(f"{self.name}: {self.count} entries, {rate:.0f}/s, at {where}")
 
 
 def account_info(name):
@@ -125,7 +169,14 @@ def plan(accounts, date):
             say(f"{account['name']}: {tree} is not a directory; nothing to move")
             continue
         same_volume = os.stat(tree).st_dev == root_parent_dev
-        repos = {rel: inspect(account, os.path.join(tree, rel)) for rel in repositories(tree)}
+        with Phase(f"plan {account['name']}"):
+            found = repositories(tree)
+            repos, last = {}, time.monotonic()
+            for k, rel in enumerate(found, 1):
+                repos[rel] = inspect(account, os.path.join(tree, rel))
+                if k == len(found) or time.monotonic() - last >= 2.0:
+                    last = time.monotonic()
+                    progress(f"plan {account['name']}: inspected {k}/{len(found)} repositories")
         entries.append({
             "account": account,
             "tree": tree,
@@ -181,16 +232,18 @@ class Manifest:
 
 def fix_ownership(path, writer, manifest, sidecar):
     exceptions = {}
+    walk = Walk("ownership", path)
     for directory, subdirs, files in os.walk(path):
         for name in [*subdirs, *files, ""] if directory == path else [*subdirs, *files]:
             entry = os.path.join(directory, name) if name else directory
+            walk.tick(entry)
             st = os.lstat(entry)
             exceptions[os.path.relpath(entry, path)] = [st.st_uid, st.st_gid, stat.S_IMODE(st.st_mode)]
             os.lchown(entry, writer["uid"], writer["gid"])
             if not stat.S_ISLNK(st.st_mode):
                 mode = stat.S_IMODE(st.st_mode)
                 readable = stat.S_IRGRP | (stat.S_IXGRP if mode & stat.S_IXUSR else 0)
-                os.chmod(entry, (mode | readable) & ~stat.S_IWGRP)
+                os.chmod(entry, (mode | readable) & ~(stat.S_IWGRP | stat.S_IRWXO))
     os.makedirs(sidecar, mode=0o700, exist_ok=True)
     with open(os.path.join(sidecar, "ownership.json"), "w") as handle:
         json.dump(exceptions, handle)
@@ -261,49 +314,61 @@ def place(source, destination, same_volume, manifest, owner, stop):
 def apply(entries, winners, writer, date):
     for entry in entries:
         account = entry["account"]
+        name = account["name"]
         manifest = Manifest(account, date)
         moved = []
         if entry["rename_whole"]:
-            if os.path.isdir(ROOT):
-                os.rmdir(ROOT)
-                manifest.record({"op": "rmdir-root", "path": ROOT})
-            os.rename(entry["tree"], ROOT)
-            manifest.record({"op": "rename", "src": entry["tree"], "dst": ROOT})
-            os.makedirs(entry["aside"], mode=0o700, exist_ok=True)
-            os.chown(entry["aside"], account["uid"], account["gid"])
-            manifest.record({"op": "mkdir", "path": entry["aside"]})
-            for rel, info in entry["repos"].items():
-                if info["gitfile"] or winners.get(rel) != account["name"]:
-                    place(os.path.join(ROOT, rel), os.path.join(entry["aside"], rel), True, manifest, account, entry["aside"])
-                else:
-                    moved.append(rel)
-            fix_ownership(ROOT, writer, manifest, os.path.join(manifest.dir, "root"))
+            with Phase(f"rename {name}"):
+                if os.path.isdir(ROOT):
+                    os.rmdir(ROOT)
+                    manifest.record({"op": "rmdir-root", "path": ROOT})
+                os.rename(entry["tree"], ROOT)
+                manifest.record({"op": "rename", "src": entry["tree"], "dst": ROOT})
+                os.makedirs(entry["aside"], mode=0o700, exist_ok=True)
+                os.chown(entry["aside"], account["uid"], account["gid"])
+                manifest.record({"op": "mkdir", "path": entry["aside"]})
+                for rel, info in entry["repos"].items():
+                    if info["gitfile"] or winners.get(rel) != name:
+                        place(os.path.join(ROOT, rel), os.path.join(entry["aside"], rel), True, manifest, account, entry["aside"])
+                    else:
+                        moved.append(rel)
+            with Phase(f"ownership {name}"):
+                fix_ownership(ROOT, writer, manifest, os.path.join(manifest.dir, "root"))
         else:
-            for rel, info in entry["repos"].items():
-                if info["gitfile"] or winners.get(rel) != account["name"]:
-                    continue
-                place(os.path.join(entry["tree"], rel), os.path.join(ROOT, rel), entry["same_volume"], manifest, writer, ROOT)
-                fix_ownership(os.path.join(ROOT, rel), writer, manifest, os.path.join(manifest.dir, "repos", rel))
-                moved.append(rel)
-            os.rename(entry["tree"], entry["aside"])
-            manifest.record({"op": "rename", "src": entry["tree"], "dst": entry["aside"]})
-        for rel in moved:
-            sanitise(os.path.join(ROOT, rel), os.path.join(manifest.dir, "repos", rel), manifest)
-        os.chown(ROOT, writer["uid"], writer["gid"])
-        os.chmod(ROOT, 0o750)
-        link = entry["tree"]
-        os.symlink(ROOT, link)
-        os.lchown(link, account["uid"], account["gid"])
-        manifest.record({"op": "symlink", "path": link})
+            with Phase(f"{'rename' if entry['same_volume'] else 'copy'} and ownership {name}"):
+                for rel, info in entry["repos"].items():
+                    if info["gitfile"] or winners.get(rel) != name:
+                        continue
+                    place(os.path.join(entry["tree"], rel), os.path.join(ROOT, rel), entry["same_volume"], manifest, writer, ROOT)
+                    fix_ownership(os.path.join(ROOT, rel), writer, manifest, os.path.join(manifest.dir, "repos", rel))
+                    moved.append(rel)
+                os.rename(entry["tree"], entry["aside"])
+                manifest.record({"op": "rename", "src": entry["tree"], "dst": entry["aside"]})
+        with Phase(f"sanitise {name}"):
+            last = time.monotonic()
+            for k, rel in enumerate(moved, 1):
+                sanitise(os.path.join(ROOT, rel), os.path.join(manifest.dir, "repos", rel), manifest)
+                if k == len(moved) or time.monotonic() - last >= 2.0:
+                    last = time.monotonic()
+                    progress(f"sanitise {name}: {k}/{len(moved)} repositories")
+        with Phase(f"link {name}"):
+            os.chown(ROOT, writer["uid"], writer["gid"])
+            os.chmod(ROOT, 0o750)
+            link = entry["tree"]
+            os.symlink(ROOT, link)
+            os.lchown(link, account["uid"], account["gid"])
+            manifest.record({"op": "symlink", "path": link})
         manifest.record({"op": "end"})
-        say(f"{account['name']}: moved {len(moved)} repositories into {ROOT}; everything else is in {entry['aside']}")
+        say(f"{name}: moved {len(moved)} repositories into {ROOT}; everything else is in {entry['aside']}")
 
 
 def restore_ownership(path, sidecar):
     with open(os.path.join(sidecar, "ownership.json")) as handle:
         recorded = json.load(handle)
+    walk = Walk("restore ownership", path)
     for rel, (uid, gid, mode) in recorded.items():
         entry = os.path.normpath(os.path.join(path, rel))
+        walk.tick(entry)
         if not os.path.lexists(entry):
             continue
         os.lchown(entry, uid, gid)
@@ -325,28 +390,29 @@ def rollback(names, writer):
     if missing := later - set(names):
         sys.exit(f"roll back {', '.join(sorted(missing))} too: they were migrated after {selected[0][2]}")
     for _date, _mtime, name, steps in reversed(selected):
-        for step in reversed(steps):
-            op = step["op"]
-            if op == "symlink" and os.path.islink(step["path"]):
-                os.unlink(step["path"])
-            elif op == "sanitise":
-                shutil.copy2(step["kept"], step["path"], follow_symlinks=False)
-            elif op == "ownership":
-                restore_ownership(step["path"], step["sidecar"])
-            elif op == "rename":
-                os.makedirs(os.path.dirname(step["src"]), exist_ok=True)
-                os.rename(step["dst"], step["src"])
-                prune_empty(os.path.dirname(step["dst"]), ROOT)
-            elif op == "copy":
-                shutil.rmtree(step["dst"])
-                prune_empty(os.path.dirname(step["dst"]), ROOT)
-            elif op == "mkdir":
-                for directory, _subdirs, _files in sorted(os.walk(step["path"]), reverse=True):
-                    prune_empty(directory, os.path.dirname(step["path"]))
-            elif op == "rmdir-root":
-                os.mkdir(step["path"], 0o750)
-                os.chown(step["path"], writer["uid"], writer["gid"])
-        os.rename(os.path.join(STATE, name), os.path.join(STATE, f"{name}.rolled-back-{datetime.datetime.now():%Y%m%d%H%M%S}"))
+        with Phase(f"rollback {name}"):
+            for step in reversed(steps):
+                op = step["op"]
+                if op == "symlink" and os.path.islink(step["path"]):
+                    os.unlink(step["path"])
+                elif op == "sanitise":
+                    shutil.copy2(step["kept"], step["path"], follow_symlinks=False)
+                elif op == "ownership":
+                    restore_ownership(step["path"], step["sidecar"])
+                elif op == "rename":
+                    os.makedirs(os.path.dirname(step["src"]), exist_ok=True)
+                    os.rename(step["dst"], step["src"])
+                    prune_empty(os.path.dirname(step["dst"]), ROOT)
+                elif op == "copy":
+                    shutil.rmtree(step["dst"])
+                    prune_empty(os.path.dirname(step["dst"]), ROOT)
+                elif op == "mkdir":
+                    for directory, _subdirs, _files in sorted(os.walk(step["path"]), reverse=True):
+                        prune_empty(directory, os.path.dirname(step["path"]))
+                elif op == "rmdir-root":
+                    os.mkdir(step["path"], 0o750)
+                    os.chown(step["path"], writer["uid"], writer["gid"])
+            os.rename(os.path.join(STATE, name), os.path.join(STATE, f"{name}.rolled-back-{datetime.datetime.now():%Y%m%d%H%M%S}"))
         say(f"{name}: rolled back")
 
 
