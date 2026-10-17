@@ -24,6 +24,17 @@ in
         rev = "7978b30199c8172b5fba612aef3c5b42f15f5e72";
         hash = "sha256-zdh4RPcZjASYaorsl1LAfvBLZ6WYfxiCbVKjxhCbtfQ=";
       };
+
+      # The telemetry store's dataset (ADR-007 E7.3; design D5): one source for
+      # the boot oneshots below and for greptimedb-envelope's environment.
+      # disko.nix repeats the values as its install-time declaration, and
+      # checks.x86_64-linux.greptimedb-envelope asserts the two agree.
+      greptimedbDataset = {
+        name = "zroot/root/greptimedb";
+        mountpoint = "/var/lib/greptimedb";
+        quota = "16G";
+        reservation = "12G";
+      };
     in
     {
       imports = [
@@ -57,6 +68,7 @@ in
         kanidm
         matrix
         omnigraph
+        greptimedb
         effects-vanixiets-secrets
         effects-ironstar-secrets
       ]);
@@ -262,6 +274,41 @@ in
         };
       };
 
+      # The telemetry store's disk envelope, enforced at boot because disko
+      # options apply at dataset creation only.
+      systemd.services.zfs-set-root-greptimedb-quota = {
+        description = "Assert quota=${greptimedbDataset.quota} on ${greptimedbDataset.name}";
+        wantedBy = [ "multi-user.target" ];
+        after = [ "zfs-import.target" ];
+        serviceConfig = {
+          Type = "oneshot";
+          RemainAfterExit = true;
+          ExecStart = "${pkgs.zfs}/bin/zfs set quota=${greptimedbDataset.quota} ${greptimedbDataset.name}";
+        };
+      };
+
+      systemd.services.zfs-set-root-greptimedb-reservation = {
+        description = "Assert reservation=${greptimedbDataset.reservation} on ${greptimedbDataset.name}";
+        wantedBy = [ "multi-user.target" ];
+        after = [ "zfs-import.target" ];
+        serviceConfig = {
+          Type = "oneshot";
+          RemainAfterExit = true;
+          ExecStart = "${pkgs.zfs}/bin/zfs set reservation=${greptimedbDataset.reservation} ${greptimedbDataset.name}";
+        };
+      };
+
+      systemd.services.zfs-assert-root-greptimedb-noautosnap = {
+        description = "Assert com.sun:auto-snapshot=false on ${greptimedbDataset.name}";
+        wantedBy = [ "multi-user.target" ];
+        after = [ "zfs-import.target" ];
+        serviceConfig = {
+          Type = "oneshot";
+          RemainAfterExit = true;
+          ExecStart = "${pkgs.zfs}/bin/zfs set com.sun:auto-snapshot=false ${greptimedbDataset.name}";
+        };
+      };
+
       # Raise nix daemon free-space thresholds for a build host. clan-core and
       # srvos both set 512 MiB / 3 GiB via mkDefault, which is undersized for
       # buildbot-nix workers materializing large closures on a CX53 with niks3
@@ -440,6 +487,117 @@ in
           actor = "magnetite";
         };
       };
+
+      # Store accounts for GreptimeDB (ADR-007, ADR-008; design D6). Hex
+      # passwords, because a users line needs exactly one `=` and the store
+      # silently skips a malformed line (design F2); written with printf '%s'
+      # so no file carries a trailing newline into an HTTP basic-auth header.
+      # perses-password has no consumer until S6. users-sha256 is public: the
+      # sha256 of 256-bit hex passwords is not reversible, and R7.4 compares it
+      # with /run/greptimedb/loaded-users.sha256.
+      clan.core.vars.generators.greptimedb-users = {
+        files.users = {
+          owner = "greptimedb";
+          mode = "0400";
+          restartUnits = [ "greptimedb.service" ];
+        };
+        files.admin-password.mode = "0400";
+        files.collector-password.mode = "0400";
+        files.perses-password.mode = "0400";
+        files.regulator-password.mode = "0400";
+        files.users-sha256.secret = false;
+        runtimeInputs = [ pkgs.openssl ];
+        script = ''
+          admin="$(openssl rand -hex 32)"
+          collector="$(openssl rand -hex 32)"
+          perses="$(openssl rand -hex 32)"
+          regulator="$(openssl rand -hex 32)"
+          printf '%s' "$admin" > "$out/admin-password"
+          printf '%s' "$collector" > "$out/collector-password"
+          printf '%s' "$perses" > "$out/perses-password"
+          printf '%s' "$regulator" > "$out/regulator-password"
+          printf 'admin:rw=%s\ncollector:wo=%s\nperses:ro=%s\nregulator:ro=%s\n' \
+            "$admin" "$collector" "$perses" "$regulator" > "$out/users"
+          sha256sum "$out/users" | cut -d ' ' -f 1 > "$out/users-sha256"
+        '';
+      };
+
+      # Cloudflare R2 credentials for the store's object data, an Object Read
+      # & Write token on bucket sciexp, delivered as an EnvironmentFile in
+      # GreptimeDB's GREPTIMEDB_STANDALONE__ layered-config form.
+      clan.core.vars.generators.greptimedb-r2 = {
+        prompts.access-key = {
+          description = ''
+            Cloudflare R2 S3 access key ID with Object Read & Write scope on
+            bucket sciexp, for GreptimeDB. Minted in the Cloudflare dashboard;
+            distinct from the omnigraph-r2 and niks3-s3 tokens.
+          '';
+          type = "hidden";
+          persist = true;
+          display = {
+            group = "greptimedb";
+            label = "GREPTIMEDB_STANDALONE__STORAGE__ACCESS_KEY_ID";
+          };
+        };
+
+        prompts.secret-key = {
+          description = "Cloudflare R2 S3 secret access key paired with the access key ID above.";
+          type = "hidden";
+          persist = true;
+          display = {
+            group = "greptimedb";
+            label = "GREPTIMEDB_STANDALONE__STORAGE__SECRET_ACCESS_KEY";
+          };
+        };
+
+        files.access-key.deploy = false;
+        files.secret-key.deploy = false;
+
+        files."env" = {
+          restartUnits = [ "greptimedb.service" ];
+        };
+
+        script = ''
+          {
+            printf 'GREPTIMEDB_STANDALONE__STORAGE__ACCESS_KEY_ID=%s\n' "$(cat "$prompts/access-key")"
+            printf 'GREPTIMEDB_STANDALONE__STORAGE__SECRET_ACCESS_KEY=%s\n' "$(cat "$prompts/secret-key")"
+          } > "$out/env"
+        '';
+      };
+
+      # Telemetry store (design D3 to D7). WAL and caches live on
+      # zroot/root/greptimedb; SSTs go to R2 under one prefix of sciexp, at the
+      # endpoint omnigraph already uses. Credentials arrive by path only.
+      services.greptimedb = {
+        enable = true;
+        databases = {
+          fleet = "30d";
+          devloop = "365d";
+          agent = "90d";
+        };
+        settings.storage = {
+          type = "S3";
+          bucket = "sciexp";
+          root = "projects/vanixiets/observability/store/";
+          endpoint = config.services.omnigraph.s3.endpointUrl;
+          region = "auto";
+          enable_virtual_host_style = false;
+          disable_ec2_metadata = true;
+          # ADR-007: the object-store read cache is capped at 4 GiB.
+          cache_capacity = "4GiB";
+        };
+      };
+
+      systemd.services.greptimedb.serviceConfig = {
+        LoadCredential = [
+          "users:${config.clan.core.vars.generators.greptimedb-users.files.users.path}"
+        ];
+        EnvironmentFile = config.clan.core.vars.generators.greptimedb-r2.files."env".path;
+      };
+
+      systemd.services.greptimedb-schema.serviceConfig.LoadCredential = [
+        "admin-password:${config.clan.core.vars.generators.greptimedb-users.files.admin-password.path}"
+      ];
 
       # nixbot's `8 x 4096` nix-eval-jobs configuration peaks at 31.4 GiB of
       # swap (logs/magnetite-zram-headroom-experiment.md §6.2), above the

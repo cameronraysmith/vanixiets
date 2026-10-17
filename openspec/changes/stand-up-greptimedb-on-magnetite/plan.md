@@ -1029,7 +1029,7 @@ import-tree activates every tracked `.nix` file under `modules/` (`modules/READM
 - [ ] **Step 3: Run the check and watch it fail**
 
 Run: `mkdir -p logs && nix build .#checks.x86_64-linux.greptimedb-envelope -L 2>&1 | tee logs/greptimedb-envelope-red-$(date +%Y%m%d-%H%M%S).log`
-Expected: FAIL at evaluation with `error: attribute 'greptimedb' missing`, pointing at `magnetite.services.greptimedb` in `modules/checks/greptimedb-envelope.nix`.
+Expected: FAIL at evaluation with `error: attribute 'greptimedb-users' missing`, pointing at `usersGenerator` in `modules/checks/greptimedb-envelope.nix`; the `failures` view evaluates clauses in name order, and `credentialHolders` forces the missing generator before any clause reads `services.greptimedb`.
 
 - [ ] **Step 4: Write the store module**
 
@@ -1600,7 +1600,7 @@ Expected, first command:
 }
 ```
 
-Expected, second command: `{"RequiresMountsFor":["/var/lib/greptimedb"],"StartLimitIntervalSec":0}`.
+Expected, second command: `{"RequiresMountsFor":["/var/lib/greptimedb"],"StartLimitIntervalSec":"0"}`; NixOS renders `startLimitIntervalSec` into `unitConfig` as a string.
 
 - [ ] **Step 14: Verify the gRPC assertion bites**
 

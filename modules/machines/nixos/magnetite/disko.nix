@@ -78,6 +78,20 @@
             options.mountpoint = "/var/lib/cognee";
             mountpoint = "/var/lib/cognee";
           };
+          # Telemetry store WAL and caches (ADR-007; design D5). Created by hand
+          # on the installed host (tasks.md 8.3); this declaration covers a
+          # reinstall, and the zfs-*-root-greptimedb-* oneshots in default.nix
+          # enforce the properties on every boot.
+          "root/greptimedb" = {
+            type = "zfs_fs";
+            options = {
+              mountpoint = "/var/lib/greptimedb";
+              "com.sun:auto-snapshot" = "false";
+              quota = "16G";
+              reservation = "12G";
+            };
+            mountpoint = "/var/lib/greptimedb";
+          };
           # Dedicated dataset for docker graphroot to use the native ZFS
           # storage driver (docker's overlay2 does not layer cleanly on ZFS,
           # and /var/lib/docker must be its own dataset for the zfs driver).
