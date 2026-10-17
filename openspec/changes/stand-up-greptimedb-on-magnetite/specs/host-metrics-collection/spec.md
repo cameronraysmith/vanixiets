@@ -22,6 +22,11 @@ The collector SHALL write series only, and SHALL write no log records and no tra
 - **WHEN** magnetite is first activated with the collector and has run for one collection interval
 - **THEN** the operator confirms that compressed swap use for magnetite's compressed swap device appears in the `fleet` database, and that the telemetry store holds no log records and no traces, and records both observations
 
+#### Scenario: The collector starts after the databases exist
+
+- **WHEN** magnetite starts the collector while the telemetry store holds no databases yet, as at first activation or after the telemetry store is rebuilt
+- **THEN** the collector begins writing only after the unit that sets up the telemetry store's databases has run, and the evaluation-time collector regulator fails before any activation if the collector is no longer ordered after that unit, which its mutant shows
+
 ### Requirement: Each stored series names its host
 
 Every series the collector writes SHALL carry the name of the host it was gathered on, and a reader SHALL be able to select series by that name through both of the telemetry store's query languages.

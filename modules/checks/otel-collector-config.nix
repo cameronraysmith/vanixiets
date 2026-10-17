@@ -330,6 +330,12 @@
             lib.hasInfix "/bin/ntfy-send " notifier && lib.hasInfix " fleet-alerts" notifier
           ))
 
+          # Startup (host-metrics-collection "The collector starts after the databases exist").
+          (check "R3.1: collector not ordered after the schema job" (
+            builtins.elem "greptimedb-schema.service" i.services.opentelemetry-collector.after
+            && builtins.elem "greptimedb-schema.service" i.services.opentelemetry-collector.wants
+          ))
+
           # R1.2 (ADR-001): below 1.3.0 the store needs explicit-bucket histograms.
           (lib.optional (
             lib.versionOlder i.storeVersion "1.3.0"
@@ -424,6 +430,16 @@
             services = i.services // {
               opentelemetry-collector = i.services.opentelemetry-collector // {
                 unitConfig = builtins.removeAttrs i.services.opentelemetry-collector.unitConfig [ "OnFailure" ];
+              };
+            };
+          };
+        schemaOrderDropped =
+          i:
+          i
+          // {
+            services = i.services // {
+              opentelemetry-collector = i.services.opentelemetry-collector // {
+                after = lib.remove "greptimedb-schema.service" i.services.opentelemetry-collector.after;
               };
             };
           };

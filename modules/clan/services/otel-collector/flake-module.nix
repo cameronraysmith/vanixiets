@@ -349,7 +349,7 @@ in
     };
 
   flake.modules.nixos.otel-collector-ingress =
-    { lib, ... }:
+    { config, lib, ... }:
     {
       imports = [ collectorCore ];
 
@@ -442,12 +442,22 @@ in
         };
       };
 
-      # Killed after the evaluator (900) and the store (500), so it survives
-      # the store's death and queues (A7:100,127).
-      systemd.services.opentelemetry-collector.serviceConfig = {
-        MemoryMax = "512M";
-        OOMScoreAdjust = 300;
-      };
+      systemd.services.opentelemetry-collector = lib.mkMerge [
+        {
+          # Killed after the evaluator (900) and the store (500), so it survives
+          # the store's death and queues (A7:100,127).
+          serviceConfig = {
+            MemoryMax = "512M";
+            OOMScoreAdjust = 300;
+          };
+        }
+        # The store answers 400 for a missing database and the exporter drops
+        # 400s as permanent, so export waits for the schema job.
+        (lib.mkIf (config.services.greptimedb.enable or false) {
+          after = [ "greptimedb-schema.service" ];
+          wants = [ "greptimedb-schema.service" ];
+        })
+      ];
     };
 
   clan.modules.otel-collector =
