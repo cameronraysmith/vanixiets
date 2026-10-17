@@ -39,7 +39,7 @@ Tasks marked *gated* wait for the named approval.
 ## 7. Documentation
 
 - [x] 7.1 Update `modules/home/ai/plugins/version-control-and-forge/.apm/skills/dependency-source-acquisition/SKILL.md`: replace line 40's claim, state that on sharing hosts `$(ghq root)` is the shared root and `ghq list -p` prints the resolved shared path, that acquisition, update, deepen and promotion are delegated, and that readers cannot fetch, gc or promote in place — verify: `nix build "$T#apm-skills-compose" --no-link --print-out-paths` succeeds and the composed `dependency-source-acquisition/SKILL.md` contains the new text and not `This fleet configures`.
-- [ ] 7.2 Update `modules/home/ai/plugins/agent-context-vanixiets/.apm/instructions/30-reference-repositories.instructions.md` for the shared root — verify: `nix eval --raw "$T#darwinConfigurations.stibnite.config.home-manager.users.crs58.programs.agents-md.settings.body"` contains the new sentence.
+- [x] 7.2 Update `modules/home/ai/plugins/agent-context-vanixiets/.apm/instructions/30-reference-repositories.instructions.md` for the shared root — verify: `nix run "$T#apm-context-compile"` in a disposable export of `T` composes a repo-root `AGENTS.md` containing the new sentence (this fragment feeds the repository's own `AGENTS.md`, not the user-wide body).
 - [ ] 7.3 Update `modules/home/README.md` (`programs.ghq-shared.root` and the package swap) and `modules/clan/services/omnigent/README.md` (the writer-group exception for participating workers) — verify: both files name `programs.ghq-shared.root` or the writer group respectively, and the names match the evaluated options from 1.1 and 3.1.
 
 ## 8. Darwin
