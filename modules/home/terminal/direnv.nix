@@ -24,6 +24,17 @@ let
           warn_timeout = "10m";
           hide_env_diff = true;
         };
+        # Layouts (nix-direnv's flake profiles and caches) live under the
+        # account's cache rather than in the project's .direnv, so `use flake`
+        # also works in repositories this account can read but not write, such
+        # as a host-shared ghq tree.
+        stdlib = ''
+          direnv_layout_dir() {
+            local hash
+            hash=$(printf '%s' "$PWD" | ${pkgs.coreutils}/bin/sha256sum | ${pkgs.coreutils}/bin/cut -c1-32)
+            printf '%s\n' "''${XDG_CACHE_HOME:-$HOME/.cache}/direnv/layouts/$hash-''${PWD##*/}"
+          }
+        '';
       };
 
       programs.direnv-instant = {
