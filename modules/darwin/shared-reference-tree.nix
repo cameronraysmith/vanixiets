@@ -4,7 +4,12 @@ let
 in
 {
   flake.modules.darwin.shared-reference-tree =
-    { config, lib, ... }:
+    {
+      config,
+      lib,
+      pkgs,
+      ...
+    }:
     let
       cfg = config.services.shared-reference-tree;
       # Darwin Omnigent workers have standalone Home Manager configurations built
@@ -13,6 +18,13 @@ in
         lib.attrValues (config.services.omnigent-host.workers or { })
       );
       humanParticipants = lib.subtractLists workerUsers cfg.participants;
+      label = "org.vanixiets.ghq-writer";
+      handlerConfig = pkgs.writeText "ghq-writer.json" (
+        builtins.toJSON {
+          inherit (cfg) root allowedProtocols;
+          group = cfg.writer;
+        }
+      );
     in
     {
       imports = [ flakeConfig.flake.modules.darwin.shared-reference-tree-options ];
@@ -41,6 +53,27 @@ in
         };
         users.knownUsers = [ cfg.writer ];
         users.knownGroups = [ cfg.writer ];
+
+        # Written as a raw plist because nix-darwin's typed Sockets submodule has no
+        # SockPathOwner or SockPathGroup, which keep the socket root:_ghq 0660.
+        environment.launchDaemons."${label}.plist".text = lib.generators.toPlist { escape = true; } {
+          Label = label;
+          ProgramArguments = [
+            "${pkgs.ghq-shared}/libexec/ghq-shared/ghq-writer-handler"
+            "${handlerConfig}"
+          ];
+          inetdCompatibility.Wait = false;
+          Sockets.Listener = {
+            SockPathName = pkgs.ghq-shared.socket;
+            SockPathOwner = 0;
+            SockPathGroup = cfg.writerId;
+            SockPathMode = 432; # 0660; plists have no octal literals
+          };
+          UserName = cfg.writer;
+          GroupName = cfg.writer;
+          Umask = 23; # 0027
+          StandardErrorPath = "/var/log/ghq-writer.log";
+        };
 
         home-manager.users = lib.genAttrs humanParticipants (_: {
           programs.ghq-shared.root = cfg.root;
