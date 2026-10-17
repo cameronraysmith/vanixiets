@@ -8,6 +8,7 @@ let
   flakeUsers = config.flake.users;
   cogneeLib = config.flake.lib.cognee;
   inherit (config.flake.lib.hosts) magnetite;
+  collectorSchema = config.flake.lib.otelCollectorSchema;
 in
 {
   flake.modules.nixos."machines/nixos/magnetite" =
@@ -592,11 +593,8 @@ in
       # endpoint omnigraph already uses. Credentials arrive by path only.
       services.greptimedb = {
         enable = true;
-        databases = {
-          fleet = "30d";
-          devloop = "365d";
-          agent = "90d";
-        };
+        # One source with the collector's routing (review F4).
+        inherit (collectorSchema) databases;
         settings.storage = {
           type = "S3";
           bucket = "sciexp";

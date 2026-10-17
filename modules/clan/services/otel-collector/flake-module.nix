@@ -408,8 +408,19 @@ in
 
   flake.modules.nixos.otel-collector-ingress =
     { config, lib, ... }:
+    let
+      databaseNames = lib.attrNames schema.databases;
+      storeDatabaseNames = lib.attrNames config.services.greptimedb.databases;
+    in
     {
       imports = [ collectorCore ];
+
+      # The exporters write only to schema.nix's databases, and the store
+      # answers 400 for any database its schema job did not create.
+      assertions = lib.optional (config.services.greptimedb.enable or false) {
+        assertion = storeDatabaseNames == databaseNames;
+        message = "otel-collector ingress: services.greptimedb.databases creates ${builtins.toJSON storeDatabaseNames}, but flake.lib.otelCollectorSchema.databases routes to ${builtins.toJSON databaseNames}";
+      };
 
       services.opentelemetry-collector = {
         settings = {
@@ -442,7 +453,7 @@ in
             context = "resource";
             condition = ''attributes["vanixiets.database"] == "${db}"'';
             pipelines = [ "metrics/${db}" ];
-          }) schema.databases;
+          }) databaseNames;
 
           exporters = lib.listToAttrs (
             map (
@@ -468,7 +479,7 @@ in
                   max_elapsed_time = "0s";
                 };
               }
-            ) schema.databases
+            ) databaseNames
           );
 
           service = {
@@ -494,7 +505,7 @@ in
                   processors = [ "resource/strip-database" ];
                   exporters = [ "otlp_http/${db}" ];
                 }
-              ) schema.databases
+              ) databaseNames
             );
           };
         };

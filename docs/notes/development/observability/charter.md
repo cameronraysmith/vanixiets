@@ -1,12 +1,12 @@
 ---
 title: Fleet observability and CCV feedback-loop charter
-status: charter v14
+status: charter v15
 date: 2026-10-17
 ---
 
 # Fleet observability and CCV feedback-loop charter
 
-Charter version: v14.
+Charter version: v15.
 A revision is a version bump with a dated entry under "Revision history"; the text of an earlier version is never edited in place.
 
 ## Objective
@@ -301,4 +301,11 @@ A research unit that meets ambiguity returns it in its questions section; the or
   - F2, R7.2's ratcheting peak: the envelope compared cgroup `memory.peak` with `MemoryHigh` (`modules/lib/greptimedb-envelope.nix:176` before this revision), but `memory.peak` counts page cache and never decreases within an invocation; magnetite's live store showed `anon` 104 MB, `file` 42 MB and `memory.peak` 169 MB, so once caches filled the hourly run would fail for good.
     ADR-007 E7.2 and R7.2 amended: R7.2 fails when `memory.events` `high` rises within one invocation, meaning the kernel throttled the store at `MemoryHigh`, tracked like `oom_kill` and `max`, and when `memory.stat` `anon` reaches `GREPTIMEDB_ENVELOPE_ANON_MAX_BYTES`, set from `MemoryHigh`, which keeps the forced-failure method of a runtime drop-in lowering the threshold; the cross-invocation OOM-journal and `NRestarts` clauses are unchanged, and `components/greptimedb.md` follows.
   - F12, curl on the notifier's path: `ntfy-send` carries curl through `runtimeInputs` on Linux, while darwin keeps `/usr/bin/curl` through `NTFY_CURL_BIN`, so the notifier template's `path = [ curl ]` and the `RESOLVED` hook's own `PATH` export are deleted.
+  - S1's design, specs and tasks carry the same amendments, with tasks.md section 10 recording their verification.
+- v15 (2026-10-17): three further findings of the S1 holistic review (`logs/s1-evidence/review-findings.md` F3, F4 and F6); no earlier text is edited beyond the status, date and version lines, and D1–D9, the requirements and the acceptance criteria are unchanged.
+  - F3, table TTLs: the hourly envelope failed on any table that set a `ttl` of its own (`modules/lib/greptimedb-envelope.nix:242` before this revision), while ADR-004, ADR-007 and `components/greptimedb.md` plan a 14-day `fleet` logs table for S7, so S7's own table would have failed the envelope.
+    ADR-007 amended: tables allowed a TTL of their own are declared in `services.greptimedb.tableTtls`, empty in S1, and the envelope fails on a table TTL the map does not declare, on one that differs from the declared duration, and on a declared table that runs on its database's TTL, while a declared table that does not exist yet is not judged; ADR-004 and `components/greptimedb.md` follow.
+    GreptimeDB `v1.2.1` renders a table's TTL through humantime 2.2.0, so `365d` reads back as `11months 30days 3h 50m 24s`, and the envelope compares declared and rendered TTLs as durations.
+  - F4, one source for databases and retention: `flake.lib.otelCollectorSchema.databases` becomes the map of database names to TTLs that magnetite's `services.greptimedb.databases` reads, in place of a separate literal, and the ingress role asserts that the store's database names equal the schema's whenever its host runs the store.
+  - F6, the agent's exporter in S4: the agent pipelines export to the in-process `forward` connector, which only a co-located ingress pipeline receives from, so S4 chooses the agent's exporter by role, `forward` beside the ingress and an OTLP exporter to the ingress elsewhere; the reference architecture's sequencing note does not claim otherwise and is unchanged.
   - S1's design, specs and tasks carry the same amendments, with tasks.md section 10 recording their verification.

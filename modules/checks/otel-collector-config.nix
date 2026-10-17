@@ -180,7 +180,7 @@
           e = s.exporters;
           pipelines = s.service.pipelines;
           check = name: ok: lib.optional (!ok) name;
-          dbs = i.schema.databases;
+          dbs = lib.attrNames i.schema.databases;
           exporterNames = map (db: "otlp_http/${db}") dbs;
           process = r."host_metrics/process".scrapers.process;
           memory = r."host_metrics/memory".scrapers;

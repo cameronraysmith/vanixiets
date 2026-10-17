@@ -3,10 +3,11 @@
 # Site-neutral and free of clan vars, so the runtime tests import it with
 # their own credentials. The host supplies LoadCredential (`users` for the
 # store, `admin-password` for the schema job), the R2 EnvironmentFile, the
-# [storage] object-store stanza and `databases`; without a stanza the store
-# uses GreptimeDB's local `File` storage under data_home. The memory envelope,
-# listeners, worker pools and usage reporting are fixed here, and R7.1
-# (modules/checks/greptimedb-envelope.nix) asserts them on magnetite.
+# [storage] object-store stanza, `databases` and any `tableTtls`; without a
+# stanza the store uses GreptimeDB's local `File` storage under data_home.
+# The memory envelope, listeners, worker pools and usage reporting are fixed
+# here, and R7.1 (modules/checks/greptimedb-envelope.nix) asserts them on
+# magnetite.
 { config, ... }:
 let
   flakeLib = config.flake.lib;
@@ -129,6 +130,14 @@ in
             fleet = "30d";
           };
           description = "Databases the schema job creates, each mapped to the TTL it sets with ALTER DATABASE.";
+        };
+        tableTtls = lib.mkOption {
+          type = lib.types.attrsOf lib.types.str;
+          default = { };
+          example = {
+            "fleet.logs" = "14d";
+          };
+          description = "Tables, as `<database>.<table>`, allowed a TTL of their own instead of their database's, each mapped to that TTL; greptimedb-envelope fails on any other table TTL.";
         };
       };
 
@@ -258,6 +267,7 @@ in
             );
             GREPTIMEDB_ENVELOPE_DISK_USED_MAX_PERCENT = "80";
             GREPTIMEDB_ENVELOPE_SST_MAX_BYTES = toString (50 * 1024 * 1024 * 1024);
+            GREPTIMEDB_ENVELOPE_TABLE_TTLS_FILE = "${flakeLib.greptimedbTableTtlsFile pkgs cfg.tableTtls}";
           };
           serviceConfig = {
             Type = "oneshot";

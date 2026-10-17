@@ -48,26 +48,37 @@
       # code 4001 answered as HTTP 400 (src/servers/src/error.rs:933-957), with
       # the message tests/cases/standalone/common/catalog/schema.result:135
       # records. The renamed-table row is the mutant: the regulator queries a
-      # table that does not exist and must fail.
+      # table that does not exist and must fail. The table rows run the
+      # envelope's table clause (review F3) on recorded information_schema.tables
+      # answers; v1.2.1 renders a table's ttl through humantime's Display, so
+      # 365d comes back as several space-separated parts.
+      rehearsalUrl = "http://greptimedb.rehearsal.invalid:4000";
       sqlHelper = self.lib.greptimedbSql pkgs {
-        url = "http://greptimedb.rehearsal.invalid:4000";
+        url = rehearsalUrl;
         user = "regulator";
       };
+      tablesRegulator = self.lib.greptimedbEnvelopeTables pkgs {
+        url = rehearsalUrl;
+        databases = [
+          "fleet"
+          "devloop"
+        ];
+      };
+      column = name: data_type: { inherit name data_type; };
       regionColumns = [
-        {
-          name = "region_id";
-          data_type = "UInt64";
-        }
-        {
-          name = "sst_size";
-          data_type = "UInt64";
-        }
+        (column "region_id" "UInt64")
+        (column "sst_size" "UInt64")
       ];
-      records = rows: {
+      tableColumns = [
+        (column "table_schema" "String")
+        (column "table_name" "String")
+        (column "create_options" "String")
+      ];
+      records = columns: rows: {
         output = [
           {
             records = {
-              schema.column_schemas = regionColumns;
+              schema.column_schemas = columns;
               inherit rows;
               total_rows = builtins.length rows;
             };
@@ -77,6 +88,7 @@
       };
       regionQuery = "SELECT region_id, sst_size FROM information_schema.region_statistics";
       renamedRegionQuery = "SELECT region_id, sst_size FROM information_schema.region_statistic";
+      tablesQuery = "SELECT table_schema, table_name, create_options FROM information_schema.tables WHERE table_schema IN ('fleet', 'devloop') AND table_type = 'BASE TABLE'";
 
       sqlStub = pkgs.writeText "greptimedb-sql-stub.py" ''
         import base64, sys
@@ -114,9 +126,10 @@
         server.serve_forever()
       '';
 
-      sqlRow =
+      stubRow =
         {
           name,
+          command,
           sql,
           httpStatus,
           reply,
@@ -135,26 +148,49 @@
           env -u no_proxy -u NO_PROXY -u HTTP_PROXY \
             CREDENTIALS_DIRECTORY="$TMPDIR/credentials" \
             http_proxy="http://127.0.0.1:$(cat "$TMPDIR/port")" \
-            ${lib.getExe sqlHelper} ${lib.escapeShellArg sql} > "$TMPDIR/output" 2>&1 || code=$?
+            ${command} > "$TMPDIR/output" 2>&1 || code=$?
           kill "$stub_pid"
           wait "$stub_pid" || true
           stub_pid=
           cat "$TMPDIR/output"
-          [ "$code" = ${toString exit} ] || fail "${name}: exit status $code, expected ${toString exit}"
+          [ "$code" = ${toString exit} ] || miss "${name}: exit status $code, expected ${toString exit}"
           ${lib.concatMapStrings (line: ''
             grep -qF -- ${lib.escapeShellArg line} "$TMPDIR/output" \
-              || fail ${lib.escapeShellArg "${name}: output lacks: ${line}"}
+              || miss ${lib.escapeShellArg "${name}: output lacks: ${line}"}
           '') expect}
           [ "$(cat "$TMPDIR/requests")" = ${lib.escapeShellArg "POST /v1/sql regulator ${sql}"} ] \
-            || fail "${name}: stub saw: $(cat "$TMPDIR/requests")"
+            || miss "${name}: stub saw: $(cat "$TMPDIR/requests")"
         '';
+
+      sqlRow =
+        row: stubRow (row // { command = "${lib.getExe sqlHelper} ${lib.escapeShellArg row.sql}"; });
+
+      # `declared` is services.greptimedb.tableTtls, rendered as the module does.
+      tableRow =
+        {
+          declared,
+          rows,
+          ...
+        }@row:
+        stubRow (
+          builtins.removeAttrs row [
+            "declared"
+            "rows"
+          ]
+          // {
+            command = "GREPTIMEDB_ENVELOPE_TABLE_TTLS_FILE=${self.lib.greptimedbTableTtlsFile pkgs declared} ${lib.getExe tablesRegulator}";
+            sql = tablesQuery;
+            httpStatus = 200;
+            reply = records tableColumns rows;
+          }
+        );
 
       sqlRows = [
         {
           name = "a records result with rows passes and prints them as TSV";
           sql = regionQuery;
           httpStatus = 200;
-          reply = records [
+          reply = records regionColumns [
             [
               4398046511104
               1048576
@@ -167,7 +203,7 @@
           name = "an empty records result fails";
           sql = regionQuery;
           httpStatus = 200;
-          reply = records [ ];
+          reply = records regionColumns [ ];
           exit = 1;
           expect = [ "greptimedb-sql: empty result: ${regionQuery}" ];
         }
@@ -185,6 +221,116 @@
         }
       ];
 
+      tableRows = [
+        {
+          name = "tables on their databases' TTL pass with nothing declared";
+          declared = { };
+          rows = [
+            [
+              "fleet"
+              "cpu"
+              ""
+            ]
+          ];
+          exit = 0;
+          expect = [ ];
+        }
+        {
+          name = "an undeclared table TTL fails";
+          declared = { };
+          rows = [
+            [
+              "fleet"
+              "logs"
+              "ttl=14days"
+            ]
+          ];
+          exit = 1;
+          expect = [
+            "FAIL TTL: fleet.logs sets ttl=14days, which services.greptimedb.tableTtls does not declare"
+          ];
+        }
+        {
+          name = "a declared table TTL that matches passes";
+          declared."fleet.logs" = "14d";
+          rows = [
+            [
+              "fleet"
+              "logs"
+              "ttl=14days"
+            ]
+          ];
+          exit = 0;
+          expect = [ ];
+        }
+        {
+          name = "a declared table TTL that differs fails";
+          declared."fleet.logs" = "7d";
+          rows = [
+            [
+              "fleet"
+              "logs"
+              "ttl=14days"
+            ]
+          ];
+          exit = 1;
+          expect = [
+            "FAIL TTL: fleet.logs sets ttl=14days, services.greptimedb.tableTtls declares 7d"
+          ];
+        }
+        {
+          name = "a multi-part humantime rendering equals its declared TTL";
+          declared."devloop.spans" = "365d";
+          rows = [
+            [
+              "devloop"
+              "spans"
+              "ttl=11months 30days 3h 50m 24s append_mode=true"
+            ]
+          ];
+          exit = 0;
+          expect = [ ];
+        }
+        {
+          name = "a declared table on its database's TTL fails";
+          declared."fleet.logs" = "14d";
+          rows = [
+            [
+              "fleet"
+              "logs"
+              ""
+            ]
+          ];
+          exit = 1;
+          expect = [
+            "FAIL TTL: fleet.logs sets no ttl of its own, services.greptimedb.tableTtls declares 14d"
+          ];
+        }
+        {
+          name = "a declared table that does not exist yet is not judged";
+          declared."fleet.logs" = "14d";
+          rows = [
+            [
+              "fleet"
+              "cpu"
+              ""
+            ]
+          ];
+          exit = 0;
+          expect = [ ];
+        }
+        {
+          name = "no base table fails";
+          declared = { };
+          rows = [ ];
+          exit = 1;
+          expect = [
+            "greptimedb-sql: empty result"
+            "FAIL R6.3: information_schema.tables gave no base table in 'fleet', 'devloop'"
+          ];
+        }
+      ];
+
       greptimedbSqlRehearsal =
         pkgs.runCommand "greptimedb-sql-rehearsal"
           {
@@ -193,7 +339,7 @@
               pkgs.gnugrep
               pkgs.python3
             ];
-            meta.description = "behavioural check: the envelope's SQL helper fails on an empty result and on a missing table";
+            meta.description = "behavioural check: the envelope's SQL helper fails on an empty result and on a missing table, and its table clause accepts only declared table TTLs";
           }
           ''
             set -euo pipefail
@@ -203,10 +349,18 @@
               echo "FAIL: $*" >&2
               exit 1
             }
+            # Every row runs, so one build reports every miss.
+            missed=0
+            miss() {
+              echo "MISS: $*" >&2
+              missed=1
+            }
             mkdir "$TMPDIR/credentials"
             printf '%s' 00112233445566778899aabbccddeeff > "$TMPDIR/credentials/regulator-password"
 
             ${lib.concatMapStrings sqlRow sqlRows}
+            ${lib.concatMapStrings tableRow tableRows}
+            [ "$missed" = 0 ]
             touch "$out"
           '';
 

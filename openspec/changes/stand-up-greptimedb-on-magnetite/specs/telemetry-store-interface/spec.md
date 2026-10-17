@@ -113,10 +113,33 @@ The machine SHALL create no logs table.
 - **WHEN** the container test runs the schema oneshot once against an empty telemetry store, and once after creating `fleet` with another `ttl`
 - **THEN** each database carries its declared `ttl` after each run
 
-#### Scenario: A table overrides its database's retention
+### Requirement: Tables allowed a retention of their own are declared
 
-- **WHEN** any table in the three databases carries a `ttl` of its own
-- **THEN** the hourly envelope regulator `greptimedb-envelope` fails
+The machine SHALL read the tables allowed a `ttl` of their own from `services.greptimedb.tableTtls`, a map from `<database>.<table>` to that table's TTL, which is empty in S1.
+
+#### Scenario: A table carries an undeclared ttl
+
+- **WHEN** any table in the three databases carries a `ttl` of its own and `services.greptimedb.tableTtls` does not declare it
+- **THEN** the hourly envelope regulator `greptimedb-envelope` fails, which the envelope check's recorded-answer rehearsal confirms
+
+#### Scenario: A table carries a declared ttl
+
+- **WHEN** a table carries a `ttl` of its own that equals, as a duration, the TTL `services.greptimedb.tableTtls` declares for it
+- **THEN** `greptimedb-envelope` passes on that table, and a declared table that does not exist yet is not judged
+
+#### Scenario: A declared table departs from its declared ttl
+
+- **WHEN** `services.greptimedb.tableTtls` declares a table whose own `ttl` differs from the declared TTL, or which carries no `ttl` of its own
+- **THEN** `greptimedb-envelope` fails
+
+### Requirement: The store and the collector name the same databases
+
+The machine SHALL take magnetite's databases and their TTLs from `flake.lib.otelCollectorSchema.databases`, the map the ingress routes on.
+
+#### Scenario: The store and the collector name different databases
+
+- **WHEN** magnetite's `services.greptimedb.databases` names a database that `flake.lib.otelCollectorSchema.databases` does not, or omits one it names
+- **THEN** magnetite's evaluation fails on the ingress module's assertion, naming both lists
 
 ### Requirement: Object data lives under one prefix of one bucket
 

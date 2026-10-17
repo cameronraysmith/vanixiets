@@ -18,9 +18,11 @@
 # - R6.4 readiness: GET <url>/ready answers 200.
 # - R6.2: information_schema.region_statistics reports sst_size for at least
 #   one region, and the sum is under GREPTIMEDB_ENVELOPE_SST_MAX_BYTES.
-# - R6.3 and per-table retention: the base tables of `databases` exist, none
-#   sets sst_format=primary_key (the legacy format) and none sets a ttl of
-#   its own, which would override its database's (F1).
+# - R6.3 and per-table retention (greptimedbEnvelopeTables): the base tables
+#   of `databases` exist, none sets sst_format=primary_key (the legacy
+#   format), and a table sets a ttl of its own exactly when
+#   GREPTIMEDB_ENVELOPE_TABLE_TTLS_FILE (services.greptimedb.tableTtls)
+#   declares one, with that duration (review F3).
 # - R7.2 (greptimedbEnvelopeMemory): the unit cgroup's anonymous memory
 #   (memory.stat anon) is under GREPTIMEDB_ENVELOPE_ANON_MAX_BYTES, and
 #   memory.events high, oom_kill and max have not risen since the last run of
@@ -169,6 +171,125 @@ let
       '';
     };
 
+  # services.greptimedb.tableTtls as greptimedb-envelope-tables reads it, one
+  # `<database>.<table>` TAB `<ttl>` line per declared table.
+  greptimedbTableTtlsFile =
+    pkgs: tableTtls:
+    pkgs.writeText "greptimedb-table-ttls" (
+      lib.concatStrings (lib.mapAttrsToList (table: ttl: "${table}\t${ttl}\n") tableTtls)
+    );
+
+  # R6.3 and per-table retention over the base tables of `databases`, so
+  # modules/checks/greptimedb-envelope.nix can run it against recorded answers.
+  # The store renders a table's own ttl with humantime 2.2.0's Display (the
+  # version GreptimeDB v1.2.1's Cargo.lock pins): "14d" reads back as
+  # "14days" and "365d" as "11months 30days 3h 50m 24s". Declared and
+  # rendered TTLs are therefore compared as durations through that crate's
+  # unit table (src/duration.rs:120-131), never as strings.
+  greptimedbEnvelopeTables =
+    pkgs:
+    { url, databases }:
+    let
+      sql = greptimedbSql pkgs {
+        inherit url;
+        user = "regulator";
+      };
+      schemaList = lib.concatMapStringsSep ", " (db: "'${db}'") databases;
+      program = pkgs.writeText "greptimedb-envelope-tables.awk" ''
+        function fail(message) {
+          printf "FAIL %s\n", message > "/dev/stderr"
+          failed = 1
+        }
+        function units(list, factor, table,   names, i) {
+          split(list, names, " ")
+          for (i in names) table[names[i]] = factor
+        }
+        # Seconds and nanoseconds, "forever" or "instant", or "invalid".
+        function duration(ttl,   rest, n, unit, s, ns) {
+          rest = ttl
+          gsub(/^ +| +$/, "", rest)
+          if (tolower(rest) == "forever" || tolower(rest) == "instant") return tolower(rest)
+          if (rest == "") return "invalid"
+          s = 0
+          ns = 0
+          while (rest != "") {
+            if (!match(rest, /^[0-9]+ */)) return "invalid"
+            n = substr(rest, 1, RLENGTH) + 0
+            rest = substr(rest, RLENGTH + 1)
+            if (!match(rest, /^[a-zA-Z]+ */)) return "invalid"
+            unit = substr(rest, 1, RLENGTH)
+            gsub(/ /, "", unit)
+            rest = substr(rest, RLENGTH + 1)
+            if (unit in nanos) ns += n * nanos[unit]
+            else if (unit in seconds) s += n * seconds[unit]
+            else return "invalid"
+          }
+          return sprintf("%d %d", s + int(ns / 1000000000), ns % 1000000000)
+        }
+        BEGIN {
+          FS = "\t"
+          units("nanos nsec ns", 1, nanos)
+          units("usec us", 1000, nanos)
+          units("millis msec ms", 1000000, nanos)
+          units("seconds second secs sec s", 1, seconds)
+          units("minutes minute min mins m", 60, seconds)
+          units("hours hour hr hrs h", 3600, seconds)
+          units("days day d", 86400, seconds)
+          units("weeks week w", 604800, seconds)
+          units("months month M", 2630016, seconds)
+          units("years year y", 31557600, seconds)
+        }
+        # The first file is services.greptimedb.tableTtls, one
+        # `<database>.<table>` TAB `<ttl>` line each.
+        FILENAME == ARGV[1] {
+          declared[$1] = $2
+          next
+        }
+        {
+          name = $1 "." $2
+          if (index(" " $3 " ", " sst_format=primary_key ")) {
+            fail("R6.3: " name " uses the legacy sst_format=primary_key")
+          }
+          own = 0
+          words = split($3, word, " ")
+          for (i = 1; i <= words; i++) {
+            if (substr(word[i], 1, 4) == "ttl=") {
+              own = 1
+              ttl = substr(word[i], 5)
+              while (i < words && index(word[i + 1], "=") == 0) ttl = ttl " " word[++i]
+            }
+          }
+          if (own && !(name in declared)) {
+            fail("TTL: " name " sets ttl=" ttl ", which services.greptimedb.tableTtls does not declare")
+          } else if (own && (duration(declared[name]) == "invalid" || duration(declared[name]) != duration(ttl))) {
+            fail("TTL: " name " sets ttl=" ttl ", services.greptimedb.tableTtls declares " declared[name])
+          } else if (!own && (name in declared)) {
+            fail("TTL: " name " sets no ttl of its own, services.greptimedb.tableTtls declares " declared[name])
+          }
+        }
+        # A declared table that does not exist yet is not judged: the slice
+        # that declares it creates it.
+        END {
+          exit failed
+        }
+      '';
+    in
+    pkgs.writeShellApplication {
+      name = "greptimedb-envelope-tables";
+      runtimeInputs = [
+        sql
+        pkgs.gawk
+      ];
+      text = ''
+        : "''${GREPTIMEDB_ENVELOPE_TABLE_TTLS_FILE:?}"
+        if ! tables=$(greptimedb-sql "SELECT table_schema, table_name, create_options FROM information_schema.tables WHERE table_schema IN (${schemaList}) AND table_type = 'BASE TABLE'"); then
+          printf 'FAIL R6.3: information_schema.tables gave no base table in %s\n' ${lib.escapeShellArg schemaList} >&2
+          exit 1
+        fi
+        awk -f ${program} "$GREPTIMEDB_ENVELOPE_TABLE_TTLS_FILE" - <<< "$tables"
+      '';
+    };
+
   greptimedbEnvelope =
     pkgs:
     {
@@ -185,13 +306,14 @@ let
         user = "regulator";
       };
       memory = greptimedbEnvelopeMemory pkgs { inherit unit systemdPackage; };
-      schemaList = lib.concatMapStringsSep ", " (db: "'${db}'") databases;
+      tables = greptimedbEnvelopeTables pkgs { inherit url databases; };
     in
     pkgs.writeShellApplication {
       name = "greptimedb-envelope";
       runtimeInputs = [
         sql
         memory
+        tables
         pkgs.coreutils
         pkgs.curl
         pkgs.gawk
@@ -234,17 +356,8 @@ let
         fi
 
         # R6.3 and per-table retention
-        if tables=$(greptimedb-sql "SELECT table_schema, table_name, create_options FROM information_schema.tables WHERE table_schema IN (${schemaList}) AND table_type = 'BASE TABLE'"); then
-          while IFS=$'\t' read -r schema table options; do
-            if [[ " $options " == *" sst_format=primary_key "* ]]; then
-              fail "R6.3: $schema.$table uses the legacy sst_format=primary_key"
-            fi
-            if [[ " $options " == *" ttl="* ]]; then
-              fail "TTL: $schema.$table sets a ttl of its own ($options), overriding its database's"
-            fi
-          done <<< "$tables"
-        else
-          fail "R6.3: information_schema.tables gave no base table in ${schemaList}"
+        if ! greptimedb-envelope-tables; then
+          failed=1
         fi
 
         # R7.2
@@ -292,6 +405,12 @@ let
 in
 {
   flake.lib = {
-    inherit greptimedbSql greptimedbEnvelopeMemory greptimedbEnvelope;
+    inherit
+      greptimedbSql
+      greptimedbEnvelopeMemory
+      greptimedbEnvelopeTables
+      greptimedbTableTtlsFile
+      greptimedbEnvelope
+      ;
   };
 }

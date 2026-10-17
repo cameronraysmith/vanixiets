@@ -38,7 +38,7 @@ Stakeholders are the fleet operator, who reads the store and receives failure no
 
 **Non-Goals:**
 
-- A logs table, a logs pipeline or traces; the `fleet` logs table and its 14-day TTL arrive with S7 (Q4).
+- A logs table, a logs pipeline or traces; the `fleet` logs table and its 14-day TTL arrive with S7 (Q4), which declares that TTL in `services.greptimedb.tableTtls` (D12).
 - Dev-loop collection (S2), the alert evaluator, the dead-man and ntfy access control (S3), other hosts, `otel-ca` and the mTLS ZeroTier ingress listener (S4), darwin (S5), the dashboard's public vhost, its API listener on 4006, dashboard provisioning and `percli lint` (S6), agent telemetry (S7), and the Parquet export with R6.1 and R6.4's export-location clause (S8).
 - Bumping the root nixpkgs pin; the pin update is independent of this change.
 - Creating an R2 bucket or lifecycle rule; the store creates its prefix on first write.
@@ -56,7 +56,7 @@ New files:
 | `pkgs/by-name/ntfy-send/` | The `ntfy-send` script and package, moved from `modules/home/tools/commands/system/` (D2) |
 | `modules/nixos/greptimedb.nix` | `flake.modules.nixos.greptimedb`: `greptimedb.service`, `greptimedb-schema.service`, `greptimedb-envelope.{service,timer}` and their assertions (D3 to D7, D12) |
 | `modules/clan/services/otel-collector/flake-module.nix` | Clan service with `agent` and `ingress` roles backed by the plain NixOS modules `flake.modules.nixos.otel-collector-agent` and `flake.modules.nixos.otel-collector-ingress`, node_exporter, the `observability-notify@` template and its `services.observability-notify.units` option (D8 to D10) |
-| `modules/clan/services/otel-collector/schema.nix` | A flake-parts module defining `flake.lib.otelCollectorSchema`, the single source of allow-lists: systemd units including `omnigent-host-*.service`, the owner aliases `ownerAliases`, promoted resource attributes, process bounds `process = { minBytes; maxNames; }`, the node_exporter keep-list, database names (A4:214) |
+| `modules/clan/services/otel-collector/schema.nix` | A flake-parts module defining `flake.lib.otelCollectorSchema`, the single source of allow-lists: systemd units including `omnigent-host-*.service`, the owner aliases `ownerAliases`, promoted resource attributes, process bounds `process = { minBytes; maxNames; }`, the node_exporter keep-list, database names and their TTLs (A4:214) |
 | `modules/clan/inventory/services/otel-collector.nix` | Instance with both roles on magnetite |
 | `modules/checks/greptimedb-envelope.nix`, `modules/checks/otel-collector-config.nix` | Evaluation-time regulators with mutants (D11) |
 | `modules/vm-tests/greptimedb-pipeline.nix`, `modules/vm-tests/greptimedb-oom-order.nix` | On-demand runtime tests (D13) |
@@ -219,6 +219,7 @@ ntfy has no authentication (`modules/machines/nixos/cinnabar/ntfy.nix`), so Zero
 ### D7: Schema oneshot creates databases, then alters their TTL; no logs table
 
 - **Choice**: `greptimedb-schema.service`, ordered after `greptimedb.service`, polls `GET /health` until it answers (F7), then as `admin` runs for each database `CREATE DATABASE IF NOT EXISTS <db>` followed by `ALTER DATABASE <db> SET 'ttl'='<ttl>'`, with `fleet` 30d, `devloop` 365d and `agent` 90d.
+  On magnetite `services.greptimedb.databases` is `otelCollectorSchema.databases`, the map the ingress routes on, and the ingress module asserts that the store's database names equal the schema's whenever the host runs the store (review F4); the store module itself takes any map.
   It creates no logs table (Q4).
 - **Rationale**: `CREATE DATABASE IF NOT EXISTS ... WITH (ttl=...)` is a no-op on an existing database, so a changed TTL would never apply without the `ALTER` (F1).
   The store has no readiness notification, so the oneshot polls (F7).
@@ -230,6 +231,7 @@ ntfy has no authentication (`modules/machines/nixos/cinnabar/ntfy.nix`), so Zero
   The two roles' NixOS fragments merge into one `services.opentelemetry-collector` configuration with `package = pkgs.opentelemetry-collector-contrib`.
   The roles import the plain NixOS modules `flake.modules.nixos.otel-collector-agent` and `flake.modules.nixos.otel-collector-ingress`; `schema.nix` is a flake-parts module defining `flake.lib.otelCollectorSchema`, because import-tree imports every `.nix` file under `modules/`.
   Agent pipelines export to a `forward` connector that the ingress pipelines receive from.
+  The agent fragment defines the `forward` connector, but only the ingress fragment's `metrics/ingress` pipeline receives from it, and the collector refuses a connector used as an exporter that no pipeline receives from (opentelemetry-collector `service/internal/graph/graph.go:180`), so the agent fragment's `exporters = [ "forward" ]` is valid only where the ingress role is on the same host, which in S1 is magnetite alone (review F6).
   The ingress runs `memory_limiter` first, `convert_exponential_histogram_to_histogram` while the store is below 1.3 (A1:49; A3:89), a `routing` connector on `vanixiets.database`, and one `otlp_http` exporter per database to `http://127.0.0.1:4000/v1/otlp` with `x-greptime-db-name` and `x-greptime-otlp-metric-promote-resource-attrs` generated from `schema.nix`.
   The promote list stays short and stable: `host.name`, `systemd.unit.name`, `process.executable.name` (A3:93).
   Each exporter authenticates with a `basicauth` client whose `client_auth.password_file` names `collector-password` in the unit's credentials directory, and uses a `file_storage` sending queue with `sizer: bytes`: 400 MiB for `fleet` and 48 MiB each for `devloop` and `agent`, in one `file_storage` directory, so the sum stays under 512 MiB and `fleet` holds at least 24 hours at an assumed `fleetBytesPerMinute = 256000` (A3:222).
@@ -241,7 +243,8 @@ ntfy has no authentication (`modules/machines/nixos/cinnabar/ntfy.nix`), so Zero
 - **Boundary**: source versus delivered.
   The nixpkgs module validates the rendered configuration at build time, before `/run/credentials` exists, so the validated file differs from the delivered one only in the zerotierone job's `authorization`, and R3.1 asserts the override touches nothing else.
 - **Rationale**: the NixOS module allows one collector per host, so two role instances on magnetite must share a process (Q2).
-  S4 then adds only `otel-ca`, the mTLS ZeroTier receiver on the ingress fragment and the agent role on other hosts; nothing S1 deploys is restructured.
+  S4 adds `otel-ca`, the mTLS ZeroTier receiver on the ingress fragment and the agent role on other hosts.
+  S4 also changes the agent fragment S1 deploys: it chooses the agent pipelines' exporter by role, `forward` where the ingress role is on the same host and an OTLP exporter to the ingress over mTLS otherwise, because an agent-only collector has no `forward` connector to export to (review F6).
 - **Alternatives considered**: O2, both roles with the notifier left in S3, rejected because S1's units would then ship without failure notification; O3, ingress only with magnetite's receivers inside it, rejected because S4 would have to split them back out into the agent role; an agent-to-ingress hop over loopback OTLP, rejected as a network hop inside one process.
 
 ### D9: Signals and scrape targets
@@ -291,7 +294,10 @@ ntfy has no authentication (`modules/machines/nixos/cinnabar/ntfy.nix`), so Zero
 
 ### D12: Hourly runtime envelope
 
-- **Choice**: `greptimedb-envelope.timer` runs `greptimedb-envelope.service` hourly with the `regulator` credential, asserting R6.2 (sum of `sst_size` under 50 GiB), R6.3 (no legacy `sst_format`), R6.4's readiness probe, R7.2 (cgroup `memory.stat` `anon` below `GREPTIMEDB_ENVELOPE_ANON_MAX_BYTES`, set from `MemoryHigh`; `memory.events` `high`, `oom_kill` and `max` not increasing), R7.3 (used under 80% of quota; quota and reservation equal the declared values), R7.4 (the sha256 in `/run/greptimedb/loaded-users.sha256` equals the generator's public `users-sha256`; a mismatch or a missing file fails), and that no table carries its own TTL overriding its database's (F1).
+- **Choice**: `greptimedb-envelope.timer` runs `greptimedb-envelope.service` hourly with the `regulator` credential, asserting R6.2 (sum of `sst_size` under 50 GiB), R6.3 (no legacy `sst_format`), R6.4's readiness probe, R7.2 (cgroup `memory.stat` `anon` below `GREPTIMEDB_ENVELOPE_ANON_MAX_BYTES`, set from `MemoryHigh`; `memory.events` `high`, `oom_kill` and `max` not increasing), R7.3 (used under 80% of quota; quota and reservation equal the declared values), R7.4 (the sha256 in `/run/greptimedb/loaded-users.sha256` equals the generator's public `users-sha256`; a mismatch or a missing file fails), and that a table carries a TTL of its own only when `services.greptimedb.tableTtls` declares that table with that TTL (F1, review F3).
+  The declared map reaches the envelope as `GREPTIMEDB_ENVELOPE_TABLE_TTLS_FILE` and is empty in S1; S7 declares the `fleet` logs table's 14-day TTL there.
+  An undeclared table TTL, a table TTL other than the declared one, and a declared table that runs on its database's TTL each fail; a declared table that does not exist yet is not judged.
+  The store renders a table's TTL through humantime 2.2.0 (`14d` reads back as `14days`, `365d` as `11months 30days 3h 50m 24s`), so the envelope compares declared and rendered TTLs as durations through that crate's unit table, not as strings.
   R7.2 does not bound `memory.peak`, because it counts page cache and never decreases within an invocation, so it would fail every run once caches fill; a rise in `high` means the kernel throttled the store at `MemoryHigh` (charter v14, review F2).
   R7.2's cgroup counters restart with each store invocation, so the envelope keeps its baseline keyed by `InvocationID`; a new invocation fails the run if the journal for `greptimedb.service` since the baseline holds `MESSAGE_ID=fe6faa94e7774663a0da52717891d8ef`, systemd 261.3's "The kernel OOM killer killed some processes in this unit.", or if `NRestarts` increased.
   The unit runs unprivileged under `DynamicUser` with `SupplementaryGroups = systemd-journal`, and R7.3 reads used space, quota and reservation with `zfs get -Hp`.
@@ -339,7 +345,7 @@ ntfy has no authentication (`modules/machines/nixos/cinnabar/ntfy.nix`), so Zero
 - [Risk, S6] The dashboard's datasources are fixed at root-absolute `/v1/prometheus` and `/v1/sql`, it has no base-path option, and its browser requests carry the store credential. → S6 gives it a vhost of its own and has nginx overwrite `Authorization` with the `perses:ro` credential, so no password reaches the browser; converted Grafana dashboards must be rewritten to these two datasources.
 - [Trade-off] gRPC listens on `127.0.0.1:4001` although ADR-007 asked for it disabled. → Accepted: v1.2.1 has no switch; the bind is asserted.
 - [Trade-off] Runtime tests are not gating. → Accepted: evaluation-time regulators gate every pull request, and the runtime tests run on demand before merge and in `verify.md`.
-- [Trade-off] S1 grows by the notifier, the `ntfy-send` move and the ingress fragment. → Accepted: S4 then extends rather than restructures, and S1's units are observed from their first deployment.
+- [Trade-off] S1 grows by the notifier, the `ntfy-send` move and the ingress fragment. → Accepted: S4 then extends the ingress fragment and changes only the agent pipelines' exporter choice (D8), and S1's units are observed from their first deployment.
 
 ## Migration Plan
 

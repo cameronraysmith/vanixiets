@@ -3,9 +3,9 @@
 ### Requirement: A database keeps its series for its retention and no longer
 
 The fleet SHALL keep one telemetry store on magnetite with three databases, `fleet` with a retention of 30 days, `devloop` with a retention of 365 days and `agent` with a retention of 90 days, and the telemetry store SHALL return each database's series to a reader for that database's retention and SHALL NOT keep them past it.
-A changed retention SHALL take effect on a database that already exists, and no part of a database SHALL keep its series on a retention other than the database's own.
+A changed retention SHALL take effect on a database that already exists.
 
-**Discharged by**: `telemetry-store-interface` requirements `Databases and their retention are set at the telemetry store` and `Object data lives under one prefix of one bucket`, resting on world assumption `A29 — Cloudflare R2 behaves as S3-compatible object storage for the telemetry store's client`; the container runtime test's retention case and the hourly envelope regulator's retention-override case discharge it.
+**Discharged by**: `telemetry-store-interface` requirements `Databases and their retention are set at the telemetry store` and `Object data lives under one prefix of one bucket`, resting on world assumption `A29 — Cloudflare R2 behaves as S3-compatible object storage for the telemetry store's client`; the container runtime test's retention case discharges it.
 
 #### Scenario: The telemetry store starts with no databases
 
@@ -17,9 +17,25 @@ A changed retention SHALL take effect on a database that already exists, and no 
 - **WHEN** the telemetry store starts while one of the three databases already exists with a retention other than its declared one
 - **THEN** that database's retention is changed to the declared value rather than left as it was, which the container runtime test confirms by creating the database with another retention first
 
-#### Scenario: Part of a database carries its own retention
+### Requirement: Part of a database keeps the database's retention unless another is declared
 
-- **WHEN** any part of one of the three databases carries a retention of its own, which would override the database's
+No part of a database SHALL keep its series on a retention other than the database's own unless the fleet's configuration declares a retention for that part, and a part with a declared retention SHALL keep its series on exactly that retention.
+
+**Discharged by**: `telemetry-store-interface` requirement `Tables allowed a retention of their own are declared`; the hourly envelope regulator's table-retention clause and the envelope check's recorded-answer rehearsal discharge it.
+
+#### Scenario: Part of a database carries an undeclared retention of its own
+
+- **WHEN** a part of one of the three databases carries a retention of its own that the fleet's configuration does not declare, which would override the database's
+- **THEN** the hourly envelope regulator fails, and a failure notice reaches a person
+
+#### Scenario: Part of a database carries a declared retention
+
+- **WHEN** a part of one of the three databases carries a retention of its own and the fleet's configuration declares that part with the same retention
+- **THEN** the hourly envelope regulator passes on that part, and a declared part that does not exist yet is not judged
+
+#### Scenario: Part of a database departs from its declared retention
+
+- **WHEN** the fleet's configuration declares a retention for a part of one of the three databases and that part carries a different retention, or none of its own
 - **THEN** the hourly envelope regulator fails, and a failure notice reaches a person
 
 ### Requirement: Only the collector writes and only named readers read

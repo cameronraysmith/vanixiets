@@ -74,11 +74,13 @@
       maxNames = 30;
     };
 
-    # Store databases, one otlp_http exporter each (design D8).
-    databases = [
-      "fleet"
-      "devloop"
-      "agent"
-    ];
+    # Store databases and their retention, one otlp_http exporter each
+    # (design D8). magnetite's services.greptimedb.databases reads this map,
+    # and the ingress role asserts the store creates exactly these names.
+    databases = {
+      fleet = "30d";
+      devloop = "365d";
+      agent = "90d";
+    };
   };
 }
