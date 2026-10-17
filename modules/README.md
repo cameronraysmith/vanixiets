@@ -29,7 +29,7 @@ A file must also be tracked by git before a flake build can see it, because flak
 - `nixpkgs/` — channel selection and the overlay stack.
 - `system/` — cross-platform system aspects.
 - `terranix/` — cloud resource definitions rendered to OpenTofu.
-- `vm-tests/` — on-demand KVM-only tests exported as `vmTests.<system>.<name>`, outside PR gating.
+- `vm-tests/` — on-demand runtime tests exported as `vmTests.<system>.<name>`, outside PR gating: QEMU VM tests needing `kvm`, and systemd-nspawn container tests needing `uid-range`.
 
 Top-level files configure the flake itself: `flake-parts.nix`, `formatting.nix`, `systems.nix`, `debug.nix`, `kubernetes.nix`, and `nixidy.nix`.
 
@@ -47,16 +47,27 @@ Its build confirms that the harness executables exist in the generated profile a
 
 `nixbot.toml` evaluates `checks`, which nixbot scopes to `checks.x86_64-linux` and, best-effort, `checks.aarch64-darwin`; VM tests instead live under `vmTests` and are not part of pull-request coverage.
 The independent `checks.x86_64-linux.zerotier-mss-clamp` structural check remains gated; it compares zerotier controller and peer role membership with `TCPMSS --set-mss 1300` in each nixosConfiguration's firewall commands.
-Run a runtime test on a reachable KVM-capable Linux host, such as Pyrite, from its checkout of the intended revision:
+A runtime test builds only on a builder advertising the features its derivation requires: QEMU VM tests need `kvm`, which only Pyrite advertises, and systemd-nspawn container tests need `uid-range`, which only Magnetite advertises.
+Run one from a checkout of the intended revision on that host, or from a dispatcher such as Stibnite, which routes it to the only builder with those features:
 
 ```sh
-nix build .#vmTests.x86_64-linux.zerotier-mss-clamp-runtime
-nix build .#vmTests.x86_64-linux.omnigent-worker-isolation
+nix build .#vmTests.x86_64-linux.zerotier-mss-clamp-runtime   # Pyrite, kvm
+nix build .#vmTests.x86_64-linux.omnigent-worker-isolation    # Pyrite, kvm
+nix build .#vmTests.x86_64-linux.greptimedb-pipeline          # Magnetite, uid-range
+nix build .#vmTests.x86_64-linux.greptimedb-oom-order         # Pyrite, kvm
 ```
 
 `omnigent-worker-isolation` establishes the runtime wiring of the Omnigent worker guards that no evaluation-time check can reach: that the private-home precondition is `ExecStartPre` on the real `omnigent-host-<owner>.service` and that violating the home's privacy at runtime prevents `ExecStart`, that the Nix daemon resolves a worker as untrusted, that two workers have separate accounts and mutually unreadable private homes, and that the unit's `User`, `UMask`, `NoNewPrivileges` and SSH-agent unsetting hold in the spawned process.
 It is not a sandbox and establishes nothing about confining hostile code inside a worker account, it stubs `ExecStart` so it is no evidence about the Omnigent client, it declares no credentials so the Clan-vars-to-sops delivery path is out of scope, and it says nothing about Stibnite or any Darwin host because there is no Darwin NixOS test node type.
 Because it lives in this lane and runs only when a KVM-capable builder is reachable, it is on-demand evidence and must not be described as coverage; `checks.x86_64-linux.omnigent-worker-linux` remains the fleet-wide regulator for the precondition script's own behaviour.
+
+`greptimedb-pipeline` runs the telemetry store and both collector roles in one systemd-nspawn container, with credentials written at boot by Magnetite's own `greptimedb-users` generator script and Magnetite's databases and TTLs.
+It establishes that the store answers `/health` and serves its embedded dashboard at `/dashboard/`, that the schema oneshot creates each database with its TTL and that a re-run with a changed TTL changes it, that no or wrong credentials are answered 401 while a write-only read and a read-only write, by `perses` and by `regulator`, are answered 403, that an OTLP point crosses the forward and routing connectors into `fleet` only and reads back through PromQL with `x-greptime-db-name` carrying `host_name`, that the systemd receiver reaches D-Bus under `DynamicUser` and stores an `omnigent-host-<owner>` unit only under its alias, and that a point emitted while the store is stopped arrives after it restarts.
+It uses local `File` storage, so it establishes nothing about R2, and a container shares the build host's kernel, so it establishes nothing about OOM behaviour.
+
+`greptimedb-oom-order` runs one QEMU VM in which three equally growing memory consumers exhaust memory: one behind the real `nix-eval-jobs` lock wrapper, one inside `greptimedb.service`'s cgroup at that unit's `oom_score_adj`, and a collector stand-in at the collector's evaluated `OOMScoreAdjust`.
+It establishes that the kernel kills them in the order evaluator (900), store (500), collector (300), that systemd records the OOM kill in each owning unit, and that `greptimedb.service` fails with result `oom-kill` under the default `OOMPolicy=stop`.
+The collector's own unit is not the third consumer, because its `MemoryMax` of 512M makes a consumer inside its cgroup die to the cgroup's own OOM first; the VM has no swap, unlike Magnetite's zram.
 
 The test requires `kvm` and `nixos-test` builder features and forces KVM acceleration rather than falling back to TCG.
 Unavailable hardware is a build failure if this command is requested, not a passed or silently skipped test.
