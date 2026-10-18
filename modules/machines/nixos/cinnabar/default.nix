@@ -25,9 +25,11 @@ in
       ]
       ++ (with flakeModules; [
         base
+        fleet-alert
         hm-sops-bridge
         kvm-declaration
         ntfy-alerter
+        observability-notify
         ssh-known-hosts
       ]);
 

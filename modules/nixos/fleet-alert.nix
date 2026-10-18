@@ -33,6 +33,16 @@
 # asserted by magnetite's configuration, which holds all four. An assertion
 # below also requires the unit to load evaluator.tokenFile and name that
 # credential in NTFY_TOKEN_FILE.
+#
+# With services.fleet-alert.deadman.enable, fleet-deadman.timer runs
+# fleet-deadman.service every 5 min on the ntfy host. Each run first
+# publishes anonymously to the heartbeat topic on ntfy's own listener and
+# fails unless ntfy answers 403 (R9.4). It then polls the topic's last
+# 10 min and applies transition.jq to the single rule AlertEvaluatorSilent,
+# keeping /var/lib/fleet-deadman/state.json. It posts through ntfy-send
+# with the alerter credential. The host lists fleet-deadman in
+# services.observability-notify.units, so a failed run reaches fleet-alerts
+# through the notifier.
 { config, ... }:
 let
   flakeLib = config.flake.lib;
@@ -246,9 +256,113 @@ let
         fi
       '';
     };
+
+  # AlertEvaluatorSilent (ADR-009 rule table; design D12): raised on the
+  # dead-man's host when no heartbeat reached ntfy in the poll window. The
+  # poll is its query, so it has no `expr`; transition.jq evaluates it from
+  # the results entry the dead-man builds, and the single-rule list enables
+  # neither StoreQueryFailing nor RuleSignalMissing.
+  alertEvaluatorSilent = {
+    alert = "AlertEvaluatorSilent";
+    for = 0;
+    severity = "critical";
+    annotations.summary = "No fleet-heartbeat message reached ntfy in 10 min: the evaluator, its host or its path to ntfy is down, and no other alert can be sent.";
+    presence = [ ];
+    attribution = [ ];
+  };
+
+  # The dead-man (design D12, "Failure path"; ADR-009 item 9, R9.4), a
+  # function so checks.x86_64-linux.fleet-alert runs it against a loopback
+  # ntfy stand-in and a recording ntfy-send. Configuration comes from the
+  # JSON file at FLEET_DEADMAN_CONFIG, the token from NTFY_TOKEN_FILE (the
+  # unit sets it to its alerter-token credential), and time from
+  # FLEET_ALERT_NOW when set, which only the check does.
+  fleetAlertDeadman =
+    pkgs:
+    {
+      ntfySend,
+      transition ? transitionJq,
+    }:
+    pkgs.writeShellApplication {
+      name = "fleet-deadman";
+      runtimeInputs = [
+        pkgs.coreutils
+        pkgs.curl
+        pkgs.jq
+      ];
+      text = ''
+        config="''${FLEET_DEADMAN_CONFIG:?}"
+        : "''${NTFY_TOKEN_FILE:?}"
+        ntfy_url=$(jq -er .ntfyUrl "$config")
+        heartbeat_topic=$(jq -er .heartbeatTopic "$config")
+        window=$(jq -er .window "$config")
+        topic=$(jq -er .topic "$config")
+        state_file=$(jq -er .stateFile "$config")
+        now="''${FLEET_ALERT_NOW:-$(date +%s)}"
+        jqlib=${jqLib pkgs transition}
+
+        # R9.4 (ADR-009): an anonymous publish to the heartbeat topic must be
+        # refused with 403 (binwiederhier/ntfy@v2.28.0
+        # server/server_middleware.go:153-171, server/errors.go:156). Any other
+        # answer, or none (000), fails the unit before the poll, so OnFailure's
+        # notifier reports it and an accepted probe never counts as a heartbeat.
+        probe=$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 \
+          -d "fleet-deadman anonymous-publish probe" "$ntfy_url/$heartbeat_topic" || true)
+        if [ "$probe" != 403 ]; then
+          echo "fleet-deadman: R9.4: anonymous publish to $heartbeat_topic answered HTTP $probe, expected 403" >&2
+          exit 1
+        fi
+        echo "fleet-deadman: R9.4 probe refused with HTTP 403"
+
+        if ! poll=$(curl -sf --max-time 10 "$ntfy_url/$heartbeat_topic/json?poll=1&since=$window"); then
+          echo "fleet-deadman: poll of $heartbeat_topic failed" >&2
+          exit 1
+        fi
+        heartbeats=$(jq -s '[.[] | select(.event == "message")] | length' <<< "$poll")
+        echo "fleet-deadman: $heartbeats heartbeat(s) on $heartbeat_topic in the last $window"
+
+        # One instance of the single rule while the window is empty, labelled
+        # with the evaluator's host, which counts as reporting so the
+        # transition's host freeze never holds it.
+        observations=$(jq -c --argjson heartbeats "$heartbeats" '{
+          storeError: false,
+          results: {(.rules[0].alert): (if $heartbeats == 0 then [{labels: {host_name: .evaluatorHost}, value: "1"}] else [] end)},
+          presence: {},
+          reporting: [.evaluatorHost],
+          failedLog: []
+        }' "$config")
+        rules=$(jq -c .rules "$config")
+        state='{}'
+        if [ -s "$state_file" ]; then
+          state=$(< "$state_file")
+        fi
+        result=$(jq -n -c -L "$jqlib" --argjson state "$state" --argjson observations "$observations" \
+          --argjson now "$now" --argjson rules "$rules" --arg topic "$topic" \
+          'include "transition"; $state | transition($observations; $now; $rules) | .posts |= map({topic: $topic} + .)')
+
+        write_state() {
+          printf '%s\n' "$state" > "$state_file.tmp"
+          mv "$state_file.tmp" "$state_file"
+        }
+        state=$(jq -c .state <<< "$result")
+        write_state
+
+        # After each successful post the state records it (mark_posted); a
+        # failed post fails the run and stays pending for the next one
+        # (design D15).
+        while IFS= read -r post; do
+          [ -n "$post" ] || continue
+          ${ntfySend} "$(jq -r .message <<< "$post")" "$(jq -r .topic <<< "$post")" \
+            -H "Title: $(jq -r .title <<< "$post")" \
+            -H "Priority: $(jq -r .priority <<< "$post")"
+          state=$(jq -c -L "$jqlib" --argjson post "$post" 'include "transition"; mark_posted($post)' <<< "$state")
+          write_state
+        done <<< "$(jq -c '.posts[]' <<< "$result")"
+      '';
+    };
 in
 {
-  flake.lib = { inherit fleetAlertEvaluator; };
+  flake.lib = { inherit fleetAlertEvaluator fleetAlertDeadman; };
 
   flake.modules.nixos.fleet-alert =
     {
@@ -308,6 +422,19 @@ in
         lib.optional (m != null && builtins.elemAt m 1 == cfg.evaluator.tokenFile) (builtins.head m)
       ) (lib.toList (unit.LoadCredential or [ ]));
       tokenEnv = config.systemd.services.fleet-alert.environment.NTFY_TOKEN_FILE or null;
+
+      deadman = fleetAlertDeadman pkgs { ntfySend = lib.getExe pkgs.ntfy-send; };
+      deadmanConfig = pkgs.writeText "fleet-deadman.json" (
+        builtins.toJSON {
+          inherit (cfg.deadman) ntfyUrl topic evaluatorHost;
+          # The option the evaluator posts its heartbeat to; declared
+          # whether or not this host runs the evaluator.
+          heartbeatTopic = cfg.evaluator.heartbeatTopic;
+          window = "10m";
+          stateFile = "/var/lib/fleet-deadman/state.json";
+          rules = [ alertEvaluatorSilent ];
+        }
+      );
     in
     {
       options.services.fleet-alert.evaluator = {
@@ -336,6 +463,29 @@ in
           type = lib.types.str;
           default = "fleet-heartbeat";
           description = "ntfy topic for the heartbeat each completed run posts at priority min.";
+        };
+      };
+
+      options.services.fleet-alert.deadman = {
+        enable = lib.mkEnableOption "the fleet alert dead-man (fleet-deadman.timer), which probes ntfy's access entries and raises AlertEvaluatorSilent when the heartbeat stops";
+        tokenFile = lib.mkOption {
+          type = lib.types.str;
+          description = "Path of the alerter token, loaded through LoadCredential as alerter-token.";
+        };
+        ntfyUrl = lib.mkOption {
+          type = lib.types.str;
+          default = "http://[::1]:2586";
+          description = "ntfy's own listener, reached directly so the anonymous probe and the poll bypass the proxy.";
+        };
+        topic = lib.mkOption {
+          type = lib.types.str;
+          default = "fleet-alerts";
+          description = "Topic the dead-man posts AlertEvaluatorSilent to.";
+        };
+        evaluatorHost = lib.mkOption {
+          type = lib.types.str;
+          default = "magnetite";
+          description = "host_name the AlertEvaluatorSilent instance carries: the host whose evaluator posts the heartbeat.";
         };
       };
 
@@ -398,6 +548,66 @@ in
             timerConfig = {
               OnCalendar = "minutely";
               AccuracySec = "1s";
+            };
+          };
+        })
+
+        (lib.mkIf cfg.deadman.enable {
+          # Design D3: the dead-man's posts carry the alerter token.
+          assertions =
+            let
+              deadmanUnit = config.systemd.services.fleet-deadman;
+              deadmanTokenIds = lib.concatMap (
+                entry:
+                let
+                  m = builtins.match "([^:]+):(.+)" entry;
+                in
+                lib.optional (m != null && builtins.elemAt m 1 == cfg.deadman.tokenFile) (builtins.head m)
+              ) (lib.toList (deadmanUnit.serviceConfig.LoadCredential or [ ]));
+              deadmanTokenEnv = deadmanUnit.environment.NTFY_TOKEN_FILE or null;
+            in
+            [
+              {
+                assertion =
+                  deadmanTokenIds != [ ] && builtins.elem deadmanTokenEnv (map (id: "%d/${id}") deadmanTokenIds);
+                message = "fleet-alert: fleet-deadman.service must load deadman.tokenFile (${cfg.deadman.tokenFile}) as a credential and name it in NTFY_TOKEN_FILE; it loads ${
+                  builtins.toJSON (deadmanUnit.serviceConfig.LoadCredential or [ ])
+                } and sets NTFY_TOKEN_FILE = ${builtins.toJSON deadmanTokenEnv}.";
+              }
+            ];
+
+          systemd.services.fleet-deadman = {
+            description = "Fleet alert dead-man: R9.4 anonymous-publish probe and heartbeat poll";
+            # Ordered, never pulled in: a boot does not probe ntfy or post
+            # through caddy and ZeroTier before they are up (every post goes
+            # to https://ntfy.zt), and the dead-man never starts a unit the
+            # operator stopped; ntfy's outage is CAM-76's (design D12).
+            after = [
+              "ntfy-sh.service"
+              "caddy.service"
+              "zerotierone.service"
+            ];
+            environment = {
+              FLEET_DEADMAN_CONFIG = "${deadmanConfig}";
+              NTFY_TOKEN_FILE = "%d/alerter-token";
+            };
+            serviceConfig = hardening // {
+              Type = "oneshot";
+              ExecStart = lib.getExe deadman;
+              DynamicUser = true;
+              StateDirectory = "fleet-deadman";
+              LoadCredential = [ "alerter-token:${cfg.deadman.tokenFile}" ];
+            };
+          };
+
+          # A silence that starts just after a run is seen 10 min later and
+          # reported by the next run, inside E9.3's 15 min.
+          systemd.timers.fleet-deadman = {
+            description = "Five-minute fleet alert dead-man";
+            wantedBy = [ "timers.target" ];
+            timerConfig = {
+              OnCalendar = "*:0/5";
+              AccuracySec = "5s";
             };
           };
         })

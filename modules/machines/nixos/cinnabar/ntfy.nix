@@ -52,6 +52,17 @@
           # server/server.go:541-545). Not trace, which logs request headers
           # including Authorization (server/server.go:500-501).
           log-level = "debug";
+
+          # Only alerter publishes on fleet-*, anonymous clients (phones
+          # included) may subscribe, and every other topic keeps the default
+          # read-write (design D5 step 3; ADR-009 item 12). The named user's
+          # row outranks `*` (user/manager.go:702-735 at ntfy v2.28.0), and an
+          # anonymous write under `*:fleet-*:ro` is refused with 403, which
+          # fleet-deadman's probe asserts every 5 min.
+          auth-access = [
+            "alerter:fleet-*:rw"
+            "*:fleet-*:ro"
+          ];
         };
       };
     };

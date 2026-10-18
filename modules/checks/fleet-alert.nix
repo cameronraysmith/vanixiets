@@ -125,6 +125,388 @@
         exit "''${FLEET_ALERT_POST_STATUS:-0}"
       '';
 
+      cinnabar = self.nixosConfigurations.cinnabar.config;
+      cinnabarPkgs = self.nixosConfigurations.cinnabar.pkgs;
+
+      # The dead-man (tasks.md 5.1; design D12, "Failure path"; ADR-009 R9.3,
+      # R9.4), built from the function cinnabar deploys with the recording
+      # ntfy-send, and run against cinnabar's own rendered configuration with
+      # only ntfyUrl and stateFile pointed at the sandbox.
+      deadmanRehearsed = self.lib.fleetAlertDeadman pkgs { ntfySend = lib.getExe ntfySendStub; };
+      deadmanConfigFile = cinnabar.systemd.services.fleet-deadman.environment.FLEET_DEADMAN_CONFIG;
+
+      # R9.4's build-time negative control: a dead-man that passes any HTTP
+      # answer to its probe. --replace-fail proves the edit hit the script.
+      deadmanProbeMutant = pkgs.runCommand "fleet-deadman-probe-mutant" { } ''
+        mkdir -p "$out/bin"
+        cp ${lib.getExe deadmanRehearsed} "$out/bin/fleet-deadman"
+        chmod +w "$out/bin/fleet-deadman"
+        substituteInPlace "$out/bin/fleet-deadman" \
+          --replace-fail '[ "$probe" != 403 ]' '[ "$probe" = 000 ]'
+      '';
+
+      # The legs take the dead-man executable and fail at the first broken
+      # expectation, printing `FAIL: <leg>`; the stand-in serves
+      # binwiederhier/ntfy@v2.28.0's answers (ntfy_stub.py).
+      deadmanLegs = pkgs.writeShellScript "fleet-deadman-legs" ''
+        set -euo pipefail
+        deadman="$1"
+        work=$(mktemp -d)
+        export FLEET_ALERT_POSTS="$work/posts" NTFY_TOKEN_FILE="${fixtureCredentials}/alerter-token"
+        touch "$FLEET_ALERT_POSTS"
+        hb_topic=$(jq -er .heartbeatTopic ${deadmanConfigFile})
+        alert_topic=$(jq -er .topic ${deadmanConfigFile})
+        host=$(jq -er .evaluatorHost ${deadmanConfigFile})
+        empty="$work/empty.jsonl"
+        : > "$empty"
+        heartbeat="$work/heartbeat.jsonl"
+        jq -nc --arg t "$hb_topic" '{id: "hb1", time: 1000, expires: 44200, event: "message", topic: $t, message: "ok 1000", priority: 1}' > "$heartbeat"
+
+        stub_pid=
+        stop_stub() {
+          if [ -n "$stub_pid" ]; then
+            kill "$stub_pid"
+            wait "$stub_pid" || true
+            stub_pid=
+          fi
+        }
+        trap stop_stub EXIT
+        fail() {
+          echo "FAIL: $*" >&2
+          sed 's/^/  request: /' "$work/requests" >&2
+          sed 's/^/  post: /' "$FLEET_ALERT_POSTS" >&2
+          exit 1
+        }
+        reset() {
+          rm -f "$work/state.json"
+          : > "$FLEET_ALERT_POSTS"
+        }
+        # run PROBE_STATUS|closed POLL_STATUS POLL_BODY NOW [POST_STATUS]:
+        # one dead-man run; its exit status in $code.
+        run() {
+          local url
+          : > "$work/requests"
+          if [ "$1" = closed ]; then
+            url=http://127.0.0.1:9
+          else
+            rm -f "$work/port"
+            python3 ${./fleet-alert/ntfy_stub.py} --topic "$hb_topic" --probe-status "$1" --poll-status "$2" \
+              --poll-body "$3" --port-file "$work/port" --log "$work/requests" &
+            stub_pid=$!
+            for _ in $(seq 100); do [ -s "$work/port" ] && break; sleep 0.1; done
+            [ -s "$work/port" ] || fail "ntfy stub did not start"
+            url="http://127.0.0.1:$(cat "$work/port")"
+          fi
+          jq --arg url "$url" --arg state "$work/state.json" '.ntfyUrl = $url | .stateFile = $state' \
+            ${deadmanConfigFile} > "$work/config.json"
+          code=0
+          FLEET_DEADMAN_CONFIG="$work/config.json" FLEET_ALERT_NOW="$4" FLEET_ALERT_POST_STATUS="''${5:-0}" \
+            "$deadman" > "$work/out" 2>&1 || code=$?
+          stop_stub
+          sed 's/^/    /' "$work/out"
+        }
+        # posts TITLE: posts with that title, priority high (critical), the
+        # alert topic and the token file.
+        posts() {
+          jq -s --arg title "Title: $1" --arg topic "$alert_topic" --arg token "$NTFY_TOKEN_FILE" \
+            '[.[] | select(any(.headers[]; . == $title) and any(.headers[]; . == "Priority: high") and .topic == $topic and .tokenFile == $token)] | length' \
+            "$FLEET_ALERT_POSTS"
+        }
+        total() { jq -s length "$FLEET_ALERT_POSTS"; }
+        probe_line="POST /$hb_topic? auth=no"
+        poll_line="GET /$hb_topic/json?poll=1&since=10m auth=no"
+        firing="[FIRING] AlertEvaluatorSilent $host"
+        resolved="[RESOLVED] AlertEvaluatorSilent $host"
+
+        reset
+        run 403 200 "$heartbeat" 1000
+        [ "$code" = 0 ] || fail "a refused probe and one heartbeat: exit $code, expected 0"
+        [ "$(cat "$work/requests")" = "$probe_line"$'\n'"$poll_line" ] \
+          || fail "a refused probe and one heartbeat: requests are not the anonymous probe then the anonymous poll"
+        grep -qxF "fleet-deadman: R9.4 probe refused with HTTP 403" "$work/out" || fail "no probe-refused line"
+        [ "$(total)" = 0 ] || fail "a heartbeat in the window raised a post"
+        echo "ok: a refused probe and one heartbeat exit 0 with no post"
+
+        for status in 200 500 closed; do
+          reset
+          run "$status" 200 "$heartbeat" 1000
+          [ "$code" != 0 ] || fail "an anonymous publish answered $status exited 0"
+          answered=$([ "$status" = closed ] && echo 000 || echo "$status")
+          grep -qF "answered HTTP $answered, expected 403" "$work/out" || fail "probe answered $status: no R9.4 failure line"
+          if [ "$status" != closed ]; then
+            [ "$(cat "$work/requests")" = "$probe_line" ] || fail "probe answered $status: the run polled anyway"
+          fi
+          [ "$(total)" = 0 ] || fail "probe answered $status: a post was made"
+          echo "ok: a probe answered $status fails the run before the poll"
+        done
+
+        reset
+        run 403 500 "$heartbeat" 1000
+        [ "$code" != 0 ] || fail "a failed poll exited 0"
+        grep -qF "fleet-deadman: poll of $hb_topic failed" "$work/out" || fail "a failed poll: no poll failure line"
+        echo "ok: a failed poll fails the run"
+
+        reset
+        run 403 200 "$empty" 1000
+        [ "$code" = 0 ] || fail "an empty window: exit $code"
+        [ "$(posts "$firing")" = 1 ] && [ "$(total)" = 1 ] || fail "an empty window did not post exactly one $firing"
+        run 403 200 "$empty" 1300
+        [ "$(total)" = 1 ] || fail "a second empty window posted again"
+        run 403 200 "$heartbeat" 1600
+        run 403 200 "$heartbeat" 1900
+        [ "$code" = 0 ] || fail "heartbeats resumed: exit $code"
+        [ "$(posts "$resolved")" = 1 ] && [ "$(total)" = 2 ] || fail "resumed heartbeats did not post exactly one $resolved"
+        echo "ok: an empty window posts one FIRING, resumed heartbeats one RESOLVED"
+
+        reset
+        run 403 200 "$empty" 1000 1
+        [ "$code" != 0 ] || fail "a failed post exited 0"
+        [ -s "$work/state.json" ] || fail "a failed post left no state"
+        run 403 200 "$empty" 1300
+        [ "$code" = 0 ] || fail "the retry run: exit $code"
+        run 403 200 "$empty" 1600
+        [ "$(posts "$firing")" = 2 ] || fail "a failed FIRING was not retried exactly once"
+        echo "ok: a failed post fails the run and the next run posts it once"
+      '';
+
+      deadmanRehearsal =
+        pkgs.runCommand "fleet-deadman-rehearsal"
+          {
+            nativeBuildInputs = [
+              pkgs.coreutils
+              pkgs.gnugrep
+              pkgs.gnused
+              pkgs.jq
+              pkgs.python3
+            ];
+            meta.description = "behavioural check: the dead-man passes only on a refused probe and posts one FIRING and one RESOLVED";
+          }
+          ''
+            ${deadmanLegs} ${lib.getExe deadmanRehearsed}
+            if ${deadmanLegs} ${deadmanProbeMutant}/bin/fleet-deadman > mutant.log 2>&1; then
+              cat mutant.log
+              echo "FAIL: the legs accepted a dead-man that passes any HTTP answer to its probe" >&2
+              exit 1
+            fi
+            grep -qF "FAIL: an anonymous publish answered 200 exited 0" mutant.log \
+              || { cat mutant.log; echo "FAIL: the probe mutant failed for another reason" >&2; exit 1; }
+            echo "ok: the probe mutant is rejected"
+            touch "$out"
+          '';
+
+      # Relations between independently written values on cinnabar and
+      # magnetite (tasks.md 5.1-5.3; design D5 step 3, D12). The access
+      # decision reproduces ntfy 2.28.0's: one row decides, rows for the user
+      # or `*` whose pattern matches, ordered user DESC, pattern length DESC,
+      # write DESC (world assumption A38; user/manager.go:702-735,
+      # user/manager_sqlite.go:90-96); no matching row means
+      # auth-default-access, here unset and so read-write (cmd/serve.go:53).
+      deadmanInput = {
+        execStart = cinnabar.systemd.services.fleet-deadman.serviceConfig.ExecStart;
+        deployedDeadman = lib.getExe (
+          self.lib.fleetAlertDeadman cinnabarPkgs { ntfySend = lib.getExe cinnabarPkgs.ntfy-send; }
+        );
+        deadman = cinnabar.services.fleet-alert.deadman;
+        pollTopic = cinnabar.services.fleet-alert.evaluator.heartbeatTopic;
+        evaluator = magnetite.services.fleet-alert.evaluator;
+        evaluatorHostName = magnetite.networking.hostName;
+        deadmanHostName = cinnabar.networking.hostName;
+        deadmanAfter = cinnabar.systemd.services.fleet-deadman.after;
+        deadmanWants = cinnabar.systemd.services.fleet-deadman.wants;
+        # The path's units that exist on the dead-man's host: ntfy behind
+        # listenHttp, caddy serving https://ntfy.zt to ntfy-send, and the
+        # ZeroTier address caddy binds (modules/machines/nixos/cinnabar/caddy.nix,
+        # zt-dns.nix).
+        pathUnits = builtins.filter (name: cinnabar.systemd.services ? ${name}) deadmanPathUnits;
+        listenHttp = cinnabar.services.ntfy-sh.settings.listen-http;
+        access = cinnabar.services.ntfy-sh.settings.auth-access or [ ];
+      };
+
+      decision =
+        access: user: topic:
+        let
+          rows = lib.concatMap (
+            entry:
+            let
+              parts = lib.splitString ":" entry;
+              pattern = builtins.elemAt parts 1;
+            in
+            lib.optional
+              (
+                builtins.length parts == 3
+                && builtins.elem (builtins.head parts) (
+                  lib.unique [
+                    user
+                    "*"
+                  ]
+                )
+                && builtins.match (builtins.replaceStrings [ "*" ] [ ".*" ] pattern) topic != null
+              )
+              {
+                user = builtins.head parts;
+                length = builtins.stringLength pattern;
+                permission = builtins.elemAt parts 2;
+              }
+          ) access;
+          writes =
+            row:
+            builtins.elem row.permission [
+              "rw"
+              "read-write"
+              "wo"
+              "write-only"
+              "write"
+            ];
+          ordered = lib.sort (
+            a: b:
+            if a.user != b.user then
+              a.user > b.user
+            else if a.length != b.length then
+              a.length > b.length
+            else
+              writes a && !writes b
+          ) rows;
+        in
+        if ordered == [ ] then null else (builtins.head ordered).permission;
+
+      # The units a dead-man run needs: the probe and poll reach ntfy, and
+      # every post goes through caddy on cinnabar's ZeroTier address.
+      deadmanPathUnits = [
+        "ntfy-sh"
+        "caddy"
+        "zerotierone"
+      ];
+
+      readOnly =
+        p:
+        builtins.elem p [
+          "ro"
+          "read-only"
+          "read"
+        ];
+      readWrite =
+        p:
+        builtins.elem p [
+          "rw"
+          "read-write"
+        ];
+
+      deadmanFailures =
+        i:
+        let
+          check = name: ok: lib.optional (!ok) name;
+          anonymous = decision i.access "*";
+          alerter = decision i.access "alerter";
+        in
+        lib.concatLists [
+          (check "deadman: fleet-deadman does not run the rehearsed fleetAlertDeadman built with ntfy-send" (
+            i.execStart == i.deployedDeadman
+          ))
+          # Ordered after every unit on its path, and never starting one, so
+          # a boot neither probes a half-started path nor starts a unit the
+          # operator stopped (design D12).
+          (check
+            "deadman: fleet-deadman is not ordered after ntfy-sh, caddy and zerotierone on its host, or wants one of them"
+            (
+              i.pathUnits == deadmanPathUnits
+              && lib.all (name: builtins.elem "${name}.service" i.deadmanAfter) i.pathUnits
+              && !(lib.any (name: builtins.elem "${name}.service" i.deadmanWants) i.pathUnits)
+            )
+          )
+          (check
+            "deadman: the dead-man polls a heartbeat topic other than the one magnetite's evaluator posts to"
+            (i.pollTopic == i.evaluator.heartbeatTopic)
+          )
+          (check "deadman: the dead-man posts to a topic other than magnetite's evaluator" (
+            i.deadman.topic == i.evaluator.topic
+          ))
+          (check "deadman: evaluatorHost is not the host whose evaluator is enabled" (
+            i.evaluator.enable && i.deadman.evaluatorHost == i.evaluatorHostName
+          ))
+          (check "deadman: ntfyUrl is not ntfy's listener on the dead-man's host" (
+            i.deadman.ntfyUrl == "http://${i.listenHttp}"
+          ))
+          # E9.4 and R9.4's premise: anonymous clients may read but not write
+          # both fleet topics, alerter may write both, host topics stay open.
+          (check "deadman: an anonymous write to the heartbeat or alert topic is not refused" (
+            lib.all (t: anonymous t != null && readOnly (anonymous t)) [
+              i.pollTopic
+              i.deadman.topic
+            ]
+          ))
+          (check "deadman: alerter may not write the heartbeat or alert topic" (
+            lib.all (t: alerter t != null && readWrite (alerter t)) [
+              i.pollTopic
+              i.deadman.topic
+            ]
+          ))
+          (check "deadman: an access entry decides a host-named topic" (
+            lib.all (t: anonymous t == null) [
+              i.evaluatorHostName
+              i.deadmanHostName
+            ]
+          ))
+        ];
+
+      deadmanActual = deadmanFailures deadmanInput;
+
+      deadmanMutants = {
+        execStartOther =
+          i:
+          i
+          // {
+            execStart = "/nix/store/${lib.fixedWidthString 32 "0" ""}-fleet-deadman/bin/fleet-deadman";
+          };
+        evaluatorHeartbeatRenamed =
+          i:
+          i
+          // {
+            evaluator = i.evaluator // {
+              heartbeatTopic = "fleet-beat";
+            };
+          };
+        deadmanTopicOther =
+          i:
+          i
+          // {
+            deadman = i.deadman // {
+              topic = "fleet-alert";
+            };
+          };
+        evaluatorHostWrong =
+          i:
+          i
+          // {
+            deadman = i.deadman // {
+              evaluatorHost = "cinnabar";
+            };
+          };
+        listenerMoved = i: i // { listenHttp = "[::1]:2587"; };
+        caddyOrderDropped = i: i // { deadmanAfter = lib.remove "caddy.service" i.deadmanAfter; };
+        zerotierOrderDropped = i: i // { deadmanAfter = lib.remove "zerotierone.service" i.deadmanAfter; };
+        ntfyWanted = i: i // { deadmanWants = i.deadmanWants ++ [ "ntfy-sh.service" ]; };
+        # R9.4's acceptance negative control, at evaluation time.
+        anonymousReadOnlyRemoved = i: i // { access = lib.remove "*:fleet-*:ro" i.access; };
+        alerterEntryRemoved = i: i // { access = lib.remove "alerter:fleet-*:rw" i.access; };
+        hostTopicsCovered = i: i // { access = i.access ++ [ "*:*:ro" ]; };
+      };
+
+      deadmanClause =
+        assert lib.assertMsg (
+          deadmanActual == [ ]
+        ) "fleet-alert dead-man failures: ${builtins.toJSON deadmanActual}";
+        assert lib.assertMsg
+          (lib.all (mutant: deadmanFailures (mutant deadmanInput) != [ ]) (lib.attrValues deadmanMutants))
+          "fleet-alert accepted a dead-man mutant: ${
+            builtins.toJSON (
+              builtins.attrNames (lib.filterAttrs (_: m: deadmanFailures (m deadmanInput) == [ ]) deadmanMutants)
+            )
+          }";
+        pkgs.runCommand "fleet-alert-deadman-clause" { } ''
+          echo "ok: dead-man relations hold and ${toString (builtins.length (lib.attrNames deadmanMutants))} mutants are rejected"
+          touch "$out"
+        '';
+
       evaluatorWith =
         transition:
         self.lib.fleetAlertEvaluator pkgs {
@@ -752,6 +1134,8 @@
                   promtoolRehearsal
                   fixtureRehearsal
                   propertyRehearsal
+                  deadmanRehearsal
+                  deadmanClause
                   ;
               };
             }
@@ -760,6 +1144,8 @@
               test -e ${promtoolRehearsal}
               test -e ${fixtureRehearsal}
               test -e ${propertyRehearsal}
+              test -e ${deadmanRehearsal}
+              test -e ${deadmanClause}
               touch "$out"
             '';
       };

@@ -176,6 +176,71 @@ def test_transition_matches_model(steps):
     )
 
 
+def without_expr(timeline):
+    """The same timeline with every non-internal rule's `expr` removed."""
+    rules = [{k: v for k, v in r.items() if k != "expr"} for r in timeline["rules"]]
+    return {"rules": rules, "steps": timeline["steps"]}
+
+
+# A rule with no `expr` whose alert has a results entry (the dead-man's
+# AlertEvaluatorSilent) is evaluated exactly as the same rule with an `expr`:
+# the generated results always hold an entry for each of RULE_NAMES.
+@settings(
+    derandomize=True,
+    database=None,
+    deadline=None,
+    max_examples=100,
+    print_blob=False,
+    suppress_health_check=[HealthCheck.too_slow, HealthCheck.data_too_large],
+)
+@given(st.lists(step_strategy, min_size=1, max_size=40))
+def test_rule_without_expr_matches_rule_with_expr(steps):
+    timeline = build(steps)
+    stripped = without_expr(timeline)
+    assert run_jq(stripped) == run_jq(timeline), "transition.jq: a rule without expr differs from its expr twin"
+    assert run_model(stripped) == run_model(timeline), "model: a rule without expr differs from its expr twin"
+
+
+# A rule with no `expr` and no results entry produces nothing, and results
+# entries named StoreQueryFailing or RuleSignalMissing are never read.
+def test_rule_without_expr_or_results_is_silent():
+    silent = {k: v for k, v in rule("Silent", 0, "critical").items() if k != "expr"}
+    missing = {
+        "alert": "RuleSignalMissing",
+        "for": 0,
+        "severity": "warning",
+        "annotations": {"summary": "missing"},
+        "presence": [],
+        "attribution": [],
+    }
+    series = [{"labels": {"host_name": "magnetite"}, "value": "1"}]
+    steps = []
+    for n, results in enumerate(
+        [{}, {"Other": series}, {"StoreQueryFailing": series, "RuleSignalMissing": series}, {}] * 2
+    ):
+        steps.append(
+            {
+                "now": T0 + 300 * (n + 1),
+                "failAt": None,
+                "observations": {
+                    "storeError": False,
+                    "reporting": HOSTS,
+                    "presence": {},
+                    "results": results,
+                    "failedLog": [],
+                },
+            }
+        )
+    timeline = {"rules": [silent, RULES[3], missing], "steps": steps}
+    for name, got in (("transition.jq", run_jq(timeline)), ("model", run_model(timeline))):
+        assert all(posts == [] for posts in got["posts"]), f"{name}: posts {got['posts']}"
+        assert got["state"]["instances"] == {}, f"{name}: instances {got['state']['instances']}"
+
+
 if __name__ == "__main__":
     test_transition_matches_model()
     print("ok: transition.jq equals the reference model on every generated timeline")
+    test_rule_without_expr_matches_rule_with_expr()
+    print("ok: a rule without expr but with a results entry fires and resolves as its expr twin")
+    test_rule_without_expr_or_results_is_silent()
+    print("ok: a rule without expr or results entry, and results named for internal rules, produce nothing")

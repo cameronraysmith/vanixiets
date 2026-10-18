@@ -1756,6 +1756,7 @@ magnetite's token, kill-order and R8.2 holder assertions are made to fail first,
   - Observations: `{ storeError, results = { <alert> = [ { labels, value } ] }, presence = { <selector> = [ <host> ] }, reporting = [ <host> ], failedLog = [ { at, unit, host } ], windows ? { <alert> = bool }, attribution ? { <host> = text } }`.
   - State: `{ instances = { <id> = { alert, labels, phase, severity, for, summary, attributed, value, activeSince, lastSeen, firingPostedAt, lastPostedAt } }, hosts = { <host> = epoch }, firings = [ { at, alert, host } ], budgetPostedAt, lastRun }`; `<id>` is `[alert, (labels | to_entries | sort_by(.key))] | tojson`.
   - An instance without `host_name` is never host-frozen, and its title omits the host: `[FIRING] StoreQueryFailing`.
+  - A rule is evaluated from `results` when it has an `expr` or, from Task 5, when `results` holds an entry for its alert name (the dead-man's `AlertEvaluatorSilent`); `StoreQueryFailing` and `RuleSignalMissing` come only from the function's own logic, never from `results`.
 - Produces: `flake.lib.fleetAlertEvaluator pkgs { ntfySend; transition ? <transition.jq>; }`, a `writeShellApplication` named `fleet-alert`; the optional `transition` exists so the check can build the evaluator over mutant jq (contract extension, see questions).
   It reads `FLEET_ALERT_CONFIG` (`{ storeUrl, database, user, queryTimeoutSec, queryDeadlineSec, postDeadlineSec, topic, heartbeatTopic, stateFile, failedLog, rules }`), `$CREDENTIALS_DIRECTORY/regulator-password`, optional `FLEET_ALERT_NOW`; `NTFY_TOKEN_FILE` is read by `ntfy-send`, not by the evaluator.
 - Produces: `flake.modules.nixos.fleet-alert`, outer `let` with `flakeLib`, `transitionJq`, `jqLib`, `fleetAlertEvaluator`; inside, `cfg = config.services.fleet-alert` and the `hardening` attrset; options `services.fleet-alert.evaluator.{enable,tokenFile,regulatorPasswordFile,storeUrl,topic,heartbeatTopic}` declared unconditionally; `config = lib.mkMerge [ (lib.mkIf cfg.evaluator.enable { … }) ]`.
@@ -2057,18 +2058,25 @@ def rule_named(rules, name):
     return next((rule for rule in rules if rule["alert"] == name), None)
 
 
+# Raised only by the logic below, never from results.
+INTERNAL = ("StoreQueryFailing", "RuleSignalMissing")
+
+
 def conditions(observations, rules):
     if observations["storeError"]:
         rule = rule_named(rules, "StoreQueryFailing")
         return [] if rule is None else [(rule, {}, "1")]
     found = []
     windows = observations.get("windows") or {}
+    results = observations.get("results") or {}
     for rule in rules:
-        if "expr" not in rule:
+        # A rule with an `expr`, or one whose alert has a results entry (a
+        # caller's own query, such as the dead-man's AlertEvaluatorSilent).
+        if "expr" not in rule and (rule["alert"] in INTERNAL or rule["alert"] not in results):
             continue
         if rule.get("window") is not None and windows.get(rule["alert"]) is not True:
             continue
-        for series in (observations.get("results") or {}).get(rule["alert"]) or []:
+        for series in results.get(rule["alert"]) or []:
             labels = {k: v for k, v in series["labels"].items() if k != "__name__"}
             found.append((rule, labels, str(series["value"])))
     missing = rule_named(rules, "RuleSignalMissing")
@@ -3467,11 +3475,19 @@ def in_window($window; $now):
 
 def rule_named($rules; $name): [ $rules[] | select(.alert == $name) ] | .[0];
 
+# A rule is evaluated from $observations.results when it has an `expr` (the
+# evaluator's PromQL rules) or when results has an entry for its alert name
+# (a caller's own query, such as fleet-deadman's AlertEvaluatorSilent);
+# StoreQueryFailing and RuleSignalMissing come only from the logic below.
+def internal_rule($alert): $alert | IN("StoreQueryFailing", "RuleSignalMissing");
+
 def conditions($observations; $rules):
   if $observations.storeError then
     [ rule_named($rules; "StoreQueryFailing") | select(. != null) | {rule: ., labels: {}, value: "1"} ]
   else
-    [ $rules[] | select(has("expr")) | . as $r
+    [ $rules[] | . as $r
+      | select(has("expr")
+               or ((internal_rule($r.alert) | not) and (($observations.results // {}) | has($r.alert))))
       | select(($r.window == null) or ($observations.windows[$r.alert] == true))
       | ($observations.results[$r.alert] // [])[]
       | {rule: $r, labels: (.labels | del(.__name__)), value: (.value | tostring)} ]
@@ -4438,14 +4454,17 @@ The access entries come last on purpose: with the dead-man wired and no `auth-ac
 - Modify: `modules/checks/fleet-alert.nix` (`deadmanRehearsal` with its probe mutant; `deadmanFailures` with eleven mutants, asserted in `deadmanClause`; the check value references both and lists them in `passthru`)
 - Modify: `modules/machines/nixos/cinnabar/default.nix` (imports `fleet-alert` and `observability-notify`)
 - Modify: `modules/machines/nixos/cinnabar/ntfy.nix` (`settings.auth-access`)
-- Modify: `openspec/changes/stand-up-fleet-alerting/tasks.md` (tick 5.1, 5.2, 5.3)
+- Modify: `modules/nixos/fleet-alert/transition.jq` and `modules/checks/fleet-alert/model.py` (a rule without an `expr` is evaluated when `results` holds an entry for its alert name, `StoreQueryFailing` and `RuleSignalMissing` excepted, so the dead-man's `AlertEvaluatorSilent` fires; found at Step 10, where Task 4's `select(has("expr"))` dropped it)
+- Modify: `modules/checks/fleet-alert/test_transition.py` (a property that a rule without an `expr` and with a results entry behaves as its `expr` twin, and an example that one without either produces nothing)
+- Modify: `openspec/changes/stand-up-fleet-alerting/design.md` (D11, D15) and this plan (Task 4's transition description and listings) to record the selection
+- Modify: `openspec/changes/stand-up-fleet-alerting/tasks.md` (4.2's wording; tick 5.1, 5.2, 5.3)
 
 **Interfaces:**
 - Consumes (Task 1): `pkgs.ntfy-send` reading `NTFY_TOKEN_FILE` and sending `Authorization: Bearer` through `-H @-`; usage `ntfy-send MESSAGE [TOPIC] [CURL_ARGS…]`, posting to `https://ntfy.zt/<topic>` with `curl -sfk -m 5`.
 - Consumes (Task 2): `flake.modules.nixos.observability-notify` with `services.observability-notify.units` and `services.observability-notify.tokenFile`; every listed unit gets `OnFailure = [ "observability-notify@%n.service" ]`, so a failed run posts `FAILED fleet-deadman.service on cinnabar` to `fleet-alerts`.
 - Consumes (Task 3): `flake.modules.nixos.ntfy-alerter`, already imported on cinnabar; the shared generator `ntfy-alerter` holds only `token`, at `config.clan.core.vars.generators.ntfy-alerter.files.token.path` (`/run/secrets/vars/shared/ntfy-alerter/token`); cinnabar's per-machine `ntfy-alerter-env` feeds `services.ntfy-sh.environmentFile`; cinnabar's `ntfy.nix` sets `behind-proxy`, `proxy-trusted-hosts`, `visitor-prefix-bits-ipv6` and `environmentFile`, and no `auth-access`; `checks.x86_64-linux.ntfy-provisioning` judges every user named in cinnabar's `services.ntfy-sh.settings.auth-access or [ ]`.
 - Consumes (Task 4), from `modules/nixos/fleet-alert.nix`: the outer `let` bindings `transitionJq = ./fleet-alert/transition.jq;` and `jqLib = pkgs: transition: pkgs.linkFarm "fleet-alert-jq" [ { name = "transition.jq"; path = transition; } ];`, `fleetAlertEvaluator`, and `flake.lib = { inherit fleetAlertEvaluator; };`; inside the NixOS module, `cfg = config.services.fleet-alert`, the `hardening` attrset (the `greptimedb-envelope` set: `DynamicUser`, `UMask = "0077"`, `NoNewPrivileges` … `RestrictAddressFamilies`), options `services.fleet-alert.evaluator.{enable,tokenFile,regulatorPasswordFile,storeUrl,topic,heartbeatTopic}` declared unconditionally (`topic` default `fleet-alerts`, `heartbeatTopic` default `fleet-heartbeat`), and `config = lib.mkMerge [ (lib.mkIf cfg.evaluator.enable { … }) ];`.
-- Consumes (Task 4), from `transition.jq`: `def transition($observations; $now; $rules)` over the state (`{}` or `null` when empty) returning `{ state, posts }`, each post `{ title, priority, message, key = { kind, id } }` with no topic, which the caller adds; `def mark_posted($post)` over the state, timed by `state.lastRun`; rule `{ alert, for (int seconds), severity, annotations = { summary }, presence, attribution }` with `expr` absent for internal rules, and `StoreQueryFailing` and `RuleSignalMissing` enabled only when listed in `$rules`; observations `{ storeError, results = { <alert> = [ { labels, value } ] }, presence, reporting, failedLog }`; an instance labelled `host_name = h` with `h` in `reporting` is never host-frozen and is titled `[FIRING|RESOLVED] <alert> <h>`; `critical` maps to priority `high`; an instance resolves after 300 s absent.
+- Consumes (Task 4), from `transition.jq`: `def transition($observations; $now; $rules)` over the state (`{}` or `null` when empty) returning `{ state, posts }`, each post `{ title, priority, message, key = { kind, id } }` with no topic, which the caller adds; `def mark_posted($post)` over the state, timed by `state.lastRun`; rule `{ alert, for (int seconds), severity, annotations = { summary }, presence, attribution }` with `expr` absent for internal rules, and `StoreQueryFailing` and `RuleSignalMissing` enabled only when listed in `$rules`; observations `{ storeError, results = { <alert> = [ { labels, value } ] }, presence, reporting, failedLog }`; an instance labelled `host_name = h` with `h` in `reporting` is never host-frozen and is titled `[FIRING|RESOLVED] <alert> <h>`; `critical` maps to priority `high`; an instance resolves after 300 s absent. Task 4's `conditions` read `results` only for rules with an `expr`; this task widens it so a rule without one is read when `results` holds an entry for its alert name (`StoreQueryFailing` and `RuleSignalMissing` excepted), the way `AlertEvaluatorSilent` reaches the transition.
 - Consumes (Task 4), from `modules/checks/fleet-alert.nix`'s `perSystem` `let`:
   - `ntfySendStub` (`pkgs.writeShellScriptBin "ntfy-send"`): appends one `{ topic, message, headers, tokenFile }` per call to `$FLEET_ALERT_POSTS` (`headers` is the list of `-H` values, `tokenFile` is `$NTFY_TOKEN_FILE`) and exits `$FLEET_ALERT_POST_STATUS`, default 0.
   - `fixtureCredentials`: a store directory holding `regulator-password` and `alerter-token`.
@@ -4952,7 +4971,8 @@ In `modules/nixos/fleet-alert.nix`'s outer `let`, after Task 4's `fleetAlertEval
 ```nix
   # AlertEvaluatorSilent (ADR-009 rule table; design D12): raised on the
   # dead-man's host when no heartbeat reached ntfy in the poll window. The
-  # poll is its query, so it has no `expr`, and the single-rule list enables
+  # poll is its query, so it has no `expr`; transition.jq evaluates it from
+  # the results entry the dead-man builds, and the single-rule list enables
   # neither StoreQueryFailing nor RuleSignalMissing.
   alertEvaluatorSilent = {
     alert = "AlertEvaluatorSilent";
@@ -5318,7 +5338,7 @@ in lib.mapAttrs (_: failing) {
   deadmanTokenFromAnotherPath = { services.fleet-alert.deadman.tokenFile = lib.mkForce "/run/secrets/elsewhere"; };
   notifierTokenUnset = { services.observability-notify.tokenFile = lib.mkForce null; };
   templateWithoutTokenFile = { systemd.services."observability-notify@".environment.NTFY_TOKEN_FILE = lib.mkForce null; };
-}' 2>&1 | jq -r 'to_entries[] | "=== \(.key)", .value[]' | tee logs/s3-evidence/5.3-assertion-mutants-$(date -u +%Y%m%dT%H%M%SZ).log
+}' 2>logs/s3-evidence/5.3-assertion-mutants-stderr.log | jq -r 'to_entries[] | "=== \(.key)", .value[]' | tee logs/s3-evidence/5.3-assertion-mutants-$(date -u +%Y%m%dT%H%M%SZ).log
 ```
 
 Expected: `control` lists nothing; `deadmanWithoutTokenFile` lists `fleet-alert: fleet-deadman.service must load deadman.tokenFile …`; `deadmanTokenFromAnotherPath` and `notifierTokenUnset` list `cinnabar: the fleet alert dead-man must be enabled, and it and the failure notifier must read the ntfy-alerter token …`; `templateWithoutTokenFile` lists `observability-notify: observability-notify@.service must load tokenFile …` (evaluation, negative control).

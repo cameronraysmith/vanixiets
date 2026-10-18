@@ -50,11 +50,19 @@ def in_window($window; $now):
 
 def rule_named($rules; $name): [ $rules[] | select(.alert == $name) ] | .[0];
 
+# A rule is evaluated from $observations.results when it has an `expr` (the
+# evaluator's PromQL rules) or when results has an entry for its alert name
+# (a caller's own query, such as fleet-deadman's AlertEvaluatorSilent);
+# StoreQueryFailing and RuleSignalMissing come only from the logic below.
+def internal_rule($alert): $alert | IN("StoreQueryFailing", "RuleSignalMissing");
+
 def conditions($observations; $rules):
   if $observations.storeError then
     [ rule_named($rules; "StoreQueryFailing") | select(. != null) | {rule: ., labels: {}, value: "1"} ]
   else
-    [ $rules[] | select(has("expr")) | . as $r
+    [ $rules[] | . as $r
+      | select(has("expr")
+               or ((internal_rule($r.alert) | not) and (($observations.results // {}) | has($r.alert))))
       | select(($r.window == null) or ($observations.windows[$r.alert] == true))
       | ($observations.results[$r.alert] // [])[]
       | {rule: $r, labels: (.labels | del(.__name__)), value: (.value | tostring)} ]

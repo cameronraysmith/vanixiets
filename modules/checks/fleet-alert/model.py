@@ -39,18 +39,25 @@ def rule_named(rules, name):
     return next((rule for rule in rules if rule["alert"] == name), None)
 
 
+# Raised only by the logic below, never from results.
+INTERNAL = ("StoreQueryFailing", "RuleSignalMissing")
+
+
 def conditions(observations, rules):
     if observations["storeError"]:
         rule = rule_named(rules, "StoreQueryFailing")
         return [] if rule is None else [(rule, {}, "1")]
     found = []
     windows = observations.get("windows") or {}
+    results = observations.get("results") or {}
     for rule in rules:
-        if "expr" not in rule:
+        # A rule with an `expr`, or one whose alert has a results entry (a
+        # caller's own query, such as the dead-man's AlertEvaluatorSilent).
+        if "expr" not in rule and (rule["alert"] in INTERNAL or rule["alert"] not in results):
             continue
         if rule.get("window") is not None and windows.get(rule["alert"]) is not True:
             continue
-        for series in (observations.get("results") or {}).get(rule["alert"]) or []:
+        for series in results.get(rule["alert"]) or []:
             labels = {k: v for k, v in series["labels"].items() if k != "__name__"}
             found.append((rule, labels, str(series["value"])))
     missing = rule_named(rules, "RuleSignalMissing")
