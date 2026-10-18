@@ -47,12 +47,6 @@
           proxy-trusted-hosts = "::1";
           visitor-prefix-bits-ipv6 = 128;
 
-          # Cutover window only (tasks.md 3.3, reverted by 7.4): ntfy logs
-          # 401 and 403 only at debug (server/log.go:37,
-          # server/server.go:541-545). Not trace, which logs request headers
-          # including Authorization (server/server.go:500-501).
-          log-level = "debug";
-
           # Only alerter publishes on fleet-*, anonymous clients (phones
           # included) may subscribe, and every other topic keeps the default
           # read-write (design D5 step 3; ADR-009 item 12). The named user's
