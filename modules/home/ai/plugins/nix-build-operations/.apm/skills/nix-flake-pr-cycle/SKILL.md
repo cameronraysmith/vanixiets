@@ -194,6 +194,7 @@ ntfy-send "vanixiets PR #<N> authorized; queue owns landing"
 ```
 
 The wrapper script lives at `pkgs/by-name/ntfy-send/ntfy-send.sh` (package `ntfy-send`) and uses `/usr/bin/curl` on Darwin to satisfy endpoint-security restrictions on ad-hoc-signed Nix store binaries; the topic argument is positional and defaults to the local hostname so the same script works unmodified across the fleet.
+Host topics accept anonymous posts, so these NOTICEs need no credential; topics matching `fleet-*` (`fleet-alerts`, `fleet-heartbeat`, `fleet-acceptance`) accept only the `alerter` token, which `ntfy-send` reads from the file named by `NTFY_TOKEN_FILE` and never places on a command line; agents do not post there.
 Suppress NOTICEs during dense local iteration (rapid push-monitor-fix cycles) and re-enable them once the cadence drops to integration-significant transitions, so the notification stream stays signal-rich.
 
 ## Caveats and known scope

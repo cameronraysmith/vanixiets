@@ -137,5 +137,5 @@ When validating changes for merge, retrieve and analyze complete workflow logs a
   - Content search (within files): use `rg` (ripgrep) instead of `grep`
   - Disk usage (directory sizes): use `diskus` instead of `du -sh`
   - Clipboard (copy to system clipboard): use `cb copy` (`clipboard-jh`) instead of platform-specific `pbcopy` (macOS) or `xclip`/`xsel` (Linux)
-  - Notification (push alert to user): use `ntfy-send "<message>"` where `<message>` includes the repo name and summarizes the completed task (default topic is the local hostname; override with `ntfy-send "<message>" <topic>`)
+  - Notification (push alert to user): use `ntfy-send "<message>"` where `<message>` includes the repo name and summarizes the completed task (default topic is the local hostname; override with `ntfy-send "<message>" <topic>`; `fleet-*` topics need the `alerter` token through `NTFY_TOKEN_FILE`, host topics stay anonymous)
 - When a repository is named, or a substantive technical claim is about to rest on a project's source, options, defaults, API, or upstream documentation, resolve it to a local copy before reasoning about it; see `dependency-source-acquisition` for both lookup kinds, the `(see local)` marker directive, and GitHub file, issue, and PR URL handling.
