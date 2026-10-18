@@ -48,8 +48,10 @@ let
 
   # Imported by both roles. `package` accepts a single definition, and the
   # shared key makes the module system load this module once on a machine
-  # holding both roles. Every pipeline starts with this limiter (ADR-003
-  # item 8; envelope 384 MiB under MemoryMax 512M).
+  # holding both roles. The agent pipelines and `metrics/ingress` start with
+  # this limiter; the per-database pipelines behind the routing connector only
+  # strip the routing attribute (ADR-003 item 8; envelope 384 MiB under
+  # MemoryMax 512M).
   collectorCore = {
     key = "vanixiets#otel-collector-core";
     imports = [

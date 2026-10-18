@@ -46,7 +46,6 @@ Every series the collector writes SHALL carry the name of the host it was gather
 ### Requirement: Series cardinality stays bounded
 
 The collector SHALL bound how many series each signal produces on magnetite, and no per-process signal SHALL carry an identifier that changes with each process started, such as its process number or command line.
-Per-process memory is bounded by a memory floor rather than by a count: no stage of the pinned collector limits the number of distinct process names, so the bound of 30 names per host is observed at first activation and regulated at runtime from slice S4.
 
 **Discharged by**: `telemetry-store-interface` requirement `The collector's configuration bounds what it gathers`; the evaluation-time regulator over magnetite's collector configuration and its mutants, the collector module's assertion that the per-process identifiers are disabled, and the operator's count of distinct process names at first activation discharge it.
 
@@ -54,6 +53,11 @@ Per-process memory is bounded by a memory floor rather than by a count: no stage
 
 - **WHEN** the evaluation-time collector regulator reads magnetite's collector configuration
 - **THEN** it finds the 64 MiB per-process memory floor in the process pipeline and no more than 40 of magnetite's units on the collector's watched-unit list, which the collector builds from the fleet's watched list, and its mutants show it fails when the floor leaves the pipeline or the list grows past 40 units; the storage-pool and out-of-memory keep-list is a literal of the collector's module with no copy in the regulator
+
+#### Scenario: Per-process memory is bounded by its floor rather than by a count of names
+
+- **WHEN** magnetite runs processes under many distinct program names, each holding at least the memory floor
+- **THEN** the collector records a series for each of them, because it bounds per-process memory by that floor only and does not itself limit how many distinct process names it stores; the bound of 30 names per host is observed by the operator at first activation, and no regulator yet watches it periodically on the host
 
 #### Scenario: Distinct process names are counted at first activation
 
