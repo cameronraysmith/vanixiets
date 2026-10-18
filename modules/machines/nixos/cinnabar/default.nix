@@ -27,6 +27,7 @@ in
         base
         hm-sops-bridge
         kvm-declaration
+        ntfy-alerter
         ssh-known-hosts
       ]);
 
