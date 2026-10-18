@@ -3,17 +3,18 @@ linear_story_id: CAM-68
 linear_story_identifier: CAM-68
 linear_story_title: "S1: Stand up GreptimeDB on magnetite fed by magnetite metrics"
 linear_story_url: https://linear.app/cameronraysmith/issue/CAM-68/s1-stand-up-greptimedb-on-magnetite-fed-by-magnetite-metrics
-linear_story_state: In Review
+linear_story_state: Done
 linear_team: CAM
 linear_project: fleet-observability
-last_synced_state: In Review
-last_synced_at: 2026-10-17T10:06:51Z
+last_synced_state: Done
+last_synced_at: 2026-10-18T04:50:56Z
 review_round: 0
 max_review_rounds: 3
 attempt_log:
   - { at: "2026-10-16T14:56:36Z", transition: "Backlog->Todo", outcome: "posted", note: "T1 bind; description seeded from this proposal" }
   - { at: "2026-10-16T17:21:08Z", transition: "Todo->In Progress", outcome: "posted", note: "first - [x] in tasks.md (1.1-1.3)" }
   - { at: "2026-10-17T10:06:51Z", transition: "In Progress->In Review", outcome: "posted", note: "T3 verify.md created; deployment and 9.1 evidence recorded" }
+  - { at: "2026-10-18T04:50:56Z", transition: "In Review->Done", outcome: "posted", note: "T4 archived; specs synced and mirrored to the Fleet observability project documents" }
 ---
 
 ## Why

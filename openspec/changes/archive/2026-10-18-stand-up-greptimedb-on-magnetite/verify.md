@@ -1300,4 +1300,4 @@ No 8.x or 9.1 expectation failed.
 
 **Next step**:
 
-plan.md Task 7 Step 16, the documenter sub-gate, then the retrospective and archive; Step 15's roborev gate is replaced by `review.md` (§11).
+documenter: approved by Cameron Smith on 2026-10-18, after the collector README, the operations runbook, the retrospective and the §8a/§8c designation fixes landed in #3501; Step 15's roborev gate is replaced by `review.md` (§11).

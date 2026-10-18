@@ -79,4 +79,10 @@ projects:
     id: "aeed302bea3b"
     name: "Fleet observability"
     teams: ["CAM"]
-    archive_documents: {}
+    archive_documents:
+      "host-metrics-collection":
+        id: "5a3a3fc0-fe9b-46dc-97c5-908743914066"
+      "telemetry-store":
+        id: "aaf61f9d-03d1-4a0d-8711-d8e89eaf75ff"
+      "telemetry-store-interface":
+        id: "1b158db4-f5e8-42bb-b733-81fd9aa9fb38"

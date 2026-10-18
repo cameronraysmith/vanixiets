@@ -1,7 +1,7 @@
 ---
 title: Satisfaction argument
 description: Discharge status for every requirement in the OpenSpec corpus
-generated: 2026-09-10
+generated: 2026-10-18
 ---
 
 This file is a projection over `openspec/specs/`, regenerated wholesale at archive time and never patched.
@@ -12,11 +12,12 @@ Nothing here is an end-to-end guarantee; OpenSpec structure checks are not behav
 
 ## Status
 
-The post-sync corpus has **105 requirements across 15 capabilities**: 95 requirement-side rows and 10 world-assumption rows.
-**3 requirement-side rows are discharged at narrow interface boundaries; 92 remain undischarged**, each with a follow-up reference.
+The post-sync corpus has **146 requirements across 18 capabilities**: 131 requirement-side rows and 15 world-assumption rows.
+**39 requirement-side rows are discharged — 3 at narrow CAM-41 interface boundaries and 36 from CAM-68's telemetry store slice; 92 remain undischarged**, each with a follow-up reference.
 Of those undischarged rows, 8 name world assumptions but no named specification-side discharge; 84 name neither.
-The 10 world rows remain self-attested, not independently discharged; their monitoring/scenario truth is not re-proved by this projection.
+The 15 world rows remain self-attested, not independently discharged; their monitoring/scenario truth is not re-proved by this projection.
 A13 has real incident evidence, including CAM-59, but no new world-assumption audit is claimed here.
+A29–A33 carry CAM-68's first-activation and runtime monitoring evidence, cited per row; that evidence monitors them and does not discharge them.
 
 **CAM-63 qualifications are load-bearing:** GNOME reachability is amended to exclude live-niri display-manager restart (**CAM-66**, unrepaired); **8.2 no-history is a source-read-only method limitation**, not discharged by evaluation; **8.3/8.4/8.5 are evaluation, not observation; 8.6 is declined under CAM-59; 8.7 is physical testing with same-boot positive/negative controls and whole-boot totals 1 requested / 1 entry**.
 Task 8.1 would have caught the strand; the post-deploy checklist ordering itself caused the lockout inside niri.
@@ -27,10 +28,11 @@ These behavioral dispositions do not manufacture named specification-side discha
 - CAM-41 evidence: `openspec/changes/archive/2026-09-02-integrate-mergify-stacked-landing/verify.md:105–111,185–191`; qualifications W1–W6 at `:31–50`.
 - CAM-62 evidence/follow-ups: `openspec/changes/archive/2026-09-09-pyrite-never-sleep/verify.md` §§7–8 and `retrospective.md` §6.
 - CAM-63 evidence/follow-ups: `openspec/changes/archive/2026-09-10-pyrite-niri-second-session/verify.md` §§8,9.12 and `retrospective.md` §6.
+- CAM-68 evidence/follow-ups: `openspec/changes/archive/2026-10-18-stand-up-greptimedb-on-magnetite/verify.md` §§8b,9.4,9.5,10,11, `tasks.md` §10 and `retrospective.md` §6.
 - `evidence annotation follow-up` means OpenSpec change `annotate-discharge-evidence` (active or subsequently archived), not implicit acceptance.
 - `V-interface` means the CAM-63 retrospective §6 architecture decision: introduce named interface properties or explicitly decide the corpus discharge convention.
 - `V-vocabulary` means the next sole designation-table owner grounds world/shared terms and relocates machine predicates; CAM-63 verify §8 is agent-executed/non-blocking and NEVER validation.
-- Older capability strata remain inferred and not re-audited; CAM-41 declares its three additions interface, CAM-62/CAM-63 declare graphical-desktop-session behavioral.
+- Older capability strata remain inferred and not re-audited; CAM-41 declares its three additions interface, CAM-62/CAM-63 declare graphical-desktop-session behavioral; CAM-68 declares telemetry-store and host-metrics-collection behavioral and telemetry-store-interface interface.
 - Every capability section cites the authoritative main-spec path; row order and titles are derived from that file.
 
 ## agentic-workflow-routing
@@ -112,6 +114,19 @@ Source: `openspec/specs/graphical-desktop-session/spec.md`.
 | A person at the panel can choose between two desktops, and the established one is what they get if they do not choose | behavioral | — | — | undischarged — V-interface; amended GNOME reachability excludes live-niri display-manager restart (CAM-66, unrepaired); 8.2 no-history METHOD LIMITATION, source-read only |
 | A newly offered desktop does not suspend the host when nobody is using it | behavioral | — | `world-assumptions` A13 | undischarged — V-interface; 8.3/8.4/8.5 evaluation, 8.6 declined CAM-59, 8.7 physical controls; see CAM-63 qualifications |
 | A desktop is not offered until the settings it will start with have been checked by the program that will start it | behavioral | — | — | undischarged — V-interface; actual positive/negative builds and binary equality do not name S; includes vacuous |
+
+## host-metrics-collection
+
+Source: `openspec/specs/host-metrics-collection/spec.md`.
+
+| Requirement | Stratum | Discharged by (S) | Under (W) | Status |
+|---|---|---|---|---|
+| magnetite contributes its own signals to the telemetry store | behavioral | `Ingest is OTLP over HTTP with a database header`; `Scrape targets are reached on loopback`; `The collector's configuration bounds what it gathers` | — | discharged — CAM-68 verify §8b |
+| Each stored series names its host | behavioral | `Ingest is OTLP over HTTP with a database header`; `Reads are PromQL and SQL over HTTP with a database header`; `Prometheus remote storage stays enabled for the PromQL query API` | — | discharged — CAM-68 verify §8b |
+| Series cardinality stays bounded | behavioral | `The collector's configuration bounds what it gathers` | — | discharged — CAM-68 verify §8b; §8c alphabet finding repaired in #3501 |
+| Collection survives a telemetry store restart without losing the queued interval | behavioral | `The collector's queue persists across a telemetry store restart` | — | discharged — CAM-68 verify §8b; verify §10.3 |
+| Stored unit names carry no owner's name | behavioral | `Omnigent unit names are stored under aliases` | — | discharged — CAM-68 verify §8b |
+| A failed collection or store job notifies a person | behavioral | `Failure notices are posted to one topic` | `world-assumptions` A33 | discharged — CAM-68 verify §8b; verify §9.5, §11.1 |
 
 ## openspec-linear-sync
 
@@ -216,6 +231,50 @@ Source: `openspec/specs/stratified-change-authoring/spec.md`.
 | Tasks artifact records per-task verification | interface | — | — | undischarged — evidence annotation follow-up |
 | The stratum layer states its own trust boundary | interface | — | — | undischarged — evidence annotation follow-up |
 
+## telemetry-store
+
+Source: `openspec/specs/telemetry-store/spec.md`.
+
+| Requirement | Stratum | Discharged by (S) | Under (W) | Status |
+|---|---|---|---|---|
+| A database keeps its series for its retention and no longer | behavioral | `Databases and their retention are set at the telemetry store`; `Object data lives under one prefix of one bucket` | `world-assumptions` A29 | discharged — CAM-68 verify §8b |
+| Part of a database keeps the database's retention unless another is declared | behavioral | `Tables allowed a retention of their own are declared` | — | discharged — CAM-68 tasks 10.5, 10.10; verify §11.2; added after §8b, see CAM-68 qualifications |
+| Only the collector writes and only named readers read | behavioral | `Store accounts carry fixed permission modes`; `Listeners are bound to loopback only`; `Credentials exist only as activation-resolved files owned by non-worker users` | — | discharged — CAM-68 verify §8b |
+| A replaced store credential takes effect on the running telemetry store | behavioral | `Credentials exist only as activation-resolved files owned by non-worker users`; `The account file the telemetry store loaded is recorded` | — | discharged — CAM-68 verify §8b |
+| The telemetry store stays inside a memory envelope that leaves build capacity to the build service | behavioral | `The telemetry store and the collector run inside a declared envelope` | `world-assumptions` A31, A32 | discharged — CAM-68 verify §8b; kill order by pyrite VM test (task 6.2) |
+| The telemetry store stays inside a disk envelope of its own | behavioral | `The telemetry store and the collector run inside a declared envelope` | — | discharged — CAM-68 verify §8b |
+| The telemetry store sends no usage report to its vendor | behavioral | `The telemetry store's release and usage reporting are fixed at evaluation` | — | discharged — CAM-68 verify §8b |
+| The telemetry store runs a stable vendor release that serves its dashboard | behavioral | `The telemetry store's release and usage reporting are fixed at evaluation` | `world-assumptions` A30 | discharged — CAM-68 verify §8b; authenticated dashboard check verify §9.4 |
+| The telemetry store's own failures reach a person | behavioral | `Failure notices are posted to one topic` | `world-assumptions` A33 | discharged — CAM-68 verify §8b; verify §9.5, §11.1 |
+
+## telemetry-store-interface
+
+Source: `openspec/specs/telemetry-store-interface/spec.md`.
+
+| Requirement | Stratum | Discharged by (S) | Under (W) | Status |
+|---|---|---|---|---|
+| Listeners are bound to loopback only | interface | R7.1 in the `greptimedb-envelope` check | — | discharged at evaluation-time regulator interface; CAM-68 verify §8b |
+| Prometheus remote storage stays enabled for the PromQL query API | interface | pipeline container test PromQL cases (task 2.1) | — | discharged at container runtime-test interface; CAM-68 verify §8b |
+| Scrape targets are reached on loopback | interface | R3.1 (tasks 3.3, 3.7, 4.4) | — | discharged at evaluation-time regulator interface; CAM-68 verify §8b |
+| Store accounts carry fixed permission modes | interface | users-file check; R8.2; container auth matrix (task 6.1) | — | discharged at regulator and runtime-test interfaces; CAM-68 verify §8b |
+| Ingest is OTLP over HTTP with a database header | interface | R3.1, R1.2; container ingest case (task 6.1) | — | discharged at regulator and runtime-test interfaces; CAM-68 verify §8b |
+| Reads are PromQL and SQL over HTTP with a database header | interface | container read-back case (task 6.1) | — | discharged at container runtime-test interface; CAM-68 verify §8b |
+| Databases and their retention are set at the telemetry store | interface | schema oneshot (task 2.6); container retention cases (task 6.1) | — | discharged at runtime-test interface; CAM-68 verify §8b |
+| Tables allowed a retention of their own are declared | interface | `flake.lib.greptimedbEnvelopeTables` table-TTL clause over `services.greptimedb.tableTtls`; container undeclared-`ttl` negative control (tasks 10.5, 10.10) | — | discharged at regulator and runtime-test interfaces; CAM-68 verify §11.2; added after §8b |
+| The store and the collector name the same databases | interface | ingress-module assertion that the store's database names equal `flake.lib.otelCollectorSchema.databases` (task 10.4) | — | discharged at evaluation-time assertion interface; CAM-68 tasks 10.4, verify §11; added after §8b |
+| Object data lives under one prefix of one bucket | interface | R6.4 storage clause; R6.3; container `sst_format` negative control (tasks 2.1, 2.5, 4.3, 5.1, 10.10) | `world-assumptions` A29 | discharged at regulator interface; CAM-68 verify §8b; verify §11.2 |
+| Credentials exist only as activation-resolved files owned by non-worker users | interface | R8.2 with its mutants (tasks 2.4, 4.3) | — | discharged at evaluation-time regulator interface; CAM-68 verify §8b |
+| The account file the telemetry store loaded is recorded | interface | `ExecStartPre` hash (task 2.2); R7.4 (task 5.1) | — | discharged at regulator interface; CAM-68 verify §8b; no `Discharges:` clause names it by title |
+| The telemetry store and the collector run inside a declared envelope | interface | R7.1 with seven mutants; R7.2, R7.3; pyrite VM kill-order test (tasks 2.2, 4.1, 5.1, 6.2) | `world-assumptions` A31, A32 | discharged at regulator and runtime-test interfaces; CAM-68 verify §8b |
+| Runtime regulators treat absent evidence as failure | interface | renamed-table mutant (tasks 5.1, 5.2) | — | discharged at runtime regulator interface; CAM-68 verify §8b |
+| The telemetry store's release and usage reporting are fixed at evaluation | interface | R1.1 amended; R1.4 with mutants (task 4.2) | `world-assumptions` A30 | discharged at evaluation-time regulator interface; CAM-68 verify §8b |
+| The collector's configuration bounds what it gathers | interface | R3.1 process and systemd clauses (tasks 3.2, 4.4) | — | discharged at evaluation-time regulator interface; CAM-68 verify §8b |
+| Omnigent unit names are stored under aliases | interface | R3.1 alias clause (task 4.4); container alias read-back (task 6.1) | — | discharged at regulator and runtime-test interfaces; CAM-68 verify §8b |
+| The collector's queue persists across a telemetry store restart | interface | R3.1 queue clause (tasks 3.2, 4.4); container restart case (task 6.1) | — | discharged at regulator and runtime-test interfaces; CAM-68 verify §8b; verify §10.3 |
+| Failure notices are posted to one topic | interface | R3.1 failure-wiring clause (tasks 3.4, 3.5, 4.4); forced failure (task 8.6) | `world-assumptions` A33 | discharged at regulator interface; CAM-68 verify §8b; delivery verify §9.5 |
+| A failure episode ends at the unit's next successful start or exit | interface | R3.1 failure-wiring clause with its start-hook mutant and notifier crash-loop rehearsal (task 10.1) | — | discharged at regulator interface; CAM-68 tasks 10.1, live notifier verify §11.1; added after §8b |
+| This capability states its own trust boundary | interface | the requirement's own statement; no regulator applies | — | discharged by statement; CAM-68 verify §8b |
+
 ## third-party-plugin-dependency
 
 Source: `openspec/specs/third-party-plugin-dependency/spec.md`.
@@ -240,11 +299,16 @@ Source: `openspec/specs/world-assumptions/spec.md`.
 | A6 — Atomic inherits Pi's configuration root unconditionally | world | Non-Bash edit and write policy | self-attested; monitoring follow-up: evidence annotation follow-up |
 | A7 — Pi's enumerated path forms are exhaustive | world | Non-Bash edit and write policy; Git default-branch boundary; Jj diamond boundary | self-attested; monitoring follow-up: evidence annotation follow-up |
 | A8 — Jj's outside-repository diagnostic is stable | world | Git default-branch boundary; Jj diamond boundary | self-attested; monitoring follow-up: evidence annotation follow-up |
-| Grounded vocabulary for behavioral requirements | world | Grounds behavioral vocabulary; not requirement-scoped | self-attested; monitoring follow-up: evidence annotation follow-up |
+| Grounded vocabulary for behavioral requirements | world | Grounds behavioral vocabulary; not requirement-scoped | self-attested; monitoring follow-up: evidence annotation follow-up; CAM-68 verify §8a nouns grounded in #3501 |
 | A13 — Resuming this laptop from a suspended state is unreliable, and recovering a failed resume requires a person at the machine | world | The laptop does not suspend itself when nobody is using it; A newly offered desktop does not suspend the host when nobody is using it | self-attested; monitoring follow-up: evidence annotation follow-up; CAM-59 incident evidence, CAM-62 added eighth failure |
+| A29 — Cloudflare R2 behaves as S3-compatible object storage for the telemetry store's client | world | A database keeps its series for its retention and no longer; Object data lives under one prefix of one bucket | self-attested; monitored by first activation (CAM-68 verify §9.4) and the R6.4 readiness probe |
+| A30 — nixpkgs channels lag the telemetry store's vendor releases and omit its dashboard | world | The telemetry store runs a stable vendor release that serves its dashboard; The telemetry store's release and usage reporting are fixed at evaluation | self-attested; monitored by R1.1 accepting the channel's package once it declares the dashboard (CAM-68 verify §8b) |
+| A31 — magnetite's memory is finite and shared with the build service's evaluation work | world | The telemetry store stays inside a memory envelope that leaves build capacity to the build service; The telemetry store and the collector run inside a declared envelope | self-attested; monitored hourly by R7.2 (CAM-68 verify §8b) |
+| A32 — magnetite has no /dev/kvm, and the kernel's kill order does not depend on the host it runs on | world | The telemetry store stays inside a memory envelope that leaves build capacity to the build service; The telemetry store and the collector run inside a declared envelope | self-attested; exercised by the pyrite kill-order VM test (CAM-68 task 6.2); kernel-equivalence not independently re-proved |
+| A33 — The fleet's notification service on cinnabar is reachable over ZeroTier and accepts anonymous publishing | world | The telemetry store's own failures reach a person; A failed collection or store job notifies a person; Failure notices are posted to one topic | self-attested; monitored by forced-failure delivery (CAM-68 verify §9.5, §11.1); nothing on magnetite detects cinnabar down |
 
-`A9` through `A12` remain absent from the current main corpus: they belong to the active `stand-up-nixbot-on-magnetite` delta, not this archive.
-CAM-64 tracks full-content MODIFIED sync loss; CAM-63 contains no world-assumptions delta and did not edit this capability.
+`A9`–`A12` and `A14`–`A28` remain absent from the current main corpus: active deltas carry them (`stand-up-nixbot-on-magnetite` A9–A12, `k3s-nixos-vm-tests` A14–A16, `capi-hetzner-cluster` A17–A21, `stand-up-gitea-mq-on-magnetite` A22–A28), not this archive; `path-scope-plugin-releases` (A9, A10), `filter-check-sources-for-substitution` (A22, A23) and `k3s-nixos-vm-tests` (A13) reuse numbers already taken, unresolved here.
+CAM-64 tracks full-content MODIFIED sync loss; CAM-68's MODIFIED `Grounded vocabulary for behavioral requirements` was synced as a whole-block replacement carrying its fourteen double-sense terms.
 
 ## CAM-41 qualifications
 
@@ -274,9 +338,19 @@ Primary disposition record: `openspec/changes/archive/2026-09-10-pyrite-niri-sec
 - **Slice B residuals:** xwayland-satellite absent, xcursor-theme default warning, GNOME GlobalShortcutsProvider InvalidArgs warning, portal functional transactions untested, 8.2 no-history half, empty logind Desktop despite niri environment/desktop-entry metadata. Empty Desktop propagation remains unresolved rather than guessed.
 - **Other follow-ups unchanged:** CAM-59 resume, CAM-60 unattended boot, CAM-61 Bluetooth/wlp2s0, CAM-64 MODIFIED content loss. The local C sd-login monitor was deliberately not carried; prototype preserved in logs/niri-session-strand-defect.md, not verified end-to-end.
 
+## CAM-68 qualifications
+
+Primary disposition record: `openspec/changes/archive/2026-10-18-stand-up-greptimedb-on-magnetite/verify.md` §8b; deployment evidence §§9–10; review follow-ups §11 and `review.md`; follow-ups: `retrospective.md` §6.
+- **Verdict PASS WITH WARNINGS:** the warnings were §8a (content nouns without a designation row) and §8c (two non-world phenomena in behavioral requirements); both were addressed in #3501 before archive, and the synced designation table and `Series cardinality stays bounded` carry those fixes.
+- **Four requirements postdate §8b:** `Part of a database keeps the database's retention unless another is declared`, `Tables allowed a retention of their own are declared`, `The store and the collector name the same databases` and `A failure episode ends at the unit's next successful start or exit` came from review findings F1, F3 and F4 (#3497, #3498); their rows cite `tasks.md` 10.1, 10.4, 10.5 and 10.10 and verify §11, not the §8b table.
+- **Interface discharges are regulator and runtime-test evidence:** evaluation-time checks with mutants, the hourly envelope regulator, the pipeline container test and the on-demand pyrite VM kill-order test, plus first-activation observations on magnetite. `The account file the telemetry store loaded is recorded` is named by no `Discharges:` clause by title; task 5.1 names it as R7.4.
+- **Trust boundary is stated, not discharged:** R2 durability and token scope belong to Cloudflare (A29), any root process on magnetite can reach the loopback listener, ntfy access is ZeroTier membership, and cinnabar is the single delivery path (A33); nothing here guarantees a series reaches the store end to end.
+- The roborev sub-gate was replaced at the operator's direction by the holistic review in `review.md` (twelve findings, all applied); verify §11 records the redeployments after #3497 and #3499.
+
 ## Known limits
 
 This projection contains no formal proof and no claim of end-to-end implementation verification.
 The three inherited CAM-41 interface discharges establish machine-visible artifacts only: no harness selection, human compliance, authorization, forge correctness, activation or landing guarantee.
+The 36 CAM-68 discharges establish configuration, regulator and tested-pipeline behavior on magnetite only; they assert neither R2 durability, ntfy delivery when cinnabar is down, nor end-to-end arrival of every series.
 Pyrite file-db contents and runtime adoption are different evidence; user dconf overrides deliberately remain possible.
 An archive-ready PASS WITH WARNINGS and an undischarged formal row are compatible claims at different boundaries, not a silent acceptance of missing evidence.
