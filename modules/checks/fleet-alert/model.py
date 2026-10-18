@@ -4,13 +4,15 @@ checks.x86_64-linux.fleet-alert's property test compares this model with
 modules/nixos/fleet-alert/transition.jq over generated timelines: posts
 (title, priority, kind, instance id) and state. It is written from the
 specification, not translated from the jq: Prometheus `for` over instances
-of a rule plus its result label set; resolve after 5 min absent; a
-`critical` instance re-posted every 24 h, a `warning` never, an `info` with
-no RESOLVED and not counted; a store error freezes every instance but
-StoreQueryFailing; a host without system_memory_usage_bytes freezes its
-instances; RuleSignalMissing per presence selector while an expected host
-reports; R9.1's 24 h count over posted FIRINGs and failed.log with one
-AlertBudgetExceeded per 24 h. Messages are not modelled.
+of a rule plus its result label set; resolve after 5 min absent, where
+frozen time is not absence (after a freeze the count restarts at the first
+unfrozen run); a `critical` instance re-posted every 24 h, a `warning`
+never, an `info` with no RESOLVED and not counted; a store error freezes
+every instance but StoreQueryFailing; a host without
+system_memory_usage_bytes freezes its instances; RuleSignalMissing per
+presence selector while an expected host reports; R9.1's 24 h count over
+posted FIRINGs and failed.log with one AlertBudgetExceeded per 24 h.
+Messages are not modelled.
 """
 
 import copy
@@ -98,7 +100,7 @@ def advance(instance, condition, now):
             }
         else:
             nxt = copy.deepcopy(instance)
-        nxt.update({"severity": rule["severity"], "for": rule["for"], "lastSeen": now})
+        nxt.update({"severity": rule["severity"], "for": rule["for"], "lastSeen": now, "absenceFrom": now})
         if nxt["phase"] == "resolved":
             nxt["phase"] = "firing"
         if nxt["phase"] == "pending" and now - nxt["activeSince"] >= nxt["for"]:
@@ -106,12 +108,17 @@ def advance(instance, condition, now):
         return nxt
     if instance is None or instance["phase"] == "pending":
         return None
-    if instance["phase"] == "firing" and now - instance["lastSeen"] >= RESOLVE_AFTER:
-        if instance["severity"] == "info" or instance["firingPostedAt"] is None:
-            return None
-        nxt = copy.deepcopy(instance)
-        nxt["phase"] = "resolved"
-        return nxt
+    if instance["phase"] == "firing":
+        since = instance.get("absenceFrom", instance["lastSeen"])
+        if since is None:
+            since = now
+        if now - since >= RESOLVE_AFTER:
+            if instance["severity"] == "info" or instance["firingPostedAt"] is None:
+                return None
+            nxt = copy.deepcopy(instance)
+            nxt["phase"] = "resolved"
+            return nxt
+        return dict(instance, absenceFrom=since)
     return instance
 
 
@@ -173,7 +180,7 @@ def transition(state, observations, now, rules):
             alert, labels = condition[0]["alert"], condition[1]
         if frozen(alert, labels, observations):
             if instance is not None:
-                instances[iid] = instance
+                instances[iid] = dict(instance, absenceFrom=None)
             continue
         nxt = advance(instance, condition, now)
         if nxt is not None:

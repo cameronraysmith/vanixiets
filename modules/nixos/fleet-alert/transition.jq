@@ -11,6 +11,9 @@
 # info instance posts no RESOLVED and is not counted. A store error freezes
 # every instance but StoreQueryFailing; a host missing from `reporting`
 # (system_memory_usage_bytes) freezes the instances labelled with it.
+# Frozen time is not absence: absence counts from `absenceFrom`, the run the
+# instance was last seen on or, after a freeze, the first unfrozen run (a
+# state written before the field existed counts from `lastSeen`).
 # StoreQueryFailing and RuleSignalMissing are raised only if $rules lists
 # them, with their `for`. Posts carry no topic; the caller adds it. The
 # caller posts in order and applies mark_posted($post) to the saved state
@@ -89,14 +92,17 @@ def advance($inst; $cond; $now):
     | . + { severity: $cond.rule.severity, for: $cond.rule.for,
             summary: ($cond.rule.annotations.summary // ""),
             attributed: ((($cond.rule.attribution // []) | length) > 0),
-            value: $cond.value, lastSeen: $now }
+            value: $cond.value, lastSeen: $now, absenceFrom: $now }
     | if .phase == "resolved" then .phase = "firing" else . end
     | if .phase == "pending" and ($now - .activeSince) >= .for then .phase = "firing" else . end
   elif $inst == null then null
   elif $inst.phase == "pending" then null
-  elif $inst.phase == "firing" and ($now - $inst.lastSeen) >= resolve_after then
-    if $inst.severity == "info" or $inst.firingPostedAt == null then null
-    else $inst | .phase = "resolved" end
+  elif $inst.phase == "firing" then
+    ((if $inst | has("absenceFrom") then $inst.absenceFrom else $inst.lastSeen end) // $now) as $from
+    | if ($now - $from) >= resolve_after then
+        if $inst.severity == "info" or $inst.firingPostedAt == null then null
+        else $inst | .phase = "resolved" end
+      else $inst | .absenceFrom = $from end
   else $inst
   end;
 
@@ -143,7 +149,7 @@ def transition($observations; $now; $rules):
         $state.instances[$id] as $inst
         | $conds[$id] as $cond
         | if frozen(($inst // {alert: $cond.rule.alert, labels: $cond.labels}); $observations) then
-            (if $inst == null then . else .[$id] = $inst end)
+            (if $inst == null then . else .[$id] = ($inst | .absenceFrom = null) end)
           else
             advance($inst; $cond; $now) as $next
             | if $next == null then . else .[$id] = $next end

@@ -698,12 +698,12 @@
           error = 503;
           requests = 1;
         }) (lib.range 1 8)
-        ++ map (n: { at = minute n; }) (lib.range 9 13);
+        ++ map (n: { at = minute n; }) (lib.range 9 14);
         expect = [
           "0 [FIRING] HostOOMKill magnetite high"
           "4 [FIRING] StoreQueryFailing high"
-          "9 [RESOLVED] HostOOMKill magnetite high"
           "13 [RESOLVED] StoreQueryFailing high"
+          "14 [RESOLVED] HostOOMKill magnetite high"
         ];
       };
 
@@ -731,6 +731,48 @@
         expect = [
           "0 [FIRING] HostOOMKill stibnite high"
           "16 [RESOLVED] HostOOMKill stibnite high"
+        ];
+      };
+
+      # Frozen time is not absence (design D11, D15): S3's live timeline of
+      # 2026-10-18 (logs/s3-evidence/7.6-oom-store-resolved-20261018T095420Z.log),
+      # where HostOOMKill, last seen before a 7 min store stop, resolved on
+      # the first run after the store returned. The absence clock restarts at
+      # the first unfrozen run, so the instance resolves 5 min after it.
+      storeThawLeg = {
+        name = "HostOOMKill last seen before 7 runs of store error resolves 5 min after the store answers again, not on its first answer";
+        steps =
+          map oomRuns (lib.range 0 2)
+          ++ map (n: {
+            at = minute n;
+            error = 503;
+            requests = 1;
+          }) (lib.range 3 9)
+          ++ map (n: { at = minute n; }) (lib.range 10 16);
+        expect = [
+          "0 [FIRING] HostOOMKill magnetite high"
+          "6 [FIRING] StoreQueryFailing high"
+          "14 [RESOLVED] StoreQueryFailing high"
+          "15 [RESOLVED] HostOOMKill magnetite high"
+        ];
+      };
+
+      hostThawLeg = {
+        name = "HostOOMKill on stibnite last seen before 7 silent runs resolves 5 min after stibnite reports again, not on its first report";
+        steps =
+          map (n: {
+            at = minute n;
+            reporting = both;
+            series.HostOOMKill = [ (seriesOn "stibnite" "HostOOMKill") ];
+          }) (lib.range 0 1)
+          ++ map (n: { at = minute n; }) (lib.range 2 8)
+          ++ map (n: {
+            at = minute n;
+            reporting = both;
+          }) (lib.range 9 15);
+        expect = [
+          "0 [FIRING] HostOOMKill stibnite high"
+          "14 [RESOLVED] HostOOMKill stibnite high"
         ];
       };
 
@@ -850,6 +892,8 @@
           exclusionLeg
           storeErrorLeg
           silentHostLeg
+          storeThawLeg
+          hostThawLeg
           signalGapLeg
           silentGapLeg
           windowLeg

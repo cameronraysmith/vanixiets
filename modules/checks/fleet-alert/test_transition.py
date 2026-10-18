@@ -5,7 +5,9 @@ hosts reporting system_memory_usage_bytes, each rule's firing hosts, and the
 index of the first post that fails in that run (the posts before it
 succeed, as the evaluator posts in order and stops at a failure). One jq
 process folds each whole timeline through transition and mark_posted; the
-model does the same; posts and state must be equal at every run. The test
+model does the same; posts and state must be equal at every run. A second
+property, written from the timeline alone, holds both to posting a RESOLVED
+only after 5 min of absence observed while not frozen. The test
 is derandomized, with no example database and no deadline, so it is a pure
 function of its source and cannot flake the merge queue.
 FLEET_ALERT_JQ_LIB names a directory holding transition.jq.
@@ -70,6 +72,7 @@ INSTANCE_FIELDS = (
     "for",
     "activeSince",
     "lastSeen",
+    "absenceFrom",
     "firingPostedAt",
     "lastPostedAt",
 )
@@ -237,6 +240,71 @@ def test_rule_without_expr_or_results_is_silent():
         assert got["state"]["instances"] == {}, f"{name}: instances {got['state']['instances']}"
 
 
+def unobserved_resolves(timeline, posts):
+    """The RESOLVED posts not preceded by RESOLVE_AFTER seconds of observed absence.
+
+    Written from the timeline alone (design D11, D15): an instance is frozen on
+    a run when the store errs or its host does not report (StoreQueryFailing
+    never), seen when unfrozen and in the results, and absent otherwise.
+    Absence counts from the run it was last seen on or, after a freeze, from
+    the first unfrozen run; a RESOLVED is due once that count reaches
+    RESOLVE_AFTER, and stays due, across later freezes, until it is seen.
+    """
+    candidates = {model.instance_id("StoreQueryFailing", {}): ("StoreQueryFailing", None)}
+    for alert in RULE_NAMES:
+        for host in HOSTS:
+            candidates[model.instance_id(alert, {"host_name": host})] = (alert, host)
+    since = dict.fromkeys(candidates)
+    due = dict.fromkeys(candidates, False)
+    found = []
+    for index, (step, planned) in enumerate(zip(timeline["steps"], posts)):
+        observations, now = step["observations"], step["now"]
+        for iid, (alert, host) in candidates.items():
+            if alert == "StoreQueryFailing":
+                frozen, seen = False, observations["storeError"]
+            else:
+                frozen = observations["storeError"] or host not in observations["reporting"]
+                seen = not frozen and host in [
+                    s["labels"]["host_name"] for s in observations["results"][alert]
+                ]
+            if frozen:
+                since[iid] = None
+            elif seen:
+                since[iid], due[iid] = now, False
+            else:
+                if since[iid] is None:
+                    since[iid] = now
+                if now - since[iid] >= model.RESOLVE_AFTER:
+                    due[iid] = True
+        found += [
+            f"run {index}: {post['title']}" for post in planned if post["kind"] == "resolved" and not due[post["id"]]
+        ]
+    return found
+
+
+# Frozen time is not absence: a RESOLVED is posted only after RESOLVE_AFTER
+# seconds of absence observed while neither the store nor the instance's
+# host is frozen, in transition.jq and in the model alike.
+@settings(
+    derandomize=True,
+    database=None,
+    deadline=None,
+    max_examples=200,
+    print_blob=False,
+    suppress_health_check=[HealthCheck.too_slow, HealthCheck.data_too_large],
+)
+@given(st.lists(step_strategy, min_size=1, max_size=40))
+def test_resolve_follows_unfrozen_absence(steps):
+    timeline = build(steps)
+    found = {
+        name: unobserved_resolves(timeline, run(timeline)["posts"])
+        for name, run in (("transition.jq", run_jq), ("model", run_model))
+    }
+    assert not any(found.values()), "RESOLVED before 5 min of unfrozen absence: " + "; ".join(
+        f"{name}: {', '.join(runs)}" for name, runs in found.items() if runs
+    )
+
+
 if __name__ == "__main__":
     test_transition_matches_model()
     print("ok: transition.jq equals the reference model on every generated timeline")
@@ -244,3 +312,5 @@ if __name__ == "__main__":
     print("ok: a rule without expr but with a results entry fires and resolves as its expr twin")
     test_rule_without_expr_or_results_is_silent()
     print("ok: a rule without expr or results entry, and results named for internal rules, produce nothing")
+    test_resolve_follows_unfrozen_absence()
+    print("ok: a RESOLVED follows 5 min of absence observed while neither the store nor the host is frozen")

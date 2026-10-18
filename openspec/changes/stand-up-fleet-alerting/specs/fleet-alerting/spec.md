@@ -60,7 +60,7 @@ An info instance SHALL produce no alert on resolving.
 While the telemetry store does not answer the evaluator, no alert instance SHALL resolve or be repeated, and a person SHALL be told once the store has failed to answer for 3 minutes.
 While a host reports no memory signal, no alert instance for that host SHALL resolve or be repeated, and each SHALL resume once the host reports again.
 
-**Discharged by**: `fleet-alerting-interface` requirement `Store errors and silent hosts freeze instance state`; `checks.x86_64-linux.fleet-alert`'s store-error and silent-host fixture legs, its store-freeze and host-freeze mutants, and its property test against the reference model's store and host freezes discharge it.
+**Discharged by**: `fleet-alerting-interface` requirement `Store errors and silent hosts freeze instance state`; `checks.x86_64-linux.fleet-alert`'s store-error and silent-host fixture legs, its store-freeze and host-freeze mutants, and its property test against the reference model's store and host freezes discharge it; the scenario "A freeze ends with the condition gone" is discharged by the same check's `storeThawLeg` and `hostThawLeg` fixture legs and its `test_resolve_follows_unfrozen_absence` property over `transition.jq` and the reference model.
 
 #### Scenario: The telemetry store stops answering
 
@@ -71,6 +71,11 @@ While a host reports no memory signal, no alert instance for that host SHALL res
 
 - **WHEN** stibnite stops reporting its memory signal while one of its alert instances is firing, and later reports again with the condition still holding
 - **THEN** no resolved alert and no second firing alert is posted for that instance, which the build-time alert regulator's host-freeze mutant shows it can detect
+
+#### Scenario: A freeze ends with the condition gone
+
+- **WHEN** a firing instance was last seen before the store stopped answering or its host fell silent, and the condition is absent once the freeze ends
+- **THEN** after a freeze ends, an instance resolves only after the full absence interval observed unfrozen: no resolved alert is posted until 5 minutes after the first run that observes the store answering and the host reporting, because frozen time is not absence
 
 ### Requirement: A missing signal is itself reported
 
