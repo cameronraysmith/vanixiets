@@ -1,19 +1,20 @@
 # Evaluation-time regulator for the telemetry store on magnetite (design D11):
-# R7.1's memory and kill-order relations, R1.1 (amended), R8.2's file
-# ownership, the disk binding, the PromQL read path (charter v13) and the
-# users-file generator run.
+# R1.1 (amended), R8.2's file ownership, the disk binding, the PromQL read
+# path (charter v13) and the users-file generator run.
 #
 # Every clause reads magnetite's evaluated configuration and judges a
 # relation a plausible edit would break silently, never a copy of a module
 # literal. The listeners, protocols, user provider and usage reporting are
-# assertions in modules/nixos/greptimedb.nix, and R8.2's credential holders an
-# assertion in magnetite's configuration. Mutants are pure functions over the
-# extracted `view`, never re-evaluations of the host, so each costs a few
-# attribute updates instead of a NixOS fixpoint. The check asserts that the
-# real view fails no clause and that every mutant fails the clause it targets,
-# following modules/checks/omnigent-environment.nix:98-118. The users-file
-# clause runs the greptimedb-users generator in the build sandbox, because the
-# store skips a malformed users line silently (design F2).
+# assertions in modules/nixos/greptimedb.nix, and R8.2's credential holders
+# and R7.1's memory and kill-order relations (with the alert evaluator last,
+# S3 design D12) assertions in magnetite's configuration. Mutants are pure
+# functions over the extracted `view`, never re-evaluations of the host, so
+# each costs a few attribute updates instead of a NixOS fixpoint. The check
+# asserts that the real view fails no clause and that every mutant fails the
+# clause it targets, following modules/checks/omnigent-environment.nix:98-118.
+# The users-file clause runs the greptimedb-users generator in the build
+# sandbox, because the store skips a malformed users line silently (design
+# F2).
 { self, lib, ... }:
 {
   perSystem =
@@ -501,34 +502,6 @@
             touch "$out"
           '';
 
-      # systemd memory sizes with an M or G suffix, which systemd reads as
-      # powers of 1024.
-      sizeBytes =
-        size:
-        let
-          m = builtins.match "([0-9]+)([MG])" (toString size);
-        in
-        if m == null then
-          null
-        else
-          lib.toInt (builtins.head m)
-          * (if builtins.elemAt m 1 == "G" then 1024 * 1024 * 1024 else 1024 * 1024);
-
-      # The evaluator's oom_score_adj is set by the nix-eval-lock wrapper
-      # script, not by a unit, so it is read from that script.
-      evaluatorAdj =
-        let
-          lines = lib.splitString "\n" (builtins.readFile ../lib/nix-eval-lock.sh);
-          matches = lib.concatMap (
-            line:
-            let
-              m = builtins.match "[[:space:]]*echo ([0-9]+) >/proc/self/oom_score_adj" line;
-            in
-            if m == null then [ ] else m
-          ) lines;
-        in
-        if builtins.length matches == 1 then lib.toInt (builtins.head matches) else null;
-
       # disko declares the dataset for installation only; the boot oneshots
       # enforce greptimedbDataset on the live host. The clause keeps the two
       # from drifting apart.
@@ -536,10 +509,6 @@
 
       view = {
         inherit (store) package settings;
-        unit = magnetite.systemd.services.greptimedb.serviceConfig;
-        collectorUnit = magnetite.systemd.services.opentelemetry-collector.serviceConfig;
-        evalLockEnabled = magnetite.services.nixEvalLock.enable;
-        inherit evaluatorAdj;
         usersFiles = lib.filterAttrs (_: file: file.secret) usersGenerator.files;
         disko = magnetite.disko.devices.zpool.zroot.datasets."root/greptimedb";
         zfsOneshots = {
@@ -553,21 +522,8 @@
         v:
         let
           s = v.settings;
-          high = sizeBytes (v.unit.MemoryHigh or "");
-          max = sizeBytes (v.unit.MemoryMax or "");
         in
         {
-          # R7.1: the store is throttled before its ceiling and never swaps,
-          # and under host OOM the kernel kills the evaluator, then the store,
-          # then the collector, so the collector outlives the store and
-          # queues (A7:100,127).
-          memoryCeilings =
-            high != null && max != null && high < max && toString (v.unit.MemorySwapMax or "unset") == "0";
-          killOrder =
-            v.evalLockEnabled
-            && v.evaluatorAdj != null
-            && v.evaluatorAdj > (v.unit.OOMScoreAdjust or 1000)
-            && (v.unit.OOMScoreAdjust or 1000) > (v.collectorUnit.OOMScoreAdjust or 1000);
           usersRestartUnits = builtins.elem "greptimedb.service" (v.usersFiles.users.restartUnits or [ ]);
 
           # R1.1, amended: a stable release that declares the embedded dashboard.
@@ -602,25 +558,6 @@
       withSettings = f: v: v // { settings = f v.settings; };
 
       mutants = {
-        # R7.1
-        dropMemoryMax = {
-          clause = "memoryCeilings";
-          apply = v: v // { unit = removeAttrs v.unit [ "MemoryMax" ]; };
-        };
-        storeOutlivesCollector = {
-          clause = "killOrder";
-          apply =
-            v:
-            v
-            // {
-              unit = v.unit // {
-                OOMScoreAdjust = v.collectorUnit.OOMScoreAdjust;
-              };
-              collectorUnit = v.collectorUnit // {
-                OOMScoreAdjust = v.unit.OOMScoreAdjust;
-              };
-            };
-        };
         restartUnitsRemoved = {
           clause = "usersRestartUnits";
           apply =

@@ -1,0 +1,60 @@
+{
+  "series": {
+    "HostMemoryPressure": { "host_name": "magnetite" },
+    "HostOOMKill": {
+      "host_name": "magnetite",
+      "instance": "127.0.0.1:9100",
+      "job": "node",
+      "service_instance_id": "127.0.0.1:9100",
+      "service_name": "node"
+    },
+    "ZfsPoolUnhealthy": {
+      "__name__": "node_zfs_zpool_state",
+      "host_name": "magnetite",
+      "instance": "127.0.0.1:9100",
+      "job": "node",
+      "service_instance_id": "127.0.0.1:9100",
+      "service_name": "node",
+      "state": "degraded",
+      "zpool": "zroot"
+    },
+    "SystemdUnitRestartLoop": {
+      "host_name": "magnetite",
+      "systemd_unit_name": "omnigent-host-owner-1.service"
+    },
+    "SystemdUnitFailed": {
+      "__name__": "systemd_unit_state",
+      "host_name": "magnetite",
+      "systemd_unit_active_state": "failed",
+      "systemd_unit_name": "nginx.service"
+    },
+    "LocalExporterDown": {
+      "__name__": "up",
+      "host_name": "magnetite",
+      "instance": "127.0.0.1:9100",
+      "job": "node",
+      "service_instance_id": "127.0.0.1:9100",
+      "service_name": "node"
+    },
+    "WeeklyPipelineTest": {}
+  },
+  "attribution": [
+    [
+      { "metric": { "process_executable_name": "nix-instantiate" }, "value": "471000000" },
+      { "metric": { "process_executable_name": "nix-eval-jobs" }, "value": "400000000" },
+      { "metric": { "process_executable_name": "niks3" }, "value": "314000000" }
+    ],
+    [
+      {
+        "metric": {
+          "instance": "127.0.0.1:9100",
+          "job": "node",
+          "service_instance_id": "127.0.0.1:9100",
+          "service_name": "node"
+        },
+        "value": "4120000000"
+      }
+    ],
+    [{ "metric": {}, "value": "960000000" }]
+  ]
+}

@@ -4,7 +4,7 @@
 
 The machine SHALL define `observability-notify@.service` in `flake.modules.nixos.observability-notify`, posting through the one `ntfy-send` package to `fleet-alerts` with the `alerter` token and logging each posted `FAILED` in `/var/lib/observability-notify/failed.log`, and SHALL set `OnFailure=observability-notify@%n.service` on `greptimedb.service`, `greptimedb-schema.service`, `greptimedb-envelope.service`, `opentelemetry-collector.service` and magnetite's nine ZFS property oneshots.
 
-**Discharged by**: the failure-wiring clause and notifier rehearsal of the evaluation-time collector check (R3.1) with their mutants, `checks.<system>.package-ntfy-send-test-token-transport` with its argv mutant, the token-wiring clause of `checks.x86_64-linux.fleet-alert` with its mutant, and the operator's recorded delivery of a forced failure after the access entries are in force.
+**Discharged by**: the failure-wiring clause and notifier rehearsal of the evaluation-time collector check (R3.1) with their mutants, `checks.<system>.package-ntfy-send-test-token-transport` with its argv mutant, the token-wiring assertions in `observability-notify.nix`, `fleet-alert.nix` and magnetite's and cinnabar's configurations, each shown able to fail by an `extendModules` override, and the operator's recorded delivery of a forced failure after the access entries are in force.
 
 #### Scenario: The failure wiring is evaluated
 
@@ -38,8 +38,8 @@ The machine SHALL define `observability-notify@.service` in `flake.modules.nixos
 
 #### Scenario: The notifier carries the alerter token
 
-- **WHEN** the token-wiring clause of `checks.x86_64-linux.fleet-alert` reads magnetite's and cinnabar's configurations
-- **THEN** it finds that the template loads the `ntfy-alerter` generator's `token` file through `LoadCredential` and sets `NTFY_TOKEN_FILE` to that credential, and that each notified unit's `ExecStartPost=` and `ExecStopPost=` hooks set `NTFY_TOKEN_FILE` to the same generator file's path, and a mutant template without `NTFY_TOKEN_FILE` makes the clause fail
+- **WHEN** magnetite's and cinnabar's configurations are evaluated
+- **THEN** `observability-notify.nix`'s assertion holds that, with `tokenFile` set, the template loads it through `LoadCredential` and names that credential in `NTFY_TOKEN_FILE`, and each notified unit's `ExecStartPost=` and `ExecStopPost=` hooks run under `env NTFY_TOKEN_FILE=<tokenFile>`; each host's assertion holds that `tokenFile` is the `ntfy-alerter` generator's `token` path; and an `extendModules` override that drops `NTFY_TOKEN_FILE` from the template makes evaluation fail
 
 #### Scenario: Each posted failure is logged
 

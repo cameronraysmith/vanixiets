@@ -35,7 +35,7 @@ A shared clan vars generator `ntfy-alerter` holds the token, a per-machine gener
 - ntfy on cinnabar: `behind-proxy = true`, `proxy-trusted-hosts = "::1"`, `visitor-prefix-bits-ipv6 = 128`, no exempt host; `log-level = "debug"` from C1 until the revert PR after 7.4; `auth-access = [ "alerter:fleet-*:rw" "*:fleet-*:ro" ]` from deploy 3 only, one entry per line in nixfmt form; `auth-default-access` unset.
 - Token: `^tk_[-_A-Za-z0-9]{29}$`, mode `0400`, never on any argv; `ntfy-send` sends `Authorization: Bearer` read from `NTFY_TOKEN_FILE` via `-H @-`.
 - Cutover, three deploys, each by `logs/s3-evidence/s3-deploy.sh <host> <C1|C2|C3>` (Task 7 Step 0), which runs `clan machines update <host>` from a fresh worktree of `origin/main` only when `nixbot-logs queue` prints `Queue is empty` and appends `<label>_START`/`<label>_END` to `logs/s3-evidence/window.env`: C1 cinnabar (provisioning, proxy settings, debug log level, no access entries), gated by `tasks.md` 7.1; C2 magnetite (evaluator, token-bearing notifier), gated by 7.2; C3 cinnabar (access entries, dead-man), gated by 7.3. Rollback runs in reverse order.
-- Shared vars: `clan vars generate` runs in the working copy before the task's commit and its `vars/` changes are squashed into that task's change; adding magnetite as a reader of the shared token (`CLAN_NO_COMMIT=1 clan vars generate magnetite --generator ntfy-alerter`) never regenerates it (clan-core `pkgs/clan-cli/clan_cli/tests/test_vars_shared.py:175-222`), verified by `clan vars check magnetite`.
+- Shared vars: `clan vars generate` runs in the working copy before the task's commit and its `vars/` changes are squashed into that task's change. A machine is added as a reader of an existing shared var with `CLAN_NO_COMMIT=1 clan vars fix <machine> --generator <generator>`, never `clan vars generate <machine> --generator <generator>`: on 2026-10-18 `generate magnetite --generator ntfy-alerter` regenerated the shared token and re-ran the dependent `ntfy-alerter-env` (`logs/s3-evidence/4.8-vars-magnetite-20261018T073644Z.log`), while `vars fix` added magnetite's age key (clan-core `sops.py:446-450`, `allow_member`) and re-encrypted only `vars/shared/ntfy-alerter/token/secret` with the value unchanged (`4.8-vars-fix-magnetite-20261018T073724Z.log`); `clan vars check <machine>` verifies.
 - No credential value in any repository file; credentials are clan vars consumed by path through `LoadCredential`, `EnvironmentFile` or `NTFY_TOKEN_FILE`.
 - Runtime tests stay out of `checks`; S3 adds no `vmTests` and needs no `kvm`; pyrite serves only as an always-on subscriber that captures `fleet-alerts` for 9.1's 24 h window (`fleet-alerts-capture.service`, `/var/lib/fleet-alerts-capture.jsonl`, curl `-k`, because pyrite does not trust caddy's internal CA).
 - Review: one read-only subagent of the default `task` agent type on an Opus model reviews S3 as merged and deployed, in place of the paid codex review (roborev), writing `openspec/changes/stand-up-fleet-alerting/review.md`; applied findings become `tasks.md` §10.
@@ -65,14 +65,14 @@ Every task uses exactly these names.
 | Dead-man config | JSON at `FLEET_DEADMAN_CONFIG`: `{ ntfyUrl, topic, evaluatorHost, heartbeatTopic, window: "10m", stateFile: "/var/lib/fleet-deadman/state.json", rules: [ AlertEvaluatorSilent ] }`; requires `NTFY_TOKEN_FILE`; time from `FLEET_ALERT_NOW` when set | Task 5 |
 | NixOS module | `flake.modules.nixos.fleet-alert` at `modules/nixos/fleet-alert.nix`; options `services.fleet-alert.evaluator.{enable,tokenFile,regulatorPasswordFile,storeUrl,topic,heartbeatTopic}` (defaults `http://127.0.0.1:4000`, `fleet-alerts`, `fleet-heartbeat`), declared in Task 4; `services.fleet-alert.deadman.{enable,tokenFile,ntfyUrl,topic,evaluatorHost}` (defaults `http://[::1]:2586`, `fleet-alerts`, `magnetite`; `tokenFile` has none), declared in Task 5 | Tasks 4, 5 |
 | Units and state | `fleet-alert.service`, `fleet-alert.timer`, `/var/lib/fleet-alert/state.json`; `fleet-deadman.service`, `fleet-deadman.timer`, `/var/lib/fleet-deadman/state.json` | Tasks 4, 5 |
-| Check | `checks.x86_64-linux.fleet-alert` at `modules/checks/fleet-alert.nix`, data under `modules/checks/fleet-alert/` (`fixture_server.py`, `ntfy_stub.py`, `model.py`, `test_transition.py`, `fixtures/*.json`); `passthru` parts `promtoolRehearsal`, `fixtureRehearsal`, `propertyRehearsal`, `wiringClause`, `failures`, and from Task 5 `deadmanRehearsal`; `perSystem` `let` bindings `ntfySendStub`, `fixtureCredentials`, `wiringHostNames`, `requiredPublishers`, `hostView`, `input`, `failures`, `mutants`, `updateService`, `runtimeMutants`, and from Task 5 `deadmanFailures`, `deadmanMutants`, `deadmanInput`, `decision` | Task 4, extended in Task 5 |
+| Check | `checks.x86_64-linux.fleet-alert` at `modules/checks/fleet-alert.nix`, data under `modules/checks/fleet-alert/` (`fixture_server.py`, `ntfy_stub.py`, `model.py`, `test_transition.py`, `fixtures/*.json`); `passthru` parts `promtoolRehearsal`, `fixtureRehearsal`, `propertyRehearsal`, and from Task 5 `deadmanRehearsal`; `perSystem` `let` bindings `ntfySendStub`, `fixtureCredentials`, `updateService`, `runtimeMutants`, and from Task 5 `deadmanFailures`, `deadmanMutants`, `deadmanInput`, `decision` | Task 4, extended in Task 5 |
 | Fixture server | `python3 fixture_server.py --responses <file> --step-file <file> --port-file <file>`: binds `127.0.0.1` on an ephemeral port written to `--port-file`; serves `GET`/`POST /v1/prometheus/api/v1/query` from `responses[<step>][<query>]` (a Prometheus JSON body, or `{ "status": <code> }`); 404 for any other path, 400 without `x-greptime-db-name: fleet`, 401 for any user other than `regulator` with the fixture password `00112233445566778899aabbccddeeff`; prints `REQUEST <step> <query>`, `UNEXPECTED <step> <query>` and `VIOLATION <text>` lines, and records a violation if two requests are open at once | Task 4 |
 | ntfy stub | `python3 ntfy_stub.py --topic <topic> --probe-status <code> --poll-status <code> …`: loopback stand-in for ntfy's publish and poll endpoints, used by `deadmanRehearsal` | Task 5 |
 | Recording `ntfy-send` stub | `ntfySendStub` (`pkgs.writeShellScriptBin "ntfy-send"`): appends one JSON line `{ topic, message, headers, tokenFile }` per call to `$FLEET_ALERT_POSTS`; exits with `$FLEET_ALERT_POST_STATUS` (default 0) | Task 4 |
 | Assertion | R9.5 in `modules/nixos/fleet-alert.nix`: `MemoryMax = "64M"` and `TimeoutStartSec = "50s"` on `fleet-alert.service` | Task 4 |
 | Assertion | magnetite R8.2 holders `regulator-password = [ "fleet-alert" "greptimedb-envelope" ]`, written sorted (`modules/machines/nixos/magnetite/default.nix:647`) | Task 4 |
 | Deploy procedure | `logs/s3-evidence/s3-deploy.sh HOST LABEL [FILE LINE]` (git-ignored); `logs/s3-evidence/window.env` holding `C1_START` … `C3_END`, `T_BADTOKEN`, `T_ANON403`, `T_CURL22`, `W_END`, `T_STOP`, `T_START`, `T_CAP_START`, `T_OOM`, `T_STORE_STOP`, `T_STORE_START`, `T_EXP_STOP`, `T_EXP_START`, `T_FORCED` | Task 7 |
-| Check clause | kill order in `checks.x86_64-linux.greptimedb-envelope`: `fleet-alert` below the collector | Task 4 |
+| Assertions | token wiring: `observability-notify.nix` (with `tokenFile` set, the template loads it and names that credential in `NTFY_TOKEN_FILE`; every notified unit's resolve hooks run under `env NTFY_TOKEN_FILE=<tokenFile>`), `fleet-alert.nix` (`fleet-alert.service`, and from Task 5 `fleet-deadman.service`, load their `tokenFile` and name it in `NTFY_TOKEN_FILE`), magnetite's and, from Task 5, cinnabar's configuration (every `tokenFile` equals the `ntfy-alerter` token path); magnetite's R7.1 memory ceilings and kill order `nix-eval-jobs` > `greptimedb` > `opentelemetry-collector` > `fleet-alert`; each shown able to fail by an `extendModules` override | Tasks 4, 5 |
 
 ## Task map
 
@@ -1235,7 +1235,7 @@ Vendor facts this task rests on, read for this plan at the pins (each re-read in
     Task 5 adds `settings.auth-access = [ "alerter:fleet-*:rw" "*:fleet-*:ro" ];` to the same `settings` attrset in `modules/machines/nixos/cinnabar/ntfy.nix`.
   - `checks.x86_64-linux.ntfy-provisioning` at `modules/checks/ntfy-provisioning.nix`: runs both generators' `finalScript` in the sandbox and judges their output against ntfy 2.28.0's parse rules and cinnabar's evaluated `services.ntfy-sh.settings.auth-access or [ ]`; its access clause is vacuous until Task 5 adds entries, and its `alertr` mutant is appended to whatever entries exist, so it bites before and after Task 5.
   - Shared vars recipients: after Step 15 the shared `token` is encrypted for cinnabar only.
-    Task 4, after importing the module on magnetite, runs `CLAN_NO_COMMIT=1 clan vars generate magnetite --generator ntfy-alerter`, which adds magnetite to the existing shared secret without regenerating its value (clan-core `pkgs/clan-cli/clan_cli/tests/test_vars_shared.py:175-222`, `test_add_machine_to_existing_shared_secret`), and verifies with `clan vars check magnetite`.
+    Task 4, after importing the module on magnetite, runs `CLAN_NO_COMMIT=1 clan vars fix magnetite --generator ntfy-alerter`, which adds magnetite's age key to the existing shared secret without regenerating its value (clan-core `sops.py:446-450`, `allow_member`); `clan vars generate magnetite --generator ntfy-alerter` regenerates it instead (`logs/s3-evidence/4.8-vars-magnetite-20261018T073644Z.log`). It verifies with `clan vars check magnetite`; its evidence is `jj diff --name-only -- vars/` listing only `vars/shared/ntfy-alerter/token/secret`, with `vars/per-machine/cinnabar/ntfy-alerter-env/` untouched; a regenerated token would leave cinnabar's provisioned token stale and every magnetite post would get 401.
     Its evidence is `jj diff --name-only -- vars/` listing magnetite's recipient entry `vars/shared/ntfy-alerter/token/machines/magnetite` (plus `token/secret` only if sops rewrites its recipient metadata), with `vars/per-machine/cinnabar/ntfy-alerter-env/` untouched; a regenerated token would leave cinnabar's provisioned token stale and every magnetite post would get 401.
 
 - [ ] **Step 1: Record ntfy 2.28.0's logging of 401 and 403 (tasks.md 3.1)**
@@ -1720,8 +1720,9 @@ If `ntfy-sh` fails to start, the journal's `invalid auth-users`/`invalid auth-to
 ### Task 4: Evaluator, rules, transition function and `checks.fleet-alert` (cutover C2)
 
 Implements `tasks.md` 4.1–4.11 (design D3, D10–D16, D18, D19, "Failure path"; ADR-009 items 1–8, 10, 14, 17, R9.1, R9.2, R9.5; specs `fleet-alerting-interface` and `fleet-alerting`).
-The whole check is written first, with its fixture server, label fixtures, reference model and property test, and each of its four parts is built on its own and fails before the code it judges exists: the `promtool` part before `rules.nix`, the property part before `transition.jq`, the fixture part before `fleet-alert.nix`, and the token-wiring clause before magnetite's wiring.
-The kill-order clause and magnetite's R8.2 holder assertion are also made to fail first, by the order of the steps.
+The whole check is written first, with its fixture server, label fixtures, reference model and property test, and each of its three parts is built on its own and fails before the code it judges exists: the `promtool` part before `rules.nix`, the property part before `transition.jq`, and the fixture part before `fleet-alert.nix`.
+The token wiring and R7.1's memory and kill-order relations are host-local, so they are module and host assertions rather than check clauses, as S1's F5 did; with the token-wiring clause in the check it measured 0.557 GiB (582 MB of it the clause), above the 0.5 GiB budget, and 0.36 GiB without it (charter v18).
+magnetite's token, kill-order and R8.2 holder assertions are made to fail first, by the order of the steps, and every new assertion is shown able to fail by an `extendModules` override.
 
 **Files:**
 - Create: `modules/nixos/fleet-alert/rules.nix` (a flake-parts module defining `flake.lib.fleetAlertRules`)
@@ -1729,9 +1730,10 @@ The kill-order clause and magnetite's R8.2 holder assertion are also made to fai
 - Create: `modules/nixos/fleet-alert.nix` (`flake.lib.fleetAlertEvaluator`, `flake.modules.nixos.fleet-alert`)
 - Create: `modules/checks/fleet-alert.nix` (`checks.x86_64-linux.fleet-alert`)
 - Create: `modules/checks/fleet-alert/fixture_server.py`, `modules/checks/fleet-alert/model.py`, `modules/checks/fleet-alert/test_transition.py`, `modules/checks/fleet-alert/fixtures/series.json`
-- Modify: `modules/checks/greptimedb-envelope.nix` (kill-order clause, `view`, one mutant, header comment)
-- Modify: `modules/machines/nixos/magnetite/default.nix` (imports `fleet-alert` and `ntfy-alerter`; `services.observability-notify.units` gains `fleet-alert`; evaluator and notifier token settings; R8.2 `regulator-password` holders)
-- Modify (by `clan vars generate magnetite`, Step 24): `vars/shared/ntfy-alerter/token/` (magnetite added as a recipient; the value is not regenerated)
+- Modify: `modules/nixos/observability-notify.nix` (the template and hook token assertions)
+- Modify: `modules/checks/greptimedb-envelope.nix` (delete the `memoryCeilings` and `killOrder` clauses, the `view` fields only they read and their mutants; header comment)
+- Modify: `modules/machines/nixos/magnetite/default.nix` (imports `fleet-alert` and `ntfy-alerter`; `services.observability-notify.units` gains `fleet-alert`; evaluator and notifier token settings; R8.2 `regulator-password` holders; the token, R7.1 memory-ceiling and kill-order assertions)
+- Modify (by `clan vars fix magnetite --generator ntfy-alerter`, Step 24): `vars/shared/ntfy-alerter/token/secret` (re-encrypted with magnetite's age key added; the value is not regenerated)
 - Modify: `openspec/changes/stand-up-fleet-alerting/tasks.md` (tick 4.1–4.9)
 - Evidence (git-ignored): `logs/s3-evidence/4.*-*.log`
 
@@ -1760,8 +1762,9 @@ The kill-order clause and magnetite's R8.2 holder assertion are also made to fai
   Task 5 adds `services.fleet-alert.deadman.*`, `fleetAlertDeadman` and a second `mkMerge` element; this task declares no `deadman` option (agreed with S3PlanT5; see questions).
 - Produces: `fleet-alert.service` (`Type = "oneshot"`, `DynamicUser`, `StateDirectory = "fleet-alert"`, `UMask = "0077"`, the `greptimedb-envelope` hardening set, `OOMScoreAdjust = 0`, `MemoryMax = "64M"`, `TimeoutStartSec = "50s"`, `LoadCredential = [ "regulator-password:<path>" "alerter-token:<path>" ]`, `environment = { FLEET_ALERT_CONFIG = <store path>; NTFY_TOKEN_FILE = "%d/alerter-token"; }`, `after = [ "greptimedb.service" "greptimedb-schema.service" "zerotierone.service" ]`, no `wants`), `fleet-alert.timer` (`OnCalendar = "minutely"`, `AccuracySec = "1s"`), state `/var/lib/fleet-alert/state.json`.
 - Produces: the R9.5 assertion in `modules/nixos/fleet-alert.nix`, message starting `fleet-alert: R9.5 requires`.
-- Produces: `checks.x86_64-linux.fleet-alert`, a `runCommand` whose `passthru` holds `rules`, `failures`, `promtoolRehearsal`, `fixtureRehearsal`, `propertyRehearsal` and `wiringClause`, each built alone in the steps below.
-  `perSystem` `let` names Task 5 extends: `ntfySendStub` (`pkgs.writeShellScriptBin "ntfy-send"`), `fixtureCredentials`, `wiringHostNames = [ "magnetite" ];`, `requiredPublishers`, `hostView`, `input`, `failures`, `mutants`, `updateService`, `runtimeMutants`.
+- Produces: `checks.x86_64-linux.fleet-alert`, a `runCommand` whose `passthru` holds `rules`, `promtoolRehearsal`, `fixtureRehearsal` and `propertyRehearsal`, each built alone in the steps below.
+  `perSystem` `let` names Task 5 extends: `ntfySendStub` (`pkgs.writeShellScriptBin "ntfy-send"`), `fixtureCredentials`, `updateService`, `runtimeMutants`.
+- Produces: the token-wiring assertions in `observability-notify.nix` and `fleet-alert.nix`, and magnetite's token, R7.1 memory-ceiling and kill-order assertions, with messages starting `observability-notify:`, `fleet-alert:` and `magnetite:`.
 - Produces: the fixture server CLI of the contract; it prints `REQUEST <step> <query>`, `UNEXPECTED <step> <query>` and `VIOLATION <text>` lines on stdout, which the check redirects to a file, and its fixture password is the constant `00112233445566778899aabbccddeeff`.
 
 - [ ] **Step 1: Confirm the base**
@@ -2420,10 +2423,10 @@ if __name__ == "__main__":
 Create `modules/checks/fleet-alert.nix`:
 
 ```nix
-# checks.x86_64-linux.fleet-alert: regulator R9.2 and the token-wiring clause
-# (ADR-009 R9.2; design D10, D11, D13-D16, D19; tasks.md 4.5-4.7).
+# checks.x86_64-linux.fleet-alert: regulator R9.2 (ADR-009 R9.2; design D10,
+# D11, D13-D16, D19; tasks.md 4.5, 4.6).
 #
-# Four parts, each a derivation in passthru so it can be built alone:
+# Three parts, each a derivation in passthru so it can be built alone:
 # - promtoolRehearsal: `promtool check rules` over the YAML rendered from
 #   modules/nixos/fleet-alert/rules.nix, and a malformed-expression mutant
 #   that promtool must reject.
@@ -2439,11 +2442,12 @@ Create `modules/checks/fleet-alert.nix`:
 # - propertyRehearsal: fleet-alert/test_transition.py compares transition.jq
 #   with the reference model fleet-alert/model.py over derandomized
 #   Hypothesis timelines, and must fail on the no-re-post mutant.
-# - wiringClause: every fleet-* publisher unit on the hosts in
-#   wiringHostNames loads the ntfy-alerter token by its vars path and names
-#   that credential in NTFY_TOKEN_FILE, and every notified unit's resolve
-#   hooks export the vars path. Mutants are functions over `input`
-#   (modules/checks/otel-collector-config.nix pattern).
+#
+# The alerter token's wiring (tasks.md 4.7) is asserted where the units are
+# declared: modules/nixos/observability-notify.nix (template and resolve
+# hooks), modules/nixos/fleet-alert.nix (the evaluator) and magnetite's
+# configuration (both read the ntfy-alerter token), because a check forcing
+# those units again cost about 0.55 GiB of evaluation (S1 review F5).
 #
 # The fixtures cannot see the store's real metric names (ADR-009
 # Consequences); RuleSignalMissing watches those after deploy. The label
@@ -3148,173 +3152,6 @@ Create `modules/checks/fleet-alert.nix`:
             echo "mutant noRepost rejected"
             touch "$out"
           '';
-
-      # --- token wiring -------------------------------------------------------
-
-      publisherUnits = [
-        "fleet-alert"
-        "fleet-deadman"
-        "observability-notify@"
-      ];
-      wiringHostNames = [ "magnetite" ];
-      # Publishers each host must carry, so the clause cannot pass on a host
-      # that lost one.
-      requiredPublishers = {
-        magnetite = [
-          "fleet-alert"
-          "observability-notify@"
-        ];
-      };
-
-      # Only the named units are read: projecting every unit of a host costs
-      # as much evaluation as its toplevel (S1 review F5).
-      hostView =
-        config:
-        let
-          notifyUnits = config.services.observability-notify.units or [ ];
-          unit = name: config.systemd.services.${name};
-        in
-        {
-          tokenPath = config.clan.core.vars.generators.ntfy-alerter.files.token.path or null;
-          inherit notifyUnits;
-          services = lib.genAttrs (builtins.filter (name: config.systemd.services ? ${name}) publisherUnits) (
-            name: { inherit (unit name) environment serviceConfig; }
-          );
-          hooks = lib.genAttrs notifyUnits (name: {
-            start = lib.toList ((unit name).serviceConfig.ExecStartPost or [ ]);
-            stop = lib.toList ((unit name).serviceConfig.ExecStopPost or [ ]);
-          });
-        };
-
-      input = {
-        hosts = lib.genAttrs wiringHostNames (name: hostView self.nixosConfigurations.${name}.config);
-      };
-
-      # LoadCredential entries are "<id>:<source path>"; the ids loading `path`.
-      credentialIds =
-        path: unit:
-        lib.concatMap (
-          entry:
-          let
-            m = builtins.match "([^:]+):(.+)" entry;
-          in
-          lib.optional (m != null && builtins.elemAt m 1 == path) (builtins.head m)
-        ) (lib.toList (unit.serviceConfig.LoadCredential or [ ]));
-
-      # Task 2's hook form when services.observability-notify.tokenFile is set.
-      hookPattern =
-        tokenPath: mode:
-        "-\\+/nix/store/[a-z0-9]{32}-coreutils-[^/ ]+/bin/env NTFY_TOKEN_FILE=${lib.escapeRegex tokenPath} /nix/store/[a-z0-9]{32}-observability-notify-resolved ${mode} %n";
-
-      failures =
-        i:
-        lib.concatLists (
-          lib.mapAttrsToList (
-            host: h:
-            let
-              check = name: ok: lib.optional (!ok) "${host}: ${name}";
-              wired =
-                name:
-                let
-                  ids = credentialIds h.tokenPath h.services.${name};
-                in
-                ids != [ ]
-                && builtins.elem (h.services.${name}.environment.NTFY_TOKEN_FILE or null) (map (id: "%d/${id}") ids);
-              exports =
-                mode: hooks: lib.any (hook: builtins.match (hookPattern h.tokenPath mode) hook != null) hooks;
-            in
-            lib.concatLists [
-              (check "no ntfy-alerter token path" (h.tokenPath != null))
-              (check "a required fleet-* publisher is missing" (
-                lib.all (name: h.services ? ${name}) (requiredPublishers.${host} or [ ])
-              ))
-              (lib.concatMap (
-                name:
-                check "${name} does not load the ntfy-alerter token and name it in NTFY_TOKEN_FILE" (
-                  h.tokenPath != null && wired name
-                )
-              ) (lib.attrNames h.services))
-              (lib.concatMap (
-                name:
-                check "${name}'s resolve hooks do not export the token path" (
-                  h.tokenPath != null && exports "start" h.hooks.${name}.start && exports "stop" h.hooks.${name}.stop
-                )
-              ) h.notifyUnits)
-            ]
-          ) i.hosts
-        );
-
-      updateService =
-        host: name: f: i:
-        i
-        // {
-          hosts = i.hosts // {
-            ${host} = i.hosts.${host} // {
-              services = i.hosts.${host}.services // {
-                ${name} = f i.hosts.${host}.services.${name};
-              };
-            };
-          };
-        };
-
-      mutants = {
-        # tasks.md 4.7's mutant.
-        templateWithoutTokenFile = updateService "magnetite" "observability-notify@" (
-          u: u // { environment = removeAttrs u.environment [ "NTFY_TOKEN_FILE" ]; }
-        );
-        evaluatorTokenFromAnotherPath = updateService "magnetite" "fleet-alert" (
-          u:
-          u
-          // {
-            serviceConfig = u.serviceConfig // {
-              LoadCredential = map (
-                entry: if lib.hasPrefix "alerter-token:" entry then "alerter-token:/run/secrets/elsewhere" else entry
-              ) (lib.toList u.serviceConfig.LoadCredential);
-            };
-          }
-        );
-        # The hooks as they are with tokenFile unset.
-        hooksWithoutToken =
-          i:
-          i
-          // {
-            hosts = i.hosts // {
-              magnetite = i.hosts.magnetite // {
-                hooks = lib.mapAttrs (
-                  _: lib.mapAttrs (
-                    _: map (
-                      hook:
-                      let
-                        m = builtins.match "-\\+/nix/store/[^ ]+/bin/env NTFY_TOKEN_FILE=[^ ]+ (.*)" hook;
-                      in
-                      if m == null then hook else "-+${builtins.head m}"
-                    )
-                  )
-                ) i.hosts.magnetite.hooks;
-              };
-            };
-          };
-        evaluatorRemoved =
-          i:
-          i
-          // {
-            hosts = i.hosts // {
-              magnetite = i.hosts.magnetite // {
-                services = removeAttrs i.hosts.magnetite.services [ "fleet-alert" ];
-              };
-            };
-          };
-      };
-
-      wiringClause =
-        assert lib.assertMsg (
-          failures input == [ ]
-        ) "fleet-alert token-wiring failures: ${builtins.toJSON (failures input)}";
-        assert lib.assertMsg (lib.all (m: failures (m input) != [ ]) (lib.attrValues mutants))
-          "fleet-alert token-wiring clause accepted a mutant: ${
-            builtins.toJSON (lib.attrNames (lib.filterAttrs (_: m: failures (m input) == [ ]) mutants))
-          }";
-        pkgs.runCommand "fleet-alert-token-wiring" { } ''touch "$out"'';
     in
     {
       checks = lib.optionalAttrs (system == "x86_64-linux") {
@@ -3324,11 +3161,9 @@ Create `modules/checks/fleet-alert.nix`:
               passthru = {
                 inherit
                   rules
-                  failures
                   promtoolRehearsal
                   fixtureRehearsal
                   propertyRehearsal
-                  wiringClause
                   ;
               };
             }
@@ -3337,8 +3172,6 @@ Create `modules/checks/fleet-alert.nix`:
               test -e ${promtoolRehearsal}
               test -e ${fixtureRehearsal}
               test -e ${propertyRehearsal}
-              # The alerter token travels only as a file.
-              test -e ${wiringClause}
               touch "$out"
             '';
       };
@@ -4175,88 +4008,186 @@ Expected, in this order: the control line and `ok: fixture server refusals and t
 The expected first misses are: `forZero`, the HostMemoryPressure leg's posts differing (a FIRING at run 0); `noAbsenceFreeze`, the silent-host leg's posts differing (a RESOLVED at run 5); `noStateWrite`, the HostOOMKill leg's posts differing (a second FIRING at run 1); `noStoreFreeze`, the store-error leg's posts differing (a RESOLVED at run 5).
 If a leg misses with the real evaluator, read `run-<i>.log` lines in the `MISS` text and fix the evaluator, the transition or the leg's fixture answers to match the specification; a leg's `expect` changes only if it contradicts the spec scenario it cites.
 
-- [ ] **Step 16: Run the token-wiring clause and see it fail**
+- [ ] **Step 16: Add the token-wiring assertions to the two modules**
 
-Run: `nix build --no-link .#checks.x86_64-linux.fleet-alert.wiringClause 2>&1 | tee logs/s3-evidence/4.7-red-$(date -u +%Y%m%dT%H%M%SZ).log | grep -o 'fleet-alert token-wiring failures: .*'`
-Expected: `fleet-alert token-wiring failures: ["magnetite: no ntfy-alerter token path","magnetite: a required fleet-* publisher is missing","magnetite: observability-notify@ does not load the ntfy-alerter token and name it in NTFY_TOKEN_FILE",` followed by one `"magnetite: <unit>'s resolve hooks do not export the token path"` per notified unit, 13 in all.
+The token wiring is a relation among one host's units, so it is asserted where the units are defined rather than in `checks.fleet-alert`, where the clause cost 582 MB of evaluation and took the check to 0.557 GiB, above its 0.5 GiB budget (S1 review F5; charter v18).
 
-- [ ] **Step 17: Extend the kill-order clause**
-
-In `modules/checks/greptimedb-envelope.nix`, replace the header's second and third lines (`:2-3` on `main` at 2026-10-18):
+In `modules/nixos/observability-notify.nix`, add to the module's `let`, after `hook`:
 
 ```nix
-# R7.1's memory and kill-order relations, R1.1 (amended), R8.2's file
-# ownership, the disk binding, the PromQL read path (charter v13) and the
+      # LoadCredential entries are "<id>:<source path>"; the ids loading `path`.
+      credentialIds =
+        path: serviceConfig:
+        lib.concatMap (
+          entry:
+          let
+            m = builtins.match "([^:]+):(.+)" entry;
+          in
+          lib.optional (m != null && builtins.elemAt m 1 == path) (builtins.head m)
+        ) (lib.toList (serviceConfig.LoadCredential or [ ]));
+      template = config.systemd.services."observability-notify@";
+      templateIds = credentialIds cfg.tokenFile template.serviceConfig;
+      exportsToken =
+        mode: hooks:
+        lib.any (
+          hook:
+          builtins.match "-\\+/nix/store/[^ ]+/bin/env NTFY_TOKEN_FILE=${lib.escapeRegex cfg.tokenFile} /nix/store/[^ ]+-observability-notify-resolved ${mode} %n" hook
+          != null
+        ) (lib.toList hooks);
+      unitsWithoutToken = builtins.filter (
+        name:
+        let
+          unit = config.systemd.services.${name}.serviceConfig;
 ```
 
-with:
+and after the option declarations:
 
 ```nix
-# R7.1's memory and kill-order relations, with the alert evaluator last
-# (S3 design D12), R1.1 (amended), R8.2's file ownership, the disk binding,
-# the PromQL read path (charter v13) and the
+      # With a token, every fleet-* post of this module carries it (design
+      # D3): the template loads tokenFile and names that credential in
+      # NTFY_TOKEN_FILE, and each notified unit's resolve hooks pass tokenFile
+      # itself. Assertions rather than a check clause, because evaluating the
+      # host already forces these units, while checks.x86_64-linux.fleet-alert
+      # forcing them again cost about 0.55 GiB of evaluation (S1 review F5).
+      config.assertions = lib.mkIf (cfg.tokenFile != null) [
+        {
+          assertion =
+            templateIds != [ ]
+            && builtins.elem (template.environment.NTFY_TOKEN_FILE or null) (map (id: "%d/${id}") templateIds);
+          message = "observability-notify: observability-notify@.service must load tokenFile (${cfg.tokenFile}) as a credential and name it in NTFY_TOKEN_FILE; it loads ${
+            builtins.toJSON (template.serviceConfig.LoadCredential or [ ])
+          } and sets NTFY_TOKEN_FILE = ${builtins.toJSON (template.environment.NTFY_TOKEN_FILE or null)}.";
+        }
+        {
+          assertion = unitsWithoutToken == [ ];
+          message = "observability-notify: the resolve hooks of ${builtins.toJSON unitsWithoutToken} do not run under `env NTFY_TOKEN_FILE=${cfg.tokenFile}`.";
+        }
+      ];
 ```
 
-In `view` (`:537-550`), after the line `collectorUnit = magnetite.systemd.services.opentelemetry-collector.serviceConfig;` insert:
+In `modules/nixos/fleet-alert.nix`, add to the module's `let`, after `unit`:
 
 ```nix
-        # Absent, the unit reads as OOMScoreAdjust 1000, so the clause fails.
-        alertUnit = (magnetite.systemd.services.fleet-alert or { serviceConfig = { }; }).serviceConfig;
+      tokenIds = lib.concatMap (
+        entry:
+        let
+          m = builtins.match "([^:]+):(.+)" entry;
+        in
+        lib.optional (m != null && builtins.elemAt m 1 == cfg.evaluator.tokenFile) (builtins.head m)
+      ) (lib.toList (unit.LoadCredential or [ ]));
+      tokenEnv = config.systemd.services.fleet-alert.environment.NTFY_TOKEN_FILE or null;
 ```
 
-Replace the `killOrder` clause and its comment (`:560-570`):
+and append to the evaluator's `assertions`, after R9.5:
 
 ```nix
-          # R7.1: the store is throttled before its ceiling and never swaps,
-          # and under host OOM the kernel kills the evaluator, then the store,
-          # then the collector, so the collector outlives the store and
-          # queues (A7:100,127).
-          memoryCeilings =
-            high != null && max != null && high < max && toString (v.unit.MemorySwapMax or "unset") == "0";
-          killOrder =
-            v.evalLockEnabled
-            && v.evaluatorAdj != null
-            && v.evaluatorAdj > (v.unit.OOMScoreAdjust or 1000)
-            && (v.unit.OOMScoreAdjust or 1000) > (v.collectorUnit.OOMScoreAdjust or 1000);
+            # Design D3: the evaluator's posts carry the alerter token.
+            {
+              assertion = tokenIds != [ ] && builtins.elem tokenEnv (map (id: "%d/${id}") tokenIds);
+              message = "fleet-alert: fleet-alert.service must load evaluator.tokenFile (${toString cfg.evaluator.tokenFile}) as a credential and name it in NTFY_TOKEN_FILE; it loads ${
+                builtins.toJSON (unit.LoadCredential or [ ])
+              } and sets NTFY_TOKEN_FILE = ${builtins.toJSON tokenEnv}.";
+            }
 ```
 
-with:
+Run: `jj st --no-pager >/dev/null && nix eval --raw .#nixosConfigurations.magnetite.config.system.build.toplevel.drvPath 2>&1 | tail -n 2`
+Expected: a `.drv` path; magnetite sets no `tokenFile` and has no evaluator yet, so neither assertion applies.
+
+- [ ] **Step 17: Move R7.1's relations into magnetite's assertions**
+
+In `modules/checks/greptimedb-envelope.nix`, delete the `memoryCeilings` and `killOrder` clauses with their comment, the `view` fields only they read and their mutants, and rewrite the header so the check names R1.1, R8.2's file ownership, the disk binding, the PromQL read path and the users-file run, and says that R7.1's memory and kill-order relations are magnetite assertions.
+
+In `modules/machines/nixos/magnetite/default.nix`, append to `assertions`, after the R8.2 holder assertion:
 
 ```nix
-          # R7.1: the store is throttled before its ceiling and never swaps,
-          # and under host OOM the kernel kills the evaluator, then the store,
-          # then the collector, so the collector outlives the store and
-          # queues (A7:100,127); the alert evaluator, which reports OOM kills,
-          # is taken after all three (S3 design D12).
-          memoryCeilings =
-            high != null && max != null && high < max && toString (v.unit.MemorySwapMax or "unset") == "0";
-          killOrder =
-            v.evalLockEnabled
-            && v.evaluatorAdj != null
-            && v.evaluatorAdj > (v.unit.OOMScoreAdjust or 1000)
-            && (v.unit.OOMScoreAdjust or 1000) > (v.collectorUnit.OOMScoreAdjust or 1000)
-            && (v.collectorUnit.OOMScoreAdjust or 1000) > (v.alertUnit.OOMScoreAdjust or 1000);
-```
+        # Relations among magnetite's own units, asserted here rather than in
+        # a flake check, because evaluating the host already forces these
+        # units, while checks.x86_64-linux.fleet-alert and greptimedb-envelope
+        # forcing them again took each check above 0.5 GiB of evaluation (S1
+        # review F5).
+        ++ (
+          let
+            tokenPath = config.clan.core.vars.generators.ntfy-alerter.files.token.path;
+            evaluator = config.services.fleet-alert.evaluator;
+            notifierTokenFile = config.services.observability-notify.tokenFile;
 
-In `mutants`, after the `storeOutlivesCollector` entry (`:610-623`), insert:
+            # systemd memory sizes with an M or G suffix, which systemd reads
+            # as powers of 1024.
+            sizeBytes =
+              size:
+              let
+                m = builtins.match "([0-9]+)([MG])" (toString size);
+              in
+              if m == null then
+                null
+              else
+                lib.toInt (builtins.head m)
+                * (if builtins.elemAt m 1 == "G" then 1024 * 1024 * 1024 else 1024 * 1024);
+            store = config.systemd.services.greptimedb.serviceConfig;
+            high = sizeBytes (store.MemoryHigh or "");
+            max = sizeBytes (store.MemoryMax or "");
 
-```nix
-        # S3 design D12; tasks.md 4.9.
-        alertEvaluatorAboveCollector = {
-          clause = "killOrder";
-          apply =
-            v:
-            v
-            // {
-              alertUnit = v.alertUnit // {
-                OOMScoreAdjust = 400;
-              };
+            # The evaluator's oom_score_adj is set by the nix-eval-lock wrapper
+            # script, not by a unit, so it is read from that script.
+            evaluatorAdj =
+              let
+                matches = lib.concatMap (
+                  line:
+                  let
+                    m = builtins.match "[[:space:]]*echo ([0-9]+) >/proc/self/oom_score_adj" line;
+                  in
+                  if m == null then [ ] else m
+                ) (lib.splitString "\n" (builtins.readFile ../../../lib/nix-eval-lock.sh));
+              in
+              if builtins.length matches == 1 then lib.toInt (builtins.head matches) else null;
+            # An absent unit or setting reads as 1000, so the order fails.
+            unitAdj =
+              name:
+              ((config.systemd.services.${name} or { serviceConfig = { }; }).serviceConfig.OOMScoreAdjust or 1000);
+            order = {
+              nix-eval-jobs = evaluatorAdj;
+              greptimedb = unitAdj "greptimedb";
+              opentelemetry-collector = unitAdj "opentelemetry-collector";
+              fleet-alert = unitAdj "fleet-alert";
             };
-        };
+          in
+          [
+            # S3 design D3: the evaluator and the failure notifier post with
+            # the shared alerter token.
+            {
+              assertion = evaluator.enable && evaluator.tokenFile == tokenPath && notifierTokenFile == tokenPath;
+              message = "magnetite: the fleet alert evaluator must be enabled, and it and the failure notifier must read the ntfy-alerter token ${tokenPath}; evaluator enabled = ${builtins.toJSON evaluator.enable}, evaluator.tokenFile = ${builtins.toJSON evaluator.tokenFile}, observability-notify.tokenFile = ${builtins.toJSON notifierTokenFile}.";
+            }
+            # R7.1: the store is throttled before its ceiling and never swaps.
+            {
+              assertion = high != null && max != null && high < max && toString (store.MemorySwapMax or "unset") == "0";
+              message = "magnetite: R7.1 requires greptimedb.service to run with MemoryHigh below MemoryMax and MemorySwapMax = 0; it has MemoryHigh = ${
+                builtins.toJSON (store.MemoryHigh or null)
+              }, MemoryMax = ${builtins.toJSON (store.MemoryMax or null)}, MemorySwapMax = ${
+                builtins.toJSON (store.MemorySwapMax or null)
+              }.";
+            }
+            # R7.1 (A7:100,127) and S3 design D12: under host OOM the kernel
+            # kills the evaluator, then the store, then the collector, so the
+            # collector outlives the store and queues; the alert evaluator,
+            # which reports OOM kills, is taken after all three.
+            {
+              assertion =
+                config.services.nixEvalLock.enable
+                && evaluatorAdj != null
+                && evaluatorAdj > order.greptimedb
+                && order.greptimedb > order.opentelemetry-collector
+                && order.opentelemetry-collector > order.fleet-alert;
+              message = "magnetite: R7.1 and S3 design D12 require the evaluation lock and oom_score_adj nix-eval-jobs > greptimedb > opentelemetry-collector > fleet-alert; the lock is ${
+                if config.services.nixEvalLock.enable then "enabled" else "disabled"
+              } and the values are ${builtins.toJSON order}.";
+            }
+          ]
+        );
 ```
 
-Run: `jj st --no-pager >/dev/null && nix build --no-link .#checks.x86_64-linux.greptimedb-envelope 2>&1 | tee logs/s3-evidence/4.9-red-$(date -u +%Y%m%dT%H%M%SZ).log | grep -o 'greptimedb envelope clauses failed on magnetite: .*'`
-Expected: `greptimedb envelope clauses failed on magnetite: ["killOrder"]` (magnetite has no `fleet-alert` unit yet).
+Run: `jj st --no-pager >/dev/null && nix eval --raw .#nixosConfigurations.magnetite.config.system.build.toplevel.drvPath 2>&1 | tee logs/s3-evidence/4.9-red-$(date -u +%Y%m%dT%H%M%SZ).log | grep -o 'magnetite: [^;]*' | sort -u`
+Expected: the token assertion (`magnetite: the fleet alert evaluator must be enabled …`) and the kill-order assertion (`magnetite: R7.1 and S3 design D12 require …`, with `"fleet-alert":1000`, because magnetite has no `fleet-alert` unit yet) fail; the memory-ceiling assertion holds.
 
 - [ ] **Step 18: Wire magnetite, without the holder change, and see R8.2 fail**
 
@@ -4364,32 +4295,46 @@ nix eval --impure --raw --expr 'let f = builtins.getFlake (toString ./.); m = f.
 
 Expected: one message starting `magnetite: greptimedb-users credentials are loaded by` whose `regulator-password` list is `["fleet-alert","greptimedb-envelope","nginx"]`.
 
-- [ ] **Step 23: Run the token-wiring and kill-order clauses and see them pass**
+- [ ] **Step 23: Show every new assertion able to fail with an `extendModules` override**
 
-Run:
+Each override extends magnetite's evaluated configuration and lists the messages of the assertions that fail; `control` is the unmodified host.
 
 ```bash
-nix build --no-link .#checks.x86_64-linux.fleet-alert.wiringClause .#checks.x86_64-linux.greptimedb-envelope 2>&1 | tee logs/s3-evidence/4.7-green-$(date -u +%Y%m%dT%H%M%SZ).log | tail -n 3
+nix eval --impure --json --expr '
+let
+  flake = builtins.getFlake (toString ./.);
+  lib = flake.inputs.nixpkgs.lib;
+  host = flake.nixosConfigurations.magnetite;
+  failing = m: map (a: a.message) (lib.filter (a: !a.assertion) (host.extendModules { modules = [ m ]; }).config.assertions);
+in lib.mapAttrs (_: failing) {
+  control = { };
+  templateWithoutTokenFile = { systemd.services."observability-notify@".environment.NTFY_TOKEN_FILE = lib.mkForce null; };
+  evaluatorTokenFromAnotherPath = { systemd.services.fleet-alert.serviceConfig.LoadCredential = lib.mkForce [ "regulator-password:/run/secrets/vars/per-machine/magnetite/greptimedb-users/regulator-password" "alerter-token:/run/secrets/elsewhere" ]; };
+  notifierTokenUnset = { services.observability-notify.tokenFile = lib.mkForce null; };
+  evaluatorRemoved = { services.fleet-alert.evaluator.enable = lib.mkForce false; };
+}' 2>&1 | jq -r 'to_entries[] | "=== \(.key)", .value[]' | tee logs/s3-evidence/4.7-assertion-mutants-$(date -u +%Y%m%dT%H%M%SZ).log
 ```
 
-Expected: both build and the command exits 0.
-Each derivation's assertions also require every mutant to fail (`templateWithoutTokenFile`, `evaluatorTokenFromAnotherPath`, `hooksWithoutToken` and `evaluatorRemoved`; `alertEvaluatorAboveCollector`), so a mutant the clause accepted would have failed evaluation with `accepted a mutant` or `oracle accepted mutants`.
-Steps 16 and 17 are the clauses' controls on magnetite's real configuration: both failed before Step 18 wired magnetite.
+Add the override `hooksWithoutToken`, which sets `greptimedb`'s `ExecStartPost` and `ExecStopPost` with `lib.mkForce` to the two resolve hooks without the `env NTFY_TOKEN_FILE=` prefix, built from `flake.lib.observabilityNotifyScripts`.
+Run the same expression with the R7.1 overrides `alertEvaluatorAboveCollector = { systemd.services.fleet-alert.serviceConfig.OOMScoreAdjust = lib.mkForce 400; };`, `storeAboveEvaluator = { systemd.services.greptimedb.serviceConfig.OOMScoreAdjust = lib.mkForce 950; };` and `dropMemoryMax = { systemd.services.greptimedb.serviceConfig.MemoryMax = lib.mkForce null; };`, logging to `4.9-assertion-mutants-*.log`.
+Expected (`logs/s3-evidence/4.7-assertion-mutants-20261018T073054Z.log`, `4.9-assertion-mutants-20261018T073326Z.log`): `control` lists nothing; `templateWithoutTokenFile`, `hooksWithoutToken`, `evaluatorTokenFromAnotherPath`, `notifierTokenUnset`, `alertEvaluatorAboveCollector`, `storeAboveEvaluator` and `dropMemoryMax` each list their own assertion's message (`observability-notify: …`, `fleet-alert: …` or `magnetite: …`); `evaluatorRemoved` lists the R8.2 holder, token and kill-order messages.
+Steps 16 and 17 are the controls on magnetite's real configuration: both failed before Step 18 wired magnetite.
 
 - [ ] **Step 24: Add magnetite as a reader of the shared token**
 
 The shared `ntfy-alerter` token exists, encrypted for cinnabar (Task 3).
-Adding magnetite re-encrypts it for one more machine without regenerating the value (clan-core `pkgs/clan-cli/clan_cli/tests/test_vars_shared.py:175-222`, `test_add_machine_to_existing_shared_secret`).
+Use `clan vars fix`, never `clan vars generate`: on 2026-10-18 `clan vars generate magnetite --generator ntfy-alerter` regenerated the shared token and re-ran the dependent `ntfy-alerter-env` (`logs/s3-evidence/4.8-vars-magnetite-20261018T073644Z.log`; the repository token's sha256 prefix changed from the deployed `1e0237…` to `5936d5…`), because clan-core's `test_vars_shared.py:175-222` runs `generate` without `--generator`; those files were reverted.
+`clan vars fix` adds the machine's age key to the secret's recipients (clan-core `sops.py:446-450`, `allow_member`) without regenerating the value.
 Record the value's hash before, without printing it:
 Run: `clan vars get cinnabar ntfy-alerter/token | sha256sum | tee logs/s3-evidence/4.8-token-hash-before-$(date -u +%Y%m%dT%H%M%SZ).log`
 Expected: one sha256 line.
-Run: `CLAN_NO_COMMIT=1 clan vars generate magnetite --generator ntfy-alerter 2>&1 | tee logs/s3-evidence/4.8-generate-$(date -u +%Y%m%dT%H%M%SZ).log`
-Expected: exits 0 without prompting.
+Run: `CLAN_NO_COMMIT=1 clan vars fix magnetite --generator ntfy-alerter 2>&1 | tee logs/s3-evidence/4.8-vars-fix-magnetite-$(date -u +%Y%m%dT%H%M%SZ).log`
+Expected: `Syncing keys for file …/vars/shared/ntfy-alerter/token/secret`, one added `+++ age1…` recipient, then `synced with new keys`.
 Run: `jj st --no-pager >/dev/null && jj diff --name-only -- vars/ sops/`
-Expected: `vars/shared/ntfy-alerter/token/machines/magnetite` is added and `vars/shared/ntfy-alerter/token/secret` changes (its recipients); nothing else under `vars/` or `sops/`.
+Expected: only `vars/shared/ntfy-alerter/token/secret`; `vars/per-machine/cinnabar/ntfy-alerter-env/` untouched.
 If any other path changed, stop and report; do not regenerate other vars.
 Run: `clan vars get magnetite ntfy-alerter/token | sha256sum | tee logs/s3-evidence/4.8-token-hash-after-$(date -u +%Y%m%dT%H%M%SZ).log && clan vars check magnetite; echo "check exit $?"`
-Expected: the same sha256 as before, and `check exit 0`.
+Expected: the same sha256 as before, equal to cinnabar's deployed token (`1e0237…`), and `check exit 0`.
 
 - [ ] **Step 25: Build the whole check and measure its evaluation cost**
 
@@ -4488,9 +4433,9 @@ The access entries come last on purpose: with the dead-man wired and no `auth-ac
 
 **Files:**
 - Create: `modules/checks/fleet-alert/ntfy_stub.py` (loopback stand-in for ntfy's publish and poll endpoints; `.py`, so import-tree does not load it)
-- Create: `modules/machines/nixos/cinnabar/fleet-alert.nix` (cinnabar's dead-man and notifier settings, a fragment of `flake.modules.nixos."machines/nixos/cinnabar"` like `zt-dns.nix`)
-- Modify: `modules/nixos/fleet-alert.nix` (outer `let`: `alertEvaluatorSilent`, `fleetAlertDeadman`; `flake.lib` export; options `services.fleet-alert.deadman.*`; a second `lib.mkMerge` element with `fleet-deadman.service` and `fleet-deadman.timer`; header comment)
-- Modify: `modules/checks/fleet-alert.nix` (`wiringHostNames` and `requiredPublishers` gain `cinnabar`; one token-wiring mutant; `deadmanRehearsal` with its probe mutant; `deadmanFailures` with eleven mutants, asserted in `deadmanClause`; the check value references both and lists them in `passthru`)
+- Create: `modules/machines/nixos/cinnabar/fleet-alert.nix` (cinnabar's dead-man and notifier settings and its token assertion, a fragment of `flake.modules.nixos."machines/nixos/cinnabar"` like `zt-dns.nix`)
+- Modify: `modules/nixos/fleet-alert.nix` (outer `let`: `alertEvaluatorSilent`, `fleetAlertDeadman`; `flake.lib` export; options `services.fleet-alert.deadman.*`; a second `lib.mkMerge` element with `fleet-deadman.service`, `fleet-deadman.timer` and the dead-man's token-wiring assertion; header comment)
+- Modify: `modules/checks/fleet-alert.nix` (`deadmanRehearsal` with its probe mutant; `deadmanFailures` with eleven mutants, asserted in `deadmanClause`; the check value references both and lists them in `passthru`)
 - Modify: `modules/machines/nixos/cinnabar/default.nix` (imports `fleet-alert` and `observability-notify`)
 - Modify: `modules/machines/nixos/cinnabar/ntfy.nix` (`settings.auth-access`)
 - Modify: `openspec/changes/stand-up-fleet-alerting/tasks.md` (tick 5.1, 5.2, 5.3)
@@ -4504,11 +4449,8 @@ The access entries come last on purpose: with the dead-man wired and no `auth-ac
 - Consumes (Task 4), from `modules/checks/fleet-alert.nix`'s `perSystem` `let`:
   - `ntfySendStub` (`pkgs.writeShellScriptBin "ntfy-send"`): appends one `{ topic, message, headers, tokenFile }` per call to `$FLEET_ALERT_POSTS` (`headers` is the list of `-H` values, `tokenFile` is `$NTFY_TOKEN_FILE`) and exits `$FLEET_ALERT_POST_STATUS`, default 0.
   - `fixtureCredentials`: a store directory holding `regulator-password` and `alerter-token`.
-  - `wiringHostNames = [ "magnetite" ];` and `requiredPublishers = { magnetite = [ "fleet-alert" "observability-notify@" ]; };`.
-  - `hostView = config: { tokenPath; notifyUnits; services; hooks; }`, where `services` holds the present publishers with their `environment` and `serviceConfig`, and `input = { hosts = lib.genAttrs wiringHostNames (…); };`.
-  - `failures` (input to a list of `"<host>: …"` strings) and `mutants` (input to input).
-  - `wiringClause`, the derivation holding the evaluation-time asserts.
-  - The check value `pkgs.runCommand "fleet-alert" { passthru = { inherit failures promtoolRehearsal fixtureRehearsal propertyRehearsal wiringClause; }; } '' test -e ${promtoolRehearsal} … test -e ${wiringClause} … touch "$out" ''`.
+  - The check value `pkgs.runCommand "fleet-alert" { passthru = { inherit rules promtoolRehearsal fixtureRehearsal propertyRehearsal; }; } '' test -e ${promtoolRehearsal} test -e ${fixtureRehearsal} test -e ${propertyRehearsal} touch "$out" ''`; Task 4 moved the token wiring into module and host assertions (charter v18), so this check holds no wiring clause.
+- Consumes (Task 4): the token-wiring assertions in `observability-notify.nix` (template and resolve hooks) and `fleet-alert.nix` (the evaluator), and magnetite's host assertion, the pattern this task repeats for the dead-man and cinnabar.
 - Produces: `flake.lib.fleetAlertDeadman pkgs { ntfySend; transition ? transitionJq; }`, a `writeShellApplication` named `fleet-deadman`. It reads the JSON configuration at `FLEET_DEADMAN_CONFIG`, requires `NTFY_TOKEN_FILE`, and takes time from `FLEET_ALERT_NOW` when set. On stdout it prints `fleet-deadman: R9.4 probe refused with HTTP 403` and `fleet-deadman: <n> heartbeat(s) on <topic> in the last 10m`. On stderr it prints `fleet-deadman: R9.4: anonymous publish to <topic> answered HTTP <code>, expected 403` or `fleet-deadman: poll of <topic> failed`, then exits 1.
 - Produces: the dead-man configuration JSON `{ ntfyUrl, topic, evaluatorHost, heartbeatTopic, window: "10m", stateFile: "/var/lib/fleet-deadman/state.json", rules: [ AlertEvaluatorSilent ] }`; `heartbeatTopic` is `services.fleet-alert.evaluator.heartbeatTopic`, the same option the evaluator posts to.
 - Produces: options `services.fleet-alert.deadman.enable` (bool), `.tokenFile` (`str`, no default), `.ntfyUrl` (default `http://[::1]:2586`), `.topic` (default `fleet-alerts`), `.evaluatorHost` (default `magnetite`; contract addition, decided by the orchestrator).
@@ -4813,7 +4755,7 @@ In `modules/checks/fleet-alert.nix`'s `perSystem` `let` block, after Task 4's `n
           '';
 ```
 
-In the same file's `checks.x86_64-linux.fleet-alert` `runCommand`, add `deadmanRehearsal` to Task 4's `passthru = { inherit failures promtoolRehearsal fixtureRehearsal propertyRehearsal wiringClause; };` so it reads `passthru = { inherit failures promtoolRehearsal fixtureRehearsal propertyRehearsal wiringClause deadmanRehearsal; };`, and in its body, after Task 4's `test -e ${wiringClause}` line, add:
+In the same file's `checks.x86_64-linux.fleet-alert` `runCommand`, add `deadmanRehearsal` to Task 4's `passthru` `inherit` list, after `propertyRehearsal`, and in its body, after Task 4's `test -e ${propertyRehearsal}` line, add:
 
 ```nix
             test -e ${deadmanRehearsal}
@@ -4976,7 +4918,7 @@ In the same `let` block, after `deadmanRehearsal`, add:
       };
 ```
 
-After `deadmanMutants`, add the derivation that holds the evaluation-time asserts, following Task 4's `wiringClause`:
+After `deadmanMutants`, add the derivation that holds the evaluation-time asserts:
 
 ```nix
       deadmanClause =
@@ -5230,55 +5172,37 @@ Append to the module's header comment, after Task 4's paragraphs:
 Run: `nix build .#checks.x86_64-linux.fleet-alert -L 2>&1 | tee logs/s3-evidence/5.1-fleet-alert-red-$(date -u +%Y%m%dT%H%M%SZ).log`
 Expected: evaluation still fails with `error: attribute 'fleet-deadman' missing`, because cinnabar does not import the module yet.
 
-- [ ] **Step 7: Extend the token-wiring clause to cinnabar, failing**
+- [ ] **Step 7: Add the dead-man's token-wiring assertion**
 
-In `modules/checks/fleet-alert.nix`, change Task 4's `wiringHostNames = [ "magnetite" ];` to:
-
-```nix
-      wiringHostNames = [
-        "cinnabar"
-        "magnetite"
-      ];
-```
-
-In the same `let` block, change Task 4's `requiredPublishers = { magnetite = [ "fleet-alert" "observability-notify@" ]; };` to:
+The token wiring is asserted where the units are defined, as Task 4 did for the evaluator and the notifier (charter v18), not by a check clause reading cinnabar.
+In `modules/nixos/fleet-alert.nix`, in the `lib.mkIf cfg.deadman.enable` element Step 6 added, add beside `systemd.services.fleet-deadman`:
 
 ```nix
-      requiredPublishers = {
-        cinnabar = [
-          "fleet-deadman"
-          "observability-notify@"
-        ];
-        magnetite = [
-          "fleet-alert"
-          "observability-notify@"
-        ];
-      };
-```
-
-With this, cinnabar's token wiring is judged on units it must have, not only on whichever publishers happen to be present.
-
-In Task 4's `mutants` attrset, add:
-
-```nix
-        # Cinnabar's dead-man without the token variable: the clause must read
-        # cinnabar's units, not only magnetite's.
-        deadmanWithoutTokenFile = lib.updateManyAttrsByPath [
-          {
-            path = [
-              "hosts"
-              "cinnabar"
-              "services"
-              "fleet-deadman"
-              "environment"
+          # Design D3: the dead-man's posts carry the alerter token.
+          assertions =
+            let
+              deadmanUnit = config.systemd.services.fleet-deadman;
+              deadmanTokenIds = lib.concatMap (
+                entry:
+                let
+                  m = builtins.match "([^:]+):(.+)" entry;
+                in
+                lib.optional (m != null && builtins.elemAt m 1 == cfg.deadman.tokenFile) (builtins.head m)
+              ) (lib.toList (deadmanUnit.serviceConfig.LoadCredential or [ ]));
+              deadmanTokenEnv = deadmanUnit.environment.NTFY_TOKEN_FILE or null;
+            in
+            [
+              {
+                assertion = deadmanTokenIds != [ ] && builtins.elem deadmanTokenEnv (map (id: "%d/${id}") deadmanTokenIds);
+                message = "fleet-alert: fleet-deadman.service must load deadman.tokenFile (${cfg.deadman.tokenFile}) as a credential and name it in NTFY_TOKEN_FILE; it loads ${
+                  builtins.toJSON (deadmanUnit.serviceConfig.LoadCredential or [ ])
+                } and sets NTFY_TOKEN_FILE = ${builtins.toJSON deadmanTokenEnv}.";
+              }
             ];
-            update = environment: builtins.removeAttrs environment [ "NTFY_TOKEN_FILE" ];
-          }
-        ];
 ```
 
-Run: `nix build .#checks.x86_64-linux.fleet-alert -L 2>&1 | tee logs/s3-evidence/5.3-fleet-alert-red-$(date -u +%Y%m%dT%H%M%SZ).log`
-Expected: evaluation fails. The likely message is `error: attribute 'fleet-deadman' missing`, from `deadmanConfigFile` or from the new mutant's path. A failure from `hostView` reading cinnabar's `clan.core.vars.generators.ntfy-alerter` would also count, because the clause now reads cinnabar.
+Run: `jj st --no-pager >/dev/null && nix build --no-link .#checks.x86_64-linux.fleet-alert 2>&1 | tail -n 3`
+Expected: evaluation still fails with `error: attribute 'fleet-deadman' missing`, because cinnabar does not import the module yet; the assertion is shown able to fail in Step 10, after Step 8 wires cinnabar.
 
 - [ ] **Step 8: Wire cinnabar**
 
@@ -5321,6 +5245,19 @@ Create `modules/machines/nixos/cinnabar/fleet-alert.nix`:
         enable = true;
         tokenFile = alerterToken;
       };
+
+      # S3 design D3: the dead-man and the failure notifier post with the
+      # shared alerter token. A host assertion rather than a check clause,
+      # as on magnetite (charter v18).
+      assertions = [
+        {
+          assertion =
+            config.services.fleet-alert.deadman.enable
+            && config.services.fleet-alert.deadman.tokenFile == alerterToken
+            && config.services.observability-notify.tokenFile == alerterToken;
+          message = "cinnabar: the fleet alert dead-man must be enabled, and it and the failure notifier must read the ntfy-alerter token ${alerterToken}; deadman enabled = ${builtins.toJSON config.services.fleet-alert.deadman.enable}, deadman.tokenFile = ${builtins.toJSON config.services.fleet-alert.deadman.tokenFile}, observability-notify.tokenFile = ${builtins.toJSON config.services.observability-notify.tokenFile}.";
+        }
+      ];
     };
 }
 ```
@@ -5360,11 +5297,31 @@ Expected: `["alerter:fleet-*:rw","*:fleet-*:ro"]` and `false` (evaluation).
 - [ ] **Step 10: Run the check green**
 
 Run: `nix build .#checks.x86_64-linux.fleet-alert -L 2>&1 | tee logs/s3-evidence/5.1-fleet-alert-green-$(date -u +%Y%m%dT%H%M%SZ).log | grep -E '^(ok|FAIL)'`
-Expected: exit 0. The filtered log holds Task 4's `ok:` lines and these seven: `ok: a refused probe and one heartbeat exit 0 with no post`, `ok: a probe answered 200 fails the run before the poll`, the same for `500` and `closed`, `ok: a failed poll fails the run`, `ok: an empty window posts one FIRING, resumed heartbeats one RESOLVED`, `ok: a failed post fails the run and the next run posts it once`. After them come `ok: the probe mutant is rejected` and `ok: dead-man relations hold and 11 mutants are rejected`. `deadmanWithoutTokenFile` is rejected inside Task 4's `wiringClause` (build).
+Expected: exit 0. The filtered log holds Task 4's `ok:` lines and these seven: `ok: a refused probe and one heartbeat exit 0 with no post`, `ok: a probe answered 200 fails the run before the poll`, the same for `500` and `closed`, `ok: a failed poll fails the run`, `ok: an empty window posts one FIRING, resumed heartbeats one RESOLVED`, `ok: a failed post fails the run and the next run posts it once`. After them come `ok: the probe mutant is rejected` and `ok: dead-man relations hold and 11 mutants are rejected` (build).
 If the RESOLVED leg fails with exactly one post, Task 4's resolve comparison is strict (`> 300`); stop and report rather than moving the run times.
 
 Run: `nix build .#checks.x86_64-linux.ntfy-provisioning -L 2>&1 | tee logs/s3-evidence/5.2-ntfy-provisioning-$(date -u +%Y%m%dT%H%M%SZ).log`
 Expected: exit 0; the access-user clause now judges `alerter` and `*`, and its log shows Task 3's `alertr` mutant rejected (build).
+
+Show the dead-man's and cinnabar's token assertions able to fail, with Task 4 Step 23's `extendModules` harness pointed at cinnabar:
+
+```bash
+nix eval --impure --json --expr '
+let
+  flake = builtins.getFlake (toString ./.);
+  lib = flake.inputs.nixpkgs.lib;
+  host = flake.nixosConfigurations.cinnabar;
+  failing = m: map (a: a.message) (lib.filter (a: !a.assertion) (host.extendModules { modules = [ m ]; }).config.assertions);
+in lib.mapAttrs (_: failing) {
+  control = { };
+  deadmanWithoutTokenFile = { systemd.services.fleet-deadman.environment.NTFY_TOKEN_FILE = lib.mkForce null; };
+  deadmanTokenFromAnotherPath = { services.fleet-alert.deadman.tokenFile = lib.mkForce "/run/secrets/elsewhere"; };
+  notifierTokenUnset = { services.observability-notify.tokenFile = lib.mkForce null; };
+  templateWithoutTokenFile = { systemd.services."observability-notify@".environment.NTFY_TOKEN_FILE = lib.mkForce null; };
+}' 2>&1 | jq -r 'to_entries[] | "=== \(.key)", .value[]' | tee logs/s3-evidence/5.3-assertion-mutants-$(date -u +%Y%m%dT%H%M%SZ).log
+```
+
+Expected: `control` lists nothing; `deadmanWithoutTokenFile` lists `fleet-alert: fleet-deadman.service must load deadman.tokenFile …`; `deadmanTokenFromAnotherPath` and `notifierTokenUnset` list `cinnabar: the fleet alert dead-man must be enabled, and it and the failure notifier must read the ntfy-alerter token …`; `templateWithoutTokenFile` lists `observability-notify: observability-notify@.service must load tokenFile …` (evaluation, negative control).
 
 - [ ] **Step 11: Record the evaluation cost**
 
@@ -5462,11 +5419,12 @@ Questions and contract notes for the orchestrator:
    - option `services.fleet-alert.deadman.evaluatorHost` (str, default `magnetite`), as decided;
    - env `FLEET_DEADMAN_CONFIG` with the JSON `{ ntfyUrl, topic, evaluatorHost, heartbeatTopic, window, stateFile, rules }`;
    - `flake.lib.fleetAlertDeadman pkgs { ntfySend; transition ? transitionJq; }`, mirroring the evaluator's signature;
-   - check bindings `deadmanRehearsal`, `deadmanClause`, `deadmanFailures`, `deadmanMutants`, `deadmanInput`, `decision`, the `cinnabar` entry of `requiredPublishers`, and data file `modules/checks/fleet-alert/ntfy_stub.py`.
+   - check bindings `deadmanRehearsal`, `deadmanClause`, `deadmanFailures`, `deadmanMutants`, `deadmanInput`, `decision`, and data file `modules/checks/fleet-alert/ntfy_stub.py`;
+   - the dead-man's token-wiring assertion in `fleet-alert.nix` and cinnabar's host token assertion, each shown able to fail by an `extendModules` override, in place of extending a check clause to cinnabar (charter v18).
 2. The heartbeat topic is `services.fleet-alert.evaluator.heartbeatTopic` on both hosts, not a literal. The dead-man reads cinnabar's value of that option, which is its default there. `deadmanFailures` relates it to magnetite's value, so a change on magnetite alone fails the check.
 3. Task 4 names this task relies on, which S3PlanT4 sent as final on 2026-10-18:
-   - bindings `ntfySendStub` (its `headers` field is the list of `-H` values), `fixtureCredentials`, `wiringHostNames`, `requiredPublishers`, `hostView`, `input`, `failures`, `mutants` and `wiringClause`;
-   - the check's `passthru` and its `test -e ${wiringClause}` line, after which Step 3 inserts;
+   - bindings `ntfySendStub` (its `headers` field is the list of `-H` values) and `fixtureCredentials`;
+   - the check's `passthru` and its `test -e ${propertyRehearsal}` line, after which Step 3 inserts;
    - in the module, `hardening`, `jqLib` and `transitionJq`.
 
    Check them against the final `plan-T4.md` at assembly.

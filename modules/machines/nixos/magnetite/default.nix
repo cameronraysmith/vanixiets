@@ -70,6 +70,8 @@ in
         matrix
         omnigraph
         greptimedb
+        fleet-alert
+        ntfy-alerter
         effects-vanixiets-secrets
         effects-ironstar-secrets
       ]);
@@ -315,6 +317,7 @@ in
       # agent role adds opentelemetry-collector itself and applies the wiring,
       # so greptimedb.nix never references the notifier.
       services.observability-notify.units = [
+        "fleet-alert"
         "greptimedb"
         "greptimedb-envelope"
         "greptimedb-schema"
@@ -634,7 +637,11 @@ in
             admin-password = [ "greptimedb-schema" ];
             collector-password = [ "opentelemetry-collector" ];
             perses-password = [ ];
-            regulator-password = [ "greptimedb-envelope" ];
+            # Sorted, because `actual` is naturalSorted.
+            regulator-password = [
+              "fleet-alert"
+              "greptimedb-envelope"
+            ];
           };
           credentialSource = entry: lib.concatStringsSep ":" (lib.drop 1 (lib.splitString ":" entry));
           holdersOf =
@@ -656,7 +663,93 @@ in
             assertion = actual == allowed;
             message = "magnetite: greptimedb-users credentials are loaded by ${builtins.toJSON actual}; R8.2 allows only ${builtins.toJSON allowed}";
           }
-        ];
+        ]
+        # Relations among magnetite's own units, asserted here rather than in
+        # a flake check, because evaluating the host already forces these
+        # units, while checks.x86_64-linux.fleet-alert and greptimedb-envelope
+        # forcing them again took each check above 0.5 GiB of evaluation (S1
+        # review F5).
+        ++ (
+          let
+            tokenPath = config.clan.core.vars.generators.ntfy-alerter.files.token.path;
+            evaluator = config.services.fleet-alert.evaluator;
+            notifierTokenFile = config.services.observability-notify.tokenFile;
+
+            # systemd memory sizes with an M or G suffix, which systemd reads
+            # as powers of 1024.
+            sizeBytes =
+              size:
+              let
+                m = builtins.match "([0-9]+)([MG])" (toString size);
+              in
+              if m == null then
+                null
+              else
+                lib.toInt (builtins.head m)
+                * (if builtins.elemAt m 1 == "G" then 1024 * 1024 * 1024 else 1024 * 1024);
+            store = config.systemd.services.greptimedb.serviceConfig;
+            high = sizeBytes (store.MemoryHigh or "");
+            max = sizeBytes (store.MemoryMax or "");
+
+            # The evaluator's oom_score_adj is set by the nix-eval-lock wrapper
+            # script, not by a unit, so it is read from that script.
+            evaluatorAdj =
+              let
+                matches = lib.concatMap (
+                  line:
+                  let
+                    m = builtins.match "[[:space:]]*echo ([0-9]+) >/proc/self/oom_score_adj" line;
+                  in
+                  if m == null then [ ] else m
+                ) (lib.splitString "\n" (builtins.readFile ../../../lib/nix-eval-lock.sh));
+              in
+              if builtins.length matches == 1 then lib.toInt (builtins.head matches) else null;
+            # An absent unit or setting reads as 1000, so the order fails.
+            unitAdj =
+              name:
+              ((config.systemd.services.${name} or { serviceConfig = { }; }).serviceConfig.OOMScoreAdjust or 1000
+              );
+            order = {
+              nix-eval-jobs = evaluatorAdj;
+              greptimedb = unitAdj "greptimedb";
+              opentelemetry-collector = unitAdj "opentelemetry-collector";
+              fleet-alert = unitAdj "fleet-alert";
+            };
+          in
+          [
+            # S3 design D3: the evaluator and the failure notifier post with
+            # the shared alerter token.
+            {
+              assertion = evaluator.enable && evaluator.tokenFile == tokenPath && notifierTokenFile == tokenPath;
+              message = "magnetite: the fleet alert evaluator must be enabled, and it and the failure notifier must read the ntfy-alerter token ${tokenPath}; evaluator enabled = ${builtins.toJSON evaluator.enable}, evaluator.tokenFile = ${builtins.toJSON evaluator.tokenFile}, observability-notify.tokenFile = ${builtins.toJSON notifierTokenFile}.";
+            }
+            # R7.1: the store is throttled before its ceiling and never swaps.
+            {
+              assertion =
+                high != null && max != null && high < max && toString (store.MemorySwapMax or "unset") == "0";
+              message = "magnetite: R7.1 requires greptimedb.service to run with MemoryHigh below MemoryMax and MemorySwapMax = 0; it has MemoryHigh = ${
+                builtins.toJSON (store.MemoryHigh or null)
+              }, MemoryMax = ${builtins.toJSON (store.MemoryMax or null)}, MemorySwapMax = ${
+                builtins.toJSON (store.MemorySwapMax or null)
+              }.";
+            }
+            # R7.1 (A7:100,127) and S3 design D12: under host OOM the kernel
+            # kills the evaluator, then the store, then the collector, so the
+            # collector outlives the store and queues; the alert evaluator,
+            # which reports OOM kills, is taken after all three.
+            {
+              assertion =
+                config.services.nixEvalLock.enable
+                && evaluatorAdj != null
+                && evaluatorAdj > order.greptimedb
+                && order.greptimedb > order.opentelemetry-collector
+                && order.opentelemetry-collector > order.fleet-alert;
+              message = "magnetite: R7.1 and S3 design D12 require the evaluation lock and oom_score_adj nix-eval-jobs > greptimedb > opentelemetry-collector > fleet-alert; the lock is ${
+                if config.services.nixEvalLock.enable then "enabled" else "disabled"
+              } and the values are ${builtins.toJSON order}.";
+            }
+          ]
+        );
 
       # The regulator credential and the host facts greptimedb-envelope checks.
       # Quota and reservation come from greptimedbDataset, the binding the
@@ -686,6 +779,20 @@ in
             }";
           };
       };
+
+      # Fleet alert evaluator (ADR-009; design D3, D12): queries `fleet` as
+      # the regulator account and posts to fleet-alerts with the shared
+      # alerter token, which the failure notifier's template and resolve
+      # hooks use too. magnetite holds only the token side of ntfy-alerter;
+      # cinnabar holds the server's ntfy-alerter-env.
+      services.fleet-alert.evaluator = {
+        enable = true;
+        tokenFile = config.clan.core.vars.generators.ntfy-alerter.files.token.path;
+        regulatorPasswordFile =
+          config.clan.core.vars.generators.greptimedb-users.files.regulator-password.path;
+      };
+      services.observability-notify.tokenFile =
+        config.clan.core.vars.generators.ntfy-alerter.files.token.path;
 
       # nixbot's `8 x 4096` nix-eval-jobs configuration peaks at 31.4 GiB of
       # swap (logs/magnetite-zram-headroom-experiment.md §6.2), above the

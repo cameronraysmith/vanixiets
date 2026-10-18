@@ -120,7 +120,7 @@ Each rule's presence selector SHALL be the bare metric name of its expression, e
 
 The evaluator SHALL post each alert through `ntfy-send` to `fleet-alerts` at `https://ntfy.zt`, with `NTFY_TOKEN_FILE` naming its `alerter` credential, titled `[FIRING] <alert> <host>` or `[RESOLVED] <alert> <host>`, at priority `high` for `critical`, `default` for `warning` and `low` for `info`.
 
-**Discharged by**: `checks.x86_64-linux.fleet-alert`'s fixture server, which records every post, and its token-wiring clause with its mutant.
+**Discharged by**: `checks.x86_64-linux.fleet-alert`'s fixture server, which records every post, and the token-wiring assertions in `observability-notify.nix`, `fleet-alert.nix` and magnetite's and cinnabar's configurations, each shown able to fail by an `extendModules` override.
 
 #### Scenario: A post is recorded
 
@@ -129,8 +129,8 @@ The evaluator SHALL post each alert through `ntfy-send` to `fleet-alerts` at `ht
 
 #### Scenario: The evaluator's token wiring is evaluated
 
-- **WHEN** the token-wiring clause reads magnetite's configuration
-- **THEN** `fleet-alert.service` loads the `ntfy-alerter` generator's `token` through `LoadCredential` and sets `NTFY_TOKEN_FILE` to that credential
+- **WHEN** magnetite's configuration is evaluated
+- **THEN** `fleet-alert.nix`'s assertion holds that `fleet-alert.service` loads `evaluator.tokenFile` through `LoadCredential` and names that credential in `NTFY_TOKEN_FILE`, and magnetite's assertion holds that `evaluator.tokenFile` is the `ntfy-alerter` generator's `token` path, and an `extendModules` override breaking either makes evaluation fail
 
 ### Requirement: Each completed evaluator run posts a heartbeat
 
@@ -147,7 +147,7 @@ Each completed run of the evaluator, including one that raised `StoreQueryFailin
 
 On cinnabar, `fleet-deadman.timer` SHALL start `fleet-deadman.service` every 5 min, with `DynamicUser = true`, `StateDirectory = "fleet-deadman"` and `OnFailure=observability-notify@%n.service`, which SHALL first publish anonymously to `http://[::1]:2586/fleet-heartbeat` and fail if accepted, then poll `/fleet-heartbeat/json?poll=1&since=10m` there and, in its `state.json`, raise `AlertEvaluatorSilent`, `critical`, on an empty result and resolve it when a heartbeat returns.
 
-**Discharged by**: regulator R9.3, shown able to fail at acceptance by stopping `fleet-alert.timer`, resting on world assumption `A42 — ntfy keeps a topic's messages for 12 hours and returns a recent window to a poll`; regulator R9.4, shown able to fail at acceptance by removing `*:fleet-*:ro`; the token-wiring clause of `checks.x86_64-linux.fleet-alert` for its `alerter` credential.
+**Discharged by**: regulator R9.3, shown able to fail at acceptance by stopping `fleet-alert.timer`, resting on world assumption `A42 — ntfy keeps a topic's messages for 12 hours and returns a recent window to a poll`; regulator R9.4, shown able to fail at acceptance by removing `*:fleet-*:ro`; the token-wiring assertions in `observability-notify.nix`, `fleet-alert.nix` and magnetite's and cinnabar's configurations, each shown able to fail by an `extendModules` override, for its `alerter` credential.
 
 #### Scenario: The evaluator's timer is stopped
 
@@ -201,7 +201,7 @@ cinnabar's ntfy SHALL set `behind-proxy: true`, `proxy-trusted-hosts` to `::1` a
 The `ntfy-alerter` generator, shared by magnetite and cinnabar, SHALL hold only the `alerter` token, as `token` with mode `0400`; the per-machine `ntfy-alerter-env` generator, declared on cinnabar only, SHALL derive `ntfy-env` from that token.
 `ntfy-send` SHALL, when `NTFY_TOKEN_FILE` is set, send `Authorization: Bearer` with that file's token without placing it on curl's argument list, and every `fleet-*` publisher SHALL pass the token to it through `NTFY_TOKEN_FILE`.
 
-**Discharged by**: `checks.<system>.package-ntfy-send-test-token-transport` with its argv mutant; the token-wiring clause of `checks.x86_64-linux.fleet-alert` with its mutant; the cutover order, resting on world assumption `A39 — ntfy refuses a request whose token it does not know, even where anonymous access is allowed`.
+**Discharged by**: `checks.<system>.package-ntfy-send-test-token-transport` with its argv mutant; the token-wiring assertions in `observability-notify.nix`, `fleet-alert.nix` and magnetite's and cinnabar's configurations, each shown able to fail by an `extendModules` override; the cutover order, resting on world assumption `A39 — ntfy refuses a request whose token it does not know, even where anonymous access is allowed`.
 
 #### Scenario: The sender is run with a recording curl
 
@@ -210,8 +210,8 @@ The `ntfy-alerter` generator, shared by magnetite and cinnabar, SHALL hold only 
 
 #### Scenario: Each fleet publisher is wired to the token
 
-- **WHEN** the token-wiring clause reads magnetite's and cinnabar's configurations
-- **THEN** `fleet-alert.service`, `fleet-deadman.service` and `observability-notify@.service` load the generator's `token` through `LoadCredential` and set `NTFY_TOKEN_FILE` to it, and the notifier's resolve hooks set `NTFY_TOKEN_FILE` to the generator file's path
+- **WHEN** magnetite's and cinnabar's configurations are evaluated
+- **THEN** the module assertions hold that `fleet-alert.service`, `fleet-deadman.service` and `observability-notify@.service` load their `tokenFile` through `LoadCredential` and name that credential in `NTFY_TOKEN_FILE`, and that the notifier's resolve hooks run under `env NTFY_TOKEN_FILE=<tokenFile>`; the host assertions hold that each `tokenFile` is the `ntfy-alerter` generator's `token` path; and an `extendModules` override breaking any of them makes evaluation fail
 
 ### Requirement: The alert budget is counted over the evaluator's state and the notifier's FAILED log
 

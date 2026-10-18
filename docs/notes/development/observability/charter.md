@@ -1,12 +1,12 @@
 ---
 title: Fleet observability and CCV feedback-loop charter
-status: charter v17
+status: charter v18
 date: 2026-10-18
 ---
 
 # Fleet observability and CCV feedback-loop charter
 
-Charter version: v17.
+Charter version: v18.
 A revision is a version bump with a dated entry under "Revision history"; the text of an earlier version is never edited in place.
 
 ## Objective
@@ -337,3 +337,8 @@ A research unit that meets ambiguity returns it in its questions section; the or
     The later-slice rows `FilesystemFillingWarn`, `FilesystemFull`, `NvmeCriticalWarning`, `NvmeWearHigh` and `LaunchdJobRestartLoop` had the same missing comparison and now carry `> 0.85`, `> 0.95`, `!= 0`, `> 90` and `> 5` in the expression; their series do not exist until S4 and S5, so these expressions are not yet verified against live series.
   - The `ntfy-send` citations in ADR-009's Delivery evidence and `components/fleet-alert.md` now point at `pkgs/by-name/ntfy-send/`; `components/fleet-alert.md` and the reference architecture's consolidated surface and sequencing follow ADR-009.
   - S3 generator split: clan-core refuses a shared generator whose files differ in `deploy` between machines ("Machines cinnabar and magnetite have different definitions for shared generator", `clan_lib/vars/generator.py:270-297` at the pin), which breaks fleet-wide `clan vars` commands; ADR-009's Implementation surface and `components/fleet-alert.md` amended: the shared generator `ntfy-alerter` holds only `token`, deployed on every machine that imports it, and a per-machine generator `ntfy-alerter-env`, declared on cinnabar only with `dependencies = [ "ntfy-alerter" ]`, reads the token, hashes a discarded password with bcrypt and writes `ntfy-env`.
+- v18 (2026-10-18): slice S3's implementation moved host-local relations from flake checks into module and host assertions, as S1's review F5 did, to keep each check within its 0.5 GiB evaluation budget; no earlier text is edited beyond the status, date and version lines, and this charter's D1–D9, the requirements and the acceptance criteria are otherwise unchanged.
+  - Token wiring: `checks.x86_64-linux.fleet-alert` measured 0.557 GiB, 582 MB of it its token-wiring clause, and 0.36 GiB without it; the clause is replaced by assertions: `modules/nixos/observability-notify.nix` (with `tokenFile` set, the template loads it as a credential named in `NTFY_TOKEN_FILE`, and every notified unit's resolve hooks run under `env NTFY_TOKEN_FILE=<tokenFile>`), `modules/nixos/fleet-alert.nix` (the evaluator, and from S3's Task 5 the dead-man, load their `tokenFile` as a credential named in `NTFY_TOKEN_FILE`), and magnetite's and cinnabar's configurations (each `tokenFile` equals the `ntfy-alerter` token path); the check keeps three parts, `promtool`, fixtures and the property test.
+  - R7.1: `checks.x86_64-linux.greptimedb-envelope`'s `memoryCeilings` and `killOrder` clauses and their mutants become magnetite assertions (`MemoryHigh` below `MemoryMax`, `MemorySwapMax = 0`, and `oom_score_adj` `nix-eval-jobs` > `greptimedb` > `opentelemetry-collector` > `fleet-alert`); the check measures 0.484 GiB after; ADR-007's R7.1 and `components/greptimedb.md` amended.
+  - Each new assertion is shown able to fail by an `extendModules` override of the host's configuration (`logs/s3-evidence/4.7-assertion-mutants-20261018T073054Z.log`, `4.9-assertion-mutants-20261018T073326Z.log`).
+  - Shared vars: a machine is added as a reader of an existing shared var with `clan vars fix <machine> --generator <generator>`, which adds its age key (clan-core `sops.py:446-450`, `allow_member`) and re-encrypts the secret with the value unchanged (`4.8-vars-fix-magnetite-20261018T073724Z.log`); `clan vars generate <machine> --generator <generator>` regenerated the shared `ntfy-alerter` token and re-ran `ntfy-alerter-env` (`4.8-vars-magnetite-20261018T073644Z.log`), and was reverted.
