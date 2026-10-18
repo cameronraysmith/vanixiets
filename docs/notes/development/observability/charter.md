@@ -1,12 +1,12 @@
 ---
 title: Fleet observability and CCV feedback-loop charter
-status: charter v16
-date: 2026-10-17
+status: charter v17
+date: 2026-10-18
 ---
 
 # Fleet observability and CCV feedback-loop charter
 
-Charter version: v16.
+Charter version: v17.
 A revision is a version bump with a dated entry under "Revision history"; the text of an earlier version is never edited in place.
 
 ## Objective
@@ -321,3 +321,19 @@ A research unit that meets ambiguity returns it in its questions section; the or
   - F10 and F11, checks of upstream or of themselves: the probe that `otelcol-contrib validate` rejects an unknown key, the check's own copy of the validated configuration, and the users-file oracle's mutants are deleted; ADR-003 R3.1's unknown-key mutant goes with them, and the validator still runs when a host's configuration builds.
   - F8, negative controls: the pipeline container test runs the envelope's table clause against the real store, failing on a table created with an undeclared `ttl` and on one created with `sst_format = 'primary_key'`, and passing once both are dropped.
   - S1's design, specs and tasks carry the same amendments, with tasks.md section 10 recording their verification.
+- v17 (2026-10-18): the decisions of slice S3's planning (`openspec/changes/stand-up-fleet-alerting/`, CAM-70), D1 to D11, numbered separately from this charter's D1 to D9; no earlier text is edited beyond the status, date and version lines, and this charter's D1–D9, the requirements and the acceptance criteria are otherwise unchanged.
+  - S3 D1, ntfy rate-limit identity: ntfy keys a visitor without a tier by IP, masked to a /64 for IPv6, so behind caddy every client shared one budget, and every ZeroTier member shares `fddb:4344:343b:14b9::/64`; ADR-009 item 12 amended: ntfy runs with `behind-proxy: true`, `proxy-trusted-hosts` set to `::1` and `visitor-prefix-bits-ipv6: 128`, with no exempt hosts.
+  - S3 D2, token transport: ADR-009 item 10 amended: `ntfy-send` reads the `alerter` token from the file named by `NTFY_TOKEN_FILE` and sends it as `Authorization: Bearer` without placing it on curl's argument list, replacing the token passed as a curl `-H` argument.
+  - S3 D3, notifier credential: ADR-009 item 11 amended: the `observability-notify@` template loads the token through `LoadCredential`, and the root `ExecStartPost=` and `ExecStopPost=` resolve hooks pass the token's clan vars path as `NTFY_TOKEN_FILE`.
+  - S3 D4, notifier extraction: ADR-009 item 11 and Implementation surface amended: the notifier becomes `flake.modules.nixos.observability-notify`, with `services.observability-notify.units` unchanged, imported by the `agent` role and by cinnabar from S3, so the dead-man's `OnFailure=` has a notifier before cinnabar runs a collector in S4.
+  - S3 D5, cutover order: ntfy refuses a failing `Authorization` header with 401 even on a topic anonymous clients may write; ADR-009 item 13 amended: the cutover takes three deploys, cinnabar's `alerter` provisioning without access entries, magnetite's token-bearing notifier and evaluator, then cinnabar's `auth-access`, after which R9.4's anonymous-publish probe confirms.
+  - S3 D6, provisioning safety: ADR-009 item 13 and Consequences amended: a flake check validates the rendered `NTFY_AUTH_*` strings before deploy, and the residual risk that nothing reports an ntfy outage is recorded against CAM-76 with ADR-009 Q5.
+  - S3 D7, rule scope: ADR-009's initial rule set amended: S3 ships the rules whose signals S1 already stores in `fleet`, and the filesystem, NVMe, launchd and `HostProbeStale` rules land with S4 and S5.
+  - S3 D8, the dev-loop SLO burn rule lands in S2, the later of S2 and S3; ADR-009 is unchanged and the reference architecture's sequencing follows.
+  - S3 D9, R9.1 counting: the notifier's stamps are removed on resolve, so they undercount; ADR-009 item 11 and R9.1 amended: the notifier appends each posted `FAILED` with its timestamp, unit and host to a log under `/var/lib/observability-notify`, which R9.1 counts with the evaluator's own state.
+  - S3 D10, duplicate unit failures: ADR-009's `SystemdUnitFailed` rule amended: its exclusion derives from `services.observability-notify.units`, so `greptimedb.service`, `opentelemetry-collector.service` and every later notified unit are reported once.
+  - S3 D11, state-machine verification: ADR-009 R9.2 amended: the evaluator's per-instance transition is a pure jq function, and beside the mutants a Hypothesis property test compares it with a Python reference model of pending, firing and resolved instances, the store freeze, the host freeze and the re-post cadence.
+  - S3 rule expressions, queried on magnetite's `fleet` store on 2026-10-18: ADR-009's rule table and `components/fleet-alert.md` amended: `HostMemoryPressure` divides by `used` plus available memory, whose sum equalled `MemTotal`, instead of the sum of all memory states; `HostOOMKill` and `SystemdUnitRestartLoop` carry `> 0` and `> 5` in the expression; `SystemdUnitFailed` writes the literal dot as `[.]`, because GreptimeDB 1.2.1 rejects `\.`; and `LocalExporterDown`'s presence selector is `up{job="node"}`.
+    The later-slice rows `FilesystemFillingWarn`, `FilesystemFull`, `NvmeCriticalWarning`, `NvmeWearHigh` and `LaunchdJobRestartLoop` had the same missing comparison and now carry `> 0.85`, `> 0.95`, `!= 0`, `> 90` and `> 5` in the expression; their series do not exist until S4 and S5, so these expressions are not yet verified against live series.
+  - The `ntfy-send` citations in ADR-009's Delivery evidence and `components/fleet-alert.md` now point at `pkgs/by-name/ntfy-send/`; `components/fleet-alert.md` and the reference architecture's consolidated surface and sequencing follow ADR-009.
+  - S3 generator split: clan-core refuses a shared generator whose files differ in `deploy` between machines ("Machines cinnabar and magnetite have different definitions for shared generator", `clan_lib/vars/generator.py:270-297` at the pin), which breaks fleet-wide `clan vars` commands; ADR-009's Implementation surface and `components/fleet-alert.md` amended: the shared generator `ntfy-alerter` holds only `token`, deployed on every machine that imports it, and a per-machine generator `ntfy-alerter-env`, declared on cinnabar only with `dependencies = [ "ntfy-alerter" ]`, reads the token, hashes a discarded password with bcrypt and writes `ntfy-env`.

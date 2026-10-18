@@ -188,7 +188,7 @@ Change numbers refer to the slices S1 to S8 of the next section.
 |---|---|---|---|---|
 | root `nixpkgs` input | flake input | no change for the store, and no new flake input is added by any record | ADR-001; ADR-007 | none |
 | `pkgs/by-name/greptimedb-bin` | package | add: the upstream release tarball on `x86_64-linux` only, with `passthru.embedsDashboard = true`, `update.sh` and `apps.update-greptimedb-bin` on every system; S6 adds `passthru.dashboardVersion` | ADR-001 R1.1; ADR-007; ADR-002 | 1, 6 |
-| `pkgs/by-name/ntfy-send` | package | add: the existing `ntfy-send` script as a package, consumed by the home-manager command, the `observability-notify@` template and the S3 evaluator | ADR-009; ADR-003 | 1 |
+| `pkgs/by-name/ntfy-send` | package | add: the existing `ntfy-send` script as a package, consumed by the home-manager command, the `observability-notify@` template and the S3 evaluator; S3 adds `NTFY_TOKEN_FILE`, sending the token as `Authorization: Bearer` without placing it on curl's argument list | ADR-009; ADR-003 | 1, 3 |
 | `modules/nixos/greptimedb.nix` | file | add: `services.greptimedb`, TOML generation with gRPC bound to `127.0.0.1:4001`, `greptimedb` user, `greptimedb.service`, `greptimedb-schema.service`, export service and timer, `greptimedb-envelope` service and timer, assertions R1.1, R1.2, R1.4 and R6.4 | ADR-007; ADR-001; ADR-006 | 1, 8 |
 | `modules/checks/greptimedb-envelope.nix` | file | add: R7.1 with its mutants | ADR-007 | 1 |
 | `modules/machines/nixos/magnetite/disko.nix` | file | modify: `root/greptimedb` dataset at `/var/lib/greptimedb` | ADR-007 | 1 |
@@ -197,7 +197,8 @@ Change numbers refer to the slices S1 to S8 of the next section.
 | `modules/machines/nixos/magnetite/default.nix` | file | modify: import `perses` and enable `sso-gateway`, which is disabled today | ADR-002; ADR-007 | 6 |
 | `modules/machines/nixos/magnetite/default.nix` | file | modify: import `fleet-alert` with the evaluator enabled | ADR-009 | 3 |
 | `modules/machines/nixos/magnetite/default.nix` | file | modify: import `devloop-collection` | ADR-005 | 2 |
-| `modules/clan/services/otel-collector/flake-module.nix` | file | add: clan service `otel-collector` with roles `agent` and `ingress`, NixOS and darwin modules, `otel-envelope`, `observability-notify@` in the `agent` role, content stages, R8.2 ownership assertions | ADR-003; ADR-004; ADR-008; ADR-009 | 1, 4, 5, 7 |
+| `modules/clan/services/otel-collector/flake-module.nix` | file | add: clan service `otel-collector` with roles `agent` and `ingress`, NixOS and darwin modules, `otel-envelope`, `observability-notify@` in the `agent` role, content stages, R8.2 ownership assertions; S3 moves `observability-notify@` into its own module, which the `agent` role imports | ADR-003; ADR-004; ADR-008; ADR-009 | 1, 3, 4, 5, 7 |
+| `modules/nixos/observability-notify.nix` | file | add: `flake.modules.nixos.observability-notify` with the unchanged option `services.observability-notify.units`, the template loading the `alerter` token through `LoadCredential`, resolve hooks reading the token's vars path through `NTFY_TOKEN_FILE`, and a log of posted `FAILED` messages under `/var/lib/observability-notify` | ADR-009; ADR-003 | 3 |
 | `modules/clan/inventory/services/otel-collector.nix` | file | add: one instance, `agent` on the seven in-scope hosts, `ingress` on magnetite, `smartDevices` on pyrite and stibnite | ADR-003 | 1, 4, 5 |
 | `modules/clan/services/otel-collector/schema.nix` | file | add: allow-lists, keep-lists, label bans, owner-to-alias attrset, signal-to-database map, budget numbers | ADR-004 | 1, 7 |
 | `modules/checks/otel-collector-config.nix` | file | add: R3.1 with recorded `launchctl print` fixtures | ADR-003 | 1, 4, 5 |
@@ -206,8 +207,8 @@ Change numbers refer to the slices S1 to S8 of the next section.
 | `modules/clan/inventory/services/zerotier.nix` or the zerotier configuration it applies | file | modify: `enableMetrics = true` | ADR-003 | 1 |
 | `modules/lib/omnigent-environment.nix` | file | modify: add `OTEL_` to the reserved prefixes | ADR-008 | 7 |
 | `modules/checks/omnigent-environment.nix` | file | modify: add an `OTEL_` policy mutant | ADR-008 | 7 |
-| `modules/machines/nixos/cinnabar/ntfy.nix` | file | modify: `auth-access` entries and `environmentFile` from `ntfy-alerter`; until then the S1 notifier posts anonymously | ADR-009 | 3 |
-| `modules/machines/nixos/cinnabar/ntfy.nix` | file | modify: import `fleet-alert` with the dead-man enabled | ADR-009 | 3 |
+| `modules/machines/nixos/cinnabar/ntfy.nix` | file | modify: `behind-proxy`, `proxy-trusted-hosts = ::1`, `visitor-prefix-bits-ipv6 = 128`, `environmentFile` from `ntfy-alerter-env`, then `auth-access` entries in the last of three deploys; until then the S1 notifier posts anonymously | ADR-009 | 3 |
+| `modules/machines/nixos/cinnabar/ntfy.nix` | file | modify: import `fleet-alert` with the dead-man enabled, and import `observability-notify` so the dead-man's `OnFailure=` has a notifier | ADR-009 | 3 |
 | `modules/nixos/perses.nix` | file | add: `sso.services.perses` registration with `allowedGroups = [ "perses_users" ]`, `/dashboard/` and `/v1/` proxied to `127.0.0.1:4006` with the `Authorization` overwrite, `http.enable_api_server = true`, `perses-dashboards.service`, assertions | ADR-002 | 6 |
 | `modules/nixos/perses/dashboards/*.json` | file | add: Perses `Dashboard` JSON reconciled through `/v1/dashboards` | ADR-002 | 6 |
 | `modules/nixos/perses/lint-rules.yaml`, `modules/nixos/perses/mutants/*.json` | file | add: custom lint rules and mutant set | ADR-002 | 6 |
@@ -217,8 +218,9 @@ Change numbers refer to the slices S1 to S8 of the next section.
 | `modules/terranix/cloudflare.nix` | Terraform resource | modify: one unproxied `CNAME` `perses.scientistexperience.net` to `magnetite.scientistexperience.net` | ADR-002 | 6 |
 | `modules/terranix/cloudflare.nix` | Terraform resource | no bucket resource; a rule in `cloudflare_r2_bucket_lifecycle.sciexp` only when an export expiry is decided | ADR-006 Q4 | none now |
 | `modules/nixos/fleet-alert.nix` | file | add: evaluator and dead-man services and timers, R9.5 assertion | ADR-009 | 3 |
-| `modules/nixos/fleet-alert/rules.nix` | file | add: rule table rendered to JSON and YAML | ADR-009 | 3, 5 |
-| `modules/checks/fleet-alert.nix` | file | add: R9.2 with fixtures and mutants | ADR-009 | 3 |
+| `modules/nixos/fleet-alert/rules.nix` | file | add: rule table rendered to JSON and YAML, with the `SystemdUnitFailed` exclusion rendered from `services.observability-notify.units`; S3 adds the rules S1's signals feed, S4 and S5 the filesystem, NVMe, launchd and `HostProbeStale` rules | ADR-009 | 3, 4, 5 |
+| `modules/checks/fleet-alert.nix` | file | add: R9.2 with fixtures, mutants and the Hypothesis property test of the jq transition function | ADR-009 | 3 |
+| `ntfy-alerter` provisioning check | flake check | add: validates the rendered `NTFY_AUTH_*` strings before deploy; ADR-009 fixes no path | ADR-009 | 3 |
 | `modules/nixos/devloop-collection.nix` | file | add: `sqlquery` queries, gitea-mq `journald` receiver, PostgreSQL role, `devloop-reconcile` | ADR-005 | 2 |
 | `modules/system/deploy-record.nix` | file | add: NixOS and darwin activation snippets | ADR-005 | 2 |
 | NixOS and darwin machine aggregates importing `modules/system/` | file | modify: import `deploy-record` on all ten machines | ADR-005 | 2 |
@@ -231,7 +233,8 @@ Change numbers refer to the slices S1 to S8 of the next section.
 | `greptimedb-r2` | clan vars generator | add on magnetite: hidden prompts for the `sciexp` token, `env` file | ADR-006 | 1 |
 | `otel-ca` | clan vars generator | add, `share = true` | ADR-003 | 4 |
 | `otel-cert` | clan vars generator | add, per machine | ADR-003 | 4 |
-| `ntfy-alerter` | clan vars generator | add, `share = true`, on magnetite and cinnabar | ADR-009 | 3 |
+| `ntfy-alerter` | clan vars generator | add, `share = true`, `token` only, on magnetite and cinnabar | ADR-009 | 3 |
+| `ntfy-alerter-env` | clan vars generator | add, per machine, on cinnabar only, depends on `ntfy-alerter` | ADR-009 | 3 |
 | `telemetry-export-reader` | clan vars generator | add, `share = true`, on the operators' primary workstations | ADR-006 | 8 |
 
 ## Implementation sequencing
@@ -246,10 +249,10 @@ Change names are chosen in each slice's proposal.
 1. S1, CAM-68: the store with its containment, dataset, users, R2 store prefix, `greptimedb-schema` and `greptimedb-envelope`, fed metrics-only by magnetite's own collector in the `ingress` role writing to the loopback store, and the `observability-notify@` template with `OnFailure=` on S1's units and magnetite's dataset oneshots, posting anonymously until S3.
    Realizes ADR-001, ADR-007, the store side of ADR-006, the databases and retention of ADR-004, magnetite's metrics from ADR-003, and the notifier of ADR-003; the embedded dashboard is reachable only through `ssh -L 4000:127.0.0.1:4000 magnetite.zt`.
    Components: [greptimedb](../components/greptimedb.md), [otel-collector](../components/otel-collector.md), [host-probes](../components/host-probes.md).
-2. S2, CAM-69: the nixbot reader, the gitea-mq journal parse, the deploy record, `devloop-reconcile` and the `devloop-queries` check.
+2. S2, CAM-69: the nixbot reader, the gitea-mq journal parse, the deploy record, `devloop-reconcile`, the `devloop-queries` check and the dev-loop SLO burn rule, which lands with the later of S2 and S3, and S2 is the later.
    Realizes ADR-005 except the omp emitter, which moves to S7.
    Component: [devloop-exporters](../components/devloop-exporters.md).
-3. S3, CAM-70: the evaluator on magnetite, the rules whose signals S1 provides, the dead-man on cinnabar, the `alerter` credential and the rule check; the dev-loop SLO burn rule lands with the later of S2 and S3.
+3. S3, CAM-70: the evaluator on magnetite, the rules whose signals S1 provides, the dead-man on cinnabar with the extracted `observability-notify` module, the `alerter` credential and its provisioning check, and the rule check, deployed in three steps: cinnabar's `alerter` provisioning, magnetite's token-bearing notifier and evaluator, then cinnabar's `auth-access`.
    Realizes ADR-009.
    Component: [fleet-alert](../components/fleet-alert.md).
 4. S4, CAM-71: `otel-ca`, the mTLS ingress on ZeroTier, and the agent role on the other in-scope NixOS hosts, with the SMART exporter on pyrite and `otel-envelope`.
