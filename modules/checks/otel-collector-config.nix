@@ -67,7 +67,12 @@
       matchesAllowList =
         patterns: name: lib.any (p: builtins.match (unitRegex p) "${name}.service" != null) patterns;
 
-      resolvedHook = mode: "-\\+(/nix/store/[a-z0-9]{32}-observability-notify-resolved) ${mode} %n";
+      # A notified unit's hook; with services.observability-notify.tokenFile
+      # set it runs under `env NTFY_TOKEN_FILE=<path>`. The last capture is
+      # the script.
+      resolvedHook =
+        mode:
+        "-\\+(/nix/store/[a-z0-9]{32}-coreutils-[^/ ]+/bin/env NTFY_TOKEN_FILE=[^ ]+ )?(/nix/store/[a-z0-9]{32}-observability-notify-resolved) ${mode} %n";
 
       input = {
         settings = collector.settings;
@@ -104,19 +109,21 @@
       notifierRehearsal =
         pkgs.runCommand "observability-notify-rehearsal"
           {
-            nativeBuildInputs = [ pkgs.coreutils ];
-            meta.description = "behavioural check: a crash loop yields one FAILED/RESOLVED pair per interval";
+            nativeBuildInputs = [
+              pkgs.coreutils
+              pkgs.gnugrep
+            ];
+            meta.description = "behavioural check: a crash loop yields one FAILED/RESOLVED pair per interval and one failed.log line per posted FAILED";
           }
           ''
             set -euo pipefail
             export NTFY_STUB_LOG="$TMPDIR/posts" OBSERVABILITY_NOTIFY_MIN_INTERVAL_SEC=900
-            mkdir "$TMPDIR/notify"
-            touch "$NTFY_STUB_LOG"
+            # systemd gives services UMask 0022; 0077 here shows the script
+            # sets failed.log's mode itself.
+            umask 077
             unit=opentelemetry-collector.service
-            # systemd's order for a crash with automatic restart: the stop
-            # hook with a failed result, OnFailure's notifier, then the start.
-            crash() { SERVICE_RESULT=exit-code ${rehearsedNotify.resolved} stop "$unit"; ${rehearsedNotify.failed} "$unit"; }
-            start() { ${rehearsedNotify.resolved} start "$unit"; }
+            failed="FAILED $unit on rehearsal|fleet-alerts"
+            resolved="RESOLVED $unit on rehearsal|fleet-alerts"
             expect() {
               if [ "$(cat "$NTFY_STUB_LOG")" != "$2" ]; then
                 echo "FAIL: $1; posts were:" >&2
@@ -125,17 +132,70 @@
               fi
               echo "ok: $1"
             }
-            failed="FAILED $unit on rehearsal|fleet-alerts"
-            resolved="RESOLVED $unit on rehearsal|fleet-alerts"
+            # expectLog DESCRIPTION COUNT: failed.log is mode 0644 and holds
+            # exactly COUNT lines `<epoch> <unit> rehearsal`, each epoch within
+            # this rehearsal.
+            expectLog() {
+              local log="$TMPDIR/notify/failed.log" lines epoch rest
+              lines=$(grep -cE '^[0-9]+ '"$unit"' rehearsal$' "$log" 2>/dev/null || true)
+              if [ ! -e "$log" ] || [ "$(wc -l < "$log")" != "$2" ] || [ "$lines" != "$2" ] || [ "$(stat -c %a "$log")" != 644 ]; then
+                echo "FAIL: $1; failed.log was:" >&2
+                ls -l "$log" >&2 || true
+                cat "$log" >&2 || true
+                exit 1
+              fi
+              while read -r epoch rest; do
+                if [ "$epoch" -lt "$t0" ] || [ "$epoch" -gt "$(date +%s)" ]; then
+                  echo "FAIL: $1; epoch $epoch is outside the rehearsal" >&2
+                  exit 1
+                fi
+              done < "$log"
+              echo "ok: $1"
+            }
+            # rehearse FAILED: the crash loop against a fresh stamp directory,
+            # with FAILED as the notifier's failed script.
+            rehearse() {
+              local failedScript=$1
+              rm -rf "$TMPDIR/notify"
+              mkdir "$TMPDIR/notify"
+              : > "$NTFY_STUB_LOG"
+              t0=$(date +%s)
+              # systemd's order for a crash with automatic restart: the stop
+              # hook with a failed result, OnFailure's notifier, then the start.
+              crash() { SERVICE_RESULT=exit-code ${rehearsedNotify.resolved} stop "$unit"; "$failedScript" "$unit"; }
+              start() { ${rehearsedNotify.resolved} start "$unit"; }
 
-            crash; start; crash; start
-            expect "crash, start, crash, start within the interval posts one pair" "$failed"$'\n'"$resolved"
+              crash; start; crash; start
+              expect "crash, start, crash, start within the interval posts one pair" "$failed"$'\n'"$resolved"
+              expectLog "one posted FAILED and one suppressed episode log one line" 1
 
-            mkdir -p "$TMPDIR/notify/last-failed"
-            echo $(( $(date +%s) - 901 )) > "$TMPDIR/notify/last-failed/$unit"
-            crash; ${rehearsedNotify.failed} "$unit"; start
-            SERVICE_RESULT=success ${rehearsedNotify.resolved} stop "$unit"
-            expect "a crash after the interval posts a new pair, once" "$failed"$'\n'"$resolved"$'\n'"$failed"$'\n'"$resolved"
+              mkdir -p "$TMPDIR/notify/last-failed"
+              echo $(( $(date +%s) - 901 )) > "$TMPDIR/notify/last-failed/$unit"
+              crash; "$failedScript" "$unit"; start
+              SERVICE_RESULT=success ${rehearsedNotify.resolved} stop "$unit"
+              expect "a crash after the interval posts a new pair, once" "$failed"$'\n'"$resolved"$'\n'"$failed"$'\n'"$resolved"
+              expectLog "a second posted FAILED logs a second line, a repeated failure none" 2
+            }
+            # mutant NAME LINE: the failed script without its one line
+            # containing LINE must fail the rehearsal.
+            mutant() {
+              local script="$TMPDIR/failed-$1"
+              grep -vF "$2" ${rehearsedNotify.failed} > "$script"
+              chmod +x "$script"
+              if [ "$(wc -l < "$script")" -ne $(( $(wc -l < ${rehearsedNotify.failed}) - 1 )) ]; then
+                echo "FAIL: mutant $1 did not remove exactly one line" >&2
+                exit 1
+              fi
+              if (rehearse "$script"); then
+                echo "FAIL: the rehearsal accepted mutant $1" >&2
+                exit 1
+              fi
+              echo "ok: mutant $1 rejected"
+            }
+
+            rehearse ${rehearsedNotify.failed}
+            mutant drop-append '>> "$log"'
+            mutant drop-mode 'install -m 0644'
             touch "$out"
           '';
 
@@ -186,7 +246,13 @@
           hookScripts =
             mode: hooks:
             lib.unique (
-              lib.concatMap (hook: lib.toList (builtins.match (resolvedHook mode) hook)) (lib.toList hooks)
+              lib.concatMap (
+                hook:
+                let
+                  m = builtins.match (resolvedHook mode) hook;
+                in
+                lib.optional (m != null) (lib.last m)
+              ) (lib.toList hooks)
             );
           # One script removes the one stamp, and systemd runs ExecStartPost
           # before ExecStopPost, so a oneshot's stop hook finds no stamp after

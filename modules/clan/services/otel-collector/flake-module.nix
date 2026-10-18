@@ -13,14 +13,9 @@
 # agent and -ingress, so the container test imports them without clan; only
 # the clan ingress role reads the collector password from clan vars.
 #
-# The agent also owns the failure notifier (ADR-009 item 11):
-# observability-notify@.service posts once per failure episode to ntfy's
-# fleet-alerts topic, guarded by a stamp per unit, and every unit listed in
-# services.observability-notify.units gets OnFailure= and two hooks that post
-# RESOLVED and remove the stamp: ExecStartPost= on the unit's next successful
-# start, which ends an episode across automatic restarts, and ExecStopPost= on
-# its next successful exit. ntfy has no authentication, so the notifier holds
-# no credential.
+# The agent imports the failure notifier, flake.modules.nixos.observability-
+# notify (modules/nixos/observability-notify.nix), and lists its own unit in
+# services.observability-notify.units.
 #
 # Build-time validation (nixpkgs' `otelcol-contrib validate`) runs before
 # /run/credentials exists. basicauth's password_file is not opened by
@@ -77,65 +72,8 @@ let
       )
     ];
   };
-
-  # The notifier's two scripts, a function so that
-  # checks.x86_64-linux.otel-collector-config can rehearse them against a
-  # temporary stamp directory and a recording ntfy-send.
-  observabilityNotifyScripts =
-    pkgs:
-    {
-      ntfySend,
-      stampDir,
-      hostName,
-    }:
-    {
-      # One post per failure episode: skip while the stamp exists. A unit
-      # whose last FAILED was posted less than OBSERVABILITY_NOTIFY_MIN_INTERVAL_SEC
-      # ago opens a `suppressed` episode instead, which the resolve hooks end
-      # without a post. A persistent crash loop therefore yields one
-      # FAILED/RESOLVED pair, then at most one new pair per interval per unit;
-      # detecting crash loops by restart rate belongs to S3. A failed post
-      # writes no stamp, so the next failure posts again.
-      failed = pkgs.writeShellScript "observability-notify-failed" ''
-        : "''${OBSERVABILITY_NOTIFY_MIN_INTERVAL_SEC:?}"
-        unit="$1"
-        stamp="${stampDir}/$unit"
-        last="${stampDir}/last-failed/$unit"
-        if [ -e "$stamp" ]; then
-          exit 0
-        fi
-        now=$(${pkgs.coreutils}/bin/date +%s)
-        if [ -s "$last" ] && [ $((now - $(< "$last"))) -lt "$OBSERVABILITY_NOTIFY_MIN_INTERVAL_SEC" ]; then
-          echo suppressed > "$stamp"
-          exit 0
-        fi
-        ${ntfySend} "FAILED $unit on ${hostName}" fleet-alerts || exit 1
-        echo posted > "$stamp"
-        ${pkgs.coreutils}/bin/mkdir -p "${stampDir}/last-failed"
-        echo "$now" > "$last"
-      '';
-
-      # Runs as root (`+`) after a notified unit starts (`start`) or stops
-      # (`stop`); a failed post leaves the stamp for the next chance and never
-      # fails the unit.
-      resolved = pkgs.writeShellScript "observability-notify-resolved" ''
-        mode="$1"
-        unit="$2"
-        stamp="${stampDir}/$unit"
-        if [ -e "$stamp" ] && { [ "$mode" = start ] || [ "''${SERVICE_RESULT:-}" = success ]; }; then
-          if [ "$(< "$stamp")" = suppressed ]; then
-            ${pkgs.coreutils}/bin/rm -f "$stamp"
-          else
-            ${ntfySend} "RESOLVED $unit on ${hostName}" fleet-alerts && ${pkgs.coreutils}/bin/rm -f "$stamp"
-          fi
-        fi
-        exit 0
-      '';
-    };
 in
 {
-  flake.lib = { inherit observabilityNotifyScripts; };
-
   flake.modules.nixos.otel-collector-agent =
     {
       config,
@@ -144,14 +82,7 @@ in
       ...
     }:
     let
-      cfg = config.services.observability-notify;
       hostName = config.networking.hostName;
-      stampDir = "/var/lib/observability-notify";
-      notifyScripts = observabilityNotifyScripts pkgs {
-        ntfySend = lib.getExe pkgs.ntfy-send;
-        inherit stampDir hostName;
-      };
-      resolved = notifyScripts.resolved;
 
       scrape =
         job: target: extra:
@@ -191,18 +122,10 @@ in
       ];
     in
     {
-      imports = [ collectorCore ];
-
-      options.services.observability-notify.units = lib.mkOption {
-        type = lib.types.listOf lib.types.str;
-        default = [ ];
-        description = ''
-          systemd.services attribute names (without `.service`) whose failure
-          posts a notice to ntfy's fleet-alerts topic through
-          observability-notify@.service, and whose next successful start or
-          exit after a notice posts RESOLVED.
-        '';
-      };
+      imports = [
+        collectorCore
+        nixosModules.observability-notify
+      ];
 
       config = lib.mkMerge [
         {
@@ -366,33 +289,7 @@ in
 
           services.observability-notify.units = [ "opentelemetry-collector" ];
 
-          systemd.services = lib.mkMerge [
-            (lib.genAttrs cfg.units (_: {
-              unitConfig.OnFailure = [ "observability-notify@%n.service" ];
-              serviceConfig = {
-                # An automatic restart's stop is never a success, so the
-                # episode ends at the next start. systemd runs ExecStartPost
-                # before ExecStopPost and both run the one script, so a
-                # oneshot's stop hook finds the stamp gone and posts no second
-                # RESOLVED.
-                ExecStartPost = [ "-+${resolved} start %n" ];
-                ExecStopPost = [ "-+${resolved} stop %n" ];
-              };
-            }))
-            {
-              prometheus-node-exporter.serviceConfig.MemoryMax = "64M";
-
-              "observability-notify@" = {
-                environment.OBSERVABILITY_NOTIFY_MIN_INTERVAL_SEC = "900";
-                description = "Post a failure notice for %i to ntfy";
-                serviceConfig = {
-                  Type = "oneshot";
-                  StateDirectory = "observability-notify";
-                  ExecStart = "${notifyScripts.failed} %i";
-                };
-              };
-            }
-          ];
+          systemd.services.prometheus-node-exporter.serviceConfig.MemoryMax = "64M";
         }
 
         (lib.mkIf (config.services.nginx.enable && config.services.nginx.statusPage) {
@@ -566,7 +463,7 @@ in
         readme = ''
           OpenTelemetry collector for the fleet. `agent` collects the
           machine's host, process, unit and service metrics, runs
-          node_exporter on loopback, and owns the observability-notify@
+          node_exporter on loopback, and imports the observability-notify@
           failure notifier. `ingress` converts, routes and writes metrics
           into GreptimeDB on 127.0.0.1:4000, one otlp_http exporter per
           database with a persistent queue. On a machine holding both

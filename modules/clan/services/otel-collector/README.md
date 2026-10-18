@@ -1,6 +1,6 @@
 # otel-collector clan service
 
-This clan service collects fleet metrics into the GreptimeDB telemetry store and posts unit failures to ntfy.
+This clan service collects fleet metrics into the GreptimeDB telemetry store, and its `agent` role imports the failure notifier that posts unit failures to ntfy.
 It has two roles, `agent` and `ingress`, and in slice S1 both are assigned to magnetite in `modules/clan/inventory/services/otel-collector.nix`.
 The roles import the plain NixOS modules `flake.modules.nixos.otel-collector-agent` and `flake.modules.nixos.otel-collector-ingress`, so the container test imports them without clan.
 Only the clan `ingress` role reads a clan var: the `collector-password` credential.
@@ -76,7 +76,7 @@ nixpkgs validates the rendered configuration at build time, before `/run/credent
 The single `validateConfigOverrides` entry therefore replaces the `prometheus/zerotier` scrape job with itself minus `authorization`, for validation only.
 `basicauth` does not open `password_file` during validation, so it needs no override.
 
-The notifier holds no credential, because ntfy on cinnabar has no authentication.
+The notifier reads no clan var itself; a host passes the path of the `alerter` ntfy token through `services.observability-notify.tokenFile` (see Failure notifier).
 
 ## Queue
 
@@ -95,8 +95,9 @@ The collector unit runs with `MemoryMax = 512M` and `OOMScoreAdjust = 300`, so u
 
 ## Failure notifier
 
-The agent role owns `observability-notify@.service` and the option `services.observability-notify.units`.
-Entries are `systemd.services` attribute names without `.service`.
+The notifier lives in `modules/nixos/observability-notify.nix` as `flake.modules.nixos.observability-notify`, which the `agent` role imports; a host without the role imports it directly.
+It defines `observability-notify@.service` and the options `services.observability-notify.units` and `services.observability-notify.tokenFile`.
+Entries in `units` are `systemd.services` attribute names without `.service`.
 The agent lists `opentelemetry-collector` itself, and magnetite lists the store units and its ZFS oneshots in `modules/machines/nixos/magnetite/default.nix`.
 For every listed unit the module sets `OnFailure=observability-notify@%n.service`, so an instance is named `observability-notify@<unit>.service.service`.
 It also adds two hooks running one script as root: `ExecStartPost=` with mode `start` and `ExecStopPost=` with mode `stop`.
@@ -111,7 +112,13 @@ A failure within `OBSERVABILITY_NOTIFY_MIN_INTERVAL_SEC` (900 s) of the last pos
 A crash loop therefore yields one `FAILED`/`RESOLVED` pair, then at most one new pair per 15 minutes per unit.
 A failed `FAILED` post writes no stamp, so the next failure posts again; a failed `RESOLVED` post leaves the stamp for the next start or successful stop.
 
-S3's alert evaluator reads these stamps for the R9.1 FIRING budget, and it must count only stamps containing `posted`.
+For each posted `FAILED` the notifier appends one line `<epoch> <unit> <host>` to `/var/lib/observability-notify/failed.log`, which it creates with mode `0644` so the alert evaluator, a `DynamicUser`, can read it; a suppressed episode and a failed post append nothing.
+The evaluator counts that log's lines from the last 24 hours, together with its own `FIRING` posts, for the R9.1 budget; the log is not rotated, and the 15-minute interval bounds its growth.
+
+`services.observability-notify.tokenFile` (default `null`) names the file holding the `alerter` ntfy token.
+When it is set, the template loads the file as the credential `alerter-token` with `NTFY_TOKEN_FILE=%d/alerter-token`, and both hooks run the script under `env NTFY_TOKEN_FILE=<tokenFile>`, because they run inside each notified unit and cannot see the template's credential.
+`ntfy-send` sends the token as an `Authorization: Bearer` header on curl's stdin, never on a command line.
+With `tokenFile` unset the notifier posts anonymously, which ntfy refuses on `fleet-*` topics once cinnabar's access entries are in force.
 
 ## Hazards
 
@@ -123,7 +130,7 @@ S3's alert evaluator reads these stamps for the R9.1 FIRING budget, and it must 
   Confirm a changed receiver by reading its series back from the store.
 - The process scraper must keep `process.pid`, `process.parent_pid`, `process.command`, `process.command_line`, `process.executable.path` and `process.owner` disabled at source; an agent assertion enforces this.
 - The exponential-histogram conversion stays while the store is below 1.3.0; R1.2 fails if it is removed earlier.
-- The notifier lives in the agent role, so a host's ZFS and store notices depend on its membership in that role.
+- A host's ZFS and store notices depend on its importing `observability-notify`, through the `agent` role or directly; the module's key `vanixiets#observability-notify` makes a host doing both load it once.
 
 ## Coverage
 
@@ -136,7 +143,7 @@ Module assertions run whenever a host imports the modules:
 
 `checks.x86_64-linux.otel-collector-config` (`modules/checks/otel-collector-config.nix`) judges R3.1 and R1.2 over magnetite's evaluated configuration, each clause with a mutant that must fail.
 R3.1 covers loopback endpoints, the 64 MiB floor stage, the 40-unit cap, owner aliases, metrics-only pipelines, queue storage and sizes, `memory_limiter` under `MemoryMax`, the override scope, the notifier wiring against the failure-path policy, and the order after the schema job.
-Its build runs `observability-notify-rehearsal`, which drives the notifier scripts through a crash loop against a recording `ntfy-send` and requires one pair per interval.
+Its build runs `observability-notify-rehearsal`, which drives the notifier scripts through a crash loop against a recording `ntfy-send`, requires one pair per interval and one `failed.log` line, mode `0644`, per posted `FAILED`, and rejects two mutants of the `failed` script, one without the append and one without the mode.
 
 `checks.x86_64-linux.greptimedb-envelope` (`modules/checks/greptimedb-envelope.nix`) covers the store side: R7.1's memory and kill-order relations, R1.1, R8.2 file ownership, disko against the dataset binding, the PromQL read path, the users-file generator run, the SQL helper and table clause against recorded answers, and R7.2 against recorded cgroup files.
 
