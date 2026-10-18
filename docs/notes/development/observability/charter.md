@@ -1,12 +1,12 @@
 ---
 title: Fleet observability and CCV feedback-loop charter
-status: charter v18
+status: charter v19
 date: 2026-10-18
 ---
 
 # Fleet observability and CCV feedback-loop charter
 
-Charter version: v18.
+Charter version: v19.
 A revision is a version bump with a dated entry under "Revision history"; the text of an earlier version is never edited in place.
 
 ## Objective
@@ -342,3 +342,7 @@ A research unit that meets ambiguity returns it in its questions section; the or
   - R7.1: `checks.x86_64-linux.greptimedb-envelope`'s `memoryCeilings` and `killOrder` clauses and their mutants become magnetite assertions (`MemoryHigh` below `MemoryMax`, `MemorySwapMax = 0`, and `oom_score_adj` `nix-eval-jobs` > `greptimedb` > `opentelemetry-collector` > `fleet-alert`); the check measures 0.484 GiB after; ADR-007's R7.1 and `components/greptimedb.md` amended.
   - Each new assertion is shown able to fail by an `extendModules` override of the host's configuration (`logs/s3-evidence/4.7-assertion-mutants-20261018T073054Z.log`, `4.9-assertion-mutants-20261018T073326Z.log`).
   - Shared vars: a machine is added as a reader of an existing shared var with `clan vars fix <machine> --generator <generator>`, which adds its age key (clan-core `sops.py:446-450`, `allow_member`) and re-encrypts the secret with the value unchanged (`4.8-vars-fix-magnetite-20261018T073724Z.log`); `clan vars generate <machine> --generator <generator>` regenerated the shared `ntfy-alerter` token and re-ran `ntfy-alerter-env` (`4.8-vars-magnetite-20261018T073644Z.log`), and was reverted.
+- v19 (2026-10-18): corrects v18's cost evidence and its reason for the move; v18's text is not edited, and this charter's D1–D9, the requirements and the acceptance criteria are unchanged.
+  - v18's figures were taken with `nix eval .#checks.x86_64-linux.<check>.drvPath`, which first probes `packages.x86_64-linux` and `legacyPackages.x86_64-linux` and adds a constant of about 114 MB; `nix eval .#.checks.…`, the form `skill://preferences-nix-checks-architecture` prescribes in `references/evaluation-cost.md`, measures the check alone (agent S3CostBisect, isolated worktrees, cold, evaluation cache off).
+  - Corrected `checks.fleet-alert`: 270,361,264 B (0.252 GiB) at Task 4's merge `6ccc644b`, 485,950,608 B (0.453 GiB) at Task 5's merge `dbec98c7`, and 485,945,120 B (0.453 GiB) at `origin/main` `6caa2425`; v18's 0.557 GiB for `checks.fleet-alert` and 553 MB for `checks.greptimedb-envelope` were about 484 MB and 439 MB, so both checks were under the 0.5 GiB budget before the move.
+  - The token-wiring and R7.1 relations stay module and host assertions, on S1's review F5 principle rather than the budget: relations within one host belong in that host's module assertions, which CI already pays for when it evaluates the host.

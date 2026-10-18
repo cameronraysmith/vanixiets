@@ -21,8 +21,9 @@
 # The alerter token's wiring (tasks.md 4.7) is asserted where the units are
 # declared: modules/nixos/observability-notify.nix (template and resolve
 # hooks), modules/nixos/fleet-alert.nix (the evaluator) and magnetite's
-# configuration (both read the ntfy-alerter token), because a check forcing
-# those units again cost about 0.55 GiB of evaluation (S1 review F5).
+# configuration (both read the ntfy-alerter token): a relation within one
+# host is a module assertion, which CI already pays for when it evaluates
+# the host (S1 review F5).
 #
 # The fixtures cannot see the store's real metric names (ADR-009
 # Consequences); RuleSignalMissing watches those after deploy. The label

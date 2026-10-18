@@ -20,7 +20,7 @@ A shared clan vars generator `ntfy-alerter` holds the token, a per-machine gener
 - Before every commit run `nix fmt` and keep its log; a commit whose tree fails `nix fmt -- --fail-on-change` is not pushed.
 - Evidence: long or output-heavy commands are captured as `<command> 2>&1 | tee logs/s3-evidence/<task>-$(date -u +%Y%m%dT%H%M%SZ).log`, with any filter after the `tee`.
 - nix-managed outputs are verified by `nix eval`, `nix build`, or inspecting the delivered path after activation, never by reading source; each step says which.
-- Every new check records `NIX_SHOW_STATS=1 nix eval --raw .#checks.x86_64-linux.<check>.drvPath` against a budget of 0.5 GiB; every check clause relates independently defined values, and a property of one module's own settings is an assertion in that module.
+- Every new check records `NIX_SHOW_STATS=1 nix eval --raw .#.checks.x86_64-linux.<check>.drvPath` against a budget of 0.5 GiB, always with the leading dot: `.#checks…` first probes `packages.x86_64-linux` and `legacyPackages.x86_64-linux`, adding about 114 MB that is not the check's (charter v19); every check clause relates independently defined values, and a property of one module's own settings is an assertion in that module.
 - Every runtime clause has a negative control that is shown to fail.
 - import-tree loads every `.nix` file under `modules/`, so each `.nix` file there is a flake-parts module; non-module inputs (`transition.jq`, Python, fixtures) use other extensions.
 - Pinned versions: ntfy-sh 2.28.0, jq 1.8.2, prometheus 3.15.0 (`promtool`), Python 3.14.7, `python3Packages.hypothesis` 6.156.1; vendor source is read at `binwiederhier/ntfy@v2.28.0` before depending on an option.
@@ -1601,7 +1601,7 @@ Expected: `1`.
 
 - [ ] **Step 10: Record the check's evaluation cost**
 
-Run: `NIX_SHOW_STATS=1 NIX_SHOW_STATS_PATH=/tmp/ntfy-provisioning-stats.json nix eval --raw .#checks.x86_64-linux.ntfy-provisioning.drvPath 2>&1 | tee logs/s3-evidence/3.4-eval-cost-$(date -u +%Y%m%dT%H%M%SZ).log && jq '{gcTotalBytes: .gc.totalBytes, cpuTime}' /tmp/ntfy-provisioning-stats.json | tee -a logs/s3-evidence/3.4-eval-cost-*.log`
+Run: `NIX_SHOW_STATS=1 NIX_SHOW_STATS_PATH=/tmp/ntfy-provisioning-stats.json nix eval --raw .#.checks.x86_64-linux.ntfy-provisioning.drvPath 2>&1 | tee logs/s3-evidence/3.4-eval-cost-$(date -u +%Y%m%dT%H%M%SZ).log && jq '{gcTotalBytes: .gc.totalBytes, cpuTime}' /tmp/ntfy-provisioning-stats.json | tee -a logs/s3-evidence/3.4-eval-cost-*.log`
 Expected: a `/nix/store/…-ntfy-provisioning.drv` path and `gcTotalBytes` below `536870912` (0.5 GiB).
 At planning, evaluating cinnabar's ntfy settings plus the `ntfy-sh` and `openssl` drvPaths cost `360456896` bytes, so a figure near 0.35–0.45 GiB is expected; above 0.5 GiB, stop and report.
 
@@ -1721,7 +1721,7 @@ If `ntfy-sh` fails to start, the journal's `invalid auth-users`/`invalid auth-to
 
 Implements `tasks.md` 4.1–4.11 (design D3, D10–D16, D18, D19, "Failure path"; ADR-009 items 1–8, 10, 14, 17, R9.1, R9.2, R9.5; specs `fleet-alerting-interface` and `fleet-alerting`).
 The whole check is written first, with its fixture server, label fixtures, reference model and property test, and each of its three parts is built on its own and fails before the code it judges exists: the `promtool` part before `rules.nix`, the property part before `transition.jq`, and the fixture part before `fleet-alert.nix`.
-The token wiring and R7.1's memory and kill-order relations are host-local, so they are module and host assertions rather than check clauses, as S1's F5 did; with the token-wiring clause in the check it measured 0.557 GiB (582 MB of it the clause), above the 0.5 GiB budget, and 0.36 GiB without it (charter v18).
+The token wiring and R7.1's memory and kill-order relations are host-local, so they are module and host assertions rather than check clauses, because relations within one host belong in that host's module assertions, which CI already pays for when it evaluates the host (S1 review F5); measured with `.#.checks…`, `checks.fleet-alert` costs 0.252 GiB at Task 4's merge `6ccc644b` (270,361,264 B) and 0.453 GiB at Task 5's merge `dbec98c7` and at `origin/main` `6caa2425` (485,950,608 B and 485,945,120 B); Task 4's earlier 0.557 GiB for `checks.fleet-alert` and 553 MB for `checks.greptimedb-envelope` were taken without the leading dot, which adds about 114 MB for probing `packages` and `legacyPackages` first, so both checks were under budget (about 484 MB and 439 MB) before the move (charter v19).
 magnetite's token, kill-order and R8.2 holder assertions are made to fail first, by the order of the steps, and every new assertion is shown able to fail by an `extendModules` override.
 
 **Files:**
@@ -2454,8 +2454,9 @@ Create `modules/checks/fleet-alert.nix`:
 # The alerter token's wiring (tasks.md 4.7) is asserted where the units are
 # declared: modules/nixos/observability-notify.nix (template and resolve
 # hooks), modules/nixos/fleet-alert.nix (the evaluator) and magnetite's
-# configuration (both read the ntfy-alerter token), because a check forcing
-# those units again cost about 0.55 GiB of evaluation (S1 review F5).
+# configuration (both read the ntfy-alerter token): a relation within one
+# host is a module assertion, which CI already pays for when it evaluates
+# the host (S1 review F5).
 #
 # The fixtures cannot see the store's real metric names (ADR-009
 # Consequences); RuleSignalMissing watches those after deploy. The label
@@ -3395,7 +3396,7 @@ Expected: a `SUCCESS: 7 rules found` line for the real file, a `FAILED` line nam
 Run:
 
 ```bash
-nix eval --raw .#checks.x86_64-linux.fleet-alert.rules.json 2>&1 | tee logs/s3-evidence/4.1-rules-json-$(date -u +%Y%m%dT%H%M%SZ).log \
+nix eval --raw .#.checks.x86_64-linux.fleet-alert.rules.json 2>&1 | tee logs/s3-evidence/4.1-rules-json-$(date -u +%Y%m%dT%H%M%SZ).log \
   | jq -r '"rules: \(length)", "with backslash: \([.[] | select(.expr // "" | contains("\\"))] | length)", "dot as [.]service: \([.[] | select(.expr // "" | contains("[.]service"))] | map(.alert))", "for: \(map({(.alert): .for}) | add)", "selectors: \([.[].presence[].selector] | unique | length)"'
 ```
 
@@ -3410,7 +3411,7 @@ selectors: 9
 ```
 
 The JSON text itself escapes each `"` of a label matcher as `\"`, which is JSON syntax, not part of the expression; the count above is over the decoded expressions, which is what reaches the store (see questions on tasks.md 4.1's wording).
-Run: `nix eval --raw .#checks.x86_64-linux.fleet-alert.rules.json | jq -r '.[] | select(.alert == "SystemdUnitFailed") | .expr'`
+Run: `nix eval --raw .#.checks.x86_64-linux.fleet-alert.rules.json | jq -r '.[] | select(.alert == "SystemdUnitFailed") | .expr'`
 Expected: `systemd_unit_state{systemd_unit_active_state="failed", systemd_unit_name!~"(greptimedb|greptimedb-envelope|greptimedb-schema|opentelemetry-collector|zfs-assert-root-docker-noautosnap|zfs-assert-root-greptimedb-noautosnap|zfs-assert-root-nix-noautosnap|zfs-assert-root-podman-noautosnap|zfs-set-root-greptimedb-quota|zfs-set-root-greptimedb-reservation|zfs-set-root-home-reservation|zfs-set-root-nix-quota|zfs-set-root-nixos-reservation)[.]service"} == 1` (magnetite's 13 notified units before Step 25 adds `fleet-alert`).
 
 - [ ] **Step 10: Run the property part and see it fail**
@@ -4026,7 +4027,7 @@ If a leg misses with the real evaluator, read `run-<i>.log` lines in the `MISS` 
 
 - [ ] **Step 16: Add the token-wiring assertions to the two modules**
 
-The token wiring is a relation among one host's units, so it is asserted where the units are defined rather than in `checks.fleet-alert`, where the clause cost 582 MB of evaluation and took the check to 0.557 GiB, above its 0.5 GiB budget (S1 review F5; charter v18).
+The token wiring is a relation among one host's units, so it is asserted where the units are defined rather than in `checks.fleet-alert`, because relations within one host belong in that host's module assertions, which CI already pays for when it evaluates the host (S1 review F5); the check was under its 0.5 GiB budget either way (charter v19).
 
 In `modules/nixos/observability-notify.nix`, add to the module's `let`, after `hook`:
 
@@ -4062,9 +4063,8 @@ and after the option declarations:
       # With a token, every fleet-* post of this module carries it (design
       # D3): the template loads tokenFile and names that credential in
       # NTFY_TOKEN_FILE, and each notified unit's resolve hooks pass tokenFile
-      # itself. Assertions rather than a check clause, because evaluating the
-      # host already forces these units, while checks.x86_64-linux.fleet-alert
-      # forcing them again cost about 0.55 GiB of evaluation (S1 review F5).
+      # itself. A relation within one host is a module assertion, which CI
+      # already pays for when it evaluates the host (S1 review F5).
       config.assertions = lib.mkIf (cfg.tokenFile != null) [
         {
           assertion =
@@ -4117,10 +4117,8 @@ In `modules/machines/nixos/magnetite/default.nix`, append to `assertions`, after
 
 ```nix
         # Relations among magnetite's own units, asserted here rather than in
-        # a flake check, because evaluating the host already forces these
-        # units, while checks.x86_64-linux.fleet-alert and greptimedb-envelope
-        # forcing them again took each check above 0.5 GiB of evaluation (S1
-        # review F5).
+        # a flake check: a relation within one host is a module assertion,
+        # which CI already pays for when it evaluates the host (S1 review F5).
         ++ (
           let
             tokenPath = config.clan.core.vars.generators.ntfy-alerter.files.token.path;
@@ -4356,12 +4354,12 @@ Expected: the same sha256 as before, equal to cinnabar's deployed token (`1e0237
 
 Run: `nix build --no-link -L .#checks.x86_64-linux.fleet-alert 2>&1 | tee logs/s3-evidence/4.5-check-$(date -u +%Y%m%dT%H%M%SZ).log | grep -E '(ok:|mutant .* rejected|FAIL|MISS)'`
 Expected: the `ok:` lines and five `mutant … rejected` lines of Steps 9, 12 and 15 (the parts rebuild because magnetite's notified units now include `fleet-alert`, which changes the rendered rules); no `FAIL` and no `MISS` from the real evaluator.
-Run: `nix eval --raw .#checks.x86_64-linux.fleet-alert.rules.json | jq -r '.[] | select(.alert == "SystemdUnitFailed") | .expr' | grep -o '(fleet-alert|greptimedb|'`
+Run: `nix eval --raw .#.checks.x86_64-linux.fleet-alert.rules.json | jq -r '.[] | select(.alert == "SystemdUnitFailed") | .expr' | grep -o '(fleet-alert|greptimedb|'`
 Expected: `(fleet-alert|greptimedb|`.
 
-Run: `NIX_SHOW_STATS=1 NIX_SHOW_STATS_PATH=/tmp/fleet-alert-stats.json nix eval --raw .#checks.x86_64-linux.fleet-alert.drvPath 2>&1 | tee logs/s3-evidence/4.5-eval-cost-$(date -u +%Y%m%dT%H%M%SZ).log && jq '{gcTotalBytes: .gc.totalBytes, cpuTime}' /tmp/fleet-alert-stats.json | tee -a logs/s3-evidence/4.5-eval-cost-*.log`
+Run: `NIX_SHOW_STATS=1 NIX_SHOW_STATS_PATH=/tmp/fleet-alert-stats.json nix eval --raw .#.checks.x86_64-linux.fleet-alert.drvPath 2>&1 | tee logs/s3-evidence/4.5-eval-cost-$(date -u +%Y%m%dT%H%M%SZ).log && jq '{gcTotalBytes: .gc.totalBytes, cpuTime}' /tmp/fleet-alert-stats.json | tee -a logs/s3-evidence/4.5-eval-cost-*.log`
 Expected: a `/nix/store/…-fleet-alert.drv` path and `gcTotalBytes` below `536870912` (0.5 GiB).
-The check forces magnetite's `observability-notify.units`, the names of its `systemd.services`, three publisher units, the 14 notified units' hooks and the `ntfy-alerter` token path, not the toplevel; if the figure is above 0.5 GiB, stop and report, naming the wiring clause as the first candidate to move into a magnetite assertion as S1's F5 did.
+The check forces magnetite's `observability-notify.units`, the names of its `systemd.services`, three publisher units, the 14 notified units' hooks and the `ntfy-alerter` token path, not the toplevel; if the figure is above 0.5 GiB, stop and report.
 Run the same for `greptimedb-envelope` (`NIX_SHOW_STATS_PATH=/tmp/greptimedb-envelope-stats.json`, log `4.9-eval-cost-…`) and record the difference from its S1 figure of 0.41 GiB (`openspec/changes/archive/2026-10-18-stand-up-greptimedb-on-magnetite/tasks.md:72`).
 
 - [ ] **Step 26: Run the neighbouring checks and magnetite's configuration**
@@ -5349,7 +5347,7 @@ Run:
 
 ```bash
 stats=logs/s3-evidence/5.1-fleet-alert-eval-cost-$(date -u +%Y%m%dT%H%M%SZ).json
-NIX_SHOW_STATS=1 NIX_SHOW_STATS_PATH="$PWD/$stats" nix eval --raw .#checks.x86_64-linux.fleet-alert.drvPath
+NIX_SHOW_STATS=1 NIX_SHOW_STATS_PATH="$PWD/$stats" nix eval --raw .#.checks.x86_64-linux.fleet-alert.drvPath
 jq '{GiB: (.gc.totalBytes / 1073741824), cpuTime}' "$stats"
 ```
 

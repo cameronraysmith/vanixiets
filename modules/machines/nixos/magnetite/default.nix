@@ -665,10 +665,8 @@ in
           }
         ]
         # Relations among magnetite's own units, asserted here rather than in
-        # a flake check, because evaluating the host already forces these
-        # units, while checks.x86_64-linux.fleet-alert and greptimedb-envelope
-        # forcing them again took each check above 0.5 GiB of evaluation (S1
-        # review F5).
+        # a flake check: a relation within one host is a module assertion,
+        # which CI already pays for when it evaluates the host (S1 review F5).
         ++ (
           let
             tokenPath = config.clan.core.vars.generators.ntfy-alerter.files.token.path;

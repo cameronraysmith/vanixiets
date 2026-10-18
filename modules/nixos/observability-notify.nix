@@ -162,9 +162,8 @@ in
       # With a token, every fleet-* post of this module carries it (design
       # D3): the template loads tokenFile and names that credential in
       # NTFY_TOKEN_FILE, and each notified unit's resolve hooks pass tokenFile
-      # itself. Assertions rather than a check clause, because evaluating the
-      # host already forces these units, while checks.x86_64-linux.fleet-alert
-      # forcing them again cost about 0.55 GiB of evaluation (S1 review F5).
+      # itself. A relation within one host is a module assertion, which CI
+      # already pays for when it evaluates the host (S1 review F5).
       config.assertions = lib.mkIf (cfg.tokenFile != null) [
         {
           assertion =
