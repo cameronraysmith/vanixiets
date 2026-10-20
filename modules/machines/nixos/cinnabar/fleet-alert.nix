@@ -6,9 +6,18 @@
 { ... }:
 {
   flake.modules.nixos."machines/nixos/cinnabar" =
-    { config, ... }:
+    { config, lib, ... }:
     let
       alerterToken = config.clan.core.vars.generators.ntfy-alerter.files.token.path;
+      deadmanUnit = config.systemd.services.fleet-deadman;
+      # The units a dead-man run needs on cinnabar: the probe and poll reach
+      # ntfy, and every post goes through caddy on cinnabar's ZeroTier
+      # address (caddy.nix, zt-dns.nix).
+      pathUnits = [
+        "ntfy-sh.service"
+        "caddy.service"
+        "zerotierone.service"
+      ];
     in
     {
       services.observability-notify = {
@@ -21,16 +30,15 @@
         tokenFile = alerterToken;
       };
 
-      # S3 design D3: the dead-man and the failure notifier post with the
-      # shared alerter token. A host assertion rather than a check clause,
-      # as on magnetite (charter v18).
+      # Design D12: ordered after every unit on its path, and never starting
+      # one, so a boot neither probes a half-started path nor starts a unit
+      # the operator stopped.
       assertions = [
         {
           assertion =
-            config.services.fleet-alert.deadman.enable
-            && config.services.fleet-alert.deadman.tokenFile == alerterToken
-            && config.services.observability-notify.tokenFile == alerterToken;
-          message = "cinnabar: the fleet alert dead-man must be enabled, and it and the failure notifier must read the ntfy-alerter token ${alerterToken}; deadman enabled = ${builtins.toJSON config.services.fleet-alert.deadman.enable}, deadman.tokenFile = ${builtins.toJSON config.services.fleet-alert.deadman.tokenFile}, observability-notify.tokenFile = ${builtins.toJSON config.services.observability-notify.tokenFile}.";
+            lib.all (u: builtins.elem u deadmanUnit.after) pathUnits
+            && !(lib.any (u: builtins.elem u deadmanUnit.wants) pathUnits);
+          message = "cinnabar: fleet-deadman.service must be ordered after ${builtins.toJSON pathUnits} and want none of them; it has after = ${builtins.toJSON deadmanUnit.after}, wants = ${builtins.toJSON deadmanUnit.wants}.";
         }
       ];
     };

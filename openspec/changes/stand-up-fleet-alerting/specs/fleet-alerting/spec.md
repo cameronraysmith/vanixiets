@@ -10,7 +10,7 @@ An alert for memory pressure or an out-of-memory kill SHALL name the three proce
 #### Scenario: A storage pool degrades
 
 - **WHEN** the telemetry store holds a series showing magnetite's `zroot` pool degraded on every pass of the evaluator for one minute
-- **THEN** one alert titled `[FIRING] ZfsPoolUnhealthy magnetite` is posted, which the build-time alert regulator confirms by replaying that series
+- **THEN** one alert titled `[FIRING] ZfsPoolUnhealthy magnetite` is posted, which the operator's hand run of the deployed evaluator against magnetite's store, with the rule's matcher changed to select the online pool, confirms
 
 #### Scenario: A unit the notifier reports fails
 

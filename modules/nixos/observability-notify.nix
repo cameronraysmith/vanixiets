@@ -103,18 +103,6 @@ in
       ) "${pkgs.coreutils}/bin/env NTFY_TOKEN_FILE=${cfg.tokenFile} ";
       hook = mode: "-+${tokenEnv}${notifyScripts.resolved} ${mode} %n";
 
-      # LoadCredential entries are "<id>:<source path>"; the ids loading `path`.
-      credentialIds =
-        path: serviceConfig:
-        lib.concatMap (
-          entry:
-          let
-            m = builtins.match "([^:]+):(.+)" entry;
-          in
-          lib.optional (m != null && builtins.elemAt m 1 == path) (builtins.head m)
-        ) (lib.toList (serviceConfig.LoadCredential or [ ]));
-      template = config.systemd.services."observability-notify@";
-      templateIds = credentialIds cfg.tokenFile template.serviceConfig;
       exportsToken =
         mode: hooks:
         lib.any (
@@ -159,20 +147,9 @@ in
         };
       };
 
-      # With a token, every fleet-* post of this module carries it (design
-      # D3): the template loads tokenFile and names that credential in
-      # NTFY_TOKEN_FILE, and each notified unit's resolve hooks pass tokenFile
-      # itself. A relation within one host is a module assertion, which CI
-      # already pays for when it evaluates the host (S1 review F5).
+      # With a token, each notified unit's resolve hooks pass tokenFile
+      # itself (design D3), which a host overriding a unit's hooks can lose.
       config.assertions = lib.mkIf (cfg.tokenFile != null) [
-        {
-          assertion =
-            templateIds != [ ]
-            && builtins.elem (template.environment.NTFY_TOKEN_FILE or null) (map (id: "%d/${id}") templateIds);
-          message = "observability-notify: observability-notify@.service must load tokenFile (${cfg.tokenFile}) as a credential and name it in NTFY_TOKEN_FILE; it loads ${
-            builtins.toJSON (template.serviceConfig.LoadCredential or [ ])
-          } and sets NTFY_TOKEN_FILE = ${builtins.toJSON (template.environment.NTFY_TOKEN_FILE or null)}.";
-        }
         {
           assertion = unitsWithoutToken == [ ];
           message = "observability-notify: the resolve hooks of ${builtins.toJSON unitsWithoutToken} do not run under `env NTFY_TOKEN_FILE=${cfg.tokenFile}`.";

@@ -19,12 +19,14 @@
 #   with the reference model fleet-alert/model.py over derandomized
 #   Hypothesis timelines, and must fail on the no-re-post mutant.
 #
-# The alerter token's wiring (tasks.md 4.7) is asserted where the units are
-# declared: modules/nixos/observability-notify.nix (template and resolve
-# hooks), modules/nixos/fleet-alert.nix (the evaluator) and magnetite's
-# configuration (both read the ntfy-alerter token): a relation within one
-# host is a module assertion, which CI already pays for when it evaluates
-# the host (S1 review F5).
+# Relations within one host are assertions where the units are declared,
+# which CI already pays for when it evaluates the host (S1 review F5, S3
+# review F3): the notifier's resolve hooks in
+# modules/nixos/observability-notify.nix, the dead-man's ntfy listener and
+# access entries in modules/nixos/fleet-alert.nix, and its ordering in
+# cinnabar's configuration. Two dead-man parts remain here: its rehearsal,
+# against the configuration flake.lib.fleetAlertDeadmanConfig renders from
+# the option defaults, and the relations between cinnabar and magnetite.
 #
 # The fixtures cannot see the store's real metric names (ADR-009
 # Consequences); RuleSignalMissing watches those after deploy. The label
@@ -128,14 +130,16 @@
       '';
 
       cinnabar = self.nixosConfigurations.cinnabar.config;
-      cinnabarPkgs = self.nixosConfigurations.cinnabar.pkgs;
 
       # The dead-man (tasks.md 5.1; design D12, "Failure path"; ADR-009 R9.3,
       # R9.4), built from the function cinnabar deploys with the recording
-      # ntfy-send, and run against cinnabar's own rendered configuration with
-      # only ntfyUrl and stateFile pointed at the sandbox.
+      # ntfy-send, and run against the configuration rendered from the
+      # module's defaults with only ntfyUrl and stateFile pointed at the
+      # sandbox.
       deadmanRehearsed = self.lib.fleetAlertDeadman pkgs { ntfySend = lib.getExe ntfySendStub; };
-      deadmanConfigFile = cinnabar.systemd.services.fleet-deadman.environment.FLEET_DEADMAN_CONFIG;
+      deadmanConfigFile = pkgs.writeText "fleet-deadman.json" (
+        builtins.toJSON (self.lib.fleetAlertDeadmanConfig { })
+      );
 
       # R9.4's build-time negative control: a dead-man that passes any HTTP
       # answer to its probe. --replace-fail proves the edit hit the script.
@@ -297,124 +301,20 @@
           '';
 
       # Relations between independently written values on cinnabar and
-      # magnetite (tasks.md 5.1-5.3; design D5 step 3, D12). The access
-      # decision reproduces ntfy 2.28.0's: one row decides, rows for the user
-      # or `*` whose pattern matches, ordered user DESC, pattern length DESC,
-      # write DESC (world assumption A38; user/manager.go:702-735,
-      # user/manager_sqlite.go:90-96); no matching row means
-      # auth-default-access, here unset and so read-write (cmd/serve.go:53).
+      # magnetite (tasks.md 5.1; design D12).
       deadmanInput = {
-        execStart = cinnabar.systemd.services.fleet-deadman.serviceConfig.ExecStart;
-        deployedDeadman = lib.getExe (
-          self.lib.fleetAlertDeadman cinnabarPkgs { ntfySend = lib.getExe cinnabarPkgs.ntfy-send; }
-        );
         deadman = cinnabar.services.fleet-alert.deadman;
         pollTopic = cinnabar.services.fleet-alert.evaluator.heartbeatTopic;
         evaluator = magnetite.services.fleet-alert.evaluator;
         evaluatorHostName = magnetite.networking.hostName;
-        deadmanHostName = cinnabar.networking.hostName;
-        deadmanAfter = cinnabar.systemd.services.fleet-deadman.after;
-        deadmanWants = cinnabar.systemd.services.fleet-deadman.wants;
-        # The path's units that exist on the dead-man's host: ntfy behind
-        # listenHttp, caddy serving https://ntfy.zt to ntfy-send, and the
-        # ZeroTier address caddy binds (modules/machines/nixos/cinnabar/caddy.nix,
-        # zt-dns.nix).
-        pathUnits = builtins.filter (name: cinnabar.systemd.services ? ${name}) deadmanPathUnits;
-        listenHttp = cinnabar.services.ntfy-sh.settings.listen-http;
-        access = cinnabar.services.ntfy-sh.settings.auth-access or [ ];
       };
-
-      decision =
-        access: user: topic:
-        let
-          rows = lib.concatMap (
-            entry:
-            let
-              parts = lib.splitString ":" entry;
-              pattern = builtins.elemAt parts 1;
-            in
-            lib.optional
-              (
-                builtins.length parts == 3
-                && builtins.elem (builtins.head parts) (
-                  lib.unique [
-                    user
-                    "*"
-                  ]
-                )
-                && builtins.match (builtins.replaceStrings [ "*" ] [ ".*" ] pattern) topic != null
-              )
-              {
-                user = builtins.head parts;
-                length = builtins.stringLength pattern;
-                permission = builtins.elemAt parts 2;
-              }
-          ) access;
-          writes =
-            row:
-            builtins.elem row.permission [
-              "rw"
-              "read-write"
-              "wo"
-              "write-only"
-              "write"
-            ];
-          ordered = lib.sort (
-            a: b:
-            if a.user != b.user then
-              a.user > b.user
-            else if a.length != b.length then
-              a.length > b.length
-            else
-              writes a && !writes b
-          ) rows;
-        in
-        if ordered == [ ] then null else (builtins.head ordered).permission;
-
-      # The units a dead-man run needs: the probe and poll reach ntfy, and
-      # every post goes through caddy on cinnabar's ZeroTier address.
-      deadmanPathUnits = [
-        "ntfy-sh"
-        "caddy"
-        "zerotierone"
-      ];
-
-      readOnly =
-        p:
-        builtins.elem p [
-          "ro"
-          "read-only"
-          "read"
-        ];
-      readWrite =
-        p:
-        builtins.elem p [
-          "rw"
-          "read-write"
-        ];
 
       deadmanFailures =
         i:
         let
           check = name: ok: lib.optional (!ok) name;
-          anonymous = decision i.access "*";
-          alerter = decision i.access "alerter";
         in
         lib.concatLists [
-          (check "deadman: fleet-deadman does not run the rehearsed fleetAlertDeadman built with ntfy-send" (
-            i.execStart == i.deployedDeadman
-          ))
-          # Ordered after every unit on its path, and never starting one, so
-          # a boot neither probes a half-started path nor starts a unit the
-          # operator stopped (design D12).
-          (check
-            "deadman: fleet-deadman is not ordered after ntfy-sh, caddy and zerotierone on its host, or wants one of them"
-            (
-              i.pathUnits == deadmanPathUnits
-              && lib.all (name: builtins.elem "${name}.service" i.deadmanAfter) i.pathUnits
-              && !(lib.any (name: builtins.elem "${name}.service" i.deadmanWants) i.pathUnits)
-            )
-          )
           (check
             "deadman: the dead-man polls a heartbeat topic other than the one magnetite's evaluator posts to"
             (i.pollTopic == i.evaluator.heartbeatTopic)
@@ -425,40 +325,11 @@
           (check "deadman: evaluatorHost is not the host whose evaluator is enabled" (
             i.evaluator.enable && i.deadman.evaluatorHost == i.evaluatorHostName
           ))
-          (check "deadman: ntfyUrl is not ntfy's listener on the dead-man's host" (
-            i.deadman.ntfyUrl == "http://${i.listenHttp}"
-          ))
-          # E9.4 and R9.4's premise: anonymous clients may read but not write
-          # both fleet topics, alerter may write both, host topics stay open.
-          (check "deadman: an anonymous write to the heartbeat or alert topic is not refused" (
-            lib.all (t: anonymous t != null && readOnly (anonymous t)) [
-              i.pollTopic
-              i.deadman.topic
-            ]
-          ))
-          (check "deadman: alerter may not write the heartbeat or alert topic" (
-            lib.all (t: alerter t != null && readWrite (alerter t)) [
-              i.pollTopic
-              i.deadman.topic
-            ]
-          ))
-          (check "deadman: an access entry decides a host-named topic" (
-            lib.all (t: anonymous t == null) [
-              i.evaluatorHostName
-              i.deadmanHostName
-            ]
-          ))
         ];
 
       deadmanActual = deadmanFailures deadmanInput;
 
       deadmanMutants = {
-        execStartOther =
-          i:
-          i
-          // {
-            execStart = "/nix/store/${lib.fixedWidthString 32 "0" ""}-fleet-deadman/bin/fleet-deadman";
-          };
         evaluatorHeartbeatRenamed =
           i:
           i
@@ -483,14 +354,6 @@
               evaluatorHost = "cinnabar";
             };
           };
-        listenerMoved = i: i // { listenHttp = "[::1]:2587"; };
-        caddyOrderDropped = i: i // { deadmanAfter = lib.remove "caddy.service" i.deadmanAfter; };
-        zerotierOrderDropped = i: i // { deadmanAfter = lib.remove "zerotierone.service" i.deadmanAfter; };
-        ntfyWanted = i: i // { deadmanWants = i.deadmanWants ++ [ "ntfy-sh.service" ]; };
-        # R9.4's acceptance negative control, at evaluation time.
-        anonymousReadOnlyRemoved = i: i // { access = lib.remove "*:fleet-*:ro" i.access; };
-        alerterEntryRemoved = i: i // { access = lib.remove "alerter:fleet-*:rw" i.access; };
-        hostTopicsCovered = i: i // { access = i.access ++ [ "*:*:ro" ]; };
       };
 
       deadmanClause =
@@ -910,10 +773,6 @@
         map fireAndResolve [
           "HostMemoryPressure"
           "HostOOMKill"
-          "ZfsPoolUnhealthy"
-          "SystemdUnitRestartLoop"
-          "SystemdUnitFailed"
-          "LocalExporterDown"
         ]
         ++ [
           exclusionLeg

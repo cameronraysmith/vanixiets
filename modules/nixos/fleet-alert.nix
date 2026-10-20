@@ -33,9 +33,7 @@
 # ExecStartPost post, ends before TimeoutStartSec, which ends before the
 # timer's next run.
 # The kill order (evaluator 900, store 500, collector 300, this unit 0) is
-# asserted by magnetite's configuration, which holds all four. An assertion
-# below also requires the unit to load evaluator.tokenFile and name that
-# credential in NTFY_TOKEN_FILE.
+# asserted by magnetite's configuration, which holds all four.
 #
 # With services.fleet-alert.deadman.enable, fleet-deadman.timer runs
 # fleet-deadman.service every 5 min on the ntfy host. Each run first
@@ -45,8 +43,12 @@
 # keeping /var/lib/fleet-deadman/state.json. It posts through ntfy-send
 # with the alerter credential. The host lists fleet-deadman in
 # services.observability-notify.units, so a failed run reaches fleet-alerts
-# through the notifier.
-{ config, ... }:
+# through the notifier. Assertions below hold R9.4's premise on that host:
+# ntfyUrl is ntfy's listener, and ntfy's auth-access refuses an anonymous
+# write to both fleet topics, lets alerter write them, and decides no
+# host-named topic. flake.lib.fleetAlertDeadmanConfig renders the dead-man's
+# configuration, from the option defaults when the check calls it.
+{ config, lib, ... }:
 let
   flakeLib = config.flake.lib;
   transitionJq = ./fleet-alert/transition.jq;
@@ -280,6 +282,86 @@ let
     attribution = [ ];
   };
 
+  # The defaults of the options below, and the dead-man's configuration
+  # rendered from them, so checks.x86_64-linux.fleet-alert rehearses the
+  # dead-man without evaluating a host (S3 review F3).
+  defaults = {
+    topic = "fleet-alerts";
+    heartbeatTopic = "fleet-heartbeat";
+    ntfyUrl = "http://[::1]:2586";
+    evaluatorHost = "magnetite";
+  };
+  fleetAlertDeadmanConfig =
+    {
+      ntfyUrl ? defaults.ntfyUrl,
+      topic ? defaults.topic,
+      evaluatorHost ? defaults.evaluatorHost,
+      heartbeatTopic ? defaults.heartbeatTopic,
+    }:
+    {
+      inherit
+        ntfyUrl
+        topic
+        evaluatorHost
+        heartbeatTopic
+        ;
+      window = "10m";
+      stateFile = "/var/lib/fleet-deadman/state.json";
+      rules = [ alertEvaluatorSilent ];
+    };
+
+  # ntfy 2.28.0's access decision (world assumption A38;
+  # user/manager.go:702-735, user/manager_sqlite.go:90-96): one row decides,
+  # rows for the user or `*` whose pattern matches, ordered user DESC,
+  # pattern length DESC, write DESC; null when no row matches, which leaves
+  # auth-default-access (cmd/serve.go:53).
+  ntfyDecision =
+    access: user: topic:
+    let
+      rows = lib.concatMap (
+        entry:
+        let
+          parts = lib.splitString ":" entry;
+          pattern = builtins.elemAt parts 1;
+        in
+        lib.optional
+          (
+            builtins.length parts == 3
+            && builtins.elem (builtins.head parts) (
+              lib.unique [
+                user
+                "*"
+              ]
+            )
+            && builtins.match (builtins.replaceStrings [ "*" ] [ ".*" ] pattern) topic != null
+          )
+          {
+            user = builtins.head parts;
+            length = builtins.stringLength pattern;
+            permission = builtins.elemAt parts 2;
+          }
+      ) access;
+      writes =
+        row:
+        builtins.elem row.permission [
+          "rw"
+          "read-write"
+          "wo"
+          "write-only"
+          "write"
+        ];
+      ordered = lib.sort (
+        a: b:
+        if a.user != b.user then
+          a.user > b.user
+        else if a.length != b.length then
+          a.length > b.length
+        else
+          writes a && !writes b
+      ) rows;
+    in
+    if ordered == [ ] then null else (builtins.head ordered).permission;
+
   # The dead-man (design D12, "Failure path"; ADR-009 item 9, R9.4), a
   # function so checks.x86_64-linux.fleet-alert runs it against a loopback
   # ntfy stand-in and a recording ntfy-send. Configuration comes from the
@@ -371,7 +453,9 @@ let
     };
 in
 {
-  flake.lib = { inherit fleetAlertEvaluator fleetAlertDeadman; };
+  flake.lib = {
+    inherit fleetAlertEvaluator fleetAlertDeadman fleetAlertDeadmanConfig;
+  };
 
   flake.modules.nixos.fleet-alert =
     {
@@ -452,27 +536,44 @@ in
       );
       evaluator = fleetAlertEvaluator pkgs { ntfySend = lib.getExe pkgs.ntfy-send; };
       unit = config.systemd.services.fleet-alert.serviceConfig;
-      tokenIds = lib.concatMap (
-        entry:
-        let
-          m = builtins.match "([^:]+):(.+)" entry;
-        in
-        lib.optional (m != null && builtins.elemAt m 1 == cfg.evaluator.tokenFile) (builtins.head m)
-      ) (lib.toList (unit.LoadCredential or [ ]));
-      tokenEnv = config.systemd.services.fleet-alert.environment.NTFY_TOKEN_FILE or null;
 
       deadman = fleetAlertDeadman pkgs { ntfySend = lib.getExe pkgs.ntfy-send; };
       deadmanConfig = pkgs.writeText "fleet-deadman.json" (
-        builtins.toJSON {
+        builtins.toJSON (fleetAlertDeadmanConfig {
           inherit (cfg.deadman) ntfyUrl topic evaluatorHost;
           # The option the evaluator posts its heartbeat to; declared
           # whether or not this host runs the evaluator.
           heartbeatTopic = cfg.evaluator.heartbeatTopic;
-          window = "10m";
-          stateFile = "/var/lib/fleet-deadman/state.json";
-          rules = [ alertEvaluatorSilent ];
-        }
+        })
       );
+
+      # The dead-man's ntfy, on its own host: the access entries R9.4's
+      # probe presumes (E9.4), and the listener ntfyUrl names.
+      ntfySettings = config.services.ntfy-sh.settings;
+      access = ntfySettings.auth-access or [ ];
+      anonymous = ntfyDecision access "*";
+      alerter = ntfyDecision access "alerter";
+      fleetTopics = [
+        cfg.evaluator.heartbeatTopic
+        cfg.deadman.topic
+      ];
+      hostTopics = [
+        config.networking.hostName
+        cfg.deadman.evaluatorHost
+      ];
+      readOnly =
+        p:
+        builtins.elem p [
+          "ro"
+          "read-only"
+          "read"
+        ];
+      readWrite =
+        p:
+        builtins.elem p [
+          "rw"
+          "read-write"
+        ];
     in
     {
       options.services.fleet-alert.evaluator = {
@@ -494,12 +595,12 @@ in
         };
         topic = lib.mkOption {
           type = lib.types.str;
-          default = "fleet-alerts";
+          default = defaults.topic;
           description = "ntfy topic for FIRING and RESOLVED posts.";
         };
         heartbeatTopic = lib.mkOption {
           type = lib.types.str;
-          default = "fleet-heartbeat";
+          default = defaults.heartbeatTopic;
           description = "ntfy topic for the heartbeat each completed run posts at priority min.";
         };
       };
@@ -512,17 +613,17 @@ in
         };
         ntfyUrl = lib.mkOption {
           type = lib.types.str;
-          default = "http://[::1]:2586";
+          default = defaults.ntfyUrl;
           description = "ntfy's own listener, reached directly so the anonymous probe and the poll bypass the proxy.";
         };
         topic = lib.mkOption {
           type = lib.types.str;
-          default = "fleet-alerts";
+          default = defaults.topic;
           description = "Topic the dead-man posts AlertEvaluatorSilent to.";
         };
         evaluatorHost = lib.mkOption {
           type = lib.types.str;
-          default = "magnetite";
+          default = defaults.evaluatorHost;
           description = "host_name the AlertEvaluatorSilent instance carries: the host whose evaluator posts the heartbeat.";
         };
       };
@@ -552,13 +653,6 @@ in
               message = "fleet-alert: R9.5 requires max(queryDeadlineSec + post timeout, postDeadlineSec) + 2 post timeouts < TimeoutStartSec < timer period; it has max(${toString deadlines.queryDeadlineSec} + ${toString postTimeoutSec}, ${toString deadlines.postDeadlineSec}) + 2 * ${toString postTimeoutSec} = ${toString worstRunSec}, TimeoutStartSec = ${
                 builtins.toJSON (unit.TimeoutStartSec or null)
               }, period = ${builtins.toJSON periodSec} s.";
-            }
-            # Design D3: the evaluator's posts carry the alerter token.
-            {
-              assertion = tokenIds != [ ] && builtins.elem tokenEnv (map (id: "%d/${id}") tokenIds);
-              message = "fleet-alert: fleet-alert.service must load evaluator.tokenFile (${toString cfg.evaluator.tokenFile}) as a credential and name it in NTFY_TOKEN_FILE; it loads ${
-                builtins.toJSON (unit.LoadCredential or [ ])
-              } and sets NTFY_TOKEN_FILE = ${builtins.toJSON tokenEnv}.";
             }
           ];
 
@@ -603,28 +697,30 @@ in
         })
 
         (lib.mkIf cfg.deadman.enable {
-          # Design D3: the dead-man's posts carry the alerter token.
-          assertions =
-            let
-              deadmanUnit = config.systemd.services.fleet-deadman;
-              deadmanTokenIds = lib.concatMap (
-                entry:
-                let
-                  m = builtins.match "([^:]+):(.+)" entry;
-                in
-                lib.optional (m != null && builtins.elemAt m 1 == cfg.deadman.tokenFile) (builtins.head m)
-              ) (lib.toList (deadmanUnit.serviceConfig.LoadCredential or [ ]));
-              deadmanTokenEnv = deadmanUnit.environment.NTFY_TOKEN_FILE or null;
-            in
-            [
-              {
-                assertion =
-                  deadmanTokenIds != [ ] && builtins.elem deadmanTokenEnv (map (id: "%d/${id}") deadmanTokenIds);
-                message = "fleet-alert: fleet-deadman.service must load deadman.tokenFile (${cfg.deadman.tokenFile}) as a credential and name it in NTFY_TOKEN_FILE; it loads ${
-                  builtins.toJSON (deadmanUnit.serviceConfig.LoadCredential or [ ])
-                } and sets NTFY_TOKEN_FILE = ${builtins.toJSON deadmanTokenEnv}.";
-              }
-            ];
+          # R9.4's premise on the dead-man's own host (E9.4): its probe and
+          # poll reach ntfy's listener, which refuses an anonymous write to
+          # either fleet topic, lets alerter write both, and leaves
+          # host-named topics to auth-default-access.
+          assertions = [
+            {
+              assertion = cfg.deadman.ntfyUrl == "http://${ntfySettings.listen-http or ""}";
+              message = "fleet-alert: deadman.ntfyUrl (${cfg.deadman.ntfyUrl}) is not ntfy's listener on this host, http://${
+                toString (ntfySettings.listen-http or "<unset>")
+              }.";
+            }
+            {
+              assertion = lib.all (t: anonymous t != null && readOnly (anonymous t)) fleetTopics;
+              message = "fleet-alert: ntfy's auth-access ${builtins.toJSON access} does not refuse an anonymous write to ${builtins.toJSON fleetTopics}.";
+            }
+            {
+              assertion = lib.all (t: alerter t != null && readWrite (alerter t)) fleetTopics;
+              message = "fleet-alert: ntfy's auth-access ${builtins.toJSON access} does not let alerter write ${builtins.toJSON fleetTopics}.";
+            }
+            {
+              assertion = lib.all (t: anonymous t == null) hostTopics;
+              message = "fleet-alert: an entry of ntfy's auth-access ${builtins.toJSON access} decides a host-named topic of ${builtins.toJSON hostTopics}.";
+            }
+          ];
 
           systemd.services.fleet-deadman = {
             description = "Fleet alert dead-man: R9.4 anonymous-publish probe and heartbeat poll";

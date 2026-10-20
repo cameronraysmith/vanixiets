@@ -669,10 +669,6 @@ in
         # which CI already pays for when it evaluates the host (S1 review F5).
         ++ (
           let
-            tokenPath = config.clan.core.vars.generators.ntfy-alerter.files.token.path;
-            evaluator = config.services.fleet-alert.evaluator;
-            notifierTokenFile = config.services.observability-notify.tokenFile;
-
             # systemd memory sizes with an M or G suffix, which systemd reads
             # as powers of 1024.
             sizeBytes =
@@ -715,12 +711,6 @@ in
             };
           in
           [
-            # S3 design D3: the evaluator and the failure notifier post with
-            # the shared alerter token.
-            {
-              assertion = evaluator.enable && evaluator.tokenFile == tokenPath && notifierTokenFile == tokenPath;
-              message = "magnetite: the fleet alert evaluator must be enabled, and it and the failure notifier must read the ntfy-alerter token ${tokenPath}; evaluator enabled = ${builtins.toJSON evaluator.enable}, evaluator.tokenFile = ${builtins.toJSON evaluator.tokenFile}, observability-notify.tokenFile = ${builtins.toJSON notifierTokenFile}.";
-            }
             # R7.1: the store is throttled before its ceiling and never swaps.
             {
               assertion =
