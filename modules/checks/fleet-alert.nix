@@ -11,9 +11,10 @@
 #   store's PromQL API per run. A leg is a timeline of runs at
 #   FLEET_ALERT_NOW. Every run must record one heartbeat at priority min and
 #   post only with NTFY_TOKEN_FILE naming the fixture credential, and the
-#   alert posts of the leg must equal its list. The four runtime R9.2
-#   mutants (no state write, `for` 0, no store freeze, no absence freeze)
-#   must each produce a non-empty failure list.
+#   alert posts of the leg must equal its list. The five runtime mutants
+#   (no state write, `for` 0, no store freeze, no absence freeze, and no
+#   update of when each host last reported) must each produce a non-empty
+#   failure list.
 # - propertyRehearsal: fleet-alert/test_transition.py compares transition.jq
 #   with the reference model fleet-alert/model.py over derandomized
 #   Hypothesis timelines, and must fail on the no-re-post mutant.
@@ -525,7 +526,7 @@
             user = "regulator";
             queryTimeoutSec = 10;
             queryDeadlineSec = 30;
-            postDeadlineSec = 40;
+            postDeadlineSec = 35;
             topic = "fleet-alerts";
             heartbeatTopic = "fleet-heartbeat";
             stateFile = "/nonexistent/state.json";
@@ -787,14 +788,25 @@
         expect = [ "6 [FIRING] RuleSignalMissing default" ];
         messages = [ "rule=HostOOMKill" ];
       };
-      silentGapLeg = {
-        name = "the same 30 min gap while every expected host is silent raises nothing";
-        steps = map (n: {
-          at = gap n;
-          reporting = [ ];
-          missing = [ "node_vmstat_oom_kill" ];
-        }) (lib.range 0 7);
-        expect = [ ];
+      # magnetite's collector stops exporting while the store answers (S3
+      # review F1): node_vmstat_oom_kill's gap raises nothing, because no
+      # expected host reports, but magnetite is always-on, so its own silence
+      # raises RuleSignalMissing 10 min after it last reported.
+      alwaysOnSilentLeg = {
+        name = "magnetite silent for 40 min while the store answers raises RuleSignalMissing magnetite 10 min after it last reported, none for node_vmstat_oom_kill, and resolves when it reports again";
+        steps =
+          map (n: { at = gap n; }) (lib.range 0 1)
+          ++ map (n: {
+            at = gap n;
+            reporting = [ ];
+            missing = [ "node_vmstat_oom_kill" ];
+          }) (lib.range 2 9)
+          ++ map (n: { at = gap n; }) (lib.range 10 11);
+        expect = [
+          "3 [FIRING] RuleSignalMissing magnetite default"
+          "10 [RESOLVED] RuleSignalMissing magnetite default"
+        ];
+        messages = [ "selector=system_memory_usage_bytes" ];
       };
 
       # Mondays: 2026-10-26 is EDT (UTC-4), 2026-11-02 is EST (UTC-5).
@@ -864,6 +876,20 @@
         steps = map oomRuns (lib.range 0 2);
         expect = [ "0 [FIRING] HostOOMKill magnetite high" ];
       };
+      unreadableLogLeg = {
+        name = "an existing failed.log that cannot be read fails the run before any post";
+        failedLogMode = "000";
+        steps = [
+          (
+            oomRuns 0
+            // {
+              exit = 1;
+              heartbeats = 0;
+            }
+          )
+        ];
+        expect = [ ];
+      };
       retryLeg = {
         name = "a failed heartbeat fails the run, and the FIRING it left pending is posted once on the next run";
         steps = [
@@ -896,12 +922,13 @@
           storeThawLeg
           hostThawLeg
           signalGapLeg
-          silentGapLeg
+          alwaysOnSilentLeg
           windowLeg
           budgetFleetLeg
           budgetLaptopLeg
           budgetFailedLogLeg
           budgetOldLogLeg
+          unreadableLogLeg
           retryLeg
         ];
 
@@ -922,8 +949,12 @@
             "$evaluator" > "$leg_dir/run-${i}.log" 2>&1 || code=$?
           [ "$code" = ${exit} ] \
             || miss "${leg.name}: run ${i} exited $code, expected ${exit}: $(tail -n 3 "$leg_dir/run-${i}.log" | tr '\n' ' ')"
-          [ "$(jq -s 'map(select(.topic == "fleet-heartbeat" and any(.headers[]; . == "Priority: min"))) | length' "${posts}")" = 1 ] \
-            || miss "${leg.name}: run ${i} did not record exactly one heartbeat at priority min"
+          [ "$(jq -s 'map(select(.topic == "fleet-heartbeat" and any(.headers[]; . == "Priority: min"))) | length' "${posts}")" = ${
+            toString (step.heartbeats or 1)
+          } ] \
+            || miss "${leg.name}: run ${i} did not record exactly ${
+              toString (step.heartbeats or 1)
+            } heartbeat(s) at priority min"
           [ "$(jq -s --arg token ${fixtureCredentials}/alerter-token 'all(.[]; .tokenFile == $token)' "${posts}")" = true ] \
             || miss "${leg.name}: run ${i} posted without NTFY_TOKEN_FILE naming the alerter credential"
           ${lib.optionalString ((step.postStatus or 0) == 0) ''
@@ -953,6 +984,7 @@
           printf '%s' ${
             lib.escapeShellArg (lib.concatMapStrings (line: line + "\n") (leg.failedLog or [ ]))
           } > "$leg_dir/failed.log"
+          ${lib.optionalString (leg ? failedLogMode) ''chmod ${leg.failedLogMode} "$leg_dir/failed.log"''}
           python3 ${fixtureServer} --responses ${responsesFile leg} \
             --step-file "$leg_dir/step" --port-file "$leg_dir/port" > "$leg_dir/server.log" 2>&1 &
           server_pid=$!
@@ -1019,6 +1051,15 @@
           );
           config = realConfig;
           legs = [ silentHostLeg ];
+        };
+        noHostsUpdate = {
+          evaluator = evaluatorWith (
+            mutantTransition "noHostsUpdate"
+              "else .hosts += (reduce ($observations.reporting // [])[] as $h ({}; .[$h] = $now)) end"
+              "else . end"
+          );
+          config = realConfig;
+          legs = [ alwaysOnSilentLeg ];
         };
       };
 

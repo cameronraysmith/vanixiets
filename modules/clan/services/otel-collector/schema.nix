@@ -35,6 +35,9 @@
       "prometheus-smartctl-exporter.service"
       "zfs-assert-*.service"
       "zfs-set-*.service"
+      # A failed notifier post becomes a SystemdUnitFailed instance, which
+      # the evaluator retries until ntfy accepts it (S3 review F2).
+      "observability-notify@*.service"
     ];
 
     # omnigent-host-<owner>.service is stored as omnigent-host-<alias>.service

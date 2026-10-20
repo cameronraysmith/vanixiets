@@ -15,14 +15,20 @@
 # instance was last seen on or, after a freeze, the first unfrozen run (a
 # state written before the field existed counts from `lastSeen`).
 # StoreQueryFailing and RuleSignalMissing are raised only if $rules lists
-# them, with their `for`. Posts carry no topic; the caller adds it. The
-# caller posts in order and applies mark_posted($post) to the saved state
+# them, with their `for`. RuleSignalMissing also reports each host in its
+# `alwaysOn` list that the store answered without for 10 min, counted from
+# state.hosts (the last run it reported on, or the first run the state saw
+# it missing), with no `for` and no host freeze (ADR-009 item 16, charter
+# v20); it resolves once the host reports again. Posts carry no topic; the
+# caller adds it. The caller posts in order and applies mark_posted($post)
+# to the saved state
 # after each successful post, so a failed post or a killed run leaves the
 # difference for the next run (D15). modules/checks/fleet-alert/model.py is
 # the reference model the property test compares this file with.
 
 def resolve_after: 300;
 def repost_every: 86400;
+def absent_after: 600;
 def budget_window: 86400;
 def budget_fleet: 10;
 def budget_hosts: { stibnite: 3, pyrite: 3 };
@@ -59,7 +65,7 @@ def rule_named($rules; $name): [ $rules[] | select(.alert == $name) ] | .[0];
 # StoreQueryFailing and RuleSignalMissing come only from the logic below.
 def internal_rule($alert): $alert | IN("StoreQueryFailing", "RuleSignalMissing");
 
-def conditions($observations; $rules):
+def conditions($observations; $rules; $hosts; $now):
   if $observations.storeError then
     [ rule_named($rules; "StoreQueryFailing") | select(. != null) | {rule: ., labels: {}, value: "1"} ]
   else
@@ -75,12 +81,17 @@ def conditions($observations; $rules):
               | select((($observations.presence[.selector] // []) | length) == 0)
               | select(. as $p | any(($observations.reporting // [])[]; . as $h | any($p.expectedHosts[]; . == $h)))
               | {rule: $missing, labels: {rule: $r.alert, selector: .selector}, value: "0"} ]
+            + [ ($missing.alwaysOn // [])[] as $h
+                | select(any(($observations.reporting // [])[]; . == $h) | not)
+                | select($now - ($hosts[$h] // $now) >= absent_after)
+                | {rule: ($missing + {for: 0}), labels: {selector: "system_memory_usage_bytes", host_name: $h}, value: "0"} ]
           end )
   end;
 
 def frozen($inst; $observations):
   if $inst.alert == "StoreQueryFailing" then false
   elif $observations.storeError then true
+  elif $inst.alert == "RuleSignalMissing" then false
   elif ($inst.labels.host_name // null) == null then false
   else (($inst.labels.host_name) as $h | any(($observations.reporting // [])[]; . == $h) | not)
   end;
@@ -142,7 +153,7 @@ def transition($observations; $now; $rules):
   normalize_state
   | .firings |= map(select(.at > $now - budget_window))
   | . as $state
-  | ( conditions($observations; $rules)
+  | ( conditions($observations; $rules; $state.hosts; $now)
       | map({key: instance_id(.rule.alert; .labels), value: .}) | from_entries ) as $conds
   | ( [ ($state.instances | keys[]), ($conds | keys[]) ] | unique ) as $ids
   | ( reduce $ids[] as $id ({};
@@ -158,7 +169,8 @@ def transition($observations; $now; $rules):
       | .instances = $instances
       | .lastRun = $now
       | if $observations.storeError then .
-        else .hosts += (reduce ($observations.reporting // [])[] as $h ({}; .[$h] = $now)) end ) as $next
+        else .hosts += (reduce ($observations.reporting // [])[] as $h ({}; .[$h] = $now)) end
+      | reduce ((rule_named($rules; "RuleSignalMissing") // {}).alwaysOn // [])[] as $h (.; .hosts[$h] //= $now) ) as $next
   | { state: $next,
       posts: ( [ $ids[] as $id
                  | $instances[$id] as $inst

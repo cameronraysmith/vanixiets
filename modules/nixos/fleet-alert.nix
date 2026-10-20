@@ -28,7 +28,10 @@
 # fleet-alert/rules.nix with the host's services.observability-notify.units.
 # The check runs flake.lib.fleetAlertEvaluator, the same function, against a
 # fixture server with a recording ntfy-send. R9.5 is an assertion below:
-# fleet-alert.service runs with MemoryMax = 64M and TimeoutStartSec = 50s.
+# fleet-alert.service runs with MemoryMax = 64M, and a run's worst case,
+# max(query deadline + heartbeat, post deadline) + one post + the notifier's
+# ExecStartPost post, ends before TimeoutStartSec, which ends before the
+# timer's next run.
 # The kill order (evaluator 900, store 500, collector 300, this unit 0) is
 # asserted by magnetite's configuration, which holds all four. An assertion
 # below also requires the unit to load evaluator.tokenFile and name that
@@ -186,7 +189,13 @@ let
           store_error=true
         fi
 
-        if [ -r "$failed_log" ]; then
+        # A missing log is an empty one; an unreadable one fails the run, so
+        # a permissions fault cannot undercount the notifier's posts (R9.1).
+        if [ -e "$failed_log" ]; then
+          if [ ! -r "$failed_log" ]; then
+            echo "fleet-alert: $failed_log exists but cannot be read" >&2
+            exit 1
+          fi
           jq -R -s '[split("\n")[] | select(test("^[0-9]+ [^ ]+ [^ ]+$")) | split(" ")
             | {at: (.[0] | tonumber), unit: .[1], host: .[2]}]' "$failed_log" > "$work/failed.json"
         else
@@ -399,18 +408,47 @@ in
         inherit lib;
         notifiedUnits = config.services.observability-notify.units or [ ];
       };
+      # The run's time budget (design D13), read by R9.5's relation below.
+      deadlines = {
+        queryTimeoutSec = 10;
+        queryDeadlineSec = 30;
+        postDeadlineSec = 35;
+      };
+      # ntfy-send bounds each post, the heartbeat and the notifier hook's
+      # RESOLVED alike, with curl's -m.
+      postTimeoutSec = lib.foldl lib.max 0 (
+        map (m: lib.toInt (builtins.head m)) (
+          builtins.filter builtins.isList (
+            builtins.split "-m ([0-9]+)" (builtins.readFile ../../pkgs/by-name/ntfy-send/ntfy-send.sh)
+          )
+        )
+      );
+      seconds =
+        s:
+        let
+          m = builtins.match "([0-9]+)s" s;
+        in
+        if m == null then null else lib.toInt (builtins.head m);
+      timeoutStartSec = seconds (unit.TimeoutStartSec or "");
+      periodSec = { minutely = 60; }.${config.systemd.timers.fleet-alert.timerConfig.OnCalendar} or null;
+      # Worst case of one run: posts start before postDeadlineSec, which
+      # may come after the query phase and the heartbeat; the last post and
+      # the notifier's ExecStartPost hook each take up to postTimeoutSec.
+      worstRunSec =
+        lib.max (deadlines.queryDeadlineSec + postTimeoutSec) deadlines.postDeadlineSec
+        + 2 * postTimeoutSec;
       evaluatorConfig = pkgs.writeText "fleet-alert-config.json" (
-        builtins.toJSON {
-          inherit (cfg.evaluator) storeUrl topic heartbeatTopic;
-          database = "fleet";
-          user = "regulator";
-          queryTimeoutSec = 10;
-          queryDeadlineSec = 30;
-          postDeadlineSec = 40;
-          stateFile = "/var/lib/fleet-alert/state.json";
-          failedLog = "/var/lib/observability-notify/failed.log";
-          rules = builtins.fromJSON rendered.json;
-        }
+        builtins.toJSON (
+          deadlines
+          // {
+            inherit (cfg.evaluator) storeUrl topic heartbeatTopic;
+            database = "fleet";
+            user = "regulator";
+            stateFile = "/var/lib/fleet-alert/state.json";
+            failedLog = "/var/lib/observability-notify/failed.log";
+            rules = builtins.fromJSON rendered.json;
+          }
+        )
       );
       evaluator = fleetAlertEvaluator pkgs { ntfySend = lib.getExe pkgs.ntfy-send; };
       unit = config.systemd.services.fleet-alert.serviceConfig;
@@ -496,12 +534,24 @@ in
               assertion = cfg.evaluator.tokenFile != null && cfg.evaluator.regulatorPasswordFile != null;
               message = "fleet-alert: services.fleet-alert.evaluator.tokenFile and regulatorPasswordFile must be set when the evaluator is enabled.";
             }
-            # R9.5 (ADR-009 E9.5).
+            # R9.5 (ADR-009 E9.5): the memory bound, and a run that ends
+            # before its timeout, which ends before the next run (design D13).
             {
-              assertion = (unit.MemoryMax or null) == "64M" && (unit.TimeoutStartSec or null) == "50s";
-              message = "fleet-alert: R9.5 requires fleet-alert.service to run with MemoryMax = \"64M\" and TimeoutStartSec = \"50s\" (ADR-009 E9.5); it has MemoryMax = ${
+              assertion = (unit.MemoryMax or null) == "64M";
+              message = "fleet-alert: R9.5 requires fleet-alert.service to run with MemoryMax = \"64M\" (ADR-009 E9.5); it has MemoryMax = ${
                 builtins.toJSON (unit.MemoryMax or null)
-              }, TimeoutStartSec = ${builtins.toJSON (unit.TimeoutStartSec or null)}.";
+              }.";
+            }
+            {
+              assertion =
+                postTimeoutSec > 0
+                && timeoutStartSec != null
+                && periodSec != null
+                && worstRunSec < timeoutStartSec
+                && timeoutStartSec < periodSec;
+              message = "fleet-alert: R9.5 requires max(queryDeadlineSec + post timeout, postDeadlineSec) + 2 post timeouts < TimeoutStartSec < timer period; it has max(${toString deadlines.queryDeadlineSec} + ${toString postTimeoutSec}, ${toString deadlines.postDeadlineSec}) + 2 * ${toString postTimeoutSec} = ${toString worstRunSec}, TimeoutStartSec = ${
+                builtins.toJSON (unit.TimeoutStartSec or null)
+              }, period = ${builtins.toJSON periodSec} s.";
             }
             # Design D3: the evaluator's posts carry the alerter token.
             {

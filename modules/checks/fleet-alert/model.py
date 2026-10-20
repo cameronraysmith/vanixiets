@@ -10,8 +10,10 @@ unfrozen run); a `critical` instance re-posted every 24 h, a `warning`
 never, an `info` with no RESOLVED and not counted; a store error freezes
 every instance but StoreQueryFailing; a host without
 system_memory_usage_bytes freezes its instances; RuleSignalMissing per
-presence selector while an expected host reports; R9.1's 24 h count over
-posted FIRINGs and failed.log with one AlertBudgetExceeded per 24 h.
+presence selector while an expected host reports, and per always-on host
+absent for 10 min from the last run it reported on (or the first run the
+state saw it missing), with no `for` and no host freeze; R9.1's 24 h count
+over posted FIRINGs and failed.log with one AlertBudgetExceeded per 24 h.
 Messages are not modelled.
 """
 
@@ -20,6 +22,7 @@ import json
 
 RESOLVE_AFTER = 300
 REPOST_EVERY = 86400
+ABSENT_AFTER = 600
 BUDGET_WINDOW = 86400
 BUDGET_FLEET = 10
 BUDGET_HOSTS = {"stibnite": 3, "pyrite": 3}
@@ -45,7 +48,7 @@ def rule_named(rules, name):
 INTERNAL = ("StoreQueryFailing", "RuleSignalMissing")
 
 
-def conditions(observations, rules):
+def conditions(observations, rules, hosts, now):
     if observations["storeError"]:
         rule = rule_named(rules, "StoreQueryFailing")
         return [] if rule is None else [(rule, {}, "1")]
@@ -72,6 +75,11 @@ def conditions(observations, rules):
                     continue
                 if any(host in reporting for host in selector["expectedHosts"]):
                     found.append((missing, {"rule": rule["alert"], "selector": selector["selector"]}, "0"))
+        for host in missing.get("alwaysOn") or []:
+            if host not in reporting and now - hosts.get(host, now) >= ABSENT_AFTER:
+                found.append(
+                    (dict(missing, **{"for": 0}), {"selector": "system_memory_usage_bytes", "host_name": host}, "0")
+                )
     return found
 
 
@@ -80,6 +88,8 @@ def frozen(alert, labels, observations):
         return False
     if observations["storeError"]:
         return True
+    if alert == "RuleSignalMissing":
+        return False
     host = labels.get("host_name")
     if host is None:
         return False
@@ -167,7 +177,7 @@ def transition(state, observations, now, rules):
     state = normalize(state)
     state["firings"] = [f for f in state["firings"] if f["at"] > now - BUDGET_WINDOW]
     conds = {}
-    for rule, labels, value in conditions(observations, rules):
+    for rule, labels, value in conditions(observations, rules, state["hosts"], now):
         conds[instance_id(rule["alert"], labels)] = (rule, labels, value)
     ids = sorted(set(state["instances"]) | set(conds))
     instances = {}
@@ -190,6 +200,8 @@ def transition(state, observations, now, rules):
     if not observations["storeError"]:
         for host in observations.get("reporting") or []:
             state["hosts"][host] = now
+    for host in (rule_named(rules, "RuleSignalMissing") or {}).get("alwaysOn") or []:
+        state["hosts"].setdefault(host, now)
     posts = []
     for iid in ids:
         instance = instances.get(iid)

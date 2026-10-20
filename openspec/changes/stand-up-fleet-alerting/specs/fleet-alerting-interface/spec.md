@@ -76,7 +76,7 @@ The evaluator SHALL keep each instance, one rule and its result label set, in `/
 ### Requirement: Store errors and silent hosts freeze instance state
 
 When a query fails or times out, the evaluator SHALL stop querying for that run, leave every other instance's state unchanged, and raise `StoreQueryFailing`, `critical`, with a `for` of 3 min.
-While a host returns no `system_memory_usage_bytes`, the evaluator SHALL leave every instance labelled with that host unchanged, posting neither a `RESOLVED` nor a re-post, until the host reports again.
+While a host returns no `system_memory_usage_bytes`, the evaluator SHALL leave every instance labelled with that host unchanged, posting neither a `RESOLVED` nor a re-post, until the host reports again, except the `RuleSignalMissing` instance that reports that host's own absence.
 
 **Discharged by**: `checks.x86_64-linux.fleet-alert`'s store-error and silent-host fixture legs, its store-freeze and host-freeze mutants, and its property test against the reference model's store and host freezes.
 
@@ -116,9 +116,21 @@ Each rule's presence selector SHALL be the bare metric name of its expression, e
 - **WHEN** at acceptance the operator runs the deployed evaluator by hand with one presence selector misspelt, its `for` at 0, scratch state and topic `fleet-acceptance`, and then waits 30 min after the evaluator's first scheduled run
 - **THEN** the hand run posts `RuleSignalMissing` for the misspelt selector, the scheduled runs post none, and the operator records both
 
+### Requirement: An always-on host's silence is reported
+
+For each host the rule table marks always-on, `magnetite` alone in S3, the evaluator SHALL raise `RuleSignalMissing` with `selector="system_memory_usage_bytes"` and that `host_name` once the store has answered but the host has been absent from `system_memory_usage_bytes` for 10 min since it last reported, or since the evaluator's first run if it never has, and SHALL resolve it once the host reports again.
+
+**Discharged by**: `checks.x86_64-linux.fleet-alert`'s always-on-host fixture leg, with the mutant that stops recording when each host last reported.
+
+#### Scenario: An always-on host stops reporting while the store answers
+
+- **WHEN** the fixture server answers every query but returns no series for magnetite for 40 min after it last reported, with `node_vmstat_oom_kill` empty, and then magnetite reports again
+- **THEN** the evaluator posts one `[FIRING] RuleSignalMissing magnetite` 10 min after magnetite last reported, none for `node_vmstat_oom_kill`, and one `[RESOLVED] RuleSignalMissing magnetite` once magnetite reports again 5 min after the last run that found it silent
+
 ### Requirement: Alerts are posted to fleet-alerts with a title and a severity priority
 
 The evaluator SHALL post each alert through `ntfy-send` to `fleet-alerts` at `https://ntfy.zt`, with `NTFY_TOKEN_FILE` naming its `alerter` credential, titled `[FIRING] <alert> <host>` or `[RESOLVED] <alert> <host>`, at priority `high` for `critical`, `default` for `warning` and `low` for `info`.
+A host-less instance SHALL be titled without a host: `StoreQueryFailing`, `RuleSignalMissing` for a whole selector, `AlertBudgetExceeded`, `WeeklyPipelineTest`.
 
 **Discharged by**: `checks.x86_64-linux.fleet-alert`'s fixture server, which records every post, and the token-wiring assertions in `observability-notify.nix`, `fleet-alert.nix` and magnetite's and cinnabar's configurations, each shown able to fail by an `extendModules` override.
 
@@ -126,6 +138,11 @@ The evaluator SHALL post each alert through `ntfy-send` to `fleet-alerts` at `ht
 
 - **WHEN** the fixture server replays a firing `critical` instance on magnetite
 - **THEN** it records one post to `fleet-alerts` titled `[FIRING] <alert> magnetite` with priority `high`
+
+#### Scenario: A host-less post is recorded
+
+- **WHEN** the fixture server answers a run with an error for 3 min
+- **THEN** it records one post to `fleet-alerts` titled `[FIRING] StoreQueryFailing`, with no host, at priority `high`
 
 #### Scenario: The evaluator's token wiring is evaluated
 
@@ -216,8 +233,9 @@ The `ntfy-alerter` generator, shared by magnetite and cinnabar, SHALL hold only 
 ### Requirement: The alert budget is counted over the evaluator's state and the notifier's FAILED log
 
 The evaluator SHALL count the non-`info` `FIRING` posts of the last 24 h in its state file together with the lines of `/var/lib/observability-notify/failed.log`, and when they exceed 10 across the fleet or 3 for `stibnite` or for `pyrite`, SHALL post one `AlertBudgetExceeded` per 24 h naming the rule and host with the most firings, suppressing no alert.
+A missing `failed.log` SHALL count as empty, and a `failed.log` that exists but cannot be read SHALL fail the run before any post.
 
-**Discharged by**: regulator R9.1, shown able to fail by `checks.x86_64-linux.fleet-alert`'s two budget legs.
+**Discharged by**: regulator R9.1, shown able to fail by `checks.x86_64-linux.fleet-alert`'s two budget legs, and its unreadable-log leg.
 
 #### Scenario: The fleet budget is exceeded
 
@@ -228,6 +246,11 @@ The evaluator SHALL count the non-`info` `FIRING` posts of the last 24 h in its 
 
 - **WHEN** the check fires 4 synthetic instances on `stibnite` within 24 h
 - **THEN** exactly one `AlertBudgetExceeded` is posted
+
+#### Scenario: The FAILED log cannot be read
+
+- **WHEN** the check makes an existing `failed.log` unreadable
+- **THEN** the run exits non-zero and posts nothing
 
 ### Requirement: The rule check runs promtool, fixture mutants and a property test
 
@@ -247,9 +270,9 @@ The evaluator SHALL count the non-`info` `FIRING` posts of the last 24 h in its 
 
 ### Requirement: The evaluator's memory ceiling and start timeout are asserted
 
-`fleet-alert.service` SHALL run with `MemoryMax = 64M` and `TimeoutStartSec = 50s`, and the `fleet-alert` module SHALL assert both when magnetite's configuration is evaluated.
+`fleet-alert.service` SHALL run with `MemoryMax = 64M`, and the `fleet-alert` module SHALL assert it and that a run's worst case, the later of the query deadline plus the heartbeat's post timeout and the post deadline, plus one post timeout and the notifier hook's post timeout, is below `TimeoutStartSec`, which is below the timer period, when magnetite's configuration is evaluated.
 
-**Discharged by**: regulator R9.5, the module's assertion, with its mutant that drops `MemoryMax`.
+**Discharged by**: regulator R9.5, the module's assertions, with its mutant that drops `MemoryMax`, and the timing relation's failure at the earlier `postDeadlineSec = 40`.
 
 #### Scenario: The memory ceiling is dropped
 

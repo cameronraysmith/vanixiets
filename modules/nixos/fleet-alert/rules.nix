@@ -19,6 +19,10 @@
 # StoreQueryFailing and RuleSignalMissing have no expression: transition.jq
 # raises them, and they are listed so their `for` lives in this one table.
 # The expected host is magnetite alone until S4 brings other hosts' series.
+# RuleSignalMissing's `alwaysOn` lists the hosts whose own silence it
+# reports: one absent from system_memory_usage_bytes for 10 min while the
+# store answers raises it with that host_name and no `for` (ADR-009 item 16,
+# charter v20).
 {
   flake.lib.fleetAlertRules =
     { lib, notifiedUnits }:
@@ -142,7 +146,8 @@
           alert = "RuleSignalMissing";
           for = "30m";
           severity = "warning";
-          annotations.summary = "A rule's presence selector returned no series while an expected host reported host memory, so the rule cannot fire";
+          annotations.summary = "A rule's presence selector returned no series while an expected host reported host memory, so the rule cannot fire; with host_name, that always-on host has reported no host memory for 10 min while the store answers";
+          alwaysOn = [ "magnetite" ];
         }
       ];
 

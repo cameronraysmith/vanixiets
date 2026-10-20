@@ -272,7 +272,12 @@ in
 
         systemd.services.greptimedb-schema = {
           description = "GreptimeDB databases and retention";
-          wantedBy = [ "multi-user.target" ];
+          # Starting the store, not only restarting it, starts the schema job
+          # again (S3 review F9).
+          wantedBy = [
+            "multi-user.target"
+            "greptimedb.service"
+          ];
           requires = [ "greptimedb.service" ];
           after = [ "greptimedb.service" ];
           partOf = [ "greptimedb.service" ];

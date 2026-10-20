@@ -5,6 +5,7 @@ title: "ADR-009: Alerting"
 ## Status
 
 Accepted (human gate, 2026-10-15), except Q5, deferred to the end of implementation, and amended in place under charter v12 (2026-10-16): `ntfy-send` is the package `pkgs/by-name/ntfy-send`, added by slice S1, which the evaluator consumes instead of building its own; under charter v13 (2026-10-17): the Prometheus-server alternative now records that ADR-007 keeps Prometheus remote read enabled; and under charter v17 (2026-10-18): slice S3's planning decisions D1 to D11 (`openspec/changes/stand-up-fleet-alerting/`) fix ntfy's rate-limit identity, the token's path into curl, the notifier's module and credential, the cutover order, the provisioning check, S3's rule subset, the notifier's `FAILED` log, the `SystemdUnitFailed` exclusions and the property-based check of the evaluator's transition function
+Amended in place under charter v20 (2026-10-18): item 16 raises `RuleSignalMissing` for an always-on host that has reported no host memory for 10 min while the store answers, and E9.5 and R9.5 bound a run by its timing relation rather than by restating `TimeoutStartSec`.
 
 ## Context
 
@@ -87,7 +88,8 @@ No new long-running process is added.
     The cutover takes three deploys and leaves no window in which a publish is refused: cinnabar first provisions `alerter` and its token with no access entries, magnetite then deploys the notifier and evaluator posting with the token, and cinnabar finally adds `auth-access`, after which R9.4's anonymous-publish probe confirms the refusal (charter v17).
 14. Weekly end-to-end test: the rule `WeeklyPipelineTest` is evaluated only between 09:00 and 09:05 local time each Monday, queries the store for the count of hosts reporting host memory, and fires as `info`, so one message each Monday proves store, evaluator, ntfy and the subscribed phone together.
 15. No CI or merge-queue rule is in the initial set, because ADR-005's decision rules are 30-day and 365-day reviews over `devloop` rows rather than conditions that need a human within minutes (ADR-005 D5-R1 to D5-R8).
-16. Host absence: no rule fires because a host has stopped reporting; the silence of an always-on host, cinnabar or magnetite or a cloud host while terranix provisions it, is ADR-003's R3.2 failure and reaches a human through item 11, and the silence of a laptop, stibnite or pyrite, raises nothing.
+16. Host absence: no rule but the `RuleSignalMissing` instance below fires because a host has stopped reporting; the silence of an always-on host, cinnabar or magnetite or a cloud host while terranix provisions it, is ADR-003's R3.2 failure and reaches a human through item 11, and the silence of a laptop, stibnite or pyrite, raises nothing.
+    An always-on host the rule table marks, magnetite alone in S3, that has reported no `system_memory_usage_bytes` for 10 min while the store answers raises `RuleSignalMissing` with `selector="system_memory_usage_bytes"` and its `host_name`, resolved when it reports again, because its silence otherwise freezes every rule while the heartbeat stays green until R3.2 ships in S4 (charter v20).
 17. Absence freeze: while a host reports no `system_memory_usage_bytes`, the evaluator freezes every instance labelled with that host, sending neither `RESOLVED` nor a re-post, and resumes normal evaluation for that host when it reports again, so a laptop's sleep neither resolves its alerts nor fires them again on wake.
 
 Initial rule set.
@@ -205,8 +207,8 @@ Envelope E9.4, delivery authorization: an anonymous publish to `fleet-alerts` or
 Regulator R9.4: a `fleet-deadman` precondition step that, before polling, performs an anonymous publish to `fleet-heartbeat` on `[::1]:2586` and fails the unit, and so notifies through ADR-003's notifier, if that publish is accepted.
 It is shown able to fail at acceptance by removing the `*:fleet-*:ro` entry and observing the unit fail.
 
-Envelope E9.5, resources: `fleet-alert.service` runs under `MemoryMax = 64M` and `TimeoutStartSec = 50s`, so one run cannot overlap the next and cannot add to a magnetite memory incident.
-Regulator R9.5: an evaluation-time assertion in the module that both limits are set, with a mutant that drops `MemoryMax`.
+Envelope E9.5, resources: `fleet-alert.service` runs under `MemoryMax = 64M`, and a run's worst case, the later of its query deadline plus the heartbeat's post timeout and its post deadline, plus one post timeout and the notifier hook's post timeout, ends before `TimeoutStartSec`, which ends before the timer's next run, so one run cannot overlap the next and cannot add to a magnetite memory incident (charter v20).
+Regulator R9.5: evaluation-time assertions in the module on `MemoryMax` and on that timing relation, reading the deadlines from the evaluator's configuration, the post timeout from `ntfy-send`'s `-m` and the period from the timer, with a mutant that drops `MemoryMax` and the relation's failure at a post deadline of 40 s (charter v20).
 
 ## Failure prevented
 

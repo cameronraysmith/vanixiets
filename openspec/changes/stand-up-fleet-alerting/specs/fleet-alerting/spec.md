@@ -80,9 +80,10 @@ While a host reports no memory signal, no alert instance for that host SHALL res
 ### Requirement: A missing signal is itself reported
 
 When a signal an alert rule reads has had no series for 30 minutes while at least one host expected to emit it reports its memory signal, a person SHALL be told by an alert naming that rule.
-The same gap while every expected host is silent SHALL raise nothing.
+The same gap while every expected host is silent SHALL raise nothing for that rule.
+When an always-on host, magnetite alone in S3, has reported no memory signal for 10 minutes while the telemetry store answers, a person SHALL be told by an alert naming that host, and told once more when it reports again.
 
-**Discharged by**: `fleet-alerting-interface` requirement `Each rule's presence selector is watched`; `checks.x86_64-linux.fleet-alert`'s signal-gap fixture legs, and the operator's observation within 30 minutes of the evaluator's first run on magnetite that no `RuleSignalMissing` alert has fired, discharge it.
+**Discharged by**: `fleet-alerting-interface` requirements `Each rule's presence selector is watched` and `An always-on host's silence is reported`; `checks.x86_64-linux.fleet-alert`'s signal-gap and always-on-host fixture legs, and the operator's observation within 30 minutes of the evaluator's first run on magnetite that no `RuleSignalMissing` alert has fired, discharge it.
 
 #### Scenario: A signal is renamed
 
@@ -93,6 +94,11 @@ The same gap while every expected host is silent SHALL raise nothing.
 
 - **WHEN** a rule's signal returns no series for 30 minutes while no host expected to emit it reports its memory signal
 - **THEN** no alert is posted for that rule, which the build-time alert regulator confirms
+
+#### Scenario: magnetite stops reporting while the store answers
+
+- **WHEN** magnetite's collector stops exporting for 10 minutes while the telemetry store keeps answering
+- **THEN** one alert titled `[FIRING] RuleSignalMissing magnetite` is posted, and one titled `[RESOLVED] RuleSignalMissing magnetite` after magnetite reports again, which the build-time alert regulator confirms
 
 #### Scenario: The rules are first deployed
 

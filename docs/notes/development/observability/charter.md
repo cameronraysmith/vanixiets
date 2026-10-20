@@ -1,12 +1,12 @@
 ---
 title: Fleet observability and CCV feedback-loop charter
-status: charter v19
+status: charter v20
 date: 2026-10-18
 ---
 
 # Fleet observability and CCV feedback-loop charter
 
-Charter version: v19.
+Charter version: v20.
 A revision is a version bump with a dated entry under "Revision history"; the text of an earlier version is never edited in place.
 
 ## Objective
@@ -346,3 +346,6 @@ A research unit that meets ambiguity returns it in its questions section; the or
   - v18's figures were taken with `nix eval .#checks.x86_64-linux.<check>.drvPath`, which first probes `packages.x86_64-linux` and `legacyPackages.x86_64-linux` and adds a constant of about 114 MB; `nix eval .#.checks.…`, the form `skill://preferences-nix-checks-architecture` prescribes in `references/evaluation-cost.md`, measures the check alone (agent S3CostBisect, isolated worktrees, cold, evaluation cache off).
   - Corrected `checks.fleet-alert`: 270,361,264 B (0.252 GiB) at Task 4's merge `6ccc644b`, 485,950,608 B (0.453 GiB) at Task 5's merge `dbec98c7`, and 485,945,120 B (0.453 GiB) at `origin/main` `6caa2425`; v18's 0.557 GiB for `checks.fleet-alert` and 553 MB for `checks.greptimedb-envelope` were about 484 MB and 439 MB, so both checks were under the 0.5 GiB budget before the move.
   - The token-wiring and R7.1 relations stay module and host assertions, on S1's review F5 principle rather than the budget: relations within one host belong in that host's module assertions, which CI already pays for when it evaluates the host.
+- v20 (2026-10-18): slice S3's review findings F1 and F5 (`logs/s3-evidence/review-report.md`); no earlier text is edited beyond the status, date and version lines, and this charter's D1–D9, the requirements and the acceptance criteria are unchanged.
+  - ADR-009 item 16 amended in place: an always-on host the rule table marks, magnetite alone in S3, that has reported no `system_memory_usage_bytes` for 10 min while the store answers raises `RuleSignalMissing` with `selector="system_memory_usage_bytes"` and its `host_name`, because until R3.2 ships in S4 its silence otherwise freezes every rule while the heartbeat stays green.
+  - ADR-009 E9.5 and R9.5 amended in place: instead of restating `TimeoutStartSec = 50s`, the module asserts that a run's worst case, the later of the query deadline plus the heartbeat's post timeout and the post deadline, plus one post timeout and the notifier hook's post timeout, is below `TimeoutStartSec`, which is below the timer period; the post deadline drops from 40 s to 35 s, because 40 s left that worst case equal to the 50 s timeout.
