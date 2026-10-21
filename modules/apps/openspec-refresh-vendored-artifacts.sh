@@ -23,6 +23,34 @@
 # in the same directory untouched.
 set -euo pipefail
 
+usage() {
+  cat <<'EOF'
+Usage: openspec-refresh-vendored-artifacts [-h|--help]
+
+Regenerates the 12 vendored openspec-* skills in
+modules/home/ai/plugins/planning-and-development/.apm/skills by running the
+flake-pinned openspec CLI (`openspec init`) in a sandboxed temp directory.
+Hand-authored skills in that directory are left untouched.
+
+Options:
+  -h, --help  show this help and exit.
+EOF
+}
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "unknown argument: $1" >&2
+      usage >&2
+      exit 2
+      ;;
+  esac
+done
+
 # locate the repo via git so the script is location-independent: it can be
 # embedded into a nix store path (the openspec-refresh-vendored-artifacts flake
 # app) and still rewrite the committed skills in the user's worktree.
