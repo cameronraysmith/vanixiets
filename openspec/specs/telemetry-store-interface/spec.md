@@ -3,7 +3,7 @@
 ## Purpose
 
 This capability (stratum: `interface`) states the properties at the machine's interface that discharge the `telemetry-store` and `host-metrics-collection` requirements: listeners bound to loopback only, the per-user permission modes, the OTLP/HTTP ingest path with its database and attribute-promotion headers, the PromQL and SQL read paths, the object-storage prefix, credentials present only as activation-resolved files owned by non-worker users, and the ntfy topic the notifier posts to.
-Trust boundary: the R2 token's scope and the bucket's durability are set and provided by Cloudflare, not asserted by this machine; any root process on magnetite can reach the loopback listener; ntfy access is ZeroTier membership; nothing here guarantees a series reaches the store end to end, only that each stage's configuration and the tested pipeline behave as stated.
+Trust boundary: the R2 token's scope and the bucket's durability are set and provided by Cloudflare, not asserted by this machine; any root process on magnetite can reach the loopback listener; ntfy on cinnabar, reached over ZeroTier, lets only the `alerter` token publish to `fleet-*` topics, any root process on magnetite or cinnabar can read that token, and cinnabar is the single delivery path, which nothing here watches; nothing here guarantees a series reaches the store end to end, only that each stage's configuration and the tested pipeline behave as stated.
 
 ## Requirements
 
@@ -173,6 +173,8 @@ The R2 access key and secret SHALL reach the telemetry store only through an env
 Every store credential SHALL reach its consumer as a file resolved when magnetite's configuration is activated, readable only by its owner, owned by no omnigent worker account, and absent from the configuration that produced it.
 Replacing the account file SHALL restart the telemetry store, and replacing the `collector` password SHALL restart the collector.
 
+**Discharged by**: the evaluation-time ownership check (R8.2) with its mutant, magnetite's credential-holder assertion (R8.2), which admits `fleet-alert` as a `regulator-password` holder, and the evaluation-time envelope check (R7.1) with its restart-on-rotation mutant.
+
 #### Scenario: The credential files are evaluated
 
 - **WHEN** the evaluation-time ownership check (R8.2) reads magnetite's configuration
@@ -186,7 +188,7 @@ Replacing the account file SHALL restart the telemetry store, and replacing the 
 #### Scenario: A credential is loaded by a unit outside its holders
 
 - **WHEN** magnetite's configuration is evaluated, which loads each password file into the units that name it
-- **THEN** magnetite's credential-holder assertion (R8.2) finds `users` loaded only by `greptimedb`, `admin-password` only by `greptimedb-schema`, `collector-password` only by `opentelemetry-collector`, `regulator-password` only by the regulator units and `perses-password` by none, and an evaluation with a second unit loading `admin-password` fails on it
+- **THEN** magnetite's credential-holder assertion (R8.2) finds `users` loaded only by `greptimedb`, `admin-password` only by `greptimedb-schema`, `collector-password` only by `opentelemetry-collector`, `regulator-password` only by `greptimedb-envelope` and `fleet-alert`, and `perses-password` by none, and an evaluation with a second unit loading `admin-password` fails on it
 
 #### Scenario: The restart on rotation is removed
 
@@ -331,7 +333,9 @@ The machine SHALL back each exporter's sending queue in magnetite's collector wi
 
 ### Requirement: Failure notices are posted to one topic
 
-The machine SHALL provide the template `observability-notify@.service` in the collector's `agent` role, posting through the single `ntfy-send` package to the topic `fleet-alerts` at `https://ntfy.zt` without a credential, and SHALL set `OnFailure=observability-notify@%n.service` on `greptimedb.service`, `greptimedb-schema.service`, `greptimedb-envelope.service`, `opentelemetry-collector.service` and all nine of magnetite's ZFS property oneshots.
+The machine SHALL define `observability-notify@.service` in `flake.modules.nixos.observability-notify`, posting through the one `ntfy-send` package to `fleet-alerts` with the `alerter` token and logging each posted `FAILED` in `/var/lib/observability-notify/failed.log`, and SHALL set `OnFailure=observability-notify@%n.service` on `greptimedb.service`, `greptimedb-schema.service`, `greptimedb-envelope.service`, `opentelemetry-collector.service` and magnetite's nine ZFS property oneshots.
+
+**Discharged by**: the failure-wiring clause and notifier rehearsal of the evaluation-time collector check (R3.1) with their mutants, `checks.<system>.package-ntfy-send-test-token-transport` with its argv mutant, the resolve-hook assertion in `observability-notify.nix`, shown able to fail by an `extendModules` override, and the operator's recorded delivery of a forced failure after the access entries are in force.
 
 #### Scenario: The failure wiring is evaluated
 
@@ -353,15 +357,35 @@ The machine SHALL provide the template `observability-notify@.service` in the co
 - **WHEN** a mutant of magnetite's configuration drops `OnFailure` from one of the named units
 - **THEN** the evaluation-time collector check (R3.1) fails on its failure-wiring clause
 
+#### Scenario: The template is one module imported where it is needed
+
+- **WHEN** magnetite's and cinnabar's configurations are evaluated
+- **THEN** both define `observability-notify@.service` from `flake.modules.nixos.observability-notify`, magnetite through the collector's `agent` role and cinnabar by a direct import, with the option `services.observability-notify.units` unchanged
+
 #### Scenario: The sender is one package
 
 - **WHEN** the notifier and the home-manager `ntfy-send` command are evaluated
 - **THEN** both resolve `ntfy-send` to `pkgs/by-name/ntfy-send`
 
+#### Scenario: The notifier carries the alerter token
+
+- **WHEN** magnetite's and cinnabar's configurations are evaluated
+- **THEN** `observability-notify.nix`'s assertion holds that, with `tokenFile` set, each notified unit's `ExecStartPost=` and `ExecStopPost=` hooks run under `env NTFY_TOKEN_FILE=<tokenFile>`, and an `extendModules` override that replaces one unit's hooks makes evaluation fail
+
+#### Scenario: Each posted failure is logged
+
+- **WHEN** the collector check's rehearsal runs the notifier's scripts against a temporary state directory and a recording `ntfy-send`, with one failure that posts and one that the 15-minute interval suppresses
+- **THEN** `failed.log` gains exactly one line of the form `<epoch> <unit> <host>`, for the posted `FAILED`, and a mutant that drops the append makes the rehearsal fail
+
 #### Scenario: A failure is delivered at first activation
 
 - **WHEN** `greptimedb-envelope` is made to fail at first activation
 - **THEN** a message naming `greptimedb-envelope.service` and magnetite appears on `fleet-alerts`, and the operator records it
+
+#### Scenario: A failure is delivered after the access entries are in force
+
+- **WHEN** after cinnabar's ntfy refuses anonymous publishing to `fleet-*`, `greptimedb-envelope` is made to fail on magnetite
+- **THEN** a message naming `greptimedb-envelope.service` and magnetite appears on `fleet-alerts`, a line for it appears in `failed.log`, and the operator records both
 
 ### Requirement: A failure episode ends at the unit's next successful start or exit
 
@@ -386,10 +410,12 @@ Each unit that sets `OnFailure=observability-notify@%n.service` SHALL carry an `
 
 This capability SHALL state what its properties guarantee and what they do not, and SHALL NOT be described, by itself or in any downstream report, as an end-to-end guarantee that a series reaches the telemetry store or that a failure reaches a person.
 
+**Discharged by**: the requirement's own statement in the scenarios below; no regulator applies.
+
 #### Scenario: The properties above are read as a set
 
 - **WHEN** the properties of this capability are read as a set
-- **THEN** what they establish is that the telemetry store and its scrape targets listen only on loopback, that four accounts with fixed modes gate every `/v1/` path, that ingest and reads use the stated paths and headers, that the databases carry their declared retention, that object data is configured under one prefix of one bucket, that credentials exist only as activation-resolved files owned by non-worker users, that the store and collector run inside the declared envelope, that the queue is persistent and bounded, and that the named units hand their failures to the notifier, each as far as its own check, test or recorded first-activation observation reaches
+- **THEN** what they establish is that the telemetry store and its scrape targets listen only on loopback, that four accounts with fixed modes gate every `/v1/` path, that ingest and reads use the stated paths and headers, that the databases carry their declared retention, that object data is configured under one prefix of one bucket, that credentials exist only as activation-resolved files owned by non-worker users, that the store and collector run inside the declared envelope, that the queue is persistent and bounded, and that the named units hand their failures to the notifier, which posts with the `alerter` token, each as far as its own check, test or recorded first-activation observation reaches
 
 #### Scenario: A guarantee about R2 is sought from this capability
 
@@ -403,8 +429,8 @@ This capability SHALL state what its properties guarantee and what they do not, 
 
 #### Scenario: A guarantee about notice delivery or publishing is sought
 
-- **WHEN** someone asks whether these properties guarantee that a failure notice reaches a person, or that only the notifier publishes to `fleet-alerts`
-- **THEN** the answer is no: access to the notification service is ZeroTier membership, and cinnabar is a single delivery path that nothing here watches
+- **WHEN** someone asks whether these properties guarantee that a failure notice reaches a person, or that only the notifier and the alert evaluator publish to `fleet-alerts`
+- **THEN** the answer is no: ntfy on cinnabar enforces that only the `alerter` token publishes to `fleet-*`, and this machine only configures it; any root process on magnetite or cinnabar can read that token; and cinnabar is a single delivery path that nothing here watches
 
 #### Scenario: An end-to-end guarantee is sought
 

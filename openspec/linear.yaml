@@ -86,3 +86,7 @@ projects:
         id: "aaf61f9d-03d1-4a0d-8711-d8e89eaf75ff"
       "telemetry-store-interface":
         id: "1b158db4-f5e8-42bb-b733-81fd9aa9fb38"
+      "fleet-alerting":
+        id: "a14e48d5-3c08-4ac4-994e-c23a5439ff18"
+      "fleet-alerting-interface":
+        id: "ee21d4e7-237f-4778-9bb4-2826a87332ab"
