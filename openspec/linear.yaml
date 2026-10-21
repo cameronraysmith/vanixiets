@@ -73,7 +73,11 @@ projects:
     id: "53fe2d07fd03"
     name: "omnigent-magnetite"
     teams: ["CAM"]
-    archive_documents: {}
+    archive_documents:
+      "shared-reference-tree":
+        id: "3eca3d5e-b1f9-4aa7-beac-bb56a8d2b174"
+      "shared-reference-tree-interface":
+        id: "5dfa1af5-9cc6-49c9-86de-058b5f3f6643"
   "fleet-observability":
     # slugId, for the reason recorded on the sibling entries.
     id: "aeed302bea3b"

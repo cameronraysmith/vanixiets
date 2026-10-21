@@ -4,11 +4,11 @@ linear_story_id: "8e3dbe06-1450-440f-80c8-8bb6b9593665"
 linear_story_identifier: CAM-77
 linear_story_title: Share one ghq reference tree per host
 linear_story_url: https://linear.app/cameronraysmith/issue/CAM-77/share-one-ghq-reference-tree-per-host
-linear_story_state: In Review
+linear_story_state: Done
 linear_team: CAM
 linear_project: omnigent-magnetite
-last_synced_state: In Review
-last_synced_at: "2026-10-21T02:49:41Z"
+last_synced_state: Done
+last_synced_at: "2026-10-21T03:30:10Z"
 review_round: 0
 attempt_log:
   - at: "2026-10-16T17:06:03Z"
@@ -47,6 +47,14 @@ attempt_log:
     transition: In Progress->In Review
     outcome: posted
     note: T3 after code review rounds 1-4 closed and post-deploy checks passed on all three hosts; verify.md PASS WITH WARNINGS; state confirmed In Review by readback and comment posted.
+  - at: "2026-10-21T03:29:00Z"
+    transition: archive->mirror
+    outcome: posted
+    note: Created OpenSpec documents for shared-reference-tree and shared-reference-tree-interface in the omnigent-magnetite project and stored their ids in openspec/linear.yaml; world-assumptions is corpus-wide and is not mirrored per project, as in the CAM-68 and CAM-70 archives.
+  - at: "2026-10-21T03:30:10Z"
+    transition: In Review->Done
+    outcome: posted
+    note: T4 after archive; the issue already read Done before the write (PR #3548 merged), the update and comment were posted, and readback confirmed Done; task 9.4 stays open for the operator.
 ---
 
 ## Why

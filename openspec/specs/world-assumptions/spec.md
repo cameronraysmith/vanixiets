@@ -93,7 +93,7 @@ Any requirement whose discharge depends on this fact SHALL name it explicitly, a
 
 The corpus SHALL provide one designation record per content term this repository's `behavioral`-stratum requirements use, recording the term, the sense in which it is used when a term carries more than one, the world phenomenon it denotes, and whether that phenomenon is world-only, shared with the machine, or machine-only.
 A term found to denote two distinct phenomena within this repository's vocabulary SHALL be recorded as two rows rather than collapsed into one.
-Fifteen terms carry two senses in this repository today and are disambiguated below rather than left to context: `session`, `package`, `policy`, `@`, `mutation`, `activation`, `probe`, `machine`, `host`, `interface`, `repository`, `build service`, `database`, `hostname`, and `evaluator`.
+Eighteen terms carry two senses in this repository today and are disambiguated below rather than left to context: `session`, `package`, `policy`, `@`, `mutation`, `activation`, `probe`, `machine`, `host`, `interface`, `repository`, `build service`, `database`, `hostname`, `evaluator`, `person`, `writer`, and `account`.
 
 | Term | Sense | World phenomenon it denotes | Status |
 |---|---|---|---|
@@ -174,7 +174,8 @@ Fifteen terms carry two senses in this repository today and are disambiguated be
 | queued interval | — | measurements a collector has gathered but the telemetry store has not yet accepted | shared |
 | gap | — | an interval within a series for which measurements were gathered, or were due to be, but none are stored | shared |
 | cardinality | — | the number of distinct series one signal produces | shared |
-| writer | — | a person or service permitted to add series to a database | shared |
+| writer | database | a person or service permitted to add series to a database | shared |
+| writer | reference tree | the one account permitted to change a host's reference tree, held by no person and no agent | shared |
 | reader | — | a person or service permitted to query a database's series | shared |
 | store credential | — | a secret that authenticates a writer or reader to the telemetry store, or the telemetry store to its object storage | shared |
 | object storage | — | the off-host bucket service in which the telemetry store keeps its series' data | shared |
@@ -182,7 +183,8 @@ Fifteen terms carry two senses in this repository today and are disambiguated be
 | local state | — | the files a service keeps on its own host's disk | shared |
 | unit | — | a supervised service or job on a host whose running state and restarts the host's supervisor records | shared |
 | Omnigent worker | — | a service the fleet runs on behalf of one person to carry out Omnigent agent work, whose unit name carries that person's name | shared |
-| person | — | a human being on whose behalf the fleet runs a service, or who uses one | world-only |
+| person | service | a human being on whose behalf the fleet runs a service, or who uses one | world-only |
+| person | account | a human who works under an account on a host | world-only |
 | alias | — | a fixed name the fleet assigns one person, stored in place of that person's name | shared |
 | failure notice | — | a message on the fleet's notification service telling a person that a named unit on a named host failed | shared |
 | notification service | — | the fleet's push-message service, which delivers a message posted to a topic to every device subscribed to it | world-only |
@@ -225,6 +227,17 @@ Fifteen terms carry two senses in this repository today and are disambiguated be
 | dead-man | — | the job on cinnabar that raises an alert when no heartbeat has reached the notification service for 10 minutes | shared |
 | topic | — | a named channel on the fleet's notification service to which a publisher posts and from which every subscribed device receives | shared |
 | alert budget | — | the number of firing alerts and failure notices, info alerts excluded, that may be posted in a rolling 24 hours across the fleet and from any one laptop before the excess is itself reported | shared |
+| agent | — | software that works under an account on a person's behalf, without that person present | world-only |
+| account | world | the standing under which a person, or an agent acting for a person, works on a host, with its own private home and its own credentials | shared |
+| account | nix | a `users.users.<name>` declaration in a host's configuration | machine-only |
+| private home | — | an account's own directory on a host, which no other account without administrative authority can read | shared |
+| reference repository | — | a copy of an upstream project's source kept on a host so that accounts there can read it, as opposed to a repository someone maintains | shared |
+| reference tree | — | the one location on a host holding every reference repository that host's participating accounts read | shared |
+| participating account | — | an account the operator has declared as reading a host's reference tree | shared |
+| acquisition request | — | a participating account's ask that a reference repository be added to, refreshed in, or deepened within the reference tree | shared |
+| repository-local setting | — | a setting stored inside one repository that names a program git runs as whichever account uses that repository | shared |
+| per-account copy | — | a reference repository an account held in its own private home before the reference tree was shared | shared |
+| administrator | — | an account on a host that can run any program as any other account on that host | shared |
 
 #### Scenario: A term resolves to two phenomena
 
@@ -384,3 +397,34 @@ Any requirement whose discharge depends on this fact SHALL name it explicitly, a
 
 - **WHEN** ntfy on cinnabar keeps messages for less than 10 minutes, loses its cache on restart and is polled before a new heartbeat arrives, or answers `poll=1&since=10m` without the messages of that window
 - **THEN** this assumption is void, and the `fleet-alerting` requirement `A silent evaluator is reported from another host` and the `fleet-alerting-interface` requirement `The dead-man on cinnabar polls the heartbeat topic after an anonymous-publish probe` lose the discharge argument that an empty poll means no heartbeat was published
+
+### Requirement: A34 — Git runs repository-local programs as the invoking account, and refuses foreign-owned repositories unless trusted
+
+It is true of git as this fleet runs it, independent of what this fleet builds, that a repository-local setting such as `core.fsmonitor`, `core.hooksPath`, `core.pager`, `core.sshCommand`, `diff.external`, or a filter or textconv driver names a program that git runs as the account that invoked git in that repository, that such a setting outranks the same key in that account's own global configuration, and that git refuses to read the configuration of a repository owned by a different account unless a `safe.directory` entry in protected configuration admits it, where `*` admits every repository and a value ending in `/*` admits every repository beneath that directory.
+A prompt that shows a repository's status invokes git whenever an account enters that repository, so a repository-local setting takes effect on entry rather than only on an explicit git command.
+Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL be treated as losing its discharge once this assumption's violation condition below is observed.
+
+#### Scenario: Git stops running repository-local programs or stops refusing foreign-owned repositories
+
+- **WHEN** a git release ships that no longer runs programs named by repository-local settings as the invoking account, lets an account's global configuration override them, or reads a foreign-owned repository's configuration without a matching `safe.directory` entry
+- **THEN** this assumption is void, and the `shared-reference-tree` requirement `Only the writer changes the reference tree` loses the discharge argument that a single writer is what keeps one account from running code as another, and the `shared-reference-tree-interface` requirement `Readers trust the writer's tree and nothing broader` loses its reason for existing in its stated form
+
+### Requirement: A35 — ghq resolves its root from the environment, then git configuration, then the home directory, through symlinks
+
+It is true of ghq at the release this fleet pins, independent of what this fleet builds, that a nonempty `GHQ_ROOT` environment variable is its sole root, that otherwise every `ghq.root` value returned by `git config --get-all` is a root with the last one primary, that otherwise its root is `$HOME/ghq`, that a `ghq.<url>.root` value selects a root for matching URLs, and that every root is resolved through symbolic links before use.
+Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL be treated as losing its discharge once this assumption's violation condition below is observed.
+
+#### Scenario: ghq changes its root resolution
+
+- **WHEN** a ghq release changes the precedence among `GHQ_ROOT`, `ghq.root` and `$HOME/ghq`, stops honoring `ghq.root` from global git configuration, or stops resolving symbolic links in a root
+- **THEN** this assumption is void, and the `shared-reference-tree` requirement `Every participating account reads one reference tree per host` and the `shared-reference-tree-interface` requirement `Each participating account resolves the shared root` lose the discharge argument that a git-configured root reaches every process an account starts
+
+### Requirement: A36 — A host's administrator can act as any account on that host
+
+It is true of the hosts this fleet runs, independent of what this fleet builds, that an account in a host's administrator group (`wheel` on NixOS, `admin` on darwin) can run any program as any other account on that host, including the writer and every participating account.
+Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL be treated as losing its discharge once this assumption's violation condition below is observed.
+
+#### Scenario: Administrators lose the authority to act as other accounts
+
+- **WHEN** a sharing host's administrator group no longer confers the authority to run programs as other accounts, for example because its sudo rule is removed or narrowed
+- **THEN** this assumption is void, and the `shared-reference-tree` requirement `Moving per-account copies into the reference tree loses nothing and is reversible` loses the discharge argument that an administrator's per-account copies may enter the reference tree unaltered

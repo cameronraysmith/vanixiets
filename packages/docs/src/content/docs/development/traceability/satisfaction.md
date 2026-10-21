@@ -12,12 +12,12 @@ Nothing here is an end-to-end guarantee; OpenSpec structure checks are not behav
 
 ## Status
 
-The post-sync corpus has **178 requirements across 20 capabilities**: 157 requirement-side rows and 21 world-assumption rows.
-**65 requirement-side rows are discharged — 3 at narrow CAM-41 interface boundaries, 36 from CAM-68's telemetry store slice and 26 from CAM-70's fleet alerting slice; 92 remain undischarged**, each with a follow-up reference.
-Of those undischarged rows, 8 name world assumptions but no named specification-side discharge; 84 name neither.
-The 21 world rows remain self-attested, not independently discharged; their monitoring/scenario truth is not re-proved by this projection.
+The post-sync corpus has **196 requirements across 22 capabilities**: 172 requirement-side rows and 24 world-assumption rows.
+**79 requirement-side rows are discharged — 3 at narrow CAM-41 interface boundaries, 36 from CAM-68's telemetry store slice, 26 from CAM-70's fleet alerting slice and 14 from CAM-77's shared reference tree; 93 remain undischarged**, each with a follow-up reference.
+Of those undischarged rows, 8 name world assumptions but no named specification-side discharge; 85 name neither.
+The 24 world rows remain self-attested, not independently discharged; their monitoring/scenario truth is not re-proved by this projection.
 A13 has real incident evidence, including CAM-59, but no new world-assumption audit is claimed here.
-A29–A33 carry CAM-68's first-activation and runtime monitoring evidence, and A33 and A37–A42 carry CAM-70's cutover and runtime observations, cited per row; that evidence monitors them and does not discharge them.
+A29–A33 carry CAM-68's first-activation and runtime monitoring evidence, A33 and A37–A42 carry CAM-70's cutover and runtime observations, and A34 and A35 carry CAM-77's VM and post-deploy observations, cited per row; that evidence monitors them and does not discharge them.
 
 **CAM-63 qualifications are load-bearing:** GNOME reachability is amended to exclude live-niri display-manager restart (**CAM-66**, unrepaired); **8.2 no-history is a source-read-only method limitation**, not discharged by evaluation; **8.3/8.4/8.5 are evaluation, not observation; 8.6 is declined under CAM-59; 8.7 is physical testing with same-boot positive/negative controls and whole-boot totals 1 requested / 1 entry**.
 Task 8.1 would have caught the strand; the post-deploy checklist ordering itself caused the lockout inside niri.
@@ -30,10 +30,11 @@ These behavioral dispositions do not manufacture named specification-side discha
 - CAM-63 evidence/follow-ups: `openspec/changes/archive/2026-09-10-pyrite-niri-second-session/verify.md` §§8,9.12 and `retrospective.md` §6.
 - CAM-68 evidence/follow-ups: `openspec/changes/archive/2026-10-18-stand-up-greptimedb-on-magnetite/verify.md` §§8b,9.4,9.5,10,11, `tasks.md` §10 and `retrospective.md` §6.
 - CAM-70 evidence/follow-ups: `openspec/changes/archive/2026-10-21-stand-up-fleet-alerting/verify.md` §§8b,9,10,11, `tasks.md` §10, `review.md` and `retrospective.md` §6.
+- CAM-77 evidence/follow-ups: `openspec/changes/archive/2026-10-20-share-ghq-reference-tree/verify.md` §§5,5a–5e,8b, `tasks.md` 9.4 and `retrospective.md` §6.
 - `evidence annotation follow-up` means OpenSpec change `annotate-discharge-evidence` (active or subsequently archived), not implicit acceptance.
 - `V-interface` means the CAM-63 retrospective §6 architecture decision: introduce named interface properties or explicitly decide the corpus discharge convention.
 - `V-vocabulary` means the next sole designation-table owner grounds world/shared terms and relocates machine predicates; CAM-63 verify §8 is agent-executed/non-blocking and NEVER validation.
-- Older capability strata remain inferred and not re-audited; CAM-41 declares its three additions interface, CAM-62/CAM-63 declare graphical-desktop-session behavioral; CAM-68 declares telemetry-store and host-metrics-collection behavioral and telemetry-store-interface interface; CAM-70 declares fleet-alerting behavioral and fleet-alerting-interface interface.
+- Older capability strata remain inferred and not re-audited; CAM-41 declares its three additions interface, CAM-62/CAM-63 declare graphical-desktop-session behavioral; CAM-68 declares telemetry-store and host-metrics-collection behavioral and telemetry-store-interface interface; CAM-70 declares fleet-alerting behavioral and fleet-alerting-interface interface; CAM-77 declares shared-reference-tree behavioral and shared-reference-tree-interface interface.
 - Every capability section cites the authoritative main-spec path; row order and titles are derived from that file.
 
 ## agentic-workflow-routing
@@ -248,6 +249,35 @@ Source: `openspec/specs/satisfaction-argument-audit/spec.md`.
 | External claims are bounded by what was actually established | behavioral | — | — | undischarged — evidence annotation follow-up |
 | The audit runs at a boundary, not continuously | behavioral | — | — | undischarged — evidence annotation follow-up |
 
+## shared-reference-tree-interface
+
+Source: `openspec/specs/shared-reference-tree-interface/spec.md`.
+
+| Requirement | Stratum | Discharged by (S) | Under (W) | Status |
+|---|---|---|---|---|
+| Sharing hosts are declared, and only they change | interface | NixOS and darwin module assertions on the three machine checks, each failing under a mutation; non-sharing projection unchanged against main (task 10.2) | — | discharged at evaluation interface; CAM-77 verify §5 |
+| The shared root is owned by the writer and closed to everyone else | interface | tmpfiles and darwin provisioning assertions; VM test with `group-writable` mutation; post-deploy ownership audit with no orphaned owner | — | discharged at evaluation, VM and runtime interfaces; CAM-77 verify §5 |
+| Each participating account resolves the shared root | interface | participant `programs.ghq-shared.root` assertion; VM `ghq root` per reader; post-deploy `ghq root` per account | `world-assumptions` A35 | discharged at evaluation, VM and runtime interfaces; CAM-77 verify §5 |
+| Readers trust the writer's tree and nothing broader | interface | `safe.directory` exactness and enclosing-entry assertions and `safe.bareRepository` assertions, each failing under mutations; VM ownership and bare-repository refusals; post-deploy settings per account | `world-assumptions` A34 | discharged at evaluation, VM and runtime interfaces; CAM-77 verify §5, §5a, §5b |
+| Acquisition is delegated to the writer through a socket-activated entry point | interface | VM delegation, deepen, promote, update and tags subtests; handler and wrapper package tests; post-deploy `ghq-sync -u .` and tags per account | — | discharged at package-test, VM and runtime interfaces; CAM-77 verify §5 |
+| The writer accepts only constrained requests | interface | handler package test refusal classes; VM malformed requests refused through the client | — | discharged at package-test and VM interfaces; CAM-77 verify §5a |
+| Migration moves only administrators' trees in place, sets other trees aside, and can be rolled back | interface | VM migration subtest (administrator move and rollback, refusals, set-aside with reacquisition, mid-apply probe, resumed rollback, earlier-format records), failing with each earlier tool; ACL and writer-stop package test | — | discharged at VM and package-test interfaces; CAM-77 verify §5, §5c–5e; darwin refusal through its probe only |
+| Each property is backed by evidence that can fail | interface | VM `group-writable` and `broken-control` mutations fail at their subtests; assertion mutations fail evaluation | — | discharged — CAM-77 verify §5 |
+| This capability states its own trust boundary | interface | — | — | undischarged — boundary statement, not a property; follow-up: CAM-77 qualifications |
+
+## shared-reference-tree
+
+Source: `openspec/specs/shared-reference-tree/spec.md`.
+
+| Requirement | Stratum | Discharged by (S) | Under (W) | Status |
+|---|---|---|---|---|
+| Every participating account reads one reference tree per host | behavioral | `Sharing hosts are declared, and only they change`; `Each participating account resolves the shared root` | `world-assumptions` A35 | discharged — CAM-77 verify §8b; post-deploy §5 |
+| Only the writer changes the reference tree | behavioral | `The shared root is owned by the writer and closed to everyone else`; `Readers trust the writer's tree and nothing broader`; `Acquisition is delegated to the writer through a socket-activated entry point` | `world-assumptions` A34 | discharged — CAM-77 verify §8b; VM threat demonstration and post-deploy refusals §5 |
+| A missing reference repository can be requested without a person | behavioral | `Acquisition is delegated to the writer through a socket-activated entry point`; `The writer accepts only constrained requests` | — | discharged — CAM-77 verify §8b |
+| Only participating accounts can read the reference tree | behavioral | `The shared root is owned by the writer and closed to everyone else` | — | discharged — CAM-77 verify §8b; `nobody` refused at root and socket §5 |
+| Sharing the reference tree leaves every private home private | behavioral | `Sharing hosts are declared, and only they change`; existing Omnigent worker obligations (private `0700` homes, admitted groups) | — | discharged — CAM-77 verify §8b |
+| Moving per-account copies into the reference tree loses nothing and is reversible | behavioral | `Migration moves only administrators' trees in place, sets other trees aside, and can be rolled back` | `world-assumptions` A36 | discharged — CAM-77 verify §8b, §5c–5e; stibnite migrated by the earlier tool, whose records still roll back |
+
 ## skill-corpus-interface
 
 Source: `openspec/specs/skill-corpus-interface/spec.md`.
@@ -353,11 +383,14 @@ Source: `openspec/specs/world-assumptions/spec.md`.
 | A40 — ntfy rate-limits a client by its address masked to a prefix, taken from a trusted proxy's forwarding header | world | Each known failure class on a host reaches a person as an alert; ntfy counts each mesh client as its own visitor | self-attested; observed by separate visitor counters after C1 (CAM-70 verify §9.2); the IPv4 prefix stays at its default (§9.9) |
 | A41 — caddy reaches ntfy from ::1 and forwards the mesh client's address | world | Each known failure class on a host reaches a person as an alert; ntfy counts each mesh client as its own visitor | self-attested; observed by the journal showing each client's own mesh address, never `::1` (CAM-70 verify §9.2) |
 | A42 — ntfy keeps a topic's messages for 12 hours and returns a recent window to a poll | world | A silent evaluator is reported from another host; The dead-man on cinnabar polls the heartbeat topic after an anonymous-publish probe | self-attested; observed by the dead-man's heartbeat counts and R9.3 (CAM-70 verify §9.4, §9.6) |
+| A34 — Git runs repository-local programs as the invoking account, and refuses foreign-owned repositories unless trusted | world | Only the writer changes the reference tree; Readers trust the writer's tree and nothing broader | self-attested; observed by the VM threat demonstration (a writer-planted `core.fsmonitor` runs as a reader) and stibnite's dubious-ownership negative control (CAM-77 verify §5) |
+| A35 — ghq resolves its root from the environment, then git configuration, then the home directory, through symlinks | world | Every participating account reads one reference tree per host; Each participating account resolves the shared root | self-attested; observed by `ghq root` resolving the shared root for every account on all three hosts (CAM-77 verify §5) |
+| A36 — A host's administrator can act as any account on that host | world | Moving per-account copies into the reference tree loses nothing and is reversible | self-attested; monitoring follow-up: evidence annotation follow-up; administrator membership read with `getgrouplist` on each host (CAM-77 verify §5) |
 
-`A9`–`A12`, `A14`–`A28` and `A34`–`A36` remain absent from the current main corpus: active deltas carry them (`stand-up-nixbot-on-magnetite` A9–A12, `k3s-nixos-vm-tests` A14–A16, `capi-hetzner-cluster` A17–A21, `stand-up-gitea-mq-on-magnetite` A22–A28, `share-ghq-reference-tree` A34–A36), not this archive; `path-scope-plugin-releases` (A9, A10), `filter-check-sources-for-substitution` (A22, A23) and `k3s-nixos-vm-tests` (A13) reuse numbers already taken, unresolved here.
+`A9`–`A12` and `A14`–`A28` remain absent from the current main corpus: active deltas carry them (`stand-up-nixbot-on-magnetite` A9–A12, `k3s-nixos-vm-tests` A14–A16, `capi-hetzner-cluster` A17–A21, `stand-up-gitea-mq-on-magnetite` A22–A28), not this archive; `path-scope-plugin-releases` (A9, A10), `filter-check-sources-for-substitution` (A22, A23) and `k3s-nixos-vm-tests` (A13) reuse numbers already taken, unresolved here.
 CAM-64 tracks full-content MODIFIED sync loss; CAM-68's MODIFIED `Grounded vocabulary for behavioral requirements` was synced as a whole-block replacement carrying its fourteen double-sense terms.
 CAM-70's MODIFIED block was synced the same way, carrying fifteen double-sense terms (`evaluator` added) and every pre-sync row, with `credential` (notification service) rewritten under the same term and sense (CAM-70 verify §10.3).
-`share-ghq-reference-tree`'s delta still MODIFIES that block from a copy that predates CAM-68's sync, so it must be rebuilt on this main before it archives.
+CAM-77's MODIFIED block was rebuilt on CAM-70's synced block before it archived and synced the same way: every pre-sync row is kept, `person` and `writer` are each split into two senses (the earlier text kept under `service` and `database`), eleven rows are added, and eighteen double-sense terms are named (CAM-77 verify §3).
 
 ## CAM-41 qualifications
 
@@ -405,11 +438,20 @@ Primary disposition record: `openspec/changes/archive/2026-10-21-stand-up-fleet-
 - **Trust boundary is stated, not discharged:** ntfy enforces the access entries and rate limits (A37–A41); any root process on magnetite or cinnabar can read the `alerter` token; cinnabar is the single delivery path (A33), and nothing reports an ntfy outage until CAM-76, which now blocks CAM-72 (review F4); nothing here guarantees that an alert reaches a person.
 - The roborev sub-gate was replaced at the operator's direction by the holistic review in `review.md` (twelve findings, none critical): F1–F3, F5–F9, F11 and F12 were applied in #3516 and #3519, F4 is documented, and F10 is deferred to S2; verify §11 records the redeployment after #3516, and #3519 was not deployed because it changed no alerting unit.
 
+## CAM-77 qualifications
+
+Primary disposition record: `openspec/changes/archive/2026-10-20-share-ghq-reference-tree/verify.md` §8b; runtime and deploy evidence §5; review rounds §5a–5e; follow-ups: `retrospective.md` §6 and task 9.4.
+- **Verdict PASS WITH WARNINGS:** task 9.4, deleting stibnite's empty `~/ghq.pre-shared-20261017` and the migration records, waits for the operator; a deploy of main before the merge removed the writer from magnetite, recovered by redeploying with the same uid (verify §5).
+- **Trust boundary decided by the user (2026-10-17):** only an administrator's tree moves in place, under A36, and only when no entry could have been written by another account; every other account's tree is set aside and reacquired through the writer; nothing a non-administrator wrote is in any shared tree.
+- **Interface discharges are evaluation, package-test, VM and post-deploy evidence:** module assertions shown able to fail by mutations, the NixOS test with the `group-writable` and `broken-control` mutations, and post-deploy checks on pyrite, magnetite and stibnite; darwin runtime behaviour is observed by inspection on stibnite only, and the darwin migration refusal is tested through its probe, not an end-to-end apply.
+- **Trust boundary is stated, not discharged:** the properties hold at the hosts' declared configuration and Unix permissions; they do not cover an account overriding its own git or ghq configuration, root or the writer acting against the tree, or upstream content.
+
 ## Known limits
 
 This projection contains no formal proof and no claim of end-to-end implementation verification.
 The three inherited CAM-41 interface discharges establish machine-visible artifacts only: no harness selection, human compliance, authorization, forge correctness, activation or landing guarantee.
 The 36 CAM-68 discharges establish configuration, regulator and tested-pipeline behavior on magnetite only; they assert neither R2 durability, ntfy delivery when cinnabar is down, nor end-to-end arrival of every series.
 The 26 CAM-70 discharges establish configuration, regulator and observed cutover behavior on magnetite and cinnabar only; they assert neither delivery while cinnabar or its notification service is down, nor that a person reads an alert.
+The 14 CAM-77 discharges establish configuration, VM-test and post-deploy behavior on pyrite, magnetite and stibnite only; they assert nothing about upstream content or an account that overrides its own git or ghq configuration.
 Pyrite file-db contents and runtime adoption are different evidence; user dconf overrides deliberately remain possible.
 An archive-ready PASS WITH WARNINGS and an undischarged formal row are compatible claims at different boundaries, not a silent acceptance of missing evidence.
