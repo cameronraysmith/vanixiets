@@ -358,12 +358,13 @@
                   # no socket activation to restart an idle-exited daemon.
                   idleTimeout = null;
                   # nix-grpc-store's Seatbelt profile (474723d) is applied
-                  # before the listening port is added and denies binding an
-                  # IPv6 address, which is the only kind a darwin builder
-                  # listens on (its ZeroTier address): with --sandbox the daemon
-                  # exits with "Address family not supported by protocol
-                  # family" on [::1] as on the ZeroTier address, and binds
-                  # without it.
+                  # before the listening port is added and allows binding only
+                  # the listening ports, never port 0, so gRPC's IPv6 probe (a
+                  # bind to [::1]:0) fails and gRPC treats IPv6, the only kind
+                  # of address a darwin builder listens on (its ZeroTier
+                  # address), as unsupported: with --sandbox the daemon exits
+                  # with "Address family not supported by protocol family" on
+                  # [::1] as on the ZeroTier address, and binds without it.
                   sandbox.enable = false;
                 };
                 launchd.daemons.nix-grpc-daemon.serviceConfig.ProgramArguments = lib.mkForce (
