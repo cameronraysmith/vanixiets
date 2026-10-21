@@ -163,7 +163,7 @@ These are ADR-009's Failure prevented entries.
 
 ## Deferred
 
-- ADR-009 Q5, an external dead-man watching `cinnabar` itself, is deferred to the end of implementation and decided then.
+- ADR-009 Q5, an external dead-man watching `cinnabar` itself, is deferred to CAM-76 and decided before S5, because until then an ntfy outage is noticed only by a missing Monday `WeeklyPipelineTest`, up to 7 days later (charter v21).
   Until then `cinnabar` is the single delivery path: while `cinnabar` or its ntfy is down no alert reaches a human, and nothing in this component detects that (ADR-009 Consequences).
   This includes an ntfy that refuses to start on a malformed `environmentFile`, which the provisioning check guards against before deploy; the residual risk is recorded against CAM-76.
   The candidate fix is an external heartbeat from a free uptime service, at the cost of a third-party dependency.

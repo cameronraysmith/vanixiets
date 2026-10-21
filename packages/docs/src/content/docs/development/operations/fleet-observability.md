@@ -82,8 +82,17 @@ Then open `https://ntfy.zt/fleet-alerts` in a browser, allow notifications, and 
 The server configures no web push, so a browser shows notifications only while the page is open.
 
 On Android, join the ZeroTier network in the ZeroTier app, copy `caddy-root-ca.crt` to the phone, and install it as a CA certificate under Settings, in Encryption & credentials → Install a certificate → CA certificate; the menus above that entry differ between Android versions.
-In the ntfy app, add a subscription to topic `fleet-alerts` on the server `https://ntfy.zt` (use another server, not `ntfy.sh`).
+Install the ntfy app from F-Droid or Google Play, and in it add a subscription to topic `fleet-alerts` on the server `https://ntfy.zt` (use another server, not `ntfy.sh`).
+Nothing reaches the phone until the app holds this subscription.
 The server sets no `upstream-base-url`, so iOS clients receive no instant push; this runbook supports Android and browser subscribers.
+
+To check a new subscription, post one test message to `fleet-alerts` as root on magnetite or cinnabar; its `[TEST]` title is not a `FIRING`, and the alert budget counts only the evaluator's state and `failed.log`, so it costs nothing:
+
+```sh
+sudo NTFY_TOKEN_FILE=/run/secrets/vars/shared/ntfy-alerter/token "$(command -v ntfy-send)" "phone delivery check" fleet-alerts -H "Title: [TEST] phone delivery check"
+```
+
+The phone should show it within seconds.
 
 From a shell on any mesh host, poll recent messages:
 
@@ -91,6 +100,8 @@ From a shell on any mesh host, poll recent messages:
 curl -sk 'https://ntfy.zt/fleet-alerts/json?poll=1&since=1h' | jq -c '{time, title, priority, message}'
 ```
 
+`-k` skips certificate verification; without it, `curl` on a host that does not trust caddy's root certificate fails with `unable to get local issuer certificate`.
+Pass `--cacert` with a copy of `caddy-root-ca.crt` to verify instead, or post through `ntfy-send`, which uses `-k` as every fleet sender does.
 ntfy keeps each topic's messages for 12 hours, so a poll or a reconnecting phone sees at most the last 12 hours.
 
 ## Reading alerts
@@ -108,7 +119,7 @@ A `critical` alert that stays firing is posted again once every 24 hours; a `war
 | `HostOOMKill` | critical | the kernel OOM killer killed a process in the last 10 min | `sudo journalctl -k -g 'Killed process' --since -15min` on the host, then the owning unit's status |
 | `ZfsPoolUnhealthy` | critical | a ZFS pool has been in a state other than `online` for 1 min | `zpool status -x` on the host; replace or reattach the failed device before anything else |
 | `SystemdUnitRestartLoop` | warning | a unit restarted more than 5 times in 15 min | `systemctl status <unit>` and `sudo journalctl -u <unit> -n 100 --no-pager`; the notifier caps its own messages, so this alert is the one that shows the loop |
-| `SystemdUnitFailed` | warning | a unit the collector watches (`systemdUnits` in `modules/clan/services/otel-collector/schema.nix`), other than the notifier's units, has been failed for 5 min | `systemctl status <unit>`; the notifier's own units report through `FAILED` notices instead, never through this alert |
+| `SystemdUnitFailed` | warning | a unit the collector watches (`systemdUnits` in `modules/clan/services/otel-collector/schema.nix`), other than the notifier's units, has been failed for 5 min | `systemctl status <unit>`; the notifier's own units report through `FAILED` notices instead, never through this alert; a failed `observability-notify@<unit>.service.service` means the notice about `<unit>` was never posted, so read that instance's journal, check `<unit>` itself, then `sudo systemctl reset-failed` the instance to resolve the alert |
 | `LocalExporterDown` | warning | a loopback exporter the collector scrapes, job `node` or `smartctl`, has been down for 10 min, so the rules that read it are blind; at acceptance it fired about 10 min after the node exporter stopped | the message's `job` label names it; for `node`, `sudo systemctl restart prometheus-node-exporter`, then check `up{job="node"}` in the dashboard |
 | `WeeklyPipelineTest` | info | the weekly test: it fires once each Monday between 09:00 and 09:05 New York time | nothing; its absence on a Monday morning means the path from the store to the phone is broken |
 | `StoreQueryFailing` | critical | the store has not answered the evaluator for 3 min; every other alert is frozen meanwhile | `systemctl status greptimedb greptimedb-schema` and `sudo journalctl -u greptimedb -n 100 --no-pager` on magnetite; starting the store also starts `greptimedb-schema` again; alerts resume when the store answers |
@@ -118,6 +129,9 @@ A `critical` alert that stays firing is posted again once every 24 hours; a `war
 | `AlertBudgetExceeded` | none, posted at `default` | more than 10 `FIRING` messages, or more than 3 for stibnite or for pyrite, were posted in 24 hours | the alerts have become noise; read the 24 hours of `fleet-alerts` and tune the rule that dominates, through a pull request |
 
 While a host reports no `system_memory_usage_bytes`, its alerts are frozen: they neither resolve nor post again, so a sleeping laptop does not churn, and their 5 minutes of absence start only when the host reports again.
+
+Nothing reports an outage of ntfy or cinnabar themselves: every alert, failure notice and dead-man post goes through ntfy on cinnabar, so such an outage shows only as a missing Monday `WeeklyPipelineTest`, up to 7 days after it begins.
+Treat a Monday without that message as an outage of the alert path until a test post shows otherwise; CAM-76, scheduled before S5, adds a watch from outside cinnabar.
 
 ## Reading failure notices
 
@@ -297,7 +311,7 @@ clan machines update magnetite
 Between the two deployments magnetite still posts with the old token and every post is refused with 401.
 The evaluator records each refused transition as unposted and posts it on its first run after magnetite's deployment, so alerts are delayed, not lost.
 A gap over 10 minutes also raises `AlertEvaluatorSilent` from cinnabar, whose dead-man already holds the new token.
-A `FAILED` or `RESOLVED` notice from magnetite's notifier inside that window is lost; check `fleet-alerts` against `systemctl list-units --failed` on magnetite afterwards.
+A `FAILED` notice refused inside that window fails its notifier instance, which `SystemdUnitFailed` reports once magnetite's token is accepted; a refused `RESOLVED` is lost, so check `fleet-alerts` against `systemctl list-units --failed` on magnetite afterwards.
 
 ## Deploying the alerting changes
 

@@ -173,12 +173,12 @@ It posts exactly one `FIRING` and one `RESOLVED` per alert instance, re-posts `c
 When the store does not answer it raises `StoreQueryFailing` and freezes every other instance, and while a host reports no `system_memory_usage_bytes` it freezes that host's instances (ADR-009 items 6 and 17).
 `RuleSignalMissing` reports a rule whose presence selector has returned no series for 30 min while an expected host reports (ADR-009 item 7).
 The initial rule set is the eighteen rules of ADR-009's rule table, and `WeeklyPipelineTest` proves the whole path each Monday at 09:00 local time (ADR-009 item 14).
-No rule fires for host absence; the silence of an always-on host is R3.2's failure and reaches a human through the notifier, and a laptop's silence raises nothing (ADR-009 item 16).
+The one rule that fires for host absence is `RuleSignalMissing` for an always-on host the rule table marks, magnetite alone in S3, silent for 10 min while the store answers; the silence of an always-on host is also R3.2's failure and reaches a human through the notifier, and a laptop's silence raises nothing (ADR-009 item 16).
 
 Every completed evaluation publishes to `fleet-heartbeat`, and `fleet-deadman.timer` on cinnabar raises `AlertEvaluatorSilent` when that topic has been empty for 10 min (ADR-009 items 8 and 9).
 Before polling, the dead-man performs an anonymous publish to `fleet-heartbeat` and fails if it is accepted (ADR-009 R9.4).
 cinnabar is the single delivery path, and nothing in the accepted design detects a cinnabar or ntfy outage (ADR-009 Consequences).
-An external watcher of cinnabar is deferred to the end of implementation, with an external heartbeat from a free uptime service as the candidate fix at the cost of a third-party dependency (ADR-009 Q5, deferred at the human gate of 2026-10-15).
+An external watcher of cinnabar is CAM-76, scheduled before S5, with an external heartbeat from a free uptime service as the candidate fix at the cost of a third-party dependency (ADR-009 Q5; charter v21).
 
 ## Consolidated implementation surface
 
@@ -273,12 +273,12 @@ Change names are chosen in each slice's proposal.
 
 S2, S3, S4 and S6 depend only on S1 and may proceed in any order; S5 follows S4, which provides the ingress it reports to, and S7 follows S5, because omp's interactive sessions run on stibnite.
 S8 follows S2 because R6.1 fails on an empty partition, and `devloop` holds rows only once S2 deploys (ADR-006 E6.1).
-The deferred decision ADR-009 Q5 is CAM-76, after S8.
+The deferred decision ADR-009 Q5 is CAM-76, which blocks S5 (CAM-72), because until it lands an ntfy outage is noticed only by a missing Monday `WeeklyPipelineTest`, up to 7 days later, and S5 adds laptops (charter v21).
 A slice whose deployment refutes a detail of a decision record amends that record in place with a charter version entry, and every artifact citing the amended identifier is updated in the same pull request.
 
 ## Deferred and future extensions
 
-- External watcher of cinnabar: deferred to the end of implementation and decided then; the candidate fix is an external heartbeat from a free uptime service, at the cost of a third-party dependency (ADR-009 Q5).
+- External watcher of cinnabar: CAM-76, decided before S5; the candidate fix is an external heartbeat from a free uptime service, at the cost of a third-party dependency (ADR-009 Q5).
 - Continuous profiling: trigger is a magnetite memory or CPU incident in which `process_memory_usage_bytes` names the executable but not the code path; adoption needs a profiles-capable store or a second backend, a packaged profiler distribution and a privileged eBPF unit (ADR-003 future extension 5).
 - Laptop battery, thermal and sleep-wake state on stibnite and pyrite: trigger is an incident in which a laptop's thermal throttling, battery wear or sleep-wake cycle explains lost builds, stale deploy records or queue replay gaps; adoption needs node_exporter collectors, a sleep-wake source and consent framing (ADR-003 future extension 6).
 - ZeroTier peer latency and path state: trigger is a cross-host failure attributed to mesh path degradation, relay fallback or peer flapping; adoption needs a `node_id` keep-list of fleet members and an ADR-004 budget increase (ADR-003 future extension 7).

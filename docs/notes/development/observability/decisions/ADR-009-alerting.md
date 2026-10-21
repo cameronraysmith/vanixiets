@@ -6,6 +6,7 @@ title: "ADR-009: Alerting"
 
 Accepted (human gate, 2026-10-15), except Q5, deferred to the end of implementation, and amended in place under charter v12 (2026-10-16): `ntfy-send` is the package `pkgs/by-name/ntfy-send`, added by slice S1, which the evaluator consumes instead of building its own; under charter v13 (2026-10-17): the Prometheus-server alternative now records that ADR-007 keeps Prometheus remote read enabled; and under charter v17 (2026-10-18): slice S3's planning decisions D1 to D11 (`openspec/changes/stand-up-fleet-alerting/`) fix ntfy's rate-limit identity, the token's path into curl, the notifier's module and credential, the cutover order, the provisioning check, S3's rule subset, the notifier's `FAILED` log, the `SystemdUnitFailed` exclusions and the property-based check of the evaluator's transition function
 Amended in place under charter v20 (2026-10-18): item 16 raises `RuleSignalMissing` for an always-on host that has reported no host memory for 10 min while the store answers, and E9.5 and R9.5 bound a run by its timing relation rather than by restating `TimeoutStartSec`.
+Amended in place under charter v21 (2026-10-20): Q5 is scheduled as CAM-76 before S5.
 
 ## Context
 
@@ -248,7 +249,8 @@ Regulator R9.5: evaluation-time assertions in the module on `MemoryMax` and on t
 4. Q4: Is the noise envelope of 10 firings per 24 h, at most 3 from any one laptop, right? Recommended: yes for the first month, then revised from the counts R9.1 records; a higher bound tolerates the muting failure this record exists to prevent, and without the laptop sub-bound stibnite's activation and sleep churn could spend the fleet's budget.
    Resolution: recommended answer accepted at the 2026-10-15 gate.
 5. Q5: Should cinnabar itself be watched by an external dead-man service? Recommended: no for now; a cinnabar outage also takes down `.zt` resolution and the ZeroTier controller, which the human notices in ordinary use, and the alternative adds a third-party account and egress.
-   Resolution: deferred to the end of implementation; candidate is an external heartbeat from a free uptime service, weighed against the third-party dependency.
+   Resolution: deferred at the 2026-10-15 gate; candidate is an external heartbeat from a free uptime service, weighed against the third-party dependency.
+   Charter v21 schedules it as CAM-76 before S5 (CAM-72), because until then an ntfy outage is noticed only by a missing Monday `WeeklyPipelineTest`, up to 7 days later.
 6. Q6: Should a merge-queue stall rule, a `batch formed` with no `batch done` within 2 h, be added over ADR-005's `devloop` events? Recommended: no until ADR-005 names a decision that needs it within hours; the alternative alerts on a signal whose consumer is a 30-day review.
    Resolution: recommended answer accepted at the 2026-10-15 gate.
 7. Q7: Should `warning` alerts stay single-shot with no daily reminder? Recommended: yes; reminders for accepted conditions are the noise that leads to muting, and `critical` alerts keep a 24 h reminder.
