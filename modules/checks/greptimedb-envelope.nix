@@ -577,9 +577,9 @@
             v:
             v
             // {
-              package = v.package.overrideAttrs (_: {
+              package = v.package // {
                 version = "1.3.0-beta.2";
-              });
+              };
             };
         };
         pinnedNixpkgsPackage = {
