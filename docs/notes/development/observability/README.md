@@ -26,7 +26,7 @@ v8 reconciled the decision records the same day with conventions already decided
 v7 extended the charter the same day with decision D9 on alerting after the human approved host-level signals and an alerting decision; v6 recorded the GreptimeDB 1.2.1 nixpkgs bump, v5 revised the charter for consistency with the decision records, v4 followed the research refresh the same day, and v2 followed the research phase on 2026-09-18.
 The research phase is complete: eight artifacts under [research/](research/) cover the store, the dashboard layer, the collection topology, the rejected store alternatives, the fleet's existing emitters, the development-loop signal set, the Nix packaging position, and telemetry access control.
 Each artifact ends with a `## Refresh (2026-10-15)` section that re-reads its sources at current revisions and supersedes its stale claims; where the findings below conflict with a refresh section, the refresh wins.
-Decisions D1 through D9 each have a decision record under [decisions/](decisions/) at status Accepted (human gate, 2026-10-15); ADR-009 is Accepted except its Q5, which is deferred to the end of implementation.
+Decisions D1 through D9 each have a decision record under [decisions/](decisions/) at status Accepted (human gate, 2026-10-15); ADR-009 is Accepted except its Q5, which is deferred to CAM-76, scheduled before S5 (charter v21).
 The gate accepted the recommended answer of every question in every record, with ADR-002 Q6 answered as `perses.scientistexperience.net` behind Kanidm and ADR-003 Q15 as SMART on pyrite and stibnite, and each question line records its resolution; charter v11 amended ADR-002 Q2 and superseded ADR-002 Q1, Q7 and Q8.
 The `architecture/` and `components/` trees that charter deliverable S1 names are listed in the map below; acceptance criterion A1 is satisfied once those files exist.
 ADR-006 now places the store and the lakehouse export in the existing R2 bucket `sciexp` under `projects/vanixiets/observability/store/` and `projects/vanixiets/observability/export/`, following web-verification D9, in place of the two dedicated buckets it first proposed.
@@ -121,7 +121,7 @@ Citations into nixpkgs must name the lock node, because `flake.lock` holds six d
 
 ## Decision status
 
-All nine decisions are Accepted at the human gate of 2026-10-15, ADR-009 with its Q5 deferred to the end of implementation.
+All nine decisions are Accepted at the human gate of 2026-10-15, ADR-009 with its Q5 deferred to CAM-76, before S5.
 The bearing column names the artifacts that supply evidence for that decision, not a recommendation.
 
 | Decision | Subject | Status | Bearing artifacts |
@@ -134,7 +134,7 @@ The bearing column names the artifacts that supply evidence for that decision, n
 | D6 | Storage substrate and the lakehouse seam | Accepted ([ADR-006](decisions/ADR-006-storage-substrate-and-lakehouse-seam.md)) | `greptimedb.md`, `store-alternatives.md`, `dev-loop-signals.md` |
 | D7 | Packaging, host placement, and clan service shape | Accepted ([ADR-007](decisions/ADR-007-packaging-placement-and-clan-service.md)) | `nix-packaging-status.md`, `greptimedb.md`, `otel-collector-topology.md`, `fleet-emitter-inventory.md`, `store-alternatives.md`, `telemetry-security-and-tenancy.md`, `perses.md` |
 | D8 | Access control and tenancy, including the prompt-content hazard | Accepted ([ADR-008](decisions/ADR-008-access-control-and-tenancy.md)) | `telemetry-security-and-tenancy.md`, `fleet-emitter-inventory.md`, `greptimedb.md`, `perses.md`, `store-alternatives.md`, `otel-collector-topology.md`, `dev-loop-signals.md` |
-| D9 | Alerting, including watching the store itself | Accepted, except Q5, deferred to the end of implementation ([ADR-009](decisions/ADR-009-alerting.md)) | `greptimedb.md`, `fleet-emitter-inventory.md`, `perses.md` |
+| D9 | Alerting, including watching the store itself | Accepted, except Q5, deferred to CAM-76 before S5 ([ADR-009](decisions/ADR-009-alerting.md)) | `greptimedb.md`, `fleet-emitter-inventory.md`, `perses.md` |
 
 ## Open questions for the human gate
 
@@ -206,5 +206,5 @@ The nine decision records are Accepted at the human gate of 2026-10-15, and char
 A1 is satisfied once `architecture/reference-architecture.md` and the seven `components/*.md` files listed in the map exist.
 Next, implementation proceeds through one or more OpenSpec changes under `openspec/changes/`, following the precedent of `openspec/changes/stand-up-nixbot-on-magnetite/` and `openspec/changes/stand-up-gitea-mq-on-magnetite/`, with the decision records, the reference architecture and the component documents as their design input (charter v8).
 The charter's S2 sequences the continuous-verification half after the store and topology decisions land, so it follows the store and collection work of ADR-001 and ADR-003.
-ADR-009 Q5, whether an external dead-man service watches cinnabar itself, is revisited at the end of implementation; the candidate is an external heartbeat from a free uptime service, weighed against the third-party dependency.
+ADR-009 Q5, whether an external dead-man service watches cinnabar itself, is decided in CAM-76 before S5 (charter v21); the candidate is an external heartbeat from a free uptime service, weighed against the third-party dependency.
 Finding 5 above adds a precondition to A6 in practice, since a regulator that cannot be shown to fail on a mutant does not discharge it.
