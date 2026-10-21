@@ -5,7 +5,7 @@ generated: 2026-10-21
 ---
 
 This file is a projection over `openspec/specs/`, regenerated wholesale at archive time and never patched.
-It enumerates every current requirement from the post-sync corpus; it does not use the previous projection as input.
+Its rows come only from the post-sync corpus, one per current requirement; discharge annotations for rows that predate the CAM-77 archive were carried over from the previous projection by capability and requirement title.
 Discharge annotations come from the owning verification artifacts cited below, not from an agreement between configuration files.
 The `W ∧ S ⇒ R` obligation is separate from implementation refinement and from an archive-ready behavioral verdict.
 Nothing here is an end-to-end guarantee; OpenSpec structure checks are not behavioral validation.
