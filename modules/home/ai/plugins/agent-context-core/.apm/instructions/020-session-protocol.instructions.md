@@ -10,7 +10,7 @@ Before acting on any non-trivial request, pause to assess:
 2. Are there ambiguities requiring clarification before I proceed?
 3. Would local access to external source code or documentation improve this work?
    Whenever a repository is named, resolve it to a local path before reasoning about it: resolve the org first, then route by authorship — repositories we maintain live under `~/projects/<repo>/`, repositories we only read live under `$(ghq root)/<host>/<org>/<repo>/`, which is `~/ghq` by default; on a host with a shared reference tree `~/ghq` links to that tree, so `ghq list -p` prints the shared root.
-   A reference copy may be read-only: update it with `ghq-sync -u <path-or-name>` (add `--tags` for every tag), never with git inside it, and clone it into `~/projects` to change it.
+   A reference copy may be read-only: update it with `ghq-sync -u <path-or-owner/repo>` (add `--tags` for every tag), never with git inside it, and clone it into `~/projects` to change it.
    The full lookup procedure, on-miss acquisition, and the `(see local)` marker directive live in the `dependency-source-acquisition` skill.
 4. Should I present my task decomposition for approval before dispatching?
 

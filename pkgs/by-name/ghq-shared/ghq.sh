@@ -86,11 +86,16 @@ if [ "$tags" = 1 ]; then flags+=(--tags); fi
 # working tree has a .git file, not a directory, so the walk passes it and names
 # the superproject, which is what ghq clones. An explicit path outside the root
 # is an error; a bare name that happens to exist locally is a ghq target, as it
-# is for ghq itself.
+# is for ghq itself. Any other bare name is refused: the writer would resolve it
+# against its own ghq.user, which it does not have.
 root_real=$("$realpath" -m -- "$shared_root")
 normalize() {
   local target=$1 dir
   if [ ! -d "$target" ]; then
+    case "$target" in
+      */*) ;;
+      *) refuse "name the repository as owner/repo, host/owner/repo, a URL, or a path (for example .)" ;;
+    esac
     printf '%s\n' "$target"
     return 0
   fi

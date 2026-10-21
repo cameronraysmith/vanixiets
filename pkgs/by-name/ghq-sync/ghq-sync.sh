@@ -24,6 +24,9 @@ Targets:
   host/user/project before calling ghq get, and --deepen/--full act on it. With
   no positional targets the fetch mode reads targets from stdin, one per line
   (piped straight through to ghq); --deepen/--full likewise read stdin.
+  On a host-shared tree (GHQ_SYNC_DELEGATE set) fetch mode refuses a bare
+  project name, which ghq would complete with the writer's absent ghq.user;
+  name it as owner/repo, host/owner/repo, a URL, or a path such as `.`.
 
 Options:
   --deepen N       Deepen each resolved repo by N commits (git fetch --deepen=N),
@@ -76,9 +79,14 @@ is_pos_int() {
 # An existing directory under $(ghq root) becomes its repository's
 # host/owner/project for ghq get; anything else passes through unchanged. A
 # submodule's working tree has a .git file, so the walk names its superproject.
+# On a host-shared tree a bare name is refused, as the ghq wrapper refuses it.
 normalize_target() {
   local target="$1" root dir
   if [ ! -d "$target" ]; then
+    if [ -n "${GHQ_SYNC_DELEGATE:-}" ] && [[ "$target" != */* ]]; then
+      printf 'ghq: name the repository as owner/repo, host/owner/repo, a URL, or a path (for example .)\n' >&2
+      exit 2
+    fi
     printf '%s\n' "$target"
     return 0
   fi
@@ -312,7 +320,7 @@ case "$mode" in
       mapfile -t targets
     fi
     for i in "${!targets[@]}"; do
-      targets[i]="$(normalize_target "${targets[i]}")"
+      targets[i]="$(normalize_target "${targets[i]}")" || exit 2
     done
     getflags=(get --shallow --partial blobless --no-recursive -P)
     if [ "$update" = 1 ]; then getflags+=(-u); fi

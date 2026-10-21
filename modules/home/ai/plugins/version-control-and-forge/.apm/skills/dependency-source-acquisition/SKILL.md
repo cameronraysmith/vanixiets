@@ -39,7 +39,8 @@ Prefer the canonical upstream; acquire a personal fork only when contribution ba
 A shallow clone sits at HEAD, which is usually not the revision we pin — read at the pinned revision or every line anchor you cite will be wrong.
 On magnetite, pyrite and stibnite every account's `$(ghq root)` is the host's one shared tree, `/var/lib/ghq`, and `~/ghq` is a link to it, so `ghq list -p` prints paths under the shared root's real path (`/private/var/lib/ghq` on stibnite) rather than under `~/ghq`; elsewhere the root is ghq's default `~/ghq`.
 The shared tree has a single writer account and is read-only to you: `ghq get`, `ghq-sync`, `ghq-sync -u`, `ghq-sync --deepen` and `ghq-sync --full` are carried out by that account on your behalf, and `git fetch`, `git gc`, editing a file or setting configuration inside a reference repository fail with a permission error by design.
-Update a reference copy with `ghq-sync -u <path-or-name>`, where a path such as `.` inside the repository names it; add `--tags` to fetch every tag, which a full clone does on every update anyway.
+Update a reference copy with `ghq-sync -u <path-or-owner/repo>`, where a path such as `.` inside the repository names it; add `--tags` to fetch every tag, which a full clone does on every update anyway.
+On the shared tree `ghq get` and `ghq-sync` accept a repository as `owner/repo`, `host/owner/repo`, a URL, or a path, and refuse a bare name such as `llm-agents.nix` before contacting the writer.
 To change a reference repository's working tree, clone it into `~/projects` with `git clone <path> ~/projects/<repo>`.
 On those hosts git is configured with `safe.bareRepository = explicit` for every repository, not only reference ones, so git refuses to work inside a bare repository it discovers from the current directory ("cannot use bare repository"); name it with `git --git-dir=<path>` or `GIT_DIR=<path>` instead.
 

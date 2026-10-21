@@ -31,22 +31,28 @@ runCommand "ghq-shared-test-wrapper"
 
     export HOME="$work/home" GIT_CONFIG_NOSYSTEM=1
     unset GHQ_ROOT
-    # expect STATUS OUTPUT ARGS...: ghq ARGS exits STATUS printing exactly OUTPUT.
-    expect() {
-      local want_status=$1 want=$2 got status=0
-      shift 2
-      got=$("$work/ghq" "$@" 2>&1) || status=$?
+    # expect STATUS OUTPUT ARGS...: ghq ARGS exits STATUS printing exactly OUTPUT;
+    # expect_sync is the same for ghq-sync.
+    expect() { expect_run "$work/ghq" "$@"; }
+    expect_sync() { expect_run ${ghq-sync}/bin/ghq-sync "$@"; }
+    expect_run() {
+      local cmd=$1 want_status=$2 want=$3 got status=0
+      shift 3
+      got=$("$cmd" "$@" 2>&1) || status=$?
       if [ "$status" != "$want_status" ] || [ "$got" != "$want" ]; then
-        printf 'FAIL: ghq %s -> exit %s:\n%s\nwant exit %s:\n%s\n' "$*" "$status" "$got" "$want_status" "$want"
+        printf 'FAIL: %s %s -> exit %s:\n%s\nwant exit %s:\n%s\n' "''${cmd##*/}" "$*" "$status" "$got" "$want_status" "$want"
         exit 1
       fi
-      echo "ok: ghq $* -> exit $status"
+      echo "ok: ''${cmd##*/} $* -> exit $status"
     }
     nl=$'\n'
+    bare="ghq: name the repository as owner/repo, host/owner/repo, a URL, or a path (for example .)"
 
     echo "case: ghq.root unset"
     expect 0 "real get github.com/a/b" get github.com/a/b
     expect 0 "real create x" create x
+    expect 0 "real get -u llm-agents.nix" get -u llm-agents.nix
+    expect_sync 0 "would run: ghq get --shallow --partial blobless --no-recursive -P -u llm-agents.nix" -n -u llm-agents.nix
 
     echo "case: ghq.root another path"
     git config --global ghq.root "$work/other"
@@ -60,6 +66,13 @@ runCommand "ghq-shared-test-wrapper"
     expect 2 "ghq: create is unavailable: this host's ghq tree is shared and only its writer account changes it" create x
     expect 3 "client get github.com/a/fail''${nl}client get github.com/a/b" get github.com/a/fail github.com/a/b
 
+    echo "case: a bare repository name is refused on a shared tree, before the writer"
+    expect 2 "$bare" get -u llm-agents.nix
+    expect 2 "$bare" get numtide/llm-agents.nix llm-agents.nix
+    expect 2 "$bare" get <<<llm-agents.nix
+    expect 0 "client get --update numtide/llm-agents.nix" get -u numtide/llm-agents.nix
+    expect 0 "client get https://github.com/numtide/llm-agents.nix" get https://github.com/numtide/llm-agents.nix
+
     echo "case: a directory under the shared root names its repository"
     mkdir -p "$work/shared/github.com/o/r/.git" "$work/shared/github.com/o/r/sub/dir" "$work/outside"
     (cd "$work/shared/github.com/o/r" && expect 0 "client get --update github.com/o/r" get -u .)
@@ -70,6 +83,7 @@ runCommand "ghq-shared-test-wrapper"
     expect 2 "ghq: $work/outside is outside the shared ghq root $work/shared-link" get github.com/a/b "$work/outside"
     (cd "$work/outside" && expect 2 "ghq: . is outside the shared ghq root $work/shared-link" get .)
     expect 2 "ghq: $work/shared/github.com is not inside a repository under $work/shared-link" get "$work/shared/github.com"
+    (cd "$work/shared/github.com/o" && expect 0 "client get github.com/o/r" get r)
 
     echo "case: a submodule's working tree names its superproject"
     mkdir -p "$work/shared/github.com/o/r/mod/dir" "$work/shared/github.com/o/r/.git/modules"
@@ -83,6 +97,12 @@ runCommand "ghq-shared-test-wrapper"
       [ "$got" = "$want" ] || { echo "FAIL: ghq-sync in $dir -> '$got', want '$want'"; exit 1; }
       echo "ok: ghq-sync -n -u . in $dir -> $got"
     done
+
+    echo "case: ghq-sync on a shared tree refuses a bare repository name"
+    GHQ_ROOT="$work/shared-link" GHQ_SYNC_DELEGATE="$work/client" expect_sync 2 "$bare" -u llm-agents.nix
+    GHQ_ROOT="$work/shared-link" GHQ_SYNC_DELEGATE="$work/client" expect_sync 2 "$bare" -n -u llm-agents.nix
+    GHQ_ROOT="$work/shared-link" GHQ_SYNC_DELEGATE="$work/client" expect_sync 0 \
+      "would run: ghq get --shallow --partial blobless --no-recursive -P -u numtide/llm-agents.nix" -n -u numtide/llm-agents.nix
 
     echo "case: ghq-sync --tags applies to fetch mode only"
     usage=$(${ghq-sync}/bin/ghq-sync --help)
