@@ -28,6 +28,7 @@ case "$tool" in
   omnigent)
     arguments=(omnigent login "$OMNIGENT_SERVER_URL")
     printf 'Open the printed %s/auth/login URL in your browser within 5 minutes and sign in as the worker owner.\n' "$OMNIGENT_SERVER_URL"
+    printf 'On the Authorize sign-in page, confirm its code matches the one printed here, then choose Approve.\n'
     ;;
   verify) arguments=(omnigent-worker-verify) ;;
   *) echo "Unsupported tool: $tool" >&2; exit 2 ;;

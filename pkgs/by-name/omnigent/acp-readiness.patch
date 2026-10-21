@@ -30,17 +30,3 @@
          except Exception:
              return False
      if canonical in _SDK_HARNESSES:
-@@ -1059,6 +1064,13 @@
-     spellings.add(GOOSE_KEY)  # headless Goose (``goose acp``) gates on the goose binary
-     spellings.add(HERMES_KEY)  # Hermes Agent wraps the ``hermes`` CLI
-     spellings.add(COPILOT_KEY)
-+    try:
-+        from omnigent.onboarding.acp_auth import acp_agents
-+
-+        spellings.update(f"acp:{agent.slug}" for agent in acp_agents())
-+    except Exception:
-+        _logger.debug("acp readiness rows skipped", exc_info=True)
-+
-     canonical_by_cache_key: dict[tuple[str, ...], str] = {}
-     cache_key_by_spelling: dict[str, tuple[str, ...]] = {}
-     for spelling in spellings:

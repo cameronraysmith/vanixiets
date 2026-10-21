@@ -176,6 +176,14 @@ in
                 proxy_buffering off;
               '';
             };
+            # Omnigent v0.19.0 deploy guidance: a cli-poll query can carry the ticket
+            # and PKCE verifier that together redeem an approved login.
+            locations."= /auth/cli-poll" = {
+              proxyPass = "http://127.0.0.1:${toString cfg.port}";
+              extraConfig = ''
+                access_log off;
+              '';
+            };
           };
         };
       };
