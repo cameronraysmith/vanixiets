@@ -46,7 +46,7 @@ flowchart LR
     dev -->|"sqlquery peer auth, journald key_value_parser"| ingress
     ingress -->|"OTLP/HTTP protobuf, collector wo, x-greptime-db-name"| store
     perses -->|"SQL and PromQL to 127.0.0.1:4006, perses ro injected by nginx"| store
-    alert -->|"PromQL instant queries, regulator ro"| store
+    alert -->|"PromQL and SQL queries, regulator ro"| store
     regs -->|"SQL and PromQL, regulator ro"| store
     export -->|"COPY DATABASE devloop, admin rw"| store
   end
@@ -82,7 +82,7 @@ Ingest uses OTLP over HTTP with protobuf, because GreptimeDB serves no OTLP gRPC
 |---|---|---|---|
 | magnetite | NixOS, always on, Hetzner `cx53` | `opentelemetry-collector.service` with `agent` and `ingress` roles, devloop collection (`sqlquery`, gitea-mq `journald`), loopback `prometheus-node-exporter`, `greptimedb.service` serving the embedded dashboard, `greptimedb-schema.service`, `greptimedb-export.service` and `.timer`, `greptimedb-envelope.service` and `.timer`, the nginx vhost `perses.scientistexperience.net` registered with `sso-gateway` and proxying to the store's API listener `127.0.0.1:4006`, `perses-dashboards.service`, `fleet-alert.service` and `.timer`, `otel-envelope` service and timer, `devloop-reconcile` service and timer, `observability-notify@` template, loopback nginx server `127.0.0.1:9180` for nixbot `/metrics`, deploy-record snippet | store placement and containment per ADR-007; dashboard admission through the shared `sso-gateway` Kanidm client per ADR-002 |
 | cinnabar | NixOS, always on, Hetzner `cx43` | collector `agent`, loopback `prometheus-node-exporter`, `observability-notify@` template, `ntfy-sh` with `auth-access` and `environmentFile`, `fleet-deadman.service` and `.timer`, deploy-record snippet | ZeroTier controller and `.zt` resolver; not a store host (ADR-007 Rationale) |
-| pyrite | NixOS, laptop, bare metal | collector `agent`, loopback `prometheus-node-exporter`, `prometheus-smartctl-exporter` on `127.0.0.1:9633` with `smartDevices = [ "/dev/nvme0" ]`, `observability-notify@` template, deploy-record snippet | KVM-capable host for the on-demand QEMU `vmTests` (ADR-005; S1's OOM-order test); silence raises nothing (ADR-009 item 16) |
+| pyrite | NixOS, laptop, bare metal | collector `agent`, loopback `prometheus-node-exporter`, `prometheus-smartctl-exporter` on `127.0.0.1:9633` with `smartDevices = [ "/dev/nvme0" ]`, `observability-notify@` template, deploy-record snippet | KVM-capable host for the on-demand QEMU `vmTests` (S1's OOM-order test), while ADR-005's `devloop-ingest` is a container test on magnetite (charter v22); silence raises nothing (ADR-009 item 16) |
 | electrum, galena, scheelite | NixOS, cloud hosts provisioned on demand | collector `agent`, loopback `prometheus-node-exporter`, `observability-notify@` template, deploy-record snippet | silence fails R3.2 only while terranix provisions them (ADR-003 R3.2; ADR-009 item 16); `scheelite` deploys report as out-of-band under D5-R7 while its machine check stays deferred (ADR-005 Consequences) |
 | stibnite | nix-darwin, laptop | `launchd.daemons.otelcol` as `_otelcol`, `launchd.daemons.otelcol-process` as root, `launchd.daemons.otel-host-probe` as `_prometheus-node-exporter` with `smartDevices = [ "disk0" ]`, loopback node_exporter with only the `textfile` collector, deploy-record snippet | darwin configuration is made gating through R3.1 on `x86_64-linux` (ADR-003 Q5) |
 | blackphos, rosegold, argentum | nix-darwin, other people's primary laptops | deploy-record snippet only, no collector | excluded until each primary user consents (ADR-003 Q3); D5-R7 records each as an exemption owned by that user (ADR-005 Decision) |
@@ -169,10 +169,12 @@ The `observability-notify@` template lives in the collector `agent` role on ever
 It posts once per failure episode to `fleet-alerts` with the `alerter` token, keeps a stamp file per unit, and each notified unit's `ExecStopPost=` posts one `RESOLVED` on the next successful exit (ADR-009 item 11).
 
 `fleet-alert.timer` on magnetite runs the evaluator every 60 s against the `fleet` database's Prometheus API with a 10 s per-query timeout (ADR-009 item 1).
+From S2 each rule declares its database and query language, and SQL rules, the dev-loop SLO burn rule first, query `devloop` through `/v1/sql` (ADR-009 items 1 and 15; charter v22).
 It posts exactly one `FIRING` and one `RESOLVED` per alert instance, re-posts `critical` instances once per 24 h, and appends attribution by top executables, ARC size and swap used to memory and OOM messages (ADR-009 items 4 and 5).
 When the store does not answer it raises `StoreQueryFailing` and freezes every other instance, and while a host reports no `system_memory_usage_bytes` it freezes that host's instances (ADR-009 items 6 and 17).
 `RuleSignalMissing` reports a rule whose presence selector has returned no series for 30 min while an expected host reports (ADR-009 item 7).
 The initial rule set is the eighteen rules of ADR-009's rule table, and `WeeklyPipelineTest` proves the whole path each Monday at 09:00 local time (ADR-009 item 14).
+S2 adds the dev-loop SLO burn rule, a 24 h slow-burn `warning` that fires when more than 10% of the pull-request builds in the trailing 24 h waited over 1 h to start (ADR-009 item 15; charter v22).
 The one rule that fires for host absence is `RuleSignalMissing` for an always-on host the rule table marks, magnetite alone in S3, silent for 10 min while the store answers; the silence of an always-on host is also R3.2's failure and reaches a human through the notifier, and a laptop's silence raises nothing (ADR-009 item 16).
 
 Every completed evaluation publishes to `fleet-heartbeat`, and `fleet-deadman.timer` on cinnabar raises `AlertEvaluatorSilent` when that topic has been empty for 10 min (ADR-009 items 8 and 9).
@@ -196,7 +198,7 @@ Change numbers refer to the slices S1 to S8 of the next section.
 | `modules/machines/nixos/magnetite/default.nix` | file | modify: `OnFailure=observability-notify@%n.service` on the six existing and three new dataset oneshots | ADR-007; ADR-009 | 1 |
 | `modules/machines/nixos/magnetite/default.nix` | file | modify: import `perses` and enable `sso-gateway`, which is disabled today | ADR-002; ADR-007 | 6 |
 | `modules/machines/nixos/magnetite/default.nix` | file | modify: import `fleet-alert` with the evaluator enabled | ADR-009 | 3 |
-| `modules/machines/nixos/magnetite/default.nix` | file | modify: import `devloop-collection` | ADR-005 | 2 |
+| `modules/machines/nixos/magnetite/default.nix` | file | modify: import `devloop-collection`, and add `devloop-reconcile` to the `regulator-password` holders and to `services.observability-notify.units` | ADR-005 | 2 |
 | `modules/clan/services/otel-collector/flake-module.nix` | file | add: clan service `otel-collector` with roles `agent` and `ingress`, NixOS and darwin modules, `otel-envelope`, `observability-notify@` in the `agent` role, content stages, R8.2 ownership assertions; S3 moves `observability-notify@` into its own module, which the `agent` role imports | ADR-003; ADR-004; ADR-008; ADR-009 | 1, 3, 4, 5, 7 |
 | `modules/nixos/observability-notify.nix` | file | add: `flake.modules.nixos.observability-notify` with the unchanged option `services.observability-notify.units`, the template loading the `alerter` token through `LoadCredential`, resolve hooks reading the token's vars path through `NTFY_TOKEN_FILE`, and a log of posted `FAILED` messages under `/var/lib/observability-notify` | ADR-009; ADR-003 | 3 |
 | `modules/clan/inventory/services/otel-collector.nix` | file | add: one instance, `agent` on the seven in-scope hosts, `ingress` on magnetite, `smartDevices` on pyrite and stibnite | ADR-003 | 1, 4, 5 |
@@ -217,16 +219,17 @@ Change numbers refer to the slices S1 to S8 of the next section.
 | `modules/vm-tests/perses-greptimedb.nix` | file | add: on-demand container test of the vhost-to-store data path | ADR-002 | 6 |
 | `modules/terranix/cloudflare.nix` | Terraform resource | modify: one unproxied `CNAME` `perses.scientistexperience.net` to `magnetite.scientistexperience.net` | ADR-002 | 6 |
 | `modules/terranix/cloudflare.nix` | Terraform resource | no bucket resource; a rule in `cloudflare_r2_bucket_lifecycle.sciexp` only when an export expiry is decided | ADR-006 Q4 | none now |
-| `modules/nixos/fleet-alert.nix` | file | add: evaluator and dead-man services and timers, R9.5 assertion | ADR-009 | 3 |
-| `modules/nixos/fleet-alert/rules.nix` | file | add: rule table rendered to JSON and YAML, with the `SystemdUnitFailed` exclusion rendered from `services.observability-notify.units`; S3 adds the rules S1's signals feed, S4 and S5 the filesystem, NVMe, launchd and `HostProbeStale` rules | ADR-009 | 3, 4, 5 |
-| `modules/checks/fleet-alert.nix` | file | add: R9.2 with fixtures, mutants and the Hypothesis property test of the jq transition function | ADR-009 | 3 |
+| `modules/nixos/fleet-alert.nix` | file | add: evaluator and dead-man services and timers, R9.5 assertion; S2 adds per-rule `database` and `language`, with SQL rules sent to `/v1/sql` | ADR-009 | 2, 3 |
+| `modules/nixos/fleet-alert/rules.nix` | file | add: rule table rendered to JSON and YAML, with the `SystemdUnitFailed` exclusion rendered from `services.observability-notify.units`; S3 adds the rules S1's signals feed, S4 and S5 the filesystem, NVMe, launchd and `HostProbeStale` rules, and S2 the dev-loop SLO burn rule, rendering only PromQL rules to YAML | ADR-009 | 2, 3, 4, 5 |
+| `modules/checks/fleet-alert.nix` | file | add: R9.2 with fixtures, mutants and the Hypothesis property test of the jq transition function; S2 adds the `/v1/sql` fixture path and a leg querying both `fleet` and `devloop` | ADR-009 | 2, 3 |
 | `ntfy-alerter` provisioning check | flake check | add: validates the rendered `NTFY_AUTH_*` strings before deploy; ADR-009 fixes no path | ADR-009 | 3 |
-| `modules/nixos/devloop-collection.nix` | file | add: `sqlquery` queries, gitea-mq `journald` receiver, PostgreSQL role, `devloop-reconcile` | ADR-005 | 2 |
+| `modules/nixos/devloop-collection.nix` | file | add: `sqlquery` queries, gitea-mq `journald` receiver, the collector's journal read, PostgreSQL roles, `devloop-reconcile` as its own `DynamicUser` with a peer-authenticated nixbot role and journal read | ADR-005 | 2 |
 | `modules/system/deploy-record.nix` | file | add: NixOS and darwin activation snippets | ADR-005 | 2 |
 | NixOS and darwin machine aggregates importing `modules/system/` | file | modify: import `deploy-record` on all ten machines | ADR-005 | 2 |
-| `modules/checks/devloop-signals.nix` | file | add: marker, deploy-record and omp session-variable checks | ADR-005 | 2, 7 |
-| `modules/checks/devloop-queries.nix` | file | add: queries against nixbot's migrations under `postgresqlTestHook` | ADR-005 | 2 |
-| `modules/vm-tests/devloop-ingest.nix` | file | add: on-demand VM test with mutants | ADR-005 | 2 |
+| `modules/checks/devloop-signals.nix` | file | add: omp session-variable check; the marker clause is in `devloop-queries` | ADR-005 | 7 |
+| `modules/checks/machines.nix` | file | modify: deploy-record obligation, evaluated with each machine's toplevel | ADR-005 | 2 |
+| `modules/checks/devloop-queries.nix` | file | add: queries against nixbot's migrations under `postgresqlTestHook`, and the abandonment-marker clause against the patch's production code | ADR-005 | 2 |
+| `modules/vm-tests/devloop-ingest.nix` | file | add: on-demand systemd-nspawn container test on magnetite with mutants | ADR-005 | 2 |
 | `modules/home/ai/omp/default.nix` | file | modify: OTLP metrics endpoint, `OTEL_TRACES_EXPORTER=none`, `OTEL_LOGS_EXPORTER=none`, protocol and service name for human accounts | ADR-005; ADR-008 | 7 |
 | reader command on each analytics host | file | add: signs the export read credential and prints DuckDB `CREATE SECRET`; ADR-006 fixes no path | ADR-006 | 8 |
 | `greptimedb-users` | clan vars generator | add on magnetite: four users, five secret files and the public `users-sha256` | ADR-007 | 1 |
@@ -242,7 +245,8 @@ Change numbers refer to the slices S1 to S8 of the next section.
 Implementation proceeds in vertical slices: each slice is one OpenSpec change that closes a feedback loop end to end, from deployment to its own regulators, and each is bound to one issue of the Linear project `Fleet observability` (`openspec/linear.yaml` key `fleet-observability`).
 Each change carries the artifacts of the repository's OpenSpec schema under `openspec/changes/`, as the `stand-up-*` precedent does (charter, Scope), and its tasks carry the deployment acceptance items of the decisions it realizes.
 Slice status is not recorded here: it is derived from the change's files by `openspec list` and mirrored to its issue by openspec-linear-sync.
-Slices S1 to S5 are metrics-only, with no logs pipeline, so no content-bearing record enters the store before S7 brings the content stages and their regulator.
+No content-bearing record enters the store before S7 brings the content stages and their regulator.
+S1 and S3 to S5 are metrics-only, and S2 adds the one non-content logs path, into `devloop` only, through an explicit allow-list and with no message bodies stored (ADR-004 Decision; charter v22).
 Change names are chosen in each slice's proposal.
 
 0. Package: the store package is `greptimedb-bin`, packaged from the upstream release tarball because it embeds the dashboard ADR-002 adopts; it lands inside S1, and the root pin is not bumped for the store (ADR-001 R1.1; ADR-007 Q2).

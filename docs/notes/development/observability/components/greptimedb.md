@@ -70,7 +70,7 @@ Downstream:
 
 - The dashboard layer: from S6, nginx on `magnetite` proxies the vhost's `/dashboard/` and `/v1/` to `http://127.0.0.1:4006` with `Authorization` overwritten by the `perses` credential; the embedded dashboard's `promql-default` and `sql-default` datasources query `/v1/prometheus` and `/v1/sql` (ADR-002 Decision).
 - The dashboard reconcile oneshot `perses-dashboards.service` on `magnetite` writes and deletes dashboards through `/v1/dashboards` with a `rw` credential whose holder is open (ADR-002 Q9).
-- `fleet-alert.service` on `magnetite`: PromQL instant queries to `http://127.0.0.1:4000/v1/prometheus/api/v1/query` against `fleet` as the `regulator` user, with a 10 s per-query timeout (ADR-009 Decision item 1).
+- `fleet-alert.service` on `magnetite`: PromQL instant queries to `http://127.0.0.1:4000/v1/prometheus/api/v1/query` against `fleet` as the `regulator` user, with a 10 s per-query timeout, and from S2 SQL rules, such as the dev-loop rule over `devloop`, through `/v1/sql` (ADR-009 Decision items 1 and 15, charter v22).
 - `otel-envelope` (ADR-003 R3.2, ADR-004 R4.2), `devloop-reconcile` (ADR-005) and `greptimedb-envelope` (ADR-007 R7.2) read as `regulator` (ADR-009 governs the holder list).
 - `greptimedb-schema` and `greptimedb-export` act as `admin` (ADR-007 Decision).
 - DuckDB consumers read only the Parquet export, never the store's SSTs (ADR-006 Decision).

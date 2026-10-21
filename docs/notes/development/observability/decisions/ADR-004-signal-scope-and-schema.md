@@ -5,6 +5,7 @@ title: "ADR-004: Signal scope and schema"
 ## Status
 
 Accepted (human gate, 2026-10-15)
+Amended in place under charter v22 (2026-10-21), from slice S2's planning (`openspec/changes/stand-up-devloop-collection/`): the batch lifecycle admits the five exact gitea-mq messages rather than every line beginning `batch `, `devloop` rows restricted to the column allow-list are stored as OTLP log records with no message body, and the CI build timing row carries `pr_number` and `branch`.
 
 ## Context
 
@@ -55,7 +56,7 @@ Signal scope for the first deployment:
 | ZFS pool state, ARC, OOM-kill count, 60 s | loopback node_exporter on NixOS agents (ADR-003) | fleet | `fleet` |
 | Swap usage per swap device, 60 s | `host_metrics` `paging` scraper on NixOS agents (ADR-003 item 18) | fleet | `fleet` |
 | NVMe health, 60 s | loopback smartctl_exporter on pyrite and `otel-host-probe` on stibnite (ADR-003) | fleet | `fleet` |
-| Batch lifecycle | gitea-mq journal lines beginning `batch ` | dev-loop | `devloop` |
+| Batch lifecycle | gitea-mq journal lines whose message is exactly `batch formed`, `batch built`, `batch landed`, `batch bisecting` or `batch done` (charter v22) | dev-loop | `devloop` |
 | Per-attribute CI outcomes | nixbot rows read on magnetite (ADR-005) | dev-loop | `devloop` |
 | Deploy records | `/var/log/deploy-record.jsonl` on every agent (ADR-005) | dev-loop | `devloop` |
 | Agent-harness metrics | omp OTLP metrics `omp.agent.tool.calls` and `omp.agent.errors` | dev-loop | `agent` |
@@ -100,11 +101,12 @@ Key-level attribute redaction, `allow_all_keys: false`, applies only to the omp 
 | Signal (ADR-005) | Columns | Primary key | Time index |
 |---|---|---|---|
 | CI attribute outcome | `build_id`, `attr`, `system`, `status`, `cached`, `abandoned`, `drv_path`, `outputs.out`, `started_at`, `finished_at`, `eval_wall_ms`, `eval_alloc_bytes`, `commit_sha`, `branch`, `pr_number`, `project` | `(build_id, attr)` | `finished_at` |
-| CI build timing | `build_id`, `created_at`, `started_at`, `finished_at`, `eval_duration_ms`, `status` | `(build_id)` | `finished_at` |
+| CI build timing | `build_id`, `created_at`, `started_at`, `finished_at`, `eval_duration_ms`, `status`, `pr_number`, `branch` (charter v22) | `(build_id)` | `finished_at` |
 | Merge-queue batch event | `batch`, `msg` (the event name), `build`, `sha`, `failed_check`, `members`, `landed`, `ejected`, `builds`, `flaky` | `(batch, msg)` | journal timestamp |
 | Deploy record | `host`, `closure`, `previous_closure`, `ts` | `(host)` | `ts` |
 
-Explicitly never stored, whatever their source: `gen_ai.input.messages`, `gen_ai.output.messages`, `gen_ai.system_instructions`, `gen_ai.tool.call.arguments`, `gen_ai.tool.call.result`, `gen_ai.tool.definitions`, `gen_ai.retrieval.query.text`, `gen_ai.prompt`, `gen_ai.completion`, `exception.message`, `exception.stacktrace`, span status messages, `user.email`, `user.id`, `user.account_uuid`, `user.account_id`, and any OTLP log record.
+Explicitly never stored, whatever their source: `gen_ai.input.messages`, `gen_ai.output.messages`, `gen_ai.system_instructions`, `gen_ai.tool.call.arguments`, `gen_ai.tool.call.result`, `gen_ai.tool.definitions`, `gen_ai.retrieval.query.text`, `gen_ai.prompt`, `gen_ai.completion`, `exception.message`, `exception.stacktrace`, span status messages, `user.email`, `user.id`, `user.account_uuid`, `user.account_id`, and any OTLP log record other than a `devloop` row (charter v22).
+A `devloop` row is an OTLP log record restricted to the column allow-list above and carrying no message body, so the journald `MESSAGE` of a gitea-mq line is dropped once parsed and the nixbot queries select no `error` text (charter v22).
 This list documents intent; enforcement is the allow-lists, so on the omp pipeline, in journald records and in `devloop` rows a key absent from its list is dropped.
 
 journald unit allow-list: `gitea`, `gitea-mq`, `nixbot*`, `niks3*`, `nix-daemon`, `nix-grpc-daemon`, `harmonia-gc`, `postgresql`, `nginx`, `greptimedb`, `opentelemetry-collector`, `zerotierone`.
