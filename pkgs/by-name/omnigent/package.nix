@@ -5,7 +5,7 @@
   runCommand,
 }:
 let
-  version = "0.18.0";
+  version = "0.19.0";
   py = python3Packages;
   omnigent-client = py.callPackage ./omnigent-client.nix { inherit version; };
   omnigent-ui-sdk = py.callPackage ./omnigent-ui-sdk.nix {
@@ -29,7 +29,7 @@ let
       python = "py3";
       dist = "py3";
       platform = "any";
-      hash = "sha256-lAZSKI07uQuXZVeFmsW0ASSURCfkv9PzRrhLgBsdJxY=";
+      hash = "sha256-YVBukl7pi91e29YOxppP+GKnnIDYHI82+Db+fJ8jAC8=";
     };
 
     # openai<2.45 is upstream's transitive cap on openai-agents, not on omnigent's
@@ -39,11 +39,7 @@ let
     # prompt_cache_options, which is optional in openai 2.53, so the agents path
     # loses prompt-cache control; bumping the override to 0.18.2 would restore it.
     pythonRelaxDeps = [
-      "argon2-cffi"
-      "cachetools"
       "openai"
-      "packaging"
-      "rich"
       "websockets"
     ];
 
