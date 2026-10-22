@@ -28,7 +28,7 @@ The reconcile's comparison logic, its seven clauses, its exit codes and its Post
   - `batchBuilds`: one row, `batch_builds`, the count of builds on a `gitea-mq/batch/` branch finished in the window;
   - `currentFinish`: of the keys of `$3` whose `finished_at_us` lies in the window, those nixbot does not explain, as `build_id`, `attr` (empty for a build), `stored_us`, `current_us` (`absent` when nixbot has no such row); a key is explained when nixbot has it with a null or later `finished_at`.
 - Produces: `flake.lib.devloopReconcile pkgs { psql; journalctl ? "journalctl"; storeUrl ? "http://127.0.0.1:4000"; hostName; deployRecord ? "/var/log/deploy-record.jsonl"; currentSystem ? "/run/current-system"; }`, a `writeShellApplication` named `devloop-reconcile` whose `psql` is the path of a `psql` binary; environment `DEVLOOP_RECONCILE_DAY` (default yesterday, UTC) and `DEVLOOP_RECONCILE_DATABASE` (default `devloop`), and `CREDENTIALS_DIRECTORY` holding `regulator-password`; stdout one line per clause in order C1–C7, `devloop-reconcile: C<n> <name>: ok` or `devloop-reconcile: C<n> <name>: FAIL <detail>`; stderr `devloop-reconcile: cannot read <source>` before exit 2; exit 0, 1 (any `FAIL`) or 2 (nixbot, the journal, the deploy record, the current system or the store unreadable, or a malformed environment value).
-- Produces: `devloop-reconcile.service` and `devloop-reconcile.timer` as the Global Constraints state, plus the `greptimedb-envelope` hardening set (`modules/nixos/greptimedb.nix:316-330`); `LoadCredential` is set by the host, as for `greptimedb-envelope`, so the module stays free of clan vars.
+- Produces: `devloop-reconcile.service` and `devloop-reconcile.timer` as the Global Constraints state, plus the `greptimedb-envelope` hardening set (`modules/nixos/greptimedb.nix:57-73`); `LoadCredential` is set by the host, as for `greptimedb-envelope`, so the module stays free of clan vars.
 - Produces: the `devloop-queries` legs labelled `reconcile: …` and its mutants `reconcileGrantWithoutFinishedAt` and `currentFinishIgnoresDuplicates`; the `devloop-ingest` case `reconcile`, its Nix-side `unitMutants` `omitCached`, `omitNullPr`, `noKeyValueParser`, `deployRecordOtherPath` and its runtime mutants `appendModeAttribute`, `silentStub`, `pipelineWithoutFlaky`, `snippetSwapsClosures`; R3.1's mutant `reconcileNotNotified`; magnetite's holder list `[ "devloop-reconcile" "fleet-alert" "greptimedb-envelope" ]`, `devloop-reconcile` added to the notified units, and the kill-order message starting `magnetite: R7.1, S3 design D12 and S2 design D11 require`.
 
 - [ ] **Step 1: Confirm the base and the anchors**
@@ -427,7 +427,7 @@ jj st --no-pager >/dev/null
 nix build --no-link -L .#checks.x86_64-linux.devloop-queries 2>&1 | tee logs/s2-evidence/4.1-devloop-queries-$(date -u +%Y%m%dT%H%M%SZ).log | rg 'ok: |FAIL|mutant .* rejected|error:'
 ```
 
-Expected: the build succeeds; Task 2's `ok:` lines, then `ok: reconcile: attributes returns nixbot's (build_id, attr, finished_at) in the window, the start included, as devloop-reconcile`, `ok: reconcile: builds returns nixbot's (id, finished_at) in the window, the start included and the end excluded, as devloop-reconcile`, `ok: reconcile: batchBuilds counts the one gitea-mq/batch/ build finished in the window as devloop-reconcile` and `ok: reconcile: currentFinish returns exactly the stored keys nixbot does not explain, as devloop-reconcile`; then five rejections in attribute order: `mutant currentFinishIgnoresDuplicates rejected: FAIL: reconcile: currentFinish returns exactly the stored keys nixbot does not explain, as devloop-reconcile`, `mutant grantWithoutError rejected: …`, `mutant reconcileGrantWithoutFinishedAt rejected: psql:/nix/store/…-devloop-queries-reconcile_attributes-window.sql:<n>: ERROR:  permission denied for table build_attributes`, `mutant renameCached rejected: …` and `mutant selectError rejected: …`, the three of Task 2 with the same reasons as Task 2's log; no `FAIL` outside a rejection line and no `error:`.
+Expected: the build succeeds; Task 2's `ok:` lines, then `ok: reconcile: attributes returns nixbot's (build_id, attr, finished_at) in the window, the start included, as devloop-reconcile`, `ok: reconcile: builds returns nixbot's (id, finished_at) in the window, the start included and the end excluded, as devloop-reconcile`, `ok: reconcile: batchBuilds counts the one gitea-mq/batch/ build finished in the window as devloop-reconcile` and `ok: reconcile: currentFinish returns exactly the stored keys nixbot does not explain, as devloop-reconcile`; then six rejections in attribute order: `mutant currentFinishIgnoresDuplicates rejected: FAIL: reconcile: currentFinish returns exactly the stored keys nixbot does not explain, as devloop-reconcile`, `mutant errorUnderAlias rejected: …`, `mutant grantWithoutError rejected: …`, `mutant reconcileGrantWithoutFinishedAt rejected: psql:/nix/store/…-devloop-queries-reconcile_attributes-window.sql:<n>: ERROR:  permission denied for table build_attributes`, `mutant renameCached rejected: …` and `mutant selectError rejected: …`, the four of Task 2 with the same reasons as Task 2's log; no `FAIL` outside a rejection line and no `error:`.
 The `-U devloop-reconcile` in each `reconcile_*` run (Task 2's runner) and the refused grant mutant are what show the queries ran as that role under the rendered grants.
 
 - [ ] **Step 8: Re-record `devloop-queries`' evaluation cost (evaluation)**
@@ -450,10 +450,9 @@ Expected: a `/nix/store/…-devloop-queries.drv` path and `gcTotalBytes` below `
 The case relates, for each clause, the reconcile's verdict and the configuration it ran against: the unmutated container must pass, and each of D11's eight mutants must fail with exactly its clause (two clauses where the mutant removes both clauses' rows), so a reconcile that cannot fail is rejected (devloop-exporters.md:134).
 In `modules/vm-tests/devloop-ingest.nix`, make these edits.
 
-1. In the outer `let`, replace `unitMutants = { };` with:
+1. In the outer `let`, replace `unitMutants = { };` with the block below; Task 3's outer `let` already binds `devloop = self.lib.devloopCollection;`, so the block does not bind it again:
 
 ```nix
-            devloop = self.lib.devloopCollection;
             # Task 4: an attribute rendered at runtime by a container path.
             currentSystemLink = "/run/devloop-ingest/current-system";
             # replaceOnce NAME FROM TO TEXT: TEXT with its one FROM replaced.
@@ -744,7 +743,17 @@ The container already sets `environment.etc = { … };` (Task 3's `gitea-mq-line
               def fresh_leg(silent=False):
                   store.succeed("systemctl stop gitea-mq.service")
                   # Earlier stub lines would otherwise stay in the day (C3, C4).
-                  store.succeed("journalctl --rotate", "sleep 2", "journalctl --vacuum-time=1s")
+                  # The container cannot set the journal directory's setgid
+                  # bit (systemd-tmpfiles' fchmod is refused at boot), so the
+                  # file journald opens on rotation is root:root; chgrp gives
+                  # it the group the collector and the reconcile read through,
+                  # as tmpfiles' `z .../system.journal` line does at boot.
+                  store.succeed(
+                      "journalctl --rotate",
+                      "sleep 2",
+                      "journalctl --vacuum-time=1s",
+                      "chgrp systemd-journal /var/log/journal/*/system.journal",
+                  )
                   reset_devloop()
                   stub = EMPTY_LINES if silent else FIXTURE_LINES
                   store.succeed(
@@ -941,6 +950,7 @@ The container already sets `environment.etc = { … };` (Task 3's `gitea-mq-line
 Grounding for the case: a newly posted pipeline replaces the cached `latest` version at once (`GreptimeTeam/greptimedb@v1.2.1:src/pipeline/src/manager/pipeline_cache.rs:156-161`), so the C5 leg's upload takes effect before the collector restarts, and the next leg's `reset_devloop()` restarts `greptimedb-schema`, which posts the real pipeline again (Task 2).
 A table recreated by `reset_devloop()` and then dropped and recreated in append mode keeps every re-read row, as the spike's append control kept all 9 of 3 distinct rows (`logs/s2/spike-dedup.md:90-95`).
 `journalctl --rotate` archives the active files and `--vacuum-time=1s` removes archived files whose entries are older than a second, so the wait in `start_sources` for exactly the fixture's count of matching lines confirms that no earlier leg's line survived `[INFERENCE]`, which Step 23's log confirms.
+In the nspawn container the new `system.journal` is `root:root`, because the boot's `systemd-tmpfiles` cannot set the journal directory's setgid bit (`fchmod() of /var/log/journal/<machine-id> failed: Operation not permitted`), so without the `chgrp` the collector's journalctl and the reconcile, both reading through `systemd-journal`, open no journal file (`logs/s2-evidence/4.6-devloop-ingest-diag-*.log`); magnetite's journal directories carry the setgid bit (`drwxr-sr-x root:systemd-journal`, and `system.journal` is `root:systemd-journal`, read 2026-10-22), so this is the container's alone.
 Each leg's `reset_devloop()` drops the collector's cursors, so every receiver reads nixbot, the journal and the deploy record from the beginning, and every leg compares the same nixbot rows of the day.
 The container's new assertion is enforced when the container's own system builds, not in the `extendModules` evaluations from which Task 3 reads only a mutant's `ExecStart`, so the mutants do not trip it.
 The case's Python contains no `''` and no `${` other than `${currentSystemLink}`, so the Nix indented string carries it unchanged.
@@ -1113,8 +1123,10 @@ Then, directly after the closing `};` of `flake.lib.devloopCollection = { … };
     in
     pkgs.writeShellApplication {
       name = "devloop-reconcile";
+      # diffutils for C3's cmp: a unit's PATH has no cmp.
       runtimeInputs = [
         pkgs.coreutils
+        pkgs.diffutils
         pkgs.jq
       ];
       text = ''
@@ -1382,7 +1394,7 @@ Then, in `flake.modules.nixos.devloop-collection`, directly after the closing `}
 ```
 
 The unit's user is the dynamic user `devloop-reconcile`, the name of Task 3's PostgreSQL role, so the default `local all all peer` rule admits it (`logs/s2/grounding.md:20-31`); `RestrictAddressFamilies` keeps `AF_UNIX` for PostgreSQL's socket and `AF_INET` for the store.
-`curl` reaches the script through `greptimedbSql`'s own `runtimeInputs` (`modules/lib/greptimedb-envelope.nix:53-57`), so the reconcile's `runtimeInputs` are `coreutils` and `jq`, and `psql` and `journalctl` are absolute paths.
+`curl` reaches the script through `greptimedbSql`'s own `runtimeInputs` (`modules/lib/greptimedb-envelope.nix:53-57`), so the reconcile's `runtimeInputs` are `coreutils`, `diffutils` (C3's `cmp`, absent from a NixOS unit's `PATH`; without it every C3 run failed with equal counts, `logs/s2-evidence/4.6-devloop-ingest-20261022T014655Z.log`) and `jq`, and `psql` and `journalctl` are absolute paths.
 Window strings are compared by GreptimeDB as timestamps (`"finished_at" >= '2026-10-20T00:00:00Z'`) and the database-qualified name `"devloop"."ci_attribute"` resolves without `?db=` `[INFERENCE]`; Step 23's passing legs confirm both, because a predicate that matched no row would fail C1 against nixbot's rows.
 A column grant lost to a later nixbot migration is not repaired, because `devloop-pg-grants` applies the grants once per boot or activation (design D10 as amended by plan review F6); the reconcile is its detector, because its nixbot read then fails and the run exits 2 naming nixbot's keys, and a lost collector grant leaves keys missing, which C1 or C2 reports.
 C7's wait, the 120 s retry, was rehearsed during planning with a stub `sleep`: with the last line naming the current system and the store's latest row older, the run printed 12 `waiting` lines and then `FAIL the latest stored closure is … after waiting 120 s …`; with the row appearing after the first wait it printed one `waiting` line and passed; with the last line naming another closure it failed at once with no wait.

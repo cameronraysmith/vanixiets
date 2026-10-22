@@ -330,6 +330,7 @@ in
       # so greptimedb.nix never references the notifier.
       services.observability-notify.units = [
         "devloop-pg-grants"
+        "devloop-reconcile"
         "fleet-alert"
         "greptimedb"
         "greptimedb-envelope"
@@ -652,6 +653,7 @@ in
             perses-password = [ ];
             # Sorted, because `actual` is naturalSorted.
             regulator-password = [
+              "devloop-reconcile"
               "fleet-alert"
               "greptimedb-envelope"
             ];
@@ -718,6 +720,7 @@ in
               );
             order = {
               nix-eval-jobs = evaluatorAdj;
+              devloop-reconcile = unitAdj "devloop-reconcile";
               greptimedb = unitAdj "greptimedb";
               opentelemetry-collector = unitAdj "opentelemetry-collector";
               fleet-alert = unitAdj "fleet-alert";
@@ -734,18 +737,21 @@ in
                 builtins.toJSON (store.MemorySwapMax or null)
               }.";
             }
-            # R7.1 (A7:100,127) and S3 design D12: under host OOM the kernel
-            # kills the evaluator, then the store, then the collector, so the
-            # collector outlives the store and queues; the alert evaluator,
-            # which reports OOM kills, is taken after all three.
+            # R7.1 (A7:100,127), S3 design D12 and S2 design D11: under host
+            # OOM the kernel kills the evaluator, then the dev-loop reconcile
+            # (which fails visibly and runs again the next day), then the
+            # store, then the collector, so the collector outlives the store
+            # and queues; the alert evaluator, which reports OOM kills, is
+            # taken after all four.
             {
               assertion =
                 config.services.nixEvalLock.enable
                 && evaluatorAdj != null
-                && evaluatorAdj > order.greptimedb
+                && evaluatorAdj > order.devloop-reconcile
+                && order.devloop-reconcile > order.greptimedb
                 && order.greptimedb > order.opentelemetry-collector
                 && order.opentelemetry-collector > order.fleet-alert;
-              message = "magnetite: R7.1 and S3 design D12 require the evaluation lock and oom_score_adj nix-eval-jobs > greptimedb > opentelemetry-collector > fleet-alert; the lock is ${
+              message = "magnetite: R7.1, S3 design D12 and S2 design D11 require the evaluation lock and oom_score_adj nix-eval-jobs > devloop-reconcile > greptimedb > opentelemetry-collector > fleet-alert; the lock is ${
                 if config.services.nixEvalLock.enable then "enabled" else "disabled"
               } and the values are ${builtins.toJSON order}.";
             }
@@ -780,6 +786,12 @@ in
             }";
           };
       };
+
+      # devloop-reconcile's store credential, the third regulator-password
+      # holder (S2 design D11); devloop-collection.nix stays free of clan vars.
+      systemd.services.devloop-reconcile.serviceConfig.LoadCredential = [
+        "regulator-password:${config.clan.core.vars.generators.greptimedb-users.files.regulator-password.path}"
+      ];
 
       # Fleet alert evaluator (ADR-009; design D3, D12): queries `fleet` as
       # the regulator account and posts to fleet-alerts with the shared

@@ -32,13 +32,15 @@
       fleetBytesPerMinute = 256000;
 
       # The failure path's policy (design "Failure path"): every store unit,
-      # every disk-share oneshot and the collector notify, so a new unit of
-      # these kinds fails the check until it is listed.
+      # every disk-share oneshot, every dev-loop unit (S2 design D11) and the
+      # collector notify, so a new unit of these kinds fails the check until
+      # it is listed.
       notifiedByPolicy =
         name:
         lib.hasPrefix "greptimedb" name
         || lib.hasPrefix "zfs-set-" name
         || lib.hasPrefix "zfs-assert-" name
+        || lib.hasPrefix "devloop-" name
         || name == "opentelemetry-collector";
 
       # ADR-004 Q12: at most 40 units may match the allow-list on one host.
@@ -364,7 +366,7 @@
           ))
 
           # Failure wiring (telemetry-store-interface "Failure notices are posted to one topic").
-          (check "R3.1: a greptimedb*, zfs-set-*, zfs-assert-* or collector unit is not notified" (
+          (check "R3.1: a greptimedb*, zfs-set-*, zfs-assert-*, devloop-* or collector unit is not notified" (
             lib.all (name: builtins.elem name i.notifyUnits) (builtins.filter notifiedByPolicy hostUnits)
           ))
           # The wiring defines a unit for every listed name, so a misspelt
@@ -563,6 +565,8 @@
               };
             };
           };
+        # S2 design D11: the dev-loop reconcile drops out of the notified units.
+        reconcileNotNotified = i: i // { notifyUnits = lib.remove "devloop-reconcile" i.notifyUnits; };
         schemaOrderDropped =
           i:
           i

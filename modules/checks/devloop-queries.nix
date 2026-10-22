@@ -38,8 +38,12 @@
 # `pg_dump --schema-only` of the three tables is $out/schema.sql, compared
 # at plan time with magnetite's dump.
 #
-# Task 4 extends `clockVars`, `fixtureFiles`, `roleQueries`, `assertions`
-# and `mutants` with the reconcile's queries run as devloop-reconcile.
+# Task 4 (design D11): the reconcile's queries, reconcileQueries, run as
+# devloop-reconcile over the fixed window of reconcile-fixtures.sql; the
+# clauses relate their rows to that file's rows and verdicts, and the
+# mutants reconcileGrantWithoutFinishedAt (the role's grant without
+# build_attributes.finished_at) and currentFinishIgnoresDuplicates (a
+# currentFinish explaining every key nixbot still has) must fail the run.
 {
   self,
   inputs,
@@ -60,6 +64,8 @@
       clockVars = {
         cursor_old = "t0 - interval '10 minutes'";
         cursor_recent = "t0 - interval '1 minute'";
+        window_start = "timestamptz '2026-10-20 00:00:00+00'";
+        window_end = "timestamptz '2026-10-21 00:00:00+00'";
       };
       clockSql = pkgs.writeText "devloop-queries-clock.sql" (
         lib.concatStringsSep "\nUNION ALL\n" (
@@ -72,7 +78,54 @@
       );
 
       # Loaded as postgres after the grants, in order.
-      fixtureFiles = [ ./devloop-queries/fixtures.sql ];
+      fixtureFiles = [
+        ./devloop-queries/fixtures.sql
+        ./devloop-queries/reconcile-fixtures.sql
+      ];
+
+      # Stored keys that nixbot's window lacks, as devloop-reconcile passes
+      # them to currentFinish: restarted and finished later (explained),
+      # restarted and unfinished (explained), equal to nixbot's (a duplicate,
+      # unexplained), unknown to nixbot (unexplained), a build equal to
+      # nixbot's (unexplained), an unknown build (unexplained), and a key
+      # outside the window (ignored).
+      reconcileKeys = [
+        {
+          build_id = 9102;
+          attr = "checks.x86_64-linux.restarted";
+          finished_at_us = 1792497600000000;
+        }
+        {
+          build_id = 9102;
+          attr = "checks.x86_64-linux.running";
+          finished_at_us = 1792497600000000;
+        }
+        {
+          build_id = 9101;
+          attr = "checks.x86_64-linux.a";
+          finished_at_us = 1792490400123456;
+        }
+        {
+          build_id = 9101;
+          attr = "checks.x86_64-linux.gone";
+          finished_at_us = 1792501200000000;
+        }
+        {
+          build_id = 9102;
+          attr = null;
+          finished_at_us = 1792494000000000;
+        }
+        {
+          build_id = 9105;
+          attr = null;
+          finished_at_us = 1792494000000000;
+        }
+        {
+          build_id = 9101;
+          attr = "checks.x86_64-linux.a";
+          finished_at_us = 1792627200000000;
+        }
+      ];
 
       # Each entry is one prepared statement run as one role, once per
       # execution; its result is $work/$db/<name>.<execution>.tsv.
@@ -105,6 +158,60 @@
           types = [ ];
           sql = "SELECT DISTINCT error FROM build_attributes WHERE error IS NOT NULL ORDER BY 1";
           executions.all = [ ];
+        }
+        {
+          name = "reconcile_attributes";
+          role = "devloop-reconcile";
+          types = [
+            "timestamptz"
+            "timestamptz"
+          ];
+          sql = (queries.reconcile or dc.reconcileQueries).attributes;
+          executions.window = [
+            ":'window_start'"
+            ":'window_end'"
+          ];
+        }
+        {
+          name = "reconcile_builds";
+          role = "devloop-reconcile";
+          types = [
+            "timestamptz"
+            "timestamptz"
+          ];
+          sql = (queries.reconcile or dc.reconcileQueries).builds;
+          executions.window = [
+            ":'window_start'"
+            ":'window_end'"
+          ];
+        }
+        {
+          name = "reconcile_batch_builds";
+          role = "devloop-reconcile";
+          types = [
+            "timestamptz"
+            "timestamptz"
+          ];
+          sql = (queries.reconcile or dc.reconcileQueries).batchBuilds;
+          executions.window = [
+            ":'window_start'"
+            ":'window_end'"
+          ];
+        }
+        {
+          name = "reconcile_current_finish";
+          role = "devloop-reconcile";
+          types = [
+            "timestamptz"
+            "timestamptz"
+            "jsonb"
+          ];
+          sql = (queries.reconcile or dc.reconcileQueries).currentFinish;
+          executions.window = [
+            ":'window_start'"
+            ":'window_end'"
+            "'${builtins.toJSON reconcileKeys}'"
+          ];
         }
       ];
 
@@ -178,6 +285,53 @@
               ! value ci_build recent build_id 103 build_id >/dev/null
           '';
         }
+        {
+          label = "reconcile: attributes returns nixbot's (build_id, attr, finished_at) in the window, the start included, as devloop-reconcile";
+          script = ''
+            [ "$(tail -n +2 "$(result reconcile_attributes window)" | LC_ALL=C sort)" = ${
+              lib.escapeShellArg (
+                lib.concatStringsSep "\n" [
+                  "9101\tchecks.x86_64-linux.a\t1792490400123456"
+                  "9101\tchecks.x86_64-linux.cached\t1792490400123456"
+                  "9106\tchecks.x86_64-linux.midnight\t1792454400000000"
+                ]
+              )
+            } ]
+          '';
+        }
+        {
+          label = "reconcile: builds returns nixbot's (id, finished_at) in the window, the start included and the end excluded, as devloop-reconcile";
+          script = ''
+            [ "$(tail -n +2 "$(result reconcile_builds window)" | LC_ALL=C sort)" = ${
+              lib.escapeShellArg (
+                lib.concatStringsSep "\n" [
+                  "9101\t1792490400123456"
+                  "9102\t1792494000000000"
+                  "9106\t1792454400000000"
+                ]
+              )
+            } ]
+          '';
+        }
+        {
+          label = "reconcile: batchBuilds counts the one gitea-mq/batch/ build finished in the window as devloop-reconcile";
+          script = ''[ "$(tail -n +2 "$(result reconcile_batch_builds window)")" = 1 ]'';
+        }
+        {
+          label = "reconcile: currentFinish returns exactly the stored keys nixbot does not explain, as devloop-reconcile";
+          script = ''
+            [ "$(tail -n +2 "$(result reconcile_current_finish window)" | LC_ALL=C sort)" = ${
+              lib.escapeShellArg (
+                lib.concatStringsSep "\n" [
+                  "9101\tchecks.x86_64-linux.a\t1792490400123456\t1792490400123456"
+                  "9101\tchecks.x86_64-linux.gone\t1792501200000000\tabsent"
+                  "9102\t\t1792494000000000\t1792494000000000"
+                  "9105\t\t1792494000000000\tabsent"
+                ]
+              )
+            } ]
+          '';
+        }
       ];
 
       replaceOnce =
@@ -207,6 +361,28 @@
           grantSql =
             replaceOnce "grantWithoutError" ''"cached", "error", "drv_path"'' ''"cached", "drv_path"''
               dc.grantSql;
+        };
+        # The reconcile's grant without build_attributes.finished_at: its
+        # attribute query must then be refused (design D10).
+        reconcileGrantWithoutFinishedAt = real // {
+          grantSql =
+            replaceOnce "reconcileGrantWithoutFinishedAt"
+              ''GRANT SELECT ("build_id", "attr", "finished_at") ON "build_attributes" TO "devloop-reconcile";''
+              ''GRANT SELECT ("build_id", "attr") ON "build_attributes" TO "devloop-reconcile";''
+              dc.grantSql;
+        };
+        # A currentFinish that explains every key nixbot still has, so a
+        # duplicated stored row would pass C1 (design D11).
+        currentFinishIgnoresDuplicates = real // {
+          queries = dc.queries // {
+            reconcile = dc.reconcileQueries // {
+              currentFinish =
+                replaceOnce "currentFinishIgnoresDuplicates"
+                  "WHERE NOT c.present OR (c.current_us IS NOT NULL AND c.current_us <= c.finished_at_us)"
+                  "WHERE NOT c.present"
+                  dc.reconcileQueries.currentFinish;
+            };
+          };
         };
         errorUnderAlias = real // {
           queries = dc.queries // {
