@@ -1,6 +1,6 @@
 # otel-collector clan service
 
-This clan service collects fleet metrics into the GreptimeDB telemetry store, and its `agent` role imports the failure notifier that posts unit failures to ntfy.
+This clan service collects fleet metrics into the GreptimeDB telemetry store and carries the dev-loop record's logs into `devloop`, and its `agent` role imports the failure notifier that posts unit failures to ntfy.
 It has two roles, `agent` and `ingress`, and in slice S1 both are assigned to magnetite in `modules/clan/inventory/services/otel-collector.nix`.
 The roles import the plain NixOS modules `flake.modules.nixos.otel-collector-agent` and `flake.modules.nixos.otel-collector-ingress`, so the container test imports them without clan.
 Only the clan `ingress` role reads a clan var: the `collector-password` credential.
@@ -38,7 +38,53 @@ The `metrics/host` pipeline also runs `transform/omnigent-alias`; the `metrics/p
 The ingress converts exponential histograms to explicit buckets while the store is below 1.3.0, then the `routing` connector sends each resource to `metrics/<database>` by its `vanixiets.database` attribute.
 Each per-database pipeline deletes `vanixiets.database` and writes through its own `otlp_http/<database>` exporter.
 Each exporter sends `x-greptime-db-name: <database>` and `x-greptime-otlp-metric-promote-resource-attrs` built from `promotedResourceAttributes`, so the store turns those resource attributes into labels.
-In S1 only `fleet` receives data; the `devloop` and `agent` routes exist so S2 and S7 add producers without restructuring the ingress.
+Only `fleet` receives metrics; the `devloop` and `agent` metrics routes exist so later slices add metric producers without restructuring the ingress, and `devloop`'s rows arrive on the logs path below.
+
+## Logs path
+
+S2 adds a logs path that copies the dev-loop record into `devloop`, one table per source.
+`modules/nixos/devloop-collection.nix` (`flake.modules.nixos.devloop-collection`, imported by magnetite) defines four receivers, each with `storage: file_storage`, so its position survives a restart:
+
+- `sqlquery/ci_attribute` and `sqlquery/ci_build` read nixbot's PostgreSQL database every 60 s over the local socket as the peer-authenticated role `opentelemetry-collector`, with a cursor on `finished_at` that re-reads a five-minute overlap in pages of 10,000 rows.
+- `journald/gitea-mq` reads the five `msg="batch …"` lines of `gitea-mq.service` and keeps only the `batch_event` keys.
+  Its `journalctl_path` is a wrapper that runs `journalctl --boot=all`, because the receiver always runs `journalctl --follow` with no boot option, and systemd 261 then reads only the current boot.
+- `file_log/deploy-record` reads `/var/log/deploy-record.jsonl` with `json_parser`.
+
+```mermaid
+flowchart LR
+  subgraph sources
+    sa[sqlquery/ci_attribute] --> pa[logs/devloop-ci_attribute]
+    sb[sqlquery/ci_build] --> pb[logs/devloop-ci_build]
+    jg[journald/gitea-mq] --> pg[logs/devloop-batch_event]
+    fd[file_log/deploy-record] --> pd[logs/devloop-deploy_record]
+  end
+  pa --> fwd((forward))
+  pb --> fwd
+  pg --> fwd
+  pd --> fwd
+  subgraph ingress
+    fwd --> li[logs/ingress<br/>memory_limiter] --> rl((routing/logs))
+    rl --> oa[logs/devloop-ci_attribute-out] --> ea[otlp_http/devloop_ci_attribute]
+    rl --> ob[logs/devloop-ci_build-out] --> eb[otlp_http/devloop_ci_build]
+    rl --> og[logs/devloop-batch_event-out] --> eg[otlp_http/devloop_batch_event]
+    rl --> od[logs/devloop-deploy_record-out] --> ed[otlp_http/devloop_deploy_record]
+  end
+  ea --> store[(127.0.0.1:4000/v1/otlp)]
+  eb --> store
+  eg --> store
+  ed --> store
+```
+
+Each receiver feeds its own pipeline `logs/devloop-<table>`, which runs `memory_limiter` and `resource/devloop-<table>`, setting `vanixiets.database = devloop`, `vanixiets.table = <table>` and `host.name`, and exports to the `forward` connector.
+In the ingress, `logs/ingress` runs `forward`, `memory_limiter` and then `routing/logs`, a second instance of the routing connector with one route per table matching both attributes.
+A second instance is needed because one routing instance resolves every route's pipelines as pipelines of the signal it routes (`open-telemetry/opentelemetry-collector-contrib@aaf5045a2:connector/routingconnector/router.go:161-190`).
+Each route ends in `logs/devloop-<table>-out`, which runs `resource/strip-database`, deleting `vanixiets.database` and `vanixiets.table`, into its own exporter: `otlp_http/devloop_ci_attribute`, `otlp_http/devloop_ci_build`, `otlp_http/devloop_batch_event` or `otlp_http/devloop_deploy_record`.
+Each exporter posts to `http://127.0.0.1:4000/v1/otlp` as `collector` with `x-greptime-db-name: devloop`, `x-greptime-log-table-name: <table>`, `x-greptime-pipeline-name: devloop_<table>` and `x-greptime-hints: auto_create_table=false`, because one exporter carries one table header and one pipeline header.
+The store's pipeline `devloop_<table>` keeps exactly the allow-listed fields, and `greptimedb-schema` creates the tables beforehand with `append_mode = 'false'`, so a re-read row replaces the stored one.
+With `auto_create_table=false`, a write that races the schema job is rejected instead of creating an append-mode table that would keep every duplicate.
+A record the pipeline cannot convert fails the whole request with HTTP 400, which the exporter drops as permanent; for `sqlquery` the cursor has already moved past it, so up to 10,000 rows are lost until a cursor reset, and `devloop-reconcile`'s `C1`, `C3` and `C6` are the detectors (runbook, "Replaying a gap").
+No `skip_error` is set, because per-row loss would then be silent.
+No `logs/*` pipeline takes the local `otlp` receiver.
 
 ## The schema is the single source
 
@@ -54,6 +100,9 @@ Nothing imports `schema.nix` by path; import-tree loads it as a flake-parts modu
 - `promotedResourceAttributes`: the resource attributes the store promotes to labels.
 - `nodeExporterKeep`: the node_exporter series the `node` scrape keeps; every other series is dropped.
 - `process.minBytes`: the floor below which an executable's summed `process.memory.usage` is dropped.
+- `devloop.tables`: the `devloop` allow-list, table name to `{ columns, primaryKey, timeIndex }`, each column `{ name; type; nullable; }` with `type` one of `int64`, `string`, `boolean` and `timestamp`.
+  From it `modules/nixos/devloop-collection.nix` renders the store's `CREATE TABLE` statements and ingest pipelines, the nixbot queries' column aliases and order, and the gitea-mq and deploy-record keep-lists.
+  A column added to an existing table is created by the pipeline's first write of it; a changed type needs an explicit migration.
 
 To add a database, add `<name> = "<ttl>";` to `databases`, add a `queueBytes.<name>` entry in `flake-module.nix`, and have the producing pipeline set `vanixiets.database = "<name>"`.
 The queues must still sum to under 512 MiB.
@@ -80,10 +129,11 @@ The notifier reads no clan var itself; a host passes the path of the `alerter` n
 
 ## Queue
 
-Every exporter uses a persistent `file_storage` sending queue under `/var/lib/opentelemetry-collector/queue`, sized in bytes.
-`fleet` gets 400 MiB and `devloop` and `agent` get 48 MiB each, so the total stays under 512 MiB and `fleet` holds at least 24 hours at the assumed rate.
+Every exporter uses a persistent `file_storage` sending queue under `/var/lib/opentelemetry-collector/queue`, sized in bytes; the logs receivers keep their positions in the same directory, as `receiver_<type>_<name>` files, with `file_log` spelled `filelog`, beside the exporters' `exporter_otlp_http_<name>_<signal>` files.
+`fleet` gets 400 MiB, `agent` 48 MiB, `devloop` (metrics) 4 MiB, `devloop_ci_attribute` 32 MiB, and `devloop_ci_build`, `devloop_batch_event` and `devloop_deploy_record` 4 MiB each, 496 MiB in all, so the total stays under 512 MiB and `fleet` holds at least 24 hours at the assumed rate.
 The assumed rate, `fleetBytesPerMinute` in `modules/checks/otel-collector-config.nix`, is an unmeasured estimate.
 Retries never stop (`max_elapsed_time = "0s"`), because a persistent queue drops an item whose retries run out.
+`devloop_ci_attribute` holds about a day of store outage on the busiest day, about 64,800 attribute rows at roughly 0.5 KiB each; a fuller queue loses rows from the store's copy only, which `devloop-reconcile` reports and a receiver replay restores (runbook, "Replaying a gap").
 
 ## Ordering after the schema job
 
@@ -132,6 +182,10 @@ With `tokenFile` unset the notifier posts anonymously, which ntfy refuses on `fl
 - The process scraper must keep `process.pid`, `process.parent_pid`, `process.command`, `process.command_line`, `process.executable.path` and `process.owner` disabled at source; an agent assertion enforces this.
 - The exponential-histogram conversion stays while the store is below 1.3.0; R1.2 fails if it is removed earlier.
 - A host's ZFS and store notices depend on its importing `observability-notify`, through the `agent` role or directly; the module's key `vanixiets#observability-notify` makes a host doing both load it once.
+- `sqlquery` stores each query's position under a key that contains the query's text (`open-telemetry/opentelemetry-collector-contrib@aaf5045a2:receiver/sqlqueryreceiver/logs_receiver.go:123`, `:276`), so any later change to an export query, such as a column a later slice adds to the allow-list, starts again from `tracking_start_value` and re-sends nixbot's retained history once, about 200,000 attribute rows; the store keeps one row per key, but that day exceeds ADR-004's 100,000 rows.
+- `sqlquery` and `journald` advance their position before delivery (`logs_receiver.go:337-346`; `pkg/stanza/operator/input/journald/input.go:186-189`), so a `memory_limiter` refusal loses journal lines, and nixbot rows older than the five-minute overlap, until a replay; `journald/gitea-mq` sets `retry_on_failure` with no time limit to narrow that loss.
+- `journald/gitea-mq` depends on its `journalctl --boot=all` wrapper: without it, systemd 261's `journalctl --follow` reads only the current boot, so a replay or first start copies only the lines since the last reboot, and `C3` fails.
+- The `sqlquery` logs signal is at Development stability and `journald` at Alpha in 0.155.0, so a collector bump runs `vmTests.x86_64-linux.devloop-ingest` before merge.
 
 ## Coverage
 
@@ -142,27 +196,32 @@ Module assertions run whenever a host imports the modules:
 - `modules/nixos/greptimedb.nix`: listeners on loopback, unused protocols off, a static user provider, usage reporting off, `MemoryHigh` in whole gibibytes.
 - `modules/nixos/observability-notify.nix`: with `tokenFile` set, every notified unit's resolve hooks run under `env NTFY_TOKEN_FILE=<tokenFile>`.
 - magnetite: R8.2, only the allowed units load each `greptimedb-users` file.
+- `modules/nixos/devloop-collection.nix`: the collector's `SupplementaryGroups` contains `systemd-journal`, so `journald/gitea-mq` can read the journal.
 
 `checks.x86_64-linux.otel-collector-config` (`modules/checks/otel-collector-config.nix`) judges R3.1 and R1.2 over magnetite's evaluated configuration, each clause with a mutant that must fail.
-R3.1 covers loopback endpoints, the 64 MiB floor stage, the 40-unit cap, owner aliases, metrics-only pipelines, queue storage and sizes, `memory_limiter` under `MemoryMax`, the override scope, the notifier wiring against the failure-path policy, and the order after the schema job.
+R3.1 covers loopback endpoints, the 64 MiB floor stage, the 40-unit cap, owner aliases, the signals pipelines may carry, with logs pipelines writing only into `devloop` (mutants `logsToFleet` and `logsToMetricsExporter`), queue storage and sizes over every exporter including the four logs exporters (mutant `logsQueueNotPersistent`), no `logs/*` pipeline taking the local OTLP receiver (`logsTakeLocalReceiver`, mutant `otlpInLogsPipeline`), `memory_limiter` under `MemoryMax`, the override scope, the notifier wiring against the failure-path policy, which includes `devloop-*` units (mutant `reconcileNotNotified`), and the order after the schema job.
 Its build runs `observability-notify-rehearsal`, which drives the notifier scripts through a crash loop against a recording `ntfy-send`, requires one pair per interval and one `failed.log` line, mode `0644`, per posted `FAILED`, and rejects two mutants of the `failed` script, one without the append and one without the mode.
 
 `checks.x86_64-linux.greptimedb-envelope` (`modules/checks/greptimedb-envelope.nix`) covers the store side: R7.1's memory and kill-order relations, R1.1, R8.2 file ownership, disko against the dataset binding, the PromQL read path, the users-file generator run, the SQL helper and table clause against recorded answers, and R7.2 against recorded cgroup files.
 
 `checks.x86_64-linux.nixos-magnetite` builds the toplevel, which runs nixpkgs' `otelcol-contrib validate` on the rendered collector configuration.
 
-Two runtime tests live in the on-demand `vmTests` lane, outside the pull-request checks:
+Three runtime tests live in the on-demand `vmTests` lane, outside the pull-request checks:
 
 - `vmTests.x86_64-linux.greptimedb-pipeline` (`modules/vm-tests/greptimedb-pipeline.nix`) is a systemd-nspawn container test needing `uid-range`, so it builds on magnetite.
   It covers the dashboard route, schema TTLs, the auth matrix, OTLP through both connectors into `fleet` only, the owner alias, delivery across a store restart, and the envelope's table clause.
+- `vmTests.x86_64-linux.devloop-ingest` (`modules/vm-tests/devloop-ingest.nix`) is a systemd-nspawn container test needing `uid-range`, so it builds on magnetite.
+  It runs PostgreSQL with nixbot's migrations, the store with its schema job, the collector with the logs path, a stub `gitea-mq.service` and `devloop-reconcile`, and covers every `otlp_http/devloop_<table>` exporter's first send, the tables' shape against the allow-list, the rejection of a write to a table the schema job did not create (`auto_create_table=false`), overlap deduplication, the deploy-record line of a switch to an `extendModules` variant of the container's system, each reconcile clause's mutant, the burn rule and the three documented queries on the real store.
 - `vmTests.x86_64-linux.greptimedb-oom-order` (`modules/vm-tests/greptimedb-oom-order.nix`) is a QEMU test needing `kvm`, so it builds only on pyrite.
   It covers the kill order 900, 500, 300.
 
-Run the container test on magnetite from a checkout of the revision under test, or from a workstation with `--max-jobs 0` so it routes to a builder advertising `uid-range`:
+Run a container test on magnetite from a checkout of the revision under test, or from a workstation with `--max-jobs 0` so it routes to a builder advertising `uid-range`:
 
 ```sh
 nix build -L --no-link .#vmTests.x86_64-linux.greptimedb-pipeline
 nix build -L --no-link --max-jobs 0 .#vmTests.x86_64-linux.greptimedb-pipeline
+nix build -L --no-link .#vmTests.x86_64-linux.devloop-ingest
+nix build -L --no-link --max-jobs 0 .#vmTests.x86_64-linux.devloop-ingest
 ```
 
 Run the OOM test from any host with `--max-jobs 0`; it fails with `missing system features` while pyrite is offline:
