@@ -9,7 +9,7 @@ Builds the build service cancelled before they started SHALL NOT count, and a bu
 
 #### Scenario: More than one in ten pull-request builds waited over an hour
 
-- **WHEN** on every pass of the evaluator for one hour the trailing 24 hours hold 20 finished pull-request builds of which 3 had a queue wait over an hour, and then, after a slow build ages out, none of the passes over the next 5 minutes finds the share above one in ten
+- **WHEN** on every pass of the evaluator for one hour the trailing 24 hours hold 20 finished pull-request builds of which 3 had a queue wait over an hour, and then, after two slow builds age out, leaving 1 of 18, none of the passes over the next 5 minutes finds the share above one in ten
 - **THEN** one alert titled `[FIRING] PullRequestQueueWaitBurn` is posted after the hour, none while it keeps holding, and one titled `[RESOLVED] PullRequestQueueWaitBurn` after the 5 minutes, which the build-time alert regulator's timeline leg confirms
 
 #### Scenario: A quiet day with one slow build

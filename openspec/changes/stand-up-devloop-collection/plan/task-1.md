@@ -11,9 +11,9 @@ Task 1 creates no dev-loop file: `modules/nixos/devloop-collection.nix` and the 
 - Modify: `modules/machines/nixos/cinnabar/default.nix:27`, `modules/machines/nixos/electrum/default.nix:27`, `modules/machines/nixos/galena/default.nix:26`, `modules/machines/nixos/magnetite/default.nix:53`, `modules/machines/nixos/pyrite/default.nix:51`, `modules/machines/nixos/scheelite/default.nix:29`, `modules/machines/darwin/argentum/default.nix:36`, `modules/machines/darwin/blackphos/default.nix:32`, `modules/machines/darwin/rosegold/default.nix:36`, `modules/machines/darwin/stibnite/default.nix:32` (each the `base` line of its `with flakeModules` list)
 - Modify: `openspec/changes/stand-up-devloop-collection/tasks.md:13-17` (tick 1.1–1.5), `openspec/changes/stand-up-devloop-collection/proposal.md:6-14` (Linear ledger)
 - Modify, only for accepted plan-review findings (Step 1): `openspec/changes/stand-up-devloop-collection/{design.md,tasks.md,plan.md}` and `specs/`, before the planning pull request
-- Create (git-ignored helpers): `logs/s2-evidence/1.2-normalise.sh`, `logs/s2-evidence/1.2-decision`, `logs/s2-evidence/1.3-script-test.sh`, `logs/s2-evidence/1.4-activation.nix`, `logs/s2-evidence/1.5-obligation-control.nix`
-- Create (git-ignored evidence): `logs/s2-evidence/1.1-plan-review-<ts>.md`, `logs/s2-evidence/1.2-schema-{scratch,magnetite}.sql`, `logs/s2-evidence/1.2-schema-{scratch,magnetite}.norm.sql`, and the `logs/s2-evidence/1.<n>-*.log` files named per step
-- Temporary: `/tmp/s2-pg` (scratch PostgreSQL cluster, removed in Step 2), `/tmp/s2-deploy-record.*` (removed by the script test)
+- Create (git-ignored helpers): `logs/s2-evidence/1.2-normalise.sh`, `logs/s2-evidence/1.3-script-test.sh`, `logs/s2-evidence/1.4-activation.nix`, `logs/s2-evidence/1.5-obligation-control.nix`
+- Create (git-ignored evidence): `logs/s2-evidence/1.1-plan-review-<ts>.md`, `logs/s2-evidence/1.2-schema-magnetite.sql`, `logs/s2-evidence/1.2-schema-magnetite.norm.sql`, and the `logs/s2-evidence/1.<n>-*.log` files named per step
+- Temporary: `/tmp/s2-deploy-record.*` (removed by the script test)
 
 **Interfaces:**
 - Consumes: nothing from earlier tasks.
@@ -30,7 +30,7 @@ Task 1 creates no dev-loop file: `modules/nixos/devloop-collection.nix` and the 
   - Both declare the read-only option `vanixiets.deployRecord.script` (`types.str`, no default) and define it once as `deployRecordScript { inherit pkgs; inherit (config.networking) hostName; }`.
   - `flake.lib.deployRecordObligations = { failures = name: hostConfig: [ <message> … ]; }`, empty exactly when the activation script the platform assembles (`hostConfig.system.activationScripts.script` on NixOS, the string nixpkgs' `apply` adds to the option at `activation-script.nix:168-173`; `hostConfig.system.activationScripts.script.text` on darwin, defined at `activation-scripts.nix:83-152`; the platform chosen by `self.lib.machineSystems.${name}`) contains `hostConfig.vanixiets.deployRecord.script`, so it fails when the entry is dropped, emptied or replaced by any means; the messages are `<name> does not import deploy-record, so vanixiets.deployRecord.script is undefined` and `<name>'s <option path> does not run <script>`.
   - `modules/checks/machines.nix`'s `withFleetObligations` asserting both sets, with the message `Fleet obligations unmet on <name>: omnigentFleetObligations [<cases>]; deployRecordObligations [<messages>]`.
-  - `logs/s2-evidence/1.2-normalise.sh` (stdin to stdout), the normalised dumps `logs/s2-evidence/1.2-schema-{scratch,magnetite}.norm.sql`, and `logs/s2-evidence/1.2-decision` holding exactly `lexical` or `migrator`, which Task 2's `devloop-queries` steps read.
+  - `logs/s2-evidence/1.2-normalise.sh` (stdin to stdout), and magnetite's normalised dump `logs/s2-evidence/1.2-schema-magnetite.norm.sql`, which Task 2's schema-diff step reads.
 
 - [ ] **Step 1: Review the plan before any implementation commit (tasks.md 1.1)**
 
@@ -98,9 +98,7 @@ The planning pull request (this change directory, `plan.md` included, and the ch
 
 - [ ] **Step 2: Take the schema baseline for `devloop-queries` (tasks.md 1.2)**
 
-The scratch cluster runs on stibnite with nixpkgs' native `postgresql_16`, not magnetite's `x86_64-linux` package, which cannot execute on `aarch64-darwin`.
-The expression below asserts that the local package has magnetite's version and the very same source tree (`src.outPath`), so the server catalogue and `pg_dump`'s formatting are those of 16.15 as magnetite runs it, and only the target platform differs; the migrations declare no collation, tablespace or extension, and `initdb --no-locale` keeps the cluster's locale out of the comparison, so nothing platform-dependent reaches the three tables' DDL.
-If either assertion fails, stop: the fallback is the same procedure on magnetite as the operator's user under `/tmp`, with `/run/current-system/sw/bin`'s PostgreSQL, a socket under `/tmp/s2-pg` and no TCP listener, which leaves the production cluster untouched; record that choice in the log.
+Only magnetite's own schema is taken here, read-only; Task 2's schema-diff step compares it with the schema `devloop-queries` builds by applying the input's migrations lexically, and falls back to nixbot's migrator only on a non-empty diff (plan review F17).
 
 Create `logs/s2-evidence/1.2-normalise.sh` (git-ignored) with exactly:
 
@@ -121,42 +119,6 @@ chmod +x logs/s2-evidence/1.2-normalise.sh && bash -n logs/s2-evidence/1.2-norma
 
 Expected: `syntax-ok`.
 
-Build the local package, start the scratch cluster and apply the input's migrations in lexical order:
-
-```bash
-ev=logs/s2-evidence; ts=$(date -u +%Y%m%dT%H%M%SZ)
-{
-  pg=$(nix build --no-link --print-out-paths --impure --expr '
-    let
-      f = builtins.getFlake (toString ./.);
-      served = f.nixosConfigurations.magnetite.config.services.postgresql.package;
-      local = f.inputs.nixpkgs.legacyPackages.${builtins.currentSystem}."postgresql_${f.inputs.nixpkgs.lib.versions.major served.version}";
-    in
-    assert local.version == served.version;
-    assert local.src.outPath == served.src.outPath;
-    local.out')
-  echo "package: $pg"
-  "$pg/bin/pg_dump" --version
-  mig=$(nix eval --raw --impure --expr '(builtins.getFlake (toString ./.)).inputs.nixbot.outPath')/nixbot/nixbot/migrations
-  echo "migrations: $mig ($(ls "$mig"/*.sql | wc -l | tr -d ' ') files)"
-  rm -rf /tmp/s2-pg && mkdir -p /tmp/s2-pg
-  "$pg/bin/initdb" -D /tmp/s2-pg/data -U postgres --auth=trust --no-locale --encoding=UTF8 >/tmp/s2-pg/initdb.log
-  "$pg/bin/pg_ctl" -D /tmp/s2-pg/data -l /tmp/s2-pg/server.log -o "-k /tmp/s2-pg -c listen_addresses= -p 54329" -w start
-  "$pg/bin/createdb" -h /tmp/s2-pg -p 54329 -U postgres nixbot
-  for f in $(LC_ALL=C ls "$mig"/*.sql); do
-    "$pg/bin/psql" -X -q -h /tmp/s2-pg -p 54329 -U postgres -d nixbot -v ON_ERROR_STOP=1 --single-transaction -f "$f" || { echo "FAILED: $(basename "$f")"; exit 1; }
-    echo "applied: $(basename "$f")"
-  done
-  "$pg/bin/pg_dump" --schema-only -h /tmp/s2-pg -p 54329 -U postgres -d nixbot -t builds -t build_attributes -t projects > "$ev/1.2-schema-scratch.sql"
-  "$pg/bin/pg_ctl" -D /tmp/s2-pg/data -m fast -w stop
-  rm -rf /tmp/s2-pg
-  wc -l "$ev/1.2-schema-scratch.sql"
-} 2>&1 | tee "$ev/1.2-schema-scratch-$ts.log"
-```
-
-Expected: `package: /nix/store/1fxwm7jmfxcab71iy41a9cj1wf7xa6mr-postgresql-16.15`, `pg_dump (PostgreSQL) 16.15`, `(37 files)`, 37 `applied:` lines from `0001_initial.sql` to `0037_effect_when_changed.sql`, no `FAILED:` line, `server stopped`, and a non-empty `1.2-schema-scratch.sql`.
-If a migration fails under `--single-transaction`, the `FAILED:` line names it; record it, select `migrator` below and continue with the magnetite dump.
-
 Take magnetite's dump read-only, as `postgres`, with its schema version recorded:
 
 ```bash
@@ -169,28 +131,22 @@ ev=logs/s2-evidence; ts=$(date -u +%Y%m%dT%H%M%SZ)
 ```
 
 Expected: `pg_dump (PostgreSQL) 16.15`, `37|37`, and a non-empty `1.2-schema-magnetite.sql`; `psql` is on magnetite's path (`logs/s2/grounding.md:14`), and `pg_dump` ships in the same package.
+Only standard output reaches the dump file; `psql` and `pg_dump` on magnetite print a collation-version warning (created 2.42, OS 2.44) on standard error, which the log keeps and the dump does not.
 
-Normalise both identically, diff, and record the decision:
+Normalise the dump:
 
 ```bash
 ev=logs/s2-evidence; ts=$(date -u +%Y%m%dT%H%M%SZ)
 {
-  for side in scratch magnetite; do
-    logs/s2-evidence/1.2-normalise.sh < "$ev/1.2-schema-$side.sql" > "$ev/1.2-schema-$side.norm.sql"
-  done
-  shasum -a 256 "$ev"/1.2-schema-scratch.sql "$ev"/1.2-schema-magnetite.sql "$ev"/1.2-schema-scratch.norm.sql "$ev"/1.2-schema-magnetite.norm.sql
-  grep -c '^\\restrict ' "$ev/1.2-schema-scratch.sql" "$ev/1.2-schema-magnetite.sql" || true
-  if diff -u "$ev/1.2-schema-scratch.norm.sql" "$ev/1.2-schema-magnetite.norm.sql"; then
-    echo lexical > "$ev/1.2-decision"
-  else
-    echo migrator > "$ev/1.2-decision"
-  fi
-  echo "decision: $(cat "$ev/1.2-decision")"
-} 2>&1 | tee "$ev/1.2-schema-diff-$ts.log"
+  logs/s2-evidence/1.2-normalise.sh < "$ev/1.2-schema-magnetite.sql" > "$ev/1.2-schema-magnetite.norm.sql"
+  shasum -a 256 "$ev/1.2-schema-magnetite.sql" "$ev/1.2-schema-magnetite.norm.sql"
+  grep -c '^\\restrict ' "$ev/1.2-schema-magnetite.sql" || true
+  grep -c '^CREATE TABLE' "$ev/1.2-schema-magnetite.norm.sql"
+} 2>&1 | tee "$ev/1.2-schema-normalise-$ts.log"
 ```
 
-Expected: four sha256 lines, the two `\restrict` counts (1 each when pg_dump emits the line, which the normaliser removes), no diff output, and `decision: lexical`; tasks.md 1.2's verify is this log (command; magnetite read-only).
-If the diff is not empty, read each differing line; a difference that is an artefact of the dump rather than of the schema (a further version-specific line) is added to `1.2-normalise.sh` as one more `-e` pattern, with the reason in the log, and the normalisation and diff are rerun; any remaining difference is a schema difference, the decision is `migrator`, and the difference stays in the log for Task 2, which then applies the migrations with nixbot's own migrator from the input.
+Expected: two sha256 lines, the `\restrict` count (1 when pg_dump emits the line, which the normaliser removes), and `3`, one `CREATE TABLE` per table; tasks.md 1.2's verify is this log with the dump's (command; magnetite read-only).
+Task 2's schema-diff step reads `1.2-schema-magnetite.norm.sql` and `1.2-normalise.sh`; a difference there that is an artefact of the dump rather than of the schema is added to the normaliser as one more `-e` pattern, with its reason.
 
 - [ ] **Step 3: Confirm the base and record the machine check's cost before the change**
 
@@ -202,7 +158,7 @@ jj git fetch
 jj log --no-graph -r main@origin -T 'commit_id.shortest(12) ++ " " ++ description.first_line() ++ "\n"'
 jj file show -r main@origin openspec/changes/stand-up-devloop-collection/plan.md | head -n 1
 jj file show -r main@origin flake.lock | jq -r .nodes.nixbot.locked.rev
-ls logs/s2-evidence/1.1-plan-review-*.md logs/s2-evidence/1.2-decision
+ls logs/s2-evidence/1.1-plan-review-*.md logs/s2-evidence/1.2-schema-magnetite.norm.sql
 jj diff --name-only -- modules
 ```
 

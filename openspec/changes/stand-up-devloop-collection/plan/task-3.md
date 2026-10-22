@@ -6,7 +6,7 @@ First each evaluated value this task adds is shown absent from magnetite, and th
 Then `devloop-collection.nix` and the ingress role are written and each `tasks.md` 3.1–3.5 value is read back by `nix eval`.
 The journal assertion is shown absent by an `extendModules` override before it is written and failing under the same override after.
 R3.1 is shown failing on the new logs pipelines with its old content clause, then its four new mutants are added and shown accepted, then the clauses that reject them are added and the check passes with every mutant rejected.
-Last, `devloop-ingest` runs on magnetite from the change's commit, with the writer-ordering mutant rejected, before the pull request merges.
+Last, `devloop-ingest` runs on magnetite from the change's commit, with the `noAutoCreate` mutant rejected, before the pull request merges.
 
 **Files:**
 - Modify: `modules/nixos/devloop-collection.nix` (whole file; 309 lines as Task 2 leaves it, `flake.lib.devloopCollection` at lines 280-291 and `flake.modules.nixos.devloop-collection` at lines 293-308)
@@ -20,7 +20,7 @@ Last, `devloop-ingest` runs on magnetite from the change's commit, with the writ
 
 **Interfaces:**
 - Consumes (Task 1): `flake.modules.nixos.deploy-record`, whose activation entry runs `flake.lib.deployRecordScript` with `"$systemConfig"` and appends one line `{"host","closure","previous_closure","ts"}` to `/var/log/deploy-record.jsonl`.
-- Consumes (Task 2): `flake.lib.otelCollectorSchema.devloop.tables`; `modules/nixos/devloop-collection.nix` with `flake.lib.devloopCollection.abandonMarker` (Task 2 creates the file, plan review F11); in `devloop-collection.nix` the `let` bindings `tables`, `abandonMarker`, `postgresqlMajor`, `quote`, `sqlLiteral`, `storeType`, `transformType`, `recordTimestamps`, `ddl`, `vrlAssignment`, `dateStep`, `pipelines`, `sources`, `asText`, `queries`, `grants`, `grantSql` and the attrset `flake.lib.devloopCollection = { abandonMarker; postgresqlMajor; ddl; pipelines; queries; grants; grantSql; selects; }`; the module function `flake.modules.nixos.devloop-collection = { config, ... }:` with the PostgreSQL-major assertion (message prefix `devloop-collection: services.postgresql.package is PostgreSQL`); `services.greptimedb.tables` and `services.greptimedb.pipelines` applied by `greptimedb-schema.service`; `grants.devloop-reconcile` is `builds = [ "id" "branch" "finished_at" ]`, `build_attributes = [ "build_id" "attr" "finished_at" ]` and has no `projects` key; the `ci_*` and `deploy_record` pipelines read each column from the string attribute of the same name, `""` or absent as null, and `batch_event`'s `ts` from the record's `Timestamp`; `devloop-queries` applies `${inputs.nixbot}/nixbot/nixbot/migrations/*.sql` lexically with `psql -X -q -v ON_ERROR_STOP=1 --single-transaction`, unless `logs/s2-evidence/1.2-decision` says `migrator`.
+- Consumes (Task 2): `flake.lib.otelCollectorSchema.devloop.tables`; `modules/nixos/devloop-collection.nix` with `flake.lib.devloopCollection.abandonMarker` (Task 2 creates the file, plan review F11); in `devloop-collection.nix` the `let` bindings `tables`, `abandonMarker`, `postgresqlMajor`, `quote`, `sqlLiteral`, `storeType`, `transformType`, `recordTimestamps`, `ddl`, `vrlAssignment`, `dateStep`, `pipelines`, `sources`, `asText`, `queries`, `grants`, `grantSql` and the attrset `flake.lib.devloopCollection = { abandonMarker; postgresqlMajor; ddl; pipelines; queries; grants; grantSql; selects; }`; the module function `flake.modules.nixos.devloop-collection = { config, ... }:` with the PostgreSQL-major assertion (message prefix `devloop-collection: services.postgresql.package is PostgreSQL`); `services.greptimedb.tables` and `services.greptimedb.pipelines` applied by `greptimedb-schema.service`; `grants.devloop-reconcile` is `builds = [ "id" "branch" "finished_at" ]`, `build_attributes = [ "build_id" "attr" "finished_at" ]` and has no `projects` key; the `ci_*` and `deploy_record` pipelines read each column from the string attribute of the same name, `""` or absent as null, and `batch_event`'s `ts` from the record's `Timestamp`; `devloop-queries` applies `${inputs.nixbot}/nixbot/nixbot/migrations/*.sql` lexically with `psql -X -q -v ON_ERROR_STOP=1 --single-transaction`, unless Task 2's schema diff chose nixbot's migrator (plan review F17).
 - Consumes (S1): magnetite's `clan.core.vars.generators.greptimedb-users` (its `finalScript` writes `admin-password`, `collector-password`, `perses-password`, `regulator-password` and `users`), the store on `127.0.0.1:4000`, the collector's `forward` connector, `memory_limiter`, `file_storage` and `basicauth/store`, and its order after `greptimedb-schema.service` (`flake-module.nix:446-451`).
 - Produces in `flake.lib.devloopCollection`: `questions.formationToLand`, `questions.queueWait`, `questions.buildOutcome` (GreptimeDB SQL over `devloop`, past 7 days, every identifier double-quoted) and `batchEventKeys` (`batch_event`'s columns minus its time index, in allow-list order).
 - Produces in `flake.modules.nixos.devloop-collection` (the function becomes `{ config, pkgs, ... }:`, a plain attrset, no `mkIf` or `mkMerge`): a second assertion, after Task 2's, with message prefix `devloop-collection: journald/gitea-mq reads`; `services.postgresql.ensureUsers` entries `{ name = "devloop-reconcile"; }` and `{ name = "opentelemetry-collector"; }`; `systemd.services.devloop-pg-grants`; receivers `sqlquery/ci_attribute`, `sqlquery/ci_build`, `journald/gitea-mq` (operators `parse-message`, `keep-list`, `drop-body`), `file_log/deploy-record` (operators `parse-line`, `keep-list`, `drop-body`); processors `resource/devloop-<table>`; pipelines `logs/devloop-<table>` ending in `forward`.
@@ -28,7 +28,7 @@ Last, `devloop-ingest` runs on magnetite from the change's commit, with the writ
 - Produces in magnetite: `services.observability-notify.units` gains `"devloop-pg-grants"`, first in the sorted list; Task 4 adds `"devloop-reconcile"` after it and extends R3.1's policy to `devloop-`.
 - Produces in the ingress role: `connectors."routing/logs"`, pipelines `logs/ingress` and `logs/devloop-<table>-out`, exporters `otlp_http/devloop_<table>`, all present only when `services.greptimedb.pipelines.devloop` is non-empty; `resource/strip-database` deletes `vanixiets.database` and `vanixiets.table`; `queueBytes` with `devloop = mib 4` and `devloop_<table>` entries.
 - Produces in R3.1: mutants `logsQueueNotPersistent`, `logsToFleet`, `logsToMetricsExporter`, `otlpInLogsPipeline`; clause messages `R3.1: a traces pipeline, or a logs pipeline exporting outside devloop` and `R3.1: a logs pipeline takes the local OTLP receiver` (contract name `logsTakeLocalReceiver`).
-- Produces `vmTests.x86_64-linux.devloop-ingest`: outer `let` bindings `vars = "/run/devloop-ingest-vars"`, `credentialConsumers`, `baselineFixtures`, `giteaMqStub`, `unitMutants = { }` (entries `{ unit = "<unit without .service>"; module = …; }`), the case strings `firstStart`, `writerOrdering`, `overlap`, `tableShape`, `switch`, `documentedQueries`, and `cases = [ firstStart writerOrdering overlap tableShape switch documentedQueries ]`; `testScript = builtins.readFile ./devloop-ingest/helpers.py + lib.concatStringsSep "\n" cases`.
+- Produces `vmTests.x86_64-linux.devloop-ingest`: outer `let` bindings `vars = "/run/devloop-ingest-vars"`, `credentialConsumers`, `baselineFixtures`, `giteaMqStub`, `unitMutants = { }` (entries `{ unit = "<unit without .service>"; module = …; }`), the case strings `firstStart`, `noAutoCreate`, `overlap`, `tableShape`, `switch`, `documentedQueries`, and `cases = [ firstStart noAutoCreate overlap tableShape switch documentedQueries ]`; `testScript = builtins.readFile ./devloop-ingest/helpers.py + lib.concatStringsSep "\n" cases`.
   Inside the container: `/etc/devloop-ingest/config.json` (keys `vars`, `psql`, `tables`, `questions`, `abandonMarker`, `batchEventKeys`), `/etc/devloop-ingest/mutants/<name>.conf` and `<name>.unit` per `unitMutants` entry, `/etc/devloop-ingest/gitea-mq-lines.txt`, `/etc/devloop-ingest/gitea-mq-empty.txt`, the runtime symlink `/run/devloop-ingest/gitea-mq-lines` that the stub reads, the specialisation `devloop-switch`.
   Helpers of the contract, plus the private `_sql`, `_count(table)`, `_sent(table)` and `_otel_metric(name, label, value)`; every Task 3 case leaves the collector running with no mutant drop-in.
   Baseline nixbot rows at boot: project 1; builds 9001 (pull request 9001) and 9002 (branch `gitea-mq/batch/1`, null `pr_number`); attributes `checks.x86_64-linux.pass`, `.abandoned`, `.broken` of 9001 (tied `finished_at`) and `checks.x86_64-linux.cached` of 9002; build ids from 9100 are free for later cases.
@@ -46,13 +46,13 @@ mkdir -p logs/s2-evidence
   nix eval --json .#.lib.devloopCollection --apply builtins.attrNames
   nix eval --json .#nixosConfigurations.magnetite.config.services.greptimedb.pipelines --apply 'p: builtins.attrNames (p.devloop or { })'
   jj file show -r main@origin modules/nixos/devloop-collection.nix | wc -l
-  cat logs/s2-evidence/1.2-decision
+  ls logs/s2-evidence/2.6-schema-diff-*.log
   ls logs/s2-evidence/7.1-*.log
 } 2>&1 | tee logs/s2-evidence/3.0-base-$(date -u +%Y%m%dT%H%M%SZ).log
 ```
 
-Expected: the path, then a `main@origin` that contains Tasks 1 and 2's merges; `["abandonMarker","ddl","grantSql","grants","pipelines","postgresqlMajor","queries","selects"]`; `["devloop_batch_event","devloop_ci_attribute","devloop_ci_build","devloop_deploy_record"]`; `309`; `lexical`; at least one 7.1 log.
-If `devloop-collection.nix` is not 309 lines, re-read it and re-anchor Step 9's file against it before writing; if the decision file says `migrator`, Step 5's `nixbot-schema.sh` replaces its migration loop with the exact command Task 2's `devloop-queries` uses for the migrator.
+Expected: the path, then a `main@origin` that contains Tasks 1 and 2's merges; `["abandonMarker","ddl","grantSql","grants","pipelines","postgresqlMajor","queries","selects"]`; `["devloop_batch_event","devloop_ci_attribute","devloop_ci_build","devloop_deploy_record"]`; `309`; Task 2's schema-diff log; at least one 7.1 log.
+If `devloop-collection.nix` is not 309 lines, re-read it and re-anchor Step 9's file against it before writing; if Task 2's schema diff chose nixbot's migrator (plan review F17), Step 5's `nixbot-schema.sh` replaces its migration loop with the exact command Task 2's `devloop-queries` uses for the migrator.
 
 - [ ] **Step 2: Confirm the collector's components on magnetite (read-only)**
 
@@ -72,7 +72,7 @@ The keys this task writes were read at the pins:
 - `forward` carries logs to logs (`open-telemetry/opentelemetry-collector@v0.155.0:connector/forwardconnector/forward.go:24`); a connector used as a receiver in a logs pipeline must be an exporter in some logs pipeline, or the configuration is rejected (`service/internal/graph/graph.go:171-184`).
 - Configuration strings without `${` are not expanded and `$$` becomes `$`, so the queries' single `$1` reaches the driver unchanged (`open-telemetry/opentelemetry-collector@v0.155.0:confmap/expand.go:73-76`, `confmap/resolver.go:198`, `:226-243`).
 - Internal telemetry: with no `service.telemetry` in our configuration (no module sets it), the collector serves Prometheus on `localhost:8888` with `without_units` and `without_type_suffix` (`service/telemetry/otelconftelemetry/factory.go:50-59`), so the counters are named `otelcol_exporter_send_failed_log_records` and `otelcol_exporter_sent_log_records` (`exporter/exporterhelper/metadata.yaml:137-144`, `:173-176`), labelled `exporter="<component id>"` (`exporter/exporterhelper/internal/obs_report_sender.go:35`, `:71`).
-- nixpkgs: `CREATE USER "<name>"`, a login role with no password, for each `ensureUsers` entry, run by `postgresql-setup.service` (`NixOS/nixpkgs@b6c8664de9b6:nixos/modules/services/databases/postgresql.nix:113`, `:870-921`); `ensureDBOwnership` defaults to false and `ensureClauses` to `{ }` (`:447-450`, `:457-476`); local connections are `peer` (`:693`); the collector unit is `DynamicUser` with `SupplementaryGroups = [ "systemd-journal" ]` (`nixos/modules/services/monitoring/opentelemetry-collector.nix:109-127`); nixbot's unit is ordered after and requires `postgresql.target` when `database.createLocally` (`Mic92/nixbot@d020013fa:nixosModules/nixbot.nix:1072-1084`).
+- nixpkgs: `CREATE USER "<name>"`, a login role with no password, for each `ensureUsers` entry, run by `postgresql-setup.service` (`NixOS/nixpkgs@ac1faec44836:nixos/modules/services/databases/postgresql.nix:113`, `:870-921`); `ensureDBOwnership` defaults to false and `ensureClauses` to `{ }` (`:447-450`, `:457-476`); local connections are `peer` (`:693`); the collector unit is `DynamicUser` with `SupplementaryGroups = [ "systemd-journal" ]` (`nixos/modules/services/monitoring/opentelemetry-collector.nix:109-127`); nixbot's unit is ordered after and requires `postgresql.target` when `database.createLocally` (`Mic92/nixbot@d020013fa:nixosModules/nixbot.nix:1072-1084`).
 
 - [ ] **Step 3: Show the task's values absent (RED, evaluation)**
 
@@ -119,7 +119,7 @@ Create `modules/vm-tests/devloop-ingest/nixbot-schema.sh` with exactly:
 # Stand-in for nixbot's start in vmTests.x86_64-linux.devloop-ingest: applies
 # the nixbot input's migrations to the nixbot database in lexical order, one
 # transaction per file, as checks.x86_64-linux.devloop-queries does (design
-# D14; logs/s2-evidence/1.2-decision), then the test's baseline fixture rows.
+# D14; Task 2's schema diff), then the test's baseline fixture rows.
 # Usage: nixbot-schema.sh MIGRATIONS_DIR FIXTURES_SQL
 set -euo pipefail
 migrations=$1
@@ -346,13 +346,18 @@ Create `modules/vm-tests/devloop-ingest.nix` with exactly:
 #
 # What it establishes: each devloop exporter's first send succeeds when the
 # store, its schema job and the collector start together, and fails when the
-# schema job has not created its table; each stored table equals the
-# allow-list and has no body column; overlap re-reads leave one row per key;
-# lines outside the five batch messages and keys outside the keep-list are
-# not stored; one activation appends one deploy record naming both closures
-# and reaches the store; the documented queries answer on GreptimeDB 1.2.1.
+# schema job has not created its table (auto_create_table=false); each stored
+# table equals the allow-list; overlap re-reads leave one row per key; lines
+# outside the five batch messages are not stored; one activation appends one
+# deploy record naming both closures and reaches the store; the documented
+# queries answer on GreptimeDB 1.2.1.
 #
-# What it does not establish: nixbot itself (the stand-in only migrates),
+# What it does not establish: the collector's keep-list (`retain`) and body
+# removal, which are defence in depth with no test here, because the
+# pre-created DDL and each pipeline's VRL reset (`. = {}` and one assignment
+# per allow-listed field) decide the stored columns whatever the record
+# carries; the collector's order after the schema job, which R3.1's
+# schemaOrderDropped mutant judges; nixbot itself (the stand-in only migrates),
 # magnetite's journal retention, deployed credentials or storage, the OOM
 # order, or a specialisation switch the container cannot perform: the
 # switch case prints a `limitation:` line when it falls back to running the
@@ -459,12 +464,12 @@ Create `modules/vm-tests/devloop-ingest.nix` with exactly:
                   ]
                   assert got == want, (table, got, want)
                   assert "body" not in [row[0] for row in desc], (table, desc)
-                  print(f"ok: firstStart: DESC TABLE {table} equals the allow-list, no body column")
+                  print(f"ok: firstStart: DESC TABLE {table} equals the allow-list")
               print("ok: firstStart")
             '';
 
-            writerOrdering = ''
-              print("=== case writerOrdering")
+            noAutoCreate = ''
+              print("=== case noAutoCreate")
               reset_devloop()
               admin_sql('DROP TABLE "ci_build"')
               collector_restart()
@@ -475,14 +480,14 @@ Create `modules/vm-tests/devloop-ingest.nix` with exactly:
                   retry(lambda _last, t=table: _sent(t) > 0, timeout=dt.timedelta(minutes=5))
                   assert send_failed(table) == 0, (table, send_failed(table))
               print(
-                  "mutant writerOrdering rejected: otlp_http/devloop_ci_build send_failed "
+                  "mutant noAutoCreate rejected: otlp_http/devloop_ci_build send_failed "
                   f"{send_failed('ci_build')} when the schema job's tables lack ci_build, and no table was created"
               )
               reset_devloop()
               collector_restart()
               retry(lambda _last: _sent("ci_build") > 0, timeout=dt.timedelta(minutes=5))
               assert send_failed("ci_build") == 0, send_failed("ci_build")
-              print("ok: writerOrdering")
+              print("ok: noAutoCreate")
             '';
 
             overlap = ''
@@ -491,8 +496,6 @@ Create `modules/vm-tests/devloop-ingest.nix` with exactly:
               reset_devloop()
               collector_restart()
               wait_rows("ci_attribute", int(psql("SELECT count(*) FROM build_attributes").strip()))
-              attributes_before = _sent("ci_attribute")
-              builds_before = _sent("ci_build")
               nixbot_rows(
                   "INSERT INTO builds (id, project_id, number, commit_sha, branch, pr_number, status, created_at, started_at, finished_at, eval_completed) "
                   "OVERRIDING SYSTEM VALUE VALUES (9101, 1, 9101, 'c000000000000000000000000000000000009101', 'pr/9101', 9101, 'succeeded', now() - interval '3 minutes', now() - interval '2 minutes', now(), true); "
@@ -501,13 +504,22 @@ Create `modules/vm-tests/devloop-ingest.nix` with exactly:
                   "(9101, 'checks.x86_64-linux.overlap-b', 'x86_64-linux', 'succeeded', false, now() - interval '1 minute', now()), "
                   "(9101, 'checks.x86_64-linux.overlap-c', 'x86_64-linux', 'skipped_local', true, NULL, now())"
               )
-              # Every poll after the insert re-reads the three attribute rows
-              # and the build row while they are under 5 min old (design D6),
-              # so three polls send at least 9 and 3 more records.
+              # The counters are read once the new rows are stored, so idle
+              # re-reads of the cursor's tie before the insert cannot meet the
+              # bound; every later poll re-reads the three attribute rows and
+              # the build row while they are under 5 min old (design D6), so
+              # two more polls send at least 6 and 2 more records.
               retry(
-                  lambda _last: _sent("ci_attribute") >= attributes_before + 9
-                  and _sent("ci_build") >= builds_before + 3,
-                  timeout=dt.timedelta(minutes=6),
+                  lambda _last: gsql('SELECT count(*) FROM "ci_attribute" WHERE "build_id" = 9101') == [[3]]
+                  and gsql('SELECT count(*) FROM "ci_build" WHERE "build_id" = 9101') == [[1]],
+                  timeout=dt.timedelta(minutes=3),
+              )
+              attributes_before = _sent("ci_attribute")
+              builds_before = _sent("ci_build")
+              retry(
+                  lambda _last: _sent("ci_attribute") >= attributes_before + 6
+                  and _sent("ci_build") >= builds_before + 2,
+                  timeout=dt.timedelta(minutes=4),
               )
               for table in ("ci_attribute", "ci_build"):
                   rows, distinct = key_counts(table)
@@ -516,7 +528,7 @@ Create `modules/vm-tests/devloop-ingest.nix` with exactly:
               assert gsql('SELECT count(*) FROM "ci_build" WHERE "build_id" = 9101') == [[1]]
               print(
                   f"ok: overlap: ci_attribute sent {_sent('ci_attribute') - attributes_before} and ci_build "
-                  f"{_sent('ci_build') - builds_before} records after the insert; one row per key"
+                  f"{_sent('ci_build') - builds_before} records after the rows were stored; one row per key"
               )
               print("ok: overlap")
             '';
@@ -542,7 +554,7 @@ Create `modules/vm-tests/devloop-ingest.nix` with exactly:
                   assert key not in columns, (key, columns)
               assert gsql("SELECT \"members\" FROM \"batch_event\" WHERE \"batch\" = 3 AND \"msg\" = 'batch formed'") == [[1]]
               assert gsql("SELECT \"flaky\", \"ejected\" FROM \"batch_event\" WHERE \"batch\" = 2 AND \"msg\" = 'batch done'") == [[True, 2]]
-              print(f"ok: tableShape: batch_event per msg {got}; the reconcile line and the extra key are not stored")
+              print(f"ok: tableShape: batch_event per msg {got}; the reconcile line is not stored")
 
               # The CI rows as stored against nixbot's source rows, read by
               # psql; abandoned against the fixture's intent.
@@ -665,7 +677,6 @@ Create `modules/vm-tests/devloop-ingest.nix` with exactly:
                   (505, "b", "succeeded", False, False, "F"),
                   (506, "a", "dependency_failed", False, False, "G"),
                   (507, "a", "ignored_failure", False, False, "H"),
-                  (508, "a", "cancelled", False, False, "I"),
                   (509, "a", "failed_eval", False, False, None),
               ]
               admin_sql(
@@ -696,7 +707,7 @@ Create `modules/vm-tests/devloop-ingest.nix` with exactly:
               print(f"buildOutcome: {outcome}")
               assert outcome == [
                   [501, "passed"], [502, "failed"], [503, "passed"], [504, "passed"], [505, "passed"],
-                  [506, "failed"], [507, "failed"], [508, "passed"], [509, "failed"],
+                  [506, "failed"], [507, "failed"], [509, "failed"],
               ], outcome
               print("ok: documentedQueries: each of the three questions returns its fixture answer")
               reset_devloop()
@@ -706,7 +717,7 @@ Create `modules/vm-tests/devloop-ingest.nix` with exactly:
 
             cases = [
               firstStart
-              writerOrdering
+              noAutoCreate
               overlap
               tableShape
               switch
@@ -1210,6 +1221,8 @@ let
     # Per build, `failed` when any row that is neither abandoned nor of a
     # flaky drv_path is an own failure or dependency_failed; a drv_path is
     # flaky when it has a pass row and an own-fail row in the window.
+    # A build with no outcome row (only cancelled, pending, building or
+    # abandoned rows) is left out (plan review F21).
     # Limitation: a dependency_failed row cannot be attributed to the flaky
     # derivation under it, because nixbot names it only in error text.
     buildOutcome = ''
@@ -1234,6 +1247,7 @@ let
       FROM "attempt" AS a
       LEFT JOIN "flaky_drv" AS f ON f."drv_path" = a."drv_path"
       GROUP BY a."build_id"
+      HAVING max(CASE WHEN a."pass" OR a."own_fail" OR a."status" = 'dependency_failed' THEN 1 ELSE 0 END) = 1
       ORDER BY a."build_id"
     '';
   };
@@ -1249,6 +1263,9 @@ let
   # The file flake.modules.nixos.deploy-record appends to (design D9).
   deployRecordFile = "/var/log/deploy-record.jsonl";
 
+  # The keep-list and the body removal are defence in depth: the
+  # pre-created tables and each pipeline's VRL reset decide the stored
+  # columns, and no test can see either operator fail (plan review F15).
   keepAttributes = names: {
     type = "retain";
     id = "keep-list";
@@ -1263,7 +1280,14 @@ let
   # Each column becomes an attribute only through attribute_columns
   # (open-telemetry/opentelemetry-collector-contrib@aaf5045a2:
   # receiver/sqlqueryreceiver/logs_receiver.go:364-382); the body is the
-  # constant '' the query selects.
+  # constant '' the query selects. The receiver stores the last row's
+  # finished_at as its cursor while it builds the batch, before the batch is
+  # consumed (logs_receiver.go:200-211, :337-346), so rows the pipeline
+  # refuses are lost unless the five-minute overlap re-reads them; C1 and C2
+  # report the gap and a cursor reset replays it. The cursor's storage key
+  # embeds the SQL text (logs_receiver.go:123, :276), so any later edit of a
+  # query restarts it from tracking_start_value and re-reads nixbot's
+  # retained history, about 200,000 attribute rows, once.
   sqlqueryReceiver = table: {
     driver = "postgres";
     datasource = "host=/run/postgresql dbname=nixbot user=opentelemetry-collector sslmode=disable";
@@ -1388,12 +1412,22 @@ in
           "sqlquery/ci_build" = sqlqueryReceiver "ci_build";
           # The unit, not the identifier, which is the wrapper gitea-mq-start
           # (logs/s2/grounding.md §2.1); the closing quote makes each of the
-          # five messages an exact match (design D7).
+          # five messages an exact match (design D7). The receiver stores its
+          # journal cursor before it hands a line on
+          # (open-telemetry/opentelemetry-collector-contrib@aaf5045a2:
+          # pkg/stanza/operator/input/journald/input.go:181-191), so a line
+          # the pipeline refuses would be lost; retry_on_failure with no
+          # elapsed limit holds the reader until memory_limiter accepts it
+          # (receiver/journaldreceiver/README.md:52-55).
           "journald/gitea-mq" = {
             units = [ "gitea-mq.service" ];
             grep = ''msg="batch (formed|built|landed|bisecting|done)"'';
             start_at = "beginning";
             storage = "file_storage";
+            retry_on_failure = {
+              enabled = true;
+              max_elapsed_time = "0s";
+            };
             operators = [
               {
                 type = "key_value_parser";
@@ -1771,7 +1805,7 @@ Run:
 } 2>&1 | tee logs/s2-evidence/3.3-journald-$(date -u +%Y%m%dT%H%M%SZ).log
 ```
 
-Expected: `units: ["gitea-mq.service"]`, `grep: "msg=\"batch (formed|built|landed|bisecting|done)\""`, `start_at: "beginning"`, `storage: "file_storage"`, operators in order `{ type: "key_value_parser", id: "parse-message", parse_from: "body.MESSAGE" }`, `{ type: "retain", id: "keep-list", fields: ["attributes.batch", …, "attributes.flaky"] }`, `{ type: "remove", id: "drop-body", field: "body" }`; then `keep-list-equal` (the receiver's keep-list against the allow-list read directly from `schema.nix`, the second value).
+Expected: `units: ["gitea-mq.service"]`, `grep: "msg=\"batch (formed|built|landed|bisecting|done)\""`, `start_at: "beginning"`, `storage: "file_storage"`, `retry_on_failure: { enabled: true, max_elapsed_time: "0s" }`, operators in order `{ type: "key_value_parser", id: "parse-message", parse_from: "body.MESSAGE" }`, `{ type: "retain", id: "keep-list", fields: ["attributes.batch", …, "attributes.flaky"] }`, `{ type: "remove", id: "drop-body", field: "body" }`; then `keep-list-equal` (the receiver's keep-list against the allow-list read directly from `schema.nix`, the second value).
 
 - [ ] **Step 14: Read back the deploy-record receiver (GREEN, evaluation; tasks.md 3.4)**
 
@@ -2004,7 +2038,7 @@ Run:
 } 2>&1 | tee logs/s2-evidence/3.5-build-$(date -u +%Y%m%dT%H%M%SZ).log | grep -E '^built$|\.drv$|error:'
 ```
 
-Expected: `built` (magnetite's toplevel runs `otelcol-contrib validate` over the rendered configuration, `NixOS/nixpkgs@b6c8664de9b6:nixos/modules/services/monitoring/opentelemetry-collector.nix:30-38`), then the two test `.drv` paths (GREEN for Step 8), and no `error:` line.
+Expected: `built` (magnetite's toplevel runs `otelcol-contrib validate` over the rendered configuration, `NixOS/nixpkgs@ac1faec44836:nixos/modules/services/monitoring/opentelemetry-collector.nix:30-38`), then the two test `.drv` paths (GREEN for Step 8), and no `error:` line.
 `greptimedb-pipeline` imports the ingress role without `devloop-collection`, so its collector has no logs pipeline, which `devloopLogs` keeps valid.
 If the build cannot be scheduled from stibnite, nixbot builds it on the pull request, and its log is fetched as this evidence instead.
 
@@ -2062,7 +2096,7 @@ git worktree remove /tmp/wt-s2-ingest
 echo "commit $commit" | tee -a logs/s2-evidence/3.9-devloop-ingest-*.log
 ```
 
-Expected, in order: `=== case firstStart`, four `ok: firstStart: otlp_http/devloop_<table> sent <n>, send_failed 0` lines, four `ok: firstStart: DESC TABLE <table> equals the allow-list, no body column` lines, `ok: firstStart`; `=== case writerOrdering`, `mutant writerOrdering rejected: otlp_http/devloop_ci_build send_failed <n> when the schema job's tables lack ci_build, and no table was created`, `ok: writerOrdering`; `=== case overlap`, `ok: overlap: ci_attribute sent <≥9> and ci_build <≥3> records after the insert; one row per key`, `ok: overlap`; `=== case tableShape`, `ok: tableShape: batch_event per msg {'batch formed': 3, 'batch built': 3, 'batch landed': 2, 'batch bisecting': 1, 'batch done': 2}; …`, `ok: tableShape: ci_attribute equals nixbot's rows, abandoned only for the marker, no error text`, `ok: tableShape`; `=== case switch`, at most one `limitation:` line, `ok: switch: one line, closure /nix/store/…, previous_closure /nix/store/…`, `ok: switch: both records reached deploy_record`, `ok: switch`; `=== case documentedQueries`, `ok: documentedQueries: queueWait counts build 605's first attempt only, not its 5000 s rerun`, `ok: documentedQueries: each of the three questions returns its fixture answer`, `ok: documentedQueries`; no `Traceback`, `AssertionError` or `error:`; the build succeeds.
+Expected, in order: `=== case firstStart`, four `ok: firstStart: otlp_http/devloop_<table> sent <n>, send_failed 0` lines, four `ok: firstStart: DESC TABLE <table> equals the allow-list` lines, `ok: firstStart`; `=== case noAutoCreate`, `mutant noAutoCreate rejected: otlp_http/devloop_ci_build send_failed <n> when the schema job's tables lack ci_build, and no table was created`, `ok: noAutoCreate`; `=== case overlap`, `ok: overlap: ci_attribute sent <≥6> and ci_build <≥2> records after the rows were stored; one row per key`, `ok: overlap`; `=== case tableShape`, `ok: tableShape: batch_event per msg {'batch formed': 3, 'batch built': 3, 'batch landed': 2, 'batch bisecting': 1, 'batch done': 2}; …`, `ok: tableShape: ci_attribute equals nixbot's rows, abandoned only for the marker, no error text`, `ok: tableShape`; `=== case switch`, at most one `limitation:` line, `ok: switch: one line, closure /nix/store/…, previous_closure /nix/store/…`, `ok: switch: both records reached deploy_record`, `ok: switch`; `=== case documentedQueries`, `ok: documentedQueries: queueWait counts build 605's first attempt only, not its 5000 s rerun`, `ok: documentedQueries: each of the three questions returns its fixture answer`, `ok: documentedQueries`; no `Traceback`, `AssertionError` or `error:`; the build succeeds.
 The `limitation:` line, if printed, is design D16's recorded gap: Task 8's `verify.md` cites it for WA `A49`, and the line says which path wrote the record.
 If any case fails, fix the code it judges in the working copy, rerun Steps 21-22, squash the fix into `$change` with the same `jj squash` paths, and rerun this step; never weaken an assertion to pass.
 
@@ -2114,6 +2148,11 @@ If the collector fails to start, `journalctl -u opentelemetry-collector` names t
 9. `documentedQueries` inserts its fixture rows as `admin` directly into the tables, so the three answers are exact; ingestion of each column is judged by `tableShape` and `firstStart`, not by this case.
 10. The vm test runs from the commit before 3.9's tick is folded in, so the merged tree differs from the tested tree by that one line, which Step 26 shows.
 11. `devloop-pg-grants` joins `services.observability-notify.units` in this task (Main's decision), but R3.1's policy clause requires it to be listed only after Task 4 extends `notifiedByPolicy` to `devloop-`; until then only the wiring clauses judge the entry, and removing it fails no check.
+12. Plan review F15: `writerOrdering` is renamed `noAutoCreate`, because it shows `auto_create_table=false` refusing a write to a missing table, while the collector's order after the schema job is judged by R3.1's `schemaOrderDropped`; `tasks.md` 3.9's "writer ordering" wording names the same case.
+    `overlap` snapshots the sent counters only after the 9101 rows are stored; the collector's `retain` and body `remove` are defence in depth with no test.
+13. Plan review F16: both journal and SQL readers advance their cursor before delivery, so a refused batch loses journal lines and CI rows older than the overlap; `journald/gitea-mq` retries without limit, and the `sqlquery` receivers rely on the overlap, C1 to C3 and a cursor reset.
+    Any later edit of an export query re-backfills about 200,000 attribute rows once, over ADR-004's row budget that day, because the cursor's storage key embeds the SQL text.
+14. Plan review F21: `buildOutcome` leaves out a build with no outcome row, so the fixture build 508 (one `cancelled` row) and its expectation are gone.
 
 ---
 

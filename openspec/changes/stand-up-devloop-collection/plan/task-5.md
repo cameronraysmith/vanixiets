@@ -97,21 +97,21 @@ In `modules/checks/fleet-alert.nix`, insert after line 770 (the `};` closing `re
 
       # The fleet-alerting-interface scenario `The timeline is replayed`
       # (stand-up-devloop-collection design D17; tasks.md 5.1): the burn
-      # rule's SQL answers one row, value 0.15, on 61 consecutive runs, then
-      # no row for 5 min. The expected posts are the scenario's, written here
-      # from the spec and not read from rules.nix: one FIRING at priority
-      # default on the 61st run (index 60), nothing more while the row
-      # persists, and one RESOLVED 5 min after the row disappears, both
-      # titled without a host.
+      # rule's SQL answers one row, value 0.15, on 65 consecutive runs (runs
+      # 1-65, indices 0-64), then no row. The expected posts are the spec's:
+      # one FIRING at priority default on the 61st run (index 60), nothing on
+      # runs 62-65 while the row persists, so a re-posting evaluator fails,
+      # and one RESOLVED 5 min after the row disappears, on run 70 (index
+      # 69), both titled without a host.
       burnRuleLeg = {
-        name = "PullRequestQueueWaitBurn answered 0.15 on 61 runs fires once on the 61st and resolves once 5 min after its row disappears";
+        name = "PullRequestQueueWaitBurn answered 0.15 on 65 runs fires once on the 61st, posts nothing on the 62nd to 65th, and resolves once 5 min after its row disappears";
         steps = map (n: {
           at = minute n;
-          series = lib.optionalAttrs (n <= 60) { PullRequestQueueWaitBurn = [ { value = 0.15; } ]; };
-        }) (lib.range 0 65);
+          series = lib.optionalAttrs (n <= 64) { PullRequestQueueWaitBurn = [ { value = 0.15; } ]; };
+        }) (lib.range 0 69);
         expect = [
           "60 [FIRING] PullRequestQueueWaitBurn default"
-          "65 [RESOLVED] PullRequestQueueWaitBurn default"
+          "69 [RESOLVED] PullRequestQueueWaitBurn default"
         ];
         messages = [ "value 0.15" ];
       };
@@ -141,7 +141,8 @@ Run:
 nix build --no-link -L .#checks.x86_64-linux.fleet-alert.fixtureRehearsal 2>&1 | tee logs/s2-evidence/5.1-red-$(date -u +%Y%m%dT%H%M%SZ).log | grep -E '(MISS|ok:|mutant .* rejected|FAIL|PullRequestQueueWaitBurn)'
 ```
 
-Expected: the build fails; the only `MISS` lines are `MISS PullRequestQueueWaitBurn answered 0.15 on 61 runs …: the alert posts differ from the expected list` and `MISS …: no posted message carries: value 0.15`, with the diff showing `-60 [FIRING] PullRequestQueueWaitBurn default` and `-65 [RESOLVED] PullRequestQueueWaitBurn default`; `ok: fixture server refusals and the concurrency guard` is printed; the five lines `mutant forZero rejected: …`, `mutant noAbsenceFreeze rejected: …`, `mutant noHostsUpdate rejected: …`, `mutant noStateWrite rejected: …`, `mutant noStoreFreeze rejected: …` are printed; the last line is `FAIL: the evaluator failed these legs:` followed by the two misses.
+Expected: the build fails; the only `MISS` lines are `MISS PullRequestQueueWaitBurn answered 0.15 on 65 runs …: the alert posts differ from the expected list` and `MISS …: no posted message carries: value 0.15`, with the diff showing `-60 [FIRING] PullRequestQueueWaitBurn default` and `-69 [RESOLVED] PullRequestQueueWaitBurn default`; `ok: fixture server refusals and the concurrency guard` is printed; the five lines `mutant forZero rejected: …`, `mutant noAbsenceFreeze rejected: …`, `mutant noHostsUpdate rejected: …`, `mutant noStateWrite rejected: …`, `mutant noStoreFreeze rejected: …` are printed; the last line is `FAIL: the evaluator failed these legs:` followed by the two misses.
+The expected lines carry the run's index, so the scenario's 61st and 70th runs are `60` and `69`.
 The leg fails because no rule named `PullRequestQueueWaitBurn` exists, so `stepAnswers` holds no answer for it and the evaluator never queries it; the 16 existing legs pass.
 
 - [ ] **Step 6: Extend the reference model to per-database store failures (review F7; tasks.md 5.1)**
@@ -1860,10 +1861,10 @@ Run:
 nix build --no-link -L .#checks.x86_64-linux.fleet-alert.fixtureRehearsal 2>&1 | tee logs/s2-evidence/5.4-fixtures-$(date -u +%Y%m%dT%H%M%SZ).log | grep -E '(--- |MISS|ok:|mutant .* rejected|FAIL)'
 ```
 
-Expected: one `--- ` line per leg, 18 legs (the 16 existing, `storeErrorLeg` and `storeThawLeg` as Step 15 rewrote them, `PullRequestQueueWaitBurn answered 0.15 on 61 runs fires once on the 61st and resolves once 5 min after its row disappears` and `a devloop failure raises StoreQueryFailing for devloop after 3 min while HostOOMKill on fleet fires and resolves as usual`); no `MISS` and no `FAIL`; `ok: fixture server refusals, the SQL answer shape and the concurrency guard`; the five existing `mutant … rejected` lines of Step 5, `noStoreFreeze` on its retargeted text; `ok: every leg passed`.
+Expected: one `--- ` line per leg, 18 legs (the 16 existing, `storeErrorLeg` and `storeThawLeg` as Step 15 rewrote them, `PullRequestQueueWaitBurn answered 0.15 on 65 runs fires once on the 61st, posts nothing on the 62nd to 65th, and resolves once 5 min after its row disappears` and `a devloop failure raises StoreQueryFailing for devloop after 3 min while HostOOMKill on fleet fires and resolves as usual`); no `MISS` and no `FAIL`; `ok: fixture server refusals, the SQL answer shape and the concurrency guard`; the five existing `mutant … rejected` lines of Step 5, `noStoreFreeze` on its retargeted text; `ok: every leg passed`.
 The devloop-failure leg's posts are `0 [FIRING] HostOOMKill magnetite high`, `4 [FIRING] StoreQueryFailing devloop high`, `5 [RESOLVED] HostOOMKill magnetite high` and `11 [RESOLVED] StoreQueryFailing devloop high`, and a FIRING message carries `the store did not answer queries on devloop`.
 Within a run the posts follow the sorted instance ids, so `StoreQueryFailing devloop` precedes `StoreQueryFailing fleet` in `storeErrorLeg` and `storeThawLeg`.
-The burn leg's posts equal `60 [FIRING] PullRequestQueueWaitBurn default` and `65 [RESOLVED] PullRequestQueueWaitBurn default`, so the title carries no host, and its FIRING message carries `value 0.15`.
+The burn leg's posts equal `60 [FIRING] PullRequestQueueWaitBurn default` and `69 [RESOLVED] PullRequestQueueWaitBurn default` (the scenario's 61st and 70th runs), with nothing on indices 61 to 64 while the row persists, so the title carries no host, and its FIRING message carries `value 0.15`.
 
 Then verify the delivered evaluator configuration on magnetite (build):
 
@@ -2124,9 +2125,10 @@ In `modules/vm-tests/devloop-ingest.nix`, in the `let` that defines `cases` (Tas
 
 
               def burn_prs(first, slow, fast):
-                  """slow pull-request builds that waited 90 min, then fast ones that waited 10."""
+                  """slow pull-request builds that waited 90 min, then fast ones that waited 45,
+                  close enough to the hour that a 30 min threshold counts them as slow."""
                   return [burn_row(first + i, 100 + first + i, 90) for i in range(slow)] + [
-                      burn_row(first + slow + i, 100 + first + slow + i, 10) for i in range(fast)
+                      burn_row(first + slow + i, 100 + first + slow + i, 45) for i in range(fast)
                   ]
 
 
@@ -2158,7 +2160,7 @@ In `modules/vm-tests/devloop-ingest.nix`, in the `let` that defines `cases` (Tas
 
               def burn_mutant(name, old, new):
                   assert old in BURN_EXPR, f"mutant {name} found nothing to replace"
-                  return BURN_EXPR.replace(old, new, 1)
+                  return BURN_EXPR.replace(old, new)
 
 
               BURN_MUTANTS = {
@@ -2168,6 +2170,7 @@ In `modules/vm-tests/devloop-ingest.nix`, in the `let` that defines `cases` (Tas
                   "noWindow": burn_mutant("noWindow", " AND c.finished_at >= now() - INTERVAL '24 hours'", ""),
                   "shareAtLeastATenth": burn_mutant("shareAtLeastATenth", "* 10 > count(*)", "* 10 >= count(*)"),
                   "everyAttempt": burn_mutant("everyAttempt", " AND c.finished_at = f.first_finished", ""),
+                  "thresholdHalfHour": burn_mutant("thresholdHalfHour", "INTERVAL '1 hour'", "INTERVAL '30 minutes'"),
               }
 
 
@@ -2202,7 +2205,7 @@ In `modules/vm-tests/devloop-ingest.nix`, in the `let` that defines `cases` (Tas
               rows = gsql(BURN_EXPR, db=BURN_DB)
               print(f"load 3: 10 builds, 1 waited over an hour, 1 restarted: {rows}", flush=True)
               assert rows == [], rows
-              burn_mutants_reject("load 3", ["noWindow", "shareAtLeastATenth", "everyAttempt"])
+              burn_mutants_reject("load 3", ["noWindow", "shareAtLeastATenth", "everyAttempt", "thresholdHalfHour"])
 
               # Leave the store as every earlier case does: tables reset and the
               # collector running.
@@ -2214,7 +2217,8 @@ In `modules/vm-tests/devloop-ingest.nix`, in the `let` that defines `cases` (Tas
 
 In the `cases` list, add `burnRule` as the last element, after `reconcile` (Task 4).
 The Python holds no `''` and no `${` of its own, so the Nix string ends only where shown.
-Each mutant's row follows from its load: on load 2, without the pull-request filter 10 rows qualify with 3 slow, without the started filter 10 with 2 slow, and with a minimum of 9 the 9 rows with 2 slow give a share above a tenth; on load 3, without the window 11 first attempts qualify with 2 slow, with `>=` the 10 first attempts with 1 slow reach exactly a tenth, and counting every attempt (`everyAttempt`) gives 11 rows with 2 slow, so the restarted build's second row would fire the rule.
+Each mutant's row follows from its load: on load 2, without the pull-request filter 10 rows qualify with 3 slow, without the started filter 10 with 2 slow, and with a minimum of 9 the 9 rows with 2 slow give a share above a tenth; on load 3, without the window 11 first attempts qualify with 2 slow, with `>=` the 10 first attempts with 1 slow reach exactly a tenth, counting every attempt (`everyAttempt`) gives 11 rows with 2 slow, so the restarted build's second row would fire the rule, and a 30 min threshold (`thresholdHalfHour`, which replaces both occurrences of `INTERVAL '1 hour'`) counts the eight 45 min builds as slow, 9 of 10, while the restarted build's 10 min first attempt stays fast.
+`burn_mutant` replaces every occurrence of its text; each other mutant's text occurs once in the expression.
 The restarted build's two rows share `build_id` and differ in `finished_at`, the time index, so the store keeps both (`logs/s2/spike-dedup.md:15`); `burn_load`'s stored count of 12 rows on load 3 confirms it.
 `[INFERENCE]` GreptimeDB 1.2.1 accepts `AS value` as a column alias, `HAVING` without `GROUP BY`, `c.started_at > c.created_at + INTERVAL '1 hour'` and the join on the first attempt per `build_id` (design D1, review F1); Step 27 confirms all four, and the wrapped `SELECT "value"` confirms the column name.
 
@@ -2277,7 +2281,7 @@ nix eval --raw "git+file://$PWD?rev=$rev#vmTests.x86_64-linux.devloop-ingest.drv
 nix build --no-link -L "git+file://$PWD?rev=$rev#vmTests.x86_64-linux.devloop-ingest" 2>&1 | tee logs/s2-evidence/5.6-devloop-ingest-$(date -u +%Y%m%dT%H%M%SZ).log | grep -E '(=== case|ok: |mutant .* rejected|load [123]:|Traceback|Error)'
 ```
 
-Expected: `=== case` and `ok:` lines for `firstStart`, `writerOrdering`, `overlap`, `tableShape`, `switch`, `documentedQueries` and `reconcile`, each with its mutant lines as Tasks 3 and 4 list them; then `=== case burnRule`, `load 1: 10 builds, 2 waited over an hour: [[0.2]]`, `load 2: 9 builds, 2 waited over an hour: []`, the three lines `mutant noPullRequestFilter rejected: load 2 gave [[0.3]]`, `mutant noStartedFilter rejected: load 2 gave [[0.2]]`, `mutant minimumNine rejected: load 2 gave [[0.2222222222222222]]`, `load 3: 10 builds, 1 waited over an hour, 1 restarted: []`, the three lines `mutant noWindow rejected: load 3 gave [[0.18181818181818182]]`, `mutant shareAtLeastATenth rejected: load 3 gave [[0.1]]`, `mutant everyAttempt rejected: load 3 gave [[0.18181818181818182]]`, `ok: burnRule`; no `Traceback`; the build succeeds.
+Expected: `=== case` and `ok:` lines for `firstStart`, `noAutoCreate`, `overlap`, `tableShape`, `switch`, `documentedQueries` and `reconcile`, each with its mutant lines as Tasks 3 and 4 list them; then `=== case burnRule`, `load 1: 10 builds, 2 waited over an hour: [[0.2]]`, `load 2: 9 builds, 2 waited over an hour: []`, the three lines `mutant noPullRequestFilter rejected: load 2 gave [[0.3]]`, `mutant noStartedFilter rejected: load 2 gave [[0.2]]`, `mutant minimumNine rejected: load 2 gave [[0.2222222222222222]]`, `load 3: 10 builds, 1 waited over an hour, 1 restarted: []`, the four lines `mutant noWindow rejected: load 3 gave [[0.18181818181818182]]`, `mutant shareAtLeastATenth rejected: load 3 gave [[0.1]]`, `mutant everyAttempt rejected: load 3 gave [[0.18181818181818182]]`, `mutant thresholdHalfHour rejected: load 3 gave [[0.9]]`, `ok: burnRule`; no `Traceback`; the build succeeds.
 `[INFERENCE]` the trailing digits of the quotients are as Python prints the IEEE doubles; GreptimeDB's JSON may print them differently, which changes no assertion, since the case compares load 1 within `1e-9` and the mutants only by row count.
 `[INFERENCE]` the colocated repository exports the jj commit to git, so `git+file://…?rev=` resolves it; if it does not, run `jj git export` first, which writes only git refs.
 A failure in `burnRule` with a parse error on `value`, `HAVING`, `INTERVAL` or the first-attempt `JOIN` refutes design D1's assumption: stop and report, since the rule, the leg's expectation and the spec scenario `The rule's expression is rendered` change together.

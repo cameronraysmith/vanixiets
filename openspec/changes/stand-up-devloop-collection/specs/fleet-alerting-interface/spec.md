@@ -13,8 +13,8 @@ The rule table SHALL hold `PullRequestQueueWaitBurn`, `database = "devloop"`, `l
 
 #### Scenario: The timeline is replayed
 
-- **WHEN** the fixture server answers the rule's SQL with one row `value = 0.15` on 61 consecutive runs and then with no row for 5 min
-- **THEN** the evaluator posts one `[FIRING] PullRequestQueueWaitBurn` at priority `default` on the 61st run, nothing more while the row persists, and one `[RESOLVED] PullRequestQueueWaitBurn` 5 min after the row disappears
+- **WHEN** the fixture server answers the rule's SQL with one row `value = 0.15` on 65 consecutive runs and then with no row for 5 min
+- **THEN** the evaluator posts one `[FIRING] PullRequestQueueWaitBurn` at priority `default` on the 61st run, nothing on runs 62 to 65 while the row persists, and one `[RESOLVED] PullRequestQueueWaitBurn` 5 min after the row disappears
 
 #### Scenario: A build is run again
 

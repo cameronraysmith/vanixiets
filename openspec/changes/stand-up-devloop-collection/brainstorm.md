@@ -32,7 +32,7 @@ Inputs gathered for this brainstorm:
 - C4: CAM-69 asks for enqueue-to-land latency, but the five admitted batch messages carry no enqueue time; enqueue is the per-PR `enqueued PR` line, which neither A5:57 nor A4:58 admits, and no D5 rule reads it (brief:36-44; A5:63-71).
 - C5: CAM-69 asks for CI outcome "excluding flaky attributes", but `flaky` is a per-batch boolean on `batch done`, and no attribute-level flakiness column exists (A4:102, A4:104).
 - C6: CAM-69 lists "commit and outcome" in the deploy record, while ADR-005 records `{host, closure, previous_closure, ts}` and attributes the commit by joining the closure against CI `outputs.out` (A5:58, A5:69, A5:180, A5:206); an activation snippet runs before the switch completes, so it cannot record the switch's outcome.
-- C7: A4:58 admits gitea-mq lines beginning `batch `, which also matches four further messages, while A5:57 greps the five exact `msg` values (brief:37-42).
+- C7: A4:58 admits gitea-mq lines beginning `batch `, which also matches five further messages (CH:363), while A5:57 greps the five exact `msg` values (brief:37-42).
 - C8: the brief's framing of the burn rule and its RA line numbers predate charter v17 to v21, and its premise, shared with A5:158, that no container-test pattern exists is stale, because S1 added the nspawn test `modules/vm-tests/greptimedb-pipeline.nix`, which runs on magnetite.
 
 ### What S1 and S3 provide

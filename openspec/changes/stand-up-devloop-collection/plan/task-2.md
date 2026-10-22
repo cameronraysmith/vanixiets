@@ -18,7 +18,7 @@ Task 3's `devloop-ingest` first-start case exercises them again with the real re
 - Evidence (git-ignored): `logs/s2-evidence/2.7-precheck.sh` (Step 25), `logs/s2-evidence/2.*-*.log`, `logs/s2-evidence/2.6-schema-check.sql`, `logs/s2-evidence/2.6-schema-check.norm.sql`
 
 **Interfaces:**
-- Consumes (Task 1): `logs/s2-evidence/1.2-decision` (one word, `lexical` or `migrator`), `logs/s2-evidence/1.2-normalise.sh` (stdin to stdout) and `logs/s2-evidence/1.2-schema-magnetite.norm.sql` from Task 1 Step 2.
+- Consumes (Task 1): `logs/s2-evidence/1.2-normalise.sh` (stdin to stdout) and `logs/s2-evidence/1.2-schema-magnetite.norm.sql` from Task 1 Step 2.
 - Consumes (S1): `services.greptimedb.databases` with `devloop = "365d"` on magnetite from `flake.lib.otelCollectorSchema.databases` (`schema.nix:81-85`), the schema job's `admin-password` credential and `sql` function (`greptimedb.nix:118-123`).
 - Produces: `flake.lib.otelCollectorSchema.devloop.tables.<table> = { columns = [ { name; type; nullable; } … ]; primaryKey = [ … ]; timeIndex = "<column>"; }` with `type` in `int64`, `string`, `boolean`, `timestamp`, the four tables of the plan head's allow-list, every column `nullable = true` except the time index (`nullable = false`).
 - Produces: `flake.lib.devloopCollection` = `{ abandonMarker; postgresqlMajor; ddl; pipelines; selects; queries; grants; grantSql; }`:
@@ -50,7 +50,6 @@ mkdir -p logs/s2-evidence
   jj git fetch
   jj log --no-graph -r main@origin -T 'description.first_line() ++ "\n"'
   jj file list -r main@origin modules/nixos/devloop-collection.nix modules/checks/devloop-signals.nix | wc -l
-  cat logs/s2-evidence/1.2-decision
   ls logs/s2-evidence/1.2-normalise.sh logs/s2-evidence/1.2-schema-magnetite.norm.sql
   nix eval --raw .#nixosConfigurations.magnetite.config.systemd.services.greptimedb-schema.serviceConfig.ExecStart; echo
   nix eval --json .#nixosConfigurations.magnetite.config.services.greptimedb --apply 's: { inherit (s) databases tableTtls; hasTables = s ? tables; }'
@@ -58,8 +57,8 @@ mkdir -p logs/s2-evidence
 } 2>&1 | tee logs/s2-evidence/2.0-base-$(date -u +%Y%m%dT%H%M%SZ).log
 ```
 
-Expected: `main@origin` contains Task 1's merge; `0` (Task 1 created neither file); the decision is `lexical` or `migrator`; both files exist; a path `/nix/store/…-greptimedb-schema/bin/greptimedb-schema` (call it `P0`); `{"databases":{"agent":"90d","devloop":"365d","fleet":"30d"},"hasTables":false,"tableTtls":{}}`; `postgresql-16.15`.
-If `1.2-decision` is missing, Task 1 Step 2 has not run; stop.
+Expected: `main@origin` contains Task 1's merge; `0` (Task 1 created neither file); both files exist; a path `/nix/store/…-greptimedb-schema/bin/greptimedb-schema` (call it `P0`); `{"databases":{"agent":"90d","devloop":"365d","fleet":"30d"},"hasTables":false,"tableTtls":{}}`; `postgresql-16.15`.
+If either file is missing, Task 1 Step 2 has not run; stop.
 Step 10 compares the script path with `P0`.
 
 - [ ] **Step 2: Show the allow-list absent (RED, evaluation)**
@@ -638,10 +637,11 @@ Run:
   nix eval --json .#nixosConfigurations.magnetite.config.services.greptimedb --apply 's: { inherit (s) tables pipelines; }'
   jj file show -r main@origin modules/nixos/greptimedb.nix | sha256sum
 } 2>&1 | tee logs/s2-evidence/2.3-script-unchanged-$(date -u +%Y%m%dT%H%M%SZ).log
+for log in logs/s2-evidence/2.0-base-*.log logs/s2-evidence/2.3-script-unchanged-*.log; do grep -c '^/nix/store/.*greptimedb-schema$' "$log"; done
 grep -h '^/nix/store/.*greptimedb-schema$' logs/s2-evidence/2.0-base-*.log logs/s2-evidence/2.3-script-unchanged-*.log | sort -u | wc -l
 ```
 
-Expected: the same path `P0` as Step 1, `{"pipelines":{},"tables":{}}`, and `1` from the last command (one distinct script path in both logs).
+Expected: the same path `P0` as Step 1, `{"pipelines":{},"tables":{}}`, then a count of at least `1` for every log the loop names, so neither log is empty, and `1` from the last command (one distinct script path in both logs).
 Equal store paths mean equal derivations, so the script `origin/main` builds is the script this tree builds when neither option is set.
 
 - [ ] **Step 11: Build the script of a configuration with one table and one pipeline (build; tasks.md 2.3 verify, first half)**
@@ -1078,7 +1078,7 @@ Create `modules/checks/devloop-queries.nix` with exactly:
           createdb -U postgres "$db" || return 1
           mkdir -p "$work/$db"
           for migration in ${migrations}/*.sql; do
-            sql_as postgres "$db" "$migration" || return 1
+            psql -X -q -v ON_ERROR_STOP=1 --single-transaction -U postgres -d "$db" -f "$migration" || return 1
           done
           sql_as postgres "$db" ${pkgs.writeText "devloop-queries-grants.sql" run.grantSql} || return 1
           ${lib.concatMapStrings (file: ''
@@ -1176,11 +1176,12 @@ Create `modules/checks/devloop-queries.nix` with exactly:
 }
 ```
 
-If `logs/s2-evidence/1.2-decision` reads `migrator`, make two changes before Step 17, and nothing else.
+The check applies the migrations lexically, each file with `psql -v ON_ERROR_STOP=1 --single-transaction`, as the migrator does in version order with one transaction per file (`Mic92/nixbot@d020013fa:nixbot/nixbot/migrations.py:46-70`, `:125-155`).
+Step 22 decides whether that stands: only if its diff with magnetite's dump is non-empty, make these two changes, and nothing else, then rerun Steps 17 to 22.
 Add after the `migrations = …;` binding:
 
 ```nix
-      # nixbot's own migrator (tasks.md 1.2 chose it): one transaction per
+      # nixbot's own migrator (Step 22's diff chose it): one transaction per
       # file in version order, recorded in schema_migrations
       # (Mic92/nixbot@d020013fa:nixbot/nixbot/migrations.py:97-165).
       nixbotPython = pkgs.python3.withPackages (_: [ inputs.nixbot.packages.${system}.nixbot ]);
@@ -1190,7 +1191,7 @@ and replace the three lines of the migration loop:
 
 ```nix
           for migration in ${migrations}/*.sql; do
-            sql_as postgres "$db" "$migration" || return 1
+            psql -X -q -v ON_ERROR_STOP=1 --single-transaction -U postgres -d "$db" -f "$migration" || return 1
           done
 ```
 
@@ -1202,14 +1203,14 @@ with:
 ```
 
 `nixbot` at the pin is a `buildPythonPackage` depending on `asyncpg` (`Mic92/nixbot@d020013fa:packages/nixbot.nix:1-40`), so `python3.withPackages` can import `nixbot.migrations` `[INFERENCE]`, confirmed by Step 20's build, whose log then shows no `psql:` migration lines.
-With the default `lexical` decision the file stays as written above.
+With an empty diff in Step 22 the file stays as written above.
 
 The marker clause (design D13, D15 as amended by plan review F11) relates two independently defined values, `flake.lib.devloopCollection.abandonMarker` and the text of `modules/nixos/nixbot-abandon-optional-attributes.patch`, which magnetite's nixbot applies.
 It requires the patch's production code, the three added lines of `outcome_status` at `:145-147`, joined by newlines with the marker in the middle one, not the bare literal, which the patch's tests also carry at `:379` and `:451`.
 Its two negative controls run the same test with the marker's last character changed, which must not hold, and over the two test lines alone, which must not hold either; an evaluation assertion first requires those two lines to hold the quoted marker, so the second control cannot pass on lines that have drifted.
 The clause and its controls are evaluated when the check's derivation is instantiated, so a failure stops evaluation in CI with the clause's label, and a pass prints the three lines at the start of the build.
 
-How the check authenticates: `postgresqlTestHook` at the root pin runs `initdb --encoding=UTF8 -U postgres` with no `--auth` (`/nix/store/l9sdkpnv33hmdr49q2nhahph8bpjmc9s-source/pkgs/by-name/po/postgresqlTestHook/postgresql-test-hook.sh:57`), and `initdb` then sets local and host authentication to `trust` (`postgres/postgres@REL_16_15:src/bin/initdb/initdb.c:2524-2532`); the socket lives under `$NIX_BUILD_TOP/run/postgresql` with TCP disabled (`postgresql-test-hook.sh:20-24`, `:61-68`), so only the build's own processes reach it.
+How the check authenticates: `postgresqlTestHook` at the root pin runs `initdb --encoding=UTF8 -U postgres` with no `--auth` (`NixOS/nixpkgs@ac1faec44836:pkgs/by-name/po/postgresqlTestHook/postgresql-test-hook.sh:57`, read in its store copy `/nix/store/l9sdkpnv33hmdr49q2nhahph8bpjmc9s-source`, magnetite's `pkgs.path`), and `initdb` then sets local and host authentication to `trust` (`postgres/postgres@REL_16_15:src/bin/initdb/initdb.c:2524-2532`); the socket lives under `$NIX_BUILD_TOP/run/postgresql` with TCP disabled (`postgresql-test-hook.sh:20-24`, `:61-68`), so only the build's own processes reach it.
 Peer authentication is not available in the sandbox, because the build runs as one build user; `psql -U opentelemetry-collector` therefore opens a session whose `session_user` and `current_user` are that `LOGIN` role, and every column-privilege check is made against it exactly as it is under magnetite's peer rule, which only decides which role a connection becomes.
 The peer admission itself is world assumption A45, observed at D3 (`tasks.md` 7.4), not here.
 `$1` is bound by `PREPARE <name>(text) AS …; EXECUTE <name>(:'cursor_old');`, the cursor arriving as text as the receiver stores and binds it, and the query casting it with `$1::timestamptz`.
@@ -1850,9 +1851,10 @@ logs/s2-evidence/1.2-normalise.sh < logs/s2-evidence/2.6-schema-check.sql > logs
 } 2>&1 | tee logs/s2-evidence/2.6-schema-diff-$(date -u +%Y%m%dT%H%M%SZ).log
 ```
 
-Expected: `schema equals magnetite's`.
+Expected: `schema equals magnetite's`, which keeps lexical application.
 The normaliser is Task 1 Step 2's, which drops comments, blank lines, `SET` and `set_config` lines, `\restrict`/`\unrestrict` lines (whose keys differ per dump from pg_dump 16.10 on), ownership, `GRANT`/`REVOKE` and `COMMENT ON` lines, so the check's grants to its two roles do not count as a difference.
-A non-empty diff means the check's schema is not the one magnetite runs: stop and report the diff, because tasks.md 1.2's decision then has to be revisited.
+Magnetite's dump, `1.2-schema-magnetite.sql`, holds `pg_dump`'s stdout only, because magnetite's `psql` and `pg_dump` print a collation-version warning on stderr, and the check's `$out/schema.sql` is likewise `pg_dump`'s stdout alone, so neither side carries a warning line.
+On a non-empty diff, apply Step 16's migrator alternative, rerun Steps 17 to 21, and run this step again: an empty diff then keeps the migrator, recorded with the first diff in this step's two logs, and a second non-empty diff means neither application reproduces magnetite's schema, so stop and report both diffs.
 
 - [ ] **Step 23: Build the neighbouring checks and magnetite (build; tasks.md 2.4 verify)**
 

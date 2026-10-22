@@ -20,7 +20,7 @@ The reconcile's comparison logic, its seven clauses, its exit codes and its Post
 - Consumes (Task 2): `flake.lib.devloopCollection.{queries,ddl,pipelines,grantSql}`; `ddl.ci_attribute` contains `'append_mode' = 'false'` exactly once; `pipelines.batch_event` contains the VRL line `        .flaky = if a.flaky == null || a.flaky == "" { null } else { to_bool!(a.flaky) }` exactly once, and without it the pipeline's `transform` entry for `flaky` writes null (Task 2's Interfaces); `grantSql` contains the line `GRANT SELECT ("build_id", "attr", "finished_at") ON "build_attributes" TO "devloop-reconcile";`.
   In `modules/checks/devloop-queries.nix`'s `perSystem` `let`: `dc`, `clockVars` (name → SQL timestamp expression, passed to every query as `-v <name>=<value>`), `fixtureFiles` (loaded in order as `postgres` after the grants), `roleQueries = queries: [ { name; role; types; sql; executions = { <label> = [ <EXECUTE argument> … ]; }; } … ]` (each execution's result, a header line and tab-separated rows, at `$(result <name> <label>)`), `assertions = [ { label; script; } … ]` (each prints `ok: <label>` or `FAIL: <label>`), `replaceOnce = name: from: to: text:`, `real` and `mutants.<name>` (each run a fresh database with its own `grantSql`, `queries` and `afterFixtures`, running every `roleQueries` entry and every assertion; a rejected mutant prints `mutant <name> rejected: <first line matching 'FAIL: |ERROR: '>`) (Task 2's Interfaces).
 - Consumes (Task 3): `modules/nixos/devloop-collection.nix` as Task 3 leaves it: a flake-parts module `{ config, lib, ... }:` whose top-level `let` ends with `grantColumns` before `in`, whose `flake.lib.devloopCollection = { inherit abandonMarker ddl pipelines queries grants grantSql; selects = …; inherit questions batchEventKeys; };` is the module's first attribute, and whose `flake.modules.nixos.devloop-collection` is a function `{ config, pkgs, ... }:` returning a plain attrset (no `mkIf` or `mkMerge`) that reads the file's outer `lib`, with `systemd.services.devloop-pg-grants`; `grants.devloop-reconcile` = `builds [ "id" "branch" "finished_at" ]` and `build_attributes [ "build_id" "attr" "finished_at" ]`; the PostgreSQL roles `opentelemetry-collector` and `devloop-reconcile`; the receivers `"sqlquery/ci_attribute"` and `"sqlquery/ci_build"` (`queries = [ { sql = queries.<table>; tracking_column = "finished_at"; tracking_start_value = "1970-01-01T00:00:00.000000Z"; logs = [ { body_column = "body"; attribute_columns = <the table's allow-list column names>; } ]; } ]`), `"journald/gitea-mq"` (`operators = [ key_value_parser "parse-message" from body.MESSAGE, retain "keep-list" of attributes.<batchEventKeys>, remove "drop-body" ]`) and `"file_log/deploy-record"` (`include = [ "/var/log/deploy-record.jsonl" ]`); magnetite's notified units already list `devloop-pg-grants`.
-  In `modules/vm-tests/devloop-ingest.nix` (header `{ self, inputs, ... }:`): the outer `let` with `unitMutants = { };`, one binding per case and `cases = [ firstStart writerOrdering overlap tableShape switch documentedQueries ];`, `testScript = builtins.readFile ./devloop-ingest/helpers.py + lib.concatStringsSep "\n" cases`; `vars = "/run/devloop-ingest-vars"` and `credentialConsumers`; the container `store` (`networking.hostName = "store"`), which renders each `unitMutants.<name> = { unit; module; }` to `/etc/devloop-ingest/mutants/<name>.conf`; the stub `gitea-mq.service`, a RemainAfterExit oneshot printing each line of /run/devloop-ingest/gitea-mq-lines to standard output with a 50 ms pause; that path is a symlink to `/etc/devloop-ingest/gitea-mq-lines.txt` (13 lines, eleven matching D7's pattern, among them `batch built` and `batch done` lines with `landed`, `ejected`, `builds` and `flaky`) or to the empty `/etc/devloop-ingest/gitea-mq-empty.txt`; nixbot's project `1` and builds `9001`, `9002` (`gitea-mq/batch/1`, null `pr_number`) and `9101`; the helpers `gsql`, `admin_sql`, `psql`, `nixbot_rows`, `collector_restart`, `reset_devloop` (leaves the collector stopped, keeps the journal), `send_failed`, `wait_rows` (until at least `n` rows), `key_counts` (`(rows, distinct primary key and time index)`), `utc_today` and `config()` (key `vars`); every Task 3 case ends with the collector running, no drop-in and the tables reset (Task 3's Interfaces).
+  In `modules/vm-tests/devloop-ingest.nix` (header `{ self, inputs, ... }:`): the outer `let` with `unitMutants = { };`, one binding per case and `cases = [ firstStart noAutoCreate overlap tableShape switch documentedQueries ];`, `testScript = builtins.readFile ./devloop-ingest/helpers.py + lib.concatStringsSep "\n" cases`; `vars = "/run/devloop-ingest-vars"` and `credentialConsumers`; the container `store` (`networking.hostName = "store"`), which renders each `unitMutants.<name> = { unit; module; }` to `/etc/devloop-ingest/mutants/<name>.conf`; the stub `gitea-mq.service`, a RemainAfterExit oneshot printing each line of /run/devloop-ingest/gitea-mq-lines to standard output with a 50 ms pause; that path is a symlink to `/etc/devloop-ingest/gitea-mq-lines.txt` (13 lines, eleven matching D7's pattern, among them `batch built` and `batch done` lines with `landed`, `ejected`, `builds` and `flaky`) or to the empty `/etc/devloop-ingest/gitea-mq-empty.txt`; nixbot's project `1` and builds `9001`, `9002` (`gitea-mq/batch/1`, null `pr_number`) and `9101`; the helpers `gsql`, `admin_sql`, `psql`, `nixbot_rows`, `collector_restart`, `reset_devloop` (leaves the collector stopped, keeps the journal), `send_failed`, `wait_rows` (until at least `n` rows), `key_counts` (`(rows, distinct primary key and time index)`), `utc_today` and `config()` (key `vars`); every Task 3 case ends with the collector running, no drop-in and the tables reset (Task 3's Interfaces).
 - Consumes (S1, S3): `config.flake.lib.greptimedbSql pkgs { url; user; }` (`modules/lib/greptimedb-envelope.nix:48-89`), which reads `$CREDENTIALS_DIRECTORY/<user>-password` into `curl --config -`, posts to `<url>/v1/sql`, prints the one records result as TSV with `NULL` for null, and exits 1 on a transport failure, a non-200 answer, a body that is not one records result, or zero rows; magnetite's R8.2 holder assertion and kill-order assertion (`modules/machines/nixos/magnetite/default.nix:642-750`); R3.1's `notifiedByPolicy`, `failures` and `mutants` (`modules/checks/otel-collector-config.nix:35-40`, `:202-366`, `:372-513`).
 - Produces: `flake.lib.devloopCollection.reconcileQueries.{attributes,builds,batchBuilds,currentFinish}`, PostgreSQL texts without a trailing `;`, prepared over `$1`, `$2` (`timestamptz`, the window `[$1, $2)`), and for `currentFinish` also `$3` (`jsonb`, an array of `{ "build_id": <int>, "attr": <string or null>, "finished_at_us": <int> }`, `attr` null for a build); times are epoch microseconds, the form the store returns for `TIMESTAMP(6)` (`logs/s2/spike-dedup.md:176-180`):
   - `attributes`: `build_id`, `attr`, `finished_at_us` of every `build_attributes` row finished in the window;
@@ -90,7 +90,9 @@ INSERT INTO builds (id, project_id, number, commit_sha, branch, pr_number, statu
     -- a batch build finishing exactly at the window's end, which is outside it
     (9103, 9100, 3, 'c9103', 'gitea-mq/batch/8', NULL, 'succeeded', '2026-10-20T23:00:00Z', '2026-10-20T23:01:00Z', '2026-10-21T00:00:00Z'),
     -- a build finishing one microsecond before the window
-    (9104, 9100, 4, 'c9104', 'main', NULL, 'succeeded', '2026-10-19T23:00:00Z', '2026-10-19T23:01:00Z', '2026-10-19T23:59:59.999999Z');
+    (9104, 9100, 4, 'c9104', 'main', NULL, 'succeeded', '2026-10-19T23:00:00Z', '2026-10-19T23:01:00Z', '2026-10-19T23:59:59.999999Z'),
+    -- a build finishing exactly at the window's start, which is inside it
+    (9106, 9100, 6, 'c9106', 'main', NULL, 'succeeded', '2026-10-19T23:30:00Z', '2026-10-19T23:31:00Z', '2026-10-20T00:00:00Z');
 INSERT INTO build_attributes (build_id, attr, status, cached, finished_at)
   VALUES
     (9101, 'checks.x86_64-linux.a', 'succeeded', false, '2026-10-20T10:00:00.123456Z'),
@@ -99,11 +101,14 @@ INSERT INTO build_attributes (build_id, attr, status, cached, finished_at)
     (9102, 'checks.x86_64-linux.restarted', 'succeeded', false, '2026-10-21T00:30:00Z'),
     -- restarted and not finished again
     (9102, 'checks.x86_64-linux.running', 'building', false, NULL),
-    (9104, 'checks.x86_64-linux.old', 'succeeded', false, '2026-10-19T23:59:59.999999Z');
+    (9104, 'checks.x86_64-linux.old', 'succeeded', false, '2026-10-19T23:59:59.999999Z'),
+    -- finished exactly at the window's start, which is inside it
+    (9106, 'checks.x86_64-linux.midnight', 'succeeded', false, '2026-10-20T00:00:00Z');
 ```
 
 Every `NOT NULL` column without a default is set: `projects` per `0001_initial.sql:4-21`, `builds.number` and `commit_sha` and `branch` per `:25-50`, and `build_attributes.log_size`/`log_truncated` default per `0020_log_metadata.sql:9-10` (`Mic92/nixbot@d020013fa:nixbot/nixbot/migrations/…`); the ids are `GENERATED ALWAYS`, hence `OVERRIDING SYSTEM VALUE`.
-The epoch microseconds the assertions below expect are `2026-10-20T10:00:00.123456Z` = `1792490400123456`, `11:00:00Z` = `1792494000000000`, `12:00:00Z` = `1792497600000000` and `13:00:00Z` = `1792501200000000` (`date -u -d … +%s`).
+The epoch microseconds the assertions below expect are `2026-10-20T00:00:00Z` = `1792454400000000`, `10:00:00.123456Z` = `1792490400123456`, `11:00:00Z` = `1792494000000000`, `12:00:00Z` = `1792497600000000` and `13:00:00Z` = `1792501200000000` (`date -u -d … +%s`).
+Build `9106` and its attribute finish exactly at the window's start and must be counted (the window is `[start, end)`, plan review F22b); build `9105` stays unused because `reconcileKeys` names it as a build nixbot does not have.
 Then snapshot it:
 
 ```bash
@@ -262,26 +267,28 @@ with
 
 ```nix
         {
-          label = "reconcile: attributes returns nixbot's (build_id, attr, finished_at) in the window as devloop-reconcile";
+          label = "reconcile: attributes returns nixbot's (build_id, attr, finished_at) in the window, the start included, as devloop-reconcile";
           script = ''
             [ "$(tail -n +2 "$(result reconcile_attributes window)" | LC_ALL=C sort)" = ${
               lib.escapeShellArg (
                 lib.concatStringsSep "\n" [
                   "9101\tchecks.x86_64-linux.a\t1792490400123456"
                   "9101\tchecks.x86_64-linux.cached\t1792490400123456"
+                  "9106\tchecks.x86_64-linux.midnight\t1792454400000000"
                 ]
               )
             } ]
           '';
         }
         {
-          label = "reconcile: builds returns nixbot's (id, finished_at) in the window, the end excluded, as devloop-reconcile";
+          label = "reconcile: builds returns nixbot's (id, finished_at) in the window, the start included and the end excluded, as devloop-reconcile";
           script = ''
             [ "$(tail -n +2 "$(result reconcile_builds window)" | LC_ALL=C sort)" = ${
               lib.escapeShellArg (
                 lib.concatStringsSep "\n" [
                   "9101\t1792490400123456"
                   "9102\t1792494000000000"
+                  "9106\t1792454400000000"
                 ]
               )
             } ]
@@ -420,7 +427,7 @@ jj st --no-pager >/dev/null
 nix build --no-link -L .#checks.x86_64-linux.devloop-queries 2>&1 | tee logs/s2-evidence/4.1-devloop-queries-$(date -u +%Y%m%dT%H%M%SZ).log | rg 'ok: |FAIL|mutant .* rejected|error:'
 ```
 
-Expected: the build succeeds; Task 2's `ok:` lines, then `ok: reconcile: attributes returns nixbot's (build_id, attr, finished_at) in the window as devloop-reconcile`, `ok: reconcile: builds returns nixbot's (id, finished_at) in the window, the end excluded, as devloop-reconcile`, `ok: reconcile: batchBuilds counts the one gitea-mq/batch/ build finished in the window as devloop-reconcile` and `ok: reconcile: currentFinish returns exactly the stored keys nixbot does not explain, as devloop-reconcile`; then five rejections in attribute order: `mutant currentFinishIgnoresDuplicates rejected: FAIL: reconcile: currentFinish returns exactly the stored keys nixbot does not explain, as devloop-reconcile`, `mutant grantWithoutError rejected: …`, `mutant reconcileGrantWithoutFinishedAt rejected: psql:/nix/store/…-devloop-queries-reconcile_attributes-window.sql:<n>: ERROR:  permission denied for table build_attributes`, `mutant renameCached rejected: …` and `mutant selectError rejected: …`, the three of Task 2 with the same reasons as Task 2's log; no `FAIL` outside a rejection line and no `error:`.
+Expected: the build succeeds; Task 2's `ok:` lines, then `ok: reconcile: attributes returns nixbot's (build_id, attr, finished_at) in the window, the start included, as devloop-reconcile`, `ok: reconcile: builds returns nixbot's (id, finished_at) in the window, the start included and the end excluded, as devloop-reconcile`, `ok: reconcile: batchBuilds counts the one gitea-mq/batch/ build finished in the window as devloop-reconcile` and `ok: reconcile: currentFinish returns exactly the stored keys nixbot does not explain, as devloop-reconcile`; then five rejections in attribute order: `mutant currentFinishIgnoresDuplicates rejected: FAIL: reconcile: currentFinish returns exactly the stored keys nixbot does not explain, as devloop-reconcile`, `mutant grantWithoutError rejected: …`, `mutant reconcileGrantWithoutFinishedAt rejected: psql:/nix/store/…-devloop-queries-reconcile_attributes-window.sql:<n>: ERROR:  permission denied for table build_attributes`, `mutant renameCached rejected: …` and `mutant selectError rejected: …`, the three of Task 2 with the same reasons as Task 2's log; no `FAIL` outside a rejection line and no `error:`.
 The `-U devloop-reconcile` in each `reconcile_*` run (Task 2's runner) and the refused grant mutant are what show the queries ran as that role under the rendered grants.
 
 - [ ] **Step 8: Re-record `devloop-queries`' evaluation cost (evaluation)**

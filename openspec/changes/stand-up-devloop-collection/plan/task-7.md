@@ -3,7 +3,7 @@
 Implements `tasks.md` 7.1–7.7 (design D1, D2, D6, D7, D9, D10, D11, Migration Plan, Risks; DCI `Each activation appends one deploy record`, `The devloop tables are pre-created with keys, a time index and deduplication`, `The collector reads nixbot's builds and attributes through two cursor queries`, `Each nixbot query re-reads a five-minute overlap in pages of 10,000 rows`, `Column grants are applied once nixbot's columns exist`, `devloop-reconcile runs daily as its own reader`; DC `A deploy can be attributed to the commits that built it`, `Every dev-loop event is recorded once and kept for a year`, `A gap in the dev-loop history reaches a person within a day`, `The past week of the dev loop can be asked about`; TSI `Databases and their retention are set at the telemetry store`, `Failure notices are posted to one topic`; HMC `magnetite contributes its own signals to the telemetry store`; FAI `The evaluator queries each rule's database as the regulators' store account`; FA `Pull-request builds that wait too long to start reach a person as a warning`; WA `A44`–`A49`).
 This task is operations only, interleaved with the five deploys of magnetite, and it changes no repository file.
 Step 0 writes the one deploy procedure that Tasks 1 to 5 invoke as `logs/s2-evidence/s2-deploy.sh magnetite D<n>`, Step 1 the read helpers, and Step 2 the baseline that must exist before D1.
-The order is strict: Steps 0–2 before D1; Steps 3–4 (7.1) after D1 and before D2; Steps 7–8 (7.3) after D2 and before D3; Steps 9–20 (7.4) after D3 and before D4; Steps 21–25 (7.5) after D4 and before D5; Steps 26–27 (7.6) after D5; Steps 28–30 (7.7) at least seven days after D3; Steps 5–6 (7.2) at a time the operator chooses after Step 4, never between a deploy's start and its item's gate.
+The order is strict: Steps 0–2 before D1; Steps 3–4 (7.1) after D1 and before D2; Steps 7–8 (7.3) after D2 and before D3; Steps 9–20 (7.4) after D3 and before D4; Steps 21–25 (7.5) after D4 and before D5; Steps 26–27 (7.6) after D5; Steps 28–30 (7.7) at least seven days after D3; Step 5 (7.2) after the next natural reboot of magnetite after D1, and Step 6 at close-out, neither a gate for any deploy.
 Every runtime observation has its failing side shown in the same task: the deploy-record file is shown absent before D1 and the previous closure read before D1 must reappear in the line; the peer rule is shown refusing the collector's role to another system user, and the column grants refusing an ungranted column; the reconcile is shown failing under a runtime drop-in before its passing runs are trusted; and the burn rule's rewritten window is shown equal to the deployed expression at the present instant before it is moved into the past.
 A failed expectation stops the task at that step, and the next deploy does not start until the orchestrator decides; rollback, if chosen, follows design.md's Migration Plan in reverse order.
 Every observation goes to `logs/s2-evidence/` (git-ignored); Task 8 folds it into `verify.md`, and `tasks.md` items 7.x are ticked in Task 8's change, not here.
@@ -11,7 +11,7 @@ No step prints or passes a credential on an argument list: the store password is
 
 **Files:**
 - Create (git-ignored helpers): `logs/s2-evidence/s2-deploy.sh`, `logs/s2-evidence/gsql.sh`, `logs/s2-evidence/pgq.sh`, `logs/s2-evidence/polls.sh`, `logs/s2-evidence/window.env`
-- Create (git-ignored evidence): `logs/s2-evidence/7.<n>-<slug>-<UTC ts>.log` for every step below, `logs/s2-evidence/7.2-boot-approval-<UTC ts>.log`, the deploy logs `logs/s2-evidence/magnetite-D<n>-<UTC ts>.log` and the queue logs `logs/s2-evidence/queue-D<n>-<UTC ts>.log`
+- Create (git-ignored evidence): `logs/s2-evidence/7.<n>-<slug>-<UTC ts>.log` for every step below, the deploy logs `logs/s2-evidence/magnetite-D<n>-<UTC ts>.log` and the queue logs `logs/s2-evidence/queue-D<n>-<UTC ts>.log`
 - Temporary: worktrees `/tmp/wt-s2-D<n>` at `origin/main`, removed by the procedure; on magnetite the runtime drop-in `/run/systemd/system/devloop-reconcile.service.d/zz-absent.conf` (Step 22, removed in Step 23)
 - Modify: none in the repository
 
@@ -22,7 +22,7 @@ No step prints or passes a credential on an argument list: the store password is
 - Consumes (Task 5): `fleet-alert.service` with `Environment=FLEET_ALERT_CONFIG=<store path>`, whose JSON holds `user`, `storeUrl` and `rules[]` each with `database` and `language` and no top-level `database`; the rule `PullRequestQueueWaitBurn` with the `expr` of Global Constraints as amended by review F1 (first attempt per `build_id` through a join on `min(finished_at)`), containing the text `c.finished_at >= now() - INTERVAL '24 hours'` exactly once.
 - Consumes (S1, S3): the store at `http://127.0.0.1:4000` with `regulator` (`ro`); `config.clan.core.vars.generators.greptimedb-users.files.regulator-password.path`; the notifier's `FAILED <unit> on <host>` and `RESOLVED <unit> on <host>` posts on `fleet-alerts` and its `/var/lib/observability-notify/failed.log` lines `<epoch> <unit> <host>` (`modules/nixos/observability-notify.nix:55`, `:77`, `:39-41`); `nixbot-logs queue` printing `Queue is empty`.
 - Consumes (vendor): the collector's internal telemetry, unset in magnetite's configuration (`modules/clan/services/otel-collector/flake-module.nix` sets no `service.telemetry`), defaults to level `normal` with a Prometheus reader on `localhost:8888` (`open-telemetry/opentelemetry-collector@v0.155.0:service/telemetry/otelconftelemetry/factory.go:50-59`), and 0.155 names its counters without a `_total` suffix (`openspec/changes/archive/2026-10-18-stand-up-greptimedb-on-magnetite/verify.md:494-501`); the collector's configuration path is the `--config=file:<path>` argument of its `ExecStart` (`NixOS/nixpkgs@ac1faec44836a722f7b003834f367486ff9adfd1:nixos/modules/services/monitoring/opentelemetry-collector.nix:114`); the store counts every HTTP request in `greptime_servers_http_requests_total{method,path,code,db}` and its latency in `greptime_servers_http_requests_elapsed`, unauthenticated at `/metrics` (`GreptimeTeam/greptimedb@v1.2.1:src/servers/src/metrics.rs:334-338`, `:454-483`; `src/servers/src/http.rs:1130-1133`), the `db` label being the bare schema name for the default catalog (`GreptimeTeam/greptimedb@v1.2.1:src/common/catalog/src/lib.rs:37-43`).
-- Produces: `logs/s2-evidence/window.env` with `PRE_D1_SYSTEM`, `PRE_D1_LINES`, `D<n>_COMMIT`, `D<n>_START`, `D<n>_END` for `D1`…`D5`, `T_BOOT`, `T_FORCED_FAIL`, `T_FORCED_RESOLVE` (all times `date -u +%FT%TZ`); the gate lines Task 8 greps: `deploy record: PASS` (7.1), `boot record: PASS` and the approval file (7.2), `devloop tables: PASS` (7.3), `ingest: PASS` (7.4), `devloop-reconcile: C7 current-system: ok` and `FAILED devloop-reconcile.service on magnetite` (7.5), `burn rule history: recorded` (7.6), `acceptance: PASS` (7.7).
+- Produces: `logs/s2-evidence/window.env` with `PRE_D1_SYSTEM`, `PRE_D1_LINES`, `D<n>_COMMIT`, `D<n>_START`, `D<n>_END` for `D1`…`D5`, `T_BOOT` (only when a natural reboot after D1 was observed), `T_FORCED_FAIL`, `T_FORCED_RESOLVE` (all times `date -u +%FT%TZ`); the gate lines Task 8 greps: `deploy record: PASS` (7.1), `boot record: PASS` or `boot record: not yet observed` in `7.2-boot-record-<ts>.log` (7.2), `devloop tables: PASS` (7.3), `ingest: PASS` (7.4), `devloop-reconcile: C7 current-system: ok` and `FAILED devloop-reconcile.service on magnetite` (7.5), `burn rule history: recorded` (7.6), `acceptance: PASS` (7.7).
 
 - [ ] **Step 0: Write the deploy procedure (used by 1.7, 2.9, 3.11, 4.8 and 5.8)**
 
@@ -236,59 +236,35 @@ Run:
 Expected: one file name, then `7.1 passed: D2 may start`.
 Task 2's 2.9 runs only after this line.
 
-- [ ] **Step 5: 7.2 — the operator confirms the magnetite reboot immediately before it (human, after Step 4)**
+- [ ] **Step 5: 7.2 — the boot line at magnetite's next natural reboot after D1 (opportunistic, not a gate)**
 
-The operator approved one reboot of magnetite for 7.2 at a time of the operator's choosing after D1 (plan review Q5, 2026-10-21).
-That approval schedules the reboot; it does not authorize it at any particular moment, so the operator confirms it explicitly at the chosen time, immediately before Step 6 runs, because the reboot stops CI, the merge queue and the store for a few minutes.
-The operator runs and completes:
-
-```bash
-A="$EV/7.2-boot-approval-$(date -u +%Y%m%dT%H%M%SZ).log"
-{
-  echo '$ nixbot-logs queue'; nixbot-logs queue 2>&1
-  printf '[operator] %s: scheduling approval of 2026-10-21 (plan review Q5) applies; I confirm rebooting magnetite now; reason: %s; nixbot queue as printed above\n' "$(date -u +%FT%TZ)" "<operator's reason>"
-} 2>&1 | tee "$A"
-```
-
-Expected: `Queue is empty` above the operator's line, and the line with the operator's own reason typed in place of `<operator's reason>`.
-Step 6 runs only within 10 minutes of this file's timestamp; a busy queue, or a longer delay, means running this step again, so each reboot has its own confirmation written just before it.
-
-- [ ] **Step 6: 7.2 — the boot appended one line without `previous_closure`**
-
-Run, only after Step 5's file exists:
+No reboot is scheduled for this change (review F18): 7.2 is observed when magnetite next reboots for its own reasons after D1, and no deploy or other step waits on it.
+Run this after any such reboot, and again at Step 6:
 
 ```bash
-A=$(ls -t "$EV"/7.2-boot-approval-*.log | head -n 1); echo "confirmation: $A"
-age=$(( $(date +%s) - $(stat -f %m "$A") ))
-[ "$age" -le 600 ] || { echo "confirmation is ${age}s old: rerun Step 5"; exit 1; }
+source "$EV/window.env"
 L="$EV/7.2-boot-record-$(date -u +%Y%m%dT%H%M%SZ).log"
 {
-  n0=$(ssh magnetite.zt 'wc -l < /var/log/deploy-record.jsonl'); echo "lines before reboot: $n0"
-  echo "T_BOOT=$(date -u +%FT%TZ)" | tee -a "$EV/window.env"
-  ssh magnetite.zt 'sudo systemctl reboot' || true
-  sleep 60
-  up=no
-  for i in $(seq 1 40); do
-    if ssh -o ConnectTimeout=5 magnetite.zt true 2>/dev/null; then up=yes; break; fi
-    sleep 15
-  done
-  [ "$up" = yes ] || { echo "magnetite not reachable 11 min after the reboot: stop and check its console"; exit 1; }
+  echo "D1_END=$D1_END"
   ssh magnetite.zt 'bash -s' > /tmp/s2-7.2.txt <<'REMOTE'
 f=/var/log/deploy-record.jsonl
-echo "uptime-s $(uptime -s)"
-echo "lines $(wc -l < "$f")"
-echo "current $(readlink -f /run/current-system)"
+boot=$(date -u -d "$(uptime -s)" +%FT%TZ)
+echo "boot $boot"
 echo "booted $(readlink -f /run/booted-system)"
-echo "last $(tail -n 1 "$f" | jq -c .)"
+echo "current $(readlink -f /run/current-system)"
+echo "boots $(journalctl --list-boots --no-pager -q | wc -l)"
+jq -c --arg b "$boot" 'select(.ts >= $b)' "$f" | head -n 1 | sed 's/^/first-after-boot /'
+jq -c --arg b "$boot" 'select(.ts >= $b and (has("previous_closure") | not))' "$f" | wc -l | sed 's/^/no-previous-after-boot /'
 REMOTE
   cat /tmp/s2-7.2.txt
-  source "$EV/window.env"
-  n1=$(sed -n 's/^lines //p' /tmp/s2-7.2.txt); cur=$(sed -n 's/^current //p' /tmp/s2-7.2.txt)
-  boot=$(sed -n 's/^booted //p' /tmp/s2-7.2.txt); last=$(sed -n 's/^last //p' /tmp/s2-7.2.txt)
-  if [ "$n1" -eq $((n0 + 1)) ] && [ "$(jq -r .host <<<"$last")" = magnetite ] \
-    && [ "$(jq -r .closure <<<"$last")" = "$boot" ] && [ "$boot" = "$cur" ] \
-    && [ "$(jq -r 'has("previous_closure")' <<<"$last")" = false ] \
-    && [[ "$(jq -r .ts <<<"$last")" > "$T_BOOT" ]]; then
+  boot=$(sed -n 's/^boot //p' /tmp/s2-7.2.txt); booted=$(sed -n 's/^booted //p' /tmp/s2-7.2.txt)
+  first=$(sed -n 's/^first-after-boot //p' /tmp/s2-7.2.txt); np=$(sed -n 's/^no-previous-after-boot //p' /tmp/s2-7.2.txt)
+  if [[ "$boot" < "$D1_END" ]]; then
+    echo "boot record: not yet observed (magnetite last booted at $boot, before D1_END)"
+  elif [ -n "$first" ] && [ "$np" = 1 ] && [ "$(jq -r .host <<<"$first")" = magnetite ] \
+    && [ "$(jq -r .closure <<<"$first")" = "$booted" ] \
+    && [ "$(jq -r 'has("previous_closure")' <<<"$first")" = false ]; then
+    grep -q "^T_BOOT=$boot$" "$EV/window.env" || echo "T_BOOT=$boot" | tee -a "$EV/window.env"
     echo "boot record: PASS"
   else
     echo "boot record: FAIL"
@@ -296,10 +272,17 @@ REMOTE
 } 2>&1 | tee "$L"
 ```
 
-Expected: `confirmation:` naming the newest approval file, less than 600 s old; `uptime-s` a time after `T_BOOT`; `lines` one more than `lines before reboot`; the last line names `magnetite` and a `closure` equal to both `booted` and `current`, has no `previous_closure` key and a `ts` after `T_BOOT`; then `boot record: PASS`.
-The wait for magnetite is bounded at 60 s plus 40 tries 15 s apart, about 11 minutes (review F18); an unreachable host stops the step instead of looping, and the operator checks the machine's console.
-At boot the activation runs from a fresh `/run`, before it links `/run/current-system`, so the snippet finds no current system (design D9).
+Expected, before any reboot since D1: `boot` earlier than `D1_END` and `boot record: not yet observed (…)`.
+Expected, after a natural reboot: `boot` after `D1_END`; the first line with `ts` at or after the boot names `magnetite`, has a `closure` equal to `booted` and no `previous_closure` key; `no-previous-after-boot 1`, exactly one line without `previous_closure` since that boot; `T_BOOT=<boot>` appended once; `boot record: PASS`.
+At boot the activation runs from a fresh `/run`, before it links `/run/current-system`, so the snippet finds no current system (design D9); a deploy after the boot adds lines that do carry `previous_closure`, which the filter leaves out.
+`uptime -s` prints the kernel's boot time in magnetite's local zone, which the remote `date -u -d` converts to UTC; the activation runs after it, so the boot's line has a `ts` at or after it.
 If the reboot happens after D3, the collector ships this line too, and C6 and C7 of later reconcile runs count it.
+
+- [ ] **Step 6: 7.2 — the final record at close-out**
+
+Run Step 5's block once more when Task 8 starts, whether or not a reboot has occurred.
+
+Expected: the newest `7.2-boot-record-*.log` ends in `boot record: PASS` or `boot record: not yet observed (…)`; Task 8 records 7.2 as observed or as not yet observed accordingly, and neither result blocks close-out.
 
 - [ ] **Step 7: 7.3 — the four tables and pipelines exist, empty, without a TTL of their own (after 2.9)**
 
@@ -375,7 +358,7 @@ L="$EV/7.4-backfill-$(date -u +%Y%m%dT%H%M%SZ).log"
   echo "D3_END=$D3_END"
   done_a=no; done_b=no
   for i in $(seq 1 30); do
-    na=$(echo "SELECT count(*) FROM build_attributes WHERE finished_at IS NOT NULL;" | "$EV/pgq.sh" postgres -At)
+    na=$(echo "SELECT count(*) FROM build_attributes a JOIN builds b ON b.id = a.build_id JOIN projects p ON p.id = b.project_id WHERE a.finished_at IS NOT NULL;" | "$EV/pgq.sh" postgres -At)
     nb=$(echo "SELECT count(*) FROM builds WHERE finished_at IS NOT NULL;" | "$EV/pgq.sh" postgres -At)
     sa=$(echo 'SELECT count(*) FROM (SELECT DISTINCT build_id, attr FROM ci_attribute)' | "$EV/gsql.sh" devloop | sed -n 2p | jq '.[0]')
     sb=$(echo 'SELECT count(*) FROM (SELECT DISTINCT build_id FROM ci_build)' | "$EV/gsql.sh" devloop | sed -n 2p | jq '.[0]')
@@ -391,6 +374,7 @@ L="$EV/7.4-backfill-$(date -u +%Y%m%dT%H%M%SZ).log"
 
 Expected: `ci_attribute` keys climbing by about 10,000 a minute, one page per 60 s poll (design D6), and `ci_attribute reached nixbot's count at poll` 19 to 25, from about 200,000 attribute rows (`logs/s2/grounding.md` §1.4, 200,006 on 2026-10-21) plus those finished since; `ci_build` reaching its count within the first one or two polls (about 1,720 builds); then `backfill: PASS`.
 The two counts come from separate systems, nixbot's PostgreSQL as `postgres` and the store as `regulator`, so neither is derived from the other.
+nixbot's attribute count joins `builds` and `projects` as the export query does (review F22e), so an attribute whose build or project row is missing is excluded on both sides; the build count takes `builds` alone, as the `ci_build` query joins nothing.
 A store count above nixbot's is expected by the size of restarted attributes, whose earlier finish the store keeps under the same `(build_id, attr)` while nixbot's row now has a later or null `finished_at` (design D11 Rationale).
 
 - [ ] **Step 10: 7.4 — every devloop exporter sends with no failure**
@@ -918,6 +902,7 @@ L="$EV/7.7-reconcile-$(date -u +%Y%m%dT%H%M%SZ).log"
 Expected: `days since D3_END` at least 7; one line per day from the first 02:15 after D4 to the last 02:15 that has finished, each `ok=7 fail=0`; `days without a passing reconcile: none`; exactly one `failed.log` line, the forced one between `T_FORCED_FAIL` and `T_FORCED_RESOLVE`; `FAILED posts outside the forced failure: 0`; `reconcile: PASS`.
 `failed.log` gains a line for every posted `FAILED` (`modules/nixos/observability-notify.nix:39-41`) and is not rotated, so it covers the whole period, which ntfy's message cache need not.
 Fewer than seven scheduled runs means waiting and rerunning this step.
+The loop counts a day's 02:15 run only once it has finished: before 02:40 UTC today's run is left out and checked at the next rerun (review F22d).
 A day whose 02:15 run is missing was one on which magnetite was down at 02:15; `Persistent=true` then catches up at boot but reconciles only the day before the boot, so the day named `needs a hand rerun` is reconciled by hand with a runtime drop-in, as Step 22 forces its failure, and the step is run again (review F13):
 
 ```bash
@@ -984,12 +969,33 @@ L="$EV/7.7-join-$(date -u +%Y%m%dT%H%M%SZ).log"
     if [ "$sha" = "$D5_COMMIT" ] || [ "$tree" = "$want" ]; then hit=yes; fi
   done
   [ "$n" = 1 ] && [ "$hit" = yes ] && echo "join: PASS" || echo "join: FAIL"
+  echo '$ fleet-alerts posts since D5_END, from the evaluator journal (ntfy publish responses on ntfy-send stdout)'
+  ssh magnetite.zt "sudo journalctl -u fleet-alert --since '$D5_END' -o cat --no-pager -q" > /tmp/s2-7.7-fleet-alert.txt
+  echo "first JSON line: $(grep -m1 '^{' /tmp/s2-7.7-fleet-alert.txt)"
+  grep '^{' /tmp/s2-7.7-fleet-alert.txt | jq -s -c '[.[] | select(.event == "message" and .topic == "fleet-alerts")] | {
+    firing_StoreQueryFailing: ([.[] | select(.title | startswith("[FIRING] StoreQueryFailing"))] | length),
+    resolved_StoreQueryFailing: ([.[] | select(.title | startswith("[RESOLVED] StoreQueryFailing"))] | length),
+    firing_PullRequestQueueWaitBurn: ([.[] | select(.title | startswith("[FIRING] PullRequestQueueWaitBurn"))] | length),
+    resolved_PullRequestQueueWaitBurn: ([.[] | select(.title | startswith("[RESOLVED] PullRequestQueueWaitBurn"))] | length)}'
+  echo "post failed lines: $(grep -c 'fleet-alert: post failed:' /tmp/s2-7.7-fleet-alert.txt || true)"
+  echo '$ cross-check over the last 24 h: journal [FIRING] counts vs state.json .firings'
+  now=$(date +%s)
+  ssh magnetite.zt "sudo journalctl -u fleet-alert --since '@$((now - 86400))' -o cat --no-pager -q" | grep '^{' \
+    | jq -s -c '[.[] | select(.event == "message" and .topic == "fleet-alerts" and (.title | startswith("[FIRING] ")))] | map(.title | sub("^\\[FIRING\\] "; "") | split(" ")[0]) | group_by(.) | map({(.[0]): length}) | add // {}' > /tmp/s2-7.7-j24.json
+  ssh magnetite.zt "sudo jq -c --argjson now $now '[.firings[] | select(.at > \$now - 86400) | .alert] | group_by(.) | map({(.[0]): length}) | add // {}' /var/lib/fleet-alert/state.json" > /tmp/s2-7.7-s24.json
+  echo "journal 24 h: $(cat /tmp/s2-7.7-j24.json)"; echo "state.json 24 h: $(cat /tmp/s2-7.7-s24.json)"
+  for a in StoreQueryFailing PullRequestQueueWaitBurn; do
+    [ "$(jq -r --arg a "$a" '.[$a] // 0' /tmp/s2-7.7-j24.json)" = "$(jq -r --arg a "$a" '.[$a] // 0' /tmp/s2-7.7-s24.json)" ] || { echo "24 h mismatch for $a"; hit=no; }
+  done
   for p in 'reconcile: PASS' 'questions: PASS' 'join: PASS'; do rg -l -F "$p" "$EV"/7.7-*.log > /dev/null || { echo "missing: $p"; hit=no; }; done
   rg -l -F 'join: PASS' "$EV"/7.7-join-*.log > /dev/null && [ "$hit" = yes ] && echo "acceptance: PASS"
 } 2>&1 | tee "$L"
 ```
 
-Expected: one line with `ts` inside D5's window, `D5 lines: 1`, and its closure; one `deploy_record` row for that closure, shipped by `file_log/deploy-record`; at least one `ci_attribute` row for `checks.x86_64-linux.nixos-magnetite` with that `outputs_out`, the check being the machine's toplevel itself (`modules/checks/machines.nix:33-45`, `:72-74`); a `commit … tree …` line whose commit is `D5_COMMIT` or whose tree is `D5_COMMIT`'s; `join: PASS`; then `acceptance: PASS`.
+Expected: one line with `ts` inside D5's window, `D5 lines: 1`, and its closure; one `deploy_record` row for that closure, shipped by `file_log/deploy-record`; at least one `ci_attribute` row for `checks.x86_64-linux.nixos-magnetite` with that `outputs_out`, the check being the machine's toplevel itself (`modules/checks/machines.nix:33-45`, `:72-74`); a `commit … tree …` line whose commit is `D5_COMMIT` or whose tree is `D5_COMMIT`'s; `join: PASS`; a `first JSON line` that is an ntfy message object with `"event":"message"`, `"topic"` and `"title"`; the four post counts since D5 recorded (review F22f), `firing_StoreQueryFailing` and `resolved_StoreQueryFailing` expected 0, and the `PullRequestQueueWaitBurn` counts a `FIRING` and a `RESOLVED` per episode on the days Step 27's method marks as holding; `post failed lines: 0`; the journal's and `state.json`'s 24 h counts equal for both alerts, with no `24 h mismatch` line; then `acceptance: PASS`.
+The evaluator logs nothing of its own for a successful post, only `fleet-alert: post failed: <title>` on failure (`modules/nixos/fleet-alert.nix:257-262`); each post's evidence is ntfy's publish response, which `ntfy-send` prints on stdout because its `curl -sfk` has no `-o` (`pkgs/by-name/ntfy-send/ntfy-send.sh`), and the unit's stdout goes to the journal.
+ntfy's publish handler answers with the published message as JSON (`binwiederhier/ntfy@v2.28.0:server/server.go:980-988`, `s.writeJSON(w, m.ForJSON())`); that the deployed server's response carries `title` as shown is `[INFERENCE]`, confirmed by this step's `first JSON line`.
+`state.json`'s `.firings` gains `{at, alert, host}` for each non-`info` `FIRING` post (`modules/nixos/fleet-alert/transition.jq:190`) and keeps only the last 24 h (`:154`), so the cross-check covers the last 24 h only, two independent records of the same posts.
 The closure comes from the snippet on magnetite and the output path from nixbot's build record, two independent sources whose equality is the attribution (DC `A deploy can be attributed to the commits that built it`).
 The tree comparison is there because the merge queue lands a tree that a pull-request or batch build already built, so nixbot's row can carry that build's commit rather than the `main` commit D5 deployed, with the same tree.
 

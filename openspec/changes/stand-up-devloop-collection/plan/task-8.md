@@ -23,8 +23,8 @@ All of it lands as one change and pull request 7; per `openspec-linear-sync`, th
 - Create (git-ignored evidence): `logs/s2-evidence/9.1-arrival-watch.log`, `logs/s2-evidence/9.1-closed-record-<ts>.log`, `logs/s2-evidence/8.1-eval-cost-<ts>.log`, `logs/s2-evidence/8.3-sync-order-<ts>.log`, `logs/s2-evidence/8.4-satisfaction-<ts>.log`, `logs/s2-evidence/8.5-specs-<ts>.log`, `logs/s2-evidence/linear-doc-ids.txt`, and the `nix fmt` logs of Steps 12 and 21
 
 **Interfaces:**
-- Consumes (Task 7, confirmed by S2PlanT7): the logs `logs/s2-evidence/7.<n>-<slug>-<ts>.log`, which print `deploy record: PASS` (7.1), `boot record: PASS` (7.2, beside the operator's `7.2-boot-approval-<ts>.log`), `devloop tables: PASS` (7.3), `ingest: PASS` (7.4), `devloop-reconcile: C7 current-system: ok` and `FAILED devloop-reconcile.service on magnetite` (7.5), `burn rule history: recorded` (7.6) and `acceptance: PASS` (7.7); `logs/s2-evidence/window.env` holding `PRE_D1_SYSTEM`, `PRE_D1_LINES`, `D1_START` … `D5_END` (`date -u +%FT%TZ`), `D1_COMMIT` … `D5_COMMIT` (the full `origin/main` hash each deploy used), `T_BOOT`, `T_FORCED_FAIL`, `T_FORCED_RESOLVE`; the deploy procedure `logs/s2-evidence/s2-deploy.sh HOST LABEL` for any review follow-up redeploy.
-- Consumes (Tasks 1–6): the evidence named in `tasks.md` (`1.1-plan-review-<ts>.md`, `1.2-schema-diff-<ts>.log`, `3.7-journal-assertion-<ts>.log`, `4.5-r31-<ts>.log`) and each task's `nix fmt`, evaluation-cost and container-test logs under `logs/s2-evidence/`; `flake.lib.devloopCollection.questions.formationToLand`; the reconcile's output lines `devloop-reconcile: C<n> <name>: ok` and `… FAIL <detail>` for `C1 attributes` … `C7 current-system`; `fleet-alert.service`'s configuration at `FLEET_ALERT_CONFIG`, whose `.rules[]` each carry `database` and `language` and which has no top-level `database` (Task 5); the evaluator's store-failure lines `fleet-alert: query failed:`, `fleet-alert: HTTP <code> for query:`, `fleet-alert: query deadline of` and `fleet-alert: the store did not answer; instances are frozen` (`modules/nixos/fleet-alert.nix:114`, `:126`, `:131`, `:266` today).
+- Consumes (Task 7, confirmed by S2PlanT7): the logs `logs/s2-evidence/7.<n>-<slug>-<ts>.log`, which print `deploy record: PASS` (7.1), `boot record: PASS` or `boot record: not yet observed` (7.2, opportunistic, in `7.2-boot-record-<ts>.log` when it ran), `devloop tables: PASS` (7.3), `ingest: PASS` (7.4), `devloop-reconcile: C7 current-system: ok` and `FAILED devloop-reconcile.service on magnetite` (7.5), `burn rule history: recorded` (7.6) and `acceptance: PASS` (7.7); `logs/s2-evidence/window.env` holding `PRE_D1_SYSTEM`, `PRE_D1_LINES`, `D1_START` … `D5_END` (`date -u +%FT%TZ`), `D1_COMMIT` … `D5_COMMIT` (the full `origin/main` hash each deploy used), `T_BOOT` (only when a natural reboot was observed), `T_FORCED_FAIL`, `T_FORCED_RESOLVE`; the deploy procedure `logs/s2-evidence/s2-deploy.sh HOST LABEL` for any review follow-up redeploy.
+- Consumes (Tasks 1–6): the evidence named in `tasks.md` and the plan (`1.1-plan-review-<ts>.md`, magnetite's normalised schema dump `1.2-schema-magnetite.norm.sql`, Task 2's schema diff `2.6-schema-diff-<ts>.log`, which decided lexical application, `2.7-precheck-<ts>.log`, `3.7-journal-assertion-<ts>.log`, `4.5-r31-<ts>.log`) and each task's `nix fmt`, evaluation-cost and container-test logs under `logs/s2-evidence/`; `flake.lib.devloopCollection.questions.formationToLand`; the reconcile's output lines `devloop-reconcile: C<n> <name>: ok` and `… FAIL <detail>` for `C1 attributes` … `C7 current-system`; `fleet-alert.service`'s configuration at `FLEET_ALERT_CONFIG`, whose `.rules[]` each carry `database` and `language` and which has no top-level `database` (Task 5); the evaluator's store-failure lines `fleet-alert: query failed:`, `fleet-alert: HTTP <code> for query:`, `fleet-alert: query deadline of` and `fleet-alert: the store did not answer; instances are frozen` (`modules/nixos/fleet-alert.nix:114`, `:126`, `:131`, `:266` today).
 - Consumes (Linear and OpenSpec): CAM-69 in team `CAM`, project `fleet-observability` (slugId `aeed302bea3b`), workspace `cameronraysmith`; proposal.md's ledger (`linear_story_state` advanced to `In Progress` by Task 1's first tick); stored document ids in `openspec/linear.yaml:85-96`: `host-metrics-collection` `5a3a3fc0-fe9b-46dc-97c5-908743914066`, `telemetry-store-interface` `1b158db4-f5e8-42bb-b733-81fd9aa9fb38`, `fleet-alerting` `a14e48d5-3c08-4ac4-994e-c23a5439ff18`, `fleet-alerting-interface` `ee21d4e7-237f-4778-9bb4-2826a87332ab`, and the shared `world-assumptions` mirror `a7f9d24e-8fe2-4120-9ba0-e7d4d3a23fe1` (registered under `pyrite-baremetal-nixos`, `openspec/linear.yaml:59-66`; S3 plan Task 8 Step 16).
 - Produces: `verify.md` with the schema's §1–§8 and an evidence ledger §9–§10; `review.md`; `retrospective.md`; seven synced main specs, two of them new with a written Purpose; the regenerated satisfaction projection; the archived change; Linear documents `OpenSpec: devloop-collection` and `OpenSpec: devloop-collection-interface` created in `fleet-observability` and five existing documents updated; CAM-69 in `Done`.
 
@@ -35,20 +35,23 @@ Run from `$REPO`, at least seven days after `D3_END` and after 7.7 has run:
 ```bash
 export EV="$(git rev-parse --show-toplevel)/logs/s2-evidence"
 ls "$EV"
-for p in '7.1:deploy record: PASS' '7.2:boot record: PASS' '7.3:devloop tables: PASS' '7.4:ingest: PASS' \
+for p in '7.1:deploy record: PASS' '7.3:devloop tables: PASS' '7.4:ingest: PASS' \
          '7.5:devloop-reconcile: C7 current-system: ok' '7.5:FAILED devloop-reconcile.service on magnetite' \
          '7.6:burn rule history: recorded' '7.7:acceptance: PASS'; do
   n=${p%%:*}; s=${p#*:}
   printf '%s %s: %s\n' "$n" "$s" "$(rg -l -F "$s" "$EV"/"$n"-*.log 2>/dev/null | wc -l | tr -d ' ')"
 done
-ls "$EV"/7.2-boot-approval-*.log "$EV"/1.1-plan-review-*.md "$EV"/1.2-schema-diff-*.log "$EV"/3.7-journal-assertion-*.log "$EV"/4.5-r31-*.log
+echo "7.2: $(rg -h -o -e 'boot record: PASS' -e 'boot record: not yet observed' "$EV"/7.2-boot-record-*.log 2>/dev/null | tail -n 1 || true)"
+ls "$EV"/1.1-plan-review-*.md "$EV"/1.2-schema-magnetite.norm.sql "$EV"/2.6-schema-diff-*.log "$EV"/3.7-journal-assertion-*.log "$EV"/4.5-r31-*.log
 source "$EV/window.env"
-for v in PRE_D1_SYSTEM D1_START D1_END D2_START D2_END D3_START D3_END D4_START D4_END D5_START D5_END D5_COMMIT T_BOOT T_FORCED_FAIL T_FORCED_RESOLVE; do
+for v in PRE_D1_SYSTEM D1_START D1_END D2_START D2_END D3_START D3_END D4_START D4_END D5_START D5_END D5_COMMIT T_FORCED_FAIL T_FORCED_RESOLVE; do
   printf '%s=%s\n' "$v" "${!v:-MISSING}"
 done
+echo "T_BOOT=${T_BOOT:-none}"
 ```
 
-Expected: every count at least `1`; the five `ls` paths exist; no `MISSING`.
+Expected: every count at least `1`; the five `ls` paths exist; no `MISSING`; `7.2:` followed by `boot record: PASS` and a `T_BOOT` time, or by `boot record: not yet observed` (or nothing, when no 7.2 log exists) and `T_BOOT=none`.
+7.2 is opportunistic and gates nothing: it records the boot line at magnetite's next natural reboot after D1, and when none has occurred by close-out, `verify.md` §9.4 records `not yet observed` (Step 8).
 A zero count or a missing file means its Task 7 or earlier step has not run or failed: stop, and run that step first.
 
 - [ ] **Step 2: 9.1 — start the arrival watch on magnetite when Task 5's pull request opens**
@@ -296,14 +299,14 @@ Sections 9 and 10 are the evidence ledger that `tasks.md` 7.1–7.7 and 9.1 requ
 ### 9.1 Evaluation cost of each new or changed check
 <!-- 8.1-eval-cost; each Task 1-5 NIX_SHOW_STATS figure for devloop-queries, otel-collector-config and fleet-alert, one line per check: check, drvPath, gc.totalBytes, cpuTime, against 0.5 GiB, with the method -->
 
-### 9.2 Planning-time evidence (tasks.md 1.1, 1.2)
-<!-- 1.1-plan-review (findings and dispositions), 1.2-schema-diff (both sha256, the diff, the decision) -->
+### 9.2 Planning-time evidence and the schema baseline (tasks.md 1.1, 1.2, 2.6)
+<!-- 1.1-plan-review (findings and dispositions); 1.2's read-only magnetite dump (sha256 of 1.2-schema-magnetite.norm.sql); 2.6-schema-diff (the diff against devloop-queries' schema and the lexical-application decision it made) -->
 
 ### 9.3 D1 and the deploy record (tasks.md 1.7, 7.1)
 <!-- 7.1-* (deploy record: PASS), queue-D1 and the tail of the D1 deploy log -->
 
-### 9.4 The boot record (tasks.md 7.2)
-<!-- 7.2-boot-approval [operator], 7.2-* (boot record: PASS) -->
+### 9.4 The boot record, opportunistic (tasks.md 7.2)
+<!-- 7.2-boot-record (boot record: PASS, with T_BOOT and the appended line) if magnetite rebooted naturally after D1; otherwise the single line "not yet observed: magnetite has not rebooted since D1 (uptime -s <time>)", which gates nothing -->
 
 ### 9.5 D2 and the devloop tables (tasks.md 2.7, 2.9, 7.3)
 <!-- 2.7-precheck (the pre-D2 compile check on a throwaway store), 7.3-* (devloop tables: PASS), queue-D2 and the tail of the D2 deploy log -->
@@ -379,7 +382,7 @@ Check `(pass) PASS` when every section holds, `(warn) PASS WITH WARNINGS` naming
 
 - [ ] **Step 9: Tick the items**
 
-With the edit tool, in `openspec/changes/stand-up-devloop-collection/tasks.md`, change only the leading `- [ ]` to `- [x]` on the lines of 7.1–7.7 (`:81-87`), 8.1–8.5 (`:91-95`) and 9.1 (`:99`), and nothing else; 7.x lines Task 7 already ticked stay as they are, and 8.2–8.5 are ticked now because this change completes them before it is pushed.
+With the edit tool, in `openspec/changes/stand-up-devloop-collection/tasks.md`, change only the leading `- [ ]` to `- [x]` on the lines of 7.1–7.7 (`:81-87`), 8.1–8.5 (`:91-95`) and 9.1 (`:99`), and nothing else; 7.x lines Task 7 already ticked stay as they are, 7.2 is ticked whether `verify.md` §9.4 records the boot line or `not yet observed`, because the item asks only that close-out record which, and 8.2–8.5 are ticked now because this change completes them before it is pushed.
 Run:
 
 ```bash
@@ -516,7 +519,7 @@ In §4 put a table `| Rule | Source | Applied in S2 | What it caught |` with one
 | Rule | Source | Applied in S2 |
 |---|---|---|
 | Read the upstream source behind a vendor option before depending on it | S1 §6 `:132` | plan pins and citations (otelcol-contrib `sqlquery`, `journald`, `file_log`; nixbot migrations; gitea-mq messages; GreptimeDB pipelines) |
-| Each new producer has a start-order relation and a check for it | S1 §6 `:136` | R3.1's ordering clause keeps the collector after `greptimedb-schema` (3.6); `devloop-ingest`'s writer-ordering case (3.9) |
+| Each new producer has a start-order relation and a check for it | S1 §6 `:136` | R3.1's ordering clause and its `schemaOrderDropped` mutant keep the collector after `greptimedb-schema` (3.6); `devloop-ingest`'s `noAutoCreate` case shows a missing table is not auto-created (3.9) |
 | Runtime tests start dependent units together and assert no dropped data | S1 §6 `:140` | every ingest case of `devloop-ingest` asserts `otelcol_exporter_send_failed_log_records` is zero after the first send (3.9) |
 | A clause relates independently defined values; a property of one module is an assertion | S1 §6 `:144`, S3 §6 `:158` | the value sources named per clause in 1.5, 2.6 (including the marker clause bound to the patch's production lines), 3.6, 4.5; the journal-read assertion (3.7) and the R8.2 and kill-order assertions (4.4) shown failing by `extendModules` overrides |
 | Measure each new check's evaluation cost against a budget, with `.#.checks…` and the method | S1 §6 `:148`, S3 §6 `:154` | each task's figure and Step 7's re-measurement (`verify.md` §9.1) |
@@ -530,7 +533,7 @@ In §4 put a table `| Rule | Source | Applied in S2 | What it caught |` with one
 | Record the operator's reason whenever a planned gate is replaced | S1 §6 `:180` | `review.md`'s opening paragraph (Step 13) |
 | A reference model is written from the specification's scenarios | S3 §6 `:142` | the burn-rule timeline leg taken from the `fleet-alerting-interface` scenario `The timeline is replayed` before any evaluator change (5.1) |
 | A shared clan var gains a reader with `clan vars fix`, never `clan vars generate` | S3 §6 `:146` | not needed: S2 adds no var and `devloop-reconcile` loads the existing `regulator-password` |
-| A human step a later observation depends on is its own gated step | S3 §6 `:150` | 7.2's reboot approval; Step 14 |
+| A human step a later observation depends on is its own gated step | S3 §6 `:150` | no later observation depends on a human step: 7.2 became opportunistic (plan review F18) and gates nothing; Step 14's documenter gate |
 | Each slice names the regulator its own silence modes need | S3 §6 `:166` | `devloop-reconcile` (C4 batch liveness) for a silent gitea-mq; `RuleSignalMissing` does not cover `devloop` |
 | Schedule CAM-76's watch before S5 | S3 §6 `:170` | not S2's: record CAM-76's state as read on the retrospective's date |
 | S2 adds a per-rule `database` to the rule table, the fixture server and `promtool` | S3 §6 `:174` | 5.1–5.5 and 10.5 above |
