@@ -71,6 +71,7 @@ in
         matrix
         omnigraph
         greptimedb
+        devloop-collection
         fleet-alert
         ntfy-alerter
         effects-vanixiets-secrets

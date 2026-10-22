@@ -3,8 +3,9 @@
 # Site-neutral and free of clan vars, so the runtime tests import it with
 # their own credentials. The host supplies LoadCredential (`users` for the
 # store, `admin-password` for the schema job), the R2 EnvironmentFile, the
-# [storage] object-store stanza, `databases` and any `tableTtls`; without a
-# stanza the store uses GreptimeDB's local `File` storage under data_home.
+# [storage] object-store stanza, `databases`, any `tableTtls` and any
+# `tables` and `pipelines`; without a stanza the store uses GreptimeDB's
+# local `File` storage under data_home.
 # The memory envelope, listeners, worker pools and usage reporting are fixed
 # here. The listeners, protocols, user provider and usage reporting are
 # assertions below, so every host and test importing the module is held to
@@ -93,6 +94,65 @@ in
         "ALTER DATABASE ${database} SET 'ttl'='${cfg.databases.${database}}'"
       ]) (lib.attrNames cfg.databases);
 
+      # Tables and ingest pipelines (design D5), applied after the databases
+      # as admin. With both options empty the script gains nothing, so a host
+      # that sets neither runs the script it ran before.
+      tableStatements = lib.concatLists (
+        lib.mapAttrsToList (
+          database: statements: map (statement: { inherit database statement; }) statements
+        ) cfg.tables
+      );
+      pipelineUploads = lib.concatLists (
+        lib.mapAttrsToList (
+          database: pipelines:
+          lib.mapAttrsToList (name: yaml: {
+            inherit database name;
+            file = pkgs.writeText "greptimedb-pipeline-${database}-${name}.yaml" yaml;
+          }) pipelines
+        ) cfg.pipelines
+      );
+      # /v1/sql answers 200 only on success
+      # (GreptimeTeam/greptimedb@v1.2.1:src/servers/src/error.rs:933-935), and
+      # the pipeline API takes the first multipart field as the pipeline's
+      # YAML (src/servers/src/http/event.rs:137-175, :293-325). The answer
+      # goes to a file under PrivateTmp, so its status is judged on its own.
+      objectsScript = lib.optionalString (tableStatements != [ ] || pipelineUploads != [ ]) (
+        "\n"
+        + ''
+          answer="$(mktemp)"
+          expect_200() {
+            cat "$answer"
+            echo
+            if [ "$1" != 200 ]; then
+              echo "greptimedb-schema: $2 answered HTTP $1" >&2
+              exit 1
+            fi
+          }
+          database_sql() {
+            local status
+            status="$(printf 'user = "admin:%s"\n' "$password" |
+              curl --silent --show-error --config - --output "$answer" --write-out '%{http_code}' \
+                --data-urlencode "sql=$2" "${httpUrl}/v1/sql?db=$1")"
+            expect_200 "$status" "the statement on $1"
+          }
+          upload_pipeline() {
+            local status
+            status="$(printf 'user = "admin:%s"\n' "$password" |
+              curl --silent --show-error --config - --output "$answer" --write-out '%{http_code}' \
+                --form "file=@$3" "${httpUrl}/v1/pipelines/$2?db=$1")"
+            expect_200 "$status" "pipeline $2 on $1"
+          }
+
+          ${lib.concatMapStringsSep "\n" (
+            table: "database_sql ${lib.escapeShellArg table.database} ${lib.escapeShellArg table.statement}"
+          ) tableStatements}
+          ${lib.concatMapStringsSep "\n" (
+            pipeline:
+            "upload_pipeline ${lib.escapeShellArg pipeline.database} ${lib.escapeShellArg pipeline.name} ${pipeline.file}"
+          ) pipelineUploads}
+        ''
+      );
+
       # The store has no readiness notification, so the job polls /health
       # (design F7). The password reaches curl on stdin through the printf
       # builtin, never on a command line.
@@ -122,7 +182,9 @@ in
             echo
           }
 
-          ${lib.concatMapStringsSep "\n" (statement: "sql ${lib.escapeShellArg statement}") schemaStatements}
+          ${
+            lib.concatMapStringsSep "\n" (statement: "sql ${lib.escapeShellArg statement}") schemaStatements
+          }${objectsScript}
         '';
       };
     in
@@ -150,6 +212,16 @@ in
             "fleet.logs" = "14d";
           };
           description = "Tables, as `<database>.<table>`, allowed a TTL of their own instead of their database's, each mapped to that TTL; greptimedb-envelope fails on any other table TTL.";
+        };
+        tables = lib.mkOption {
+          type = lib.types.attrsOf (lib.types.listOf lib.types.str);
+          default = { };
+          description = "Statements, per database, that the schema job issues through /v1/sql?db=<database> as admin after the databases, in order; any answer but 200 fails the job.";
+        };
+        pipelines = lib.mkOption {
+          type = lib.types.attrsOf (lib.types.attrsOf lib.types.str);
+          default = { };
+          description = "Ingest pipelines, as `<database>.<name>` mapped to the pipeline's YAML, that the schema job uploads to /v1/pipelines/<name>?db=<database> as admin after the tables; any answer but 200 fails the job, and each upload stores a new version.";
         };
       };
 

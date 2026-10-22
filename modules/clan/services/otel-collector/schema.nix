@@ -83,5 +83,95 @@
       devloop = "365d";
       agent = "90d";
     };
+
+    # The devloop allow-list (design D3; ADR-004 as amended by charter v22):
+    # the only declaration of the dev-loop tables' columns, in stored order,
+    # their types, primary keys and time indexes. devloop-collection.nix
+    # renders from it the table statements, the ingest pipelines and the
+    # nixbot queries' output columns; S4's agents read it too. Every column
+    # but the time index is nullable.
+    devloop.tables =
+      let
+        column = name: type: {
+          inherit name type;
+          nullable = true;
+        };
+        timeIndex = name: {
+          inherit name;
+          type = "timestamp";
+          nullable = false;
+        };
+      in
+      {
+        ci_attribute = {
+          columns = [
+            (column "build_id" "int64")
+            (column "attr" "string")
+            (column "system" "string")
+            (column "status" "string")
+            (column "cached" "boolean")
+            (column "abandoned" "boolean")
+            (column "drv_path" "string")
+            (column "outputs_out" "string")
+            (column "started_at" "timestamp")
+            (timeIndex "finished_at")
+            (column "eval_wall_ms" "int64")
+            (column "eval_alloc_bytes" "int64")
+            (column "commit_sha" "string")
+            (column "branch" "string")
+            (column "pr_number" "int64")
+            (column "project" "string")
+          ];
+          primaryKey = [
+            "build_id"
+            "attr"
+          ];
+          timeIndex = "finished_at";
+        };
+        ci_build = {
+          columns = [
+            (column "build_id" "int64")
+            (column "created_at" "timestamp")
+            (column "started_at" "timestamp")
+            (timeIndex "finished_at")
+            (column "eval_duration_ms" "int64")
+            (column "status" "string")
+            (column "pr_number" "int64")
+            (column "branch" "string")
+          ];
+          primaryKey = [ "build_id" ];
+          timeIndex = "finished_at";
+        };
+        batch_event = {
+          columns = [
+            (column "batch" "int64")
+            (column "msg" "string")
+            (column "build" "int64")
+            (column "sha" "string")
+            (column "failed_check" "string")
+            (column "members" "int64")
+            (column "landed" "int64")
+            (column "ejected" "int64")
+            (column "builds" "int64")
+            (column "flaky" "boolean")
+            (timeIndex "ts")
+          ];
+          primaryKey = [
+            "batch"
+            "msg"
+          ];
+          timeIndex = "ts";
+        };
+        deploy_record = {
+          columns = [
+            (column "host" "string")
+            (column "closure" "string")
+            (column "previous_closure" "string")
+            (timeIndex "ts")
+          ];
+          primaryKey = [ "host" ];
+          timeIndex = "ts";
+        };
+      };
   };
 }
