@@ -25,6 +25,7 @@ in
       ]
       ++ (with flakeModules; [
         base
+        deploy-record
         fleet-alert
         hm-sops-bridge
         kvm-declaration

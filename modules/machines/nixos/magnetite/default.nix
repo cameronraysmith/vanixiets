@@ -51,6 +51,7 @@ in
       ]
       ++ (with flakeModules; [
         base
+        deploy-record
         hm-sops-bridge
         kvm-declaration
         memory-pressure-guards

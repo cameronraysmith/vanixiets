@@ -30,6 +30,7 @@ in
       ]
       ++ (with flakeModules; [
         base
+        deploy-record
         ssh-ca-trust
         ssh-known-hosts
         dnscrypt-proxy

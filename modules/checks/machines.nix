@@ -29,15 +29,17 @@
       ) inventory;
 
       obligations = self.lib.omnigentFleetObligations;
+      deployRecordObligations = self.lib.deployRecordObligations;
 
       withFleetObligations =
         name: machineConfig: toplevel:
         let
           unmet = obligations.failures name machineConfig;
+          unmetDeployRecord = deployRecordObligations.failures name machineConfig;
           hostFailures = map (a: a.message) (lib.filter (a: !a.assertion) machineConfig.assertions);
         in
-        assert lib.assertMsg (unmet == [ ]) (
-          "Omnigent fleet obligations unmet on ${name}: ${lib.concatStringsSep ", " unmet}"
+        assert lib.assertMsg (unmet == [ ] && unmetDeployRecord == [ ]) (
+          "Fleet obligations unmet on ${name}: omnigentFleetObligations [${lib.concatStringsSep ", " unmet}]; deployRecordObligations [${lib.concatStringsSep ", " unmetDeployRecord}]"
           + lib.optionalString (hostFailures != [ ]) (
             "\n${name} assertion failures: ${lib.concatStringsSep "\n" hostFailures}"
           )

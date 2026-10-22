@@ -3,15 +3,16 @@ linear_story_id: CAM-69
 linear_story_identifier: CAM-69
 linear_story_title: "S2: Collect dev-loop signals into the devloop database"
 linear_story_url: https://linear.app/cameronraysmith/issue/CAM-69/s2-collect-dev-loop-signals-into-the-devloop-database
-linear_story_state: Todo
+linear_story_state: In Progress
 linear_team: CAM
 linear_project: fleet-observability
-last_synced_state: Todo
-last_synced_at: 2026-10-21T17:20:48Z
+last_synced_state: In Progress
+last_synced_at: 2026-10-22T00:13:34Z
 review_round: 0
 max_review_rounds: 3
 attempt_log:
   - { at: "2026-10-21T17:20:48Z", transition: "Backlog->Todo", outcome: "posted", note: "T1 bind; description seeded from this proposal" }
+  - { at: "2026-10-22T00:13:34Z", transition: "Todo->In Progress", outcome: "posted", note: "first - [x] in tasks.md (1.1-1.5)" }
 ---
 
 ## Why

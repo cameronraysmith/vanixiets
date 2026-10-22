@@ -49,6 +49,7 @@ in
       ]
       ++ (with flakeModules; [
         base
+        deploy-record
         dnscrypt-proxy
         hm-sops-bridge
         kvm-declaration
