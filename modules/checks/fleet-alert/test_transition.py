@@ -1,15 +1,18 @@
 """Property test: transition.jq equals model.py (design D11; tasks.md 4.6).
 
-Hypothesis generates timelines of runs: the time step, a store error, the
-hosts reporting system_memory_usage_bytes, each rule's firing hosts, and the
-index of the first post that fails in that run (the posts before it
-succeed, as the evaluator posts in order and stops at a failure). One jq
-process folds each whole timeline through transition and mark_posted; the
-model does the same; posts and state must be equal at every run. A second
-property, written from the timeline alone, holds both to posting a RESOLVED
-only after 5 min of absence observed while not frozen. The test
-is derandomized, with no example database and no deadline, so it is a pure
-function of its source and cannot flake the merge queue.
+Hypothesis generates timelines of runs: the time step, the databases whose
+queries failed (storeErrors, over fleet and devloop), the hosts reporting
+system_memory_usage_bytes, each rule's firing hosts, and the index of the
+first post that fails in that run (the posts before it succeed, as the
+evaluator posts in order and stops at a failure). One jq process folds each
+whole timeline through transition and mark_posted; the model does the same;
+posts and state must be equal at every run. Further properties, written
+from the timeline alone, hold both to posting a RESOLVED only after 5 min
+of absence observed while not frozen, to leaving fleet's posts unchanged by
+a devloop failure, and to one StoreQueryFailing per failing database
+(stand-up-devloop-collection review F7). The test is derandomized, with no
+example database and no deadline, so it is a pure function of its source
+and cannot flake the merge queue.
 FLEET_ALERT_JQ_LIB names a directory holding transition.jq.
 """
 
@@ -27,9 +30,13 @@ HOSTS = ["magnetite", "stibnite"]
 T0 = 1793102400
 
 
-def rule(alert, seconds, severity):
+DATABASES = ["fleet", "devloop"]
+
+
+def rule(alert, seconds, severity, database="fleet"):
     return {
         "alert": alert,
+        "database": database,
         "expr": alert.lower(),
         "for": seconds,
         "severity": severity,
@@ -39,10 +46,13 @@ def rule(alert, seconds, severity):
     }
 
 
+# Crit, Warn and Info on fleet, Dev on devloop; StoreQueryFailing has no
+# database of its own, as in rules.nix.
 RULES = [
     rule("Crit", 0, "critical"),
     rule("Warn", 120, "warning"),
     rule("Info", 0, "info"),
+    rule("Dev", 60, "critical", "devloop"),
     {
         "alert": "StoreQueryFailing",
         "for": 180,
@@ -52,7 +62,9 @@ RULES = [
         "attribution": [],
     },
 ]
-RULE_NAMES = ["Crit", "Warn", "Info"]
+RULE_NAMES = ["Crit", "Warn", "Info", "Dev"]
+FLEET_RULE_NAMES = ["Crit", "Warn", "Info"]
+RULE_DATABASE = {r["alert"]: r["database"] for r in RULES if "database" in r}
 
 DRIVER = r"""
 include "transition";
@@ -102,7 +114,7 @@ def build(steps):
                 "now": now,
                 "failAt": step["failAt"],
                 "observations": {
-                    "storeError": step["storeError"],
+                    "storeErrors": step["storeErrors"],
                     "reporting": step["reporting"],
                     "presence": {},
                     "results": {
@@ -148,7 +160,7 @@ def run_model(timeline):
 step_strategy = st.fixed_dictionaries(
     {
         "dt": st.sampled_from([60, 60, 60, 120, 300, 900, 3600, 86400]),
-        "storeError": st.sampled_from([False, False, False, False, True]),
+        "storeErrors": st.sampled_from([[], [], [], [], ["devloop"], ["fleet"], ["devloop", "fleet"]]),
         "reporting": st.sampled_from([HOSTS, HOSTS, HOSTS, ["magnetite"], ["stibnite"], []]),
         "results": st.fixed_dictionaries(
             {name: st.lists(st.sampled_from(HOSTS), unique=True) for name in RULE_NAMES}
@@ -226,7 +238,7 @@ def test_rule_without_expr_or_results_is_silent():
                 "now": T0 + 300 * (n + 1),
                 "failAt": None,
                 "observations": {
-                    "storeError": False,
+                    "storeErrors": [],
                     "reporting": HOSTS,
                     "presence": {},
                     "results": results,
@@ -234,7 +246,7 @@ def test_rule_without_expr_or_results_is_silent():
                 },
             }
         )
-    timeline = {"rules": [silent, RULES[3], missing], "steps": steps}
+    timeline = {"rules": [silent, model.rule_named(RULES, "StoreQueryFailing"), missing], "steps": steps}
     for name, got in (("transition.jq", run_jq(timeline)), ("model", run_model(timeline))):
         assert all(posts == [] for posts in got["posts"]), f"{name}: posts {got['posts']}"
         assert got["state"]["instances"] == {}, f"{name}: instances {got['state']['instances']}"
@@ -243,27 +255,33 @@ def test_rule_without_expr_or_results_is_silent():
 def unobserved_resolves(timeline, posts):
     """The RESOLVED posts not preceded by RESOLVE_AFTER seconds of observed absence.
 
-    Written from the timeline alone (design D11, D15): an instance is frozen on
-    a run when the store errs or its host does not report (StoreQueryFailing
-    never), seen when unfrozen and in the results, and absent otherwise.
+    Written from the timeline alone (design D11, D15; review F7): an instance
+    is frozen on a run when its rule's database is in storeErrors or its host
+    does not report (StoreQueryFailing never), seen when unfrozen and in the
+    results, and absent otherwise; StoreQueryFailing for a database is seen
+    exactly when that database failed.
     Absence counts from the run it was last seen on or, after a freeze, from
     the first unfrozen run; a RESOLVED is due once that count reaches
     RESOLVE_AFTER, and stays due, across later freezes, until it is seen.
     """
-    candidates = {model.instance_id("StoreQueryFailing", {}): ("StoreQueryFailing", None)}
+    candidates = {
+        model.instance_id("StoreQueryFailing", {"database": database}): ("StoreQueryFailing", None, database)
+        for database in DATABASES
+    }
     for alert in RULE_NAMES:
         for host in HOSTS:
-            candidates[model.instance_id(alert, {"host_name": host})] = (alert, host)
+            candidates[model.instance_id(alert, {"host_name": host})] = (alert, host, RULE_DATABASE[alert])
     since = dict.fromkeys(candidates)
     due = dict.fromkeys(candidates, False)
     found = []
     for index, (step, planned) in enumerate(zip(timeline["steps"], posts)):
         observations, now = step["observations"], step["now"]
-        for iid, (alert, host) in candidates.items():
+        errors = observations["storeErrors"]
+        for iid, (alert, host, database) in candidates.items():
             if alert == "StoreQueryFailing":
-                frozen, seen = False, observations["storeError"]
+                frozen, seen = False, database in errors
             else:
-                frozen = observations["storeError"] or host not in observations["reporting"]
+                frozen = database in errors or host not in observations["reporting"]
                 seen = not frozen and host in [
                     s["labels"]["host_name"] for s in observations["results"][alert]
                 ]
@@ -305,6 +323,83 @@ def test_resolve_follows_unfrozen_absence(steps):
     )
 
 
+def every_post_succeeds(timeline):
+    """The timeline with no failed post, so removing one database's posts cannot shift another's."""
+    return {"rules": timeline["rules"], "steps": [dict(step, failAt=None) for step in timeline["steps"]]}
+
+
+def without_devloop_failures(timeline):
+    """The same timeline with devloop removed from every run's storeErrors."""
+    steps = []
+    for step in timeline["steps"]:
+        errors = [database for database in step["observations"]["storeErrors"] if database != "devloop"]
+        steps.append(dict(step, observations=dict(step["observations"], storeErrors=errors)))
+    return {"rules": timeline["rules"], "steps": steps}
+
+
+def on_fleet(post):
+    alert, entries = json.loads(post["id"])
+    return alert in FLEET_RULE_NAMES or (
+        alert == "StoreQueryFailing" and entries == [{"key": "database", "value": "fleet"}]
+    )
+
+
+def fleet_posts(result):
+    return [[post for post in run if post["kind"] != "budget" and on_fleet(post)] for run in result["posts"]]
+
+
+# A devloop failure leaves every fleet instance as it is without it (review
+# F7): fleet's posts, StoreQueryFailing for fleet among them, are those of
+# the same timeline with devloop removed from every run's storeErrors.
+@settings(
+    derandomize=True,
+    database=None,
+    deadline=None,
+    max_examples=200,
+    print_blob=False,
+    suppress_health_check=[HealthCheck.too_slow, HealthCheck.data_too_large],
+)
+@given(st.lists(step_strategy, min_size=1, max_size=40))
+def test_failure_freezes_only_its_database(steps):
+    timeline = every_post_succeeds(build(steps))
+    twin = without_devloop_failures(timeline)
+    for name, run in (("transition.jq", run_jq), ("model", run_model)):
+        assert fleet_posts(run(timeline)) == fleet_posts(run(twin)), f"{name}: a devloop failure changed fleet's posts"
+
+
+# StoreQueryFailing is one instance per failing database, labelled with it,
+# and its title names that database.
+@settings(
+    derandomize=True,
+    database=None,
+    deadline=None,
+    max_examples=200,
+    print_blob=False,
+    suppress_health_check=[HealthCheck.too_slow, HealthCheck.data_too_large],
+)
+@given(st.lists(step_strategy, min_size=1, max_size=40))
+def test_store_query_failing_is_keyed_by_database(steps):
+    timeline = build(steps)
+    allowed = {model.instance_id("StoreQueryFailing", {"database": database}) for database in DATABASES}
+    for name, run in (("transition.jq", run_jq), ("model", run_model)):
+        got = run(timeline)
+        failing = [
+            post
+            for posts in got["posts"]
+            for post in posts
+            if post["kind"] != "budget" and json.loads(post["id"])[0] == "StoreQueryFailing"
+        ]
+        ids = {post["id"] for post in failing}
+        ids |= {iid for iid, inst in got["state"]["instances"].items() if inst["alert"] == "StoreQueryFailing"}
+        assert ids <= allowed, f"{name}: StoreQueryFailing instances {sorted(ids - allowed)}"
+        titles = [
+            post["title"]
+            for post in failing
+            if not post["title"].endswith(" StoreQueryFailing " + json.loads(post["id"])[1][0]["value"])
+        ]
+        assert not titles, f"{name}: StoreQueryFailing titles without their database {titles}"
+
+
 if __name__ == "__main__":
     test_transition_matches_model()
     print("ok: transition.jq equals the reference model on every generated timeline")
@@ -314,3 +409,7 @@ if __name__ == "__main__":
     print("ok: a rule without expr or results entry, and results named for internal rules, produce nothing")
     test_resolve_follows_unfrozen_absence()
     print("ok: a RESOLVED follows 5 min of absence observed while neither the store nor the host is frozen")
+    test_failure_freezes_only_its_database()
+    print("ok: a devloop failure leaves fleet's posts as they are without it")
+    test_store_query_failing_is_keyed_by_database()
+    print("ok: StoreQueryFailing is one instance per failing database, labelled and titled with it")

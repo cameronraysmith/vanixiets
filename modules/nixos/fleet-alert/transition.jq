@@ -8,9 +8,13 @@
 # result label set. It fires once its condition has held on every run for
 # the rule's `for` (seconds) and resolves once the condition has been absent
 # 300 s; a critical instance is re-posted every 24 h, a warning never, and an
-# info instance posts no RESOLVED and is not counted. A store error freezes
-# every instance but StoreQueryFailing; a host missing from `reporting`
-# (system_memory_usage_bytes) freezes the instances labelled with it.
+# info instance posts no RESOLVED and is not counted. A database in
+# $observations.storeErrors freezes every instance whose rule is on it (a
+# rule or an instance without `database` is on fleet) and raises one
+# StoreQueryFailing per failing database, labelled `database` and never
+# frozen; `reporting` (system_memory_usage_bytes) and state.hosts come from
+# RuleSignalMissing's database, and a host missing from `reporting` freezes
+# the instances labelled with it (stand-up-devloop-collection review F7).
 # Frozen time is not absence: absence counts from `absenceFrom`, the run the
 # instance was last seen on or, after a freeze, the first unfrozen run (a
 # state written before the field existed counts from `lastSeen`).
@@ -65,32 +69,41 @@ def rule_named($rules; $name): [ $rules[] | select(.alert == $name) ] | .[0];
 # StoreQueryFailing and RuleSignalMissing come only from the logic below.
 def internal_rule($alert): $alert | IN("StoreQueryFailing", "RuleSignalMissing");
 
+def store_errors($observations): $observations.storeErrors // [];
+def database_of($x): $x.database // "fleet";
+def store_failed($observations; $database): any(store_errors($observations) | .[]; . == $database);
+def reporting_database($rules): database_of(rule_named($rules; "RuleSignalMissing") // {});
+
 def conditions($observations; $rules; $hosts; $now):
-  if $observations.storeError then
-    [ rule_named($rules; "StoreQueryFailing") | select(. != null) | {rule: ., labels: {}, value: "1"} ]
-  else
-    [ $rules[] | . as $r
+  ( rule_named($rules; "StoreQueryFailing") as $failing
+    | if $failing == null then []
+      else [ store_errors($observations) | .[] | {rule: $failing, labels: {database: .}, value: "1"} ] end )
+  + [ $rules[] | . as $r
+      | select(store_failed($observations; database_of($r)) | not)
       | select(has("expr")
                or ((internal_rule($r.alert) | not) and (($observations.results // {}) | has($r.alert))))
       | select(($r.window == null) or ($observations.windows[$r.alert] == true))
       | ($observations.results[$r.alert] // [])[]
       | {rule: $r, labels: (.labels | del(.__name__)), value: (.value | tostring)} ]
-    + ( rule_named($rules; "RuleSignalMissing") as $missing
-        | if $missing == null then [] else
-            [ $rules[] | . as $r | ($r.presence // [])[]
-              | select((($observations.presence[.selector] // []) | length) == 0)
-              | select(. as $p | any(($observations.reporting // [])[]; . as $h | any($p.expectedHosts[]; . == $h)))
-              | {rule: $missing, labels: {rule: $r.alert, selector: .selector}, value: "0"} ]
-            + [ ($missing.alwaysOn // [])[] as $h
-                | select(any(($observations.reporting // [])[]; . == $h) | not)
-                | select($now - ($hosts[$h] // $now) >= absent_after)
-                | {rule: ($missing + {for: 0}), labels: {selector: "system_memory_usage_bytes", host_name: $h}, value: "0"} ]
-          end )
-  end;
+  + ( rule_named($rules; "RuleSignalMissing") as $missing
+      | if $missing == null then [] else
+          [ $rules[] | . as $r
+            | select(store_failed($observations; database_of($r)) | not)
+            | ($r.presence // [])[]
+            | select((($observations.presence[.selector] // []) | length) == 0)
+            | select(. as $p | any(($observations.reporting // [])[]; . as $h | any($p.expectedHosts[]; . == $h)))
+            | {rule: $missing, labels: {rule: $r.alert, selector: .selector}, value: "0"} ]
+          + ( if store_failed($observations; reporting_database($rules)) then [] else
+                [ ($missing.alwaysOn // [])[] as $h
+                  | select(any(($observations.reporting // [])[]; . == $h) | not)
+                  | select($now - ($hosts[$h] // $now) >= absent_after)
+                  | {rule: ($missing + {for: 0}), labels: {selector: "system_memory_usage_bytes", host_name: $h}, value: "0"} ]
+              end )
+        end );
 
 def frozen($inst; $observations):
   if $inst.alert == "StoreQueryFailing" then false
-  elif $observations.storeError then true
+  elif store_failed($observations; database_of($inst)) then true
   elif $inst.alert == "RuleSignalMissing" then false
   elif ($inst.labels.host_name // null) == null then false
   else (($inst.labels.host_name) as $h | any(($observations.reporting // [])[]; . == $h) | not)
@@ -103,7 +116,7 @@ def advance($inst; $cond; $now):
     | . + { severity: $cond.rule.severity, for: $cond.rule.for,
             summary: ($cond.rule.annotations.summary // ""),
             attributed: ((($cond.rule.attribution // []) | length) > 0),
-            value: $cond.value, lastSeen: $now, absenceFrom: $now }
+            value: $cond.value, database: $cond.rule.database, lastSeen: $now, absenceFrom: $now }
     | if .phase == "resolved" then .phase = "firing" else . end
     | if .phase == "pending" and ($now - .activeSince) >= .for then .phase = "firing" else . end
   elif $inst == null then null
@@ -123,9 +136,11 @@ def post_for($id; $inst; $now; $observations):
       elif $inst.phase == "firing" and $inst.severity == "critical" and ($now - $inst.lastPostedAt) >= repost_every then "repost"
       elif $inst.phase == "resolved" then "resolved"
       else empty end ) as $kind
-  | { title: title($kind; $inst.alert; $host),
+  | { title: title($kind; $inst.alert;
+            if $inst.alert == "StoreQueryFailing" then ($inst.labels.database // $host) else $host end),
       priority: priority_of($inst.severity),
       message: ( [ $inst.summary,
+                   (if $inst.alert == "StoreQueryFailing" then "the store did not answer queries on \($inst.labels.database // "?")" else empty end),
                    ($inst.labels | to_entries | map("\(.key)=\(.value)") | join(", ")),
                    (if $kind != "resolved" then "value \($inst.value)" else empty end),
                    (if $kind != "resolved" and $inst.attributed and $host != ""
@@ -159,7 +174,7 @@ def transition($observations; $now; $rules):
   | ( reduce $ids[] as $id ({};
         $state.instances[$id] as $inst
         | $conds[$id] as $cond
-        | if frozen(($inst // {alert: $cond.rule.alert, labels: $cond.labels}); $observations) then
+        | if frozen(($inst // {alert: $cond.rule.alert, labels: $cond.labels, database: $cond.rule.database}); $observations) then
             (if $inst == null then . else .[$id] = ($inst | .absenceFrom = null) end)
           else
             advance($inst; $cond; $now) as $next
@@ -168,7 +183,7 @@ def transition($observations; $now; $rules):
   | ( $state
       | .instances = $instances
       | .lastRun = $now
-      | if $observations.storeError then .
+      | if store_failed($observations; reporting_database($rules)) then .
         else .hosts += (reduce ($observations.reporting // [])[] as $h ({}; .[$h] = $now)) end
       | reduce ((rule_named($rules; "RuleSignalMissing") // {}).alwaysOn // [])[] as $h (.; .hosts[$h] //= $now) ) as $next
   | { state: $next,

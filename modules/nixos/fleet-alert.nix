@@ -2,13 +2,18 @@
 # design D11-D16, D18; tasks.md 4.3, 4.4).
 #
 # fleet-alert.timer starts fleet-alert.service every minute. The evaluator
-# reads its configuration from the JSON at FLEET_ALERT_CONFIG, queries the
-# store's PromQL API one query at a time as `regulator` (password from
+# reads its configuration from the JSON at FLEET_ALERT_CONFIG and queries
+# the store one query at a time as `regulator`, each rule in its own
+# `database` and `language` (stand-up-devloop-collection design D2): PromQL
+# to /v1/prometheus/api/v1/query with x-greptime-db-name, SQL as POST
+# /v1/sql?db=<database> with the form field sql (password from
 # $CREDENTIALS_DIRECTORY/regulator-password, passed to curl on stdin, as
 # modules/lib/greptimedb-envelope.nix does), each with --max-time
-# queryTimeoutSec, and ends the query phase at the first failed query or at
-# queryDeadlineSec: a store error, which transition.jq turns into a freeze
-# and, after 3 min, StoreQueryFailing. It reads the notifier's failed.log,
+# queryTimeoutSec. A failed query, or the passing of queryDeadlineSec, ends
+# querying of that database for the run while other databases' queries
+# continue (review F7); the failed databases reach transition.jq as
+# storeErrors, which freezes the instances on them and, after 3 min, raises
+# one StoreQueryFailing per database. It reads the notifier's failed.log,
 # applies transition.jq's pure transition to state.json, writes the state,
 # posts the heartbeat at priority min, then posts each alert through
 # ntfy-send, which reads the alerter token from NTFY_TOKEN_FILE, and records
@@ -87,7 +92,10 @@ let
           jq -er --arg key "$1" '.[$key]' "$config"
         }
         store_url=$(setting storeUrl)
-        database=$(setting database)
+        # system_memory_usage_bytes, which `reporting` reads, is queried in
+        # RuleSignalMissing's database; the run fails without exactly one.
+        reporting_database=$(jq -er '[.rules[] | select(.alert == "RuleSignalMissing") | .database]
+          | if length == 1 then .[0] else error("the rules must list RuleSignalMissing exactly once") end' "$config")
         user=$(setting user)
         query_timeout=$(setting queryTimeoutSec)
         query_deadline=$(setting queryDeadlineSec)
@@ -104,11 +112,21 @@ let
         : > "$work/windows.jsonl"
         : > "$work/attribution.jsonl"
 
-        # One instant query; its body lands in $work/body. Fails on a
-        # transport error, a timeout, any status but 200, a body that is not
-        # a vector, or when the query deadline has passed.
+        # One query of a rule's language in a rule's database: promql as an
+        # instant query with x-greptime-db-name, sql as POST
+        # /v1/sql?db=<database> with the form field sql. The answer lands in
+        # $work/body as a Prometheus vector: an SQL answer must be 200 with
+        # exactly one output holding records with a `value` column, and each
+        # row becomes one result with that column as its value and every
+        # other column as a label (GreptimeTeam/greptimedb@v1.2.1
+        # src/servers/src/http.rs:291-338, 395-400). Fails on a transport
+        # error, a timeout, any other status or body, or when the query
+        # deadline has passed; ask_store below turns a failure into the
+        # failure of the query's database for the run.
         query() {
+          local language=$1 database=$2 expr=$3
           local remaining status
+          local -a request
           remaining=$((query_deadline - SECONDS))
           if [ "$remaining" -le 0 ]; then
             echo "fleet-alert: query deadline of ''${query_deadline}s reached" >&2
@@ -117,38 +135,98 @@ let
           if [ "$remaining" -gt "$query_timeout" ]; then
             remaining=$query_timeout
           fi
+          case "$language" in
+            promql)
+              request=(--header "x-greptime-db-name: $database" --get --data-urlencode "query=$expr"
+                "$store_url/v1/prometheus/api/v1/query")
+              ;;
+            sql)
+              request=(--url-query "db=$database" --data-urlencode "sql=$expr" "$store_url/v1/sql")
+              ;;
+            *)
+              printf 'fleet-alert: unknown query language %s for: %s\n' "$language" "$expr" >&2
+              return 1
+              ;;
+          esac
           if ! status=$(printf 'user = "%s:%s"\n' "$user" "$(< "$credentials/regulator-password")" \
             | curl --config - --silent --show-error --max-time "$remaining" \
-                --header "x-greptime-db-name: $database" \
-                --get --data-urlencode "query=$1" \
-                --output "$work/body" --write-out '%{http_code}' \
-                "$store_url/v1/prometheus/api/v1/query"); then
-            printf 'fleet-alert: query failed: %s\n' "$1" >&2
+                --output "$work/answer" --write-out '%{http_code}' "''${request[@]}"); then
+            printf 'fleet-alert: query failed: %s\n' "$expr" >&2
             return 1
           fi
-          if [ "$status" != 200 ] \
-            || ! jq -e '.status == "success" and .data.resultType == "vector"' "$work/body" > /dev/null; then
-            printf 'fleet-alert: HTTP %s for query: %s\n' "$status" "$1" >&2
+          if [ "$status" != 200 ]; then
+            printf 'fleet-alert: HTTP %s for query: %s\n' "$status" "$expr" >&2
+            return 1
+          fi
+          if [ "$language" = sql ]; then
+            if ! jq -e '(.output | length) == 1 and (.output[0] | has("records"))
+                and any(.output[0].records.schema.column_schemas[]; .name == "value")' "$work/answer" > /dev/null; then
+              printf 'fleet-alert: no single records answer with a value column for query: %s\n' "$expr" >&2
+              return 1
+            fi
+            jq '.output[0].records as $records
+              | [$records.schema.column_schemas[].name] as $columns
+              | {status: "success", data: {resultType: "vector", result: [$records.rows[]
+                  | [$columns, .] | transpose | map({key: .[0], value: .[1]}) | from_entries
+                  | {metric: (del(.value) | map_values(tostring)), value: [null, (.value | tostring)]}]}}' \
+              "$work/answer" > "$work/body"
+          else
+            mv -f "$work/answer" "$work/body"
+          fi
+          if ! jq -e '.status == "success" and .data.resultType == "vector"' "$work/body" > /dev/null; then
+            printf 'fleet-alert: HTTP %s for query: %s\n' "$status" "$expr" >&2
             return 1
           fi
         }
 
-        # Presence selectors (system_memory_usage_bytes first among them is
-        # what `reporting` reads), then rule expressions, then attribution
-        # for the hosts in the results of rules that name attribution
-        # queries. Stops at the first failed query.
+        # Databases whose queries failed this run, each followed by a space
+        # (review F7); names come from the rule table and hold no space.
+        failed_databases=""
+
+        # ask_store LANGUAGE DATABASE EXPR: query EXPR unless DATABASE has
+        # already failed this run. A failed query marks DATABASE failed, so
+        # its remaining rule, presence and attribution queries are skipped
+        # while other databases' queries continue; once the query deadline
+        # has passed every query fails, so a database not reached by then
+        # counts as failed.
+        ask_store() {
+          if [[ " $failed_databases" == *" $2 "* ]]; then
+            return 1
+          fi
+          if ! query "$1" "$2" "$3"; then
+            failed_databases+="$2 "
+            printf 'fleet-alert: the store did not answer queries on %s; its instances are frozen this run\n' "$2" >&2
+            return 1
+          fi
+        }
+
+        # Presence selectors, each in the database of the rule naming it, and
+        # system_memory_usage_bytes, what `reporting` reads, in
+        # RuleSignalMissing's; then rule expressions, each in its rule's
+        # database and language; then attribution, in the attributing rule's
+        # database, for the hosts in the results of rules that name
+        # attribution queries. A query whose database has failed is skipped
+        # and records nothing.
         collect() {
-          local selector rule alert expr window inside host attr name label attr_query
-          while IFS= read -r selector; do
-            query "count by (host_name) ($selector)" || return 1
-            jq -c --arg selector "$selector" \
-              '{selector: $selector, hosts: [.data.result[].metric.host_name // empty]}' \
-              "$work/body" >> "$work/presence.jsonl"
-          done < <(jq -r '["system_memory_usage_bytes"] + [.rules[].presence[]?.selector] | unique | .[]' "$config")
+          local presence selector database language rule alert expr window inside host attr name label attr_query
+          while IFS= read -r presence; do
+            selector=$(jq -r .selector <<< "$presence")
+            database=$(jq -r .database <<< "$presence")
+            if ask_store promql "$database" "count by (host_name) ($selector)"; then
+              jq -c --arg selector "$selector" \
+                '{selector: $selector, hosts: [.data.result[].metric.host_name // empty]}' \
+                "$work/body" >> "$work/presence.jsonl"
+            fi
+          done < <(jq -c --arg reporting "$reporting_database" \
+            '[{selector: "system_memory_usage_bytes", database: $reporting}]
+              + [.rules[] | .database as $database | .presence[]? | {selector, database: $database}]
+              | unique | .[]' "$config")
 
           while IFS= read -r rule; do
             alert=$(jq -r .alert <<< "$rule")
             expr=$(jq -r .expr <<< "$rule")
+            database=$(jq -r .database <<< "$rule")
+            language=$(jq -r .language <<< "$rule")
             window=$(jq -c '.window // empty' <<< "$rule")
             if [ -n "$window" ]; then
               inside=$(TZ=$(jq -r .zone <<< "$window") jq -n -L "$jqlib" \
@@ -160,10 +238,11 @@ let
                 continue
               fi
             fi
-            query "$expr" || return 1
-            jq -c --arg alert "$alert" \
-              '{alert: $alert, result: [.data.result[] | {labels: .metric, value: .value[1]}]}' \
-              "$work/body" >> "$work/results.jsonl"
+            if ask_store "$language" "$database" "$expr"; then
+              jq -c --arg alert "$alert" \
+                '{alert: $alert, result: [.data.result[] | {labels: .metric, value: .value[1]}]}' \
+                "$work/body" >> "$work/results.jsonl"
+            fi
           done < <(jq -c '.rules[] | select(has("expr"))' "$config")
 
           while IFS= read -r host; do
@@ -175,21 +254,23 @@ let
               name=$(jq -r .name <<< "$attr")
               label=$(jq -r '.label // ""' <<< "$attr")
               attr_query=$(jq -r .query <<< "$attr")
-              query "''${attr_query//<host>/$host}" || return 1
-              jq -c --arg host "$host" --arg name "$name" --arg label "$label" \
-                '{host: $host, name: $name, label: $label, result: .data.result}' \
-                "$work/body" >> "$work/attribution.jsonl"
-            done < <(jq -c '[.rules[].attribution[]?] | unique | .[]' "$config")
+              database=$(jq -r .database <<< "$attr")
+              if ask_store promql "$database" "''${attr_query//<host>/$host}"; then
+                jq -c --arg host "$host" --arg name "$name" --arg label "$label" \
+                  '{host: $host, name: $name, label: $label, result: .data.result}' \
+                  "$work/body" >> "$work/attribution.jsonl"
+              fi
+            done < <(jq -c '[.rules[] | .database as $database | .attribution[]? | . + {database: $database}] | unique | .[]' "$config")
           done < <(jq -r --slurpfile results "$work/results.jsonl" '
             [.rules[] | select((.attribution // []) | length > 0) | .alert] as $attributed
             | [$results[] | select(.alert as $a | any($attributed[]; . == $a)) | .result[].labels.host_name // empty]
             | unique | .[]' "$config")
         }
 
-        store_error=false
-        if ! collect; then
-          store_error=true
-        fi
+        # As before review F7, a command other than a query failing inside
+        # collect does not end the run; a failed query marks its database.
+        collect || true
+        store_errors=$(jq -cn --arg failed "$failed_databases" '$failed | split(" ") | map(select(. != "")) | unique')
 
         # A missing log is an empty one; an unreadable one fails the run, so
         # a permissions fault cannot undercount the notifier's posts (R9.1).
@@ -204,7 +285,7 @@ let
           echo '[]' > "$work/failed.json"
         fi
 
-        jq -n --argjson storeError "$store_error" \
+        jq -n --argjson storeErrors "$store_errors" \
           --slurpfile presence "$work/presence.jsonl" \
           --slurpfile results "$work/results.jsonl" \
           --slurpfile windows "$work/windows.jsonl" \
@@ -212,7 +293,7 @@ let
           --slurpfile failed "$work/failed.json" '
           def mb: (tonumber / 1000000 | floor | tostring) + " MB";
           {
-            storeError: $storeError,
+            storeErrors: $storeErrors,
             presence: ($presence | map({key: .selector, value: .hosts}) | from_entries),
             reporting: ([$presence[] | select(.selector == "system_memory_usage_bytes") | .hosts[]] | unique),
             results: ($results | map({key: .alert, value: .result}) | from_entries),
@@ -262,8 +343,9 @@ let
           jq -L "$jqlib" --argjson post "$post" 'include "transition"; mark_posted($post)' "$state_file" | save_state
         done < <(jq -c '.posts[]' "$work/result.json")
 
-        if [ "$store_error" = true ]; then
-          echo "fleet-alert: the store did not answer; instances are frozen" >&2
+        if [ "$store_errors" != '[]' ]; then
+          printf 'fleet-alert: the store did not answer queries on %s; the instances on them are frozen\n' \
+            "$(jq -r 'join(", ")' <<< "$store_errors")" >&2
         fi
       '';
     };
@@ -416,7 +498,7 @@ let
         # with the evaluator's host, which counts as reporting so the
         # transition's host freeze never holds it.
         observations=$(jq -c --argjson heartbeats "$heartbeats" '{
-          storeError: false,
+          storeErrors: [],
           results: {(.rules[0].alert): (if $heartbeats == 0 then [{labels: {host_name: .evaluatorHost}, value: "1"}] else [] end)},
           presence: {},
           reporting: [.evaluatorHost],
@@ -526,7 +608,6 @@ in
           deadlines
           // {
             inherit (cfg.evaluator) storeUrl topic heartbeatTopic;
-            database = "fleet";
             user = "regulator";
             stateFile = "/var/lib/fleet-alert/state.json";
             failedLog = "/var/lib/observability-notify/failed.log";

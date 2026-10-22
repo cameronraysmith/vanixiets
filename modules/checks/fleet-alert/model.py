@@ -7,8 +7,12 @@ specification, not translated from the jq: Prometheus `for` over instances
 of a rule plus its result label set; resolve after 5 min absent, where
 frozen time is not absence (after a freeze the count restarts at the first
 unfrozen run); a `critical` instance re-posted every 24 h, a `warning`
-never, an `info` with no RESOLVED and not counted; a store error freezes
-every instance but StoreQueryFailing; a host without
+never, an `info` with no RESOLVED and not counted; a failed query on a
+database freezes every instance whose rule is on that database and raises
+one StoreQueryFailing per failing database, labelled `database`, which is
+never frozen; `reporting` and the hosts' last reports are read from
+RuleSignalMissing's database (stand-up-devloop-collection review F7); a
+rule or instance without `database` is on fleet; a host without
 system_memory_usage_bytes freezes its instances; RuleSignalMissing per
 presence selector while an expected host reports, and per always-on host
 absent for 10 min from the last run it reported on (or the first run the
@@ -48,14 +52,32 @@ def rule_named(rules, name):
 INTERNAL = ("StoreQueryFailing", "RuleSignalMissing")
 
 
+def store_errors(observations):
+    """The databases whose queries failed in the run."""
+    return observations.get("storeErrors") or []
+
+
+def database_of(entry):
+    """A rule's or an instance's database; one without the field is on fleet."""
+    return entry.get("database") or "fleet"
+
+
+def reporting_database(rules):
+    """The database system_memory_usage_bytes, and so `reporting`, is read from."""
+    return database_of(rule_named(rules, "RuleSignalMissing") or {})
+
+
 def conditions(observations, rules, hosts, now):
-    if observations["storeError"]:
-        rule = rule_named(rules, "StoreQueryFailing")
-        return [] if rule is None else [(rule, {}, "1")]
+    errors = store_errors(observations)
     found = []
+    failing = rule_named(rules, "StoreQueryFailing")
+    if failing is not None:
+        found += [(failing, {"database": database}, "1") for database in errors]
     windows = observations.get("windows") or {}
     results = observations.get("results") or {}
     for rule in rules:
+        if database_of(rule) in errors:
+            continue
         # A rule with an `expr`, or one whose alert has a results entry (a
         # caller's own query, such as the dead-man's AlertEvaluatorSilent).
         if "expr" not in rule and (rule["alert"] in INTERNAL or rule["alert"] not in results):
@@ -70,23 +92,26 @@ def conditions(observations, rules, hosts, now):
         reporting = observations.get("reporting") or []
         presence = observations.get("presence") or {}
         for rule in rules:
+            if database_of(rule) in errors:
+                continue
             for selector in rule.get("presence") or []:
                 if presence.get(selector["selector"]):
                     continue
                 if any(host in reporting for host in selector["expectedHosts"]):
                     found.append((missing, {"rule": rule["alert"], "selector": selector["selector"]}, "0"))
-        for host in missing.get("alwaysOn") or []:
-            if host not in reporting and now - hosts.get(host, now) >= ABSENT_AFTER:
-                found.append(
-                    (dict(missing, **{"for": 0}), {"selector": "system_memory_usage_bytes", "host_name": host}, "0")
-                )
+        if reporting_database(rules) not in errors:
+            for host in missing.get("alwaysOn") or []:
+                if host not in reporting and now - hosts.get(host, now) >= ABSENT_AFTER:
+                    found.append(
+                        (dict(missing, **{"for": 0}), {"selector": "system_memory_usage_bytes", "host_name": host}, "0")
+                    )
     return found
 
 
-def frozen(alert, labels, observations):
+def frozen(alert, labels, database, observations):
     if alert == "StoreQueryFailing":
         return False
-    if observations["storeError"]:
+    if database in store_errors(observations):
         return True
     if alert == "RuleSignalMissing":
         return False
@@ -110,7 +135,15 @@ def advance(instance, condition, now):
             }
         else:
             nxt = copy.deepcopy(instance)
-        nxt.update({"severity": rule["severity"], "for": rule["for"], "lastSeen": now, "absenceFrom": now})
+        nxt.update(
+            {
+                "severity": rule["severity"],
+                "for": rule["for"],
+                "database": rule.get("database"),
+                "lastSeen": now,
+                "absenceFrom": now,
+            }
+        )
         if nxt["phase"] == "resolved":
             nxt["phase"] = "firing"
         if nxt["phase"] == "pending" and now - nxt["activeSince"] >= nxt["for"]:
@@ -185,10 +218,10 @@ def transition(state, observations, now, rules):
         instance = state["instances"].get(iid)
         condition = conds.get(iid)
         if instance is not None:
-            alert, labels = instance["alert"], instance["labels"]
+            alert, labels, database = instance["alert"], instance["labels"], database_of(instance)
         else:
-            alert, labels = condition[0]["alert"], condition[1]
-        if frozen(alert, labels, observations):
+            alert, labels, database = condition[0]["alert"], condition[1], database_of(condition[0])
+        if frozen(alert, labels, database, observations):
             if instance is not None:
                 instances[iid] = dict(instance, absenceFrom=None)
             continue
@@ -197,7 +230,7 @@ def transition(state, observations, now, rules):
             instances[iid] = nxt
     state["instances"] = instances
     state["lastRun"] = now
-    if not observations["storeError"]:
+    if reporting_database(rules) not in store_errors(observations):
         for host in observations.get("reporting") or []:
             state["hosts"][host] = now
     for host in (rule_named(rules, "RuleSignalMissing") or {}).get("alwaysOn") or []:
@@ -205,13 +238,20 @@ def transition(state, observations, now, rules):
     posts = []
     for iid in ids:
         instance = instances.get(iid)
-        if instance is None or frozen(instance["alert"], instance["labels"], observations):
+        if instance is None or frozen(instance["alert"], instance["labels"], database_of(instance), observations):
             continue
         kind = post_kind(instance, now)
         if kind is not None:
             posts.append(
                 {
-                    "title": title(kind, instance["alert"], instance["labels"].get("host_name") or ""),
+                    # StoreQueryFailing names its database where a host would stand.
+                    "title": title(
+                        kind,
+                        instance["alert"],
+                        (instance["labels"].get("database") if instance["alert"] == "StoreQueryFailing" else None)
+                        or instance["labels"].get("host_name")
+                        or "",
+                    ),
                     "priority": PRIORITY.get(instance["severity"], "default"),
                     "key": {"kind": kind, "id": iid},
                 }

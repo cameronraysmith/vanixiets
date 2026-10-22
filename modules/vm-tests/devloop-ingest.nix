@@ -781,6 +781,142 @@
               print("ok: reconcile")
             '';
 
+            # The burn rule as fleet-alert's evaluator sends it (design D1,
+            # D16); the notified units shape only SystemdUnitFailed.
+            burnAlertRule =
+              lib.findFirst (r: r.alert == "PullRequestQueueWaitBurn")
+                (throw "devloop-ingest: no PullRequestQueueWaitBurn rule")
+                (self.lib.fleetAlertRules {
+                  inherit lib;
+                  notifiedUnits = [ ];
+                }).rules;
+            burnRule = ''
+              print("=== case burnRule", flush=True)
+              import datetime
+
+              BURN_EXPR = json.loads(${builtins.toJSON (builtins.toJSON burnAlertRule.expr)})
+              BURN_DB = ${builtins.toJSON burnAlertRule.database}
+              assert ${builtins.toJSON burnAlertRule.language} == "sql", "PullRequestQueueWaitBurn is not an SQL rule"
+              assert BURN_DB == "devloop", BURN_DB
+
+              # ci_build holds exactly the rows each load writes as admin.
+              reset_devloop()
+              store.succeed("systemctl stop opentelemetry-collector.service")
+              BURN_NOW = int(store.succeed("date -u +%s").strip())
+
+
+              def burn_time(epoch):
+                  return datetime.datetime.fromtimestamp(epoch, datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+              def burn_row(build_id, pr_number, wait_minutes, finished_hours_ago=2):
+                  """A build finished finished_hours_ago h ago, started 5 min before,
+                  created wait_minutes before it started; None never started."""
+                  finished = BURN_NOW - finished_hours_ago * 3600
+                  if wait_minutes is None:
+                      created, started, status = finished - 600, "NULL", "cancelled"
+                  else:
+                      started_at = finished - 300
+                      created = started_at - wait_minutes * 60
+                      started, status = "'" + burn_time(started_at) + "'", "success"
+                  pr = "NULL" if pr_number is None else str(pr_number)
+                  branch = "main" if pr_number is None else f"pr-{pr_number}"
+                  return (
+                      f"({build_id}, '{burn_time(created)}', {started}, '{burn_time(finished)}', "
+                      f"1000, '{status}', {pr}, '{branch}')"
+                  )
+
+
+              def burn_prs(first, slow, fast):
+                  """slow pull-request builds that waited 90 min, then fast ones that waited 45,
+                  close enough to the hour that a 30 min threshold counts them as slow."""
+                  return [burn_row(first + i, 100 + first + i, 90) for i in range(slow)] + [
+                      burn_row(first + slow + i, 100 + first + slow + i, 45) for i in range(fast)
+                  ]
+
+
+              def burn_restarted(build_id, pr_number):
+                  """A pull-request build restarted after a fast first attempt: nixbot's
+                  restart keeps created_at and resets started_at and finished_at
+                  (Mic92/nixbot@d020013fa nixbot/nixbot/db_gen/maintenance.py:96-123),
+                  so the second row's wait is over an hour."""
+                  created = BURN_NOW - 4 * 3600
+                  branch = f"pr-{pr_number}"
+                  return [
+                      f"({build_id}, '{burn_time(created)}', '{burn_time(created + 600)}', "
+                      f"'{burn_time(created + 900)}', 1000, 'failure', {pr_number}, '{branch}')",
+                      f"({build_id}, '{burn_time(created)}', '{burn_time(created + 5400)}', "
+                      f"'{burn_time(created + 5700)}', 1000, 'success', {pr_number}, '{branch}')",
+                  ]
+
+
+              def burn_load(rows):
+                  admin_sql('TRUNCATE TABLE "ci_build"', db=BURN_DB)
+                  admin_sql(
+                      'INSERT INTO "ci_build" ("build_id", "created_at", "started_at", "finished_at", '
+                      '"eval_duration_ms", "status", "pr_number", "branch") VALUES ' + ", ".join(rows),
+                      db=BURN_DB,
+                  )
+                  stored = gsql('SELECT count(*) FROM "ci_build"', db=BURN_DB)
+                  assert stored == [[len(rows)]], (stored, len(rows))
+
+
+              def burn_mutant(name, old, new):
+                  assert old in BURN_EXPR, f"mutant {name} found nothing to replace"
+                  return BURN_EXPR.replace(old, new)
+
+
+              BURN_MUTANTS = {
+                  "noPullRequestFilter": burn_mutant("noPullRequestFilter", "c.pr_number IS NOT NULL AND ", ""),
+                  "noStartedFilter": burn_mutant("noStartedFilter", "c.started_at IS NOT NULL AND ", ""),
+                  "minimumNine": burn_mutant("minimumNine", "count(*) >= 10", "count(*) >= 9"),
+                  "noWindow": burn_mutant("noWindow", " AND c.finished_at >= now() - INTERVAL '24 hours'", ""),
+                  "shareAtLeastATenth": burn_mutant("shareAtLeastATenth", "* 10 > count(*)", "* 10 >= count(*)"),
+                  "everyAttempt": burn_mutant("everyAttempt", " AND c.finished_at = f.first_finished", ""),
+                  "thresholdHalfHour": burn_mutant("thresholdHalfHour", "INTERVAL '1 hour'", "INTERVAL '30 minutes'"),
+              }
+
+
+              def burn_mutants_reject(load, names):
+                  for name in names:
+                      got = gsql(BURN_MUTANTS[name], db=BURN_DB)
+                      assert len(got) == 1, f"mutant {name} accepted on {load}: {got}"
+                      print(f"mutant {name} rejected: {load} gave {got}", flush=True)
+
+
+              # 10 pull-request builds of which 2 waited over an hour: one row, 0.2,
+              # in a column named value, which the evaluator requires.
+              burn_load(burn_prs(1, 2, 8))
+              rows = gsql(BURN_EXPR, db=BURN_DB)
+              print(f"load 1: 10 builds, 2 waited over an hour: {rows}", flush=True)
+              assert len(rows) == 1 and abs(rows[0][0] - 0.2) < 1e-9, rows
+              named = gsql(f'SELECT "value" FROM ({BURN_EXPR}) AS burn', db=BURN_DB)
+              assert named == rows, (named, rows)
+
+              # 9 of which 2 did, beside a slow build with no pull request and a
+              # pull-request build that never started: no row.
+              burn_load(burn_prs(11, 2, 7) + [burn_row(20, None, 90), burn_row(21, 121, None)])
+              rows = gsql(BURN_EXPR, db=BURN_DB)
+              print(f"load 2: 9 builds, 2 waited over an hour: {rows}", flush=True)
+              assert rows == [], rows
+              burn_mutants_reject("load 2", ["noPullRequestFilter", "noStartedFilter", "minimumNine"])
+
+              # 10 of which 1 did, the tenth a build restarted after a fast first
+              # attempt whose second attempt waited over an hour, beside a slow
+              # pull-request build that finished 25 h ago: no row.
+              burn_load(burn_prs(31, 1, 8) + burn_restarted(40, 140) + [burn_row(50, 150, 90, finished_hours_ago=25)])
+              rows = gsql(BURN_EXPR, db=BURN_DB)
+              print(f"load 3: 10 builds, 1 waited over an hour, 1 restarted: {rows}", flush=True)
+              assert rows == [], rows
+              burn_mutants_reject("load 3", ["noWindow", "shareAtLeastATenth", "everyAttempt", "thresholdHalfHour"])
+
+              # Leave the store as every earlier case does: tables reset and the
+              # collector running.
+              reset_devloop()
+              collector_restart()
+              print("ok: burnRule", flush=True)
+            '';
+
             cases = [
               firstStart
               noAutoCreate
@@ -789,6 +925,7 @@
               switch
               documentedQueries
               reconcile
+              burnRule
             ];
           in
           pkgs.testers.runNixOSTest {

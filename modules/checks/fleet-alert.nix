@@ -1,5 +1,6 @@
 # checks.x86_64-linux.fleet-alert: regulator R9.2 (ADR-009 R9.2; design D10,
-# D11, D13-D16, D19; tasks.md 4.5, 4.6).
+# D11, D13-D16, D19; tasks.md 4.5, 4.6; stand-up-devloop-collection design
+# D17, tasks.md 5.1, 5.3-5.5).
 #
 # Three parts, each a derivation in passthru so it can be built alone:
 # - promtoolRehearsal: `promtool check rules` over the YAML rendered from
@@ -8,16 +9,23 @@
 # - fixtureRehearsal: the evaluator, flake.lib.fleetAlertEvaluator built with
 #   a recording ntfy-send, runs in the build sandbox against
 #   fleet-alert/fixture_server.py, which replays canned answers to the
-#   store's PromQL API per run. A leg is a timeline of runs at
-#   FLEET_ALERT_NOW. Every run must record one heartbeat at priority min and
-#   post only with NTFY_TOKEN_FILE naming the fixture credential, and the
-#   alert posts of the leg must equal its list. The five runtime mutants
-#   (no state write, `for` 0, no store freeze, no absence freeze, and no
-#   update of when each host last reported) must each produce a non-empty
-#   failure list.
+#   store's PromQL and SQL APIs per run and answers 400 to a query sent to
+#   any database but the one its rule declares. A leg is a timeline of runs
+#   at FLEET_ALERT_NOW. Every run must record one heartbeat at priority min
+#   and post only with NTFY_TOKEN_FILE naming the fixture credential, and
+#   the alert posts of the leg must equal its list; the two-database leg
+#   also requires the server to record each rule's query once on its path
+#   and database. The seven runtime mutants (no state write, `for` 0, no
+#   store freeze, no absence freeze, no update of when each host last
+#   reported, every query sent to fleet, and every instance frozen when any
+#   database fails) must each produce a non-empty failure list; the store
+#   freezes only the instances of the database that failed (review F7).
 # - propertyRehearsal: fleet-alert/test_transition.py compares transition.jq
 #   with the reference model fleet-alert/model.py over derandomized
-#   Hypothesis timelines, and must fail on the no-re-post mutant.
+#   Hypothesis timelines over two databases, holds both to leaving fleet's
+#   posts unchanged by a devloop failure (stand-up-devloop-collection
+#   review F7), and must fail on the no-re-post and allDatabasesFreeze
+#   mutants.
 #
 # Relations within one host are assertions where the units are declared,
 # which CI already pays for when it evaluates the host (S1 review F5, S3
@@ -35,6 +43,8 @@
 # server cannot evaluate PromQL, so the SystemdUnitFailed exclusion leg
 # replays only the failed units the rendered exclusion regex keeps, matched
 # here with the full-match semantics PromQL uses for `!~`.
+# Nor can it run SQL: vmTests.x86_64-linux.devloop-ingest's burnRule case
+# runs PullRequestQueueWaitBurn's query on GreptimeDB 1.2.1 (design D1, D16).
 { self, lib, ... }:
 {
   perSystem =
@@ -380,12 +390,12 @@
         };
       realEvaluator = evaluatorWith transitionJq;
 
-      checkConfig =
-        rulesList:
-        pkgs.writeText "fleet-alert-check-config.json" (
+      # The evaluator's configuration for a rule list, and the database each
+      # query of that list belongs to, which the fixture server enforces.
+      checkConfig = rulesList: {
+        file = pkgs.writeText "fleet-alert-check-config.json" (
           builtins.toJSON {
             storeUrl = "http://127.0.0.1:1";
-            database = "fleet";
             user = "regulator";
             queryTimeoutSec = 10;
             queryDeadlineSec = 30;
@@ -397,7 +407,58 @@
             rules = rulesList;
           }
         );
+        databases = queryDatabases rulesList;
+      };
       realConfig = checkConfig evaluatorRules;
+
+      # The database of every query the evaluator may send, read from each
+      # rule's declared `database` (stand-up-devloop-collection design D2,
+      # D17): its expression, presence selectors and attribution queries in
+      # its own, and the reporting selector system_memory_usage_bytes in
+      # RuleSignalMissing's. The fixture server answers 400 to a query sent
+      # to any other database, so the evaluator's routing is judged against
+      # the rule table.
+      queryDatabases =
+        rulesList:
+        let
+          missing = lib.findFirst (
+            r: r.alert == "RuleSignalMissing"
+          ) (throw "fleet-alert check: no RuleSignalMissing rule") rulesList;
+          pairs = [
+            {
+              query = "count by (host_name) (system_memory_usage_bytes)";
+              inherit (missing) database;
+            }
+          ]
+          ++ lib.concatMap (
+            r:
+            lib.optional (r ? expr) {
+              query = r.expr;
+              inherit (r) database;
+            }
+            ++ map (p: {
+              query = "count by (host_name) (${p.selector})";
+              inherit (r) database;
+            }) r.presence
+            ++ lib.concatMap (
+              a:
+              map (host: {
+                query = builtins.replaceStrings [ "<host>" ] [ host ] a.query;
+                inherit (r) database;
+              }) both
+            ) r.attribution
+          ) rulesList;
+          byQuery = lib.mapAttrs (_: ps: lib.unique (map (p: p.database) ps)) (
+            lib.groupBy (p: p.query) pairs
+          );
+          conflicting = lib.filterAttrs (_: ds: builtins.length ds > 1) byQuery;
+        in
+        assert lib.assertMsg (
+          conflicting == { }
+        ) "fleet-alert check: queries declared in two databases: ${builtins.toJSON conflicting}";
+        pkgs.writeText "fleet-alert-databases.json" (
+          builtins.toJSON (lib.mapAttrs (_: builtins.head) byQuery)
+        );
 
       # Tuesday 2026-10-27 12:00 UTC: outside WeeklyPipelineTest's window.
       t0 = 1793102400;
@@ -423,6 +484,22 @@
               s.value
             ];
           }) series;
+        };
+      };
+
+      # An SQL answer in GreptimeDB 1.2.1's records shape
+      # (GreptimeTeam/greptimedb@v1.2.1 src/servers/src/http.rs:291-338): the
+      # column `value` and one array per row; no row keeps the schema, as
+      # HttpRecordsOutput::try_new does for an empty result (:365-375).
+      sqlAnswer = rows: {
+        records = {
+          schema.column_schemas = [
+            {
+              name = "value";
+              data_type = "Float64";
+            }
+          ];
+          rows = map (row: [ row.value ]) rows;
         };
       };
 
@@ -467,16 +544,23 @@
               )
             ) selectors
           );
+          # A PromQL rule's series are label sets, each answered with value
+          # "1"; an SQL rule's are rows, each { value = <number>; }, and a
+          # step's `sqlError` replaces every SQL rule's answer with that HTTP
+          # status.
           ruleAnswers = lib.listToAttrs (
             map (
               r:
               lib.nameValuePair r.expr (
-                vector step.at (
-                  map (labels: {
-                    metric = labels;
-                    value = "1";
-                  }) (series.${r.alert} or [ ])
-                )
+                if r.language == "sql" then
+                  if step ? sqlError then { status = step.sqlError; } else sqlAnswer (series.${r.alert} or [ ])
+                else
+                  vector step.at (
+                    map (labels: {
+                      metric = labels;
+                      value = "1";
+                    }) (series.${r.alert} or [ ])
+                  )
               )
             ) (builtins.filter (r: r ? expr) evaluatorRules)
           );
@@ -550,8 +634,11 @@
         expect = [ "5 [FIRING] SystemdUnitFailed magnetite default" ];
       };
 
+      # Every answer of runs 1 to 8 is an error, so the first query of each
+      # database fails and its other queries are skipped: two requests per
+      # run, and one StoreQueryFailing for each of fleet and devloop.
       storeErrorLeg = {
-        name = "a store error freezes a firing HostOOMKill, raises StoreQueryFailing after 3 min, heartbeats, and resumes";
+        name = "a store error on fleet and devloop freezes a firing HostOOMKill, raises one StoreQueryFailing per database after 3 min, heartbeats, and resumes";
         steps = [
           {
             at = minute 0;
@@ -561,14 +648,20 @@
         ++ map (n: {
           at = minute n;
           error = 503;
-          requests = 1;
+          requests = 2;
         }) (lib.range 1 8)
         ++ map (n: { at = minute n; }) (lib.range 9 14);
         expect = [
           "0 [FIRING] HostOOMKill magnetite high"
-          "4 [FIRING] StoreQueryFailing high"
-          "13 [RESOLVED] StoreQueryFailing high"
+          "4 [FIRING] StoreQueryFailing devloop high"
+          "4 [FIRING] StoreQueryFailing fleet high"
+          "13 [RESOLVED] StoreQueryFailing devloop high"
+          "13 [RESOLVED] StoreQueryFailing fleet high"
           "14 [RESOLVED] HostOOMKill magnetite high"
+        ];
+        messages = [
+          "the store did not answer queries on fleet"
+          "the store did not answer queries on devloop"
         ];
       };
 
@@ -611,15 +704,42 @@
           ++ map (n: {
             at = minute n;
             error = 503;
-            requests = 1;
+            requests = 2;
           }) (lib.range 3 9)
           ++ map (n: { at = minute n; }) (lib.range 10 16);
         expect = [
           "0 [FIRING] HostOOMKill magnetite high"
-          "6 [FIRING] StoreQueryFailing high"
-          "14 [RESOLVED] StoreQueryFailing high"
+          "6 [FIRING] StoreQueryFailing devloop high"
+          "6 [FIRING] StoreQueryFailing fleet high"
+          "14 [RESOLVED] StoreQueryFailing devloop high"
+          "14 [RESOLVED] StoreQueryFailing fleet high"
           "15 [RESOLVED] HostOOMKill magnetite high"
         ];
+      };
+
+      # Review F7 (FA scenario `The dev-loop database stops answering`): the
+      # burn rule's SQL answers 500 on runs 1 to 6 while fleet answers.
+      # HostOOMKill, seen on run 0 only, resolves 5 min later on run 5,
+      # inside the devloop failure; StoreQueryFailing for devloop, first
+      # raised on run 1, fires on run 4 after its 3 min, names devloop, and
+      # resolves 5 min after run 6, its last failing run.
+      devloopFailureLeg = {
+        name = "a devloop failure raises StoreQueryFailing for devloop after 3 min while HostOOMKill on fleet fires and resolves as usual";
+        steps = [
+          (oomRuns 0)
+        ]
+        ++ map (n: {
+          at = minute n;
+          sqlError = 500;
+        }) (lib.range 1 6)
+        ++ map (n: { at = minute n; }) (lib.range 7 11);
+        expect = [
+          "0 [FIRING] HostOOMKill magnetite high"
+          "4 [FIRING] StoreQueryFailing devloop high"
+          "5 [RESOLVED] HostOOMKill magnetite high"
+          "11 [RESOLVED] StoreQueryFailing devloop high"
+        ];
+        messages = [ "the store did not answer queries on devloop" ];
       };
 
       hostThawLeg = {
@@ -769,6 +889,60 @@
         expect = [ "1 [FIRING] HostOOMKill magnetite high" ];
       };
 
+      # The fleet-alerting-interface scenario `The timeline is replayed`
+      # (stand-up-devloop-collection design D17; tasks.md 5.1): the burn
+      # rule's SQL answers one row, value 0.15, on 65 consecutive runs (runs
+      # 1-65, indices 0-64), then no row. The expected posts are the spec's:
+      # one FIRING at priority default on the 61st run (index 60), nothing on
+      # runs 62-65 while the row persists, so a re-posting evaluator fails,
+      # and one RESOLVED 5 min after the row disappears, on run 70 (index
+      # 69), both titled without a host.
+      burnRuleLeg = {
+        name = "PullRequestQueueWaitBurn answered 0.15 on 65 runs fires once on the 61st, posts nothing on the 62nd to 65th, and resolves once 5 min after its row disappears";
+        steps = map (n: {
+          at = minute n;
+          series = lib.optionalAttrs (n <= 64) { PullRequestQueueWaitBurn = [ { value = 0.15; } ]; };
+        }) (lib.range 0 69);
+        expect = [
+          "60 [FIRING] PullRequestQueueWaitBurn default"
+          "69 [RESOLVED] PullRequestQueueWaitBurn default"
+        ];
+        messages = [ "value 0.15" ];
+      };
+
+      # Design D17's two-database leg (tasks.md 5.5): one PromQL rule on fleet
+      # and the burn rule on devloop in one run. The server records each
+      # request's path and database; the leg requires exactly one PromQL
+      # request for HostOOMKill's expression on fleet and one /v1/sql request
+      # for the burn rule's on devloop, the spec scenario's databases.
+      twoDatabaseRules = builtins.filter (
+        r:
+        builtins.elem r.alert [
+          "HostOOMKill"
+          "PullRequestQueueWaitBurn"
+          "StoreQueryFailing"
+          "RuleSignalMissing"
+        ]
+      ) evaluatorRules;
+      twoDatabaseConfig = checkConfig twoDatabaseRules;
+      twoDatabaseLeg = {
+        name = "one run queries HostOOMKill on fleet through PromQL and PullRequestQueueWaitBurn on devloop through SQL";
+        steps = [
+          {
+            at = minute 0;
+            series = {
+              HostOOMKill = [ (seriesOn "magnetite" "HostOOMKill") ];
+              PullRequestQueueWaitBurn = [ { value = 0.15; } ];
+            };
+          }
+        ];
+        expect = [ "0 [FIRING] HostOOMKill magnetite high" ];
+        recorded = [
+          "0 /v1/prometheus/api/v1/query fleet ${(ruleNamed "HostOOMKill").expr}"
+          "0 /v1/sql devloop ${(ruleNamed "PullRequestQueueWaitBurn").expr}"
+        ];
+      };
+
       legs =
         map fireAndResolve [
           "HostMemoryPressure"
@@ -789,6 +963,8 @@
           budgetOldLogLeg
           unreadableLogLeg
           retryLeg
+          burnRuleLeg
+          devloopFailureLeg
         ];
 
       runStep =
@@ -822,7 +998,7 @@
           ''}
           ${lib.optionalString (step ? requests) ''
             [ "$(grep -c '^REQUEST ${i} ' "$leg_dir/server.log")" = ${toString step.requests} ] \
-              || miss "${leg.name}: run ${i} queried again after a failed query"
+              || miss "${leg.name}: run ${i} did not send exactly ${toString step.requests} queries, the first of each database, which then failed"
           ''}
         '';
 
@@ -844,14 +1020,14 @@
             lib.escapeShellArg (lib.concatMapStrings (line: line + "\n") (leg.failedLog or [ ]))
           } > "$leg_dir/failed.log"
           ${lib.optionalString (leg ? failedLogMode) ''chmod ${leg.failedLogMode} "$leg_dir/failed.log"''}
-          python3 ${fixtureServer} --responses ${responsesFile leg} \
+          python3 ${fixtureServer} --responses ${responsesFile leg} --databases ${config.databases} \
             --step-file "$leg_dir/step" --port-file "$leg_dir/port" > "$leg_dir/server.log" 2>&1 &
           server_pid=$!
           for _ in $(seq 100); do [ -s "$leg_dir/port" ] && break; sleep 0.1; done
           if [ -s "$leg_dir/port" ]; then
             jq --arg url "http://127.0.0.1:$(cat "$leg_dir/port")" --arg state "$leg_dir/state.json" \
               --arg failed "$leg_dir/failed.log" \
-              '.storeUrl = $url | .stateFile = $state | .failedLog = $failed' ${config} > "$leg_dir/config.json"
+              '.storeUrl = $url | .stateFile = $state | .failedLog = $failed' ${config.file} > "$leg_dir/config.json"
             ${lib.concatMapStrings (runStep leg) (lib.imap0 (i: step: step // { inherit i; }) leg.steps)}
           else
             miss ${lib.escapeShellArg "${leg.name}: the fixture server did not start"}
@@ -862,6 +1038,10 @@
           if grep -E '^(VIOLATION|UNEXPECTED) ' "$leg_dir/server.log" >&2; then
             miss ${lib.escapeShellArg "${leg.name}: the fixture server recorded a violation or an unexpected query"}
           fi
+          ${lib.concatMapStrings (line: ''
+            [ "$(grep -cxF -- ${lib.escapeShellArg "REQUEST ${line}"} "$leg_dir/server.log")" = 1 ] \
+              || miss ${lib.escapeShellArg "${leg.name}: the server did not record exactly one: REQUEST ${line}"}
+          '') (leg.recorded or [ ])}
           if ! diff -u ${expected} "$leg_dir/actual" >&2; then
             miss ${lib.escapeShellArg "${leg.name}: the alert posts differ from the expected list"}
           fi
@@ -896,8 +1076,9 @@
         };
         noStoreFreeze = {
           evaluator = evaluatorWith (
-            mutantTransition "noStoreFreeze" "  elif $observations.storeError then true\n"
-              "  elif $observations.storeError then false\n"
+            mutantTransition "noStoreFreeze"
+              "  elif store_failed($observations; database_of($inst)) then true\n"
+              "  elif store_failed($observations; database_of($inst)) then false\n"
           );
           config = realConfig;
           legs = [ storeErrorLeg ];
@@ -920,6 +1101,21 @@
           config = realConfig;
           legs = [ alwaysOnSilentLeg ];
         };
+        everyQueryToFleet = {
+          evaluator = realEvaluator.overrideAttrs (old: {
+            text =
+              mutateText "everyQueryToFleet" "local language=$1 database=$2 expr=$3"
+                "local language=$1 database=fleet expr=$3"
+                old.text;
+          });
+          config = twoDatabaseConfig;
+          legs = [ twoDatabaseLeg ];
+        };
+        allDatabasesFreeze = {
+          evaluator = evaluatorWith allDatabasesFreezeTransition;
+          config = realConfig;
+          legs = [ devloopFailureLeg ];
+        };
       };
 
       mutantRun = name: mutant: ''
@@ -938,22 +1134,36 @@
         fi
       '';
 
+      controlQuery = "SELECT 1 AS value";
       controlResponses = pkgs.writeText "fleet-alert-control-responses.json" (
-        builtins.toJSON { "0".up = vector t0 [ ]; }
+        builtins.toJSON {
+          "0" = {
+            up = vector t0 [ ];
+            "${controlQuery}" = sqlAnswer [ ];
+          };
+        }
+      );
+      controlDatabases = pkgs.writeText "fleet-alert-control-databases.json" (
+        builtins.toJSON {
+          up = "fleet";
+          "${controlQuery}" = "devloop";
+        }
       );
 
       # The fixture server's own clauses, each with its negative control.
       serverControls = ''
-        echo "--- the fixture server refuses other paths, databases and accounts, and detects two open requests"
+        echo "--- the fixture server refuses other paths, databases and accounts, replays SQL as GreptimeDB does, and detects two open requests"
         control=$(mktemp -d)
         echo 0 > "$control/step"
-        python3 ${fixtureServer} --responses ${controlResponses} \
+        python3 ${fixtureServer} --responses ${controlResponses} --databases ${controlDatabases} \
           --step-file "$control/step" --port-file "$control/port" > "$control/server.log" 2>&1 &
         server_pid=$!
         for _ in $(seq 100); do [ -s "$control/port" ] && break; sleep 0.1; done
-        [ -s "$control/port" ] || { echo "FAIL: the control fixture server did not start" >&2; exit 1; }
+        [ -s "$control/port" ] || { cat "$control/server.log" >&2; echo "FAIL: the control fixture server did not start" >&2; exit 1; }
         port=$(cat "$control/port")
         query_url="http://127.0.0.1:$port/v1/prometheus/api/v1/query"
+        sql_url="http://127.0.0.1:$port/v1/sql"
+        sql_arg=${lib.escapeShellArg "sql=${controlQuery}"}
         ask() {
           printf 'user = "%s"\n' "$1" | curl --config - --silent --output /dev/null --write-out '%{http_code}' "''${@:2}" || true
         }
@@ -961,11 +1171,19 @@
           [ "$2" = "$3" ] || { echo "FAIL: fixture server: $1 answered $2, expected $3" >&2; exit 1; }
         }
         good=regulator:${fixturePassword}
-        expect_code "the query path" "$(ask "$good" -H 'x-greptime-db-name: fleet' --get --data-urlencode 'query=up' "$query_url")" 200
-        expect_code "another path" "$(ask "$good" -H 'x-greptime-db-name: fleet' "http://127.0.0.1:$port/v1/sql")" 404
-        expect_code "a query without the database header" "$(ask "$good" --get --data-urlencode 'query=up' "$query_url")" 400
-        expect_code "another account" "$(ask perses:${fixturePassword} -H 'x-greptime-db-name: fleet' --get --data-urlencode 'query=up' "$query_url")" 401
+        expect_code "the PromQL path" "$(ask "$good" -H 'x-greptime-db-name: fleet' --get --data-urlencode 'query=up' "$query_url")" 200
+        expect_code "the SQL path" "$(ask "$good" --url-query 'db=devloop' --data-urlencode "$sql_arg" "$sql_url")" 200
+        expect_code "another path" "$(ask "$good" -H 'x-greptime-db-name: fleet' --get --data-urlencode 'query=up' "http://127.0.0.1:$port/v1/promql")" 404
+        expect_code "a PromQL query without the database header" "$(ask "$good" --get --data-urlencode 'query=up' "$query_url")" 400
+        expect_code "a PromQL query to another database" "$(ask "$good" -H 'x-greptime-db-name: devloop' --get --data-urlencode 'query=up' "$query_url")" 400
+        expect_code "an SQL query without db" "$(ask "$good" --data-urlencode "$sql_arg" "$sql_url")" 400
+        expect_code "an SQL query to another database" "$(ask "$good" --url-query 'db=fleet' --data-urlencode "$sql_arg" "$sql_url")" 400
+        expect_code "another account on the PromQL path" "$(ask perses:${fixturePassword} -H 'x-greptime-db-name: fleet' --get --data-urlencode 'query=up' "$query_url")" 401
+        expect_code "another account on the SQL path" "$(ask perses:${fixturePassword} --url-query 'db=devloop' --data-urlencode "$sql_arg" "$sql_url")" 401
         expect_code "a wrong password" "$(ask regulator:wrong -H 'x-greptime-db-name: fleet' --get --data-urlencode 'query=up' "$query_url")" 401
+        printf 'user = "%s"\n' "$good" | curl --config - --silent --url-query 'db=devloop' --data-urlencode "$sql_arg" "$sql_url" > "$control/sql.json"
+        jq -e '(.output | length) == 1 and (.output[0].records.schema.column_schemas | map(.name)) == ["value"] and .output[0].records.rows == []' "$control/sql.json" > /dev/null \
+          || { cat "$control/sql.json" >&2; echo "FAIL: fixture server: the SQL answer is not GreptimeDB's output[0].records shape" >&2; exit 1; }
         python3 -c 'import socket, sys, time; s = socket.create_connection(("127.0.0.1", int(sys.argv[1]))); time.sleep(10)' "$port" &
         holder=$!
         sleep 1
@@ -985,7 +1203,7 @@
           echo "FAIL: the fixture server did not record two open requests" >&2
           exit 1
         fi
-        echo "ok: fixture server refusals and the concurrency guard"
+        echo "ok: fixture server refusals, the SQL answer shape and the concurrency guard"
       '';
 
       fixtureRehearsal =
@@ -1016,6 +1234,10 @@
               evaluator = lib.getExe realEvaluator;
               config = realConfig;
             }) legs}
+            ${runLeg {
+              evaluator = lib.getExe realEvaluator;
+              config = twoDatabaseConfig;
+            } twoDatabaseLeg}
             mutant_missed=0
             ${lib.concatStrings (lib.mapAttrsToList mutantRun runtimeMutants)}
             if [ -s "$TMPDIR/misses-real" ]; then
@@ -1041,6 +1263,12 @@
       noRepostTransition =
         mutantTransition "noRepost" ''>= repost_every then "repost"''
           ''>= repost_every and false then "repost"'';
+      # Review F7's negative control: any failed database freezes every
+      # instance, as before per-database freezing.
+      allDatabasesFreezeTransition =
+        mutantTransition "allDatabasesFreeze"
+          "  elif store_failed($observations; database_of($inst)) then true\n"
+          "  elif (store_errors($observations) | length) > 0 then true\n";
 
       propertyRehearsal =
         pkgs.runCommand "fleet-alert-property"
@@ -1050,7 +1278,7 @@
               pkgs.jq
               pkgs.gnugrep
             ];
-            meta.description = "D11: transition.jq equals the reference model on derandomized Hypothesis timelines, and the no-re-post mutant is caught";
+            meta.description = "D11, review F7: transition.jq equals the reference model on derandomized Hypothesis timelines, a devloop failure leaves fleet's posts alone, and the no-re-post and allDatabasesFreeze mutants are caught";
           }
           ''
             set -euo pipefail
@@ -1065,6 +1293,14 @@
             cat no-repost.log
             grep -q 'Falsifying' no-repost.log
             echo "mutant noRepost rejected"
+            if FLEET_ALERT_JQ_LIB=${jqLibOf "allDatabasesFreeze" allDatabasesFreezeTransition} python3 ${./fleet-alert}/test_transition.py > all-databases-freeze.log 2>&1; then
+              cat all-databases-freeze.log
+              echo "FAIL: the property test accepted the allDatabasesFreeze mutant" >&2
+              exit 1
+            fi
+            cat all-databases-freeze.log
+            grep -q 'Falsifying' all-databases-freeze.log
+            echo "mutant allDatabasesFreeze rejected"
             touch "$out"
           '';
     in

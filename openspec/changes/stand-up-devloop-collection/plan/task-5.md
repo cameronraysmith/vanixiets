@@ -444,6 +444,18 @@ with:
                     "storeErrors": [],
 ```
 
+Replace line 237, where `RULES[3]` would now be `Dev`:
+
+```python
+    timeline = {"rules": [silent, RULES[3], missing], "steps": steps}
+```
+
+with:
+
+```python
+    timeline = {"rules": [silent, model.rule_named(RULES, "StoreQueryFailing"), missing], "steps": steps}
+```
+
 Replace lines 246-269, from `    Written from the timeline alone (design D11, D15): an instance is frozen on` to the `                ]` closing `seen`, with:
 
 ```python
@@ -2089,7 +2101,6 @@ In `modules/vm-tests/devloop-ingest.nix`, in the `let` that defines `cases` (Tas
             burnRule = ''
               print("=== case burnRule", flush=True)
               import datetime
-              import json
 
               BURN_EXPR = json.loads(${builtins.toJSON (builtins.toJSON burnAlertRule.expr)})
               BURN_DB = ${builtins.toJSON burnAlertRule.database}

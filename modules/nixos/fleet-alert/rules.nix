@@ -3,7 +3,7 @@
 #
 # One Nix source for the evaluator and for promtool. fleetAlertRules returns
 # `rules`; `json`, the evaluator's rule list with `for` in seconds; and
-# `yaml`, a Prometheus rules file of the rules with an expression, written as
+# `yaml`, a Prometheus rules file of the `promql` rules, written as
 # JSON (which YAML accepts) and read only by checks.x86_64-linux.fleet-alert's
 # promtool pass. The expressions are ADR-009's rule table as amended
 # (ADR-009-alerting.md:102-119), measured on magnetite on 2026-10-18
@@ -23,6 +23,18 @@
 # reports: one absent from system_memory_usage_bytes for 10 min while the
 # store answers raises it with that host_name and no `for` (ADR-009 item 16,
 # charter v20).
+#
+# Every rule but StoreQueryFailing carries `database` (default "fleet") and
+# `language` ("promql", the default, or "sql"); the evaluator sends a promql
+# rule to the PromQL API with x-greptime-db-name and an sql rule as POST
+# /v1/sql?db=<database> (stand-up-devloop-collection design D2).
+# StoreQueryFailing has no database of its own: transition.jq raises one
+# instance per failing database (review F7). RuleSignalMissing's `database`
+# is the one the evaluator reads system_memory_usage_bytes from, the
+# selector `reporting` comes from. PullRequestQueueWaitBurn (design D1)
+# reads devloop's ci_build in SQL, which promtool cannot parse;
+# vmTests.x86_64-linux.devloop-ingest's burnRule case runs it on GreptimeDB
+# 1.2.1.
 {
   flake.lib.fleetAlertRules =
     { lib, notifiedUnits }:
@@ -63,6 +75,10 @@
         {
           presence = [ ];
           attribution = [ ];
+        }
+        // lib.optionalAttrs (r.alert != "StoreQueryFailing") {
+          database = "fleet";
+          language = "promql";
         }
         // r;
 
@@ -137,10 +153,19 @@
           };
         }
         {
+          alert = "PullRequestQueueWaitBurn";
+          database = "devloop";
+          language = "sql";
+          expr = "SELECT CAST(sum(CASE WHEN c.started_at > c.created_at + INTERVAL '1 hour' THEN 1 ELSE 0 END) AS DOUBLE) / count(*) AS value FROM ci_build c JOIN (SELECT build_id, min(finished_at) AS first_finished FROM ci_build GROUP BY build_id) f ON c.build_id = f.build_id AND c.finished_at = f.first_finished WHERE c.pr_number IS NOT NULL AND c.started_at IS NOT NULL AND c.finished_at >= now() - INTERVAL '24 hours' HAVING count(*) >= 10 AND sum(CASE WHEN c.started_at > c.created_at + INTERVAL '1 hour' THEN 1 ELSE 0 END) * 10 > count(*)";
+          for = "1h";
+          severity = "warning";
+          annotations.summary = "More than one in ten of the at least 10 pull-request builds whose first attempt finished in the last 24 h waited over an hour to start; the value is that share";
+        }
+        {
           alert = "StoreQueryFailing";
           for = "3m";
           severity = "critical";
-          annotations.summary = "The telemetry store has not answered the evaluator's queries; every other alert instance is frozen";
+          annotations.summary = "The telemetry store has not answered the evaluator's queries on the database named below for 3 min; the alert instances on that database are frozen, and those on other databases are evaluated as usual";
         }
         {
           alert = "RuleSignalMissing";
@@ -184,7 +209,7 @@
         groups = [
           {
             name = "fleet-alert";
-            rules = map promRule (builtins.filter (r: r ? expr) rules);
+            rules = map promRule (builtins.filter (r: r ? expr && r.language == "promql") rules);
           }
         ];
       };
