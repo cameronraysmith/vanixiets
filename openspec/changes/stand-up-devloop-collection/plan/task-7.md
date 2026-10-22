@@ -252,7 +252,7 @@ boot=$(date -u -d "$(uptime -s)" +%FT%TZ)
 echo "boot $boot"
 echo "booted $(readlink -f /run/booted-system)"
 echo "current $(readlink -f /run/current-system)"
-echo "boots $(journalctl --list-boots --no-pager -q | wc -l)"
+echo "boots $(sudo journalctl --list-boots --no-pager -q | wc -l)"
 jq -c --arg b "$boot" 'select(.ts >= $b)' "$f" | head -n 1 | sed 's/^/first-after-boot /'
 jq -c --arg b "$boot" 'select(.ts >= $b and (has("previous_closure") | not))' "$f" | wc -l | sed 's/^/no-previous-after-boot /'
 REMOTE
@@ -339,7 +339,7 @@ source "$EV/window.env"
 L="$EV/7.3-envelope-$(date -u +%Y%m%dT%H%M%SZ).log"
 {
   echo "D2_END=$D2_END"
-  ssh magnetite.zt "systemctl show greptimedb-envelope -p Result -p ExecMainStatus -p ExecMainStartTimestamp -p ExecMainExitTimestamp; journalctl -u greptimedb-envelope --since '$D2_END' -p warning --no-pager -q || true"
+  ssh magnetite.zt "systemctl show greptimedb-envelope -p Result -p ExecMainStatus -p ExecMainStartTimestamp -p ExecMainExitTimestamp; sudo journalctl -u greptimedb-envelope --since '$D2_END' -p warning --no-pager -q || true"
   rg -l 'devloop tables: PASS' "$EV"/7.3-tables-*.log && echo "7.3 passed: D3 may start"
 } 2>&1 | tee "$L"
 ```
@@ -450,7 +450,7 @@ Run:
 L="$EV/7.4-pg-grants-$(date -u +%Y%m%dT%H%M%SZ).log"
 {
   ssh magnetite.zt 'systemctl show devloop-pg-grants -p ActiveState -p Result -p After -p WantedBy -p PartOf -p ActiveEnterTimestamp; systemctl show nixbot -p ActiveEnterTimestamp'
-  ssh magnetite.zt 'journalctl -u devloop-pg-grants -b --no-pager -o short-iso -q'
+  ssh magnetite.zt 'sudo journalctl -u devloop-pg-grants -b --no-pager -o short-iso -q'
   echo '$ pgq.sh opentelemetry-collector: count over the granted columns of builds, build_attributes, projects'
   echo 'SELECT count(*) FROM build_attributes a JOIN builds b ON b.id = a.build_id JOIN projects p ON p.id = b.project_id WHERE a.finished_at IS NOT NULL;' | "$EV/pgq.sh" opentelemetry-collector -At
   echo '$ pgq.sh devloop-reconcile: count over the granted columns of builds and build_attributes'
@@ -646,7 +646,7 @@ L="$EV/7.5-hand-start-$(date -u +%Y%m%dT%H%M%SZ).log"
 {
   ssh magnetite.zt 'systemctl show devloop-reconcile -p LoadCredential -p DynamicUser -p SupplementaryGroups -p MemoryMax -p OOMScoreAdjust -p Environment; systemctl list-timers devloop-reconcile.timer --all --no-pager'
   T=$(date -u +%FT%TZ)
-  ssh magnetite.zt "sudo systemctl start devloop-reconcile.service; echo \"start exit=\$?\"; systemctl show devloop-reconcile -p Result -p ExecMainStatus; journalctl -u devloop-reconcile --since '$T' -o cat --no-pager -q"
+  ssh magnetite.zt "sudo systemctl start devloop-reconcile.service; echo \"start exit=\$?\"; systemctl show devloop-reconcile -p Result -p ExecMainStatus; sudo journalctl -u devloop-reconcile --since '$T' -o cat --no-pager -q"
 } 2>&1 | tee "$L"
 ```
 
@@ -671,7 +671,7 @@ T=$(date -u +%FT%TZ)
 sudo systemctl start devloop-reconcile.service; echo "start exit=$?"
 systemctl show devloop-reconcile -p Result -p ExecMainStatus
 sleep 20
-journalctl -u devloop-reconcile --since "$T" -o cat --no-pager -q
+sudo journalctl -u devloop-reconcile --since "$T" -o cat --no-pager -q
 systemctl show 'observability-notify@devloop-reconcile.service.service' -p Result
 echo "\$ tail -1 failed.log"; tail -n 1 /var/lib/observability-notify/failed.log
 echo "\$ sudo cat stamp"; sudo cat /var/lib/observability-notify/devloop-reconcile.service
@@ -706,7 +706,7 @@ systemctl show devloop-reconcile -p Environment -p DropInPaths
 T=$(date -u +%FT%TZ)
 sudo systemctl start devloop-reconcile.service; echo "start exit=$?"
 systemctl show devloop-reconcile -p Result
-journalctl -u devloop-reconcile --since "$T" -o cat --no-pager -q
+sudo journalctl -u devloop-reconcile --since "$T" -o cat --no-pager -q
 test ! -e /var/lib/observability-notify/devloop-reconcile.service && echo "stamp removed"
 REMOTE
   source "$EV/window.env"
@@ -729,9 +729,9 @@ if [[ "$t" < "02:15:00Z" ]]; then day=${D4_END%%T*}; else day=$(date -j -u -v+1d
 L="$EV/7.5-scheduled-$(date -u +%Y%m%dT%H%M%SZ).log"
 {
   echo "first scheduled run day: $day"
-  ssh magnetite.zt "systemctl list-timers devloop-reconcile.timer --all --no-pager; journalctl -u devloop-reconcile --since '$day 02:14:00 UTC' --until '$day 02:40:00 UTC' -o short-iso --no-pager -q"
-  echo '$ journalctl -u devloop-reconcile -g "memory peak"'
-  ssh magnetite.zt "journalctl -u devloop-reconcile -g 'memory peak' --no-pager -q -o short-iso"
+  ssh magnetite.zt "systemctl list-timers devloop-reconcile.timer --all --no-pager; sudo journalctl -u devloop-reconcile --since '$day 02:14:00 UTC' --until '$day 02:40:00 UTC' -o short-iso --no-pager -q"
+  echo '$ sudo journalctl -u devloop-reconcile -g "memory peak"'
+  ssh magnetite.zt "sudo journalctl -u devloop-reconcile -g 'memory peak' --no-pager -q -o short-iso"
 } 2>&1 | tee "$L"
 ```
 
@@ -780,11 +780,11 @@ jq -c '{user, storeUrl, topLevelDatabase: has("database"), rules: (.rules | leng
 jq -c '.rules[] | select(.alert == "PullRequestQueueWaitBurn") | {alert, database, language, for, severity, presence}' "$cfg"
 systemctl show fleet-alert -p Result -p LoadCredential
 REMOTE
-  ssh magnetite.zt "journalctl -u fleet-alert --since '$D5_END' --no-pager -q -o cat | grep -cE 'Deactivated successfully|Finished'; journalctl -u fleet-alert --since '$D5_END' -p warning --no-pager -q || true"
+  ssh magnetite.zt "sudo journalctl -u fleet-alert --since '$D5_END' --no-pager -q -o cat | grep -cE 'Deactivated successfully|Finished'; sudo journalctl -u fleet-alert --since '$D5_END' -p warning --no-pager -q || true"
   echo '$ StoreQueryFailing posts since D5_START, per database named in the body'
   "$EV/polls.sh" fleet-alerts "$(date -j -u -f '%Y-%m-%dT%H:%M:%SZ' "$D5_START" +%s)" | grep StoreQueryFailing || echo "no StoreQueryFailing post"
   echo '$ evaluator journal lines naming a failed database since D5_END'
-  ssh magnetite.zt "journalctl -u fleet-alert --since '$D5_END' --no-pager -q -o cat | grep -E 'did not answer queries on (fleet|devloop)' || echo 'no failed database'"
+  ssh magnetite.zt "sudo journalctl -u fleet-alert --since '$D5_END' --no-pager -q -o cat | grep -E 'did not answer queries on (fleet|devloop)' || echo 'no failed database'"
   echo '$ StoreQueryFailing instances in state.json'
   ssh magnetite.zt "sudo grep -o 'StoreQueryFailing[^}]*' /var/lib/fleet-alert/state.json || echo 'no StoreQueryFailing instance'"
   snap() { ssh magnetite.zt 'curl -s http://127.0.0.1:4000/metrics' | grep -E '^greptime_servers_http_requests_(total|elapsed_sum)\{' | grep -E 'db="(fleet|devloop)"' | grep -E 'path="/v1/(sql|prometheus/api/v1/query)"' | awk '{ print $1, $NF }' | LC_ALL=C sort -k1,1; }
@@ -871,7 +871,7 @@ L="$EV/7.7-reconcile-$(date -u +%Y%m%dT%H%M%SZ).log"
   if [ "$(date -u +%H%M)" -ge 0240 ]; then last=$(date -u +%F); else last=$(date -j -u -v-1d +%F); fi
   ok=yes; runs=0; missed=""
   while [[ "$day" < "$last" || "$day" == "$last" ]]; do
-    out=$(ssh magnetite.zt "journalctl -u devloop-reconcile --since '$day 02:14:00 UTC' --until '$day 02:40:00 UTC' -o cat --no-pager -q")
+    out=$(ssh magnetite.zt "sudo journalctl -u devloop-reconcile --since '$day 02:14:00 UTC' --until '$day 02:40:00 UTC' -o cat --no-pager -q")
     nok=$(grep -c ': ok$' <<<"$out" || true); nfail=$(grep -c ': FAIL' <<<"$out" || true)
     if [ "$nok" -eq 0 ] && [ "$nfail" -eq 0 ]; then
       covered=$(date -j -u -v-1d -f '%Y-%m-%d' "$day" +%F)
@@ -914,7 +914,7 @@ printf '[Service]\nEnvironment=DEVLOOP_RECONCILE_DAY=%s\n' "$1" | sudo tee "$d/z
 sudo systemctl daemon-reload
 T=$(date -u +%FT%TZ)
 sudo systemctl start devloop-reconcile.service; echo "start exit=$?"
-journalctl -u devloop-reconcile --since "$T" -o cat --no-pager -q
+sudo journalctl -u devloop-reconcile --since "$T" -o cat --no-pager -q
 sudo rm "$d/zz-day.conf"; sudo rmdir "$d" 2>/dev/null || true
 sudo systemctl daemon-reload
 REMOTE

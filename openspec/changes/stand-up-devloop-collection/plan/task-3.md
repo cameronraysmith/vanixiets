@@ -2131,7 +2131,7 @@ Run: `$REPO/logs/s2-evidence/s2-deploy.sh magnetite D3`
 Expected: `clan exit=0` and `D3_START`, `D3_END` appended to `logs/s2-evidence/window.env`; the script deploys from a fresh worktree of `origin/main` only when `nixbot-logs queue` prints `Queue is empty` (Task 7 Step 0).
 The first polls backfill nixbot's retained history, about 200,000 attribute rows in about 20 polls of 10,000, above ADR-004's 100,000 rows a day once, on this deploy day only, as design Risks accepts; 7.4 records the day's sent and stored counts against that budget, so nothing here is a failure.
 Tick 3.11 with the edit tool in the next task's change, or in Task 8's, after 7.4 passes; 7.4 must pass before group 4's deploy.
-If the collector fails to start, `journalctl -u opentelemetry-collector` names the component; roll back by redeploying magnetite from the previous `main@origin` commit through the same script, which stops collection and leaves the tables and their rows in place (design Migration Plan).
+If the collector fails to start, `sudo journalctl -u opentelemetry-collector` names the component; roll back by redeploying magnetite from the previous `main@origin` commit through the same script, which stops collection and leaves the tables and their rows in place (design Migration Plan).
 
 #### Questions and contract notes for Task 3
 

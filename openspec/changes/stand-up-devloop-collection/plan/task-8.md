@@ -156,7 +156,7 @@ git fetch -q origin
   git merge-base --is-ancestor "$SHA5" "$D5_COMMIT" && echo "D5_COMMIT contains pull request 5 ($SHA5)" || echo "FAIL: D5_COMMIT lacks $SHA5"
 
   echo '## 10.4 seven consecutive scheduled devloop-reconcile passes'
-  ssh magnetite.zt "journalctl -u devloop-reconcile.service --since @$(ep "$D4_END") -o json --no-pager" > "$EV/9.1-reconcile-journal.json"
+  ssh magnetite.zt "sudo journalctl -u devloop-reconcile.service --since @$(ep "$D4_END") -o json --no-pager" > "$EV/9.1-reconcile-journal.json"
   jq -s -r '
     group_by(._SYSTEMD_INVOCATION_ID // .INVOCATION_ID // "")
     | map(select((.[0]._SYSTEMD_INVOCATION_ID // .[0].INVOCATION_ID // "") != ""))
@@ -177,12 +177,12 @@ git fetch -q origin
 
   echo '## 10.5 the burn rule on devloop every minute, no StoreQueryFailing since D5'
   ssh magnetite.zt 'cfg=$(systemctl show -p Environment --value fleet-alert.service | tr " " "\n" | sed -n "s/^FLEET_ALERT_CONFIG=//p"); jq -c ".rules[] | select(.alert == \"PullRequestQueueWaitBurn\") | {alert, database, language, for}" "$cfg"; jq -c "{topLevelDatabase: has(\"database\")}" "$cfg"'
-  ssh magnetite.zt "journalctl -u fleet-alert.service --since @$(ep "$D5_END") -o json --no-pager" \
+  ssh magnetite.zt "sudo journalctl -u fleet-alert.service --since @$(ep "$D5_END") -o json --no-pager" \
     | jq -s -r --argjson d5 "$(ep "$D5_END")" '
         [.[] | select(.JOB_TYPE == "start") | {t: ((.__REALTIME_TIMESTAMP | tonumber) / 1000000 | floor), r: .JOB_RESULT}] as $runs
         | ($runs | map(.t)) as $ts
         | "runs=\($runs | length) done=\([$runs[] | select(.r == "done")] | length) first=+\(($ts | min) - $d5)s maxgap=\([range(1; $ts | length) as $i | $ts[$i] - $ts[$i - 1]] | max)s minutes=\(((now | floor) - $d5) / 60 | floor)"'
-  echo "store-failure lines since D5: $(ssh magnetite.zt "journalctl -u fleet-alert.service --since @$(ep "$D5_END") -o cat --no-pager" | grep -cE 'fleet-alert: (query failed|HTTP [0-9]+ for query|query deadline of|the store did not answer)')"
+  echo "store-failure lines since D5: $(ssh magnetite.zt "sudo journalctl -u fleet-alert.service --since @$(ep "$D5_END") -o cat --no-pager" | grep -cE 'fleet-alert: (query failed|HTTP [0-9]+ for query|query deadline of|the store did not answer)')"
 } 2>&1 | tee "$EV/9.1-closed-record-$(date -u +%Y%m%dT%H%M%SZ).log"
 ssh magnetite.zt 'sudo rm -r /var/lib/devloop-arrival-watch.sh /var/lib/devloop-arrival-watch'
 ```

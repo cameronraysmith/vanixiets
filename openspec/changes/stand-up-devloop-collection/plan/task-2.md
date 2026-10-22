@@ -2034,7 +2034,10 @@ done
     echo "      exporters: [otlp_http/devloop_$t]"
   done
 } > "$w/otelcol.yaml"
-systemd-run --user --unit=s2-precheck-otelcol --collect "$otelcol" "--config=file:$w/otelcol.yaml"
+# The collector's output goes to a file, because the operator cannot read
+# the user journal on magnetite (journalctl --user: "No journal files were
+# opened due to insufficient permissions").
+systemd-run --user --unit=s2-precheck-otelcol --collect -p "StandardOutput=append:$w/otelcol.log" -p "StandardError=append:$w/otelcol.log" "$otelcol" "--config=file:$w/otelcol.yaml"
 sleep 5
 
 # One record per table, every value a string attribute as the S2 receivers
@@ -2076,7 +2079,9 @@ status=$(admin --data-urlencode 'sql=SELECT "batch", "msg", "flaky", "build", "t
 expect_200 "$status" "read of batch_event"
 [ "$(jq -c '.output[0].records.rows' "$w/answer")" = '[[180,"batch done",false,null,1792576800123456]]' ] || { echo "FAIL: batch_event's row is not (180, batch done, false, null, record time)"; exit 1; }
 echo "ok: batch_event's ts is the record time and an empty attribute is null"
-failed=$(journalctl --user -u s2-precheck-otelcol --no-pager -o cat | grep -c 'Exporting failed' || true)
+[ -s "$w/otelcol.log" ] || { echo "FAIL: the collector's log file is empty"; exit 1; }
+echo "ok: the collector wrote $(wc -l < "$w/otelcol.log") log lines"
+failed=$(grep -c 'Exporting failed' "$w/otelcol.log" || true)
 [ "$failed" = 0 ] || { echo "FAIL: the collector logged $failed failed exports"; exit 1; }
 echo "ok: the collector logged no failed export"
 echo "precheck passed"
@@ -2090,6 +2095,7 @@ The records carry every value as a string attribute with `""` for null, as the S
 That the OTLP receiver answers non-200 when its synchronous exporter's write is refused is `[INFERENCE]`; the per-table row counts and the collector's `Exporting failed` count decide the step either way.
 The exact JSON of the `batch_event` read, `[[180,"batch done",false,null,1792576800123456]]` with the time index in microseconds, is `[INFERENCE]` from the spike's `finished_at` read (`logs/s2/spike-dedup.md:175-180`), confirmed by this step; on a mismatch on that line alone, the printed answer shows the stored row.
 During planning the script passed `bash -n` and `shellcheck` at the root pin, its four generated payloads parsed with `jq`, and `jq` and a running user manager were confirmed on magnetite (`/etc/profiles/per-user/cameron/bin/jq`, `systemctl --user is-system-running` printing `running`).
+The collector's stdout and stderr go to `$w/otelcol.log`, not the user journal: the operator `cameron` is not in `systemd-journal`, so on magnetite `journalctl --user` prints `No journal files were opened due to insufficient permissions.` and an empty stream, over which a `grep -c` counts 0 whatever the collector logged (first run, 2026-10-22, `logs/s2-evidence/2.7-precheck-20261022T003015Z.log`); the count is therefore taken only after the file is shown non-empty.
 
 - [ ] **Step 26: Run the pre-D2 compile check on magnetite (runtime, magnetite; tasks.md 2.7 verify)**
 
@@ -2106,10 +2112,11 @@ greptimedb=$(nix eval --raw .#nixosConfigurations.magnetite.config.services.grep
 otelcol=$(nix eval --raw .#nixosConfigurations.magnetite.config.services.opentelemetry-collector.package)
 ssh magnetite.zt "rm -rf $in /tmp/2.7-precheck.sh && test -x $greptimedb/bin/greptime && test -x $otelcol/bin/otelcol-contrib" && echo "store paths present on magnetite"
 scp -rq "$in" logs/s2-evidence/2.7-precheck.sh magnetite.zt:/tmp/
-ssh magnetite.zt "bash /tmp/2.7-precheck.sh $greptimedb $otelcol; status=\$?; rm -rf $in /tmp/2.7-precheck.sh; exit \$status" 2>&1 | tee logs/s2-evidence/2.7-precheck-$(date -u +%Y%m%dT%H%M%SZ).log
+ssh magnetite.zt "bash /tmp/2.7-precheck.sh $greptimedb $otelcol; rc=\$?; rm -rf $in /tmp/2.7-precheck.sh; exit \$rc" 2>&1 | tee logs/s2-evidence/2.7-precheck-$(date -u +%Y%m%dT%H%M%SZ).log
 ```
 
-Expected: `store paths present on magnetite`; the two version lines naming GreptimeDB 1.2.1 and `otelcol-contrib version 0.155.0`; then, in order, `ok: CREATE DATABASE devloop answered 200`, `ok: ddl.<table> answered 200` and `ok: pipeline devloop_<table> answered 200` for each of the four tables, `ok: the OTLP write to <table> through otlp_http/devloop_<table> answered 200` for each, `ok: count of <table> answered 200` and `ok: <table> holds one row` for each, `ok: read of batch_event answered 200`, `ok: batch_event's ts is the record time and an empty attribute is null`, `ok: the collector logged no failed export`, and the last line `precheck passed`.
+Expected: `store paths present on magnetite`; the two version lines naming GreptimeDB 1.2.1 and `otelcol-contrib version 0.155.0`; then, in order, `ok: CREATE DATABASE devloop answered 200`, `ok: ddl.<table> answered 200` and `ok: pipeline devloop_<table> answered 200` for each of the four tables, `ok: the OTLP write to <table> through otlp_http/devloop_<table> answered 200` for each, `ok: count of <table> answered 200` and `ok: <table> holds one row` for each, `ok: read of batch_event answered 200`, `ok: batch_event's ts is the record time and an empty attribute is null`, `ok: the collector wrote <n> log lines` with `<n>` at least 1, `ok: the collector logged no failed export`, and the last line `precheck passed`.
+The remote command line runs under the operator's login shell, zsh on magnetite, where `status` is read-only, so the exit code is kept in `rc`.
 The store and collector are the paths magnetite's configuration evaluates, the versions running there since S1; if `test -x` fails because this tree's paths are not yet on magnetite, run `nix copy --to ssh-ng://magnetite.zt "$greptimedb" "$otelcol"` after `nix build --no-link "$greptimedb" "$otelcol"`, which stibnite routes to magnetite, and repeat.
 Any `FAIL:` line stops the task before the commit: a statement, pipeline or write that the real store refuses is fixed in Steps 6 to 9 and this step is run again.
 The step changes nothing on magnetite but the operator's user units and `/tmp` directories, which the trap and the last command remove; `ssh magnetite.zt 'systemctl --user list-units --all "s2-precheck*"; ls -d /tmp/s2-precheck /tmp/s2-precheck-inputs'` afterwards prints `0 loaded units listed.` and two `No such file or directory` lines.
@@ -2164,9 +2171,9 @@ Expected: the 7.1 evidence files exist and 7.1 is ticked, and at least one `2.7-
 - [ ] **Step 31: Deploy D2 (tasks.md 2.9)**
 
 Run Task 7 Step 0's procedure: `logs/s2-evidence/s2-deploy.sh magnetite D2 2>&1 | tee logs/s2-evidence/2.9-deploy-$(date -u +%Y%m%dT%H%M%SZ).log`
-Expected: the script finds `Queue is empty`, runs `clan machines update magnetite` from a fresh worktree of `origin/main` containing Step 29's commit, and appends `D2_START` and `D2_END` to `logs/s2-evidence/window.env`; then `ssh magnetite.zt 'systemctl show greptimedb-schema -p ActiveState -p Result; journalctl -u greptimedb-schema -b --since "-15min" -o cat | grep -c "answered HTTP"'` prints `ActiveState=active`, `Result=success` and `0`.
+Expected: the script finds `Queue is empty`, runs `clan machines update magnetite` from a fresh worktree of `origin/main` containing Step 29's commit, and appends `D2_START` and `D2_END` to `logs/s2-evidence/window.env`; then `ssh magnetite.zt 'systemctl show greptimedb-schema -p ActiveState -p Result; sudo journalctl -u greptimedb-schema -b --since "-15min" -o cat | grep -c "answered HTTP"'` prints `ActiveState=active`, `Result=success` and `0` (`sudo`, because the operator is not in `systemd-journal` and an unprivileged `journalctl` reads nothing).
 Verify: Task 7's 7.3 passes after D2 (2.9) (`SHOW TABLES FROM devloop`, `SHOW CREATE TABLE`, `greptime_private.pipelines`, empty tables and the next `greptimedb-envelope` run, read as `regulator`); group 3's deploy waits for it, and the orchestrator ticks 2.9.
-If `greptimedb-schema` failed, `journalctl -u greptimedb-schema` names the statement or pipeline and its HTTP status; roll back by redeploying magnetite from the previous `main@origin` commit through the same script, which leaves any created table in place, empty and unread until Task 3.
+If `greptimedb-schema` failed, `sudo journalctl -u greptimedb-schema` names the statement or pipeline and its HTTP status; roll back by redeploying magnetite from the previous `main@origin` commit through the same script, which leaves any created table in place, empty and unread until Task 3.
 
 ---
 
