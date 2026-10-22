@@ -29,7 +29,7 @@ Last, `devloop-ingest` runs on magnetite from the change's commit, with the `noA
 - Produces in the ingress role: `connectors."routing/logs"`, pipelines `logs/ingress` and `logs/devloop-<table>-out`, exporters `otlp_http/devloop_<table>`, all present only when `services.greptimedb.pipelines.devloop` is non-empty; `resource/strip-database` deletes `vanixiets.database` and `vanixiets.table`; `queueBytes` with `devloop = mib 4` and `devloop_<table>` entries.
 - Produces in R3.1: mutants `logsQueueNotPersistent`, `logsToFleet`, `logsToMetricsExporter`, `otlpInLogsPipeline`; clause messages `R3.1: a traces pipeline, or a logs pipeline exporting outside devloop` and `R3.1: a logs pipeline takes the local OTLP receiver` (contract name `logsTakeLocalReceiver`).
 - Produces `vmTests.x86_64-linux.devloop-ingest`: outer `let` bindings `vars = "/run/devloop-ingest-vars"`, `credentialConsumers`, `baselineFixtures`, `giteaMqStub`, `unitMutants = { }` (entries `{ unit = "<unit without .service>"; module = …; }`), the case strings `firstStart`, `noAutoCreate`, `overlap`, `tableShape`, `switch`, `documentedQueries`, and `cases = [ firstStart noAutoCreate overlap tableShape switch documentedQueries ]`; `testScript = builtins.readFile ./devloop-ingest/helpers.py + lib.concatStringsSep "\n" cases`.
-  Inside the container: `/etc/devloop-ingest/config.json` (keys `vars`, `psql`, `tables`, `questions`, `abandonMarker`, `batchEventKeys`), `/etc/devloop-ingest/mutants/<name>.conf` and `<name>.unit` per `unitMutants` entry, `/etc/devloop-ingest/gitea-mq-lines.txt`, `/etc/devloop-ingest/gitea-mq-empty.txt`, the runtime symlink `/run/devloop-ingest/gitea-mq-lines` that the stub reads, the specialisation `devloop-switch`.
+  Inside the container: `/etc/devloop-ingest/config.json` (keys `vars`, `psql`, `tables`, `questions`, `abandonMarker`, `batchEventKeys`), `/etc/devloop-ingest/mutants/<name>.conf` and `<name>.unit` per `unitMutants` entry, `/etc/devloop-ingest/gitea-mq-lines.txt`, `/etc/devloop-ingest/gitea-mq-empty.txt`, the runtime symlink `/run/devloop-ingest/gitea-mq-lines` that the stub reads, the variant system `/etc/devloop-ingest/variant-system` (the container's configuration extended by `extendModules` with the test-local option `devloopIngest.isVariant`, because nixpkgs' nspawn module disallows `specialisation`).
   Helpers of the contract, plus the private `_sql`, `_count(table)`, `_sent(table)` and `_otel_metric(name, label, value)`; every Task 3 case leaves the collector running with no mutant drop-in.
   Baseline nixbot rows at boot: project 1; builds 9001 (pull request 9001) and 9002 (branch `gitea-mq/batch/1`, null `pr_number`); attributes `checks.x86_64-linux.pass`, `.abandoned`, `.broken` of 9001 (tied `finished_at`) and `checks.x86_64-linux.cached` of 9002; build ids from 9100 are free for later cases.
 
@@ -226,7 +226,8 @@ def nixbot_rows(sql):
 
 def collector_restart(mutant=None):
     """Remove every mutant drop-in, install `mutant`'s when given, reload,
-    restart each unit that had or gets a drop-in, then the collector."""
+    restart each unit that had or gets a drop-in, then the collector, and
+    wait until it serves its internal telemetry."""
     units = store.succeed(
         'for f in /run/systemd/system/*.service.d/zz-mutant.conf; do '
         '[ -e "$f" ] && basename "$(dirname "$f")" .service.d; done; true'
@@ -244,6 +245,10 @@ def collector_restart(mutant=None):
         store.succeed(f"systemctl restart {unit}.service")
     store.succeed(f"systemctl restart {COLLECTOR}.service")
     store.wait_for_unit(f"{COLLECTOR}.service")
+    retry(
+        lambda _last: store.execute("curl -sSf -o /dev/null http://localhost:8888/metrics")[0] == 0,
+        timeout=dt.timedelta(minutes=2),
+    )
 
 
 def reset_devloop():
@@ -359,7 +364,7 @@ Create `modules/vm-tests/devloop-ingest.nix` with exactly:
 # carries; the collector's order after the schema job, which R3.1's
 # schemaOrderDropped mutant judges; nixbot itself (the stand-in only migrates),
 # magnetite's journal retention, deployed credentials or storage, the OOM
-# order, or a specialisation switch the container cannot perform: the
+# order, or a configuration switch the container cannot perform: the
 # switch case prints a `limitation:` line when it falls back to running the
 # activation script. A configuration mutant is installed at runtime as a
 # drop-in, because an nspawn node cannot switch to a specialisation.
@@ -597,7 +602,7 @@ Create `modules/vm-tests/devloop-ingest.nix` with exactly:
                   return [json.loads(line) for line in text.splitlines() if line.strip()]
 
               original = store.succeed("readlink -f /run/current-system").strip()
-              variant = store.succeed("readlink -f /run/current-system/specialisation/devloop-switch").strip()
+              variant = store.succeed("readlink -f /etc/devloop-ingest/variant-system").strip()
               before = record_lines()
               code, output = store.execute(f"{variant}/bin/switch-to-configuration test 2>&1")
               added = record_lines()[len(before):]
@@ -745,6 +750,15 @@ Create `modules/vm-tests/devloop-ingest.nix` with exactly:
                   self.modules.nixos.otel-collector-ingress
                   self.modules.nixos.devloop-collection
                   self.modules.nixos.deploy-record
+                  # Marks the switch case's second system, so it does not
+                  # build a variant of itself.
+                  {
+                    options.devloopIngest.isVariant = lib.mkOption {
+                      type = lib.types.bool;
+                      default = false;
+                      internal = true;
+                    };
+                  }
                 ];
                 system.stateVersion = lib.trivial.release;
                 environment.systemPackages = [ pkgs.curl ];
@@ -830,14 +844,23 @@ Create `modules/vm-tests/devloop-ingest.nix` with exactly:
                   "collector-password:${vars}/collector-password"
                 ];
 
-                # The switch case's second system.
-                specialisation.devloop-switch.configuration = {
-                  environment.etc."devloop-ingest/variant".text = "devloop-switch";
-                };
-
                 environment.etc = {
                   "devloop-ingest/gitea-mq-lines.txt".source = ./devloop-ingest/gitea-mq-lines.txt;
                   "devloop-ingest/gitea-mq-empty.txt".text = "";
+                  # The switch case's second system: nixpkgs' nspawn module
+                  # disallows `specialisation`, so the variant is this
+                  # configuration extended, linked from /etc.
+                  "devloop-ingest/variant-system" = lib.mkIf (!config.devloopIngest.isVariant) {
+                    source =
+                      (extendModules {
+                        modules = [
+                          {
+                            devloopIngest.isVariant = true;
+                            environment.etc."devloop-ingest/variant".text = "devloop-switch";
+                          }
+                        ];
+                      }).config.system.build.toplevel;
+                  };
                   "devloop-ingest/config.json".text = builtins.toJSON {
                     inherit vars;
                     psql = "${config.services.postgresql.package}/bin/psql";
@@ -872,7 +895,7 @@ Unverified until the case runs, each confirmed by the named case's first run on 
 - `[INFERENCE]` PostgreSQL 16 starts in the nspawn container and the `DynamicUser` collector reaches `/run/postgresql` by peer as `opentelemetry-collector` (`firstStart`, the `ci_*` tables filling).
 - `[INFERENCE]` journald attributes each stub line to `gitea-mq.service` and gives it its own timestamp (`tableShape`, whose per-`msg` counts would differ otherwise).
 - `[INFERENCE]` a timestamp column reads back over HTTP as integer microseconds, as `logs/s2/spike-dedup.md` showed for `finished_at` (`tableShape`).
-- `[INFERENCE]` a specialisation's `activate` runs inside the container and relinks `/run/current-system` (`switch`, which prints its `limitation:` line on that path).
+- `[INFERENCE]` the variant system's `activate` runs inside the container and relinks `/run/current-system` (`switch`, which prints its `limitation:` line on that path).
 
 - [ ] **Step 8: Show the test failing at evaluation (RED)**
 
@@ -883,7 +906,7 @@ jj st --no-pager >/dev/null
 nix eval --raw .#vmTests.x86_64-linux.devloop-ingest.drvPath 2>&1 | tee logs/s2-evidence/3.9-ingest-red-$(date -u +%Y%m%dT%H%M%SZ).log | grep -E "error:.*(questions|batchEventKeys)"
 ```
 
-Expected: an `error:` line naming the missing attribute `questions` (the container's `config.json` reads `devloop.questions` first).
+Expected: an `error:` line naming a missing attribute, `batchEventKeys` (`builtins.toJSON` forces the `config.json` keys in sorted order, so `batchEventKeys` before `questions`).
 
 - [ ] **Step 9: Write `modules/nixos/devloop-collection.nix`**
 
@@ -1914,7 +1937,7 @@ Run:
 nix build --no-link .#checks.x86_64-linux.otel-collector-config 2>&1 | tee logs/s2-evidence/3.6-r31-red-mutants-$(date -u +%Y%m%dT%H%M%SZ).log | grep -E 'otel-collector-config (failures|accepted)'
 ```
 
-Expected: `otel-collector-config accepted a mutant: ["logsQueueNotPersistent","logsToFleet","logsToMetricsExporter","otlpInLogsPipeline"]`: the queue clause still reads only the three database exporters, the content clause reads no exporter, and no clause reads a logs pipeline's receivers.
+Expected: `otel-collector-config accepted a mutant: ["logsQueueNotPersistent","logsToFleet","logsToMetricsExporter","otlpInLogsPipeline","queueOver512MiB"]`: the queue clause still reads only the three database exporters, the content clause reads no exporter, and no clause reads a logs pipeline's receivers; `queueOver512MiB` (fleet at 448 MiB) is accepted too, because Step 10 dropped `devloop` to 4 MiB while the 512 MiB clause still sums only the three database exporters (500 MiB), and Step 19's `exporterNames` adds the four table queues back.
 
 - [ ] **Step 19: Add the clauses that reject them (GREEN, build; tasks.md 3.6)**
 
@@ -2153,6 +2176,9 @@ If the collector fails to start, `sudo journalctl -u opentelemetry-collector` na
 13. Plan review F16: both journal and SQL readers advance their cursor before delivery, so a refused batch loses journal lines and CI rows older than the overlap; `journald/gitea-mq` retries without limit, and the `sqlquery` receivers rely on the overlap, C1 to C3 and a cursor reset.
     Any later edit of an export query re-backfills about 200,000 attribute rows once, over ADR-004's row budget that day, because the cursor's storage key embeds the SQL text.
 14. Plan review F21: `buildOutcome` leaves out a build with no outcome row, so the fixture build 508 (one `cancelled` row) and its expectation are gone.
+15. nixpkgs' nspawn container module asserts `specialisation` unset (activating one needs SUID wrappers, prohibited in the build sandbox), found at Step 8's first evaluation; the switch case's second system is instead the container's configuration extended by `extendModules`, guarded by the test-local option `devloopIngest.isVariant` so the variant does not build a variant of itself, and linked at `/etc/devloop-ingest/variant-system` (Main's decision, 2026-10-21).
+16. The first run on magnetite failed in `noAutoCreate`: `_otel_metric`'s `curl` of `localhost:8888` ran before the restarted collector served its telemetry (exit 7); `collector_restart` now also waits up to 2 min until `curl -sSf http://localhost:8888/metrics` succeeds, an added wait, no assertion changed.
+17. `switch` takes the recorded fallback in the container: the variant system has no `bin/switch-to-configuration` there (exit 127), so the case runs the variant's `activate` and prints its `limitation:` line (design D16).
 
 ---
 

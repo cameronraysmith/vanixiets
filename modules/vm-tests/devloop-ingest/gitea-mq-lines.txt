@@ -1,0 +1,13 @@
+time=2026-10-21T10:00:00.000Z level=INFO msg="batch formed" batch=1 branch=gitea-mq/batch/1 members=2
+time=2026-10-21T10:00:01.000Z level=INFO msg="batch built" batch=1 build=11 sha=1111111111111111111111111111111111111111 current=1 pending=0
+time=2026-10-21T10:00:02.000Z level=INFO msg="batch landed" batch=1 sha=1111111111111111111111111111111111111111 prs=2
+time=2026-10-21T10:00:03.000Z level=INFO msg="batch done" batch=1 landed=2 ejected=0 builds=1 flaky=false
+time=2026-10-21T10:01:00.000Z level=INFO msg="batch formed" batch=2 branch=gitea-mq/batch/2 members=3
+time=2026-10-21T10:01:01.000Z level=INFO msg="batch built" batch=2 build=12 sha=2222222222222222222222222222222222222222 current=1 pending=0
+time=2026-10-21T10:01:02.000Z level=INFO msg="batch bisecting" batch=2 build=12 failed_check=nixbot/nix-build left=1 right=2
+time=2026-10-21T10:01:03.000Z level=INFO msg="batch built" batch=2 build=13 sha=3333333333333333333333333333333333333333 current=1 pending=1
+time=2026-10-21T10:01:04.000Z level=INFO msg="batch landed" batch=2 sha=3333333333333333333333333333333333333333 prs=1
+time=2026-10-21T10:01:05.000Z level=INFO msg="batch done" batch=2 landed=1 ejected=2 builds=2 flaky=true
+time=2026-10-21T10:01:06.000Z level=INFO msg="batch reconcile build failed" batch=2 build=14 err="exit status 1"
+time=2026-10-21T10:02:00.000Z level=INFO msg="batch formed" batch=3 branch=gitea-mq/batch/3 members=1 extra_key=dropped
+time=2026-10-21T10:02:01.000Z level=INFO msg="discovery: reconciled" repos=1

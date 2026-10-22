@@ -366,7 +366,7 @@ LIMIT 10000
   - Writer ordering: the schema job without `ci_build` makes that exporter's `send_failed` non-zero.
   - Overlap: fixture rows re-read on three polls leave one row per key, and the reconcile passes.
   - Reconcile mutants: each row of D11's table.
-  - Specialisation switch: a node switching between two specialisations appends exactly one line naming both closures (A5:152); whether a switch works inside a container is settled by this case's first run, and if it does not, the case appends by running the activation script with a chosen `$systemConfig` and the gap is recorded (BS D13).
+  - Configuration switch: a node switching to a second system, its own configuration extended by `extendModules` because nixpkgs' nspawn container module forbids `specialisation`, appends exactly one line naming both closures (A5:152); the container's systems carry no `switch-to-configuration`, so the case appends by running the second system's activation script, which sets `$systemConfig`, and the gap is recorded (BS D13).
   - Burn rule: D1's three fixtures on the real store.
   - Queries: each D8 query returns its fixture answer.
 - **Rationale**: the gitea-mq parser and the reconcile's fallibility have no gating regulator, so this test runs on magnetite before the merge of any change to either (A5:166).

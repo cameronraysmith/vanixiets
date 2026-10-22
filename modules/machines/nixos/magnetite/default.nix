@@ -329,6 +329,7 @@ in
       # agent role adds opentelemetry-collector itself and applies the wiring,
       # so greptimedb.nix never references the notifier.
       services.observability-notify.units = [
+        "devloop-pg-grants"
         "fleet-alert"
         "greptimedb"
         "greptimedb-envelope"

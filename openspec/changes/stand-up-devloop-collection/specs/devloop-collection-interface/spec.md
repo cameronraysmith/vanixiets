@@ -120,15 +120,15 @@ magnetite's collector SHALL run `journald/gitea-mq` with `units: [gitea-mq.servi
 
 **Discharged by**: `devloop-reconcile`'s comparison of deploy records, resting on world assumption `A49 — NixOS and nix-darwin run activation snippets before the current system is relinked`; `vmTests.x86_64-linux.devloop-ingest`'s switch case; the operator's recorded deploy and boot lines at deploy.
 
-#### Scenario: A node switches specialisation
+#### Scenario: A node switches to a second system
 
-- **WHEN** `devloop-ingest` switches its node from one specialisation to another
+- **WHEN** `devloop-ingest` switches its node from one system to another, the second its configuration extended by `extendModules`
 - **THEN** exactly one line is appended, naming the second as `closure` and the first as `previous_closure`
 
-#### Scenario: The specialisation switch cannot run in a container
+#### Scenario: The configuration switch cannot run in a container
 
-- **WHEN** the switch case's first run finds that a specialisation switch does not activate inside the container
-- **THEN** the case runs the activation script with a chosen `$systemConfig` instead, and the limitation is recorded with the run
+- **WHEN** the switch case finds no `switch-to-configuration` in the container's second system, as nixpkgs' nspawn container module builds it
+- **THEN** the case runs that system's activation script, which sets `$systemConfig`, instead, and the limitation is recorded with the run
 
 ### Requirement: magnetite's collector ships its own deploy records
 
@@ -321,7 +321,7 @@ Over the same day, the reconcile SHALL exit non-zero when the count of `/var/log
 #### Scenario: The cases are run
 
 - **WHEN** the test runs
-- **THEN** it runs the first-start, writer-ordering, overlap, table-shape, specialisation-switch, burn-rule-query and documented-query cases and one mutant per reconcile comparison, and every mutant makes the reconcile exit non-zero
+- **THEN** it runs the first-start, writer-ordering, overlap, table-shape, configuration-switch, burn-rule-query and documented-query cases and one mutant per reconcile comparison, and every mutant makes the reconcile exit non-zero
 
 #### Scenario: The burn rule's query runs on the store
 

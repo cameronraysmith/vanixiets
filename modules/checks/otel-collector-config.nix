@@ -7,7 +7,9 @@
 # against the failure path's policy, the limiter under the unit's ceiling and
 # the collector's order after the schema job. It does not copy the module's
 # literals, and the process identity attributes and node_exporter's firewall
-# are module assertions. R1.2 requires the exponential-histogram conversion
+# are module assertions. Since S2 it also judges the devloop logs routes: each
+# devloop table's exporter queue, no logs pipeline exporting outside devloop
+# and none taking the local OTLP receiver. R1.2 requires the exponential-histogram conversion
 # while the store is below 1.3.0 (ADR-001). Each mutant edits the evaluated
 # input and must produce a non-empty failure list
 # (modules/checks/omnigent-environment.nix pattern). The configuration file
@@ -209,7 +211,29 @@
           pipelines = s.service.pipelines;
           check = name: ok: lib.optional (!ok) name;
           dbs = lib.attrNames i.schema.databases;
-          exporterNames = map (db: "otlp_http/${db}") dbs;
+          devloopTables = lib.attrNames i.schema.devloop.tables;
+          exporterNames =
+            map (db: "otlp_http/${db}") dbs ++ map (table: "otlp_http/devloop_${table}") devloopTables;
+          logsPipelineNames = builtins.filter (lib.hasPrefix "logs/") (builtins.attrNames pipelines);
+          # A logs pipeline writes only into devloop: through the forward and
+          # routing connectors, or a devloop table's exporter whose database
+          # header is devloop.
+          # Not the metrics exporter otlp_http/devloop, which carries no table
+          # or pipeline header, so logs sent there would skip the allow-list
+          # pipeline.
+          exportsToDevloop =
+            name:
+            name == "forward"
+            || name == "routing/logs"
+            || (
+              builtins.elem name (map (table: "otlp_http/devloop_${table}") devloopTables)
+              && (e.${name}.headers."x-greptime-db-name" or null) == "devloop"
+            );
+          # The OTLP receiver's component type is `otlp`
+          # (open-telemetry/opentelemetry-collector@v0.155.0:
+          # receiver/otlpreceiver/internal/metadata/generated_status.go:12);
+          # an instance is `otlp` or `otlp/<name>`.
+          isOtlpReceiver = name: name == "otlp" || lib.hasPrefix "otlp/" name;
           collectorMemoryMax = builtins.match "([0-9]+)M" (i.collectorService.MemoryMax or "");
           promTargets = lib.concatMap (
             name:
@@ -294,9 +318,17 @@
             )
           ))
 
-          # Content: S1 stores metrics only (S7 adds logs behind ADR-008's stages).
-          (check "R3.1: a logs or traces pipeline" (
-            lib.all (lib.hasPrefix "metrics/") (builtins.attrNames pipelines)
+          # Content: no traces pipeline, and the logs pipelines write only
+          # into devloop (S2 design D4; S7 adds journald logs behind ADR-008's
+          # stages).
+          (check "R3.1: a traces pipeline, or a logs pipeline exporting outside devloop" (
+            lib.all (name: !(lib.hasPrefix "traces" name)) (builtins.attrNames pipelines)
+            && lib.all (name: lib.all exportsToDevloop pipelines.${name}.exporters) logsPipelineNames
+          ))
+          # logsTakeLocalReceiver: the local OTLP receiver feeds no logs
+          # pipeline (ADR-003:81; S2 design D4).
+          (check "R3.1: a logs pipeline takes the local OTLP receiver" (
+            lib.all (name: !(lib.any isOtlpReceiver pipelines.${name}.receivers)) logsPipelineNames
           ))
 
           # Queue (host-metrics-collection "Collection survives a telemetry store restart").
@@ -432,6 +464,39 @@
           };
         queueUnder24h = onSettings { exporters."otlp_http/fleet".sending_queue.queue_size = mib 64; };
         queueOver512MiB = onSettings { exporters."otlp_http/fleet".sending_queue.queue_size = mib 448; };
+        # S2 design D4: a logs exporter without the persistent queue.
+        logsQueueNotPersistent =
+          i:
+          i
+          // {
+            settings = i.settings // {
+              exporters = i.settings.exporters // {
+                "otlp_http/devloop_ci_build" = i.settings.exporters."otlp_http/devloop_ci_build" // {
+                  sending_queue =
+                    builtins.removeAttrs i.settings.exporters."otlp_http/devloop_ci_build".sending_queue
+                      [ "storage" ];
+                };
+              };
+            };
+          };
+        # A devloop logs route writing into fleet.
+        logsToFleet = onSettings {
+          service.pipelines."logs/devloop-ci_build-out".exporters = [ "otlp_http/fleet" ];
+        };
+        # A devloop logs route bypassing the table's pipeline through the
+        # metrics exporter, whose only header is the database (plan review F3).
+        logsToMetricsExporter = onSettings {
+          service.pipelines."logs/devloop-ci_build-out".exporters = [ "otlp_http/devloop" ];
+        };
+        # ADR-003:81: the local OTLP receiver feeding a logs pipeline.
+        otlpInLogsPipeline =
+          i:
+          onSettings {
+            receivers.otlp.protocols.http.endpoint = "127.0.0.1:4318";
+            service.pipelines."logs/devloop-ci_build".receivers =
+              i.settings.service.pipelines."logs/devloop-ci_build".receivers
+              ++ [ "otlp" ];
+          } i;
         overrideTouchesAnotherReceiver =
           i:
           i // { overrides = i.overrides ++ [ "receivers::host_metrics/memory::collection_interval=1s" ]; };

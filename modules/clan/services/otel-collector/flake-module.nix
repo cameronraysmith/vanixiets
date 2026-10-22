@@ -1,13 +1,15 @@
-# Fleet metrics collection as one clan service (ADR-003; design D8 to D10).
+# Fleet metrics collection as one clan service (ADR-003; design D8 to D10),
+# and the logs path of S2's dev-loop tables (S2 design D4).
 #
 # Both roles' NixOS fragments merge into one services.opentelemetry-collector,
 # because the NixOS module runs one collector per host. On magnetite, which
 # holds both roles, the agent pipelines export to an in-process `forward`
-# connector that the ingress pipeline receives from. The ingress converts
+# connector that the ingress pipelines receive from. The ingress converts
 # exponential histograms while the store is below 1.3.0 (ADR-001 R1.2), routes
-# on the `vanixiets.database` resource attribute, and writes each database
-# through its own otlp_http exporter with a persistent queue, authenticating
-# as the store's write-only `collector` user.
+# metrics on the `vanixiets.database` resource attribute and logs on it and
+# `vanixiets.table`, and writes each database, and each devloop table, through
+# its own otlp_http exporter with a persistent queue, authenticating as the
+# store's write-only `collector` user.
 #
 # The fragments are plain NixOS modules, flake.modules.nixos.otel-collector-
 # agent and -ingress, so the container test imports them without clan; only
@@ -32,13 +34,19 @@ let
 
   mib = n: n * 1024 * 1024;
 
-  # Persistent queue per database: at least 24 h of fleet and under 512 MiB
+  # Persistent queue per exporter: at least 24 h of fleet and under 512 MiB
   # in total (ADR-003 envelope), asserted by
-  # checks.x86_64-linux.otel-collector-config.
+  # checks.x86_64-linux.otel-collector-config. devloop's 48 MiB is split
+  # between its metrics and its four tables, ci_attribute holding about a
+  # day of store outage on the busiest day (S2 design D4).
   queueBytes = {
     fleet = mib 400;
-    devloop = mib 48;
+    devloop = mib 4;
     agent = mib 48;
+    devloop_ci_attribute = mib 32;
+    devloop_ci_build = mib 4;
+    devloop_batch_event = mib 4;
+    devloop_deploy_record = mib 4;
   };
 
   # Imported by both roles. `package` accepts a single definition, and the
@@ -334,6 +342,29 @@ in
     let
       databaseNames = lib.attrNames schema.databases;
       storeDatabaseNames = lib.attrNames config.services.greptimedb.databases;
+      devloopTables = lib.attrNames schema.devloop.tables;
+      # The logs routes write through the store's devloop_<table> pipelines,
+      # so they exist where the store declares those pipelines
+      # (flake.modules.nixos.devloop-collection); without a logs pipeline
+      # exporting to `forward`, `logs/ingress` would fail validation.
+      devloopLogs = (config.services.greptimedb.pipelines.devloop or { }) != { };
+      storeExporter = headers: queueSize: {
+        endpoint = "http://127.0.0.1:4000/v1/otlp";
+        inherit headers;
+        auth.authenticator = "basicauth/store";
+        sending_queue = {
+          storage = "file_storage";
+          sizer = "bytes";
+          queue_size = queueSize;
+        };
+        # A persistent queue drops an item whose retries run out, so
+        # retries never stop while the store is down.
+        retry_on_failure = {
+          enabled = true;
+          max_interval = "60s";
+          max_elapsed_time = "0s";
+        };
+      };
     in
     {
       imports = [ collectorCore ];
@@ -345,94 +376,135 @@ in
         message = "otel-collector ingress: services.greptimedb.databases creates ${builtins.toJSON storeDatabaseNames}, but flake.lib.otelCollectorSchema.databases routes to ${builtins.toJSON databaseNames}";
       };
 
-      services.opentelemetry-collector = {
-        settings = {
-          extensions = {
-            file_storage = {
-              directory = "${stateDir}/queue";
-              create_directory = true;
+      services.opentelemetry-collector = lib.mkMerge [
+        {
+          settings = {
+            extensions = {
+              file_storage = {
+                directory = "${stateDir}/queue";
+                create_directory = true;
+              };
+              "basicauth/store".client_auth = {
+                username = "collector";
+                password_file = "${credentialsDir}/collector-password";
+              };
             };
-            "basicauth/store".client_auth = {
-              username = "collector";
-              password_file = "${credentialsDir}/collector-password";
+
+            processors = {
+              # The store accepts explicit-bucket histograms only below 1.3.0
+              # (ADR-001 R1.2); the bounds are Prometheus' default buckets.
+              "transform/exphist".metric_statements = [
+                "convert_exponential_histogram_to_histogram(\"upper\", [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0]) where metric.type == METRIC_DATA_TYPE_EXPONENTIAL_HISTOGRAM"
+              ];
+              "resource/strip-database".attributes = [
+                {
+                  key = "vanixiets.database";
+                  action = "delete";
+                }
+                {
+                  key = "vanixiets.table";
+                  action = "delete";
+                }
+              ];
+            };
+
+            connectors.routing.table = map (db: {
+              context = "resource";
+              condition = ''attributes["vanixiets.database"] == "${db}"'';
+              pipelines = [ "metrics/${db}" ];
+            }) databaseNames;
+
+            exporters = lib.listToAttrs (
+              map (
+                db:
+                lib.nameValuePair "otlp_http/${db}" (
+                  storeExporter {
+                    "x-greptime-db-name" = db;
+                    "x-greptime-otlp-metric-promote-resource-attrs" =
+                      lib.concatStringsSep ";" schema.promotedResourceAttributes;
+                  } queueBytes.${db}
+                )
+              ) databaseNames
+            );
+
+            service = {
+              extensions = [
+                "file_storage"
+                "basicauth/store"
+              ];
+              pipelines = {
+                "metrics/ingress" = {
+                  receivers = [ "forward" ];
+                  processors = [
+                    "memory_limiter"
+                    "transform/exphist"
+                  ];
+                  exporters = [ "routing" ];
+                };
+              }
+              // lib.listToAttrs (
+                map (
+                  db:
+                  lib.nameValuePair "metrics/${db}" {
+                    receivers = [ "routing" ];
+                    processors = [ "resource/strip-database" ];
+                    exporters = [ "otlp_http/${db}" ];
+                  }
+                ) databaseNames
+              );
             };
           };
+        }
 
-          processors = {
-            # The store accepts explicit-bucket histograms only below 1.3.0
-            # (ADR-001 R1.2); the bounds are Prometheus' default buckets.
-            "transform/exphist".metric_statements = [
-              "convert_exponential_histogram_to_histogram(\"upper\", [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0]) where metric.type == METRIC_DATA_TYPE_EXPONENTIAL_HISTOGRAM"
-            ];
-            "resource/strip-database".attributes = [
-              {
-                key = "vanixiets.database";
-                action = "delete";
-              }
-            ];
-          };
+        # A second routing instance carries logs: one instance's logs router
+        # resolves every route as a logs pipeline
+        # (open-telemetry/opentelemetry-collector-contrib@aaf5045a2:
+        # connector/routingconnector/router.go:161-260). One exporter per
+        # table, because an exporter carries one table and one pipeline
+        # header; auto_create_table=false turns a write that races the schema
+        # job into a 400 instead of an append-mode table (S2 design D4, D5).
+        (lib.mkIf devloopLogs {
+          settings = {
+            connectors."routing/logs".table = map (table: {
+              context = "resource";
+              condition = ''attributes["vanixiets.database"] == "devloop" and attributes["vanixiets.table"] == "${table}"'';
+              pipelines = [ "logs/devloop-${table}-out" ];
+            }) devloopTables;
 
-          connectors.routing.table = map (db: {
-            context = "resource";
-            condition = ''attributes["vanixiets.database"] == "${db}"'';
-            pipelines = [ "metrics/${db}" ];
-          }) databaseNames;
+            exporters = lib.listToAttrs (
+              map (
+                table:
+                lib.nameValuePair "otlp_http/devloop_${table}" (
+                  storeExporter {
+                    "x-greptime-db-name" = "devloop";
+                    "x-greptime-log-table-name" = table;
+                    "x-greptime-pipeline-name" = "devloop_${table}";
+                    "x-greptime-hints" = "auto_create_table=false";
+                  } queueBytes."devloop_${table}"
+                )
+              ) devloopTables
+            );
 
-          exporters = lib.listToAttrs (
-            map (
-              db:
-              lib.nameValuePair "otlp_http/${db}" {
-                endpoint = "http://127.0.0.1:4000/v1/otlp";
-                headers = {
-                  "x-greptime-db-name" = db;
-                  "x-greptime-otlp-metric-promote-resource-attrs" =
-                    lib.concatStringsSep ";" schema.promotedResourceAttributes;
-                };
-                auth.authenticator = "basicauth/store";
-                sending_queue = {
-                  storage = "file_storage";
-                  sizer = "bytes";
-                  queue_size = queueBytes.${db};
-                };
-                # A persistent queue drops an item whose retries run out, so
-                # retries never stop while the store is down.
-                retry_on_failure = {
-                  enabled = true;
-                  max_interval = "60s";
-                  max_elapsed_time = "0s";
-                };
-              }
-            ) databaseNames
-          );
-
-          service = {
-            extensions = [
-              "file_storage"
-              "basicauth/store"
-            ];
-            pipelines = {
-              "metrics/ingress" = {
+            service.pipelines = {
+              "logs/ingress" = {
                 receivers = [ "forward" ];
-                processors = [
-                  "memory_limiter"
-                  "transform/exphist"
-                ];
-                exporters = [ "routing" ];
+                processors = [ "memory_limiter" ];
+                exporters = [ "routing/logs" ];
               };
             }
             // lib.listToAttrs (
               map (
-                db:
-                lib.nameValuePair "metrics/${db}" {
-                  receivers = [ "routing" ];
+                table:
+                lib.nameValuePair "logs/devloop-${table}-out" {
+                  receivers = [ "routing/logs" ];
                   processors = [ "resource/strip-database" ];
-                  exporters = [ "otlp_http/${db}" ];
+                  exporters = [ "otlp_http/devloop_${table}" ];
                 }
-              ) databaseNames
+              ) devloopTables
             );
           };
-        };
-      };
+        })
+      ];
 
       systemd.services.opentelemetry-collector = lib.mkMerge [
         {
@@ -443,8 +515,8 @@ in
             OOMScoreAdjust = 300;
           };
         }
-        # The store answers 400 for a missing database and the exporter drops
-        # 400s as permanent, so export waits for the schema job.
+        # The store answers 400 for a missing database or table and the
+        # exporter drops 400s as permanent, so export waits for the schema job.
         (lib.mkIf (config.services.greptimedb.enable or false) {
           after = [ "greptimedb-schema.service" ];
           wants = [ "greptimedb-schema.service" ];
