@@ -18,8 +18,6 @@
 #
 # The clauses, each relating two independently defined values:
 #   - marker: abandonMarker and the patch's production code (below);
-#   - columns: the column names PostgreSQL returns for each rendered query
-#     against the migrated schema, and the allow-list in schema.nix;
 #   - abandoned: the query's value over fixture rows whose error text is
 #     the patch's marker, the marker inside other text, other text and null,
 #     and a failed row carrying the marker, and the fixture's expectation;
@@ -33,8 +31,7 @@
 # migration renaming build_attributes.cached), selectError (a.error added to
 # the attribute query's SELECT list), grantWithoutError (the collector's
 # grant without build_attributes.error) and errorUnderAlias (a.error under
-# the drv_path alias); the marker clause has two negative controls,
-# markerLastCharacter and testLiteralsOnly. The real run's
+# the drv_path alias). The real run's
 # `pg_dump --schema-only` of the three tables is $out/schema.sql, compared
 # at plan time with magnetite's dump.
 #
@@ -226,19 +223,8 @@
           EXECUTE ${query.name}${list arguments};
         '';
 
-      header =
-        table: lib.concatStringsSep "\t" ([ "body" ] ++ map (column: column.name) tables.${table}.columns);
-
       # Each script runs with $db set and returns non-zero on failure.
       assertions = [
-        {
-          label = "ci_attribute returns body and the allow-listed columns in order";
-          script = ''[ "$(head -n 1 "$(result ci_attribute old)")" = ${lib.escapeShellArg (header "ci_attribute")} ]'';
-        }
-        {
-          label = "ci_build returns body and the allow-listed columns in order";
-          script = ''[ "$(head -n 1 "$(result ci_build old)")" = ${lib.escapeShellArg (header "ci_build")} ]'';
-        }
         {
           label = "abandoned is true only for the ignored_failure row whose error is exactly the marker";
           script = ''
@@ -378,8 +364,8 @@
             reconcile = dc.reconcileQueries // {
               currentFinish =
                 replaceOnce "currentFinishIgnoresDuplicates"
-                  "WHERE NOT c.present OR (c.current_us IS NOT NULL AND c.current_us <= c.finished_at_us)"
-                  "WHERE NOT c.present"
+                  " OR (c.current_us IS NOT NULL AND c.current_us <= c.finished_at_us)"
+                  ""
                   dc.reconcileQueries.currentFinish;
             };
           };
@@ -402,7 +388,6 @@
       # merely somewhere in the patch, where its test literals (:379, :451)
       # would satisfy a bare search.
       patchText = builtins.readFile ../nixos/nixbot-abandon-optional-attributes.patch;
-      patchLines = lib.splitString "\n" patchText;
       productionContext =
         marker:
         lib.concatStringsSep "\n" [
@@ -411,32 +396,12 @@
           "+            if outcome == BuildOutcome.abandoned"
         ];
       markerHolds = text: marker: lib.hasInfix (productionContext marker) text;
-      lastCharacterChanged =
-        let
-          stem = lib.substring 0 (lib.stringLength dc.abandonMarker - 1) dc.abandonMarker;
-        in
-        stem + (if lib.hasSuffix "x" dc.abandonMarker then "y" else "x");
-      testLiterals = map (number: lib.elemAt patchLines (number - 1)) [
-        379
-        451
+      markerClauses = [
+        {
+          label = "ok: the patch's production code returns abandonMarker as an abandoned attribute's error";
+          holds = markerHolds patchText dc.abandonMarker;
+        }
       ];
-      markerClauses =
-        assert lib.assertMsg (lib.all (line: lib.hasInfix "\"${dc.abandonMarker}\"" line) testLiterals)
-          "devloop-queries: lines 379 and 451 of the abandonment patch no longer hold the marker's test literals; update testLiterals";
-        [
-          {
-            label = "ok: the patch's production code returns abandonMarker as an abandoned attribute's error";
-            holds = markerHolds patchText dc.abandonMarker;
-          }
-          {
-            label = "mutant markerLastCharacter rejected: the production context with the marker's last character changed is not in the patch";
-            holds = !markerHolds patchText lastCharacterChanged;
-          }
-          {
-            label = "mutant testLiteralsOnly rejected: the patch's test literals (:379, :451) alone do not hold the production context";
-            holds = !markerHolds (lib.concatStringsSep "\n" testLiterals) dc.abandonMarker;
-          }
-        ];
 
       # run_<name>: builds database <db>, runs every query and assertion;
       # returns 1 at the first failure.

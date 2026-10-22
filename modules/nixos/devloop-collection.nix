@@ -431,8 +431,12 @@ let
   # takes $3, a jsonb array of { build_id, attr (null for a build),
   # finished_at_us }: the stored keys nixbot's window lacks; it returns
   # those nixbot does not explain, a key being explained when nixbot has
-  # it with a null or later finished_at (a restart). Times are epoch
-  # microseconds, the form the store returns for TIMESTAMP(6).
+  # it with a null or later finished_at (a restart), or, for an attribute
+  # nixbot no longer has, when its build's current finished_at is null or
+  # later (a restarted build drops attributes for systems it no longer
+  # builds, Mic92/nixbot@d020013fa:nixbot/nixbot/rerun_exec.py:83-92; S2
+  # review F3). Times are epoch microseconds, the form the store returns
+  # for TIMESTAMP(6).
   # checks.x86_64-linux.devloop-queries runs all four as devloop-reconcile.
   reconcileQueries =
     let
@@ -464,16 +468,18 @@ let
         "), c AS ("
         "  SELECT k.build_id, k.attr, k.finished_at_us,"
         "    coalesce(a.build_id, b.id) IS NOT NULL AS present,"
-        "    ${us "coalesce(a.finished_at, b.finished_at)"} AS current_us"
+        "    ${us "coalesce(a.finished_at, b.finished_at)"} AS current_us,"
+        "    rb.id IS NOT NULL AND (rb.finished_at IS NULL OR ${us "rb.finished_at"} > k.finished_at_us) AS restarted"
         "  FROM k"
         "  LEFT JOIN build_attributes a ON k.attr IS NOT NULL AND a.build_id = k.build_id AND a.attr = k.attr"
         "  LEFT JOIN builds b ON k.attr IS NULL AND b.id = k.build_id"
+        "  LEFT JOIN builds rb ON k.attr IS NOT NULL AND a.build_id IS NULL AND rb.id = k.build_id"
         ")"
         "SELECT coalesce(c.build_id::text, 'NULL') AS build_id, coalesce(c.attr, '') AS attr,"
         "  c.finished_at_us::text AS stored_us,"
         "  CASE WHEN NOT c.present THEN 'absent' ELSE coalesce(c.current_us::text, 'null') END AS current_us"
         "FROM c"
-        "WHERE NOT c.present OR (c.current_us IS NOT NULL AND c.current_us <= c.finished_at_us)"
+        "WHERE (NOT c.present AND NOT c.restarted) OR (c.current_us IS NOT NULL AND c.current_us <= c.finished_at_us)"
         "ORDER BY 1, 2, 3"
       ];
     };
@@ -486,8 +492,9 @@ let
   #   C1 attributes, C2 builds: nixbot's keys in the window against the
   #     table's, compared as multisets, so a duplicated row is an extra key;
   #     an extra key is explained only when nixbot's current finished_at for
-  #     it is null or later (a restart), and any other fails, as does a
-  #     missing key;
+  #     it is null or later (a restart), or, for an attribute nixbot no
+  #     longer has, its build's is (a restarted build's dropped attribute),
+  #     and any other fails, as does a missing key;
   #   C3 batch-lines: per-msg counts of the gitea-mq.service journal lines
   #     matching design D7's pattern, by __REALTIME_TIMESTAMP, against
   #     batch_event's rows;
@@ -640,7 +647,8 @@ let
         # keyed CLAUSE TABLE COLUMNS QUERY: C1 and C2. Keys are compared as
         # multisets (sorted, not made unique), so a duplicated stored row is an
         # extra key; an extra key is explained only when nixbot's current
-        # finished_at for it is null or later than the stored one (a restart).
+        # finished_at for it, or for a dropped attribute its build's, is null
+        # or later than the stored one (a restart).
         keyed() {
           local clause=$1 table=$2 columns=$3 query=$4 n detail=""
           pg "$(< "$query")" > "$work/source.raw" || unreadable "nixbot's $table keys as devloop-reconcile"
@@ -824,10 +832,11 @@ in
 
       # nixbot.service is not a notify unit, so its migrations may still be
       # running when it counts as started: wait up to 300 s for every granted
-      # column, then grant, once per boot or activation. A grant that a later
-      # nixbot migration drops with its column is not repaired here; the
-      # collector's query errors and devloop-reconcile's C1 and C2 report it.
-      # Nothing is created in nixbot's database but the grants (design D10).
+      # column, then grant, once per boot, and at an activation only when the
+      # unit changes (S2 review F2). A grant that a later nixbot migration
+      # drops with its column is not repaired here; the collector's query
+      # errors and devloop-reconcile's C1 and C2 report it. Nothing is created
+      # in nixbot's database but the grants (design D10).
       systemd.services.devloop-pg-grants = {
         description = "Column grants on nixbot's tables for the dev-loop readers";
         after = [
@@ -869,11 +878,11 @@ in
       # greptimedb-envelope does, and lists the unit in
       # services.observability-notify.units for OnFailure. No `wants`: a run
       # whose sources are down exits 2 and is notified instead of starting
-      # them. OOMScoreAdjust 600 puts it after nixbot's evaluator (900) and
-      # before the store (500); magnetite asserts the order. Persistent=true
-      # catches up one missed run at boot, which reconciles only the previous
-      # day; days missed while magnetite was down are rerun by hand with
-      # DEVLOOP_RECONCILE_DAY (design D11; plan review F13).
+      # them. It sets no OOMScoreAdjust: it peaks at about 11.5 MB, so a place
+      # in magnetite's kill order would protect nothing (S2 review F7).
+      # Persistent=true catches up one missed run at boot, which reconciles
+      # only the previous day; days missed while magnetite was down are rerun
+      # by hand with DEVLOOP_RECONCILE_DAY (design D11; plan review F13).
       systemd.services.devloop-reconcile = {
         description = "Daily reconcile of the devloop tables with nixbot, the journal and the deploy record";
         after = [
@@ -895,7 +904,6 @@ in
           SupplementaryGroups = [ "systemd-journal" ];
           MemoryMax = "128M";
           TimeoutStartSec = "10min";
-          OOMScoreAdjust = 600;
           UMask = "0077";
           NoNewPrivileges = true;
           PrivateTmp = true;

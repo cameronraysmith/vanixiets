@@ -41,7 +41,7 @@ The component also runs the daily `devloop-reconcile` regulator and the build-ti
 - omp, OTLP/HTTP `http/protobuf` metrics to the agent's `127.0.0.1:4318`, with `OTEL_SERVICE_NAME=omp` (ADR-005).
 - Downstream: the local agent's pipelines, then the ingress on magnetite, into the `devloop` and `agent` databases; see `components/otel-collector.md` and `components/greptimedb.md`.
 - Downstream beyond 365 d: the daily Parquet export of `devloop` event tables (ADR-006); see `components/parquet-export.md`.
-- `devloop-reconcile` reads `journalctl -u gitea-mq --grep`, nixbot's PostgreSQL and the store at `127.0.0.1:4000` (ADR-005; ADR-007).
+- `devloop-reconcile` reads the `gitea-mq.service` journal with `journalctl --output=json`, nixbot's PostgreSQL and the store at `127.0.0.1:4000` (ADR-005; ADR-007).
 
 Stored tables (ADR-004 `devloop` column allow-list):
 
@@ -99,10 +99,10 @@ Envelopes and regulators (ADR-005):
 
 | Artifact | Envelope | Regulator |
 |---|---|---|
-| E5.1 nixbot export queries | every `build_attributes` row with `finished_at` in a closed 24-hour window ending one hour ago appears once in `devloop`, distinct on `(build_id, attr, finished_at)`; every finished build likewise | `devloop-reconcile`, daily on magnetite, counting both sides and exiting non-zero on any difference |
+| E5.1 nixbot export queries | every `build_attributes` row with `finished_at` in the previous UTC day, reconciled at 02:15 UTC, appears once in `devloop`, distinct on `(build_id, attr, finished_at)`; every finished build likewise | `devloop-reconcile`, daily on magnetite, comparing both sides' keys and exiting non-zero on any unexplained difference |
 | E5.2 nixbot schema coupling | the export queries execute against the schema the pinned nixbot input creates | flake check `devloop-queries` |
 | E5.3 `abandoned` derivation | the marker is byte-identical to the error text in `nixbot-abandon-optional-attributes.patch` | flake check `devloop-queries`, against the patch's production code |
-| E5.4 gitea-mq journal parse | each `batch done` line yields one row with integer `landed`, `ejected`, `builds` and boolean `flaky`; any 24-hour window containing a nixbot build on a `gitea-mq/batch/` branch contains at least one `batch built` row | `devloop-reconcile`, comparing `journalctl -u gitea-mq --grep` counts with store rows and checking the cross-signal liveness condition |
+| E5.4 gitea-mq journal parse | each `batch done` line yields one row with integer `landed`, `ejected`, `builds` and boolean `flaky`; any 24-hour window containing a nixbot build on a `gitea-mq/batch/` branch contains at least one `batch built` row | `devloop-reconcile`, counting the day's journal entries per message with `jq`, comparing the counts with store rows and checking the cross-signal liveness condition |
 | E5.5 deploy-record snippet | every machine appends one valid JSON line per activation with `host`, `closure` and, outside boot, `previous_closure` | the deploy-record obligation in `modules/checks/machines.nix`, evaluated with each machine's toplevel, plus `devloop-reconcile` asserting magnetite's latest stored record equals its current system |
 | E5.6 `devloop-reconcile` itself | runs daily and fails on any envelope breach above | the mutants of `vmTests.x86_64-linux.devloop-ingest`, run on demand on magnetite |
 | omp emitter configuration, realized in S7 and unnumbered | human-account sessions export metrics only, `OTEL_LOGS_EXPORTER=none` is set, and no content-capture variable is set | `devloop-signals` over the evaluated home configuration, plus `devloop-reconcile` asserting at least one `omp.agent.tool.calls` sample in the last seven days |

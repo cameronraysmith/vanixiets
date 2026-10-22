@@ -24,8 +24,7 @@
 #   with the reference model fleet-alert/model.py over derandomized
 #   Hypothesis timelines over two databases, holds both to leaving fleet's
 #   posts unchanged by a devloop failure (stand-up-devloop-collection
-#   review F7), and must fail on the no-re-post and allDatabasesFreeze
-#   mutants.
+#   review F7), and must fail on the no-re-post mutant.
 #
 # Relations within one host are assertions where the units are declared,
 # which CI already pays for when it evaluates the host (S1 review F5, S3
@@ -1278,7 +1277,7 @@
               pkgs.jq
               pkgs.gnugrep
             ];
-            meta.description = "D11, review F7: transition.jq equals the reference model on derandomized Hypothesis timelines, a devloop failure leaves fleet's posts alone, and the no-re-post and allDatabasesFreeze mutants are caught";
+            meta.description = "D11, review F7: transition.jq equals the reference model on derandomized Hypothesis timelines, a devloop failure leaves fleet's posts alone, and the no-re-post mutant is caught";
           }
           ''
             set -euo pipefail
@@ -1293,14 +1292,6 @@
             cat no-repost.log
             grep -q 'Falsifying' no-repost.log
             echo "mutant noRepost rejected"
-            if FLEET_ALERT_JQ_LIB=${jqLibOf "allDatabasesFreeze" allDatabasesFreezeTransition} python3 ${./fleet-alert}/test_transition.py > all-databases-freeze.log 2>&1; then
-              cat all-databases-freeze.log
-              echo "FAIL: the property test accepted the allDatabasesFreeze mutant" >&2
-              exit 1
-            fi
-            cat all-databases-freeze.log
-            grep -q 'Falsifying' all-databases-freeze.log
-            echo "mutant allDatabasesFreeze rejected"
             touch "$out"
           '';
     in

@@ -117,7 +117,7 @@ While a host returns no `system_memory_usage_bytes`, the evaluator SHALL leave e
 #### Scenario: Every database is frozen by one failure
 
 - **WHEN** the check's mutant `allDatabasesFreeze` freezes every instance whenever any database fails
-- **THEN** the `devloop`-failure leg and the two-database property both fail, and the check fails
+- **THEN** the `devloop`-failure leg fails, and the check fails
 
 ### Requirement: Alerts are posted to fleet-alerts with a title and a severity priority
 

@@ -460,7 +460,7 @@ L="$EV/7.4-pg-grants-$(date -u +%Y%m%dT%H%M%SZ).log"
 ```
 
 Expected: `ActiveState=active`, `Result=success`, `After=` containing `postgresql.service`, `postgresql-setup.service` and `nixbot.service`, `WantedBy=multi-user.target`, an empty `PartOf=`, and an `ActiveEnterTimestamp` after nixbot's; the unit's journal for this boot showing its one run after D3's activation; a positive count from each role, with no `permission denied`; `pg-grants: recorded`.
-The unit grants once per boot or activation, after nixbot's columns exist (review F6); it does not run again when nixbot restarts, and a grant lost to a later nixbot migration is detected by the collector's query errors and by reconcile C1 and C2 (missing keys, or exit 2), not repaired, so no step here claims a re-run.
+The unit grants once per boot, and at an activation only when the unit changes, after nixbot's columns exist (review F6; S2 review F2); it does not run again when nixbot restarts, and a grant lost to a later nixbot migration is detected by the collector's query errors and by reconcile C1 and C2 (missing keys, or exit 2), not repaired, so no step here claims a re-run.
 
 - [ ] **Step 13: 7.4 — per-message journal counts equal `batch_event`'s**
 

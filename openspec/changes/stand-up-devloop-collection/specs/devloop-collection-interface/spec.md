@@ -36,12 +36,12 @@ Each nixbot query SHALL select rows with `finished_at >= least($1::timestamptz, 
 
 Each nixbot query SHALL select exactly its table's allow-listed columns in allow-list order, each as text with a null as the empty string and each timestamp as `to_char(<column> AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')`, plus a constant empty `body` as its body column, with `outputs_out` taken from `outputs ->> 'out'` and `project` as `owner || '/' || name`, and SHALL select no `error` column.
 
-**Discharged by**: `checks.x86_64-linux.devloop-queries`, which compares the column names PostgreSQL returns with the allow-list, and its selected-error mutant.
+**Discharged by**: `checks.x86_64-linux.devloop-queries`, whose error-cell clause finds none of the fixtures' error texts in any cell the attribute query returns, with its selected-error and error-under-alias mutants; the query's aliases and the expected columns are both rendered from the allow-list, so the check does not compare them (S2 review F4).
 
 #### Scenario: A query gains the error column
 
 - **WHEN** the check's mutant adds `a.error` to the attribute query's SELECT list
-- **THEN** the returned columns differ from the allow-list and the check fails
+- **THEN** a returned cell holds a fixture's error text and the check fails
 
 ### Requirement: The attribute query derives abandoned from the shared marker
 
@@ -72,7 +72,7 @@ magnetite SHALL declare the PostgreSQL roles `opentelemetry-collector` and `devl
 
 ### Requirement: Column grants are applied once nixbot's columns exist
 
-magnetite SHALL run `devloop-pg-grants.service`, a oneshot as `postgres` with `RemainAfterExit`, ordered after `postgresql.service`, `postgresql-setup.service` and `nixbot.service` and wanted by `multi-user.target`, which waits up to 300 s for every granted column to exist and then applies the grants once per boot or activation, failing if a column does not appear.
+magnetite SHALL run `devloop-pg-grants.service`, a oneshot as `postgres` with `RemainAfterExit`, ordered after `postgresql.service`, `postgresql-setup.service` and `nixbot.service` and wanted by `multi-user.target`, which, once per boot and at an activation only when the unit changes, waits up to 300 s for every granted column, then grants, failing if one is absent.
 It SHALL NOT be described as re-applying a grant that a later nixbot migration removes; such a loss is detected, not repaired.
 
 **Discharged by**: the unit's failure notice through `services.observability-notify.units`; the operator's observation at deploy that both roles can run their queries; for a grant lost later, the collector's query errors and `devloop-reconcile`'s comparisons of CI rows, whose container mutants show them failing on missing rows.
@@ -197,19 +197,14 @@ Each S2 receiver SHALL feed its own `logs/devloop-<table>` pipeline through `mem
 
 ### Requirement: devloop-reconcile runs daily as its own reader
 
-magnetite SHALL run `devloop-reconcile.service`, a oneshot with `DynamicUser`, `SupplementaryGroups = [ "systemd-journal" ]`, `LoadCredential=regulator-password`, `MemoryMax = "128M"`, `TimeoutStartSec = "10min"` and `OOMScoreAdjust = 600`, ordered after `postgresql.service`, `greptimedb.service`, `greptimedb-schema.service` and `devloop-pg-grants.service` with no `wants`, from `devloop-reconcile.timer` at `*-*-* 02:15:00 UTC` with `Persistent = true`.
+magnetite SHALL run `devloop-reconcile.service`, a oneshot with `DynamicUser`, `SupplementaryGroups = [ "systemd-journal" ]`, `LoadCredential=regulator-password`, `MemoryMax = "128M"` and `TimeoutStartSec = "10min"`, ordered after `postgresql.service`, `greptimedb.service`, `greptimedb-schema.service` and `devloop-pg-grants.service` with no `wants`, from `devloop-reconcile.timer` at `*-*-* 02:15:00 UTC` with `Persistent = true`.
 
-**Discharged by**: magnetite's credential-holder assertion (R8.2) and kill-order assertion, each with its `extendModules` mutant; R3.1's failure-wiring clause; the operator's recorded memory peak of the first scheduled run.
+**Discharged by**: magnetite's credential-holder assertion (R8.2) with its `extendModules` mutant; R3.1's failure-wiring clause; the operator's recorded memory peak of the first scheduled run.
 
 #### Scenario: The day and database are overridden
 
 - **WHEN** the unit runs with `DEVLOOP_RECONCILE_DAY` or `DEVLOOP_RECONCILE_DATABASE` set
 - **THEN** it compares that UTC day, or reads that store database, instead of yesterday and `devloop`
-
-#### Scenario: The kill order is evaluated
-
-- **WHEN** magnetite's configuration is evaluated
-- **THEN** its kill-order assertion finds the nixbot evaluator above `devloop-reconcile`, `devloop-reconcile` above the store, the store above the collector and the collector above the alert evaluator, and an override setting `devloop-reconcile`'s `OOMScoreAdjust` to 0 fails it
 
 #### Scenario: The reconcile fails on magnetite
 
@@ -218,9 +213,9 @@ magnetite SHALL run `devloop-reconcile.service`, a oneshot with `DynamicUser`, `
 
 ### Requirement: devloop-reconcile compares CI rows with nixbot every day
 
-Over its day, the reconcile SHALL exit non-zero when a nixbot `(build_id, attr, finished_at)` is missing from `ci_attribute`, or a stored key is absent from nixbot unless nixbot's current `finished_at` for that `(build_id, attr)` is null or later, and likewise for `builds` and `ci_build`; each store query SHALL count before it reads keys.
+Over its day, the reconcile SHALL exit non-zero when a nixbot `(build_id, attr, finished_at)` is missing from `ci_attribute`, or a stored key is absent from nixbot unless nixbot's current `finished_at` for that `(build_id, attr)` is null or later, or, when nixbot no longer has the attribute, its build's current `finished_at` is null or later, and likewise for `builds` and `ci_build`; each store query SHALL count before it reads keys.
 
-**Discharged by**: `vmTests.x86_64-linux.devloop-ingest`'s cached-row and null-`pr_number` mutants and its append-mode mutant.
+**Discharged by**: `vmTests.x86_64-linux.devloop-ingest`'s cached-row and null-`pr_number` mutants, each failing with as many missing keys as nixbot holds of its kind, its append-mode mutant, and its restarted-build leg.
 
 #### Scenario: The collector omits cached outcomes
 
@@ -231,6 +226,11 @@ Over its day, the reconcile SHALL exit non-zero when a nixbot `(build_id, attr, 
 
 - **WHEN** a fixture attribute finished in the window is restarted after it and finishes again
 - **THEN** the reconcile accepts the stored earlier row and passes
+
+#### Scenario: A restarted build drops a finished attribute
+
+- **WHEN** a fixture build is restarted after the window and nixbot deletes one of its attributes that finished in the window, as nixbot does for a system it no longer builds
+- **THEN** the reconcile accepts the stored row of that attribute and passes
 
 ### Requirement: devloop-reconcile compares batch events with the journal every day
 
@@ -282,19 +282,19 @@ Over the same day, the reconcile SHALL exit non-zero when the count of `/var/log
 
 ### Requirement: devloop-queries binds the abandonment marker to the patch's production code
 
-`checks.x86_64-linux.devloop-queries` SHALL fail unless `modules/nixos/nixbot-abandon-optional-attributes.patch` contains `flake.lib.devloopCollection.abandonMarker`, enclosed in double quotes, on the added line between `return AttributeStatus.ignored_failure, (` and `if outcome == BuildOutcome.abandoned`, and SHALL carry embedded negative controls that evaluate the same test with the marker's last character changed, and over the patch's test lines alone, and require each false.
+`checks.x86_64-linux.devloop-queries` SHALL fail unless `modules/nixos/nixbot-abandon-optional-attributes.patch` contains `flake.lib.devloopCollection.abandonMarker`, enclosed in double quotes, on the added line between `return AttributeStatus.ignored_failure, (` and `if outcome == BuildOutcome.abandoned`.
 
-**Discharged by**: the embedded negative controls; the measurement of the check's evaluation cost with `NIX_SHOW_STATS`.
+**Discharged by**: the check's marker clause, which compares `abandonMarker` with the patch text; the measurement of the check's evaluation cost with `NIX_SHOW_STATS`.
 
 #### Scenario: The marker drifts from the patch
 
 - **WHEN** the marker differs from the patch's production literal by one character
-- **THEN** the check fails, as its embedded negative control shows on every run
+- **THEN** the check fails
 
 #### Scenario: Only the patch's tests carry the marker
 
 - **WHEN** the production literal changes while the patch's test assertions keep the old text
-- **THEN** the check fails, because only the production context satisfies it, as its second negative control shows
+- **THEN** the check fails, because only the production context satisfies it
 
 ### Requirement: The x86_64-linux NixOS machine checks carry the deploy-record snippet
 

@@ -16,7 +16,7 @@ S1's store and collector, S2's dev-loop collection and S3's alert evaluator run 
 - Its table data goes to Cloudflare R2, bucket `sciexp`, under the prefix `projects/vanixiets/observability/store/`.
 - `greptimedb-schema.service` creates the databases and sets their retention each time the store starts.
 - `opentelemetry-collector.service` collects magnetite's host, unit, process-memory, ZFS, OOM-kill and service metrics and writes them to the store; it also copies nixbot's builds and attributes, gitea-mq's batch transitions and magnetite's deploy records into `devloop`.
-- `devloop-pg-grants.service` grants the collector's and the reconcile's PostgreSQL roles their columns of nixbot's database once per boot or activation, after waiting up to 300 s for the columns to exist.
+- `devloop-pg-grants.service` grants the collector's and the reconcile's PostgreSQL roles their columns of nixbot's database once per boot, and at an activation only when the unit changes, after waiting up to 300 s for the columns to exist.
 - `devloop-reconcile.timer` runs `devloop-reconcile.service` at 02:15 UTC to compare the previous UTC day of `devloop` with its sources.
 - `greptimedb-envelope.timer` runs `greptimedb-envelope.service` hourly to check the store's runtime envelope.
 - `observability-notify@.service` posts unit failures to ntfy with the `alerter` token, on magnetite and on cinnabar.
@@ -491,12 +491,12 @@ A boot record repeats the booted closure with no `previous_closure`, so a deploy
 
 `devloop-reconcile.service` runs at 02:15 UTC over the previous UTC day, from 00:00 to 24:00, as its own PostgreSQL role, the journal reader and the store's `regulator`.
 It prints one line per clause, `devloop-reconcile: C<n> <name>: ok` or `devloop-reconcile: C<n> <name>: FAIL <detail>`, and exits 1 when any clause fails.
-It exits 2 when it cannot read a source or the store at all.
+It exits 2 when it cannot read a source or the store at all, or when `DEVLOOP_RECONCILE_DAY` or `DEVLOOP_RECONCILE_DATABASE` is malformed.
 Either failure posts `FAILED devloop-reconcile.service on magnetite` to `fleet-alerts`.
-Read the run on magnetite:
+Read the run on magnetite, keeping only the clause lines, because a run also prints PostgreSQL's collation-version warnings and up to 12 `C7` wait lines:
 
 ```sh
-sudo journalctl -u devloop-reconcile -n 20 --no-pager
+sudo journalctl -u devloop-reconcile -o cat -n 200 --no-pager | grep '^devloop-reconcile: C'
 systemctl show devloop-reconcile -p ExecMainStatus
 ```
 
@@ -511,11 +511,11 @@ systemctl show devloop-reconcile -p ExecMainStatus
 | `C7 current-system` | the latest `deploy_record` row for magnetite does not name `readlink -f /run/current-system`, after the reconcile has retried the store read every 10 s for 120 s while the file's last line already names it | the last line of `/var/log/deploy-record.jsonl` and whether the last activation appended one |
 
 A stored attribute row that nixbot no longer has is accepted when nixbot's current `finished_at` for that `(build_id, attr)` is empty or later, because a restarted attribute keeps its key and finishes again.
+It is also accepted when nixbot no longer has the attribute and its build's current `finished_at` is empty or later, because a restarted build deletes its attributes for systems it no longer builds, finished ones included (`Mic92/nixbot@d020013fa:nixbot/nixbot/rerun_exec.py:83-92`).
 Any other extra row means a table keeps duplicates, so compare `SHOW CREATE TABLE "<table>"` with `append_mode = 'false'` before replaying anything.
 For an exit 2, check `systemctl status devloop-pg-grants postgresql greptimedb` first.
-`devloop-pg-grants` grants once per boot or activation and does not run again when nixbot restarts, so a nixbot migration that drops and recreates a granted column removes the grant until the next activation.
+`devloop-pg-grants` grants once per boot, and at an activation only when the unit changes, and does not run again when nixbot restarts, so a nixbot migration that drops and recreates a granted column removes the grant until the unit next runs (boot, or `systemctl restart devloop-pg-grants`).
 That shows as permission errors in `sudo journalctl -u opentelemetry-collector --since -1d --no-pager | grep sqlquery` and as a failed `C1` or `C2`, or an exit 2; `sudo systemctl restart devloop-pg-grants` grants again, and a replay restores the missed rows.
-`C1` and `C2` can also fail falsely when nixbot deletes rows the store already holds: a restarted build drops its pending attributes for systems it no longer builds (`Mic92/nixbot@d020013fa:nixbot/nixbot/rerun_exec.py:83-92`); a store key that nixbot no longer has, for a build that was restarted that day, is such a deletion, not a gap.
 `C4` can fail falsely across midnight on a day with a single batch, when its build finished before 00:00 UTC and its `batch built` line was written after, or the reverse; check the neighbouring day's `batch built` rows for that build before replaying.
 
 After fixing the cause, run the failed day again instead of waiting for the night, with a runtime drop-in naming the day as `YYYY-MM-DD`:
@@ -523,7 +523,7 @@ After fixing the cause, run the failed day again instead of waiting for the nigh
 ```sh
 printf "[Service]\nEnvironment=DEVLOOP_RECONCILE_DAY=2026-10-20\n" | sudo systemctl edit --runtime --stdin --drop-in=rerun-day devloop-reconcile
 sudo systemctl start devloop-reconcile
-sudo journalctl -u devloop-reconcile -n 20 --no-pager
+sudo journalctl -u devloop-reconcile -o cat -n 200 --no-pager | grep '^devloop-reconcile: C'
 sudo systemctl revert devloop-reconcile
 ```
 
@@ -559,15 +559,16 @@ The receiver then starts from its beginning and sends every row again, and the s
 nixbot keeps 90 days of builds, and the journal keeps `gitea-mq.service`'s lines only until journald rotates them out, about five weeks on magnetite in October 2026, so a replay restores only what the source still holds.
 A replay of `sqlquery/ci_attribute` sends about 200,000 rows in about 20 minutes; wait until `devloop_sql 'SELECT count(*) FROM "ci_attribute"'` stops rising, then rerun the failed day as above.
 A record the store's pipeline cannot convert fails the whole OTLP request with HTTP 400, which the exporter drops as permanent, while `sqlquery` has already advanced its cursor past it; so one bad record can lose up to 10,000 nixbot rows, one page, or a batch of journal or deploy-record lines.
-No alert reports that at once: `C1`, `C3` or `C6` fails the next morning, and the replay above restores the rows once the cause is fixed.
+No alert reports that at once: `C1`, `C2`, `C3` or `C6` fails the next morning, and the replay above restores the rows once the cause is fixed.
 The collector also stores each nixbot query's position under a key that contains the query's text, so a merged change to an export query replays that query's whole history at its first start, about 200,000 attribute rows, over the row budget that day.
-Both nixbot queries and `journald/gitea-mq` advance their position before the rows are delivered, so rows the collector's `memory_limiter` refuses are lost: journal lines at once, and nixbot rows once they are older than the five-minute overlap; the reconcile reports them and the replay above restores them.
+Both nixbot queries advance their position before the rows are delivered, so nixbot rows the collector's `memory_limiter` refuses are lost once they are older than the five-minute overlap; the reconcile reports them and the replay above restores them.
+`journald/gitea-mq` also advances its position first, but retries a refused line with no time limit, so a refusal holds its reader until the line is accepted rather than losing it.
 
 ### The row budget
 
 ADR-004 bounds `devloop` at 100,000 rows a day.
 The busiest day before S2, 2026-10-14, would send about 64,800 attribute rows, counting each row's five re-reads, and store 12,867.
-S2's deploy of the collection (D3) sent nixbot's retained history, about 200,000 attribute rows in about 20 polls, and exceeded the budget on that day only, as the design accepted; `verify.md` records that day's sent and stored counts.
+S2's deploy of the collection (D3) sent nixbot's retained history, about 200,000 attribute rows in about 20 polls, and exceeded the budget on that day only, as the design accepted: on 2026-10-22 the collector sent 204,203 rows and the store held 204,163.
 A replay of `sqlquery/ci_attribute` exceeds it the same way, once.
 Count the stored rows per day:
 

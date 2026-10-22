@@ -1396,10 +1396,11 @@ in
 
       # nixbot.service is not a notify unit, so its migrations may still be
       # running when it counts as started: wait up to 300 s for every granted
-      # column, then grant, once per boot or activation. A grant that a later
-      # nixbot migration drops with its column is not repaired here; the
-      # collector's query errors and devloop-reconcile's C1 and C2 report it.
-      # Nothing is created in nixbot's database but the grants (design D10).
+      # column, then grant, once per boot, and at an activation only when the
+      # unit changes (S2 review F2). A grant that a later nixbot migration
+      # drops with its column is not repaired here; the collector's query
+      # errors and devloop-reconcile's C1 and C2 report it. Nothing is created
+      # in nixbot's database but the grants (design D10).
       systemd.services.devloop-pg-grants = {
         description = "Column grants on nixbot's tables for the dev-loop readers";
         after = [
