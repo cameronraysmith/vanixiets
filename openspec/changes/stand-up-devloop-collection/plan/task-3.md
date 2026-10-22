@@ -65,7 +65,7 @@ ssh magnetite.zt 'p=$(systemctl show -P ExecStart opentelemetry-collector.servic
 Expected: `otelcol-contrib version 0.155.0`, five `name:` lines for `sqlquery`, `journald`, `file_log`, `routing` and `forward`, then `systemd-journal` (as `logs/s2/grounding.md` §4.2 recorded on 2026-10-21).
 The keys this task writes were read at the pins:
 - `sqlquery`: `driver`, `datasource`, `collection_interval`, `storage` (`open-telemetry/opentelemetry-collector-contrib@aaf5045a2:internal/sqlquery/config.go:15-27`); per query `sql`, `logs`, `tracking_column`, `tracking_start_value` (`:85-91`); per logs entry `body_column` and `attribute_columns` (`:116-118`), so each column becomes an attribute only when listed in that entry's `attribute_columns` (`receiver/sqlqueryreceiver/logs_receiver.go:364-382`); the last row's tracking value is stored under the receiver's storage and bound as `$1` (`logs_receiver.go:299-311`, `:319-321`, `:350-361`); the README places `attribute_columns` at query level (`README.md:85`), which the code contradicts, and the code is followed.
-- `journald`: `units`, `grep`, `start_at`, `storage`, `operators` (`receiver/journaldreceiver/README.md:40-58`); `start_at: beginning` passes `--no-tail` and `grep` passes `--grep` (`pkg/stanza/operator/input/journald/config_linux.go:97-114`); the record's timestamp is `__REALTIME_TIMESTAMP`, removed from the body (`pkg/stanza/operator/input/journald/input.go:209-256`); `--priority info` is the default and gitea-mq's lines are `PRIORITY=6`.
+- `journald`: `units`, `grep`, `start_at`, `storage`, `operators` (`receiver/journaldreceiver/README.md:40-58`), and `journalctl_path` (`pkg/stanza/operator/input/journald/config_linux.go`, `validate` and `buildNewCmdFunc`); every invocation carries `--follow` (`buildArgs`) and no boot option exists, while magnetite's systemd 261 `journalctl` reads only the current boot under `--follow`, so the receiver's `journalctl_path` is a wrapper adding `--boot=all` (found by 7.4 after D3; `logs/s2-evidence/3.12-journalctl-boot-all-*.log`); `start_at: beginning` passes `--no-tail` and `grep` passes `--grep` (`pkg/stanza/operator/input/journald/config_linux.go:97-114`); the record's timestamp is `__REALTIME_TIMESTAMP`, removed from the body (`pkg/stanza/operator/input/journald/input.go:209-256`); `--priority info` is the default and gitea-mq's lines are `PRIORITY=6`.
 - Operators: `key_value_parser` with `parse_from`, default `parse_to: attributes`, `=` and whitespace delimiters (`pkg/stanza/operator/parser/keyvalue/config.go:30-65`), splitting on whitespace outside quotes and stripping the outer quotes, so `msg="batch done"` yields `msg = batch done` (`internal/coreinternal/parseutils/parser.go:17-81`); `retain` keeps only the listed attributes and leaves the body untouched when no body field is listed (`pkg/stanza/operator/transformer/retain/transformer.go:33-60`); `remove` with `field: body` sets the body to null (`pkg/stanza/entry/body_field.go:126-131`); `json_parser` defaults to `parse_from: body`, `parse_to: attributes` (`pkg/stanza/docs/operators/json_parser.md:7-17`).
 - `file_log`: `include`, `start_at`, `storage`, `operators` (`receiver/filelogreceiver/README.md:24-55`); its type is `file_log`, with `filelog` the deprecated alias (`receiver/filelogreceiver/internal/metadata/generated_status.go:12-13`); `include_file_name` defaults to true, adding `log.file.name`, which the keep-list removes.
 - `routing`: a `table` of items with `context`, `condition`, `pipelines` (`connector/routingconnector/config.go:120-144`), `context: resource` evaluating the condition on the resource attributes (`connector/routingconnector/logs.go:79-104`), and a logs router resolving every route's pipelines as logs pipelines (`router.go:161-260`), which is why `routing/logs` is a second instance.
@@ -560,6 +560,11 @@ Create `modules/vm-tests/devloop-ingest.nix` with exactly:
               assert gsql("SELECT \"members\" FROM \"batch_event\" WHERE \"batch\" = 3 AND \"msg\" = 'batch formed'") == [[1]]
               assert gsql("SELECT \"flaky\", \"ejected\" FROM \"batch_event\" WHERE \"batch\" = 2 AND \"msg\" = 'batch done'") == [[True, 2]]
               print(f"ok: tableShape: batch_event per msg {got}; the reconcile line is not stored")
+              # The receiver's journalctl reads every retained boot: under
+              # --follow, systemd 261 otherwise reads only the current one.
+              argv = store.succeed("pgrep -a journalctl").splitlines()
+              assert any("--boot=all" in line.split() and "gitea-mq.service" in line.split() for line in argv), argv
+              print("ok: tableShape: the receiver's journalctl runs with --boot=all")
 
               # The CI rows as stored against nixbot's source rows, read by
               # psql; abandoned against the fixture's intent.
@@ -1442,7 +1447,19 @@ in
           # the pipeline refuses would be lost; retry_on_failure with no
           # elapsed limit holds the reader until memory_limiter accepts it
           # (receiver/journaldreceiver/README.md:52-55).
+          # The receiver always runs `journalctl --follow`
+          # (pkg/stanza/operator/input/journald/config_linux.go buildArgs)
+          # and has no boot option, and systemd 261's journalctl reads only
+          # the current boot under --follow unless a --boot is given: on
+          # magnetite the receiver's argv selected 282 of the 772 retained
+          # lines, those since the last reboot, and 772 with --boot=all
+          # (logs/s2-evidence/7.4-batch-lines-*.log). The wrapper reads every
+          # retained boot, including the lines written after the cursor
+          # before a reboot.
           "journald/gitea-mq" = {
+            journalctl_path = "${pkgs.writeShellScript "journalctl-all-boots" ''
+              exec ${config.systemd.package}/bin/journalctl --boot=all "$@"
+            ''}";
             units = [ "gitea-mq.service" ];
             grep = ''msg="batch (formed|built|landed|bisecting|done)"'';
             start_at = "beginning";
@@ -1828,7 +1845,7 @@ Run:
 } 2>&1 | tee logs/s2-evidence/3.3-journald-$(date -u +%Y%m%dT%H%M%SZ).log
 ```
 
-Expected: `units: ["gitea-mq.service"]`, `grep: "msg=\"batch (formed|built|landed|bisecting|done)\""`, `start_at: "beginning"`, `storage: "file_storage"`, `retry_on_failure: { enabled: true, max_elapsed_time: "0s" }`, operators in order `{ type: "key_value_parser", id: "parse-message", parse_from: "body.MESSAGE" }`, `{ type: "retain", id: "keep-list", fields: ["attributes.batch", …, "attributes.flaky"] }`, `{ type: "remove", id: "drop-body", field: "body" }`; then `keep-list-equal` (the receiver's keep-list against the allow-list read directly from `schema.nix`, the second value).
+Expected: `journalctl_path: "/nix/store/…-journalctl-all-boots"`, `units: ["gitea-mq.service"]`, `grep: "msg=\"batch (formed|built|landed|bisecting|done)\""`, `start_at: "beginning"`, `storage: "file_storage"`, `retry_on_failure: { enabled: true, max_elapsed_time: "0s" }`, operators in order `{ type: "key_value_parser", id: "parse-message", parse_from: "body.MESSAGE" }`, `{ type: "retain", id: "keep-list", fields: ["attributes.batch", …, "attributes.flaky"] }`, `{ type: "remove", id: "drop-body", field: "body" }`; then `keep-list-equal` (the receiver's keep-list against the allow-list read directly from `schema.nix`, the second value).
 
 - [ ] **Step 14: Read back the deploy-record receiver (GREEN, evaluation; tasks.md 3.4)**
 
@@ -2179,6 +2196,7 @@ If the collector fails to start, `sudo journalctl -u opentelemetry-collector` na
 15. nixpkgs' nspawn container module asserts `specialisation` unset (activating one needs SUID wrappers, prohibited in the build sandbox), found at Step 8's first evaluation; the switch case's second system is instead the container's configuration extended by `extendModules`, guarded by the test-local option `devloopIngest.isVariant` so the variant does not build a variant of itself, and linked at `/etc/devloop-ingest/variant-system` (Main's decision, 2026-10-21).
 16. The first run on magnetite failed in `noAutoCreate`: `_otel_metric`'s `curl` of `localhost:8888` ran before the restarted collector served its telemetry (exit 7); `collector_restart` now also waits up to 2 min until `curl -sSf http://localhost:8888/metrics` succeeds, an added wait, no assertion changed.
 17. `switch` takes the recorded fallback in the container: the variant system has no `bin/switch-to-configuration` there (exit 127), so the case runs the variant's `activate` and prints its `limitation:` line (design D16).
+18. 7.4 after D3 found `batch_event` holding 282 of the 772 retained `gitea-mq.service` batch lines, those since magnetite's boot of 2026-10-15: the receiver always runs `journalctl --follow`, which systemd 261 limits to the current boot, also after `--after-cursor`. The fix, its own pull request before D4 (Main's decision, 2026-10-22), sets `journalctl_path` to a wrapper adding `--boot=all`, asserts the running argv in `tableShape`, and resets the receiver's cursor once after its deploy (`logs/s2-evidence/s2-journald-cursor-reset.sh`, task-7 Step 13a).
 
 ---
 

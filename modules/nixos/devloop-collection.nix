@@ -526,7 +526,19 @@ in
           # the pipeline refuses would be lost; retry_on_failure with no
           # elapsed limit holds the reader until memory_limiter accepts it
           # (receiver/journaldreceiver/README.md:52-55).
+          # The receiver always runs `journalctl --follow`
+          # (pkg/stanza/operator/input/journald/config_linux.go buildArgs)
+          # and has no boot option, and systemd 261's journalctl reads only
+          # the current boot under --follow unless a --boot is given: on
+          # magnetite the receiver's argv selected 282 of the 772 retained
+          # lines, those since the last reboot, and 772 with --boot=all
+          # (logs/s2-evidence/7.4-batch-lines-*.log). The wrapper reads every
+          # retained boot, including the lines written after the cursor
+          # before a reboot.
           "journald/gitea-mq" = {
+            journalctl_path = "${pkgs.writeShellScript "journalctl-all-boots" ''
+              exec ${config.systemd.package}/bin/journalctl --boot=all "$@"
+            ''}";
             units = [ "gitea-mq.service" ];
             grep = ''msg="batch (formed|built|landed|bisecting|done)"'';
             start_at = "beginning";

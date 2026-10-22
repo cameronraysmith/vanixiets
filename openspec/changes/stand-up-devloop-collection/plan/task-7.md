@@ -484,6 +484,21 @@ REMOTE
 
 Expected: the same five-or-fewer rows on both sides, `batch built`, `batch done`, `batch formed`, `batch landed` and, if retained, `batch bisecting`, with equal counts (about 2,535 lines over the 7 days before 2026-10-21, more over the whole journal, `logs/s2/grounding.md` §2.2); no `diff` output; `batch lines: PASS` on both runs.
 The journal side counts the lines `journald/gitea-mq` is configured to select, read by `journalctl` independently of the collector, and the store side the rows the pipeline wrote (WA `A44`).
+The journal side runs without `--follow`, so it reads every retained boot; the collector's `journalctl` always runs with `--follow`, which systemd 261 limits to the current boot unless the receiver's `journalctl_path` wrapper adds `--boot=all`.
+This step's first run after D3 failed for that reason (282 of 772 lines, `logs/s2-evidence/7.4-batch-lines-20261022T*.log`); after the fix's deploy, Step 13a resets the receiver's cursor and this step is run again.
+
+- [ ] **Step 13a: 7.4 — reset the `journald/gitea-mq` cursor once after the `--boot=all` fix is deployed (operator)**
+
+Run from `$REPO` on stibnite after the deploy that carries the wrapper, with `nixbot-logs queue` empty:
+
+```bash
+logs/s2-evidence/s2-journald-cursor-reset.sh
+```
+
+The script checks that the running collector configuration's `journalctl_path` carries `--boot=all`, stops the collector, moves aside only `/var/lib/private/opentelemetry-collector/queue/receiver_journald_gitea-mq` (the `file_storage` extension keeps one bbolt file per component; the `exporter_*` queues and the other receivers' cursors stay), starts the collector, and waits up to 10 min for `batch_event`'s per-`msg` counts to equal the journal's over every boot.
+Expected: the guard prints the wrapper and its `--boot=all` line; `equal after poll <n>`; both per-`msg` listings equal (772 lines on 2026-10-22: `batch bisecting` 9, `batch built` 217, `batch done` 180, `batch formed` 180, `batch landed` 186, plus any written since); `batch_event [total, distinct (batch, msg, ts)]` equal; `otlp_http/devloop_batch_event send_failed=0`; `cursor reset: PASS`, logged to `logs/s2-evidence/7.4-cursor-reset-<ts>.log`.
+The re-read re-sends the 282 stored lines, which the store keeps once each under `batch_event`'s key and time index (WA `A46`).
+Then run Step 13 again; its `batch lines: PASS` is the line Step 20 needs.
 
 - [ ] **Step 14: 7.4 — no table holds a duplicate key**
 

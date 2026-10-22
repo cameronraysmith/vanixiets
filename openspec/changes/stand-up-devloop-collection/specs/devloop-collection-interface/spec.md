@@ -89,7 +89,7 @@ It SHALL NOT be described as re-applying a grant that a later nixbot migration r
 
 ### Requirement: gitea-mq's five batch messages are parsed from its journal
 
-magnetite's collector SHALL run `journald/gitea-mq` with `units: [gitea-mq.service]`, `grep: 'msg="batch (formed|built|landed|bisecting|done)"'`, `start_at: beginning` and `storage: file_storage`, then a `key_value_parser` from `body.MESSAGE` into attributes, a `retain` of the allow-listed `batch_event` keys, and the removal of the body, keeping the record's journal timestamp.
+magnetite's collector SHALL run `journald/gitea-mq` with `units: [gitea-mq.service]`, `grep: 'msg="batch (formed|built|landed|bisecting|done)"'`, `start_at: beginning`, `storage: file_storage` and a `journalctl_path` wrapper adding `--boot=all`, so it reads every retained boot, then a `key_value_parser` from `body.MESSAGE` into attributes, a `retain` of the allow-listed `batch_event` keys, and the removal of the body, keeping the record's journal timestamp.
 
 **Discharged by**: `devloop-reconcile`'s comparison of batch events, resting on world assumption `A44 — gitea-mq announces each batch transition in one of five exact journal messages`; `vmTests.x86_64-linux.devloop-ingest`'s stub `gitea-mq` with its mutant lacking `key_value_parser`.
 

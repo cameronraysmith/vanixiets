@@ -222,6 +222,11 @@
               assert gsql("SELECT \"members\" FROM \"batch_event\" WHERE \"batch\" = 3 AND \"msg\" = 'batch formed'") == [[1]]
               assert gsql("SELECT \"flaky\", \"ejected\" FROM \"batch_event\" WHERE \"batch\" = 2 AND \"msg\" = 'batch done'") == [[True, 2]]
               print(f"ok: tableShape: batch_event per msg {got}; the reconcile line is not stored")
+              # The receiver's journalctl reads every retained boot: under
+              # --follow, systemd 261 otherwise reads only the current one.
+              argv = store.succeed("pgrep -a journalctl").splitlines()
+              assert any("--boot=all" in line.split() and "gitea-mq.service" in line.split() for line in argv), argv
+              print("ok: tableShape: the receiver's journalctl runs with --boot=all")
 
               # The CI rows as stored against nixbot's source rows, read by
               # psql; abandoned against the fixture's intent.
