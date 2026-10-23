@@ -1594,11 +1594,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1792052575,
-        "narHash": "sha256-3jxWHyyfc+oNWME8RuQcWpjbd73RhKmJ6euvNKOY0zc=",
+        "lastModified": 1792744745,
+        "narHash": "sha256-QPKRo9H0s/b8A7ny05usWItZUxZYzDfSZ2y9oJdo6Jk=",
         "owner": "halfwhey",
         "repo": "nix-playwright-nightly",
-        "rev": "80878549bc5b4bf3af4eaa5e0fc467405ea0be6f",
+        "rev": "5644ce47abba4a48b181b6b03a1ef10e184e1286",
         "type": "github"
       },
       "original": {
