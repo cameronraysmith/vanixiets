@@ -35,7 +35,7 @@
     # imported home-manager module is the release the running shell was built
     # from; renovate's github-tags manager bumps the tag and pyrite-desktop.nix
     # holds it to the packaged version.
-    dms-src.url = "github:AvengeMedia/DankMaterialShell/v1.6.2";
+    dms-src.url = "github:AvengeMedia/DankMaterialShell/v1.6.3";
     dms-src.flake = false;
 
     zen-browser.url = "github:youwen5/zen-browser-flake";

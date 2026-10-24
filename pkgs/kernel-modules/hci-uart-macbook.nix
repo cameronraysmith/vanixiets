@@ -9,8 +9,8 @@ let
   release = kernel.modDirVersion;
   kernelBuild = "${kernel.dev}/lib/modules/${release}/build";
 in
-assert lib.assertMsg (kernel.version == "6.18.55" && release == "6.18.55")
-  "hci-uart-macbook: only Linux 6.18.55 has been checked; revalidate source, prepared configuration, ABI and effective module selection before updating";
+assert lib.assertMsg (kernel.version == "6.18.56" && release == "6.18.56")
+  "hci-uart-macbook: only Linux 6.18.56 has been checked; revalidate source, prepared configuration, ABI and effective module selection before updating";
 kernel.stdenv.mkDerivation {
   pname = "hci-uart-macbook";
   version = "0-unstable-2026-09-14-${release}";
@@ -76,12 +76,13 @@ kernel.stdenv.mkDerivation {
     runHook preBuild
     cp -a ${kernelBuild} prepared
     chmod -R u+w prepared
-    ln -s ${kernel.dev}/vmlinux prepared/vmlinux
+    # Newer kernel.dev also carries vmlinux inside build/, so the copy may hold it already.
+    ln -sfn ${kernel.dev}/vmlinux prepared/vmlinux
     test "$(cat prepared/include/config/kernel.release)" = '${release}'
     sha256sum -c <<'HASHES'
-    25734de0f461a508cfb9b8276fb0525621b444b72e076491775fbda67052bf84  prepared/.config
-    904449eaf2d342156be0a1c78f798b6511fe99ed47e9f718f9e1e1f305e74335  prepared/Module.symvers
-    8219e2179a64e3ff447ac93ed579731c20699e5de22d9588d25692ca1e79e98b  prepared/include/generated/autoconf.h
+    43734014b485b1bcd239583097b2e6dc2f0bf66c2411579d932796296d6b40c4  prepared/.config
+    bfd7348d464948110dc5d129c54d52f75b9e188e6cbc4040b1c9432c3386bfd6  prepared/Module.symvers
+    311b24be20d34f65f179394c35655ee018dad5ebb8cfb51f25f53871e5e8d222  prepared/include/generated/autoconf.h
     HASHES
     flagsArray=()
     concatTo flagsArray makeFlags makeFlagsArray
