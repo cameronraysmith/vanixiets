@@ -5,7 +5,7 @@
   runCommand,
 }:
 let
-  version = "0.19.0";
+  version = "0.19.1";
   py = python3Packages;
   omnigent-client = py.callPackage ./omnigent-client.nix { inherit version; };
   omnigent-ui-sdk = py.callPackage ./omnigent-ui-sdk.nix {
@@ -29,7 +29,7 @@ let
       python = "py3";
       dist = "py3";
       platform = "any";
-      hash = "sha256-YVBukl7pi91e29YOxppP+GKnnIDYHI82+Db+fJ8jAC8=";
+      hash = "sha256-5i1X9B3TS8e+9qdnkZcIbnDTmadMGmE2p/J8NEQT5w0=";
     };
 
     # openai<2.45 is upstream's transitive cap on openai-agents, not on omnigent's
@@ -38,7 +38,13 @@ let
     # cap does not bind. Accepted tradeoff: nixpkgs' openai-agents 0.18.1 omits
     # prompt_cache_options, which is optional in openai 2.53, so the agents path
     # loses prompt-cache control; bumping the override to 0.18.2 would restore it.
+    #
+    # certifi>=2026.10.19 (0.19.1) exists to drop the emSign ECC Root CA - G3
+    # root (compromised eMudhra intermediates, upstream #11203). The version floor
+    # has no effect here: nixpkgs certifi serves nixpkgs cacert's bundle, and
+    # omnigent prefers the OpenSSL default bundle over certifi in any case.
     pythonRelaxDeps = [
+      "certifi"
       "openai"
       "websockets"
     ];

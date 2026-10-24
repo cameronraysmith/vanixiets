@@ -18,7 +18,7 @@ buildPythonPackage {
     python = "py3";
     dist = "py3";
     platform = "any";
-    hash = "sha256-mypnsGqsfzUM/cceDGTnpNCOu4ArsWKHGf4+HcoP+P4=";
+    hash = "sha256-/sj533tJX50HxnsAwQpGrkil4BIYHyBpCzbCF68+tao=";
   };
 
   # Break the circular dependency; the application supplies omnigent and checks imports.
