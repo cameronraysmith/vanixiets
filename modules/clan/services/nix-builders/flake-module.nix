@@ -262,12 +262,24 @@
             builder:
             "grpc://[${builder.settings.address}]:${toString port}?ca-cert=${clientDir}/ca.crt&connect-timeout=5";
         in
+        { config, pkgs, ... }:
+        let
+          client = config.programs.nix-grpc-store;
+          # clan-cli runs its own nix, which loads the system nix.conf and so
+          # this plugin; the loader finds no build for that nix unless the
+          # dispatcher carries one built against it.
+          clanNix =
+            inputs.clan-core.packages.${pkgs.stdenv.hostPlatform.system}.clan-cli.runtimeDependenciesMap.nix;
+        in
         {
           # The flake exports the client only under nixosModules; it sets
           # nix.settings alone, which nix-darwin provides too.
           imports = [ inputs.nix-grpc-store.nixosModules.client ];
 
           programs.nix-grpc-store.enable = true;
+          programs.nix-grpc-store.package = client.packageSet.plugin-dispatcher.overrideAttrs (old: {
+            paths = old.paths ++ [ (client.packageSet.pluginFor clanNix) ];
+          });
 
           nix.buildMachines = lib.mapAttrsToList (_: builder: {
             hostName = storeUri builder;
