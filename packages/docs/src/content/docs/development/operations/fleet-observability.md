@@ -590,6 +590,7 @@ A restarted build's later attempts are left out, because their wait counts from 
 Its expression is in `modules/nixos/fleet-alert/rules.nix`.
 It is posted once as `[FIRING] PullRequestQueueWaitBurn` with no host, is never posted again while it fires, and resolves after 5 minutes without the condition.
 On a day with fewer than 10 pull-request builds it stays silent, so a single slow build cannot fire it.
+The flake updater opens one pull request per changed input, and its runs of 10 to 26 at once caused every firing in S2's first weeks: a firing during an updater run is that run's queue contention, kept deliberately because one combined pull request would let any failing input hold back every other update.
 A missing `devloop` or `ci_build` table fails the query, which freezes only the rules on `devloop` and raises one `StoreQueryFailing` whose message names `devloop`; the `fleet` rules keep being evaluated and posted.
 
 When it fires, list the slow builds:
