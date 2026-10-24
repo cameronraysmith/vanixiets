@@ -1290,7 +1290,8 @@
               exit 1
             fi
             cat no-repost.log
-            grep -q 'Falsifying' no-repost.log
+            # Hypothesis 6.159.0 renamed the banner "Falsifying example" to "Failing test case".
+            grep -Eq 'Falsifying example|Failing test case' no-repost.log
             echo "mutant noRepost rejected"
             touch "$out"
           '';
