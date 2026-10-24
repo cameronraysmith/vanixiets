@@ -3,9 +3,6 @@
   flake.modules.nixos.base =
     { config, pkgs, ... }:
     {
-      # Enable systemd-based initrd for modern boot process
-      boot.initrd.systemd.enable = true;
-
       # Generate initrd SSH host key via clan vars
       clan.core.vars.generators.initrd-ssh = {
         files."id_ed25519".neededFor = "activation";

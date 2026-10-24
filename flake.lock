@@ -359,17 +359,17 @@
     "dms-src": {
       "flake": false,
       "locked": {
-        "lastModified": 1789657660,
-        "narHash": "sha256-NPYX33iiXo6aBwh7umfJzeZQBedupOG7pk5z171ID3s=",
-        "owner": "AvengeMedia",
-        "repo": "DankMaterialShell",
-        "rev": "2db7646fe3ab47fddfdb8723f2da07d61a0d47ac",
+        "lastModified": 1792523829,
+        "narHash": "sha256-hyWdbsyOGXsJxvXG4Tqg0uRI1s3JwPi8DKyWips3Ta8=",
+        "owner": "duxlabs-dev",
+        "repo": "dux-shell",
+        "rev": "9b413296b16721f7679fb62e624cb1ed2433fa58",
         "type": "github"
       },
       "original": {
-        "owner": "AvengeMedia",
-        "ref": "v1.6.2",
-        "repo": "DankMaterialShell",
+        "owner": "duxlabs-dev",
+        "ref": "v2.0.0",
+        "repo": "dux-shell",
         "type": "github"
       }
     },
@@ -1394,11 +1394,12 @@
     },
     "nixpkgs_10": {
       "locked": {
-        "lastModified": 1791332963,
-        "narHash": "sha256-m/4DbxikDpBuH47YjbJSAIQlz1mXS815cj+uhRjBXzc=",
-        "rev": "ac1faec44836a722f7b003834f367486ff9adfd1",
-        "type": "tarball",
-        "url": "https://releases.nixos.org/nixos/unstable-small/nixos-26.11pre1086968.ac1faec44836/nixexprs.tar.xz"
+        "lastModified": 1792734696,
+        "narHash": "sha256-nAY7gNcbuoQkfPHxwVuRFcazYHptzBpKZN/I1/18Vaw=",
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "3a32588c117116d2bf0edc33915981398fab2b00",
+        "type": "github"
       },
       "original": {
         "type": "tarball",

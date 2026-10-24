@@ -6,11 +6,11 @@
 }:
 let
   # dms-src is pinned by release tag. Only its home-manager module (distro/nix)
-  # is imported; the shell itself is nixpkgs' dms-shell. The invariant is that
+  # is imported; the shell itself is nixpkgs' dux-shell. The invariant is that
   # the module and the running shell are the same release: the tag declared in
   # flake.nix (`original.ref`), the release the fetched tree names in
-  # quickshell/VERSION, and the packaged dms-shell version must all agree. A
-  # nixpkgs bump of dms-shell therefore fails until the tag follows it, and a
+  # quickshell/VERSION, and the packaged dux-shell version must all agree. A
+  # nixpkgs bump of dux-shell therefore fails until the tag follows it, and a
   # tag bump fails until nixpkgs ships that release; an untagged master
   # revision fails because its VERSION names the next pre-release, not a
   # shipped one.
@@ -47,7 +47,7 @@ in
           machine = config.flake.nixosConfigurations.pyrite;
           cfg = machine.config;
           pkgs = machine.pkgs;
-          greeter = cfg.services.displayManager.dms-greeter;
+          greeter = cfg.services.displayManager.dux-greeter;
           configuration = pkgs.writeText "pyrite-dankgreeter.kdl" greeter.compositor.customConfig;
           launcher = cfg.services.greetd.settings.default_session.command;
           greeterBin = "${greeter.package}/bin/dms-greeter";
@@ -186,12 +186,12 @@ in
       ];
       bar = builtins.head settings.barConfigs;
       widgets = bar.leftWidgets ++ bar.centerWidgets ++ bar.rightWidgets;
-      greeter = config.services.displayManager.dms-greeter;
+      greeter = config.services.displayManager.dux-greeter;
       greetd = config.services.greetd;
       loginPam = config.security.pam.services.login;
       greeterPam = config.security.pam.services.dms-greeter;
       greetdPam = config.security.pam.services.greetd;
-      nativeGreeterModule = "${inputs.nixpkgs}/nixos/modules/services/display-managers/dms-greeter.nix";
+      nativeGreeterModule = "${inputs.nixpkgs}/nixos/modules/services/display-managers/dux-greeter.nix";
       enabledRules = rules: lib.filterAttrs (_: rule: rule.enable) rules;
     in
     {
@@ -214,12 +214,12 @@ in
           assertion =
             toString config.programs.niri.package == toString pkgs.niri
             && toString niri.package == toString pkgs.niri
-            && toString dms.package == toString pkgs.dms-shell
+            && toString dms.package == toString pkgs.dux-shell
             && toString dms.quickshell.package == toString pkgs.quickshell
             && toString home.programs.quickshell.package == toString pkgs.quickshell
             && declaredRef "dms-src" == dmsSrcVersion
-            && dmsSrcVersion == "v${pkgs.dms-shell.version}"
-            && pkgs.dms-greeter.version == "1.6.2"
+            && dmsSrcVersion == "v${pkgs.dux-shell.version}"
+            && pkgs.dux-greeter.version == "2.0.0"
             &&
               map toString options.programs.niri.enable.declarations == [
                 "${inputs.nixpkgs}/nixos/modules/programs/wayland/niri.nix"
@@ -235,10 +235,11 @@ in
             && unit.Unit.Requisite == [ "niri.service" ]
             && unit.Install.WantedBy == [ "niri.service" ]
             && unit.Unit.ConditionEnvironment == "XDG_CURRENT_DESKTOP=niri"
-            && unit.Service.ExecStart == [ "${lib.getExe pkgs.dms-shell} run --session" ]
-            && unit.Service.Type == "dbus"
-            && unit.Service.BusName == "org.freedesktop.Notifications"
-            && !config.programs.dms-shell.enable
+            && unit.Service.ExecStart == [ "${lib.getExe pkgs.dux-shell} run --session" ]
+            && unit.Service.Type == "notify"
+            && unit.Service.NotifyAccess == "main"
+            && !(unit.Service ? BusName)
+            && !config.programs.dux-shell.enable
             && !home.programs.quickshell.systemd.enable
             && niri.settings.includes == [ ]
             && niri.settings.spawn-at-startup == [ ]
@@ -280,7 +281,7 @@ in
           assertion = lib.all (
             key:
             niri.settings.binds.${key}.action.spawn == [
-              (lib.getExe pkgs.dms-shell)
+              (lib.getExe pkgs.dux-shell)
               "ipc"
               "call"
             ]
@@ -368,9 +369,9 @@ in
         {
           message = "pyrite desktop: native DankGreeter declaration provenance";
           assertion = lib.all (option: map toString option.declarations == [ nativeGreeterModule ]) [
-            options.services.displayManager.dms-greeter.enable
-            options.services.displayManager.dms-greeter.package
-            options.services.displayManager.dms-greeter.compositor.name
+            options.services.displayManager.dux-greeter.enable
+            options.services.displayManager.dux-greeter.package
+            options.services.displayManager.dux-greeter.compositor.name
           ];
         }
         {
@@ -387,7 +388,7 @@ in
             && greetd.settings.default_session.user == "dms-greeter"
             && lib.hasSuffix "/bin/dms-greeter-start" greetd.settings.default_session.command
             && greeter.compositor.name == "niri"
-            && toString greeter.package == toString pkgs.dms-greeter
+            && toString greeter.package == toString pkgs.dux-greeter
             && toString greeter.quickshell.package == toString pkgs.quickshell
             && greeter.configHome == null
             && greeter.configFiles == [ ]

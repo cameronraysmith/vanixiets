@@ -42,7 +42,7 @@ niri IS part of this capability, as a second desktop a person may choose at the 
 - **WHEN** GDM is enabled on a machine whose root is unlocked by a stage-1 initrd prompt against a LUKS container (D1, D11)
 - **THEN** the unlock prompt remains a stage-1 initrd event that unlocks the root before any graphical target starts, because `systemd.services.display-manager` is a stage-2 unit ordered after `systemd-user-sessions.service` (`nixos/modules/services/display-managers/gdm.nix:294-300`) and is reached only after the root the prompt gates is mounted
 - **AND** GDM enables no plymouth: its only plymouth definition is guarded by `lib.mkIf config.boot.plymouth.enable` (`gdm.nix:313`), so with plymouth off per D11 the console ask-password path `systemd-cryptsetup` uses is unchanged, decidable by `nix eval .#nixosConfigurations.pyrite.config.boot.plymouth.enable` returning `false`
-- **AND** the stage-1/stage-2 separation is unaffected by the FIDO2 enrollment, because disko forces `boot.initrd.systemd.enable = true` (`lib/types/luks.nix:354`) and that option was already true on this machine through `modules/system/initrd-networking.nix:7`, so the initrd's agent stack does not change
+- **AND** the stage-1/stage-2 separation is unaffected by the FIDO2 enrollment, because systemd stage 1 is unconditional since nixpkgs removed scripted stage 1 (`316b009d0df3`), so the initrd's agent stack does not change
 
 ### Requirement: The laptop does not suspend itself when nobody is using it
 

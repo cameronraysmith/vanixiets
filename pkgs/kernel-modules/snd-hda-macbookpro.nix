@@ -1,6 +1,7 @@
 {
   lib,
   stdenv,
+  buildPackages,
   fetchFromGitHub,
   kernel,
   kernelModuleMakeFlags,
@@ -11,8 +12,8 @@ let
   kernelBuild = "${kernel.dev}/lib/modules/${kernel.modDirVersion}/build";
   appleFlags = "-DAPPLE_PINSENSE_FIXUP -DAPPLE_CODECS -DCONFIG_SND_HDA_RECONFIG=1 -Wno-unused-variable -Wno-unused-function";
 in
-assert lib.assertMsg (kernel.version == "6.18.55")
-  "snd-hda-macbookpro: only Linux 6.18.55 has been checked; revalidate the source/header layout and module selection before changing this boundary";
+assert lib.assertMsg (kernel.version == "6.18.58")
+  "snd-hda-macbookpro: only Linux 6.18.58 has been checked; revalidate the source/header layout and module selection before changing this boundary";
 stdenv.mkDerivation {
   pname = "snd-hda-macbookpro";
   version = "0-unstable-2026-09-06-${kernel.modDirVersion}";
@@ -84,9 +85,13 @@ stdenv.mkDerivation {
     install -Dm644 source-sha256 "$out/share/snd-hda-macbookpro/source-sha256"
     runHook postInstall
   '';
+  # nixpkgs' kmod aggregator requires a kmodigest certificate beside every
+  # external module; signing must follow stripping, so it runs here.
   postFixup = ''
     export LC_ALL=C
     module="$out/lib/modules/${kernel.modDirVersion}/updates/codecs/cirrus/${moduleName}.ko"
+    ${lib.getExe buildPackages.kmodigest} "$module"
+    test -s "$module.cer"
     if grep -aFq "$NIX_BUILD_TOP/" "$module"; then
       echo 'Build-directory reference remains in module output' >&2
       exit 1

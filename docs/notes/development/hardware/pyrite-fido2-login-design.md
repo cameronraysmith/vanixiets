@@ -215,7 +215,7 @@ Settings render to module arguments as: boolean true becomes a bare flag, boolea
 ### Alternative Phase B, without a clan generator
 
 The mapping line is public-key material: a credential ID and a COSE public key, useless without the physical token and, with `pinverification=1`, without the PIN.
-Upstream calls it "much the same concept as the SSH authorized_keys file" (`README:439`), and this repository already commits SSH public keys as clear clan vars (`modules/system/initrd-networking.nix:12`, `modules/nixos/niks3.nix:53`).
+Upstream calls it "much the same concept as the SSH authorized_keys file" (`README:439`), and this repository already commits SSH public keys as clear clan vars (`modules/system/initrd-networking.nix:9`, `modules/nixos/niks3.nix:53`).
 So this is defensible:
 
 ```nix

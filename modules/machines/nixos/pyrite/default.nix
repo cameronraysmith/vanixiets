@@ -375,9 +375,9 @@ in
 
       services.displayManager.gdm.enable = false;
       services.desktopManager.gnome.enable = false;
-      services.displayManager.dms-greeter = {
+      services.displayManager.dux-greeter = {
         enable = true;
-        package = pkgs.dms-greeter;
+        package = pkgs.dux-greeter;
         quickshell.package = pkgs.quickshell;
         compositor = {
           name = "niri";

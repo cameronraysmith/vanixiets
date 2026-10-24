@@ -151,7 +151,7 @@ ZFS native encryption MUST NOT be used: no dataset carries `encryption`, `keyfor
 
 #### Scenario: the boot-time unlock reaches the console and needs no new stage-1 options
 
-- **WHEN** the machine boots with `boot.initrd.systemd.enable = true`, which `base` already sets at `modules/system/initrd-networking.nix:7` and which disko would set anyway for a FIDO2 container (`lib/types/luks.nix:354`)
+- **WHEN** the machine boots with systemd stage 1, which nixpkgs makes unconditional since scripted stage 1 was removed (`316b009d0df3`, 2026-10-18; `boot.initrd.systemd.enable` is now a `mkRemovedOptionModule`)
 - **THEN** disko's `_config` emits a `boot.initrd.luks.devices.<name>` entry, nixpkgs renders it into the stage-1 crypttab at `nixos/modules/system/boot/luksroot.nix:590-598` and installs that file as `/etc/crypttab` at `:1221`, and `systemd-cryptsetup` unlocks the container before ZFS is asked to import anything
 - **AND** that entry carries no `fido2-device=auto` option, at the install and permanently: disko emits `crypttabExtraOpts` under `lib.mkIf config.enrollFido2` (`lib/types/luks.nix:348`) and `enrollFido2` is false, and no such option is added by hand afterward, so `nix eval --json .#nixosConfigurations.pyrite.config.boot.initrd.luks.devices.cryptroot.crypttabExtraOpts` returns `[]` against the deployed configuration and `determine_token_type` returns `_TOKEN_TYPE_INVALID` on every boot
 - **AND** in the window between the install and the first enrollment the header carried no token at all, so the token-plugin path that runs ahead of the unlock loop found nothing in it and stage 1 requested the passphrase directly with no token prompt of any kind and no preceding wait, which is what the first boot observed

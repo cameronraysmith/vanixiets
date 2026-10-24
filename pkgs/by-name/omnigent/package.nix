@@ -1,21 +1,71 @@
 {
   lib,
+  fetchFromGitHub,
   fetchPypi,
   python3Packages,
   runCommand,
 }:
 let
   version = "0.19.1";
-  py = python3Packages;
+  # omnigent 0.19.1 caps mcp<2 and imports
+  # mcp.client.streamable_http.streamablehttp_client and
+  # mcp.shared.exceptions.McpError, both absent from nixpkgs' mcp 2.2.0. Pin
+  # mcp 1.29.0, nixpkgs' previous release, in omnigent's package set only, so
+  # openai-agents and claude-agent-sdk resolve the same mcp. Remove once an
+  # omnigent release accepts mcp 2.
+  python = python3Packages.python.override {
+    self = python;
+    packageOverrides = pyFinal: pyPrev: {
+      mcp = pyPrev.mcp.overridePythonAttrs (_: {
+        version = "1.29.0";
+        src = fetchFromGitHub {
+          owner = "modelcontextprotocol";
+          repo = "python-sdk";
+          tag = "v1.29.0";
+          hash = "sha256-lRlj5RT/R5zrYL5XpdQR2l9t99G94WTsubN0gSQekMc=";
+        };
+        pythonRelaxDeps = [ "pydantic-settings" ];
+        dependencies = [
+          pyFinal.anyio
+          pyFinal.httpx
+          pyFinal.httpx-sse
+          pyFinal.jsonschema
+          pyFinal.pydantic
+          pyFinal.pydantic-settings
+          pyFinal.pyjwt
+          pyFinal.python-multipart
+          pyFinal.sse-starlette
+          pyFinal.starlette
+          pyFinal.uvicorn
+        ];
+        # The inherited check inputs, preCheck and disabledTests describe the
+        # 2.2.0 suite; nixpkgs ran the 1.29.0 suite before the bump.
+        doCheck = false;
+      });
+    };
+  };
+  py = python.pkgs;
   omnigent-client = py.callPackage ./omnigent-client.nix { inherit version; };
   omnigent-ui-sdk = py.callPackage ./omnigent-ui-sdk.nix {
     inherit version omnigent-client;
   };
 
-  # Version 0.18.1 requires websockets, omitted by the pinned nixpkgs recipe.
-  # https://pypi.org/pypi/openai-agents/0.18.1/json
+  # nixpkgs master carries openai-agents 0.22.0, which needs openai>=3, while
+  # master still ships openai 2.53; 0.20.0 is the newest release that accepts
+  # openai<3. Every 0.18+ release caps websockets<17 below nixpkgs' 17.0.1 and
+  # the nixpkgs recipe omits the websockets dependency. Remove this pin once
+  # master carries nixpkgs b745875580cb and the openai 3.x bump
+  # (NixOS/nixpkgs#564353).
+  # https://pypi.org/pypi/openai-agents/0.20.0/json
   openai-agents = py.openai-agents.overridePythonAttrs (old: {
+    version = "0.20.0";
+    src = fetchPypi {
+      pname = "openai_agents";
+      version = "0.20.0";
+      hash = "sha256-prN5VId4aKwjOHaifaseKkYcU+y9X89uGeLSdtPoSM0=";
+    };
     dependencies = old.dependencies ++ [ py.websockets ];
+    pythonRelaxDeps = [ "websockets" ];
   });
   omnigent = py.buildPythonPackage {
     pname = "omnigent";
@@ -34,10 +84,9 @@ let
 
     # openai<2.45 is upstream's transitive cap on openai-agents, not on omnigent's
     # own openai surface; upstream holds it only because its websockets<15 macOS
-    # pin blocks openai-agents 0.18.2. We already relax websockets (16.1), so the
-    # cap does not bind. Accepted tradeoff: nixpkgs' openai-agents 0.18.1 omits
-    # prompt_cache_options, which is optional in openai 2.53, so the agents path
-    # loses prompt-cache control; bumping the override to 0.18.2 would restore it.
+    # pin blocks openai-agents 0.18.2. We already relax websockets, so the cap
+    # does not bind, and the pinned openai-agents 0.20.0 (openai>=2.45) keeps
+    # prompt_cache_options.
     #
     # certifi>=2026.10.19 (0.19.1) exists to drop the emSign ECC Root CA - G3
     # root (compromised eMudhra intermediates, upstream #11203). The version floor

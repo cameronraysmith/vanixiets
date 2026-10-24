@@ -88,7 +88,7 @@ The requirement is decidable by `nix eval` of `.#nixosConfigurations.pyrite.conf
 
 #### Scenario: the profile supplies the modules that base does not
 
-- **WHEN** `modules/system/initrd-networking.nix:33-37` contributes only `virtio_pci` and `virtio_net` to `boot.initrd.kernelModules` for every NixOS machine
+- **WHEN** `modules/system/initrd-networking.nix:31-34` contributes only `virtio_pci` and `virtio_net` to `boot.initrd.kernelModules` for every NixOS machine
 - **THEN** the SPI modules arrive from the imported profile instead, which sets `boot.initrd.kernelModules` — the option that force-loads — rather than `availableKernelModules`, which only makes a module present
 - **AND** a two-way evaluation carrying the facter report and differing only by the import gives `["dm_mod" "i915"]` without the profile and `["applesmc" "applespi" "dm_mod" "i915" "intel_lpss_pci" "spi_pxa2xx_platform"]` with it, so all four are the profile's marginal contribution and none is supplied elsewhere
 

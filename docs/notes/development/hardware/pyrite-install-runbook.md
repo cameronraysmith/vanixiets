@@ -138,7 +138,6 @@ in
         passwordFile = lib.mkForce "/tmp/secret.key";
         additionalKeyFiles = lib.mkForce [ "/tmp/additionalSecret.key" ];
       };
-      boot.initrd.systemd.enable = true;
       disko.tests.enableOCR = true;
       disko.tests.bootCommands = ''
         machine.wait_for_text("[Pp]assphrase for")
@@ -174,9 +173,8 @@ The test driver aborts the derivation on the first failing step, so a non-zero e
 Each override is a stated divergence rather than a convenience.
 `boot.zfs.devNodes` resolves the conflict in pyrite's favour and not the harness's, which is the point: keeping `/dev/disk/by-id` is what forces the booted VM's `zfs-import-zroot` to find the pool through the dm udev rules' `dm-name-cryptroot` symlink, and forcing the harness value `/dev` would sidestep the mechanism the test exists to check.
 disko justifies `/dev` on the grounds that `/dev/disk/by-id` is empty in QEMU VMs, which holds for virtio disks, whose by-id entries QEMU does not supply, and not for device-mapper nodes, whose symlinks the dm udev rules produce.
-`boot.initrd.systemd.enable` is stated explicitly to name the property under test — the prompt is systemd's `systemd-ask-password` rather than the scripted initrd's — and not because anything else would leave it off.
-disko does set it, at `lib/types/luks.nix:354` under `lib.mkIf config.enrollFido2`, which emits nothing here; but it was never the only definition site, and an earlier revision of this note said it was.
-`modules/system/initrd-networking.nix:7` sets it plainly in `flake.modules.nixos.base`, which pyrite imports at `modules/machines/nixos/pyrite/default.nix:26`, so the real machine has systemd stage 1 with or without the enrollment.
+The harness does not set `boot.initrd.systemd.enable`: nixpkgs removed scripted stage 1 (`316b009d0df3`, 2026-10-18) and turned the option into a `mkRemovedOptionModule`, so systemd stage 1, and with it the `systemd-ask-password` prompt under test, is unconditional and defining the option fails evaluation.
+disko still sets it at `lib/types/luks.nix:354` under `lib.mkIf config.enrollFido2`, which emits nothing here, and would trip that removal assertion if enrollment were turned on before disko drops the line.
 The two key files are deliberately different so that the `cryptsetup luksAddKey` branch stays live instead of short-circuiting on `--test-passphrase`, and under `enrollFido2 = false` that is a branch the real install does not take: the same file fills `passwordFile` and `additionalKeyFiles`, so `luks.nix:258`'s guard succeeds against the slot `luksFormat` just created and `:259` never runs.
 The harness writes both with `echo -n`, which is what makes the post-boot `--test-passphrase` check severe against the trailing-newline failure D27 turns on — a failure that now surfaces as an extra keyslot rather than a dead one, per the keyslot criterion under `## Verifying the install` below.
 

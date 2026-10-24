@@ -9,7 +9,7 @@
 
       programs.dank-material-shell = {
         enable = true;
-        package = pkgs.dms-shell;
+        package = pkgs.dux-shell;
         quickshell.package = pkgs.quickshell;
         systemd = {
           enable = true;
@@ -67,11 +67,7 @@
           Requisite = [ "niri.service" ];
           ConditionEnvironment = "XDG_CURRENT_DESKTOP=niri";
         };
-        Service = {
-          Type = "dbus";
-          BusName = "org.freedesktop.Notifications";
-          Environment = [ "DMS_DISABLE_POLKIT=0" ];
-        };
+        Service.Environment = [ "DMS_DISABLE_POLKIT=0" ];
       };
     };
 }
