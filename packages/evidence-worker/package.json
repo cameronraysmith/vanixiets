@@ -9,7 +9,7 @@
     "url": "https://github.com/cameronraysmith/vanixiets.git"
   },
   "license": "MIT",
-  "packageManager": "bun@1.4.3",
+  "packageManager": "bun@1.4.4",
   "scripts": {
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
@@ -18,7 +18,7 @@
     "test": "vitest run"
   },
   "devDependencies": {
-    "@cloudflare/vitest-plugin": "^1.4.4",
+    "@cloudflare/vitest-plugin": "^1.4.7",
     "typescript": "7.0.2",
     "vitest": "~5.0.5",
     "wrangler": "4.151.3"
