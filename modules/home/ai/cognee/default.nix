@@ -30,45 +30,52 @@
         hostName = if osConfig != null then osConfig.networking.hostName else null;
       in
       {
-        # Endpoint, owner-identity, per-host dataset/agent, and the plugin
-        # credential are ALL delivered through .zshenv exports (programs.zsh.envExtra)
-        # rather than home.sessionVariables. The cognee-memory plugin reads these
-        # from os.environ inside a hook subprocess that Claude Code launches itself,
-        # and that subprocess does NOT inherit home.sessionVariables: those ride
-        # hm-session-vars.sh, which .zshenv sources only in login shells and only
-        # once (the __HM_SESS_VARS_SOURCED guard), so under Claude Code the guard is
-        # set-but-valueless and the vars arrive EMPTY. With COGNEE_SERVICE_URL empty
-        # the plugin silently falls back to LOCAL mode. The unconditional .zshenv
-        # export channel (already proven for COGNEE_API_KEY) is the only one that
-        # reaches the launching shell, so the non-secret vars ride it too.
-        #
-        # COGNEE_SERVICE_URL is non-local, which puts the plugin in HTTP mode
-        # (connect to remote magnetite, never boot a local server). COGNEE_USER_EMAIL
-        # must be the real cognee default/owner account; the plugin's built-in
-        # default (default_user@example.com) does not exist on this server.
-        # COGNEE_PLUGIN_DATASET / COGNEE_AGENT_NAME are derived statically from
-        # osConfig.networking.hostName in the deploying nix-darwin-embedded path and
-        # omitted in the standalone homeConfigurations path (osConfig null).
-        #
-        # COGNEE_API_KEY is the only secret value: it is the contents of a sops-nix
-        # home-manager secret read at shell-init, never a literal in the store. The
-        # plugin reads it as a plaintext env VALUE with no _FILE variant, so a
-        # wrapper-cat or _FILE indirection cannot reach it and it cannot ride
-        # home.sessionVariables (world-readable).
-        programs.zsh.envExtra = ''
-          export COGNEE_SERVICE_URL=${lib.escapeShellArg meshApiUrl}
-          export COGNEE_USER_EMAIL=${lib.escapeShellArg userEmail}
-        ''
-        + lib.optionalString (hostName != null) ''
-          export COGNEE_PLUGIN_DATASET=${lib.escapeShellArg "claude_sessions_${hostName}"}
-          export COGNEE_AGENT_NAME=${lib.escapeShellArg "claude_${hostName}"}
-        ''
-        + ''
-          if [ -r ${lib.escapeShellArg keyPath} ]; then
-            COGNEE_API_KEY="$(cat ${lib.escapeShellArg keyPath})"
-            export COGNEE_API_KEY
-          fi
-        '';
+        # Off by default: the CLI wrapper pulls cognee's Python closure into
+        # every home. The cognee plugin marketplace in claude-code/ is only a
+        # source tree, so it stays declared.
+        options.programs.cognee.enable = lib.mkEnableOption "the cognee CLI wrapper and the cognee-memory plugin's zshenv wiring";
+
+        config = lib.mkIf config.programs.cognee.enable {
+          # Endpoint, owner-identity, per-host dataset/agent, and the plugin
+          # credential are ALL delivered through .zshenv exports (programs.zsh.envExtra)
+          # rather than home.sessionVariables. The cognee-memory plugin reads these
+          # from os.environ inside a hook subprocess that Claude Code launches itself,
+          # and that subprocess does NOT inherit home.sessionVariables: those ride
+          # hm-session-vars.sh, which .zshenv sources only in login shells and only
+          # once (the __HM_SESS_VARS_SOURCED guard), so under Claude Code the guard is
+          # set-but-valueless and the vars arrive EMPTY. With COGNEE_SERVICE_URL empty
+          # the plugin silently falls back to LOCAL mode. The unconditional .zshenv
+          # export channel (already proven for COGNEE_API_KEY) is the only one that
+          # reaches the launching shell, so the non-secret vars ride it too.
+          #
+          # COGNEE_SERVICE_URL is non-local, which puts the plugin in HTTP mode
+          # (connect to remote magnetite, never boot a local server). COGNEE_USER_EMAIL
+          # must be the real cognee default/owner account; the plugin's built-in
+          # default (default_user@example.com) does not exist on this server.
+          # COGNEE_PLUGIN_DATASET / COGNEE_AGENT_NAME are derived statically from
+          # osConfig.networking.hostName in the deploying nix-darwin-embedded path and
+          # omitted in the standalone homeConfigurations path (osConfig null).
+          #
+          # COGNEE_API_KEY is the only secret value: it is the contents of a sops-nix
+          # home-manager secret read at shell-init, never a literal in the store. The
+          # plugin reads it as a plaintext env VALUE with no _FILE variant, so a
+          # wrapper-cat or _FILE indirection cannot reach it and it cannot ride
+          # home.sessionVariables (world-readable).
+          programs.zsh.envExtra = ''
+            export COGNEE_SERVICE_URL=${lib.escapeShellArg meshApiUrl}
+            export COGNEE_USER_EMAIL=${lib.escapeShellArg userEmail}
+          ''
+          + lib.optionalString (hostName != null) ''
+            export COGNEE_PLUGIN_DATASET=${lib.escapeShellArg "claude_sessions_${hostName}"}
+            export COGNEE_AGENT_NAME=${lib.escapeShellArg "claude_${hostName}"}
+          ''
+          + ''
+            if [ -r ${lib.escapeShellArg keyPath} ]; then
+              COGNEE_API_KEY="$(cat ${lib.escapeShellArg keyPath})"
+              export COGNEE_API_KEY
+            fi
+          '';
+        };
       };
   };
 }

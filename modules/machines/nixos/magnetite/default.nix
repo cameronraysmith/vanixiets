@@ -48,6 +48,7 @@ in
         inputs.buildbot-nix.nixosModules.buildbot-worker
         inputs.nixbot.nixosModules.nixbot
         inputs.gitea-mq.nixosModules.default
+        inputs.cognee-nix.nixosModules.cognee
       ]
       ++ (with flakeModules; [
         base
@@ -64,6 +65,7 @@ in
         nixbot
         gitea-mq
         gitea
+        cognee
         sso-gateway
         gitea-actions-runner
         docker
@@ -175,7 +177,10 @@ in
         hash = "sha256-7d14/2OgFEcZxC0DKJdvwgmfynv5BTj8wOBhYwpcAWU=";
       };
 
-      sso.services.cognee = {
+      # The cognee server is off; its vars and root/cognee dataset are kept.
+      vanixiets.cognee.enable = false;
+
+      sso.services.cognee = lib.mkIf config.vanixiets.cognee.enable {
         domain = cogneeLib.publicFqdn;
         allowedGroups = [ "cognee_access" ];
         upstream = {
