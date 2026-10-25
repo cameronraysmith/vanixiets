@@ -19,6 +19,7 @@
   flake.modules.homeManager.ai =
     {
       pkgs,
+      lib,
       config,
       flake, # extraSpecialArgs: config.flake // { inherit inputs; }; exposes flake.lib.cognee
       ...
@@ -28,7 +29,7 @@
       keyPath = config.sops.secrets."cognee-api-key".path;
     in
     {
-      home.packages = [
+      home.packages = lib.mkIf config.programs.cognee.enable [
         (pkgs.writeShellApplication {
           name = "cognee";
           runtimeInputs = [ pkgs.coreutils ];

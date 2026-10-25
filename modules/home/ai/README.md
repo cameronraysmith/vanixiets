@@ -39,3 +39,4 @@ The lighter human `agents` aggregate does not import it.
 Harness-specific modules, each configuring one agent's settings, hooks, MCP servers, and wrappers: `atomic/`, `claude-code/`, `codex/`, `firstmate/`, `omp/`, `opencode/`, `pi/`.
 
 Supporting tools these harnesses invoke: `cognee/` (memory layer), `moshi/` (session multiplexing), `hunk/` and `tuicr/` (interactive diff review), `worktrunk/` (worktree management).
+cognee is off: the client switch `programs.cognee.enable` (home-manager, `cognee/`) and the server switch `vanixiets.cognee.enable` (NixOS, `modules/nixos/cognee.nix`, set on magnetite) both default to false, and setting either to true restores that layer.
