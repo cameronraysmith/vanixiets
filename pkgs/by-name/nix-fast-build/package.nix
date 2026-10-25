@@ -22,14 +22,17 @@ python3Packages.buildPythonApplication (finalAttrs: {
   build-system = [ python3Packages.setuptools ];
 
   # 2.x renders build logs itself and no longer uses nix-output-monitor.
+  # Separate elements: with __structuredAttrs (buildPythonPackage's default since
+  # nixpkgs 26.11) makeWrapperArgs is not word-split.
   makeWrapperArgs = [
-    "--prefix PATH : ${
-      lib.makeBinPath [
-        nix-eval-jobs
-        nix-eval-jobs.nix
-        bashInteractive
-      ]
-    }"
+    "--prefix"
+    "PATH"
+    ":"
+    (lib.makeBinPath [
+      nix-eval-jobs
+      nix-eval-jobs.nix
+      bashInteractive
+    ])
   ];
 
   # Don't run integration tests as they try to run nix
