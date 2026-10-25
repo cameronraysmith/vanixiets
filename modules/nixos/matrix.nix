@@ -394,6 +394,14 @@
         keyFile = config.clan.core.vars.generators.livekit-keyfile.files."keyfile".path;
       };
 
+      # lk-jwt-service 0.9.0 refuses to start without this list, which it
+      # matches against the requester's Matrix server name to decide who may
+      # create LiveKit rooms; the nixpkgs module has no option for it. Only
+      # this homeserver's users may, so it is synapse's server_name rather
+      # than `*`.
+      systemd.services.lk-jwt-service.environment.LIVEKIT_FULL_ACCESS_HOMESERVERS =
+        config.services.matrix-synapse.settings.server_name;
+
       ############################################################
       # Part 5: coturn TURN/STUN relay
       ############################################################
