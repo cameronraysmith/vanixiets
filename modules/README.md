@@ -101,6 +101,7 @@ A machine in the `builder` role runs `nix-grpc-daemon` from nix-grpc-store on TC
 The daemon requires a client certificate signed by the instance CA and grants the `trusted` role to each dispatcher's certificate CN; `trustClients` makes its proxy user a Nix trusted user so builds can import the unsigned paths a dispatcher sends.
 The CA is the shared `nix-grpc-ca` clan var, whose private key is never deployed, and every machine of the service has a `nix-grpc-cert` var signed by it, named by machine name and, on builders, by ZeroTier address.
 A machine in the `dispatcher` role loads the `grpc://` store plugin and gets a `nix.buildMachines` entry naming `grpc://[<zerotier address>]:50051` with the CA and its own certificate for every builder it does not exclude.
+Its plugin set also carries a build for the nix that `clan` wraps, taken from clan-core's own nixpkgs, because the plugin loads only into the libnixstore version it was built for and `clan` runs from a different nixpkgs than the system.
 Stibnite dispatches x86_64-linux work to Magnetite and Pyrite, and Pyrite's entry is the only one advertising `kvm` for x86_64-linux.
 Magnetite dispatches aarch64-darwin work, nixbot's best-effort darwin checks included, to Stibnite only, and excludes Pyrite.
 Rosegold and Argentum stay excluded from Magnetite until the binary cache holds nixbot's darwin outputs; deleting a name from Magnetite's `exclude` and redeploying Magnetite re-admits that machine, whose builder side is already in place.
