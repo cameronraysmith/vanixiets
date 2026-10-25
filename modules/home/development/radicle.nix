@@ -85,6 +85,9 @@
           Description = "Radicle node";
           After = [ "sops-nix.service" ];
           Wants = [ "sops-nix.service" ];
+          # The node reads config.json only at startup; embedding its store path
+          # changes the unit whenever the config does, so activation restarts it.
+          X-Restart-Triggers = [ "${config.home.file.".radicle/config.json".source}" ];
         };
         Service = {
           ExecStart = lib.escapeShellArgs nodeArgv;
