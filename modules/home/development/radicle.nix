@@ -18,33 +18,36 @@
       nodeEnv.RAD_HOME = radHome;
     in
     {
-      home.packages = [
-        pkgs.radicle-node
-        pkgs.radicle-tui
-      ];
+      home.packages = [ pkgs.radicle-tui ];
 
       sops.secrets.ssh-signing-key.path = "${radHome}/keys/radicle";
 
-      # Deploy Radicle configuration to ~/.radicle/config.json
-      home.file.".radicle/config.json".source = pkgs.writers.writeJSON "config.json" {
-        # Public explorer URL pattern for viewing Radicle content via browser
-        publicExplorer = "https://app.radicle.xyz/nodes/$host/$rid$path";
+      programs.radicle = {
+        enable = true;
+        uri.rad.browser.enable = false;
+        settings = {
+          publicExplorer = "https://app.radicle.xyz/nodes/$host/$rid$path";
 
-        node = {
-          # Human-readable alias for this node
-          alias = config.home.username;
+          node = {
+            alias = config.home.username;
+            listen = [ ];
 
-          # Do not listen for inbound connections on client-only node
-          listen = [ ];
+            # Dial only the configured connect peers, which include preferredSeeds
+            # (radicle-node main.rs:343) and keep their reconnect backoff. In dynamic
+            # mode 1.10.3 redials gossip-learned addresses with no backoff, and an
+            # IPv6 address stored with type dns never records its attempt
+            # (store.rs:350-366), so on a host without an IPv6 route the node spins a
+            # core, floods the journal and cannot reach SIGTERM until it is killed.
+            peers.type = "static";
+          };
+
+          preferredSeeds = [
+            "z6MkjAoHXtb7qQdVn1fDhiaQ4UGk1CmGNApYXKPP9dDSy68E@cinnabar.zt:8776"
+            "z6MksmpU5b1dS7oaqF2bHXhQi1DWy2hB7Mh9CuN7y1DN6QSz@seed.radicle.xyz:8776"
+            "z6MkrLMMsiPWUcNPHcRajuMi9mDfYckSoJyPwwnknocNYPm7@iris.radicle.xyz:8776"
+            "z6Mkmqogy2qEM2ummccUthFEaaHvyYmYBYh3dbe9W4ebScxo@rosa.radicle.xyz:8776"
+          ];
         };
-
-        # Default Radicle seeds for repository discovery and replication
-        preferredSeeds = [
-          "z6MkjAoHXtb7qQdVn1fDhiaQ4UGk1CmGNApYXKPP9dDSy68E@cinnabar.zt:8776"
-          "z6MksmpU5b1dS7oaqF2bHXhQi1DWy2hB7Mh9CuN7y1DN6QSz@seed.radicle.xyz:8776"
-          "z6MkrLMMsiPWUcNPHcRajuMi9mDfYckSoJyPwwnknocNYPm7@iris.radicle.xyz:8776"
-          "z6Mkmqogy2qEM2ummccUthFEaaHvyYmYBYh3dbe9W4ebScxo@rosa.radicle.xyz:8776"
-        ];
       };
 
       # Signing key: sops.secrets.ssh-signing-key decrypts to ~/.radicle/keys/radicle.
