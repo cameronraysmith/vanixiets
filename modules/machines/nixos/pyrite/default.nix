@@ -411,6 +411,9 @@ in
 
       # These effective support values previously came from GNOME's module.
       networking.networkmanager.enable = true;
+      # Temporary: INFO records association and DHCP, the evidence the warm-reboot
+      # wifi experiment needs (logs/pyrite-warmreboot-rootcause.md); revert after it.
+      networking.networkmanager.logLevel = "INFO";
       services.upower.enable = true;
       services.power-profiles-daemon.enable = true;
       services.tlp.enable = false;
