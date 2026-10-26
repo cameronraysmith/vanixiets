@@ -371,6 +371,14 @@ in
           "nvme.noacpi=1"
           "pci=noaer"
         ])
+        # The default ACPI reset (0x06 to port 0xCF9) keeps the power rails up, and Apple's
+        # firmware cuts the BCM4350's power only when the OS asks first (ARPT.PDEN), which
+        # Linux never does, so about one warm reboot in five came up with the chip silent
+        # (brcmf_chip_recognition: MMIO read failed: 0xffffffff), wifi and Bluetooth both
+        # lost until a power-off: 3 of 14 in the journal. The PCI reset (0x0E) drops the
+        # power briefly, and 15 warm reboots with it never lost the chip
+        # (warm-reboot trials, 2026-10-26).
+        [ "reboot=pci" ]
       ];
 
       services.displayManager.gdm.enable = false;
