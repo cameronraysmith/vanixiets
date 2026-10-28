@@ -94,3 +94,7 @@ projects:
         id: "a14e48d5-3c08-4ac4-994e-c23a5439ff18"
       "fleet-alerting-interface":
         id: "ee21d4e7-237f-4778-9bb4-2826a87332ab"
+      "devloop-collection":
+        id: "7d5bccb1-9485-4630-a0c9-f1b49539db3a"
+      "devloop-collection-interface":
+        id: "5e606d29-7edc-4aaa-96e9-f704ab78a115"

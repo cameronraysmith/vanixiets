@@ -73,8 +73,20 @@ The machine SHALL require one of these accounts on every `/v1/` path, loopback i
 
 ### Requirement: Ingest is OTLP over HTTP with a database header
 
-The collector SHALL write metrics to the telemetry store only through OTLP over HTTP at `http://127.0.0.1:4000/v1/otlp`, authenticating as `collector`, through one `otlp_http` exporter per database fed by a `routing` connector, each sending `x-greptime-db-name` and `x-greptime-otlp-metric-promote-resource-attrs`.
-The collector SHALL carry no logs or traces pipeline into the telemetry store.
+The collector SHALL write metrics to the telemetry store only through OTLP over HTTP at `http://127.0.0.1:4000/v1/otlp` as `collector`, through one `otlp_http` exporter per database fed by a `routing` connector, each sending `x-greptime-db-name` and `x-greptime-otlp-metric-promote-resource-attrs`.
+Logs SHALL enter the store only in `devloop`, routed as a scenario below states, with no message body or field outside `flake.lib.otelCollectorSchema.devloop.tables`, and traces SHALL NOT enter it.
+
+**Discharged by**: the evaluation-time collector check (R3.1) with its mutants, nixpkgs' build-time `otelcol-contrib validate`, and the container tests `greptimedb-pipeline` and `devloop-ingest`.
+
+#### Scenario: Logs are routed to their devloop table
+
+- **WHEN** magnetite's collector configuration is evaluated
+- **THEN** logs reach the telemetry store only through a `routing/logs` connector in the ingress role that routes on the resource attributes `vanixiets.database` and `vanixiets.table` to one `otlp_http/devloop_<table>` exporter per table of `flake.lib.otelCollectorSchema.devloop.tables`, each authenticating as `collector` and sending `x-greptime-db-name: devloop`, `x-greptime-log-table-name: <table>`, `x-greptime-pipeline-name: devloop_<table>` and `x-greptime-hints: auto_create_table=false`, and `resource/strip-database` deletes both attributes before every exporter
+
+#### Scenario: Dev-loop rows are ingested in the container test
+
+- **WHEN** `vmTests.x86_64-linux.devloop-ingest` runs the collector with its S2 receivers against the store
+- **THEN** each source's rows pass from its `logs/devloop-<table>` pipeline through `forward` and `routing/logs` into the `devloop` table its exporter names, with zero failed log records and no `body` column
 
 #### Scenario: A metric is ingested in the container test
 
@@ -112,13 +124,28 @@ The machine SHALL serve reads on the telemetry store's HTTP listener through the
 
 ### Requirement: Databases and their retention are set at the telemetry store
 
-The machine SHALL run a oneshot `greptimedb-schema.service` as `admin` that polls `GET /health` until the telemetry store answers, then for each of `fleet` (`30d`), `devloop` (`365d`) and `agent` (`90d`) issues `CREATE DATABASE IF NOT EXISTS` followed by `ALTER DATABASE ... SET 'ttl'`, because the create statement leaves an existing database's retention unchanged.
-The machine SHALL create no logs table.
+The machine SHALL run a oneshot `greptimedb-schema.service` as `admin` that polls `GET /health` until the telemetry store answers, then sets each database's retention as the scenarios below state.
+The machine SHALL then create exactly the four `devloop` tables of `services.greptimedb.tables` and upload each `devloop_<table>` ingest pipeline from `services.greptimedb.pipelines`, as the scenarios below state, and SHALL create no other table.
+
+#### Scenario: Each database's retention is set
+
+- **WHEN** the schema oneshot runs
+- **THEN** for each of `fleet` (`30d`), `devloop` (`365d`) and `agent` (`90d`) it issues `CREATE DATABASE IF NOT EXISTS` followed by `ALTER DATABASE ... SET 'ttl'`, because the create statement leaves an existing database's retention unchanged
+
+#### Scenario: The devloop tables are declared
+
+- **WHEN** the schema oneshot creates the `devloop` tables
+- **THEN** it creates, with `CREATE TABLE IF NOT EXISTS`, exactly `ci_attribute`, `ci_build`, `batch_event` and `deploy_record` from `services.greptimedb.tables`, each non-append with the flat SST format, its primary key, its time index and no `ttl` of its own
 
 #### Scenario: The schema oneshot runs against an empty store and against an existing database
 
 - **WHEN** the container test runs the schema oneshot once against an empty telemetry store, and once after creating `fleet` with another `ttl`
 - **THEN** each database carries its declared `ttl` after each run
+
+#### Scenario: The devloop tables are created before the collector writes
+
+- **WHEN** the container test `devloop-ingest` runs the schema oneshot and then the collector
+- **THEN** the four `devloop` tables exist with `append_mode=false` and `sst_format=flat` in their create options and no `ttl` of their own, and the collector's first logs write to each succeeds
 
 ### Requirement: Tables allowed a retention of their own are declared
 
@@ -173,7 +200,7 @@ The R2 access key and secret SHALL reach the telemetry store only through an env
 Every store credential SHALL reach its consumer as a file resolved when magnetite's configuration is activated, readable only by its owner, owned by no omnigent worker account, and absent from the configuration that produced it.
 Replacing the account file SHALL restart the telemetry store, and replacing the `collector` password SHALL restart the collector.
 
-**Discharged by**: the evaluation-time ownership check (R8.2) with its mutant, magnetite's credential-holder assertion (R8.2), which admits `fleet-alert` as a `regulator-password` holder, and the evaluation-time envelope check (R7.1) with its restart-on-rotation mutant.
+**Discharged by**: the evaluation-time ownership check (R8.2) with its mutant, magnetite's credential-holder assertion (R8.2), which admits `fleet-alert` and `devloop-reconcile` as `regulator-password` holders, and the evaluation-time envelope check (R7.1) with its restart-on-rotation mutant.
 
 #### Scenario: The credential files are evaluated
 
@@ -188,7 +215,7 @@ Replacing the account file SHALL restart the telemetry store, and replacing the 
 #### Scenario: A credential is loaded by a unit outside its holders
 
 - **WHEN** magnetite's configuration is evaluated, which loads each password file into the units that name it
-- **THEN** magnetite's credential-holder assertion (R8.2) finds `users` loaded only by `greptimedb`, `admin-password` only by `greptimedb-schema`, `collector-password` only by `opentelemetry-collector`, `regulator-password` only by `greptimedb-envelope` and `fleet-alert`, and `perses-password` by none, and an evaluation with a second unit loading `admin-password` fails on it
+- **THEN** magnetite's credential-holder assertion (R8.2) finds `users` loaded only by `greptimedb`, `admin-password` only by `greptimedb-schema`, `collector-password` only by `opentelemetry-collector`, `regulator-password` only by `greptimedb-envelope`, `fleet-alert` and `devloop-reconcile`, and `perses-password` by none, and an evaluation with a second unit loading `admin-password` fails on it
 
 #### Scenario: The restart on rotation is removed
 
@@ -314,11 +341,16 @@ The machine SHALL rewrite each `omnigent-host-<owner>.service` unit name to `omn
 
 ### Requirement: The collector's queue persists across a telemetry store restart
 
-The machine SHALL back each exporter's sending queue in magnetite's collector with a `file_storage` extension using the `bytes` sizer, 400 MiB for `fleet` and 48 MiB each for `devloop` and `agent` in one directory, so that the queues sum to less than 512 MiB and the `fleet` queue holds at least 24 hours at an assumed 256,000 bytes per minute, a rate measured at first activation.
+The machine SHALL back each exporter's sending queue in magnetite's collector with a `file_storage` extension using the `bytes` sizer, in one directory, sized as the first scenario below states, so that the queues sum to less than 512 MiB and the `fleet` queue holds at least 24 hours at an assumed 256,000 bytes per minute, a rate measured at first activation.
+
+#### Scenario: The queues are sized per database
+
+- **WHEN** magnetite's collector configuration is evaluated
+- **THEN** the queues are 400 MiB for `fleet`, 48 MiB for `agent`, and 48 MiB for `devloop` split as 4 MiB for its metrics exporter, 32 MiB for `otlp_http/devloop_ci_attribute` and 4 MiB each for `otlp_http/devloop_ci_build`, `otlp_http/devloop_batch_event` and `otlp_http/devloop_deploy_record`
 
 #### Scenario: The persistent queue is removed
 
-- **WHEN** a mutant of magnetite's collector configuration drops the `file_storage` queue, sizes the `fleet` queue below 24 hours at the assumed rate, or brings the queues' sum to 512 MiB or more
+- **WHEN** a mutant of magnetite's collector configuration drops the `file_storage` queue, sizes the `fleet` queue below 24 hours at the assumed rate, gives a `devloop` logs exporter no persistent queue, or brings the queues' sum to 512 MiB or more
 - **THEN** the evaluation-time collector check (R3.1) fails on its queue clause
 
 #### Scenario: The `fleet` queue rate is measured at first activation
@@ -333,18 +365,28 @@ The machine SHALL back each exporter's sending queue in magnetite's collector wi
 
 ### Requirement: Failure notices are posted to one topic
 
-The machine SHALL define `observability-notify@.service` in `flake.modules.nixos.observability-notify`, posting through the one `ntfy-send` package to `fleet-alerts` with the `alerter` token and logging each posted `FAILED` in `/var/lib/observability-notify/failed.log`, and SHALL set `OnFailure=observability-notify@%n.service` on `greptimedb.service`, `greptimedb-schema.service`, `greptimedb-envelope.service`, `opentelemetry-collector.service` and magnetite's nine ZFS property oneshots.
+The machine SHALL define `observability-notify@.service` in `flake.modules.nixos.observability-notify`, posting through the one `ntfy-send` package to `fleet-alerts` with the `alerter` token and logging each posted `FAILED` in `/var/lib/observability-notify/failed.log`, and SHALL set `OnFailure=observability-notify@%n.service` on the units the first scenario below names.
 
 **Discharged by**: the failure-wiring clause and notifier rehearsal of the evaluation-time collector check (R3.1) with their mutants, `checks.<system>.package-ntfy-send-test-token-transport` with its argv mutant, the resolve-hook assertion in `observability-notify.nix`, shown able to fail by an `extendModules` override, and the operator's recorded delivery of a forced failure after the access entries are in force.
+
+#### Scenario: Each named unit has the failure handler
+
+- **WHEN** magnetite's configuration is evaluated
+- **THEN** `OnFailure=observability-notify@%n.service` is set on `greptimedb.service`, `greptimedb-schema.service`, `greptimedb-envelope.service`, `opentelemetry-collector.service`, `devloop-reconcile.service`, `devloop-pg-grants.service` and magnetite's nine ZFS property oneshots
 
 #### Scenario: The failure wiring is evaluated
 
 - **WHEN** the evaluation-time collector check (R3.1) reads magnetite's configuration
-- **THEN** its failure-wiring clause finds every magnetite service named `greptimedb*`, `zfs-set-*`, `zfs-assert-*` or `opentelemetry-collector` listed in `services.observability-notify.units`, which today is `greptimedb.service`, `greptimedb-schema.service`, `greptimedb-envelope.service`, `opentelemetry-collector.service`, `zfs-set-root-greptimedb-quota`, `zfs-set-root-greptimedb-reservation`, `zfs-assert-root-greptimedb-noautosnap`, `zfs-assert-root-nix-noautosnap`, `zfs-assert-root-docker-noautosnap`, `zfs-assert-root-podman-noautosnap`, `zfs-set-root-nix-quota`, `zfs-set-root-nixos-reservation` and `zfs-set-root-home-reservation`, finds each listed name to be a unit with an `ExecStart`, and finds `OnFailure=observability-notify@%n.service` on each
+- **THEN** its failure-wiring clause finds every magnetite service named `greptimedb*`, `devloop-*`, `zfs-set-*`, `zfs-assert-*` or `opentelemetry-collector` listed in `services.observability-notify.units`, which today is `greptimedb.service`, `greptimedb-schema.service`, `greptimedb-envelope.service`, `opentelemetry-collector.service`, `devloop-reconcile.service`, `devloop-pg-grants.service`, `zfs-set-root-greptimedb-quota`, `zfs-set-root-greptimedb-reservation`, `zfs-assert-root-greptimedb-noautosnap`, `zfs-assert-root-nix-noautosnap`, `zfs-assert-root-docker-noautosnap`, `zfs-assert-root-podman-noautosnap`, `zfs-set-root-nix-quota`, `zfs-set-root-nixos-reservation` and `zfs-set-root-home-reservation`, finds each listed name to be a unit with an `ExecStart`, and finds `OnFailure=observability-notify@%n.service` on each
 
 #### Scenario: A new disk-share unit is not listed
 
 - **WHEN** a mutant of magnetite's configuration adds a `zfs-set-root-foo-quota` service that `services.observability-notify.units` does not list
+- **THEN** the evaluation-time collector check (R3.1) fails on its failure-wiring clause
+
+#### Scenario: The reconcile is not listed
+
+- **WHEN** a mutant of magnetite's configuration drops `devloop-reconcile` from `services.observability-notify.units`
 - **THEN** the evaluation-time collector check (R3.1) fails on its failure-wiring clause
 
 #### Scenario: A listed name is not a unit

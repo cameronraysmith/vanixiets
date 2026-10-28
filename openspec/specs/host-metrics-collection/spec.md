@@ -9,7 +9,7 @@ This capability (stratum: `behavioral`) states what the fleet requires of collec
 ### Requirement: magnetite contributes its own signals to the telemetry store
 
 The collector on magnetite SHALL write magnetite's memory, compressed swap, per-process memory, unit, storage-pool and out-of-memory signals, and the signals the services on magnetite publish about themselves, to the `fleet` database, gathering each from a source on magnetite itself.
-The collector SHALL write series only, and SHALL write no log records and no traces to the telemetry store.
+The collector SHALL write only series to the `fleet` database, no log records and no traces; the dev-loop records it writes to the dev-loop history are required by `devloop-collection`, not here.
 
 **Discharged by**: `telemetry-store-interface` requirements `Ingest is OTLP over HTTP with a database header`, `Scrape targets are reached on loopback` and `The collector's configuration bounds what it gathers`; the evaluation-time regulator over magnetite's collector configuration, the container runtime test's ingest and unit-state cases, and the operator's confirmation at first activation discharge it.
 
@@ -26,7 +26,7 @@ The collector SHALL write series only, and SHALL write no log records and no tra
 #### Scenario: magnetite is first activated with the collector
 
 - **WHEN** magnetite is first activated with the collector and has run for one collection interval
-- **THEN** the operator confirms that compressed swap use for magnetite's compressed swap device appears in the `fleet` database, and that the telemetry store holds no log records and no traces, and records both observations
+- **THEN** the operator confirms that compressed swap use for magnetite's compressed swap device appears in the `fleet` database, and that the `fleet` database holds no log records and no traces, and records both observations
 
 #### Scenario: The collector starts after the databases exist
 

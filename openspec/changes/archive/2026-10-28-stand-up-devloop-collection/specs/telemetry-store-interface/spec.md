@@ -2,11 +2,15 @@
 
 ### Requirement: Ingest is OTLP over HTTP with a database header
 
-The collector SHALL write metrics to the telemetry store only through OTLP over HTTP at `http://127.0.0.1:4000/v1/otlp`, authenticating as `collector`, through one `otlp_http` exporter per database fed by a `routing` connector, each sending `x-greptime-db-name` and `x-greptime-otlp-metric-promote-resource-attrs`.
-The collector SHALL write logs to the telemetry store only into `devloop`, through a `routing/logs` connector in the ingress role that routes on the resource attributes `vanixiets.database` and `vanixiets.table` to one `otlp_http/devloop_<table>` exporter per table of `flake.lib.otelCollectorSchema.devloop.tables`, each authenticating as `collector` and sending `x-greptime-db-name: devloop`, `x-greptime-log-table-name: <table>`, `x-greptime-pipeline-name: devloop_<table>` and `x-greptime-hints: auto_create_table=false`, and `resource/strip-database` SHALL delete both attributes before every exporter.
-No logs pipeline SHALL carry a message body or a field outside that allow-list into the telemetry store, and the collector SHALL carry no traces pipeline into it.
+The collector SHALL write metrics to the telemetry store only through OTLP over HTTP at `http://127.0.0.1:4000/v1/otlp` as `collector`, through one `otlp_http` exporter per database fed by a `routing` connector, each sending `x-greptime-db-name` and `x-greptime-otlp-metric-promote-resource-attrs`.
+Logs SHALL enter the store only in `devloop`, routed as a scenario below states, with no message body or field outside `flake.lib.otelCollectorSchema.devloop.tables`, and traces SHALL NOT enter it.
 
 **Discharged by**: the evaluation-time collector check (R3.1) with its mutants, nixpkgs' build-time `otelcol-contrib validate`, and the container tests `greptimedb-pipeline` and `devloop-ingest`.
+
+#### Scenario: Logs are routed to their devloop table
+
+- **WHEN** magnetite's collector configuration is evaluated
+- **THEN** logs reach the telemetry store only through a `routing/logs` connector in the ingress role that routes on the resource attributes `vanixiets.database` and `vanixiets.table` to one `otlp_http/devloop_<table>` exporter per table of `flake.lib.otelCollectorSchema.devloop.tables`, each authenticating as `collector` and sending `x-greptime-db-name: devloop`, `x-greptime-log-table-name: <table>`, `x-greptime-pipeline-name: devloop_<table>` and `x-greptime-hints: auto_create_table=false`, and `resource/strip-database` deletes both attributes before every exporter
 
 #### Scenario: Dev-loop rows are ingested in the container test
 
@@ -35,8 +39,18 @@ No logs pipeline SHALL carry a message body or a field outside that allow-list i
 
 ### Requirement: Databases and their retention are set at the telemetry store
 
-The machine SHALL run a oneshot `greptimedb-schema.service` as `admin` that polls `GET /health` until the telemetry store answers, then for each of `fleet` (`30d`), `devloop` (`365d`) and `agent` (`90d`) issues `CREATE DATABASE IF NOT EXISTS` followed by `ALTER DATABASE ... SET 'ttl'`, because the create statement leaves an existing database's retention unchanged.
-The machine SHALL then create, with `CREATE TABLE IF NOT EXISTS`, exactly the `devloop` tables `ci_attribute`, `ci_build`, `batch_event` and `deploy_record` from `services.greptimedb.tables`, each non-append with the flat SST format, its primary key, its time index and no `ttl` of its own, and upload each `devloop_<table>` ingest pipeline from `services.greptimedb.pipelines`, and SHALL create no other table.
+The machine SHALL run a oneshot `greptimedb-schema.service` as `admin` that polls `GET /health` until the telemetry store answers, then sets each database's retention as the scenarios below state.
+The machine SHALL then create exactly the four `devloop` tables of `services.greptimedb.tables` and upload each `devloop_<table>` ingest pipeline from `services.greptimedb.pipelines`, as the scenarios below state, and SHALL create no other table.
+
+#### Scenario: Each database's retention is set
+
+- **WHEN** the schema oneshot runs
+- **THEN** for each of `fleet` (`30d`), `devloop` (`365d`) and `agent` (`90d`) it issues `CREATE DATABASE IF NOT EXISTS` followed by `ALTER DATABASE ... SET 'ttl'`, because the create statement leaves an existing database's retention unchanged
+
+#### Scenario: The devloop tables are declared
+
+- **WHEN** the schema oneshot creates the `devloop` tables
+- **THEN** it creates, with `CREATE TABLE IF NOT EXISTS`, exactly `ci_attribute`, `ci_build`, `batch_event` and `deploy_record` from `services.greptimedb.tables`, each non-append with the flat SST format, its primary key, its time index and no `ttl` of its own
 
 #### Scenario: The schema oneshot runs against an empty store and against an existing database
 
@@ -77,9 +91,14 @@ Replacing the account file SHALL restart the telemetry store, and replacing the 
 
 ### Requirement: Failure notices are posted to one topic
 
-The machine SHALL define `observability-notify@.service` in `flake.modules.nixos.observability-notify`, posting through the one `ntfy-send` package to `fleet-alerts` with the `alerter` token and logging each posted `FAILED` in `/var/lib/observability-notify/failed.log`, and SHALL set `OnFailure=observability-notify@%n.service` on `greptimedb.service`, `greptimedb-schema.service`, `greptimedb-envelope.service`, `opentelemetry-collector.service`, `devloop-reconcile.service`, `devloop-pg-grants.service` and magnetite's nine ZFS property oneshots.
+The machine SHALL define `observability-notify@.service` in `flake.modules.nixos.observability-notify`, posting through the one `ntfy-send` package to `fleet-alerts` with the `alerter` token and logging each posted `FAILED` in `/var/lib/observability-notify/failed.log`, and SHALL set `OnFailure=observability-notify@%n.service` on the units the first scenario below names.
 
 **Discharged by**: the failure-wiring clause and notifier rehearsal of the evaluation-time collector check (R3.1) with their mutants, `checks.<system>.package-ntfy-send-test-token-transport` with its argv mutant, the resolve-hook assertion in `observability-notify.nix`, shown able to fail by an `extendModules` override, and the operator's recorded delivery of a forced failure after the access entries are in force.
+
+#### Scenario: Each named unit has the failure handler
+
+- **WHEN** magnetite's configuration is evaluated
+- **THEN** `OnFailure=observability-notify@%n.service` is set on `greptimedb.service`, `greptimedb-schema.service`, `greptimedb-envelope.service`, `opentelemetry-collector.service`, `devloop-reconcile.service`, `devloop-pg-grants.service` and magnetite's nine ZFS property oneshots
 
 #### Scenario: The failure wiring is evaluated
 
@@ -138,7 +157,12 @@ The machine SHALL define `observability-notify@.service` in `flake.modules.nixos
 
 ### Requirement: The collector's queue persists across a telemetry store restart
 
-The machine SHALL back each exporter's sending queue in magnetite's collector with a `file_storage` extension using the `bytes` sizer, 400 MiB for `fleet`, 48 MiB for `agent`, and 48 MiB for `devloop` split as 4 MiB for its metrics exporter, 32 MiB for `otlp_http/devloop_ci_attribute` and 4 MiB each for `otlp_http/devloop_ci_build`, `otlp_http/devloop_batch_event` and `otlp_http/devloop_deploy_record`, in one directory, so that the queues sum to less than 512 MiB and the `fleet` queue holds at least 24 hours at an assumed 256,000 bytes per minute, a rate measured at first activation.
+The machine SHALL back each exporter's sending queue in magnetite's collector with a `file_storage` extension using the `bytes` sizer, in one directory, sized as the first scenario below states, so that the queues sum to less than 512 MiB and the `fleet` queue holds at least 24 hours at an assumed 256,000 bytes per minute, a rate measured at first activation.
+
+#### Scenario: The queues are sized per database
+
+- **WHEN** magnetite's collector configuration is evaluated
+- **THEN** the queues are 400 MiB for `fleet`, 48 MiB for `agent`, and 48 MiB for `devloop` split as 4 MiB for its metrics exporter, 32 MiB for `otlp_http/devloop_ci_attribute` and 4 MiB each for `otlp_http/devloop_ci_build`, `otlp_http/devloop_batch_event` and `otlp_http/devloop_deploy_record`
 
 #### Scenario: The persistent queue is removed
 

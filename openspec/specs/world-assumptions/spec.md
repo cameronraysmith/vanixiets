@@ -93,7 +93,7 @@ Any requirement whose discharge depends on this fact SHALL name it explicitly, a
 
 The corpus SHALL provide one designation record per content term this repository's `behavioral`-stratum requirements use, recording the term, the sense in which it is used when a term carries more than one, the world phenomenon it denotes, and whether that phenomenon is world-only, shared with the machine, or machine-only.
 A term found to denote two distinct phenomena within this repository's vocabulary SHALL be recorded as two rows rather than collapsed into one.
-Eighteen terms carry two senses in this repository today and are disambiguated below rather than left to context: `session`, `package`, `policy`, `@`, `mutation`, `activation`, `probe`, `machine`, `host`, `interface`, `repository`, `build service`, `database`, `hostname`, `evaluator`, `person`, `writer`, and `account`.
+Twenty-one terms carry two senses in this repository today and are disambiguated below rather than left to context: `session`, `package`, `policy`, `@`, `mutation`, `activation`, `probe`, `machine`, `host`, `interface`, `repository`, `build service`, `database`, `hostname`, `evaluator`, `person`, `writer`, `account`, `build`, `path`, and `credential`.
 
 | Term | Sense | World phenomenon it denotes | Status |
 |---|---|---|---|
@@ -238,6 +238,41 @@ Eighteen terms carry two senses in this repository today and are disambiguated b
 | repository-local setting | — | a setting stored inside one repository that names a program git runs as whichever account uses that repository | shared |
 | per-account copy | — | a reference repository an account held in its own private home before the reference tree was shared | shared |
 | administrator | — | an account on a host that can run any program as any other account on that host | shared |
+| failure class | — | a kind of fault a host or a service on it can be in, such as a degraded storage pool or a failed unit, which one alert rule is written to detect | shared |
+| condition | alerting | the statement over a signal's series, or over dev-loop records, that an alert rule checks on each pass of the evaluator, and which either holds or does not | shared |
+| holding time | — | how long an alert rule's condition must hold on every pass of the evaluator before its alert instance fires | shared |
+| publisher | — | a person or service that posts a message to a topic of the fleet's notification service | shared |
+| fleet | — | the set of hosts this repository configures, together with the services they run for the people who use them | world-only |
+| pass | evaluator | one run of the evaluator over every alert rule, once a minute | shared |
+| memory incident | — | an episode of memory pressure on a host, ending in reclaim or in the kernel killing a process | world-only |
+| path | alert delivery | the chain of services an alert travels from the telemetry store, through the evaluator and the notification service, to a person's device | shared |
+| time zone | — | a region's rule for converting an instant into a person's local clock time, including its daylight-saving changes | world-only |
+| always-on host | — | a host the fleet expects to report its memory signal at all times, such as magnetite, whose silence is itself reported | shared |
+| dev-loop history | — | the fleet's lasting record of how changes moved through the build service, the merge queue and deploys, kept in the telemetry store's dev-loop database for 365 days | shared |
+| dev-loop record | — | one entry of the dev-loop history describing one event: an attribute's outcome in a build, a finished build, a batch event or a deploy | shared |
+| build | build service | one run of the build service over one commit of a forge-hosted repository, from the time the build service accepts it until it finishes | shared |
+| attribute | — | one declared output of a forge-hosted repository that a build evaluates and builds, and whose outcome the build service records | shared |
+| derivation | — | the recipe from which one attribute's output is built, named by a store path, so that the same derivation in two builds means the same inputs | shared |
+| outcome | — | how an attribute ended in one build: passed, failed on its own, failed because something it depends on failed, was cancelled, or was abandoned | shared |
+| commit | — | one recorded state of a forge-hosted repository's history, named by its hash | shared |
+| pull request | — | a proposed change to a forge-hosted repository, which the build service builds before the change may merge | shared |
+| merge queue | — | the service that groups approved pull requests into batches, builds each batch and lands the batches that pass | shared |
+| batch | — | a group of pull requests the merge queue builds and lands together | shared |
+| batch event | — | one of the five transitions the merge queue announces for a batch: formed, built, landed, bisecting and done | shared |
+| deploy | — | one activation, in the machine sense, of a configuration on a host, including the one each NixOS boot performs | shared |
+| deploy record | — | the entry a host writes at each deploy naming the host, the closure it activated, the closure it replaced and the time | shared |
+| closure | — | the complete built system a configuration produces for one host, identified by its store path | shared |
+| collected host | — | a host whose deploy records a collector ships to the telemetry store, magnetite alone until the fleet's other collectors arrive | shared |
+| error text | — | the free-form message the build service keeps when an attribute or a build fails, which can carry compiler output and repository content | shared |
+| message body | — | the free text of a log record, as distinct from the named fields parsed out of it | shared |
+| free text | — | any value whose content is not drawn from a fixed or bounded set, such as an error message or a whole log line | world-only |
+| flaky attribute | — | within a window, an attribute whose one derivation both passed and failed on its own in builds there | shared |
+| abandoned attribute | — | an optional attribute the build service stopped waiting for once the required attributes had settled, which this fleet's patch to it marks with fixed error text | shared |
+| formation-to-land | — | for one batch, the interval from the merge queue forming it to the merge queue announcing it done | shared |
+| queue wait | — | for one build, the interval from the build service accepting it to the build starting | shared |
+| event | dev-loop | one occurrence in the dev loop, such as an attribute finishing, a build finishing, a batch transition or a deploy, that one dev-loop record describes | shared |
+| field | — | one named value a dev-loop record or a source's entry carries | shared |
+| credential | service database | a password or other secret that authenticates a reader to a service's own relational database | shared |
 
 #### Scenario: A term resolves to two phenomena
 
@@ -428,3 +463,87 @@ Any requirement whose discharge depends on this fact SHALL name it explicitly, a
 
 - **WHEN** a sharing host's administrator group no longer confers the authority to run programs as other accounts, for example because its sudo rule is removed or narrowed
 - **THEN** this assumption is void, and the `shared-reference-tree` requirement `Moving per-account copies into the reference tree loses nothing and is reversible` loses the discharge argument that an administrator's per-account copies may enter the reference tree unaltered
+
+### Requirement: A43 — nixbot's migrations create the build and attribute columns the dev-loop copy reads, and finish times are transaction start times
+
+It is true of nixbot at `Mic92/nixbot@d020013fa`, independent of what this fleet builds, that its migrations create the columns the dev-loop queries read, that a restart overwrites an attribute's finish time, which is its transaction's start time, and that rows are kept 90 days.
+Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL be treated as losing its discharge once this assumption's violation condition below is observed.
+
+**Evidence**: magnetite's deployed migrations `0001_initial.sql` to `0037_effect_when_changed.sql` are byte-identical to `b1f699803`'s, and `schema_migrations` records versions 1 to 37 with matching checksums (`logs/s2/grounding.md` §1.3); `d020013fa`, which PR #3536 pinned on 2026-10-21, adds no migration and changes no file under `nixbot/nixbot/migrations/` or `db_gen/` (`git diff --stat b1f699803 d020013fa`); finish times are written as `now()` (`nixbot/nixbot/db_gen/builds.py:257`, `:303`, `:352`, `:417`, `:436`) and reset to null on restart (`db_gen/events.py:97`); the prune is `retention_days`, 90 by default (`nixbot/nixbot/config.py:427-428`, `db_gen/maintenance.py:232-238`); the `devloop-queries` check at each input bump and `devloop-pg-grants`'s wait for its columns at each nixbot start are its monitors.
+
+#### Scenario: A nixbot input bump changes the schema the copy reads
+
+- **WHEN** a nixbot revision renames, drops or retypes a column the dev-loop queries or the reconcile read, drops the `(build_id, attr)` uniqueness, sets finish times from something other than the recording transaction, or changes its retention below the reconcile's window
+- **THEN** this assumption is void, and the `devloop-collection` requirements `Every dev-loop event is recorded once and kept for a year`, `A gap in the dev-loop history reaches a person within a day` and `The past week of the dev loop can be asked about` lose the discharge argument that the export queries and the reconcile read the rows nixbot keeps
+
+### Requirement: A44 — gitea-mq announces each batch transition in one of five exact journal messages
+
+It is true of gitea-mq at `Mic92/gitea-mq@02264515b`, independent of what this fleet builds, that it journals each batch transition as one line whose `msg` is one of five exact values with fixed keys, with one `batch formed` and one `batch done` per batch number.
+Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL be treated as losing its discharge once this assumption's violation condition below is observed.
+
+**Evidence**: the five messages and their keys are `batch formed` (`batch`, `branch`, `members`), `batch built` (`batch`, `build`, `sha`, `current`, `pending`), `batch landed` (`batch`, `sha`, `prs`), `batch bisecting` (`batch`, `build`, `failed_check`, `left`, `right`) and `batch done` (`batch`, `landed`, `ejected`, `builds`, `flaky`), written by slog's text handler to standard error (`internal/batch/batch.go:143`, `:228`, `:328`, `:391`, `:568`; `cmd/gitea-mq/main.go:52`); every one of the last 7 days' batch lines and the 9 retained `batch bisecting` lines carried exactly those keys, and `batch formed` and `batch done` occurred once per batch in the retained journal (`logs/s2/grounding.md` §2.1-§2.3); the four further messages beginning `batch ` at the pin do not equal any of the five; the reconcile's daily liveness comparison against nixbot's batch-branch builds is its monitor.
+
+#### Scenario: gitea-mq renames a batch message or changes its keys
+
+- **WHEN** a gitea-mq revision renames one of the five messages, drops or renames a key the dev-loop copy keeps, writes batch transitions elsewhere than its journal, or reuses a batch number
+- **THEN** this assumption is void, and the `devloop-collection` requirements `Every dev-loop event is recorded once and kept for a year` and `The past week of the dev loop can be asked about` lose the discharge argument for batch events and formation-to-land, until the parser and the reconcile are revised
+
+### Requirement: A45 — PostgreSQL on magnetite admits a local role named after the connecting system user without a password
+
+It is true of PostgreSQL 16 as magnetite runs it, independent of what this fleet builds for the dev-loop copy, that a connection over the local socket is authenticated by peer, admitting the role whose name equals the connecting process's system user name and no other, with no password.
+Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL be treated as losing its discharge once this assumption's violation condition below is observed.
+
+**Evidence**: `pg_hba_file_rules` on magnetite lists `local all all peer` after the `niks3` and `postgres` peer lines, and nixbot connects as `nixbot@/nixbot?host=/run/postgresql` (`logs/s2/grounding.md` §1.1); nixpkgs' module renders that default (`NixOS/nixpkgs@ac1faec44836:nixos/modules/services/databases/postgresql.nix:693`); `modules/nixos/gitea-mq.nix` relies on the same rule; the collector's first query after deploy and the reconcile's first run are its monitors.
+
+#### Scenario: Local connections stop being peer-authenticated
+
+- **WHEN** magnetite's PostgreSQL configuration requires a password on the local socket, maps system users to other role names, or admits a role whose name differs from the connecting user
+- **THEN** this assumption is void, and the `devloop-collection` requirement `The build service's records are read without being changed and without a stored credential` loses the discharge argument that the readers hold no credential and act only as their own roles
+
+### Requirement: A46 — GreptimeDB 1.2.1 keeps one row per key and time in a pre-created non-append table
+
+It is true of GreptimeDB 1.2.1, independent of what this fleet builds, that a pre-created non-append table keeps one row per key and time, the last written, for OTLP logs through a pipeline, and that `auto_create_table=false` refuses a write to a missing table.
+Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL be treated as losing its discharge once this assumption's violation condition below is observed.
+
+**Evidence**: a spike on magnetite with the deployed `greptimedb-bin` 1.2.1 and `otelcol-contrib` 0.155.0 wrote the same three rows three and four times through SQL and through OTLP with a pipeline, before and after flush and compaction, and kept three rows in every pre-created non-append table and nine to twelve in every append or write-created table; an extra pipeline field added a column; a missing table with the hint answered 400 (`logs/s2/spike-dedup.md`); the reconcile's daily comparison of stored keys with the source's, which fails on an unexplained extra row, is its monitor.
+
+#### Scenario: A store upgrade changes deduplication or table creation
+
+- **WHEN** a GreptimeDB release keeps more than one row per key and time in a non-append table, makes OTLP logs writes ignore a pre-created table's mode, or creates a missing table despite `auto_create_table=false`
+- **THEN** this assumption is void, and the `devloop-collection` requirement `Every dev-loop event is recorded once and kept for a year` loses the discharge argument that re-read rows are stored once
+
+### Requirement: A47 — The collector's sqlquery receiver resumes logs queries from the last row's tracking value
+
+It is true of `otelcol-contrib` 0.155.0, independent of what this fleet builds, that its Development-stability `sqlquery` logs receiver resumes from the last row's tracking value, persisted across restarts, as its `journald` and `file_log` receivers persist their positions.
+Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL be treated as losing its discharge once this assumption's violation condition below is observed.
+
+**Evidence**: the receiver's documentation at the pin states the body column, the parameterized tracking query and the storage property (`open-telemetry/opentelemetry-collector-contrib@aaf5045a2:receiver/sqlqueryreceiver/README.md:79-83`, `:158`, `:166-173`), and `otelcol-contrib components` on magnetite reports `sqlquery` logs at Development and names the file receiver `file_log` (`logs/s2/grounding.md` §4.2); the Development rating means the behaviour can change without a deprecation period; the on-demand container test at each collector bump and the reconcile's daily comparison are its monitors.
+
+#### Scenario: A collector release changes how logs queries resume
+
+- **WHEN** a collector release changes which row supplies the tracking value, stops binding it to the first parameter, stops persisting it, or stops persisting a journal or file read position
+- **THEN** this assumption is void, and the `devloop-collection` requirement `Every dev-loop event is recorded once and kept for a year` loses the discharge argument that each source row is read at least once and no source is re-read from its beginning after a restart
+
+### Requirement: A48 — magnetite's journal keeps gitea-mq's lines for longer than the reconcile's window
+
+It is true of magnetite's journal, independent of what this fleet builds for the dev-loop copy, that it keeps gitea-mq's lines for at least two days after they are written.
+Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL be treated as losing its discharge once this assumption's violation condition below is observed.
+
+**Evidence**: on 2026-10-21 the journal held gitea-mq lines from 2026-09-16 onwards in 1.9 GB, with no `SystemMaxUse` or `MaxRetentionSec` set (`logs/s2/grounding.md` §2.1); the reconcile, which counts the previous day's lines, fails if they are gone.
+
+#### Scenario: The journal stops holding the previous day
+
+- **WHEN** a journal size or retention limit, or a rotation, removes gitea-mq lines less than two days old
+- **THEN** this assumption is void, and the `devloop-collection` requirement `A gap in the dev-loop history reaches a person within a day` loses the discharge argument that the reconcile can count the source side of batch events
+
+### Requirement: A49 — NixOS and nix-darwin run activation snippets before the current system is relinked
+
+It is true of NixOS and nix-darwin as pinned, independent of what this fleet builds, that each activation, including a NixOS boot, runs activation snippets with `$systemConfig` set before relinking `/run/current-system`, which then names the previous system or nothing.
+Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL be treated as losing its discharge once this assumption's violation condition below is observed.
+
+**Evidence**: `NixOS/nixpkgs@ac1faec44836:nixos/modules/system/activation/activation-script.nix:55`, `:79`, and `nix-darwin/nix-darwin@4cff07de:modules/system/activation-scripts.nix:102`, `:140`, `:146` (ADR-005 Context); the on-demand container test's switch case and the reconcile's comparison of magnetite's latest record with its current system are its monitors.
+
+#### Scenario: Activation relinks before the snippets run, or skips them
+
+- **WHEN** a NixOS or nix-darwin release relinks `/run/current-system` before running activation snippets, stops exporting `$systemConfig` to them, or activates a system without running them
+- **THEN** this assumption is void, and the `devloop-collection` requirement `A deploy can be attributed to the commits that built it` loses the discharge argument that each deploy record names the activated and the replaced closure

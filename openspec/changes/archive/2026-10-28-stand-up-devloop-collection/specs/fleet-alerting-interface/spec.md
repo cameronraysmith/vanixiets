@@ -30,10 +30,15 @@ The rule table SHALL hold `PullRequestQueueWaitBurn`, `database = "devloop"`, `l
 
 ### Requirement: The evaluator queries each rule's database as the regulators' store account
 
-The machine SHALL run on magnetite `fleet-alert.service`, a oneshot with `DynamicUser = true` and `StateDirectory = "fleet-alert"` that `fleet-alert.timer` starts every 60 s, issuing each rule's query as `regulator`, whose password it loads through `LoadCredential`, one query at a time with a 10 s timeout per query: a rule whose `language` is `promql` as an instant query to `http://127.0.0.1:4000/v1/prometheus/api/v1/query` with `x-greptime-db-name: <database>`, and a rule whose `language` is `sql` as `POST http://127.0.0.1:4000/v1/sql?db=<database>`, accepting a 200 whose body holds exactly one `records` result, each of whose rows is one result with its `value` column as the value and its other columns as labels.
-A failed or timed-out query, SQL or PromQL, SHALL end the querying of its rule's database for that run, and queries on other databases SHALL continue inside the run's query deadline.
+The machine SHALL run on magnetite `fleet-alert.service`, a oneshot with `DynamicUser = true` and `StateDirectory = "fleet-alert"` that `fleet-alert.timer` starts every 60 s, issuing each rule's query on its database as `regulator` (password through `LoadCredential`), one at a time with a 10 s timeout each, as a scenario below states.
+A failed or timed-out query SHALL end that run's querying of its rule's database, and queries on other databases SHALL continue inside the run's query deadline.
 
 **Discharged by**: magnetite's credential-holder assertion (R8.2), which admits `fleet-alert` and `devloop-reconcile` as `regulator-password` holders; `checks.x86_64-linux.fleet-alert`, whose fixture server refuses any other path, any database other than the rule's, or any other credential, records each request's path and database, and fails a leg if two queries are ever open at once, with its two-database leg and its mutant that sends every rule to `fleet`; and the operator's recorded first run on magnetite.
+
+#### Scenario: A rule's query is sent by its language
+
+- **WHEN** the evaluator issues a rule's query
+- **THEN** a rule whose `language` is `promql` is sent as an instant query to `http://127.0.0.1:4000/v1/prometheus/api/v1/query` with `x-greptime-db-name: <database>`, and a rule whose `language` is `sql` as `POST http://127.0.0.1:4000/v1/sql?db=<database>`, accepting a 200 whose body holds exactly one `records` result, each of whose rows is one result with its `value` column as the value and its other columns as labels
 
 #### Scenario: A second unit loads the regulators' password
 
@@ -88,11 +93,21 @@ The machine SHALL declare the alert rules once in `modules/nixos/fleet-alert/rul
 
 ### Requirement: Store errors and silent hosts freeze instance state
 
-When a query fails or times out, the evaluator SHALL stop querying that query's database for that run, leave the state of every instance whose rule reads that database unchanged, keep evaluating the rules on databases that answered, and raise `StoreQueryFailing`, `critical`, with a `for` of 3 min, one instance per failing database, labelled with that `database` and naming it in its message.
+When a query fails or times out, the evaluator SHALL stop querying that database for the run, leave unchanged every instance whose rule reads it, keep evaluating rules on databases that answered, and raise `StoreQueryFailing`.
 A database whose queries the run's query deadline did not reach SHALL count as failed for that run.
-While a host returns no `system_memory_usage_bytes`, the evaluator SHALL leave every instance labelled with that host unchanged, posting neither a `RESOLVED` nor a re-post, until the host reports again, except the `RuleSignalMissing` instance that reports that host's own absence.
+While a host returns no `system_memory_usage_bytes`, the evaluator SHALL leave every instance labelled with that host unchanged, as the scenarios below state.
 
 **Discharged by**: `checks.x86_64-linux.fleet-alert`'s store-error, `devloop`-failure and silent-host fixture legs, its store-freeze, host-freeze and `allDatabasesFreeze` mutants, and its property test against the reference model's per-database store freeze and host freeze, whose two-database property was shown failing against the all-freeze transition before the change.
+
+#### Scenario: A database's queries fail
+
+- **WHEN** the queries on one database fail or time out
+- **THEN** the evaluator raises `StoreQueryFailing`, `critical`, with a `for` of 3 min, one instance per failing database, labelled with that `database` and naming it in its message
+
+#### Scenario: A host falls silent
+
+- **WHEN** a host returns no `system_memory_usage_bytes`
+- **THEN** every instance labelled with that host is left unchanged, posting neither a `RESOLVED` nor a re-post, until the host reports again, except the `RuleSignalMissing` instance that reports that host's own absence
 
 #### Scenario: The store freeze is dropped
 
@@ -122,9 +137,14 @@ While a host returns no `system_memory_usage_bytes`, the evaluator SHALL leave e
 ### Requirement: Alerts are posted to fleet-alerts with a title and a severity priority
 
 The evaluator SHALL post each alert through `ntfy-send` to `fleet-alerts` at `https://ntfy.zt`, with `NTFY_TOKEN_FILE` naming its `alerter` credential, titled `[FIRING] <alert> <host>` or `[RESOLVED] <alert> <host>`, at priority `high` for `critical`, `default` for `warning` and `low` for `info`.
-A host-less instance SHALL be titled without a host: `RuleSignalMissing` for a whole selector, `AlertBudgetExceeded`, `WeeklyPipelineTest`, `PullRequestQueueWaitBurn`, and `StoreQueryFailing`, which instead names its failing database, `[FIRING] StoreQueryFailing <database>` or `[RESOLVED] StoreQueryFailing <database>`, so the instances of two databases are told apart.
+A host-less instance SHALL be titled without a host, `StoreQueryFailing` naming its failing database instead, as a scenario below states.
 
 **Discharged by**: `checks.x86_64-linux.fleet-alert`'s fixture server, which records every post; the `alerter`-authenticated heartbeat requests recorded during the cutover; and regulator R9.3 at runtime, since once `*:fleet-*:ro` is in force a run posting without the `alerter` token has its heartbeat refused.
+
+#### Scenario: Host-less titles
+
+- **WHEN** a host-less instance is posted
+- **THEN** `RuleSignalMissing` for a whole selector, `AlertBudgetExceeded`, `WeeklyPipelineTest` and `PullRequestQueueWaitBurn` are titled with no host, and `StoreQueryFailing` is titled `[FIRING] StoreQueryFailing <database>` or `[RESOLVED] StoreQueryFailing <database>`
 
 #### Scenario: A post is recorded
 
