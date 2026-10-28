@@ -130,7 +130,7 @@ Envelopes and regulators (ADR-005):
 ## Deployment acceptance items
 
 - `devloop-ingest`, run on demand on magnetite, makes `devloop-reconcile` exit non-zero against a collector whose query omits `cached = true` rows, and against a mutant collector config lacking `key_value_parser` (ADR-005).
-- `devloop-ingest` switches a test node between two specialisations and finds exactly one new deploy-record line naming both closures (ADR-005).
+- `devloop-ingest` switches its container to an `extendModules` variant of the container's system by running the variant's activation script, because the container's systems carry no `switch-to-configuration`, and finds exactly one new deploy-record line naming both closures (ADR-005; S2 design D16).
 - A reconcile job that passes every `devloop-ingest` mutant is rejected under charter RK8 (ADR-005).
 - GreptimeDB's default deduplication of non-append tables collapses the rows re-read in the five-minute overlap, which ADR-005 records as `[INFERENCE]`; `devloop-reconcile` compares stored keys with nixbot's as multisets, so a duplicated `(build_id, attr, finished_at)` row is an extra key that fails the comparison (ADR-005 Consequences; S2 design D11).
 - Applying the nixbot input's migrations in lexical order reproduces nixbot's schema, which ADR-005 records as `[INFERENCE]`; if it does not, `devloop-queries` runs nixbot's own migration code from the input instead (ADR-005).
