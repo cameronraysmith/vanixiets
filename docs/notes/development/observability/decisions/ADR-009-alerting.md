@@ -8,6 +8,7 @@ Accepted (human gate, 2026-10-15), except Q5, deferred to the end of implementat
 Amended in place under charter v20 (2026-10-18): item 16 raises `RuleSignalMissing` for an always-on host that has reported no host memory for 10 min while the store answers, and E9.5 and R9.5 bound a run by its timing relation rather than by restating `TimeoutStartSec`.
 Amended in place under charter v21 (2026-10-20): Q5 is scheduled as CAM-76 before S5.
 Amended in place under charter v22 (2026-10-21), from slice S2's planning (`openspec/changes/stand-up-devloop-collection/`): item 15 admits one dev-loop rule, a 24 h slow-burn `warning` on ADR-005 D5-R4's queue-wait objective, and items 1 and 2, E9.2 and R9.2 let each rule declare its database and query language, with SQL rules sent to `/v1/sql`.
+Amended in place under charter v23 (2026-10-28), from slice S4's planning (`openspec/changes/stand-up-linux-fleet-collection/`): item 16 makes the evaluator's always-on list, magnetite and cinnabar from S4, the only host-absence path, since ADR-003's R3.2 drops its per-host last-seen clause, and the agents' export no longer depends on cinnabar's `.zt` resolver; Q9's always-on list is magnetite and cinnabar, and a host joins it only by an edit of the fleet's observability host table when it becomes permanently provisioned, so a cloud host provisioned on demand is never on it.
 
 ## Context
 
@@ -94,8 +95,9 @@ No new long-running process is added.
 15. One dev-loop rule is in the set: a 24 h slow-burn rule at severity `warning` on the objective that at least 90% of pull-request builds start within 1 h (ADR-005 D5-R4, Q11), which fires when more than 10% of the pull-request builds in the trailing 24 h waited more than 1 h from `created_at` to `started_at`, and stays silent below a minimum build count (charter v22).
     Its minimum build count, its `for` and its query text are left to slice S2's design, and its state transitions land with a fixture timeline taken from a spec scenario before the reference model changes (charter v22).
     No other CI or merge-queue rule is in the set, because ADR-005's other decision rules are 30-day and 365-day reviews over `devloop` rows rather than conditions that need a human within minutes (ADR-005 D5-R1 to D5-R8).
-16. Host absence: no rule but the `RuleSignalMissing` instance below fires because a host has stopped reporting; the silence of an always-on host, cinnabar or magnetite or a cloud host while terranix provisions it, is ADR-003's R3.2 failure and reaches a human through item 11, and the silence of a laptop, stibnite or pyrite, raises nothing.
-    An always-on host the rule table marks, magnetite alone in S3, that has reported no `system_memory_usage_bytes` for 10 min while the store answers raises `RuleSignalMissing` with `selector="system_memory_usage_bytes"` and its `host_name`, resolved when it reports again, because its silence otherwise freezes every rule while the heartbeat stays green until R3.2 ships in S4 (charter v20).
+16. Host absence: no rule but the `RuleSignalMissing` instance below fires because a host has stopped reporting; the silence of a host on the evaluator's always-on list, magnetite and cinnabar from S4, reaches a human only through that instance, ADR-003's R3.2 has no per-host last-seen clause, and the silence of a laptop, stibnite or pyrite, or of a cloud host provisioned on demand, electrum, galena or scheelite, raises nothing (charter v23).
+    The list is the hosts that `flake.lib.observabilityHosts` marks `alwaysOn`, and a host joins it only by an edit of that table when it becomes permanently provisioned, never from the terranix `enabled` flags, so a host provisioned for an hour does not alert when it is destroyed (charter v23).
+    A host on the always-on list that has reported no `system_memory_usage_bytes` for 10 min while the store answers raises `RuleSignalMissing` with `selector="system_memory_usage_bytes"` and its `host_name`, resolved when it reports again, because its silence otherwise freezes every rule while the heartbeat stays green (charter v20), and one path posts once for one silence where two would post twice (charter v23).
 17. Absence freeze: while a host reports no `system_memory_usage_bytes`, the evaluator freezes every instance labelled with that host, sending neither `RESOLVED` nor a re-post, and resumes normal evaluation for that host when it reports again, so a laptop's sleep neither resolves its alerts nor fires them again on wake.
 
 Initial rule set.
@@ -134,7 +136,7 @@ Because `process_memory_usage_bytes` is resident memory only, the top three exec
 pyrite's NVMe SMART support through the Apple controller is unverified until acceptance; if `smartctl_device_critical_warning` never appears for pyrite while it reports host memory, `RuleSignalMissing` reports it within 30 min of deploy.
 Whether a darwin activation that replaces a kept-alive job's plist leaves a non-zero `launchd_job_last_exit_code` or a 10 min `not_running` gap is unverified until acceptance, which runs `darwin-rebuild switch` with a changed `otelcol` plist on stibnite and requires that neither `LaunchdJobFailed` nor `LaunchdJobNotRunning` fires.
 
-Collector liveness and per-host freshness stay with ADR-003's `otel-envelope` regulator (R3.2) and reach a human through the deduplicated notifier of item 11, so no rule duplicates them.
+Collector liveness, queues and send failures stay with ADR-003's `otel-envelope` regulator (R3.2) and reach a human through the deduplicated notifier of item 11, so no rule duplicates them; host absence is item 16's (charter v23).
 ZFS ARC size has no rule of its own; `HostMemoryPressure` counts the ARC above its minimum as available, because the ARC shrinks to `node_zfs_arc_c_min` under pressure while the kernel's available-memory figure does not include it `[INFERENCE: OpenZFS ARC is not page cache, so MemAvailable omits it; to be confirmed at acceptance on magnetite]`, and the ARC size is appended to memory messages as attribution.
 
 ## Rationale
@@ -157,7 +159,8 @@ The 0.85 swap threshold sits above the 33.68 GB, about 68 % of magnetite's 45.9 
 `warning` alerts are never re-posted, so a known and accepted condition costs one message rather than a daily reminder; `critical` alerts are re-posted daily because each one names data loss or blindness.
 `SystemdUnitFailed` excludes every unit in `services.observability-notify.units` because ADR-003's notifier already reports them through `OnFailure=` and also works while the store is down; deriving the exclusion from that option means a newly notified unit, such as `greptimedb.service` or `opentelemetry-collector.service`, is never reported twice (charter v17).
 The launchd rules mirror the systemd pair: a not-running rule for kept-alive jobs and a launch-count loop rule at the same 5-in-15-min threshold, plus an exit-code rule because launchd's `state` does not say whether a job's last run failed, which `last exit code` does.
-Laptop absence is not a fault: stibnite and pyrite sleep and travel most days, so an absence rule would fire nightly and teach the human to mute `fleet-alerts`, whereas the silence of an always-on host is already R3.2's.
+Laptop absence is not a fault: stibnite and pyrite sleep and travel most days, so an absence rule would fire nightly and teach the human to mute `fleet-alerts`, whereas the silence of an always-on host is item 16's `RuleSignalMissing` (charter v23).
+Nor is the absence of a cloud host provisioned on demand: electrum, galena and scheelite exist only while provisioned, and their teardown is normal (charter v23).
 The absence freeze is the per-host form of item 6's store freeze: without it every firing stibnite instance would resolve when the lid closes and fire again on wake.
 
 ## Rejected alternatives
@@ -187,7 +190,7 @@ The evaluator's state file and the notifier's `FAILED` log are the only alert hi
 Alerts have no silencing: a known condition is accepted by its single `warning` message, and a noisy rule is fixed by a reviewed change to its threshold, its `for`, or its exclusion list.
 cinnabar is the single delivery path: while cinnabar or its ntfy is down no alert reaches a human, and nothing in this decision detects that (Q5).
 An `environmentFile` that ntfy rejects at start would take ntfy down with every publisher; the provisioning check of item 13 guards against it before deploy, and the residual risk that nothing reports an ntfy outage is recorded against CAM-76 with Q5 (charter v17).
-magnetite reaches `ntfy.zt` through cinnabar's dnsmasq and caddy's internal TLS, so delivery inherits ADR-003's dependency on cinnabar's `.zt` resolver.
+magnetite reaches `ntfy.zt` through cinnabar's dnsmasq and caddy's internal TLS, so delivery depends on cinnabar's `.zt` resolver, a dependency ADR-003's agents no longer share from S4 (charter v23).
 Following `ntfy-send`'s `-k`, the evaluator and notifier do not verify caddy's certificate, so the `alerter` token's confidentiality rests on ZeroTier's encryption and on cinnabar's dnsmasq answering `ntfy.zt`, as for every existing `ntfy-send` caller; trusting caddy's root certificate instead would need that certificate distributed to magnetite, which no existing caller does.
 Every `fleet-alerts` message is readable by every mesh member, including the two Android members; messages carry host, unit, mountpoint, pool and process names and no agent or user content (ADR-008).
 Every `fleet-*` publisher needs the `alerter` token, so ad hoc `ntfy-send` calls cannot post to `fleet-alerts`.
@@ -265,7 +268,7 @@ Regulator R9.5: evaluation-time assertions in the module on `MemoryMax` and on t
    Resolution: recommended answer accepted at the 2026-10-15 gate.
 8. Q8: Is restricting publishing on `fleet-*` to the `alerter` user, while leaving every other topic anonymous read-write, acceptable? Recommended: yes; it protects the dead-man from spoofed heartbeats without changing any existing `ntfy-send` or hook caller, and the alternative of `deny-all` requires a credential on every host and agent hook.
    Resolution: recommended answer accepted at the 2026-10-15 gate.
-9. Q9: Should host absence alert only for always-on hosts, cinnabar and magnetite plus any cloud host while terranix provisions it, and never for stibnite or pyrite? Recommended: yes, with the absence freeze of item 17; the alternative fires whenever a laptop sleeps or travels.
-   Resolution: recommended answer accepted at the 2026-10-15 gate.
+9. Q9: Should host absence alert only for always-on hosts, cinnabar and magnetite, a host joining that list only by an edit of the host table when it becomes permanently provisioned, and never for stibnite, pyrite or a cloud host provisioned on demand? Recommended: yes, with the absence freeze of item 17; the alternative fires whenever a laptop sleeps or travels.
+   Resolution: recommended answer accepted at the 2026-10-15 gate; amended in place under charter v23, replacing "plus any cloud host while terranix provisions it", because a host provisioned for an hour would alert when destroyed.
 10. Q10: Should `LaunchdJobFailed` fire on any non-zero last exit code of an allow-listed job, including calendar and run-at-load jobs? Recommended: yes, as a single-shot `warning`; the alternative watches only kept-alive jobs and misses a failed `harmonia-gc` or `sops-install-secrets` run.
     Resolution: recommended answer accepted at the 2026-10-15 gate.

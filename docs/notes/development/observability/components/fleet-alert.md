@@ -23,7 +23,7 @@ No new long-running process and no new listener are added (ADR-009 Decision, Imp
 - ADR-009 Q2: the `fleet-alerts` subscribers are the human's phone and desktop, subscribing anonymously with read-only access.
 - ADR-009 Decision item 14: the weekly end-to-end test `WeeklyPipelineTest`.
 - ADR-009 Decision item 15 and Q6: one dev-loop rule, slice S2's 24 h slow-burn `warning` when more than 10% of pull-request builds in the trailing 24 h waited over 1 h to start, above a minimum build count, and no other CI or merge-queue rule (charter v22).
-- ADR-009 Decision item 16 and Q9: host absence alerts only through ADR-003's R3.2 for always-on hosts, and never for stibnite or pyrite.
+- ADR-009 Decision item 16 and Q9: host absence alerts only through `RuleSignalMissing` for a host on the evaluator's always-on list, magnetite and cinnabar from S4, which a host joins only by an edit of `flake.lib.observabilityHosts` when it becomes permanently provisioned, and never for stibnite, pyrite or a cloud host provisioned on demand; ADR-003's R3.2 has no per-host last-seen clause (charter v23).
 - ADR-009 Q10: `LaunchdJobFailed` fires on any non-zero last exit code of an allow-listed job, as a single-shot `warning`.
 - ADR-009 Q4: the noise envelope E9.1 of 10 firings per 24 h, at most 3 from any one laptop, for the first month.
 - ADR-007 Decision (credentials): the evaluator reads the store as the read-only `regulator` store user.
@@ -91,7 +91,7 @@ Slice S3 ships `HostMemoryPressure`, `HostOOMKill`, `ZfsPoolUnhealthy`, `Systemd
 
 The attribution query for `HostMemoryPressure` and `HostOOMKill` is `topk(3, process_memory_usage_bytes{host_name="<host>"})` together with `node_zfs_arc_size{host_name="<host>"}` and `sum(system_paging_usage_bytes{host_name="<host>", state="used"})` (ADR-009 Decision).
 No pool-capacity rule exists, because ADR-003 collects no pool allocation metric (ADR-009 Decision).
-Collector liveness and per-host freshness stay with ADR-003's `otel-envelope` regulator R3.2 and reach a human through `observability-notify@`, so no rule duplicates them (ADR-009 Decision).
+Collector liveness, queues and send failures stay with ADR-003's `otel-envelope` regulator R3.2 and reach a human through `observability-notify@`, so no rule duplicates them, and host absence is item 16's `RuleSignalMissing` (ADR-009 Decision; charter v23).
 
 ## Configuration surface
 

@@ -6,6 +6,7 @@ title: "ADR-004: Signal scope and schema"
 
 Accepted (human gate, 2026-10-15)
 Amended in place under charter v22 (2026-10-21), from slice S2's planning (`openspec/changes/stand-up-devloop-collection/`): the batch lifecycle admits the five exact gitea-mq messages rather than every line beginning `batch `, `devloop` rows restricted to the column allow-list are stored as OTLP log records with no message body, and the CI build timing row carries `pr_number` and `branch`.
+Amended in place under charter v23 (2026-10-28), from slice S4's planning (`openspec/changes/stand-up-linux-fleet-collection/`): `observability-notify@` instances are excluded from the per-host cap of 40 `systemd_unit_name` values and bounded by the host's notified units, the `fleet` estimate counts S4's notifier instances, filesystem series and collector self-telemetry, 6,154 series against the unchanged 8,000, `systemd_unit_name`'s fleet-wide bound becomes 268, and R4.2 runs hourly in the ingress host's `otel-envelope`, with its journald-bytes and logs-table `ttl` clauses landing with S7.
 
 ## Context
 
@@ -127,7 +128,7 @@ Budget per consumer:
 
 | Consumer | Database | Cardinality envelope | Volume envelope | Retention |
 |---|---|---|---|---|
-| Fleet | `fleet` | at most 8,000 active series; at most 200 distinct values per label key per metric, except `process_executable_name`, bounded instead by 30 values per agent host (Q10), and `systemd_unit_name`, bounded instead by 40 values per NixOS agent host (Q12); per host at most 30 `process_executable_name` values, 40 `systemd_unit_name` values and 30 `launchd_label` values | journald at most 100 MB per host per day, provisional | metrics 30 d; logs table 14 d |
+| Fleet | `fleet` | at most 8,000 active series; at most 200 distinct values per label key per metric, except `process_executable_name`, bounded instead by 30 values per agent host (Q10), and `systemd_unit_name`, bounded instead by 40 values per NixOS agent host (Q12) plus that host's `observability-notify@` instances; per host at most 30 `process_executable_name` values, 40 `systemd_unit_name` values other than `observability-notify@` instances, at most one `observability-notify@` instance per unit in the host's `services.observability-notify.units`, and 30 `launchd_label` values (charter v23) | journald at most 100 MB per host per day, provisional | metrics 30 d; logs table 14 d |
 | Dev-loop | `devloop` | no metric series; rows only | at most 100,000 rows per day | 365 d |
 | Agent harness | `agent` | at most 2,000 active series; `gen_ai.tool.name` at most 200 values | at most 200,000 span rows per day when spans are wired | 90 d |
 
@@ -146,13 +147,16 @@ Banning unbounded domains from metric labels is the single rule that keeps the b
 The fleet envelope was 6,000 series: the measured 392 points per host at seven hosts plus service endpoints, with headroom.
 The host-level signals add, per NixOS host, at most 30 process series, at most 40 units at nine series each (eight `systemd_unit_state` states plus one restart counter), 7 pool-state series for the single pool `zroot`, 7 ARC series, 1 `oom_kill` series, 1 `up` series, 1 memory-available series and 2 paging series for the one zram device, which is 30 + 360 + 7 + 7 + 1 + 1 + 1 + 2 = 409.
 The unit cap is 40 rather than 30 because magnetite reaches 30 allow-listed units once these decisions land: 19 matched its evaluated configuration at `cameronraysmith/vanixiets@f55c27adb` (six of them `zfs-assert-*` and `zfs-set-*`), and ADR-003, ADR-005 and ADR-007 add `opentelemetry-collector`, `prometheus-node-exporter`, `otel-envelope`, `devloop-reconcile`, `greptimedb`, `greptimedb-schema`, `greptimedb-export`, `greptimedb-envelope` and three `greptimedb` dataset oneshots, so one further Omnigent owner would breach a cap of 30.
+`observability-notify@` instances count outside the cap of 40 and are bounded instead by the host's notified units, because they pass the allow-list so that `SystemdUnitFailed` reports a failed post (charter v21), and magnetite stored 44 `systemd_unit_name` values on 2026-10-27, 16 of them notifier instances (charter v23).
 pyrite adds 10 more for smartctl: 7 single-series metrics and `smartctl_device_temperature` with up to 2 `temperature_type` values on one controller, plus 1 `up`.
 Six NixOS hosts therefore add 5 × 409 + 419 = 2,464 series, and the budget rises from 6,000 to 8,000.
 stibnite's base host metrics are already inside the 392 points per host counted above, and item 21's device and mountpoint bounds only shrink them; darwin agents collect no paging series (ADR-003 item 25).
 Its host-level signals add at most 30 process series, at most 30 jobs at six series each (four `launchd_job_state` states, one exit code and one launch counter), 8 SMART series for `disk0`, 2 `node_textfile_mtime_seconds` series for `launchd.prom` and `smartctl.prom`, 1 `node_textfile_scrape_error` series and 1 `up` series, which is 30 + 180 + 8 + 2 + 1 + 1 = 222.
-The estimated base of 3,000 plus 2,464 plus 222 is 5,686 series, inside the 8,000 budget with 2,314 to spare; each further consenting darwin host would add at most 222 plus its own base of about 392.
+The estimated base of 3,000 plus 2,464 plus 222 is 5,686 series before slice S4's additions.
+S4 adds at most 9 series per `observability-notify@` instance for the 28 units notified fleet-wide, 252; 3 `system_filesystem_usage_bytes` series, `used`, `free` and `reserved`, per ZFS mountpoint, 7 mountpoints on magnetite and 3 on each other NixOS host, 66; and the collector self-telemetry keep-list, at most 50 series on magnetite and 20 on each other NixOS host, 150 `[INFERENCE: counted from the rendered exporters and receivers]` (charter v23).
+The estimate is therefore 3,000 + 2,464 + 222 + 252 + 66 + 150 = 6,154 series, inside the 8,000 budget with 1,846 to spare; each further consenting darwin host would add at most 222 plus its own base of about 392.
 The per-host cap of 30 keeps `launchd_label` at no more than 30 values on stibnite, inside the 200-value cap.
-`systemd_unit_name` could reach 6 × 40 = 240 values if no unit name were shared between hosts, and `process_executable_name` 7 × 30 = 210, both above the 200-value cap, so their fleet-wide bounds are the per-host caps times the number of agent hosts (Q10, Q12).
+`systemd_unit_name` could reach 6 × 40 + 28 = 268 values, 40 per NixOS agent host plus the 28 units notified fleet-wide, if no unit name were shared between hosts, and `process_executable_name` 7 × 30 = 210, both above the 200-value cap, so their fleet-wide bounds are the per-host caps times the number of agent hosts, plus each NixOS host's notified units for `systemd_unit_name` (Q10, Q12; charter v23).
 Swap is collected per host rather than per process because no pinned receiver attributes it lower: `system_paging_usage_bytes` with `state="used"` is the uncompressed size of the pages swapped out to zram, read from the `Used` column of `/proc/swaps`, and with `system_linux_memory_available_bytes` it is the memory-pressure input ADR-009 consumes.
 The RAM that zram's compressed pool occupies is not exported by any pinned collector, because node_exporter at `prometheus/node_exporter@6044da783` has no zram collector (`collector/` contains only the `swap` collector's `/dev/zram0` fixture), and that RAM is already absent from available memory `[INFERENCE: zram's zsmalloc pages are not reclaimable, so the kernel's MemAvailable excludes them]`.
 
@@ -191,10 +195,11 @@ It also fails evaluation when an enabled Omnigent worker has no entry in the own
 It reads the same `schema.nix` file the collector configuration is generated from, so configuration and check cannot diverge.
 It is shown able to fail at acceptance by deleting the label-ban stage from the generated configuration and observing the banned label in the output.
 
-Regulator R4.2, runtime: the `otel-envelope` timer of ADR-003 additionally queries, per database, active series, the maximum distinct values of any label key per metric, per host the distinct values of `process_executable_name`, `systemd_unit_name` and `launchd_label`, rows ingested in the last 24 h, and journald bytes per host, and fails when any bound in the budget table is breached.
+Regulator R4.2, runtime: the ingress host's instance of ADR-003's `otel-envelope`, which alone holds `regulator-password`, additionally queries each hour, per database, active series, the maximum distinct values of any label key per metric, per host the distinct values of `process_executable_name`, `systemd_unit_name` and `launchd_label` and the stored `observability-notify@` instances, and rows ingested in the last 24 h, and fails when any bound in the budget table is breached or a query returns an empty result or a missing table (charter v23).
+The journald-bytes clause and the fleet logs table's `ttl` comparison have no input until S7 creates that table, and land with it (charter v23).
 It is shown able to fail at acceptance by pushing one synthetic metric with 300 distinct values of one label into `fleet` and observing the unit fail.
 A failed `otel-envelope` unit reaches a human through ADR-003's `OnFailure=observability-notify@%n.service` notifier; the systemd unit-state and launchd job series in `fleet` are a stored signal, and alerting over them belongs to ADR-009.
-TTLs are asserted, not only set: ADR-007's `greptimedb-schema` oneshot enforces them, and R4.2 also compares each database's and the fleet logs table's `ttl` option against this table.
+TTLs are asserted, not only set: ADR-007's `greptimedb-schema` oneshot enforces them, and R4.2 also compares each database's `ttl` option, and from S7 the fleet logs table's, against this table.
 
 ## Failure prevented
 
@@ -216,7 +221,7 @@ TTLs are asserted, not only set: ADR-007's `greptimedb-schema` oneshot enforces 
 - Add `modules/clan/services/otel-collector/schema.nix`: attribute allow-list, omp metric-name allow-list, per-signal `devloop` column allow-list with each table's primary key and time index, never-stored list, journald unit allow-list, systemd unit allow-list, launchd job allow-list, Omnigent owner-to-alias attrset, node_exporter, darwin textfile and smartctl_exporter metric keep-lists, the enabled `paging` and memory scraper metrics, metric label bans, signal-to-database map, and the budget numbers used by R4.2.
 - Modify the collector configuration generated by `modules/clan/services/otel-collector/flake-module.nix` (ADR-003) to build `redaction`, `filter`, `transform` and `resource` stages from `schema.nix`.
 - Modify `modules/checks/otel-redaction.nix` (ADR-008) to add the R4.1 fixtures.
-- Add the R4.2 queries to the `otel-envelope` unit of ADR-003.
+- Add the R4.2 queries to the ingress host's instance of ADR-003's `otel-envelope`, run hourly, with the journald-bytes and logs-table `ttl` queries landing with S7 (charter v23).
 - Consumed, not created here: the `greptimedb-schema` oneshot in `modules/nixos/greptimedb.nix` (ADR-007) creates `fleet`, `devloop` and `agent` with the database TTLs in the budget table and sets the fleet logs table TTL to 14 d, declared in `services.greptimedb.tableTtls` (charter v15).
 - No flake input and no clan vars generator is added by this decision.
 
@@ -237,7 +242,7 @@ TTLs are asserted, not only set: ADR-007's `greptimedb-schema` oneshot enforces 
 7. Q7: Should the allow-list admit `omp.gen_ai.agent.name`? Recommended: yes, it is bounded by the agent roster; dropping it loses the per-subagent breakdown of tool calls and errors.
    Resolution: recommended answer accepted at the 2026-10-15 gate.
 8. Q8: Raise the `fleet` active-series budget from 6,000 to 8,000 for the host-level signals? Recommended: yes, per the per-host arithmetic in Rationale, which with stibnite's 222 series reaches about 5,686 and leaves 2,314 of headroom; the alternative keeps 6,000 and leaves about 314 series of headroom over the estimated 3,000 base plus 2,464 plus 222.
-   Resolution: recommended answer accepted at the 2026-10-15 gate.
+   Resolution: recommended answer accepted at the 2026-10-15 gate; under charter v23 S4's notifier instances, filesystem series and collector self-telemetry raise the estimate to 6,154 series, leaving 1,846 of headroom under the unchanged 8,000 (Rationale).
 9. Q9: Admit `process.executable.name` as a label? Recommended: yes, bounded by the 64 MiB floor and a cap of 30 values per host; dropping it leaves a per-host total that cannot say which process grew.
    Resolution: recommended answer accepted at the 2026-10-15 gate.
 10. Q10: Bound `process_executable_name` fleet-wide by 30 values per agent host, 210 at seven hosts, instead of the general 200-value cap? Recommended: yes, because the key is already capped per host and its worst case grows only with consenting hosts; the alternative lowers every host's cap to 28 now and again at each new darwin host.
@@ -245,4 +250,4 @@ TTLs are asserted, not only set: ADR-007's `greptimedb-schema` oneshot enforces 
 11. Q11: Name the darwin job metrics `launchd_job_state`, `launchd_job_last_exit_code` and `launchd_job_runs_total` with labels `launchd_label` and `launchd_state`? Recommended: yes, parallel to the systemd names without sharing them; the alternative reuses `systemd_*` names for series with different meanings.
     Resolution: recommended answer accepted at the 2026-10-15 gate.
 12. Q12: Raise the per-host `systemd_unit_name` cap from 30 to 40 and bound the key fleet-wide by 40 values per NixOS agent host, 240 at six hosts, instead of the general 200-value cap? Recommended: yes, because magnetite reaches exactly 30 allow-listed units with the dataset oneshots and this design's own units, and each unit costs nine series; the alternative keeps 30 and drops the zfs oneshots from the allow-list, leaving their failures visible only through `OnFailure=`.
-    Resolution: recommended answer accepted at the 2026-10-15 gate.
+    Resolution: recommended answer accepted at the 2026-10-15 gate; under charter v23 the fleet-wide bound adds each NixOS host's notified units, 240 + 28 = 268 at S4, because `observability-notify@` instances count outside the per-host cap of 40 (Rationale).

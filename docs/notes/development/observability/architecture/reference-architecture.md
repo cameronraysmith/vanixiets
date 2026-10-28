@@ -30,7 +30,7 @@ flowchart LR
   subgraph fleet["In-scope hosts: cinnabar, electrum, galena, scheelite, magnetite, pyrite, stibnite"]
     emit["Local emitters: omp metrics on human accounts, deploy-record.jsonl, allow-listed journald units"]
     probes["Host probes: loopback node_exporter, smartctl_exporter on pyrite, otel-host-probe and root otelcol-process on stibnite"]
-    agent["otel-collector agent: memory_limiter, redaction and allow-lists from schema.nix, file_storage queue"]
+    agent["otel-collector agent: memory_limiter, redaction and allow-lists from schema.nix, file_storage queue; otel-envelope R3.2 over its own 127.0.0.1:8888 telemetry and declared targets"]
     emit -->|"OTLP/HTTP 127.0.0.1:4318, filelog, journald"| agent
     probes -->|"Prometheus scrape of 127.0.0.1 targets, OTLP from otelcol-process"| agent
   end
@@ -41,7 +41,7 @@ flowchart LR
     store[("GreptimeDB 1.2.1 standalone, 127.0.0.1:4000, databases fleet, devloop, agent")]
     perses["Embedded Perses dashboard, served by the store, nginx vhost perses.scientistexperience.net behind sso-gateway"]
     alert["fleet-alert.timer, every 60 s"]
-    regs["otel-envelope, devloop-reconcile, greptimedb-envelope"]
+    regs["otel-envelope R4.2 clauses, devloop-reconcile, greptimedb-envelope"]
     export["greptimedb-export.timer, daily"]
     dev -->|"sqlquery peer auth, journald key_value_parser"| ingress
     ingress -->|"OTLP/HTTP protobuf, collector wo, x-greptime-db-name"| store
@@ -80,10 +80,10 @@ Ingest uses OTLP over HTTP with protobuf, because GreptimeDB serves no OTLP gRPC
 
 | Host | Kind | Components | Notes |
 |---|---|---|---|
-| magnetite | NixOS, always on, Hetzner `cx53` | `opentelemetry-collector.service` with `agent` and `ingress` roles, devloop collection (`sqlquery`, gitea-mq `journald`), loopback `prometheus-node-exporter`, `greptimedb.service` serving the embedded dashboard, `greptimedb-schema.service`, `greptimedb-export.service` and `.timer`, `greptimedb-envelope.service` and `.timer`, the nginx vhost `perses.scientistexperience.net` registered with `sso-gateway` and proxying to the store's API listener `127.0.0.1:4006`, `perses-dashboards.service`, `fleet-alert.service` and `.timer`, `otel-envelope` service and timer, `devloop-reconcile` service and timer, `observability-notify@` template, loopback nginx server `127.0.0.1:9180` for nixbot `/metrics`, deploy-record snippet | store placement and containment per ADR-007; dashboard admission through the shared `sso-gateway` Kanidm client per ADR-002 |
-| cinnabar | NixOS, always on, Hetzner `cx43` | collector `agent`, loopback `prometheus-node-exporter`, `observability-notify@` template, `ntfy-sh` with `auth-access` and `environmentFile`, `fleet-deadman.service` and `.timer`, deploy-record snippet | ZeroTier controller and `.zt` resolver; not a store host (ADR-007 Rationale) |
-| pyrite | NixOS, laptop, bare metal | collector `agent`, loopback `prometheus-node-exporter`, `prometheus-smartctl-exporter` on `127.0.0.1:9633` with `smartDevices = [ "/dev/nvme0" ]`, `observability-notify@` template, deploy-record snippet | KVM-capable host for the on-demand QEMU `vmTests` (S1's OOM-order test), while ADR-005's `devloop-ingest` is a container test on magnetite (charter v22); silence raises nothing (ADR-009 item 16) |
-| electrum, galena, scheelite | NixOS, cloud hosts provisioned on demand | collector `agent`, loopback `prometheus-node-exporter`, `observability-notify@` template, deploy-record snippet | silence fails R3.2 only while terranix provisions them (ADR-003 R3.2; ADR-009 item 16); `scheelite` deploys report as out-of-band under D5-R7 while its machine check stays deferred (ADR-005 Consequences) |
+| magnetite | NixOS, always on, Hetzner `cx53` | `opentelemetry-collector.service` with `agent` and `ingress` roles, devloop collection (`sqlquery`, gitea-mq `journald`), loopback `prometheus-node-exporter`, `greptimedb.service` serving the embedded dashboard, `greptimedb-schema.service`, `greptimedb-export.service` and `.timer`, `greptimedb-envelope.service` and `.timer`, the nginx vhost `perses.scientistexperience.net` registered with `sso-gateway` and proxying to the store's API listener `127.0.0.1:4006`, `perses-dashboards.service`, `fleet-alert.service` and `.timer`, `otel-envelope` service and timer, the only instance holding `regulator-password` and running R4.2 (charter v23), `devloop-reconcile` service and timer, `observability-notify@` template, loopback nginx server `127.0.0.1:9180` for nixbot `/metrics`, deploy-record snippet | store placement and containment per ADR-007; dashboard admission through the shared `sso-gateway` Kanidm client per ADR-002 |
+| cinnabar | NixOS, always on, Hetzner `cx43` | collector `agent`, loopback `prometheus-node-exporter`, `otel-envelope` service and timer, `observability-notify@` template, `ntfy-sh` with `auth-access` and `environmentFile`, `fleet-deadman.service` and `.timer`, deploy-record snippet | ZeroTier controller and `.zt` resolver; not a store host (ADR-007 Rationale) |
+| pyrite | NixOS, laptop, bare metal | collector `agent`, loopback `prometheus-node-exporter`, `prometheus-smartctl-exporter` on `127.0.0.1:9633` with `smartDevices = [ "/dev/nvme0" ]`, `otel-envelope` service and timer, `observability-notify@` template, deploy-record snippet | KVM-capable host for the on-demand QEMU `vmTests` (S1's OOM-order test), while ADR-005's `devloop-ingest` is a container test on magnetite (charter v22); silence raises nothing (ADR-009 item 16) |
+| electrum, galena, scheelite | NixOS, cloud hosts provisioned on demand | collector `agent`, loopback `prometheus-node-exporter`, `otel-envelope` service and timer, `observability-notify@` template, deploy-record snippet | silence raises nothing, because none is on the evaluator's always-on list, which a host joins only by an edit of the host table when it becomes permanently provisioned (ADR-009 item 16 and Q9; charter v23); `scheelite` deploys report as out-of-band under D5-R7 while its machine check stays deferred (ADR-005 Consequences) |
 | stibnite | nix-darwin, laptop | `launchd.daemons.otelcol` as `_otelcol`, `launchd.daemons.otelcol-process` as root, `launchd.daemons.otel-host-probe` as `_prometheus-node-exporter` with `smartDevices = [ "disk0" ]`, loopback node_exporter with only the `textfile` collector, deploy-record snippet | darwin configuration is made gating through R3.1 on `x86_64-linux` (ADR-003 Q5) |
 | blackphos, rosegold, argentum | nix-darwin, other people's primary laptops | deploy-record snippet only, no collector | excluded until each primary user consents (ADR-003 Q3); D5-R7 records each as an exemption owned by that user (ADR-005 Decision) |
 | Android ZeroTier members | unmanaged mesh members | none | refused by mTLS because they hold no `otel-ca` certificate (ADR-003 Q4); may subscribe anonymously to `fleet-*` topics (ADR-009 item 12) |
@@ -175,7 +175,7 @@ When the store does not answer it raises `StoreQueryFailing` and freezes every o
 `RuleSignalMissing` reports a rule whose presence selector has returned no series for 30 min while an expected host reports (ADR-009 item 7).
 The initial rule set is the eighteen rules of ADR-009's rule table, and `WeeklyPipelineTest` proves the whole path each Monday at 09:00 local time (ADR-009 item 14).
 S2 adds the dev-loop SLO burn rule, a 24 h slow-burn `warning` that fires when more than 10% of the pull-request builds in the trailing 24 h waited over 1 h to start (ADR-009 item 15; charter v22).
-The one rule that fires for host absence is `RuleSignalMissing` for an always-on host the rule table marks, magnetite alone in S3, silent for 10 min while the store answers; the silence of an always-on host is also R3.2's failure and reaches a human through the notifier, and a laptop's silence raises nothing (ADR-009 item 16).
+The one rule that fires for host absence is `RuleSignalMissing` for a host on the evaluator's always-on list, magnetite and cinnabar from S4, silent for 10 min while the store answers; it is the only host-absence path, because R3.2 has no per-host last-seen clause, and a laptop's silence raises nothing (ADR-009 item 16; charter v23).
 
 Every completed evaluation publishes to `fleet-heartbeat`, and `fleet-deadman.timer` on cinnabar raises `AlertEvaluatorSilent` when that topic has been empty for 10 min (ADR-009 items 8 and 9).
 Before polling, the dead-man performs an anonymous publish to `fleet-heartbeat` and fails if it is accepted (ADR-009 R9.4).
@@ -201,7 +201,7 @@ Change numbers refer to the slices S1 to S8 of the next section.
 | `modules/machines/nixos/magnetite/default.nix` | file | modify: import `devloop-collection`, and add `devloop-reconcile` to the `regulator-password` holders and to `services.observability-notify.units` | ADR-005 | 2 |
 | `modules/clan/services/otel-collector/flake-module.nix` | file | add: clan service `otel-collector` with roles `agent` and `ingress`, NixOS and darwin modules, `otel-envelope`, `observability-notify@` in the `agent` role, content stages, R8.2 ownership assertions; S3 moves `observability-notify@` into its own module, which the `agent` role imports | ADR-003; ADR-004; ADR-008; ADR-009 | 1, 3, 4, 5, 7 |
 | `modules/nixos/observability-notify.nix` | file | add: `flake.modules.nixos.observability-notify` with the unchanged option `services.observability-notify.units`, the template loading the `alerter` token through `LoadCredential`, resolve hooks reading the token's vars path through `NTFY_TOKEN_FILE`, and a log of posted `FAILED` messages under `/var/lib/observability-notify` | ADR-009; ADR-003 | 3 |
-| `modules/clan/inventory/services/otel-collector.nix` | file | add: one instance, `agent` on the seven in-scope hosts, `ingress` on magnetite, `smartDevices` on pyrite and stibnite | ADR-003 | 1, 4, 5 |
+| `modules/clan/inventory/services/otel-collector.nix` | file | add: one instance, `agent` on the seven in-scope hosts, `ingress` on magnetite; S4 generates `agent`'s machines from `flake.lib.observabilityHosts`, which also holds each host's `smartDevices`, pyrite's and stibnite's (charter v23) | ADR-003 | 1, 4, 5 |
 | `modules/clan/services/otel-collector/schema.nix` | file | add: allow-lists, keep-lists, label bans, owner-to-alias attrset, signal-to-database map, budget numbers | ADR-004 | 1, 7 |
 | `modules/checks/otel-collector-config.nix` | file | add: R3.1 with recorded `launchctl print` fixtures | ADR-003 | 1, 4, 5 |
 | `modules/checks/otel-redaction.nix` | file | add: R8.1 with ADR-004's R4.1 fixtures | ADR-008; ADR-004 | 7 |
@@ -246,7 +246,7 @@ Implementation proceeds in vertical slices: each slice is one OpenSpec change th
 Each change carries the artifacts of the repository's OpenSpec schema under `openspec/changes/`, as the `stand-up-*` precedent does (charter, Scope), and its tasks carry the deployment acceptance items of the decisions it realizes.
 Slice status is not recorded here: it is derived from the change's files by `openspec list` and mirrored to its issue by openspec-linear-sync.
 No content-bearing record enters the store before S7 brings the content stages and their regulator.
-S1 and S3 to S5 are metrics-only, and S2 adds the one non-content logs path, into `devloop` only, through an explicit allow-list and with no message bodies stored (ADR-004 Decision; charter v22).
+S1, S3 and S5 are metrics-only, S2 adds the one non-content logs path, into `devloop` only, through an explicit allow-list and with no message bodies stored, and S4's agent hosts ship their deploy records over that path and are otherwise metrics-only (ADR-004 Decision; charter v22, v23).
 Change names are chosen in each slice's proposal.
 
 0. Package: the store package is `greptimedb-bin`, packaged from the upstream release tarball because it embeds the dashboard ADR-002 adopts; it lands inside S1, and the root pin is not bumped for the store (ADR-001 R1.1; ADR-007 Q2).
@@ -259,7 +259,7 @@ Change names are chosen in each slice's proposal.
 3. S3, CAM-70: the evaluator on magnetite, the rules whose signals S1 provides, the dead-man on cinnabar with the extracted `observability-notify` module, the `alerter` credential and its provisioning check, and the rule check, deployed in three steps: cinnabar's `alerter` provisioning, magnetite's token-bearing notifier and evaluator, then cinnabar's `auth-access`.
    Realizes ADR-009.
    Component: [fleet-alert](../components/fleet-alert.md).
-4. S4, CAM-71: `otel-ca`, the mTLS ingress on ZeroTier, and the agent role on the other in-scope NixOS hosts, with the SMART exporter on pyrite and `otel-envelope`.
+4. S4, CAM-71: `otel-ca`, the mTLS ingress on ZeroTier, and the agent role on the other in-scope NixOS hosts, with the SMART exporter on pyrite and `otel-envelope` on every agent host.
    Realizes the rest of ADR-003 for NixOS and its metrics in ADR-004.
    Components: [otel-collector](../components/otel-collector.md), [host-probes](../components/host-probes.md).
 5. S5, CAM-72: stibnite on darwin, with the root `otelcol-process` collector, the `otel-host-probe` job for launchd state and SMART, and the darwin rules of ADR-009.
@@ -278,6 +278,7 @@ Change names are chosen in each slice's proposal.
 S2, S3, S4 and S6 depend only on S1 and may proceed in any order; S5 follows S4, which provides the ingress it reports to, and S7 follows S5, because omp's interactive sessions run on stibnite.
 S8 follows S2 because R6.1 fails on an empty partition, and `devloop` holds rows only once S2 deploys (ADR-006 E6.1).
 The deferred decision ADR-009 Q5 is CAM-76, which blocks S5 (CAM-72), because until it lands an ntfy outage is noticed only by a missing Monday `WeeklyPipelineTest`, up to 7 days later, and S5 adds laptops (charter v21).
+S4 proceeds before CAM-76 although pyrite is a laptop that joins alerting in S4, because adding pyrite does not change the ntfy-outage exposure CAM-76 addresses (charter v23).
 A slice whose deployment refutes a detail of a decision record amends that record in place with a charter version entry, and every artifact citing the amended identifier is updated in the same pull request.
 
 ## Deferred and future extensions

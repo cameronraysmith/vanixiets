@@ -12,11 +12,11 @@ The collector-side host signals, namely per-process memory, systemd unit state, 
 ## Decisions realized
 
 - ADR-003 item 18: `services.prometheus.exporters.node` on `127.0.0.1:9100` on every NixOS agent host with only the `zfs` and `vmstat` collectors and `--collector.vmstat.fields=^oom_kill$`, scraped at 60 s with ADR-004's node_exporter keep-list (ADR-003 Q14).
-- ADR-003 item 19: `services.prometheus.exporters.smartctl` on `127.0.0.1:9633` on pyrite only, with `devices = [ "/dev/nvme0" ]`, scraped at 60 s with ADR-004's smartctl keep-list, which excludes the `smartctl_device` info series (ADR-003 Q15).
+- ADR-003 item 19: `services.prometheus.exporters.smartctl` on `127.0.0.1:9633` on pyrite only, with `devices = [ "/dev/nvme0" ]`, scraped at 60 s with ADR-004's smartctl keep-list, which excludes the `smartctl_device` info series, and granting the `smartctl-exporter-access` group its ACL on each device in a privileged `ExecStartPre=` before start, because the module's udev rule grants it only on an `add` event, which a switch does not replay (ADR-003 Q15; charter v23).
 - ADR-003 item 20: both NixOS exporters set `listenAddress = "127.0.0.1"` and `openFirewall = false`, and the agent's scrape configuration names only `127.0.0.1` targets.
 - ADR-003 item 23: `launchd.daemons.otel-host-probe` runs every 60 s as `_prometheus-node-exporter`, runs `launchctl print system/<label>` for each label both on ADR-004's launchd allow-list and in the host's evaluated `launchd.daemons`, and atomically replaces `launchd.prom` (ADR-003 Q16).
 - ADR-003 item 23: nix-darwin's `services.prometheus.exporters.node` serves only the `textfile` collector on `127.0.0.1:9100`, scraped at 60 s with ADR-004's darwin keep-list.
-- ADR-003 item 24: the same probe runs the root pin's `smartctl -j -H -A` on each device in the `smartDevices` role option and atomically replaces `smartctl.prom` under smartctl_exporter's metric names, so pyrite's and stibnite's series share names and rules (ADR-003 Q15, Q18).
+- ADR-003 item 24: the same probe runs the root pin's `smartctl -j -H -A` on each device in the host's `smartDevices` entry of `flake.lib.observabilityHosts` and atomically replaces `smartctl.prom` under smartctl_exporter's metric names, so pyrite's and stibnite's series share names and rules (ADR-003 Q15, Q18; charter v23).
 - ADR-003 item 25: darwin hosts collect no ZFS, `oom_kill`, available-memory or paging series.
 - ADR-004: the node_exporter, smartctl_exporter, launchd and darwin textfile keep-lists, the launchd job allow-list, the owner-to-alias attrset, the kept-alive job set, and the label bans on `serial_number` and launchd `pid`.
 - ADR-007: the exporters and darwin daemons belong to the `otel-collector` clan service's `agent` role, not to any machine module.
@@ -29,7 +29,7 @@ The collector-side host signals, namely per-process memory, systemd unit state, 
 - darwin, stibnite: `launchd.daemons.otel-host-probe` with `StartInterval = 60` and `UserName = "_prometheus-node-exporter"` (ADR-003 Implementation surface).
 - darwin, stibnite: nix-darwin's node_exporter, launchd label `org.nixos.prometheus-node-exporter`, running as `_prometheus-node-exporter` through `script` behind `/bin/wait4path` with `KeepAlive` (ADR-003 Context; ADR-004 launchd job allow-list; `nix-darwin/nix-darwin@4cff07de:modules/services/monitoring/prometheus-node-exporter.nix:35-42`, `:98-119`).
 - Textfile directory: `/var/lib/prometheus-node-exporter/textfile`, holding `launchd.prom` and, when `smartDevices` is non-empty, `smartctl.prom` (ADR-003 items 23 and 24).
-- Role option `smartDevices`, default `[ ]`: `[ "/dev/nvme0" ]` on pyrite and `[ "disk0" ]` on stibnite (ADR-003 Implementation surface).
+- `smartDevices`, from each host's entry in `flake.lib.observabilityHosts`, empty by default: `[ "/dev/nvme0" ]` on pyrite and `[ "disk0" ]` on stibnite (ADR-003 Implementation surface; charter v23).
 
 ## Interfaces
 
@@ -60,10 +60,9 @@ Launchd job allow-list (ADR-004): `org.nixos.nix-daemon`, `org.nixos.nix-grpc-da
 
 ## Configuration surface
 
-- In `modules/clan/services/otel-collector/flake-module.nix`, `agent` role NixOS module: `services.prometheus.exporters.node` per ADR-003 item 18, `services.prometheus.exporters.smartctl` when `smartDevices` is non-empty, and the agent's `prometheus` receiver scrape configurations with their keep-lists from `schema.nix` (ADR-003 Implementation surface).
+- In `modules/clan/services/otel-collector/flake-module.nix`, `agent` role NixOS module: `services.prometheus.exporters.node` per ADR-003 item 18, `services.prometheus.exporters.smartctl` with item 19's device ACL step when `smartDevices` is non-empty, and the agent's `prometheus` receiver scrape configurations with their keep-lists from `schema.nix` (ADR-003 Implementation surface).
 - In the same file, `agent` role darwin module: nix-darwin's `services.prometheus.exporters.node` with `listenAddress = "127.0.0.1"` and `--collector.disable-defaults --collector.textfile --collector.textfile.directory=/var/lib/prometheus-node-exporter/textfile`; `launchd.daemons.otel-host-probe` as a `pkgs.writeShellApplication` over `/bin/launchctl`, the root pin's `smartmontools` and `jq`, generated from `schema.nix`, writing by write-then-rename; and the agent's scrape of `127.0.0.1:9100` with the darwin keep-list (ADR-003 items 23 and 24, Implementation surface).
-- In the same file: the `smartDevices` role option, default `[ ]` (ADR-003 Implementation surface).
-- In `modules/clan/inventory/services/otel-collector.nix`: `smartDevices = [ "/dev/nvme0" ]` on pyrite and `smartDevices = [ "disk0" ]` on stibnite (ADR-003 Implementation surface).
+- In `modules/lib/observability-hosts.nix`, `flake.lib.observabilityHosts`: each host's `smartDevices`, `[ "/dev/nvme0" ]` on pyrite and, from S5, `[ "disk0" ]` on stibnite, which the `agent` role reads (ADR-003 Implementation surface; charter v23).
 - In `modules/clan/services/otel-collector/schema.nix`: the node_exporter, darwin textfile and smartctl_exporter keep-lists, the launchd job allow-list, the owner-to-alias attrset and the kept-alive job set (ADR-004 Implementation surface).
 - In `modules/checks/otel-collector-config.nix`: R3.1's exporter and probe assertions and the recorded `launchctl print` fixtures (ADR-003).
 - In `modules/checks/otel-redaction.nix`: R4.1's `launchd_job_state` alias fixture and `smartctl_device` `serial_number` fixture (ADR-004).
@@ -85,9 +84,9 @@ Regulators:
 
 - R3.1, deterministic, build time, in `checks.x86_64-linux.otel-collector-config`: every `prometheus` receiver target is `127.0.0.1`; both NixOS exporters set `listenAddress = "127.0.0.1"` and `openFirewall = false`; darwin node_exporter's `listenAddress` is `127.0.0.1` with only the `textfile` collector enabled; the probe's label list equals the launchd allow-list in `schema.nix` intersected with the host's `launchd.daemons` (ADR-003).
 - R3.1 also runs the probe's parser over recorded `launchctl print` output from stibnite, one running job, one with `last exit code = 78`, one `org.nixos.omnigent-host-cameron` and one reply for an unloaded label, and asserts the expected `launchd_job_*` lines with the alias label, the `unloaded` state and no `pid` (ADR-003).
-- R3.2, runtime: `otel-envelope` fails when `up` of a declared exporter target on an online host is 0 (ADR-003).
+- R3.2, runtime: each host's own `otel-envelope` probes the scrape targets its collector declares and fails when one does not answer `GET` with 200 within 10 s on two consecutive runs (ADR-003; charter v23).
 - R4.1, deterministic, build time: the launchd alias and `serial_number` fixtures leave no owner name and no `serial_number` in the output (ADR-004).
-- R4.2, runtime: `otel-envelope` fails when a host exceeds 30 `launchd_label` values (ADR-004).
+- R4.2, runtime: the ingress host's `otel-envelope` fails when a host exceeds 30 `launchd_label` values (ADR-004; charter v23).
 - Alerting over these series is ADR-009's: `ZfsPoolUnhealthy`, `HostOOMKill`, `NvmeCriticalWarning`, `NvmeWearHigh`, `LaunchdJobNotRunning`, `LaunchdJobFailed`, `LaunchdJobRestartLoop`, `HostProbeStale` and `LocalExporterDown`, with `RuleSignalMissing` detecting a renamed or vanished series; see `components/fleet-alert.md`.
 
 ## Failure prevented

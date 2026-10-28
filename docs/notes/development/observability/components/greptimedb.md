@@ -71,7 +71,7 @@ Downstream:
 - The dashboard layer: from S6, nginx on `magnetite` proxies the vhost's `/dashboard/` and `/v1/` to `http://127.0.0.1:4006` with `Authorization` overwritten by the `perses` credential; the embedded dashboard's `promql-default` and `sql-default` datasources query `/v1/prometheus` and `/v1/sql` (ADR-002 Decision).
 - The dashboard reconcile oneshot `perses-dashboards.service` on `magnetite` writes and deletes dashboards through `/v1/dashboards` with a `rw` credential whose holder is open (ADR-002 Q9).
 - `fleet-alert.service` on `magnetite`: PromQL instant queries to `http://127.0.0.1:4000/v1/prometheus/api/v1/query` against `fleet` as the `regulator` user, with a 10 s per-query timeout, and from S2 SQL rules, such as the dev-loop rule over `devloop`, through `/v1/sql` (ADR-009 Decision items 1 and 15, charter v22).
-- `otel-envelope` (ADR-003 R3.2, ADR-004 R4.2), `devloop-reconcile` (ADR-005) and `greptimedb-envelope` (ADR-007 R7.2) read as `regulator` (ADR-009 governs the holder list).
+- magnetite's `otel-envelope`, for its ADR-004 R4.2 clauses only, since R3.2 reads each host's own collector rather than the store (charter v23), `devloop-reconcile` (ADR-005) and `greptimedb-envelope` (ADR-007 R7.2) read as `regulator` (ADR-009 governs the holder list).
 - `greptimedb-schema` and `greptimedb-export` act as `admin` (ADR-007 Decision).
 - DuckDB consumers read only the Parquet export, never the store's SSTs (ADR-006 Decision).
 
@@ -133,7 +133,7 @@ Failure notification:
 | E7.2 runtime memory: cgroup `memory.stat` `anon` below `MemoryHigh`, `memory.events` `high`, `oom_kill` and `max` not increasing within one store invocation, and no kernel OOM kill or automatic restart between invocations; `memory.peak` is not bounded, because it counts page cache and never decreases within an invocation | R7.2: hourly `greptimedb-envelope.timer` oneshot comparing `anon` with `GREPTIMEDB_ENVELOPE_ANON_MAX_BYTES` and reading the `memory.events` counters against a baseline keyed by `InvocationID`, and across invocations the journal's `MESSAGE_ID=fe6faa94e7774663a0da52717891d8ef` entries for `greptimedb.service` and its `NRestarts`, failing on breach, and running R6.1 to R6.4 | ADR-007 |
 | E7.3 disk: `zroot/root/greptimedb` used below 80% of quota, quota and reservation at declared values | R7.3: boot-time `zfs set` oneshots with `OnFailure=`, plus the envelope oneshot reading `zfs get -Hp used,quota,reservation` | ADR-007 |
 | E7.4 credential freshness: the running store loaded the users file currently deployed | R7.4: the envelope oneshot compares `/run/greptimedb/loaded-users.sha256` with the generator's public `users-sha256` and fails when they differ or either is missing | ADR-007 |
-| ADR-004 budget and TTLs | R4.2: `otel-envelope` compares each database's and the `fleet` logs table's `ttl` option against ADR-004's table, and checks the per-database cardinality and volume bounds | ADR-004 |
+| ADR-004 budget and TTLs | R4.2: magnetite's `otel-envelope` compares each database's `ttl` option, and from S7 the `fleet` logs table's, against ADR-004's table each hour, and checks the per-database cardinality and volume bounds (charter v23) | ADR-004 |
 
 A failed regulator oneshot is a failed systemd unit whose `OnFailure=` notifier reaches a human, so the store needs no alerting component of its own (ADR-007 R7.2).
 A store that stops answering raises `StoreQueryFailing` after 3 min in the ADR-009 evaluator, which freezes every other alert instance (ADR-009 Decision item 6).
