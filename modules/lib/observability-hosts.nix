@@ -43,7 +43,7 @@
           alwaysOn = true;
         };
       cinnabar = agent [ "fleet-deadman" ] // {
-        collect = false;
+        collect = true;
         alwaysOn = true;
       };
       pyrite = agent [ ] // {
