@@ -1,9 +1,9 @@
 ### Task 5: pyrite, with the operator present
 
-Implements `tasks.md` 5.1–5.6 (design D4, D13, Migration Plan steps 4 and 7; O4, O7; FII `pyrite's NVMe health is read by a loopback exporter`; HMC `Each agent host contributes its own signals to the telemetry store`; DCI `Each agent host's collector ships its own deploy records`; DC `Every dev-loop event is recorded once and kept for a year`; FA `A missing signal is itself reported`; FAI `An always-on host's silence is reported`; WA `A13 — Resuming this laptop from a suspended state is unreliable, and recovering a failed resume requires a person at the machine`, `A51 — pyrite's NVMe controller answers the SMART health log at the pinned smartmontools`).
+Implements `tasks.md` 5.1–5.7 (design D4, D9, D13, Migration Plan steps 4 and 7; O4, O7; FII `pyrite's NVMe health is read by a loopback exporter`; HMC `Each agent host contributes its own signals to the telemetry store`; DCI `Each agent host's collector ships its own deploy records`; DC `Every dev-loop event is recorded once and kept for a year`; FA `A missing signal is itself reported`; FAI `An always-on host's silence is reported`; WA `A13 — Resuming this laptop from a suspended state is unreliable, and recovering a failed resume requires a person at the machine`, `A51 — pyrite's NVMe controller answers the SMART health log at the pinned smartmontools`).
 pyrite cannot be recovered remotely after a failed boot or network, so every step that changes it runs only after the operator has confirmed, in this session, being physically at pyrite (S3-R6; O4, O7).
 Pull request 1 leaves pyrite with `collect = false`, so pyrite runs exactly what it ran before until Step 2's own pull request, enqueued only after the presence gate, turns its collection on.
-There are two sittings: the first (Steps 1–4) after Task 4 has passed, the second (Steps 5–6) after `tasks.md` 6.7.
+There are two sittings: the first (Steps 1–4) after Task 4 has passed, the second (Steps 5–6) after `tasks.md` 6.7; Step 7, read-only and without the operator, runs once pyrite has a day of history.
 The switch stops and starts `zerotierone` on pyrite (GR §3), so the deploy runs over pyrite's LAN address, not `pyrite.zt`.
 No reboot and no `udevadm trigger` is part of this task: the exporter's `ExecStartPre` grants the device ACL itself (design D4, D13).
 
@@ -104,3 +104,24 @@ ssh root@"$PYRITE_LAN" 'bash -c "curl -s http://127.0.0.1:8888/metrics | grep -E
 ```
 
 Expected: no line naming pyrite (`grep` exit 1, `matches=1`) from the start of the window until 15 min after it ends, so no `RuleSignalMissing pyrite`, no resolution and no repeat of a firing instance; the queue back to 0 within 30 min; the operator confirms no message naming pyrite reached `fleet-alerts` on their ntfy client.
+
+- [ ] **Step 7: Replay the NVMe and laptop rules over pyrite's first day (tasks.md 5.7)**
+
+Task 6 shipped `FilesystemFillingWarn`, `FilesystemFull`, `NvmeCriticalWarning` and `NvmeWearHigh` before pyrite collected, so its replay had no pyrite history, and the NVMe rules expected no host until Step 2.
+At least 24 h after Step 2, before Task 9's acceptance captures, with no operator needed (read-only, magnetite):
+
+```bash
+L=logs/s4-evidence/5.7-pyrite-replay-$(/bin/date -u +%Y%m%dT%H%M%SZ).log
+r=logs/s4-evidence/6.1-replay.sh
+fs='sum by (host_name, mountpoint) (system_filesystem_usage_bytes{host_name="pyrite", state="used"}) / sum by (host_name, mountpoint) (system_filesystem_usage_bytes{host_name="pyrite"})'
+$r "$fs > 0.85" | tee "$L"
+$r "$fs > 0.95" | tee -a "$L"
+$r 'smartctl_device_critical_warning{host_name="pyrite"} != 0' | tee -a "$L"
+$r 'smartctl_device_percentage_used{host_name="pyrite"} > 90' | tee -a "$L"
+for m in smartctl_device_critical_warning smartctl_device_percentage_used; do
+  $r "count by (host_name) (system_memory_usage_bytes{host_name=\"pyrite\"}) unless on (host_name) count by (host_name) ($m)" | tee -a "$L"
+done
+```
+
+Expected: for each of the first four, the runs that last at least the rule's `for` (15 min, 5 min, 0, 1 h) are the would-be firings; for the last two, a run of 30 min or more, pyrite reporting host memory with no SMART series, is a would-be `RuleSignalMissing` naming that NVMe rule.
+Each would-be firing is attributed in the log to its cause; a rule whose would-be firings share one known cause is put to the operator, whose decision is recorded in the log, and a change it calls for is its own pull request.

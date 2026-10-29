@@ -18,11 +18,13 @@
 #
 # StoreQueryFailing and RuleSignalMissing have no expression: transition.jq
 # raises them, and they are listed so their `for` lives in this one table.
-# The expected host is magnetite alone until S4 brings other hosts' series.
-# RuleSignalMissing's `alwaysOn` lists the hosts whose own silence it
-# reports: one absent from system_memory_usage_bytes for 10 min while the
-# store answers raises it with that host_name and no `for` (ADR-009 item 16,
-# charter v20).
+# Every rule's expected hosts and RuleSignalMissing's `alwaysOn` come from
+# `hosts`, flake.lib.observabilityHosts by default (S4 design D9): the
+# expected hosts are the hosts that collect, and for the NVMe rules those
+# of them with SMART devices; `alwaysOn` lists the collecting hosts marked
+# always-on, whose own silence it reports: one absent from
+# system_memory_usage_bytes for 10 min while the store answers raises it
+# with that host_name and no `for` (ADR-009 item 16, charter v20).
 #
 # Every rule but StoreQueryFailing carries `database` (default "fleet") and
 # `language` ("promql", the default, or "sql"); the evaluator sends a promql
@@ -43,10 +45,12 @@
       hosts ? config.flake.lib.observabilityHosts,
     }:
     let
-      presence = selector: {
-        inherit selector;
-        expectedHosts = [ "magnetite" ];
-      };
+      # A host is expected, or always-on, only once it collects (design D6, D9).
+      collecting = lib.filterAttrs (_: h: h.collect) hosts;
+      agentHosts = builtins.attrNames collecting;
+      smartHosts = builtins.attrNames (lib.filterAttrs (_: h: h.smartDevices != [ ]) collecting);
+      presence = expectedHosts: selector: { inherit selector expectedHosts; };
+      fsRatio = ''sum by (host_name, mountpoint) (system_filesystem_usage_bytes{state="used"}) / sum by (host_name, mountpoint) (system_filesystem_usage_bytes)'';
 
       # Appended to HostMemoryPressure and HostOOMKill messages (ADR-009 item
       # 5); the evaluator substitutes the firing host for <host>.
@@ -95,7 +99,7 @@
           for = "5m";
           severity = "warning";
           annotations.summary = "Available memory, counting the ZFS ARC above its minimum, is below 10 % of total, or swap use is above 85 %";
-          presence = map presence [
+          presence = map (presence agentHosts) [
             "system_linux_memory_available_bytes"
             "node_zfs_arc_size"
             "system_memory_usage_bytes"
@@ -109,7 +113,7 @@
           for = "0s";
           severity = "critical";
           annotations.summary = "The kernel killed a process for memory in the last 10 min";
-          presence = [ (presence "node_vmstat_oom_kill") ];
+          presence = [ (presence agentHosts "node_vmstat_oom_kill") ];
           attribution = memoryAttribution;
         }
         {
@@ -118,7 +122,39 @@
           for = "1m";
           severity = "critical";
           annotations.summary = "A ZFS pool is not online";
-          presence = [ (presence "node_zfs_zpool_state") ];
+          presence = [ (presence agentHosts "node_zfs_zpool_state") ];
+        }
+        {
+          alert = "FilesystemFillingWarn";
+          expr = fsRatio + " > 0.85";
+          for = "15m";
+          severity = "warning";
+          annotations.summary = "A ZFS file system is more than 85 % full";
+          presence = [ (presence agentHosts "system_filesystem_usage_bytes") ];
+        }
+        {
+          alert = "FilesystemFull";
+          expr = fsRatio + " > 0.95";
+          for = "5m";
+          severity = "critical";
+          annotations.summary = "A ZFS file system is more than 95 % full";
+          presence = [ (presence agentHosts "system_filesystem_usage_bytes") ];
+        }
+        {
+          alert = "NvmeCriticalWarning";
+          expr = "smartctl_device_critical_warning != 0";
+          for = "0s";
+          severity = "critical";
+          annotations.summary = "A laptop's NVMe controller reports a critical warning";
+          presence = [ (presence smartHosts "smartctl_device_critical_warning") ];
+        }
+        {
+          alert = "NvmeWearHigh";
+          expr = "smartctl_device_percentage_used > 90";
+          for = "1h";
+          severity = "warning";
+          annotations.summary = "A laptop's SSD has used more than 90 % of its rated endurance";
+          presence = [ (presence smartHosts "smartctl_device_percentage_used") ];
         }
         {
           alert = "SystemdUnitRestartLoop";
@@ -126,7 +162,7 @@
           for = "0s";
           severity = "warning";
           annotations.summary = "A unit restarted more than 5 times in 15 min";
-          presence = [ (presence "systemd_service_restarts_total") ];
+          presence = [ (presence agentHosts "systemd_service_restarts_total") ];
         }
         {
           alert = "SystemdUnitFailed";
@@ -134,7 +170,7 @@
           for = "5m";
           severity = "warning";
           annotations.summary = "A unit the failure notifier does not report has failed";
-          presence = [ (presence "systemd_unit_state") ];
+          presence = [ (presence agentHosts "systemd_unit_state") ];
         }
         {
           alert = "LocalExporterDown";
@@ -142,7 +178,7 @@
           for = "10m";
           severity = "warning";
           annotations.summary = "A loopback exporter the collector scrapes is down";
-          presence = [ (presence ''up{job="node"}'') ];
+          presence = [ (presence agentHosts ''up{job="node"}'') ];
         }
         {
           alert = "WeeklyPipelineTest";
@@ -150,7 +186,7 @@
           for = "0s";
           severity = "info";
           annotations.summary = "Weekly test of the alert path: the value is the number of hosts reporting host memory";
-          presence = [ (presence "system_memory_usage_bytes") ];
+          presence = [ (presence agentHosts "system_memory_usage_bytes") ];
           window = {
             zone = "America/New_York";
             weekday = 1;
@@ -178,7 +214,7 @@
           for = "30m";
           severity = "warning";
           annotations.summary = "A rule's presence selector returned no series while an expected host reported host memory, so the rule cannot fire; with host_name, that always-on host has reported no host memory for 10 min while the store answers";
-          alwaysOn = [ "magnetite" ];
+          alwaysOn = builtins.attrNames (lib.filterAttrs (_: h: h.alwaysOn) collecting);
         }
       ];
 

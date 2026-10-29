@@ -75,7 +75,7 @@ Every task uses exactly these names.
 | Task 2: Host table, certificates and the agent by role | 2.1–2.10 | 1 | vars committed in it |
 | Task 3: `otel-envelope` and `fleet-ingress` | 3.1–3.5 | 1 | — |
 | Task 4: Deploying to cinnabar and magnetite | 4.1–4.6 | cinnabar's `collect` pull request in 4.2 | cinnabar, then magnetite |
-| Task 5: pyrite, with the operator present | 5.1–5.4 after Task 4; 5.5–5.6 after 6.7 | pyrite's `collect` pull request in 5.2 | pyrite |
+| Task 5: pyrite, with the operator present | 5.1–5.4 after Task 4; 5.5–5.6 after 6.7; 5.7 a day after 5.2 | pyrite's `collect` pull request in 5.2 | pyrite |
 | Task 6: Rules over the fleet | 6.1–6.7 | 2 | magnetite |
 | Task 7: The fleet budget | 7.1–7.6 | 3 | magnetite |
 | Task 8: Documentation | 8.1–8.4 | 4 | none |

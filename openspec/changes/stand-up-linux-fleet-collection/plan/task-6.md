@@ -16,8 +16,9 @@ The replay over stored history (Step 1) precedes the rules, the fixture legs (St
 
 - [ ] **Step 1: Replay the new rules over stored history (tasks.md 6.1)**
 
-Start at least 24 h after Task 5 Step 2, so pyrite has a day of history.
-Create `logs/s4-evidence/6.1-replay.sh`, which runs one PromQL expression as `regulator` through `/v1/prometheus/api/v1/query_range` with `start` the earliest of the three hosts' first `system_memory_usage_bytes` sample, `end` now and `step=60`, and prints `<host_name> <mountpoint or device> <first ts> <last ts> <max value>` for each contiguous run of points; rehearse it in Task 1 Step 3 against magnetite's history.
+Runs over the history magnetite and cinnabar have stored since Task 4; pyrite collects only from Task 5 Step 2, so the NVMe rules expect no host until then and their replay over pyrite's history is Task 5 Step 7.
+The file-system replays are rerun as late as practical before Step 7 of this task, because no host stored `system_filesystem_usage_bytes` before the scraper was given `include_virtual_filesystems` (pull request #3634; the first samples are cinnabar's at 09:50 UTC and magnetite's at 09:51 UTC on 2026-10-29): otelcol-contrib 0.155.0 treats ZFS, listed `nodev` in `/proc/filesystems`, as a virtual file system and skips it otherwise.
+Create `logs/s4-evidence/6.1-replay.sh`, which runs one PromQL expression as `regulator` through `/v1/prometheus/api/v1/query_range` with `start` the earliest of the three hosts' first `system_memory_usage_bytes` sample, `end` now and `step=60`, in chunks of at most 10,000 points, and prints `<host_name> <mountpoint or device> <first ts> <last ts> <max value>` for each contiguous run of points; its run splitting is controlled by replaying cinnabar's memory series with the second half of each hour removed (`unless on () (minute() >= 30)`), which must print one run per half hour.
 Replay:
 
 ```bash
@@ -33,19 +34,20 @@ $r 'count by (host_name) (system_memory_usage_bytes{host_name="cinnabar"})' | te
 Expected: for each of the first four, the runs that last at least the rule's `for` (15 min, 5 min, 0, 1 h) are the would-be firings; for the last, each gap of 10 min or more between cinnabar's runs is a would-be `RuleSignalMissing cinnabar`.
 Each would-be firing is attributed in the log to its cause (a ZFS dataset near its quota, a deploy's restart of cinnabar's collector, and so on); a rule whose would-be firings share one known cause is put to the operator, whose decision is recorded under `## Decision` before Step 4.
 
-- [ ] **Step 2: The fixture legs, seen failing (tasks.md 6.2)**
+- [x] **Step 2: The fixture legs, seen failing (tasks.md 6.2)**
 
-Add to `modules/checks/fleet-alert.nix`, built with the existing `gap` and `minute` helpers and the real `rules` (rendered from `flake.lib.observabilityHosts`):
+Add to `modules/checks/fleet-alert.nix`, built with the existing `gap` and `minute` helpers and the real `rules` (rendered from `flake.lib.observabilityHosts`); pyrite does not collect on main until Task 5 Step 2, so the legs about pyrite render that table with pyrite's `collect` forced true (`laptopSilentLeg`, `nvmeExpectsPyriteLeg`, `nvmeLeg`) or false (`notCollectingLeg`), and the label sets of the four new rules are added to `fixtures/series.json`:
 
 | Leg | Replayed answers | Expected posts |
 |---|---|---|
 | `cinnabarSilentLeg` | `system_memory_usage_bytes` for magnetite every run; for cinnabar until t0, then none for 40 min, then again | one `[FIRING] RuleSignalMissing cinnabar` 10 min after cinnabar last reported, one `[RESOLVED] RuleSignalMissing cinnabar` when it reports again, nothing else |
-| `laptopSilentLeg` | `HostOOMKill` firing for pyrite, then no `system_memory_usage_bytes` for pyrite or electrum for 40 min while magnetite and cinnabar report | nothing about pyrite or electrum: no silence, no resolution, no repeat |
+| `laptopSilentLeg` | `HostOOMKill` firing for pyrite, then no `system_memory_usage_bytes` for pyrite or electrum for 40 min while magnetite and cinnabar report | one `[FIRING] HostOOMKill pyrite` on the first run, then nothing about pyrite or electrum: no silence, no resolution, no repeat |
 | `nvmeExpectsPyriteLeg` | memory for magnetite and cinnabar only, no `smartctl_device_critical_warning`, 30 min; then pyrite's memory too for 30 min, still no SMART series | nothing in the first 30 min; then one `[FIRING] RuleSignalMissing` naming `NvmeCriticalWarning`, and one naming `NvmeWearHigh` |
 | `filesystemLeg` | cinnabar's `/` at 0.9 for 15 min, then 0.97 for 5 min | one `[FIRING] FilesystemFillingWarn cinnabar` at priority `default`, then one `[FIRING] FilesystemFull cinnabar` at the critical priority |
 | `nvmeLeg` | pyrite's `smartctl_device_critical_warning` 1 on one run | one `[FIRING] NvmeCriticalWarning pyrite` at the critical priority |
+| `notCollectingLeg` | the table with pyrite's `collect` false and `alwaysOn` true; pyrite's memory with no SMART series for 35 min, then no memory for 40 min, while magnetite and cinnabar report | nothing |
 
-Add the runtime mutant `alwaysOnMagnetiteOnly`, the real evaluator with a rules JSON whose `RuleSignalMissing.alwaysOn` is `[ "magnetite" ]`, which `cinnabarSilentLeg` must reject; and add the five legs to `legs`.
+Add the runtime mutant `alwaysOnMagnetiteOnly`, the real evaluator with a rules JSON whose `RuleSignalMissing.alwaysOn` is `[ "magnetite" ]`, which `cinnabarSilentLeg` must reject; add `cinnabarSilentLeg` and `filesystemLeg` to `legs`, and run the other four against their own tables' configurations, as `twoHostExclusionLeg` is.
 Run:
 
 ```bash
@@ -53,9 +55,9 @@ jj st --no-pager >/dev/null
 nix build .#checks.x86_64-linux.fleet-alert -L 2>&1 | tee logs/s4-evidence/6.2-red-$(/bin/date -u +%Y%m%dT%H%M%SZ).log | grep -E 'FAIL|leg'
 ```
 
-Expected: FAIL, naming `cinnabarSilentLeg`, `nvmeExpectsPyriteLeg`, `filesystemLeg` and `nvmeLeg` (no such rules or hosts yet); `laptopSilentLeg` may already pass, since today nothing about pyrite is expected (RED).
+Expected: FAIL, naming `cinnabarSilentLeg`, `nvmeExpectsPyriteLeg`, `filesystemLeg` and `nvmeLeg` (no such rules or hosts yet); `laptopSilentLeg` and `notCollectingLeg` already pass, since today nothing about pyrite is expected; `notCollectingLeg` is seen failing in Step 3 (RED).
 
-- [ ] **Step 3: The rules read the host table (tasks.md 6.3)**
+- [x] **Step 3: The rules read the host table (tasks.md 6.3)**
 
 In `modules/nixos/fleet-alert/rules.nix`:
 
@@ -68,7 +70,8 @@ presence = expectedHosts: selector: { inherit selector expectedHosts; };
 ```
 
 Every existing rule's `presence` becomes `map (presence agentHosts) [ … ]` or `[ (presence agentHosts "…") ]`; `RuleSignalMissing.alwaysOn = builtins.attrNames (lib.filterAttrs (_: h: h.alwaysOn) collecting);` replaces `[ "magnetite" ]`; and four rules are added after `ZfsPoolUnhealthy`, with the expressions of the FAI scenario `The file-system and disk-health rules are rendered`.
-The leg `notCollectingLeg`, written in Step 2 with the others, takes the real table with pyrite's `collect` set false: pyrite silent for 40 min with no SMART series while magnetite and cinnabar report, expecting no `RuleSignalMissing` naming an NVMe rule or pyrite; it fails until this filter exists.
+The leg `notCollectingLeg`, written in Step 2 with the others, makes pyrite a host that does not collect but is marked always-on and reports host memory without SMART series: without the `collecting` filter it raises one `RuleSignalMissing` for each NVMe rule and `RuleSignalMissing pyrite`. So the rules are first written reading `hosts` unfiltered, the check is built and `notCollectingLeg` seen failing (logged as `6.3-red-nofilter-<ts>.log`), and then `collecting` is added.
+Once the rules read `alwaysOn` from the table, cinnabar is always-on, so a fixture in which only magnetite reports raises `RuleSignalMissing cinnabar` in every leg: the fixture's reporting hosts therefore default to the fleet's always-on hosts, listed in the check independently of the rules (`alwaysOnHosts`), plus a step's `reporting`, less its `silent`; `alwaysOnSilentLeg` silences both always-on hosts, keeping its point that a selector empty while no expected host reports raises nothing.
 The four rules:
 
 ```nix
@@ -89,12 +92,11 @@ Run:
 jj st --no-pager >/dev/null
 L=logs/s4-evidence/6.3-rules-$(/bin/date -u +%Y%m%dT%H%M%SZ).log
 nix build .#checks.x86_64-linux.fleet-alert -L 2>&1 | tee "$L" | grep -E 'SUCCESS|FAIL|mutant|Leg'
-nix eval --json .#.lib.fleetAlertRules --apply 'f: let r = (f { lib = (builtins.getFlake "nixpkgs").lib; }).rules; in map (x: { inherit (x) alert; hosts = map (p: p.expectedHosts) (x.presence or [ ]); alwaysOn = x.alwaysOn or null; }) r' | tee -a "$L"
+nix eval --json .#.checks.x86_64-linux.fleet-alert.rules.rules --apply 'r: map (x: { inherit (x) alert; hosts = map (p: p.expectedHosts) (x.presence or [ ]); alwaysOn = x.alwaysOn or null; }) r' | jq -c '.[]' | tee -a "$L"
 NIX_SHOW_STATS=1 NIX_SHOW_STATS_PATH=/tmp/fleet-alert-stats.json nix eval --option eval-cache false --raw .#.checks.x86_64-linux.fleet-alert.drvPath >/dev/null && jq '.gc.totalBytes, .cpuTime' /tmp/fleet-alert-stats.json | tee -a "$L"
 ```
 
-If `builtins.getFlake "nixpkgs"` is not resolvable on the machine, evaluate through `.#nixosConfigurations.magnetite.config.services.fleet-alert` instead, whose rendered JSON the module carries.
-Expected: `SUCCESS: 11 rules found`; every leg passes, the five new ones included; `alwaysOnMagnetiteOnly` rejected; every PromQL rule's expected hosts are the six agent hosts, the NVMe rules' `["pyrite"]`, and `RuleSignalMissing`'s `alwaysOn` `["cinnabar","magnetite"]`; cost between 0.30 and 0.34 GiB and below 536,870,912 (design D10).
+Expected: `SUCCESS: 11 rules found`; every leg passes, the six new ones included; `alwaysOnMagnetiteOnly` rejected; every PromQL rule's expected hosts are the five collecting hosts `["cinnabar","electrum","galena","magnetite","scheelite"]`, the NVMe rules' `[]` until pyrite's `collect` flips (then `["pyrite"]`, as the pyrite legs render), and `RuleSignalMissing`'s `alwaysOn` `["cinnabar","magnetite"]`; cost between 0.30 and 0.34 GiB and below 536,870,912 (design D10).
 
 - [ ] **Step 4: The pull request (tasks.md 6.4)**
 
@@ -120,14 +122,14 @@ rehearse: magnetite:
 L=logs/s4-evidence/6.6-first-run-$(/bin/date -u +%Y%m%dT%H%M%SZ).log
 ssh magnetite.zt 'bash -c "systemctl show fleet-alert -p ExecMainStatus -p ExecMainStartTimestamp -p ExecMainExitTimestamp; sudo journalctl -u fleet-alert -o cat -n 60"' | tee "$L"
 ssh magnetite.zt 'bash -s' <<'EOS' \
-  | jq '[.[] | select(.expr and (.window // null) == null and (.alert | test("^Host(MemoryPressure|OOMKill)$") | not)) ] | length' | tee -a "$L"
+  | jq '([.[] | select(.alert == "RuleSignalMissing") | {selector: "system_memory_usage_bytes", database}] + [.[] | .database as $database | .presence[]? | {selector, database: $database}] | unique | length) as $p | [.[] | select(.expr and (.window // null) == null)] as $e | {presence: $p, promql: ([$e[] | select(.language == "promql")] | length), sql: ([$e[] | select(.language == "sql")] | length), total: ($p + ($e | length))}' | tee -a "$L"
 c=$(systemctl show fleet-alert -p Environment --value | tr ' ' '\n' | sed -n 's/^FLEET_ALERT_CONFIG=//p')
 jq -c '.rules' "$c"
 EOS
 ```
 
-The rules are read from the delivered evaluator configuration (`FLEET_ALERT_CONFIG` in the unit's environment, `modules/nixos/fleet-alert.nix:606-617`), because the module exposes no rendered-rules option; count unique presence selectors plus expressions outside the weekly window from the same `.rules`.
-Expected: `ExecMainStatus=0`; the journal shows `fleet` and `devloop` queried as `regulator`; the count gives 23 queries in a run with no memory rule firing (22 PromQL, one SQL), and the time between start and exit is recorded beside S3's 0.62–0.68 s for 19 queries.
+The rules are read from the delivered evaluator configuration (`FLEET_ALERT_CONFIG` in the unit's environment, `modules/nixos/fleet-alert.nix:606-617`), because the module exposes no rendered-rules option; the count is the evaluator's own per-run query set (`modules/nixos/fleet-alert.nix:203-267`): each unique presence selector and database, `system_memory_usage_bytes` in `RuleSignalMissing`'s database included, plus each expression outside the weekly window; attribution queries run only for a firing memory rule.
+Expected: `ExecMainStatus=0`; the journal shows `fleet` and `devloop` queried as `regulator`; the count gives `{"presence":12,"promql":10,"sql":1,"total":23}`, 23 queries in a run with no memory rule firing (22 PromQL, one SQL), against 16 (9, 6, 1) before the change, and the time between start and exit is recorded beside S3's 0.62–0.68 s for 19 queries.
 
 - [ ] **Step 7: Thirty minutes without a missing signal, and the hand-run control (tasks.md 6.7)**
 

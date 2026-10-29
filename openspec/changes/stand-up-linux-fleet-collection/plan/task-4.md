@@ -152,7 +152,7 @@ curl -sS --max-time 10 -o /dev/null -w '%{http_code}\n' -k -X POST -H 'Content-T
   'https://[fddb:4344:343b:14b9:399:930f:39db:40d2]:4318/v1/metrics'; echo "rc=$?"
 ```
 
-Expected: `000` and `rc=55` with `certificate required`, or `rc=35`; the operator records the error line (FII scenario `A mesh member without a certificate connects at deploy`).
+Expected: `000` and `rc=55` or `rc=56` with `certificate required`, or `rc=35`; the operator records the error line (FII scenario `A mesh member without a certificate connects at deploy`).
 Each host's first `otel-envelope` run:
 
 ```bash

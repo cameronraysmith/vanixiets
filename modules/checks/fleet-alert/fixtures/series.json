@@ -18,7 +18,23 @@
       "systemd_unit_active_state": "failed",
       "systemd_unit_name": "nginx.service"
     },
-    "WeeklyPipelineTest": {}
+    "WeeklyPipelineTest": {},
+    "FilesystemFillingWarn": { "host_name": "magnetite", "mountpoint": "/" },
+    "FilesystemFull": { "host_name": "magnetite", "mountpoint": "/" },
+    "NvmeCriticalWarning": {
+      "__name__": "smartctl_device_critical_warning",
+      "device": "nvme0",
+      "host_name": "pyrite",
+      "instance": "127.0.0.1:9633",
+      "job": "smartctl"
+    },
+    "NvmeWearHigh": {
+      "__name__": "smartctl_device_percentage_used",
+      "device": "nvme0",
+      "host_name": "pyrite",
+      "instance": "127.0.0.1:9633",
+      "job": "smartctl"
+    }
   },
   "attribution": [
     [

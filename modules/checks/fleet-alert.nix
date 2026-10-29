@@ -15,11 +15,14 @@
 #   and post only with NTFY_TOKEN_FILE naming the fixture credential, and
 #   the alert posts of the leg must equal its list; the two-database leg
 #   also requires the server to record each rule's query once on its path
-#   and database. The seven runtime mutants (no state write, `for` 0, no
+#   and database. The eight runtime mutants (no state write, `for` 0, no
 #   store freeze, no absence freeze, no update of when each host last
-#   reported, every query sent to fleet, and every instance frozen when any
-#   database fails) must each produce a non-empty failure list; the store
-#   freezes only the instances of the database that failed (review F7).
+#   reported, every query sent to fleet, every instance frozen when any
+#   database fails, and magnetite the only always-on host) must each
+#   produce a non-empty failure list; the store freezes only the instances
+#   of the database that failed (review F7). The legs about pyrite render
+#   the host table with its `collect` forced, since it does not collect
+#   on main yet.
 # - propertyRehearsal: fleet-alert/test_transition.py compares transition.jq
 #   with the reference model fleet-alert/model.py over derandomized
 #   Hypothesis timelines over two databases, holds both to leaving fleet's
@@ -38,10 +41,13 @@
 # The fixtures cannot see the store's real metric names (ADR-009
 # Consequences); RuleSignalMissing watches those after deploy. The label
 # sets in fleet-alert/fixtures/series.json are those measured on magnetite's
-# `fleet` database on 2026-10-18 (logs/s3/series-labels.md). The fixture
-# server cannot evaluate PromQL, so the SystemdUnitFailed exclusion leg
-# replays only the failed units the rendered exclusion regex keeps, matched
-# here with the full-match semantics PromQL uses for `!~`.
+# `fleet` database on 2026-10-18 (logs/s3/series-labels.md), except the
+# file-system and NVMe rules', which no host stored when those rules were
+# added: theirs are the file-system expressions' `by` labels and the
+# smartctl scrape job's target. The fixture server cannot evaluate PromQL,
+# so the SystemdUnitFailed exclusion leg replays only the failed units the
+# rendered exclusion regex keeps, matched here with the full-match
+# semantics PromQL uses for `!~`.
 # Nor can it run SQL: vmTests.x86_64-linux.devloop-ingest's burnRule case
 # runs PullRequestQueueWaitBurn's query on GreptimeDB 1.2.1 (design D1, D16).
 { self, lib, ... }:
@@ -445,7 +451,7 @@
               map (host: {
                 query = builtins.replaceStrings [ "<host>" ] [ host ] a.query;
                 inherit (r) database;
-              }) both
+              }) attributedHosts
             ) r.attribution
           ) rulesList;
           byQuery = lib.mapAttrs (_: ps: lib.unique (map (p: p.database) ps)) (
@@ -522,14 +528,19 @@
       # answers: presence selectors return the reporting hosts unless
       # listed in `missing`; the expressions of the leg's rules (its `rules`,
       # the real table by default) return the step's `series`;
-      # `error` replaces every answer with that HTTP status.
+      # `error` replaces every answer with that HTTP status. The reporting
+      # hosts are the fleet's always-on hosts, stated here independently of
+      # the rules' `alwaysOn`, and the step's `reporting`, less its `silent`.
+      alwaysOnHosts = [
+        "magnetite"
+        "cinnabar"
+      ];
       stepAnswers =
         rulesList: step:
         let
-          reporting =
-            step.reporting or [
-              "magnetite"
-            ];
+          reporting = lib.subtractLists (step.silent or [ ]) (
+            lib.unique (alwaysOnHosts ++ step.reporting or [ ])
+          );
           missing = step.missing or [ ];
           series = step.series or { };
           presence = lib.listToAttrs (
@@ -568,8 +579,7 @@
           answers =
             presence
             // ruleAnswers
-            // attributionAnswers step.at "magnetite"
-            // attributionAnswers step.at "stibnite";
+            // lib.foldl' (acc: host: acc // attributionAnswers step.at host) { } attributedHosts;
         in
         if step ? error then lib.mapAttrs (_: _: { status = step.error; }) answers else answers;
 
@@ -589,6 +599,9 @@
         "magnetite"
         "stibnite"
       ];
+      # The hosts a fixture leg may report a memory rule firing on, each of
+      # whose attribution queries the fixture answers.
+      attributedHosts = both ++ [ "pyrite" ];
 
       # A rule's condition holds from minute 0 to its `for` plus one, then
       # clears: one FIRING at its `for`, none on the next run, one RESOLVED
@@ -837,25 +850,170 @@
         expect = [ "6 [FIRING] RuleSignalMissing default" ];
         messages = [ "rule=HostOOMKill" ];
       };
-      # magnetite's collector stops exporting while the store answers (S3
-      # review F1): node_vmstat_oom_kill's gap raises nothing, because no
-      # expected host reports, but magnetite is always-on, so its own silence
-      # raises RuleSignalMissing 10 min after it last reported.
+      # The always-on hosts' collectors stop exporting while the store answers
+      # (S3 review F1): node_vmstat_oom_kill's gap raises nothing, because no
+      # expected host reports, but magnetite and cinnabar are always-on, so
+      # each one's own silence raises RuleSignalMissing 10 min after it last
+      # reported.
       alwaysOnSilentLeg = {
-        name = "magnetite silent for 40 min while the store answers raises RuleSignalMissing magnetite 10 min after it last reported, none for node_vmstat_oom_kill, and resolves when it reports again";
+        name = "magnetite and cinnabar silent for 40 min while the store answers raise RuleSignalMissing for each 10 min after they last reported, none for node_vmstat_oom_kill, and resolve when they report again";
         steps =
           map (n: { at = gap n; }) (lib.range 0 1)
           ++ map (n: {
             at = gap n;
-            reporting = [ ];
+            silent = alwaysOnHosts;
             missing = [ "node_vmstat_oom_kill" ];
           }) (lib.range 2 9)
           ++ map (n: { at = gap n; }) (lib.range 10 11);
         expect = [
+          "3 [FIRING] RuleSignalMissing cinnabar default"
           "3 [FIRING] RuleSignalMissing magnetite default"
+          "10 [RESOLVED] RuleSignalMissing cinnabar default"
           "10 [RESOLVED] RuleSignalMissing magnetite default"
         ];
         messages = [ "selector=system_memory_usage_bytes" ];
+      };
+
+      # design D9: the rules read their expected and always-on hosts from
+      # flake.lib.observabilityHosts. pyrite does not collect on main until
+      # its own pull request, so the legs about pyrite render the real table
+      # with its `collect` set each way.
+      tableWith =
+        pyrite:
+        builtins.fromJSON
+          (self.lib.fleetAlertRules {
+            inherit lib;
+            hosts = hosts // {
+              pyrite = hosts.pyrite // pyrite;
+            };
+          }).json;
+      pyriteRules = tableWith { collect = true; };
+      pyriteConfig = checkConfig pyriteRules;
+      # pyrite also always-on, so the leg judges both halves of the filter.
+      notCollectingRules = tableWith {
+        collect = false;
+        alwaysOn = true;
+      };
+      notCollectingConfig = checkConfig notCollectingRules;
+      smartSelectors = [
+        "smartctl_device_critical_warning"
+        "smartctl_device_percentage_used"
+      ];
+
+      # cinnabar is always-on (FAI `An always-on host's silence is
+      # reported`): silent from 10 min to 50 min while magnetite reports.
+      cinnabarSilentLeg = {
+        name = "cinnabar silent for 40 min while magnetite reports raises RuleSignalMissing cinnabar 10 min after it last reported, and resolves when it reports again";
+        steps =
+          map (n: { at = gap n; }) (lib.range 0 1)
+          ++ map (n: {
+            at = gap n;
+            silent = [ "cinnabar" ];
+          }) (lib.range 2 9)
+          ++ map (n: { at = gap n; }) (lib.range 10 11);
+        expect = [
+          "3 [FIRING] RuleSignalMissing cinnabar default"
+          "10 [RESOLVED] RuleSignalMissing cinnabar default"
+        ];
+        messages = [ "selector=system_memory_usage_bytes" ];
+      };
+
+      # Laptops are not always-on: pyrite, with HostOOMKill firing, and
+      # electrum fall silent for 40 min while magnetite and cinnabar report.
+      laptopSilentLeg = {
+        name = "pyrite, with HostOOMKill firing, and electrum silent for 40 min post nothing after the FIRING: no silence, no resolution, no repeat";
+        rules = pyriteRules;
+        steps = [
+          {
+            at = gap 0;
+            reporting = [
+              "pyrite"
+              "electrum"
+            ];
+            series.HostOOMKill = [ (seriesOn "pyrite" "HostOOMKill") ];
+          }
+        ]
+        ++ map (n: { at = gap n; }) (lib.range 1 8);
+        expect = [ "0 [FIRING] HostOOMKill pyrite high" ];
+      };
+
+      # The NVMe rules expect only the hosts with SMART devices: no SMART
+      # series is missing while pyrite is silent, and both are once it
+      # reports host memory for their 30 min.
+      nvmeExpectsPyriteLeg = {
+        name = "no SMART series for 30 min posts nothing while pyrite is silent, then one RuleSignalMissing for each NVMe rule 30 min after pyrite reports";
+        rules = pyriteRules;
+        steps =
+          map (n: {
+            at = gap n;
+            missing = smartSelectors;
+          }) (lib.range 0 6)
+          ++ map (n: {
+            at = gap n;
+            reporting = [ "pyrite" ];
+            missing = smartSelectors;
+          }) (lib.range 7 13);
+        expect = [
+          "13 [FIRING] RuleSignalMissing default"
+          "13 [FIRING] RuleSignalMissing default"
+        ];
+        messages = [
+          "rule=NvmeCriticalWarning"
+          "rule=NvmeWearHigh"
+        ];
+      };
+
+      # A host whose collect is false is neither expected nor always-on:
+      # pyrite, collect false and alwaysOn true, reports host memory with
+      # no SMART series for 35 min, then is silent for 40 min.
+      notCollectingLeg = {
+        name = "pyrite, not collecting, reporting without SMART series for 35 min and then silent for 40 min posts nothing";
+        rules = notCollectingRules;
+        steps =
+          map (n: {
+            at = gap n;
+            reporting = [ "pyrite" ];
+            missing = smartSelectors;
+          }) (lib.range 0 7)
+          ++ map (n: {
+            at = gap n;
+            missing = smartSelectors;
+          }) (lib.range 8 15);
+        expect = [ ];
+      };
+
+      # cinnabar's / is above 85 % from minute 0 and above 95 % from minute
+      # 15: each rule fires after its own `for`, at its own priority.
+      filesystemLeg = {
+        name = "cinnabar's / above 85 % for 15 min fires FilesystemFillingWarn at default, then above 95 % for 5 min fires FilesystemFull at high";
+        steps = map (n: {
+          at = minute n;
+          series = {
+            FilesystemFillingWarn = [ (seriesOn "cinnabar" "FilesystemFillingWarn") ];
+          }
+          // lib.optionalAttrs (n >= 15) { FilesystemFull = [ (seriesOn "cinnabar" "FilesystemFull") ]; };
+        }) (lib.range 0 20);
+        expect = [
+          "15 [FIRING] FilesystemFillingWarn cinnabar default"
+          "20 [FIRING] FilesystemFull cinnabar high"
+        ];
+      };
+
+      nvmeLeg = {
+        name = "pyrite's NVMe critical warning on one run fires NvmeCriticalWarning pyrite at once at high";
+        rules = pyriteRules;
+        steps = [
+          {
+            at = minute 0;
+            reporting = [ "pyrite" ];
+            series.NvmeCriticalWarning = [ (seriesOn "pyrite" "NvmeCriticalWarning") ];
+          }
+        ]
+        ++ map (n: {
+          at = minute n;
+          reporting = [ "pyrite" ];
+        }) (lib.range 1 2);
+        expect = [ "0 [FIRING] NvmeCriticalWarning pyrite high" ];
       };
 
       # Mondays: 2026-10-26 is EDT (UTC-4), 2026-11-02 is EST (UTC-5).
@@ -1022,6 +1180,8 @@
           hostThawLeg
           signalGapLeg
           alwaysOnSilentLeg
+          cinnabarSilentLeg
+          filesystemLeg
           windowLeg
           budgetFleetLeg
           budgetLaptopLeg
@@ -1182,6 +1342,15 @@
           config = realConfig;
           legs = [ devloopFailureLeg ];
         };
+        alwaysOnMagnetiteOnly = {
+          evaluator = realEvaluator;
+          config = checkConfig (
+            map (
+              r: if r.alert == "RuleSignalMissing" then r // { alwaysOn = [ "magnetite" ]; } else r
+            ) evaluatorRules
+          );
+          legs = [ cinnabarSilentLeg ];
+        };
       };
 
       mutantRun = name: mutant: ''
@@ -1308,6 +1477,21 @@
               evaluator = lib.getExe realEvaluator;
               config = twoHostConfig;
             } twoHostExclusionLeg}
+            ${lib.concatMapStrings
+              (runLeg {
+                evaluator = lib.getExe realEvaluator;
+                config = pyriteConfig;
+              })
+              [
+                laptopSilentLeg
+                nvmeExpectsPyriteLeg
+                nvmeLeg
+              ]
+            }
+            ${runLeg {
+              evaluator = lib.getExe realEvaluator;
+              config = notCollectingConfig;
+            } notCollectingLeg}
             mutant_missed=0
             ${lib.concatStrings (lib.mapAttrsToList mutantRun runtimeMutants)}
             if [ -s "$TMPDIR/misses-real" ]; then
