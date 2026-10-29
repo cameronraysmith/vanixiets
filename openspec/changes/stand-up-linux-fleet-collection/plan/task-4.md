@@ -43,7 +43,7 @@ Expected: `200 info <id> <version> ONLINE`, the network list, one hash line per 
 
 - [ ] **Step 2: Turn on cinnabar's collection and deploy it over its public address (tasks.md 4.2)**
 
-After Step 1, in a change off `main@origin`, change `collect = false;` to `collect = true;` in cinnabar's one line of `modules/lib/observability-hosts.nix` (`cinnabar = agent [ "fleet-deadman" ] // { collect = false; alwaysOn = true; };`), run `nix fmt`, and confirm in `$REPO`:
+After Step 1, in a change off `main@origin`, change `collect = false;` to `collect = true;` in cinnabar's entry of `modules/lib/observability-hosts.nix` (`cinnabar = agent [ "fleet-deadman" ] // {`, then `collect = false;` and `alwaysOn = true;` on their own lines), run `nix fmt`, and confirm in `$REPO`:
 
 ```bash
 jj st --no-pager >/dev/null
@@ -109,7 +109,7 @@ In `$DEPLOY`, after `git -C $REPO fetch origin && git -C $DEPLOY checkout --deta
 
 ```bash
 clan machines update magnetite 2>&1 | tee logs/magnetite-$(date +%Y%m%d-%H%M%S).log
-ssh magnetite.zt 'bash -c "systemctl show opentelemetry-collector -p ActiveEnterTimestampMonotonic --value; cat /proc/uptime"'
+ssh magnetite.zt 'bash -c "systemctl show opentelemetry-collector -p ActiveEnterTimestampMonotonic --value; awk '"'"'/^btime/ {print \$2}'"'"' /proc/stat"'
 ```
 
 Record `MAGNETITE_RECEIVER_EPOCH` in `window.env` as the collector's active-enter time converted with `/proc/stat`'s `btime` (`btime + ActiveEnterTimestampMonotonic / 1e6`).
