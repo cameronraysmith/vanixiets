@@ -179,13 +179,58 @@ let
       lib.concatStrings (lib.mapAttrsToList (table: ttl: "${table}\t${ttl}\n") tableTtls)
     );
 
+  # humantime 2.2.0's duration grammar as awk functions, the version
+  # GreptimeDB v1.2.1's Cargo.lock pins: the store renders a ttl through its
+  # Display, so "14d" reads back as "14days" and "365d" as
+  # "11months 30days 3h 50m 24s". duration(ttl) returns seconds and
+  # nanoseconds, "forever" or "instant", or "invalid", through the crate's
+  # unit table (src/duration.rs:120-131); a program calls humantime_units()
+  # in BEGIN first. Declared and rendered TTLs are compared as durations,
+  # never as strings.
+  humantimeDurationAwk = ''
+    function humantime_unit_names(list, factor, table,   names, i) {
+      split(list, names, " ")
+      for (i in names) table[names[i]] = factor
+    }
+    function humantime_units() {
+      humantime_unit_names("nanos nsec ns", 1, nanos)
+      humantime_unit_names("usec us", 1000, nanos)
+      humantime_unit_names("millis msec ms", 1000000, nanos)
+      humantime_unit_names("seconds second secs sec s", 1, seconds)
+      humantime_unit_names("minutes minute min mins m", 60, seconds)
+      humantime_unit_names("hours hour hr hrs h", 3600, seconds)
+      humantime_unit_names("days day d", 86400, seconds)
+      humantime_unit_names("weeks week w", 604800, seconds)
+      humantime_unit_names("months month M", 2630016, seconds)
+      humantime_unit_names("years year y", 31557600, seconds)
+    }
+    function duration(ttl,   rest, n, unit, s, ns) {
+      rest = ttl
+      gsub(/^ +| +$/, "", rest)
+      if (tolower(rest) == "forever" || tolower(rest) == "instant") return tolower(rest)
+      if (rest == "") return "invalid"
+      s = 0
+      ns = 0
+      while (rest != "") {
+        if (!match(rest, /^[0-9]+ */)) return "invalid"
+        n = substr(rest, 1, RLENGTH) + 0
+        rest = substr(rest, RLENGTH + 1)
+        if (!match(rest, /^[a-zA-Z]+ */)) return "invalid"
+        unit = substr(rest, 1, RLENGTH)
+        gsub(/ /, "", unit)
+        rest = substr(rest, RLENGTH + 1)
+        if (unit in nanos) ns += n * nanos[unit]
+        else if (unit in seconds) s += n * seconds[unit]
+        else return "invalid"
+      }
+      return sprintf("%d %d", s + int(ns / 1000000000), ns % 1000000000)
+    }
+  '';
+
   # R6.3 and per-table retention over the base tables of `databases`, so
-  # modules/checks/greptimedb-envelope.nix can run it against recorded answers.
-  # The store renders a table's own ttl with humantime 2.2.0's Display (the
-  # version GreptimeDB v1.2.1's Cargo.lock pins): "14d" reads back as
-  # "14days" and "365d" as "11months 30days 3h 50m 24s". Declared and
-  # rendered TTLs are therefore compared as durations through that crate's
-  # unit table (src/duration.rs:120-131), never as strings.
+  # modules/checks/greptimedb-envelope.nix can run it against recorded answers;
+  # a table's own ttl is compared with its declared one through
+  # humantimeDurationAwk.
   greptimedbEnvelopeTables =
     pkgs:
     { url, databases }:
@@ -200,44 +245,10 @@ let
           printf "FAIL %s\n", message > "/dev/stderr"
           failed = 1
         }
-        function units(list, factor, table,   names, i) {
-          split(list, names, " ")
-          for (i in names) table[names[i]] = factor
-        }
-        # Seconds and nanoseconds, "forever" or "instant", or "invalid".
-        function duration(ttl,   rest, n, unit, s, ns) {
-          rest = ttl
-          gsub(/^ +| +$/, "", rest)
-          if (tolower(rest) == "forever" || tolower(rest) == "instant") return tolower(rest)
-          if (rest == "") return "invalid"
-          s = 0
-          ns = 0
-          while (rest != "") {
-            if (!match(rest, /^[0-9]+ */)) return "invalid"
-            n = substr(rest, 1, RLENGTH) + 0
-            rest = substr(rest, RLENGTH + 1)
-            if (!match(rest, /^[a-zA-Z]+ */)) return "invalid"
-            unit = substr(rest, 1, RLENGTH)
-            gsub(/ /, "", unit)
-            rest = substr(rest, RLENGTH + 1)
-            if (unit in nanos) ns += n * nanos[unit]
-            else if (unit in seconds) s += n * seconds[unit]
-            else return "invalid"
-          }
-          return sprintf("%d %d", s + int(ns / 1000000000), ns % 1000000000)
-        }
+        ${humantimeDurationAwk}
         BEGIN {
           FS = "\t"
-          units("nanos nsec ns", 1, nanos)
-          units("usec us", 1000, nanos)
-          units("millis msec ms", 1000000, nanos)
-          units("seconds second secs sec s", 1, seconds)
-          units("minutes minute min mins m", 60, seconds)
-          units("hours hour hr hrs h", 3600, seconds)
-          units("days day d", 86400, seconds)
-          units("weeks week w", 604800, seconds)
-          units("months month M", 2630016, seconds)
-          units("years year y", 31557600, seconds)
+          humantime_units()
         }
         # The first file is services.greptimedb.tableTtls, one
         # `<database>.<table>` TAB `<ttl>` line each.
@@ -407,6 +418,7 @@ in
   flake.lib = {
     inherit
       greptimedbSql
+      humantimeDurationAwk
       greptimedbEnvelopeMemory
       greptimedbEnvelopeTables
       greptimedbTableTtlsFile

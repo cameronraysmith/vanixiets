@@ -634,11 +634,14 @@ in
             admin-password = [ "greptimedb-schema" ];
             collector-password = [ "opentelemetry-collector" ];
             perses-password = [ ];
-            # Sorted, because `actual` is naturalSorted.
+            # Sorted, because `actual` is naturalSorted: the four regulators
+            # that read the store, devloop-reconcile, fleet-alert,
+            # greptimedb-envelope and otel-envelope's hourly budget.
             regulator-password = [
               "devloop-reconcile"
               "fleet-alert"
               "greptimedb-envelope"
+              "otel-envelope"
             ];
           };
           credentialSource = entry: lib.concatStringsSep ":" (lib.drop 1 (lib.splitString ":" entry));

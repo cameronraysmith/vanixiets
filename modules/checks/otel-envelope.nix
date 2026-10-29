@@ -12,7 +12,12 @@
 # the check prints `ok: <case>` for each. Each mutant is the script with one
 # line marked `# mutant: <name>` replaced, built for every variant, and must
 # fail its named case, printed as `mutant <name> rejected: <case>`.
-# vmTests.x86_64-linux.fleet-ingress runs the unit itself on a real store.
+# budgetOnlyHourly holds the hourly clauses to the minute and to `budget`:
+# with a store that does not answer, a run at minute 05 is judged by C1 to
+# C4 alone, as is one at minute 00 without `budget`, and one at minute 00
+# with it fails B1.
+# vmTests.x86_64-linux.fleet-ingress runs the unit itself on a real store,
+# and the budget's clauses there.
 { self, lib, ... }:
 {
   perSystem =
@@ -20,6 +25,8 @@
     let
       telemetryPort = 18888;
       targetPort = 19100;
+      # Nothing listens here, so every budget query fails.
+      closedStorePort = 14000;
       target = path: [
         {
           job = "node";
@@ -44,6 +51,13 @@
         ingress = envelope {
           hostName = "magnetite";
           ingress = true;
+        };
+        budget = envelope {
+          budget = {
+            storeUrl = "http://127.0.0.1:${toString closedStorePort}";
+            notifiedUnits = { };
+            databases.fleet = "30d";
+          };
         };
       };
       variantsDir =
@@ -250,6 +264,26 @@
           done
           return 0
         }
+        case_budgetOnlyHourly() {
+          local s
+          s=$(mktemp -d)
+          local -x CREDENTIALS_DIRECTORY
+          CREDENTIALS_DIRECTORY=$(mktemp -d)
+          printf placeholder > "$CREDENTIALS_DIRECTORY/regulator-password"
+          local -x OTEL_ENVELOPE_FORCE_HOURLY=0 OTEL_ENVELOPE_MINUTE=05
+          run budget "$s" agent-healthy down 0 || return 1
+          if grep -q '^otel-envelope: B' "$work/out"; then
+            echo "    $current: minute 05 ran the budget clauses"
+            return 1
+          fi
+          OTEL_ENVELOPE_MINUTE=00
+          run agent "$(mktemp -d)" agent-healthy down 0 || return 1
+          if grep -q '^otel-envelope: B' "$work/out"; then
+            echo "    $current: minute 00 without budget ran the budget clauses"
+            return 1
+          fi
+          run budget "$s" agent-healthy down 1 && grep -q '^otel-envelope: B1 active-series: FAIL' "$work/out"
+        }
 
         for c in "$@"; do
           current=$c
@@ -277,6 +311,7 @@
         "targetDownTwice"
         "missThenSame"
         "longRun"
+        "budgetOnlyHourly"
       ];
       allCases = lib.concatStringsSep " " caseNames;
     in

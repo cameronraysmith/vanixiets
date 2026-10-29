@@ -447,7 +447,9 @@
               store.wait_until_succeeds(
                   f"journalctl -u {INGRESS} -o cat | grep -q 'failed to load client CA'", timeout=120
               )
-              print(store.succeed(f"journalctl -u {INGRESS} -o cat | grep -m1 'failed to load client CA'"), flush=True)
+              # sed reads to the end, so journalctl never meets a closed pipe
+              # (grep -m1 made it exit 141 under pipefail once the journal grew).
+              print(store.succeed(f"journalctl -u {INGRESS} -o cat | grep 'failed to load client CA' | sed -n 1p"), flush=True)
               wait_for(lambda: len(failed_lines()) > failed0, "the collector's failed.log line", 120)
               # Several automatic restarts fail inside one episode.
               time.sleep(30)
@@ -460,6 +462,169 @@
               print("ok: absentClientCa", flush=True)
             '';
 
+            # design D8: the ingress host's envelope judges the store's budget
+            # hourly; a runtime drop-in forces the hourly clauses on each run.
+            # Each fixture is written through otlp/mesh with the agent's
+            # certificate, so the ingress stores it as `collector`, and is
+            # removed before the next.
+            budget = ''
+              print("=== case budget", flush=True)
+              fresh_start()
+              PKI = config()["pki"]
+              DROP_INS = "/run/systemd/system/otel-envelope.service.d"
+              BUDGET_DROP_IN = f"{DROP_INS}/zz-budget.conf"
+              MUTANT_DROP_IN = f"{DROP_INS}/zz-mutant.conf"
+              store.succeed(
+                  f"install -d {DROP_INS}",
+                  f"printf '[Service]\\nEnvironment=OTEL_ENVELOPE_FORCE_HOURLY=1\\n' > {BUDGET_DROP_IN}",
+                  "systemctl daemon-reload",
+              )
+              CLAUSE = re.compile(r"^otel-envelope: ([BC][1-6] [a-z-]+): (ok|FAIL)(?: (.*))?$")
+
+
+              def budget_run():
+                  """One run of the ingress envelope: exit code and clause to
+                  (verdict, detail). A run that succeeds leaves the unit
+                  inactive with no InvocationID, so its lines are read after a
+                  journal cursor taken before the start, until the run's last
+                  clause (B6) is there or 20 s have passed."""
+                  cursor = store.succeed("journalctl -n 0 --show-cursor -o cat | sed -n 's/^-- cursor: //p'").strip()
+                  store.execute("systemctl start otel-envelope.service")
+                  code = int(store.succeed("systemctl show -p ExecMainStatus --value otel-envelope.service"))
+                  for _ in range(20):
+                      lines = [
+                          l for l in store.succeed(
+                              f"journalctl -u otel-envelope.service --after-cursor={shlex.quote(cursor)} -o cat"
+                          ).splitlines()
+                          if l.startswith("otel-envelope:")
+                      ]
+                      if any(l.startswith("otel-envelope: B6 ttl:") for l in lines):
+                          break
+                      time.sleep(1)
+                  clauses = {}
+                  for line in lines:
+                      print(f"  otel-envelope: {line}", flush=True)
+                      match = CLAUSE.match(line)
+                      if match:
+                          clauses[match.group(1)] = (match.group(2), match.group(3) or "")
+                  print(f"  otel-envelope: exit {code}", flush=True)
+                  assert all(c in clauses for c in ("C1 telemetry", "C2 targets", "C3 queue", "C4 loss")), clauses
+                  return code, clauses
+
+
+              def clean(final=False):
+                  code, clauses = budget_run()
+                  assert code == 0 and all(v == "ok" for v, _ in clauses.values()), (code, clauses)
+                  if final:
+                      budget_clauses = sorted(c for c in clauses if c.startswith("B"))
+                      assert [c.split()[0] for c in budget_clauses] == ["B1", "B2", "B3", "B4", "B5", "B6"], clauses
+
+
+              def fails(what, expected, *details):
+                  """A run that fails exactly the `expected` clauses, each line holding every detail."""
+                  code, clauses = budget_run()
+                  failed = sorted(c for c, (v, _) in clauses.items() if v == "FAIL")
+                  assert code == 1 and failed == sorted(expected), (what, code, clauses)
+                  for clause in expected:
+                      assert all(d in clauses[clause][1] for d in details), (what, clause, details, clauses[clause])
+                      print(f"  budget fixture {what}: {clause}: FAIL {clauses[clause][1]}", flush=True)
+
+
+              def attribute(key, value):
+                  return {"key": key, "value": {"stringValue": value}}
+
+
+              def mesh_write(resources):
+                  """One OTLP/HTTP JSON export through otlp/mesh: resources are
+                  (resource attributes, metric name, [point attributes]) gauges."""
+                  now = str(time.time_ns())
+                  body = {"resourceMetrics": [
+                      {
+                          "resource": {"attributes": [attribute("vanixiets.database", "fleet")]
+                                       + [attribute(k, v) for k, v in res.items()]},
+                          "scopeMetrics": [{"metrics": [{"name": name, "gauge": {"dataPoints": [
+                              {"asInt": "1", "timeUnixNano": now, "attributes": [attribute(k, v) for k, v in point.items()]}
+                              for point in points
+                          ]}}]}],
+                      }
+                      for res, name, points in resources
+                  ]}
+                  store.succeed(f"cat > /tmp/budget-fixture.json <<'EOF'\n{json.dumps(body)}\nEOF")
+                  status = store.succeed(
+                      f"curl -sS -o /dev/null -w '%{{http_code}}' --cacert {PKI}/ca.crt --cert {PKI}/agent.crt --key {PKI}/agent.key "
+                      "-H 'Content-Type: application/json' --data @/tmp/budget-fixture.json https://127.0.0.1:4318/v1/metrics"
+                  ).strip()
+                  assert status == "200", status
+
+
+              def admin_sql(sql, db="fleet"):
+                  status = store.succeed(
+                      f"curl -sS -o /tmp/budget-admin -w '%{{http_code}}' --netrc-file {config()['vars']}/admin.netrc "
+                      f"--data-urlencode {shlex.quote('sql=' + sql)} 'http://127.0.0.1:4000/v1/sql?db={db}'"
+                  ).strip()
+                  assert status == "200", (sql, status, store.succeed("cat /tmp/budget-admin"))
+
+
+              def stored(sql, want):
+                  """sql's single value as `regulator`, once the store has it equal to want."""
+                  def holds():
+                      status, body = _request("/v1/sql", "fleet", [("sql", sql)])
+                      rows = json.loads(body)["output"][0]["records"]["rows"] if status == 200 else None
+                      print(f"  {sql}: {status} {rows}", flush=True)
+                      return rows is not None and rows[0][0] == want
+                  wait_for(holds, f"{sql} = {want}", 180)
+
+
+              envelope("otel-envelope")
+              clean()
+
+              # labelValues: 300 values of one label key on one metric.
+              mesh_write([({"host.name": "budgethost"}, "s4_fixture_wide", [{"fixture_key": f"k{i:03d}"} for i in range(300)])])
+              stored("SELECT count(DISTINCT fixture_key) FROM s4_fixture_wide", 300)
+              fails("labelValues", ["B2 label-values"], "s4_fixture_wide fixture_key 300")
+              admin_sql("DELETE FROM s4_fixture_wide WHERE host_name = 'budgethost'")
+              stored("SELECT count(*) FROM s4_fixture_wide", 0)
+              clean()
+
+              # processNames: 31 process names on one host.
+              mesh_write([
+                  ({"host.name": "budgethost", "process.executable.name": f"budget-proc-{i:02d}"}, "process_memory_usage_bytes", [{}])
+                  for i in range(31)
+              ])
+              stored("SELECT count(DISTINCT process_executable_name) FROM process_memory_usage_bytes WHERE host_name = 'budgethost'", 31)
+              fails("processNames", ["B3 per-host"], "budgethost process_executable_name 31")
+              admin_sql("DELETE FROM process_memory_usage_bytes WHERE host_name = 'budgethost'")
+              stored("SELECT count(*) FROM process_memory_usage_bytes WHERE host_name = 'budgethost'", 0)
+              clean()
+
+              # notifierOutside: a notifier instance for a unit cinnabar does not notify.
+              NOT_LISTED = "observability-notify@not-listed.service.service"
+              mesh_write([({"host.name": "cinnabar", "systemd.unit.name": NOT_LISTED}, "systemd_unit_state", [{}])])
+              stored(f"SELECT count(*) FROM systemd_unit_state WHERE systemd_unit_name = '{NOT_LISTED}'", 1)
+              fails("notifierOutside", ["B4 notifier-instances"], "cinnabar not-listed")
+              admin_sql(f"DELETE FROM systemd_unit_state WHERE systemd_unit_name = '{NOT_LISTED}'")
+              stored(f"SELECT count(*) FROM systemd_unit_state WHERE systemd_unit_name = '{NOT_LISTED}'", 0)
+              clean()
+
+              # ttlAltered: a database's ttl changed from SC's.
+              admin_sql("ALTER DATABASE agent SET 'ttl' = '7d'")
+              fails("ttlAltered", ["B6 ttl"], "agent 7days")
+              admin_sql("ALTER DATABASE agent SET 'ttl' = '${databases.agent}'")
+              clean()
+
+              # renamedTable: the envelope reading a unit-state table that does not exist.
+              store.succeed(
+                  f"install -m 0444 /etc/fleet-ingress/mutants/renamedTable.conf {MUTANT_DROP_IN}",
+                  "systemctl daemon-reload",
+              )
+              fails("renamedTable", ["B3 per-host", "B4 notifier-instances"], "systemd_unit_state_absent")
+              store.succeed(f"rm {MUTANT_DROP_IN}", "systemctl daemon-reload")
+
+              clean(final=True)
+              store.succeed(f"rm {BUDGET_DROP_IN}", "systemctl daemon-reload")
+              print("ok: budget", flush=True)
+            '';
+
             cases = [
               refusal
               delivery
@@ -468,6 +633,7 @@
               crashLoop
               longRun
               absentClientCa
+              budget
             ];
           in
           pkgs.testers.runNixOSTest {
@@ -492,6 +658,17 @@
                   ExecStart=
                   ${lib.concatMapStringsSep "\n" (command: "ExecStart=${command}") (lib.toList execStart)}
                 '';
+                # The envelope with its unit-state table name replaced by one
+                # that does not exist; the budget case requires the run to
+                # fail naming it, so a replacement that matched nothing fails
+                # the case.
+                unitMutants.renamedTable =
+                  pkgs.runCommand "otel-envelope-renamedTable" { meta.mainProgram = "otel-envelope"; }
+                    ''
+                      mkdir -p "$out/bin"
+                      sed 's/\bsystemd_unit_state\b/systemd_unit_state_absent/g' ${envelope.ExecStart} > "$out/bin/otel-envelope"
+                      chmod +x "$out/bin/otel-envelope"
+                    '';
               in
               {
                 imports = [
@@ -548,11 +725,35 @@
                   "otel-cert:${pki}/ingress.crt"
                   "otel-key:${pki}/ingress.key"
                 ];
+                systemd.services.otel-envelope.serviceConfig.LoadCredential = [
+                  "regulator-password:${vars}/regulator-password"
+                ];
+
+                # The budget over this container's store; its two collectors
+                # report this container's units as `store` and `electrum`.
+                vanixiets.otelCollector.envelopeBudget = {
+                  storeUrl = "http://127.0.0.1:4000";
+                  notifiedUnits = lib.mapAttrs (_: h: h.notifiedUnits) self.lib.observabilityHosts // {
+                    store = config.services.observability-notify.units;
+                    electrum = config.services.observability-notify.units;
+                  };
+                  inherit databases;
+                };
 
                 # The ingress receiver on loopback, trusting the test CA.
                 vanixiets.otelCollector.caFile = "${pki}/ca.crt";
                 services.opentelemetry-collector.settings.receivers."otlp/mesh".protocols.http.endpoint =
                   lib.mkForce "127.0.0.1:4318";
+                # The container has no ZFS dataset, so the agent fragment
+                # configures no filesystem scraper here (an empty strict list
+                # would match every mount: 713 in the nspawn container, which
+                # the budget's B2 failed); electrum's rendered scraper on "/"
+                # stands in for a host's datasets, so the cases still run it.
+                services.opentelemetry-collector.settings.receivers."host_metrics/memory".scrapers.filesystem =
+                  lib.recursiveUpdate electrum.receivers."host_metrics/memory".scrapers.filesystem
+                    {
+                      include_mount_points.mount_points = [ "/" ];
+                    };
 
                 services.observability-notify = {
                   units = [
@@ -627,7 +828,13 @@
                   lib.nameValuePair "fleet-ingress/mutants/${name}.conf" {
                     text = dropIn (agentExecStart collector settings);
                   }
-                ) agentMutants;
+                ) agentMutants
+                // lib.mapAttrs' (
+                  name: drv:
+                  lib.nameValuePair "fleet-ingress/mutants/${name}.conf" {
+                    text = dropIn (lib.getExe drv);
+                  }
+                ) unitMutants;
               };
             testScript = builtins.readFile ./fleet-ingress/helpers.py + lib.concatStringsSep "\n" cases;
           };

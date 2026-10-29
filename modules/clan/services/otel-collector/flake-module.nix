@@ -95,6 +95,17 @@ let
                 agent scrapes; none when empty.
               '';
             };
+            envelopeBudget = lib.mkOption {
+              type = lib.types.nullOr lib.types.attrs;
+              default = null;
+              description = ''
+                flake.lib.otelEnvelope's `budget`, { storeUrl; notifiedUnits;
+                databases; }, set by the clan ingress role: otel-envelope then
+                also judges the store's series and row budget hourly as the
+                store's `regulator`, whose password it loads as the
+                regulator-password credential (design D8).
+              '';
+            };
           };
 
           config = {
@@ -332,9 +343,12 @@ in
                       "system.paging.faults".enabled = false;
                       "system.paging.utilization".enabled = false;
                     };
-                    # Only the host's ZFS mountpoints, by strict match, so
-                    # container runtime mounts under /var/lib/docker stay out
-                    # (design D4; ADR-003 item 26).
+                  }
+                  # Only the host's ZFS mountpoints, by strict match, so
+                  # container runtime mounts under /var/lib/docker stay out
+                  # (design D4; ADR-003 item 26). An empty strict list is no
+                  # filter in otelcol, so a host without ZFS gets no scraper.
+                  // lib.optionalAttrs (zfsMounts != [ ]) {
                     filesystem = {
                       # /proc/filesystems lists zfs as nodev, and the scraper
                       # drops virtual filesystems unless told otherwise
@@ -472,7 +486,8 @@ in
           # R3.2 from the host's own collector (design D7): its telemetry,
           # queues and loss counters, and the targets it scrapes itself, so
           # the two cannot drift. A target's bearer credential is read from
-          # this unit's credentials under the same name.
+          # this unit's credentials under the same name. On the ingress host
+          # it also judges the store's budget hourly (design D8).
           systemd.services.otel-envelope = {
             description = "Collector delivery envelope (ADR-003 R3.2)";
             after = [ "opentelemetry-collector.service" ];
@@ -486,6 +501,7 @@ in
                 flakeLib.otelEnvelope pkgs {
                   inherit hostName ingress;
                   targets = flakeLib.otelEnvelopeTargets config.services.opentelemetry-collector.settings.receivers;
+                  budget = config.vanixiets.otelCollector.envelopeBudget;
                 }
               );
             };
@@ -996,12 +1012,25 @@ in
           { ... }:
           {
             nixosModule =
-              { config, ... }:
+              { config, lib, ... }:
               {
                 imports = [ nixosModules.otel-collector-ingress ];
                 systemd.services.opentelemetry-collector.serviceConfig.LoadCredential = [
                   "collector-password:${config.clan.core.vars.generators.greptimedb-users.files.collector-password.path}"
                 ];
+                # The hourly budget over the store, read as `regulator`
+                # (design D8); the envelope reads every host's notified units.
+                vanixiets.otelCollector.envelopeBudget = {
+                  storeUrl = "http://127.0.0.1:4000";
+                  notifiedUnits = lib.mapAttrs (_: h: h.notifiedUnits) flakeLib.observabilityHosts;
+                  databases = schema.databases;
+                };
+                systemd.services.otel-envelope = {
+                  after = [ "greptimedb.service" ];
+                  serviceConfig.LoadCredential = [
+                    "regulator-password:${config.clan.core.vars.generators.greptimedb-users.files.regulator-password.path}"
+                  ];
+                };
                 # otlp/mesh, on ZeroTier only. magnetite's
                 # net.ipv6.ip_nonlocal_bind = 1 lets the receiver bind its
                 # address before zerotierone holds it.

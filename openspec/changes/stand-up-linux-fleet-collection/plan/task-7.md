@@ -7,16 +7,17 @@ The journald-bytes clause and the `fleet` logs table's `ttl` are not written: th
 
 **Files:**
 - Modify: `modules/lib/otel-envelope.nix` (the `budget` argument and clauses B1–B6), `modules/checks/otel-envelope.nix` (case `budgetOnlyHourly`)
-- Modify: `modules/clan/services/otel-collector/flake-module.nix` (the clan ingress role passes `budget` and loads `regulator-password` into `otel-envelope`)
-- Modify: `modules/machines/nixos/magnetite/default.nix:660-664` (the holder list)
-- Modify: `modules/vm-tests/fleet-ingress.nix` (case `budget`, mutant `renamedTable`)
-- Create (git-ignored): `logs/s4-evidence/7.<n>-*.log`, `logs/s4-evidence/7.3-holders.nix`
+- Modify: `modules/clan/services/otel-collector/flake-module.nix` (the option `vanixiets.otelCollector.envelopeBudget` in `collectorCore`, consumed by the agent fragment's `otel-envelope`; the clan ingress role sets it and loads `regulator-password` into `otel-envelope`; the agent fragment configures the filesystem scraper only where the host has ZFS mountpoints, because an empty strict list is no filter in otelcol)
+- Modify: `modules/lib/greptimedb-envelope.nix` (humantime's duration parser moves out of `greptimedbEnvelopeTables` into `flake.lib.humantimeDurationAwk`, which B6 also uses)
+- Modify: `modules/machines/nixos/magnetite/default.nix:637-645` (the holder list)
+- Modify: `modules/vm-tests/fleet-ingress.nix` (case `budget`, mutant `renamedTable`; the container's `envelopeBudget` with `notifiedUnits` extended by `store` and `electrum`, the container's own units, under which its two collectors report them; electrum's rendered filesystem scraper on `/`, the container having no ZFS dataset)
+- Create (git-ignored): `logs/s4-evidence/7.<n>-*.log`
 
 **Interfaces:**
 - Consumes: `flake.lib.otelEnvelope`'s Task 3 contract; `flake.lib.greptimedbSql pkgs { url; user; }` (`modules/lib/greptimedb-envelope.nix:48-60`), which reads `$CREDENTIALS_DIRECTORY/<user>-password`, puts it on curl's stdin, and exits 1 on any answer but 200, on a missing table and on zero rows; `flake.lib.observabilityHosts`'s `notifiedUnits`; SC's `databases`.
 - Produces: the hourly clauses `B1 active-series` … `B6 ttl` and `OTEL_ENVELOPE_MAX_UNITS`, `OTEL_ENVELOPE_FORCE_HOURLY`.
 
-- [ ] **Step 1: The budget fixtures, seen failing (tasks.md 7.1)**
+- [x] **Step 1: The budget fixtures, seen failing (tasks.md 7.1)**
 
 Append to `fleet-ingress`'s `cases` the case `budget`, run against the real store as the ingress host's `otel-envelope.service` with a runtime drop-in setting `OTEL_ENVELOPE_FORCE_HOURLY=1`:
 
@@ -26,8 +27,8 @@ Append to `fleet-ingress`'s `cases` the case `budget`, run against the real stor
 | labelValues | one synthetic gauge `s4_fixture_wide` with 300 values of label `fixture_key` | exit 1, `B2 label-values: FAIL s4_fixture_wide fixture_key 300` |
 | processNames | 31 `process_memory_usage_bytes` series for host `budgethost`, distinct `process_executable_name` | exit 1, `B3 per-host: FAIL budgethost process_executable_name 31` |
 | notifierOutside | `systemd_unit_state` for host `cinnabar` with `systemd_unit_name="observability-notify@not-listed.service.service"` | exit 1, `B4 notifier-instances: FAIL cinnabar not-listed` |
-| ttlAltered | `ALTER DATABASE agent SET 'ttl' = '7d'` as `admin` | exit 1, `B6 ttl: FAIL agent 7d` |
-| renamedTable | the envelope built with its unit-state table name replaced by `systemd_unit_state_absent` (`unitMutants.renamedTable`) | exit 1, the clause naming the missing table |
+| ttlAltered | `ALTER DATABASE agent SET 'ttl' = '7d'` as `admin` | exit 1, `B6 ttl: FAIL agent 7days, declared 90d` (the store renders `7d` as `7days`) |
+| renamedTable | the envelope built with its unit-state table name replaced by `systemd_unit_state_absent` (`unitMutants.renamedTable`) | exit 1, `B3 per-host` and `B4 notifier-instances`, the two clauses reading that table, each naming the missing table |
 
 Each fixture is removed (the synthetic series dropped with `DELETE`, the TTL restored) before the next, and the clean run is repeated at the end.
 Run on magnetite from the working copy:
@@ -38,8 +39,9 @@ nix build .#vmTests.x86_64-linux.fleet-ingress -L 2>&1 | tee logs/s4-evidence/7.
 ```
 
 Expected: the test fails in case `budget` at `labelValues`, because the envelope has no budget clause and exits 0 (RED).
+The container sets `envelopeBudget`, so Step 1 declares the option, which nothing consumes until Step 2.
 
-- [ ] **Step 2: The budget clauses (tasks.md 7.2)**
+- [x] **Step 2: The budget clauses (tasks.md 7.2)**
 
 Extend `flake.lib.otelEnvelope` with `budget = { storeUrl; notifiedUnits; databases; } or null`; when non-null and the run's minute is `00` (`OTEL_ENVELOPE_MINUTE`, defaulting to `$(date -u +%M)`, so the check can set it; the timer fires at `*:0/5`) or `OTEL_ENVELOPE_FORCE_HOURLY=1`, it runs these clauses through `greptimedbSql { url = storeUrl; user = "regulator"; }`, a handful of queries in all, each query's failure (non-200, missing table, zero rows) failing its own clause:
 
@@ -47,14 +49,15 @@ Extend `flake.lib.otelEnvelope` with `budget = { storeUrl; notifiedUnits; databa
 |---|---|---|
 | `B1 active-series` | one query: `SELECT count(DISTINCT __tsid) FROM greptime_physical_table WHERE greptime_timestamp > now() - INTERVAL '1 hour'` | above 8,000 |
 | `B2 label-values` | one query over `greptime_physical_table` with a `count(DISTINCT <tag>)` for each of its tag columns other than the internal `__tsid` and `__table_id` and `process_executable_name`, `systemd_unit_name` and `launchd_label`; only for a column above 200 a second query groups it by `__table_id` and maps the ids to metric names through `information_schema.tables`, to name the metric | a column above 200 within one metric |
-| `B3 per-host` | per `host_name`: distinct `process_executable_name` in `process_memory_usage_bytes`; distinct `systemd_unit_name NOT LIKE 'observability-notify@%'` over `systemd_unit_state` and `systemd_service_restarts_total`; distinct `launchd_label` where that table exists | above 30, above `OTEL_ENVELOPE_MAX_UNITS` (default 40), above 30 |
-| `B4 notifier-instances` | per `host_name`, distinct `systemd_unit_name LIKE 'observability-notify@%'` | an instance `observability-notify@<u>.service.service` whose `<u>` is not in `notifiedUnits.<host>` |
+| `B3 per-host` | per `host_name`: distinct `process_executable_name` in `process_memory_usage_bytes`; distinct `systemd_unit_name NOT LIKE 'observability-notify@%'` over `systemd_unit_state` and `systemd_service_restarts_total`; distinct `launchd_label` in `greptime_physical_table` where a table carries that column | above 30, above `OTEL_ENVELOPE_MAX_UNITS` (default 40), above 30 |
+| `B4 notifier-instances` | per `host_name`, distinct `systemd_unit_name LIKE 'observability-notify@%'` in `systemd_unit_state` | an instance `observability-notify@<u>.service.service` whose `<u>` is not in `notifiedUnits.<host>` |
 | `B5 devloop-rows` | `devloop`: the sum of `count(*)` over its four tables with time index in the last 24 h | above 100,000 |
 | `B6 ttl` | `information_schema` database options for each of `databases` | a `ttl` other than SC's |
 
-The tag columns of `greptime_physical_table` come from `information_schema.columns` with `semantic_type = 'TAG'` (61 on 2026-10-29, read as `regulator`, of which `__tsid` and `__table_id` are the store's internal series and table ids, not label keys: over the hour of Task 1 Step 3 `__tsid` held 2,283 values, 352 within `systemd_unit_state` alone, and `__table_id` 372); a column with 200 or fewer distinct values across all metrics has 200 or fewer within any one, so the screen loses nothing; a table missing from a query whose input should exist fails its clause, while `launchd_label`'s table, which no host writes until darwin agents exist, is skipped only when `information_schema.tables` lists no such table, and the run prints `B3 per-host: launchd_label table absent` in that case.
+The tag columns of `greptime_physical_table` come from `information_schema.columns` with `semantic_type = 'TAG'` (61 on 2026-10-29 at Task 1, 65 later that day, read as `regulator`, of which `__tsid` and `__table_id` are the store's internal series and table ids, not label keys: over the hour of Task 1 Step 3 `__tsid` held 2,283 values, 352 within `systemd_unit_state` alone, and `__table_id` 372); a column with 200 or fewer distinct values across all metrics has 200 or fewer within any one, so the screen loses nothing; a table missing from a query whose input should exist fails its clause, while `launchd_label`, which no host writes until darwin agents exist and whose metric no file names yet, is skipped only when `information_schema.columns` lists no `fleet` table with that column, and the run prints `B3 per-host: launchd_label table absent` in that case.
+B6 compares each rendered `ttl` with SC's as durations through `flake.lib.humantimeDurationAwk`, the parser `greptimedbEnvelopeTables` already used, moved out of it; the store's `options` column ends each option with a newline, which `greptimedb-sql`'s TSV shows as a literal `\n`.
 Task 1 Step 3 timed these queries on magnetite; their sum is the expected runtime of an hourly run and must stay well inside `TimeoutStartSec`.
-Add `pkgs.jq` and the `greptimedbSql` package to `runtimeInputs`, and to `otel-envelope`'s check the case `budgetOnlyHourly`: with `budget` set and a store URL on a closed port, a run with `OTEL_ENVELOPE_MINUTE=05` exits by R3.2's clauses alone, and one with `OTEL_ENVELOPE_MINUTE=00` exits 1 on B1's unreachable store, whatever the build's wall clock.
+Add the `greptimedbSql` package to `runtimeInputs` (it carries its own `jq`; the envelope calls none), and to `otel-envelope`'s check the case `budgetOnlyHourly`: with `budget` set and a store URL on a closed port, a run with `OTEL_ENVELOPE_MINUTE=05` exits by R3.2's clauses alone, a run at `00` without `budget` prints no `B` line, and one with `OTEL_ENVELOPE_MINUTE=00` exits 1 on B1's unreachable store, whatever the build's wall clock.
 In the clan ingress role pass `budget = { storeUrl = "http://127.0.0.1:4000"; notifiedUnits = lib.mapAttrs (_: h: h.notifiedUnits) flakeLib.observabilityHosts; databases = schema.databases; }` through a fragment option `vanixiets.otelCollector.envelopeBudget` (default `null`, consumed by the unit of Task 3 Step 3), and `systemd.services.otel-envelope.serviceConfig.LoadCredential = [ "regulator-password:${config.clan.core.vars.generators.greptimedb-users.files.regulator-password.path}" ];` with `after = [ "greptimedb.service" ]` and no `wants`.
 Run:
 
@@ -65,16 +68,16 @@ nix build .#checks.x86_64-linux.otel-envelope -L 2>&1 | tee logs/s4-evidence/7.2
 
 Expected: 15 `ok:` lines and the five mutants rejected; cost recorded below 536,870,912.
 
-- [ ] **Step 3: The fourth credential holder (tasks.md 7.3)**
+- [x] **Step 3: The fourth credential holder (tasks.md 7.3)**
 
-In `modules/machines/nixos/magnetite/default.nix:660-664`, the list becomes `[ "devloop-reconcile" "fleet-alert" "greptimedb-envelope" "otel-envelope" ]`, sorted, and its comment names the four holders.
-Create `logs/s4-evidence/7.3-holders.nix`, magnetite extended with `systemd.services.nix-daemon.serviceConfig.LoadCredential = [ "regulator-password:<the same path>" ]`.
+In `modules/machines/nixos/magnetite/default.nix:637-645`, the list becomes `[ "devloop-reconcile" "fleet-alert" "greptimedb-envelope" "otel-envelope" ]`, sorted, and its comment names the four holders.
+The negative control extends magnetite with `systemd.services.nix-daemon.serviceConfig.LoadCredential = [ "regulator-password:<the same path>" ]` inline, through `--apply` (an impure `import` of a fixture file under `logs/` with `builtins.getFlake` or the installable did not finish within 30 min on 2026-10-29, while the pure `--apply` takes about 10 s).
 Run:
 
 ```bash
 L=logs/s4-evidence/7.3-holders-$(/bin/date -u +%Y%m%dT%H%M%SZ).log
 nix eval --raw .#nixosConfigurations.magnetite.config.system.build.toplevel.drvPath 2>&1 | tee "$L"; echo
-nix eval --impure --raw --expr '(import ./logs/s4-evidence/7.3-holders.nix (builtins.getFlake (toString ./.))).fifthHolder' 2>&1 | grep -o 'regulator-password[^.]*' | head -n 1 | tee -a "$L"
+nix eval --raw .#nixosConfigurations.magnetite --apply 'm: (m.extendModules { modules = [ ({ config, ... }: { systemd.services.nix-daemon.serviceConfig.LoadCredential = [ "regulator-password:${config.clan.core.vars.generators.greptimedb-users.files.regulator-password.path}" ]; }) ]; }).config.system.build.toplevel.drvPath' 2>&1 | grep -o 'regulator-password[^.]*' | head -n 1 | tee -a "$L"
 ```
 
 Expected: a drvPath, then the holder assertion's message naming `nix-daemon` (negative control).
@@ -85,7 +88,9 @@ Expected: a drvPath, then the holder assertion's message naming `nix-daemon` (ne
 nix build .#vmTests.x86_64-linux.fleet-ingress -L 2>&1 | tee logs/s4-evidence/7.4-fleet-ingress-$(/bin/date -u +%Y%m%dT%H%M%SZ).log | grep -E '^=== case|B[1-6] |FAIL'
 ```
 
-Expected: eight `=== case` lines; in `budget`, each fixture fails exactly its clause as tabled in Step 1 and the clean runs pass.
+Expected: eight `=== case` lines; in `budget`, each fixture fails exactly its clause as tabled in Step 1 and the clean runs pass, the last one printing all six `B` lines.
+The first green attempt found the container's own budget breach: with no ZFS dataset the agent fragment rendered a strict mount list `[ ]`, which otelcol reads as no filter, so the store's scraper read every one of the container's 713 mounts and B2 failed `system_filesystem_usage_bytes mountpoint 713`; the fragment now configures the filesystem scraper only where the host has ZFS mountpoints (magnetite's and cinnabar's rendered scrapers unchanged), and the container runs electrum's rendered scraper on `/`.
+`budget` reads each run's lines after a journal cursor, because a successful oneshot run leaves the unit inactive with an empty `InvocationID`, so the helpers' `envelope()` returns no lines for a passing run; `absentClientCa` prints its journal line through `sed -n 1p` rather than `grep -m1`, which once exited 141 under pipefail.
 Run `nix fmt` and `nix fmt -- --fail-on-change`; commit with a plain message, for example "Check the store's series and row budget every hour on magnetite"; open pull request 3 with the same kind of title, its body stating in words the container run (commit, host, date, and that each budget fixture failed its clause) rather than a log path.
 Expected: nixbot green, including `otel-envelope` and `nixos-magnetite`.
 

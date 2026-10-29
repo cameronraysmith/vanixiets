@@ -14,7 +14,7 @@ The replay over stored history (Step 1) precedes the rules, the fixture legs (St
 - Consumes: `flake.lib.fleetAlertRules { lib, hosts ? … }` and `twoHostExclusionLeg` (Task 2 Step 9); `flake.lib.observabilityHosts`; the existing legs `signalGapLeg`, `alwaysOnSilentLeg`, `silentHostLeg` and the runtime mutant `noHostsUpdate` as patterns; magnetite's stored `fleet` history since Tasks 4 and 5.
 - Produces: the deployed rule set of 11 PromQL rules plus `PullRequestQueueWaitBurn`, read by Task 9 Step 2's acceptance and Task 5 Step 6's offline test.
 
-- [ ] **Step 1: Replay the new rules over stored history (tasks.md 6.1)**
+- [x] **Step 1: Replay the new rules over stored history (tasks.md 6.1)**
 
 Runs over the history magnetite and cinnabar have stored since Task 4; pyrite collects only from Task 5 Step 2, so the NVMe rules expect no host until then and their replay over pyrite's history is Task 5 Step 7.
 The file-system replays are rerun as late as practical before Step 7 of this task, because no host stored `system_filesystem_usage_bytes` before the scraper was given `include_virtual_filesystems` (pull request #3634; the first samples are cinnabar's at 09:50 UTC and magnetite's at 09:51 UTC on 2026-10-29): otelcol-contrib 0.155.0 treats ZFS, listed `nodev` in `/proc/filesystems`, as a virtual file system and skips it otherwise.
@@ -98,12 +98,12 @@ NIX_SHOW_STATS=1 NIX_SHOW_STATS_PATH=/tmp/fleet-alert-stats.json nix eval --opti
 
 Expected: `SUCCESS: 11 rules found`; every leg passes, the six new ones included; `alwaysOnMagnetiteOnly` rejected; every PromQL rule's expected hosts are the five collecting hosts `["cinnabar","electrum","galena","magnetite","scheelite"]`, the NVMe rules' `[]` until pyrite's `collect` flips (then `["pyrite"]`, as the pyrite legs render), and `RuleSignalMissing`'s `alwaysOn` `["cinnabar","magnetite"]`; cost between 0.30 and 0.34 GiB and below 536,870,912 (design D10).
 
-- [ ] **Step 4: The pull request (tasks.md 6.4)**
+- [x] **Step 4: The pull request (tasks.md 6.4)**
 
 Run `nix fmt` and `nix fmt -- --fail-on-change`, keeping the log; commit with a plain message, for example "Alert on full file systems and failing laptop disks, and on cinnabar's silence"; open pull request 2 with the same kind of title, its body describing the rules and stating in words the replay's would-be firings, their causes and the operator's decision (no log path), with no slice, decision or task code.
 Expected: nixbot green, including `fleet-alert` and `nixos-magnetite`.
 
-- [ ] **Step 5: Deploy magnetite (tasks.md 6.5)**
+- [x] **Step 5: Deploy magnetite (tasks.md 6.5)**
 
 In `$DEPLOY`, after `git -C $REPO fetch origin && git -C $DEPLOY checkout --detach origin/main` and `nixbot-logs queue` printing `Queue is empty`:
 
@@ -114,7 +114,7 @@ ssh magnetite.zt 'bash -c "systemctl is-active fleet-alert.timer opentelemetry-c
 
 Expected: the log ends without error; `active` twice.
 
-- [ ] **Step 6: The evaluator's first run (tasks.md 6.6)**
+- [x] **Step 6: The evaluator's first run (tasks.md 6.6)**
 
 rehearse: magnetite:
 
@@ -129,9 +129,9 @@ EOS
 ```
 
 The rules are read from the delivered evaluator configuration (`FLEET_ALERT_CONFIG` in the unit's environment, `modules/nixos/fleet-alert.nix:606-617`), because the module exposes no rendered-rules option; the count is the evaluator's own per-run query set (`modules/nixos/fleet-alert.nix:203-267`): each unique presence selector and database, `system_memory_usage_bytes` in `RuleSignalMissing`'s database included, plus each expression outside the weekly window; attribution queries run only for a firing memory rule.
-Expected: `ExecMainStatus=0`; the journal shows `fleet` and `devloop` queried as `regulator`; the count gives `{"presence":12,"promql":10,"sql":1,"total":23}`, 23 queries in a run with no memory rule firing (22 PromQL, one SQL), against 16 (9, 6, 1) before the change, and the time between start and exit is recorded beside S3's 0.62–0.68 s for 19 queries.
+Expected: `ExecMainStatus=0`; the evaluator's journal does not name databases or accounts, so the run's use of both as `regulator` is read from the delivered configuration (`user` `regulator`, rule databases `devloop` and `fleet`) and from the state holding no `StoreQueryFailing` instance, which a failed query on either database would raise; the count gives `{"presence":12,"promql":10,"sql":1,"total":23}`, 23 queries in a run with no memory rule firing (22 PromQL, one SQL), against 16 (9, 6, 1) before the change, and the time between start and exit is recorded beside S3's 0.62–0.68 s for 19 queries.
 
-- [ ] **Step 7: Thirty minutes without a missing signal, and the hand-run control (tasks.md 6.7)**
+- [x] **Step 7: Thirty minutes without a missing signal, and the hand-run control (tasks.md 6.7)**
 
 Thirty minutes after Step 5, rehearse: magnetite:
 
@@ -141,5 +141,5 @@ ssh magnetite.zt 'bash -c "sudo journalctl -u fleet-alert -o cat --since \"-35mi
 ```
 
 Expected: `0` (and the block's `rc=1`, which is `grep -c`'s exit code for no match).
-The negative control: run the deployed evaluator once by hand, as S3's acceptance did, with scratch state, topic `fleet-acceptance`, one selector misspelt (`system_filesystem_usage_byte`) and its `for` at 0, by copying the deployed rules JSON, editing that one rule with `jq`, and starting the evaluator's `ExecStart` under `systemd-run --pty -p DynamicUser=yes -p StateDirectory=fleet-alert-acceptance -p LoadCredential=regulator-password:<path> -p LoadCredential=alerter-token:<path>` with the evaluator's environment pointing at the copied file and the topic.
-Expected: the hand run posts one `[FIRING] RuleSignalMissing` naming `FilesystemFillingWarn` to `fleet-acceptance`, and the operator records it beside the `0` above.
+The negative control: run the deployed evaluator once by hand, as S3's acceptance did, with scratch state, topic and heartbeat topic `fleet-acceptance`, `FilesystemFillingWarn`'s presence selector misspelt (`system_filesystem_usage_byte`) and `RuleSignalMissing`'s `for` at 0 (the instance takes the `for` of `RuleSignalMissing`, `transition.jq:116`, so a single run posts only then), by copying the deployed configuration to `/run/fleet-alert-acceptance/config.json`, editing those two rules with `jq`, and starting the evaluator's `ExecStart` under `systemd-run --wait --pipe --collect --unit=fleet-alert-acceptance -p DynamicUser=yes -p StateDirectory=fleet-alert-acceptance -p LoadCredential=regulator-password:<path> -p LoadCredential=alerter-token:<path>` with the unit's `PATH`, `LOCALE_ARCHIVE` and `TZDIR`, `FLEET_ALERT_CONFIG` pointing at the copy and `NTFY_TOKEN_FILE` at the credential; afterwards the copy, the scratch state and its `/var/lib` link are removed.
+Expected: the hand run exits 0 and posts one `[FIRING] RuleSignalMissing` naming `FilesystemFillingWarn` to `fleet-acceptance`, and the operator records it beside the `0` above.
