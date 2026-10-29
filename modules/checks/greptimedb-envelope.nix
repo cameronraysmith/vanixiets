@@ -510,6 +510,7 @@
       view = {
         inherit (store) package settings;
         usersFiles = lib.filterAttrs (_: file: file.secret) usersGenerator.files;
+        otelKey = magnetite.clan.core.vars.generators.otel-cert.files."key.pem";
         disko = magnetite.disko.devices.zpool.zroot.datasets."root/greptimedb";
         zfsOneshots = {
           quota = oneshotCommand "zfs-set-root-greptimedb-quota";
@@ -530,13 +531,15 @@
           stableRelease = builtins.match "[0-9]+\\.[0-9]+\\.[0-9]+" (v.package.version or "") != null;
           embedsDashboard = (v.package.passthru.embedsDashboard or false) == true;
 
-          # R8.2 (A8:139)
+          # R8.2 (A8:139), and the collection key (S4 design D8)
           usersFilesNonWorker =
             workerUsers != [ ]
             && v.usersFiles ? users
             && lib.all (file: file.mode == "0400" && !(builtins.elem file.owner workerUsers)) (
               lib.attrValues v.usersFiles
-            );
+            )
+            && v.otelKey.mode == "0400"
+            && !(builtins.elem v.otelKey.owner workerUsers);
 
           # Disk envelope (ADR-007 E7.3): disko's install-time declaration
           # equals what the boot oneshots enforce, and mounts at data_home.
@@ -598,6 +601,17 @@
                 collector-password = v.usersFiles.collector-password // {
                   owner = builtins.head workerUsers;
                 };
+              };
+            };
+        };
+        workerOwnsOtelKey = {
+          clause = "usersFilesNonWorker";
+          apply =
+            v:
+            v
+            // {
+              otelKey = v.otelKey // {
+                owner = builtins.head workerUsers;
               };
             };
         };

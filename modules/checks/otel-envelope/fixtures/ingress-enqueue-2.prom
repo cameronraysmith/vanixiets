@@ -1,0 +1,5 @@
+otelcol_exporter_queue_capacity{data_type="metrics",exporter="otlp_http/fleet",otel_scope_name="go.opentelemetry.io/collector/exporter/exporterhelper",otel_scope_schema_url="",otel_scope_version="",service_instance_id="2b3c4d5e-6f70-4812-9a3b-4c5d6e7f8091",service_name="otelcol-contrib",service_version="0.155.0"} 419430400
+otelcol_exporter_queue_size{data_type="metrics",exporter="otlp_http/fleet",otel_scope_name="go.opentelemetry.io/collector/exporter/exporterhelper",otel_scope_schema_url="",otel_scope_version="",service_instance_id="2b3c4d5e-6f70-4812-9a3b-4c5d6e7f8091",service_name="otelcol-contrib",service_version="0.155.0"} 10
+# HELP otelcol_exporter_enqueue_failed_metric_points Number of metric points failed to be added to the sending queue.
+# TYPE otelcol_exporter_enqueue_failed_metric_points counter
+otelcol_exporter_enqueue_failed_metric_points{exporter="otlp_http/fleet",otel_scope_name="go.opentelemetry.io/collector/exporter/exporterhelper",otel_scope_schema_url="",otel_scope_version="",service_instance_id="2b3c4d5e-6f70-4812-9a3b-4c5d6e7f8091",service_name="otelcol-contrib",service_version="0.155.0"} 200

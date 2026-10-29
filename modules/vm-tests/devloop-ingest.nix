@@ -63,6 +63,7 @@
               "opentelemetry-collector.service"
               "devloop-reconcile.service"
             ];
+            pki = self.lib.otelTestPki pkgs;
 
             # nixbot's rows at boot: build 9001 is a pull-request build whose
             # three attributes finish in one transaction (a finished_at tie),
@@ -806,14 +807,11 @@
             '';
 
             # The burn rule as fleet-alert's evaluator sends it (design D1,
-            # D16); the notified units shape only SystemdUnitFailed.
+            # D16); the hosts' notified units shape only SystemdUnitFailed.
             burnAlertRule =
               lib.findFirst (r: r.alert == "PullRequestQueueWaitBurn")
                 (throw "devloop-ingest: no PullRequestQueueWaitBurn rule")
-                (self.lib.fleetAlertRules {
-                  inherit lib;
-                  notifiedUnits = [ ];
-                }).rules;
+                (self.lib.fleetAlertRules { inherit lib; }).rules;
             burnRule = ''
               print("=== case burnRule", flush=True)
               import datetime
@@ -1130,7 +1128,22 @@
                 ];
                 systemd.services.opentelemetry-collector.serviceConfig.LoadCredential = [
                   "collector-password:${vars}/collector-password"
+                  "otel-cert:${pki}/ingress.crt"
+                  "otel-key:${pki}/ingress.key"
                 ];
+
+                # The ingress's otlp/mesh on loopback with throwaway
+                # certificates, never the real vars, and the agent's
+                # notified-unit assertion satisfied; the envelope is
+                # fleet-ingress's subject, so its timer stays off here.
+                vanixiets.otelCollector.caFile = "${pki}/ca.crt";
+                services.opentelemetry-collector.settings.receivers."otlp/mesh".protocols.http.endpoint =
+                  lib.mkForce "127.0.0.1:4318";
+                services.observability-notify.units = [
+                  "opentelemetry-collector"
+                  "otel-envelope"
+                ];
+                systemd.timers.otel-envelope.wantedBy = lib.mkForce [ ];
 
                 environment.etc = {
                   "devloop-ingest/gitea-mq-lines.txt".source = ./devloop-ingest/gitea-mq-lines.txt;

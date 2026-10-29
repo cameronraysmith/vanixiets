@@ -1,8 +1,8 @@
 # Single source of the collector's allow-lists and bounds (ADR-004
 # "Implementation surface"; design D8, D9). The otel-collector clan service
-# builds its receivers, transforms and exporter headers from it, and
-# checks.x86_64-linux.otel-collector-config reads its owner aliases and
-# databases. import-tree loads every .nix file under
+# builds its receivers, transforms and exporter headers from it, its agent
+# assertions read the unit allow-list, owner aliases and rate assumption,
+# and checks.x86_64-linux.otel-collector-config reads its databases. import-tree loads every .nix file under
 # modules/, so this is a flake-parts module exposing the data as
 # flake.lib.otelCollectorSchema; nothing imports it by path. S1 carries the
 # keys S1 deploys; later slices add theirs here.
@@ -68,12 +68,55 @@
       "node_vmstat_oom_kill"
     ];
 
+    # The collector's own telemetry kept from 127.0.0.1:8888 (design D4;
+    # ADR-003 item 26): queue size and capacity, send and enqueue failures,
+    # receiver refusals. At contrib 0.155.0 the counters carry no `_total`
+    # suffix (read live on magnetite on 2026-10-29).
+    otelcolKeep = [
+      "otelcol_exporter_queue_size"
+      "otelcol_exporter_queue_capacity"
+      "otelcol_exporter_send_failed_metric_points"
+      "otelcol_exporter_send_failed_log_records"
+      "otelcol_exporter_enqueue_failed_metric_points"
+      "otelcol_exporter_enqueue_failed_log_records"
+      "otelcol_receiver_refused_metric_points"
+      "otelcol_receiver_refused_log_records"
+    ];
+
+    # smartctl_exporter series kept; `smartctl_device` and
+    # `smartctl_version` are dropped (ADR-004).
+    smartctlKeep = [
+      "smartctl_device_smart_status"
+      "smartctl_device_critical_warning"
+      "smartctl_device_media_errors"
+      "smartctl_device_percentage_used"
+      "smartctl_device_available_spare"
+      "smartctl_device_available_spare_threshold"
+      "smartctl_device_num_err_log_entries"
+      "smartctl_device_temperature"
+    ];
+
     # process.memory.usage is stored only for executables holding at least
     # minBytes after same-name aggregation (ADR-003 item 16). ADR-004's
     # per-host bound of 30 distinct names has no collector stage at contrib
     # 0.155.0; S1 records the observed count at deployment and S4's
     # otel-envelope adds its regulator.
     process.minBytes = 67108864;
+
+    # Unmeasured estimate of magnetite's `fleet` export rate: about 2000
+    # series (ADR-004's ~800 host-level series per NixOS host plus the
+    # scraped service endpoints) at 128 bytes per OTLP number point with its
+    # resource and attribute overhead, one point per minute. The deployment
+    # measurement (logs/s1-evidence/8.5-queue-rate.log) replaces it. The
+    # agents' queue assertion and checks.x86_64-linux.otel-collector-config
+    # read it.
+    fleetBytesPerMinute = 256000;
+
+    # observability-notify@ instances pass the unit allow-list, so that
+    # SystemdUnitFailed reports a failed post, but are bounded by the host's
+    # notified units, not by the cap of 40 (ADR-004 as amended under charter
+    # v23).
+    systemdUnitsNotifierPattern = "observability-notify@*.service";
 
     # Store databases and their retention, one otlp_http exporter each
     # (design D8). magnetite's services.greptimedb.databases reads this map,

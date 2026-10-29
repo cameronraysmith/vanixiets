@@ -64,6 +64,7 @@
               "greptimedb-schema.service"
               "opentelemetry-collector.service"
             ];
+            pki = self.lib.otelTestPki pkgs;
           in
           assert lib.assertMsg (
             databases ? fleet && databases.fleet != changedTtl
@@ -156,7 +157,22 @@
                 ];
                 systemd.services.opentelemetry-collector.serviceConfig.LoadCredential = [
                   "collector-password:${vars}/collector-password"
+                  "otel-cert:${pki}/ingress.crt"
+                  "otel-key:${pki}/ingress.key"
                 ];
+
+                # The ingress's otlp/mesh on loopback (4318 is the test's own
+                # otlp entry) with throwaway certificates, never the real vars,
+                # and the agent's notified-unit assertion satisfied; the
+                # envelope is fleet-ingress's subject, so its timer stays off.
+                vanixiets.otelCollector.caFile = "${pki}/ca.crt";
+                services.opentelemetry-collector.settings.receivers."otlp/mesh".protocols.http.endpoint =
+                  lib.mkForce "127.0.0.1:4319";
+                services.observability-notify.units = [
+                  "opentelemetry-collector"
+                  "otel-envelope"
+                ];
+                systemd.timers.otel-envelope.wantedBy = lib.mkForce [ ];
 
                 # A loopback OTLP entry into the agent pipeline that stamps
                 # host.name and vanixiets.database, so a synthetic point takes

@@ -149,7 +149,7 @@ done 2>&1 | tee -a "$L"
 cd $REPO && git worktree remove --force $SCRATCH
 ```
 
-Expected: two drvPaths; each override prints its own assertion's message, the notified units, `41 of pyrite's services match the unit allow-list` and the alias (negative controls).
+Expected: two drvPaths; each override prints its own assertion's message, the notified units, `<n> of pyrite's services match the unit allow-list, above ADR-004's 40` (the 41 added services plus pyrite's own allow-listed ones, 50 at the time of writing) and the alias (negative controls).
 
 - [ ] **Step 3: The certificate generators (tasks.md 2.3, code)**
 
@@ -207,7 +207,7 @@ in {
       '';
     };
   };
-  config = lib.mkIf collect {
+  config = lib.optionalAttrs collect {
     vanixiets.otelCollector.caFile = pkgs.writeText "otel-ca.crt" gens.otel-ca.files."ca.crt".value;
     systemd.services.opentelemetry-collector.serviceConfig.LoadCredential = [
       "otel-cert:${gens.otel-cert.files."cert.pem".path}"
@@ -218,10 +218,12 @@ in {
 ```
 
 `flakeLib` is FM's outer `config.flake.lib`, bound in FM's top `let` beside `nixosModules`, so it is not shadowed by the NixOS `config`.
-This module replaces the role's existing `nixosModule.imports = [ nixosModules.otel-collector-agent ]` (FM `:536-540`); with `imports` and `config` both present, the generator attrset above sits under `config` as well (`config = lib.mkMerge [ { clan.core.vars.generators = …; } (lib.mkIf collect { … }) ]`).
+This module replaces the role's existing `nixosModule.imports = [ nixosModules.otel-collector-agent ]` (FM `:536-540`); with `imports` and `config` both present, the generator attrset above sits under `config` as well (`config = lib.mkMerge [ { clan.core.vars.generators = …; } (lib.optionalAttrs collect { … }) ]`).
+The collect block is `lib.optionalAttrs`, not `lib.mkIf`: where `collect` is false the agent fragment, and so `vanixiets.otelCollector`, is not imported, and a `mkIf false` definition of an undeclared option still fails evaluation; `collect` is static data, so `optionalAttrs` causes no recursion.
 `ca.crt` carries no `restartUnits`: the CA reaches the collector as a store path, so a new CA changes the configuration and restarts it (design D1).
 The two credentials load on magnetite too, where the ingress receiver uses them.
 Declare in `collectorCore` the three options of the Interface contract, with descriptions; `caFile` is `nullOr path`, default `null`.
+Make the inventory change of Step 4's first paragraph before this run, so cinnabar is an agent machine.
 Run:
 
 ```bash
@@ -286,6 +288,7 @@ Expected: 16 `==` records, every `token=` equal, every `otel-ca=` from `magnetit
 The token value is hashed in a pipe and never printed; `clan vars get` decrypts with the operator's key on stibnite.
 `otel-ca` is created exactly once, by the first command, as the missing dependency of magnetite's `otel-cert`: no `otel-ca` value exists yet, so nothing shared is overwritten, which is what the rule against `clan vars generate` on a shared generator protects; from then on `otel-ca` only gains readers through `clan vars fix`, and the `otel-ca=` hash proves it is never regenerated.
 `vars/shared/ntfy-alerter/token/machines/` lists pyrite, electrum, galena and scheelite beside cinnabar and magnetite afterwards.
+With the pinned clan the first command already writes `otel-cert` for every agent host and re-encrypts the `ntfy-alerter` token for the four new readers, and each later `generate` re-issues that host's certificate under the same CA; the hash records stay equal, because neither shared value is regenerated.
 Then verify the issued certificates (tasks.md 2.3's verify):
 
 ```bash
@@ -307,7 +310,7 @@ In the agent fragment, under `lib.mkIf (!config.vanixiets.otelCollector.ingress)
 
 ```nix
 let
-  e = config.services.opentelemetry-collector.settings.exporters;
+  e = config.services.opentelemetry-collector.settings.exporters or { };
   agentExporters = [ "otlp_http/ingress" "otlp_http/ingress-logs" ];
   q = n: e.${n}.sending_queue or { };
   memMax = builtins.match "([0-9]+)M" (config.systemd.services.opentelemetry-collector.serviceConfig.MemoryMax or "");
@@ -354,7 +357,7 @@ in {
 ```
 
 The `MemoryMax = "512M"` and `OOMScoreAdjust = 300` of the ingress fragment (`:509-515`) stay on the ingress host only.
-Create `logs/s4-evidence/2.4-overrides.nix`, which takes the flake and returns two `extendModules` evaluations, cinnabar with `services.opentelemetry-collector.settings.exporters."otlp_http/ingress".sending_queue.queue_size = lib.mkForce (64 * 1024 * 1024)` and pyrite with `processors.memory_limiter.limit_mib = lib.mkForce 300`, each `config.system.build.toplevel.drvPath`; run the block below in the scratch tree (created as in Step 2, `cd $SCRATCH`, `L` and the overrides file under `$REPO/logs/s4-evidence/`), then remove it.
+Create `logs/s4-evidence/2.4-overrides.nix`, which takes the flake and returns two `extendModules` evaluations, cinnabar with `services.opentelemetry-collector.settings.exporters."otlp_http/ingress".sending_queue.queue_size = lib.mkForce (64 * 1024 * 1024)` and pyrite with `processors.memory_limiter.limit_mib = lib.mkOverride 10 300` (above the agent's own `lib.mkForce 150`), each `config.system.build.toplevel.drvPath`; run the block below in the scratch tree (created as in Step 2, `cd $SCRATCH`, `L` and the overrides file under `$REPO/logs/s4-evidence/`), then remove it.
 Run:
 
 ```bash
@@ -398,7 +401,7 @@ nix eval --json .#nixosConfigurations.magnetite.config.networking.firewall.inter
 NIX_SHOW_STATS=1 NIX_SHOW_STATS_PATH=/tmp/otel-collector-config-stats.json nix eval --option eval-cache false --raw .#.checks.x86_64-linux.otel-collector-config.drvPath >/dev/null && jq '.gc.totalBytes, .cpuTime' /tmp/otel-collector-config-stats.json
 ```
 
-Expected: the build passes, and the evaluation-time mutants `meshWildcard`, `secondMeshReceiver`, `ztAddressOther`, `receiverEndpointWildcard` and `otlpInLogsPipeline` are all rejected (the check's `assert` would fail otherwise); `"zt+": [4318]` and no other interface with 4318; the cost below 536,870,912, recorded beside 1.2's; above it, stop and apply design D10's remedies.
+Expected: the build passes, and the evaluation-time mutants `meshWildcard`, `secondMeshReceiver`, `ztAddressOther`, `receiverEndpointWildcard` and `otlpInLogsPipeline` are all rejected (the check's `assert` would fail otherwise); `"zt+"` lists 4318 beside its existing ports and no other interface has 4318; the cost below 536,870,912, recorded beside 1.2's; above it, stop and apply design D10's remedies.
 
 - [ ] **Step 7: Scrapes, file systems, self-telemetry and SMART (tasks.md 2.6)**
 
@@ -462,7 +465,7 @@ services.opentelemetry-collector.settings.receivers.prometheus.config.scrape_con
 ```
 
 and extend the firewall assertion to `!(config.services.prometheus.exporters.node.openFirewall || config.services.prometheus.exporters.smartctl.openFirewall)`.
-In the clan agent role's `lib.mkIf collect` block (Step 3) set `vanixiets.otelCollector.smartDevices = flakeLib.observabilityHosts.${machine.name}.smartDevices;`.
+In the clan agent role's `lib.optionalAttrs collect` block (Step 3) set `vanixiets.otelCollector.smartDevices = flakeLib.observabilityHosts.${machine.name}.smartDevices;`.
 Run:
 
 ```bash
@@ -505,11 +508,13 @@ Expected: the three hashes equal (the receiver's id and settings and both query 
 
 First the fixture leg.
 In `modules/checks/fleet-alert.nix`, replace `:52-54` with `hosts = self.lib.observabilityHosts; notifiedUnits = lib.unique (lib.concatMap (h: h.notifiedUnits) (builtins.attrValues hosts)); rules = self.lib.fleetAlertRules { inherit lib hosts; };`, so `exclusionLeg` (`:622-637`) replays a failed state for every unit of the union, `fleet-deadman` included.
-Add `twoHostExclusionLeg`, whose rules come from a two-host table `{ a = { collect = true; alwaysOn = true; notifiedUnits = [ "unit-a" ]; smartDevices = [ ]; }; b = { collect = true; alwaysOn = false; notifiedUnits = [ "unit-b" ]; smartDevices = [ ]; }; }` and whose fixture replays `systemd_unit_state{systemd_unit_active_state="failed"} == 1` for `unit-a.service` on host `b`, `unit-b.service` on host `a` and `nginx.service` on `a`, expecting exactly one `[FIRING] SystemdUnitFailed a`, for nginx; add it to `legs`.
+Add `twoHostExclusionLeg`, whose rules come from a two-host table `{ a = { collect = true; alwaysOn = true; notifiedUnits = [ "unit-a" ]; smartDevices = [ ]; }; b = { collect = true; alwaysOn = false; notifiedUnits = [ "unit-b" ]; smartDevices = [ ]; }; }` and whose fixture replays `systemd_unit_state{systemd_unit_active_state="failed"} == 1` for `unit-a.service` on host `b`, `unit-b.service` on host `a` and `nginx.service` on `a`, expecting exactly one `[FIRING] SystemdUnitFailed a`, for nginx.
+Because its rules are not the real table's, it runs beside `twoDatabaseLeg` with its own `checkConfig`, not in `legs`, and carries its rule list as `rules`, which `responsesFile` passes to `stepAnswers` (default `evaluatorRules`) so the fixture server answers its expression; its steps set `reporting = [ "magnetite" "a" "b" ]`, since the evaluator freezes the instances of a host that does not report.
+`modules/vm-tests/devloop-ingest.nix`'s call of `fleetAlertRules` drops its `notifiedUnits = [ ]` argument too.
 Build and see it fail at evaluation, because `fleetAlertRules` takes no `hosts` (RED).
 Then in `modules/nixos/fleet-alert/rules.nix` change the signature to `{ lib, hosts ? config.flake.lib.observabilityHosts }:` (the file's outer arguments become `{ config, ... }`), set `units = lib.unique (lib.naturalSort (lib.concatMap (h: h.notifiedUnits) (builtins.attrValues hosts)));`, and replace the header comment's `:14-17` with one saying the exclusion is the union of every host's notified units (design D9).
 In `modules/nixos/fleet-alert.nix:573-576` call `flakeLib.fleetAlertRules { inherit lib; }`.
-In the clan agent role's `lib.mkIf collect` block (Step 3) set:
+In the clan agent role's `lib.optionalAttrs collect` block (Step 3) set:
 
 ```nix
 services.observability-notify = {
@@ -519,7 +524,7 @@ services.observability-notify = {
 ```
 
 and remove `services.observability-notify.units = [ "opentelemetry-collector" ];` from the agent fragment (`:298`), the list at `modules/machines/nixos/magnetite/default.nix:332-353` with its comment, and magnetite's `services.observability-notify.tokenFile` (`:808-809`).
-In cinnabar's `fleet-alert.nix` (`:23-26`) keep `tokenFile` (an equal definition merges with the role's) and make the list `units = lib.mkIf (!config.flake.lib.observabilityHosts.cinnabar.collect) [ "fleet-deadman" ];`, reading the flake-parts `config` of the file's outer arguments (`{ config, ... }:` replacing `{ ... }:`, the NixOS module's own argument renamed `nixosArgs`), so `fleet-deadman` stays notified exactly once both before and after cinnabar's flag flips, and the flip stays a one-line change; update the header comment, which says cinnabar runs no collector, to say it runs one once its `collect` is true.
+In cinnabar's `fleet-alert.nix` (`:23-26`) keep `tokenFile` (an equal definition merges with the role's) and make the list `units = lib.mkIf (!collects) [ "fleet-deadman" ];`, `collects` bound in a `let` of the file's outer flake-parts arguments (`{ config, ... }:` replacing `{ ... }:`) to `config.flake.lib.observabilityHosts.cinnabar.collect`, so the NixOS module keeps its own `config`; `fleet-deadman` stays notified exactly once both before and after cinnabar's flag flips, and the flip stays a one-line change; update the header comment, which says cinnabar runs no collector, to say it runs one once its `collect` is true.
 Run:
 
 ```bash

@@ -329,28 +329,6 @@ in
         };
       };
 
-      # Units whose failure posts to ntfy's fleet-alerts topic and whose
-      # recovery posts RESOLVED (design "Failure path"). The otel-collector
-      # agent role adds opentelemetry-collector itself and applies the wiring,
-      # so greptimedb.nix never references the notifier.
-      services.observability-notify.units = [
-        "devloop-pg-grants"
-        "devloop-reconcile"
-        "fleet-alert"
-        "greptimedb"
-        "greptimedb-envelope"
-        "greptimedb-schema"
-        "zfs-assert-root-docker-noautosnap"
-        "zfs-assert-root-greptimedb-noautosnap"
-        "zfs-assert-root-nix-noautosnap"
-        "zfs-assert-root-podman-noautosnap"
-        "zfs-set-root-greptimedb-quota"
-        "zfs-set-root-greptimedb-reservation"
-        "zfs-set-root-home-reservation"
-        "zfs-set-root-nix-quota"
-        "zfs-set-root-nixos-reservation"
-      ];
-
       # Raise nix daemon free-space thresholds for a build host. clan-core and
       # srvos both set 512 MiB / 3 GiB via mkDefault, which is undersized for
       # buildbot-nix workers materializing large closures on a CX53 with niks3
@@ -805,8 +783,6 @@ in
         regulatorPasswordFile =
           config.clan.core.vars.generators.greptimedb-users.files.regulator-password.path;
       };
-      services.observability-notify.tokenFile =
-        config.clan.core.vars.generators.ntfy-alerter.files.token.path;
 
       # nixbot's `8 x 4096` nix-eval-jobs configuration peaks at 31.4 GiB of
       # swap (logs/magnetite-zram-headroom-experiment.md §6.2), above the

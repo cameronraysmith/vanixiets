@@ -359,12 +359,14 @@ let
     '';
   };
 
-  # The receiver that feeds each table (design D6, D7, D9).
+  # The receiver that feeds each table on magnetite (design D6, D7, D9).
+  # deploy_record's file_log/deploy-record runs in the otel-collector agent
+  # on every agent host, from deployRecordFile, keepAttributes and dropBody
+  # below (S4 design D5).
   sourceReceivers = {
     ci_attribute = "sqlquery/ci_attribute";
     ci_build = "sqlquery/ci_build";
     batch_event = "journald/gitea-mq";
-    deploy_record = "file_log/deploy-record";
   };
 
   # The file flake.modules.nixos.deploy-record appends to (design D9).
@@ -792,7 +794,14 @@ in
       grantSql
       ;
     selects = lib.mapAttrs (_: source: source.selects) sources;
-    inherit questions batchEventKeys reconcileQueries;
+    inherit
+      questions
+      batchEventKeys
+      reconcileQueries
+      keepAttributes
+      dropBody
+      deployRecordFile
+      ;
   };
 
   flake.lib.devloopReconcile = devloopReconcile;
@@ -972,19 +981,6 @@ in
                 parse_from = "body.MESSAGE";
               }
               (keepAttributes batchEventKeys)
-              dropBody
-            ];
-          };
-          "file_log/deploy-record" = {
-            include = [ deployRecordFile ];
-            start_at = "beginning";
-            storage = "file_storage";
-            operators = [
-              {
-                type = "json_parser";
-                id = "parse-line";
-              }
-              (keepAttributes (map (column: column.name) tables.deploy_record.columns))
               dropBody
             ];
           };

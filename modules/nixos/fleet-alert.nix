@@ -570,10 +570,7 @@ in
         ];
       };
 
-      rendered = flakeLib.fleetAlertRules {
-        inherit lib;
-        notifiedUnits = config.services.observability-notify.units or [ ];
-      };
+      rendered = flakeLib.fleetAlertRules { inherit lib; };
       # The run's time budget (design D13), read by R9.5's relation below.
       deadlines = {
         queryTimeoutSec = 10;

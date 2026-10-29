@@ -2,14 +2,16 @@
 #
 # R3.1 judges relations in magnetite's evaluated configuration that a
 # plausible edit would break silently: every listener and scrape target on
-# loopback, the unit cap on the host, owner aliases, queue sizes against the
-# assumed rate, the validation override's scope, the failure-notifier wiring
-# against the failure path's policy, the limiter under the unit's ceiling and
-# the collector's order after the schema job. It does not copy the module's
-# literals, and the process identity attributes and node_exporter's firewall
-# are module assertions. Since S2 it also judges the devloop logs routes: each
+# loopback except the ingress receiver on the address ZeroTier assigned to
+# magnetite, the alias transform in the host pipeline, queue sizes against
+# the assumed rate, the validation override's scope, the failure-notifier
+# wiring against the failure path's policy, the limiter under the unit's
+# ceiling and the collector's order after the schema job. It does not copy
+# the module's literals; the process identity attributes, node_exporter's
+# firewall, the unit cap and the owner aliases are agent assertions on every
+# host (design D6). Since S2 it also judges the devloop logs routes: each
 # devloop table's exporter queue, no logs pipeline exporting outside devloop
-# and none taking the local OTLP receiver. R1.2 requires the exponential-histogram conversion
+# and none taking an OTLP receiver but otlp/mesh. R1.2 requires the exponential-histogram conversion
 # while the store is below 1.3.0 (ADR-001). Each mutant edits the evaluated
 # input and must produce a non-empty failure list
 # (modules/checks/omnigent-environment.nix pattern). The configuration file
@@ -24,27 +26,18 @@
 
       mib = n: n * 1024 * 1024;
 
-      # Unmeasured estimate of magnetite's `fleet` export rate: about 2000
-      # series (ADR-004's ~800 host-level series per NixOS host plus the
-      # scraped service endpoints) at 128 bytes per OTLP number point with its
-      # resource and attribute overhead, one point per minute. The deployment
-      # measurement (logs/s1-evidence/8.5-queue-rate.log) replaces it.
-      fleetBytesPerMinute = 256000;
-
       # The failure path's policy (design "Failure path"): every store unit,
-      # every disk-share oneshot, every dev-loop unit (S2 design D11) and the
-      # collector notify, so a new unit of these kinds fails the check until
-      # it is listed.
+      # every disk-share oneshot, every dev-loop unit (S2 design D11), the
+      # collector and its envelope (S4 design D7) notify, so a new unit of
+      # these kinds fails the check until it is listed.
       notifiedByPolicy =
         name:
         lib.hasPrefix "greptimedb" name
         || lib.hasPrefix "zfs-set-" name
         || lib.hasPrefix "zfs-assert-" name
         || lib.hasPrefix "devloop-" name
-        || name == "opentelemetry-collector";
-
-      # ADR-004 Q12: at most 40 units may match the allow-list on one host.
-      maxUnits = 40;
+        || name == "opentelemetry-collector"
+        || name == "otel-envelope";
 
       isLoopback =
         s:
@@ -66,11 +59,6 @@
         else
           [ ];
 
-      # systemd unit patterns as regular expressions over attribute names.
-      unitRegex = pattern: builtins.replaceStrings [ "." "*" ] [ "\\." ".*" ] pattern;
-      matchesAllowList =
-        patterns: name: lib.any (p: builtins.match (unitRegex p) "${name}.service" != null) patterns;
-
       # A notified unit's hook; with services.observability-notify.tokenFile
       # set it runs under `env NTFY_TOKEN_FILE=<path>`. The last capture is
       # the script.
@@ -86,6 +74,9 @@
         services = magnetite.systemd.services;
         notifyUnits = magnetite.services.observability-notify.units;
         schema = self.lib.otelCollectorSchema;
+        ztAddress = lib.trim (
+          builtins.readFile "${self}/vars/shared/zerotier-ip-magnetite-zerotier/ip/value"
+        );
         storeVersion = magnetite.services.greptimedb.package.version;
         notifierInterval =
           magnetite.systemd.services."observability-notify@".environment.OBSERVABILITY_NOTIFY_MIN_INTERVAL_SEC
@@ -245,13 +236,6 @@
           ) (builtins.filter (lib.hasPrefix "prometheus") (builtins.attrNames r));
           queueSizes = map (n: e.${n}.sending_queue.queue_size or 0) exporterNames;
           hostUnits = builtins.attrNames i.services;
-          owners = lib.concatMap (
-            name:
-            let
-              m = builtins.match "omnigent-host-(.+)" name;
-            in
-            lib.optional (m != null) (builtins.head m)
-          ) hostUnits;
           zerotierJobs = map (job: builtins.removeAttrs job [ "authorization" ]) (
             r."prometheus/zerotier".config.scrape_configs or [ ]
           );
@@ -294,30 +278,28 @@
           exphist = p."transform/exphist".metric_statements or [ ];
         in
         lib.concatLists [
-          # Loopback (R3.1; telemetry-store-interface "Listeners are bound to
-          # loopback only", "Scrape targets are reached on loopback").
-          (check "R3.1: a receiver, exporter, scrape target or node_exporter listener off loopback" (
-            lib.all isLoopback (
-              collectEndpoints r ++ collectEndpoints e ++ promTargets ++ [ i.node.listenAddress ]
+          # Loopback, with exactly one exception: otlp/mesh on the address ZeroTier
+          # assigned to magnetite (ADR-003 item 9).
+          (check
+            "R3.1: an endpoint off loopback other than otlp/mesh, or otlp/mesh not on magnetite's assigned address"
+            (
+              lib.all isLoopback (
+                collectEndpoints (builtins.removeAttrs r [ "otlp/mesh" ])
+                ++ collectEndpoints e
+                ++ promTargets
+                ++ [ i.node.listenAddress ]
+              )
+              && (r."otlp/mesh".protocols.http.endpoint or null) == "[${i.ztAddress}]:4318"
+              && !(r."otlp/mesh".protocols ? grpc)
             )
-          ))
+          )
 
           # Bounds (host-metrics-collection "Series cardinality stays bounded").
           (check "R3.1: the 64 MiB floor is not in the process pipeline" (
             builtins.elem "filter/process-min" pipelines."metrics/process".processors
           ))
-          (check "R3.1: more than 40 allow-listed units" (
-            builtins.length r.systemd.units <= maxUnits
-            && builtins.length (builtins.filter (matchesAllowList r.systemd.units) hostUnits) <= maxUnits
-          ))
-          (check "R3.1: omnigent-host owner without alias" (
-            lib.all (o: i.schema.ownerAliases ? ${o}) owners
-            && builtins.elem "transform/omnigent-alias" pipelines."metrics/host".processors
-          ))
-          (check "R3.1: an alias carries an owner name" (
-            lib.all (alias: lib.all (o: !(lib.hasInfix o alias)) owners) (
-              builtins.attrValues i.schema.ownerAliases
-            )
+          (check "R3.1: the alias transform is not in the host pipeline" (
+            builtins.elem "transform/omnigent-alias" pipelines."metrics/host".processors
           ))
 
           # Content: no traces pipeline, and the logs pipelines write only
@@ -327,10 +309,12 @@
             lib.all (name: !(lib.hasPrefix "traces" name)) (builtins.attrNames pipelines)
             && lib.all (name: lib.all exportsToDevloop pipelines.${name}.exporters) logsPipelineNames
           ))
-          # logsTakeLocalReceiver: the local OTLP receiver feeds no logs
-          # pipeline (ADR-003:81; S2 design D4).
-          (check "R3.1: a logs pipeline takes the local OTLP receiver" (
-            lib.all (name: !(lib.any isOtlpReceiver pipelines.${name}.receivers)) logsPipelineNames
+          # otlpInLogsPipeline: no OTLP receiver but the agents' otlp/mesh
+          # feeds a logs pipeline (ADR-003:81; S2 design D4; design D3).
+          (check "R3.1: a logs pipeline takes an OTLP receiver other than otlp/mesh" (
+            lib.all (
+              name: !(lib.any (n: isOtlpReceiver n && n != "otlp/mesh") pipelines.${name}.receivers)
+            ) logsPipelineNames
           ))
 
           # Queue (host-metrics-collection "Collection survives a telemetry store restart").
@@ -343,7 +327,7 @@
             ) exporterNames
           ))
           (check "R3.1: fleet queue below 24 h" (
-            (e."otlp_http/fleet".sending_queue.queue_size or 0) >= 24 * 60 * fleetBytesPerMinute
+            (e."otlp_http/fleet".sending_queue.queue_size or 0) >= 24 * 60 * i.schema.fleetBytesPerMinute
           ))
           (check "R3.1: queues at or above 512 MiB" (lib.foldl' builtins.add 0 queueSizes < mib 512))
 
@@ -366,9 +350,10 @@
           ))
 
           # Failure wiring (telemetry-store-interface "Failure notices are posted to one topic").
-          (check "R3.1: a greptimedb*, zfs-set-*, zfs-assert-*, devloop-* or collector unit is not notified" (
-            lib.all (name: builtins.elem name i.notifyUnits) (builtins.filter notifiedByPolicy hostUnits)
-          ))
+          (check
+            "R3.1: a greptimedb*, zfs-set-*, zfs-assert-*, devloop-*, collector or otel-envelope unit is not notified"
+            (lib.all (name: builtins.elem name i.notifyUnits) (builtins.filter notifiedByPolicy hostUnits))
+          )
           # The wiring defines a unit for every listed name, so a misspelt
           # name would otherwise become a unit with nothing to run.
           (check "R3.1: a notified name is not a unit with an ExecStart" (
@@ -408,6 +393,14 @@
         receiverEndpointWildcard = onSettings {
           receivers.otlp.protocols.http.endpoint = "0.0.0.0:4318";
         };
+        meshWildcard = onSettings { receivers."otlp/mesh".protocols.http.endpoint = "[::]:4318"; };
+        secondMeshReceiver =
+          i:
+          onSettings {
+            receivers."otlp/second".protocols.http.endpoint =
+              i.settings.receivers."otlp/mesh".protocols.http.endpoint;
+          } i;
+        ztAddressOther = i: i // { ztAddress = "fddb:4344:343b:14b9:399:930f:39db:40d3"; };
         # A3:233: an exporter listenAddress of 0.0.0.0.
         exporterListenWildcard =
           i:
@@ -428,12 +421,6 @@
                 job
             ) i.settings.receivers.prometheus.config.scrape_configs;
           } i;
-        systemdUnitsOverCap =
-          i:
-          onSettings {
-            receivers.systemd.units =
-              i.settings.receivers.systemd.units ++ map (n: "cap-${toString n}.service") (lib.range 1 20);
-          } i;
         processFloorUnwired =
           i:
           onSettings {
@@ -442,14 +429,13 @@
                 i.settings.service.pipelines."metrics/process".processors;
           } i;
         limiterOverMemoryMax = onSettings { processors.memory_limiter.limit_mib = 600; };
-        ownerWithoutAlias =
+        aliasTransformUnwired =
           i:
-          i
-          // {
-            schema = i.schema // {
-              ownerAliases = builtins.removeAttrs i.schema.ownerAliases [ "cameron" ];
-            };
-          };
+          onSettings {
+            service.pipelines."metrics/host".processors =
+              lib.remove "transform/omnigent-alias"
+                i.settings.service.pipelines."metrics/host".processors;
+          } i;
         queueInMemory =
           i:
           i
@@ -567,6 +553,7 @@
           };
         # S2 design D11: the dev-loop reconcile drops out of the notified units.
         reconcileNotNotified = i: i // { notifyUnits = lib.remove "devloop-reconcile" i.notifyUnits; };
+        envelopeNotNotified = i: i // { notifyUnits = lib.remove "otel-envelope" i.notifyUnits; };
         schemaOrderDropped =
           i:
           i

@@ -1,6 +1,6 @@
-# Collector roles. magnetite runs both in one collector process: its agent
-# pipelines feed the ingress in-process (design D8). Other hosts join the
-# agent role in S4, with the ZeroTier ingress listener.
+# Collector roles. Every host of flake.lib.observabilityHosts runs the agent;
+# magnetite also runs the ingress, joined in-process by `forward`.
+{ config, lib, ... }:
 {
   clan.inventory.instances.otel-collector = {
     module = {
@@ -8,7 +8,7 @@
       input = "self";
     };
 
-    roles.agent.machines.magnetite = { };
+    roles.agent.machines = lib.mapAttrs (_: _: { }) config.flake.lib.observabilityHosts;
     roles.ingress.machines.magnetite = { };
   };
 }

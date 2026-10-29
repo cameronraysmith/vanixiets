@@ -7,9 +7,9 @@ The check comes first and fails at evaluation (Step 1); the script makes it pass
 **Files:**
 - Create: `modules/checks/otel-envelope.nix`, `modules/checks/otel-envelope/stub.py`, `modules/checks/otel-envelope/fixtures/*.prom`
 - Create: `modules/lib/otel-envelope.nix`
-- Modify: `modules/clan/services/otel-collector/flake-module.nix` (the agent fragment: `otel-envelope.service`, `otel-envelope.timer`)
+- Modify: `modules/clan/services/otel-collector/flake-module.nix` (the agent fragment: `otel-envelope.service`, `otel-envelope.timer`; the deploy-record pipeline only where the ingress host has `logs/ingress`, without which `greptimedb-pipeline`'s ingress fails validation on a `forward` exporter with no receiving pipeline)
 - Modify: `modules/checks/otel-collector-config.nix:34-44` (`notifiedByPolicy`), `:369-371` (the policy clause's name), `mutants`
-- Create: `modules/vm-tests/fleet-ingress.nix`, `modules/vm-tests/fleet-ingress/helpers.py`, `modules/vm-tests/fleet-ingress/target.py`
+- Create: `modules/vm-tests/fleet-ingress.nix`, `modules/vm-tests/fleet-ingress/helpers.py`, `modules/vm-tests/otel-test-pki.nix` (`flake.lib.otelTestPki pkgs`, the throwaway certificates, shared with `greptimedb-pipeline` and `devloop-ingest`, whose ingress needs `otlp/mesh`'s credentials and whose notified units must include `opentelemetry-collector` and `otel-envelope`)
 - Create (git-ignored): `logs/s4-evidence/3.<n>-*.log`, `logs/s4-evidence/2.2-overrides.nix`
 
 **Interfaces:**
@@ -44,7 +44,7 @@ Write the fixtures first, copying metric and label names from the live read (`ot
 | `ingressMeshRefused` | ingress | mesh-refused-1 → 0, mesh-refused-2 → 0 |
 | `ingressOwnRefused` | ingress | memory-refused-1 → 0, memory-refused-2 → 1 (C4) |
 | `resetAfterRecorded` | agent | sendfail-0 → 0, sendfail-reset → 0 |
-| `resetThenFailure` | agent | sendfail-0 → 0, sendfail-reset → 0, sendfail-reset-fail → 1 (C4) |
+| `resetThenFailure` | agent | sendfail-0 → 0, sendfail-reset-fail → 1 (C4: a restart between the runs, with 3 new failures, fewer than the 10 recorded) |
 | `targetDownOnce` | agent, targets `/ok` then a closed port | → 0, → 0 (one run down) |
 | `targetDownTwice` | agent, target a closed port | → 0, → 1 (C2) |
 | `missThenSame` | agent | sendfail-0 → 0, closed telemetry port → 0 (first miss), sendfail-0 → 0 |
@@ -88,14 +88,15 @@ fi
 # empty match from failing the run under writeShellApplication's pipefail.
 loss_re='^otelcol_exporter_send_failed_|^otelcol_receiver_refused_'
 [ "$ingress" = 1 ] || loss_re="$loss_re|^otelcol_exporter_enqueue_failed_"
+# mutant: missingCounterFails
 [ -s "$tmp/now" ] && { grep -E "$loss_re" "$tmp/now" || true; } | while read -r series value; do
   # mutant: meshRefusalIsLoss
   [ "$ingress" = 1 ] && [[ $series == otelcol_receiver_refused_* ]] && [[ $series == *'receiver="otlp/mesh"'* ]] && continue
   key=$(printf '%s' "$series" | normalise); was=$(prev "$key")
   echo "$key $value" >> "$next"
   [ "$baseline" = 1 ] && continue
-  # mutant: missingCounterFails / resetNegative
   [ "$was" = absent ] && was=0
+  # mutant: resetNegative
   inc=$(awk -v n="$value" -v p="$was" 'BEGIN { print (n < p) ? n : n - p }')
   if awk -v i="$inc" 'BEGIN { exit !(i > 0) }'; then echo "C4 $key +$inc" >> "$tmp/loss"; fi
 done
@@ -186,13 +187,13 @@ Expected: a drvPath, then the notified-unit assertion's message naming `otel-env
 - [ ] **Step 5: `fleet-ingress` (tasks.md 3.4)**
 
 Create `modules/vm-tests/fleet-ingress.nix`, following `greptimedb-pipeline` (`:31-84`): `vmTests.x86_64-linux.fleet-ingress`, `requiredFeatures = { nixos-test = true; uid-range = true; }`, `node.pkgs = lib.mkForce nodePkgs` with the flake overlay and an overlay replacing `ntfy-send` by a recorder that appends `<topic>|<title>` to `/run/ntfy-posts` and exits 0.
-Certificates are made at test build by one `runCommand` with `pkgs.openssl`: a test CA, an ingress certificate with SAN `IP:127.0.0.1` and `serverAuth,clientAuth`, an agent certificate with `clientAuth`, and a rogue CA with its client certificate.
+Certificates are made at test build by one `runCommand` with `pkgs.openssl` (`flake.lib.otelTestPki`): a test CA, an ingress certificate with SAN `IP:127.0.0.1` and `serverAuth,clientAuth`, an agent certificate with `clientAuth`, and a rogue CA with its client certificate.
 One container `store` holds:
 - `greptimedb` with magnetite's databases, the schema job and the `devloop` tables and pipelines, as `greptimedb-pipeline` and `devloop-ingest` set them up;
 - `opentelemetry-collector.service` from `otel-collector-agent` and `otel-collector-ingress` (the ingress host), with `vanixiets.otelCollector.caFile` the test CA, `otlp/mesh`'s endpoint forced to `127.0.0.1:4318`, and its two credentials loaded from the test certificates;
-- `agent-collector.service`, `DynamicUser`, `StateDirectory = "agent-collector"`, running `otelcol-contrib --config=file:<yaml>` where the YAML renders electrum's evaluated `services.opentelemetry-collector.settings` (the agent role's non-ingress configuration on a host whose `collect` is true) with exactly these overrides: both exporters' endpoint `https://127.0.0.1:4318` and TLS files the test CA and agent certificate, `file_storage.directory` `/var/lib/agent-collector/queue`, `service.telemetry.metrics` on `127.0.0.1:8889`, `prometheus/zerotier` and its pipeline entry removed, and `file_log/deploy-record` reading `/var/lib/agent-collector/deploy-record.jsonl`; `host.name` stays `electrum`;
-- `otel-envelope.service` from the agent fragment (the ingress host's), and `agent-envelope.service`, the same unit definition with the script built for `electrum`, `ingress = false`, telemetry `127.0.0.1:8889` and the agent's targets;
-- `services.observability-notify.units = [ "opentelemetry-collector" "otel-envelope" "agent-collector" "agent-envelope" ]` and `services.observability-notify.tokenFile` a test token file, so the agent fragment's notified-unit assertion holds in the container and its failures reach the recording `ntfy-send`;
+- `agent-collector.service`, `DynamicUser`, `StateDirectory = "agent-collector"`, running `otelcol-contrib --config=file:<yaml>` where the YAML renders electrum's evaluated `services.opentelemetry-collector.settings` (the agent role's non-ingress configuration on a host whose `collect` is true) with exactly these overrides: both exporters' endpoint `https://127.0.0.1:4318` and TLS files the test CA and agent certificate, `file_storage.directory` `/var/lib/agent-collector/queue`, `service.telemetry.metrics` on `127.0.0.1:8889` and the `otelcol` scrape following it there, `prometheus/zerotier` and its pipeline entry removed, and `file_log/deploy-record` reading `/var/lib/agent-collector/deploy-record.jsonl`; `host.name` stays `electrum`;
+- `otel-envelope.service` from the agent fragment (the ingress host's), and `agent-envelope.service`, the same unit definition with the script built for `electrum`, `ingress = false`, telemetry `127.0.0.1:8889` and the agent's targets; the cases start both, and `otel-envelope.timer` is off so no timer run falls between a case's runs;
+- `services.observability-notify.units = [ "opentelemetry-collector" "otel-envelope" "agent-collector" "agent-envelope" ]` and `services.observability-notify.tokenFile` a test token file written at boot (a store path fails the notifier's hook assertion), so the agent fragment's notified-unit assertion holds in the container and its failures reach the recording `ntfy-send`;
 - `prometheus-node-exporter` on loopback, which both collectors scrape.
 
 `helpers.py` provides `gsql(sql, db)` and `promql(expr)` as `regulator`, `metric(port, name_regex)` (summing a counter from a telemetry endpoint, 0 when absent), `envelope(unit)` (starts it, returns its exit code and its `otel-envelope:` lines from `journalctl -u <unit> -o cat`), and `collector_with(unit, mutant)` (installs `/run/systemd/system/<unit>.service.d/zz-mutant.conf` from `/etc/fleet-ingress/mutants/<mutant>.conf`, `daemon-reload`, restart; `None` removes it), as `devloop-ingest`'s helpers do.
@@ -200,11 +201,11 @@ The `testScript` is `helpers.py` followed by the `cases` list, each starting wit
 
 | Case | Actions | Assertions |
 |---|---|---|
-| `refusal` | `curl --cacert ca.crt https://127.0.0.1:4318/v1/metrics` without a client certificate; with the rogue certificate; with the agent certificate and `--tls-max 1.2` | exit codes 55, 55 and 35 with GR §2's error strings; the ingress journal logs three `TLS handshake error`; `otelcol_receiver_accepted_metric_points{receiver="otlp/mesh"}` unchanged |
+| `refusal` | `curl --cacert ca.crt https://127.0.0.1:4318/v1/metrics` without a client certificate; with the rogue certificate; with the agent certificate and `--tls-max 1.2` | exit codes 55 or 56 (TLS 1.3 sends the alert after the client's Finished, so curl meets it while sending or reading, as timing has it), 55 or 56, and 35, with GR §2's error strings; the ingress journal logs three `TLS handshake error`; `otelcol_receiver_accepted_metric_points{receiver="otlp/mesh"}` unchanged |
 | `delivery` | start the store, schema job and both collectors together; append three lines to the agent's deploy-record file | within 3 min `count by (host_name) (system_memory_usage_bytes)` includes `electrum`; `SELECT count(*) FROM deploy_record WHERE host = 'electrum'` is 3; every exporter's `send_failed` on 8888 and 8889 is 0 |
-| `backPressure` | ingress mutant `storeQueueTwo` (`otlp_http/fleet` queue `requests`, size 2) and `systemctl stop greptimedb` for 3 min; then ingress mutant `limiterRefusing` (`limit_mib` 2, spike 1) for 2 min; then both removed and the store started | the agent's `otelcol_exporter_queue_size` grows then returns to 0; the ingress counted `refused` on `otlp/mesh` and `enqueue_failed` on `otlp_http/fleet`; the agent's accepted point total equals the ingress's accepted total on `otlp/mesh` over the case; both envelopes exit 0 on every run in the case |
-| `lossControls` | C1: stop `agent-collector`, run `agent-envelope` twice; C2: stop the node exporter, run twice; C3/C4: agent mutant `queueOneMiB` with the ingress stopped until the queue fills, run, then run again after more enqueue failures; C4 on the ingress: ingress mutant `limiterRefusing` while its own `host_metrics/memory` scrape runs | second runs exit 1 with `C1 telemetry: FAIL`, `C2 targets: FAIL node`, then `C3 queue: FAIL`, then `C4 loss: FAIL` naming `enqueue_failed`; the ingress envelope exits 1 with `C4 loss: FAIL` naming `host_metrics/memory`; each restored run passes |
-| `crashLoop` | `systemctl kill -s KILL agent-collector` four times in 10 min, `agent-envelope` run after each kill and after each restart | runs with telemetry answering exit 0; a run that sees no telemetry twice in a row exits 1 only on C1; no run fails C4; the agent's points all arrive (accepted totals equal) |
+| `backPressure` | ingress mutant `storeQueueTwo` (`otlp_http/fleet` queue `requests`, size 2) and `systemctl stop greptimedb` for 3 min; then ingress mutant `limiterRefusing` (`limit_mib` 2, spike 1) for 2 min; then both removed and the store started | the agent's `otelcol_exporter_queue_size` grows then returns to 0; the ingress counted `refused` on `otlp/mesh` and `enqueue_failed` on `otlp_http/fleet`; the agent's sent point total (`otelcol_exporter_sent_metric_points{exporter="otlp_http/ingress"}`; its processors drop and merge points, so its accepted total differs) equals the ingress's accepted total on `otlp/mesh` over the case; the agent's envelope exits 0 on every run in the case, and the ingress's never names `otlp/mesh` or `enqueue_failed` in C4 (its C2 on the stopped store, C3 on the full two-request queue and C4 on its own refused scrapes are design D7's) |
+| `lossControls` | C1: stop `agent-collector`, run `agent-envelope` twice; C2: stop the node exporter, run twice; C3/C4: agent mutant `queue64KiB` (a 1 MiB queue takes about an hour at this agent's 16 KiB a minute) with the ingress stopped until the queue fills, run, then run again after more enqueue failures; C4 on the ingress: ingress mutant `limiterRefusing` while its own `host_metrics/memory` scrape runs | second runs exit 1 with `C1 telemetry: FAIL`, `C2 targets: FAIL node`, then `C3 queue: FAIL`, then `C4 loss: FAIL` naming `enqueue_failed`; the ingress envelope exits 1 with `C4 loss: FAIL` naming `host_metrics/memory`; each restored run passes |
+| `crashLoop` | `systemctl kill -s KILL agent-collector` four times in 10 min, `agent-envelope` run after each kill and after each restart | runs with telemetry answering exit 0; a run that sees no telemetry twice in a row exits 1 only on C1; no run fails C4; the agent's points all arrive: the ingress's accepted total on `otlp/mesh` is at least the agent's sent total summed over its four starts (each start's counters begin at 0, and a kill between the ingress's accept and the agent's count resends a request) |
 | `longRun` | 10 `agent-envelope` runs with counters accumulating | each `ActiveEnterTimestamp`-to-exit under 240 s; `wc -l` of the state file equals the number of loss series plus the telemetry and target flags, constant across runs |
 | `absentClientCa` | ingress mutant `absentClientCa` (`client_ca_file` a missing path) | the collector fails to start with `failed to load client CA`; `/var/lib/observability-notify/failed.log` gains one line for `opentelemetry-collector.service`; `/run/ntfy-posts` holds one `FAILED`; after removing the mutant, one `RESOLVED` |
 
@@ -216,8 +217,8 @@ jj st --no-pager >/dev/null
 nix build .#vmTests.x86_64-linux.fleet-ingress -L 2>&1 | tee logs/s4-evidence/3.4-fleet-ingress-$(/bin/date -u +%Y%m%dT%H%M%SZ).log | grep -E '^=== case|FAIL|error:' 
 ```
 
-Run from stibnite, which routes it to magnetite, the only builder advertising `uid-range` (`modules/README.md:56-69`).
-Expected: seven `=== case` lines, the test passes, and the log holds each assertion's output, including `curl: (55)` twice and `curl: (35)` once.
+Run from stibnite with `--option builders` naming magnetite alone, the only builder advertising `uid-range` (`modules/README.md:56-69`); `/etc/nix/machines` also lists pyrite, which would otherwise build the test's dependencies.
+Expected: seven `=== case` lines, the test passes, and the log holds each assertion's output, including `curl: (55)` or `(56)` twice and `curl: (35)` once.
 
 - [ ] **Step 6: Format, cost and the pull request (tasks.md 3.5)**
 

@@ -11,10 +11,10 @@
 # query returns every input series otherwise, and SystemdUnitFailed writes
 # its literal dot as `[.]`, because GreptimeDB 1.2.1 rejects `\.` in
 # double-quoted and backtick strings, so no expression may contain a
-# backslash. SystemdUnitFailed excludes `notifiedUnits`, the evaluating
-# host's services.observability-notify.units, so the notifier and the rule
-# never report one failure twice (D10); when S4 adds notified units on other
-# hosts, this must become their union (design D10, "Later slices").
+# backslash. SystemdUnitFailed excludes the union of every host's
+# notifiedUnits in `hosts`, flake.lib.observabilityHosts by default, so the
+# notifier and the rule never report one failure twice on any host (S4
+# design D9).
 #
 # StoreQueryFailing and RuleSignalMissing have no expression: transition.jq
 # raises them, and they are listed so their `for` lives in this one table.
@@ -35,9 +35,13 @@
 # reads devloop's ci_build in SQL, which promtool cannot parse;
 # vmTests.x86_64-linux.devloop-ingest's burnRule case runs it on GreptimeDB
 # 1.2.1.
+{ config, ... }:
 {
   flake.lib.fleetAlertRules =
-    { lib, notifiedUnits }:
+    {
+      lib,
+      hosts ? config.flake.lib.observabilityHosts,
+    }:
     let
       presence = selector: {
         inherit selector;
@@ -64,7 +68,9 @@
         }
       ];
 
-      units = lib.unique (lib.naturalSort notifiedUnits);
+      units = lib.unique (
+        lib.naturalSort (lib.concatMap (h: h.notifiedUnits) (builtins.attrValues hosts))
+      );
       notifiedRegex =
         assert lib.assertMsg (lib.all (unit: builtins.match "[A-Za-z0-9_-]+" unit != null) units)
           "fleetAlertRules: notified unit names must match [A-Za-z0-9_-]+, so the exclusion needs no escape; got ${builtins.toJSON units}";

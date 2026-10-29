@@ -50,8 +50,9 @@
     { pkgs, system, ... }:
     let
       magnetite = self.nixosConfigurations.magnetite.config;
-      notifiedUnits = magnetite.services.observability-notify.units;
-      rules = self.lib.fleetAlertRules { inherit lib notifiedUnits; };
+      hosts = self.lib.observabilityHosts;
+      notifiedUnits = lib.unique (lib.concatMap (h: h.notifiedUnits) (builtins.attrValues hosts));
+      rules = self.lib.fleetAlertRules { inherit lib hosts; };
       evaluatorRules = builtins.fromJSON rules.json;
       transitionJq = ../nixos/fleet-alert/transition.jq;
       fixtureServer = ./fleet-alert/fixture_server.py;
@@ -519,10 +520,11 @@
 
       # Every query the evaluator may issue in one run, with this step's
       # answers: presence selectors return the reporting hosts unless
-      # listed in `missing`; rule expressions return the step's `series`;
+      # listed in `missing`; the expressions of the leg's rules (its `rules`,
+      # the real table by default) return the step's `series`;
       # `error` replaces every answer with that HTTP status.
       stepAnswers =
-        step:
+        rulesList: step:
         let
           reporting =
             step.reporting or [
@@ -561,7 +563,7 @@
                     }) (series.${r.alert} or [ ])
                   )
               )
-            ) (builtins.filter (r: r ? expr) evaluatorRules)
+            ) (builtins.filter (r: r ? expr) rulesList)
           );
           answers =
             presence
@@ -575,7 +577,11 @@
         leg:
         pkgs.writeText "fleet-alert-responses.json" (
           builtins.toJSON (
-            lib.listToAttrs (lib.imap0 (i: step: lib.nameValuePair (toString i) (stepAnswers step)) leg.steps)
+            lib.listToAttrs (
+              lib.imap0 (
+                i: step: lib.nameValuePair (toString i) (stepAnswers (leg.rules or evaluatorRules) step)
+              ) leg.steps
+            )
           )
         );
 
@@ -611,14 +617,20 @@
           ];
         };
 
-      exclusionRegex =
+      # The SystemdUnitFailed exclusion a rule list renders.
+      exclusionRegexOf =
+        rulesList:
         let
-          m = builtins.match ''.*systemd_unit_name!~"([^"]*)".*'' (ruleNamed "SystemdUnitFailed").expr;
+          rule = lib.findFirst (
+            r: r.alert == "SystemdUnitFailed"
+          ) (throw "fleet-alert check: no SystemdUnitFailed rule") rulesList;
+          m = builtins.match ''.*systemd_unit_name!~"([^"]*)".*'' rule.expr;
         in
         if m == null then
           throw "fleet-alert check: SystemdUnitFailed has no systemd_unit_name exclusion"
         else
           builtins.head m;
+      exclusionRegex = exclusionRegexOf evaluatorRules;
       failedCandidates = map (unit: "${unit}.service") notifiedUnits ++ [ "nginx.service" ];
       storeKeeps = name: builtins.match exclusionRegex name == null;
 
@@ -631,6 +643,61 @@
           ) (builtins.filter storeKeeps failedCandidates);
         }) (lib.range 0 5);
         expect = [ "5 [FIRING] SystemdUnitFailed magnetite default" ];
+      };
+
+      # design D9: the exclusion is the union of every host's notified units,
+      # so a unit notified on one host is excluded on every host. Rules from a
+      # two-host table; the fixture replays the failed states the rendered
+      # exclusion keeps, unit-a on b, unit-b on a and nginx on a.
+      twoHostRules =
+        builtins.fromJSON
+          (self.lib.fleetAlertRules {
+            inherit lib;
+            hosts = {
+              a = {
+                collect = true;
+                alwaysOn = true;
+                notifiedUnits = [ "unit-a" ];
+                smartDevices = [ ];
+              };
+              b = {
+                collect = true;
+                alwaysOn = false;
+                notifiedUnits = [ "unit-b" ];
+                smartDevices = [ ];
+              };
+            };
+          }).json;
+      twoHostConfig = checkConfig twoHostRules;
+      twoHostExclusionLeg = {
+        name = "a unit notified on one host posts no SystemdUnitFailed on another, and nginx, notified nowhere, posts one";
+        rules = twoHostRules;
+        steps = map (n: {
+          at = minute n;
+          # a and b report, so their instances are not frozen as silent.
+          reporting = [
+            "magnetite"
+            "a"
+            "b"
+          ];
+          series.SystemdUnitFailed = map (s: fixtures.series.SystemdUnitFailed // s) (
+            builtins.filter (s: builtins.match (exclusionRegexOf twoHostRules) s.systemd_unit_name == null) [
+              {
+                host_name = "b";
+                systemd_unit_name = "unit-a.service";
+              }
+              {
+                host_name = "a";
+                systemd_unit_name = "unit-b.service";
+              }
+              {
+                host_name = "a";
+                systemd_unit_name = "nginx.service";
+              }
+            ]
+          );
+        }) (lib.range 0 5);
+        expect = [ "5 [FIRING] SystemdUnitFailed a default" ];
       };
 
       # Every answer of runs 1 to 8 is an error, so the first query of each
@@ -1237,6 +1304,10 @@
               evaluator = lib.getExe realEvaluator;
               config = twoDatabaseConfig;
             } twoDatabaseLeg}
+            ${runLeg {
+              evaluator = lib.getExe realEvaluator;
+              config = twoHostConfig;
+            } twoHostExclusionLeg}
             mutant_missed=0
             ${lib.concatStrings (lib.mapAttrsToList mutantRun runtimeMutants)}
             if [ -s "$TMPDIR/misses-real" ]; then
