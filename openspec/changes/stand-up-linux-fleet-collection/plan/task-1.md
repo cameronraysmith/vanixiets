@@ -98,7 +98,8 @@ set -euo pipefail
 db=$1 sql=$2
 # The deployed path of the regulator password, from magnetite's evaluated configuration.
 pw_path=${GSQL_PW_PATH:-$(nix eval --raw .#nixosConfigurations.magnetite.config.clan.core.vars.generators.greptimedb-users.files.regulator-password.path)}
-ssh magnetite.zt 'bash -s' -- "$db" "$sql" "$pw_path" <<'EOS'
+# ssh joins its arguments into one remote command line, so each is quoted for the remote shell.
+ssh magnetite.zt "bash -s -- $(printf '%q ' "$db" "$sql" "$pw_path")" <<'EOS'
 set -euo pipefail
 db=$1 sql=$2 pw_path=$3
 pw=$(sudo cat "$pw_path")
@@ -123,18 +124,16 @@ Expected: `magnetite false 28` and `magnetite true 16` (GR §4) or the current f
 - [ ] **Step 3: Rehearse every verification block (tasks.md 1.3)**
 
 For each fenced verification block in `plan/task-4.md`, `task-5.md`, `task-6.md`, `task-7.md` and `task-9.md` marked `rehearse:`, run it once as written against the host it names, but with every mutating command (deploy, `systemctl stop|start|restart`, drop-ins, powering off) replaced by an `echo` of the command; every block reading `opentelemetry-collector`'s telemetry on cinnabar or pyrite, where the collector does not run yet, is expected to fail with `curl: (7)` and is recorded as such.
-On pyrite only these are run: `awk '/^btime/ {print $2}' /proc/stat` (never `uptime -s`, which fails for the ssh user there), `getfacl /dev/nvme0`, `ls -l /dev/nvme0`, `systemctl is-active zerotierone`, `zerotier-cli info`, `wc -l < /var/log/deploy-record.jsonl`, `sudo journalctl -u zerotierone -n 5 -o cat`.
+On pyrite (over `pyrite.zt` as the ssh user) only these are run: `awk '/^btime/ {print $2}' /proc/stat` (never `uptime -s`, which fails for the ssh user there), `getfacl /dev/nvme0`, `ls -l /dev/nvme0`, `systemctl is-active zerotierone`, `sudo zerotier-cli info` (without `sudo` the ssh user cannot read the daemon's port and token, rc 2), `wc -l < /var/log/deploy-record.jsonl`, `sudo journalctl -u zerotierone -n 5 -o cat`.
 On magnetite also read `curl -s http://127.0.0.1:8888/metrics | grep -E '^otelcol_(exporter_queue_(size|capacity)|exporter_(send|enqueue)_failed|receiver_refused)' | head -n 20` and confirm what the review read live on 2026-10-29: `otelcol_exporter_queue_capacity` exists with a `data_type` label and the counters carry no `_total` suffix; Task 3 Step 1's fixtures copy these names.
 Time design D8's budget queries on magnetite as `regulator`, read-only, each as `time logs/s4-evidence/gsql.sh fleet "<query>"` under bash on stibnite (bash's `time` keyword, since stibnite's `/bin/date` has no `%N`), whose `real` is an upper bound including the ssh round trip: B1 `SELECT count(DISTINCT __tsid) FROM greptime_physical_table WHERE greptime_timestamp > now() - INTERVAL '1 hour'`; B2 one query with a `count(DISTINCT <tag>)` for each tag column of `greptime_physical_table` (the columns listed by `SELECT column_name FROM information_schema.columns WHERE table_name = 'greptime_physical_table' AND semantic_type = 'TAG'`) over the same hour; B3's three per-host counts; B4's notifier count; B5's `devloop` row count over 24 h; B6's `information_schema` read; record each duration, their sum as the expected runtime of an hourly run against `TimeoutStartSec` of 240 s, and the number of tag columns.
 
-Run each block as:
+Each block runs on stibnite in `$REPO` and makes its own ssh calls, so it is not wrapped in another ssh; it is written to a file and run with stdin closed, because an ssh inside a block reading the script from stdin consumes the rest of it.
+In the copy, `logs/s4-evidence/window.env` and each `logs/s4-evidence/<4-9>.<n>-*` path become `logs/s4-evidence/1.3-rehearsal/…`, with rehearsal epochs in `1.3-rehearsal/window.env`, so no rehearsal output is taken for a real record later (Task 4 Step 3 globs `4.1-pre-cinnabar-*.log`):
 
 ```bash
-ssh <host>.zt 'bash -s' <<'EOS' 2>&1 | tee -a logs/s4-evidence/1.3-rehearsal-<ts>.log
-set -uo pipefail
-<block>
-echo "rc=$?"
-EOS
+{ printf 'set -uo pipefail\n'; cat logs/s4-evidence/1.3-rehearsal/<task>-<line>.sh; printf 'echo "rc=$?"\n'; } > /tmp/rehearse.sh
+bash /tmp/rehearse.sh </dev/null 2>&1 | tee -a logs/s4-evidence/1.3-rehearsal-<ts>.log
 ```
 
 Expected: every block prints `rc=0`, or the documented expected code; a block that fails for a reason of its own (a missing `sudo`, a GNU-only flag on stibnite, a jq filter failing on an absent field, `status` used in zsh) is fixed in its plan file and rerun, and the fix is listed at the end of the log under `## Fixes`.

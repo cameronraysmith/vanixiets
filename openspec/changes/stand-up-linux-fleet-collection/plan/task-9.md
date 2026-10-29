@@ -23,7 +23,7 @@ for t in magnetite.zt root@49.13.68.78 pyrite.zt; do echo "== $t"
 done 2>&1 | tee "$L"
 logs/s4-evidence/gsql.sh fleet "SELECT host_name, systemd_unit_name LIKE 'observability-notify@%' AS notifier, count(DISTINCT systemd_unit_name) FROM systemd_unit_state WHERE greptime_timestamp > now() - INTERVAL '24 hours' GROUP BY host_name, notifier ORDER BY host_name, notifier" | tee -a "$L"
 logs/s4-evidence/gsql.sh fleet "SELECT host_name, count(DISTINCT process_executable_name) FROM process_memory_usage_bytes WHERE greptime_timestamp > now() - INTERVAL '24 hours' GROUP BY host_name" | tee -a "$L"
-logs/s4-evidence/gsql.sh fleet "SELECT DISTINCT host_name, systemd_unit_name FROM systemd_unit_state WHERE systemd_unit_name LIKE 'observability-notify@%' AND greptime_timestamp > now() - INTERVAL '24 hours' ORDER BY host_name" | tee -a "$L"
+logs/s4-evidence/gsql.sh fleet "SELECT host_name, systemd_unit_name FROM systemd_unit_state WHERE systemd_unit_name LIKE 'observability-notify@%' AND greptime_timestamp > now() - INTERVAL '24 hours' GROUP BY host_name, systemd_unit_name ORDER BY host_name, systemd_unit_name" | tee -a "$L"
 ```
 
 Expected: `0` failing lines and about 288 `C1` lines per host (one run each 5 min); per host at most 40 ordinary unit names, at most 30 process names, and every stored notifier instance `observability-notify@<u>.service.service` with `<u>` in that host's `notifiedUnits`; any exceedance is a finding against design D8's bounds, recorded with the names.

@@ -119,11 +119,14 @@ rehearse: magnetite:
 ```bash
 L=logs/s4-evidence/6.6-first-run-$(/bin/date -u +%Y%m%dT%H%M%SZ).log
 ssh magnetite.zt 'bash -c "systemctl show fleet-alert -p ExecMainStatus -p ExecMainStartTimestamp -p ExecMainExitTimestamp; sudo journalctl -u fleet-alert -o cat -n 60"' | tee "$L"
-nix eval --raw .#nixosConfigurations.magnetite.config.services.fleet-alert.evaluator.rulesJson 2>/dev/null \
+ssh magnetite.zt 'bash -s' <<'EOS' \
   | jq '[.[] | select(.expr and (.window // null) == null and (.alert | test("^Host(MemoryPressure|OOMKill)$") | not)) ] | length' | tee -a "$L"
+c=$(systemctl show fleet-alert -p Environment --value | tr ' ' '\n' | sed -n 's/^FLEET_ALERT_CONFIG=//p')
+jq -c '.rules' "$c"
+EOS
 ```
 
-If the evaluator module exposes the rendered JSON under another option, read it there (the module's `rendered.json`, `modules/nixos/fleet-alert.nix:573-576`), and count unique presence selectors plus expressions outside the weekly window the same way.
+The rules are read from the delivered evaluator configuration (`FLEET_ALERT_CONFIG` in the unit's environment, `modules/nixos/fleet-alert.nix:606-617`), because the module exposes no rendered-rules option; count unique presence selectors plus expressions outside the weekly window from the same `.rules`.
 Expected: `ExecMainStatus=0`; the journal shows `fleet` and `devloop` queried as `regulator`; the count gives 23 queries in a run with no memory rule firing (22 PromQL, one SQL), and the time between start and exit is recorded beside S3's 0.62–0.68 s for 19 queries.
 
 - [ ] **Step 7: Thirty minutes without a missing signal, and the hand-run control (tasks.md 6.7)**
@@ -135,6 +138,6 @@ L=logs/s4-evidence/6.7-signals-$(/bin/date -u +%Y%m%dT%H%M%SZ).log
 ssh magnetite.zt 'bash -c "sudo journalctl -u fleet-alert -o cat --since \"-35min\" | grep -c RuleSignalMissing"' | tee "$L"
 ```
 
-Expected: `0`.
+Expected: `0` (and the block's `rc=1`, which is `grep -c`'s exit code for no match).
 The negative control: run the deployed evaluator once by hand, as S3's acceptance did, with scratch state, topic `fleet-acceptance`, one selector misspelt (`system_filesystem_usage_byte`) and its `for` at 0, by copying the deployed rules JSON, editing that one rule with `jq`, and starting the evaluator's `ExecStart` under `systemd-run --pty -p DynamicUser=yes -p StateDirectory=fleet-alert-acceptance -p LoadCredential=regulator-password:<path> -p LoadCredential=alerter-token:<path>` with the evaluator's environment pointing at the copied file and the topic.
 Expected: the hand run posts one `[FIRING] RuleSignalMissing` naming `FilesystemFillingWarn` to `fleet-acceptance`, and the operator records it beside the `0` above.
