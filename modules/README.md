@@ -59,6 +59,10 @@ It also applies the nixbot input's migrations to a sandboxed PostgreSQL, creates
 `checks.x86_64-linux.fleet-alert` also replays `PullRequestQueueWaitBurn` against `devloop` through the fixture server's `/v1/sql` and requires each rule's query to reach its own database.
 The five x86_64-linux NixOS machine checks (cinnabar, electrum, galena, magnetite, pyrite) require the deploy-record snippet in the machine's activation through `flake.lib.deployRecordObligations`; the darwin machine checks require it too, but nixbot evaluates `checks.aarch64-darwin` only best-effort, and the deferred scheelite carries the snippet with no machine check.
 The receivers, the store's pipelines and `devloop-reconcile` against the real store are verified by `devloop-ingest` below and at deployment, not by these checks.
+The collector's envelope check is gated the same way and needs no running collector.
+`checks.x86_64-linux.otel-envelope` runs the script of `flake.lib.otelEnvelope`, which `otel-envelope.service` runs on every agent host, against recorded collector telemetry served by a loopback stub, one case per sequence of runs on a fresh state directory.
+It establishes each envelope clause, `C1` to `C4`, against the recorded counters, queues and targets, requires each marked mutant of the script to fail its case, and holds the hourly budget clauses to minute `00` and to a host given a `budget`.
+The real collector's telemetry and the budget's queries against a real store are verified by `fleet-ingress` below and at deployment, not by this check.
 A runtime test builds only on a builder advertising the features its derivation requires: QEMU VM tests need `kvm`, which only Pyrite advertises, and systemd-nspawn container tests need `uid-range`, which only Magnetite advertises.
 Run one from a checkout of the intended revision on that host, or from a dispatcher such as Stibnite, which routes it to the only builder with those features:
 
@@ -67,6 +71,7 @@ nix build .#vmTests.x86_64-linux.zerotier-mss-clamp-runtime   # Pyrite, kvm
 nix build .#vmTests.x86_64-linux.omnigent-worker-isolation    # Pyrite, kvm
 nix build .#vmTests.x86_64-linux.greptimedb-pipeline          # Magnetite, uid-range
 nix build .#vmTests.x86_64-linux.devloop-ingest               # Magnetite, uid-range
+nix build .#vmTests.x86_64-linux.fleet-ingress                # Magnetite, uid-range
 nix build .#vmTests.x86_64-linux.greptimedb-oom-order         # Pyrite, kvm
 ```
 
@@ -83,6 +88,10 @@ It establishes that each `otlp_http/devloop_<table>` exporter's first send succe
 It uses fixture nixbot rows and a stub gitea-mq, so the backfill's size, the widest `finished_at` tie and a change in gitea-mq's real messages are observed only on magnetite, at deployment and by `devloop-reconcile`; and a container shares the build host's kernel, so it establishes nothing about memory limits.
 Its activation case runs the activation script of an `extendModules` variant of the container's system, because the container's systems carry no `switch-to-configuration`, and prints a `limitation:` line.
 Run it on Magnetite before merging any change to the dev-loop receivers, pipelines, allow-list or reconcile, or to `PullRequestQueueWaitBurn`'s SQL in `modules/nixos/fleet-alert/rules.nix`, which only its `burnRule` case runs on a real store, and name its log in the pull request.
+
+`fleet-ingress` runs the telemetry store, a collector of both roles with its `otlp/mesh` receiver on loopback, and Electrum's evaluated non-ingress collector exporting to it over mutual TLS with throwaway certificates, in one systemd-nspawn container.
+It establishes that the receiver refuses a client without a certificate, with a rogue CA's certificate or at TLS 1.2, that metrics and deploy records cross the ingress into the store, that back-pressure from a stopped store or a refusing limiter fills the agent's queue without loss, that each envelope clause fails on its negative control when run as its unit, and that each budget fixture fails its clause on the ingress host's unit.
+It stands the container's loopback in for Magnetite's ZeroTier address and generates its own certificates, so it establishes nothing about the real address, the `zt+` firewall opening, the deployed certificates or the refusal over the mesh, which are observed at deployment.
 
 `greptimedb-oom-order` runs one QEMU VM in which three equally growing memory consumers exhaust memory: one behind the real `nix-eval-jobs` lock wrapper, one inside `greptimedb.service`'s cgroup at that unit's `oom_score_adj`, and a collector stand-in at the collector's evaluated `OOMScoreAdjust`.
 It establishes that the kernel kills them in the order evaluator (900), store (500), collector (300), that systemd records the OOM kill in each owning unit, and that `greptimedb.service` fails with result `oom-kill` under the default `OOMPolicy=stop`.
