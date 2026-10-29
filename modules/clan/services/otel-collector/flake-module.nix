@@ -336,6 +336,12 @@ in
                     # container runtime mounts under /var/lib/docker stay out
                     # (design D4; ADR-003 item 26).
                     filesystem = {
+                      # /proc/filesystems lists zfs as nodev, and the scraper
+                      # drops virtual filesystems unless told otherwise
+                      # (filesystem_scraper.go:75 at otelcol 0.155.0), which
+                      # would discard every ZFS mount; the strict list below
+                      # still limits it to the ZFS datasets.
+                      include_virtual_filesystems = true;
                       include_mount_points = {
                         match_type = "strict";
                         mount_points = zfsMounts;
