@@ -9,7 +9,7 @@
     "url": "https://github.com/cameronraysmith/vanixiets.git"
   },
   "license": "MIT",
-  "packageManager": "bun@1.4.3",
+  "packageManager": "bun@1.4.4",
   "scripts": {
     "clean": "bun run clean:dist && bun run clean:public && bun run clean:cache",
     "clean:cache": "astro sync --force",
@@ -44,13 +44,13 @@
     "astro": "7.4.4"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.5.15",
+    "@biomejs/biome": "^2.6.4",
     "@cloudflare/vite-plugin": "1.64.0",
     "@playwright/test": "1.64.1",
     "@semantic-release/changelog": "^7.0.0",
     "@semantic-release/git": "^11.0.1",
     "@semantic-release/github": "^12.0.10",
-    "@types/node": "^26.6.5",
+    "@types/node": "^26.6.6",
     "@vitest/coverage-v8": "^5.0.5",
     "conventional-changelog-conventionalcommits": "^9.3.1",
     "playwright": "1.64.1",
