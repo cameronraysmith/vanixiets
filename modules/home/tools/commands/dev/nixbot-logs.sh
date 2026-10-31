@@ -48,16 +48,20 @@ Subcommands:
   builds                  List builds for the repository, newest first
   show [BUILD]            Build summary: per-attribute and per-effect status
   log ATTR [BUILD]        Print one attribute's build log as text
-  effect NAME [BUILD]     Print one effect's log as text ('effect:NAME' sugar)
-  failures [BUILD]        Print every failed attribute's log in one command
+                          ('effect:NAME' is passed on to 'effect')
+  effect NAME [BUILD]     Print one effect's log as text
+  failures [BUILD]        Print every failed attribute's and effect's log
   toc ATTR [BUILD]        Per-derivation log table of contents for an attribute
   download [BUILD]        Write one file per attribute into a directory
   queue                   Global build queue across all repositories
 
 BUILD is a build number or the literal 'latest' (the default when omitted).
 Unlike buildbot, nixbot addresses a build by repository plus one build
-number; there is no builder id and no per-step decomposition. Attributes,
-including 'effect:<name>' attributes, take the place of buildbot steps.
+number; there is no builder id and no per-step decomposition. Attributes
+and effects take the place of buildbot steps. Effects are not attributes:
+each effect run has its own id and log, and NAME is matched against the
+effect names 'show' lists. When several runs of one effect share a build,
+the latest run is used.
 
 Options:
   --repo OWNER/NAME  Repository (default: cameronraysmith/vanixiets)
@@ -65,7 +69,7 @@ Options:
   --forge FORGE      Forge segment of the API path (default: github)
   --token TOKEN      Bearer token; only needed for private repositories
   --tail N           Last N lines only (log, effect, failures)
-  --drv DRV          Restrict a log to one derivation (store path or name)
+  --drv DRV          Restrict an attribute log to one derivation
   --ansi             Keep ANSI colour escapes instead of stripping them
   --json             Emit raw API JSON (builds, show, failures, toc, queue)
   --limit N          Max builds to list, paging as needed (default: 20)
@@ -99,7 +103,7 @@ Examples:
   nixbot-logs builds --commit ad6a9e5
   nixbot-logs log checks.x86_64-linux.effects-interpreter 1 --tail 200
 
-  # Effect logs; the 'effect:' attribute prefix is added for you
+  # Effect logs, by the effect name 'show' lists
   nixbot-logs effect default.deploy-docs
   nixbot-logs log 'effect:default.deploy-docs'   # equivalent
 
@@ -253,9 +257,7 @@ trap 'rm -rf "$tmp"' EXIT
 
 # Percent-encode the characters that would otherwise change the meaning of a
 # path segment. '/' is deliberately preserved: nixbot's log routes use a
-# :path converter precisely because attribute names contain slashes, while
-# effect attributes ('effect:<name>') require the colon encoded or the route
-# does not match at all.
+# :path converter precisely because attribute names contain slashes.
 enc() {
   local s="$1"
   s="${s//%/%25}"
@@ -341,6 +343,22 @@ untailed_log_query() {
   return 0
 }
 
+# effect_run_text ID [TAIL] -> one effect run's log; empty TAIL means whole.
+# Effect run logs take tail and ansi only: --drv names a derivation of an
+# attribute and has no meaning for an effect run.
+effect_run_text() {
+  local q=""
+  [ -n "${2-}" ] && q="${q}&tail=$2"
+  [ "$ansi" -eq 1 ] && q="${q}&ansi=1"
+  req_soft "$(repo_path "/effects/runs/$1/text")${q:+?${q#&}}"
+}
+
+# One entry per effect name, keeping the run with the highest id, since a
+# restarted effect leaves its earlier runs in the build's effects array.
+latest_effect_runs() {
+  jq -c '.effects | group_by(.name) | map(max_by(.id)) | sort_by(.id) | .[]' <<<"$1"
+}
+
 failure_status_json() {
   printf '%s\n' "${failure_statuses[@]}" | jq -R -s 'split("\n") | map(select(. != ""))'
 }
@@ -362,20 +380,7 @@ print_eval_warnings() {
 }
 
 attr_missing() {
-  local build="$1" attr="$2"
-  case "$attr" in
-    effect:*)
-      die 4 "build $build of $repo has no effect '${attr#effect:}'; run 'nixbot-logs show $build' to list its effects"
-      ;;
-    *)
-      die 4 "build $build of $repo has no attribute '$attr'; run 'nixbot-logs show $build' to list its attributes"
-      ;;
-  esac
-}
-
-failed_effect_names() {
-  jq -r --argjson failures "$(failure_status_json)" \
-    '.effects[] | select(.status | IN($failures[])) | .name' <<<"$1"
+  die 4 "build $1 of $repo has no attribute '$2'; run 'nixbot-logs show $1' to list its attributes"
 }
 
 cmd_builds() {
@@ -468,6 +473,13 @@ cmd_show() {
 cmd_log() {
   local attr="${args[1]-}" build text status
   [ -n "$attr" ] || die 2 "ATTR is required: nixbot-logs log ATTR [BUILD]"
+  case "$attr" in
+    effect:*)
+      args=(effect "${attr#effect:}" "${args[2]-latest}")
+      cmd_effect
+      return
+      ;;
+  esac
   build=$(resolve_build "${args[2]-latest}")
   if text=$(req_soft "$(repo_path "/builds/$build/logs/$(enc "$attr")/text")$(log_query)"); then
     printf '%s\n' "$text"
@@ -484,14 +496,29 @@ cmd_log() {
 }
 
 cmd_effect() {
-  local effect="${args[1]-}"
+  local effect="${args[1]-}" build detail runs count run id status text
   [ -n "$effect" ] || die 2 "NAME is required: nixbot-logs effect NAME [BUILD]"
-  case "$effect" in
-    effect:*) : ;;
-    *) effect="effect:$effect" ;;
-  esac
-  args=(log "$effect" "${args[2]-latest}")
-  cmd_log
+  effect="${effect#effect:}"
+  build=$(resolve_build "${args[2]-latest}")
+  detail=$(req "$(repo_path "/builds/$build")" "build $build of $repo")
+  runs=$(jq -c --arg n "$effect" '[.effects[] | select(.name == $n)] | sort_by(.id)' <<<"$detail")
+  count=$(jq 'length' <<<"$runs")
+  if [ "$count" -eq 0 ]; then
+    die 4 "build $build of $repo has no effect '$effect'; its effects are: $(jq -r '[.effects[].name] | unique | if length == 0 then "(none)" else join(", ") end' <<<"$detail")"
+  fi
+  run=$(jq -c '.[-1]' <<<"$runs")
+  id=$(jq -r '.id' <<<"$run")
+  status=$(jq -r '.status' <<<"$run")
+  if [ "$count" -gt 1 ]; then
+    printf 'Note: build %s has %s runs of effect %s (ids %s); showing the latest, %s.\n' \
+      "$build" "$count" "$effect" "$(jq -r 'map(.id) | join(", ")' <<<"$runs")" "$id" >&2
+  fi
+  if text=$(effect_run_text "$id" "$tail_lines"); then
+    printf '%s\n' "$text"
+    return 0
+  fi
+  printf 'Note: effect %s (run %s) has no log in build %s (status: %s).\n' \
+    "$effect" "$id" "$build" "$status" >&2
 }
 
 cmd_toc() {
@@ -522,12 +549,15 @@ cmd_toc() {
 }
 
 cmd_failures() {
-  local build summary detail effects count attr status error
+  local build summary detail failed_runs effects count attr status error id effect
   build=$(resolve_build "${args[1]-latest}")
   summary=$(req "$(repo_path "/builds/$build/failures")?tail=${tail_lines:-50}" \
     "failure summary for build $build of $repo")
   detail=$(req "$(repo_path "/builds/$build")" "build $build of $repo")
-  effects=$(failed_effect_names "$detail")
+  failed_runs=$(latest_effect_runs "$detail" |
+    jq -r --argjson failures "$(failure_status_json)" \
+      'select(.status | IN($failures[])) | [.id, .name] | @tsv')
+  effects=$(cut -f2 <<<"$failed_runs")
 
   if [ "$as_json" -eq 1 ]; then
     jq --argjson failed_effects \
@@ -566,13 +596,18 @@ cmd_failures() {
   done < <(jq -r '.failures[] | [.attr, .status,
     (if (.error // "") == "" then "null" else .error end)] | @tsv' <<<"$summary")
 
-  while IFS= read -r effect; do
-    [ -n "$effect" ] || continue
-    printf '=== FAILED EFFECT: %s ===\n' "$effect"
-    req_soft "$(repo_path "/builds/$build/logs/$(enc "effect:$effect")/text")$(log_query)" ||
-      printf '(no log available for effect %s)\n' "$effect"
+  # The failure summary covers attributes only; effect logs come from their
+  # runs, tailed to the summary's 50 lines unless --full or --tail says else.
+  while IFS=$'\t' read -r id effect; do
+    [ -n "$id" ] || continue
+    printf '=== FAILED EFFECT: %s (run %s) ===\n' "$effect" "$id"
+    if [ "$full" -eq 1 ]; then
+      effect_run_text "$id"
+    else
+      effect_run_text "$id" "${tail_lines:-50}"
+    fi || printf '(no log available for effect %s)\n' "$effect"
     printf '\n'
-  done <<<"$effects"
+  done <<<"$failed_runs"
 }
 
 cmd_download() {
@@ -605,21 +640,20 @@ cmd_download() {
     fi
   done < <(jq -r '.attributes[] | [.status, (.log_size // 0), .attr] | @tsv' <<<"$detail")
 
-  while IFS=$'\t' read -r status effect; do
+  while IFS=$'\t' read -r id status effect; do
     [ -n "$effect" ] || continue
     if [ "$failed_only" -eq 1 ] && ! is_failure_status "$status"; then
       skipped=$((skipped + 1))
       continue
     fi
     filename="effect-${effect//\//_}"
-    if req_soft "$(repo_path "/builds/$build/logs/$(enc "effect:$effect")/text")$(log_query)" \
-      >"$target/$filename.log"; then
+    if effect_run_text "$id" "$tail_lines" >"$target/$filename.log"; then
       written=$((written + 1))
     else
       rm -f "$target/$filename.log"
       printf 'Note: no log stored for effect %s\n' "$effect" >&2
     fi
-  done < <(jq -r '.effects[] | [.status, .name] | @tsv' <<<"$detail")
+  done < <(latest_effect_runs "$detail" | jq -r '[.id, .status, .name] | @tsv')
 
   printf 'Wrote %s log file(s) to %s (build.json holds the full build detail).\n' \
     "$written" "$target" >&2
