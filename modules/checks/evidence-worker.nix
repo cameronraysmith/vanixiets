@@ -38,6 +38,10 @@
           CLOUDFLARE_CF_FETCH_ENABLED = "false";
           WRANGLER_SEND_METRICS = "false";
           CI = "true";
+          # workerd refuses to start when its internet service finds no
+          # system CA roots, and the Linux build sandbox has none. The tests
+          # make no outbound TLS connections; the bundle only satisfies startup.
+          SSL_CERT_FILE = "${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt";
         };
 
         dontConfigure = true;
