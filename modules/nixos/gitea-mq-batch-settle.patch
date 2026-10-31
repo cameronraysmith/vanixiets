@@ -1,5 +1,5 @@
 diff --git a/cmd/gitea-mq/main.go b/cmd/gitea-mq/main.go
-index 7dc131f..7392da0 100644
+index d43bd86..debdb90 100644
 --- a/cmd/gitea-mq/main.go
 +++ b/cmd/gitea-mq/main.go
 @@ -63,6 +63,8 @@ func run() error {
@@ -11,7 +11,7 @@ index 7dc131f..7392da0 100644
  	)
  
  	// Graceful shutdown context.
-@@ -131,6 +133,8 @@ func run() error {
+@@ -132,6 +134,8 @@ func run() error {
  		SkipQueueIfUpToDate: cfg.SkipQueueIfUpToDate,
  		BatchMax:            cfg.BatchMax,
  		BisectMaxSteps:      cfg.BisectMaxSteps,
@@ -21,7 +21,7 @@ index 7dc131f..7392da0 100644
  
  	discTrigger := make(chan struct{}, 1)
 diff --git a/internal/batch/batch.go b/internal/batch/batch.go
-index d1a22eb..e00be53 100644
+index d1a22eb..c44942e 100644
 --- a/internal/batch/batch.go
 +++ b/internal/batch/batch.go
 @@ -53,6 +53,15 @@ type Engine struct {
@@ -62,7 +62,7 @@ index d1a22eb..e00be53 100644
  	b, err := e.Queue.FormBatch(ctx, e.RepoID, targetBranch, e.BatchMax)
  	if err != nil || b == nil {
  		return nil, err
-@@ -144,6 +157,35 @@ func (e *Engine) FormAndBuild(ctx context.Context, targetBranch string) (*pg.Bat
+@@ -144,6 +157,49 @@ func (e *Engine) FormAndBuild(ctx context.Context, targetBranch string) (*pg.Bat
  	return b, e.Build(ctx, b)
  }
  
@@ -73,24 +73,38 @@ index d1a22eb..e00be53 100644
 +	if e.Settle <= 0 {
 +		return true, nil
 +	}
-+	entries, err := e.Queue.List(ctx, e.RepoID, targetBranch)
++	entries, err := e.Queue.ListActiveEntries(ctx, e.RepoID)
 +	if err != nil {
 +		return false, err
 +	}
-+	queued := slices.DeleteFunc(entries, func(q pg.QueueEntry) bool { return q.State != pg.EntryStateQueued })
-+	if len(queued) == 0 || (e.BatchMax > 0 && len(queued) >= e.BatchMax) {
++	// Queue order is not enqueue order (priority entries sort first), so
++	// scan for the oldest and newest enqueue instead of taking the ends.
++	var queued int
++	var oldest, newest time.Time
++	for _, q := range entries {
++		if q.TargetBranch != targetBranch || q.State != pg.EntryStateQueued {
++			continue
++		}
++		at := q.EnqueuedAt.Time
++		if queued == 0 || at.Before(oldest) {
++			oldest = at
++		}
++		if queued == 0 || at.After(newest) {
++			newest = at
++		}
++		queued++
++	}
++	if queued == 0 || (e.BatchMax > 0 && queued >= e.BatchMax) {
 +		return true, nil
 +	}
 +	now := time.Now()
 +	if e.Now != nil {
 +		now = e.Now()
 +	}
-+	// ListQueue orders by enqueued_at ascending.
-+	oldest, newest := queued[0].EnqueuedAt.Time, queued[len(queued)-1].EnqueuedAt.Time
 +	if now.Sub(newest) >= e.Settle || (e.SettleMax > 0 && now.Sub(oldest) >= e.SettleMax) {
 +		return true, nil
 +	}
-+	slog.Debug("batch settling", "branch", targetBranch, "queued", len(queued),
++	slog.Debug("batch settling", "branch", targetBranch, "queued", queued,
 +		"since_newest", now.Sub(newest), "since_oldest", now.Sub(oldest))
 +	return false, nil
 +}
@@ -99,7 +113,7 @@ index d1a22eb..e00be53 100644
  // tip. Conflicting members are ejected and construction continues. On success
  // the batch transitions to testing and every current entry's merge_branch_*
 diff --git a/internal/batch/batch_test.go b/internal/batch/batch_test.go
-index b33944a..e6f4cd9 100644
+index 614a859..07ca031 100644
 --- a/internal/batch/batch_test.go
 +++ b/internal/batch/batch_test.go
 @@ -7,6 +7,7 @@ import (
@@ -110,21 +124,21 @@ index b33944a..e6f4cd9 100644
  
  	"github.com/Mic92/gitea-mq/internal/batch"
  	"github.com/Mic92/gitea-mq/internal/forge"
-@@ -573,3 +574,130 @@ func TestPendingDrop(t *testing.T) {
+@@ -573,3 +574,128 @@ func TestPendingDrop(t *testing.T) {
  		t.Fatalf("expected done, got %+v", b)
  	}
  }
 +
 +// settleQueue is setup with a controllable clock and enqueue times: each PR
-+// is enqueued and its enqueued_at pinned to t0+offset.
++// is inserted into the queue with enqueued_at = t0+offset.
 +type settleQueue struct {
-+	t   *testing.T
-+	ctx context.Context
-+	e   *batch.Engine
-+	svc *queue.Service
-+	t0  time.Time
-+	now time.Time
-+	pin func(pr int64, at time.Time)
++	t      *testing.T
++	ctx    context.Context
++	e      *batch.Engine
++	svc    *queue.Service
++	t0     time.Time
++	now    time.Time
++	insert func(pr int64, at time.Time)
 +}
 +
 +func setupSettle(t *testing.T, batchMax int, settle, settleMax time.Duration) *settleQueue {
@@ -138,8 +152,9 @@ index b33944a..e6f4cd9 100644
 +	}
 +	s := &settleQueue{t: t, ctx: ctx, svc: svc, t0: time.Now().Truncate(time.Second)}
 +	s.now = s.t0
-+	s.pin = func(pr int64, at time.Time) {
-+		if _, err := pool.Exec(ctx, "UPDATE queue_entries SET enqueued_at = $1 WHERE repo_id = $2 AND pr_number = $3", at, repo.ID, pr); err != nil {
++	s.insert = func(pr int64, at time.Time) {
++		if _, err := pool.Exec(ctx, "INSERT INTO queue_entries (repo_id, pr_number, pr_head_sha, target_branch, enqueued_at) VALUES ($1, $2, $3, 'main', $4)",
++			repo.ID, pr, fmt.Sprintf("sha%d", pr), at); err != nil {
 +			t.Fatal(err)
 +		}
 +	}
@@ -163,10 +178,7 @@ index b33944a..e6f4cd9 100644
 +// enqueue adds pr with enqueued_at = t0+offset.
 +func (s *settleQueue) enqueue(pr int64, offset time.Duration) {
 +	s.t.Helper()
-+	if _, err := s.svc.Enqueue(s.ctx, s.e.RepoID, pr, fmt.Sprintf("sha%d", pr), "main"); err != nil {
-+		s.t.Fatal(err)
-+	}
-+	s.pin(pr, s.t0.Add(offset))
++	s.insert(pr, s.t0.Add(offset))
 +}
 +
 +// formAt runs FormAndBuild with the clock at t0+offset.
@@ -242,10 +254,10 @@ index b33944a..e6f4cd9 100644
 +	s.wantBatch(0, 1)
 +}
 diff --git a/internal/config/config.go b/internal/config/config.go
-index 6330c7a..87470d6 100644
+index 9c7a429..6df9148 100644
 --- a/internal/config/config.go
 +++ b/internal/config/config.go
-@@ -31,6 +31,8 @@ type Config struct {
+@@ -32,6 +32,8 @@ type Config struct {
  	SkipQueueIfUpToDate bool
  	BatchMax            int
  	BisectMaxSteps      int
@@ -254,7 +266,7 @@ index 6330c7a..87470d6 100644
  	RefreshInterval     time.Duration
  	DiscoveryInterval   time.Duration
  	LogLevel            string
-@@ -173,6 +175,14 @@ func Load() (*Config, error) {
+@@ -179,6 +181,14 @@ func Load() (*Config, error) {
  	if err != nil {
  		return nil, err
  	}
@@ -270,10 +282,10 @@ index 6330c7a..87470d6 100644
  	cfg.CacheDir = os.Getenv("GITEA_MQ_CACHE_DIR")
  	if cfg.CacheDir == "" {
 diff --git a/internal/config/config_test.go b/internal/config/config_test.go
-index 13f7372..b9996ab 100644
+index f40a640..f9a50c3 100644
 --- a/internal/config/config_test.go
 +++ b/internal/config/config_test.go
-@@ -98,6 +98,32 @@ func TestLoad_BatchMax(t *testing.T) {
+@@ -99,6 +99,32 @@ func TestLoad_BatchMax(t *testing.T) {
  	}
  }
  
@@ -307,10 +319,10 @@ index 13f7372..b9996ab 100644
  	setEnv(t, giteaEnv)
  	for _, tc := range []struct{ env, want string }{
 diff --git a/internal/registry/registry.go b/internal/registry/registry.go
-index 4e5dea7..98a6da5 100644
+index 9468c92..a1e3cef 100644
 --- a/internal/registry/registry.go
 +++ b/internal/registry/registry.go
-@@ -43,6 +43,8 @@ type Deps struct {
+@@ -44,6 +44,8 @@ type Deps struct {
  	SkipQueueIfUpToDate bool
  	BatchMax            int
  	BisectMaxSteps      int
@@ -319,7 +331,7 @@ index 4e5dea7..98a6da5 100644
  }
  
  // RepoRegistry manages the set of active repos. Thread-safe for concurrent
-@@ -118,6 +120,8 @@ func (r *RepoRegistry) Add(ctx context.Context, ref forge.RepoRef) error {
+@@ -119,6 +121,8 @@ func (r *RepoRegistry) Add(ctx context.Context, ref forge.RepoRef) error {
  			ExternalURL:    r.deps.ExternalURL,
  			BatchMax:       r.deps.BatchMax,
  			BisectMaxSteps: r.deps.BisectMaxSteps,
