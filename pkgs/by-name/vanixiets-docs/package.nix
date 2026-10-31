@@ -4,6 +4,7 @@
   bun,
   nodejs-slim,
   stdenv,
+  cacert,
   runCommand,
   svgo,
   jq,
@@ -258,6 +259,13 @@ stdenv.mkDerivation (finalAttrs: {
       # Nothing here attaches a debugger. Negative-control reports inherit it
       # via `old.env //`.
       DOCS_DISABLE_WORKER_INSPECTOR = "1";
+      # astro preview's workerd configures miniflare's "internet" service with
+      # trustBrowserCas, which workerd 1.20261023 and later resolves from the
+      # system trust store and refuses to start without ("No CA certificates
+      # were loaded from the system"). The linux build sandbox has no store, so
+      # point workerd's loader at the nixpkgs bundle; with no network in the
+      # sandbox these roots only satisfy startup.
+      SSL_CERT_FILE = "${cacert}/etc/ssl/certs/ca-bundle.crt";
       DOCS_EVIDENCE_EPOCH =
         assert lib.assertMsg (
           builtins.isString evidenceEpoch && builtins.match "(0|[1-9][0-9]*)" evidenceEpoch != null
