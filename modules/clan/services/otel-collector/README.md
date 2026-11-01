@@ -50,6 +50,9 @@ The `otelcol` job scrapes the collector's own telemetry at `127.0.0.1:8888`, kee
 Where `vanixiets.otelCollector.smartDevices` is non-empty, the agent runs `prometheus-smartctl-exporter.service` on `127.0.0.1:9633` with `openFirewall = false` and `MemoryMax = "64M"`, and the `smartctl` job keeps the eight series of `schema.smartctlKeep`.
 The exporter's NixOS module grants the `smartctl-exporter-access` group its ACL on each device by a udev rule that fires only on an `add` event, which a switch does not replay.
 The unit therefore runs one privileged `ExecStartPre` per device, `+setfacl -m g:smartctl-exporter-access:rw <device>`.
+The exporter's `--smartctl.path` is a wrapper that drops the `--log=error` argument the exporter always passes, then runs the root pin's `smartctl`.
+The exporter discards a device whenever smartctl reports an error message, and pyrite's APPLE SSD rejects the Error Information log page, so without the wrapper pyrite publishes no NVMe series.
+No kept series comes from that log: `smartctl_device_num_err_log_entries` is read from the health log, and a failed health-log read still drops the device.
 An agent assertion keeps `openFirewall` off for both node_exporter and the smartctl exporter.
 
 `file_log/deploy-record` lives in the agent fragment, unchanged in id and settings from when magnetite's dev-loop collection defined it, so magnetite's stored offset carried over.
