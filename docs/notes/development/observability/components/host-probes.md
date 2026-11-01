@@ -44,7 +44,7 @@ The collector-side host signals, namely per-process memory, systemd unit state, 
 Series written (ADR-004 keep-lists):
 
 - node_exporter, NixOS: `node_zfs_zpool_state` with labels `zpool` and `state`, `node_zfs_arc_size`, `node_zfs_arc_c`, `node_zfs_arc_c_min`, `node_zfs_arc_c_max`, `node_zfs_arc_hits`, `node_zfs_arc_misses`, `node_zfs_arc_memory_throttle_count` and `node_vmstat_oom_kill`.
-- smartctl, pyrite and stibnite: `smartctl_device_smart_status`, `smartctl_device_critical_warning`, `smartctl_device_media_errors`, `smartctl_device_percentage_used`, `smartctl_device_available_spare`, `smartctl_device_available_spare_threshold`, `smartctl_device_num_err_log_entries` and `smartctl_device_temperature`, with labels `device` and `temperature_type`; stibnite writes `device="disk0"` and `temperature_type="current"`.
+- smartctl, pyrite and stibnite: `smartctl_device_smart_status`, `smartctl_device_critical_warning`, `smartctl_device_media_errors`, `smartctl_device_percentage_used`, `smartctl_device_available_spare`, `smartctl_device_available_spare_threshold`, `smartctl_device_num_err_log_entries` and `smartctl_device_temperature`, with labels `device` and `temperature_type`; stibnite writes `device="disk0"` and `temperature_type="current"`; the store appends `_total` to the six the exporter declares counters, every one but `smart_status` and `temperature` (ADR-004 item 7).
 - launchd, darwin: `launchd_job_state{launchd_label, launchd_state}` with `launchd_state` one of `running`, `not_running`, `unloaded` and `other`; `launchd_job_last_exit_code{launchd_label}`; and `launchd_job_runs_total{launchd_label}`.
 - Textfile metadata, darwin: `node_textfile_mtime_seconds` with label `file`, and `node_textfile_scrape_error`.
 
@@ -103,7 +103,7 @@ Regulators:
 ## Deployment acceptance items
 
 - pyrite's Apple NVMe controller answers smartctl's health log on `/dev/nvme0`; if it does not, pyrite's exporter is removed (ADR-003 Q15).
-- `RuleSignalMissing` reports a missing `smartctl_device_critical_warning` for pyrite within 30 min of deploy if pyrite reports host memory but no SMART series (ADR-009).
+- `RuleSignalMissing` reports a missing `smartctl_device_critical_warning_total` for pyrite within 30 min of deploy if pyrite reports host memory but no SMART series (ADR-009).
 - `_prometheus-node-exporter` reads `disk0`'s health log on stibnite, as `nobody` did on 2026-10-15 (ADR-003 Q18).
 - `launchctl print` encodes a signal termination as an integer, or the probe writes -1 for it (ADR-003 Q18; ADR-003 item 23).
 - A `darwin-rebuild switch` with a changed `otelcol` plist on stibnite fires neither `LaunchdJobFailed` nor `LaunchdJobNotRunning` (ADR-009).

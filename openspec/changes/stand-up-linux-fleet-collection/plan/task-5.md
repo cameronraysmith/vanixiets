@@ -53,11 +53,11 @@ rehearse: pyrite and magnetite:
 L=logs/s4-evidence/5.3-smart-$(/bin/date -u +%Y%m%dT%H%M%SZ).log
 ssh root@"$PYRITE_LAN" 'bash -c "awk \"/^btime/ {print \\\$2}\" /proc/stat; getfacl -p /dev/nvme0; curl -s http://127.0.0.1:9633/metrics | grep -E \"^smartctl_device_(critical_warning|percentage_used)\""' | tee "$L"
 sleep 120
-logs/s4-evidence/promq.sh 'smartctl_device_critical_warning{host_name="pyrite"}' | tee -a "$L"
-logs/s4-evidence/promq.sh 'smartctl_device_percentage_used{host_name="pyrite"}' | tee -a "$L"
+logs/s4-evidence/promq.sh 'smartctl_device_critical_warning_total{host_name="pyrite"}' | tee -a "$L"
+logs/s4-evidence/promq.sh 'smartctl_device_percentage_used_total{host_name="pyrite"}' | tee -a "$L"
 ```
 
-Expected: the boot epoch earlier than `PYRITE_DEPLOY_EPOCH` (no reboot); `group:smartctl-exporter-access:rw-` in the ACL; the exporter's two series locally; one stored row each for pyrite, critical warning `0` and percentage used near A51's 11 (AC3).
+Expected: the boot epoch earlier than `PYRITE_DEPLOY_EPOCH` (no reboot); `group:smartctl-exporter-access:rw-` in the ACL; the exporter's two series locally under its own names; one stored row each for pyrite under the `_total` names the store gives the exporter's counter-typed fields, critical warning `0` and percentage used near A51's 11 (AC3).
 If the series are missing, read `sudo journalctl -u prometheus-smartctl-exporter -n 50 -o cat` on pyrite and record it; A51's violation condition applies if the exporter reads the device but reports no health log.
 
 - [ ] **Step 4: pyrite's first-deploy capture (tasks.md 5.4)**
@@ -116,9 +116,9 @@ r=logs/s4-evidence/6.1-replay.sh
 fs='sum by (host_name, mountpoint) (system_filesystem_usage_bytes{host_name="pyrite", state="used"}) / sum by (host_name, mountpoint) (system_filesystem_usage_bytes{host_name="pyrite"})'
 $r "$fs > 0.85" | tee "$L"
 $r "$fs > 0.95" | tee -a "$L"
-$r 'smartctl_device_critical_warning{host_name="pyrite"} != 0' | tee -a "$L"
-$r 'smartctl_device_percentage_used{host_name="pyrite"} > 90' | tee -a "$L"
-for m in smartctl_device_critical_warning smartctl_device_percentage_used; do
+$r 'smartctl_device_critical_warning_total{host_name="pyrite"} != 0' | tee -a "$L"
+$r 'smartctl_device_percentage_used_total{host_name="pyrite"} > 90' | tee -a "$L"
+for m in smartctl_device_critical_warning_total smartctl_device_percentage_used_total; do
   $r "count by (host_name) (system_memory_usage_bytes{host_name=\"pyrite\"}) unless on (host_name) count by (host_name) ($m)" | tee -a "$L"
 done
 ```

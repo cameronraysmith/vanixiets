@@ -155,7 +155,7 @@ On each host whose `smartDevices` is non-empty, the agent role SHALL run `promet
 #### Scenario: pyrite is deployed
 
 - **WHEN** pyrite has been switched to the agent role without a reboot and one scrape interval has passed
-- **THEN** `smartctl_device_critical_warning{host_name="pyrite"}` and `smartctl_device_percentage_used{host_name="pyrite"}` are stored, and the operator records both
+- **THEN** `smartctl_device_critical_warning_total{host_name="pyrite"}` and `smartctl_device_percentage_used_total{host_name="pyrite"}`, the names the store gives the exporter's counter-typed fields, are stored, and the operator records both
 
 ### Requirement: This capability states its own trust boundary
 

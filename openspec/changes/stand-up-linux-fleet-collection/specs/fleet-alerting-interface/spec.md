@@ -51,7 +51,7 @@ The machine SHALL declare the alert rules once in `modules/nixos/fleet-alert/rul
 #### Scenario: The file-system and disk-health rules are rendered
 
 - **WHEN** the rule table is rendered
-- **THEN** `FilesystemFillingWarn` is `sum by (host_name, mountpoint) (system_filesystem_usage_bytes{state="used"}) / sum by (host_name, mountpoint) (system_filesystem_usage_bytes) > 0.85` for 15 min at `warning`, `FilesystemFull` the same above 0.95 for 5 min at `critical`, `NvmeCriticalWarning` `smartctl_device_critical_warning != 0` with no `for` at `critical`, and `NvmeWearHigh` `smartctl_device_percentage_used > 90` for 1 h at `warning`
+- **THEN** `FilesystemFillingWarn` is `sum by (host_name, mountpoint) (system_filesystem_usage_bytes{state="used"}) / sum by (host_name, mountpoint) (system_filesystem_usage_bytes) > 0.85` for 15 min at `warning`, `FilesystemFull` the same above 0.95 for 5 min at `critical`, `NvmeCriticalWarning` `smartctl_device_critical_warning_total != 0` with no `for` at `critical`, and `NvmeWearHigh` `smartctl_device_percentage_used_total > 90` for 1 h at `warning`, under the `_total` names the store gives the exporter's counter-typed fields
 
 #### Scenario: An expression does not parse
 
@@ -86,7 +86,7 @@ Each rule's presence selector SHALL be the bare metric name of its expression, e
 
 #### Scenario: The NVMe selectors expect pyrite alone
 
-- **WHEN** the fixture server returns `system_memory_usage_bytes` for magnetite and cinnabar only, and no `smartctl_device_critical_warning`, for 30 min
+- **WHEN** the fixture server returns `system_memory_usage_bytes` for magnetite and cinnabar only, and no `smartctl_device_critical_warning_total`, for 30 min
 - **THEN** the evaluator posts nothing for `NvmeCriticalWarning`, and once pyrite also reports memory for 30 min without that series it posts one `[FIRING] RuleSignalMissing` naming the rule
 
 #### Scenario: The deployed selectors are checked at acceptance

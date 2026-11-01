@@ -22,18 +22,22 @@
     "FilesystemFillingWarn": { "host_name": "magnetite", "mountpoint": "/" },
     "FilesystemFull": { "host_name": "magnetite", "mountpoint": "/" },
     "NvmeCriticalWarning": {
-      "__name__": "smartctl_device_critical_warning",
+      "__name__": "smartctl_device_critical_warning_total",
       "device": "nvme0",
       "host_name": "pyrite",
       "instance": "127.0.0.1:9633",
-      "job": "smartctl"
+      "job": "smartctl",
+      "service_instance_id": "127.0.0.1:9633",
+      "service_name": "smartctl"
     },
     "NvmeWearHigh": {
-      "__name__": "smartctl_device_percentage_used",
+      "__name__": "smartctl_device_percentage_used_total",
       "device": "nvme0",
       "host_name": "pyrite",
       "instance": "127.0.0.1:9633",
-      "job": "smartctl"
+      "job": "smartctl",
+      "service_instance_id": "127.0.0.1:9633",
+      "service_name": "smartctl"
     }
   },
   "attribution": [

@@ -140,21 +140,23 @@
           annotations.summary = "A ZFS file system is more than 95 % full";
           presence = [ (presence agentHosts "system_filesystem_usage_bytes") ];
         }
+        # smartctl_exporter declares these fields counters, and the store
+        # names an OTLP Sum with `_total`.
         {
           alert = "NvmeCriticalWarning";
-          expr = "smartctl_device_critical_warning != 0";
+          expr = "smartctl_device_critical_warning_total != 0";
           for = "0s";
           severity = "critical";
           annotations.summary = "A laptop's NVMe controller reports a critical warning";
-          presence = [ (presence smartHosts "smartctl_device_critical_warning") ];
+          presence = [ (presence smartHosts "smartctl_device_critical_warning_total") ];
         }
         {
           alert = "NvmeWearHigh";
-          expr = "smartctl_device_percentage_used > 90";
+          expr = "smartctl_device_percentage_used_total > 90";
           for = "1h";
           severity = "warning";
           annotations.summary = "A laptop's SSD has used more than 90 % of its rated endurance";
-          presence = [ (presence smartHosts "smartctl_device_percentage_used") ];
+          presence = [ (presence smartHosts "smartctl_device_percentage_used_total") ];
         }
         {
           alert = "SystemdUnitRestartLoop";

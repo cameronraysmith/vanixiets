@@ -67,7 +67,7 @@ L=logs/s4-evidence/11.1-integration-$(/bin/date -u +%Y%m%dT%H%M%SZ).log
 for m in system_memory_usage_bytes systemd_unit_state node_zfs_zpool_state system_filesystem_usage_bytes; do
   printf '%s ' "$m"; logs/s4-evidence/promq.sh "count by (host_name) (count_over_time(${m}[24h]))" | tr '\n' ' '; echo
 done | tee "$L"
-logs/s4-evidence/promq.sh 'count_over_time(smartctl_device_critical_warning{host_name="pyrite"}[24h])' | tee -a "$L"
+logs/s4-evidence/promq.sh 'count_over_time(smartctl_device_critical_warning_total{host_name="pyrite"}[24h])' | tee -a "$L"
 for h in magnetite cinnabar pyrite; do printf '%s rows=' "$h"; logs/s4-evidence/gsql.sh devloop "SELECT count(*) FROM deploy_record WHERE host = '$h'"; done | tee -a "$L"
 ```
 

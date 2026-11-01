@@ -1,12 +1,12 @@
 ---
 title: Fleet observability and CCV feedback-loop charter
-status: charter v24
+status: charter v25
 date: 2026-11-01
 ---
 
 # Fleet observability and CCV feedback-loop charter
 
-Charter version: v24.
+Charter version: v25.
 A revision is a version bump with a dated entry under "Revision history"; the text of an earlier version is never edited in place.
 
 ## Objective
@@ -387,3 +387,5 @@ A research unit that meets ambiguity returns it in its questions section; the or
   - S4's remaining decisions, D1 to D3, D5, D6 beyond the moves above, and D11 to D13, amend no decision record, and S4's design and specs carry them; O1, O2, O4, O5 and O9 also correct CAM-71's text.
 - v24 (2026-11-01): one operator decision; no earlier text is edited beyond the status, date and version lines, and this charter's D1–D9, the requirements and the acceptance criteria are unchanged.
   - Operator decision 2026-11-01, ntfy's retention: cinnabar's ntfy sets `cache-duration` to 168h, so `fleet-alerts` survive on disk for a week and a phone off ZeroTier for days still receives them, rather than the default 12 h; the reference architecture's ntfy line and ADR-009's Consequences line on ntfy's cache are amended in place.
+- v25 (2026-11-01): one correction of stored metric names; no earlier text is edited beyond the status, date and version lines, and this charter's D1–D9, the requirements and the acceptance criteria are unchanged.
+  - The store names the exporter's counter-typed SMART fields with `_total`; the NVMe rules and docs use the stored names: ADR-004 item 7 and its smartctl keep-list, ADR-009's `NvmeCriticalWarning` and `NvmeWearHigh` rows and its line on pyrite's SMART support, and the `fleet-alert` and `host-probes` components are amended in place.

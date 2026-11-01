@@ -262,11 +262,11 @@ Any requirement whose discharge depends on this fact SHALL name it explicitly, a
 It is true of pyrite's `APPLE SSD AP0512J` controller at firmware `16.14.01`, independent of what this fleet builds, that it answers smartmontools 7.5's NVMe health log, with its critical warning, spare, wear, media errors and temperature, to a reader allowed to open its controller device.
 Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL be treated as losing its discharge once this assumption's violation condition below is observed.
 
-**Evidence**: `smartctl -j -H -A /dev/nvme0` with the store's smartmontools 7.5 exited 0 as root on pyrite on 2026-10-27, reporting `Critical Warning 0x00`, `Available Spare 90%`, `Available Spare Threshold 2%`, `Percentage Used 11%`, `Media and Data Integrity Errors 0` and `Temperature 32 Celsius` (`logs/s4/brainstorm-prep.md` §2); the exporter's own read after pyrite's deploy and `RuleSignalMissing` on `smartctl_device_critical_warning` are its monitors.
+**Evidence**: `smartctl -j -H -A /dev/nvme0` with the store's smartmontools 7.5 exited 0 as root on pyrite on 2026-10-27, reporting `Critical Warning 0x00`, `Available Spare 90%`, `Available Spare Threshold 2%`, `Percentage Used 11%`, `Media and Data Integrity Errors 0` and `Temperature 32 Celsius` (`logs/s4/brainstorm-prep.md` §2); the exporter's own read after pyrite's deploy and `RuleSignalMissing` on `smartctl_device_critical_warning_total` are its monitors.
 
 #### Scenario: The controller stops answering the health log
 
-- **WHEN** a firmware update or a smartmontools bump leaves pyrite's exporter without `smartctl_device_critical_warning` while pyrite reports its memory signal
+- **WHEN** a firmware update or a smartmontools bump leaves the store without pyrite's `smartctl_device_critical_warning_total` while pyrite reports its memory signal
 - **THEN** this assumption is void, and the `host-metrics-collection` requirement `Each agent host contributes its own signals to the telemetry store` and the `fleet-alerting` requirement `Each known failure class on a host reaches a person as an alert` lose the discharge argument for pyrite's disk health, which `RuleSignalMissing` reports within 30 minutes
 
 ### Requirement: A52 — The collector answers back-pressure with a retryable refusal and keeps its persistent queue across an outage and a restart

@@ -42,9 +42,11 @@
 # Consequences); RuleSignalMissing watches those after deploy. The label
 # sets in fleet-alert/fixtures/series.json are those measured on magnetite's
 # `fleet` database on 2026-10-18 (logs/s3/series-labels.md), except the
-# file-system and NVMe rules', which no host stored when those rules were
-# added: theirs are the file-system expressions' `by` labels and the
-# smartctl scrape job's target. The fixture server cannot evaluate PromQL,
+# file-system rules', which no host stored when those rules were added:
+# theirs are the file-system expressions' `by` labels. The NVMe rules' names
+# and label sets are pyrite's as stored on 2026-11-01
+# (logs/s4-evidence/5.3-smart-20261101T063202Z.log), where the exporter's
+# counter-typed fields carry `_total`. The fixture server cannot evaluate PromQL,
 # so the SystemdUnitFailed exclusion leg replays only the failed units the
 # rendered exclusion regex keeps, matched here with the full-match
 # semantics PromQL uses for `!~`.
@@ -895,9 +897,11 @@
         alwaysOn = true;
       };
       notCollectingConfig = checkConfig notCollectingRules;
-      smartSelectors = [
-        "smartctl_device_critical_warning"
-        "smartctl_device_percentage_used"
+      # The stored names of the NVMe series, which the rules' presence
+      # selectors must equal for the legs below to see them missing.
+      smartSelectors = map (alert: fixtures.series.${alert}.__name__) [
+        "NvmeCriticalWarning"
+        "NvmeWearHigh"
       ];
 
       # cinnabar is always-on (FAI `An always-on host's silence is
