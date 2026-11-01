@@ -367,6 +367,24 @@ in
             && config.security.rtkit.enable;
         }
         {
+          # Two DHCP clients on one link give it two leases and two default
+          # routes. networkd ignores a .network with an empty [Match], so only
+          # networks with match settings can claim a link.
+          message = "pyrite desktop: networkd configures only links NetworkManager leaves unmanaged";
+          assertion =
+            !config.networking.networkmanager.enable
+            || lib.all (
+              network:
+              network.matchConfig == { }
+              || (
+                network.matchConfig ? Name
+                && lib.all (name: lib.elem "interface-name:${name}" config.networking.networkmanager.unmanaged) (
+                  lib.toList network.matchConfig.Name
+                )
+              )
+            ) (lib.filter (network: network.enable) (lib.attrValues config.systemd.network.networks));
+        }
+        {
           message = "pyrite desktop: native DankGreeter declaration provenance";
           assertion = lib.all (option: map toString option.declarations == [ nativeGreeterModule ]) [
             options.services.displayManager.dux-greeter.enable
