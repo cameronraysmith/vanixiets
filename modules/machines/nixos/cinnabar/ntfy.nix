@@ -36,6 +36,11 @@
           listen-http = "[::1]:2586";
           base-url = "https://ntfy.zt";
 
+          # A week, so a phone off ZeroTier for days still receives fleet
+          # alerts; nixpkgs' default cache-file already keeps them on disk
+          # under the state directory across restarts.
+          cache-duration = "168h";
+
           # Design D1: each mesh client is its own visitor. caddy's
           # reverse_proxy sets X-Forwarded-For to the client's address
           # (caddy v2.11.7 reverseproxy.go:929-994) and connects from ::1;

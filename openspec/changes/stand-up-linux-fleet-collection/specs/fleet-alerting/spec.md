@@ -93,3 +93,14 @@ When an always-on host, magnetite or cinnabar, has reported no memory signal for
 
 - **WHEN** 30 minutes have passed since the evaluator first ran on magnetite with the fleet's expected hosts, and the operator has also run it once by hand with one rule's signal misspelt
 - **THEN** the hand run reports the misspelt signal missing, no scheduled run reports any signal missing, and the operator records both, because the build-time alert regulator replays recorded results and cannot see the signal names the telemetry store actually holds
+
+### Requirement: A silent evaluator is reported from another host
+
+When no heartbeat has reached the notification service for 10 minutes, a person SHALL be told within the next 5 minutes by an alert raised on cinnabar, and told once more when heartbeats resume.
+
+**Discharged by**: `fleet-alerting-interface` requirements `Each completed evaluator run posts a heartbeat` and `The dead-man on cinnabar polls the heartbeat topic after an anonymous-publish probe`, resting on world assumptions `A33 — The fleet's notification service on cinnabar is reachable over ZeroTier and is the single delivery path` and `A42 — ntfy keeps a topic's messages for a week and returns a recent window to a poll`; regulator R9.3's dead-man and its acceptance negative control discharge it.
+
+#### Scenario: The evaluator is stopped
+
+- **WHEN** at acceptance the operator stops the evaluator on magnetite
+- **THEN** an alert titled `[FIRING] AlertEvaluatorSilent` arrives within 15 minutes, and after the evaluator is started again one titled `[RESOLVED] AlertEvaluatorSilent` arrives, and the operator records both

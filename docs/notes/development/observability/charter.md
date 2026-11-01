@@ -1,12 +1,12 @@
 ---
 title: Fleet observability and CCV feedback-loop charter
-status: charter v23
-date: 2026-10-28
+status: charter v24
+date: 2026-11-01
 ---
 
 # Fleet observability and CCV feedback-loop charter
 
-Charter version: v23.
+Charter version: v24.
 A revision is a version bump with a dated entry under "Revision history"; the text of an earlier version is never edited in place.
 
 ## Objective
@@ -385,3 +385,5 @@ A research unit that meets ambiguity returns it in its questions section; the or
   - S4 D8, ADR-004's arithmetic: ADR-004's Rationale amended in place: beside the 2,464 series of six NixOS hosts at 409 each and pyrite's 10 smartctl series, S4 adds at most 252 series for 28 notified units' `observability-notify@` instances, 66 filesystem series and 150 self-telemetry series, so the estimate is 3,000 + 2,464 + 222 + 252 + 66 + 150 = 6,154 against the unchanged 8,000 budget, and `systemd_unit_name`'s fleet-wide bound becomes 6 × 40 + 28 = 268; ADR-004's R4.2 amended in place: it runs hourly in the ingress host's `otel-envelope`, fails on an empty result or a missing table, and its journald-bytes clause and the fleet logs table's `ttl` comparison land with S7, which creates that table; ADR-004's Q8 and Q12 resolutions note the new figures, and `components/otel-collector.md` and `components/greptimedb.md` follow.
   - S4 D9, the always-on list: ADR-009 item 16 and Q9 amended in place: Q9's "plus any cloud host while terranix provisions it" is replaced: the always-on list is magnetite and cinnabar, the hosts `flake.lib.observabilityHosts` marks `alwaysOn`, and a host joins it only by an edit of that table when it becomes permanently provisioned, never from the terranix `enabled` flags, because a host provisioned for an hour would alert when destroyed; electrum, galena and scheelite raise nothing when silent; ADR-009's Rationale and the reference architecture follow.
   - S4's remaining decisions, D1 to D3, D5, D6 beyond the moves above, and D11 to D13, amend no decision record, and S4's design and specs carry them; O1, O2, O4, O5 and O9 also correct CAM-71's text.
+- v24 (2026-11-01): one operator decision; no earlier text is edited beyond the status, date and version lines, and this charter's D1–D9, the requirements and the acceptance criteria are unchanged.
+  - Operator decision 2026-11-01, ntfy's retention: cinnabar's ntfy sets `cache-duration` to 168h, so `fleet-alerts` survive on disk for a week and a phone off ZeroTier for days still receives them, rather than the default 12 h; the reference architecture's ntfy line and ADR-009's Consequences line on ntfy's cache are amended in place.

@@ -9,6 +9,7 @@ Amended in place under charter v20 (2026-10-18): item 16 raises `RuleSignalMissi
 Amended in place under charter v21 (2026-10-20): Q5 is scheduled as CAM-76 before S5.
 Amended in place under charter v22 (2026-10-21), from slice S2's planning (`openspec/changes/stand-up-devloop-collection/`): item 15 admits one dev-loop rule, a 24 h slow-burn `warning` on ADR-005 D5-R4's queue-wait objective, and items 1 and 2, E9.2 and R9.2 let each rule declare its database and query language, with SQL rules sent to `/v1/sql`.
 Amended in place under charter v23 (2026-10-28), from slice S4's planning (`openspec/changes/stand-up-linux-fleet-collection/`): item 16 makes the evaluator's always-on list, magnetite and cinnabar from S4, the only host-absence path, since ADR-003's R3.2 drops its per-host last-seen clause, and the agents' export no longer depends on cinnabar's `.zt` resolver; Q9's always-on list is magnetite and cinnabar, and a host joins it only by an edit of the fleet's observability host table when it becomes permanently provisioned, so a cloud host provisioned on demand is never on it.
+Amended in place under charter v24 (2026-11-01): cinnabar's ntfy keeps sent messages for a week rather than its default 12 h, so the Consequences line on ntfy's cache says a week.
 
 ## Context
 
@@ -186,7 +187,7 @@ The absence freeze is the per-host form of item 6's store freeze: without it eve
 ## Consequences
 
 magnetite gains one timer and one oneshot that runs every 60 s; cinnabar gains one timer and one oneshot every 5 min.
-The evaluator's state file and the notifier's `FAILED` log are the only alert history; past alerts are not written to the store, and ntfy's 12 h cache is the only record of sent messages.
+The evaluator's state file and the notifier's `FAILED` log are the only alert history; past alerts are not written to the store, and ntfy's cache, which cinnabar keeps for a week (charter v24), is the only record of sent messages.
 Alerts have no silencing: a known condition is accepted by its single `warning` message, and a noisy rule is fixed by a reviewed change to its threshold, its `for`, or its exclusion list.
 cinnabar is the single delivery path: while cinnabar or its ntfy is down no alert reaches a human, and nothing in this decision detects that (Q5).
 An `environmentFile` that ntfy rejects at start would take ntfy down with every publisher; the provisioning check of item 13 guards against it before deploy, and the residual risk that nothing reports an ntfy outage is recorded against CAM-76 with Q5 (charter v17).

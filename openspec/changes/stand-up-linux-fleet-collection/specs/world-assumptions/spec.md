@@ -1,3 +1,8 @@
+## RENAMED Requirements
+
+- FROM: `### Requirement: A42 — ntfy keeps a topic's messages for 12 hours and returns a recent window to a poll`
+- TO: `### Requirement: A42 — ntfy keeps a topic's messages for a week and returns a recent window to a poll`
+
 ## MODIFIED Requirements
 
 ### Requirement: Grounded vocabulary for behavioral requirements
@@ -225,6 +230,18 @@ Any requirement whose discharge depends on this fact SHALL name it explicitly, a
 
 - **WHEN** pyrite's journal records `systemd-suspend` runs during ordinary use, or its lid switch suspends it again
 - **THEN** this assumption is void for its silence, and the `fleet-alerting` requirement `A missing signal is itself reported` loses the argument that pyrite's silence comes from power-off, reboot or leaving the network, on which its acceptance by taking pyrite offline rests
+
+### Requirement: A42 — ntfy keeps a topic's messages for a week and returns a recent window to a poll
+
+It is true of ntfy 2.28.0, independent of what this fleet builds, that it keeps each published message for the `cache-duration` it is given, which cinnabar sets to 168 hours, in a cache that survives a restart, and answers `GET /<topic>/json?poll=1&since=10m` with that topic's cached messages of the last 10 minutes.
+Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL be treated as losing its discharge once this assumption's violation condition below is observed.
+
+**Evidence**: `cache-duration` defaults to 12h (`binwiederhier/ntfy` `docs/config.md:503`, `:2387`, read on `main` rather than the 2.28.0 tag), `modules/machines/nixos/cinnabar/ntfy.nix` sets it to `168h` by the operator's decision of 2026-11-01 (charter v24), and the NixOS module sets a persistent `cache-file`; a poll with `since=<duration>` returns the cached messages of that window (`docs/subscribe/api.md:239-261`); 2.29.0, newer than cinnabar's release, fixed `poll=1` missing messages for up to 40 s under bursts, which at one heartbeat a minute leaves the 10-minute window full; the dead-man's own `AlertEvaluatorSilent`, which a cache that stopped answering would raise falsely, and R9.3's acceptance step of stopping and restarting the evaluator are its monitors.
+
+#### Scenario: ntfy stops returning recent messages to a poll
+
+- **WHEN** ntfy on cinnabar keeps messages for less than 10 minutes, loses its cache on restart and is polled before a new heartbeat arrives, or answers `poll=1&since=10m` without the messages of that window
+- **THEN** this assumption is void, and the `fleet-alerting` requirement `A silent evaluator is reported from another host` and the `fleet-alerting-interface` requirement `The dead-man on cinnabar polls the heartbeat topic after an anonymous-publish probe` lose the discharge argument that an empty poll means no heartbeat was published
 
 ## ADDED Requirements
 
