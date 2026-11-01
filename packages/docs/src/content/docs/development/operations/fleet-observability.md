@@ -88,6 +88,8 @@ The server configures no web push, so a browser shows notifications only while t
 
 On Android, join the ZeroTier network in the ZeroTier app, copy `caddy-root-ca.crt` to the phone, and install it as a CA certificate under Settings, in Encryption & credentials → Install a certificate → CA certificate; the menus above that entry differ between Android versions.
 Install the ntfy app from F-Droid or Google Play, and in it add a subscription to topic `fleet-alerts` on the server `https://ntfy.zt` (use another server, not `ntfy.sh`).
+Do not accept the app's offer to trust the server's certificate ("Your connection is not private"): the app then pins that exact leaf certificate and trusts nothing else for the server, and caddy replaces the leaf every 12 hours, so the subscription fails with "Certificate fingerprint mismatch" at the next renewal.
+With caddy's root installed as a CA certificate, the app needs no pin; if one exists, delete the `ntfy.zt` entry under the app's Settings → Advanced → Trusted certificates.
 Nothing reaches the phone until the app holds this subscription.
 The server sets no `upstream-base-url`, so iOS clients receive no instant push; this runbook supports Android and browser subscribers.
 

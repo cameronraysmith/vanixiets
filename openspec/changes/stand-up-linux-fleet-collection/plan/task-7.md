@@ -82,7 +82,7 @@ nix eval --raw .#nixosConfigurations.magnetite --apply 'm: (m.extendModules { mo
 
 Expected: a drvPath, then the holder assertion's message naming `nix-daemon` (negative control).
 
-- [ ] **Step 4: The container test passes, and the pull request (tasks.md 7.4)**
+- [x] **Step 4: The container test passes, and the pull request (tasks.md 7.4)**
 
 ```bash
 nix build .#vmTests.x86_64-linux.fleet-ingress -L 2>&1 | tee logs/s4-evidence/7.4-fleet-ingress-$(/bin/date -u +%Y%m%dT%H%M%SZ).log | grep -E '^=== case|B[1-6] |FAIL'
@@ -94,7 +94,7 @@ The first green attempt found the container's own budget breach: with no ZFS dat
 Run `nix fmt` and `nix fmt -- --fail-on-change`; commit with a plain message, for example "Check the store's series and row budget every hour on magnetite"; open pull request 3 with the same kind of title, its body stating in words the container run (commit, host, date, and that each budget fixture failed its clause) rather than a log path.
 Expected: nixbot green, including `otel-envelope` and `nixos-magnetite`.
 
-- [ ] **Step 5: Deploy magnetite (tasks.md 7.5)**
+- [x] **Step 5: Deploy magnetite (tasks.md 7.5)**
 
 In `$DEPLOY`, after `git -C $REPO fetch origin && git -C $DEPLOY checkout --detach origin/main` and `nixbot-logs queue` printing `Queue is empty`:
 
@@ -104,7 +104,7 @@ clan machines update magnetite 2>&1 | tee logs/magnetite-$(date +%Y%m%d-%H%M%S).
 
 Expected: the log ends without error.
 
-- [ ] **Step 6: The drop-in control and the first hourly run (tasks.md 7.6)**
+- [x] **Step 6: The drop-in control and the first hourly run (tasks.md 7.6)**
 
 rehearse: magnetite (in the rehearsal, the `install`, `start` and `rm` commands are echoed):
 
