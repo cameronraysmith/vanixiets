@@ -508,7 +508,10 @@ in
           };
           systemd.timers.otel-envelope = {
             wantedBy = [ "timers.target" ];
-            timerConfig.OnCalendar = "*:0/5";
+            # UTC: in a daylight-saving zone such as pyrite's, systemd
+            # computes a local calendar's next elapse across the autumn
+            # change as an hour later, so the timer would skip an hour.
+            timerConfig.OnCalendar = "*:0/5 UTC";
           };
         }
 

@@ -407,7 +407,8 @@ in
           description = "Hourly GreptimeDB runtime envelope";
           wantedBy = [ "timers.target" ];
           timerConfig = {
-            OnCalendar = "hourly";
+            # UTC, so a daylight-saving host zone cannot skip an hour.
+            OnCalendar = "hourly UTC";
             Persistent = true;
             RandomizedDelaySec = "5m";
           };

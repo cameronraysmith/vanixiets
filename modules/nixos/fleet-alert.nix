@@ -593,7 +593,11 @@ in
         in
         if m == null then null else lib.toInt (builtins.head m);
       timeoutStartSec = seconds (unit.TimeoutStartSec or "");
-      periodSec = { minutely = 60; }.${config.systemd.timers.fleet-alert.timerConfig.OnCalendar} or null;
+      periodSec =
+        {
+          "minutely UTC" = 60;
+        }
+        .${config.systemd.timers.fleet-alert.timerConfig.OnCalendar} or null;
       # Worst case of one run: posts start before postDeadlineSec, which
       # may come after the query phase and the heartbeat; the last post and
       # the notifier's ExecStartPost hook each take up to postTimeoutSec.
@@ -768,7 +772,8 @@ in
             description = "Run the fleet alert evaluator every minute";
             wantedBy = [ "timers.target" ];
             timerConfig = {
-              OnCalendar = "minutely";
+              # UTC, so a daylight-saving host zone cannot skip an hour.
+              OnCalendar = "minutely UTC";
               AccuracySec = "1s";
             };
           };
@@ -830,7 +835,8 @@ in
             description = "Five-minute fleet alert dead-man";
             wantedBy = [ "timers.target" ];
             timerConfig = {
-              OnCalendar = "*:0/5";
+              # UTC, so a daylight-saving host zone cannot skip an hour.
+              OnCalendar = "*:0/5 UTC";
               AccuracySec = "5s";
             };
           };

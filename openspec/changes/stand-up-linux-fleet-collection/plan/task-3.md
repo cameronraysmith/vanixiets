@@ -144,7 +144,7 @@ systemd.services.otel-envelope = {
 };
 systemd.timers.otel-envelope = {
   wantedBy = [ "timers.target" ];
-  timerConfig.OnCalendar = "*:0/5";
+  timerConfig.OnCalendar = "*:0/5 UTC";
 };
 ```
 
@@ -169,7 +169,7 @@ done 2>&1 | tee "$L"
 nix build .#checks.x86_64-linux.otel-collector-config -L 2>&1 | tee -a "$L" | grep -E 'FAIL|ok: R3.1'
 ```
 
-Expected: on both hosts `DynamicUser` true, `otel-envelope`, `64M`, `4min`, `cred` naming `zerotier-metricstoken`, `onFailure` `["observability-notify@%n.service"]`, `"*:0/5"`; the check passes, so `envelopeNotNotified` is rejected; cost recorded.
+Expected: on both hosts `DynamicUser` true, `otel-envelope`, `64M`, `4min`, `cred` naming `zerotier-metricstoken`, `onFailure` `["observability-notify@%n.service"]`, `"*:0/5 UTC"`; the check passes, so `envelopeNotNotified` is rejected; cost recorded.
 Repeat the loop for cinnabar and pyrite in the scratch tree (plan Global Constraints), expecting the same.
 
 - [ ] **Step 4: The notified-unit assertion now requires `otel-envelope` (tasks.md 3.3's negative control)**
