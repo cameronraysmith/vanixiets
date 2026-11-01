@@ -1462,6 +1462,9 @@ Its commits carry the `Change-Id` trailer from `templates.commit_trailers` and a
 jj runs no git hooks (jj-vcs/jj#405), so run the repository's lint entry point before pushing.
 When another workspace rewrites a commit that this workspace's `@` descends from, this workspace becomes stale and `jj workspace update-stale` refreshes it.
 Remove it with `jj workspace forget <name>` from any other workspace, then delete the directory.
+Never remove it with `wt remove`: `wt list` shows the workspace as a detached worktree row and its bookmark as a separate branch row.
+`wt remove` on the worktree row deletes the git worktree and the directory but leaves the workspace registered in jj.
+`wt remove -D` on the branch row deletes the git branch, and the next jj command imports that as deleting the bookmark, abandons the bookmarked commit, and rebases the workspace's `@` off it, so the work drops out of the workspace; top-level `jj undo` restores the bookmark and the git branch, and `jj workspace update-stale` inside the workspace then restores its files.
 
 Choose a git worktree when the work will be committed with git, or when `wt list`'s pull-request and CI columns matter for the tree.
 Create it with `wt switch --create <branch> --no-cd` rather than a detached `git worktree add`: the named branch lets `wt list` show the tree's pull request and check status, and `wt remove` deletes the tree and the branch once the branch is in the default branch.
