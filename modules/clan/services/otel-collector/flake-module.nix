@@ -623,6 +623,22 @@ in
             port = 9633;
             devices = config.vanixiets.otelCollector.smartDevices;
             openFirewall = false;
+            # smartctl_exporter 0.15.0 hard-codes `--log=error` and drops a device
+            # whenever smartctl reports any error message; pyrite's APPLE SSD
+            # rejects the Error Information log page (0x01) with Invalid Log Page,
+            # so the exporter would never publish its health. No kept series reads
+            # that log (the error count comes from the health log), and a failed
+            # health-log read still errors and drops the device, so only the
+            # unread error-log flag is removed, as the darwin probe's `-H -A` does.
+            extraFlags = [
+              "--smartctl.path=${pkgs.writeShellScript "smartctl-without-error-log" ''
+                args=()
+                for a in "$@"; do
+                  [ "$a" = --log=error ] || args+=("$a")
+                done
+                exec ${lib.getExe pkgs.smartmontools} "''${args[@]}"
+              ''}"
+            ];
           };
           systemd.services.prometheus-smartctl-exporter.serviceConfig = {
             MemoryMax = "64M";
