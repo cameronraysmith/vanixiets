@@ -1444,14 +1444,29 @@ A linked git worktree can coexist with a jj-colocated primary working copy.
 This section is the authority for how, and the worktree-surface hook messages point here.
 The default for parallel chains that share one review boundary remains the diamond development join; a worktree is warranted when a separate filesystem tree is itself the point, such as an external agent framework driving its own process, a long-running build, a side-by-side comparison, or a tree pinned at a base to show one change failing there and passing with it while other work sits in the join.
 The discriminator is whether the work needs a tree of its own, not which mechanism seems faster.
-The behavior this section describes was established against jj 0.43.0.
+The behavior this section describes was established against jj 0.43.0, except colocated jj workspaces, which were established against jj 0.46.0.
 
 ### Choosing the mechanism
 
-In a flake repository, isolation means a git worktree rather than `jj workspace add`.
-A `jj workspace add` directory contains `.jj` and no `.git`, so `git rev-parse --show-toplevel` inside it fails and flake evaluation degrades to a `path:` source with no revision, carrying `.jj` and gitignored directories into the store (jj-vcs/jj#4436, open).
-A git worktree resolves as `git+file://…&rev=<sha>` and evaluates to the same store path as the primary.
+Since jj 0.46.0 a colocated `jj workspace add` and a git worktree are both valid isolation in a flake repository, because both are git worktrees.
+Run from a colocated workspace with `git.colocate = true`, `jj workspace add` colocates by default: it runs `git worktree add --orphan`, so the new directory holds a `.git` file beside `.jj`, and `jj workspace forget` removes the git worktree along with the workspace.
+Flake evaluation there resolves as `git+file://…?rev=<sha>`; in vanixiets a colocated workspace and a `wt` worktree at the same commit evaluated to the same source store path.
+A non-colocated workspace — created by jj before 0.46.0, with `--no-colocate`, or from a non-colocated repository — still has no `.git`, and flake evaluation in it degrades to a `path:` source with no revision that carries `.jj` and gitignored directories into the store (jj-vcs/jj#4436, open).
+`jj git colocation status` inside a workspace reports which kind it is, and `jj git colocation enable` converts a non-colocated one.
+
+Create the workspace with `jj workspace add --name <name> --revision 'trunk()' <path>`, without `--ignore-working-copy`.
+With that flag jj 0.46.0 registers the workspace and then exits with "This command must be able to update the working copy" before checking it out, leaving the directory empty and its `@` on the root commit; `jj new 'trunk()'` inside the workspace recovers.
+
+Choose a colocated jj workspace when the work will be committed with jj.
+Its commits carry the `Change-Id` trailer from `templates.commit_trailers` and are signed like any other jj commit, it appears in `jj workspace list`, and its commits are visible in the primary by change id at once, with no branch to own.
+jj runs no git hooks (jj-vcs/jj#405), so run the repository's lint entry point before pushing.
+When another workspace rewrites a commit that this workspace's `@` descends from, this workspace becomes stale and `jj workspace update-stale` refreshes it.
+Remove it with `jj workspace forget <name>` from any other workspace, then delete the directory.
+
+Choose a git worktree when the work will be committed with git, or when `wt list`'s pull-request and CI columns matter for the tree.
 Create it with `wt switch --create <branch> --no-cd` rather than a detached `git worktree add`: the named branch lets `wt list` show the tree's pull request and check status, and `wt remove` deletes the tree and the branch once the branch is in the default branch.
+git resolves a relative `core.hooksPath` against the working tree root, and a linked tree's `.git` is a file, so a relative value written from the primary makes git in either kind of tree run no hooks at all; an absolute path to `$(git rev-parse --path-format=absolute --git-common-dir)/hooks` works from every checkout.
+The rest of this section governs git worktrees.
 
 ### How work crosses the boundary
 
@@ -1464,8 +1479,8 @@ Work therefore returns from a worktree by ref, never by checkout.
 Commit in the worktree, then integrate from the primary with `jj new <branch>` or `jj bookmark set <target> -r <branch>`.
 The primary's HEAD stays detached throughout, which is the healthy steady state in a colocated repository.
 
-Import has no worktree counterpart: `import_head` in `lib/src/git.rs` reads only `git_repo.head_id()`, so jj never learns what any worktree has checked out.
-jj's `View` carries a single `git_head` field (`struct View` in `lib/src/op_store.rs`, where an upstream `// TODO: Support multiple Git worktrees?` sits directly above it), and a git worktree never appears in `jj workspace list`.
+jj 0.45.0 tracks git HEAD per worktree internally, and a worktree created by `jj workspace add` appears in `jj workspace list`.
+A worktree created by `git worktree add` or `wt` does not appear there.
 
 ### Exclusive branch ownership
 

@@ -55,4 +55,4 @@ Recovery for the second is `jj undo`; the first needs nothing.
 ## Worktree interop
 
 `jj-version-control/SKILL.md` §"Worktree interop" is the authority for worktree mechanics — it carries the jj-version provenance and upstream citations this file does not, and the worktree-surface hook messages point there.
-The summary: worktree-creating surfaces are ask-gated; a flake repository's separate tree must be a git worktree rather than `jj workspace add`; the discipline is exclusive branch ownership and return-by-ref; and an external agent framework such as firstmate gets its own clone rather than a symlink to a working copy we also use.
+The summary: worktree-creating surfaces are ask-gated; in a flake repository the separate tree is a colocated jj workspace (jj 0.46.0 or later) or a git worktree, never a non-colocated jj workspace; the git-worktree discipline is exclusive branch ownership and return-by-ref; and an external agent framework such as firstmate gets its own clone rather than a symlink to a working copy we also use.

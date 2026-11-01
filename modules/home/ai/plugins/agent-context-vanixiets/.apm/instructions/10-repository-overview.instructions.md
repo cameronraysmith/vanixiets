@@ -64,4 +64,6 @@ The aarch64-darwin checks are best-effort through `modules/checks/nixbot-best-ef
 Read those failures before enqueueing rather than treating the aggregate status as the whole answer, because a genuine platform-specific break — an upstream package that compiles only with the other platform's toolchain, say — presents exactly as an ignored failure and would otherwise reach `main` unnoticed.
 
 Checkouts of this repository are commonly colocated with [jujutsu](https://jj-vcs.github.io/jj/), in which case a detached git `HEAD` is normal and must not be reattached.
-Because this is a flake repository, flake evaluation resolves the root through git, so a second working tree must be a git worktree, created with `wt switch --create <branch>`, rather than a `jj workspace add` directory.
+Because this is a flake repository, flake evaluation resolves the root through git, so a second working tree must itself be a git worktree: either a colocated `jj workspace add` directory, which jj 0.46.0 and later creates by default here because `git.colocate` is `true`, or a `wt switch --create <branch>` worktree.
+Entering the devshell once in a new tree (`direnv allow`) installs the prek hooks, pins `core.hooksPath` to an absolute path so git runs them from every checkout, and runs `mergify stack setup`, so a git commit there gets treefmt, gitleaks, and a `Change-Id` trailer.
+jj commits run no git hooks and take their `Change-Id` from `templates.commit_trailers`, so run `just lint` before pushing them.

@@ -3,8 +3,8 @@ name: worktree-sparsity-eval
 description: >-
   Evaluate repository size metrics to determine whether a separate working copy should use
   sparse checkout. **Invoke when a separate working copy is already warranted — a
-  `git worktree` in any mode, or a `jj workspace add` in a non-flake jj repository — and
-  only to size that invocation.** It does not decide whether to create one. In jj mode the
+  `git worktree` or a `jj workspace add` — and only to size that invocation.** It does
+  not decide whether to create one. In jj mode the
   diamond workflow's development join remains the default for parallel chains and needs no
   sparsity evaluation; see the `jj-version-control` skill's `tiered-ceremony.md` for the
   triggers and `jj-version-control` §"Worktree interop" for the
@@ -18,7 +18,7 @@ Three conditions must all hold for sparse checkout to be recommended.
 
 This skill sizes a separate working copy that is already warranted; it does not decide whether to create one.
 That decision belongs to the `jj-version-control` skill's `tiered-ceremony.md`, whose default in jj mode is the diamond workflow's development join in a single working copy — which needs no sparsity evaluation.
-In a flake repository the separate working copy must be a `git worktree add` rather than `jj workspace add`, so the sparse-checkout recipes below apply directly; the `jj workspace add` form applies only in non-flake jj repositories.
+In a flake repository the separate working copy is a git worktree or a colocated jj workspace (jj 0.46.0 or later), never a non-colocated jj workspace; the `git sparse-checkout` recipes below apply to a git worktree, and a jj workspace narrows its checkout with `jj sparse set` instead.
 Before creating a worktree in a jj-colocated repository, read `jj-version-control` §"Worktree interop" for the branch-ownership and return-by-ref discipline.
 
 ## Thresholds

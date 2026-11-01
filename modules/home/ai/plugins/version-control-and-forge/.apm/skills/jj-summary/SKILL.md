@@ -390,7 +390,7 @@ jj log -r 'mine() & ~bookmarks()'
 
 4. Does something outside this session need its own filesystem tree (an external framework driving its own agent process, a long-running build, side-by-side comparison), or did the user explicitly request isolation by name (`worktree`, `workspace`, `isolate`, `separate working copy`, or path forms like `.worktrees/X`)?
    → Create a separate tree; otherwise stay at tier 3 and parallelize via the development join in a single working copy, which remains the default for parallel chains.
-   In a flake repository that tree is a `git worktree add`, not `jj workspace add`, because a jj workspace has no `.git` and flake evaluation there loses the revision.
+   In a flake repository that tree is a colocated `jj workspace add` (jj 0.46.0 or later) when committing with jj, or a git worktree when committing with git; a non-colocated jj workspace has no `.git`, and flake evaluation there loses the revision.
    `EnterWorktree`, `git worktree add` against a jj-colocated repository, and subagent dispatch (tool name `Agent`) with `isolation: "worktree"` each raise an ask; `ExitWorktree` is ungated.
    Before creating one, read `jj-version-control` §"Worktree interop" — exclusive branch ownership and return-by-ref are the load-bearing rules.
 

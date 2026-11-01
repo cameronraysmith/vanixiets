@@ -439,8 +439,9 @@ Disadvantages:
 Workspace creation is reserved for cases where a separate filesystem tree is itself the requirement, or where the user explicitly requests isolation in-session.
 Parallel related work in jj mode uses the diamond workflow's development join, which remains the default.
 
-In a flake repository the separate tree must be a `git worktree add` rather than a `jj workspace add`, because a jj workspace has no `.git` and flake evaluation there degrades to a `path:` source with no revision.
-The `jj workspace add` mechanics below therefore apply to non-flake repositories; for the git-worktree path and the discipline that governs it, see `jj-version-control` §"Worktree interop".
+In a flake repository the workspace must be colocated, which `jj workspace add` does by default since jj 0.46.0 when run from a colocated workspace with `git.colocate = true`; a non-colocated workspace has no `.git`, and flake evaluation there degrades to a `path:` source with no revision.
+Check with `jj git colocation status` inside the new workspace, and do not pass `--ignore-working-copy` to `jj workspace add`, which in jj 0.46.0 leaves the new workspace unchecked-out on the root commit.
+For choosing between a jj workspace and a git worktree, and for the discipline that governs git worktrees, see `jj-version-control` §"Worktree interop".
 
 Cross-references:
 - The `jj-version-control` skill's `tiered-ceremony.md` — policy authority for when ceremony escalates from anonymous chain to bookmarked chain, and for why a separate working copy is not a tier.

@@ -135,9 +135,10 @@ The first is that something outside this session needs its own filesystem tree: 
 The second is that the user explicitly requests isolation by name in-session, with utterances naming `worktree`, `workspace`, `isolate`, `separate working copy`, or path forms like `.worktrees/X`.
 Absent either trigger, all parallel work in jj mode uses the diamond workflow's development join.
 
-jj workspaces and git worktrees are not interchangeable, so the choice between them is not a matter of taste.
-A `jj workspace add` directory carries `.jj` and no `.git`, so jj works inside it but flake evaluation degrades to a `path:` source with no revision that copies `.jj` and gitignored directories into the store.
-A `git worktree add` directory carries `.git` and no `.jj`, so jj is unavailable inside it while flake evaluation resolves to `git+file://…&rev=<sha>` and yields the same store path as the primary.
-In a flake repository, therefore, isolation means a git worktree.
+jj workspaces and git worktrees differ, so the choice between them is not a matter of taste.
+Since jj 0.46.0, `jj workspace add` run from a colocated workspace creates a colocated workspace by default: a git worktree carrying both `.git` and `.jj`, in which jj works and flake evaluation resolves to `git+file://…?rev=<sha>` with the same store path as the primary.
+A non-colocated jj workspace carries `.jj` and no `.git`, so flake evaluation there degrades to a `path:` source with no revision that copies `.jj` and gitignored directories into the store.
+A `git worktree add` directory created by git or `wt` carries `.git` and no `.jj`, so jj is unavailable inside it while flake evaluation behaves as in a colocated workspace.
+In a flake repository, therefore, isolation means a colocated jj workspace when the work will be committed with jj, and a git worktree when it will be committed with git.
 
-See `jj-version-control/SKILL.md` §"Worktree interop" for the git-worktree discipline and mechanics, and `jj-workflow/SKILL.md` "Workspace creation" for the `jj workspace add` mechanics in a non-flake repository.
+See `jj-version-control/SKILL.md` §"Worktree interop" for the choice between them and the git-worktree discipline, and `jj-workflow/SKILL.md` "Workspace creation" for the `jj workspace add` mechanics.
