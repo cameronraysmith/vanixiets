@@ -220,7 +220,7 @@ A run without telemetry carries the previous counters forward, so the next run d
 A run without a state file, the first after the unit is deployed, records the baseline and judges `C1` to `C3` only, so counters that were already non-zero do not fail it; magnetite's and cinnabar's first runs on 2026-10-29 passed.
 
 On the ingress host the clan ingress role sets `vanixiets.otelCollector.envelopeBudget` to the store's URL, every host's `notifiedUnits` and `schema.databases`, loads `regulator-password`, and orders the unit after `greptimedb.service`.
-A run there whose UTC minute is `00` (`OTEL_ENVELOPE_MINUTE`, default `date -u +%M`), or any run with `OTEL_ENVELOPE_FORCE_HOURLY=1`, also judges the store's budget as `regulator` through `flake.lib.greptimedbSql`:
+A run there whose UTC minute is `00` (`OTEL_ENVELOPE_MINUTE`, default the minute of `OTEL_ENVELOPE_NOW`, itself default `date -u +%s`, both read before `C1`), or any run with `OTEL_ENVELOPE_FORCE_HOURLY=1`, is a budget run and also judges the store's budget as `regulator` through `flake.lib.greptimedbSql`:
 
 - `B1 active-series` fails above `budget.activeSeries` (8,000) series in `fleet` in the last hour.
 - `B2 label-values` fails when a tag column of `fleet`'s physical table, other than `__tsid`, `__table_id` and the three that `B3` bounds per host, has over `budget.labelValues` (200) values within one metric in the last hour.
@@ -230,6 +230,10 @@ A run there whose UTC minute is `00` (`OTEL_ENVELOPE_MINUTE`, default `date -u +
 - `B6 ttl` fails when a database of `schema.databases` has a `ttl` other than the declared one, compared as durations.
 
 A query that cannot reach the store, errors, names a missing table or returns no rows fails the clause that sent it.
+The state there also holds each budget clause's last verdict, `budget:<clause> ok|FAIL <message>`, and `budget-run <epoch>` of the last budget run.
+A run that is not a budget run repeats each clause the last budget run failed, with its message and `(carried from the budget run at <time>)`, so a breach keeps the unit failed until a budget run passes, and the notifier posts its `RESOLVED` then rather than five minutes after each `FAILED` (review F1).
+Every run there also prints `B0 budget-run`, which fails when the last budget run is over 65 minutes old: the hourly calendar's 60, the timer's 1 minute accuracy, and the run's own time.
+A state without a budget run, fresh or written before `B0` existed, records `budget-since <epoch>` at the first run that finds none and counts from it, so it fails only after a whole calendar hour has passed without a budget run.
 A forced hand run of all ten clauses on magnetite on 2026-10-29 took about 1.5 s.
 
 ## Failure notifier

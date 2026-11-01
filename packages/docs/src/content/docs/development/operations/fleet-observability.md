@@ -468,6 +468,13 @@ On magnetite the run at minute `00` of each UTC hour also prints the budget clau
 | `B6 ttl: FAIL <database> <ttl>, declared <ttl>` | a database's retention differs from `schema.nix`'s, or is absent | `systemctl status greptimedb-schema`, which sets the retention when the store starts |
 
 `otel-envelope: B3 per-host: launchd_label table absent` is a note, not a failure, while no darwin host reports launchd jobs.
+Between budget runs, every run repeats each `B` clause the last budget run failed, its line ending `(carried from the budget run at <time>)`, so a breach stays one failure episode, posting `RESOLVED` only after a budget run passes; a fix therefore shows as resolved at the next minute `00`, or at once with the forced run below.
+
+| Line | Meaning | Check first |
+|---|---|---|
+| `B0 budget-run: FAIL the last budget run was at <time>, <n> min ago` | no budget run has completed for over 65 minutes | `systemctl list-timers otel-envelope.timer` and the runs at minute `00` in `journalctl -u otel-envelope`, for one killed by `TimeoutStartSec` or a host that was down over the hour |
+| `B0 budget-run: FAIL no budget run since this state's first run at <time>` | the state has recorded no budget run in over 65 minutes since it was created | the same; a fresh state waits for the first minute `00` |
+
 To run the budget at once rather than on the hour, set `OTEL_ENVELOPE_FORCE_HOURLY=1` with a runtime drop-in, start the unit, and revert the drop-in, as "Forcing a failure deliberately" does for the store's envelope:
 
 ```sh

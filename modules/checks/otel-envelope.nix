@@ -16,7 +16,9 @@
 # budgetOnlyHourly holds the hourly clauses to the minute and to `budget`:
 # with a store that does not answer, a run at minute 05 is judged by C1 to
 # C4 alone, as is one at minute 00 without `budget`, and one at minute 00
-# with it fails B1.
+# with it fails B1. The cases budgetBreachCarried, budgetBreachCleared,
+# budgetRunStale and budgetFreshState run the `budgetStore` variant against
+# the stub's store on OTEL_ENVELOPE_NOW's clock (review F1).
 # vmTests.x86_64-linux.fleet-ingress runs the unit itself on a real store,
 # and the budget's clauses there.
 { self, lib, ... }:
@@ -30,6 +32,9 @@
       secondTargetPort = 19101;
       # Nothing listens here, so every budget query fails.
       closedStorePort = 14000;
+      # The stub's store, started for a run only when the case names an
+      # answer for it.
+      storePort = 14001;
       target = path: [
         {
           job = "node";
@@ -85,6 +90,13 @@
             databases.fleet = "30d";
           };
         };
+        budgetStore = envelope {
+          budget = {
+            storeUrl = "http://127.0.0.1:${toString storePort}";
+            notifiedUnits.electrum = [ "otel-envelope" ];
+            databases.fleet = "30d";
+          };
+        };
       };
       variants = variantsWith self.lib.otelEnvelopeTargets;
       variantsDir =
@@ -93,10 +105,15 @@
           mkdir "$out"
           ${lib.concatStrings (lib.mapAttrsToList (v: drv: "ln -s ${drv} \"$out/${v}\"\n") scripts)}
         '';
+      budgetVariants = [
+        "budget"
+        "budgetStore"
+      ];
 
       # Each mutant replaces the line after its marker; `from` is that line.
       # A `source` mutant marks a line of modules/lib/otel-envelope.nix
-      # itself rather than of the script.
+      # itself rather than of the script. A mutant of a budget line, which
+      # only the variants with `budget` carry, lists those in `variants`.
       mutants = {
         meshRefusalIsLoss = {
           case = "ingressMeshRefused";
@@ -134,24 +151,39 @@
           from = "hostPorts = lib.concatMap (c: c.targets) job.static_configs;";
           to = "hostPorts = [ (builtins.head (builtins.head job.static_configs).targets) ];";
         };
+        budgetVerdictNotCarried = {
+          case = "budgetBreachCarried";
+          variants = budgetVariants;
+          from = ''if [ "$verdict" = FAIL ]; then'';
+          to = "if false; then";
+        };
+        staleBudgetIgnored = {
+          case = "budgetRunStale";
+          variants = budgetVariants;
+          from = "if [ $((now - since)) -gt 3900 ]; then";
+          to = "if false; then";
+        };
       };
       mutate = name: m: if m.source or false then mutateSource name m else mutateScript name m;
       mutateScript =
         name: m:
         lib.mapAttrs (
           v: drv:
-          pkgs.runCommand "otel-envelope-${name}-${v}" { } ''
-            script=${lib.getExe drv}
-            # The marked line is the one replaced.
-            awk -v marker=${lib.escapeShellArg "# mutant: ${name}"} -v line=${lib.escapeShellArg m.from} '
-              found { if (index($0, line)) ok = 1; exit }
-              index($0, marker) { found = 1 }
-              END { exit !ok }' "$script" || { echo "mutant ${name}: the line after its marker is not the one replaced" >&2; exit 1; }
-            mkdir -p "$out/bin"
-            cp "$script" "$out/bin/otel-envelope"
-            chmod +w "$out/bin/otel-envelope"
-            substituteInPlace "$out/bin/otel-envelope" --replace-fail ${lib.escapeShellArg m.from} ${lib.escapeShellArg m.to}
-          ''
+          if !(builtins.elem v (m.variants or (builtins.attrNames variants))) then
+            drv
+          else
+            pkgs.runCommand "otel-envelope-${name}-${v}" { } ''
+              script=${lib.getExe drv}
+              # The marked line is the one replaced.
+              awk -v marker=${lib.escapeShellArg "# mutant: ${name}"} -v line=${lib.escapeShellArg m.from} '
+                found { if (index($0, line)) ok = 1; exit }
+                index($0, marker) { found = 1 }
+                END { exit !ok }' "$script" || { echo "mutant ${name}: the line after its marker is not the one replaced" >&2; exit 1; }
+              mkdir -p "$out/bin"
+              cp "$script" "$out/bin/otel-envelope"
+              chmod +w "$out/bin/otel-envelope"
+              substituteInPlace "$out/bin/otel-envelope" --replace-fail ${lib.escapeShellArg m.from} ${lib.escapeShellArg m.to}
+            ''
         ) variants;
       # The library file with the marked line replaced, imported as the
       # flake-parts module it is, renders every variant's targets.
@@ -209,7 +241,8 @@
 
         # run VARIANT STATE FIXTURE|down up|down EXIT: one run; the
         # telemetry stub serves FIXTURE (none if `down`), the target stub
-        # runs if `up`.
+        # runs if `up`, and the store stub if the caller's $store names its
+        # answers.
         run() {
           local variant=$1 state=$2 fixture=$3 tgt=$4 want=$5 got=0 start
           if [ "$fixture" != down ]; then
@@ -217,6 +250,7 @@
             start_stub ${toString telemetryPort} || return 1
           fi
           if [ "$tgt" = up ]; then start_stub ${toString targetPort} || return 1; fi
+          if [ -n "''${store:-}" ]; then STUB_STORE=$store start_stub ${toString storePort} || return 1; fi
           start=$(date +%s)
           STATE_DIRECTORY=$state "$variants/$variant/bin/otel-envelope" > "$work/out" 2>&1 || got=$?
           elapsed=$(($(date +%s) - start))
@@ -345,17 +379,67 @@
           printf placeholder > "$CREDENTIALS_DIRECTORY/regulator-password"
           local -x OTEL_ENVELOPE_FORCE_HOURLY=0 OTEL_ENVELOPE_MINUTE=05
           run budget "$s" agent-healthy down 0 || return 1
-          if grep -q '^otel-envelope: B' "$work/out"; then
+          if grep -q '^otel-envelope: B[1-6]' "$work/out"; then
             echo "    $current: minute 05 ran the budget clauses"
             return 1
           fi
           OTEL_ENVELOPE_MINUTE=00
           run agent "$(mktemp -d)" agent-healthy down 0 || return 1
-          if grep -q '^otel-envelope: B' "$work/out"; then
+          if grep -q '^otel-envelope: B[1-6]' "$work/out"; then
             echo "    $current: minute 00 without budget ran the budget clauses"
             return 1
           fi
           run budget "$s" agent-healthy down 1 && grep -q '^otel-envelope: B1 active-series: FAIL' "$work/out"
+        }
+
+        # The budget cases' clock: t0 is 2027-01-15T08:00:00Z, minute 00.
+        t0=1800000000
+        # at OFFSET STORE STATE EXIT: one budgetStore run OFFSET seconds after
+        # t0, the store stub answering as STORE, or not running for `-`.
+        at() {
+          local -x OTEL_ENVELOPE_NOW=$((t0 + $1)) CREDENTIALS_DIRECTORY
+          local store=$2
+          [ "$store" != - ] || store=
+          CREDENTIALS_DIRECTORY=$(mktemp -d)
+          printf placeholder > "$CREDENTIALS_DIRECTORY/regulator-password"
+          run budgetStore "$3" agent-healthy down "$4"
+        }
+        # A breach at minute 00 still fails the run at 05, with its message,
+        # and nothing else.
+        case_budgetBreachCarried() {
+          local s
+          s=$(mktemp -d)
+          at 0 breach "$s" 1 && grep -q '^otel-envelope: B1 active-series: FAIL 100000 series' "$work/out" \
+            && at 300 - "$s" 1 \
+            && grep -q '^otel-envelope: B1 active-series: FAIL 100000 series .* (carried from the budget run at 2027-01-15T08:00:00Z)$' "$work/out" \
+            && [ "$(grep -c ': FAIL' "$work/out")" = 1 ]
+        }
+        # The next budget run's pass clears the breach for the runs after it.
+        case_budgetBreachCleared() {
+          local s
+          s=$(mktemp -d)
+          at 0 breach "$s" 1 && at 3600 pass "$s" 0 && at 3900 - "$s" 0
+        }
+        # 65 min after the last budget run passes and 66 min fails, as does a
+        # state that has had no budget run for 66 min.
+        case_budgetRunStale() {
+          local s
+          s=$(mktemp -d)
+          at 0 pass "$s" 0 && at 3900 - "$s" 0 && at 3960 - "$s" 1 \
+            && grep -q '^otel-envelope: B0 budget-run: FAIL the last budget run was at 2027-01-15T08:00:00Z, 66 min ago, over 65 min$' "$work/out" \
+            || return 1
+          s=$(mktemp -d)
+          at 300 - "$s" 0 && at 4260 - "$s" 1 \
+            && grep -q "^otel-envelope: B0 budget-run: FAIL no budget run since this state's first run at 2027-01-15T08:05:00Z, 66 min ago" "$work/out"
+        }
+        # A fresh state, and one written before the budget's record existed,
+        # pass for 65 min without a budget run.
+        case_budgetFreshState() {
+          local s
+          s=$(mktemp -d)
+          at 300 - "$s" 0 && grep -q '^otel-envelope: B0 budget-run: ok' "$work/out" && at 4200 - "$s" 0 || return 1
+          s=$(mktemp -d)
+          run agent "$s" agent-healthy down 0 && at 300 - "$s" 0 && at 4200 - "$s" 0
         }
 
         for c in "$@"; do
@@ -387,6 +471,10 @@
         "missThenSame"
         "longRun"
         "budgetOnlyHourly"
+        "budgetBreachCarried"
+        "budgetBreachCleared"
+        "budgetRunStale"
+        "budgetFreshState"
       ];
       allCases = lib.concatStringsSep " " caseNames;
     in

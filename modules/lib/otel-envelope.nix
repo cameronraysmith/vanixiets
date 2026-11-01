@@ -25,11 +25,12 @@
 #   that the agents' queues absorb; a full store queue fails C3.
 #
 # With `budget` = { storeUrl; notifiedUnits; databases; } (the ingress host,
-# S4 design D8), a run whose minute is 00 (OTEL_ENVELOPE_MINUTE, default
-# `date -u +%M`) or with OTEL_ENVELOPE_FORCE_HOURLY=1 also judges the store
-# as its read-only `regulator`, through flake.lib.greptimedbSql, whose
-# failure (no answer, an error, a missing table, no rows) fails the clause
-# that sent the query:
+# S4 design D8), a run whose minute is 00 (OTEL_ENVELOPE_MINUTE, default the
+# UTC minute of OTEL_ENVELOPE_NOW, itself default `date -u +%s`, both read
+# before C1) or with OTEL_ENVELOPE_FORCE_HOURLY=1 is a budget run: it also
+# judges the store as its read-only `regulator`, through
+# flake.lib.greptimedbSql, whose failure (no answer, an error, a missing
+# table, no rows) fails the clause that sent the query:
 #
 # - B1 active-series: over budget.activeSeries series (`__tsid`) in `fleet`
 #   in the last hour.
@@ -50,12 +51,27 @@
 # - B6 ttl: a database of `databases` whose ttl is not the declared one,
 #   compared as durations (flake.lib.humantimeDurationAwk).
 #
+# Every run with `budget`, budget run or not, also judges:
+#
+# - B1 to B6 carried: a run that is not a budget run repeats each clause the
+#   last budget run failed, with its message, so the failure episode lasts
+#   until a budget run passes it rather than ending at the next run with a
+#   false RESOLVED (review F1).
+# - B0 budget-run: the last budget run was over 65 min ago, the hourly
+#   calendar's 60 plus the timer's 1 min accuracy and a run's own minutes. A
+#   state with no budget run recorded, fresh or written before this clause
+#   existed, counts from the first run that found none, so it fails only
+#   when a whole calendar hour has passed it without a budget run.
+#
 # $STATE_DIRECTORY/state holds one `<key> <value>` line per loss series,
 # keyed without the labels that change at every collector start, plus
-# `telemetry 0|1` and `down:<target> 0|1`; it is replaced as a whole at the
-# end of each run. checks.x86_64-linux.otel-envelope replaces each line
-# marked `# mutant: <name>`, in the script or in this file, and requires
-# that mutant's case to fail.
+# `telemetry 0|1` and `down:<target> 0|1`, and with `budget` one
+# `budget:<clause> ok|FAIL <message>` line per budget clause (its spaces as
+# `:`), `budget-run <epoch>` or, before the first, `budget-since <epoch>`; it
+# is replaced as a whole at the end of each run.
+# checks.x86_64-linux.otel-envelope replaces each line marked
+# `# mutant: <name>`, in the script or in this file, and requires that
+# mutant's case to fail.
 #
 # The budget limits are flake.lib.otelCollectorSchema.budget, ADR-004's,
 # which the agent role's unit-cap assertion reads too.
@@ -69,6 +85,14 @@
 { config, lib, ... }:
 let
   flakeLib = config.flake.lib;
+
+  # The budget run's clock, read before C1 and C2, whose 10 s probes could
+  # otherwise carry a run started at minute 00 into minute 01.
+  budgetClock = ''
+    now=''${OTEL_ENVELOPE_NOW:-$(date -u +%s)}
+    minute=''${OTEL_ENVELOPE_MINUTE:-$(date -u -d "@$now" +%M)}
+    utc() { date -u -d "@$1" +%Y-%m-%dT%H:%M:%SZ; }
+  '';
 
   # The hourly clauses' script text, interpolated after C4.
   budgetClauses =
@@ -123,7 +147,7 @@ let
     in
     ''
       # B1 to B6 (design D8): the store's budget, on the hour.
-      if [ "''${OTEL_ENVELOPE_MINUTE:-$(date -u +%M)}" = 00 ] || [ "''${OTEL_ENVELOPE_FORCE_HOURLY:-0}" = 1 ]; then
+      if [ "$minute" = 00 ] || [ "''${OTEL_ENVELOPE_FORCE_HOURLY:-0}" = 1 ]; then
         max_units=''${OTEL_ENVELOPE_MAX_UNITS:-${toString limits.units}}
         hour=${lib.escapeShellArg hour}
         problems=""
@@ -135,7 +159,13 @@ let
           return 1
         }
         verdict() {
-          if [ -n "$problems" ]; then fail "$1" "''${problems%; }"; else ok "$1"; fi
+          if [ -n "$problems" ]; then
+            fail "$1" "''${problems%; }"
+            echo "budget:''${1// /:} FAIL ''${problems%; }" >> "$next"
+          else
+            ok "$1"
+            echo "budget:''${1// /:} ok" >> "$next"
+          fi
           problems=""
         }
 
@@ -206,6 +236,33 @@ let
           problems+=$(awk -f ${ttlProgram} ${declaredTtls} "$tmp/ttls")
         fi
         verdict "B6 ttl"
+        last=$now
+      else
+        last=$(prev budget-run)
+        while read -r key verdict message; do
+          echo "$key $verdict''${message:+ $message}" >> "$next"
+          clause=''${key#budget:}
+          # mutant: budgetVerdictNotCarried
+          if [ "$verdict" = FAIL ]; then fail "''${clause//:/ }" "$message (carried from the budget run at $(utc "$last"))"; fi
+        done < <(grep '^budget:' "$state" 2> /dev/null || true)
+      fi
+
+      # B0: the budget's own heartbeat.
+      if [ "$last" != absent ]; then
+        since=$last
+        echo "budget-run $last" >> "$next"
+        what="the last budget run was at $(utc "$last")"
+      else
+        since=$(prev budget-since)
+        [ "$since" != absent ] || since=$now
+        echo "budget-since $since" >> "$next"
+        what="no budget run since this state's first run at $(utc "$since")"
+      fi
+      # mutant: staleBudgetIgnored
+      if [ $((now - since)) -gt 3900 ]; then
+        fail "B0 budget-run" "$what, $(((now - since) / 60)) min ago, over 65 min"
+      else
+        ok "B0 budget-run"
       fi
     '';
 in
@@ -280,7 +337,7 @@ in
         # envelope existed does not fail its first run.
         baseline=0
         [ -e "$state" ] || baseline=1
-        failed=0
+        failed=0${lib.optionalString (budget != null) "\n${budgetClock}"}
 
         ok() { echo "otel-envelope: $1: ok"; }
         fail() {
