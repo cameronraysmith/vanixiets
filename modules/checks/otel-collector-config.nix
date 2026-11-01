@@ -354,11 +354,6 @@
             "R3.1: a greptimedb*, zfs-set-*, zfs-assert-*, devloop-*, collector or otel-envelope unit is not notified"
             (lib.all (name: builtins.elem name i.notifyUnits) (builtins.filter notifiedByPolicy hostUnits))
           )
-          # The wiring defines a unit for every listed name, so a misspelt
-          # name would otherwise become a unit with nothing to run.
-          (check "R3.1: a notified name is not a unit with an ExecStart" (
-            lib.all (name: (i.services.${name}.serviceConfig or { }) ? ExecStart) i.notifyUnits
-          ))
           (check "R3.1: a named unit is not wired to the notifier" (lib.all unitWired i.notifyUnits))
           (check "R3.1: a notified unit lacks the start-time RESOLVED hook sharing its stop hook's script" (
             lib.all startResolves i.notifyUnits
@@ -532,22 +527,6 @@
               zfs-set-root-foo-quota = {
                 unitConfig = { };
                 serviceConfig.ExecStart = "/run/current-system/sw/bin/zfs set quota=1G zroot/root/foo";
-              };
-            };
-          };
-        # A listed name with no such service: the agent's wiring then creates
-        # a unit carrying only the hooks.
-        listedWithoutService =
-          i:
-          i
-          // {
-            notifyUnits = i.notifyUnits ++ [ "zfs-set-root-typo-quota" ];
-            services = i.services // {
-              zfs-set-root-typo-quota = {
-                inherit (i.services.zfs-set-root-nix-quota) unitConfig;
-                serviceConfig = builtins.removeAttrs i.services.zfs-set-root-nix-quota.serviceConfig [
-                  "ExecStart"
-                ];
               };
             };
           };

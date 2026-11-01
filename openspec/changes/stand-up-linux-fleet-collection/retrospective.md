@@ -169,7 +169,7 @@ The `:<line>` cells cite the rule's line in S1's (`openspec/changes/archive/2026
 - facter's detected DHCP turns on systemd-networkd beside NetworkManager on pyrite's wifi (#3670).
 - The evaluator's expected and always-on hosts come from magnetite's closure, so a host's flag changes alerting only after magnetite deploys (`review.md` F5).
 - ntfy on cinnabar moved three minor releases through a nixpkgs bump with no review of the assumptions that name its version (`review.md` F4).
-- An always-on host's silence posts about 15 min after its last sample, not 10, because the presence query sees a series until it leaves the store's lookback window `[INFERENCE]` (`review.md` F9).
+- An always-on host's silence posts about 15 min after its last sample, not 10, because the presence query sees a series until it leaves the store's 300 s lookback window, GreptimeDB 1.2.1's default, which magnetite does not override (`review.md` F9; `12.9-lookback-20261101T184133Z.log`).
 
 ## 6. Promote candidates → long-term learning
 
@@ -218,8 +218,8 @@ The `:<line>` cells cite the rule's line in S1's (`openspec/changes/archive/2026
   > **How to apply**: the orchestrator reads each operator-sitting log whole before moving on.
 
 - [ ] [low] **A timing statement in a requirement counts the store's lookback window.** → **Promote to** one-off (this change's §12, FA `A missing signal is itself reported`)
-  > **Why**: the always-on silence posts about 15 min after the last sample, and 9.2 met its bound by 25 s `[INFERENCE]` (`review.md` F9).
-  > **How to apply**: confirm GreptimeDB's lookback on magnetite and restate the requirement's 10 minutes.
+  > **Why**: the always-on silence posts about 15 min after the last sample, the store's 300 s lookback plus the evaluator's 10 min, and 9.2 met its bound by 25 s (`review.md` F9).
+  > **How to apply**: done in this change's §12, where FA `A missing signal is itself reported` states 15 minutes.
 
 - [ ] [low] **A migration flag's one-shot branches are removed in the change's close-out.** → **Promote to** schema (OpenSpec tasks template, close-out)
   > **Why**: cinnabar's `units = lib.mkIf (!collects)` and the text around it outlived the migration (`review.md` F10).

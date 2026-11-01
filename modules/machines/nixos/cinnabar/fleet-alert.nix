@@ -1,14 +1,8 @@
 # The fleet alert dead-man and its failure notifier on cinnabar (design D4,
 # D12; ADR-009 items 9 and 11, R9.4). Both post to fleet-alerts with the
-# shared alerter token, loaded by path. cinnabar imports observability-notify
-# directly, and runs the otel-collector agent once its `collect` in
-# flake.lib.observabilityHosts is true; the agent role then lists
-# fleet-deadman from that table, so this file lists it only until then and
-# it stays notified exactly once.
-{ config, ... }:
-let
-  collects = config.flake.lib.observabilityHosts.cinnabar.collect;
-in
+# shared alerter token, loaded by path. The otel-collector agent role lists
+# fleet-deadman among cinnabar's notified units from
+# flake.lib.observabilityHosts.
 {
   flake.modules.nixos."machines/nixos/cinnabar" =
     { config, lib, ... }:
@@ -25,10 +19,7 @@ in
       ];
     in
     {
-      services.observability-notify = {
-        units = lib.mkIf (!collects) [ "fleet-deadman" ];
-        tokenFile = alerterToken;
-      };
+      services.observability-notify.tokenFile = alerterToken;
 
       services.fleet-alert.deadman = {
         enable = true;

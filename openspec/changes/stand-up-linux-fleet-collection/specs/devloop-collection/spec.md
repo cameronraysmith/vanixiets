@@ -29,7 +29,7 @@ When the build service restarts an attribute that had finished, the earlier outc
 
 ### Requirement: A gap in the dev-loop history reaches a person within a day
 
-When the dev-loop history lacks a record for an event of the previous UTC day that its source on magnetite still holds, or holds a record such a source cannot account for, a failure notice SHALL reach a person by the end of the following morning.
+When the dev-loop history lacks a record for an event of the previous UTC day that its source on magnetite still holds, or holds a record such a source cannot account for, a failure notice SHALL reach a person by 03:00 UTC of the following day.
 When the build service built a merge-queue batch on a day for which the dev-loop history holds no batch event announcing a build, a failure notice SHALL reach a person the same way.
 
 **Discharged by**: `devloop-collection-interface` requirements `devloop-reconcile runs daily as its own reader`, `devloop-reconcile compares CI rows with nixbot every day`, `devloop-reconcile compares batch events with the journal every day` and `devloop-reconcile compares deploy records with the file and the current system`, and `telemetry-store-interface` requirement `Failure notices are posted to one topic`, resting on world assumptions `A33 — The fleet's notification service on cinnabar is reachable over ZeroTier and is the single delivery path`, `A43 — nixbot's migrations create the build and attribute columns the dev-loop copy reads, and finish times are transaction start times` and `A48 — magnetite's journal keeps gitea-mq's lines for longer than the reconcile's window`; the container test's reconcile mutants and the operator's forced reconcile failure at deploy discharge it.

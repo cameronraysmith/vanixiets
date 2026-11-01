@@ -9,9 +9,10 @@
 # `exporter` and `data_type`, the counters have no `_total` suffix, and the
 # memory receiver is host_metrics/memory. A case is a sequence of runs
 # against one fresh state directory, each with the exit code it must have;
-# the check prints `ok: <case>` for each. Each mutant is the script with one
-# line marked `# mutant: <name>` replaced, built for every variant, and must
-# fail its named case, printed as `mutant <name> rejected: <case>`.
+# the check prints `ok: <case>` for each. Each mutant is the script, or
+# modules/lib/otel-envelope.nix for a `source` mutant, with one line marked
+# `# mutant: <name>` replaced, built for every variant; it runs its named
+# case alone, which must fail, printed as `mutant <name> rejected: <case>`.
 # budgetOnlyHourly holds the hourly clauses to the minute and to `budget`:
 # with a store that does not answer, a run at minute 05 is judged by C1 to
 # C4 alone, as is one at minute 00 without `budget`, and one at minute 00
@@ -25,6 +26,8 @@
     let
       telemetryPort = 18888;
       targetPort = 19100;
+      # Nothing listens here, so a target there is down.
+      secondTargetPort = 19101;
       # Nothing listens here, so every budget query fails.
       closedStorePort = 14000;
       target = path: [
@@ -40,17 +43,40 @@
             hostName = "electrum";
             telemetryUrl = "http://127.0.0.1:${toString telemetryPort}/metrics";
             targets = [ ];
+            # The agent fixtures' exporters.
+            exporters = [
+              "otlp_http/ingress"
+              "otlp_http/ingress-logs"
+            ];
           }
           // args
         );
-      # The script as each case runs it.
-      variants = {
+      # Receivers with one job of two targets, the second down.
+      twoTargets.prometheus.config.scrape_configs = [
+        {
+          job_name = "node";
+          metrics_path = "/ok";
+          static_configs = [
+            {
+              targets = [
+                "127.0.0.1:${toString targetPort}"
+                "127.0.0.1:${toString secondTargetPort}"
+              ];
+            }
+          ];
+        }
+      ];
+      # The script as each case runs it, with receivers' targets rendered by
+      # targetsOf.
+      variantsWith = targetsOf: {
         agent = envelope { };
         agentOk = envelope { targets = target "/ok"; };
         agentSlow = envelope { targets = target "/slow"; };
+        agentTwoTargets = envelope { targets = targetsOf twoTargets; };
         ingress = envelope {
           hostName = "magnetite";
           ingress = true;
+          exporters = [ "otlp_http/fleet" ];
         };
         budget = envelope {
           budget = {
@@ -60,6 +86,7 @@
           };
         };
       };
+      variants = variantsWith self.lib.otelEnvelopeTargets;
       variantsDir =
         name: scripts:
         pkgs.runCommand name { } ''
@@ -68,6 +95,8 @@
         '';
 
       # Each mutant replaces the line after its marker; `from` is that line.
+      # A `source` mutant marks a line of modules/lib/otel-envelope.nix
+      # itself rather than of the script.
       mutants = {
         meshRefusalIsLoss = {
           case = "ingressMeshRefused";
@@ -94,8 +123,20 @@
           from = ''{ grep -E '^otelcol_' "$state" 2> /dev/null || true; } >> "$next"'';
           to = ":";
         };
+        queueSeriesOptional = {
+          case = "queueSizeAbsent";
+          from = ''n = NR ? split(exporters, configured, " ") : 0'';
+          to = "n = 0";
+        };
+        firstTargetOnly = {
+          case = "secondTargetDown";
+          source = true;
+          from = "hostPorts = lib.concatMap (c: c.targets) job.static_configs;";
+          to = "hostPorts = [ (builtins.head (builtins.head job.static_configs).targets) ];";
+        };
       };
-      mutate =
+      mutate = name: m: if m.source or false then mutateSource name m else mutateScript name m;
+      mutateScript =
         name: m:
         lib.mapAttrs (
           v: drv:
@@ -112,6 +153,26 @@
             substituteInPlace "$out/bin/otel-envelope" --replace-fail ${lib.escapeShellArg m.from} ${lib.escapeShellArg m.to}
           ''
         ) variants;
+      # The library file with the marked line replaced, imported as the
+      # flake-parts module it is, renders every variant's targets.
+      mutateSource =
+        name: m:
+        let
+          source = builtins.readFile ../lib/otel-envelope.nix;
+          parts = builtins.split "# mutant: ${name}\n" source;
+          marked =
+            builtins.length parts == 3
+            && lib.hasInfix m.from (builtins.head (lib.splitString "\n" (builtins.elemAt parts 2)));
+          mutated =
+            import
+              (builtins.toFile "otel-envelope-${name}.nix" (builtins.replaceStrings [ m.from ] [ m.to ] source))
+              {
+                inherit lib;
+                config.flake.lib = self.lib;
+              };
+        in
+        assert lib.assertMsg marked "mutant ${name}: the line after its marker is not the one replaced";
+        variantsWith mutated.flake.lib.otelEnvelopeTargets;
 
       # cases VARIANTS CASE...: runs each case with the scripts under
       # VARIANTS, printing `$RESULT_PREFIX<ok|FAIL>: <case>` and appending
@@ -187,6 +248,12 @@
           s=$(mktemp -d)
           run agent "$s" agent-healthy down 0 && run agent "$s" agent-full down 1 && grep -q '^otel-envelope: C3 queue: FAIL' "$work/out"
         }
+        # A configured exporter whose queue size series is absent, as after
+        # a release renaming it.
+        case_queueSizeAbsent() {
+          run agent "$(mktemp -d)" agent-no-logs-queue-size down 1 \
+            && grep -q '^otel-envelope: C3 queue: FAIL otlp_http/ingress-logs otelcol_exporter_queue_size absent' "$work/out"
+        }
         case_agentEnqueueFailed() {
           local s
           s=$(mktemp -d)
@@ -231,6 +298,12 @@
           s=$(mktemp -d)
           run agentOk "$s" agent-healthy down 0 && run agentOk "$s" agent-healthy down 1 \
             && grep -q '^otel-envelope: C2 targets: FAIL node' "$work/out"
+        }
+        case_secondTargetDown() {
+          local s
+          s=$(mktemp -d)
+          run agentTwoTargets "$s" agent-healthy up 0 && run agentTwoTargets "$s" agent-healthy up 1 \
+            && grep -q '^otel-envelope: C2 targets: FAIL node@127.0.0.1:${toString secondTargetPort} down' "$work/out"
         }
         case_missThenSame() {
           local s
@@ -301,6 +374,7 @@
         "missingSendFailed"
         "noTelemetry"
         "queueFull"
+        "queueSizeAbsent"
         "agentEnqueueFailed"
         "ingressEnqueueFailed"
         "ingressMeshRefused"
@@ -309,6 +383,7 @@
         "resetThenFailure"
         "targetDownOnce"
         "targetDownTwice"
+        "secondTargetDown"
         "missThenSame"
         "longRun"
         "budgetOnlyHourly"
@@ -338,7 +413,7 @@
               ${lib.concatStrings (
                 lib.mapAttrsToList (name: m: ''
                   : > "$FAILED_CASES"
-                  RESULT_PREFIX="  under ${name}: " ${cases} ${variantsDir "otel-envelope-${name}" (mutate name m)} ${allCases} > ${name}.log
+                  RESULT_PREFIX="  under ${name}: " ${cases} ${variantsDir "otel-envelope-${name}" (mutate name m)} ${m.case} > ${name}.log
                   if grep -qx ${m.case} "$FAILED_CASES"; then
                     echo "mutant ${name} rejected: ${m.case}"
                   else

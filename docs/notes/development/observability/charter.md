@@ -1,12 +1,12 @@
 ---
 title: Fleet observability and CCV feedback-loop charter
-status: charter v25
+status: charter v26
 date: 2026-11-01
 ---
 
 # Fleet observability and CCV feedback-loop charter
 
-Charter version: v25.
+Charter version: v26.
 A revision is a version bump with a dated entry under "Revision history"; the text of an earlier version is never edited in place.
 
 ## Objective
@@ -389,3 +389,8 @@ A research unit that meets ambiguity returns it in its questions section; the or
   - Operator decision 2026-11-01, ntfy's retention: cinnabar's ntfy sets `cache-duration` to 168h, so `fleet-alerts` survive on disk for a week and a phone off ZeroTier for days still receives them, rather than the default 12 h; the reference architecture's ntfy line and ADR-009's Consequences line on ntfy's cache are amended in place.
 - v25 (2026-11-01): one correction of stored metric names; no earlier text is edited beyond the status, date and version lines, and this charter's D1–D9, the requirements and the acceptance criteria are unchanged.
   - The store names the exporter's counter-typed SMART fields with `_total`; the NVMe rules and docs use the stored names: ADR-004 item 7 and its smartctl keep-list, ADR-009's `NvmeCriticalWarning` and `NvmeWearHigh` rows and its line on pyrite's SMART support, and the `fleet-alert` and `host-probes` components are amended in place.
+- v26 (2026-11-01): the fixes S4's deployment and acceptance needed, and the outcome of v23's M10; no earlier text is edited beyond the status, date and version lines, and this charter's D1–D9, the requirements and the acceptance criteria are unchanged.
+  - #3667, UTC calendars: `otel-envelope.timer`, `fleet-alert.timer`, `fleet-deadman.timer` and `greptimedb-envelope.timer` name UTC in their calendars, `*:0/5 UTC`, `minutely UTC` and `hourly UTC`, because pyrite runs on `America/New_York` and its deploy one minute before the autumn clock change put `otel-envelope.timer`'s next local run an hour later; no decision record changes, and S4's design and the `otel-collector` README carry the calendars.
+  - #3668, smartctl without the error-information log: smartctl_exporter 0.15.0 calls smartctl with `--log=error` and drops a device on any smartctl error, and pyrite's `APPLE SSD AP0512J` rejects the Error Information log page with `Invalid Log Page (0x109)`, so the exporter dropped `/dev/nvme0`; the exporter's `--smartctl.path` now names a wrapper that removes that one argument, and no kept series reads that log; ADR-003 item 19 and its Consequences line on pyrite's controller are amended in place, and `components/host-probes.md` follows with the exporter's version, 0.15.0.
+  - S4 M10, the exporter's own read on pyrite: v23 kept it as an acceptance observation; on 2026-11-01 it first failed with smartctl's exit status 4, which #3668 resolved, and from 06:28:38Z the store held pyrite's `smartctl_device_critical_warning_total` and `smartctl_device_percentage_used_total` every minute, so ADR-003 Q15's answer stands; ADR-009's line on pyrite's SMART support and `components/fleet-alert.md` are amended in place.
+  - #3670, pyrite's double DHCP: facter's detected DHCP made systemd-networkd lease a second address on pyrite's `wlp2s0` beside NetworkManager's, and pyrite took about 6 min to answer after its wifi returned in S4's offline test; networkd now configures only the ZeroTier link, which a pyrite desktop assertion holds; it amends no decision record and is recorded because S4's acceptance met it.

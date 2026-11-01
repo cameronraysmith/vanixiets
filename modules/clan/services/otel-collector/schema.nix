@@ -1,8 +1,9 @@
 # Single source of the collector's allow-lists and bounds (ADR-004
 # "Implementation surface"; design D8, D9). The otel-collector clan service
 # builds its receivers, transforms and exporter headers from it, its agent
-# assertions read the unit allow-list, owner aliases and rate assumption,
-# and checks.x86_64-linux.otel-collector-config reads its databases. import-tree loads every .nix file under
+# assertions read the unit allow-list, owner aliases, rate assumption and
+# unit cap, otel-envelope's hourly clauses read the budget, and
+# checks.x86_64-linux.otel-collector-config reads its databases. import-tree loads every .nix file under
 # modules/, so this is a flake-parts module exposing the data as
 # flake.lib.otelCollectorSchema; nothing imports it by path. S1 carries the
 # keys S1 deploys; later slices add theirs here.
@@ -10,7 +11,8 @@
 {
   flake.lib.otelCollectorSchema = {
     # ADR-004's systemd unit allow-list, `.service` units only, as systemd
-    # unit patterns. At most 40 units may match on one host (ADR-004 Q12).
+    # unit patterns. At most budget.units of them may match on one host
+    # (ADR-004 Q12).
     systemdUnits = [
       "gitea.service"
       "gitea-mq.service"
@@ -114,9 +116,22 @@
 
     # observability-notify@ instances pass the unit allow-list, so that
     # SystemdUnitFailed reports a failed post, but are bounded by the host's
-    # notified units, not by the cap of 40 (ADR-004 as amended under charter
+    # notified units, not by budget.units (ADR-004 as amended under charter
     # v23).
     systemdUnitsNotifierPattern = "observability-notify@*.service";
+
+    # ADR-004's budget: otel-envelope's hourly clauses B1, B2, B3 and B5
+    # judge the store against it on the ingress host, and the agent role
+    # asserts `units` against each host's allow-listed services, so the two
+    # cannot disagree on the cap.
+    budget = {
+      activeSeries = 8000;
+      labelValues = 200;
+      processNames = 30;
+      units = 40;
+      launchdLabels = 30;
+      devloopRows = 100000;
+    };
 
     # Store databases and their retention, one otlp_http exporter each
     # (design D8). magnetite's services.greptimedb.databases reads this map,

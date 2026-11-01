@@ -119,6 +119,24 @@ in
           exportsToken "start" (unit.ExecStartPost or [ ]) && exportsToken "stop" (unit.ExecStopPost or [ ])
         )
       ) cfg.units;
+
+      # Each OnCalendar of a timer that starts a notified unit, with its
+      # timer's name, unless its last word is UTC or an Area/Location zone.
+      localCalendars = lib.concatLists (
+        lib.mapAttrsToList (
+          name: timer:
+          lib.optionals
+            (builtins.elem (timer.timerConfig.Unit or "${name}.service") (map (u: "${u}.service") cfg.units))
+            (
+              map (calendar: "${name}.timer: ${calendar}") (
+                builtins.filter (
+                  calendar:
+                  calendar != "" && builtins.match ".*[[:space:]](UTC|[A-Za-z_]+(/[A-Za-z0-9_+-]+)+)" calendar == null
+                ) (lib.toList (timer.timerConfig.OnCalendar or [ ]))
+              )
+            )
+        ) config.systemd.timers
+      );
     in
     {
       key = "vanixiets#observability-notify";
@@ -147,14 +165,21 @@ in
         };
       };
 
-      # With a token, each notified unit's resolve hooks pass tokenFile
+      # A calendar without a zone is local time, and in a daylight-saving
+      # zone systemd computes its next elapse across the autumn change as an
+      # hour later, so the unit and the post its failure would make skip an
+      # hour. With a token, each notified unit's resolve hooks pass tokenFile
       # itself (design D3), which a host overriding a unit's hooks can lose.
-      config.assertions = lib.mkIf (cfg.tokenFile != null) [
+      config.assertions = [
         {
-          assertion = unitsWithoutToken == [ ];
-          message = "observability-notify: the resolve hooks of ${builtins.toJSON unitsWithoutToken} do not run under `env NTFY_TOKEN_FILE=${cfg.tokenFile}`.";
+          assertion = localCalendars == [ ];
+          message = "observability-notify: the timers of notified units must name their zone in OnCalendar, as `UTC` or an Area/Location zone: ${builtins.toJSON localCalendars}.";
         }
-      ];
+      ]
+      ++ lib.optional (cfg.tokenFile != null) {
+        assertion = unitsWithoutToken == [ ];
+        message = "observability-notify: the resolve hooks of ${builtins.toJSON unitsWithoutToken} do not run under `env NTFY_TOKEN_FILE=${cfg.tokenFile}`.";
+      };
 
       config.systemd.services = lib.mkMerge [
         (lib.genAttrs cfg.units (_: {

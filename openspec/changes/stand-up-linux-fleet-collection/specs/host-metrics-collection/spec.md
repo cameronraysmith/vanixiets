@@ -101,7 +101,7 @@ The collector's signals about itself SHALL carry no identifier that changes with
 
 ### Requirement: Collection survives a telemetry store restart without losing the queued interval
 
-When the telemetry store or the ingress is unavailable, the collector on each agent host SHALL hold the queued interval on disk, for at least 24 hours of collection and in less than 512 MiB, and SHALL write it once the telemetry store or the ingress accepts series again, so that a restart of either leaves no gap in the series.
+When the telemetry store or the ingress is unavailable, the collector on each agent host SHALL hold the queued interval in its local state, for at least 24 hours of collection and in less than 512 MiB, and SHALL write it once the telemetry store or the ingress accepts series again, so that a restart of either leaves no gap in the series.
 
 **Discharged by**: `telemetry-store-interface` requirement `The collector's queue persists across a telemetry store restart` and `fleet-ingress-interface` requirement `Each agent exports by its role`, resting on world assumption `A52 — The collector answers back-pressure with a retryable refusal and keeps its persistent queue across an outage and a restart`; the evaluation-time collector regulator's queue case with its mutant, the agent role's queue assertion, the container runtime tests' restart and back-pressure cases, and the operator's measurements of the rate each queue fills discharge it.
 

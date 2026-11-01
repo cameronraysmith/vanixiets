@@ -277,8 +277,8 @@ in
               message = "otel-collector agent: ${hostName}'s notified units ${builtins.toJSON notified} must be services with an ExecStart and include opentelemetry-collector and otel-envelope (design D6, D7).";
             }
             {
-              assertion = builtins.length capped <= 40;
-              message = "otel-collector agent: ${toString (builtins.length capped)} of ${hostName}'s services match the unit allow-list, above ADR-004's 40: ${builtins.toJSON capped}";
+              assertion = builtins.length capped <= schema.budget.units;
+              message = "otel-collector agent: ${toString (builtins.length capped)} of ${hostName}'s services match the unit allow-list, above ADR-004's ${toString schema.budget.units}: ${builtins.toJSON capped}";
             }
             {
               assertion =
@@ -484,8 +484,9 @@ in
           systemd.services.prometheus-node-exporter.serviceConfig.MemoryMax = "64M";
 
           # R3.2 from the host's own collector (design D7): its telemetry,
-          # queues and loss counters, and the targets it scrapes itself, so
-          # the two cannot drift. A target's bearer credential is read from
+          # queues and loss counters, and the targets it scrapes and the
+          # exporters it runs, both read from its settings so the two cannot
+          # drift. A target's bearer credential is read from
           # this unit's credentials under the same name. On the ingress host
           # it also judges the store's budget hourly (design D8).
           systemd.services.otel-envelope = {
@@ -501,6 +502,7 @@ in
                 flakeLib.otelEnvelope pkgs {
                   inherit hostName ingress;
                   targets = flakeLib.otelEnvelopeTargets config.services.opentelemetry-collector.settings.receivers;
+                  exporters = builtins.attrNames config.services.opentelemetry-collector.settings.exporters;
                   budget = config.vanixiets.otelCollector.envelopeBudget;
                 }
               );

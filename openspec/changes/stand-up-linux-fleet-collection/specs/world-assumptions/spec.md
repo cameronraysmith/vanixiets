@@ -198,6 +198,12 @@ A term found to denote two distinct phenomena within this repository's vocabular
 | back-pressure | — | the ingress refusing signals for a while because it cannot pass them on, which the sending collector answers by keeping them and trying again | shared |
 | notifier instance | — | one run of the notifier for one failed unit on one host, which the host's supervisor records as a unit of its own | shared |
 | identifier | collector start | a value the collector's signals about itself carry that differs at each start of the collector | shared |
+| owner | — | the person an Omnigent worker runs for, whose name the worker's unit name carries | world-only |
+| collection | — | a collector's continuing gathering of its host's signals | shared |
+| job | — | a unit that runs to completion each time it is started, by a timer or by another unit's failure, such as a regulator or the notifier | shared |
+| expected host | — | for one alert rule, a host from which the fleet expects its signal: every collecting host, or for the disk-health rules each collecting host with a disk-health source | shared |
+| silent | — | of a host or a job, having sent nothing it is expected to send for a stated time: a host no memory signal, the evaluator no heartbeat | shared |
+| day | — | a UTC calendar day, the period the reconcile compares | shared |
 
 #### Scenario: The terms with two senses are read
 
@@ -231,6 +237,54 @@ Any requirement whose discharge depends on this fact SHALL name it explicitly, a
 - **WHEN** pyrite's journal records `systemd-suspend` runs during ordinary use, or its lid switch suspends it again
 - **THEN** this assumption is void for its silence, and the `fleet-alerting` requirement `A missing signal is itself reported` loses the argument that pyrite's silence comes from power-off, reboot or leaving the network, on which its acceptance by taking pyrite offline rests
 
+### Requirement: A37 — ntfy provisions users, access entries and tokens from its declaration, and refuses to start on an undeclared user
+
+It is true of ntfy 2.31.0, which cinnabar runs, independent of what this fleet builds, that it provisions the users, access entries and tokens its configuration declares, deletes at its next start any entry no longer declared, and refuses to start when an access or token entry names an undeclared user or a token is malformed.
+Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL be treated as losing its discharge once this assumption's violation condition below is observed.
+
+**Evidence**: declarative provisioning arrived in 2.14.0 through `auth-users`, `auth-access` and `auth-tokens`, or `NTFY_AUTH_USERS`, `NTFY_AUTH_ACCESS` and `NTFY_AUTH_TOKENS` (`binwiederhier/ntfy@v2.31.0:cmd/serve.go:61-63`); an entry naming a user missing from `auth-users` stops the server (`cmd/serve.go:714`, `:753`); a token must match `^tk_[-_A-Za-z0-9]{29}$` (`user/util.go:24`); removed entries are deleted at the next start (`docs/config.md:688-689`); these lines were read at the v2.31.0 tag, the source cinnabar's package builds from, on 2026-11-01, and their text is unchanged from 2.28.0, at which this assumption was first read (`logs/s4-evidence/12.4-ntfy-2.31-20261101T183920Z.log`); cinnabar has run 2.31.0 since 2026-10-25T16:09:05Z, its `ntfy serve --help` listed the three flags on 2026-11-01, and ntfy started at 2026-11-01T06:03:17Z under 2.31.0 with its declared access entries `alerter:fleet-*:rw` and `*:fleet-*:ro`; the provisioning check before each deploy and the dead-man's anonymous-publish probe every 5 minutes are its monitors.
+
+#### Scenario: ntfy stops honouring or enforcing its provisioning declaration
+
+- **WHEN** a ntfy release on cinnabar starts with an access or token entry naming an undeclared user, keeps an entry the declaration no longer names, or ignores a declared user, access entry or token
+- **THEN** this assumption is void, and the `fleet-alerting` requirement `Only the alerting credential publishes alerts and heartbeats`, the `fleet-alerting-interface` requirement `ntfy grants the fleet topics to alerter through declarative provisioning`, the `telemetry-store` requirement `The telemetry store's own failures reach a person` and the `host-metrics-collection` requirement `A failed collection or store job notifies a person` lose the discharge argument that the declaration is the whole of ntfy's access state and that the provisioning check guards its start
+
+### Requirement: A38 — One ntfy access entry decides a request, a named user's before the anonymous one's
+
+It is true of ntfy 2.31.0, which cinnabar runs, independent of what this fleet builds, that one access entry decides each request: among the entries whose topic pattern matches, a named user's entry outranks the anonymous `*` entry and a longer pattern outranks a shorter one, and with no matching entry the default access applies.
+Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL be treated as losing its discharge once this assumption's violation condition below is observed.
+
+**Evidence**: the access query orders matching rows `u.user DESC, LENGTH(topic) DESC, write DESC` and takes the first (`binwiederhier/ntfy@v2.31.0:user/manager.go:702-735`, `user/manager_sqlite.go:90-96`), so `alerter:fleet-*:rw` outranks `*:fleet-*:ro`, an anonymous write under `*:fleet-*:ro` is refused with 403, and a topic no entry matches keeps `auth-default-access`; the in-memory access cache keeps the query's order (`user/access_cache.go:55-58`) and is off unless `auth-access-cache` is set, which cinnabar's configuration does not set; these lines were read at the v2.31.0 tag on 2026-11-01, and the query and the cache are unchanged from 2.28.0 (`logs/s4-evidence/12.4-ntfy-2.31-20261101T183920Z.log`); under 2.31.0 the dead-man's anonymous-publish probe was refused with 403 on each of its 1,088 runs from 2026-10-29T00:00Z to 2026-11-01T18:39Z, and it and the acceptance publish to a host-named topic are its monitors.
+
+#### Scenario: ntfy changes how it chooses among access entries
+
+- **WHEN** a ntfy release on cinnabar lets the anonymous entry outrank a named user's, combines several matching entries, or applies something other than the default access to a topic no entry matches
+- **THEN** this assumption is void, and the `fleet-alerting` requirement `Only the alerting credential publishes alerts and heartbeats` and the `fleet-alerting-interface` requirement `ntfy grants the fleet topics to alerter through declarative provisioning` lose the discharge argument that `alerter` alone writes the fleet topics while every other topic stays open
+
+### Requirement: A39 — ntfy refuses a request whose token it does not know, even where anonymous access is allowed
+
+It is true of ntfy 2.31.0, which cinnabar runs, independent of what this fleet builds, that a request whose `Authorization` header fails authentication is refused with 401, even on a topic an anonymous client may write.
+Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL be treated as losing its discharge once this assumption's violation condition below is observed.
+
+**Evidence**: the pinned source refuses a failed `Authorization` header before consulting access (`binwiederhier/ntfy@v2.31.0:server/server_auth.go:45-50`, a file identical to 2.28.0's), so a sender may carry the token only once cinnabar has provisioned it, which is why the cutover provisions the user and token before any sender uses them; nothing monitors it at runtime, and a ntfy upgrade on cinnabar is the event at which it is read again; the upgrade to 2.31.0 reached cinnabar on 2026-10-25 through a nixpkgs update, and this reading followed on 2026-11-01 (`logs/s4-evidence/12.4-ntfy-2.31-20261101T183920Z.log`).
+
+#### Scenario: ntfy starts treating an unknown token as anonymous
+
+- **WHEN** a ntfy release on cinnabar accepts a request carrying an unknown token where anonymous access is allowed, or refuses an unknown token with something other than 401
+- **THEN** this assumption no longer describes ntfy, and the `fleet-alerting-interface` requirement `The alerter token travels only as a file` loses the reason its senders must not carry the token before cinnabar provisions it; the requirement still holds, but its ordering constraint becomes unnecessary
+
+### Requirement: A40 — ntfy rate-limits a client by its address masked to a prefix, taken from a trusted proxy's forwarding header
+
+It is true of ntfy 2.31.0, which cinnabar runs, independent of what this fleet builds, that it rate-limits a client without a tier by its address, masked for IPv6 to `visitor-prefix-bits-ipv6` bits, 64 by default, and takes that address from `X-Forwarded-For` only with `behind-proxy` set and the peer in `proxy-trusted-hosts`.
+Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL be treated as losing its discharge once this assumption's violation condition below is observed.
+
+**Evidence**: a visitor is keyed by user only when the user has a tier and otherwise by masked address (`binwiederhier/ntfy@v2.31.0:server/visitor.go:592-602`); without `behind-proxy` the address is the TCP peer (`server/util.go:84-92`); the default budget is a burst of 60 requests refilled at one per 5 s (`docs/config.md:1905-1910`); these lines were read at the v2.31.0 tag on 2026-11-01, and `visitorID`, `extractIPAddress` and the rate-limit paragraph are unchanged from 2.28.0 (`logs/s4-evidence/12.4-ntfy-2.31-20261101T183920Z.log`); every ZeroTier member lies in `fddb:4344:343b:14b9::/64`, so at the default prefix the whole mesh is one visitor; the deployed 2.31.0 binary's `ntfy serve --help` listed all three settings on 2026-11-01, the prefix defaulting to 64; the two-client visitor observation at the cutover's first cinnabar deploy, made under 2.28.0 and not repeated under 2.31.0, is its monitor.
+
+#### Scenario: ntfy changes how it identifies a rate-limited client
+
+- **WHEN** a ntfy release on cinnabar keys a client without a tier by something other than its masked address, ignores `visitor-prefix-bits-ipv6`, or reads `X-Forwarded-For` from an untrusted peer or not at all
+- **THEN** this assumption is void, and the `fleet-alerting` requirement `Each known failure class on a host reaches a person as an alert` and the `fleet-alerting-interface` requirement `ntfy counts each mesh client as its own visitor` lose the discharge argument that another client's burst cannot spend the evaluator's publishing budget
+
 ### Requirement: A42 — ntfy keeps a topic's messages for a week and returns a recent window to a poll
 
 It is true of ntfy 2.31.0, which cinnabar runs, independent of what this fleet builds, that it keeps each published message for the `cache-duration` it is given, which cinnabar sets to 168 hours, in a cache that survives a restart, and answers `GET /<topic>/json?poll=1&since=10m` with that topic's cached messages of the last 10 minutes.
@@ -262,7 +316,7 @@ Any requirement whose discharge depends on this fact SHALL name it explicitly, a
 It is true of pyrite's `APPLE SSD AP0512J` controller at firmware `16.14.01`, independent of what this fleet builds, that it answers smartmontools 7.5's NVMe health log, with its critical warning, spare, wear, media errors and temperature, to a reader allowed to open its controller device.
 Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL be treated as losing its discharge once this assumption's violation condition below is observed.
 
-**Evidence**: `smartctl -j -H -A /dev/nvme0` with the store's smartmontools 7.5 exited 0 as root on pyrite on 2026-10-27, reporting `Critical Warning 0x00`, `Available Spare 90%`, `Available Spare Threshold 2%`, `Percentage Used 11%`, `Media and Data Integrity Errors 0` and `Temperature 32 Celsius` (`logs/s4/brainstorm-prep.md` §2); the exporter's own read after pyrite's deploy and `RuleSignalMissing` on `smartctl_device_critical_warning_total` are its monitors.
+**Evidence**: `smartctl -j -H -A /dev/nvme0` with the store's smartmontools 7.5 exited 0 as root on pyrite on 2026-10-27, reporting `Critical Warning 0x00`, `Available Spare 90%`, `Available Spare Threshold 2%`, `Percentage Used 11%`, `Media and Data Integrity Errors 0` and `Temperature 32 Celsius` (`logs/s4/brainstorm-prep.md` §2); the controller rejects the Error Information log page with `Invalid Log Page (0x109)`, which smartctl_exporter 0.15.0 requests with `--log=error` and on which it dropped the device (`logs/s4-evidence/5.3-smart-20261101T060029Z.log`), so the exporter reads the health log through #3668's `--smartctl.path` wrapper, which removes that one argument; through it the store held pyrite's SMART samples every minute from 2026-11-01T06:28:38Z to 17:32:38Z (`logs/s4-evidence/5.7-pyrite-replay-20261101T173317Z.log`); the exporter's read and `RuleSignalMissing` on `smartctl_device_critical_warning_total` are its monitors.
 
 #### Scenario: The controller stops answering the health log
 

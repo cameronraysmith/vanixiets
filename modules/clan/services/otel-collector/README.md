@@ -16,7 +16,7 @@ The inventory generates `roles.agent.machines` from that table, so a host joins 
 On every row, whatever its `collect`, the clan agent role declares the `otel-ca` and `otel-cert` generators and imports `flake.modules.nixos.ntfy-alerter`, so one vars step covers every host.
 `collect` gates everything else the role runs on the host: the agent fragment, `vanixiets.otelCollector.caFile` and `smartDevices`, the notifier's `units` and `tokenFile`, and the collector's `otel-cert` and `otel-key` credentials.
 On a host that does not collect, the certificate and the token are uploaded files that no unit reads.
-A new host is therefore added with `collect = false`, and turned on by its own one-line change setting `collect = true`, merged immediately before the host's watched deploy (runbook, "Adding an agent host").
+A new host is therefore added with `collect = false`, and turned on by its own one-line change setting `collect = true`, merged immediately before the host's watched deploy, which magnetite's deploy follows, because magnetite's evaluator takes its expected and always-on hosts from the same table (runbook, "Adding an agent host").
 `alwaysOn` marks magnetite and cinnabar, the hosts whose silence the alert rules report, and only pyrite lists `smartDevices`, `[ "/dev/nvme0" ]`.
 
 ## Export by role
@@ -145,7 +145,8 @@ Nothing imports `schema.nix` by path; import-tree loads it as a flake-parts modu
 - `databases`: database name to TTL (`fleet` 30d, `devloop` 365d, `agent` 90d).
   The ingress builds one route and one exporter per name, and magnetite's `services.greptimedb.databases` reads the same map, so the schema job creates exactly these databases.
 - `systemdUnits`: systemd unit patterns for the systemd receiver, `.service` units only.
-  At most 40 units may match on one host.
+  At most `budget.units` (40) units may match on one host.
+- `budget`: ADR-004's limits, `activeSeries` 8,000, `labelValues` 200, `processNames` 30, `units` 40, `launchdLabels` 30 and `devloopRows` 100,000; `otel-envelope`'s hourly clauses and the agent role's unit-cap assertion both read them.
 - `ownerAliases`: owner name to opaque alias.
   `omnigent-host-<owner>.service` is stored as `omnigent-host-<alias>.service`, so no owner's name becomes a label value.
 - `promotedResourceAttributes`: the resource attributes the store promotes to labels.
@@ -159,7 +160,7 @@ To add a database, add `<name> = "<ttl>";` to `databases`, add a `queueBytes.<na
 The queues must still sum to under 512 MiB.
 The ingress assertion fails if the store would create a different set of databases from the one the ingress routes to.
 
-To add a unit, add its pattern to `systemdUnits`; an agent assertion fails the evaluation of any host on which more than 40 services, notifier instances (`systemdUnitsNotifierPattern`) apart, match it.
+To add a unit, add its pattern to `systemdUnits`; an agent assertion fails the evaluation of any host on which more than `budget.units` services, notifier instances (`systemdUnitsNotifierPattern`) apart, match it.
 If the unit is a store unit (`greptimedb*`) or a disk-share oneshot (`zfs-set-*`, `zfs-assert-*`) on magnetite, also add it to magnetite's `notifiedUnits` in `flake.lib.observabilityHosts`.
 
 To add an owner, give the new omnigent worker owner the next alias (`owner-3`, then `owner-4`).
@@ -206,8 +207,8 @@ Each run prints one line per clause, `otel-envelope: <clause> <name>: ok` or `ot
 `otel-envelope` is in every host's `notifiedUnits`, so a failed run posts `FAILED otel-envelope.service on <host>`.
 
 - `C1 telemetry` fails when the telemetry endpoint did not answer within 10 s on this run and the previous one.
-- `C2 targets` fails when a declared target did not answer `GET` with 200 within 10 s on this run and the previous one, and names the job.
-- `C3 queue` fails when an exporter's `otelcol_exporter_queue_size` reached 90 % of its `otelcol_exporter_queue_capacity`, or its capacity is absent.
+- `C2 targets` fails when a declared target did not answer `GET` with 200 within 10 s on this run and the previous one, and names it: every target of every scrape job is probed, named `<job>`, or `<job>@<host:port>` in a job with several targets.
+- `C3 queue` fails when telemetry answered and an exporter the collector's configuration declares has no `otelcol_exporter_queue_size` or no `otelcol_exporter_queue_capacity` series, or when an exporter's size reached 90 % of its capacity, or its capacity is absent.
 - `C4 loss` fails when, since the previous run, an `otelcol_exporter_send_failed_*` counter rose, an `otelcol_receiver_refused_*` counter rose on any receiver but the ingress's `otlp/mesh`, or, off the ingress host, an `otelcol_exporter_enqueue_failed_*` counter rose.
 
 On magnetite, `otlp/mesh` refusals and the store exporters' enqueue failures are back-pressure, not loss.
@@ -221,11 +222,11 @@ A run without a state file, the first after the unit is deployed, records the ba
 On the ingress host the clan ingress role sets `vanixiets.otelCollector.envelopeBudget` to the store's URL, every host's `notifiedUnits` and `schema.databases`, loads `regulator-password`, and orders the unit after `greptimedb.service`.
 A run there whose UTC minute is `00` (`OTEL_ENVELOPE_MINUTE`, default `date -u +%M`), or any run with `OTEL_ENVELOPE_FORCE_HOURLY=1`, also judges the store's budget as `regulator` through `flake.lib.greptimedbSql`:
 
-- `B1 active-series` fails above 8,000 series in `fleet` in the last hour.
-- `B2 label-values` fails when a tag column of `fleet`'s physical table, other than `__tsid`, `__table_id` and the three that `B3` bounds per host, has over 200 values within one metric in the last hour.
-- `B3 per-host` fails when a host has over 30 `process_executable_name` values, over `OTEL_ENVELOPE_MAX_UNITS` (default 40) `systemd_unit_name` values other than notifier instances, or over 30 `launchd_label` values in the last hour; while no table carries `launchd_label` it prints `otel-envelope: B3 per-host: launchd_label table absent` and skips that count.
+- `B1 active-series` fails above `budget.activeSeries` (8,000) series in `fleet` in the last hour.
+- `B2 label-values` fails when a tag column of `fleet`'s physical table, other than `__tsid`, `__table_id` and the three that `B3` bounds per host, has over `budget.labelValues` (200) values within one metric in the last hour.
+- `B3 per-host` fails when a host has over `budget.processNames` (30) `process_executable_name` values, over `OTEL_ENVELOPE_MAX_UNITS` (default `budget.units`, 40) `systemd_unit_name` values other than notifier instances, or over `budget.launchdLabels` (30) `launchd_label` values in the last hour; while no table carries `launchd_label` it prints `otel-envelope: B3 per-host: launchd_label table absent` and skips that count.
 - `B4 notifier-instances` fails when an `observability-notify@<unit>.service.service` instance is stored for a host whose `notifiedUnits` lacks `<unit>`.
-- `B5 devloop-rows` fails above 100,000 `devloop` rows in the last 24 hours.
+- `B5 devloop-rows` fails above `budget.devloopRows` (100,000) `devloop` rows in the last 24 hours.
 - `B6 ttl` fails when a database of `schema.databases` has a `ttl` other than the declared one, compared as durations.
 
 A query that cannot reach the store, errors, names a missing table or returns no rows fails the clause that sent it.
@@ -233,11 +234,11 @@ A forced hand run of all ten clauses on magnetite on 2026-10-29 took about 1.5 s
 
 ## Failure notifier
 
-The notifier lives in `modules/nixos/observability-notify.nix` as `flake.modules.nixos.observability-notify`, which the agent fragment imports; a host that does not collect imports it directly, as cinnabar does.
+The notifier lives in `modules/nixos/observability-notify.nix` as `flake.modules.nixos.observability-notify`, which the agent fragment imports on every collecting host.
 It defines `observability-notify@.service` and the options `services.observability-notify.units` and `services.observability-notify.tokenFile`.
 Entries in `units` are `systemd.services` attribute names without `.service`.
 The clan agent role sets `units` from the host's `notifiedUnits` in `flake.lib.observabilityHosts`, which on every host include `opentelemetry-collector` and `otel-envelope`.
-magnetite's add the store units, `fleet-alert`, `devloop-pg-grants`, `devloop-reconcile` and its ZFS oneshots, and cinnabar's add `fleet-deadman`, which `modules/machines/nixos/cinnabar/fleet-alert.nix` lists itself only while cinnabar's `collect` is false.
+magnetite's add the store units, `fleet-alert`, `devloop-pg-grants`, `devloop-reconcile` and its ZFS oneshots, and cinnabar's add `fleet-deadman`.
 An agent assertion requires every listed unit to be a service with an `ExecStart`, and the list to include `opentelemetry-collector` and `otel-envelope`.
 For every listed unit the module sets `OnFailure=observability-notify@%n.service`, so an instance is named `observability-notify@<unit>.service.service`.
 It also adds two hooks running one script as root: `ExecStartPost=` with mode `start` and `ExecStopPost=` with mode `stop`.

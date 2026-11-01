@@ -6,6 +6,7 @@ title: "ADR-003: Collection topology"
 
 Accepted (human gate, 2026-10-15), and amended in place under charter v12 (2026-10-16): zerotierone's metrics key is `enableMetrics`, not `allowMetrics`, item 17 names the owner-to-alias attrset with its values, and the ingress reads the `collector` password through `client_auth.password_file`
 Amended in place under charter v23 (2026-10-28), from slice S4's planning (`openspec/changes/stand-up-linux-fleet-collection/`): item 7's agents export to the IP literal of `flake.lib.hosts.magnetite.zt` rather than to `magnetite.zt`, R3.2 drops its per-host last-seen clause, leaving host absence to ADR-009 item 16, and runs on every agent host from its own collector's telemetry and declared targets, with ADR-004's R4.2 in the ingress host's instance, R3.1 compares the ingress endpoint with the address ZeroTier assigned and leaves the unit cap and owner aliases to agent assertions, item 19's exporter grants its own device ACL before start, item 26 adds the NixOS filesystem scraper and the collector self-telemetry scrape, and `smartDevices` moves to `flake.lib.observabilityHosts`.
+Amended in place under charter v26 (2026-11-01), from S4's acceptance: item 19's exporter reads smartctl through a wrapper that drops `--log=error`, because pyrite's controller rejects the Error Information log page, and the Consequences line on pyrite's controller records what acceptance found.
 
 ## Context
 
@@ -100,6 +101,7 @@ Run `opentelemetry-collector-contrib` 0.155.0 from the root nixpkgs pin as one p
     Per-process swap is not collected because the `process` scraper defines no swap metric at 0.155.0, and the `systemd` receiver defines no memory metric (ADR-004 Context), so swapped-out pages are seen only in the host-level paging series.
 19. Disk health on NixOS, pyrite only: `services.prometheus.exporters.smartctl` on `127.0.0.1:9633` with `devices = [ "/dev/nvme0" ]`, scraped at 60 s with a keep-list of ADR-004's smartctl metric names that excludes the `smartctl_device` info series; the KVM and cloud guests run no SMART exporter because their disks are emulated, and darwin disk health is item 24.
     The exporter's unit grants the `smartctl-exporter-access` group its ACL on each device in a privileged `ExecStartPre=` before start, because the module's udev rule grants it only on an `add` event, which a switch does not replay (charter v23).
+    smartctl_exporter 0.15.0 calls smartctl with `--log=error` and drops a device on any smartctl error, and pyrite's controller rejects the Error Information log page with `Invalid Log Page (0x109)`, so the exporter's `--smartctl.path` names a wrapper that removes that one argument; no kept series reads that log (charter v26).
 20. Both exporters set `listenAddress = "127.0.0.1"` and `openFirewall = false`, and the agent's scrape configuration names only `127.0.0.1` targets; the existing zerotierone scrape gains a `metric_relabel_configs` drop of `zt_peer_.*`.
 21. Disk and filesystem bounds, darwin agents: the `disk` scraper includes only the internal SSD, `disk0` on stibnite, by `strict` device match and disables `system.disk.io_time` and `system.disk.pending_operations`, which on darwin repeat the operation-time sum and read a constant 0, so it emits read and write bytes, operations and operation time.
     The `filesystem` scraper includes only the mountpoint `/System/Volumes/Data` by `strict` match, which reports the whole `disk3` container that also holds `/nix`, so the sealed `/` snapshot, `/System/Volumes/VM`, `/System/Volumes/Preboot`, `/System/Volumes/Update`, the ISC volumes `/System/Volumes/xarts`, `/System/Volumes/iSCPreboot` and `/System/Volumes/Hardware`, the sops-nix secret ramdisks, and disk images under `/Volumes/` are excluded.
@@ -216,7 +218,7 @@ Summed resident memory also omits swapped-out pages, which on magnetite left res
 A failing unit outside the systemd allow-list is not seen through the store.
 No pool capacity or fragmentation series exists; pool free space is read from the root dataset's filesystem series.
 Adding an Omnigent owner requires adding an alias to `schema.nix`, and ADR-004's R4.1 fails the build until it is added; from S4, an assertion in the agent role on every NixOS agent host also fails when an evaluated `omnigent-host-<owner>` unit has no alias, a clause R3.1 held for magnetite alone from S1 (charter v23).
-Whether pyrite's Apple NVMe controller answers smartctl's health log is unverified until acceptance (Q15).
+pyrite's Apple NVMe controller answers smartctl's health log and rejects its Error Information log page, as acceptance found on 2026-11-01, so item 19's wrapper keeps the exporter from asking for that page (Q15; charter v26).
 
 ## Operating envelope and regulator
 

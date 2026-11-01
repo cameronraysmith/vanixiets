@@ -60,13 +60,13 @@ Launchd job allow-list (ADR-004): `org.nixos.nix-daemon`, `org.nixos.nix-grpc-da
 
 ## Configuration surface
 
-- In `modules/clan/services/otel-collector/flake-module.nix`, `agent` role NixOS module: `services.prometheus.exporters.node` per ADR-003 item 18, `services.prometheus.exporters.smartctl` with item 19's device ACL step when `smartDevices` is non-empty, and the agent's `prometheus` receiver scrape configurations with their keep-lists from `schema.nix` (ADR-003 Implementation surface).
+- In `modules/clan/services/otel-collector/flake-module.nix`, `agent` role NixOS module: `services.prometheus.exporters.node` per ADR-003 item 18, `services.prometheus.exporters.smartctl` with item 19's device ACL step and its `--smartctl.path` wrapper, which removes the exporter's `--log=error` from each smartctl call (charter v26), when `smartDevices` is non-empty, and the agent's `prometheus` receiver scrape configurations with their keep-lists from `schema.nix` (ADR-003 Implementation surface).
 - In the same file, `agent` role darwin module: nix-darwin's `services.prometheus.exporters.node` with `listenAddress = "127.0.0.1"` and `--collector.disable-defaults --collector.textfile --collector.textfile.directory=/var/lib/prometheus-node-exporter/textfile`; `launchd.daemons.otel-host-probe` as a `pkgs.writeShellApplication` over `/bin/launchctl`, the root pin's `smartmontools` and `jq`, generated from `schema.nix`, writing by write-then-rename; and the agent's scrape of `127.0.0.1:9100` with the darwin keep-list (ADR-003 items 23 and 24, Implementation surface).
 - In `modules/lib/observability-hosts.nix`, `flake.lib.observabilityHosts`: each host's `smartDevices`, `[ "/dev/nvme0" ]` on pyrite and, from S5, `[ "disk0" ]` on stibnite, which the `agent` role reads (ADR-003 Implementation surface; charter v23).
 - In `modules/clan/services/otel-collector/schema.nix`: the node_exporter, darwin textfile and smartctl_exporter keep-lists, the launchd job allow-list, the owner-to-alias attrset and the kept-alive job set (ADR-004 Implementation surface).
 - In `modules/checks/otel-collector-config.nix`: R3.1's exporter and probe assertions and the recorded `launchctl print` fixtures (ADR-003).
 - In `modules/checks/otel-redaction.nix`: R4.1's `launchd_job_state` alias fixture and `smartctl_device` `serial_number` fixture (ADR-004).
-- Packages: `prometheus-node-exporter` 1.12.1, `prometheus-smartctl-exporter` 0.14.0 and `smartmontools` 7.5 from the root pin (ADR-003 Context; `NixOS/nixpkgs@ac1faec4:pkgs/by-name/sm/smartmontools/package.nix:103`).
+- Packages: `prometheus-node-exporter` 1.12.1, `prometheus-smartctl-exporter` 0.15.0, which logs `version=0.15.0` on pyrite (2026-11-01), and `smartmontools` 7.5 from the root pin (ADR-003 Context; `NixOS/nixpkgs@ac1faec4:pkgs/by-name/sm/smartmontools/package.nix:103`).
 - Flake inputs: none added (ADR-003 Implementation surface).
 - Clan vars generators: none (ADR-003; ADR-007).
 

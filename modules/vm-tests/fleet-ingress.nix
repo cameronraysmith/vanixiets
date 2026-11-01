@@ -799,6 +799,7 @@
                         hostName = "electrum";
                         telemetryUrl = "http://127.0.0.1:8889/metrics";
                         targets = self.lib.otelEnvelopeTargets agentSettings.receivers;
+                        exporters = builtins.attrNames agentSettings.exporters;
                       }
                     );
                   };

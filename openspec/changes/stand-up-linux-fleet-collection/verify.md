@@ -5,14 +5,14 @@
 > corresponding artifact for correction before re-running verify.
 
 **Change**: `stand-up-linux-fleet-collection`
-**Verified at**: `2026-11-01 17:40 UTC`
-**Verifier**: `VerifyMd (agent), writing tasks.md 10.1 read-only from tasks.md, design.md, proposal.md, plan/, specs/, logs/s4/ and logs/s4-evidence/; it measured nothing and ran no validator`; this file was then updated on 2026-11-01 with #3672's record of 5.7 and with read-only evidence and evaluation costs taken at origin/main `fcaf4e2d0` (`logs/s4-evidence/`, files named in §8b and §9.1)
+**Verified at**: `2026-11-01 17:40 UTC`, with later reads to 18:07 UTC (A42's poll) and the review corrections of 18:38–18:50 UTC
+**Verifier**: `VerifyMd (agent), writing tasks.md 10.1 read-only from tasks.md, design.md, proposal.md, plan/, specs/, logs/s4/ and logs/s4-evidence/; it measured nothing and ran no validator`; this file was then updated on 2026-11-01 with #3672's record of 5.7 and with read-only evidence and evaluation costs taken at origin/main `fcaf4e2d0` (`logs/s4-evidence/`, files named in §8b and §9.1), and again from 18:38 UTC with `review.md`'s findings F3, F4, F7, F8, F9 and F13 (tasks.md 12.3, 12.4, 12.7, 12.8, 12.9), read-only on magnetite, cinnabar and pyrite and at origin/main `f889b8321`
 
 ---
 
-## 1. Structural Validation (`openspec validate --all --json`)
+## 1. Structural Validation (`openspec validate stand-up-linux-fleet-collection --strict`)
 
-- [ ] All items report `"valid": true`
+- [x] The change reports valid; `openspec validate --all --json` did not run
 
 **Result**:
 
@@ -48,7 +48,7 @@ The working copy's `tasks.md` has 54 ticked items and 6 unticked ones: 5.8, 10.2
 
 | Task | Reason incomplete | Blocks archive? |
 |---|---|---|
-| 5.8 | runs after 2026-11-02T05:59Z: repeats 5.7's replay with `logs/s4-evidence/5.7-pyrite-replay.sh` over pyrite's full first day, runs 11.1 and runs 9.1's capture for pyrite; evidence `5.8-pyrite-replay-<ts>.log` | yes; 11.1, the full-day replay and pyrite's 9.1 capture are inputs to this file |
+| 5.8 | runs after 2026-11-02T05:59Z: repeats 5.7's replay with `logs/s4-evidence/5.7-pyrite-replay.sh` over pyrite's full first day, runs 11.1 and runs 9.1's capture for pyrite; it also records the number of pyrite's `systemd-suspend` runs over the window (`sudo journalctl -b all -u systemd-suspend.service` on pyrite), and if that number is zero, as on 2026-11-01 at 18:15Z when the journal held none since boot 0 began on 2026-10-28 (`review.md` F13), this file states the laptop's resume path (the timer stopping in sleep, the exporter and the queue after resume) unexercised; evidence `5.8-pyrite-replay-<ts>.log` | yes; 11.1, the full-day replay and pyrite's 9.1 capture are inputs to this file |
 | 11.1 | runs after 2026-11-02T05:59Z, with 5.8: 24 h of memory, unit, ZFS and file-system series for magnetite, cinnabar and pyrite, pyrite's NVMe series, and each host's `deploy_record` rows equal to its file's lines | yes |
 | 9.1, pyrite's part | 9.1 is ticked for magnetite and cinnabar only (`9.1-day-20261101T045619Z.log`: "pyrite: not covered"); `9.1-due.md` sets pyrite's window from its deploy epoch, `PYRITE_DEPLOY_EPOCH=1793512554` (2026-11-01T05:55:54Z), so it reads after 2026-11-02T05:55:54Z, with 5.8 | yes, for HMC `Series cardinality stays bounded` and FII `otel-envelope regulates each agent from its own collector` on pyrite |
 | 10.2 | review and retrospective | no |
@@ -70,7 +70,7 @@ For each delta spec file under `openspec/changes/stand-up-linux-fleet-collection
 | `fleet-ingress-interface` | pending sync | New capability; `openspec/specs/fleet-ingress-interface/` does not exist; ADDS eight requirements. |
 | `host-metrics-collection` | pending sync | RENAMES `magnetite contributes its own signals to the telemetry store` to `Each agent host contributes its own signals to the telemetry store`; MODIFIES it and four others. |
 | `telemetry-store-interface` | pending sync | MODIFIES eight requirements, from `Listeners are bound to loopback only` to `Failure notices are posted to one topic`. |
-| `world-assumptions` | pending sync | RENAMES A42; MODIFIES `Grounded vocabulary for behavioral requirements` (176 main rows, 186 in the delta), A13 and A42; ADDS A50, A51 and A52. |
+| `world-assumptions` | pending sync | RENAMES A42; MODIFIES `Grounded vocabulary for behavioral requirements` (176 main rows, 192 in the delta), A13, A37, A38, A39, A40 and A42; ADDS A50, A51 and A52. |
 
 All eight sync at archive.
 
@@ -111,8 +111,12 @@ The change's pull requests, all merged to `main`:
 | #3667 | 2026-11-01T06:26Z | observability timers on UTC calendars | 5.4 |
 | #3668 | 2026-11-01T06:26Z | pyrite's NVMe read without the error-information log | 5.3 |
 | #3669 | 2026-11-01T07:05Z | the NVMe rules read the stored `_total` names | 5.3 |
+| #3670 | 2026-11-01T15:24Z | pyrite's wifi left to NetworkManager, so systemd-networkd no longer runs a second DHCP client on `wlp2s0` | 5.6 |
 | #3671 | 2026-11-01T15:24Z | pyrite's presence and offline test recorded | 5.5, 5.6 |
 | #3672 | 2026-11-01T17:39Z | pyrite's replay over its observed first hours recorded, and 5.8 added | 5.7 |
+
+#3670 fixed the second DHCP client that 5.6 found, after pyrite took about 6 min to answer once its wifi returned.
+Its effect was not settled when it merged: pyrite deployed again at 15:41:19Z (its `/var/log/deploy-record.jsonl`), and a wifi toggle from 15:44:08Z left it unreachable until 16:02:04Z, 1,076 s (`logs/pyrite-wifi-toggle-20261101T154158Z.log`).
 
 The working copy also carries other agents' unmerged chains, which this verification did not inspect.
 
@@ -158,7 +162,7 @@ This section is agent-executed and non-blocking.
 The proposal tags `host-metrics-collection`, `fleet-alerting` and `devloop-collection` `behavioral` (`proposal.md:80`, `:82`, `:84`).
 The pass read the title and statement of each requirement these three deltas carry, five in `host-metrics-collection`, three in `fleet-alerting` and two in `devloop-collection`, excluding scenarios and `Discharged by` lines.
 Each content noun was looked up in the `Term` column of `openspec/specs/world-assumptions/spec.md`'s designation table (176 rows), by the whole term or by a listed term the noun phrase is built from, such as `memory signal` from `memory` and `signal`.
-A noun with no main row was then looked up among the 10 rows this change's `world-assumptions` delta adds (186 rows, every main row carried, by a sorted-row comparison run read-only on 2026-11-01).
+A noun with no main row was then looked up among the 10 rows this change's `world-assumptions` delta then added (186 rows, every main row carried, by a sorted-row comparison run read-only on 2026-11-01); tasks.md 12.8 later added six more, for 192.
 Quantities and identifiers (`fleet`, `devloop-collection`, host names, "24 hours", "512 MiB", "365 days") were not counted as nouns.
 
 #### 8a.2 Result
@@ -175,21 +179,19 @@ Seven nouns have no row in the main table and resolve to a row this change's del
 | ingress | HMC `Collection survives a telemetry store restart without losing the queued interval` | `ingress` |
 | identifier that changes with each start of the collector | HMC `Series cardinality stays bounded` | `identifier` (collector start) |
 
-Seven nouns resolve to no row in either table:
+Seven nouns resolved to no row in either table when the pass ran; `review.md` F8 took them up, and tasks.md 12.8 applied its dispositions:
 
-| Noun | Requirement | Disposition proposed |
+| Noun | Requirement | Disposition (tasks.md 12.8) |
 |---|---|---|
-| owner | HMC `Stored unit names carry no owner's name` (title) | read as `person` (service sense), which the statement uses; or retitle with "person" |
-| collection | HMC `Collection survives a telemetry store restart without losing the queued interval` (title, and "24 hours of collection"); `A failed collection or store job notifies a person` (title) | designation table: shared, the collector's gathering of a host's signals; or rephrase through `collector` |
-| job | HMC `A failed collection or store job notifies a person` (title) | read through `unit`, which the statement uses; the `notifier` and `evaluator` rows also say "job" without a row |
-| disk (where the queue is held, "on disk") | HMC `Collection survives a telemetry store restart without losing the queued interval` | read through `local state`, "the files a service keeps on its own host's disk" |
-| expected host ("a host expected to emit it") | FA `A missing signal is itself reported` | interface stratum: FAI `Each rule's presence selector is watched` defines each rule's expected hosts; or a shared row |
-| silence, silent | FA `A missing signal is itself reported` ("a laptop's silence", "every expected host is silent") | designation table: shared, a host reporting no memory signal; the `always-on host` and `laptop` rows already use the word |
-| day, morning | DC `A gap in the dev-loop history reaches a person within a day` | carried from S2's lint (archived `2026-10-28-stand-up-devloop-collection/verify.md` §8a), still without a row |
+| owner | HMC `Stored unit names carry no owner's name` (title) | delta row `owner`, world-only; the title stays, because tasks.md and this file quote it |
+| collection | HMC `Collection survives a telemetry store restart without losing the queued interval` (title, and "24 hours of collection"); `A failed collection or store job notifies a person` (title) | delta row `collection`, shared |
+| job | HMC `A failed collection or store job notifies a person` (title) | delta row `job`, shared; it also grounds the word in the `unit`, `notifier` and `evaluator` rows |
+| disk (where the queue is held, "on disk") | HMC `Collection survives a telemetry store restart without losing the queued interval` | the statement now reads "in its local state", the existing `local state` row |
+| expected host ("a host expected to emit it") | FA `A missing signal is itself reported` | delta row `expected host`, shared |
+| silence, silent | FA `A missing signal is itself reported` ("a laptop's silence", "every expected host is silent") | delta row `silent`, shared, one sense for a host and for a job |
+| day, morning | DC `A gap in the dev-loop history reaches a person within a day` | delta row `day`, shared, a UTC calendar day; the statement's "by the end of the following morning" now reads "by 03:00 UTC of the following day", since the reconcile runs at 02:15 UTC (`modules/nixos/devloop-collection.nix:938`) |
 
-These seven nouns are open findings for the holistic review of tasks.md 10.2.
-This change adds no row for them and rewords no requirement.
-A further open finding for that review: four ntfy assumptions in main, `openspec/specs/world-assumptions/spec.md:366`, `:378`, `:390` and `:402`, still cite ntfy 2.28.0 while cinnabar runs 2.31.0; this change leaves them, because their evidence was read at 2.28.0 and rewriting the version would claim a reading nobody made.
+The four ntfy assumptions in main, `openspec/specs/world-assumptions/spec.md:366`, `:378`, `:390` and `:402`, cited ntfy 2.28.0 while cinnabar runs 2.31.0; tasks.md 12.4 read their cited paths at the v2.31.0 tag and the delta now MODIFIES A37 to A40 (§8b).
 
 One row resolved a noun with a sense this change made stale, and the delta now corrects it:
 
@@ -198,7 +200,7 @@ One row resolved a noun with a sense this change made stale, and the delta now c
 | collected host | DC `Every dev-loop event is recorded once and kept for a year` | main's row reads "magnetite alone until the fleet's other collectors arrive", while cinnabar and pyrite have been collected hosts since #3633 and #3665; the delta's row now names magnetite, cinnabar and pyrite, and says stibnite is not one yet |
 
 Every other content noun resolves to a main row: `collector`, `host`, `memory`, `compressed swap`, `process`, `unit`, `storage pool`, `out-of-memory`, `signal`, `service`, `database` (telemetry), `source`, `series`, `log record`, `trace`, `dev-loop record`, `telemetry store`, `cardinality`, `identifier` (per-process), `process number`, `command line`, `queued interval`, `gap`, `Omnigent worker`, `person`, `alias`, `regulator`, `envelope`, `disk share`, `failure notice`, `notification service`, `fleet`, `failure class`, `alert`, `alert rule`, `memory pressure`, `kernel`, `notifier`, `always-on host`, `heartbeat`, `evaluator` (alerting), `event` (dev-loop), `attribute`, `outcome`, `build service`, `build` (build service), `batch event`, `batch`, `merge queue`, `deploy` and `dev-loop history`.
-Apart from the `collected host` row, each finding above is for the holistic review and the retrospective's Promote section, not a rewrite applied here.
+Apart from the `collected host` row, each finding above went to the holistic review (`review.md` F8) and was applied by tasks.md 12.8.
 
 #### 8a.3 Archive-time row check (tasks.md 10.3)
 
@@ -220,13 +222,13 @@ Evidence names are files under `logs/s4-evidence/`, which is git-ignored.
 | Requirement | Discharged by (tasks, evidence) | Under (W) | Status |
 |---|---|---|---|
 | devloop-collection: `Every dev-loop event is recorded once and kept for a year` | tasks.md 2.7, 4.6, 5.4; receiver id and settings and both `sqlquery` texts unchanged (`2.7-before-20261029T051753Z.log`, `2.7-after-20261029T051839Z.log`: "hashes equal"); lines equal rows on magnetite and cinnabar (`4.6-deploy-records-20261029T083717Z.log`, `4.6-deploy-records-20261101T045542Z.log`) and on pyrite, 31 and 31 (`5.4-pyrite-20261101T060249Z.log`) | A43, A44, A46, A47 | discharged; 11.1 repeats the line counts after 2026-11-02T05:59Z |
-| devloop-collection: `A gap in the dev-loop history reaches a person within a day` | tasks.md 4.6; the scheduled `devloop-reconcile` runs of 2026-10-30, 10-31 and 11-01 pass after the receiver moved (`4.6-deploy-records-20261101T045542Z.log`) | A33, A43, A48 | discharged |
+| devloop-collection: `A gap in the dev-loop history reaches a person within a day` | tasks.md 4.6; the passing path: the scheduled `devloop-reconcile` runs of 2026-10-30, 10-31 and 11-01 pass after the receiver moved (`4.6-deploy-records-20261101T045542Z.log`); the failing path: each of design D11's eight mutants in `vmTests.devloop-ingest` makes `devloop-reconcile` fail naming its clause, C1 to C7 (`3.0-devloop-ingest-20261029T061132Z.log:4646-8212`), and the reconcile runs at 02:15 UTC (`modules/nixos/devloop-collection.nix:938`), inside the statement's 03:00 UTC of the following day | A33, A43, A48 | discharged |
 | devloop-collection-interface: `Each agent host's collector ships its own deploy records` | tasks.md 2.7, 3.4, 4.6, 5.4; `fleet-ingress` delivery case (`3.4-fleet-ingress-20261029T072517Z.log`); line and row counts (`4.6-deploy-records-…`, `5.4-pyrite-20261101T060249Z.log`) | — | discharged |
 | devloop-collection-interface: `Dev-loop sources are stamped and routed to their table` | tasks.md 2.5, 2.7; R3.1 with `otlpInLogsPipeline` rejected (`2.5-r31-20261029T051525Z.log`); electrum's `logs/devloop-deploy_record` exports to `otlp_http/ingress-logs` (`2.7-after-20261029T051839Z.log`) | — | discharged |
 | devloop-collection-interface: `This capability states its own trust boundary` | tasks.md 10.1; the requirement's own statement, §8d | — | discharged by statement |
-| fleet-alerting: `Each known failure class on a host reaches a person as an alert` | tasks.md 2.8, 5.7, 6.1, 6.3; exclusion legs over the notified-unit union (`2.8-fleet-alert-20261029T053142Z.log`); replay before the rules shipped (`6.1-replay-20261029T094134Z.log`, `6.1-replay-fs-20261029T102912Z.log`, `6.1-replay-fs-20261029T103045Z.log`); `SUCCESS: 11 rules found` and the new legs (`6.3-rules-20261029T101800Z.log`); pyrite's replay over 05:59:08Z–17:33:08Z, no would-be firing (`5.7-pyrite-replay-20261101T173317Z.log`); the NVMe rules read the stored names (`5.3-nvme-names-red-20261101T063615Z.log`, `5.3-nvme-names-green-20261101T064653Z.log`, `5.3-nvme-names-replay-20261101T065651Z.log`) | A33, A40, A41, A51 | discharged; pyrite's full-day replay is 5.8, after 2026-11-02T05:59Z |
-| fleet-alerting: `A missing signal is itself reported` | tasks.md 5.6, 5.7, 6.2, 6.7, 9.2; legs red before 6.3 (`6.2-red-20261029T094638Z.log`); 30 min with no `RuleSignalMissing` and the misspelt-selector control (`6.7-control-20261029T103909Z.log`, `6.7-signals-20261029T110916Z.log`); `[FIRING]` and `[RESOLVED] RuleSignalMissing cinnabar` (`9.2-cinnabar-20261029T133229Z.log`); pyrite off its network 1,387 s with no post naming it (`5.6-offline-20261101T070658Z.log`, `5.6-acceptance-20261101T144554Z.log`); SMART absence 1,740 s, under the 1,800 s `for` (`5.7-pyrite-replay-20261101T173317Z.log`) | A13, A50 | discharged; 5.8 pending |
-| fleet-alerting: `A silent evaluator is reported from another host` (MODIFIED by #3666, which brought it into the deltas) | no `tasks.md` item; cinnabar's `fleet-deadman.timer` ran 1,077 times from 2026-10-29T00:00Z to 2026-11-01T17:40Z with no failed run, each probe refused with 403 and each poll finding 9 to 11 heartbeats (`fa-silent-evaluator-20261101T174309Z.log`, its corrected summary); the live silence test is S3's and was not re-run: `[FIRING] AlertEvaluatorSilent magnetite` at 2026-10-18T09:20:02Z and `[RESOLVED]` at 09:25:02Z (`logs/s3-evidence/7.5-silent-20261018T092040Z.log`, `logs/s3-evidence/7.5-resolved-20261018T093153Z.log`); whether the dead-man's code changed between 2026-10-18 and 2026-11-01 was not checked | A33, A42 | discharged: the dead-man on cinnabar polls magnetite's heartbeats every 5 min, posts with the alerter credential, and raised `AlertEvaluatorSilent` when the heartbeats stopped |
+| fleet-alerting: `Each known failure class on a host reaches a person as an alert` | tasks.md 2.8, 5.7, 6.1, 6.3; exclusion legs over the notified-unit union (`2.8-fleet-alert-20261029T053142Z.log`); replay before the rules shipped (`6.1-replay-20261029T094134Z.log`, `6.1-replay-fs-20261029T102912Z.log`, `6.1-replay-fs-20261029T103045Z.log`); `SUCCESS: 11 rules found` and the new legs (`6.3-rules-20261029T101800Z.log`); pyrite's replay over 05:59:08Z–17:33:08Z, no would-be firing (`5.7-pyrite-replay-20261101T173317Z.log`); the NVMe rules read the stored names (`5.3-nvme-names-red-20261101T063615Z.log`, `5.3-nvme-names-green-20261101T064653Z.log`, `5.3-nvme-names-replay-20261101T065651Z.log`); the scenario `The new rules meet the stored history` could not hold for pyrite: 6.1's NVMe replay was empty because pyrite did not collect until 2026-11-01, so the NVMe rules shipped on 2026-10-29 unreplayed and under names the store never gives, and 5.7's replay and 5.8's full day stand in for the replay before shipping | A33, A40, A41, A51 | discharged, with pyrite's replay made after the rules shipped; pyrite's full-day replay is 5.8, after 2026-11-02T05:59Z |
+| fleet-alerting: `A missing signal is itself reported` | tasks.md 5.6, 5.7, 6.2, 6.7, 9.2; legs red before 6.3 (`6.2-red-20261029T094638Z.log`); 30 min with no `RuleSignalMissing` and the misspelt-selector control (`6.7-control-20261029T103909Z.log`, `6.7-signals-20261029T110916Z.log`); `[FIRING]` and `[RESOLVED] RuleSignalMissing cinnabar` (`9.2-cinnabar-20261029T133229Z.log`); the live run of the scenario `pyrite reports memory but no disk health`: magnetite's evaluator, expecting pyrite from its 06:28:35Z deploy, posted `[FIRING] RuleSignalMissing` for `rule=NvmeCriticalWarning, selector=smartctl_device_critical_warning` at 06:59:02.150Z and for `rule=NvmeWearHigh, selector=smartctl_device_percentage_used` at 06:59:02.225Z, and `[RESOLVED]` for both at 07:11:02.818Z and 07:11:02.886Z, after #3669's deploy at 07:06:26Z (`12.3-nvme-posts-20261101T183805Z.log:3-6`, `:9-10`); pyrite off its network 1,387 s with no evaluator post naming it (`5.6-offline-20261101T070658Z.log`, `5.6-acceptance-20261101T144554Z.log`), while the notifier's read in the same log printed `Failed to add filter for units: No data available` (`5.6-acceptance-20261101T144554Z.log:12-13`), journalctl's answer when no `observability-notify@*` unit has a journal entry, which a read on pyrite at 18:15Z repeated (`review.md` F7); the store's PromQL lookback is 300 s, GreptimeDB 1.2.1's default, since magnetite's `greptimedb.toml` sets none: cinnabar's last memory sample before 9.2's stop is at 13:02:28.858Z, and an instant `count by (host_name)` returns it at 13:07:28Z and not at 13:07:29Z (`12.9-lookback-20261101T184133Z.log`), so the 9.2 post at 13:17:02Z came 14 min 33 s after the last sample, inside the statement's 15 minutes | A13, A50 | discharged; 5.8 pending |
+| fleet-alerting: `A silent evaluator is reported from another host` (MODIFIED by #3666, which brought it into the deltas) | no `tasks.md` item; cinnabar's `fleet-deadman.timer` ran 1,077 times from 2026-10-29T00:00Z to 2026-11-01T17:40Z with no failed run, each probe refused with 403 and each poll finding 9 to 11 heartbeats (`fa-silent-evaluator-20261101T174309Z.log`, its corrected summary); the build-time leg `an empty window posts one FIRING, resumed heartbeats one RESOLVED` (`modules/checks/fleet-alert.nix:273-283`) passes on the current code at every pull request; the live silence test is S3's: `[FIRING] AlertEvaluatorSilent magnetite` at 2026-10-18T09:20:02Z and `[RESOLVED]` at 09:25:02Z (`logs/s3-evidence/7.5-silent-20261018T092040Z.log`, `logs/s3-evidence/7.5-resolved-20261018T093153Z.log`), on code that e48bf7b2d, a1b2aac08, cdd4e49e5, a76ffc452, 493bd3981 (the dead-man's own timer) and 54a9613e7 have changed since | A33, A42 | discharged by the build-time leg on the current code and by S3's live test on the code of 2026-10-18; a live test on the deployed code, stopping `fleet-alert.timer` for 15 min at 5.8's sitting, waits on the operator (`review.md` question 3) |
 | fleet-alerting-interface: `The evaluator queries each rule's database as the regulators' store account` | tasks.md 6.6, 7.3; the first run after 6.5 (`6.6-first-run-20261029T103804Z.log`); a fifth `regulator-password` holder fails magnetite's evaluation (`7.3-holders-20261029T095322Z.log`, `7.3-holders-20261029T105957Z.log`) | — | discharged |
 | fleet-alerting-interface: `Alert rules are rendered from one Nix source to the evaluator and to promtool` | tasks.md 2.8, 6.3; `fleetAlertRules` red without `notifiedUnits` (`2.8-red-20261029T051915Z.log`), then green (`2.8-fleet-alert-20261029T052539Z.log`, `2.8-fleet-alert-20261029T053142Z.log`); `6.3-rules-20261029T101800Z.log` | — | discharged |
 | fleet-alerting-interface: `Each rule's presence selector is watched` | tasks.md 6.2, 6.3, 6.7; `6.2-red-…`, `6.3-rules-…`, `6.3-red-nofilter-20261029T095500Z.log`, `6.3-red-nofilter-20261029T100657Z.log`, `6.7-signals-…` | — | discharged |
@@ -253,14 +255,19 @@ Evidence names are files under `logs/s4-evidence/`, which is git-ignored.
 | telemetry-store-interface: `The collector's configuration bounds what it gathers` | tasks.md 2.2, 2.6, 7.2; `2.2-assertions-…`, `2.6-scrapes-…`, `7.2-check-…` | — | discharged |
 | telemetry-store-interface: `Omnigent unit names are stored under aliases` | tasks.md 2.2; `2.2-assertions-…` | — | discharged |
 | telemetry-store-interface: `Failure notices are posted to one topic` | tasks.md 2.8, 3.3, 9.2; `2.8-notify-…`, `3.3-units-…`, `9.2-cinnabar-…` | — | discharged |
-| world-assumptions: `A13 — Resuming this laptop from a suspended state is unreliable, and recovering a failed resume requires a person at the machine` (MODIFIED) | world assumption; tasks.md 5.6; pyrite fell silent by leaving its network and raised nothing (`5.6-offline-…`, `5.6-acceptance-…`) | — | assumption, holding |
-| world-assumptions: `A42 — ntfy keeps a topic's messages for a week and returns a recent window to a poll` (MODIFIED and RENAMED by #3666, which brought it into the deltas) | no `tasks.md` item; cinnabar's running `server.yml` sets `cache-duration: 168h` and `cache-file: /var/lib/ntfy-sh/cache-file.db` under ntfy 2.31.0; the 700 heartbeats published after ntfy's 06:03:17Z restart expire 604,800 s after publication; an anonymous `since=168h` poll at 18:07:35Z returned 724 messages, four of them older than 12 h, a `since=10m` poll returned 10, and the 20 messages published before the restart survived it (`a42-ntfy-retention-20261101T174340Z.log`, `a42-ntfy-retention-past12h-20261101T180734Z.log`) | — | assumption, holding: cinnabar's ntfy keeps heartbeats for 168 h across a restart and returns a recent window to a poll |
+| world-assumptions: `A13 — Resuming this laptop from a suspended state is unreliable, and recovering a failed resume requires a person at the machine` (MODIFIED) | world assumption; tasks.md 5.6; pyrite fell silent by leaving its network and raised nothing (`5.6-offline-…`, `5.6-acceptance-…`); pyrite's journal holds no `systemd-suspend` run since boot 0 began on 2026-10-28 (`review.md` F13) | — | assumption, not violated; 5.6 exercised network loss only, not a suspend or a resume; 5.8 records the suspend count over its window (§2) |
+| world-assumptions: `A37 — ntfy provisions users, access entries and tokens from its declaration, and refuses to start on an undeclared user` (MODIFIED by tasks.md 12.4) | world assumption; the cited paths read at the `binwiederhier/ntfy` v2.31.0 tag, the source of cinnabar's package, with their text unchanged from 2.28.0; cinnabar has run 2.31.0 since 2026-10-25T16:09:05Z, its `ntfy serve --help` lists the three provisioning flags, and ntfy started at 06:03:17Z under 2.31.0 with its declared access entries (`12.4-ntfy-2.31-20261101T183920Z.log`) | — | assumption, holding at 2.31.0 |
+| world-assumptions: `A38 — One ntfy access entry decides a request, a named user's before the anonymous one's` (MODIFIED by tasks.md 12.4) | world assumption; the access query and the access cache at v2.31.0, unchanged from 2.28.0, and the cache off on cinnabar; the dead-man's anonymous-publish probe refused with 403 on each of 1,088 runs from 2026-10-29T00:00Z to 18:39Z, 151 of them after ntfy's 06:03:17Z start, with no other outcome logged (`12.4-ntfy-2.31-20261101T183920Z.log`) | — | assumption, holding at 2.31.0 |
+| world-assumptions: `A39 — ntfy refuses a request whose token it does not know, even where anonymous access is allowed` (MODIFIED by tasks.md 12.4) | world assumption; `server/server_auth.go` at v2.31.0, identical to 2.28.0's (`12.4-ntfy-2.31-20261101T183920Z.log`); nothing monitors it at runtime | — | assumption, holding at 2.31.0 by reading |
+| world-assumptions: `A40 — ntfy rate-limits a client by its address masked to a prefix, taken from a trusted proxy's forwarding header` (MODIFIED by tasks.md 12.4) | world assumption; `visitorID`, `extractIPAddress` and the rate-limit paragraph at v2.31.0, unchanged from 2.28.0; the 2.31.0 binary's `ntfy serve --help` lists `behind-proxy`, `proxy-trusted-hosts` and `visitor-prefix-bits-ipv6`, the last defaulting to 64 (`12.4-ntfy-2.31-20261101T183920Z.log`); the two-client visitor observation was made under 2.28.0 and not repeated | — | assumption, holding at 2.31.0 by reading; its runtime monitor last ran under 2.28.0 |
+| world-assumptions: `A42 — ntfy keeps a topic's messages for a week and returns a recent window to a poll` (MODIFIED and RENAMED by #3666, which brought it into the deltas) | no `tasks.md` item; cinnabar's running `server.yml` sets `cache-duration: 168h` and `cache-file: /var/lib/ntfy-sh/cache-file.db` under ntfy 2.31.0; the 700 heartbeats published after ntfy's 06:03:17Z restart expire 604,800 s after publication; an anonymous `since=168h` poll at 18:07:35Z returned 724 messages, four of them older than 12 h, the oldest 12.05 h, a `since=10m` poll returned 10, and the 20 messages published before the restart survived it, carrying the old 12 h expiry, and expired on schedule (`a42-ntfy-retention-20261101T174340Z.log`, `a42-ntfy-retention-past12h-20261101T180734Z.log`) | — | assumption, holding against its violation condition: the 168 h is configured and seen in each new message's `expires`, retention is observed to 12.05 h, and a cache that survives a restart is observed only for messages under the old 12 h expiry; a poll after 2026-11-08T06:04Z observes the week |
 | world-assumptions: `A50 — electrum, galena and scheelite exist only while provisioned on demand` | world assumption; tasks.md 2.10, 9.4; `2.10-hosts-…`, `9.4-unprovisioned-…` | — | assumption, holding |
-| world-assumptions: `A51 — pyrite's NVMe controller answers the SMART health log at the pinned smartmontools` | world assumption; tasks.md 5.3; `5.3-smart-20261101T063202Z.log` | — | assumption, holding, once #3668 stopped asking for the error-information log |
+| world-assumptions: `A51 — pyrite's NVMe controller answers the SMART health log at the pinned smartmontools` | world assumption; tasks.md 5.3, 5.7; the controller rejects the Error Information log page with `Invalid Log Page (0x109)`, and smartctl_exporter 0.15.0 dropped the device for it (`5.3-smart-20261101T060029Z.log`); read through #3668's `--smartctl.path` wrapper, which removes `--log=error`, the health log answered (`5.3-smart-20261101T063202Z.log`), and the store held pyrite's SMART samples every minute from 06:28:38Z to 17:32:38Z (`5.7-pyrite-replay-20261101T173317Z.log`) | — | assumption, holding for the health log; the error-information log is not answered and not read |
 | world-assumptions: `A52 — The collector answers back-pressure with a retryable refusal and keeps its persistent queue across an outage and a restart` | world assumption; tasks.md 3.4; `fleet-ingress` back-pressure case (`3.4-fleet-ingress-…`) | — | assumption, holding |
-| world-assumptions: `Grounded vocabulary for behavioral requirements` (MODIFIED) | tasks.md 10.1; the delta's table and §8a | — | discharged, with the unresolved nouns of §8a.2 |
+| world-assumptions: `Grounded vocabulary for behavioral requirements` (MODIFIED) | tasks.md 10.1, 12.8; the delta's table and §8a | — | discharged; the seven nouns of §8a.2 resolve to the rows and rewordings of tasks.md 12.8 |
 
 The three requirements #3666 brought into the deltas have no `tasks.md` item; each is discharged by evidence taken on 2026-11-01 at origin/main `fcaf4e2d0`, except the dead-man's live silence test, which is S3's of 2026-10-18.
+A37 to A40 entered the delta through tasks.md 12.4, read at the v2.31.0 tag and on cinnabar on 2026-11-01.
 Every ADDED or MODIFIED requirement is discharged; four depend on observations due after 2026-11-02T05:59Z (§2).
 
 ### 8c. Alphabet check
@@ -302,6 +309,7 @@ The capability SHALL state what its properties guarantee and what they do not, a
 The budget is 0.5 GiB, 536,870,912 bytes of `gc.totalBytes` (tasks.md preamble line 8).
 Unless a row says otherwise, the method is `NIX_SHOW_STATS=1 NIX_SHOW_STATS_PATH=<file> nix eval --option eval-cache false --raw .#.checks.x86_64-linux.<check>.drvPath`, reading `.gc.totalBytes` and `.cpuTime` from the stats file; the files of 1.2 and 3.5 print it in their header, and those of 2.5, 2.9, 3.2, 6.3 and 7.2 print the figures alone under the commands of `plan/task-2.md:401`, `plan/task-2.md:559`, `plan/task-3.md:114`, `plan/task-6.md:96` and `plan/task-7.md`.
 The figures at origin/main `fcaf4e2d0` were taken on 2026-11-01 in one detached worktree by the same method, and for the container tests at `.#.vmTests.x86_64-linux.<test>.drvPath`; all are in `costs-origin-main-20261101T174417Z.log`, with each run's stats file under `costs-origin-main-20261101T174417Z.stats/`.
+The figures at origin/main `f889b8321` were taken on 2026-11-01 at 18:42Z for tasks.md 12.7 by the same method, with the flake named `git+file://$PWD?rev=f889b8321…` rather than a worktree, and `otel-collector-config` measured beside them as a control; they are in `costs-envelopes-20261101T184219Z.log`, with the stats files under `costs-envelopes-20261101T184219Z.stats/`.
 
 | Check | Point | `gc.totalBytes` | GiB | cpuTime (s) | Log |
 |---|---|---|---|---|---|
@@ -316,6 +324,7 @@ The figures at origin/main `fcaf4e2d0` were taken on 2026-11-01 in one detached 
 | | after 3.2 | 156,291,488 | 0.146 | 0.56 | `3.2-cost-…` |
 | | after: pull request 1's head | 156,304,304 | 0.146 | 0.50 | `3.5-cost-…` |
 | | before 7.2 / after 7.2 (two runs) | 156,304,304 / 156,537,440 and 156,537,840 | 0.146 | 0.58 / 0.51 and 0.56 | `7.2-cost-before-20261029T094410Z.log`, `7.2-cost-after-…` |
+| | origin/main `f889b8321` | 156,780,640 | 0.146 | 0.68 | `costs-envelopes-20261101T184219Z.log` |
 | `fleet-alert` (changed) | before: `main@origin` | 339,763,552 | 0.316 | 0.95 | `1.2-baseline-…` |
 | | after 2.8 (two runs) | 340,372,288 and 340,419,040 | 0.317 | 0.95 and 0.96 | `2.8-fleet-alert-20261029T052539Z.log`, `2.8-fleet-alert-20261029T053142Z.log` |
 | | after: pull request 1's head | 340,497,248 | 0.317 | 0.90 | `3.5-cost-…` |
@@ -326,6 +335,7 @@ The figures at origin/main `fcaf4e2d0` were taken on 2026-11-01 in one detached 
 | | after 2.9 | 400,701,584 | 0.373 | 1.07 | `2.9-r82-20261029T052229Z.log` |
 | | after: pull request 1's head | 400,779,440 | 0.373 | 1.01 | `3.5-cost-…` |
 | | before 7.2 / after 7.2 | 400,779,440 / 400,779,008 | 0.373 | 1.41 / 1.05 | `7.2-cost-before-…`, `7.2-cost-after-…` |
+| | after #3667: origin/main `f889b8321` | 401,034,624 | 0.373 | 1.15 | `costs-envelopes-20261101T184219Z.log` |
 | `nixos-magnetite` (machine check) | before / after 2.10 | 2,856,483,312 / 2,860,219,344 | 2.660 / 2.664 | 11.72 / 10.92 | `1.2-baseline-…`, `2.10-hosts-20261029T061006Z.log` |
 | | origin/main `fcaf4e2d0` | 2,860,693,600 | 2.664 | 11.20 | `costs-origin-main-…` |
 | `nixos-cinnabar` | before / after 2.10, `collect` false | 2,648,967,568 / 2,651,020,528 | 2.467 / 2.469 | 13.56 / 11.96 | same |
@@ -341,7 +351,9 @@ The figures at origin/main `fcaf4e2d0` were taken on 2026-11-01 in one detached 
 | `vmTests.devloop-ingest` (changed in #3632) | origin/main `fcaf4e2d0` | 1,806,107,984 | 1.682 | 5.04 | `costs-origin-main-…` |
 | `vmTests.greptimedb-pipeline` (changed in #3632) | origin/main `fcaf4e2d0` | 902,539,664 | 0.841 | 3.57 | `costs-origin-main-…` |
 
-Every check under the budget stayed under it, at origin/main `fcaf4e2d0` too; `otel-collector-config` fell from 0.455 to 0.443 GiB, because 2.2 moved the unit-cap and alias clauses into module assertions.
+Every check under the budget stayed under it; at origin/main, `otel-collector-config` and `fleet-alert` were measured at `fcaf4e2d0`, and `otel-envelope` and `greptimedb-envelope` at `f889b8321`, which adds to `fcaf4e2d0` this change's `verify.md`, an agent-context commit and a worktrunk update (`git log fcaf4e2d0..f889b8321`).
+The control `otel-collector-config` measured 476,352,624 B (0.444 GiB, 1.83 s) at `f889b8321` against 476,108,544 B at `fcaf4e2d0`, a difference of 244,080 B.
+`otel-collector-config` fell from 0.455 to 0.443 GiB, because 2.2 moved the unit-cap and alias clauses into module assertions.
 `otel-envelope` landed inside design D10's estimate of 0.12 to 0.2 GiB, `fleet-alert` inside 0.30 to 0.34 GiB and `greptimedb-envelope` under 0.38 GiB.
 `6.3-cost-before-20261029T094622Z.log` recorded 458,012,080 B for `fleet-alert` before 6.3, and its command, not the check, explains the figure.
 That command, recorded in the measuring session's transcript, named the attribute as `git+file://$PWD?rev=$rev#checks.x86_64-linux.fleet-alert.drvPath`, with no `.` after `#`, so nix looked for it under `packages` and `legacyPackages` first.
@@ -375,7 +387,7 @@ Times are from `logs/s4-evidence/window.env` and the `done:` notes of `tasks.md`
 
 ### 9.3 Pending after 2026-11-02T05:59Z
 
-- tasks.md 5.8: pyrite's replay over its full first day, recording any would-be firing after 17:33Z with its cause.
+- tasks.md 5.8: pyrite's replay over its full first day, recording any would-be firing after 17:33Z with its cause, and pyrite's `systemd-suspend` count over the window; with a count of zero, the laptop's resume path is recorded here as unexercised (§2).
 - tasks.md 11.1: the integration verification, recorded here beside the controls of 4.5, 5.6, 7.6, 9.2 and 9.3.
 - tasks.md 9.1's pyrite capture, from `PYRITE_DEPLOY_EPOCH` (2026-11-01T05:55:54Z) for 24 h, run with 5.8.
 - tasks.md 10.3's `comm` output, at archive time (§8a.3).

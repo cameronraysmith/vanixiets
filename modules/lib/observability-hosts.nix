@@ -1,10 +1,10 @@
 # The agent hosts and what each reports (design D6). The inventory's agent
 # machines, whether each collects, each host's notified units, its SMART
 # devices and the alert rules' always-on hosts, expected hosts and
-# SystemdUnitFailed exclusion are read from here. `collect = false` keeps
-# the agent role off a host until its watched first deploy; a host joins
-# alwaysOn only by an edit here when it becomes permanently provisioned
-# (ADR-009 item 16).
+# SystemdUnitFailed exclusion are read from here. A host's `collect` turns
+# the agent role on; a host joining the fleet enters with `collect = false`
+# until its watched first deploy. A host joins alwaysOn only by an edit here
+# when it becomes permanently provisioned (ADR-009 item 16).
 { ... }:
 {
   flake.lib.observabilityHosts =
@@ -43,11 +43,9 @@
           alwaysOn = true;
         };
       cinnabar = agent [ "fleet-deadman" ] // {
-        collect = true;
         alwaysOn = true;
       };
       pyrite = agent [ ] // {
-        collect = true;
         smartDevices = [ "/dev/nvme0" ];
       };
       electrum = agent [ ];

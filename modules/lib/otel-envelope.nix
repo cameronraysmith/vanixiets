@@ -1,11 +1,12 @@
 # otel-envelope: each agent host's collector judged from its own telemetry
 # endpoint every five minutes (ADR-003 R3.2; S4 design D7).
 #
-# flake.lib.otelEnvelope pkgs { hostName; telemetryUrl; targets; ingress;
-# budget; } is otel-envelope.service's ExecStart. `targets` is a list of
-# { job; url; credential ? null; }, the collector's own scrape targets; a
-# target with a credential is probed with `Authorization: Bearer` read from
-# $CREDENTIALS_DIRECTORY/<credential> and passed to curl on stdin. Each run
+# flake.lib.otelEnvelope pkgs { hostName; telemetryUrl; targets; exporters;
+# ingress; budget; } is otel-envelope.service's ExecStart. `targets` is a
+# list of { job; url; credential ? null; }, the collector's own scrape
+# targets; a target with a credential is probed with `Authorization: Bearer`
+# read from $CREDENTIALS_DIRECTORY/<credential> and passed to curl on stdin.
+# `exporters` names the collector's configured exporters. Each run
 # prints one `otel-envelope: <clause> <name>: ok|FAIL <detail>` line per
 # clause and exits 1 if any failed:
 #
@@ -13,8 +14,9 @@
 #   the previous one.
 # - C2 targets: a target did not answer GET with 200 within 10 s on this run
 #   and the previous one.
-# - C3 queue: an exporter's otelcol_exporter_queue_size reached 90 % of its
-#   otelcol_exporter_queue_capacity, or the capacity is absent.
+# - C3 queue: a configured exporter has no otelcol_exporter_queue_size or no
+#   otelcol_exporter_queue_capacity series in telemetry that answered, or an
+#   exporter's size reached 90 % of its capacity, or the capacity is absent.
 # - C4 loss: since the previous run, otelcol_exporter_send_failed_* rose on
 #   any exporter, otelcol_receiver_refused_* on any receiver but the
 #   ingress's otlp/mesh, or, off the ingress host, any
@@ -29,34 +31,41 @@
 # failure (no answer, an error, a missing table, no rows) fails the clause
 # that sent the query:
 #
-# - B1 active-series: over 8,000 series (`__tsid`) in `fleet` in the last
-#   hour.
+# - B1 active-series: over budget.activeSeries series (`__tsid`) in `fleet`
+#   in the last hour.
 # - B2 label-values: a tag column of fleet's physical table, other than the
 #   store's own `__tsid` and `__table_id` and the three that B3 bounds per
-#   host, over 200 values within one metric in the last hour. A column at
-#   200 or fewer across all metrics is at 200 or fewer within each, so only
-#   a column above 200 is grouped by metric.
-# - B3 per-host: a host with over 30 process_executable_name values, over
-#   OTEL_ENVELOPE_MAX_UNITS (default 40) systemd_unit_name values other than
-#   notifier instances, or over 30 launchd_label values in the last hour; the
+#   host, over budget.labelValues values within one metric in the last hour.
+#   A column within the limit across all metrics is within it for each, so
+#   only a column above it is grouped by metric.
+# - B3 per-host: a host with over budget.processNames
+#   process_executable_name values, over OTEL_ENVELOPE_MAX_UNITS (default
+#   budget.units) systemd_unit_name values other than notifier instances, or
+#   over budget.launchdLabels launchd_label values in the last hour; the
 #   launchd count is skipped, with a note, while no table carries that label.
 # - B4 notifier-instances: an `observability-notify@<unit>.service.service`
 #   instance stored for a host whose `notifiedUnits` lacks `<unit>`.
-# - B5 devloop-rows: over 100,000 rows in devloop's tables with a time index
-#   in the last 24 h.
+# - B5 devloop-rows: over budget.devloopRows rows in devloop's tables with a
+#   time index in the last 24 h.
 # - B6 ttl: a database of `databases` whose ttl is not the declared one,
 #   compared as durations (flake.lib.humantimeDurationAwk).
 #
 # $STATE_DIRECTORY/state holds one `<key> <value>` line per loss series,
 # keyed without the labels that change at every collector start, plus
-# `telemetry 0|1` and `down:<job> 0|1`; it is replaced as a whole at the end
-# of each run. checks.x86_64-linux.otel-envelope replaces each line marked
-# `# mutant: <name>` and requires one of its cases to fail.
+# `telemetry 0|1` and `down:<target> 0|1`; it is replaced as a whole at the
+# end of each run. checks.x86_64-linux.otel-envelope replaces each line
+# marked `# mutant: <name>`, in the script or in this file, and requires
+# that mutant's case to fail.
+#
+# The budget limits are flake.lib.otelCollectorSchema.budget, ADR-004's,
+# which the agent role's unit-cap assertion reads too.
 #
 # flake.lib.otelEnvelopeTargets receivers renders `targets` from a
-# collector's evaluated receivers: every job of every `prometheus*`
-# receiver, so the envelope probes what the collector scrapes, and a job's
-# authorization.credentials_file becomes the credential of that file's name.
+# collector's evaluated receivers: every target of every job of every
+# `prometheus*` receiver, so the envelope probes what the collector scrapes.
+# A target is named by its job, or `<job>@<host:port>` in a job with more
+# than one target, and a job's authorization.credentials_file becomes the
+# credential of that file's name.
 { config, lib, ... }:
 let
   flakeLib = config.flake.lib;
@@ -66,6 +75,7 @@ let
     pkgs: budget:
     let
       hour = "greptime_timestamp > now() - INTERVAL '1 hour'";
+      limits = flakeLib.otelCollectorSchema.budget;
       devloopRows = lib.concatStringsSep " UNION ALL " (
         lib.mapAttrsToList (
           name: table:
@@ -114,7 +124,7 @@ let
     ''
       # B1 to B6 (design D8): the store's budget, on the hour.
       if [ "''${OTEL_ENVELOPE_MINUTE:-$(date -u +%M)}" = 00 ] || [ "''${OTEL_ENVELOPE_FORCE_HOURLY:-0}" = 1 ]; then
-        max_units=''${OTEL_ENVELOPE_MAX_UNITS:-40}
+        max_units=''${OTEL_ENVELOPE_MAX_UNITS:-${toString limits.units}}
         hour=${lib.escapeShellArg hour}
         problems=""
         # query FILE SQL: the rows in FILE, or the helper's error added to the
@@ -131,7 +141,7 @@ let
 
         if query "$tmp/b1" "SELECT count(DISTINCT __tsid) FROM fleet.greptime_physical_table WHERE $hour"; then
           series=$(< "$tmp/b1")
-          if [ "$series" -gt 8000 ]; then problems="$series series in fleet over the last hour, above 8000; "; fi
+          if [ "$series" -gt ${toString limits.activeSeries} ]; then problems="$series series in fleet over the last hour, above ${toString limits.activeSeries}; "; fi
         fi
         verdict "B1 active-series"
 
@@ -142,10 +152,10 @@ let
             if query "$tmp/values" "SELECT ''${counts%, } FROM fleet.greptime_physical_table WHERE $hour"; then
               read -r -a values < "$tmp/values"
               for i in "''${!tags[@]}"; do
-                [ "''${values[$i]}" -gt 200 ] || continue
+                [ "''${values[$i]}" -gt ${toString limits.labelValues} ] || continue
                 tag=''${tags[$i]}
                 query "$tmp/per-table" "SELECT __table_id, count(DISTINCT \"$tag\") FROM fleet.greptime_physical_table WHERE $hour GROUP BY __table_id" || continue
-                awk -F '\t' '$2 > 200' "$tmp/per-table" > "$tmp/wide"
+                awk -F '\t' '$2 > ${toString limits.labelValues}' "$tmp/per-table" > "$tmp/wide"
                 [ -s "$tmp/wide" ] || continue
                 query "$tmp/names" "SELECT table_id, table_name FROM information_schema.tables WHERE table_schema = 'fleet' AND table_id IN ($(cut -f 1 "$tmp/wide" | paste -s -d , -))" || continue
                 problems+=$(awk -F '\t' -v tag="$tag" '
@@ -158,7 +168,7 @@ let
         verdict "B2 label-values"
 
         if query "$tmp/processes" "SELECT host_name, count(DISTINCT process_executable_name) FROM fleet.process_memory_usage_bytes WHERE $hour GROUP BY host_name"; then
-          problems+=$(awk -F '\t' '$2 > 30 { printf "%s process_executable_name %s; ", $1, $2 }' "$tmp/processes")
+          problems+=$(awk -F '\t' '$2 > ${toString limits.processNames} { printf "%s process_executable_name %s; ", $1, $2 }' "$tmp/processes")
         fi
         if query "$tmp/units" "SELECT host_name, count(DISTINCT systemd_unit_name) FROM (SELECT host_name, systemd_unit_name FROM fleet.systemd_unit_state WHERE $hour UNION ALL SELECT host_name, systemd_unit_name FROM fleet.systemd_service_restarts_total WHERE $hour) AS u WHERE systemd_unit_name NOT LIKE 'observability-notify@%' GROUP BY host_name"; then
           problems+=$(awk -F '\t' -v max="$max_units" '$2 > max + 0 { printf "%s systemd_unit_name %s; ", $1, $2 }' "$tmp/units")
@@ -169,7 +179,7 @@ let
           # The constant row keeps an hour without launchd series from
           # reading as an empty answer.
           elif query "$tmp/labels" "SELECT host_name, count(DISTINCT launchd_label) FROM fleet.greptime_physical_table WHERE $hour AND launchd_label IS NOT NULL GROUP BY host_name UNION ALL SELECT '-', 0"; then
-            problems+=$(awk -F '\t' '$1 != "-" && $2 > 30 { printf "%s launchd_label %s; ", $1, $2 }' "$tmp/labels")
+            problems+=$(awk -F '\t' '$1 != "-" && $2 > ${toString limits.launchdLabels} { printf "%s launchd_label %s; ", $1, $2 }' "$tmp/labels")
           fi
         fi
         verdict "B3 per-host"
@@ -188,7 +198,7 @@ let
 
         if query "$tmp/rows" ${lib.escapeShellArg "SELECT sum(n) FROM (${devloopRows}) AS t"}; then
           rows=$(< "$tmp/rows")
-          if [ "$rows" -gt 100000 ]; then problems="$rows devloop rows in the last 24 h, above 100000; "; fi
+          if [ "$rows" -gt ${toString limits.devloopRows} ]; then problems="$rows devloop rows in the last 24 h, above ${toString limits.devloopRows}; "; fi
         fi
         verdict "B5 devloop-rows"
 
@@ -204,15 +214,22 @@ in
     receivers:
     lib.concatMap (
       name:
-      map (job: {
-        job = job.job_name;
-        url = "${job.scheme or "http"}://${builtins.head (builtins.head job.static_configs).targets}${job.metrics_path or "/metrics"}";
-        credential =
-          if job ? authorization.credentials_file then
-            baseNameOf job.authorization.credentials_file
-          else
-            null;
-      }) receivers.${name}.config.scrape_configs
+      lib.concatMap (
+        job:
+        let
+          # mutant: firstTargetOnly
+          hostPorts = lib.concatMap (c: c.targets) job.static_configs;
+        in
+        map (hostPort: {
+          job = if builtins.length hostPorts == 1 then job.job_name else "${job.job_name}@${hostPort}";
+          url = "${job.scheme or "http"}://${hostPort}${job.metrics_path or "/metrics"}";
+          credential =
+            if job ? authorization.credentials_file then
+              baseNameOf job.authorization.credentials_file
+            else
+              null;
+        }) hostPorts
+      ) receivers.${name}.config.scrape_configs
     ) (builtins.filter (lib.hasPrefix "prometheus") (builtins.attrNames receivers));
 
   flake.lib.otelEnvelope =
@@ -221,6 +238,7 @@ in
       hostName,
       telemetryUrl ? "http://127.0.0.1:8888/metrics",
       targets,
+      exporters,
       ingress ? false,
       budget ? null,
     }:
@@ -321,16 +339,32 @@ in
           ok "C2 targets"
         fi
 
-        # C3: size against capacity per exporter and data type.
-        full=$(awk '
+        # C3: each configured exporter's two queue series, then size against
+        # capacity per exporter and data type. The exporter names come from
+        # the configuration, not the telemetry, so a renamed series is absent
+        # rather than unseen; telemetry that did not answer is C1's.
+        full=$(awk -v exporters=${lib.escapeShellArg (lib.concatStringsSep " " exporters)} '
           function label(s, k) {
             return match(s, "[{,]" k "=\"[^\"]*\"") ? substr(s, RSTART + length(k) + 3, RLENGTH - length(k) - 4) : ""
           }
           /^otelcol_exporter_queue_(size|capacity)\{/ {
-            id = label($1, "exporter") "/" label($1, "data_type")
-            if ($1 ~ /^otelcol_exporter_queue_size\{/) size[id] = $2; else capacity[id] = $2
+            exporter = label($1, "exporter")
+            id = exporter "/" label($1, "data_type")
+            if ($1 ~ /^otelcol_exporter_queue_size\{/) {
+              size[id] = $2
+              sized[exporter] = 1
+            } else {
+              capacity[id] = $2
+              bounded[exporter] = 1
+            }
           }
           END {
+            # mutant: queueSeriesOptional
+            n = NR ? split(exporters, configured, " ") : 0
+            for (i = 1; i <= n; i++) {
+              if (!(configured[i] in sized)) printf "%s otelcol_exporter_queue_size absent; ", configured[i]
+              if (!(configured[i] in bounded)) printf "%s otelcol_exporter_queue_capacity absent; ", configured[i]
+            }
             for (id in size) {
               if (!(id in capacity)) printf "%s capacity absent; ", id
               else if (size[id] * 10 >= capacity[id] * 9) printf "%s %s of %s; ", id, size[id], capacity[id]
