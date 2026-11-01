@@ -1442,8 +1442,8 @@ No value of that setting prevents this; only a gitignore entry does, because jj 
 
 A linked git worktree can coexist with a jj-colocated primary working copy.
 This section is the authority for how, and the worktree-surface hook messages point here.
-The default for parallel chains that share one review boundary remains the diamond development join; a worktree is warranted when a separate filesystem tree is itself the point, such as an external agent framework driving its own process, a long-running build, or a side-by-side comparison.
-The discriminator is whether something outside this session needs its own tree, not which mechanism seems faster.
+The default for parallel chains that share one review boundary remains the diamond development join; a worktree is warranted when a separate filesystem tree is itself the point, such as an external agent framework driving its own process, a long-running build, a side-by-side comparison, or a tree pinned at a base to show one change failing there and passing with it while other work sits in the join.
+The discriminator is whether the work needs a tree of its own, not which mechanism seems faster.
 The behavior this section describes was established against jj 0.43.0.
 
 ### Choosing the mechanism
@@ -1451,6 +1451,7 @@ The behavior this section describes was established against jj 0.43.0.
 In a flake repository, isolation means a git worktree rather than `jj workspace add`.
 A `jj workspace add` directory contains `.jj` and no `.git`, so `git rev-parse --show-toplevel` inside it fails and flake evaluation degrades to a `path:` source with no revision, carrying `.jj` and gitignored directories into the store (jj-vcs/jj#4436, open).
 A git worktree resolves as `git+file://…&rev=<sha>` and evaluates to the same store path as the primary.
+Create it with `wt switch --create <branch> --no-cd` rather than a detached `git worktree add`: the named branch lets `wt list` show the tree's pull request and check status, and `wt remove` deletes the tree and the branch once the branch is in the default branch.
 
 ### How work crosses the boundary
 
