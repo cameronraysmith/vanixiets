@@ -47,7 +47,7 @@
         alwaysOn = true;
       };
       pyrite = agent [ ] // {
-        collect = false;
+        collect = true;
         smartDevices = [ "/dev/nvme0" ];
       };
       electrum = agent [ ];
