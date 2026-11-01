@@ -237,7 +237,7 @@ otel-envelope.timer (every 5 min) ─▶ otel-envelope.service
 
 ### D7: `otel-envelope` on every agent host: R3.2 from local inputs
 
-- **Choice**: every agent host runs `otel-envelope.service`, a oneshot from `flake.lib.otelEnvelope`, `DynamicUser`, `StateDirectory = "otel-envelope"`, `MemoryMax = "64M"`, `TimeoutStartSec = "4min"`, with `LoadCredential` of zerotierone's metrics token where zerotierone runs, started by `otel-envelope.timer` at `OnCalendar = "*:0/5"`, and notified through the table (D6).
+- **Choice**: every agent host runs `otel-envelope.service`, a oneshot from `flake.lib.otelEnvelope`, `DynamicUser`, `StateDirectory = "otel-envelope"`, `MemoryMax = "64M"`, `TimeoutStartSec = "4min"`, with `LoadCredential` of zerotierone's metrics token where zerotierone runs, started by `otel-envelope.timer` at `OnCalendar = "*:0/5 UTC"`, and notified through the table (D6).
   Each run reads `http://127.0.0.1:8888/metrics` and fails on:
   - C1, collector down: the endpoint did not answer within 10 s on this run and the previous one;
   - C2, target down: a declared scrape target, rendered from the collector's evaluated `prometheus*` scrape configurations, did not answer `GET` with 200 within 10 s on this run and the previous one;
