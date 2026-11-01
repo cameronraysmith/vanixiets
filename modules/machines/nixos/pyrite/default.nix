@@ -419,6 +419,10 @@ in
 
       # These effective support values previously came from GNOME's module.
       networking.networkmanager.enable = true;
+      # NetworkManager owns the wifi. Facter's detected DHCP would also hand
+      # wlp2s0 to networkd (40-wlp2s0), running a second DHCP client on it;
+      # networkd keeps only the ZeroTier link, which NetworkManager leaves unmanaged.
+      hardware.facter.detected.dhcp.enable = false;
       # Temporary: INFO records association and DHCP, the evidence the warm-reboot
       # wifi experiment needs (logs/pyrite-warmreboot-rootcause.md); revert after it.
       networking.networkmanager.logLevel = "INFO";
