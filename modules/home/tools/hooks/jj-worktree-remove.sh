@@ -1,7 +1,8 @@
 # shellcheck shell=bash
 # Hook: WorktreeRemove -- tear down the isolation worktree
 # Companion to jj-worktree-create. Removes whatever that hook created:
-#   - jj workspace (path has .jj and no .git): forget it, then rm -rf the path.
+#   - jj workspace (path has .jj): forget it, which also removes the git
+#     worktree of a colocated workspace, then rm -rf the path.
 #   - git worktree (otherwise): git worktree remove --force, falling back to rm -rf.
 # Best-effort: this event cannot block, so failures are tolerated and never
 # propagated.
@@ -24,7 +25,7 @@ if [ -z "$CWD" ]; then
   CWD="$PWD"
 fi
 
-if [ -d "$WORKTREE_PATH/.jj" ] && [ ! -e "$WORKTREE_PATH/.git" ]; then
+if [ -d "$WORKTREE_PATH/.jj" ]; then
   # jj workspace: forget by basename from the main repo's cwd, then remove.
   WS_NAME=$(basename "$WORKTREE_PATH")
   jj --repository "$CWD" workspace forget "$WS_NAME" >/dev/null 2>&1 \

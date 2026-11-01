@@ -7,9 +7,10 @@
 # Every repository gets a git worktree under <root>/.claude/worktrees/<name> on
 # a fresh branch worktree-<name>. In a jj-managed repository, setting
 # CLAUDE_JJ_WORKSPACE_ISOLATION=1 selects a jj workspace at that path instead.
-# A jj workspace has no .git, so nix flake evaluation there degrades to a
-# revisionless path: source (jj-vcs/jj#4436); a git worktree keeps flake
-# fidelity, which is why it is the default in both modes.
+# jj 0.46.0 and later colocates that workspace by default (a git worktree with
+# .git beside .jj), keeping flake fidelity; a non-colocated jj workspace has no
+# .git, so nix flake evaluation there degrades to a revisionless path: source
+# (jj-vcs/jj#4436).
 #
 # Stdin is JSON: {session_id, transcript_path, cwd, hook_event_name, name}.
 # Success: print the created worktree's absolute path on stdout, exit 0.
@@ -46,7 +47,8 @@ if [ -n "$JJ_ROOT" ]; then
   DEST="$JJ_ROOT/.claude/worktrees/$NAME"
   if [ "${CLAUDE_JJ_WORKSPACE_ISOLATION:-0}" = "1" ]; then
     # Escape hatch: redirect harness isolation to a jj workspace.
-    # The added workspace has only .jj (no .git); that is expected for this path.
+    # From a colocated repository with git.colocate=true the workspace is
+    # colocated; otherwise it has only .jj and no .git.
     # jj workspace add does not create intermediate parent directories, so the
     # .claude/worktrees/ parent must exist first (git worktree add creates it).
     mkdir -p "$(dirname "$DEST")"
