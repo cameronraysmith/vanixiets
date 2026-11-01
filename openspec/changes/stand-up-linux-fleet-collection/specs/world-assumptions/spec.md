@@ -177,7 +177,7 @@ A term found to denote two distinct phenomena within this repository's vocabular
 | deploy | — | one activation, in the machine sense, of a configuration on a host, including the one each NixOS boot performs | shared |
 | deploy record | — | the entry a host writes at each deploy naming the host, the closure it activated, the closure it replaced and the time | shared |
 | closure | — | the complete built system a configuration produces for one host, identified by its store path | shared |
-| collected host | — | a host whose deploy records a collector ships to the telemetry store, magnetite alone until the fleet's other collectors arrive | shared |
+| collected host | — | a host whose deploy records a collector ships to the telemetry store: magnetite, cinnabar and pyrite, and not yet stibnite | shared |
 | error text | — | the free-form message the build service keeps when an attribute or a build fails, which can carry compiler output and repository content | shared |
 | message body | — | the free text of a log record, as distinct from the named fields parsed out of it | shared |
 | free text | — | any value whose content is not drawn from a fixed or bounded set, such as an error message or a whole log line | world-only |
@@ -233,10 +233,10 @@ Any requirement whose discharge depends on this fact SHALL name it explicitly, a
 
 ### Requirement: A42 — ntfy keeps a topic's messages for a week and returns a recent window to a poll
 
-It is true of ntfy 2.28.0, independent of what this fleet builds, that it keeps each published message for the `cache-duration` it is given, which cinnabar sets to 168 hours, in a cache that survives a restart, and answers `GET /<topic>/json?poll=1&since=10m` with that topic's cached messages of the last 10 minutes.
+It is true of ntfy 2.31.0, which cinnabar runs, independent of what this fleet builds, that it keeps each published message for the `cache-duration` it is given, which cinnabar sets to 168 hours, in a cache that survives a restart, and answers `GET /<topic>/json?poll=1&since=10m` with that topic's cached messages of the last 10 minutes.
 Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL be treated as losing its discharge once this assumption's violation condition below is observed.
 
-**Evidence**: `cache-duration` defaults to 12h (`binwiederhier/ntfy` `docs/config.md:503`, `:2387`, read on `main` rather than the 2.28.0 tag), `modules/machines/nixos/cinnabar/ntfy.nix` sets it to `168h` by the operator's decision of 2026-11-01 (charter v24), and the NixOS module sets a persistent `cache-file`; a poll with `since=<duration>` returns the cached messages of that window (`docs/subscribe/api.md:239-261`); 2.29.0, newer than cinnabar's release, fixed `poll=1` missing messages for up to 40 s under bursts, which at one heartbeat a minute leaves the 10-minute window full; the dead-man's own `AlertEvaluatorSilent`, which a cache that stopped answering would raise falsely, and R9.3's acceptance step of stopping and restarting the evaluator are its monitors.
+**Evidence**: cinnabar's running `ntfy serve` is the `ntfy-sh-2.31.0` store path, observed on 2026-11-01; `cache-duration` defaults to 12h (`binwiederhier/ntfy` `docs/config.md:503`, `:2387`, read on `main` rather than the 2.31.0 tag), `modules/machines/nixos/cinnabar/ntfy.nix` sets it to `168h` by the operator's decision of 2026-11-01 (charter v24), and the NixOS module sets a persistent `cache-file`; a poll with `since=<duration>` returns the cached messages of that window (`docs/subscribe/api.md:239-261`); 2.29.0, older than cinnabar's 2.31.0, fixed `poll=1` missing messages for up to 40 s under bursts, and without that fix one heartbeat a minute would still leave the 10-minute window full; the dead-man's own `AlertEvaluatorSilent`, which a cache that stopped answering would raise falsely, and R9.3's acceptance step of stopping and restarting the evaluator are its monitors.
 
 #### Scenario: ntfy stops returning recent messages to a poll
 

@@ -26,7 +26,7 @@ discharged() { grep -o 'Discharges: .* — verify:' tasks.md | sed -E 's/^Discha
   | grep -oE '(DCI|DC|FAI|FA|FII|HMC|TSI|WA) `[^`]+`' | LC_ALL=C sort -u; }
 echo "undischarged:"; LC_ALL=C comm -23 <(reqs) <(discharged)
 echo "unknown:"; LC_ALL=C comm -13 <(reqs) <(discharged)
-echo "absent from verify.md:"; LC_ALL=C comm -23 <(discharged | sed -E 's/^[A-Z]+ //') <(grep -oE '`[^`]+`' verify.md | LC_ALL=C sort -u)
+echo "absent from verify.md:"; LC_ALL=C comm -23 <(discharged | sed -E 's/^[A-Z]+ //' | LC_ALL=C sort -u) <(grep -oE '`[^`]+`' verify.md | LC_ALL=C sort -u)
 openspec validate stand-up-linux-fleet-collection --strict
 ```
 
