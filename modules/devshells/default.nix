@@ -54,6 +54,21 @@
               echo "apm-context-compile: skipped (run 'just agents-context' to regenerate AGENTS.md/CLAUDE.md manually)" >&2
             fi
           fi
+
+          # git-hooks.nix (via inputsFrom, whose shellHook runs first) writes
+          # core.hooksPath relative to the checkout it installs from, so a value
+          # written from the primary checkout resolves to nothing in a linked
+          # worktree or colocated jj workspace, whose `.git` is a file, and git
+          # there silently runs no hooks. The absolute common-dir path names the
+          # same directory from every checkout. mergify's hooks mint the
+          # Change-Id trailer for git-native commits; jj commits get theirs from
+          # templates.commit_trailers and run no git hooks.
+          if git_common_dir=$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null); then
+            git config --local core.hooksPath "$git_common_dir/hooks"
+            if ! ${lib.getExe self'.packages.mergify-cli-bin} stack setup >/dev/null; then
+              echo "mergify stack setup: failed; git commits will lack a Change-Id trailer" >&2
+            fi
+          fi
         ''
         + lib.optionalString pkgs.stdenv.hostPlatform.isLinux ''
           # WPE WebKit aborts with "Could not create EGL display: no supported
