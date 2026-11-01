@@ -98,6 +98,10 @@ let
             # plus "(elided revisions)". This shows every commit between
             # trunk and each join parent regardless of mutability.
             "diamond()" = "present(@) | @- | trunk() | trunk()..parents(@-)";
+            # builtin_log() stops at trunk(), hiding what the merge queue just
+            # landed; n is the trunk ancestry depth, so `L` → `recent(15)` in
+            # jjui widens the view without a rebuild.
+            "recent(n)" = "builtin_log() | diamond() | ancestors(trunk(), n)";
           };
 
           revsets = {
