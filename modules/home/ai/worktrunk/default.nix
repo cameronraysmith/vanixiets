@@ -17,6 +17,12 @@
       programs.worktrunk = {
         enable = true;
         package = pkgs.worktrunk-bin;
+        # Every list shows each branch's open PR with its check status, and
+        # branches without a worktree, such as bookmarks pushed from the jj join.
+        settings.list = {
+          full = true;
+          branches = true;
+        };
       };
     };
 }
