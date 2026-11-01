@@ -157,7 +157,7 @@ The bucket-wide 7-day multipart-abort rule also applies to the store prefix (ADR
 A DuckLake catalog is deferred (ADR-006 Q5).
 nixbot's own rows are still pruned at 90 days, so the `devloop` copy is the only CI history older than that (ADR-005 Consequences).
 Each agent's `file_storage` queue absorbs at least 24 h of that host's output below 512 MiB (ADR-003 Envelope, buffering).
-ntfy keeps published messages for its default 12 h cache, which is the only record of sent alerts (ADR-009 Consequences).
+ntfy keeps published messages on disk for a week, cinnabar's `cache-duration` of 168h, and that cache is the only record of sent alerts (ADR-009 Consequences; charter v24).
 
 ## Failure and alert path
 

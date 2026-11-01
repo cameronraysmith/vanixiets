@@ -114,3 +114,24 @@ For each host whose `alwaysOn` and `collect` are true in `flake.lib.observabilit
 
 - **WHEN** the fixture server returns no `system_memory_usage_bytes` for pyrite, with one of its instances firing, or for electrum, for 40 min
 - **THEN** the evaluator posts nothing about either host, and pyrite's firing instance neither resolves nor repeats
+
+### Requirement: The dead-man on cinnabar polls the heartbeat topic after an anonymous-publish probe
+
+On cinnabar, `fleet-deadman.timer` SHALL start `fleet-deadman.service` every 5 min, with `DynamicUser = true`, `StateDirectory = "fleet-deadman"` and `OnFailure=observability-notify@%n.service`, which SHALL first publish anonymously to `http://[::1]:2586/fleet-heartbeat` and fail if accepted, then poll `/fleet-heartbeat/json?poll=1&since=10m` there and, in its `state.json`, raise `AlertEvaluatorSilent`, `critical`, on an empty result and resolve it when a heartbeat returns.
+
+**Discharged by**: regulator R9.3, shown able to fail at acceptance by stopping `fleet-alert.timer`, resting on world assumption `A42 — ntfy keeps a topic's messages for a week and returns a recent window to a poll`, whose `AlertEvaluatorSilent` reaches `fleet-alerts` only with the `alerter` credential once `*:fleet-*:ro` is in force; regulator R9.4, shown able to fail at acceptance by removing `*:fleet-*:ro`; and the assertions that hold R9.4's premise on cinnabar, `fleet-alert.nix`'s on ntfy's listener and access entries and cinnabar's on the dead-man's ordering, each shown able to fail by an `extendModules` override.
+
+#### Scenario: The evaluator's timer is stopped
+
+- **WHEN** at acceptance the operator stops `fleet-alert.timer` on magnetite, then starts it again
+- **THEN** `AlertEvaluatorSilent` is posted to `fleet-alerts` within 15 min of the stop, and its `RESOLVED` after the start, and the operator records both
+
+#### Scenario: The anonymous read-only entry is removed
+
+- **WHEN** at acceptance the operator removes `*:fleet-*:ro` from cinnabar's `auth-access`
+- **THEN** the probe's anonymous publish is accepted, `fleet-deadman.service` fails, a `FAILED` naming it and cinnabar appears on `fleet-alerts`, and the operator records both
+
+#### Scenario: The probe is refused
+
+- **WHEN** the access entries are in force and the dead-man runs
+- **THEN** the probe's anonymous publish is refused with 403 and the unit goes on to poll

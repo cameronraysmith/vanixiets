@@ -109,7 +109,7 @@ curl -sk 'https://ntfy.zt/fleet-alerts/json?poll=1&since=1h' | jq -c '{time, tit
 
 `-k` skips certificate verification; without it, `curl` on a host that does not trust caddy's root certificate fails with `unable to get local issuer certificate`.
 Pass `--cacert` with a copy of `caddy-root-ca.crt` to verify instead, or post through `ntfy-send`, which uses `-k` as every fleet sender does.
-ntfy keeps each topic's messages for 12 hours, so a poll or a reconnecting phone sees at most the last 12 hours.
+ntfy keeps each topic's messages on disk for a week, so they survive ntfy restarts and a poll or a reconnecting phone sees at most the last week.
 
 ## Reading alerts
 
