@@ -93,6 +93,9 @@ Negating each goal in turn produces them by construction.
 An obstacle, once found, has a natural home: it is the violation condition of an indicative assumption.
 Recording it as such turns a one-time analysis into a standing monitor, because the assumption now states what would falsify it.
 
+A world assumption that names a vendor's version carries a trigger that fires when the deployed version moves, such as an evaluation assertion on the version or a comparison against the running version at each change's close-out.
+A dependency bump moves a vendor's version without anyone rereading the assumptions that name it, so a trigger that depends on someone noticing does not fire.
+
 ## Parnas' four-variable model
 
 When the world is physical, specialise: Parnas' four-variable model splits the problem into monitored and controlled environmental quantities (NAT, REQ) and the input and output registers the software actually reads and writes (IN, OUT, SOF).

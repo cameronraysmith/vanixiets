@@ -205,6 +205,8 @@ artifacts:
       - Group related tasks under ## numbered headings
       - Each task MUST be a checkbox: `- [ ] X.Y Task description`
       - Each task MUST carry its verification: `— verify: <test, command, observable behavior, or delivered artifact>`. Name what would be run or observed, not "tested" or "works". A task whose verification you cannot name is not yet decomposed enough.
+      - When a task deploys to a host, its verification reads every alert or notice posted since the deploy started from the logs of whatever evaluates and delivers alerts, and records each post with its cause; a post that no record explains is a finding nobody followed up.
+      - When the change adds a migration flag or a one-shot conditional, a close-out task lists each such branch and removes the ones that can no longer apply; left in place, they outlive the migration as dead configuration that readers take for live behavior.
       - Close with an `## Integration Verification` group asserting the broader system behavior the individual tasks do not reach
       - Tasks should be small enough to complete in one session
       - Order tasks by dependency (what must be done first?)
@@ -242,6 +244,13 @@ artifacts:
       Pass the tasks.md content to the skill as the input for
       decomposition. The plan should reference the specs and
       design artifacts in this change directory.
+
+      When a step configures a vendored consumer (a collector, an
+      exporter, a probe's tool), any pre-deploy probe of it runs the
+      consumer's exact argument list, read from the vendored source,
+      and the plan records that list in its grounding. The same tool
+      can succeed with the arguments a person picks and fail with the
+      arguments the consumer actually passes.
     requires:
       - tasks
 
@@ -386,6 +395,14 @@ artifacts:
          silently accepted. Undischarged rows feed retrospective §6
          Promote, where `world-assumption` and `architecture-decision`
          are valid promotion destinations alongside the existing ones.
+
+         The Status of each world assumption names what was observed,
+         and over what window: `configured` (the setting exists),
+         `not violated` (no counter-evidence in the window), or
+         `observed` (the assumption's own claim was seen to hold).
+         Write `holding` only with an observation of the assumption's
+         own claim; evidence of a shorter window or of a different
+         event reads as confirmation while confirming nothing.
 
          **8c. Alphabet check.** Behavioral requirements must not name
          interface phenomena, and interface requirements must not

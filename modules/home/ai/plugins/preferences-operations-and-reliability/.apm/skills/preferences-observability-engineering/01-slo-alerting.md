@@ -113,6 +113,14 @@ There must be a systematic way to investigate the alert and reach a diagnosis wi
 An alert that says "error budget burning at 5x" combined with observability tooling that supports the core analysis loop is actionable.
 An alert that says "CPU is high" with no further investigation path is not.
 
+## Rule names and notification state
+
+An alert rule's metric names are read from a store that already holds the series, before the rule merges; a replay of the rule that returns nothing blocks the merge.
+One series can carry different names at the exporter, at the collector and in the store (a store may append `_total` to an OTLP sum, for example), and a rule written from the exposition name matches nothing and stays silent.
+
+A notified unit that evaluates clauses at two cadences keeps each cadence's last verdict separately, so a passing run of one cadence never resolves a failure posted by the other.
+With one shared verdict, the next fast-cadence pass clears a slow-cadence breach that still stands.
+
 ## Acting on burn alerts
 
 The response to a burn alert depends on the burn pattern.
