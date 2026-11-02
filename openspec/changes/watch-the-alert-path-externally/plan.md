@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** cinnabar's `fleet-deadman` pings a healthchecks.io check after each run that found the alert path working, with magnetite's heartbeat in its window, so that an outage of cinnabar, ntfy, caddy, the mesh path or the dead-man itself emails the operator within 15 min of the last accepted ping, without passing through cinnabar; landed as two pull requests and one cinnabar deploy, accepted by stopping ntfy on cinnabar and the evaluator on magnetite (Linear CAM-76; ADR-009 Q5).
+**Goal:** cinnabar's `fleet-deadman` pings a healthchecks.io check after each run that found the alert path working, with magnetite's heartbeat in its window, so that an outage of cinnabar, ntfy, caddy, the mesh path or the dead-man itself emails the operator at least 15 and at most 20 min after the last accepted ping, without passing through cinnabar; landed as two pull requests and one cinnabar deploy, accepted by stopping ntfy on cinnabar and the evaluator on magnetite (Linear CAM-76; ADR-009 Q5).
 
 **Architecture:** `flake.lib.fleetDeadmanPing` is a small `writeShellApplication` that reads a curl configuration file on stdin and requires the answer `OK`; `flake.lib.fleetAlertDeadman` takes it as `ping` and calls it as its last step when the poll held a heartbeat.
 The option `services.fleet-alert.deadman.pingConfigFile` wires the credential through `LoadCredential`, and cinnabar sets it from the per-machine clan vars generator `fleet-deadman-ping`, whose hidden prompt the operator fills.
@@ -43,7 +43,7 @@ Every task uses exactly these names.
 | Option | `services.fleet-alert.deadman.pingConfigFile` (`nullOr str`, default `null`); when set: `ping = lib.getExe (fleetDeadmanPing pkgs { })`, `LoadCredential` gains `external-ping:<path>`, environment gains `FLEET_DEADMAN_PING_CONFIG = "%d/external-ping"`, and the assertion that the path does not start with `builtins.storeDir` | Task 2 |
 | Generator | `fleet-deadman-ping` on cinnabar: prompt `ping-url` (`hidden`, `persist = true`), file `ping-url` (`deploy = false`), file `curl-config` (secret, `url = "<URL>"`), `runtimeInputs = [ pkgs.gnugrep ]`, the pattern `^https://hc-ping\.com/[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$` | Task 3 |
 | Stand-in | `modules/checks/fleet-alert/ping_stub.py --answer <body> --port-file <file> --log <file>`; logs `<METHOD> <path> body=<bytes>` per request; answers 200 with `<body>` | Task 2 |
-| Check parts | `deadmanPingRehearsal`, mutants `deadmanPingFirst` and `pingAcceptsAny200`; `pingTransport`, mutant `pingOnArgv`; both in `checks.fleet-alert`'s `passthru` and its build | Task 2 |
+| Check parts | `deadmanPingRehearsal`, mutants `deadmanPingFirst`, `deadmanPingNoHeartbeat`, `deadmanPingBeforePosts`, `pingAcceptsAny200` and `pingPrintsConfig`; `pingTransport`, mutant `pingOnArgv`; both in `checks.fleet-alert`'s `passthru` and its build | Task 2 |
 | Evidence | `logs/cam76-evidence/` | all |
 
 ## Task map
@@ -57,7 +57,7 @@ Every task uses exactly these names.
 | Task 5: Documentation and decision records | 5.1–5.3 | 2 | none |
 | Task 6: Close-out and integration verification | 6.1–6.3, 7.1 | close-out pull request | none |
 
-Rollback: the operator pauses the check in healthchecks.io first, so the rollback sends no email; then a pull request unsets `pingConfigFile` on cinnabar and cinnabar is deployed from it; the vars stay committed and unused, and the check is deleted once the rollback is final.
+Rollback: a pull request unsets `pingConfigFile` on cinnabar and cinnabar is deployed from it; then, within 15 min of the last `external ping accepted` in cinnabar's journal, the operator pauses the check in healthchecks.io, because a ping to a paused check resumes it; the vars stay committed and unused, and the check is deleted once the rollback is final.
 
 ---
 

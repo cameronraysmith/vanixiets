@@ -3,12 +3,12 @@
 Implements `tasks.md` 2.1–2.5 (design D2, D4, D5, D7, D8; FAI `The dead-man pings the watch service only after a passing run`, `The ping URL travels only as a credential read on stdin`, `The rule check runs promtool, fixture mutants and a property test`; FA `An outage of the alert path reaches the operator by email from outside the fleet`).
 This is the first part of pull request 1.
 The legs (Step 1) and the transport test (Step 2) are written first and seen failing; the ping step (Step 3) and the dead-man's call (Step 4) make them pass; the option and its assertion follow (Step 5).
-No host sets the option in this task, so no deployed configuration changes.
+No host sets the option in this task, so no deployed configuration changes; Step 5 observes this by comparing cinnabar's toplevel `drvPath` with its base's.
 
 **Files:**
 - Create: `modules/checks/fleet-alert/ping_stub.py`
 - Modify: `modules/nixos/fleet-alert.nix` (`fleetAlertDeadman`, `:447-535`; `flake.lib`, `:538-540`; the module's `let`, `:622-630`; `options.services.fleet-alert.deadman`, `:690-711`; the dead-man's `config`, `:782-843`)
-- Modify: `modules/checks/fleet-alert.nix` (after `deadmanRehearsal`, `:296-319`; the check's `passthru` and build, `:1560-1582`)
+- Modify: `modules/checks/fleet-alert.nix` (the header comment, `:1-39`; after `deadmanRehearsal`, `:296-319`; the check's `passthru` and build, `:1560-1582`)
 - Create (git-ignored): `logs/cam76-evidence/2.<n>-*.log`
 
 **Interfaces:**
@@ -65,7 +65,18 @@ with open(args.port_file, "w") as port_file:
 server.serve_forever()
 ```
 
-In `modules/checks/fleet-alert.nix`, after `deadmanRehearsal`, add:
+In `modules/checks/fleet-alert.nix`'s header comment, change "Three parts, each a derivation in passthru" to "Four parts, each a derivation in passthru" and add after the `propertyRehearsal` bullet:
+
+```nix
+# - deadmanPingRehearsal (R9.6; CAM-76 design D7): the dead-man, built with
+#   flake.lib.fleetDeadmanPing, runs against fleet-alert/ntfy_stub.py and
+#   fleet-alert/ping_stub.py, which share one request log; each leg compares
+#   the recorded requests with the expectation it writes, and the mutants
+#   deadmanPingFirst, deadmanPingNoHeartbeat, deadmanPingBeforePosts,
+#   pingAcceptsAny200 and pingPrintsConfig must each fail a named leg.
+```
+
+After `deadmanRehearsal`, add:
 
 ```nix
       # R9.6 (CAM-76, design D7): the dead-man with its external ping, against
@@ -98,7 +109,7 @@ In `modules/checks/fleet-alert.nix`, after `deadmanRehearsal`, add:
         trap stop_stubs EXIT
         fail() {
           echo "FAIL: $*" >&2
-          sed 's/^/  ping: /' "$work/pings" >&2 || true
+          sed 's/^/  request: /' "$work/requests" >&2 || true
           sed 's/^/  out: /' "$work/out" >&2 || true
           exit 1
         }
@@ -110,12 +121,12 @@ In `modules/checks/fleet-alert.nix`, after `deadmanRehearsal`, add:
           for _ in $(seq 100); do [ -s "$1" ] && return 0; sleep 0.1; done
           fail "a stand-in did not start"
         }
-        # run PROBE|closed POLL_STATUS POLL_BODY NOW [POST_STATUS] [ANSWER]:
-        # one dead-man run with its ping; exit status in $code.
+        # run PROBE|closed POLL_STATUS POLL_BODY NOW [POST_STATUS] [ANSWER] [PING_URL]:
+        # one dead-man run with its ping; exit status in $code. Both stand-ins
+        # log to $work/requests, so a leg sees the order of probe, poll and ping.
         run() {
-          local url
+          local url ping_url
           : > "$work/requests"
-          : > "$work/pings"
           rm -f "$work/ntfy-port" "$work/ping-port"
           if [ "$1" = closed ]; then
             url=http://127.0.0.1:9
@@ -126,10 +137,15 @@ In `modules/checks/fleet-alert.nix`, after `deadmanRehearsal`, add:
             wait_port "$work/ntfy-port"
             url="http://127.0.0.1:$(cat "$work/ntfy-port")"
           fi
-          python3 ${./fleet-alert/ping_stub.py} --answer "''${6:-OK}" --port-file "$work/ping-port" --log "$work/pings" &
+          python3 ${./fleet-alert/ping_stub.py} --answer "''${6:-OK}" --port-file "$work/ping-port" --log "$work/requests" &
           pids+=($!)
           wait_port "$work/ping-port"
-          printf 'url = "http://127.0.0.1:%s/${pingUuid}"\n' "$(cat "$work/ping-port")" > "$work/ping.conf"
+          if [ -n "''${7:-}" ]; then
+            ping_url="$7"
+          else
+            ping_url="http://127.0.0.1:$(cat "$work/ping-port")/${pingUuid}"
+          fi
+          printf 'url = "%s"\n' "$ping_url" > "$work/ping.conf"
           jq --arg url "$url" --arg state "$work/state.json" '.ntfyUrl = $url | .stateFile = $state' \
             ${deadmanConfigFile} > "$work/config.json"
           code=0
@@ -139,7 +155,8 @@ In `modules/checks/fleet-alert.nix`, after `deadmanRehearsal`, add:
           stop_stubs
           sed 's/^/    /' "$work/out"
         }
-        pings() { grep -c . "$work/pings" || true; }
+        # The ping stand-in's lines are the only ones with "body=".
+        pings() { grep -c ' body=' "$work/requests" || true; }
 
         # The failing legs come first, so a dead-man that pings before its
         # probe is caught by a probe leg rather than by the passing leg.
@@ -161,7 +178,8 @@ In `modules/checks/fleet-alert.nix`, after `deadmanRehearsal`, add:
         run 403 200 "$heartbeat" 1000
         [ "$code" = 0 ] || fail "a passing run: exit $code"
         [ "$(pings)" = 1 ] || fail "a passing run did not ping exactly once"
-        [ "$(cat "$work/pings")" = "GET /${pingUuid} body=0" ] || fail "a passing run pinged another path or with a body"
+        printf '%s\n' "POST /fleet-heartbeat? auth=no" "GET /fleet-heartbeat/json?poll=1&since=10m auth=no" "GET /${pingUuid} body=0" > "$work/expected"
+        cmp -s "$work/requests" "$work/expected" || fail "a passing run: the requests are not the probe, the poll and one ping to the configured path, in that order"
         grep -qxF "fleet-deadman: external ping accepted" "$work/out" || fail "a passing run: no accepted line"
         echo "ok: a passing run with a heartbeat pings once"
 
@@ -173,17 +191,13 @@ In `modules/checks/fleet-alert.nix`, after `deadmanRehearsal`, add:
         grep -qF "no external ping" "$work/out" || fail "an empty window: no no-ping line"
         echo "ok: an empty window posts one FIRING and sends no ping"
 
-        # The FIRING above is in the state. The first run with the heartbeat
-        # back has nothing to post yet and pings; once the absence has lasted
-        # its 5 min the RESOLVED is due, its post fails, and that run must
-        # fail without pinging (transition.jq's resolve delay, as in S3's
-        # resumed-heartbeat leg).
-        run 403 200 "$heartbeat" 1300
+        # The FIRING above is in the state, its absenceFrom 1000. A heartbeat
+        # run before 300 s have passed has nothing to post and pings; the run
+        # at 1300 has the RESOLVED due (transition.jq resolve_after), its post
+        # fails, and that run must fail without pinging.
+        run 403 200 "$heartbeat" 1100
         [ "$code" = 0 ] && [ "$(pings)" = 1 ] || fail "heartbeat back with nothing to post: expected exit 0 and one ping"
-        for now in 1600 1900; do
-          run 403 200 "$heartbeat" "$now" 1
-          [ "$code" != 0 ] && break
-        done
+        run 403 200 "$heartbeat" 1300 1
         [ "$code" != 0 ] || fail "the RESOLVED post never came due"
         [ "$(pings)" = 0 ] || fail "a failed post pinged"
         echo "ok: a failed post sends no ping"
@@ -194,6 +208,15 @@ In `modules/checks/fleet-alert.nix`, after `deadmanRehearsal`, add:
         grep -qF "answered 'OK (not found)', expected OK" "$work/out" || fail "an unknown check: no answer line"
         if grep -qF "${pingUuid}" "$work/out"; then fail "an unknown check: the URL was printed"; fi
         echo "ok: an unknown check fails the run without printing the URL"
+
+        # The ping's egress fails: curl cannot connect (port 9 is closed, as in
+        # the probe-closed leg), the run fails, and the URL stays unprinted.
+        reset
+        run 403 200 "$heartbeat" 1000 0 OK "http://127.0.0.1:9/${pingUuid}"
+        [ "$code" != 0 ] || fail "an unreachable ping exited 0"
+        grep -qxF "fleet-deadman: external ping failed" "$work/out" || fail "an unreachable ping: no failure line"
+        if grep -qF "${pingUuid}" "$work/out"; then fail "an unreachable ping: the URL was printed"; fi
+        echo "ok: an unreachable ping fails the run without printing the URL"
       '';
 
       deadmanPingRehearsal =
@@ -201,6 +224,7 @@ In `modules/checks/fleet-alert.nix`, after `deadmanRehearsal`, add:
           {
             nativeBuildInputs = [
               pkgs.coreutils
+              pkgs.diffutils
               pkgs.gnugrep
               pkgs.gnused
               pkgs.jq
@@ -222,7 +246,7 @@ jj st --no-pager >/dev/null
 nix build .#checks.x86_64-linux.fleet-alert.passthru.deadmanPingRehearsal -L 2>&1 | tee logs/cam76-evidence/2.1-red-$(/bin/date -u +%Y%m%dT%H%M%SZ).log | tail -5
 ```
 
-Expected: FAIL at evaluation, `attribute 'fleetDeadmanPing' missing` (RED).
+Expected: FAIL at evaluation, `called with unexpected argument 'ping'` (RED), because `flake.lib.fleetAlertDeadman` does not yet take `ping`.
 
 - [ ] **Step 2: The transport test, seen failing (tasks.md 2.2)**
 
@@ -283,6 +307,14 @@ After `deadmanPingRehearsal`, add:
 ```
 
 Add `pingTransport` to the check's `passthru` and `test -e ${pingTransport}` to its build.
+In the header comment, change "Four parts" to "Five parts" and add after the `deadmanPingRehearsal` bullet:
+
+```nix
+# - pingTransport (CAM-76 design D5): flake.lib.fleetDeadmanPing built with a
+#   recording curl must read the ping URL on stdin and put it on no argv,
+#   and the mutant pingOnArgv, which passes the URL as an argument, must fail.
+```
+
 Run `nix build .#checks.x86_64-linux.fleet-alert.passthru.pingTransport -L 2>&1 | tee logs/cam76-evidence/2.2-red-$(/bin/date -u +%Y%m%dT%H%M%SZ).log | tail -5`.
 
 Expected: FAIL at evaluation, `attribute 'fleetDeadmanPing' missing` (RED).
@@ -354,7 +386,7 @@ and append to its `text`, after the post loop's `done <<< …` line:
         ''}
 ```
 
-Then add the two mutants after `deadmanPingRehearsal`'s definition and run them inside it:
+Then add the five mutants after `deadmanPingRehearsal`'s definition and run them inside it:
 
 ```nix
       # A dead-man that pings before its probe: rejected by the probe legs.
@@ -377,6 +409,38 @@ Then add the two mutants after `deadmanPingRehearsal`'s definition and run them 
         ntfySend = lib.getExe ntfySendStub;
         ping = "${pingAcceptsAny200}/bin/fleet-deadman-ping";
       };
+      # A dead-man that pings without a heartbeat: rejected by the empty-window leg.
+      deadmanPingNoHeartbeat = pkgs.runCommand "fleet-deadman-ping-no-heartbeat" { } ''
+        mkdir -p "$out/bin"
+        cp ${lib.getExe deadmanPinged} "$out/bin/fleet-deadman"
+        chmod +w "$out/bin/fleet-deadman"
+        substituteInPlace "$out/bin/fleet-deadman" \
+          --replace-fail 'if [ "$heartbeats" -gt 0 ]; then' 'if true; then'
+      '';
+      # A dead-man that pings before its post loop: rejected by the failed-post
+      # leg. The two replacements run in this order; a mutant that only inserts
+      # an early ping is caught at the passing leg as a double ping instead.
+      deadmanPingBeforePosts = pkgs.runCommand "fleet-deadman-ping-before-posts" { } ''
+        mkdir -p "$out/bin"
+        cp ${lib.getExe deadmanPinged} "$out/bin/fleet-deadman"
+        chmod +w "$out/bin/fleet-deadman"
+        substituteInPlace "$out/bin/fleet-deadman" \
+          --replace-fail 'if [ "$heartbeats" -gt 0 ]; then' 'if false; then' \
+          --replace-fail 'while IFS= read -r post; do' 'if [ "$heartbeats" -gt 0 ]; then ${pingExe}; fi; while IFS= read -r post; do'
+      '';
+      # A ping step whose failure line prints its configuration, and so the
+      # URL: rejected by the unknown-check leg.
+      pingPrintsConfig = pkgs.runCommand "fleet-deadman-ping-prints-config" { } ''
+        mkdir -p "$out/bin"
+        cp ${pingExe} "$out/bin/fleet-deadman-ping"
+        chmod +w "$out/bin/fleet-deadman-ping"
+        substituteInPlace "$out/bin/fleet-deadman-ping" \
+          --replace-fail "expected OK\" >&2" "expected OK \$(cat \"\$config\")\" >&2"
+      '';
+      deadmanPingPrints = self.lib.fleetAlertDeadman pkgs {
+        ntfySend = lib.getExe ntfySendStub;
+        ping = "${pingPrintsConfig}/bin/fleet-deadman-ping";
+      };
 ```
 
 and in `deadmanPingRehearsal`'s build script, after the unmutated run:
@@ -394,6 +458,24 @@ and in `deadmanPingRehearsal`'s build script, after the unmutated run:
             grep -qF "FAIL: an unknown check answered OK (not found) exited 0" any200.log \
               || { cat any200.log; echo "FAIL: pingAcceptsAny200 failed for another reason" >&2; exit 1; }
             echo "mutant pingAcceptsAny200 rejected"
+            if ${deadmanPingLegs} ${deadmanPingNoHeartbeat}/bin/fleet-deadman > nohb.log 2>&1; then
+              cat nohb.log; echo "FAIL: the legs accepted a dead-man that pings without a heartbeat" >&2; exit 1
+            fi
+            grep -qF "FAIL: an empty window pinged" nohb.log \
+              || { cat nohb.log; echo "FAIL: deadmanPingNoHeartbeat failed for another reason" >&2; exit 1; }
+            echo "mutant deadmanPingNoHeartbeat rejected"
+            if ${deadmanPingLegs} ${deadmanPingBeforePosts}/bin/fleet-deadman > beforeposts.log 2>&1; then
+              cat beforeposts.log; echo "FAIL: the legs accepted a dead-man that pings before its posts" >&2; exit 1
+            fi
+            grep -qF "FAIL: a failed post pinged" beforeposts.log \
+              || { cat beforeposts.log; echo "FAIL: deadmanPingBeforePosts failed for another reason" >&2; exit 1; }
+            echo "mutant deadmanPingBeforePosts rejected"
+            if ${deadmanPingLegs} ${lib.getExe deadmanPingPrints} > prints.log 2>&1; then
+              cat prints.log; echo "FAIL: the legs accepted a ping step that prints its configuration" >&2; exit 1
+            fi
+            grep -qF "FAIL: an unknown check: the URL was printed" prints.log \
+              || { cat prints.log; echo "FAIL: pingPrintsConfig failed for another reason" >&2; exit 1; }
+            echo "mutant pingPrintsConfig rejected"
 ```
 
 Run, then measure:
@@ -405,7 +487,8 @@ NIX_SHOW_STATS=1 NIX_SHOW_STATS_PATH=/tmp/fleet-alert-stats.json nix eval --opti
 jq -r '[.gc.totalBytes, .cpuTime] | @tsv' /tmp/fleet-alert-stats.json | tee -a logs/cam76-evidence/2.4-cost-$(/bin/date -u +%Y%m%dT%H%M%SZ).log
 ```
 
-Expected: PASS; every `ok:` line of `deadmanPingLegs`, `mutant deadmanPingFirst rejected` and `mutant pingAcceptsAny200 rejected`; S3's dead-man legs unchanged and passing; the cost below 536,870,912 B and recorded beside Task 1's.
+Expected: PASS; every `ok:` line of `deadmanPingLegs`, including `ok: an unreachable ping fails the run without printing the URL`; `mutant deadmanPingFirst rejected`, `mutant pingAcceptsAny200 rejected`, `mutant deadmanPingNoHeartbeat rejected`, `mutant deadmanPingBeforePosts rejected` and `mutant pingPrintsConfig rejected`; S3's dead-man legs unchanged and passing; the cost below 536,870,912 B and recorded beside Task 1's.
+The 1.1 prototype rejected `deadmanPingNoHeartbeat` and `deadmanPingBeforePosts` at these legs (`logs/cam76-evidence/1.1-proto-fixed-moved-ping-20261102T045132Z.log`); `pingPrintsConfig` and the unreachable-ping leg were not built there.
 
 - [ ] **Step 5: The option, its credential and the store-path assertion (tasks.md 2.5)**
 
@@ -476,8 +559,13 @@ nix eval --impure --raw --expr '
       modules = [ ({ lib, pkgs, ... }: { services.fleet-alert.deadman.pingConfigFile = lib.mkForce "${pkgs.writeText "ping.conf" "url = \"https://hc-ping.com/x\""}"; }) ];
     };
   in c.config.system.build.toplevel.drvPath' 2>&1 | tee "$L" | grep -F 'deadman.pingConfigFile is under the Nix store'
-nix eval --raw .#nixosConfigurations.cinnabar.config.system.build.toplevel.drvPath 2>&1 | tee -a "$L"
+nix eval --raw .#nixosConfigurations.cinnabar.config.system.build.toplevel.drvPath 2>&1 | sed 's/^/change toplevel: /' | tee -a "$L"
+base=$(git rev-parse origin/main)
+echo "base: $base" | tee -a "$L"
+nix eval --raw "git+file://$PWD?rev=$base#nixosConfigurations.cinnabar.config.system.build.toplevel.drvPath" 2>&1 | sed 's/^/base toplevel: /' | tee -a "$L"
+nix eval --raw .#checks.x86_64-linux.nixos-cinnabar.drvPath 2>&1 | sed 's/^/change nixos-cinnabar: /' | tee -a "$L"
 ```
 
-Expected: the first prints the assertion's message (the override fails evaluation); the second prints a `.drv` path.
+Expected: the first prints the assertion's message (the override fails evaluation); the change's and the base's toplevel `drvPath` are equal, which shows that no deployed configuration changes while no host sets the option.
+When the base is still `79d5cee3dcdc330fe996f80f9d6a6292bcb438a9`, the change's `nixos-cinnabar` `drvPath` equals 1.2's, `/nix/store/pa9lmfsc8q3axvjicq986z5lca3fy2m4-nixos-system-cinnabar-26.11.20261023.3a32588.drv`; otherwise the log states that the base moved and that comparison is skipped.
 Commit Steps 1 to 5 as one change, `Ping an external heartbeat check from the alert dead-man when configured`, after `nix fmt`.

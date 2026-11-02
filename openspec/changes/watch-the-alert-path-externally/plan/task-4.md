@@ -29,12 +29,13 @@ L=$REPO/logs/cam76-evidence/3.2-first-pings-$(/bin/date -u +%Y%m%dT%H%M%SZ).log
 sleep 1800
 ssh cinnabar.zt 'bash -s' <<'EOF' 2>&1 | tee "$L"
 sudo journalctl -u fleet-deadman --since -30min -o cat | grep -E 'heartbeat\(s\) on|external ping|no external ping|Failed'
-systemctl show fleet-deadman -p Environment -p LoadCredential
-systemctl show fleet-deadman -p Environment -p LoadCredential | grep -c hc-ping || true
+systemctl cat fleet-deadman.service | grep -E '^(Environment=|LoadCredential=)'
+systemctl show fleet-deadman -p Environment | grep -c hc-ping || true
 EOF
 ```
 
-Expected: six runs, each `fleet-deadman: external ping accepted`, no `Failed`; `Environment=` holds `FLEET_DEADMAN_PING_CONFIG=%d/external-ping` and `LoadCredential=` the `curl-config` path under `/run/secrets/`; the `hc-ping` count is `0`.
+Expected: six runs, each `fleet-deadman: external ping accepted`, no `Failed`; the unit file holds `Environment="FLEET_DEADMAN_PING_CONFIG=%d/external-ping"` and `LoadCredential=external-ping:/run/secrets/vars/per-machine/cinnabar/fleet-deadman-ping/curl-config`; the `hc-ping` count is `0`.
+`systemctl show` cannot serve for the first two: it prints `%d` expanded and `LoadCredential=[unprintable]` (`logs/cam76-evidence/1.1-cinnabar-show-20261102T044645Z.log`).
 Ask the operator to confirm that the check shows "up" with a ping every 5 min and that no `FAILED fleet-deadman` arrived; record the reply in the log.
 
 - [ ] **Step 3: Presence gate (tasks.md 4.1)**
@@ -60,22 +61,22 @@ ssh cinnabar.zt 'sudo journalctl -u fleet-deadman --since -40min -o short-iso | 
 
 Ask the operator to report the up email's time, and every `fleet-alerts` message since the stop; record them.
 
-Expected: the down email's time minus the last accepted ping's is at most 15 min; the runs during the stop log `R9.4: anonymous publish … answered HTTP 000` and no ping; after the start a run logs `external ping accepted` and the up email follows; `AlertEvaluatorSilent` may fire and resolve after the start, and `FAILED fleet-deadman on cinnabar` arrives once ntfy is back; a down email later than 15 min after the last ping is a finding put to the operator.
+Expected: the down email arrives at least 15 and at most 20 min after the last accepted ping; the runs during the stop log `R9.4: anonymous publish … answered HTTP 000` and no ping; after the start a run logs `external ping accepted`, at the latest the second, and the up email follows; `AlertEvaluatorSilent` may fire and resolve after the start, and `FAILED fleet-deadman on cinnabar` arrives once ntfy is back; a down email later than 20 min after the last accepted ping is a finding put to the operator.
 
 - [ ] **Step 5: The evaluator stop (tasks.md 4.3)**
 
 ```bash
 L=$REPO/logs/cam76-evidence/4.3-evaluator-stop-$(/bin/date -u +%Y%m%dT%H%M%SZ).log
 ssh magnetite.zt 'sudo systemctl stop fleet-alert.timer; /usr/bin/env date -u +%FT%TZ' | sed 's/^/stopped: /' | tee "$L"
-sleep 1200
+sleep 1800
 ssh magnetite.zt 'sudo systemctl start fleet-alert.timer; /usr/bin/env date -u +%FT%TZ' | sed 's/^/started: /' | tee -a "$L"
 sleep 900
-ssh cinnabar.zt 'sudo journalctl -u fleet-deadman --since -40min -o short-iso | grep -E "heartbeat\(s\) on|external ping|no external ping"' | tee -a "$L"
+ssh cinnabar.zt 'sudo journalctl -u fleet-deadman --since -50min -o short-iso | grep -E "heartbeat\(s\) on|external ping|no external ping"' | tee -a "$L"
 ```
 
 Ask the operator for the times of `[FIRING] AlertEvaluatorSilent magnetite`, the down email, `[RESOLVED] AlertEvaluatorSilent magnetite` and the up email; record them.
 
-Expected: the runs with `0 heartbeat(s)` log `no external ping`; all four messages arrive, the down email within 15 min of the last accepted ping before the stop.
+Expected: the runs with `0 heartbeat(s)` log `no external ping`; all four messages arrive; the last accepted ping falls up to 10 min after the stop, because the dead-man pings while a heartbeat is still in its 10 min window, and the down email arrives at least 15 and at most 20 min after that ping; a later arrival is a finding put to the operator.
 
 - [ ] **Step 6: A day without a false email (tasks.md 4.4)**
 

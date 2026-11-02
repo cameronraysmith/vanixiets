@@ -5,7 +5,7 @@ Nothing in this task changes the repository outside this change directory.
 
 **Files:**
 - Modify: this change's `design.md`, `tasks.md`, `plan.md`, `plan/` and `specs/` with accepted findings only
-- Create (git-ignored): `logs/cam76-evidence/1.1-plan-review-<ts>.log`, `logs/cam76-evidence/1.2-baseline-<ts>.log`
+- Create (git-ignored): `logs/cam76-evidence/1.1-plan-review-<ts>.md`, `logs/cam76-evidence/1.2-baseline-<ts>.log`
 
 **Interfaces:**
 - Consumes: the planning artifacts.
@@ -14,7 +14,7 @@ Nothing in this task changes the repository outside this change directory.
 - [ ] **Step 1: Plan review (tasks.md 1.1)**
 
 Dispatch one read-only subagent of the default `task` agent type with this brief: answer the holistic review's four questions over `openspec/changes/watch-the-alert-path-externally/{design.md,tasks.md,plan.md,plan/,specs/}` (critical oversights; significant architecture improvements; checks that cannot fail, clauses that restate the line they judge, and properties nothing covers; checks or mechanisms that cost more than the invariant they protect), and list each leg, mutant and assertion of plan Task 2 with the two independently defined values it compares.
-Save its answer to `logs/cam76-evidence/1.1-plan-review-$(/bin/date -u +%Y%m%dT%H%M%SZ).log`.
+Save its answer to `logs/cam76-evidence/1.1-plan-review-$(/bin/date -u +%Y%m%dT%H%M%SZ).md`.
 Put each finding to the operator; apply accepted findings to the planning artifacts; record each decision under the finding in the log.
 Then run `openspec validate watch-the-alert-path-externally --strict` and enqueue the planning pull request.
 
@@ -48,4 +48,6 @@ rm /tmp/deadman-7d.log
 EOF
 ```
 
-Expected: about 2,016 runs; a longest run of three or more zero-heartbeat runs is an episode that, with the 5 min period and 10 min grace, would have emailed; each such episode, found with `grep -n` in the same journal, is put to the operator before Task 2 Step 4, with its cause from the evaluator's journal on magnetite at that time.
+Then, from the same journal read with `-o short-iso-precise`, take the longest gap between the start times of consecutive runs that would have pinged, a run that exited 0 and logged at least one heartbeat.
+
+Expected: about 2,016 runs; with the 5 min period and 10 min grace, a gap of 15 min or more between runs that would have pinged (two or more consecutive non-pinging runs) races or passes the deadline and could have emailed; each such gap, found with `grep -n` in the same journal, is put to the operator before Task 2 Step 4, with its cause from the evaluator's journal on magnetite at that time.

@@ -16,13 +16,13 @@ The current state:
 
 - `fleet-deadman.timer` runs `fleet-deadman.service` on cinnabar every 5 min at `*:0/5 UTC` (FAN:834-842).
   Each run sends an anonymous publish to `fleet-heartbeat` on ntfy's own listener `[::1]:2586` and fails unless it is refused with 403 (R9.4), polls the topic for the last 10 min and fails if the poll fails, raises or resolves `AlertEvaluatorSilent` through the shared jq transition, and posts through `ntfy-send` with the `alerter` token, failing the run on a failed post and leaving it pending for the next run (FAN:453-535).
-- The probe and the poll bypass caddy, while every post goes to `https://ntfy.zt` through caddy on cinnabar's ZeroTier addresses (CFA:18-25; FAN:810-813).
-- magnetite's evaluator posts its heartbeat through `ntfy-send` to `https://ntfy.zt`, resolved by cinnabar's dnsmasq (A9:195), so a heartbeat in the dead-man's window shows that magnetite, the mesh path, cinnabar's resolver, caddy and ntfy all worked within the last 10 min.
-- caddy serves `ntfy.zt` only on cinnabar's ZeroTier addresses, opens 443 only on `zt+`, and ntfy listens on `[::1]:2586` (`modules/machines/nixos/cinnabar/caddy.nix:5-8`, `:29-35`, `:100`; `modules/machines/nixos/cinnabar/ntfy.nix:36`), so nothing outside the mesh can probe ntfy without a new public listener, which A9:252 excludes.
+- The probe and the poll bypass caddy, while every post goes to `https://ntfy.zt` through caddy on cinnabar's ZeroTier addresses (CFA:12-19, "every post goes through caddy"; FAN:810-813).
+- magnetite's evaluator posts its heartbeat through `ntfy-send` to `https://ntfy.zt`, resolved by cinnabar's dnsmasq (A9:196, "magnetite reaches `ntfy.zt` through cinnabar's dnsmasq"), so a heartbeat in the dead-man's window shows that magnetite, the mesh path, cinnabar's resolver, caddy and ntfy all worked within the last 10 min.
+- caddy serves `ntfy.zt` only on cinnabar's ZeroTier addresses, opens 443 only on `zt+`, and ntfy listens on `[::1]:2586` (`modules/machines/nixos/cinnabar/caddy.nix:5-8`, `:29-35`, `:100`; `modules/machines/nixos/cinnabar/ntfy.nix:36`), so nothing outside the mesh can probe ntfy without a new public listener, which A9:253 ("no new listener") excludes.
 - The dead-man runs under the shared hardening with `DynamicUser`, `AF_INET` and `AF_INET6` allowed (FAN:554-571), and has no `TimeoutStartSec`, so a wedged run blocks the next one.
-- `fleet-deadman` is cinnabar's notified unit, so a failed run posts `FAILED fleet-deadman on cinnabar` through the same ntfy (CFA:28-31).
+- `fleet-deadman` is cinnabar's notified unit, so a failed run posts `FAILED fleet-deadman on cinnabar` through the same ntfy (`modules/lib/observability-hosts.nix:45`, `cinnabar = agent [ "fleet-deadman" ]`).
 - cinnabar and magnetite are both Hetzner cloud servers in `fsn1` (`modules/terranix/hetzner.nix:10-29`), and no Hetzner firewall restricts their egress in that file.
-- A9 lists "a hosted dead-man service such as healthchecks.io watching cinnabar" as a rejected alternative deferred to Q5 (A9:181), and records that nothing detects an outage of cinnabar or its ntfy (A9:193-194).
+- A9 lists "a hosted dead-man service such as healthchecks.io watching cinnabar" as a rejected alternative deferred to Q5 (A9:182, "deferred to Q5."), and records that nothing detects an outage of cinnabar or its ntfy (A9:194-195, "nothing in this decision detects that (Q5)").
 
 Facts about healthchecks.io that shape the decisions:
 
@@ -47,7 +47,7 @@ Stakeholders are the operator, who receives both the ntfy alerts and the new ema
 
 **Goals:**
 
-- An outage of cinnabar, ntfy, caddy, cinnabar's resolver or ZeroTier, or of the dead-man itself, produces an email to the operator within 15 min, by a path that does not pass through cinnabar.
+- An outage of cinnabar, ntfy, caddy, cinnabar's resolver or ZeroTier, or of the dead-man itself, produces an email to the operator within about 15 min of the last accepted ping, by a path that does not pass through cinnabar: about 15 min after the outage for W1, W2, W6 and W7, and up to about 25 min for W3 to W5, because the dead-man keeps pinging while a heartbeat is still in its 10 min window.
 - A misconfigured ntfy access entry, which R9.4 today reports only through ntfy, reaches the operator by the same email.
 - The ping is sent exactly when the dead-man's run passes completely, shown by a build-time regulator with mutants (R9.6).
 - The ping URL is carried as a credential and never on a command line, in the environment or in the store.
@@ -59,7 +59,7 @@ Stakeholders are the operator, who receives both the ntfy alerts and the new ema
 - Reporting a broken phone subscription; the Monday `WeeklyPipelineTest` stays its only monitor.
 - Watching healthchecks.io itself, the operator's mail provider, or the account's continued existence.
 - Declaring the check's period, grace and integrations in the flake (D6).
-- Probing ntfy or caddy from outside the mesh, which needs a public listener (A9:252).
+- Probing ntfy or caddy from outside the mesh, which needs a public listener (A9:253, "no new listener").
 - Changing the dead-man's rule, window, timer, or the evaluator on magnetite.
 
 ## Decisions
@@ -72,7 +72,7 @@ This design numbers the outage classes it reasons about W1 to W9.
 | Class | What fails | Reported today | Reported after this change |
 |---|---|---|---|
 | W1 | cinnabar is down | by the missing Monday test, up to 7 days later | email: no run, no ping |
-| W2 | ntfy is down, including a refused start on a malformed `environmentFile` | R9.4 fails the dead-man, whose failure notice also goes through ntfy, so nothing arrives (A9:193-194) | email: the probe answers 000, the run fails |
+| W2 | ntfy is down, including a refused start on a malformed `environmentFile` | R9.4 fails the dead-man, whose failure notice also goes through ntfy, so nothing arrives (A9:194-195) | email: the probe answers 000, the run fails |
 | W3 | caddy is down | `AlertEvaluatorSilent` fires, but its post goes through caddy and fails | email: no heartbeat arrives, and the pending post fails |
 | W4 | cinnabar's ZeroTier or dnsmasq is down, or magnetite's path to cinnabar is broken | as W3 | email: no heartbeat arrives; a post from cinnabar may also fail |
 | W5 | magnetite or its evaluator is down | `AlertEvaluatorSilent` through ntfy, while W1 to W4 do not hold | `AlertEvaluatorSilent` through ntfy and the email (O4) |
@@ -128,8 +128,8 @@ The ping URL's UUID is a bearer credential: whoever holds it can keep the check 
 
 - **Choice**: a healthchecks.io check on the free tier, pinged by `fleet-deadman` (O1).
 - **Rationale**: it is the only free option that sees W1 to W7 together, because the dead-man already exercises ntfy's listener, its access entries, and (through magnetite's heartbeat) caddy and the mesh, and an external heartbeat adds only "did that pass recently".
-  Detection drops from up to 7 days to at most period plus grace, 15 min under O5.
-  It needs no new listener, so A9:252 holds.
+  Detection drops from up to 7 days to 15 to 20 min after the last accepted ping under O5: about 15 min from the outage's start for W1, W2, W6 and W7, and up to about 25 min for W3 to W5, because the dead-man keeps pinging while a heartbeat is still in its 10 min window.
+  It needs no new listener, so A9:253 ("no new listener") holds.
 - **Boundary**: vendored versus first-party; the watcher's evaluation and email are healthchecks.io's, and this change only pings it.
 - **Alternatives considered**:
   - Better Stack or Cronitor heartbeats with the same wiring: equal coverage; Better Stack's free tier has 10 monitors and charges for push, Cronitor's has 5 monitors and one user (https://betterstack.com/pricing, https://cronitor.io/pricing); rejected as no better on any axis that matters here.
@@ -169,7 +169,7 @@ The ping URL's UUID is a bearer credential: whoever holds it can keep the check 
 
 ### D5: The ping URL is a per-machine generator on cinnabar, read from stdin (O6)
 
-- **Choice**: `clan.core.vars.generators.fleet-deadman-ping` in CFA, with `prompts.ping-url` (`type = "hidden"`, `persist = true`, a `display` group and label) and `files.ping-url.deploy = false`, as MG:404-430 declares `omnigraph-r2`.
+- **Choice**: `clan.core.vars.generators.fleet-deadman-ping` in CFA, with `prompts.ping-url` (`type = "hidden"`, `persist = true`, a `display` group and label) and `files.ping-url.deploy = false`, as MG:404-442 (`clan.core.vars.generators.omnigraph-r2 = {`) declares `omnigraph-r2`.
   Its script fails unless the prompt matches `^https://hc-ping\.com/[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$`, and writes `curl-config` with `printf 'url = "%s"\n'`.
   `services.fleet-alert.deadman.pingConfigFile` takes `clan.core.vars.generators.fleet-deadman-ping.files.curl-config.path`, never a literal, and FAN asserts the path is not under `builtins.storeDir`.
 - **Rationale**: only cinnabar pings, so a shared generator would add readers with no use.
@@ -184,7 +184,7 @@ The ping URL's UUID is a bearer credential: whoever holds it can keep the check 
 - **Choice**: the operator creates the check by hand with period 5 min, grace 10 min and an email integration, and the runbook records the values; acceptance observes the email, which tests the values that are actually set.
 - **Rationale**: these are properties of the vendor's service, not of anything the flake builds, and the only regulator that can see them is the acceptance observation and any later real outage.
   A 5 min period matches the dead-man's timer; a 10 min grace absorbs one failed run and a timer that fires late.
-  Worst case, an outage that starts just after a ping is reported about 15 min later; the free tier's 100 log entries cover the last 8 h.
+  The email arrives 15 to 20 min after the last accepted ping: about 15 min after an outage that starts just after a ping for W1, W2, W6 and W7, and up to about 25 min from the outage's start for W3 to W5; the free tier's 100 log entries cover the last 8 h.
 - **Boundary**: vendored versus first-party; the check is configured outside the repository, so a change to it leaves no diff.
 - **Alternatives considered**: declaring the check through the Management API from a deploy-time unit, rejected for the API-key secret and the reconciler it needs, and because drift between that unit and the vendor would still be seen only by observation.
 
@@ -193,8 +193,8 @@ The ping URL's UUID is a bearer credential: whoever holds it can keep the check 
 - **Choice**:
   - Envelope E9.6, the external watch: the dead-man sends exactly one success ping per run that passes under D2, and nothing on any run that fails; an absence of success pings for period plus grace produces an email to the operator from outside the fleet.
   - Regulator R9.6, deterministic, build time, a leg of `checks.x86_64-linux.fleet-alert`: the dead-man, built with `ping` set to `fleetDeadmanPing` over the real curl, runs against S3's ntfy stand-in and a ping stand-in on loopback that records each request and answers a configured body.
-    Its legs: a passing run with a heartbeat sends exactly one ping to the configured path; a probe answered 200, 500 or a closed port, a failed poll, and a failed post each send none; an empty window sends one `FIRING` and no ping; a stand-in answering `OK (not found)` fails the run.
-    Its mutants, each of which the legs must reject: a dead-man that pings before the probe, and one whose ping step accepts any 200.
+    Its legs: a passing run with a heartbeat sends exactly one ping to the configured path, after the probe and the poll in one shared request log; a probe answered 200, 500 or a closed port, a failed poll, and a failed post each send none; an empty window sends one `FIRING` and no ping; a stand-in answering `OK (not found)` fails the run without printing the URL; a ping to a closed port fails the run with `fleet-deadman: external ping failed` and without printing the URL.
+    Its mutants, each of which the legs must reject at a named leg: a dead-man that pings before the probe (`deadmanPingFirst`), one that pings without a heartbeat (`deadmanPingNoHeartbeat`), one that pings before its posts (`deadmanPingBeforePosts`), one whose ping step accepts any 200 (`pingAcceptsAny200`), and one whose ping step prints its configuration in its failure line (`pingPrintsConfig`).
   - The ping step's transport leg, built with a recording curl in the pattern of `package-ntfy-send-test-token-transport`, asserts the URL is absent from argv and present on stdin, with a mutant passing the URL as an argument.
   - The runtime regulator of the whole watch is the acceptance negative control in the Migration Plan and, after it, healthchecks.io itself.
 - **Rationale**: the legs compare the dead-man's behaviour, observed through the stand-ins, with expectations written in the legs, not with values rendered from the module, so they are not restatements.
@@ -221,25 +221,26 @@ No requirement that the active S4 change modifies is touched, so the two changes
 
 ### Implementation surface: artifacts amended when ADR-009 Q5 resolves
 
-The orchestrator records these under the next charter version entry (v26 at the time of writing), each an amendment in place.
+The orchestrator records these under the next charter version entry (v27; the charter is at v26, `charter.md:9`), each an amendment in place.
+Each line number is cited with a quoted phrase from that line at `origin/main` `79d5cee3`, so later drift shows.
 
-- A9:7-9: the status line no longer excepts ADR-009 Q5.
-- A9:181: the healthchecks.io entry leaves the rejected alternatives and becomes the adopted watch.
-- A9:193-194: the Consequences state that the external watch reports an outage of cinnabar or ntfy by email within period plus grace, and that the watch adds an account and an egress.
-- A9 "Operating envelope and regulator", "Failure prevented" and "Implementation surface": E9.6, R9.6, the generator and the option; A9:252's "no new listener" still holds.
-- A9:264-266: ADR-009 Q5's resolution.
+- A9:7-9 ("except Q5, deferred to the end of implementation"; "Q5 is scheduled as CAM-76 before S5"): the status line no longer excepts ADR-009 Q5.
+- A9:182 ("deferred to Q5."): the healthchecks.io entry leaves the rejected alternatives and becomes the adopted watch.
+- A9:194-195 ("nothing in this decision detects that (Q5)"; "the residual risk that nothing reports an ntfy outage"): the Consequences state that the external watch reports an outage of cinnabar or ntfy by email within period plus grace, and that the watch adds an account and an egress.
+- A9 "Operating envelope and regulator", "Failure prevented" and "Implementation surface": E9.6, R9.6, the generator and the option; A9:253's "no new listener" still holds.
+- A9:265-267 ("5. Q5: Should cinnabar itself be watched by an external dead-man service?" to "Charter v21 schedules it as CAM-76 before S5"): ADR-009 Q5's resolution.
 - FA:32 and FA:164-169: ADR-009 Q5 resolved, and the "Deferred" entry moves to the component's design.
 - RA:73: the deferred external watcher node becomes healthchecks.io, pinged from cinnabar; RA:182-183, RA:280-281 and RA:286 follow, and RA's sequencing records that CAM-72 is unblocked.
-- README:18, :34, :129, :142 and :214: ADR-009 Q5 is resolved by CAM-76.
-- RB:145-146 and RB:816: the runbook states what the email means, how to read the check, how to pause it before cinnabar maintenance longer than the grace, and how to rotate the ping URL.
-- SAT:425 and SAT:493 change when SAT is regenerated wholesale at archive, as `openspec/config.yaml` requires; it is not patched.
+- README:19 ("schedules ADR-009 Q5 as CAM-76"), :35 ("ADR-009 is Accepted except its Q5"), :130 ("ADR-009 with its Q5 deferred to CAM-76"), :143 ("Accepted, except Q5, deferred to CAM-76 before S5") and :215 ("ADR-009 Q5, whether an external dead-man service watches cinnabar itself"): ADR-009 Q5 is resolved by CAM-76.
+- RB:145-146 ("Nothing reports an outage of ntfy or cinnabar themselves"; "CAM-76, scheduled before S5, adds a watch from outside cinnabar") and RB:825 ("an external watch of cinnabar and ntfy themselves (CAM-76)"): the runbook states what the email means, how to read the check, how to pause it after the dead-man's last accepted ping for maintenance longer than the grace, and how to rotate the ping URL.
+- SAT:441 ("A33 — The fleet's notification service on cinnabar is reachable over ZeroTier") and SAT:514 ("**Trust boundary is stated, not discharged:**") change when SAT is regenerated wholesale at archive, as `openspec/config.yaml` requires; it is not patched.
 
 ### Later slices
 
 | Slice | Touches | Rule it must keep |
 |---|---|---|
 | S5 (CAM-72) | darwin agents | starts only after this change's ntfy-stop control is recorded (S3-RT:170-172) |
-| any slice that restarts ntfy, caddy or zerotierone on cinnabar | the deploy | the restart completes within the grace, or the check is paused first |
+| any slice that restarts ntfy, caddy or zerotierone on cinnabar | the deploy | the restart completes within the grace, or the check is paused after the dead-man's last accepted ping, since a ping resumes a paused check |
 
 ## Risks / Trade-offs
 
@@ -265,16 +266,16 @@ The change lands as two pull requests, merged in order:
 1. Gated, the operator: create a healthchecks.io account and one check named for the dead-man, with period 5 min, grace 10 min and an email integration to an address not hosted on the fleet (O2, O5), and keep its ping URL.
 2. Gated, the operator: run `clan vars generate cinnabar --generator fleet-deadman-ping` and paste the URL at the hidden prompt; the agent verifies only that `vars/per-machine/cinnabar/fleet-deadman-ping/curl-config/secret` exists and that no other generator's files changed.
 3. Deploy cinnabar from pull request 1's head.
-   Verified by: the dead-man's journal shows the ping accepted on each run for 30 min; healthchecks.io shows the check up with pings every 5 min; `systemctl show fleet-deadman -p Environment` names only the credential path; no `FAILED fleet-deadman` arrives.
+   Verified by: the dead-man's journal shows the ping accepted on each run for 30 min; healthchecks.io shows the check up with pings every 5 min; `systemctl cat fleet-deadman.service` shows `Environment="FLEET_DEADMAN_PING_CONFIG=%d/external-ping"` and `LoadCredential=external-ping:/run/secrets/vars/per-machine/cinnabar/fleet-deadman-ping/curl-config`, and `systemctl show fleet-deadman -p Environment` holds no `hc-ping` string; no `FAILED fleet-deadman` arrives.
 4. Negative control, with the operator present: `systemctl stop ntfy-sh.service` on cinnabar, recording the time.
-   Expected: the next dead-man run fails its probe; the healthchecks.io email arrives within 15 min of the last accepted ping; the time is recorded.
-   Then `systemctl start ntfy-sh.service`; the next run pings and healthchecks.io sends its recovery email.
+   Expected: the next dead-man run fails its probe; the healthchecks.io email arrives at least 15 and at most 20 min after the last accepted ping, and a later arrival is a finding; the time is recorded.
+   Then `systemctl start ntfy-sh.service`; a run after the start pings, at the latest the second, and healthchecks.io sends its recovery email.
    Expected side effects, recorded rather than avoided: magnetite's heartbeats and any notifier posts fail while ntfy is stopped, so `AlertEvaluatorSilent` may fire and resolve after the restart, and `FAILED fleet-deadman on cinnabar` arrives once ntfy is back.
-5. A second control (O4): stop `fleet-alert.timer` on magnetite for 20 min; `AlertEvaluatorSilent` arrives through ntfy and the email arrives; start it, and both recover.
+5. A second control (O4): stop `fleet-alert.timer` on magnetite for 30 min; `AlertEvaluatorSilent` arrives through ntfy; the last accepted ping falls up to 10 min after the stop, and the email arrives at least 15 and at most 20 min after it; start the timer, and both recover.
 6. Over the next 24 h, no healthchecks.io email arrives; cinnabar's journal counts the day's pings, and the check's log, which keeps its last 100 pings (about 8 h), is read at the end.
 7. Pull request 2 merges; the orchestrator records step 4's times in CAM-76, and CAM-72 may start.
 
-Rollback: pause the check in healthchecks.io first, so the rollback itself sends no email, then unset `pingConfigFile` and deploy cinnabar; the vars stay committed and unused, and the check is deleted once the rollback is final.
+Rollback: deploy cinnabar with `pingConfigFile` unset, then, within 15 min of the last `external ping accepted`, pause the check in healthchecks.io, because a ping to a paused check resumes it; the vars stay committed and unused, and the check is deleted once the rollback is final.
 
 ## Open Questions
 

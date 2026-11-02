@@ -51,4 +51,4 @@ Expected: nothing printed.
 
 Confirm that `logs/cam76-evidence/4.2-ntfy-stop-*.log` and `logs/cam76-evidence/4.3-evaluator-stop-*.log` exist and that `verify.md` cites both, then report to the orchestrator, in one sentence each, the last ping, stop, down-email, start and up-email times of 4.2, so that it records in CAM-76 that an outage of the alert path reached the operator by a channel other than ntfy and CAM-72 may start.
 
-Expected: both logs exist and are cited; the down email of 4.2 arrived within 15 min of the last accepted ping.
+Expected: both logs exist and are cited; the down email of 4.2 arrived at least 15 and at most 20 min after the last accepted ping, or the later arrival is recorded as a finding the operator decided.

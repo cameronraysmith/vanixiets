@@ -9,7 +9,7 @@ When `services.fleet-alert.deadman.pingConfigFile` is set, as it SHALL be on cin
 #### Scenario: A passing run pings once
 
 - **WHEN** the ping stand-in answers `OK`, the probe is refused with 403, the poll returns one heartbeat and no post is pending
-- **THEN** the run exits 0 and the ping stand-in records exactly one request, to the configured path, after the probe and the poll
+- **THEN** the run exits 0 and the request log the two stand-ins share records the probe, the poll and exactly one ping, to the configured path, in that order
 
 #### Scenario: A failing run sends nothing
 
@@ -26,6 +26,11 @@ When `services.fleet-alert.deadman.pingConfigFile` is set, as it SHALL be on cin
 - **WHEN** the ping stand-in answers `200` with the body `OK (not found)`
 - **THEN** the run exits non-zero with a message naming that body and not the URL, so the notifier posts `FAILED fleet-deadman on cinnabar`
 
+#### Scenario: The watch service cannot be reached
+
+- **WHEN** the ping URL names a closed port
+- **THEN** the run exits non-zero with `fleet-deadman: external ping failed` and a message that does not contain the URL
+
 #### Scenario: The deployed dead-man pings
 
 - **WHEN** cinnabar has been deployed with the option set for 30 min
@@ -34,18 +39,18 @@ When `services.fleet-alert.deadman.pingConfigFile` is set, as it SHALL be on cin
 #### Scenario: The notification service is stopped at acceptance
 
 - **WHEN** the operator stops `ntfy-sh.service` on cinnabar and starts it again after the email arrives
-- **THEN** the runs during the stop fail their probe and send no request, the watch service's down email arrives within 15 min of the last accepted ping, and the first run after the start pings and the up email follows
+- **THEN** the runs during the stop fail their probe and send no request, the watch service's down email arrives at least 15 and at most 20 min after the last accepted ping, and a run after the start pings, at the latest the second, and the up email follows
 
 #### Scenario: The evaluator's timer is stopped at acceptance
 
-- **WHEN** the operator stops `fleet-alert.timer` on magnetite for 20 min, then starts it
-- **THEN** the dead-man's runs post `AlertEvaluatorSilent` and send no request, the down email arrives, and after the start the `RESOLVED`, a ping and the up email follow
+- **WHEN** the operator stops `fleet-alert.timer` on magnetite for 30 min, then starts it
+- **THEN** the dead-man's runs post `AlertEvaluatorSilent` and send no request once no heartbeat is in their window, the last accepted ping falls up to 10 min after the stop, the down email arrives at least 15 and at most 20 min after that ping, and after the start the `RESOLVED`, a ping and the up email follow
 
 ### Requirement: The ping URL travels only as a credential read on stdin
 
 The per-machine generator `fleet-deadman-ping` on cinnabar SHALL take the ping URL through a hidden, persisted, undeployed prompt, reject any value that is not an `https://hc-ping.com/<uuid>` URL, and write the secret `curl-config`; `fleet-deadman.service` SHALL load it with `LoadCredential=external-ping:<path>` and give it to curl on stdin with `-K -`, and the `fleet-alert` module SHALL assert that `pingConfigFile` is not under the Nix store.
 
-**Discharged by**: the ping step's transport test with a recording curl and its argv mutant; the store-path assertion, shown able to fail by an `extendModules` override; the generator's validation at the gated `clan vars generate`; `systemctl show fleet-deadman -p Environment` after the first cinnabar deploy.
+**Discharged by**: the ping step's transport test with a recording curl and its argv mutant; the store-path assertion, shown able to fail by an `extendModules` override; the generator's validation at the gated `clan vars generate`; `systemctl cat fleet-deadman.service` and `systemctl show fleet-deadman -p Environment` after the first cinnabar deploy.
 
 #### Scenario: A value that is not a ping URL is entered
 
@@ -64,8 +69,8 @@ The per-machine generator `fleet-deadman-ping` on cinnabar SHALL take the ping U
 
 #### Scenario: The deployed unit is inspected
 
-- **WHEN** after the first cinnabar deploy the operator reads `systemctl show fleet-deadman -p Environment -p LoadCredential`
-- **THEN** the environment names only the credential's path under `%d`, and `LoadCredential` names the `curl-config` path under `/run/secrets/`
+- **WHEN** after the first cinnabar deploy the operator reads `systemctl cat fleet-deadman.service | grep -E '^(Environment=|LoadCredential=)'` and `systemctl show fleet-deadman -p Environment`
+- **THEN** the unit file holds `Environment="FLEET_DEADMAN_PING_CONFIG=%d/external-ping"` and `LoadCredential=external-ping:/run/secrets/vars/per-machine/cinnabar/fleet-deadman-ping/curl-config`, and the shown environment holds no `hc-ping` string
 
 ## MODIFIED Requirements
 
@@ -82,8 +87,8 @@ The per-machine generator `fleet-deadman-ping` on cinnabar SHALL take the ping U
 
 #### Scenario: The ping mutants are run
 
-- **WHEN** the check runs a dead-man that pings before its probe and a ping step that accepts any `200`
-- **THEN** the dead-man legs reject each, the first on a probe answered 200 that still pinged and the second on an `OK (not found)` answer that did not fail the run, and the unmutated dead-man passes every leg
+- **WHEN** the check runs a dead-man that pings before its probe, one that pings without a heartbeat, one that pings before its posts, a ping step that accepts any `200`, and a ping step that prints its configuration in its failure line
+- **THEN** the dead-man legs reject each at a named leg: a probe answered 200 that still pinged, an empty window that pinged, a failed post that pinged, an `OK (not found)` answer that did not fail the run, and an `OK (not found)` answer whose message printed the URL; and the unmutated dead-man passes every leg
 
 #### Scenario: The check's evaluation cost is measured
 

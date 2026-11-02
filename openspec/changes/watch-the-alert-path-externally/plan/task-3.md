@@ -5,7 +5,7 @@ This is the second part of pull request 1.
 Steps 1 and 3 are gated on the operator; no agent reads, prints or logs the ping URL.
 
 **Files:**
-- Modify: `modules/machines/nixos/cinnabar/fleet-alert.nix` (the module's arguments, `:13`; the generator and the option, after `services.fleet-alert.deadman`, `:33-36`)
+- Modify: `modules/machines/nixos/cinnabar/fleet-alert.nix` (the module's arguments, `:8`; the generator and the option, after `services.fleet-alert.deadman`, `:24-27`)
 - Create (by `clan vars generate`, committed): `vars/per-machine/cinnabar/fleet-deadman-ping/ping-url/secret`, `vars/per-machine/cinnabar/fleet-deadman-ping/curl-config/secret`
 - Create (git-ignored): `logs/cam76-evidence/2.6-check-<ts>.log`, `logs/cam76-evidence/2.7-vars-<ts>.log`, `logs/cam76-evidence/2.8-pr-<ts>.log`
 

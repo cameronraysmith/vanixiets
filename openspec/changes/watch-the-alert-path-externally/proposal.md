@@ -15,18 +15,18 @@ Decisions tagged `O<n>` were made by the operator on 2026-11-01; `brainstorm.md`
 - The ping reads healthchecks.io's answer and fails the run on anything but `OK`, because an unknown check is answered `200 OK (not found)`.
 
 **The ping URL as a secret**
-- A per-machine clan vars generator `fleet-deadman-ping` on cinnabar takes the ping URL through a hidden, persisted prompt, as `modules/machines/nixos/magnetite/default.nix:404-422` takes the R2 keys, validates its form, and writes a curl configuration file (O6).
+- A per-machine clan vars generator `fleet-deadman-ping` on cinnabar takes the ping URL through a hidden, persisted prompt, as `modules/machines/nixos/magnetite/default.nix:404-442` (`clan.core.vars.generators.omnigraph-r2 = {`) takes the R2 keys, validates its form, and writes a curl configuration file (O6).
 - `fleet-deadman.service` loads that file through `LoadCredential`, and curl reads it on stdin, so the URL never appears on a command line, in the unit's environment or in the Nix store.
 
 **Regulators**
-- R9.6, a new leg of `checks.x86_64-linux.fleet-alert`: the dead-man runs against the existing ntfy stand-in and a ping stand-in, and a fully passing run sends exactly one ping while each failing run and each run without a heartbeat sends none, with mutants that ping before the probe and that accept any 200.
+- R9.6, a new leg of `checks.x86_64-linux.fleet-alert`: the dead-man runs against the existing ntfy stand-in and a ping stand-in, and a fully passing run sends exactly one ping while each failing run and each run without a heartbeat sends none, with mutants that ping before the probe, ping without a heartbeat, ping before the posts, accept any 200, and print the ping configuration.
 - A package-style test of the ping step with a recording curl, asserting the URL arrives on stdin and never on argv, with a mutant that passes it on argv.
-- At deployment, a deliberate stop of `ntfy-sh.service` on cinnabar produces the healthchecks.io email within 15 min of the last accepted ping and the recovery email after restart, and a 20 min stop of `fleet-alert.timer` on magnetite produces the email beside `AlertEvaluatorSilent`.
+- At deployment, a deliberate stop of `ntfy-sh.service` on cinnabar produces the healthchecks.io email at least 15 and at most 20 min after the last accepted ping and the recovery email after restart, and a 30 min stop of `fleet-alert.timer` on magnetite produces the email beside `AlertEvaluatorSilent`.
 
 **Decision records amended through a charter version entry**
-- From: ADR-009 lists a hosted dead-man service as rejected and defers its Q5; cinnabar is the single delivery path and nothing reports its outage (ADR-009:181, :193-194, :264-266).
+- From: ADR-009 lists a hosted dead-man service as rejected and defers its Q5; cinnabar is the single delivery path and nothing reports its outage (ADR-009:182, "deferred to Q5."; :194-195, "nothing in this decision detects that (Q5)"; :265-267, "5. Q5: Should cinnabar itself be watched by an external dead-man service?").
 - To: ADR-009 Q5 is resolved: healthchecks.io watches the dead-man, which watches magnetite's heartbeat through caddy and the mesh; ADR-009 gains envelope E9.6 and regulator R9.6; the component, reference architecture, observability README and runbook follow.
-- Reason: the reasoning of ADR-009 Q5's original recommendation, that a cinnabar outage is noticed because `.zt` resolution breaks, weakened when S4's agents stopped depending on cinnabar's resolver (charter v23; ADR-009:195).
+- Reason: the reasoning of ADR-009 Q5's original recommendation, that a cinnabar outage is noticed because `.zt` resolution breaks, weakened when S4's agents stopped depending on cinnabar's resolver (charter v23; ADR-009:196, "a dependency ADR-003's agents no longer share from S4").
 - Impact: non-breaking; adds one third-party account, one egress from cinnabar to `hc-ping.com`, and one secret.
 
 ## Capabilities
@@ -37,7 +37,7 @@ None.
 The watch extends the existing alerting capabilities rather than adding a new area of behaviour.
 
 ### Modified Capabilities
-- `fleet-alerting` (stratum: `behavioral`): a new requirement, `An outage of the alert path reaches the operator by email from outside the fleet`, covering an outage of cinnabar, its notification service or the path to it, and the evaluator's silence (O4), within 15 minutes; `A silent evaluator is reported from another host`, which the active S4 change modifies, is left unchanged.
+- `fleet-alerting` (stratum: `behavioral`): a new requirement, `An outage of the alert path reaches the operator by email from outside the fleet`, covering an outage of cinnabar, its notification service or the path to it, and the evaluator's silence (O4), at least 15 and at most 20 minutes after the dead-man's last accepted ping; `A silent evaluator is reported from another host`, which the active S4 change modifies, is left unchanged.
 - `fleet-alerting-interface` (stratum: `interface`): new requirements for the ping's conditions and the `OK` answer check, the ping URL's transport by credential and stdin, and R9.6 with its mutants; the trust-boundary requirement's ntfy-outage scenario is revised and gains scenarios for the watch.
   Trust boundary: healthchecks.io is trusted to evaluate the check's period and grace and to send the email, and this machine only pings it; the operator's mail provider is trusted to deliver the email; the ping URL is a bearer credential, so anyone holding it, including any root process on cinnabar, can keep the check green; the check's period, grace and integrations live in healthchecks.io's interface and are observed at acceptance, never asserted by the flake; nothing here guarantees that an email reaches a person, only that the ping is sent exactly when the dead-man's run passes, which the fixture check and the acceptance observations show.
 - `world-assumptions` (stratum: `world`): A33's evidence that nothing reports an outage is revised under its existing "A second delivery path appears" scenario; new assumptions, numbered from A53 because the active `stand-up-linux-fleet-collection` change takes A50 to A52, record healthchecks.io's ping and lateness behaviour (A53), its hosting outside the fleet on Hetzner in Germany (A54), and the operator's mailbox being reached without the fleet (A55); the designation table gains `watch service`, `email` and `ping`.
