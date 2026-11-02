@@ -6,12 +6,12 @@ This capability (stratum: `behavioral`) states what the fleet requires of collec
 
 ## Requirements
 
-### Requirement: magnetite contributes its own signals to the telemetry store
+### Requirement: Each agent host contributes its own signals to the telemetry store
 
-The collector on magnetite SHALL write magnetite's memory, compressed swap, per-process memory, unit, storage-pool and out-of-memory signals, and the signals the services on magnetite publish about themselves, to the `fleet` database, gathering each from a source on magnetite itself.
-The collector SHALL write only series to the `fleet` database, no log records and no traces; the dev-loop records it writes to the dev-loop history are required by `devloop-collection`, not here.
+The collector on each provisioned agent host SHALL write that host's memory, compressed swap, per-process memory, unit, storage-pool, out-of-memory and file-system signals, a laptop's disk health, and on magnetite the signals its services publish about themselves, to the `fleet` database, gathering each from a source on that host.
+The collector SHALL write only series to the `fleet` database, no log records and no traces; the dev-loop records it writes are required by `devloop-collection`.
 
-**Discharged by**: `telemetry-store-interface` requirements `Ingest is OTLP over HTTP with a database header`, `Scrape targets are reached on loopback` and `The collector's configuration bounds what it gathers`; the evaluation-time regulator over magnetite's collector configuration, the container runtime test's ingest and unit-state cases, and the operator's confirmation at first activation discharge it.
+**Discharged by**: `telemetry-store-interface` requirements `Ingest is OTLP over HTTP with a database header`, `Scrape targets are reached on loopback` and `The collector's configuration bounds what it gathers`, and `fleet-ingress-interface` requirements `The ingress receiver accepts only certificate holders on magnetite's ZeroTier address`, `Each agent exports by its role` and `pyrite's NVMe health is read by a loopback exporter`, resting on world assumptions `A50 — electrum, galena and scheelite exist only while provisioned on demand` and `A51 — pyrite's NVMe controller answers the SMART health log at the pinned smartmontools`; the evaluation-time regulator over magnetite's collector configuration, the agent role's assertions, the container runtime tests and the operator's confirmation at each host's first deploy discharge it.
 
 #### Scenario: magnetite's collector configuration is evaluated
 
@@ -33,6 +33,31 @@ The collector SHALL write only series to the `fleet` database, no log records an
 - **WHEN** magnetite starts the collector while the telemetry store holds no databases yet, as at first activation or after the telemetry store is rebuilt
 - **THEN** the collector begins writing only after the unit that sets up the telemetry store's databases has run, and the evaluation-time collector regulator fails before any activation if the collector is no longer ordered after that unit, which its mutant shows
 
+#### Scenario: Every provisioned agent host reports
+
+- **WHEN** magnetite, cinnabar and pyrite have each run the collector for one collection interval after their first deploy with the ingress
+- **THEN** the operator finds memory, unit, storage-pool and file-system series for each of the three, told apart by the name of its host, and records the result
+
+#### Scenario: Another agent host's collector is the container test's agent
+
+- **WHEN** the ingress container test runs a collector of a host other than magnetite against the ingress and the telemetry store
+- **THEN** that host's series arrive in the `fleet` database under its own name, after crossing the ingress
+
+#### Scenario: pyrite's disk health is read
+
+- **WHEN** pyrite has run the collector for one collection interval after its deploy, without a reboot
+- **THEN** the operator finds pyrite's disk health in the `fleet` database and records it
+
+#### Scenario: A host that is not provisioned
+
+- **WHEN** an agent host of the fleet is configured but not provisioned
+- **THEN** it writes nothing and nothing reports its absence, and it reports from its first provisioning on
+
+#### Scenario: A host runs none of magnetite's services
+
+- **WHEN** a host other than magnetite is evaluated
+- **THEN** its collector reaches no endpoint for the forge, the build service, the binary cache or the telemetry store, because each is gathered only where that service runs
+
 ### Requirement: Each stored series names its host
 
 Every series the collector writes SHALL carry the name of the host it was gathered on, and a reader SHALL be able to select series by that name through both of the telemetry store's query languages.
@@ -51,19 +76,20 @@ Every series the collector writes SHALL carry the name of the host it was gather
 
 ### Requirement: Series cardinality stays bounded
 
-The collector SHALL bound how many series each signal produces on magnetite, and no per-process signal SHALL carry an identifier that changes with each process started, such as its process number or command line.
+The collector SHALL bound how many series each signal produces on each agent host, and no per-process signal SHALL carry an identifier that changes with each process started, such as its process number or command line.
+The collector's signals about itself SHALL carry no identifier that changes with each start of the collector.
 
-**Discharged by**: `telemetry-store-interface` requirement `The collector's configuration bounds what it gathers`; the evaluation-time regulator over magnetite's collector configuration and its mutants, the collector module's assertion that the per-process identifiers are disabled, and the operator's count of distinct process names at first activation discharge it.
+**Discharged by**: `telemetry-store-interface` requirement `The collector's configuration bounds what it gathers` and `fleet-ingress-interface` requirement `otel-envelope on the ingress host regulates the fleet budget`; the evaluation-time regulator over magnetite's collector configuration and its mutants, the agent role's assertions, the collector module's assertion that the per-process identifiers are disabled, and the hourly budget regulator with its container-test fixtures discharge it.
 
 #### Scenario: The bounds are evaluated
 
-- **WHEN** the evaluation-time collector regulator reads magnetite's collector configuration
-- **THEN** it finds the 64 MiB per-process memory floor in the process pipeline and no more than 40 of magnetite's units on the collector's watched-unit list, which the collector builds from the fleet's watched list, and its mutants show it fails when the floor leaves the pipeline or the list grows past 40 units; the storage-pool and out-of-memory keep-list is a literal of the collector's module with no copy in the regulator
+- **WHEN** the evaluation-time collector regulator reads magnetite's collector configuration, and each agent host's configuration is evaluated
+- **THEN** the regulator finds the 64 MiB per-process memory floor in magnetite's process pipeline, and each host's evaluation finds no more than 40 of that host's units on the collector's watched-unit list, the notifier's per-unit instances not counted, and its mutants and overrides show each fails when the floor leaves the pipeline or the list grows past 40 units; the storage-pool and out-of-memory keep-list is a literal of the collector's module with no copy in the regulator
 
 #### Scenario: Per-process memory is bounded by its floor rather than by a count of names
 
-- **WHEN** magnetite runs processes under many distinct program names, each holding at least the memory floor
-- **THEN** the collector records a series for each of them, because it bounds per-process memory by that floor only and does not itself limit how many distinct process names it stores; the bound of 30 names per host is observed by the operator at first activation, and no regulator yet watches it periodically on the host
+- **WHEN** a host runs processes under many distinct program names, each holding at least the memory floor
+- **THEN** the collector records a series for each of them, because it bounds per-process memory by that floor only and does not itself limit how many distinct process names it stores, and the hourly budget regulator fails once a host stores more than 30 names
 
 #### Scenario: Distinct process names are counted at first activation
 
@@ -72,40 +98,60 @@ The collector SHALL bound how many series each signal produces on magnetite, and
 
 #### Scenario: A per-process identifier is turned back on
 
-- **WHEN** magnetite's collector configuration is changed so that any of the six disabled per-process identifiers is gathered again
-- **THEN** magnetite's evaluation fails before any activation on the collector module's assertion, as an evaluation with `process.command_line` enabled shows
+- **WHEN** a host's collector configuration is changed so that any of the six disabled per-process identifiers is gathered again
+- **THEN** that host's evaluation fails before any activation on the collector module's assertion, as an evaluation with `process.command_line` enabled shows
 
 #### Scenario: The watched-unit list grows past its bound
 
-- **WHEN** more than 40 of magnetite's units match the units the collector watches, or the list itself exceeds 40 entries
-- **THEN** the evaluation-time collector regulator fails before any activation, which its mutant shows
+- **WHEN** more than 40 of a host's units, the notifier's instances not counted, match the units the collector watches
+- **THEN** that host's evaluation fails before any activation, which a mutant of pyrite's configuration shows
+
+#### Scenario: The notifier's instances are counted
+
+- **WHEN** the hourly budget regulator counts a host's stored unit names
+- **THEN** it counts the notifier's instances apart from the cap of 40, and fails when one names a unit the host does not list for notification
+
+#### Scenario: The collector restarts in a loop
+
+- **WHEN** a host's collector restarts repeatedly
+- **THEN** its stored signals about itself keep one series per signal, because the identifier of each start is dropped before storage
 
 ### Requirement: Collection survives a telemetry store restart without losing the queued interval
 
-When the telemetry store is unavailable, the collector SHALL hold the queued interval on disk, for at least 24 hours of collection and in less than 512 MiB, and SHALL write it to the telemetry store once the telemetry store accepts series again, so that a restart of the telemetry store leaves no gap in the series.
+When the telemetry store or the ingress is unavailable, the collector on each agent host SHALL hold the queued interval in its local state, for at least 24 hours of collection and in less than 512 MiB, and SHALL write it once the telemetry store or the ingress accepts series again, so that a restart of either leaves no gap in the series.
 
-**Discharged by**: `telemetry-store-interface` requirement `The collector's queue persists across a telemetry store restart`; the evaluation-time collector regulator's queue case with its mutant, the container runtime test's restart case, and the operator's measurement at first activation of the rate the queue fills, which the 24-hour bound otherwise assumes, discharge it.
+**Discharged by**: `telemetry-store-interface` requirement `The collector's queue persists across a telemetry store restart` and `fleet-ingress-interface` requirement `Each agent exports by its role`, resting on world assumption `A52 — The collector answers back-pressure with a retryable refusal and keeps its persistent queue across an outage and a restart`; the evaluation-time collector regulator's queue case with its mutant, the agent role's queue assertion, the container runtime tests' restart and back-pressure cases, and the operator's measurements of the rate each queue fills discharge it.
 
 #### Scenario: magnetite's collector configuration loses its persistent queue
 
 - **WHEN** magnetite's collector configuration holds its queue only in memory, or bounds it below 24 hours or at or above 512 MiB
 - **THEN** the evaluation-time collector regulator fails before any activation, which its mutant shows
 
+#### Scenario: Another agent host's queue is shrunk
+
+- **WHEN** the configuration of a host other than magnetite bounds its queue below 24 hours, at or above 512 MiB, or in memory only
+- **THEN** that host's evaluation fails before any activation, which a mutant of cinnabar's configuration shows
+
 #### Scenario: The telemetry store is stopped while the collector gathers
 
 - **WHEN** the container runtime test stops the telemetry store, lets the collector gather, and starts the telemetry store again
 - **THEN** the measurements gathered while the telemetry store was stopped are read back from the telemetry store
 
+#### Scenario: The ingress refuses series for a while
+
+- **WHEN** the ingress container test fills the ingress's queue toward the telemetry store, and later makes it refuse series for memory, while another host's collector keeps gathering
+- **THEN** every measurement that host gathered is read back from the telemetry store once the ingress accepts series again
+
 ### Requirement: Stored unit names carry no owner's name
 
 The collector SHALL store the name of each Omnigent worker unit, which carries the name of the person it runs for, under a fixed alias of that person instead, so that no series in the telemetry store carries a person's name and adding or removing a person never renames another person's series.
 
-**Discharged by**: `telemetry-store-interface` requirement `Omnigent unit names are stored under aliases`; the evaluation-time collector regulator's alias case with its mutant, the container runtime test's alias read-back, and the operator's query at first activation discharge it.
+**Discharged by**: `telemetry-store-interface` requirement `Omnigent unit names are stored under aliases`; the agent role's alias assertion on every agent host with its override, the container runtime test's alias read-back, and the operator's query at first activation discharge it.
 
 #### Scenario: A worker unit has no alias
 
-- **WHEN** magnetite's configuration runs an Omnigent worker unit for a person who has no alias
-- **THEN** the evaluation-time collector regulator fails before any activation, which its mutant shows
+- **WHEN** any agent host's configuration runs an Omnigent worker unit for a person who has no alias
+- **THEN** that host's evaluation fails before any activation, which a mutant of cinnabar's configuration shows
 
 #### Scenario: A worker unit's state is read back
 
@@ -114,9 +160,9 @@ The collector SHALL store the name of each Omnigent worker unit, which carries t
 
 ### Requirement: A failed collection or store job notifies a person
 
-A failure of the collector, of the telemetry store, of the unit that sets up its databases, of its hourly envelope regulator, or of any unit that applies or confirms a disk-share setting on magnetite SHALL produce, from magnetite, a failure notice on the fleet's notification service naming the failed unit and magnetite.
+A failure of the collector or of its periodic regulator on any agent host, or on magnetite of the telemetry store, the unit that sets up its databases, its hourly envelope regulator, or any unit that applies or confirms a disk-share setting, SHALL produce, from that host, a failure notice on the fleet's notification service naming the failed unit and the host.
 
-**Discharged by**: `telemetry-store-interface` requirement `Failure notices are posted to one topic`, which posts with the notification service's credential, resting on world assumptions `A33 — The fleet's notification service on cinnabar is reachable over ZeroTier and is the single delivery path` and `A37 — ntfy provisions users, access entries and tokens from its declaration, and refuses to start on an undeclared user`; the evaluation-time collector regulator's failure-wiring case with its mutants discharges that every unit of the kinds named here, present or added later, hands its failure to the notifier, `checks.<system>.package-ntfy-send-test-token-transport` and the resolve-hook assertion in `observability-notify.nix`, shown able to fail by an `extendModules` override, discharge that the notifier presents the credential, and the operator's deliberately failed envelope regulator after the access entries are in force discharges delivery from magnetite.
+**Discharged by**: `telemetry-store-interface` requirement `Failure notices are posted to one topic`, which posts with the notification service's credential, and `fleet-ingress-interface` requirement `One host table declares the agent hosts and what each reports`, resting on world assumptions `A33 — The fleet's notification service on cinnabar is reachable over ZeroTier and is the single delivery path` and `A37 — ntfy provisions users, access entries and tokens from its declaration, and refuses to start on an undeclared user`; the evaluation-time collector regulator's failure-wiring case with its mutants, the agent role's notified-unit assertion on every agent host, `checks.<system>.package-ntfy-send-test-token-transport` and the resolve-hook assertion in `observability-notify.nix`, shown able to fail by an `extendModules` override, discharge that every unit of the kinds named here hands its failure to the notifier with the credential; the operator's recorded deliveries discharge the rest.
 
 #### Scenario: A watched unit fails at first activation
 
@@ -137,3 +183,13 @@ A failure of the collector, of the telemetry store, of the unit that sets up its
 
 - **WHEN** once the notification service refuses anonymous publishing to the fleet topics, a unit this requirement names fails on magnetite
 - **THEN** a failure notice naming that unit and magnetite appears on the fleet's notification service, posted with the credential, and the operator records it
+
+#### Scenario: Another agent host's collector or regulator stops being notified
+
+- **WHEN** an agent host's configuration no longer lists its collector or its periodic regulator for notification
+- **THEN** that host's evaluation fails before any activation, which a mutant of cinnabar's configuration shows
+
+#### Scenario: cinnabar's periodic regulator fails at acceptance
+
+- **WHEN** the operator stops cinnabar's collector for 10 minutes while the notification service runs
+- **THEN** a failure notice naming cinnabar's periodic regulator and cinnabar appears on the fleet's notification service, and the operator records it

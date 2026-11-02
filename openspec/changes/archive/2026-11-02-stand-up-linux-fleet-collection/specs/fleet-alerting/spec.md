@@ -50,8 +50,7 @@ Memory alerts SHALL name the three processes holding the most memory on that hos
 ### Requirement: A missing signal is itself reported
 
 When a signal an alert rule reads has had no series for 30 minutes while at least one host expected to emit it reports its memory signal, a person SHALL be told by an alert naming that rule, but not while every expected host is silent.
-When an always-on host, magnetite or cinnabar, has sent no memory signal for 15 minutes while the telemetry store answers, a person SHALL be told once, naming that host, by the end of those 15 minutes, and again when it reports, and a laptop's silence SHALL raise nothing.
-The 15 minutes are the telemetry store's 5-minute lookback, during which a query still returns the host's last memory signal, followed by the 10 minutes the evaluator counts once no query returns it.
+When an always-on host, magnetite or cinnabar, has sent no memory signal for 15 minutes while the telemetry store answers, a person SHALL be told once, naming that host, within those 15 minutes, and again when it reports; a laptop's silence SHALL raise nothing.
 
 **Discharged by**: `fleet-alerting-interface` requirements `Each rule's presence selector is watched` and `An always-on host's silence is reported`, and `fleet-ingress-interface` requirement `One host table declares the agent hosts and what each reports`, resting on world assumptions `A13 — Resuming this laptop from a suspended state is unreliable, and recovering a failed resume requires a person at the machine` and `A50 — electrum, galena and scheelite exist only while provisioned on demand`; `checks.x86_64-linux.fleet-alert`'s signal-gap, always-on-host and laptop-silence fixture legs, and the operator's observations at deploy and at acceptance, discharge it.
 
@@ -69,6 +68,11 @@ The 15 minutes are the telemetry store's 5-minute lookback, during which a query
 
 - **WHEN** magnetite's collector stops exporting for 15 minutes while the telemetry store keeps answering
 - **THEN** one alert titled `[FIRING] RuleSignalMissing magnetite` is posted, and one titled `[RESOLVED] RuleSignalMissing magnetite` after magnetite reports again, which the build-time alert regulator confirms
+
+#### Scenario: The 15 minutes are counted
+
+- **WHEN** an always-on host's last memory signal is stored and no later one follows while the telemetry store answers
+- **THEN** a query still returns that signal for the telemetry store's 5-minute lookback, the evaluator then counts the 10 minutes once no query returns it, and the alert is posted by the end of those 15 minutes
 
 #### Scenario: cinnabar falls silent while the notification service runs
 

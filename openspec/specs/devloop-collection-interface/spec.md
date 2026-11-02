@@ -136,16 +136,31 @@ magnetite's collector SHALL run `journald/gitea-mq` with `units: [gitea-mq.servi
 - **WHEN** the switch case finds no `switch-to-configuration` in the container's second system, as nixpkgs' nspawn container module builds it
 - **THEN** the case runs that system's activation script, which sets `$systemConfig`, instead, and the limitation is recorded with the run
 
-### Requirement: magnetite's collector ships its own deploy records
+### Requirement: Each agent host's collector ships its own deploy records
 
-magnetite's collector SHALL read `/var/log/deploy-record.jsonl` through `file_log/deploy-record` with `start_at: beginning`, `storage: file_storage` and `json_parser`, keeping `host`, `closure`, `previous_closure` and `ts`.
+Each agent host's collector SHALL read `/var/log/deploy-record.jsonl` through `file_log/deploy-record`, defined in the agent role, with `start_at: beginning`, `storage: file_storage` and `json_parser`, keeping `host`, `closure`, `previous_closure` and `ts`, under the receiver id and settings magnetite used before, so magnetite's stored offset carries over.
 
-**Discharged by**: `devloop-reconcile`'s comparison of deploy records; `vmTests.x86_64-linux.devloop-ingest`'s first-start case.
+**Discharged by**: `devloop-reconcile`'s comparison of deploy records on magnetite; `vmTests.x86_64-linux.devloop-ingest`'s first-start case; `vmTests.x86_64-linux.fleet-ingress`'s delivery case; the operator's line-count comparison at each agent host's first deploy.
 
 #### Scenario: The receiver reads another file
 
 - **WHEN** `devloop-ingest`'s mutant points `file_log/deploy-record` at another path
 - **THEN** `devloop-reconcile` exits non-zero on the deploy-record count
+
+#### Scenario: An agent host without the ingress role ships its records
+
+- **WHEN** `fleet-ingress`'s agent writes three deploy-record lines
+- **THEN** three `deploy_record` rows naming that agent's host arrive in `devloop` through `otlp_http/ingress-logs` and `otlp/mesh`
+
+#### Scenario: magnetite's receiver moves into the agent role
+
+- **WHEN** magnetite is first deployed with the receiver defined in the agent role
+- **THEN** magnetite's `deploy_record` row count equals its file's line count, and no line is shipped a second time
+
+#### Scenario: Each agent host is first deployed
+
+- **WHEN** cinnabar and pyrite are first deployed with the agent role
+- **THEN** the operator records, for each, the line count of its `/var/log/deploy-record.jsonl` and its `deploy_record` row count, and a difference is a finding
 
 ### Requirement: The devloop tables are pre-created with keys, a time index and deduplication
 
@@ -192,14 +207,19 @@ magnetite's collector SHALL read `/var/log/deploy-record.jsonl` through `file_lo
 
 ### Requirement: Dev-loop sources are stamped and routed to their table
 
-Each S2 receiver SHALL feed its own `logs/devloop-<table>` pipeline through `memory_limiter` and a `resource/devloop-<table>` processor that sets `vanixiets.database` to `devloop`, `vanixiets.table` to its table and `host.name`, ending in the `forward` connector, and no `logs/*` pipeline SHALL take the local OTLP receiver.
+Each dev-loop receiver SHALL feed its own `logs/devloop-<table>` pipeline through `memory_limiter` and a `resource/devloop-<table>` processor that sets `vanixiets.database` to `devloop`, `vanixiets.table` to its table and `host.name`, ending in `forward` on the ingress host and in `otlp_http/ingress-logs` elsewhere, and no `logs/*` pipeline SHALL take an OTLP receiver other than `otlp/mesh`.
 
-**Discharged by**: the R3.1 collector check's clause that no logs pipeline takes the OTLP receiver, with its mutant; `vmTests.x86_64-linux.devloop-ingest`'s first-start case, in which each table receives its rows.
+**Discharged by**: the R3.1 collector check's clause that no logs pipeline takes an OTLP receiver other than `otlp/mesh`, with its mutant; `vmTests.x86_64-linux.devloop-ingest`'s first-start case and `vmTests.x86_64-linux.fleet-ingress`'s delivery case, in which each table receives its rows.
 
 #### Scenario: The local receiver is added to a logs pipeline
 
-- **WHEN** a mutant of magnetite's collector configuration adds the OTLP receiver to `logs/devloop-ci_build`
+- **WHEN** a mutant of magnetite's collector configuration adds a local OTLP receiver to `logs/devloop-ci_build`
 - **THEN** the evaluation-time collector check (R3.1) fails
+
+#### Scenario: Another host's deploy records reach the logs route
+
+- **WHEN** an agent host without the ingress role is evaluated
+- **THEN** its `logs/devloop-deploy_record` pipeline ends in `otlp_http/ingress-logs`, and on magnetite `logs/ingress` receives from both `forward` and `otlp/mesh` into the unchanged `routing/logs`
 
 ### Requirement: devloop-reconcile runs daily as its own reader
 
@@ -357,10 +377,15 @@ This capability SHALL state what its properties guarantee and what they do not, 
 
 #### Scenario: A guarantee about other hosts is sought
 
-- **WHEN** someone asks whether deploys on hosts other than magnetite reach `devloop`
-- **THEN** the answer is no: those hosts write records that no collector ships until S4 and S5, and their snippets are held by the build-time check only on the five x86_64-linux NixOS machines, the four darwin machines and `scheelite` having been shown carrying them once by evaluation
+- **WHEN** someone asks whether deploys on hosts other than magnetite reach `devloop` and are reconciled
+- **THEN** the answer is no for reconciliation: every NixOS agent host ships its records through the ingress, but `devloop-reconcile` compares magnetite's alone, the darwin machines ship none until they run collectors of their own, and the snippets are held by the build-time check only on the five x86_64-linux NixOS machines
+
+#### Scenario: A guarantee about a record's host is sought
+
+- **WHEN** someone asks whether a `deploy_record` row's `host` proves which host sent it
+- **THEN** the answer is no: any holder of an `otel-ca` certificate can send a row naming any host
 
 #### Scenario: An end-to-end guarantee is sought
 
 - **WHEN** someone asks whether these properties guarantee that a given event reaches the store
-- **THEN** the answer is no: each stage's configuration, the gating checks, the container test and the daily reconcile behave as stated, and nothing here observes every event's whole path
+- **THEN** the answer is no: each stage's configuration, the gating checks, the container tests and the daily reconcile behave as stated, and nothing here observes every event's whole path

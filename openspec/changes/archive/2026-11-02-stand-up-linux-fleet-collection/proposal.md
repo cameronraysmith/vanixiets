@@ -3,16 +3,18 @@ linear_story_id: CAM-71
 linear_story_identifier: CAM-71
 linear_story_title: "S4: Extend collection to the Linux fleet over mTLS"
 linear_story_url: https://linear.app/cameronraysmith/issue/CAM-71/s4-extend-collection-to-the-linux-fleet-over-mtls
-linear_story_state: In Progress
+linear_story_state: Done
 linear_team: CAM
 linear_project: fleet-observability
-last_synced_state: In Progress
-last_synced_at: 2026-10-29T05:01:31Z
+last_synced_state: Done
+last_synced_at: 2026-11-02T04:08:37Z
 review_round: 0
 max_review_rounds: 3
 attempt_log:
   - { at: "2026-10-28T20:35:36Z", transition: "Backlog->Todo", outcome: "posted", note: "T1 bind; description seeded from this proposal" }
   - { at: "2026-10-29T05:01:31Z", transition: "Todo->In Progress", outcome: "posted", note: "first - [x] in tasks.md (1.1-1.3)" }
+  - { at: "2026-11-01T18:13:38Z", transition: "In Progress->In Review", outcome: "posted", note: "T3 verify.md created; recorded at archive from Linear's issue history, the ledger had not recorded it" }
+  - { at: "2026-11-02T04:08:37Z", transition: "In Review->Done", outcome: "posted", note: "T4 archived; specs synced, satisfaction projection regenerated, and the eight changed main specs mirrored to the Fleet observability project documents (fleet-ingress-interface created)" }
 ---
 
 ## Why

@@ -93,7 +93,6 @@ Any requirement whose discharge depends on this fact SHALL name it explicitly, a
 
 The corpus SHALL provide one designation record per content term this repository's `behavioral`-stratum requirements use, recording the term, the sense in which it is used when a term carries more than one, the world phenomenon it denotes, and whether that phenomenon is world-only, shared with the machine, or machine-only.
 A term found to denote two distinct phenomena within this repository's vocabulary SHALL be recorded as two rows rather than collapsed into one.
-Twenty-one terms carry two senses in this repository today and are disambiguated below rather than left to context: `session`, `package`, `policy`, `@`, `mutation`, `activation`, `probe`, `machine`, `host`, `interface`, `repository`, `build service`, `database`, `hostname`, `evaluator`, `person`, `writer`, `account`, `build`, `path`, and `credential`.
 
 | Term | Sense | World phenomenon it denotes | Status |
 |---|---|---|---|
@@ -262,7 +261,7 @@ Twenty-one terms carry two senses in this repository today and are disambiguated
 | deploy | — | one activation, in the machine sense, of a configuration on a host, including the one each NixOS boot performs | shared |
 | deploy record | — | the entry a host writes at each deploy naming the host, the closure it activated, the closure it replaced and the time | shared |
 | closure | — | the complete built system a configuration produces for one host, identified by its store path | shared |
-| collected host | — | a host whose deploy records a collector ships to the telemetry store, magnetite alone until the fleet's other collectors arrive | shared |
+| collected host | — | a host whose deploy records a collector ships to the telemetry store: magnetite, cinnabar and pyrite, and not yet stibnite | shared |
 | error text | — | the free-form message the build service keeps when an attribute or a build fails, which can carry compiler output and repository content | shared |
 | message body | — | the free text of a log record, as distinct from the named fields parsed out of it | shared |
 | free text | — | any value whose content is not drawn from a fixed or bounded set, such as an error message or a whole log line | world-only |
@@ -273,6 +272,27 @@ Twenty-one terms carry two senses in this repository today and are disambiguated
 | event | dev-loop | one occurrence in the dev loop, such as an attribute finishing, a build finishing, a batch transition or a deploy, that one dev-loop record describes | shared |
 | field | — | one named value a dev-loop record or a source's entry carries | shared |
 | credential | service database | a password or other secret that authenticates a reader to a service's own relational database | shared |
+| agent host | — | a host of the fleet that runs a collector of its own, which gathers that host's signals and sends them on to the telemetry store | shared |
+| provisioned host | — | a host of the fleet that currently exists and runs, as opposed to one that is only configured and is created on demand | world-only |
+| ingress | — | the part of magnetite's collector that alone accepts other hosts' signals and writes them to the telemetry store | shared |
+| collection certificate | — | the credential each agent host presents to the ingress, issued by the fleet's own collection authority, without which the ingress refuses the connection | shared |
+| laptop | — | a portable host of the fleet, such as pyrite, that sleeps, travels and is powered off in ordinary use, so that its silence is not a fault | world-only |
+| file system | — | a mounted dataset of a host's storage pool, whose used and free space are signals of that host | shared |
+| disk health | — | the condition a physical disk reports about itself, such as a critical warning, its wear, its spare capacity and its media errors | shared |
+| back-pressure | — | the ingress refusing signals for a while because it cannot pass them on, which the sending collector answers by keeping them and trying again | shared |
+| notifier instance | — | one run of the notifier for one failed unit on one host, which the host's supervisor records as a unit of its own | shared |
+| identifier | collector start | a value the collector's signals about itself carry that differs at each start of the collector | shared |
+| owner | — | the person an Omnigent worker runs for, whose name the worker's unit name carries | world-only |
+| collection | — | a collector's continuing gathering of its host's signals | shared |
+| job | — | a unit that runs to completion each time it is started, by a timer or by another unit's failure, such as a regulator or the notifier | shared |
+| expected host | — | for one alert rule, a host from which the fleet expects its signal: every collecting host, or for the disk-health rules each collecting host with a disk-health source | shared |
+| silent | — | of a host or a job, having sent nothing it is expected to send for a stated time: a host no memory signal, the evaluator no heartbeat | shared |
+| day | — | a UTC calendar day, the period the reconcile compares | shared |
+
+#### Scenario: The terms with two senses are read
+
+- **WHEN** the table is read for terms that carry two senses in this repository
+- **THEN** twenty-two terms carry two senses today and are disambiguated by separate rows rather than left to context: `session`, `package`, `policy`, `@`, `mutation`, `activation`, `probe`, `machine`, `host`, `interface`, `repository`, `build service`, `database`, `hostname`, `evaluator`, `person`, `writer`, `account`, `build`, `path`, `credential`, and `identifier`
 
 #### Scenario: A term resolves to two phenomena
 
@@ -286,15 +306,20 @@ Twenty-one terms carry two senses in this repository today and are disambiguated
 
 ### Requirement: A13 — Resuming this laptop from a suspended state is unreliable, and recovering a failed resume requires a person at the machine
 
-It is true of this fleet's bare-metal Apple laptop, independent of what this fleet configures on it, that a host which enters a suspended state sometimes never runs again — measured at 7 failures against 30 successes across 14 boots, with no distinguishing record left behind and no identified mechanism — and that the duration of the suspended interval does not predict which outcome occurs.
-It is further true of this host that its only remaining wake source is a physical control on the machine itself, so a host that fails to resume, and a host that resumes without anyone present to press that control, are indistinguishable from anywhere but the machine.
-An automatic suspend is therefore a cost taken on behalf of a person who is by definition absent, and a deliberate suspend is a cost taken by someone standing there.
+It is true of pyrite, this fleet's bare-metal Apple laptop, independent of its configuration, that a suspend sometimes never resumes, that only a control on the machine wakes it, and that it no longer suspends in use, falling silent instead by power-off, reboot or leaving the network.
 Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL be treated as losing its discharge once this assumption's violation condition below is observed.
+
+**Evidence**: a host which entered a suspended state sometimes never ran again, measured at 7 failures against 30 successes across 14 boots, with no distinguishing record left behind and no identified mechanism, and the duration of the suspended interval did not predict which outcome occurred; its only remaining wake source is a physical control on the machine itself, so a host that fails to resume and a host that resumes without anyone present to press that control are indistinguishable from anywhere but the machine, an automatic suspend is a cost taken on behalf of a person who is by definition absent, and a deliberate suspend a cost taken by someone standing there; on 2026-10-27 its logind set `HandleLidSwitch=lock` and `HandleLidSwitchExternalPower=lock`, its last `systemd-suspend` entry across 75 journal boots was dated 2026-09-09, and on 2026-10-25 it booted seven times between 23:42 and 23:58 EDT (`journalctl -b all -u systemd-suspend.service` and `journalctl --list-boots` on pyrite; `logs/s4/brainstorm-prep.md` C4).
 
 #### Scenario: Resume becomes reliable, or a wake source reachable from elsewhere appears
 
 - **WHEN** this host is observed to resume from a suspended state across a run of attempts long enough to distinguish it from the recorded failure rate, or a wake source becomes available that a person not at the machine can trigger
 - **THEN** this assumption is void, and the `graphical-desktop-session` requirement `The laptop does not suspend itself when nobody is using it` loses the reason it exists, becoming a preference about power use rather than an avoidance of a known harm
+
+#### Scenario: pyrite suspends in use again
+
+- **WHEN** pyrite's journal records `systemd-suspend` runs during ordinary use, or its lid switch suspends it again
+- **THEN** this assumption is void for its silence, and the `fleet-alerting` requirement `A missing signal is itself reported` loses the argument that pyrite's silence comes from power-off, reboot or leaving the network, on which its acceptance by taking pyrite offline rests
 
 ### Requirement: A29 — Cloudflare R2 behaves as S3-compatible object storage for the telemetry store's client
 
@@ -363,10 +388,10 @@ Any requirement whose discharge depends on this fact SHALL name it explicitly, a
 
 ### Requirement: A37 — ntfy provisions users, access entries and tokens from its declaration, and refuses to start on an undeclared user
 
-It is true of ntfy 2.28.0, independent of what this fleet builds, that it provisions the users, access entries and tokens its configuration declares, deletes at its next start any entry no longer declared, and refuses to start when an access or token entry names an undeclared user or a token is malformed.
+It is true of ntfy 2.31.0, which cinnabar runs, independent of what this fleet builds, that it provisions the users, access entries and tokens its configuration declares, deletes at its next start any entry no longer declared, and refuses to start when an access or token entry names an undeclared user or a token is malformed.
 Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL be treated as losing its discharge once this assumption's violation condition below is observed.
 
-**Evidence**: declarative provisioning arrived in 2.14.0 through `auth-users`, `auth-access` and `auth-tokens`, or `NTFY_AUTH_USERS`, `NTFY_AUTH_ACCESS` and `NTFY_AUTH_TOKENS` (`binwiederhier/ntfy` `cmd/serve.go:61-63`); an entry naming a user missing from `auth-users` stops the server (`cmd/serve.go:714`, `:753`); a token must match `^tk_[-_A-Za-z0-9]{29}$` (`user/util.go:24`); removed entries are deleted at the next start (`docs/config.md:688-689`); the deployed binary's `ntfy serve --help` on cinnabar listed the three flags on 2026-10-18; the provisioning check before each deploy and the dead-man's anonymous-publish probe every 5 minutes are its monitors.
+**Evidence**: declarative provisioning arrived in 2.14.0 through `auth-users`, `auth-access` and `auth-tokens`, or `NTFY_AUTH_USERS`, `NTFY_AUTH_ACCESS` and `NTFY_AUTH_TOKENS` (`binwiederhier/ntfy@v2.31.0:cmd/serve.go:61-63`); an entry naming a user missing from `auth-users` stops the server (`cmd/serve.go:714`, `:753`); a token must match `^tk_[-_A-Za-z0-9]{29}$` (`user/util.go:24`); removed entries are deleted at the next start (`docs/config.md:688-689`); these lines were read at the v2.31.0 tag, the source cinnabar's package builds from, on 2026-11-01, and their text is unchanged from 2.28.0, at which this assumption was first read (`logs/s4-evidence/12.4-ntfy-2.31-20261101T183920Z.log`); cinnabar has run 2.31.0 since 2026-10-25T16:09:05Z, its `ntfy serve --help` listed the three flags on 2026-11-01, and ntfy started at 2026-11-01T06:03:17Z under 2.31.0 with its declared access entries `alerter:fleet-*:rw` and `*:fleet-*:ro`; the provisioning check before each deploy and the dead-man's anonymous-publish probe every 5 minutes are its monitors.
 
 #### Scenario: ntfy stops honouring or enforcing its provisioning declaration
 
@@ -375,10 +400,10 @@ Any requirement whose discharge depends on this fact SHALL name it explicitly, a
 
 ### Requirement: A38 — One ntfy access entry decides a request, a named user's before the anonymous one's
 
-It is true of ntfy 2.28.0, independent of what this fleet builds, that one access entry decides each request: among the entries whose topic pattern matches, a named user's entry outranks the anonymous `*` entry and a longer pattern outranks a shorter one, and with no matching entry the default access applies.
+It is true of ntfy 2.31.0, which cinnabar runs, independent of what this fleet builds, that one access entry decides each request: among the entries whose topic pattern matches, a named user's entry outranks the anonymous `*` entry and a longer pattern outranks a shorter one, and with no matching entry the default access applies.
 Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL be treated as losing its discharge once this assumption's violation condition below is observed.
 
-**Evidence**: the access query orders matching rows `u.user DESC, LENGTH(topic) DESC, write DESC` and takes the first (`binwiederhier/ntfy` `user/manager.go:702-735`, `user/manager_sqlite.go:90-96`), so `alerter:fleet-*:rw` outranks `*:fleet-*:ro`, an anonymous write under `*:fleet-*:ro` is refused with 403, and a topic no entry matches keeps `auth-default-access`; the dead-man's anonymous-publish probe every 5 minutes and the acceptance publish to a host-named topic are its monitors.
+**Evidence**: the access query orders matching rows `u.user DESC, LENGTH(topic) DESC, write DESC` and takes the first (`binwiederhier/ntfy@v2.31.0:user/manager.go:702-735`, `user/manager_sqlite.go:90-96`), so `alerter:fleet-*:rw` outranks `*:fleet-*:ro`, an anonymous write under `*:fleet-*:ro` is refused with 403, and a topic no entry matches keeps `auth-default-access`; the in-memory access cache keeps the query's order (`user/access_cache.go:55-58`) and is off unless `auth-access-cache` is set, which cinnabar's configuration does not set; these lines were read at the v2.31.0 tag on 2026-11-01, and the query and the cache are unchanged from 2.28.0 (`logs/s4-evidence/12.4-ntfy-2.31-20261101T183920Z.log`); under 2.31.0 the dead-man's anonymous-publish probe was refused with 403 on each of its 1,088 runs from 2026-10-29T00:00Z to 2026-11-01T18:39Z, and it and the acceptance publish to a host-named topic are its monitors.
 
 #### Scenario: ntfy changes how it chooses among access entries
 
@@ -387,10 +412,10 @@ Any requirement whose discharge depends on this fact SHALL name it explicitly, a
 
 ### Requirement: A39 — ntfy refuses a request whose token it does not know, even where anonymous access is allowed
 
-It is true of ntfy 2.28.0, independent of what this fleet builds, that a request whose `Authorization` header fails authentication is refused with 401, even on a topic an anonymous client may write.
+It is true of ntfy 2.31.0, which cinnabar runs, independent of what this fleet builds, that a request whose `Authorization` header fails authentication is refused with 401, even on a topic an anonymous client may write.
 Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL be treated as losing its discharge once this assumption's violation condition below is observed.
 
-**Evidence**: the pinned source refuses a failed `Authorization` header before consulting access (`binwiederhier/ntfy@v2.28.0:server/server_auth.go:45-50`), so a sender may carry the token only once cinnabar has provisioned it, which is why the cutover provisions the user and token before any sender uses them; nothing monitors it at runtime, and a ntfy upgrade on cinnabar is the event at which it is read again.
+**Evidence**: the pinned source refuses a failed `Authorization` header before consulting access (`binwiederhier/ntfy@v2.31.0:server/server_auth.go:45-50`, a file identical to 2.28.0's), so a sender may carry the token only once cinnabar has provisioned it, which is why the cutover provisions the user and token before any sender uses them; nothing monitors it at runtime, and a ntfy upgrade on cinnabar is the event at which it is read again; the upgrade to 2.31.0 reached cinnabar on 2026-10-25 through a nixpkgs update, and this reading followed on 2026-11-01 (`logs/s4-evidence/12.4-ntfy-2.31-20261101T183920Z.log`).
 
 #### Scenario: ntfy starts treating an unknown token as anonymous
 
@@ -399,10 +424,10 @@ Any requirement whose discharge depends on this fact SHALL name it explicitly, a
 
 ### Requirement: A40 — ntfy rate-limits a client by its address masked to a prefix, taken from a trusted proxy's forwarding header
 
-It is true of ntfy 2.28.0, independent of what this fleet builds, that it rate-limits a client without a tier by its address, masked for IPv6 to `visitor-prefix-bits-ipv6` bits, 64 by default, and takes that address from `X-Forwarded-For` only with `behind-proxy` set and the peer in `proxy-trusted-hosts`.
+It is true of ntfy 2.31.0, which cinnabar runs, independent of what this fleet builds, that it rate-limits a client without a tier by its address, masked for IPv6 to `visitor-prefix-bits-ipv6` bits, 64 by default, and takes that address from `X-Forwarded-For` only with `behind-proxy` set and the peer in `proxy-trusted-hosts`.
 Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL be treated as losing its discharge once this assumption's violation condition below is observed.
 
-**Evidence**: a visitor is keyed by user only when the user has a tier and otherwise by masked address (`binwiederhier/ntfy` `server/visitor.go:592-602`); without `behind-proxy` the address is the TCP peer (`server/util.go:84-92`); the default budget is a burst of 60 requests refilled at one per 5 s (`docs/config.md:1905-1910`); every ZeroTier member lies in `fddb:4344:343b:14b9::/64`, so at the default prefix the whole mesh is one visitor; the deployed binary's `ntfy serve --help` lists all three settings, the prefix defaulting to 64; the two-client visitor observation at the cutover's first cinnabar deploy is its monitor.
+**Evidence**: a visitor is keyed by user only when the user has a tier and otherwise by masked address (`binwiederhier/ntfy@v2.31.0:server/visitor.go:592-602`); without `behind-proxy` the address is the TCP peer (`server/util.go:84-92`); the default budget is a burst of 60 requests refilled at one per 5 s (`docs/config.md:1905-1910`); these lines were read at the v2.31.0 tag on 2026-11-01, and `visitorID`, `extractIPAddress` and the rate-limit paragraph are unchanged from 2.28.0 (`logs/s4-evidence/12.4-ntfy-2.31-20261101T183920Z.log`); every ZeroTier member lies in `fddb:4344:343b:14b9::/64`, so at the default prefix the whole mesh is one visitor; the deployed 2.31.0 binary's `ntfy serve --help` listed all three settings on 2026-11-01, the prefix defaulting to 64; the two-client visitor observation at the cutover's first cinnabar deploy, made under 2.28.0 and not repeated under 2.31.0, is its monitor.
 
 #### Scenario: ntfy changes how it identifies a rate-limited client
 
@@ -421,12 +446,12 @@ Any requirement whose discharge depends on this fact SHALL name it explicitly, a
 - **WHEN** caddy on cinnabar connects to ntfy from an address other than `::1`, stops setting `X-Forwarded-For`, or sets it to something other than the connecting mesh client's address
 - **THEN** this assumption is void, and the `fleet-alerting` requirement `Each known failure class on a host reaches a person as an alert` and the `fleet-alerting-interface` requirement `ntfy counts each mesh client as its own visitor` lose the discharge argument that ntfy sees each mesh client's own address
 
-### Requirement: A42 — ntfy keeps a topic's messages for 12 hours and returns a recent window to a poll
+### Requirement: A42 — ntfy keeps a topic's messages for a week and returns a recent window to a poll
 
-It is true of ntfy 2.28.0 as cinnabar runs it, independent of what this fleet builds, that it keeps each published message for `cache-duration`, 12 hours by default, in a cache that survives a restart, and answers `GET /<topic>/json?poll=1&since=10m` with that topic's cached messages of the last 10 minutes.
+It is true of ntfy 2.31.0, which cinnabar runs, independent of what this fleet builds, that it keeps each published message for the `cache-duration` it is given, which cinnabar sets to 168 hours, in a cache that survives a restart, and answers `GET /<topic>/json?poll=1&since=10m` with that topic's cached messages of the last 10 minutes.
 Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL be treated as losing its discharge once this assumption's violation condition below is observed.
 
-**Evidence**: `cache-duration` defaults to 12h (`binwiederhier/ntfy` `docs/config.md:503`, `:2387`, read on `main` rather than the 2.28.0 tag), the NixOS module sets a persistent `cache-file`, and nothing in this repository overrides `cache-duration`; a poll with `since=<duration>` returns the cached messages of that window (`docs/subscribe/api.md:239-261`); 2.29.0, newer than cinnabar's release, fixed `poll=1` missing messages for up to 40 s under bursts, which at one heartbeat a minute leaves the 10-minute window full; the dead-man's own `AlertEvaluatorSilent`, which a cache that stopped answering would raise falsely, and R9.3's acceptance step of stopping and restarting the evaluator are its monitors.
+**Evidence**: cinnabar's running `ntfy serve` is the `ntfy-sh-2.31.0` store path, observed on 2026-11-01; `cache-duration` defaults to 12h (`binwiederhier/ntfy` `docs/config.md:503`, `:2387`, read on `main` rather than the 2.31.0 tag), `modules/machines/nixos/cinnabar/ntfy.nix` sets it to `168h` by the operator's decision of 2026-11-01 (charter v24), and the NixOS module sets a persistent `cache-file`; a poll with `since=<duration>` returns the cached messages of that window (`docs/subscribe/api.md:239-261`); 2.29.0, older than cinnabar's 2.31.0, fixed `poll=1` missing messages for up to 40 s under bursts, and without that fix one heartbeat a minute would still leave the 10-minute window full; the dead-man's own `AlertEvaluatorSilent`, which a cache that stopped answering would raise falsely, and R9.3's acceptance step of stopping and restarting the evaluator are its monitors.
 
 #### Scenario: ntfy stops returning recent messages to a poll
 
@@ -547,3 +572,39 @@ Any requirement whose discharge depends on this fact SHALL name it explicitly, a
 
 - **WHEN** a NixOS or nix-darwin release relinks `/run/current-system` before running activation snippets, stops exporting `$systemConfig` to them, or activates a system without running them
 - **THEN** this assumption is void, and the `devloop-collection` requirement `A deploy can be attributed to the commits that built it` loses the discharge argument that each deploy record names the activated and the replaced closure
+
+### Requirement: A50 — electrum, galena and scheelite exist only while provisioned on demand
+
+It is true of the fleet's cloud hosts electrum, galena and scheelite, independent of what their configurations hold, that each exists only while the operator provisions it on demand and is destroyed afterwards, so most of the time it is configured but runs nowhere.
+Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL be treated as losing its discharge once this assumption's violation condition below is observed.
+
+**Evidence**: the terranix machine tables set `enabled = false` for electrum (`modules/terranix/hetzner.nix:18`) and for galena and scheelite (`modules/terranix/gcp.nix:32`, `:40`), while cinnabar and magnetite are `enabled = true`; ADR-009's Context records the same split, and their absence from the `fleet` database's `count by (host_name) (system_memory_usage_bytes)` on 2026-10-27 is its monitor.
+
+#### Scenario: One of them is provisioned to run permanently
+
+- **WHEN** electrum, galena or scheelite is set to `enabled = true` in its terranix table, or runs for more than a week
+- **THEN** this assumption is void for that host, and the `fleet-alerting` requirement `A missing signal is itself reported` and the `host-metrics-collection` requirement `Each agent host contributes its own signals to the telemetry store` lose the argument that its silence is normal and its signals unobserved, until it is added to the always-on hosts
+
+### Requirement: A51 — pyrite's NVMe controller answers the SMART health log at the pinned smartmontools
+
+It is true of pyrite's `APPLE SSD AP0512J` controller at firmware `16.14.01`, independent of what this fleet builds, that it answers smartmontools 7.5's NVMe health log, with its critical warning, spare, wear, media errors and temperature, to a reader allowed to open its controller device.
+Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL be treated as losing its discharge once this assumption's violation condition below is observed.
+
+**Evidence**: `smartctl -j -H -A /dev/nvme0` with the store's smartmontools 7.5 exited 0 as root on pyrite on 2026-10-27, reporting `Critical Warning 0x00`, `Available Spare 90%`, `Available Spare Threshold 2%`, `Percentage Used 11%`, `Media and Data Integrity Errors 0` and `Temperature 32 Celsius` (`logs/s4/brainstorm-prep.md` §2); the controller rejects the Error Information log page with `Invalid Log Page (0x109)`, which smartctl_exporter 0.15.0 requests with `--log=error` and on which it dropped the device (`logs/s4-evidence/5.3-smart-20261101T060029Z.log`), so the exporter reads the health log through #3668's `--smartctl.path` wrapper, which removes that one argument; through it the store held pyrite's SMART samples every minute from 2026-11-01T06:28:38Z to 17:32:38Z (`logs/s4-evidence/5.7-pyrite-replay-20261101T173317Z.log`); the exporter's read and `RuleSignalMissing` on `smartctl_device_critical_warning_total` are its monitors.
+
+#### Scenario: The controller stops answering the health log
+
+- **WHEN** a firmware update or a smartmontools bump leaves the store without pyrite's `smartctl_device_critical_warning_total` while pyrite reports its memory signal
+- **THEN** this assumption is void, and the `host-metrics-collection` requirement `Each agent host contributes its own signals to the telemetry store` and the `fleet-alerting` requirement `Each known failure class on a host reaches a person as an alert` lose the discharge argument for pyrite's disk health, which `RuleSignalMissing` reports within 30 minutes
+
+### Requirement: A52 — The collector answers back-pressure with a retryable refusal and keeps its persistent queue across an outage and a restart
+
+It is true of `otelcol-contrib` 0.155.0, independent of what this fleet builds, that a receiver whose queue is full or whose memory limiter refuses answers HTTP 503, which its exporter retries, and that a `file_storage` queue keeps its items across an outage of the receiver and a restart of its collector.
+Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL be treated as losing its discharge once this assumption's violation condition below is observed.
+
+**Evidence**: on magnetite on 2026-10-28 a spike ingress with a two-request queue toward an absent store, and then with a refusing limiter, answered `503` with `{"code":14,...}`, the agent logged `Will retry`, its queue grew from 28 to 59 requests across an outage and its own restart, and every one of the 783 points it scraped arrived once the ingress recovered, while the ingress counted the same points as refused and enqueue-failed (`logs/s4/grounding.md` §2); `vmTests.x86_64-linux.fleet-ingress`'s back-pressure case, run before any collector bump merges, is its monitor.
+
+#### Scenario: A collector bump changes the refusal or the queue
+
+- **WHEN** a collector version answers a full queue or a refusing limiter with a status its exporter treats as permanent, or loses persistent-queue items across a restart
+- **THEN** this assumption is void, and the `host-metrics-collection` requirement `Collection survives a telemetry store restart without losing the queued interval` and the `fleet-ingress-interface` requirement `otel-envelope regulates each agent from its own collector` lose the argument that the ingress's refusals are back-pressure rather than loss

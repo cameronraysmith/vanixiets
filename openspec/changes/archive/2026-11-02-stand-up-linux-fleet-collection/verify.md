@@ -35,6 +35,15 @@ If any items fail, list their id and issues:
 |---|---|---|
 | — | — | none |
 
+**At archive, 2026-11-02 (`openspec validate --all --strict`).**
+The criterion is that the archive adds no strict failure, because the repository failed `--all --strict` before the sync for reasons outside this change.
+Before the sync: 11 passed and 31 failed of 42 items.
+The 14 failing changes are `adopt-queue-landing-protocol`, `annotate-discharge-evidence`, `capi-hetzner-cluster`, `declarative-cognee-endpoint`, `deploy-omnigent-magnetite`, `filter-check-sources-for-substitution`, `k3s-nixos-vm-tests`, `path-scope-plugin-releases`, `pyrite-bluetooth-boot`, `pyrite-dankgreeter`, `pyrite-dms-session`, `sso-gateway`, `stand-up-gitea-mq-on-magnetite` and `stand-up-nixbot-on-magnetite`.
+The 17 failing specs are `agentic-workflow-routing`, `apple-laptop-hardware-support`, `bare-metal-install-path`, `encrypted-zfs-root`, `first-party-skill-distribution`, `graphical-desktop-session`, `openspec-linear-sync`, `pi-agent-environment`, `project-management-hub`, `requirements-stratification`, `satisfaction-argument-audit`, `shared-reference-tree`, `shared-reference-tree-interface`, `skill-corpus-interface`, `stratified-change-authoring`, `third-party-plugin-dependency` and `world-assumptions`.
+The first sync added two failures: spec `fleet-alerting`, whose MODIFIED `A missing signal is itself reported` had a 708-character statement, and change `watch-the-alert-path-externally`, whose MODIFIED `Grounded vocabulary for behavioral requirements` lacked main's new scenario `The terms with two senses are read`.
+By the operator's decision, the first was fixed by moving the account of the 15 minutes into a new scenario of the same requirement, `The 15 minutes are counted`, in both the delta and main, and the second by retaking that change's block from main with its three rows re-added (its `tasks.md` 6.2).
+After the archive: 11 passed and 31 failed of 42 items, with the same 31 failing items; `stand-up-linux-fleet-collection` left the list and the new spec `fleet-ingress-interface` passes.
+
 ---
 
 ## 2. Task Completion (`tasks.md`)
@@ -201,15 +210,20 @@ Apart from the `collected host` row, each finding above went to the holistic rev
 
 #### 8a.3 Archive-time row check (tasks.md 10.3)
 
-Pending; it runs at archive time:
+Run at archive time, 2026-11-02T04:01Z, before the sync:
 
 ```bash
 row() { awk '/^\| /' "$1" | grep -vE '^\| *(Term|---)' | LC_ALL=C sort -u; }
 LC_ALL=C comm -23 <(row openspec/specs/world-assumptions/spec.md) <(row openspec/changes/stand-up-linux-fleet-collection/specs/world-assumptions/spec.md)
 ```
 
-Its output is pasted here when tasks.md 10.3 runs.
-Because the delta rewrites the `collected host` row, the check will print main's `collected host` row, the one row the delta replaces on purpose rather than drops.
+Output:
+
+```text
+| collected host | — | a host whose deploy records a collector ships to the telemetry store, magnetite alone until the fleet's other collectors arrive | shared |
+```
+
+It printed exactly main's old `collected host` row, the one row the delta replaces on purpose rather than drops, and no other row, so the sync went ahead.
 
 ### 8b. Discharge coherence
 
@@ -392,7 +406,7 @@ The operator decided at about 2026-11-02T00:50Z to run them before then, over py
 - tasks.md 11.1, done at 2026-11-02T00:57:15Z beside the controls of 4.5, 5.6, 7.6, 9.2 and 9.3 (`11.1-integration-20261102T005714Z.log`, §8b).
 - The evaluator stop (`review.md` F7), done: `fleet-alert.timer` stopped at 00:55:53Z, `[FIRING] AlertEvaluatorSilent magnetite` at 01:10:00Z and `[RESOLVED]` at 01:15:00Z (`12.7-evaluator-stop-20261102T005553Z.log`, §8b).
 - pyrite's suspend (`review.md` F13), done: suspended from 01:34:23Z to 03:53:16Z and resumed cleanly (`12.7-suspend-20261102T011537Z.log`, §8b's A13 row).
-- tasks.md 10.3's `comm` output remains, at archive time (§8a.3).
+- tasks.md 10.3's `comm` output, done at archive time: exactly main's old `collected host` row (§8a.3).
 
 ---
 

@@ -98,3 +98,5 @@ projects:
         id: "7d5bccb1-9485-4630-a0c9-f1b49539db3a"
       "devloop-collection-interface":
         id: "5e606d29-7edc-4aaa-96e9-f704ab78a115"
+      "fleet-ingress-interface":
+        id: "0effd0fb-9c2e-4d8c-af6f-682fb9dc39a4"

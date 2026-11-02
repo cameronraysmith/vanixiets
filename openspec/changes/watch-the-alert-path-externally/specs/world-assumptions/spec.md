@@ -4,7 +4,6 @@
 
 The corpus SHALL provide one designation record per content term this repository's `behavioral`-stratum requirements use, recording the term, the sense in which it is used when a term carries more than one, the world phenomenon it denotes, and whether that phenomenon is world-only, shared with the machine, or machine-only.
 A term found to denote two distinct phenomena within this repository's vocabulary SHALL be recorded as two rows rather than collapsed into one.
-Twenty-one terms carry two senses in this repository today and are disambiguated below rather than left to context: `session`, `package`, `policy`, `@`, `mutation`, `activation`, `probe`, `machine`, `host`, `interface`, `repository`, `build service`, `database`, `hostname`, `evaluator`, `person`, `writer`, `account`, `build`, `path`, and `credential`.
 
 | Term | Sense | World phenomenon it denotes | Status |
 |---|---|---|---|
@@ -173,7 +172,7 @@ Twenty-one terms carry two senses in this repository today and are disambiguated
 | deploy | — | one activation, in the machine sense, of a configuration on a host, including the one each NixOS boot performs | shared |
 | deploy record | — | the entry a host writes at each deploy naming the host, the closure it activated, the closure it replaced and the time | shared |
 | closure | — | the complete built system a configuration produces for one host, identified by its store path | shared |
-| collected host | — | a host whose deploy records a collector ships to the telemetry store, magnetite alone until the fleet's other collectors arrive | shared |
+| collected host | — | a host whose deploy records a collector ships to the telemetry store: magnetite, cinnabar and pyrite, and not yet stibnite | shared |
 | error text | — | the free-form message the build service keeps when an attribute or a build fails, which can carry compiler output and repository content | shared |
 | message body | — | the free text of a log record, as distinct from the named fields parsed out of it | shared |
 | free text | — | any value whose content is not drawn from a fixed or bounded set, such as an error message or a whole log line | world-only |
@@ -184,9 +183,30 @@ Twenty-one terms carry two senses in this repository today and are disambiguated
 | event | dev-loop | one occurrence in the dev loop, such as an attribute finishing, a build finishing, a batch transition or a deploy, that one dev-loop record describes | shared |
 | field | — | one named value a dev-loop record or a source's entry carries | shared |
 | credential | service database | a password or other secret that authenticates a reader to a service's own relational database | shared |
+| agent host | — | a host of the fleet that runs a collector of its own, which gathers that host's signals and sends them on to the telemetry store | shared |
+| provisioned host | — | a host of the fleet that currently exists and runs, as opposed to one that is only configured and is created on demand | world-only |
+| ingress | — | the part of magnetite's collector that alone accepts other hosts' signals and writes them to the telemetry store | shared |
+| collection certificate | — | the credential each agent host presents to the ingress, issued by the fleet's own collection authority, without which the ingress refuses the connection | shared |
+| laptop | — | a portable host of the fleet, such as pyrite, that sleeps, travels and is powered off in ordinary use, so that its silence is not a fault | world-only |
+| file system | — | a mounted dataset of a host's storage pool, whose used and free space are signals of that host | shared |
+| disk health | — | the condition a physical disk reports about itself, such as a critical warning, its wear, its spare capacity and its media errors | shared |
+| back-pressure | — | the ingress refusing signals for a while because it cannot pass them on, which the sending collector answers by keeping them and trying again | shared |
+| notifier instance | — | one run of the notifier for one failed unit on one host, which the host's supervisor records as a unit of its own | shared |
+| identifier | collector start | a value the collector's signals about itself carry that differs at each start of the collector | shared |
+| owner | — | the person an Omnigent worker runs for, whose name the worker's unit name carries | world-only |
+| collection | — | a collector's continuing gathering of its host's signals | shared |
+| job | — | a unit that runs to completion each time it is started, by a timer or by another unit's failure, such as a regulator or the notifier | shared |
+| expected host | — | for one alert rule, a host from which the fleet expects its signal: every collecting host, or for the disk-health rules each collecting host with a disk-health source | shared |
+| silent | — | of a host or a job, having sent nothing it is expected to send for a stated time: a host no memory signal, the evaluator no heartbeat | shared |
+| day | — | a UTC calendar day, the period the reconcile compares | shared |
 | watch service | — | a monitoring service run by a third party outside the fleet, healthchecks.io, that expects a ping from the dead-man at a set period and emails the operator when one is late | world-only |
 | ping | — | the request the dead-man sends the watch service at the end of a run in which it found the path working, which the watch service counts as the dead-man being alive | shared |
 | email | — | a message the watch service sends to the operator's mailbox, delivered by a mail provider that runs on no host of the fleet | world-only |
+
+#### Scenario: The terms with two senses are read
+
+- **WHEN** the table is read for terms that carry two senses in this repository
+- **THEN** twenty-two terms carry two senses today and are disambiguated by separate rows rather than left to context: `session`, `package`, `policy`, `@`, `mutation`, `activation`, `probe`, `machine`, `host`, `interface`, `repository`, `build service`, `database`, `hostname`, `evaluator`, `person`, `writer`, `account`, `build`, `path`, `credential`, and `identifier`
 
 #### Scenario: A term resolves to two phenomena
 
