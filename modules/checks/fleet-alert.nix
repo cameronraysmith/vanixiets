@@ -2,7 +2,7 @@
 # D11, D13-D16, D19; tasks.md 4.5, 4.6; stand-up-devloop-collection design
 # D17, tasks.md 5.1, 5.3-5.5).
 #
-# Three parts, each a derivation in passthru so it can be built alone:
+# Five parts, each a derivation in passthru so it can be built alone:
 # - promtoolRehearsal: `promtool check rules` over the YAML rendered from
 #   modules/nixos/fleet-alert/rules.nix, and a malformed-expression mutant
 #   that promtool must reject.
@@ -28,6 +28,15 @@
 #   Hypothesis timelines over two databases, holds both to leaving fleet's
 #   posts unchanged by a devloop failure (stand-up-devloop-collection
 #   review F7), and must fail on the no-re-post mutant.
+# - deadmanPingRehearsal (R9.6; CAM-76 design D7): the dead-man, built with
+#   flake.lib.fleetDeadmanPing, runs against fleet-alert/ntfy_stub.py and
+#   fleet-alert/ping_stub.py, which share one request log; each leg compares
+#   the recorded requests with the expectation it writes, and the mutants
+#   deadmanPingFirst, deadmanPingNoHeartbeat, deadmanPingBeforePosts,
+#   pingAcceptsAny200 and pingPrintsConfig must each fail a named leg.
+# - pingTransport (CAM-76 design D5): flake.lib.fleetDeadmanPing built with a
+#   recording curl must read the ping URL on stdin and put it on no argv,
+#   and the mutant pingOnArgv, which passes the URL as an argument, must fail.
 #
 # Relations within one host are assertions where the units are declared,
 # which CI already pays for when it evaluates the host (S1 review F5, S3
@@ -315,6 +324,299 @@
             grep -qF "FAIL: an anonymous publish answered 200 exited 0" mutant.log \
               || { cat mutant.log; echo "FAIL: the probe mutant failed for another reason" >&2; exit 1; }
             echo "ok: the probe mutant is rejected"
+            touch "$out"
+          '';
+
+      # R9.6 (CAM-76, design D7): the dead-man with its external ping, against
+      # the ntfy stand-in and a ping stand-in. The legs compare the stand-ins'
+      # recorded requests with the expectations written here.
+      pingExe = lib.getExe (self.lib.fleetDeadmanPing pkgs { });
+      deadmanPinged = self.lib.fleetAlertDeadman pkgs {
+        ntfySend = lib.getExe ntfySendStub;
+        ping = pingExe;
+      };
+      pingUuid = "5bf66975-d4c7-4bf5-bcc8-b8d8a82ea278";
+
+      deadmanPingLegs = pkgs.writeShellScript "fleet-deadman-ping-legs" ''
+        set -euo pipefail
+        deadman="$1"
+        work=$(mktemp -d)
+        export FLEET_ALERT_POSTS="$work/posts" NTFY_TOKEN_FILE="${fixtureCredentials}/alerter-token"
+        touch "$FLEET_ALERT_POSTS"
+        hb_topic=$(jq -er .heartbeatTopic ${deadmanConfigFile})
+        empty="$work/empty.jsonl"
+        : > "$empty"
+        heartbeat="$work/heartbeat.jsonl"
+        jq -nc --arg t "$hb_topic" '{id: "hb1", time: 1000, expires: 44200, event: "message", topic: $t, message: "ok 1000", priority: 1}' > "$heartbeat"
+
+        pids=()
+        stop_stubs() {
+          for p in "''${pids[@]}"; do kill "$p" 2>/dev/null || true; wait "$p" 2>/dev/null || true; done
+          pids=()
+        }
+        trap stop_stubs EXIT
+        fail() {
+          echo "FAIL: $*" >&2
+          sed 's/^/  request: /' "$work/requests" >&2 || true
+          sed 's/^/  out: /' "$work/out" >&2 || true
+          exit 1
+        }
+        reset() {
+          rm -f "$work/state.json"
+          : > "$FLEET_ALERT_POSTS"
+        }
+        wait_port() {
+          for _ in $(seq 100); do [ -s "$1" ] && return 0; sleep 0.1; done
+          fail "a stand-in did not start"
+        }
+        # run PROBE|closed POLL_STATUS POLL_BODY NOW [POST_STATUS] [ANSWER] [PING_URL]:
+        # one dead-man run with its ping; exit status in $code. Both stand-ins
+        # log to $work/requests, so a leg sees the order of probe, poll and ping.
+        run() {
+          local url ping_url
+          : > "$work/requests"
+          rm -f "$work/ntfy-port" "$work/ping-port"
+          if [ "$1" = closed ]; then
+            url=http://127.0.0.1:9
+          else
+            python3 ${./fleet-alert/ntfy_stub.py} --topic "$hb_topic" --probe-status "$1" --poll-status "$2" \
+              --poll-body "$3" --port-file "$work/ntfy-port" --log "$work/requests" &
+            pids+=($!)
+            wait_port "$work/ntfy-port"
+            url="http://127.0.0.1:$(cat "$work/ntfy-port")"
+          fi
+          python3 ${./fleet-alert/ping_stub.py} --answer "''${6:-OK}" --port-file "$work/ping-port" --log "$work/requests" &
+          pids+=($!)
+          wait_port "$work/ping-port"
+          if [ -n "''${7:-}" ]; then
+            ping_url="$7"
+          else
+            ping_url="http://127.0.0.1:$(cat "$work/ping-port")/${pingUuid}"
+          fi
+          printf 'url = "%s"\n' "$ping_url" > "$work/ping.conf"
+          jq --arg url "$url" --arg state "$work/state.json" '.ntfyUrl = $url | .stateFile = $state' \
+            ${deadmanConfigFile} > "$work/config.json"
+          code=0
+          FLEET_DEADMAN_CONFIG="$work/config.json" FLEET_DEADMAN_PING_CONFIG="$work/ping.conf" \
+            FLEET_ALERT_NOW="$4" FLEET_ALERT_POST_STATUS="''${5:-0}" \
+            "$deadman" > "$work/out" 2>&1 || code=$?
+          stop_stubs
+          sed 's/^/    /' "$work/out"
+        }
+        # The ping stand-in's lines are the only ones with "body=".
+        pings() { grep -c ' body=' "$work/requests" || true; }
+
+        # The failing legs come first, so a dead-man that pings before its
+        # probe is caught by a probe leg rather than by the passing leg.
+        for status in 200 500 closed; do
+          reset
+          run "$status" 200 "$heartbeat" 1000
+          [ "$code" != 0 ] || fail "a probe answered $status exited 0"
+          [ "$(pings)" = 0 ] || fail "a probe answered $status pinged"
+          echo "ok: a probe answered $status sends no ping"
+        done
+
+        reset
+        run 403 500 "$heartbeat" 1000
+        [ "$code" != 0 ] || fail "a failed poll exited 0"
+        [ "$(pings)" = 0 ] || fail "a failed poll pinged"
+        echo "ok: a failed poll sends no ping"
+
+        reset
+        run 403 200 "$heartbeat" 1000
+        [ "$code" = 0 ] || fail "a passing run: exit $code"
+        [ "$(pings)" = 1 ] || fail "a passing run did not ping exactly once"
+        printf '%s\n' "POST /fleet-heartbeat? auth=no" "GET /fleet-heartbeat/json?poll=1&since=10m auth=no" "GET /${pingUuid} body=0" > "$work/expected"
+        cmp -s "$work/requests" "$work/expected" || fail "a passing run: the requests are not the probe, the poll and one ping to the configured path, in that order"
+        grep -qxF "fleet-deadman: external ping accepted" "$work/out" || fail "a passing run: no accepted line"
+        echo "ok: a passing run with a heartbeat pings once"
+
+        reset
+        run 403 200 "$empty" 1000
+        [ "$code" = 0 ] || fail "an empty window: exit $code"
+        [ "$(jq -s length "$FLEET_ALERT_POSTS")" = 1 ] || fail "an empty window did not post one FIRING"
+        [ "$(pings)" = 0 ] || fail "an empty window pinged"
+        grep -qF "no external ping" "$work/out" || fail "an empty window: no no-ping line"
+        echo "ok: an empty window posts one FIRING and sends no ping"
+
+        # The FIRING above is in the state, its absenceFrom 1000. A heartbeat
+        # run before 300 s have passed has nothing to post and pings; the run
+        # at 1300 has the RESOLVED due (transition.jq resolve_after), its post
+        # fails, and that run must fail without pinging.
+        run 403 200 "$heartbeat" 1100
+        [ "$code" = 0 ] && [ "$(pings)" = 1 ] || fail "heartbeat back with nothing to post: expected exit 0 and one ping"
+        run 403 200 "$heartbeat" 1300 1
+        [ "$code" != 0 ] || fail "the RESOLVED post never came due"
+        [ "$(pings)" = 0 ] || fail "a failed post pinged"
+        echo "ok: a failed post sends no ping"
+
+        reset
+        run 403 200 "$heartbeat" 1000 0 "OK (not found)"
+        [ "$code" != 0 ] || fail "an unknown check answered OK (not found) exited 0"
+        grep -qF "answered 'OK (not found)', expected OK" "$work/out" || fail "an unknown check: no answer line"
+        if grep -qF "${pingUuid}" "$work/out"; then fail "an unknown check: the URL was printed"; fi
+        echo "ok: an unknown check fails the run without printing the URL"
+
+        # The ping's egress fails: curl cannot connect (port 9 is closed, as in
+        # the probe-closed leg), the run fails, and the URL stays unprinted.
+        reset
+        run 403 200 "$heartbeat" 1000 0 OK "http://127.0.0.1:9/${pingUuid}"
+        [ "$code" != 0 ] || fail "an unreachable ping exited 0"
+        grep -qxF "fleet-deadman: external ping failed" "$work/out" || fail "an unreachable ping: no failure line"
+        if grep -qF "${pingUuid}" "$work/out"; then fail "an unreachable ping: the URL was printed"; fi
+        echo "ok: an unreachable ping fails the run without printing the URL"
+      '';
+
+      deadmanPingRehearsal =
+        pkgs.runCommand "fleet-deadman-ping-rehearsal"
+          {
+            nativeBuildInputs = [
+              pkgs.coreutils
+              pkgs.diffutils
+              pkgs.gnugrep
+              pkgs.gnused
+              pkgs.jq
+              pkgs.python3
+            ];
+            meta.description = "behavioural check: the dead-man pings the external check only after a passing run with a heartbeat";
+          }
+          ''
+            ${deadmanPingLegs} ${lib.getExe deadmanPinged}
+            if ${deadmanPingLegs} ${deadmanPingFirst}/bin/fleet-deadman > first.log 2>&1; then
+              cat first.log; echo "FAIL: the legs accepted a dead-man that pings before its probe" >&2; exit 1
+            fi
+            grep -qF "FAIL: a probe answered 200 pinged" first.log \
+              || { cat first.log; echo "FAIL: deadmanPingFirst failed for another reason" >&2; exit 1; }
+            echo "mutant deadmanPingFirst rejected"
+            if ${deadmanPingLegs} ${lib.getExe deadmanPingAny200} > any200.log 2>&1; then
+              cat any200.log; echo "FAIL: the legs accepted a ping step that accepts any 200" >&2; exit 1
+            fi
+            grep -qF "FAIL: an unknown check answered OK (not found) exited 0" any200.log \
+              || { cat any200.log; echo "FAIL: pingAcceptsAny200 failed for another reason" >&2; exit 1; }
+            echo "mutant pingAcceptsAny200 rejected"
+            if ${deadmanPingLegs} ${deadmanPingNoHeartbeat}/bin/fleet-deadman > nohb.log 2>&1; then
+              cat nohb.log; echo "FAIL: the legs accepted a dead-man that pings without a heartbeat" >&2; exit 1
+            fi
+            grep -qF "FAIL: an empty window pinged" nohb.log \
+              || { cat nohb.log; echo "FAIL: deadmanPingNoHeartbeat failed for another reason" >&2; exit 1; }
+            echo "mutant deadmanPingNoHeartbeat rejected"
+            if ${deadmanPingLegs} ${deadmanPingBeforePosts}/bin/fleet-deadman > beforeposts.log 2>&1; then
+              cat beforeposts.log; echo "FAIL: the legs accepted a dead-man that pings before its posts" >&2; exit 1
+            fi
+            grep -qF "FAIL: a failed post pinged" beforeposts.log \
+              || { cat beforeposts.log; echo "FAIL: deadmanPingBeforePosts failed for another reason" >&2; exit 1; }
+            echo "mutant deadmanPingBeforePosts rejected"
+            if ${deadmanPingLegs} ${lib.getExe deadmanPingPrints} > prints.log 2>&1; then
+              cat prints.log; echo "FAIL: the legs accepted a ping step that prints its configuration" >&2; exit 1
+            fi
+            grep -qF "FAIL: an unknown check: the URL was printed" prints.log \
+              || { cat prints.log; echo "FAIL: pingPrintsConfig failed for another reason" >&2; exit 1; }
+            echo "mutant pingPrintsConfig rejected"
+            touch "$out"
+          '';
+
+      # A dead-man that pings before its probe: rejected by the probe legs.
+      deadmanPingFirst = pkgs.runCommand "fleet-deadman-ping-first" { } ''
+        mkdir -p "$out/bin"
+        cp ${lib.getExe deadmanPinged} "$out/bin/fleet-deadman"
+        chmod +w "$out/bin/fleet-deadman"
+        substituteInPlace "$out/bin/fleet-deadman" \
+          --replace-fail 'config="''${FLEET_DEADMAN_CONFIG:?}"' 'config="''${FLEET_DEADMAN_CONFIG:?}"; ${pingExe}'
+      '';
+      # A ping step that accepts any 200 body: rejected by the unknown-check leg.
+      pingAcceptsAny200 = pkgs.runCommand "fleet-deadman-ping-any-200" { } ''
+        mkdir -p "$out/bin"
+        cp ${pingExe} "$out/bin/fleet-deadman-ping"
+        chmod +w "$out/bin/fleet-deadman-ping"
+        substituteInPlace "$out/bin/fleet-deadman-ping" \
+          --replace-fail '[ "$answer" != OK ]' '[ -z "$answer" ]'
+      '';
+      deadmanPingAny200 = self.lib.fleetAlertDeadman pkgs {
+        ntfySend = lib.getExe ntfySendStub;
+        ping = "${pingAcceptsAny200}/bin/fleet-deadman-ping";
+      };
+      # A dead-man that pings without a heartbeat: rejected by the empty-window leg.
+      deadmanPingNoHeartbeat = pkgs.runCommand "fleet-deadman-ping-no-heartbeat" { } ''
+        mkdir -p "$out/bin"
+        cp ${lib.getExe deadmanPinged} "$out/bin/fleet-deadman"
+        chmod +w "$out/bin/fleet-deadman"
+        substituteInPlace "$out/bin/fleet-deadman" \
+          --replace-fail 'if [ "$heartbeats" -gt 0 ]; then' 'if true; then'
+      '';
+      # A dead-man that pings before its post loop: rejected by the failed-post
+      # leg. The two replacements run in this order; a mutant that only inserts
+      # an early ping is caught at the passing leg as a double ping instead.
+      deadmanPingBeforePosts = pkgs.runCommand "fleet-deadman-ping-before-posts" { } ''
+        mkdir -p "$out/bin"
+        cp ${lib.getExe deadmanPinged} "$out/bin/fleet-deadman"
+        chmod +w "$out/bin/fleet-deadman"
+        substituteInPlace "$out/bin/fleet-deadman" \
+          --replace-fail 'if [ "$heartbeats" -gt 0 ]; then' 'if false; then' \
+          --replace-fail 'while IFS= read -r post; do' 'if [ "$heartbeats" -gt 0 ]; then ${pingExe}; fi; while IFS= read -r post; do'
+      '';
+      # A ping step whose failure line prints its configuration, and so the
+      # URL: rejected by the unknown-check leg.
+      pingPrintsConfig = pkgs.runCommand "fleet-deadman-ping-prints-config" { } ''
+        mkdir -p "$out/bin"
+        cp ${pingExe} "$out/bin/fleet-deadman-ping"
+        chmod +w "$out/bin/fleet-deadman-ping"
+        substituteInPlace "$out/bin/fleet-deadman-ping" \
+          --replace-fail "expected OK\" >&2" "expected OK \$(cat \"\$config\")\" >&2"
+      '';
+      deadmanPingPrints = self.lib.fleetAlertDeadman pkgs {
+        ntfySend = lib.getExe ntfySendStub;
+        ping = "${pingPrintsConfig}/bin/fleet-deadman-ping";
+      };
+
+      # The ping URL reaches curl only on stdin (design D5): the step built
+      # with a curl stub that records its argv and stdin and answers OK.
+      recordingCurl = pkgs.writeShellScript "recording-curl" ''
+        printf '%s\n' "$@" > "$REC/argv"
+        cat > "$REC/stdin"
+        printf OK
+      '';
+      pingRecorded = self.lib.fleetDeadmanPing pkgs { curl = "${recordingCurl}"; };
+      pingOnArgv = pkgs.runCommand "fleet-deadman-ping-on-argv" { } ''
+        mkdir -p "$out/bin"
+        cp ${lib.getExe pingRecorded} "$out/bin/fleet-deadman-ping"
+        chmod +w "$out/bin/fleet-deadman-ping"
+        substituteInPlace "$out/bin/fleet-deadman-ping" \
+          --replace-fail '-K - < "$config"' '"$(sed -n '"'"'s/^url = "\(.*\)"$/\1/p'"'"' "$config")" < /dev/null'
+      '';
+      pingTransportCases = pkgs.writeShellScript "fleet-deadman-ping-transport-cases" ''
+        set -uo pipefail
+        step="$1"
+        work=$(mktemp -d)
+        url="https://hc-ping.com/${pingUuid}"
+        printf 'url = "%s"\n' "$url" > "$work/ping.conf"
+        REC=$(mktemp -d)
+        export REC
+        out=$(FLEET_DEADMAN_PING_CONFIG="$work/ping.conf" "$step" 2>&1) || { echo "FAIL: exit $?: $out"; exit 1; }
+        if grep -qF "$url" "$REC/argv"; then echo "FAIL: the URL is on curl's argv"; exit 1; fi
+        cmp -s "$REC/stdin" "$work/ping.conf" || { echo "FAIL: stdin is not the configuration file"; exit 1; }
+        [ "$out" = "fleet-deadman: external ping accepted" ] || { echo "FAIL: output: $out"; exit 1; }
+        echo "ok: the URL on stdin and on no argv"
+      '';
+      pingTransport =
+        pkgs.runCommand "fleet-deadman-ping-transport"
+          {
+            nativeBuildInputs = [
+              pkgs.coreutils
+              pkgs.diffutils
+              pkgs.gnugrep
+              pkgs.gnused
+            ];
+          }
+          ''
+            ${pingTransportCases} ${lib.getExe pingRecorded}
+            if ${pingTransportCases} ${pingOnArgv}/bin/fleet-deadman-ping > mutant.log 2>&1; then
+              cat mutant.log
+              echo "FAIL: the mutant passing the URL on argv was accepted" >&2
+              exit 1
+            fi
+            grep -qF "FAIL: the URL is on curl's argv" mutant.log \
+              || { cat mutant.log; echo "FAIL: the argv mutant failed for another reason" >&2; exit 1; }
+            echo "mutant passing the URL on argv rejected"
             touch "$out"
           '';
 
@@ -1567,6 +1869,8 @@
                   fixtureRehearsal
                   propertyRehearsal
                   deadmanRehearsal
+                  deadmanPingRehearsal
+                  pingTransport
                   deadmanClause
                   ;
               };
@@ -1577,6 +1881,8 @@
               test -e ${fixtureRehearsal}
               test -e ${propertyRehearsal}
               test -e ${deadmanRehearsal}
+              test -e ${deadmanPingRehearsal}
+              test -e ${pingTransport}
               test -e ${deadmanClause}
               touch "$out"
             '';

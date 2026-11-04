@@ -444,6 +444,32 @@ let
     in
     if ordered == [ ] then null else (builtins.head ordered).permission;
 
+  # The external watch's ping (CAM-76, design D4, D5): one request to the
+  # healthchecks.io URL that the curl configuration at
+  # FLEET_DEADMAN_PING_CONFIG holds, read by curl on stdin so the URL, a
+  # bearer credential, is on no argv. healthchecks.io answers 200 for an
+  # unknown or rate-limited check too, so only the body "OK" counts.
+  fleetDeadmanPing =
+    pkgs:
+    {
+      curl ? lib.getExe pkgs.curl,
+    }:
+    pkgs.writeShellApplication {
+      name = "fleet-deadman-ping";
+      text = ''
+        config="''${FLEET_DEADMAN_PING_CONFIG:?}"
+        if ! answer=$(${curl} -sS --max-time 10 --retry 2 -K - < "$config"); then
+          echo "fleet-deadman: external ping failed" >&2
+          exit 1
+        fi
+        if [ "$answer" != OK ]; then
+          echo "fleet-deadman: external ping answered '$answer', expected OK" >&2
+          exit 1
+        fi
+        echo "fleet-deadman: external ping accepted"
+      '';
+    };
+
   # The dead-man (design D12, "Failure path"; ADR-009 item 9, R9.4), a
   # function so checks.x86_64-linux.fleet-alert runs it against a loopback
   # ntfy stand-in and a recording ntfy-send. Configuration comes from the
@@ -454,6 +480,7 @@ let
     pkgs:
     {
       ntfySend,
+      ping ? null,
       transition ? transitionJq,
     }:
     pkgs.writeShellApplication {
@@ -531,12 +558,30 @@ let
           state=$(jq -c -L "$jqlib" --argjson post "$post" 'include "transition"; mark_posted($post)' <<< "$state")
           write_state
         done <<< "$(jq -c '.posts[]' <<< "$result")"
+      ''
+      # Appended rather than interpolated, so a dead-man without ping keeps
+      # the script, and every deployed configuration, byte-identical.
+      + lib.optionalString (ping != null) ''
+        # The external watch (CAM-76, design D2): the run's last step, so a
+        # failed probe, poll or post has already exited non-zero; and only
+        # with a heartbeat in the window, so the check stays down while the
+        # path from magnetite is broken (O4).
+        if [ "$heartbeats" -gt 0 ]; then
+          ${ping}
+        else
+          echo "fleet-deadman: no heartbeat in the last $window; no external ping"
+        fi
       '';
     };
 in
 {
   flake.lib = {
-    inherit fleetAlertEvaluator fleetAlertDeadman fleetAlertDeadmanConfig;
+    inherit
+      fleetAlertEvaluator
+      fleetAlertDeadman
+      fleetAlertDeadmanConfig
+      fleetDeadmanPing
+      ;
   };
 
   flake.modules.nixos.fleet-alert =
@@ -619,7 +664,14 @@ in
       evaluator = fleetAlertEvaluator pkgs { ntfySend = lib.getExe pkgs.ntfy-send; };
       unit = config.systemd.services.fleet-alert.serviceConfig;
 
-      deadman = fleetAlertDeadman pkgs { ntfySend = lib.getExe pkgs.ntfy-send; };
+      deadman = fleetAlertDeadman pkgs (
+        {
+          ntfySend = lib.getExe pkgs.ntfy-send;
+        }
+        // lib.optionalAttrs (cfg.deadman.pingConfigFile != null) {
+          ping = lib.getExe (fleetDeadmanPing pkgs { });
+        }
+      );
       deadmanConfig = pkgs.writeText "fleet-deadman.json" (
         builtins.toJSON (fleetAlertDeadmanConfig {
           inherit (cfg.deadman) ntfyUrl topic evaluatorHost;
@@ -707,6 +759,16 @@ in
           type = lib.types.str;
           default = defaults.evaluatorHost;
           description = "host_name the AlertEvaluatorSilent instance carries: the host whose evaluator posts the heartbeat.";
+        };
+        pingConfigFile = lib.mkOption {
+          type = lib.types.nullOr lib.types.str;
+          default = null;
+          description = ''
+            Path of a curl configuration file holding `url = "<healthchecks.io ping URL>"`,
+            loaded through LoadCredential as external-ping. When set, a run that passes
+            with a heartbeat in its window pings that URL as its last step (CAM-76).
+            A string, never a Nix path, so the URL never enters the store.
+          '';
         };
       };
 
@@ -803,6 +865,11 @@ in
               assertion = lib.all (t: anonymous t == null) hostTopics;
               message = "fleet-alert: an entry of ntfy's auth-access ${builtins.toJSON access} decides a host-named topic of ${builtins.toJSON hostTopics}.";
             }
+            {
+              assertion =
+                cfg.deadman.pingConfigFile == null || !lib.hasPrefix builtins.storeDir cfg.deadman.pingConfigFile;
+              message = "fleet-alert: deadman.pingConfigFile is under the Nix store (${toString cfg.deadman.pingConfigFile}); the ping URL is a credential and must come from a secret file.";
+            }
           ];
 
           systemd.services.fleet-deadman = {
@@ -819,13 +886,19 @@ in
             environment = {
               FLEET_DEADMAN_CONFIG = "${deadmanConfig}";
               NTFY_TOKEN_FILE = "%d/alerter-token";
+            }
+            // lib.optionalAttrs (cfg.deadman.pingConfigFile != null) {
+              FLEET_DEADMAN_PING_CONFIG = "%d/external-ping";
             };
             serviceConfig = hardening // {
               Type = "oneshot";
               ExecStart = lib.getExe deadman;
               DynamicUser = true;
               StateDirectory = "fleet-deadman";
-              LoadCredential = [ "alerter-token:${cfg.deadman.tokenFile}" ];
+              LoadCredential = [
+                "alerter-token:${cfg.deadman.tokenFile}"
+              ]
+              ++ lib.optional (cfg.deadman.pingConfigFile != null) "external-ping:${cfg.deadman.pingConfigFile}";
             };
           };
 

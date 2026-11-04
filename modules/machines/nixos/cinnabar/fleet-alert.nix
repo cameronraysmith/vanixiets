@@ -5,7 +5,12 @@
 # flake.lib.observabilityHosts.
 {
   flake.modules.nixos."machines/nixos/cinnabar" =
-    { config, lib, ... }:
+    {
+      config,
+      lib,
+      pkgs,
+      ...
+    }:
     let
       alerterToken = config.clan.core.vars.generators.ntfy-alerter.files.token.path;
       deadmanUnit = config.systemd.services.fleet-deadman;
@@ -25,6 +30,40 @@
         enable = true;
         tokenFile = alerterToken;
       };
+
+      # The external watch's ping URL (CAM-76, design D5): a bearer
+      # credential, entered once by the operator at a hidden prompt, kept as
+      # a curl configuration that fleet-deadman loads as external-ping and
+      # curl reads on stdin.
+      clan.core.vars.generators.fleet-deadman-ping = {
+        prompts.ping-url = {
+          description = ''
+            healthchecks.io ping URL of the check that watches fleet-deadman,
+            in its UUID form https://hc-ping.com/<uuid>. Anyone holding it can
+            keep the check up, so it is entered here and nowhere else.
+          '';
+          type = "hidden";
+          persist = true;
+          display = {
+            group = "fleet-alert";
+            label = "healthchecks.io ping URL";
+          };
+        };
+        files.ping-url.deploy = false;
+        files.curl-config = { };
+        runtimeInputs = [ pkgs.gnugrep ];
+        script = ''
+          url=$(cat "$prompts/ping-url")
+          if ! printf '%s' "$url" | grep -Eqx 'https://hc-ping\.com/[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}'; then
+            echo "fleet-deadman-ping: the value is not a healthchecks.io ping URL of the form https://hc-ping.com/<uuid>" >&2
+            exit 1
+          fi
+          printf 'url = "%s"\n' "$url" > "$out/curl-config"
+        '';
+      };
+
+      services.fleet-alert.deadman.pingConfigFile =
+        config.clan.core.vars.generators.fleet-deadman-ping.files.curl-config.path;
 
       # Design D12: ordered after every unit on its path, and never starting
       # one, so a boot neither probes a half-started path nor starts a unit

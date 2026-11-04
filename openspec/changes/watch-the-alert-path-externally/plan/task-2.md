@@ -3,7 +3,7 @@
 Implements `tasks.md` 2.1–2.5 (design D2, D4, D5, D7, D8; FAI `The dead-man pings the watch service only after a passing run`, `The ping URL travels only as a credential read on stdin`, `The rule check runs promtool, fixture mutants and a property test`; FA `An outage of the alert path reaches the operator by email from outside the fleet`).
 This is the first part of pull request 1.
 The legs (Step 1) and the transport test (Step 2) are written first and seen failing; the ping step (Step 3) and the dead-man's call (Step 4) make them pass; the option and its assertion follow (Step 5).
-No host sets the option in this task, so no deployed configuration changes; Step 5 observes this by comparing cinnabar's toplevel `drvPath` with its base's.
+No host sets the option in this task, so no deployed configuration changes; Step 5 observes this by comparing cinnabar's `fleet-deadman` unit `drvPath` and script store path with its base's.
 
 **Files:**
 - Create: `modules/checks/fleet-alert/ping_stub.py`
@@ -66,6 +66,7 @@ server.serve_forever()
 ```
 
 In `modules/checks/fleet-alert.nix`'s header comment, change "Three parts, each a derivation in passthru" to "Four parts, each a derivation in passthru" and add after the `propertyRehearsal` bullet:
+The count covers the bulleted parts; `deadmanRehearsal` and `deadmanClause` stay in the paragraph after the bullets, which names them as its "two dead-man parts".
 
 ```nix
 # - deadmanPingRehearsal (R9.6; CAM-76 design D7): the dead-man, built with
@@ -370,21 +371,27 @@ Give `fleetAlertDeadman` the argument `ping ? null`:
     }:
 ```
 
-and append to its `text`, after the post loop's `done <<< …` line:
+and append the ping block to its `text`, after the post loop's `done <<< …` line, by closing the string and adding a second one:
 
 ```nix
-        ${lib.optionalString (ping != null) ''
-          # The external watch (CAM-76, design D2): the run's last step, so a
-          # failed probe, poll or post has already exited non-zero; and only
-          # with a heartbeat in the window, so the check stays down while the
-          # path from magnetite is broken (O4).
-          if [ "$heartbeats" -gt 0 ]; then
-            ${ping}
-          else
-            echo "fleet-deadman: no heartbeat in the last $window; no external ping"
-          fi
-        ''}
+        done <<< "$(jq -c '.posts[]' <<< "$result")"
+      ''
+      # Appended rather than interpolated, so a dead-man without ping keeps
+      # the script, and every deployed configuration, byte-identical.
+      + lib.optionalString (ping != null) ''
+        # The external watch (CAM-76, design D2): the run's last step, so a
+        # failed probe, poll or post has already exited non-zero; and only
+        # with a heartbeat in the window, so the check stays down while the
+        # path from magnetite is broken (O4).
+        if [ "$heartbeats" -gt 0 ]; then
+          ${ping}
+        else
+          echo "fleet-deadman: no heartbeat in the last $window; no external ping"
+        fi
+      '';
 ```
+
+An interpolated `${lib.optionalString (ping != null) ''…''}` on its own line leaves a trailing empty line in the script when `ping` is null, which changed cinnabar's `fleet-deadman` derivation; appended, a dead-man without ping keeps main's script byte-identical.
 
 Then add the five mutants after `deadmanPingRehearsal`'s definition and run them inside it:
 
@@ -548,7 +555,7 @@ and in `systemd.services.fleet-deadman`:
               ++ lib.optional (cfg.deadman.pingConfigFile != null) "external-ping:${cfg.deadman.pingConfigFile}";
 ```
 
-Show the assertion failing, then cinnabar unmodified evaluating:
+Show the assertion failing, then cinnabar unmodified evaluating, then its dead-man unchanged:
 
 ```bash
 L=logs/cam76-evidence/2.5-store-path-$(/bin/date -u +%Y%m%dT%H%M%SZ).log
@@ -562,10 +569,15 @@ nix eval --impure --raw --expr '
 nix eval --raw .#nixosConfigurations.cinnabar.config.system.build.toplevel.drvPath 2>&1 | sed 's/^/change toplevel: /' | tee -a "$L"
 base=$(git rev-parse origin/main)
 echo "base: $base" | tee -a "$L"
-nix eval --raw "git+file://$PWD?rev=$base#nixosConfigurations.cinnabar.config.system.build.toplevel.drvPath" 2>&1 | sed 's/^/base toplevel: /' | tee -a "$L"
-nix eval --raw .#checks.x86_64-linux.nixos-cinnabar.drvPath 2>&1 | sed 's/^/change nixos-cinnabar: /' | tee -a "$L"
+for a in 'systemd.units."fleet-deadman.service".unit.drvPath' 'systemd.services.fleet-deadman.serviceConfig.ExecStart'; do
+  for ref in "git+file://$PWD?rev=$base" .; do
+    printf '%s %s: ' "$ref" "$a" | tee -a "$L"
+    nix eval --raw "$ref#nixosConfigurations.cinnabar.config.$a" 2>/dev/null | tee -a "$L"
+    echo | tee -a "$L"
+  done
+done
 ```
 
-Expected: the first prints the assertion's message (the override fails evaluation); the change's and the base's toplevel `drvPath` are equal, which shows that no deployed configuration changes while no host sets the option.
-When the base is still `79d5cee3dcdc330fe996f80f9d6a6292bcb438a9`, the change's `nixos-cinnabar` `drvPath` equals 1.2's, `/nix/store/pa9lmfsc8q3axvjicq986z5lca3fy2m4-nixos-system-cinnabar-26.11.20261023.3a32588.drv`; otherwise the log states that the base moved and that comparison is skipped.
+Expected: the first prints the assertion's message (the override fails evaluation); the change's toplevel evaluates; the `fleet-deadman` unit's `drvPath` and its `ExecStart` script are equal at the base and at the change, which shows that no deployed configuration changes while no host sets the option.
+The toplevels are not compared: every toplevel embeds the flake's source store path through the sops manifests, so any edit to the repository changes it.
 Commit Steps 1 to 5 as one change, `Ping an external heartbeat check from the alert dead-man when configured`, after `nix fmt`.
