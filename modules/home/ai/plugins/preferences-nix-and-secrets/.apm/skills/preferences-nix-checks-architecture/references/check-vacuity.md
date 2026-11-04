@@ -91,6 +91,15 @@ The replacement is to gate the check to one system, after confirming that its in
 The opposite error is not a fix: a check whose derivation genuinely differs per platform, such as a package, a dev shell, or a platform-gated module branch, stays on every system it can fail on.
 "System gating" in the parent skill states both directions.
 
+## Iterating over what was found
+
+The smell is a regulator clause that judges whatever series, files, or units it happens to find, rather than the set the configuration declares.
+When a declared member emits nothing, the clause has nothing to iterate over and passes, so the absence it should report is the condition under which it goes quiet.
+`otel-envelope`'s exporter queue-size clause passed when no queue-size series existed, because it judged only the series it found.
+
+The replacement renders the judged set from the evaluated configuration, such as the configured exporters, targets, or hosts, and has the clause iterate over that set, failing on any member with no observation.
+This is the permissive scanner's fail-closed rule applied to a declared set: an empty or partial observation is a failure, not a pass.
+
 ## The single test
 
 Every pattern above is an instance of one question, the severity criterion from `preferences-validation-assurance` applied to the check itself.

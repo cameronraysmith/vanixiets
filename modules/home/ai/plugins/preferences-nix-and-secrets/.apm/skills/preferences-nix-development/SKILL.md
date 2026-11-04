@@ -205,6 +205,10 @@ home-manager modules target user-level configuration through `home.file`, `home.
 All three share the module system primitives (`mkOption`, `mkIf`, `mkMerge`, `mkDefault`, `mkForce`) and compose identically.
 The difference is the set of available option namespaces, not the module authoring mechanics.
 
+Every repeating systemd calendar (`OnCalendar`, `startAt`) names its time zone, for example `*:0/5 UTC`, and a module `assertions` entry holds that every such timer in the configuration does.
+A calendar without a zone follows local time, so a daylight-saving change can skip an hour of runs, and review by eye does not stop the next timer from omitting the zone.
+On nix-darwin, a launchd `StartCalendarInterval` job has no zone field and runs on local time, so its module states how it behaves across a clock change.
+
 ### Testing modules
 
 `lib.evalModules` evaluates a module set without building a full system, producing the merged `config` attribute set for inspection.

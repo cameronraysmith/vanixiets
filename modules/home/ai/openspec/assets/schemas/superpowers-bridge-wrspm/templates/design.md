@@ -40,6 +40,9 @@ Format: [Risk] <description> → Mitigation: <mitigation measure>
 
 <!--
 Deployment order, rollback strategy, acceptance criteria.
+When a change edits shared data that another host's closure reads (a host table, an inventory row, a shared list),
+that host's behaviour changes only when it deploys, so list it in the deployment order and say so in the runbook;
+otherwise the change takes effect at some later deploy made for unrelated reasons.
 If this change does not involve a deployment change (pure package addition, no endpoint / DB change),
 you may write "N/A — this change does not involve a deployment change".
 -->

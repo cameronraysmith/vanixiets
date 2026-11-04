@@ -449,6 +449,9 @@ The corollary is the rule an agent applies in review: a check that can be replac
 A check that cannot name a plausible incorrect implementation it would catch, and that nothing else catches, has no rung at all and is deleted rather than re-pinned.
 The question is the severity criterion from `preferences-validation-assurance`, applied to the check rather than to the code it targets.
 
+A mutant that demonstrates integrity runs only the case it must fail, not the regulator's full case set.
+Rerunning every case to judge one multiplies the check's cost by its case count in every build and adds no failure mode, since the other cases are already exercised by the unmutated regulator.
+
 `references/check-vacuity.md` names the vacuity patterns found in this repository, each with its smell, the concrete instance, and the replacement, so that a reviewer can recognize them without re-deriving the argument.
 
 
