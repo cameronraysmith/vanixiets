@@ -17,6 +17,7 @@ No new long-running process and no new listener are added (ADR-009 Decision, Imp
 - ADR-009 Decision item 5: memory and OOM messages carry attribution by the three executables with the largest resident memory, the host's ZFS ARC size and its swap used.
 - ADR-009 Decision items 6, 7 and 17: the store freeze (`StoreQueryFailing`), the signal-presence check (`RuleSignalMissing`) and the per-host absence freeze.
 - ADR-009 Decision items 8 and 9: the `fleet-heartbeat` heartbeat and the `fleet-deadman.timer` dead-man on `cinnabar` raising `AlertEvaluatorSilent`.
+- ADR-009 Decision item 18 and Q5: the dead-man pings a healthchecks.io check after a passing run, and healthchecks.io emails the operator when pings stop (charter v27).
 - ADR-009 Decision item 10: delivery to `fleet-alerts` at `https://ntfy.zt` through `ntfy-send` built from its existing script, with the `alerter` token passed through `NTFY_TOKEN_FILE` and never on a command line.
 - ADR-009 Decision item 11 and ADR-003 Q9: `observability-notify@%n.service`, the module `flake.modules.nixos.observability-notify`, posts to `fleet-alerts` once per failure episode with a recovery message and logs each posted `FAILED` for R9.1.
 - ADR-009 Decision items 12 and 13 and Q8: one new ntfy user `alerter` publishes on `fleet-*`, `auth-default-access` stays `read-write` for every other topic, ntfy rate-limits each mesh client as its own visitor, a flake check validates the provisioning strings, and the cutover takes three deploys.
@@ -29,12 +30,14 @@ No new long-running process and no new listener are added (ADR-009 Decision, Imp
 - ADR-007 Decision (credentials): the evaluator reads the store as the read-only `regulator` store user.
 - ADR-003 Operating envelope and regulator: the `observability-notify@` template unit is the only path from a failed observability regulator or oneshot unit to a human.
 
-The human gate of 2026-10-15 accepted the recommended answer of every ADR-009 question except Q5, which is deferred (see Deferred).
+The human gate of 2026-10-15 accepted the recommended answer of every ADR-009 question but Q5, which the operator answered on 2026-11-01 under CAM-76 by adopting an external watch, so every ADR-009 question is now answered (ADR-009 Decision item 18; charter v27).
 
 ## Placement
 
 - `magnetite`: `fleet-alert.timer` and `fleet-alert.service`, with `StateDirectory = "fleet-alert"` holding `/var/lib/fleet-alert/state.json` (ADR-009 Decision items 1 and 4, Implementation surface).
 - `cinnabar`: `fleet-deadman.timer` and `fleet-deadman.service`, with `StateDirectory = "fleet-deadman"` holding `/var/lib/fleet-deadman/state.json` (ADR-009 Decision item 9, Implementation surface).
+- `cinnabar`: `fleet-deadman.service` pings the healthchecks.io check `fleet-deadman cinnabar` as its last step after a passing run, and the check emails the operator when pings have been missing for its 5 min period plus its 10 min grace (ADR-009 Decision item 18, E9.6).
+- healthchecks.io, outside the fleet: the check, its period, grace and email integration, set in the vendor's web interface and not in the repository (ADR-009 Decision item 18).
 - `cinnabar`: the existing ntfy-sh 2.28.0 on `[::1]:2586` behind caddy as `https://ntfy.zt` (`cameronraysmith/vanixiets@ff2ca5c77:modules/machines/nixos/cinnabar/ntfy.nix:4-9`, `cameronraysmith/vanixiets@ff2ca5c77:modules/machines/nixos/cinnabar/caddy.nix:29-32`).
 - Every in-scope NixOS host, `cinnabar` included: the `observability-notify@` template unit in the module `flake.modules.nixos.observability-notify`, which the `agent` role of the `otel-collector` clan service imports and `cinnabar` imports directly from S3, before it runs a collector in S4; it calls `ntfy-send` against `ntfy.zt` and keeps per-unit stamp files and a log of posted `FAILED` messages under `/var/lib/observability-notify` (ADR-003; ADR-009 Decision item 11).
 - Store account: the GreptimeDB user `regulator` with mode `ro` (ADR-007 Decision; ADR-009 Decision item 1).
@@ -59,6 +62,7 @@ The human gate of 2026-10-15 accepted the recommended answer of every ADR-009 qu
 - Credentials consumed:
   - `regulator-password` of the `greptimedb-users` generator of ADR-007, delivered to `fleet-alert.service` through `LoadCredential`; it needs no `restartUnits` because its consumers are timer-driven oneshots that load it at each start (ADR-007 Decision; ADR-009 Decision item 13, Implementation surface).
   - `token` of the `ntfy-alerter` generator, delivered through `LoadCredential` to magnetite's evaluator, to the `observability-notify@` template unit and to cinnabar's dead-man; the notifier's `ExecStartPost=` and `ExecStopPost=` resolve hooks run as root inside each notified unit and read the token's clan vars path through `NTFY_TOKEN_FILE` (ADR-009 Decision items 11 and 13).
+  - `curl-config` of the per-machine `fleet-deadman-ping` generator on `cinnabar`, holding the check's ping URL, delivered to `fleet-deadman.service` through `LoadCredential` and read by curl from stdin, never from its argument list (ADR-009 Implementation surface; charter v27).
   - `ntfy-env` of the per-machine `ntfy-alerter-env` generator on `cinnabar`, consumed by ntfy through `services.ntfy-sh.environmentFile` as `NTFY_AUTH_USERS` and `NTFY_AUTH_TOKENS` (ADR-009 Decision item 13, Implementation surface).
 
 ### Initial rule set
@@ -108,6 +112,9 @@ Files to modify:
 - `modules/machines/nixos/cinnabar/ntfy.nix`: set `auth-access` to `alerter:fleet-*:rw` and `*:fleet-*:ro`, set `behind-proxy`, `proxy-trusted-hosts` and `visitor-prefix-bits-ipv6`, set `services.ntfy-sh.environmentFile` to the `ntfy-alerter-env` generator's `ntfy-env` file, import `fleet-alert` with the dead-man enabled, and import `observability-notify` (ADR-009 Implementation surface).
 - The `observability-notify@` template unit, extracted from the `agent` role's NixOS module of the `otel-collector` clan service into `flake.modules.nixos.observability-notify` with the option `services.observability-notify.units` unchanged: post to `fleet-alerts` with the `alerter` token, keep the per-unit stamp, append each posted `FAILED` with its timestamp, unit and host to a log under `/var/lib/observability-notify`, and add the `ExecStartPost=` and `ExecStopPost=` recovery hooks to each notified unit (ADR-003; ADR-009 Implementation surface).
 - `pkgs/by-name/ntfy-send`: when `NTFY_TOKEN_FILE` is set, send `Authorization: Bearer` with the token read from that file, without placing it on curl's argument list (ADR-009 Implementation surface).
+- `modules/nixos/fleet-alert.nix`: the option `services.fleet-alert.deadman.pingConfigFile`, asserted not to lie under the Nix store, and `flake.lib.fleetDeadmanPing`, the ping step, which fails the run unless healthchecks.io answers exactly `OK` (ADR-009 Decision item 18, Implementation surface; charter v27).
+- `modules/machines/nixos/cinnabar/fleet-alert.nix`: the generator `fleet-deadman-ping` and `services.fleet-alert.deadman.pingConfigFile` set from its `curl-config` path (ADR-009 Implementation surface; charter v27).
+- `modules/checks/fleet-alert.nix`: R9.6 with its ping stand-in, legs and mutants, and the ping step's transport leg (ADR-009 Operating envelope R9.6; charter v27).
 
 The cutover takes three deploys and leaves no window in which a publish is refused: `cinnabar` first provisions `alerter` and its token with no access entries, `magnetite` then deploys the notifier and evaluator posting with the token, and `cinnabar` finally adds `auth-access`, after which R9.4's anonymous-publish probe confirms the refusal (ADR-009 Decision item 13).
 
@@ -117,6 +124,7 @@ Clan vars generators:
 
 - `ntfy-alerter`, `share = true`, declared on `magnetite` and `cinnabar`: `runtimeInputs` `ntfy-sh`; one file, `token` (secret, a `tk_`-prefixed token from `ntfy token generate`, mode `0400`, written with `printf '%s'`), deployed on every machine that declares it (ADR-009 Implementation surface).
 - `ntfy-alerter-env`, per machine, declared on `cinnabar` only, `dependencies = [ "ntfy-alerter" ]`: `runtimeInputs` `ntfy-sh` and openssl; reads `$in/ntfy-alerter/token`, generates a password discarded after hashing, and writes `ntfy-env` (secret, `NTFY_AUTH_USERS=alerter:<bcrypt hash from ntfy user hash>:user` and `NTFY_AUTH_TOKENS=alerter:<token>`, `restartUnits = [ "ntfy-sh.service" ]`); a shared generator cannot deploy a file to one machine only, because clan-core refuses shared generators whose files differ between machines (ADR-009 Implementation surface).
+- `fleet-deadman-ping`, per machine, declared on `cinnabar` only: a hidden, persisted prompt for the check's ping URL, refused unless it is `https://hc-ping.com/` followed by a UUID, and one deployed secret file, `curl-config` (ADR-009 Implementation surface; charter v27).
 - Consumed, not created here: `greptimedb-users` `regulator-password` (ADR-007 Implementation surface).
 
 ## Operating envelope and regulator
@@ -130,6 +138,7 @@ The envelopes and regulators below are ADR-009's.
 | E9.3, liveness of the alert path | every 10 min window contains at least one `fleet-heartbeat` message while magnetite is up, and a silence of 10 min produces `AlertEvaluatorSilent` within the next 5 min | R9.3, runtime: the cinnabar dead-man regulates the evaluator, and `WeeklyPipelineTest` regulates the whole path, whose absence on a Monday is observed by the human, which charter A8 accepts as recorded human judgment | at acceptance, stopping `fleet-alert.timer` on magnetite and observing `AlertEvaluatorSilent` within 15 min, then starting it and observing `RESOLVED` |
 | E9.4, delivery authorization | an anonymous publish to `fleet-alerts` or `fleet-heartbeat` is refused, an `alerter` publish is accepted, and an anonymous publish to any host-named topic is still accepted | R9.4: a `fleet-deadman` precondition step that, before polling, performs an anonymous publish to `fleet-heartbeat` on `[::1]:2586` and fails the unit, and so notifies through ADR-003's notifier, if that publish is accepted | at acceptance, removing the `*:fleet-*:ro` entry and observing the unit fail |
 | E9.5, resources | `fleet-alert.service` runs under `MemoryMax = 64M` and `TimeoutStartSec = 50s`, so one run cannot overlap the next and cannot add to a magnetite memory incident | R9.5: an evaluation-time assertion in the module that both limits are set | a mutant that drops `MemoryMax` |
+| E9.6, the external watch | the dead-man sends exactly one success ping per run that passes under item 18, and nothing on any run that fails; an absence of success pings for period plus grace produces an email to the operator from outside the fleet | R9.6, deterministic, build time, a leg of `checks.x86_64-linux.fleet-alert`: the dead-man with its real ping step runs against S3's ntfy stand-in and a loopback ping stand-in, and a transport leg asserts the URL reaches curl on stdin and not on its argument list | the mutants `deadmanPingFirst`, `deadmanPingNoHeartbeat`, `deadmanPingBeforePosts`, `pingAcceptsAny200` and `pingPrintsConfig`, a transport mutant passing the URL as an argument, and at acceptance stopping ntfy on cinnabar |
 
 The R9.2 fixture check is the gating regulator, because `vmTests` run only on pyrite's kvm lane and do not gate on nixbot (ADR-009 Test-lane evidence, Rejected alternatives).
 Beside its mutants, the check runs a property-based test: Hypothesis generates query timelines and compares the jq transition function's posts and state with a small Python reference model of pending, firing and resolved instances, the store freeze, the host freeze and the re-post cadence (ADR-009 Operating envelope R9.2).
@@ -148,6 +157,7 @@ These are ADR-009's Failure prevented entries.
 - `WeeklyPipelineTest`: a broken delivery path is read as a quiet fleet.
 - R9.2 fixture check: an evaluator change that re-posts, never resolves, or fires early ships, which a VM test on the non-gating kvm lane would not stop.
 - R9.5: the evaluator itself grows into magnetite's memory during an incident.
+- External watch: an outage of cinnabar, ntfy, caddy or the mesh path is read as a quiet fleet for up to a week.
 
 ## Deployment acceptance items
 
@@ -163,10 +173,6 @@ These are ADR-009's Failure prevented entries.
 
 ## Deferred
 
-- ADR-009 Q5, an external dead-man watching `cinnabar` itself, is deferred to CAM-76 and decided before S5, because until then an ntfy outage is noticed only by a missing Monday `WeeklyPipelineTest`, up to 7 days later (charter v21).
-  Until then `cinnabar` is the single delivery path: while `cinnabar` or its ntfy is down no alert reaches a human, and nothing in this component detects that (ADR-009 Consequences).
-  This includes an ntfy that refuses to start on a malformed `environmentFile`, which the provisioning check guards against before deploy; the residual risk is recorded against CAM-76.
-  The candidate fix is an external heartbeat from a free uptime service, at the cost of a third-party dependency.
 - Alertmanager adoption: triggered by E9.1 breached in two separate weeks after threshold review, or the rule set passing 30 rules; at that point vmalert loads the same Prometheus-format rules and Alertmanager posts to `fleet-alerts` through `?template=alertmanager` (ADR-009 Q3).
 - Merge-queue stall rule over ADR-005's `devloop` events: not added until ADR-005 names a decision that needs it within hours (ADR-009 Q6).
 - Noise envelope revision: E9.1 is revised after the first month from the counts R9.1 records (ADR-009 Q4).

@@ -1,12 +1,12 @@
 ---
 title: Fleet observability and CCV feedback-loop charter
-status: charter v26
-date: 2026-11-01
+status: charter v27
+date: 2026-11-04
 ---
 
 # Fleet observability and CCV feedback-loop charter
 
-Charter version: v26.
+Charter version: v27.
 A revision is a version bump with a dated entry under "Revision history"; the text of an earlier version is never edited in place.
 
 ## Objective
@@ -394,3 +394,5 @@ A research unit that meets ambiguity returns it in its questions section; the or
   - #3668, smartctl without the error-information log: smartctl_exporter 0.15.0 calls smartctl with `--log=error` and drops a device on any smartctl error, and pyrite's `APPLE SSD AP0512J` rejects the Error Information log page with `Invalid Log Page (0x109)`, so the exporter dropped `/dev/nvme0`; the exporter's `--smartctl.path` now names a wrapper that removes that one argument, and no kept series reads that log; ADR-003 item 19 and its Consequences line on pyrite's controller are amended in place, and `components/host-probes.md` follows with the exporter's version, 0.15.0.
   - S4 M10, the exporter's own read on pyrite: v23 kept it as an acceptance observation; on 2026-11-01 it first failed with smartctl's exit status 4, which #3668 resolved, and from 06:28:38Z the store held pyrite's `smartctl_device_critical_warning_total` and `smartctl_device_percentage_used_total` every minute, so ADR-003 Q15's answer stands; ADR-009's line on pyrite's SMART support and `components/fleet-alert.md` are amended in place.
   - #3670, pyrite's double DHCP: facter's detected DHCP made systemd-networkd lease a second address on pyrite's `wlp2s0` beside NetworkManager's, and pyrite took about 6 min to answer after its wifi returned in S4's offline test; networkd now configures only the ZeroTier link, which a pyrite desktop assertion holds; it amends no decision record and is recorded because S4's acceptance met it.
+- v27 (2026-11-04): the decisions of CAM-76 (`openspec/changes/watch-the-alert-path-externally/`), the operator's O1 to O6; no earlier text is edited beyond the status, date and version lines, and this charter's D1–D9, the requirements and the acceptance criteria are unchanged.
+  - ADR-009 Q5, resolved: cinnabar's dead-man pings the healthchecks.io check `fleet-deadman cinnabar` as its last step after a run that passes with a heartbeat and sends nothing on a failing run, and the check's only channel, email, reaches the operator once pings have been missing for its 5 min period plus its 10 min grace, both set in healthchecks.io's interface (O1 to O5); the ping URL is the per-machine generator `fleet-deadman-ping` on cinnabar, read by curl from stdin (O6); the watch landed in #3716, and at acceptance on 2026-11-04 a stop of ntfy on cinnabar and a stop of magnetite's evaluator each produced the email 15 min after the last accepted ping, so CAM-72 is unblocked; ADR-009's status line, its new Decision item 18, E9.6 and R9.6, the healthchecks.io entry under Rejected alternatives, its Consequences, Failure prevented, Implementation surface and Q5's resolution are amended in place, and `components/fleet-alert.md`, the reference architecture, this tree's `README.md` and the operator runbook `packages/docs/src/content/docs/development/operations/fleet-observability.md` follow.

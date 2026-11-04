@@ -4,7 +4,7 @@ title: "ADR-009: Alerting"
 
 ## Status
 
-Accepted (human gate, 2026-10-15), except Q5, deferred to the end of implementation, and amended in place under charter v12 (2026-10-16): `ntfy-send` is the package `pkgs/by-name/ntfy-send`, added by slice S1, which the evaluator consumes instead of building its own; under charter v13 (2026-10-17): the Prometheus-server alternative now records that ADR-007 keeps Prometheus remote read enabled; and under charter v17 (2026-10-18): slice S3's planning decisions D1 to D11 (`openspec/changes/stand-up-fleet-alerting/`) fix ntfy's rate-limit identity, the token's path into curl, the notifier's module and credential, the cutover order, the provisioning check, S3's rule subset, the notifier's `FAILED` log, the `SystemdUnitFailed` exclusions and the property-based check of the evaluator's transition function
+Accepted (human gate, 2026-10-15), and amended in place under charter v12 (2026-10-16): `ntfy-send` is the package `pkgs/by-name/ntfy-send`, added by slice S1, which the evaluator consumes instead of building its own; under charter v13 (2026-10-17): the Prometheus-server alternative now records that ADR-007 keeps Prometheus remote read enabled; and under charter v17 (2026-10-18): slice S3's planning decisions D1 to D11 (`openspec/changes/stand-up-fleet-alerting/`) fix ntfy's rate-limit identity, the token's path into curl, the notifier's module and credential, the cutover order, the provisioning check, S3's rule subset, the notifier's `FAILED` log, the `SystemdUnitFailed` exclusions and the property-based check of the evaluator's transition function
 Amended in place under charter v20 (2026-10-18): item 16 raises `RuleSignalMissing` for an always-on host that has reported no host memory for 10 min while the store answers, and E9.5 and R9.5 bound a run by its timing relation rather than by restating `TimeoutStartSec`.
 Amended in place under charter v21 (2026-10-20): Q5 is scheduled as CAM-76 before S5.
 Amended in place under charter v22 (2026-10-21), from slice S2's planning (`openspec/changes/stand-up-devloop-collection/`): item 15 admits one dev-loop rule, a 24 h slow-burn `warning` on ADR-005 D5-R4's queue-wait objective, and items 1 and 2, E9.2 and R9.2 let each rule declare its database and query language, with SQL rules sent to `/v1/sql`.
@@ -12,6 +12,7 @@ Amended in place under charter v23 (2026-10-28), from slice S4's planning (`open
 Amended in place under charter v24 (2026-11-01): cinnabar's ntfy keeps sent messages for a week rather than its default 12 h, so the Consequences line on ntfy's cache says a week.
 Amended in place under charter v25 (2026-11-01): the NVMe rules read `smartctl_device_critical_warning_total` and `smartctl_device_percentage_used_total`, the names the store gives the exporter's counter-typed fields (ADR-004 item 7).
 Amended in place under charter v26 (2026-11-01): the Decision's line on pyrite's SMART support records its verification at acceptance.
+Amended in place under charter v27 (2026-11-04): Q5 is resolved by CAM-76 (`openspec/changes/watch-the-alert-path-externally/`); item 18 adopts a healthchecks.io check pinged by the dead-man, E9.6 and R9.6 regulate it, and the Consequences, Failure prevented and Implementation surface follow.
 
 ## Context
 
@@ -102,6 +103,10 @@ No new long-running process is added.
     The list is the hosts that `flake.lib.observabilityHosts` marks `alwaysOn`, and a host joins it only by an edit of that table when it becomes permanently provisioned, never from the terranix `enabled` flags, so a host provisioned for an hour does not alert when it is destroyed (charter v23).
     A host on the always-on list that has reported no `system_memory_usage_bytes` for 10 min while the store answers raises `RuleSignalMissing` with `selector="system_memory_usage_bytes"` and its `host_name`, resolved when it reports again, because its silence otherwise freezes every rule while the heartbeat stays green (charter v20), and one path posts once for one silence where two would post twice (charter v23).
 17. Absence freeze: while a host reports no `system_memory_usage_bytes`, the evaluator freezes every instance labelled with that host, sending neither `RESOLVED` nor a re-post, and resumes normal evaluation for that host when it reports again, so a laptop's sleep neither resolves its alerts nor fires them again on wake.
+18. External watch: when its configuration carries a ping, the dead-man pings the healthchecks.io check `fleet-deadman cinnabar` as its last step, after the post loop, and only on a run in which ntfy refused the anonymous probe with 403, the poll answered and held at least one heartbeat, and every post the transition produced was sent (charter v27).
+    A failing run sends nothing, neither a ping nor healthchecks.io's `/fail`, so the single failed run of a deploy that restarts ntfy is absorbed by the grace (charter v27).
+    The check's only channel is email to a mailbox not hosted on the fleet, and an outage of healthchecks.io's region together with the fleet's is accepted as residual (charter v27).
+    Its period is 5 min and its grace 10 min, set in healthchecks.io's web interface and not in the flake, so the operator is emailed once pings have been missing for 15 min (charter v27).
 
 Initial rule set.
 Signal names are ADR-003's and ADR-004's, as PromQL-visible in the `fleet` database, where the agent-stamped `host.name` appears as the label `host_name`.
@@ -179,7 +184,7 @@ The absence freeze is the per-host form of item 6's store freeze: without it eve
 - Folding rules into `otel-envelope`: a failed unit is one message regardless of which rule broke, with no per-instance deduplication and no recovery notice.
 - One local alert timer per host posting directly to ntfy: works while the store is down, but deploys rules and an ntfy credential to seven hosts, including laptops, and duplicates what one store query answers.
 - Evaluator on cinnabar reading the store over the mesh: the store binds loopback only (ADR-007), so it would need a mesh listener on the store.
-- A hosted dead-man service such as healthchecks.io watching cinnabar: adds a third-party egress and account; deferred to Q5.
+- A hosted dead-man service watching cinnabar: adopted under Q5 as healthchecks.io, pinged by `fleet-deadman` (item 18; charter v27).
 - A NixOS VM test as the regulator: `vmTests` run only on pyrite's kvm lane and are not gating, whereas a sandboxed fixture check runs on nixbot.
 - Anonymous publishing to `fleet-*`: any mesh member could spoof alerts or mask the dead-man by publishing heartbeats.
 - Rules over `devloop` merge-queue events now: no ADR-005 rule needs a human within minutes (Q6).
@@ -191,8 +196,9 @@ The absence freeze is the per-host form of item 6's store freeze: without it eve
 magnetite gains one timer and one oneshot that runs every 60 s; cinnabar gains one timer and one oneshot every 5 min.
 The evaluator's state file and the notifier's `FAILED` log are the only alert history; past alerts are not written to the store, and ntfy's cache, which cinnabar keeps for a week (charter v24), is the only record of sent messages.
 Alerts have no silencing: a known condition is accepted by its single `warning` message, and a noisy rule is fixed by a reviewed change to its threshold, its `for`, or its exclusion list.
-cinnabar is the single delivery path: while cinnabar or its ntfy is down no alert reaches a human, and nothing in this decision detects that (Q5).
-An `environmentFile` that ntfy rejects at start would take ntfy down with every publisher; the provisioning check of item 13 guards against it before deploy, and the residual risk that nothing reports an ntfy outage is recorded against CAM-76 with Q5 (charter v17).
+cinnabar is the single delivery path for alerts: while cinnabar or its ntfy is down no alert reaches a human, and healthchecks.io emails the operator once the dead-man's pings have been missing for the check's 5-minute period plus its 10-minute grace (Q5, CAM-76).
+An `environmentFile` that ntfy rejects at start would take ntfy down with every publisher; the provisioning check of item 13 guards against it before deploy, and an outage it causes reaches the operator by the same email (charter v27).
+The watch adds a third-party account, an egress from cinnabar to `hc-ping.com` and one secret, and it fails together with the fleet if an outage takes healthchecks.io down with cinnabar (accepted 2026-11-01).
 magnetite reaches `ntfy.zt` through cinnabar's dnsmasq and caddy's internal TLS, so delivery depends on cinnabar's `.zt` resolver, a dependency ADR-003's agents no longer share from S4 (charter v23).
 Following `ntfy-send`'s `-k`, the evaluator and notifier do not verify caddy's certificate, so the `alerter` token's confidentiality rests on ZeroTier's encryption and on cinnabar's dnsmasq answering `ntfy.zt`, as for every existing `ntfy-send` caller; trusting caddy's root certificate instead would need that certificate distributed to magnetite, which no existing caller does.
 Every `fleet-alerts` message is readable by every mesh member, including the two Android members; messages carry host, unit, mountpoint, pool and process names and no agent or user content (ADR-008).
@@ -225,6 +231,12 @@ It is shown able to fail at acceptance by removing the `*:fleet-*:ro` entry and 
 Envelope E9.5, resources: `fleet-alert.service` runs under `MemoryMax = 64M`, and a run's worst case, the later of its query deadline plus the heartbeat's post timeout and its post deadline, plus one post timeout and the notifier hook's post timeout, ends before `TimeoutStartSec`, which ends before the timer's next run, so one run cannot overlap the next and cannot add to a magnetite memory incident (charter v20).
 Regulator R9.5: evaluation-time assertions in the module on `MemoryMax` and on that timing relation, reading the deadlines from the evaluator's configuration, the post timeout from `ntfy-send`'s `-m` and the period from the timer, with a mutant that drops `MemoryMax` and the relation's failure at a post deadline of 40 s (charter v20).
 
+Envelope E9.6, the external watch: the dead-man sends exactly one success ping per run that passes under item 18, and nothing on any run that fails; an absence of success pings for period plus grace produces an email to the operator from outside the fleet (charter v27).
+Regulator R9.6, deterministic, build time, a leg of `checks.x86_64-linux.fleet-alert`: the dead-man, built with `ping` set to `fleetDeadmanPing` over the real curl, runs against S3's ntfy stand-in and a ping stand-in on loopback that records each request and answers a configured body.
+Its legs: a passing run with a heartbeat sends exactly one ping to the configured path, after the probe and the poll in one shared request log; a probe answered 200, 500 or a closed port, a failed poll, and a failed post each send none; an empty window sends one `FIRING` and no ping; a stand-in answering `OK (not found)` fails the run without printing the URL; a ping to a closed port fails the run with `fleet-deadman: external ping failed` and without printing the URL.
+A transport leg runs the ping step with a recording curl and asserts the URL is absent from curl's argument list and present on its stdin.
+It is shown able to fail by `deadmanPingFirst`, `deadmanPingNoHeartbeat`, `deadmanPingBeforePosts`, `pingAcceptsAny200` and `pingPrintsConfig`, by a transport mutant passing the URL as an argument, and at acceptance by stopping ntfy on cinnabar; on 2026-11-04 the email arrived 15 min after the last accepted ping, both for that stop and for a 30 min stop of `fleet-alert.timer` on magnetite, and the recovery email followed the next ping (charter v27).
+
 ## Failure prevented
 
 - The evaluator and rule table: each failure in the table's last column passes with nobody told.
@@ -237,6 +249,7 @@ Regulator R9.5: evaluation-time assertions in the module on `MemoryMax` and on t
 - `WeeklyPipelineTest`: a broken delivery path is read as a quiet fleet.
 - R9.2 fixture check: an evaluator change that re-posts, never resolves, or fires early ships, which a VM test on the non-gating kvm lane would not stop.
 - R9.5: the evaluator itself grows into magnetite's memory during an incident.
+- External watch: an outage of cinnabar, ntfy, caddy or the mesh path is read as a quiet fleet for up to a week.
 
 ## Implementation surface
 
@@ -250,6 +263,8 @@ Regulator R9.5: evaluation-time assertions in the module on `MemoryMax` and on t
 - A flake check validating the rendered `NTFY_AUTH_*` strings of the `ntfy-alerter-env` generator, as item 13 states.
 - Clan vars generator `ntfy-alerter`, `share = true`, declared on magnetite and cinnabar: `runtimeInputs` `ntfy-sh`; one file, `token` (secret, a `tk_`-prefixed token from `ntfy token generate`, mode `0400`, written with `printf '%s'`), deployed on every machine that declares it (charter v17).
 - Clan vars generator `ntfy-alerter-env`, per machine, declared on cinnabar only, `dependencies = [ "ntfy-alerter" ]`: `runtimeInputs` `ntfy-sh` and openssl; reads `$in/ntfy-alerter/token`, generates a password that is discarded after hashing, and writes `ntfy-env` (secret, `NTFY_AUTH_USERS=alerter:<bcrypt hash from ntfy user hash>:user` and `NTFY_AUTH_TOKENS=alerter:<token>`, `restartUnits = [ "ntfy-sh.service" ]`); one shared generator cannot deploy a file to one machine only, because clan-core refuses shared generators whose files differ between machines (charter v17).
+- Modify `modules/nixos/fleet-alert.nix` and `modules/machines/nixos/cinnabar/fleet-alert.nix` (charter v27): the option `services.fleet-alert.deadman.pingConfigFile`, asserted not to lie under the Nix store; `flake.lib.fleetDeadmanPing`, the ping step, which reads the check's URL as curl configuration from stdin; and the per-machine clan vars generator `fleet-deadman-ping` on cinnabar, whose hidden prompt takes the URL and whose `curl-config` file reaches `fleet-deadman.service` through `LoadCredential`.
+- Modify `modules/checks/fleet-alert.nix` (charter v27): R9.6 with its ping stand-in, its legs and mutants, and the transport leg.
 - No flake input, no overlay, no new long-running service and no new listener.
 
 ## Questions for the human gate
@@ -265,6 +280,7 @@ Regulator R9.5: evaluation-time assertions in the module on `MemoryMax` and on t
 5. Q5: Should cinnabar itself be watched by an external dead-man service? Recommended: no for now; a cinnabar outage also takes down `.zt` resolution and the ZeroTier controller, which the human notices in ordinary use, and the alternative adds a third-party account and egress.
    Resolution: deferred at the 2026-10-15 gate; candidate is an external heartbeat from a free uptime service, weighed against the third-party dependency.
    Charter v21 schedules it as CAM-76 before S5 (CAM-72), because until then an ntfy outage is noticed only by a missing Monday `WeeklyPipelineTest`, up to 7 days later.
+   Resolution: decided by the operator on 2026-11-01 under CAM-76: yes, healthchecks.io, pinged by the dead-man after a passing run with a heartbeat, emailing the operator (item 18; charter v27).
 6. Q6: Should a merge-queue stall rule, a `batch formed` with no `batch done` within 2 h, be added over ADR-005's `devloop` events? Recommended: no until ADR-005 names a decision that needs it within hours; the alternative alerts on a signal whose consumer is a 30-day review.
    Resolution: recommended answer accepted at the 2026-10-15 gate.
 7. Q7: Should `warning` alerts stay single-shot with no daily reminder? Recommended: yes; reminders for accepted conditions are the noise that leads to muting, and `critical` alerts keep a 24 h reminder.

@@ -70,7 +70,9 @@ flowchart LR
   regs -->|"OnFailure observability-notify@"| ntfy
   ntfy -->|"anonymous read-only subscription"| phone["Human phone and desktop"]
   perses -->|"sso-gateway login, perses_users"| human["Admitted readers"]
-  ext["External watcher of cinnabar, deferred"] -.->|"ADR-009 Q5"| ntfy
+  ext["healthchecks.io check, outside the fleet"]
+  deadman -->|"ping after a passing run"| ext
+  ext -->|"email"| phone
 ```
 
 Every arrow into the store crosses loopback on magnetite, and the only mesh-facing telemetry listener is the ingress receiver (ADR-003 items 9 and 13; ADR-007 Decision).
@@ -179,8 +181,8 @@ The one rule that fires for host absence is `RuleSignalMissing` for a host on th
 
 Every completed evaluation publishes to `fleet-heartbeat`, and `fleet-deadman.timer` on cinnabar raises `AlertEvaluatorSilent` when that topic has been empty for 10 min (ADR-009 items 8 and 9).
 Before polling, the dead-man performs an anonymous publish to `fleet-heartbeat` and fails if it is accepted (ADR-009 R9.4).
-cinnabar is the single delivery path, and nothing in the accepted design detects a cinnabar or ntfy outage (ADR-009 Consequences).
-An external watcher of cinnabar is CAM-76, scheduled before S5, with an external heartbeat from a free uptime service as the candidate fix at the cost of a third-party dependency (ADR-009 Q5; charter v21).
+cinnabar is the single delivery path for alerts, and an outage of cinnabar or its ntfy reaches the operator by email from healthchecks.io, outside the fleet (ADR-009 item 18 and Q5; charter v27).
+The dead-man pings a healthchecks.io check after each run that passes with a heartbeat, and the check emails the operator once pings have been missing for its 5 min period plus its 10 min grace (ADR-009 E9.6).
 
 ## Consolidated implementation surface
 
@@ -277,13 +279,12 @@ Change names are chosen in each slice's proposal.
 
 S2, S3, S4 and S6 depend only on S1 and may proceed in any order; S5 follows S4, which provides the ingress it reports to, and S7 follows S5, because omp's interactive sessions run on stibnite.
 S8 follows S2 because R6.1 fails on an empty partition, and `devloop` holds rows only once S2 deploys (ADR-006 E6.1).
-The deferred decision ADR-009 Q5 is CAM-76, which blocks S5 (CAM-72), because until it lands an ntfy outage is noticed only by a missing Monday `WeeklyPipelineTest`, up to 7 days later, and S5 adds laptops (charter v21).
-S4 proceeds before CAM-76 although pyrite is a laptop that joins alerting in S4, because adding pyrite does not change the ntfy-outage exposure CAM-76 addresses (charter v23).
+ADR-009 Q5 was resolved by CAM-76, which blocked S5 (CAM-72) because until it landed an ntfy outage was noticed only by a missing Monday `WeeklyPipelineTest`, up to 7 days later, and S5 adds laptops (charter v21); the external watch is in place, so CAM-72 is unblocked (charter v27).
+S4 proceeded before CAM-76 although pyrite is a laptop that joins alerting in S4, because adding pyrite does not change the ntfy-outage exposure CAM-76 addressed (charter v23).
 A slice whose deployment refutes a detail of a decision record amends that record in place with a charter version entry, and every artifact citing the amended identifier is updated in the same pull request.
 
 ## Deferred and future extensions
 
-- External watcher of cinnabar: CAM-76, decided before S5; the candidate fix is an external heartbeat from a free uptime service, at the cost of a third-party dependency (ADR-009 Q5).
 - Continuous profiling: trigger is a magnetite memory or CPU incident in which `process_memory_usage_bytes` names the executable but not the code path; adoption needs a profiles-capable store or a second backend, a packaged profiler distribution and a privileged eBPF unit (ADR-003 future extension 5).
 - Laptop battery, thermal and sleep-wake state on stibnite and pyrite: trigger is an incident in which a laptop's thermal throttling, battery wear or sleep-wake cycle explains lost builds, stale deploy records or queue replay gaps; adoption needs node_exporter collectors, a sleep-wake source and consent framing (ADR-003 future extension 6).
 - ZeroTier peer latency and path state: trigger is a cross-host failure attributed to mesh path degradation, relay fallback or peer flapping; adoption needs a `node_id` keep-list of fleet members and an ADR-004 budget increase (ADR-003 future extension 7).

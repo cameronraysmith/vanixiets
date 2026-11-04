@@ -142,8 +142,12 @@ A `critical` alert that stays firing is posted again once every 24 hours; a `war
 
 While a host reports no `system_memory_usage_bytes`, its alerts are frozen: they neither resolve nor post again, so a sleeping laptop does not churn, and their 5 minutes of absence start only when the host reports again.
 
-Nothing reports an outage of ntfy or cinnabar themselves: every alert, failure notice and dead-man post goes through ntfy on cinnabar, so such an outage shows only as a missing Monday `WeeklyPipelineTest`, up to 7 days after it begins.
-Treat a Monday without that message as an outage of the alert path until a test post shows otherwise; CAM-76, scheduled before S5, adds a watch from outside cinnabar.
+An outage of ntfy or cinnabar themselves is reported by email from healthchecks.io, outside the fleet.
+cinnabar's `fleet-deadman` pings the check `fleet-deadman cinnabar` at the end of each 5-minute run that found ntfy refusing anonymous heartbeats, a heartbeat from magnetite in the last 10 minutes, and every alert it raised posted.
+When no ping arrives for the check's 5-minute period plus its 10-minute grace, healthchecks.io emails the operator, and it emails again when pings resume.
+An email together with `FAILED fleet-deadman.service on cinnabar` on `fleet-alerts` means the alert path works and only the ping to `hc-ping.com` failed; an email with nothing on `fleet-alerts` means the alert path is down.
+The email does not watch the phone's `fleet-alerts` subscription, so a Monday without `WeeklyPipelineTest` and without an email still calls for a test post.
+"The external watch" below says how to read, pause and rotate the check.
 
 ## Reading failure notices
 
@@ -162,7 +166,7 @@ nix eval --json .#nixosConfigurations.<host>.config.services.observability-notif
 A `FAILED fleet-alert.service on magnetite` means a run could not post its heartbeat or an alert, or reached its post deadline; `sudo journalctl -u fleet-alert -n 50 --no-pager` on magnetite names the post.
 A deploy that restarts the store, ZeroTier or ntfy fails the evaluator run that falls inside the restart, as on 2026-10-25, when a deploy of magnetite stopped the store and ZeroTier for about 20 s and a deploy of cinnabar stopped ntfy and ZeroTier for about 17 s; one failed run during such a deploy, followed by a passing run a minute later, is the deploy, not a fault, but its `FAILED` notice may never arrive, because the notifier cannot post while ZeroTier or ntfy is down and the switch clears the failed instance.
 After a deploy, look for notices that were never posted with `sudo journalctl -u 'observability-notify@*' --since '<deploy start>' --no-pager`; a `Failed with result` line marks one.
-A `FAILED fleet-deadman.service on cinnabar` means ntfy did not refuse the anonymous probe with 403, or the heartbeat poll failed; `sudo journalctl -u fleet-deadman -n 20 --no-pager` on cinnabar shows which.
+A `FAILED fleet-deadman.service on cinnabar` means ntfy did not refuse the anonymous probe with 403, the heartbeat poll failed, a post failed, or the ping to `hc-ping.com` was not answered `OK`; `sudo journalctl -u fleet-deadman -n 20 --no-pager` on cinnabar shows which.
 A `FAILED devloop-reconcile.service on magnetite` means a day of `devloop` differs from its sources, or a source could not be read; "When devloop-reconcile fails" under "Querying devloop" says what each clause means.
 A `FAILED devloop-pg-grants.service on magnetite` means a column the dev-loop readers are granted did not appear in nixbot's database within 300 s of the unit's start, which a nixbot migration renaming or dropping it causes; the collector's nixbot queries fail until the grants apply, and `sudo journalctl -u devloop-pg-grants -n 20 --no-pager` names the column.
 The grants are not applied again when nixbot restarts, so a grant lost to a later migration posts no `FAILED` of this unit; it shows as the collector's query errors and as a `FAILED devloop-reconcile.service on magnetite` the next morning.
@@ -185,6 +189,51 @@ sudo journalctl -u 'observability-notify@greptimedb-envelope.service.service' --
 The notifier keeps one stamp per open episode in `/var/lib/observability-notify/<unit>`, containing `posted` or `suppressed`.
 A stamp left behind by a failed `RESOLVED` post silences that unit until its next start or successful exit.
 Each posted `FAILED` also appends one line `<epoch> <unit> <host>` to `/var/lib/observability-notify/failed.log`; a suppressed episode appends nothing.
+
+## The external watch
+
+The check `fleet-deadman cinnabar` lives in a healthchecks.io account, not in the repository.
+Its period, grace and email integration are set in healthchecks.io's web interface; the values in force are period 5 minutes, grace 10 minutes and one email integration to a mailbox not hosted on the fleet.
+The check's page shows its state and a log of its last 100 pings, about 8 hours at one ping per 5 minutes.
+cinnabar's journal keeps the longer record, one `fleet-deadman: external ping accepted` line per ping and one `no external ping` line per run that saw no heartbeat:
+
+```sh
+sudo journalctl -u fleet-deadman --since -24h -o cat | grep -cF 'external ping accepted'
+sudo journalctl -u fleet-deadman --since -24h -o cat | grep -cF 'no external ping'
+```
+
+The down email arrives about 15 minutes after the last accepted ping, and the up email arrives with the first ping after it; at acceptance on 2026-11-04 each down email came 15 minutes after the last ping.
+Read a down email by what `fleet-alerts` shows beside it:
+
+- Nothing: the alert path is down, which is ntfy, caddy, cinnabar's ZeroTier, cinnabar itself or the dead-man.
+- `[FIRING] AlertEvaluatorSilent magnetite`: magnetite's evaluator or its path to cinnabar is down; the dead-man stops pinging when its 10-minute window holds no heartbeat, so the email follows the alert by about 10 minutes.
+- `FAILED fleet-deadman.service on cinnabar`: the alert path works and only the ping to `hc-ping.com` failed.
+
+A dead-man failure during an ntfy outage posts no `FAILED fleet-deadman.service on cinnabar`, not even after ntfy returns, because the notifier posts to the stopped ntfy and does not retry; for that window the email is the only signal.
+
+For maintenance that stops ntfy, caddy or zerotierone on cinnabar, or magnetite's evaluator, for longer than 10 minutes, pause the check in healthchecks.io after the dead-man's last `external ping accepted` and within 15 minutes of it.
+A ping to a paused check resumes it, so a pause made before that last ping is undone by it, and the first ping after the maintenance resumes the check by itself.
+For maintenance of magnetite's evaluator, that last ping comes up to 10 minutes after the evaluator stops, because the dead-man pings while a heartbeat is still in its window.
+Find the last ping on cinnabar:
+
+```sh
+sudo journalctl -u fleet-deadman -o short-iso | grep -F 'external ping accepted' | tail -n 1
+```
+
+To take the watch out, deploy cinnabar first with `services.fleet-alert.deadman.pingConfigFile` unset, then pause the check within 15 minutes of the last `external ping accepted`.
+In the other order the next ping resumes the paused check, and the check emails 15 minutes after the last ping before the deploy.
+The `fleet-deadman-ping` vars stay committed and unused, and the check is deleted once the rollback is final.
+
+The ping URL is a credential: anyone holding it can keep the check up.
+It lives only in cinnabar's clan vars generator `fleet-deadman-ping`, and curl reads it from stdin.
+To rotate it, create a new check with the same settings and copy its ping URL, the one with the UUID, not the slug.
+Regenerate the var and enter the new URL at its hidden prompt; the generator refuses any URL that is not `https://hc-ping.com/` followed by a UUID:
+
+```sh
+clan vars generate cinnabar --regenerate --generator fleet-deadman-ping
+```
+
+Land the vars change through a pull request, deploy cinnabar from a fresh worktree of `origin/main`, confirm pings on the new check, then delete or pause the old one within 15 minutes of its last ping, or it emails.
 
 ## The alert budget and the evaluator's state
 
@@ -822,7 +871,7 @@ The declaration does not set the TTL: the change that creates the table sets it,
 ## Not covered yet
 
 - S2 left for later slices: stibnite's deploy records, collected once S5 runs a collector there, while `devloop-reconcile` checks magnetite's records alone; dashboards over `devloop` (S6); and attributing a `dependency_failed` attribute to the derivation that failed under it, which would need error text or dependency edges that S2 does not store.
-- S3 left for later slices: the launchd and `HostProbeStale` rules (S5), and an external watch of cinnabar and ntfy themselves (CAM-76).
+- S3 left for later slices: the launchd and `HostProbeStale` rules (S5); the external watch of cinnabar and ntfy themselves landed with CAM-76 (#3716), under "The external watch".
 - S5: stibnite on darwin.
 - S6: the dashboard on its own SSO-protected vhost with provisioned dashboards, replacing the SSH tunnel.
 - S7: omp telemetry and journald logs into `agent` and `fleet`.
