@@ -6,8 +6,8 @@
   runCommand,
 }:
 let
-  version = "0.19.1";
-  # omnigent 0.19.1 caps mcp<2 and imports
+  version = "0.21.0";
+  # omnigent 0.21.0 caps mcp<2 and imports
   # mcp.client.streamable_http.streamablehttp_client and
   # mcp.shared.exceptions.McpError, both absent from nixpkgs' mcp 2.2.0. Pin
   # mcp 1.29.0, nixpkgs' previous release, in omnigent's package set only, so
@@ -79,7 +79,7 @@ let
       python = "py3";
       dist = "py3";
       platform = "any";
-      hash = "sha256-5i1X9B3TS8e+9qdnkZcIbnDTmadMGmE2p/J8NEQT5w0=";
+      hash = "sha256-yX9U2Q806HODefaMetNKPCpNu7P4ZkHiRdtTatUcqzk=";
     };
 
     # openai<2.45 is upstream's transitive cap on openai-agents, not on omnigent's
@@ -88,7 +88,7 @@ let
     # does not bind, and the pinned openai-agents 0.20.0 (openai>=2.45) keeps
     # prompt_cache_options.
     #
-    # certifi>=2026.10.19 (0.19.1) exists to drop the emSign ECC Root CA - G3
+    # certifi>=2026.10.19 (0.21.0) exists to drop the emSign ECC Root CA - G3
     # root (compromised eMudhra intermediates, upstream #11203). The version floor
     # has no effect here: nixpkgs certifi serves nixpkgs cacert's bundle, and
     # omnigent prefers the OpenSSL default bundle over certifi in any case.
