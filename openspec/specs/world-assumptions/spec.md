@@ -288,6 +288,9 @@ A term found to denote two distinct phenomena within this repository's vocabular
 | expected host | — | for one alert rule, a host from which the fleet expects its signal: every collecting host, or for the disk-health rules each collecting host with a disk-health source | shared |
 | silent | — | of a host or a job, having sent nothing it is expected to send for a stated time: a host no memory signal, the evaluator no heartbeat | shared |
 | day | — | a UTC calendar day, the period the reconcile compares | shared |
+| watch service | — | a monitoring service run by a third party outside the fleet, healthchecks.io, that expects a ping from the dead-man at a set period and emails the operator when one is late | world-only |
+| ping | — | the request the dead-man sends the watch service at the end of a run in which it found the path working, which the watch service counts as the dead-man being alive | shared |
+| email | — | a message the watch service sends to the operator's mailbox, delivered by a mail provider that runs on no host of the fleet | world-only |
 
 #### Scenario: The terms with two senses are read
 
@@ -374,17 +377,17 @@ Any requirement whose discharge depends on this fact SHALL name it explicitly, a
 It is true of cinnabar, independent of what this fleet builds on magnetite, that it serves the fleet's notification service at `https://ntfy.zt` to members of the fleet's ZeroTier network, and that it is the only path by which a message posted on any host reaches a person.
 Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL be treated as losing its discharge once this assumption's violation condition below is observed.
 
-**Evidence**: the name resolves through cinnabar's own resolver and caddy serves it only on the mesh addresses, so ZeroTier membership bounds who reaches it, and the notification service's access entries, not this assumption, bound who may publish to the fleet topics; while cinnabar or its notification service is down no message reaches a person, and nothing in the fleet reports that (ADR-009 Q5); the forced failure delivered at first activation and the weekly test alert are its monitors.
+**Evidence**: the name resolves through cinnabar's own resolver and caddy serves it only on the mesh addresses, so ZeroTier membership bounds who reaches it, and the notification service's access entries, not this assumption, bound who may publish to the fleet topics; while cinnabar or its notification service is down no alert or failure notice reaches a person, and the watch service's email reports that outage, not its content (CAM-76; ADR-009 Q5); the forced failure delivered at first activation, the weekly test alert and the watch service's email are its monitors.
 
 #### Scenario: Publishing to the notification service requires a credential, or the service becomes unreachable from magnetite
 
 - **WHEN** once the access entries are in force the notification service refuses a publish to a `fleet-*` topic that carries the `alerter` credential, or refuses an anonymous publish to a topic named after a host, or `ntfy.zt` stops resolving or answering from magnetite, or cinnabar's notification service stops running
-- **THEN** this assumption is void, and the `telemetry-store` requirement `The telemetry store's own failures reach a person`, the `host-metrics-collection` requirement `A failed collection or store job notifies a person` and every `fleet-alerting` requirement that ends in a person being told lose their discharge until the credential is accepted again or delivery is restored
+- **THEN** this assumption is void, and the `telemetry-store` requirement `The telemetry store's own failures reach a person`, the `host-metrics-collection` requirement `A failed collection or store job notifies a person` and every `fleet-alerting` requirement that ends in a person being told lose their discharge until the credential is accepted again or delivery is restored, except `An outage of the alert path reaches the operator by email from outside the fleet`, which does not rest on this assumption and reports the violation
 
 #### Scenario: A second delivery path appears
 
-- **WHEN** the fleet gains a path other than cinnabar's notification service by which an alert or a failure notice reaches a person, such as an external watch on cinnabar
-- **THEN** this assumption no longer describes the fleet, and the `fleet-alerting-interface` trust-boundary statement that an outage of the notification service goes unreported is revised with it
+- **WHEN** the fleet gains a path other than cinnabar's notification service by which an alert or a failure notice reaches a person; the watch service's email is not such a path, because it reports only that the dead-man's pings stopped and carries no alert or failure notice
+- **THEN** this assumption no longer describes the fleet, and the `fleet-alerting-interface` trust-boundary statement on an outage of the notification service is revised with it
 
 ### Requirement: A37 — ntfy provisions users, access entries and tokens from its declaration, and refuses to start on an undeclared user
 
@@ -608,3 +611,39 @@ Any requirement whose discharge depends on this fact SHALL name it explicitly, a
 
 - **WHEN** a collector version answers a full queue or a refusing limiter with a status its exporter treats as permanent, or loses persistent-queue items across a restart
 - **THEN** this assumption is void, and the `host-metrics-collection` requirement `Collection survives a telemetry store restart without losing the queued interval` and the `fleet-ingress-interface` requirement `otel-envelope regulates each agent from its own collector` lose the argument that the ingress's refusals are back-pressure rather than loss
+
+### Requirement: A53 — healthchecks.io counts a ping by its URL and emails when pings stop for longer than a check's period and grace
+
+It is true of healthchecks.io, independent of what this fleet builds, that a ping to `https://hc-ping.com/<uuid>` is answered `OK` only when that check exists and is not rate-limited, and that a check left without a ping for its period plus grace is reported by email, as is its next ping.
+Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL be treated as losing its discharge once this assumption's violation condition below is observed.
+
+**Evidence**: the Pinging API documentation (https://healthchecks.io/docs/http_api/, read on 2026-11-01) states that the UUID is assigned by the service and cannot be chosen, that an unknown check is answered `200` with `OK (not found)` and a rate-limited ping `200` with `OK (rate limited)`, and that more than 5 pings a minute to one check may be dropped; the free tier includes email (https://healthchecks.io/pricing/); the ping step's `OK` check at every run, and the acceptance stop of the notification service, which must produce the down and up emails, are its monitors.
+
+#### Scenario: The service changes how it answers or when it emails
+
+- **WHEN** a ping to an unknown or a rate-limited check is answered with exactly `OK`, the ping URL's form changes, the email integration leaves the free tier, or a check left without pings for its period plus grace produces no email
+- **THEN** this assumption is void, and the `fleet-alerting` requirement `An outage of the alert path reaches the operator by email from outside the fleet` and the `fleet-alerting-interface` requirement `The dead-man pings the watch service only after a passing run` lose the discharge argument that a missing ping becomes an email and an accepted ping is counted
+
+### Requirement: A54 — healthchecks.io runs outside the fleet, on Hetzner in Germany
+
+It is true of healthchecks.io, independent of what this fleet builds, that it runs on no host of the fleet and depends on none of the fleet's services, and that its hosting provider is Hetzner with servers in Germany, a region that may or may not be `fsn1`, where cinnabar and magnetite run.
+Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL be treated as losing its discharge once this assumption's violation condition below is observed.
+
+**Evidence**: the service's privacy page names Hetzner as its host (https://healthchecks.io/privacy/) and its comparison page places its servers in Germany (https://healthchecks.io/docs/healthchecks_sentry_comparison/), both read on 2026-11-01; cinnabar and magnetite are in `fsn1` (`modules/terranix/hetzner.nix`); the operator accepted on 2026-11-01 that an outage of that region may silence the service together with the hosts it watches.
+
+#### Scenario: The service and the fleet fail together
+
+- **WHEN** an outage takes down healthchecks.io at the same time as cinnabar, or the service moves onto infrastructure the fleet depends on
+- **THEN** this assumption is void for that outage, the `fleet-alerting` requirement `An outage of the alert path reaches the operator by email from outside the fleet` loses its discharge for its duration, and the weekly test alert remains the only report
+
+### Requirement: A55 — The operator's mailbox is reached without the fleet
+
+It is true of the operator's mailbox, independent of what this fleet builds, that its mail provider receives and delivers mail from healthchecks.io without passing through any host or service of the fleet, and that the operator reads it on a device that does not depend on the fleet's ZeroTier network.
+Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL be treated as losing its discharge once this assumption's violation condition below is observed.
+
+**Evidence**: no host of the fleet runs a mail service, and the address set in the watch service's email integration is chosen at the check's creation to be hosted off the fleet; the acceptance down and up emails, read on the operator's device, are its monitors.
+
+#### Scenario: Mail comes to depend on the fleet
+
+- **WHEN** the address the watch service emails is moved to a mail service hosted on the fleet, or the operator reads it only through the fleet's network, or mail from healthchecks.io stops being delivered
+- **THEN** this assumption is void, and the `fleet-alerting` requirement `An outage of the alert path reaches the operator by email from outside the fleet` loses the discharge argument that the email reaches the operator when the fleet cannot

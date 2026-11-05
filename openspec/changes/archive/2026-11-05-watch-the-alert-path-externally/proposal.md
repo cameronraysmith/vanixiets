@@ -1,3 +1,19 @@
+---
+linear_story_id: CAM-76
+linear_story_identifier: CAM-76
+linear_story_title: "Decide an external watcher for cinnabar (ADR-009 Q5)"
+linear_story_url: https://linear.app/cameronraysmith/issue/CAM-76/decide-an-external-watcher-for-cinnabar-adr-009-q5
+linear_story_state: Done
+linear_team: CAM
+linear_project: fleet-observability
+last_synced_state: Done
+last_synced_at: 2026-11-05T14:24:05Z
+review_round: 0
+max_review_rounds: 3
+attempt_log:
+  - { at: "2026-11-05T14:24:05Z", transition: "Backlog->Done", outcome: "posted", note: "catch-up at archive: the change was not bound when planned, so no earlier transition fired; specs synced, satisfaction projection regenerated, the three changed main specs mirrored (fleet-alerting, fleet-alerting-interface, world-assumptions), and a comment records that CAM-72 may start" }
+---
+
 ## Why
 
 Every alert, failure notice and dead-man post reaches a person only through ntfy on cinnabar, so an outage of cinnabar, ntfy, caddy or the mesh path to them is noticed only by a missing Monday `WeeklyPipelineTest`, up to 7 days later.
