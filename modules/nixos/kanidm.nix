@@ -151,6 +151,26 @@ in
         '';
       };
 
+      # The Perses client secret, read by Kanidm's provisioning and loaded by
+      # perses.service as the credential kanidm-client-secret; written
+      # without a newline so both read the same value.
+      clan.core.vars.generators.kanidm-oauth2-perses = {
+        files.secret = {
+          secret = true;
+          owner = "kanidm";
+          group = "kanidm";
+          mode = "0400";
+          restartUnits = [
+            "kanidm.service"
+            "perses.service"
+          ];
+        };
+        runtimeInputs = [ pkgs.openssl ];
+        script = ''
+          printf '%s' "$(openssl rand -hex 32)" > "$out/secret"
+        '';
+      };
+
       services.kanidm = {
         package = pkgs.kanidmWithSecretProvisioning_1_11;
 
@@ -223,6 +243,10 @@ in
               members = [ ];
               overwriteMembers = false;
             };
+            perses_users = {
+              members = [ ];
+              overwriteMembers = false;
+            };
           };
 
           systems.oauth2.synapse = {
@@ -274,6 +298,27 @@ in
               "email"
             ];
             basicSecretFile = config.clan.core.vars.generators.kanidm-oauth2-omnigent.files.secret.path;
+          };
+
+          # The scope map is the group gate: Kanidm refuses an authorization
+          # whose scopes no group of the person maps, so only perses_users
+          # members reach Perses.
+          systems.oauth2.perses = {
+            displayName = "Observability";
+            originUrl = "https://obs.scientistexperience.net/api/auth/providers/oidc/kanidm/callback";
+            originLanding = "https://obs.scientistexperience.net/";
+            # The cropped Perses mark at the v0.55.0 commit.
+            imageFile = pkgs.fetchurl {
+              url = "https://raw.githubusercontent.com/perses/perses/bfaf3ce26d8b36397efb41ce185197a6e22f28b1/docs/images/perses_logo_cropped.svg";
+              hash = "sha256-8hLSMQekM6OfRq1SXh+fqdFaQcIH7jHEkqJfTfKfalo=";
+            };
+            preferShortUsername = true;
+            scopeMaps.perses_users = [
+              "openid"
+              "profile"
+              "email"
+            ];
+            basicSecretFile = config.clan.core.vars.generators.kanidm-oauth2-perses.files.secret.path;
           };
         };
       };

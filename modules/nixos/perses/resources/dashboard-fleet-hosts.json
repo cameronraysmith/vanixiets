@@ -1,0 +1,824 @@
+{
+  "kind": "Dashboard",
+  "metadata": {
+    "name": "fleet-hosts",
+    "project": "fleet"
+  },
+  "spec": {
+    "display": {
+      "name": "Fleet hosts",
+      "description": "Each collecting host's memory, swap, processes, OOM kills, file systems, ZFS, units, exporters and NVMe health, selectable by host."
+    },
+    "duration": "6h",
+    "refreshInterval": "1m",
+    "variables": [
+      {
+        "kind": "ListVariable",
+        "spec": {
+          "name": "host_name",
+          "display": {
+            "name": "Host"
+          },
+          "allowMultiple": true,
+          "allowAllValue": true,
+          "defaultValue": "$__all",
+          "plugin": {
+            "kind": "PrometheusLabelValuesVariable",
+            "spec": {
+              "datasource": {
+                "kind": "PrometheusDatasource",
+                "name": "greptimedb-promql"
+              },
+              "labelName": "host_name",
+              "matchers": [
+                "system_memory_usage_bytes"
+              ]
+            }
+          }
+        }
+      }
+    ],
+    "panels": {
+      "memory": {
+        "kind": "Panel",
+        "spec": {
+          "display": {
+            "name": "Memory",
+            "description": "Available and used bytes per host."
+          },
+          "plugin": {
+            "kind": "TimeSeriesChart",
+            "spec": {
+              "yAxis": {
+                "format": {
+                  "unit": "bytes"
+                }
+              },
+              "legend": {
+                "position": "bottom",
+                "mode": "list"
+              }
+            }
+          },
+          "queries": [
+            {
+              "kind": "TimeSeriesQuery",
+              "spec": {
+                "plugin": {
+                  "kind": "PrometheusTimeSeriesQuery",
+                  "spec": {
+                    "datasource": {
+                      "kind": "PrometheusDatasource",
+                      "name": "greptimedb-promql"
+                    },
+                    "query": "sum by (host_name) (system_linux_memory_available_bytes{host_name=~\"$host_name\"})",
+                    "seriesNameFormat": "{{host_name}} available"
+                  }
+                }
+              }
+            },
+            {
+              "kind": "TimeSeriesQuery",
+              "spec": {
+                "plugin": {
+                  "kind": "PrometheusTimeSeriesQuery",
+                  "spec": {
+                    "datasource": {
+                      "kind": "PrometheusDatasource",
+                      "name": "greptimedb-promql"
+                    },
+                    "query": "sum by (host_name) (system_memory_usage_bytes{state=\"used\", host_name=~\"$host_name\"})",
+                    "seriesNameFormat": "{{host_name}} used"
+                  }
+                }
+              }
+            }
+          ]
+        }
+      },
+      "memory-headroom": {
+        "kind": "Panel",
+        "spec": {
+          "display": {
+            "name": "Memory headroom",
+            "description": "HostMemoryPressure's ratio: available memory plus the ZFS ARC above its minimum, over used plus available; the alert fires below 0.10."
+          },
+          "plugin": {
+            "kind": "TimeSeriesChart",
+            "spec": {
+              "yAxis": {
+                "format": {
+                  "unit": "percent-decimal"
+                }
+              },
+              "legend": {
+                "position": "bottom",
+                "mode": "list"
+              }
+            }
+          },
+          "queries": [
+            {
+              "kind": "TimeSeriesQuery",
+              "spec": {
+                "plugin": {
+                  "kind": "PrometheusTimeSeriesQuery",
+                  "spec": {
+                    "datasource": {
+                      "kind": "PrometheusDatasource",
+                      "name": "greptimedb-promql"
+                    },
+                    "query": "(sum by (host_name) (system_linux_memory_available_bytes{host_name=~\"$host_name\"}) + sum by (host_name) (node_zfs_arc_size{host_name=~\"$host_name\"} - node_zfs_arc_c_min{host_name=~\"$host_name\"})) / (sum by (host_name) (system_memory_usage_bytes{state=\"used\", host_name=~\"$host_name\"}) + sum by (host_name) (system_linux_memory_available_bytes{host_name=~\"$host_name\"}))",
+                    "seriesNameFormat": "{{host_name}}"
+                  }
+                }
+              }
+            }
+          ]
+        }
+      },
+      "swap": {
+        "kind": "Panel",
+        "spec": {
+          "display": {
+            "name": "Swap used",
+            "description": "Used swap over total swap; HostMemoryPressure fires above 0.85."
+          },
+          "plugin": {
+            "kind": "TimeSeriesChart",
+            "spec": {
+              "yAxis": {
+                "format": {
+                  "unit": "percent-decimal"
+                }
+              },
+              "legend": {
+                "position": "bottom",
+                "mode": "list"
+              }
+            }
+          },
+          "queries": [
+            {
+              "kind": "TimeSeriesQuery",
+              "spec": {
+                "plugin": {
+                  "kind": "PrometheusTimeSeriesQuery",
+                  "spec": {
+                    "datasource": {
+                      "kind": "PrometheusDatasource",
+                      "name": "greptimedb-promql"
+                    },
+                    "query": "sum by (host_name) (system_paging_usage_bytes{state=\"used\", host_name=~\"$host_name\"}) / sum by (host_name) (system_paging_usage_bytes{host_name=~\"$host_name\"})",
+                    "seriesNameFormat": "{{host_name}}"
+                  }
+                }
+              }
+            }
+          ]
+        }
+      },
+      "processes": {
+        "kind": "Panel",
+        "spec": {
+          "display": {
+            "name": "Top processes by resident memory",
+            "description": "The five executables holding the most resident memory on each host; swapped-out pages are not counted."
+          },
+          "plugin": {
+            "kind": "TimeSeriesChart",
+            "spec": {
+              "yAxis": {
+                "format": {
+                  "unit": "bytes"
+                }
+              },
+              "legend": {
+                "position": "bottom",
+                "mode": "list"
+              }
+            }
+          },
+          "queries": [
+            {
+              "kind": "TimeSeriesQuery",
+              "spec": {
+                "plugin": {
+                  "kind": "PrometheusTimeSeriesQuery",
+                  "spec": {
+                    "datasource": {
+                      "kind": "PrometheusDatasource",
+                      "name": "greptimedb-promql"
+                    },
+                    "query": "topk by (host_name) (5, process_memory_usage_bytes{host_name=~\"$host_name\"})",
+                    "seriesNameFormat": "{{host_name}} {{process_executable_name}}"
+                  }
+                }
+              }
+            }
+          ]
+        }
+      },
+      "oom-kills": {
+        "kind": "Panel",
+        "spec": {
+          "display": {
+            "name": "OOM kills",
+            "description": "Processes the kernel killed for memory in the last 10 min."
+          },
+          "plugin": {
+            "kind": "TimeSeriesChart",
+            "spec": {
+              "yAxis": {
+                "format": {
+                  "unit": "decimal"
+                }
+              },
+              "legend": {
+                "position": "bottom",
+                "mode": "list"
+              }
+            }
+          },
+          "queries": [
+            {
+              "kind": "TimeSeriesQuery",
+              "spec": {
+                "plugin": {
+                  "kind": "PrometheusTimeSeriesQuery",
+                  "spec": {
+                    "datasource": {
+                      "kind": "PrometheusDatasource",
+                      "name": "greptimedb-promql"
+                    },
+                    "query": "increase(node_vmstat_oom_kill{host_name=~\"$host_name\"}[10m])",
+                    "seriesNameFormat": "{{host_name}}"
+                  }
+                }
+              }
+            }
+          ]
+        }
+      },
+      "filesystems": {
+        "kind": "Panel",
+        "spec": {
+          "display": {
+            "name": "File systems used",
+            "description": "Used over total per mount point; the alerts fire above 0.85 and 0.95."
+          },
+          "plugin": {
+            "kind": "TimeSeriesChart",
+            "spec": {
+              "yAxis": {
+                "format": {
+                  "unit": "percent-decimal"
+                }
+              },
+              "legend": {
+                "position": "bottom",
+                "mode": "list"
+              }
+            }
+          },
+          "queries": [
+            {
+              "kind": "TimeSeriesQuery",
+              "spec": {
+                "plugin": {
+                  "kind": "PrometheusTimeSeriesQuery",
+                  "spec": {
+                    "datasource": {
+                      "kind": "PrometheusDatasource",
+                      "name": "greptimedb-promql"
+                    },
+                    "query": "sum by (host_name, mountpoint) (system_filesystem_usage_bytes{state=\"used\", host_name=~\"$host_name\"}) / sum by (host_name, mountpoint) (system_filesystem_usage_bytes{host_name=~\"$host_name\"})",
+                    "seriesNameFormat": "{{host_name}} {{mountpoint}}"
+                  }
+                }
+              }
+            }
+          ]
+        }
+      },
+      "pools": {
+        "kind": "Panel",
+        "spec": {
+          "display": {
+            "name": "ZFS pool states",
+            "description": "The state each pool reports; any state but online raises ZfsPoolUnhealthy."
+          },
+          "plugin": {
+            "kind": "Table",
+            "spec": {}
+          },
+          "queries": [
+            {
+              "kind": "TimeSeriesQuery",
+              "spec": {
+                "plugin": {
+                  "kind": "PrometheusTimeSeriesQuery",
+                  "spec": {
+                    "datasource": {
+                      "kind": "PrometheusDatasource",
+                      "name": "greptimedb-promql"
+                    },
+                    "query": "node_zfs_zpool_state{host_name=~\"$host_name\"} == 1"
+                  }
+                }
+              }
+            }
+          ]
+        }
+      },
+      "arc-size": {
+        "kind": "Panel",
+        "spec": {
+          "display": {
+            "name": "ZFS ARC size",
+            "description": "The ARC's size against its minimum and maximum."
+          },
+          "plugin": {
+            "kind": "TimeSeriesChart",
+            "spec": {
+              "yAxis": {
+                "format": {
+                  "unit": "bytes"
+                }
+              },
+              "legend": {
+                "position": "bottom",
+                "mode": "list"
+              }
+            }
+          },
+          "queries": [
+            {
+              "kind": "TimeSeriesQuery",
+              "spec": {
+                "plugin": {
+                  "kind": "PrometheusTimeSeriesQuery",
+                  "spec": {
+                    "datasource": {
+                      "kind": "PrometheusDatasource",
+                      "name": "greptimedb-promql"
+                    },
+                    "query": "node_zfs_arc_size{host_name=~\"$host_name\"}",
+                    "seriesNameFormat": "{{host_name}} size"
+                  }
+                }
+              }
+            },
+            {
+              "kind": "TimeSeriesQuery",
+              "spec": {
+                "plugin": {
+                  "kind": "PrometheusTimeSeriesQuery",
+                  "spec": {
+                    "datasource": {
+                      "kind": "PrometheusDatasource",
+                      "name": "greptimedb-promql"
+                    },
+                    "query": "node_zfs_arc_c_min{host_name=~\"$host_name\"}",
+                    "seriesNameFormat": "{{host_name}} c_min"
+                  }
+                }
+              }
+            },
+            {
+              "kind": "TimeSeriesQuery",
+              "spec": {
+                "plugin": {
+                  "kind": "PrometheusTimeSeriesQuery",
+                  "spec": {
+                    "datasource": {
+                      "kind": "PrometheusDatasource",
+                      "name": "greptimedb-promql"
+                    },
+                    "query": "node_zfs_arc_c_max{host_name=~\"$host_name\"}",
+                    "seriesNameFormat": "{{host_name}} c_max"
+                  }
+                }
+              }
+            }
+          ]
+        }
+      },
+      "arc-hits": {
+        "kind": "Panel",
+        "spec": {
+          "display": {
+            "name": "ZFS ARC hit ratio",
+            "description": "Hits over hits plus misses over 5 min."
+          },
+          "plugin": {
+            "kind": "TimeSeriesChart",
+            "spec": {
+              "yAxis": {
+                "format": {
+                  "unit": "percent-decimal"
+                }
+              },
+              "legend": {
+                "position": "bottom",
+                "mode": "list"
+              }
+            }
+          },
+          "queries": [
+            {
+              "kind": "TimeSeriesQuery",
+              "spec": {
+                "plugin": {
+                  "kind": "PrometheusTimeSeriesQuery",
+                  "spec": {
+                    "datasource": {
+                      "kind": "PrometheusDatasource",
+                      "name": "greptimedb-promql"
+                    },
+                    "query": "sum by (host_name) (rate(node_zfs_arc_hits{host_name=~\"$host_name\"}[5m])) / (sum by (host_name) (rate(node_zfs_arc_hits{host_name=~\"$host_name\"}[5m])) + sum by (host_name) (rate(node_zfs_arc_misses{host_name=~\"$host_name\"}[5m])))",
+                    "seriesNameFormat": "{{host_name}}"
+                  }
+                }
+              }
+            }
+          ]
+        }
+      },
+      "units-failed": {
+        "kind": "Panel",
+        "spec": {
+          "display": {
+            "name": "Failed units",
+            "description": "Units the collector stores that are in the failed state; perses.service is not among the stored units."
+          },
+          "plugin": {
+            "kind": "Table",
+            "spec": {}
+          },
+          "queries": [
+            {
+              "kind": "TimeSeriesQuery",
+              "spec": {
+                "plugin": {
+                  "kind": "PrometheusTimeSeriesQuery",
+                  "spec": {
+                    "datasource": {
+                      "kind": "PrometheusDatasource",
+                      "name": "greptimedb-promql"
+                    },
+                    "query": "systemd_unit_state{systemd_unit_active_state=\"failed\", host_name=~\"$host_name\"} == 1"
+                  }
+                }
+              }
+            }
+          ]
+        }
+      },
+      "units-restarts": {
+        "kind": "Panel",
+        "spec": {
+          "display": {
+            "name": "Unit restarts",
+            "description": "Restarts per unit in the last 15 min; SystemdUnitRestartLoop fires above 5."
+          },
+          "plugin": {
+            "kind": "TimeSeriesChart",
+            "spec": {
+              "yAxis": {
+                "format": {
+                  "unit": "decimal"
+                }
+              },
+              "legend": {
+                "position": "bottom",
+                "mode": "list"
+              }
+            }
+          },
+          "queries": [
+            {
+              "kind": "TimeSeriesQuery",
+              "spec": {
+                "plugin": {
+                  "kind": "PrometheusTimeSeriesQuery",
+                  "spec": {
+                    "datasource": {
+                      "kind": "PrometheusDatasource",
+                      "name": "greptimedb-promql"
+                    },
+                    "query": "increase(systemd_service_restarts_total{host_name=~\"$host_name\"}[15m])",
+                    "seriesNameFormat": "{{host_name}} {{systemd_unit_name}}"
+                  }
+                }
+              }
+            }
+          ]
+        }
+      },
+      "exporters": {
+        "kind": "Panel",
+        "spec": {
+          "display": {
+            "name": "Loopback exporters",
+            "description": "1 while the collector scrapes the exporter, 0 when it is down."
+          },
+          "plugin": {
+            "kind": "TimeSeriesChart",
+            "spec": {
+              "yAxis": {
+                "format": {
+                  "unit": "decimal"
+                }
+              },
+              "legend": {
+                "position": "bottom",
+                "mode": "list"
+              }
+            }
+          },
+          "queries": [
+            {
+              "kind": "TimeSeriesQuery",
+              "spec": {
+                "plugin": {
+                  "kind": "PrometheusTimeSeriesQuery",
+                  "spec": {
+                    "datasource": {
+                      "kind": "PrometheusDatasource",
+                      "name": "greptimedb-promql"
+                    },
+                    "query": "up{job=~\"node|smartctl\", host_name=~\"$host_name\"}",
+                    "seriesNameFormat": "{{host_name}} {{job}}"
+                  }
+                }
+              }
+            }
+          ]
+        }
+      },
+      "nvme-warning": {
+        "kind": "Panel",
+        "spec": {
+          "display": {
+            "name": "NVMe critical warning",
+            "description": "The controller's critical-warning bits; any value but 0 raises NvmeCriticalWarning."
+          },
+          "plugin": {
+            "kind": "TimeSeriesChart",
+            "spec": {
+              "yAxis": {
+                "format": {
+                  "unit": "decimal"
+                }
+              },
+              "legend": {
+                "position": "bottom",
+                "mode": "list"
+              }
+            }
+          },
+          "queries": [
+            {
+              "kind": "TimeSeriesQuery",
+              "spec": {
+                "plugin": {
+                  "kind": "PrometheusTimeSeriesQuery",
+                  "spec": {
+                    "datasource": {
+                      "kind": "PrometheusDatasource",
+                      "name": "greptimedb-promql"
+                    },
+                    "query": "smartctl_device_critical_warning_total{host_name=~\"$host_name\"}",
+                    "seriesNameFormat": "{{host_name}} {{device}}"
+                  }
+                }
+              }
+            }
+          ]
+        }
+      },
+      "nvme-wear": {
+        "kind": "Panel",
+        "spec": {
+          "display": {
+            "name": "NVMe endurance used",
+            "description": "Percentage of rated endurance used; NvmeWearHigh fires above 90."
+          },
+          "plugin": {
+            "kind": "TimeSeriesChart",
+            "spec": {
+              "yAxis": {
+                "format": {
+                  "unit": "percent"
+                }
+              },
+              "legend": {
+                "position": "bottom",
+                "mode": "list"
+              }
+            }
+          },
+          "queries": [
+            {
+              "kind": "TimeSeriesQuery",
+              "spec": {
+                "plugin": {
+                  "kind": "PrometheusTimeSeriesQuery",
+                  "spec": {
+                    "datasource": {
+                      "kind": "PrometheusDatasource",
+                      "name": "greptimedb-promql"
+                    },
+                    "query": "smartctl_device_percentage_used_total{host_name=~\"$host_name\"}",
+                    "seriesNameFormat": "{{host_name}} {{device}}"
+                  }
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "layouts": [
+      {
+        "kind": "Grid",
+        "spec": {
+          "display": {
+            "title": "Memory",
+            "collapse": {
+              "open": true
+            }
+          },
+          "items": [
+            {
+              "x": 0,
+              "y": 0,
+              "width": 12,
+              "height": 8,
+              "content": {
+                "$ref": "#/spec/panels/memory"
+              }
+            },
+            {
+              "x": 12,
+              "y": 0,
+              "width": 12,
+              "height": 8,
+              "content": {
+                "$ref": "#/spec/panels/memory-headroom"
+              }
+            },
+            {
+              "x": 0,
+              "y": 8,
+              "width": 12,
+              "height": 8,
+              "content": {
+                "$ref": "#/spec/panels/swap"
+              }
+            },
+            {
+              "x": 12,
+              "y": 8,
+              "width": 12,
+              "height": 8,
+              "content": {
+                "$ref": "#/spec/panels/processes"
+              }
+            },
+            {
+              "x": 0,
+              "y": 16,
+              "width": 12,
+              "height": 8,
+              "content": {
+                "$ref": "#/spec/panels/oom-kills"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "kind": "Grid",
+        "spec": {
+          "display": {
+            "title": "Storage",
+            "collapse": {
+              "open": true
+            }
+          },
+          "items": [
+            {
+              "x": 0,
+              "y": 0,
+              "width": 12,
+              "height": 8,
+              "content": {
+                "$ref": "#/spec/panels/filesystems"
+              }
+            },
+            {
+              "x": 12,
+              "y": 0,
+              "width": 12,
+              "height": 8,
+              "content": {
+                "$ref": "#/spec/panels/pools"
+              }
+            },
+            {
+              "x": 0,
+              "y": 8,
+              "width": 12,
+              "height": 8,
+              "content": {
+                "$ref": "#/spec/panels/arc-size"
+              }
+            },
+            {
+              "x": 12,
+              "y": 8,
+              "width": 12,
+              "height": 8,
+              "content": {
+                "$ref": "#/spec/panels/arc-hits"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "kind": "Grid",
+        "spec": {
+          "display": {
+            "title": "Units and exporters",
+            "collapse": {
+              "open": true
+            }
+          },
+          "items": [
+            {
+              "x": 0,
+              "y": 0,
+              "width": 12,
+              "height": 8,
+              "content": {
+                "$ref": "#/spec/panels/units-failed"
+              }
+            },
+            {
+              "x": 12,
+              "y": 0,
+              "width": 12,
+              "height": 8,
+              "content": {
+                "$ref": "#/spec/panels/units-restarts"
+              }
+            },
+            {
+              "x": 0,
+              "y": 8,
+              "width": 12,
+              "height": 8,
+              "content": {
+                "$ref": "#/spec/panels/exporters"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "kind": "Grid",
+        "spec": {
+          "display": {
+            "title": "NVMe",
+            "collapse": {
+              "open": true
+            }
+          },
+          "items": [
+            {
+              "x": 0,
+              "y": 0,
+              "width": 12,
+              "height": 8,
+              "content": {
+                "$ref": "#/spec/panels/nvme-warning"
+              }
+            },
+            {
+              "x": 12,
+              "y": 0,
+              "width": 12,
+              "height": 8,
+              "content": {
+                "$ref": "#/spec/panels/nvme-wear"
+              }
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

@@ -1,0 +1,42 @@
+{
+  "kind": "GlobalDatasource",
+  "metadata": {
+    "name": "greptimedb-promql"
+  },
+  "spec": {
+    "default": true,
+    "plugin": {
+      "kind": "PrometheusDatasource",
+      "spec": {
+        "proxy": {
+          "kind": "HTTPProxy",
+          "spec": {
+            "url": "http://127.0.0.1:4000/v1/prometheus",
+            "secret": "greptimedb-perses",
+            "headers": {
+              "x-greptime-db-name": "fleet"
+            },
+            "allowHeaders": [
+              "Accept",
+              "Accept-Encoding",
+              "Content-Type",
+              "Content-Length",
+              "User-Agent",
+              "x-greptime-db-name"
+            ],
+            "allowedEndpoints": [
+              {
+                "method": "POST",
+                "endpointPattern": "^/api/v1/(query|query_range|labels|series)$"
+              },
+              {
+                "method": "GET",
+                "endpointPattern": "^/api/v1/(label/[A-Za-z_][A-Za-z0-9_]*/values|labels|series|query|query_range)$"
+              }
+            ]
+          }
+        }
+      }
+    }
+  }
+}

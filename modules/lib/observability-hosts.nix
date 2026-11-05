@@ -29,6 +29,7 @@
           "greptimedb"
           "greptimedb-envelope"
           "greptimedb-schema"
+          "perses"
           "zfs-assert-root-docker-noautosnap"
           "zfs-assert-root-greptimedb-noautosnap"
           "zfs-assert-root-nix-noautosnap"

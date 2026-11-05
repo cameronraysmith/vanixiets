@@ -1,0 +1,38 @@
+{
+  "kind": "GlobalDatasource",
+  "metadata": {
+    "name": "greptimedb-sql"
+  },
+  "spec": {
+    "default": false,
+    "plugin": {
+      "kind": "GreptimeDBDatasource",
+      "spec": {
+        "proxy": {
+          "kind": "HTTPProxy",
+          "spec": {
+            "url": "http://127.0.0.1:4000",
+            "secret": "greptimedb-perses",
+            "headers": {
+              "x-greptime-db-name": "fleet"
+            },
+            "allowHeaders": [
+              "Accept",
+              "Accept-Encoding",
+              "Content-Type",
+              "Content-Length",
+              "User-Agent",
+              "x-greptime-db-name"
+            ],
+            "allowedEndpoints": [
+              {
+                "method": "POST",
+                "endpointPattern": "^/v1/sql$"
+              }
+            ]
+          }
+        }
+      }
+    }
+  }
+}

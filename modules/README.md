@@ -72,6 +72,7 @@ nix build .#vmTests.x86_64-linux.omnigent-worker-isolation    # Pyrite, kvm
 nix build .#vmTests.x86_64-linux.greptimedb-pipeline          # Magnetite, uid-range
 nix build .#vmTests.x86_64-linux.devloop-ingest               # Magnetite, uid-range
 nix build .#vmTests.x86_64-linux.fleet-ingress                # Magnetite, uid-range
+nix build .#vmTests.x86_64-linux.perses-greptimedb            # Magnetite, uid-range
 nix build .#vmTests.x86_64-linux.greptimedb-oom-order         # Pyrite, kvm
 ```
 
@@ -92,6 +93,12 @@ Run it on Magnetite before merging any change to the dev-loop receivers, pipelin
 `fleet-ingress` runs the telemetry store, a collector of both roles with its `otlp/mesh` receiver on loopback, and Electrum's evaluated non-ingress collector exporting to it over mutual TLS with throwaway certificates, in one systemd-nspawn container.
 It establishes that the receiver refuses a client without a certificate, with a rogue CA's certificate or at TLS 1.2, that metrics and deploy records cross the ingress into the store, that back-pressure from a stopped store or a refusing limiter fills the agent's queue without loss, that each envelope clause fails on its negative control when run as its unit, and that each budget fixture fails its clause on the ingress host's unit.
 It stands the container's loopback in for Magnetite's ZeroTier address and generates its own certificates, so it establishes nothing about the real address, the `zt+` firewall opening, the deployed certificates or the refusal over the mesh, which are observed at deployment.
+
+`perses-greptimedb` runs the telemetry store with Magnetite's databases, devloop tables and store accounts, Perses from `flake.modules.nixos.perses`, and nginx with the module's vhost on plain HTTP, in one systemd-nspawn container.
+No Kanidm runs: the test replaces the providers with native login, adds a test-only provisioning folder holding one native `User` and `greptimedb-sql-open` (the SQL datasource without `allowHeaders`), and holds the module's assertion to exactly the serving-predicate failures those overrides explain.
+It establishes that a request without a session is answered 401, that dashboard writes are refused and a planted view is gone after a restart, that both datasources read data with the caller's database header overwritten, that every committed view's query succeeds and a view with a missing series fails that case, that the store refuses an `INSERT`, that the four out-of-pattern routes are refused by Perses before any request, that a caller's `x-greptime-auth` reaches the store as `perses` through nginx and directly but as `admin` through `greptimedb-sql-open` (the negative control), and that `/metrics` is 404 at the vhost.
+It establishes nothing about Kanidm's refusal or admission, TLS and ACME, R2 storage, OOM behaviour, or what a chart renders.
+Run it on Magnetite before merging any change to `modules/nixos/perses.nix`, its resources or `perses-bin`, and name its log in the pull request.
 
 `greptimedb-oom-order` runs one QEMU VM in which three equally growing memory consumers exhaust memory: one behind the real `nix-eval-jobs` lock wrapper, one inside `greptimedb.service`'s cgroup at that unit's `oom_score_adj`, and a collector stand-in at the collector's evaluated `OOMScoreAdjust`.
 It establishes that the kernel kills them in the order evaluator (900), store (500), collector (300), that systemd records the OOM kill in each owning unit, and that `greptimedb.service` fails with result `oom-kill` under the default `OOMPolicy=stop`.

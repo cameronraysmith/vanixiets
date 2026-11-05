@@ -1,0 +1,11 @@
+{
+  "kind": "User",
+  "metadata": {
+    "name": "tester"
+  },
+  "spec": {
+    "nativeProvider": {
+      "password": "container-test-only"
+    }
+  }
+}

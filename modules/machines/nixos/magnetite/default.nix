@@ -67,6 +67,7 @@ in
         gitea
         cognee
         sso-gateway
+        perses
         gitea-actions-runner
         docker
         kanidm
@@ -512,9 +513,10 @@ in
       # passwords, because a users line needs exactly one `=` and the store
       # silently skips a malformed line (design F2); written with printf '%s'
       # so no file carries a trailing newline into an HTTP basic-auth header.
-      # perses-password has no consumer until S6. users-sha256 is public: the
-      # sha256 of 256-bit hex passwords is not reversible, and R7.4 compares it
-      # with /run/greptimedb/loaded-users.sha256.
+      # perses-password is loaded by perses.service, which restarts on its
+      # rotation. users-sha256 is public: the sha256 of 256-bit hex passwords
+      # is not reversible, and R7.4 compares it with
+      # /run/greptimedb/loaded-users.sha256.
       clan.core.vars.generators.greptimedb-users = {
         files.users = {
           owner = "greptimedb";
@@ -526,7 +528,10 @@ in
           mode = "0400";
           restartUnits = [ "opentelemetry-collector.service" ];
         };
-        files.perses-password.mode = "0400";
+        files.perses-password = {
+          mode = "0400";
+          restartUnits = [ "perses.service" ];
+        };
         files.regulator-password.mode = "0400";
         files.users-sha256.secret = false;
         runtimeInputs = [ pkgs.openssl ];
@@ -544,6 +549,28 @@ in
           sha256sum "$out/users" | cut -d ' ' -f 1 > "$out/users-sha256"
         '';
       };
+
+      # Perses signs its session tokens with this key (design D8); 32 bytes,
+      # as Perses requires, and replaced only by regeneration, which restarts
+      # perses.service.
+      clan.core.vars.generators.perses-encryption-key = {
+        files.key = {
+          mode = "0400";
+          restartUnits = [ "perses.service" ];
+        };
+        runtimeInputs = [ pkgs.openssl ];
+        script = ''
+          printf '%s' "$(openssl rand -hex 16)" > "$out/key"
+        '';
+      };
+
+      # The three files flake.modules.nixos.perses reads, each under
+      # /run/credentials/perses.service/.
+      systemd.services.perses.serviceConfig.LoadCredential = [
+        "kanidm-client-secret:${config.clan.core.vars.generators.kanidm-oauth2-perses.files.secret.path}"
+        "encryption-key:${config.clan.core.vars.generators.perses-encryption-key.files.key.path}"
+        "perses-password:${config.clan.core.vars.generators.greptimedb-users.files.perses-password.path}"
+      ];
 
       # Cloudflare R2 credentials for the store's object data, an Object Read
       # & Write token on bucket sciexp, delivered as an EnvironmentFile in
@@ -633,7 +660,7 @@ in
             users = [ "greptimedb" ];
             admin-password = [ "greptimedb-schema" ];
             collector-password = [ "opentelemetry-collector" ];
-            perses-password = [ ];
+            perses-password = [ "perses" ];
             # Sorted, because `actual` is naturalSorted: the four regulators
             # that read the store, devloop-reconcile, fleet-alert,
             # greptimedb-envelope and otel-envelope's hourly budget.
@@ -706,6 +733,7 @@ in
               );
             order = {
               nix-eval-jobs = evaluatorAdj;
+              perses = unitAdj "perses";
               greptimedb = unitAdj "greptimedb";
               opentelemetry-collector = unitAdj "opentelemetry-collector";
               fleet-alert = unitAdj "fleet-alert";
@@ -722,18 +750,20 @@ in
                 builtins.toJSON (store.MemorySwapMax or null)
               }.";
             }
-            # R7.1 (A7:100,127) and S3 design D12: under host OOM the kernel
-            # kills the evaluator, then the store, then the collector, so the
-            # collector outlives the store and queues; the alert evaluator,
-            # which reports OOM kills, is taken after all three.
+            # R7.1 (A7:100,127), S3 design D12 and CAM-73 design D8: under host
+            # OOM the kernel kills the evaluator, then the dashboard service,
+            # then the store, then the collector, so the collector outlives
+            # the store and queues; the alert evaluator, which reports OOM
+            # kills, is taken after all of them.
             {
               assertion =
                 config.services.nixEvalLock.enable
                 && evaluatorAdj != null
-                && evaluatorAdj > order.greptimedb
+                && evaluatorAdj > order.perses
+                && order.perses > order.greptimedb
                 && order.greptimedb > order.opentelemetry-collector
                 && order.opentelemetry-collector > order.fleet-alert;
-              message = "magnetite: R7.1 and S3 design D12 require the evaluation lock and oom_score_adj nix-eval-jobs > greptimedb > opentelemetry-collector > fleet-alert; the lock is ${
+              message = "magnetite: R7.1, S3 design D12 and CAM-73 design D8 require the evaluation lock and oom_score_adj nix-eval-jobs > perses > greptimedb > opentelemetry-collector > fleet-alert; the lock is ${
                 if config.services.nixEvalLock.enable then "enabled" else "disabled"
               } and the values are ${builtins.toJSON order}.";
             }
