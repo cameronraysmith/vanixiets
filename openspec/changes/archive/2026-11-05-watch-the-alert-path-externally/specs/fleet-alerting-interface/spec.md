@@ -76,7 +76,7 @@ The per-machine generator `fleet-deadman-ping` on cinnabar SHALL take the ping U
 
 ### Requirement: The rule check runs promtool, fixture mutants and a property test
 
-`checks.x86_64-linux.fleet-alert` SHALL run `promtool check rules` over the rendered YAML, run the evaluator in the build sandbox against a loopback fixture server that replays canned query responses and records every ntfy post, compare the jq transition function with a Python reference model over Hypothesis-generated timelines, run the dead-man with its ping step against the ntfy stand-in and a loopback ping stand-in that records each request (R9.6), and fail on each of its mutants, within an evaluation budget of 0.5 GiB.
+`checks.x86_64-linux.fleet-alert` SHALL run `promtool check rules` over the rendered YAML, run the evaluator in the build sandbox against a loopback fixture server that replays canned query responses and records every ntfy post, compare the jq transition function with a Python reference model over Hypothesis-generated timelines, run the dead-man with its ping step against the ntfy stand-in and a loopback ping stand-in that records each request (R9.6), and fail on each of its mutants.
 
 **Discharged by**: the check's own mutants, each of which must produce a non-empty failure list, and the plan-time measurement of its evaluation cost with `NIX_SHOW_STATS`.
 
