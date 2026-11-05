@@ -1,0 +1,12 @@
+- name: datasource-names
+  target: '$.spec.panels[*].spec.queries[*].spec.plugin.spec.datasource.name'
+  assertion: 'dyn(value).all(n, n in ["greptimedb-promql", "greptimedb-sql"])'
+  message: "a query names a datasource other than greptimedb-promql or greptimedb-sql"
+- name: sql-no-select-star
+  target: '$.spec.panels[*].spec.queries[*].spec.plugin'
+  assertion: 'dyn(value).all(p, p.kind != "GreptimeDBTimeSeriesQuery" || !p.spec.query.matches("(?i)select\\s+\\*"))'
+  message: "an SQL query selects *"
+- name: sql-qualified-tables
+  target: '$.spec.panels[*].spec.queries[*].spec.plugin'
+  assertion: 'dyn(value).all(p, p.kind != "GreptimeDBTimeSeriesQuery" || !p.spec.query.matches("(?i)\\b(from|join)\\s+(\"[^\"]*\"\\s*([^.\\s]|$)|[^\"(\\s])"))'
+  message: "an SQL query names a table without its database; views use no CTEs, whose names cannot carry one"

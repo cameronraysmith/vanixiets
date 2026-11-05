@@ -1,0 +1,41 @@
+{
+  "version": "0.55.1",
+  "hashes": {
+    "x86_64-linux": "sha256-fDis5c5mXiLX1PgjuLwMjpH5vO84HyGNjFZOD+Yrp1A=",
+    "aarch64-darwin": "sha256-+oQkxosNGszgeGneyJZ9EC3Z2Sb2p+jrrr1bopKpfc8="
+  },
+  "plugins": {
+    "AlertManager": "0.2.1",
+    "BarChart": "0.14.1",
+    "Canvas": "0.1.1",
+    "ClickHouse": "0.7.1",
+    "DatasourceVariable": "0.7.1",
+    "FlameChart": "0.7.1",
+    "GaugeChart": "0.14.1",
+    "GreptimeDB": "0.2.1",
+    "HeatMapChart": "0.6.1",
+    "HistogramChart": "0.13.1",
+    "Jaeger": "0.2.1",
+    "Json": "0.1.1",
+    "LogExplorer": "0.2.1",
+    "LogsTable": "0.4.1",
+    "Loki": "0.7.1",
+    "Markdown": "0.13.1",
+    "OpenSearch": "0.2.1",
+    "PieChart": "0.15.1",
+    "Prometheus": "0.59.1",
+    "Pyroscope": "0.7.1",
+    "ScatterChart": "0.12.1",
+    "Splunk": "0.2.1",
+    "StatChart": "0.15.1",
+    "StaticListVariable": "0.10.1",
+    "StatusHistoryChart": "0.14.1",
+    "Table": "0.14.1",
+    "Tempo": "0.60.1",
+    "TimeSeriesChart": "0.14.1",
+    "TimeSeriesTable": "0.13.1",
+    "TraceTable": "0.12.1",
+    "TracingGanttChart": "0.14.1",
+    "VictoriaLogs": "0.5.1"
+  }
+}

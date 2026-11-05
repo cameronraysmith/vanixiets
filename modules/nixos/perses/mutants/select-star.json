@@ -1,0 +1,46 @@
+{
+  "kind": "Dashboard",
+  "metadata": {
+    "name": "fixture",
+    "project": "fleet"
+  },
+  "spec": {
+    "display": {
+      "name": "fixture"
+    },
+    "duration": "1h",
+    "variables": [],
+    "layouts": [],
+    "panels": {
+      "p": {
+        "kind": "Panel",
+        "spec": {
+          "display": {
+            "name": "up"
+          },
+          "plugin": {
+            "kind": "TimeSeriesChart",
+            "spec": {}
+          },
+          "queries": [
+            {
+              "kind": "TimeSeriesQuery",
+              "spec": {
+                "plugin": {
+                  "kind": "GreptimeDBTimeSeriesQuery",
+                  "spec": {
+                    "datasource": {
+                      "kind": "GreptimeDBDatasource",
+                      "name": "greptimedb-sql"
+                    },
+                    "query": "SELECT * FROM \"devloop\".\"ci_build\""
+                  }
+                }
+              }
+            }
+          ]
+        }
+      }
+    }
+  }
+}

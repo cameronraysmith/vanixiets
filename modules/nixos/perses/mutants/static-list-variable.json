@@ -1,0 +1,63 @@
+{
+  "kind": "Dashboard",
+  "metadata": {
+    "name": "fixture",
+    "project": "fleet"
+  },
+  "spec": {
+    "display": {
+      "name": "fixture"
+    },
+    "duration": "1h",
+    "variables": [
+      {
+        "kind": "ListVariable",
+        "spec": {
+          "name": "x",
+          "allowMultiple": false,
+          "allowAllValue": false,
+          "plugin": {
+            "kind": "StaticListVariable",
+            "spec": {
+              "values": [
+                "a"
+              ]
+            }
+          }
+        }
+      }
+    ],
+    "layouts": [],
+    "panels": {
+      "p": {
+        "kind": "Panel",
+        "spec": {
+          "display": {
+            "name": "up"
+          },
+          "plugin": {
+            "kind": "TimeSeriesChart",
+            "spec": {}
+          },
+          "queries": [
+            {
+              "kind": "TimeSeriesQuery",
+              "spec": {
+                "plugin": {
+                  "kind": "PrometheusTimeSeriesQuery",
+                  "spec": {
+                    "datasource": {
+                      "kind": "PrometheusDatasource",
+                      "name": "greptimedb-promql"
+                    },
+                    "query": "up"
+                  }
+                }
+              }
+            }
+          ]
+        }
+      }
+    }
+  }
+}

@@ -53,6 +53,14 @@
         program = "${../../pkgs/by-name/greptimedb-bin/update.sh}";
       };
 
+      # perses-bin exists only on x86_64-linux and aarch64-darwin (its
+      # package.nix yields null on aarch64-linux); the updater is
+      # host-agnostic, so the app runs the script itself on every system.
+      apps.update-perses-bin = {
+        type = "app";
+        program = "${../../pkgs/by-name/perses-bin/update.sh}";
+      };
+
       apps.update-linear-cli = {
         type = "app";
         program = "${config.packages.linear-cli.updateScript}";
