@@ -21,9 +21,11 @@ Expected: `magnetite.scientistexperience.net.` and magnetite's address.
 In `$DEPLOY`, refreshed to `origin/main`, after `nixbot-logs queue` prints `Queue is empty`:
 
 ```bash
+L=logs/cam73-evidence/4.2-deploy-$(/bin/date -u +%Y%m%dT%H%M%SZ).log
+clan vars check magnetite 2>&1 | tee -a "$L"   # must pass before the deploy; a failure stops the step
 START=$(/bin/date -u +%Y-%m-%dT%H:%M:%SZ)
 clan machines update magnetite 2>&1 | tee logs/magnetite-$(date +%Y%m%d-%H%M%S).log
-L=logs/cam73-evidence/4.2-deploy-$(/bin/date -u +%Y%m%dT%H%M%SZ).log
+git -C "$DEPLOY" status --porcelain vars/ | tee -a "$L"   # must print nothing
 ssh magnetite.zt 'bash -s' <<'EOF' | tee -a "$L"
 systemctl is-active perses kanidm nginx
 ss -ltnH | awk '{print $4}' | grep -E ':8095$'
@@ -37,13 +39,13 @@ ssh magnetite.zt "sudo journalctl -u fleet-alert --since '$START' -o cat | grep 
 
 Then the operator runs `kanidm system oauth2 get perses` and logs in to `omni.` once; both are recorded in the log; every alert and notice since `START`, from the journal above and from `fleet-alerts`, is recorded with its cause.
 
-Expected: `active` three times; `127.0.0.1:8095` only; `MemoryMax=268435456`, `OOMScoreAdjust=600`; `projects 401`; `metrics 404`; the client shown with `perses_users`; the `omni.` login succeeds; `kanidm.service`'s restart explains any notice that arrives.
+Expected: `clan vars check` passes before the deploy and `git status --porcelain vars/` prints nothing after it, so the deploy generated no var outside a commit; `active` three times; `127.0.0.1:8095` only; `MemoryMax=268435456`, `OOMScoreAdjust=600`; `projects 401`; `metrics 404`; the client shown with `perses_users`; the `omni.` login succeeds; `kanidm.service`'s restart explains any notice that arrives.
 
 - [ ] **Step 3: The refusal (tasks.md 4.3)**
 
-Gated, the operator: in a browser with no Kanidm session, open `https://obs.scientistexperience.net/`, choose Kanidm, log in as `cameron`.
+Gated, the operator: first run `kanidm group get perses_users` and state its members, which the agent records; then, in a browser with no Kanidm session, open `https://obs.scientistexperience.net/`, choose Kanidm, log in as `cameron`.
 
-Expected: Kanidm's Access Denied page with an operation id; the operator states the time and the page text, recorded in `logs/cam73-evidence/4.3-refusal-<ts>.log`.
+Expected: `cameron` is not among `perses_users`' members (if he is, stop and ask the operator, because the refusal would be impossible); Kanidm's Access Denied page with an operation id; the operator states the time and the page text, recorded in `logs/cam73-evidence/4.3-refusal-<ts>.log`.
 
 - [ ] **Step 4: The admission (tasks.md 4.4)**
 

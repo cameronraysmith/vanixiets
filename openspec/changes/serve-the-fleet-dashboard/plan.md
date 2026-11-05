@@ -2,15 +2,15 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** a standalone Perses 0.55.0 on magnetite, packaged from the upstream release, serves `fleet-hosts` and `devloop` at `https://obs.scientistexperience.net/` to members of the Kanidm group `perses_users` through its own Kanidm client, reads the telemetry store only through two global datasources with anchored read-only endpoints and the `perses:ro` account, and holds no resource that is not committed; landed as three pull requests and one magnetite deploy, accepted by `cameron`'s refusal before he joins the group and his admission after (Linear CAM-73; ADR-002 reversed; ADR-002 Q9 dissolved, Q10 answered).
+**Goal:** a standalone Perses 0.55.1 on magnetite, packaged from the upstream release, serves `fleet-hosts` and `devloop` at `https://obs.scientistexperience.net/` to members of the Kanidm group `perses_users` through its own Kanidm client, reads the telemetry store only through two global datasources with anchored read-only endpoints, a fixed header allow-list and the `perses:ro` account, and holds no resource that is not committed; landed as three pull requests and one magnetite deploy, accepted by `cameron`'s refusal before he joins the group and his admission after (Linear CAM-73; ADR-002 reversed; ADR-002 Q9 dissolved, Q10 answered).
 
-**Architecture:** `pkgs/by-name/perses-bin` installs the release's `perses`, `percli` and pinned plugin archives; `modules/nixos/perses.nix` configures nixpkgs' `services.perses` with that package on `127.0.0.1:8095`, an nginx vhost that strips `x-greptime-auth` and hides `/metrics`, the unit's credentials, envelope and failure wiring, provisioning from `modules/nixos/perses/resources/` with a wipe before each start, and an assertion over `flake.lib.persesServingFailures`.
+**Architecture:** `pkgs/by-name/perses-bin` installs the release's `perses`, `percli` and pinned plugin archives from the version, hashes and pins in its `sources.json`; `modules/nixos/perses.nix` configures nixpkgs' `services.perses` with that package on `127.0.0.1:8095`, an nginx vhost that strips `x-greptime-auth` and hides `/metrics`, the unit's credentials, envelope and failure wiring, provisioning from `modules/nixos/perses/resources/` with the database and plugin directories removed before each start, and an assertion over `flake.lib.persesServingFailures`.
 `modules/nixos/kanidm.nix` adds the client `perses`, its generator and the group stub; magnetite adds `perses-encryption-key`, the restart on `perses-password` and the holder and kill-order changes.
 `checks.x86_64-linux.perses-lint` lints the resources with the shipped plugins; `checks.x86_64-linux.perses-config` judges the predicate against mutants; `vmTests.x86_64-linux.perses-greptimedb` exercises the read path on demand.
 
-**Tech Stack:** nix flakes with flake-parts and import-tree; nixpkgs' `services.perses`; Perses 0.55.0 (`perses`, `percli`) and its plugin archives; Kanidm 1.11.2 OAuth2 provisioning; clan vars generators; nginx with ACME; nspawn container tests; terranix with Cloudflare.
+**Tech Stack:** nix flakes with flake-parts and import-tree; nixpkgs' `services.perses`; Perses 0.55.1 (`perses`, `percli`) and its plugin archives; Kanidm 1.11.2 OAuth2 provisioning; clan vars generators; nginx with ACME; nspawn container tests; terranix with Cloudflare.
 
-**Spec:** `openspec/changes/serve-the-fleet-dashboard/` — `design.md` (D1–D12, Q1–Q4), `brainstorm.md` (O1–O11, the rejected embedded option), `specs/`, `tasks.md`, `proposal.md`; ADR-002 and `components/perses.md` under `docs/notes/development/observability/`.
+**Spec:** `openspec/changes/serve-the-fleet-dashboard/` — `design.md` (D1–D12, Q1–Q4 answered), `brainstorm.md` (O1–O11, the rejected embedded option), `specs/`, `tasks.md`, `proposal.md`; the plan review and the operator's decisions in `logs/cam73-evidence/1.1-plan-review-20261104T235200Z.md` (F1–F23, all applied); ADR-002 and `components/perses.md` under `docs/notes/development/observability/`.
 
 ## Global Constraints
 
@@ -39,15 +39,16 @@ Every task uses exactly these names.
 
 | Kind | Name | Defined in |
 |---|---|---|
-| Package | `pkgs.perses-bin`, version `0.55.0`; `$out/bin/{perses,percli}`; `$out/share/perses/plugins-archive/<Name>-<version>.tar.gz`; `passthru.plugins` (attrset name → version); `passthru.pluginsArchive = "$out/share/perses/plugins-archive"`; `passthru.updateScript = ./update.sh`; `meta.mainProgram = "perses"` | Task 2 |
+| Package | `pkgs.perses-bin`, version `0.55.1`, read from `pkgs/by-name/perses-bin/sources.json` (`version`, `hashes.<system>`, `plugins`); `$out/bin/{perses,percli}`; `$out/share/perses/plugins-archive/<Name>-<version>.tar.gz`; `passthru.plugins` (attrset name → version); `passthru.pluginsArchive = "${finalAttrs.finalPackage}/share/perses/plugins-archive"`; `passthru.updateScript = ./update.sh`; `meta.mainProgram = "perses"`; `null` on systems other than `x86_64-linux` and `aarch64-darwin` | Task 2 |
+| App | `apps.update-perses-bin`, running `pkgs/by-name/perses-bin/update.sh` on every system | Task 2 |
 | Lib | `flake.lib.persesCuratedPlugins = [ "Prometheus" "GreptimeDB" "TimeSeriesChart" "StatChart" "GaugeChart" "Table" "Markdown" ]` | Task 2 |
-| Lib | `flake.lib.persesExtractedPlugins pkgs` → derivation with `<Name>/` per curated archive, each extracted alone | Task 2 |
+| Lib | `flake.lib.persesCuratedArchives pkgs perses-bin` → `linkFarm` of the curated `<Name>-<version>.tar.gz` archives, used by the lint check and by the module's `plugin.archive_paths` | Task 2 |
 | Lib | `flake.lib.persesServingFailures { settings; listenAddress; port; unit; vhost; client; resources; }` → list of strings | Task 3 |
 | Constants | `credsDir = "/run/credentials/perses.service"`; credential ids `kanidm-client-secret`, `encryption-key`, `perses-password`; port `8095`; domain `obs.scientistexperience.net`; project `fleet`; secret `greptimedb-perses`; datasources `greptimedb-promql`, `greptimedb-sql`; dashboards `fleet-hosts`, `devloop`; OIDC `slug_id = "kanidm"` | Tasks 3–4 |
 | Module | `flake.modules.nixos.perses`, imported by magnetite | Task 4 |
 | Generators | `kanidm-oauth2-perses` (file `secret`, owner `kanidm`, `0400`, `restartUnits = [ "kanidm.service" "perses.service" ]`); `perses-encryption-key` (file `key`, `0400`, `restartUnits = [ "perses.service" ]`, 32 bytes) | Task 4 |
-| Checks | `checks.x86_64-linux.perses-lint` (legs `valid`, `mutants`, `archiveDirFailsClosed`, `bareLintTautological`); `checks.x86_64-linux.perses-config` (`valid`, one mutant per clause) | Tasks 2–3 |
-| Test | `vmTests.x86_64-linux.perses-greptimedb` | Task 5 |
+| Checks | `checks.x86_64-linux.perses-lint` (legs `valid`, `mutants` with an expected message each, `bareLintTautological`); `checks.x86_64-linux.perses-config` (`valid`, at least one mutant per clause) | Tasks 2–3 |
+| Test | `vmTests.x86_64-linux.perses-greptimedb`, with its provisioning folder `modules/vm-tests/perses-greptimedb/` (one `User`, the datasource `greptimedb-sql-open`) | Task 5 |
 | Evidence | `logs/cam73-evidence/` | all |
 
 ## Task map

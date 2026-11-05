@@ -47,8 +47,4 @@ clan vars check magnetite 2>&1 | tee -a "$L"
 
 Expected: `8095` count `0`; `OOMScoreAdjust=500`; `clan vars check` reports nothing to regenerate.
 
-- [ ] **Step 4: cameron's groups (tasks.md 1.2)**
-
-Gated, the operator: run `kanidm person get cameron` and state the groups listed; the agent records the statement in the log.
-
-Expected: `perses_users` absent; if present, stop and ask the operator, because Task 6 Step 3's refusal would then be impossible.
+The statement of `cameron`'s Kanidm groups, first planned here, is taken at deployment instead: Task 6 Step 3 runs `kanidm group get perses_users` before the refusal login (operator decision, 2026-11-05).

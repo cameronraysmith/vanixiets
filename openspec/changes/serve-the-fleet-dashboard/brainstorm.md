@@ -81,7 +81,7 @@ Probe on 2026-11-04 with the release's `darwin_arm64` `percli` and three fixture
 - Every fleet series carries `host_name` (`openspec/specs/host-metrics-collection/spec.md:61-63`).
 - Memory, swap and per-process memory (`modules/nixos/fleet-alert/rules.nix:60`, `:70`, `:98`); ZFS file systems (`:53`); pools, ARC and OOM kills (`modules/clan/services/otel-collector/schema.nix:61-71`); NVMe on pyrite (`rules.nix:147`, `:155`); units (`:163`, `:171`); exporter health (`:179`).
 - CPU is not collected (`modules/clan/services/otel-collector/flake-module.nix:338-346`, `:386`, `:398`; ADR-004:90).
-- `devloop`'s `queueWait`, `formationToLand` and `buildOutcome` are SQL already run against GreptimeDB 1.2.1 by `vmTests.x86_64-linux.devloop-ingest` (`modules/nixos/devloop-collection.nix:299-326`; `modules/vm-tests/devloop-ingest.nix:450-463`); SQL qualifies a table with its database as `"devloop"."ci_build"` (`devloop-collection.nix:645-647`).
+- `devloop`'s `queueWait`, `formationToLand` and `buildOutcome` are SQL already run against GreptimeDB 1.2.1 by `vmTests.x86_64-linux.devloop-ingest` (`modules/nixos/devloop-collection.nix:299-326`; `modules/vm-tests/devloop-ingest.nix:450-463`); SQL qualifies a table with its database as `"devloop"."ci_build"`, as reconcile's `tbl` helper does (`devloop-collection.nix:645-647`); the three documented questions themselves are unqualified (citation corrected after the plan review, F19).
 - The GreptimeDB plugin `0.2.0` charts only the first numeric column of a result without a time column and drops rows with no numeric value (`agent://PersesStandalone` §1, read at plugin `0.1.0`) `[INFERENCE: unchanged at 0.2.0]`.
 
 ## Decision chain

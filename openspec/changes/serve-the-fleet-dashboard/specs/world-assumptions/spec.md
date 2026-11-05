@@ -248,16 +248,16 @@ Any requirement whose discharge depends on this fact SHALL name it explicitly, a
 - **WHEN** the repository declares members of `perses_users`, or provisioning overwrites them
 - **THEN** this assumption is void, and the `fleet-dashboard` requirements `A person outside the dashboard group is refused` and `A person removed from the dashboard group loses access within an hour` must be restated over the declared list
 
-### Requirement: A58 — Perses 0.55.0 removes its write routes in read-only mode, proxies with the stored credential and fixed headers, and refreshes a session without the identity provider
+### Requirement: A58 — Perses 0.55.1 removes its write routes in read-only mode, proxies with the stored credential and fixed headers, and refreshes a session without depending on the identity provider's answer
 
-It is true of Perses 0.55.0, independent of what this fleet builds, that read-only mode removes resource writes, its proxy authorizes from a secret's `passwordFile`, overwrites configured headers and refuses unmatched paths with 403, provisioning never deletes, and a session refresh skips the identity provider.
+It is true of Perses 0.55.1, independent of what this fleet builds, that read-only mode removes writes and sign-up, its proxy authenticates from a secret file, fixes configured headers, drops unlisted ones, refuses unmatched paths, provisioning never deletes, and a refresh ignores the identity provider's answer.
 Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL be treated as losing its discharge once this assumption's violation condition below is observed.
 
-**Evidence**: `perses/perses@v0.55.0:internal/api/core/server.go:63-93`; at v0.54.0, `perses/perses@4c719fc1:internal/api/impl/proxy/proxy.go:213-234`, `:280-290`, `:346-376`, `internal/api/provisioning/provisioning.go:73-121` and `internal/api/impl/auth/auth.go:163-193`, with a stub-upstream probe of the proxy showing that other caller headers, `x-greptime-auth` among them, pass through (`agent://PersesStandalone` §2, §3, §4); `vmTests.x86_64-linux.perses-greptimedb` is its monitor at 0.55.0 and at every upgrade.
+**Evidence**: read at v0.55.0 (`bfaf3ce2`): `perses/perses@v0.55.0:internal/api/core/server.go:63-93`, `internal/api/impl/v1/user/endpoint.go`, `internal/api/impl/proxy/http/http.go:157-306`, `internal/api/provisioning/service.go:43-120`, `internal/api/crypto/jwt.go:102-110` and `internal/api/impl/auth/auth.go:167-207`, where a refresh issues an access token valid for `access_token_ttl` from the refresh and returns the same refresh token, and calls Kanidm's token endpoint when an OIDC refresh cookie exists but ignores the answer, on failure only clearing the OIDC cookies; `perses/spec@v0.3.0-rc.1:go/datasource/proxy/http/http.go:89-93` for `allowHeaders`; the plan review's stub-upstream probe at 0.55.0 (`logs/cam73-evidence/1.1-runtime-probe-20261104T234415Z.log`), showing a caller's `x-greptime-auth` passed through a datasource without `allowHeaders` and dropped by one with it; 0.55.1 is a patch release, so Task 2's first step re-runs that probe at 0.55.1 before any code lands, and `vmTests.x86_64-linux.perses-greptimedb` is the monitor at 0.55.1 and at every upgrade.
 
 #### Scenario: A Perses upgrade changes one of these behaviours
 
-- **WHEN** the container runtime test finds a write route answering in read-only mode, a configured header passed from the caller, an unmatched path forwarded, a planted resource kept after a restart with the wipe, or a refresh that consults the identity provider
+- **WHEN** the container runtime test or the probe finds a write route answering in read-only mode, a configured header passed from the caller, a caller header outside `allowHeaders` forwarded, an unmatched path forwarded, a planted resource kept after a restart with the wipe, or a session that outlives `refresh_token_ttl` plus `access_token_ttl`
 - **THEN** this assumption is void for that version, and the `fleet-dashboard` requirements resting on it lose their discharge until the configuration or the assumption is restated
 
 ### Requirement: A59 — GreptimeDB 1.2.1 reads x-greptime-auth before Authorization
@@ -265,12 +265,12 @@ Any requirement whose discharge depends on this fact SHALL name it explicitly, a
 It is true of GreptimeDB 1.2.1, independent of what this fleet builds, that its HTTP authentication reads the `x-greptime-auth` header before `Authorization`, and that a present but unparsable value fails rather than falling back.
 Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL be treated as losing its discharge once this assumption's violation condition below is observed.
 
-**Evidence**: `GreptimeTeam/greptimedb@179ff8e50:src/servers/src/http/authorize.rs:310-319`; the container runtime test's bypass negative control is its monitor.
+**Evidence**: `GreptimeTeam/greptimedb@179ff8e50:src/servers/src/http/authorize.rs:310-319`; the container runtime test's bypass negative control, through a datasource without `allowHeaders`, is its monitor.
 
 #### Scenario: The store stops preferring the header
 
 - **WHEN** a store upgrade reads `Authorization` first or ignores `x-greptime-auth`
-- **THEN** this assumption is void, and the strip in front of the dashboard service is no longer what keeps a person's credential away from the store; the `fleet-dashboard` requirement `No store credential reaches a person, and the dashboard service only reads` keeps its discharge through the proxy's own authorization only if the bypass control then shows the proxy's identity winning
+- **THEN** this assumption is void, and neither the datasources' header allow-lists nor the strip in front of the dashboard service is then what keeps a person's credential away from the store; the `fleet-dashboard` requirement `No store credential reaches a person, and the dashboard service only reads` keeps its discharge through the proxy's own authorization only if the bypass control then shows the proxy's identity winning
 
 ### Requirement: A60 — magnetite is reachable on public TCP port 80 for HTTP-01
 
