@@ -27,6 +27,7 @@
       pkgs.direnv
       pkgs.nix
       pkgs.gh
+      pkgs.curl
     ]
     ++ lib.optionals pkgs.stdenv.hostPlatform.isLinux [
       pkgs.bubblewrap
