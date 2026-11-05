@@ -4,11 +4,11 @@ linear_story_id: "691c9e9f-548d-40f1-8424-3490a2ab4795"
 linear_story_identifier: CAM-79
 linear_story_title: Deliver the omp browser relay extension declaratively
 linear_story_url: https://linear.app/cameronraysmith/issue/CAM-79/deliver-the-omp-browser-relay-extension-declaratively
-linear_story_state: In Progress
+linear_story_state: In Review
 linear_team: CAM
 linear_project: pi-agent-environment
-last_synced_state: In Progress
-last_synced_at: "2026-11-05T22:57:00Z"
+last_synced_state: In Review
+last_synced_at: "2026-11-05T23:43:35Z"
 review_round: 0
 attempt_log:
   - at: "2026-11-05T22:48:30Z"
@@ -19,6 +19,10 @@ attempt_log:
     transition: Todo->In Progress
     outcome: posted
     note: T2 on the first checked tasks.md boxes (1.1-4.1, 6.2); state confirmed In Progress by readback and comment posted.
+  - at: "2026-11-05T23:43:35Z"
+    transition: In Progress->In Review
+    outcome: posted
+    note: T3 on verify.md (PASS WITH WARNINGS; 5.2 loaded in one of six Helium profiles, 5.4 deferred); state confirmed In Review by readback and comment posted.
 ---
 
 ## Why
