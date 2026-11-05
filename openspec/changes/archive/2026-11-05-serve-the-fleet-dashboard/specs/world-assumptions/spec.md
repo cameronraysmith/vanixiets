@@ -199,6 +199,9 @@ A term found to denote two distinct phenomena within this repository's vocabular
 | expected host | — | for one alert rule, a host from which the fleet expects its signal: every collecting host, or for the disk-health rules each collecting host with a disk-health source | shared |
 | silent | — | of a host or a job, having sent nothing it is expected to send for a stated time: a host no memory signal, the evaluator no heartbeat | shared |
 | day | — | a UTC calendar day, the period the reconcile compares | shared |
+| watch service | — | a monitoring service run by a third party outside the fleet, healthchecks.io, that expects a ping from the dead-man at a set period and emails the operator when one is late | world-only |
+| ping | — | the request the dead-man sends the watch service at the end of a run in which it found the path working, which the watch service counts as the dead-man being alive | shared |
+| email | — | a message the watch service sends to the operator's mailbox, delivered by a mail provider that runs on no host of the fleet | world-only |
 | dashboard service | — | the service at its own hostname through which an admitted person views the fleet's signals and the dev-loop history, as distinct from the dashboard the telemetry store itself serves | shared |
 | view | — | one named page of the dashboard service, holding charts over one subject, committed to the repository | shared |
 | chart | — | one plot or table within a view, drawn from one query of the telemetry store | shared |

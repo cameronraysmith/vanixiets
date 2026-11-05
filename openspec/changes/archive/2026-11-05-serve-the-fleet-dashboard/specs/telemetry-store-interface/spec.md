@@ -3,7 +3,7 @@
 ### Requirement: Credentials exist only as activation-resolved files owned by non-worker users
 
 Every store credential and every `otel-cert` key SHALL reach its consumer as a file resolved when its host's configuration is activated, readable only by its owner, owned by no omnigent worker account, and absent from the configuration that produced it.
-Replacing the account file SHALL restart the telemetry store, replacing the `collector` password or a host's `otel-cert` SHALL restart that host's collector, and replacing the `perses` password SHALL restart `perses.service`, the only unit that loads it.
+Replacing the account file SHALL restart the telemetry store, replacing the `collector` password or a host's `otel-cert` SHALL restart that host's collector, and replacing the `perses` password SHALL restart `perses.service`.
 
 **Discharged by**: the evaluation-time ownership check (R8.2) with its mutant, magnetite's credential-holder assertion (R8.2), which admits `fleet-alert`, `devloop-reconcile` and `otel-envelope` as `regulator-password` holders and `perses` as the `perses-password` holder, the evaluation-time envelope check (R7.1) with its restart-on-rotation mutant, the `otel-cert` generator's `restartUnits`, and `perses-password`'s `restartUnits`.
 

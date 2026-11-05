@@ -1,3 +1,19 @@
+---
+linear_story_id: CAM-73
+linear_story_identifier: CAM-73
+linear_story_title: "S6: Serve GreptimeDB's embedded Perses dashboard behind Kanidm"
+linear_story_url: https://linear.app/cameronraysmith/issue/CAM-73/s6-serve-greptimedbs-embedded-perses-dashboard-behind-kanidm
+linear_story_state: Done
+linear_team: CAM
+linear_project: fleet-observability
+last_synced_state: Done
+last_synced_at: 2026-11-05T14:51:34Z
+review_round: 0
+max_review_rounds: 3
+attempt_log:
+  - { at: "2026-11-05T14:51:34Z", transition: "Backlog->Done", outcome: "posted", note: "catch-up at archive: the change was not bound when planned, so no earlier transition fired; the description was corrected to the standalone Perses 0.55.1 at obs. with its own Kanidm OIDC client (ADR-002 Q9 dissolved, Q10 answered); specs synced, satisfaction projection regenerated, the five changed main specs mirrored (fleet-dashboard and fleet-dashboard-interface created, telemetry-store, telemetry-store-interface and world-assumptions updated), and a comment records that CAM-72 may start" }
+---
+
 ## Why
 
 A person can read the telemetry store only through an SSH tunnel to magnetite's loopback listener, so nobody looks at the fleet's memory, disks or units until an alert fires, and the dev-loop rows in `devloop` have no reader.

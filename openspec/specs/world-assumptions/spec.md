@@ -291,6 +291,13 @@ A term found to denote two distinct phenomena within this repository's vocabular
 | watch service | — | a monitoring service run by a third party outside the fleet, healthchecks.io, that expects a ping from the dead-man at a set period and emails the operator when one is late | world-only |
 | ping | — | the request the dead-man sends the watch service at the end of a run in which it found the path working, which the watch service counts as the dead-man being alive | shared |
 | email | — | a message the watch service sends to the operator's mailbox, delivered by a mail provider that runs on no host of the fleet | world-only |
+| dashboard service | — | the service at its own hostname through which an admitted person views the fleet's signals and the dev-loop history, as distinct from the dashboard the telemetry store itself serves | shared |
+| view | — | one named page of the dashboard service, holding charts over one subject, committed to the repository | shared |
+| chart | — | one plot or table within a view, drawn from one query of the telemetry store | shared |
+| dashboard group | — | the group of people the identity provider lets into the dashboard service | shared |
+| admitted person | — | a person the identity provider has let into the dashboard service as a member of the dashboard group | shared |
+| identity provider | — | the service that authenticates the fleet's people and tells another service who they are and whether to let them in, Kanidm here | shared |
+| browser | — | the program on a person's own device through which the person views the dashboard service | world-only |
 
 #### Scenario: The terms with two senses are read
 
@@ -647,3 +654,63 @@ Any requirement whose discharge depends on this fact SHALL name it explicitly, a
 
 - **WHEN** the address the watch service emails is moved to a mail service hosted on the fleet, or the operator reads it only through the fleet's network, or mail from healthchecks.io stops being delivered
 - **THEN** this assumption is void, and the `fleet-alerting` requirement `An outage of the alert path reaches the operator by email from outside the fleet` loses the discharge argument that the email reaches the operator when the fleet cannot
+
+### Requirement: A56 — Kanidm refuses an authorization whose scopes no group of the person maps
+
+It is true of Kanidm 1.11.2, independent of what this fleet builds, that when a person asks an OAuth2 client for scopes outside the union of the scope maps of that person's groups, Kanidm answers Access Denied and issues no code.
+Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL be treated as losing its discharge once this assumption's violation condition below is observed.
+
+**Evidence**: `kanidm/kanidm@v1.11.2:server/lib/src/idm/oauth2.rs:3473-3502`, called at `:2517-2519`; the same scope maps, with `displayName` and one `originLanding`, put the client's tile in a member's apps portal (`server/lib/src/idm/applinks.rs:6-69`); omnigent's and matrix's clients gate their groups this way (`modules/nixos/kanidm.nix:228-277`); the operator's recorded refusal of `cameron` before he joins `perses_users` is its monitor at deployment.
+
+#### Scenario: Kanidm admits a person outside the scope maps
+
+- **WHEN** a Kanidm upgrade issues a code to a person none of whose groups maps a requested scope, or the operator's refusal test is admitted
+- **THEN** this assumption is void, and the `fleet-dashboard` requirement `A person outside the dashboard group is refused` loses its discharge until the dashboard service checks group membership itself
+
+### Requirement: A57 — Dashboard-group membership is kept in the running identity provider
+
+It is true of this fleet, independent of its configuration, that membership of `perses_users` is set by the operator in the running Kanidm with `kanidm group add-members` and `remove-members`, and that provisioning declares the group with no members and does not overwrite them.
+Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL be treated as losing its discharge once this assumption's violation condition below is observed.
+
+**Evidence**: the repository provisions no person and declares each `*_users` group as a stub with `overwriteMembers = false` (`modules/nixos/kanidm.nix:196-226`); the runbook adds members by hand and records that a non-member sees Kanidm's Access Denied (`packages/docs/src/content/docs/development/operations/identity/kanidm.md:49`, `:63`).
+
+#### Scenario: Membership becomes declarative
+
+- **WHEN** the repository declares members of `perses_users`, or provisioning overwrites them
+- **THEN** this assumption is void, and the `fleet-dashboard` requirements `A person outside the dashboard group is refused` and `A person removed from the dashboard group loses access within an hour` must be restated over the declared list
+
+### Requirement: A58 — Perses 0.55.1 removes its write routes in read-only mode, proxies with the stored credential and fixed headers, and refreshes a session without depending on the identity provider's answer
+
+It is true of Perses 0.55.1, independent of what this fleet builds, that read-only mode removes writes and sign-up, its proxy authenticates from a secret file, fixes configured headers, drops unlisted ones, refuses unmatched paths, provisioning never deletes, and a refresh ignores the identity provider's answer.
+Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL be treated as losing its discharge once this assumption's violation condition below is observed.
+
+**Evidence**: read at v0.55.0 (`bfaf3ce2`): `perses/perses@v0.55.0:internal/api/core/server.go:63-93`, `internal/api/impl/v1/user/endpoint.go`, `internal/api/impl/proxy/http/http.go:157-306`, `internal/api/provisioning/service.go:43-120`, `internal/api/crypto/jwt.go:102-110` and `internal/api/impl/auth/auth.go:167-207`, where a refresh issues an access token valid for `access_token_ttl` from the refresh and returns the same refresh token, and calls Kanidm's token endpoint when an OIDC refresh cookie exists but ignores the answer, on failure only clearing the OIDC cookies; `perses/spec@v0.3.0-rc.1:go/datasource/proxy/http/http.go:89-93` for `allowHeaders`; the plan review's stub-upstream probe at 0.55.0 (`logs/cam73-evidence/1.1-runtime-probe-20261104T234415Z.log`), showing a caller's `x-greptime-auth` passed through a datasource without `allowHeaders` and dropped by one with it; 0.55.1 is a patch release, so Task 2's first step re-runs that probe at 0.55.1 before any code lands, and `vmTests.x86_64-linux.perses-greptimedb` is the monitor at 0.55.1 and at every upgrade.
+
+#### Scenario: A Perses upgrade changes one of these behaviours
+
+- **WHEN** the container runtime test or the probe finds a write route answering in read-only mode, a configured header passed from the caller, a caller header outside `allowHeaders` forwarded, an unmatched path forwarded, a planted resource kept after a restart with the wipe, or a session that outlives `refresh_token_ttl` plus `access_token_ttl`
+- **THEN** this assumption is void for that version, and the `fleet-dashboard` requirements resting on it lose their discharge until the configuration or the assumption is restated
+
+### Requirement: A59 — GreptimeDB 1.2.1 reads x-greptime-auth before Authorization
+
+It is true of GreptimeDB 1.2.1, independent of what this fleet builds, that its HTTP authentication reads the `x-greptime-auth` header before `Authorization`, and that a present but unparsable value fails rather than falling back.
+Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL be treated as losing its discharge once this assumption's violation condition below is observed.
+
+**Evidence**: `GreptimeTeam/greptimedb@179ff8e50:src/servers/src/http/authorize.rs:310-319`; the container runtime test's bypass negative control, through a datasource without `allowHeaders`, is its monitor.
+
+#### Scenario: The store stops preferring the header
+
+- **WHEN** a store upgrade reads `Authorization` first or ignores `x-greptime-auth`
+- **THEN** this assumption is void, and neither the datasources' header allow-lists nor the strip in front of the dashboard service is then what keeps a person's credential away from the store; the `fleet-dashboard` requirement `No store credential reaches a person, and the dashboard service only reads` keeps its discharge through the proxy's own authorization only if the bypass control then shows the proxy's identity winning
+
+### Requirement: A60 — magnetite is reachable on public TCP port 80 for HTTP-01
+
+It is true of magnetite, independent of this change, that its public address accepts TCP port 80 from the certificate authority, so nginx's ACME HTTP-01 challenge for a name pointing at it succeeds.
+Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL be treated as losing its discharge once this assumption's violation condition below is observed.
+
+**Evidence**: magnetite opens TCP 80 and 443 publicly and `security.acme.defaults.dnsProvider` evaluates to `null`, and the existing `accounts.`, `omni.` and `auth.` names hold certificates issued this way (`modules/terranix/cloudflare.nix:177-216`).
+
+#### Scenario: HTTP-01 stops reaching magnetite
+
+- **WHEN** a firewall or proxy change blocks port 80, or issuance for a magnetite name fails
+- **THEN** this assumption is void, and the `fleet-dashboard-interface` requirement `The dashboard hostname resolves to magnetite` no longer yields a certificate a browser accepts until DNS-01 or another route is configured

@@ -100,3 +100,7 @@ projects:
         id: "5e606d29-7edc-4aaa-96e9-f704ab78a115"
       "fleet-ingress-interface":
         id: "0effd0fb-9c2e-4d8c-af6f-682fb9dc39a4"
+      "fleet-dashboard":
+        id: "3b3af5d5-4d05-4e2d-97fd-88595f9440fd"
+      "fleet-dashboard-interface":
+        id: "4a7767c0-6588-4958-b772-b06bf882e3e1"

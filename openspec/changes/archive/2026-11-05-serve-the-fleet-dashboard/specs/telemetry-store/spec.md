@@ -4,7 +4,7 @@
 
 The telemetry store SHALL run a stable release, never a prerelease, and SHALL serve its vendor's embedded dashboard only to a reader on magnetite or tunnelled to its loopback listener, as the operator's fallback when the dashboard service is unavailable.
 The fleet SHALL run the vendor's own published build of that release unless the channel's package also serves the embedded dashboard.
-The embedded dashboard SHALL NOT be reachable through the dashboard service's hostname; people read the fleet's signals through the dashboard service, which `fleet-dashboard` requires.
+The embedded dashboard SHALL NOT be reachable through the dashboard service's hostname.
 
 **Discharged by**: `telemetry-store-interface` requirements `The telemetry store's release and usage reporting are fixed at evaluation` and `Listeners are bound to loopback only`, and `fleet-dashboard-interface` requirement `The dashboard service listens on loopback behind one vhost`, resting on world assumption `A30 — nixpkgs channels lag the telemetry store's vendor releases and omit its dashboard`; the evaluation-time release regulator with its mutants, the store module's listener assertion, the serving predicate's vhost clause and the container runtime test's dashboard case discharge it.
 
