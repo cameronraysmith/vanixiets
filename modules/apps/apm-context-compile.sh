@@ -65,15 +65,25 @@
 # heuristic.
 #
 # why --if-stale hashes fragment content rather than comparing mtimes:
-# this script is invoked from a devShell shellHook on every shell entry
+# this script is invoked from a devShell shellHook on shell entry
 # (modules/devshells/default.nix), and the repository is a jj working
 # copy where jj rewrites touch file mtimes on operations that do not
 # change fragment content (rebase, snapshot, absorb). An mtime-based
 # guard would therefore recompose on unrelated jj activity, and would
 # also be silently wrong the other way: byte-identical fragments can
 # carry an mtime older than the previously generated output. Hashing
-# fragment content (path + bytes) plus the selected tier set is the only
-# signal that tracks what actually determines the composed output.
+# fragment content (path + bytes), the selected tier set, apm.yml's
+# `compilation:` block (read by apm compile, see above) and this
+# script's own store path (which changes with the script text or the
+# apm version on its PATH) is the signal that tracks what actually
+# determines the composed output.
+#
+# the shellHook does use mtimes, but only as a builtin-only prefilter
+# that decides whether to exec this script at all; the content hash here
+# stays authoritative. So that the prefilter settles after a jj rewrite
+# that changed mtimes but not content, a matching --if-stale run touches
+# the digest file, and every run records the compile key (script path and
+# tier) that the prefilter compares without forking.
 #
 # grep-able marker: APM-CONTEXT-COMPILE-OK
 set -euo pipefail
@@ -102,8 +112,9 @@ Tier selection:
 Options:
   --if-stale  compose only if the recorded input digest
               (.agents/.context-inputs-sha256) does not match the
-              selected tier's fragments, or a generated output is
-              missing or still a symlink; otherwise exit 0 silently.
+              selected tier's inputs, or a generated output is
+              missing or still a symlink; otherwise refresh the
+              digest file's mtime and exit 0 silently.
   -h, --help  show this help and exit.
 EOF
 }
@@ -218,9 +229,13 @@ if [ "${#missing[@]}" -gt 0 ]; then
 fi
 
 digest_file="${repo_root}/.agents/.context-inputs-sha256"
+key_file="${repo_root}/.agents/.context-compile-key"
+compile_key="${BASH_SOURCE[0]} ${tier_marker}"
 new_digest="$(
   {
     printf 'tier-set:%s\n' "${tier_marker}"
+    printf 'compiler:%s\n' "${BASH_SOURCE[0]}"
+    printf 'compilation:%s\n' "$(yq -o=json -I=0 '.compilation' apm.yml)"
     for src in "${plan_srcs[@]}"; do
       printf '%s  %s\n' "$(sha256sum "${src}" | cut -d' ' -f1)" "${src#"${repo_root}"/}"
     done
@@ -236,6 +251,8 @@ if [ "${if_stale}" -eq 1 ]; then
     fi
   done
   if [ "${outputs_current}" -eq 1 ] && [ -f "${digest_file}" ] && [ "$(cat "${digest_file}")" = "${new_digest}" ]; then
+    touch "${digest_file}"
+    printf '%s\n' "${compile_key}" >"${key_file}"
     exit 0
   fi
 fi
@@ -297,6 +314,7 @@ section_count="$(grep -c '^## ' "${repo_root}/AGENTS.md" || true)"
 
 mkdir -p "${repo_root}/.agents"
 printf '%s\n' "${new_digest}" >"${digest_file}"
+printf '%s\n' "${compile_key}" >"${key_file}"
 
 echo ""
 echo "paths written:"

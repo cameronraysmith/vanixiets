@@ -31,17 +31,32 @@
 #   --relock   apm install --update    re-solve the graph in place so a
 #              newly appeared transitive dependency is discovered.
 #
+# refuses by default on a host where home-manager already delivers the same
+# skills at user level (modules/home/ai/skills/default.nix): agent harnesses
+# prefer the project-level .agents/skills/ over the user-level directories,
+# so a repo-local tree materialized from the committed lock silently shadows
+# the current Nix-delivered skills and goes stale as the lock ages. That
+# happened: a tree from a 19-day-old lock shadowed the user-level skills and
+# agents followed an outdated jj-version-control. See
+# home_manager_skills_present below for the detection rule;
+# --shadow-user-skills overrides it for deliberate use (for example a relock
+# on a home-manager host).
+#
 # grep-able marker: APM-SKILLS-INSTALL-OK
 set -euo pipefail
 
 usage() {
   cat <<'EOF'
-Usage: apm-skills-install [--relock] [-h|--help]
+Usage: apm-skills-install [--relock] [--shadow-user-skills] [-h|--help]
 
 Materializes this repo's own 18 apm skill packages (declared in apm.yml
 `dependencies.apm`, resolved from github cameronraysmith/vanixiets `main`)
 into .agents/skills/, using the shared warm apm git cache. Never isolates
 $HOME or APM_CACHE_DIR.
+
+Refuses when home-manager already delivers skills at user level, because
+the repo-local .agents/skills/ would shadow them for agents run in this
+repository.
 
 Modes:
   (default)  apm install --frozen  — install strictly from the committed
@@ -50,11 +65,45 @@ Modes:
              newly appeared transitive dependency is discovered.
 
 Options:
-  -h, --help  show this help and exit.
+  --shadow-user-skills  install even though home-manager delivers skills
+                        at user level; the result shadows them until
+                        .agents/skills/ is removed.
+  -h, --help            show this help and exit.
 EOF
 }
 
+# True when any user-level skill directory that modules/home/ai/skills/
+# populates via home.file holds a SKILL.md symlink into home-manager's
+# generation tree. home-manager links every home.file entry through one
+# derivation it always names "home-manager-files" (runCommandLocal in
+# home-manager's modules/files.nix), and programs.claude-code.skills,
+# programs.opencode.skills and the .factory/.hermes home.file entries all
+# deploy SKILL.md as such a link. A clone, a manual copy, or another tool
+# produces regular files or links elsewhere, so the test does not fire
+# there. ~/.agents/skills is not tested: its activation script copies real
+# files, which carry no provenance. Cost: one glob and at most one readlink
+# per directory.
+home_manager_skills_present() {
+  local dir leaf target
+  for dir in "${HOME}/.claude/skills" "${HOME}/.config/opencode/skills" \
+    "${HOME}/.factory/skills" "${HOME}/.hermes/skills"; do
+    for leaf in "${dir}"/*/SKILL.md; do
+      [ -L "${leaf}" ] || continue
+      target="$(readlink "${leaf}")"
+      case "${target}" in
+        /nix/store/*-home-manager-files/*)
+          echo "${leaf} -> ${target}"
+          return 0
+          ;;
+      esac
+      break
+    done
+  done
+  return 1
+}
+
 mode=frozen
+shadow_user_skills=0
 while [ $# -gt 0 ]; do
   case "$1" in
     -h | --help)
@@ -62,6 +111,7 @@ while [ $# -gt 0 ]; do
       exit 0
       ;;
     --relock) mode=refresh ;;
+    --shadow-user-skills) shadow_user_skills=1 ;;
     *)
       echo "unknown argument: $1" >&2
       usage >&2
@@ -85,6 +135,24 @@ manifest_output="$(yq -r '.marketplace.output' apm.yml)"
 if [ "${manifest_output}" != ".github/plugin/marketplace.json" ]; then
   echo "apm-skills-install: apm.yml at ${repo_root} is not the vanixiets producer manifest (marketplace.output=${manifest_output})" >&2
   exit 1
+fi
+
+if hm_evidence="$(home_manager_skills_present)"; then
+  if [ "${shadow_user_skills}" -eq 0 ]; then
+    cat >&2 <<EOF
+apm-skills-install: refusing: home-manager already delivers agent skills on
+  this host (${hm_evidence}).
+  A repo-local .agents/skills/ would shadow those user-level skills for
+  every agent run in this repository and drift from them as apm.lock.yaml
+  ages. Use the home-manager-delivered skills instead.
+  To install anyway (for example to relock), pass --shadow-user-skills:
+    nix run .#apm-skills-install -- --shadow-user-skills
+    just agents-install --shadow-user-skills
+  and remove .agents/skills/ afterwards unless the shadowing is intended.
+EOF
+    exit 3
+  fi
+  echo "apm-skills-install: --shadow-user-skills: installing over home-manager-delivered skills (${hm_evidence})" >&2
 fi
 
 echo "=== apm-skills-install (mode=${mode}) ==="

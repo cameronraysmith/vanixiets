@@ -780,14 +780,17 @@ openspec-regen:
   {{nix_cmd}} run .#openspec-refresh-vendored-artifacts
 
 # Materialize this repo's own apm skill packages from the committed lockfile.
+# Refuses where home-manager already delivers skills (the repo-local tree would
+# shadow them); pass --shadow-user-skills to install anyway.
 [group('agents')]
-agents-install:
-  {{nix_cmd}} run .#apm-skills-install
+agents-install *args:
+  {{nix_cmd}} run .#apm-skills-install -- {{args}}
 
 # Re-resolve apm skill packages' `#main` pins and rewrite the committed lockfile.
+# On a home-manager host pass --shadow-user-skills, then remove .agents/skills/.
 [group('agents')]
-agents-relock:
-  {{nix_cmd}} run .#apm-skills-install -- --relock
+agents-relock *args:
+  {{nix_cmd}} run .#apm-skills-install -- --relock {{args}}
 
 # Regenerate pkgs/by-name/apm-skills-compose/skills.json, the committed skill index the
 # compose build guards against drift. New skill dirs must be git-tracked first.

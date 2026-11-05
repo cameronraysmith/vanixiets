@@ -29,31 +29,62 @@
           config.pre-commit.devShell
         ];
 
-        # Materializes the repo-root AGENTS.md/CLAUDE.md from the
-        # agent-context-* apm fragments once per clone; run `just
-        # agents-context` to refresh after editing the fragments. The
-        # presence check below is a bash builtin, so the common case
-        # (AGENTS.md already exists) execs nothing: the compile wrapper's
-        # runtimeInputs (apm, git, yq-go, coreutils, findutils) exec
-        # roughly 20 non-Apple binaries even just to check staleness, and
-        # each exec of non-Apple code on macOS triggers a syspolicyd
-        # Gatekeeper adjudication -- paying that cost on every shell entry
-        # and direnv reload, across every worktree, contributed to a
-        # syspolicyd lockup. `lib.getExe` embeds the store path at eval
-        # time; `--auto` lets the script itself pick the repository tier
-        # vs every tier by checking for a user-level agent context file
-        # (see apm-context-compile.sh); the `if !` guard means a failure
-        # never fails the shell, since a missing AGENTS.md degrades an
-        # agent session but must not block a human terminal or direnv.
-        # The check below is `$PWD`-relative, not repo-root-relative:
-        # entering the devShell from a subdirectory can miss an
-        # AGENTS.md that exists only at the repo root.
+        # Regenerates the repo-root AGENTS.md/CLAUDE.md from the
+        # agent-context-* apm fragments whenever their inputs changed, so a
+        # fresh clone or jj workspace gets them on first entry and a
+        # fragment edit reaches them on the next one. The unchanged case
+        # must exec nothing: the compile wrapper's runtimeInputs (apm, git,
+        # yq-go, coreutils, findutils) exec roughly 20 non-Apple binaries
+        # even just to hash the inputs, and each exec of non-Apple code on
+        # macOS triggers a syspolicyd Gatekeeper adjudication -- paying that
+        # cost on every shell entry and direnv reload, across every
+        # worktree, contributed to a syspolicyd lockup. So the prefilter
+        # below uses only bash builtins (globs, `-nt`, `read`) and execs the
+        # compiler only when an output is missing or a symlink, the digest
+        # stamp is missing, the recorded compile key (compiler store path
+        # plus tier) differs, or apm.yml or a fragment (or its directory,
+        # which catches removals) is newer than the stamp. The compiler's
+        # `--if-stale` then decides on a content hash, and touches the stamp
+        # when the hash still matches, so a jj rewrite that only moved
+        # mtimes costs one exec, not one per entry. Stamp and key live in
+        # the git-ignored .agents/. `--auto` picks the repository tier vs
+        # every tier from the user-level context file, the same test the
+        # prefilter uses for the key. The repo root is found by walking up
+        # from $PWD to apm.yml beside .git, so entry from a subdirectory
+        # works. The `if !` guard means a compile failure only warns, since
+        # a missing or stale AGENTS.md degrades an agent session but must
+        # not block a human terminal or direnv.
         shellHook = ''
-          if [[ ! -f "$PWD/AGENTS.md" ]]; then
-            if ! ${lib.getExe config.packages.apm-context-compile} --auto; then
-              echo "apm-context-compile: skipped (run 'just agents-context' to regenerate AGENTS.md/CLAUDE.md manually)" >&2
+          _vanixiets_agents_context() {
+            local root=$PWD tool=${lib.getExe config.packages.apm-context-compile}
+            while [[ ! ( -f $root/apm.yml && -e $root/.git ) ]]; do
+              [[ $root == / ]] && return 0
+              root=''${root%/*}
+              [[ -n $root ]] || root=/
+            done
+            local stamp=$root/.agents/.context-inputs-sha256 tier=full key= stale=0 f
+            [[ -e $HOME/.claude/CLAUDE.md ]] && tier=default
+            [[ -r $root/.agents/.context-compile-key ]] && read -r key <"$root/.agents/.context-compile-key"
+            if [[ ! -f $stamp || $key != "$tool $tier" ]]; then
+              stale=1
+            else
+              for f in "$root/AGENTS.md" "$root/CLAUDE.md"; do
+                [[ -f $f && ! -L $f ]] || stale=1
+              done
+              for f in "$root/apm.yml" "$root"/modules/home/ai/plugins/agent-context-*/.apm/instructions{,/*.instructions.md}; do
+                if [[ $f -nt $stamp ]]; then
+                  stale=1
+                  break
+                fi
+              done
             fi
-          fi
+            ((stale)) || return 0
+            if ! "$tool" --auto --if-stale; then
+              echo "apm-context-compile: failed; AGENTS.md/CLAUDE.md may be stale or missing (run 'just agents-context' to see why)" >&2
+            fi
+          }
+          _vanixiets_agents_context
+          unset -f _vanixiets_agents_context
 
           # git-hooks.nix (via inputsFrom, whose shellHook runs first) writes
           # core.hooksPath relative to the checkout it installs from, so a value
