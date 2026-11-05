@@ -11,7 +11,8 @@ Read [charter.md](charter.md) first, because every artifact below is scoped by i
 
 ## Current status
 
-The charter is at v27, which records CAM-76's decisions: ADR-009 Q5 is resolved by an external watch, a healthchecks.io check that cinnabar's dead-man pings after each passing run with a heartbeat and that emails the operator when the pings stop for 15 min, regulated by ADR-009's new E9.6 and R9.6, so CAM-72 is unblocked.
+The charter is at v28, which records CAM-73's decisions: ADR-002 is reversed to a standalone Perses 0.55.1 server, packaged as `perses-bin`, serving views at `obs.scientistexperience.net` to the Kanidm group `perses_users` through its own Kanidm client, reading the store only through two global datasources with anchored read-only paths, and holding only the resources committed under `modules/nixos/perses/resources/`; the embedded dashboard stays on loopback as the operator's fallback, `sso-gateway` stays off, ADR-002 Q9 is dissolved and Q10 answered, ADR-007 and ADR-008 follow, and S6 ran before S5 (#3720, #3721).
+v27 records CAM-76's decisions: ADR-009 Q5 is resolved by an external watch, a healthchecks.io check that cinnabar's dead-man pings after each passing run with a heartbeat and that emails the operator when the pings stop for 15 min, regulated by ADR-009's new E9.6 and R9.6, so CAM-72 is unblocked.
 v26 records the fixes S4's deployment and acceptance needed: the observability timers run on UTC calendars (#3667); pyrite's smartctl_exporter reads smartctl through a wrapper that drops `--log=error`, because its controller rejects the Error Information log page (#3668), so ADR-003 item 19 is amended and ADR-009 records pyrite's SMART support as verified; and pyrite's wifi no longer runs two DHCP clients (#3670).
 v25 records that the store names the exporter's counter-typed SMART fields with `_total`, so ADR-004 item 7 no longer equates its keep-list names with the PromQL-visible ones, and ADR-009's `NvmeCriticalWarning` and `NvmeWearHigh` read `smartctl_device_critical_warning_total` and `smartctl_device_percentage_used_total`.
 v24 records the operator's decision that cinnabar's ntfy keeps `fleet-alerts` on disk for a week, `cache-duration` 168h rather than the default 12 h, so a phone off ZeroTier for days still receives them.
@@ -153,7 +154,7 @@ Each is attributed to the artifact that raised it; where two artifacts raised th
 - Is in-database alerting wanted at all, given that trigger DDL is enterprise-gated and external alerting is therefore the open-build answer (`greptimedb.md` Q1), answered by ADR-009, which evaluates rules outside the store through a timer that queries `/v1/prometheus` and posts to ntfy.
 - Are the three darwin machines belonging to other people in scope as telemetry subjects at all (`otel-collector-topology.md`)?
 - Are `cognee` and `k3s-server` intended to be deployed, or retained as unimported definitions, since that decides whether they enter the D4 scope (`fleet-emitter-inventory.md` Q4)?
-- Is re-enabling the disabled `sso-gateway` on `magnetite` in scope, or must the dashboard layer work with it disabled (`telemetry-security-and-tenancy.md` Q4), settled by charter v11: ADR-002 admits dashboard readers through the gateway, so S6 enables it.
+- Is re-enabling the disabled `sso-gateway` on `magnetite` in scope, or must the dashboard layer work with it disabled (`telemetry-security-and-tenancy.md` Q4), settled by charter v11, under which ADR-002 admitted dashboard readers through the gateway, and again by charter v28, which supersedes that: the standalone Perses server logs readers in through its own Kanidm client, so the gateway stays disabled.
 - Is bumping the root nixpkgs pin in scope, or must the design assume the current pin (`nix-packaging-status.md` question 1), settled because the pin has since been bumped to `nixpkgs_10`, and since charter v11 the store comes from `greptimedb-bin` rather than the pin (ADR-001 Decision).
 - Is darwin continuous-integration coverage in scope, or is the local-run channel the accepted permanent answer for four of ten machines (`dev-loop-signals.md` Q4)?
 
@@ -174,7 +175,7 @@ Each is attributed to the artifact that raised it; where two artifacts raised th
 ### Dashboard layer
 
 - Does the dashboard layer have to render logs and traces from the chosen store, or are metrics-only dashboards acceptable for the first deployment (`perses.md`)?
-- Should the design target the packaged 0.54.0 or the 0.55 line (`perses.md`), carried forward as ADR-002 Q1 and superseded in charter v11, because the Perses version now follows the dashboard the store embeds.
+- Should the design target the packaged 0.54.0 or the 0.55 line (`perses.md`), carried forward as ADR-002 Q1 and superseded in charter v11, because the Perses version then followed the dashboard the store embeds; under charter v28 the standalone server runs 0.55.1 from the upstream release.
 - Which plugin, if any, declares the SQL proxy, and would the MySQL or PostgreSQL wire route be preferable for analytical dev-loop queries (`perses.md`)?
 
 ### Collection topology and darwin
@@ -199,7 +200,7 @@ Each is attributed to the artifact that raised it; where two artifacts raised th
 - What retention applies to the identifying attributes that survive redaction, which are also the fields that make the store a personal-activity record (`telemetry-security-and-tenancy.md` Q6)?
 - Should the three formerly public metrics endpoints be closed behind the gateway, moved to a mesh-only listener, or left open (`fleet-emitter-inventory.md` Q3), settled because #3447 restricted them to loopback and ZeroTier (charter W3) and ADR-003 scrapes them over loopback.
 - Should the design carry an upstream patch to obtain redaction-safe tool-call error classes, accept failure rates without classes, or enable content capture behind an access boundary (`dev-loop-signals.md` Q3)?
-- Is Kanidm the intended identity provider for the dashboard layer (`perses.md`), carried forward as ADR-002 Q4 and, since charter v11, served through `sso-gateway`'s Kanidm client; the original choice between a separate project and a separate instance for agent-session dashboards is superseded by ADR-008's shared read zone (ADR-008 Q1).
+- Is Kanidm the intended identity provider for the dashboard layer (`perses.md`), carried forward as ADR-002 Q4 and, from charter v11 to v27, served through `sso-gateway`'s Kanidm client; since charter v28 the standalone Perses server logs readers in through its own Kanidm client `perses`; the original choice between a separate project and a separate instance for agent-session dashboards is superseded by ADR-008's shared read zone (ADR-008 Q1).
 
 ### Coverage model and regulators
 

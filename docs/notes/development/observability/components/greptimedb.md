@@ -5,14 +5,14 @@ title: "greptimedb"
 ## Purpose
 
 GreptimeDB is the store: it durably holds fleet, dev-loop and agent-harness telemetry and answers OTLP writes, PromQL queries and SQL queries over it (ADR-001 Decision).
-It also serves the dashboard layer, the Perses dashboard its release build embeds, at `/dashboard/`, with dashboards stored through `/v1/dashboards` (ADR-002 Decision; `components/perses.md`).
+It also serves the Perses dashboard its release build embeds, at `/dashboard/` on loopback, which since charter v28 is the operator's tunnelled fallback; the dashboard layer is ADR-002's standalone Perses server, which reads the store through its datasource proxy (ADR-002 Decision; `components/perses.md`).
 It runs as one standalone process on `magnetite`, with its SST substrate in the existing Cloudflare R2 bucket `sciexp` (ADR-006 Decision, ADR-007 Decision).
 Its daily Parquet export to the lakehouse seam is a separate component, `components/parquet-export.md`, that runs inside this process.
 
 ## Decisions realized
 
 - ADR-001 Decision: the open build of GreptimeDB, standalone, consumed as `greptimedb-bin`, a first-party package of the upstream release tarball, and never from a prerelease.
-- ADR-001 Decision: `greptimedb-bin` is the intended package because the tarball embeds the dashboard ADR-002 adopts; `pkgs.greptimedb` is acceptable only if it carries that dashboard.
+- ADR-001 Decision: `greptimedb-bin` is the intended package because the tarball embeds the dashboard, which ADR-002 keeps as the operator's fallback since charter v28; `pkgs.greptimedb` is acceptable only if it carries that dashboard.
 - ADR-001 Decision and Q1: the first deployment uses `v1.2.1`.
 - ADR-001 Decision and Q6: the `v1.3.x` line is adopted only when a stable `v1.3` release is published, through `greptimedb-bin`'s `update.sh`, and not through an overlay.
 - ADR-001 Decision and Q3: alerting is external to the store, so no enterprise-gated trigger DDL is relied on.
@@ -26,7 +26,7 @@ Its daily Parquet export to the lakehouse seam is a separate component, `compone
 - ADR-006 Q7: local `File` storage on the dedicated dataset is the fallback if the R2 stanza fails its first deployment.
 - ADR-007 Decision and Q1: placement on `magnetite` inside an explicit memory and disk containment.
 - ADR-007 Decision and Q3, Q4, Q5: the unit limits, memory knobs, dataset quota and reservation, and cache caps listed under Placement and Configuration surface.
-- ADR-007 Decision: HTTP on loopback; gRPC bound to `127.0.0.1:4001` because `v1.2.1` cannot disable it; from S6 the API listener on `127.0.0.1:4006` for the dashboard vhost; every other listener disabled; the event recorder's event list empty.
+- ADR-007 Decision: HTTP on loopback; gRPC bound to `127.0.0.1:4001` because `v1.2.1` cannot disable it; the API listener `127.0.0.1:4006` stays disabled, because no vhost proxies to the store since charter v28; every other listener disabled; the event recorder's event list empty.
 - ADR-007 Decision and Q7: one `greptimedb-users` generator with four users, `admin:rw`, `collector:wo`, `perses:ro` and `regulator:ro`.
 - ADR-007 Decision and Q6: credential rotation restarts the store, and restart-on-rotation stays after a `v1.3` release is deployed.
 - ADR-007 Decision: the store is a plain NixOS module imported by `magnetite`, not a clan service role.
@@ -50,7 +50,7 @@ Listener:
 
 - HTTP on `127.0.0.1:4000`; no firewall port is opened (ADR-007 Decision).
 - gRPC on `127.0.0.1:4001`, held on loopback because `v1.2.1` has no setting that disables it (ADR-007 Context, Decision).
-- From S6, the API listener on `127.0.0.1:4006`, enabled by `http.enable_api_server = true`, serving only `/v1` and `/dashboard` to the dashboard vhost (ADR-002 Decision; ADR-007 Decision).
+- No API listener: `http.enable_api_server` stays unset, because ADR-002's standalone server reads the main listener and no vhost proxies to the store (ADR-002 Decision, charter v28; ADR-007 Decision).
 - The embedded dashboard at `/dashboard/`, and the dashboards API `GET /v1/dashboards`, `POST /v1/dashboards/{name}` and `DELETE /v1/dashboards/{name}`, whose saves and deletes the store rejects for `ro` users (ADR-002 Context).
 - OTLP ingest at `/v1/otlp/v1/{metrics,traces,logs}`, HTTP with protobuf only, since all three handlers reject JSON and no OTLP/gRPC service exists at `v1.2.1` (ADR-001 Context).
 - PromQL at `/v1/prometheus/api/v1`, including `/query` and `/query_range`; the Prometheus `/metadata` route is absent at 1.2.1 (ADR-001 Context, ADR-009 Context).
@@ -68,8 +68,8 @@ Upstream:
 
 Downstream:
 
-- The dashboard layer: from S6, nginx on `magnetite` proxies the vhost's `/dashboard/` and `/v1/` to `http://127.0.0.1:4006` with `Authorization` overwritten by the `perses` credential; the embedded dashboard's `promql-default` and `sql-default` datasources query `/v1/prometheus` and `/v1/sql` (ADR-002 Decision).
-- The dashboard reconcile oneshot `perses-dashboards.service` on `magnetite` writes and deletes dashboards through `/v1/dashboards` with a `rw` credential whose holder is open (ADR-002 Q9).
+- The dashboard layer: from S6, `perses.service` on `magnetite` reads `http://127.0.0.1:4000/v1/prometheus` and `http://127.0.0.1:4000/v1/sql` through two global datasources that send the `perses` credential, set `x-greptime-db-name: fleet` and forward only anchored query paths (ADR-002 Decision, charter v28).
+- No unit writes dashboards through `/v1/dashboards`: ADR-002 provisions its views from committed files into Perses, so the reconcile oneshot planned under charter v11 does not exist (ADR-002 Q9, dissolved under charter v28).
 - `fleet-alert.service` on `magnetite`: PromQL instant queries to `http://127.0.0.1:4000/v1/prometheus/api/v1/query` against `fleet` as the `regulator` user, with a 10 s per-query timeout, and from S2 SQL rules, such as the dev-loop rule over `devloop`, through `/v1/sql` (ADR-009 Decision items 1 and 15, charter v22).
 - magnetite's `otel-envelope`, for its ADR-004 R4.2 clauses only, since R3.2 reads each host's own collector rather than the store (charter v23), `devloop-reconcile` (ADR-005) and `greptimedb-envelope` (ADR-007 R7.2) read as `regulator` (ADR-009 governs the holder list).
 - `greptimedb-schema` and `greptimedb-export` act as `admin` (ADR-007 Decision).
@@ -81,7 +81,7 @@ Store users, from the `greptimedb-users` generator (ADR-007 Decision):
 |---|---|---|
 | `admin` | `rw` | `greptimedb-schema`, `greptimedb-export` (ADR-007 Decision) |
 | `collector` | `wo` | the ADR-003 `ingress` collector (ADR-003 Decision item 10) |
-| `perses` | `ro` | nginx on `magnetite` from S6, injecting it into dashboard readers' requests (ADR-002 Decision) |
+| `perses` | `ro` | `perses.service` on `magnetite` from S6, sent by its datasource proxy on dashboard readers' queries (ADR-002 Decision) |
 | `regulator` | `ro` | `otel-envelope`, `devloop-reconcile`, `greptimedb-envelope`, `fleet-alert.service` (ADR-009 Decision item 1 and Implementation surface) |
 
 No worker account and no worker-run process holds any store credential (ADR-008 Decision).
@@ -114,7 +114,7 @@ Failure notification:
 - Modify `modules/machines/nixos/magnetite/default.nix`: import `greptimedb`, set `services.greptimedb`, declare the `greptimedb-users` and `greptimedb-r2` generators beside `omnigraph-r2`, add the three `greptimedb` dataset oneshots, and give these three and the six existing `zfs-assert-*` and `zfs-set-*` oneshots `OnFailure=observability-notify@%n.service` (ADR-007 Implementation surface, ADR-009 Implementation surface).
 - Modify `modules/machines/nixos/magnetite/disko.nix`: add the `root/greptimedb` dataset with mountpoint `/var/lib/greptimedb`, `quota = "16G"`, `reservation = "12G"` and `com.sun:auto-snapshot = "false"` (ADR-007 Implementation surface).
 - Add `modules/checks/greptimedb-envelope.nix`: regulator R7.1 and its mutants (ADR-007 Implementation surface).
-- Clan vars generator `greptimedb-users` on `magnetite`: `runtimeInputs` openssl; files `users` (owner `greptimedb`, mode `0400`, `restartUnits = [ "greptimedb.service" ]`), `admin-password` (mode `0400`), `collector-password` (mode `0400`, `restartUnits` naming the ADR-003 ingress collector unit), `perses-password` (mode `0400`, no consumer in S1, `restartUnits = [ "nginx.service" ]` from S6), `regulator-password` (mode `0400`, no `restartUnits`) and the public `users-sha256` (`secret = false`, the sha256 of `users`); the three non-admin password files are written with `printf '%s'` (ADR-007 Decision and Implementation surface).
+- Clan vars generator `greptimedb-users` on `magnetite`: `runtimeInputs` openssl; files `users` (owner `greptimedb`, mode `0400`, `restartUnits = [ "greptimedb.service" ]`), `admin-password` (mode `0400`), `collector-password` (mode `0400`, `restartUnits` naming the ADR-003 ingress collector unit), `perses-password` (mode `0400`, no consumer in S1, `restartUnits = [ "perses.service" ]` from S6), `regulator-password` (mode `0400`, no `restartUnits`) and the public `users-sha256` (`secret = false`, the sha256 of `users`); the three non-admin password files are written with `printf '%s'` (ADR-007 Decision and Implementation surface).
 - Clan vars generator `greptimedb-r2` on `magnetite`: hidden prompts `access-key` and `secret-key` for an R2 token with Object Read & Write on `sciexp`, `persist = true`, per-file `deploy = false`, rendered to an `env` file, `restartUnits = [ "greptimedb.service" ]`, following `omnigraph-r2` (ADR-006 Implementation surface).
 - `modules/terranix/cloudflare.nix`: no bucket resource and no lifecycle rule for the store prefix (ADR-006 Implementation surface).
 
@@ -143,7 +143,7 @@ A store that stops answering raises `StoreQueryFailing` after 3 min in the ADR-0
 - Standalone instead of distributed: three additional units, each with its own memory floor, on a host that has OOM-killed twice (ADR-001).
 - The no-prerelease version rule: a beta store without published artifacts becoming a fleet dependency through an overlay (ADR-001).
 - Packaging the upstream release tarball: a first-party Rust build of the store entering the closure operator on the hosts that have run out of memory, while keeping the embedded dashboard (ADR-007).
-- The dashboard clause of R1.1: a package switch that silently removes the dashboard layer and the dashboards API (ADR-001).
+- The dashboard clause of R1.1: a package switch that silently removes the operator's embedded dashboard and the dashboards API (ADR-001).
 - The histogram conversion: silent loss of every exponential-histogram series (ADR-001).
 - Disabling usage reporting and the event recorder: an undeclared outbound connection from the host holding agent-session telemetry, and an unrequested 90-day table (ADR-001, ADR-007).
 - External alerting: a design that silently depends on an enterprise-only feature and reopens RK1 (ADR-001).
@@ -175,5 +175,4 @@ A store that stops answering raises `StoreQueryFailing` after 3 min in the ADR-0
 - `v1.3.x`: adopted when a stable `v1.3` release is published and `greptimedb-bin`'s `update.sh` takes it, at which point R1.2 no longer requires the collector's exponential-histogram conversion and tracks its removal; restart-on-rotation stays because `LoadCredential` snapshots credentials at start (ADR-001 Consequences, ADR-007 Q6).
 - Local `File` storage: applied only if the R2 stanza fails its first deployment (ADR-006 Q7).
 - Phase-2 memory work: the store's ceiling ships now and is folded into the incident note's phase-2 `MemoryLow` and oomd work when it lands (ADR-007 Q8).
-- API listener `127.0.0.1:4006`: enabled in S6 with the dashboard vhost, not in S1 (ADR-002 Decision).
 - Store-enforced per-person read partitioning: not available in the open build, and not required under ADR-008's shared read zone (ADR-001 Q4).

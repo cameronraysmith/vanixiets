@@ -3,7 +3,7 @@ title: Fleet observability
 description: "Operating the fleet's telemetry store, metrics collectors, dev-loop record and alerting: dashboard access, querying devloop, alerts and failure notices on fleet-alerts, the dead-man on cinnabar, agent hosts and their certificates, the ingress, the hourly and five-minute envelopes, the daily reconcile, credential rotation and retention."
 ---
 
-This runbook is for the operator of the fleet's telemetry store, its collectors, its dev-loop record and alerting, as deployed by slices S1 to S4.
+This runbook is for the operator of the fleet's telemetry store, its collectors, its dev-loop record, alerting and the dashboard, as deployed by slices S1 to S4 and S6.
 It assumes SSH access to `magnetite.zt` and `cinnabar.zt` over ZeroTier, and to cinnabar as `root@49.13.68.78` over its public address, `sudo` on both, and a vanixiets checkout with the `clan` CLI on the workstation.
 The maintainer contract for the collector lives in `modules/clan/services/otel-collector/README.md`; the failure notifier lives in `modules/nixos/observability-notify.nix`, the alert evaluator and the dead-man in `modules/nixos/fleet-alert.nix`, and the rules in `modules/nixos/fleet-alert/rules.nix`.
 
@@ -25,6 +25,7 @@ S1's store and collector, S2's dev-loop collection and S3's alert evaluator run 
 - `fleet-alert.timer` runs `fleet-alert.service` on magnetite every 60 s: it evaluates each alert rule against its own database, `fleet` or, for `PullRequestQueueWaitBurn`, `devloop`, posts a heartbeat to `fleet-heartbeat`, and posts alerts to `fleet-alerts`.
 - `fleet-deadman.timer` runs `fleet-deadman.service` on cinnabar every 5 min: it checks that anonymous publishing to `fleet-heartbeat` is refused, then raises `AlertEvaluatorSilent` when no heartbeat arrived in the last 10 min.
 - `ntfy-sh.service` on cinnabar serves `https://ntfy.zt` through caddy; only the `alerter` user may publish to `fleet-*` topics, every other topic stays open to anonymous publishing, and anyone on the mesh may subscribe.
+- `perses.service` on magnetite runs Perses 0.55.1 from `pkgs.perses-bin` on `127.0.0.1:8095`, behind the nginx vhost `obs.scientistexperience.net`; it logs people in through its own Kanidm client `perses`, reads the store as `perses` and serves the views committed under `modules/nixos/perses/resources/` (see "Reaching the dashboard").
 - Every NixOS and darwin machine activated since S2 appends one line to `/var/log/deploy-record.jsonl` at each activation, which on NixOS includes the activation at boot; each collecting host's collector copies its own file.
 
 The store holds three databases.
@@ -39,7 +40,50 @@ The store has four users: `admin` (read and write), `collector` (write only), `p
 
 ## Reaching the dashboard
 
-The store serves its embedded dashboard on the loopback listener, so reach it through an SSH tunnel from the workstation:
+Open `https://obs.scientistexperience.net/` and log in through Kanidm.
+Perses itself has no password login; it sends every visitor to `accounts.scientistexperience.net`, and Kanidm admits only members of the group `perses_users`.
+A person outside the group gets Kanidm's "Access Denied" page with an Operation ID, as the operator's account did on 2026-11-05 before it joined.
+A member who has joined also sees an `Observability` tile under `https://accounts.scientistexperience.net/ui/apps`.
+
+The views are in the project `fleet`:
+
+- `fleet-hosts`, selected by `host_name`: memory and ARC pressure, swap, the largest processes, OOM kills, ZFS file systems, pools and ARC, failed and restarting units, exporter health and NVMe health.
+  It shows magnetite, cinnabar and pyrite; stibnite appears once CAM-72 runs a collector there.
+  Its units panels read the units the collector stores, which do not include `perses` itself.
+- `devloop`: pull-request queue wait at the 50th, 90th and 99th percentile, formation to landing per batch, build outcomes per day and deploys per host.
+
+Every reader holds read permission only, and the server runs read-only: saving, editing or deleting a view or datasource is refused.
+The views reach the store only through Perses' proxy, which adds the `perses` read-only credential itself, so no store password reaches a browser.
+
+### Granting and revoking access
+
+Membership of `perses_users` lives in the running Kanidm, not in the repository; `modules/nixos/kanidm.nix` declares the group with no members and `overwriteMembers = false`, so a deploy keeps the members added by hand.
+Change it as `idm_admin` on magnetite, typing the password from `clan vars get magnetite kanidm-idm-admin-password/password` at the login prompt, as the Kanidm runbook (`identity/kanidm.md`) describes:
+
+```sh
+ssh magnetite.zt
+export KANIDM_URL=https://accounts.scientistexperience.net
+nix develop -c kanidm login --name idm_admin
+nix develop -c kanidm group add-members perses_users <account> --name idm_admin
+nix develop -c kanidm group list-members perses_users --name idm_admin
+```
+
+Kanidm checks the group when a person logs in, so the person then logs in to `obs.` again; a refusal shown before the change stays until that new login.
+To revoke access, remove the member and check the list:
+
+```sh
+nix develop -c kanidm group remove-members perses_users <account> --name idm_admin
+nix develop -c kanidm group list-members perses_users --name idm_admin
+```
+
+Kanidm refuses the person's next login at once, but a session already open keeps working for up to an hour.
+Perses renews a session without asking Kanidm: its refresh token lives 45 min and the last access token issued from it 15 min more, so a removed member loses access within 1 h of the removal.
+
+### The operator's fallback: the embedded dashboard
+
+The store still serves its own embedded dashboard on the loopback listener, for the operator only; it is not on any public vhost.
+Use it when `obs.` or Kanidm is down, or for a query no committed view runs.
+Reach it through an SSH tunnel from the workstation:
 
 ```sh
 ssh -L 4000:127.0.0.1:4000 magnetite.zt
@@ -52,6 +96,7 @@ Sign in as `perses`, the read-only user, with the password from:
 clan vars get magnetite greptimedb-users/perses-password
 ```
 
+Type the password only here, in the tunnelled embedded dashboard; the views at `obs.` never ask for it.
 Open the connection settings from the gear and set the connection database to `fleet`; the status bar then shows `fleet`.
 The database selector in the Tables panel does not change where queries run.
 A query run while the connection database is `public` returns no rows.
@@ -60,6 +105,44 @@ Two queries confirm data is arriving:
 
 - PromQL, in Metrics Query: `up`
 - SQL, in Table Query: `SELECT count(*) FROM fleet.up`
+
+### Changing the views
+
+The committed files under `modules/nixos/perses/resources/` are the only source of the views, the two datasources, the store credential's reference and the project.
+Each start of `perses.service` removes `/var/lib/perses/db` and provisions exactly those files, and a deploy that changes a file restarts the service, so a view created by any other route is gone at the next start, and deleting a file deletes its view.
+To change a view, edit its `dashboard-*.json` in a pull request.
+A view reads the store only through the datasources `greptimedb-promql` and `greptimedb-sql`, both on the database `fleet`; an SQL query names each table with its database, as `"devloop"."ci_build"`, uses no `SELECT *` and no `WITH`, and a PromQL query for another database adds `{__database__="<db>"}`.
+Before merging, build the lint check, which runs `percli lint` at the shipped plugins with these rules:
+
+```sh
+nix build .#checks.x86_64-linux.perses-lint -L
+```
+
+### Upgrading Perses
+
+`pkgs/by-name/perses-bin/sources.json` holds the Perses version, the release tarballs' hashes and the plugin versions that release pins.
+Rewrite all three from the latest upstream release with:
+
+```sh
+nix run .#update-perses-bin
+```
+
+The app runs `pkgs/by-name/perses-bin/update.sh`, which exits non-zero with "a partial update" when the version and the hashes did not all change or all stay the same.
+Before merging an upgrade, build the package and the two checks:
+
+```sh
+nix build .#packages.x86_64-linux.perses-bin -L
+nix build .#checks.x86_64-linux.perses-lint -L
+nix build .#checks.x86_64-linux.perses-config -L
+```
+
+Then run the container test on magnetite, which has no `/dev/kvm` and runs it as an nspawn container, from a checkout of the upgrade's commit there:
+
+```sh
+nix build .#vmTests.x86_64-linux.perses-greptimedb -L
+```
+
+A lint behaviour or a configuration key that changed with the release fails `perses-lint` or `perses-config` first; the container test exercises login, the read-only refusals and every committed query against a real store.
 
 ## Subscribing to fleet-alerts
 
@@ -153,7 +236,7 @@ The email does not watch the phone's `fleet-alerts` subscription, so a Monday wi
 
 Unit failures go to the same topic as plain messages without a title.
 The notified units of each host are its `notifiedUnits` in `modules/lib/observability-hosts.nix`.
-On every collecting host they are `opentelemetry-collector` and `otel-envelope`; magnetite adds `greptimedb`, `greptimedb-schema`, `greptimedb-envelope`, `fleet-alert`, `devloop-pg-grants`, `devloop-reconcile` and its `zfs-set-*` and `zfs-assert-*` oneshots, and cinnabar adds `fleet-deadman`.
+On every collecting host they are `opentelemetry-collector` and `otel-envelope`; magnetite adds `greptimedb`, `greptimedb-schema`, `greptimedb-envelope`, `fleet-alert`, `devloop-pg-grants`, `devloop-reconcile`, `perses` and its `zfs-set-*` and `zfs-assert-*` oneshots, and cinnabar adds `fleet-deadman`.
 Print the current list for a host:
 
 ```sh
@@ -170,6 +253,9 @@ A `FAILED fleet-deadman.service on cinnabar` means ntfy did not refuse the anony
 A `FAILED devloop-reconcile.service on magnetite` means a day of `devloop` differs from its sources, or a source could not be read; "When devloop-reconcile fails" under "Querying devloop" says what each clause means.
 A `FAILED devloop-pg-grants.service on magnetite` means a column the dev-loop readers are granted did not appear in nixbot's database within 300 s of the unit's start, which a nixbot migration renaming or dropping it causes; the collector's nixbot queries fail until the grants apply, and `sudo journalctl -u devloop-pg-grants -n 20 --no-pager` names the column.
 The grants are not applied again when nixbot restarts, so a grant lost to a later migration posts no `FAILED` of this unit; it shows as the collector's query errors and as a `FAILED devloop-reconcile.service on magnetite` the next morning.
+A `FAILED perses.service on magnetite` means Perses exited: it was killed, crashed, hit its 256 MiB `MemoryMax`, or stopped at start because Kanidm's OIDC discovery did not answer.
+systemd restarts it 10 s later with no start limit, and its next successful start posts `RESOLVED perses.service on magnetite`; on 2026-11-05 a `SIGKILL` posted the `FAILED` the same second and Perses was active again 11 s later.
+`SystemdUnitFailed` does not watch `perses`, so this notice is its only failure report; read `sudo journalctl -u perses -n 100 --no-pager` and `systemctl show perses -p NRestarts -p MemoryCurrent -p MemoryPeak` on magnetite.
 
 Within one episode the notifier posts once, however many times the unit fails.
 It also posts at most one `FAILED` per unit per 15 minutes: a failure within 15 minutes of the last posted `FAILED` opens a suppressed episode that ends without a message.
@@ -343,7 +429,8 @@ clan machines update magnetite
 The deployment restarts `greptimedb.service`, which loads the new users file and restarts `greptimedb-schema`, and `opentelemetry-collector.service`, which loads the new `collector-password`.
 The envelope reads `regulator-password` afresh on each run.
 R7.4 then compares the sha256 the running store recorded for the users file it loaded with the deployed file's sha256, so the next envelope run fails if the store is still running on the old file.
-Fetch the new `perses` password with `clan vars get` before signing in to the dashboard again.
+The deployment also restarts `perses.service`, which loads the new `perses-password`, so the views at `obs.` need nothing.
+Fetch the new `perses` password with `clan vars get` only before signing in to the embedded dashboard through the tunnel again.
 
 The R2 token comes from the `greptimedb-r2` generator, whose two hidden prompts take an Object Read & Write token on bucket `sciexp`, minted in the Cloudflare dashboard:
 
@@ -580,8 +667,8 @@ Every night `devloop-reconcile` compares the previous UTC day with the sources, 
 
 ### Reaching the SQL API
 
-Both read-only accounts can read `devloop`: `perses` from the workstation through the SSH tunnel of "Reaching the dashboard", and `regulator` on magnetite.
-In the dashboard, set the connection database to `devloop` and use Table Query.
+The `devloop` view at `obs.` charts queue wait, formation to landing, build outcomes and deploys; for any other query, both read-only accounts can read `devloop`: `perses` from the workstation through the tunnel of "The operator's fallback: the embedded dashboard", and `regulator` on magnetite.
+In the embedded dashboard, set the connection database to `devloop` and use Table Query.
 In a shell, define a helper that gives curl the password on standard input, so it never appears on a command line.
 On the workstation, with the tunnel open:
 
@@ -606,7 +693,7 @@ devloop_sql() {
 ```
 
 `devloop_sql 'SHOW TABLES'` then lists the four tables.
-The database comes from `?db=devloop` or from the dashboard's connection database; a query run against `public` finds no table.
+The database comes from `?db=devloop` or from the embedded dashboard's connection database; a query run against `public` finds no table.
 The queries below quote identifiers in double quotes, as `SHOW CREATE TABLE` prints them.
 
 ### The four tables
@@ -870,9 +957,9 @@ The declaration does not set the TTL: the change that creates the table sets it,
 
 ## Not covered yet
 
-- S2 left for later slices: stibnite's deploy records, collected once S5 runs a collector there, while `devloop-reconcile` checks magnetite's records alone; dashboards over `devloop` (S6); and attributing a `dependency_failed` attribute to the derivation that failed under it, which would need error text or dependency edges that S2 does not store.
+- S2 left for later slices: stibnite's deploy records, collected once S5 runs a collector there, while `devloop-reconcile` checks magnetite's records alone; and attributing a `dependency_failed` attribute to the derivation that failed under it, which would need error text or dependency edges that S2 does not store; the dashboards over `devloop` landed with S6 as the `devloop` view.
 - S3 left for later slices: the launchd and `HostProbeStale` rules (S5); the external watch of cinnabar and ntfy themselves landed with CAM-76 (#3716), under "The external watch".
 - S5: stibnite on darwin.
-- S6: the dashboard on its own SSO-protected vhost with provisioned dashboards, replacing the SSH tunnel.
+- S6: landed with CAM-73 (#3720, #3721): the views at `obs.scientistexperience.net` behind Kanidm, under "Reaching the dashboard"; the SSH tunnel stays as the operator's fallback.
 - S7: omp telemetry and journald logs into `agent` and `fleet`.
 - S8: the Parquet export of the store and its reader.

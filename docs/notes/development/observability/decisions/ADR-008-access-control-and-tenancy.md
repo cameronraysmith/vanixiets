@@ -6,6 +6,7 @@ title: "ADR-008: Access control and tenancy"
 
 Accepted (human gate, 2026-10-15).
 Amended in place under charter v11 (2026-10-16): the read side follows ADR-002's embedded dashboard, admitted through `sso-gateway` with the `perses:ro` credential injected by nginx.
+Amended in place under charter v28 (2026-11-05): the read side follows ADR-002's reversal to a standalone Perses server at `obs.scientistexperience.net`, which logs readers in through its own Kanidm client scoped to `perses_users` and holds the `perses:ro` credential itself; the v11 admission through `sso-gateway` is superseded.
 
 ## Context
 
@@ -86,11 +87,11 @@ What is not enforceable with the open build, and is therefore not promised:
 
 Readers and admission:
 
-1. Humans read only through GreptimeDB's embedded dashboard at `perses.scientistexperience.net` (ADR-002), admitted by `sso-gateway`, whose registration for the vhost sets `allowedGroups = [ "perses_users" ]`, so login is restricted to that Kanidm group.
-   This follows web-verification D11, which keeps `sso-gateway` for UIs hosted on `magnetite` (`docs/notes/development/web-verification/decisions.md:252`), and the gateway module's rule that a service without OIDC of its own registers with it (`modules/nixos/sso-gateway.nix:288-298`).
-2. Readers hold only the `perses:ro` credential, and only indirectly: nginx overwrites the `Authorization` header of every request the vhost proxies to the store's API listener, so no reader's browser holds a store password and the store rejects every dashboard save or delete a reader attempts (ADR-002).
+1. Humans read through ADR-002's standalone Perses server at `obs.scientistexperience.net`, which logs them in through its own Kanidm OIDC client `perses`, whose only scope map is the group `perses_users`, so Kanidm refuses everyone outside that group.
+   Perses has OIDC of its own, so the gateway module's rule that a service without OIDC registers with `sso-gateway` (`modules/nixos/sso-gateway.nix:288-298`) does not apply, and the gateway stays disabled; the operator alone also reads through the store's embedded dashboard over an SSH tunnel to loopback (ADR-002).
+2. Readers hold only `read` permission on a read-only Perses server, and the `perses:ro` credential only indirectly: the server's datasource proxy injects it from a file under its credentials directory and forwards only the anchored query paths and a fixed list of caller headers, so no reader's browser holds a store password and no reader can save, change or delete a view (ADR-002).
 3. Every admitted person reads every stored signal, including the other person's harness metrics; the boundary that makes this acceptable is that the store holds no content and no person identifier (ADR-004).
-4. No standalone Perses server is deployed; it is ADR-002's fallback, and deploying it would reopen this record's read side.
+4. A person removed from `perses_users` loses access within 1 h, because Perses renews a session for up to 45 min plus 15 min without consulting Kanidm (ADR-002).
 5. No worker account and no worker-run process holds any store credential.
 
 Public surfaces:
@@ -117,7 +118,8 @@ A shared read zone among admitted people is the smallest model that is true as s
 - Write-only store credentials in worker accounts: usable by any code the worker runs and able to write into any database.
 - Redacting omp OTLP logs instead of refusing them: string bodies pass the redaction processor by value-pattern only.
 - Trusting emitter content gates: each is an environment variable the worker controls.
-- A direct Kanidm OIDC client for the dashboard: the embedded dashboard has no OIDC login to use it, and D11 keeps `sso-gateway` for `magnetite` UIs (`docs/notes/development/web-verification/decisions.md:252`).
+- A direct Kanidm OIDC client for the dashboard: rejected under charter v11 because the embedded dashboard has no OIDC login and D11 keeps `sso-gateway` for `magnetite` UIs (`docs/notes/development/web-verification/decisions.md:252`); superseded under charter v28, where ADR-002's reversal to a standalone Perses server with native OIDC makes a direct client the chosen admission path (Readers and admission item 1).
+- Admission through `sso-gateway` to the embedded dashboard, the read side from charter v11 to v27: superseded under charter v28 by ADR-002's reversal.
 - Readers typing the `perses:ro` password into the embedded dashboard: the browser persists it in `localStorage` (`research/perses.md` R41).
 - Closing the gitea-mq dashboard now: breaks commit-status links and webhooks while showing only a public repository's pull requests.
 
@@ -127,8 +129,8 @@ Every admitted reader sees all telemetry, so admission to the Kanidm group `pers
 Content-bearing diagnostics, such as error messages and exception text, are unavailable from the store; failure classes come from `error.type` only (ADR-004).
 A worker can inject misleading telemetry for its own host; the dev-loop consumer must treat agent-harness metrics as emitter-claimed.
 Raising the content bar later, for example admitting a single opt-in content session, requires a separate store or the Enterprise provider, not a configuration change.
-nginx forwards the reader's request to the store with the `Authorization` header replaced; whether the gateway's session cookie is also forwarded is decided by the nginx configuration of ADR-002, and its only receiver is the loopback store on magnetite `[INFERENCE]`.
-Rotation of store credentials requires `restartUnits` on the store, the ingress collector and, from S6, nginx, also after GreptimeDB 1.3, because `LoadCredential` snapshots credentials at start (ADR-007 Q6).
+Perses forwards a reader's query to the store with the injected `Authorization` and only the headers its datasource's `allowHeaders` lists, so neither the reader's Perses session cookie nor a caller's `x-greptime-auth` reaches the store (ADR-002).
+Rotation of store credentials requires `restartUnits` on the store, the ingress collector and, from S6, `perses.service`, also after GreptimeDB 1.3, because `LoadCredential` snapshots credentials at start (ADR-007 Q6).
 The relationship to worker isolation is that the worker account boundary protects the collector's configuration and credentials, not the emitter's output, which remains untrusted.
 
 ## Operating envelope and regulator
@@ -167,7 +169,7 @@ The dashboard layer's serving-configuration regulator, covering gateway admissio
 - Modify `modules/clan/services/otel-collector/flake-module.nix` (ADR-003): the content stages above, the absence of a logs pipeline on the local OTLP receiver, and the R8.2 ownership assertions for `otel-cert`.
 - Modify `modules/lib/omnigent-environment.nix`: add `OTEL_` to the reserved prefixes, if Q4 is accepted.
 - Modify `modules/checks/omnigent-environment.nix`: add an `OTEL_` policy mutant, if Q4 is accepted.
-- No change to `modules/nixos/kanidm.nix`: `sso-gateway` derives the group stub `perses_users` with `members = [ ]` and `overwriteMembers = false` from ADR-002's registration, members managed operationally as for `omnigent_users` (`modules/nixos/sso-gateway.nix:459-468`).
+- Modify `modules/nixos/kanidm.nix` (ADR-002, charter v28): the group stub `perses_users` with `members = [ ]` and `overwriteMembers = false`, members managed operationally as for `omnigent_users`, and the client `systems.oauth2.perses` whose only scope map is that group.
 - Add the R8.3 query to the `otel-envelope` unit of ADR-003.
 - Modify `modules/home/ai/omp/default.nix`: `OTEL_LOGS_EXPORTER=none` alongside the endpoint ADR-005 sets.
 - Consumed, not created here: the `greptimedb-users` generator of ADR-007 with users `admin` (`rw`), `collector` (`wo`), `perses` (`ro`) and `regulator` (`ro`).
