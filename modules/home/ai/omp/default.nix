@@ -33,6 +33,10 @@
 # 54-entry registry (src/lsp/defaults.json) by requiring a root marker in the
 # project and a resolvable binary, so the roster follows whatever PATH omp is
 # launched with. Pinning it would mean an lsp.yml, which omp only ever reads.
+#
+# Outside the configuration directory, programs.omp.browserRelay.extension
+# copies omp's browser relay Chrome extension to a fixed real directory for
+# Helium to load unpacked; README.md beside this file covers the manual step.
 { config, ... }:
 let
   managedConfigsModule = config.flake.modules.homeManager.managedConfigs;
@@ -46,6 +50,7 @@ let
     }:
     let
       cfg = config.programs.omp;
+      relayExtension = cfg.browserRelay.extension;
       yamlFormat = pkgs.formats.yaml { };
     in
     {
@@ -91,6 +96,39 @@ let
             {command}`/advisor` editor reads and rewrites, replaced wholesale
             on every activation.
           '';
+        };
+
+        browserRelay.extension = {
+          enable = lib.mkOption {
+            type = lib.types.bool;
+            default = pkgs.stdenv.hostPlatform.isDarwin;
+            defaultText = lib.literalExpression "pkgs.stdenv.hostPlatform.isDarwin";
+            description = ''
+              Whether to copy omp's browser relay extension into
+              {option}`programs.omp.browserRelay.extension.directory` on every
+              activation, for a Chromium browser to load unpacked.
+            '';
+          };
+
+          package = lib.mkOption {
+            type = lib.types.package;
+            default = pkgs.omp-browser-relay-extension.override { ompPackage = cfg.package; };
+            defaultText = lib.literalExpression "pkgs.omp-browser-relay-extension.override { ompPackage = config.programs.omp.package; }";
+            description = ''
+              The extension files, written by the same omp that
+              {option}`programs.omp.package` installs, so the extension's
+              version stamp matches the relay it talks to.
+            '';
+          };
+
+          directory = lib.mkOption {
+            type = lib.types.str;
+            default = "${config.home.homeDirectory}/.omp/browser-relay/extension";
+            description = ''
+              Real directory the extension is mirrored into. The default is the
+              directory omp's own relay updates, so both write the same files.
+            '';
+          };
         };
       };
 
@@ -284,7 +322,32 @@ let
           };
         };
 
+        assertions = [
+          {
+            assertion = lib.hasPrefix "/" relayExtension.directory;
+            message = "programs.omp.browserRelay.extension.directory must be an absolute path, got '${relayExtension.directory}'.";
+          }
+        ];
+
         home.packages = lib.mkIf cfg.enable [ cfg.package ];
+
+        home.activation.ompBrowserRelayExtension = lib.mkIf (cfg.enable && relayExtension.enable) (
+          lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+            ompRelayExtensionDir=${lib.escapeShellArg relayExtension.directory}
+            # Helium records the realpath of an unpacked extension and derives
+            # the extension ID from it, so a symlink into the store would give
+            # the extension a new ID on every omp bump.
+            if [[ -L $ompRelayExtensionDir ]]; then
+              errorEcho "omp: $ompRelayExtensionDir is a symlink but must be a real directory; remove it and activate again"
+              exit 1
+            fi
+            run ${pkgs.coreutils}/bin/mkdir -p "$ompRelayExtensionDir"
+            # --checksum without --times leaves identical files untouched, so
+            # the browser sees no change when the package did not change.
+            run ${lib.getExe pkgs.rsync} --recursive --checksum --delete --perms --chmod=D0755,F0644 \
+              ${relayExtension.package}/ "$ompRelayExtensionDir/"
+          ''
+        );
 
         managedConfigs = lib.mkIf cfg.enable {
           omp-config = {
