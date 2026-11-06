@@ -8,7 +8,7 @@ The darwin rules themselves, `org.nixos.otel-envelope` on the launchd allow-list
 **Files:**
 - Create: `modules/lib/observability-notify-run.nix` (`flake.lib.observabilityNotifyRun`, and `flake.lib.observabilityNotifyScripts` moved here)
 - Modify: `modules/nixos/observability-notify.nix` (ON): the scripts (`:21-85`) leave for the new file; the template (`:87-215`) calls `flake.lib.observabilityNotifyScripts` with unchanged arguments
-- Modify: `modules/lib/otel-envelope.nix` (OE): the header (`:1-84`), the `flake.lib.otelEnvelope` arguments (`:292-301`), C5 after C4 (`:453`)
+- Modify: `modules/lib/otel-envelope.nix` (OE): the header (`:1-84`), the `flake.lib.otelEnvelope` arguments (`:292-301`), C5 after C4 (`:453`), interpolated on C4's line so the NixOS script's text is unchanged
 - Modify: `modules/checks/otel-envelope.nix`: `variantsWith` (`:76-100`), `mutants` (`:117-166`), `cases` (`:212-454`), `caseNames` (`:456-478`); create `modules/checks/otel-envelope/fixtures/darwin-*.prom`
 - Modify: `modules/checks/otel-collector-darwin.nix`: the wrapper's cases and `postEveryFailure`
 - Modify: `modules/darwin/otel-collector-agent.nix`: `launchd.daemons.otel-envelope`, and `otel-envelope` in the calendar assertion's labels
@@ -31,7 +31,8 @@ In `modules/checks/otel-collector-darwin.nix`, build the wrapper over a recordin
         # One line per post: the title, the topic, NTFY_TOKEN_FILE, and the argv.
         printf '%s|%s|%s|%s\n' "$1" "$2" "''${NTFY_TOKEN_FILE:-}" "$*" >> "$NTFY_STUB_LOG"
       '';
-      notifyPkgs = pkgs.extend (_: _: { ntfy-send = ntfyStub; });
+      # `//`, not pkgs.extend, which re-evaluates nixpkgs (design D13).
+      notifyPkgs = pkgs // { ntfy-send = ntfyStub; };
       tokenFile = pkgs.writeText "alerter-token" "tk_fixture00000000000000000000000";
       wrapper = self.lib.observabilityNotifyRun notifyPkgs {
         label = "otel-envelope";
@@ -53,7 +54,8 @@ and the cases, each in a fresh `NOTIFY_STATE` and `NTFY_STUB_LOG`, running `obse
 | `tokenAsFile` | false | every stub line's third field equals `tokenFile`, and no line's fourth field contains `tk_fixture` |
 | `exitCodeKept` | `sh -c 'exit 3'`, then true | the wrapper exits 3, then 0 |
 
-The mutant `postEveryFailure` replaces, in a copy of `modules/lib/observability-notify-run.nix` imported as the flake-parts module it is (as `modules/checks/otel-envelope.nix:190-207` does for OE), the text `if [ -e "$stamp" ]; then`, which must occur exactly once, by `if false; then`, and runs only `passFailFailPass`.
+The mutant `postEveryFailure` replaces, in a copy of `modules/lib/observability-notify-run.nix` imported as the flake-parts module it is (as `modules/checks/otel-envelope.nix:190-207` does for OE), the text `if [ -e "$stamp" ]; then`, which must occur exactly once, by `if false; then`, builds its wrapper with `minIntervalSec = 0`, and runs only `passFailFailPass`, where it posts a second `FAILED`.
+With the default 900 s it would not: the third run's failure falls inside the interval, writes `suppressed` and posts nothing, and the fourth run then removes the stamp without a `RESOLVED`, so the mutant would be rejected for the missing `RESOLVED` alone, as the review's rehearsal observed on 2026-11-05.
 No `# mutant:` marker is put in the scripts' text, because the NixOS notifier's scripts must keep their store paths (Step 2).
 Run:
 
@@ -158,7 +160,7 @@ in
 }
 ```
 
-In ON, delete the scripts' `let` and `flake.lib = { inherit observabilityNotifyScripts; };`, take `config` in the file's arguments, and set `notifyScripts = config.flake.lib.observabilityNotifyScripts pkgs { … }` with the three arguments it passes today (`:96-100`); update the header to say the scripts live in `modules/lib/observability-notify-run.nix`.
+In ON, delete the scripts' `let` and `flake.lib = { inherit observabilityNotifyScripts; };`, take `config` in the file's arguments and bind it as `flakeConfig = config` in a file-level `let`, because inside `flake.modules.nixos.observability-notify` the name `config` is the NixOS configuration and `config.flake` fails with `attribute 'flake' missing`; set `notifyScripts = flakeConfig.flake.lib.observabilityNotifyScripts pkgs { … }` with the three arguments it passes today (`:96-100`); update the header to say the scripts live in `modules/lib/observability-notify-run.nix`.
 `modules/checks/otel-collector-config.nix:88-103` keeps calling `self.lib.observabilityNotifyScripts` unchanged.
 Run:
 
@@ -169,7 +171,7 @@ nix build .#checks.x86_64-linux.otel-collector-darwin -L 2>&1 | tee -a "$L" | gr
 nix build .#checks.x86_64-linux.otel-envelope .#checks.x86_64-linux.otel-collector-config 2>&1 | tail -n 2 | tee -a "$L"
 ```
 
-Expected: `nixos notifier unchanged` (the hook and template store paths, so the notices, are what `origin/main` deploys); the five wrapper cases `ok:` and `mutant postEveryFailure rejected: passFailFailPass`; both other checks pass unchanged (evaluation, build).
+Expected: `nixos notifier unchanged` (the hook and template store paths, so the notices, are what `origin/main` deploys); the five wrapper cases `ok:` and `mutant postEveryFailure rejected: passFailFailPass`, its posts showing two `FAILED` titles; both other checks pass unchanged (evaluation, build).
 Then, from stibnite, `fleet-ingress` from the commit that will be the pull request's head, which routes to magnetite, the only builder advertising `uid-range` (`modules/README.md:65-74`):
 
 ```bash
@@ -225,10 +227,10 @@ nix build .#checks.x86_64-linux.otel-envelope 2>&1 | tee logs/s5-evidence/3.3-re
 ```
 
 Expected: FAIL at evaluation, `function 'anonymous lambda' called with unexpected argument 'darwinMemory'` (RED).
-Then extend OE: the arguments gain `darwinMemory ? null`; the header gains C5's paragraph and says `STATE_DIRECTORY` is read from the environment, which systemd's `StateDirectory` sets on NixOS and the launchd plist's `EnvironmentVariables` on darwin (the script has required it since S4, `:329`, so no code changes for it); after C4 (`:453`):
+Then extend OE: the arguments gain `darwinMemory ? null`; the header gains C5's paragraph and says `STATE_DIRECTORY` is read from the environment, which systemd's `StateDirectory` sets on NixOS and the launchd plist's `EnvironmentVariables` on darwin (the script has required it since S4, `:329`, so no code changes for it); C5 is appended to C4's line (`:453`), so that without `darwinMemory` the script's text, and every NixOS envelope's store path, stay as they are (an interpolation on a line of its own would leave an empty line in every NixOS script; rehearsed 2026-11-05):
 
 ```nix
-        ${lib.optionalString (darwinMemory != null) ''
+        if [ -s "$tmp/loss" ]; then fail "C4 loss" "$(tr '\n' ' ' < "$tmp/loss")"; else ok "C4 loss"; fi${lib.optionalString (darwinMemory != null) ("\n" + ''
           # C5 (darwin; design D6, O5): launchd bounds no memory, so each
           # collector's resident size is read from its pid in `launchctl print`
           # and compared with its limit. A job with no pid is not judged here.
@@ -242,8 +244,7 @@ Then extend OE: the arguments gain `darwinMemory ? null`; the header gains C5's 
             rss=$(${darwinMemory.ps} -o rss= -p "$pid" | tr -d ' ') || continue
             if [ $((rss * 1024)) -gt "$limit" ]; then over="$over $label $((rss / 1024)) MiB"; fi
           done <<< ${lib.escapeShellArg (lib.concatStrings (lib.mapAttrsToList (l: b: "${l} ${toString b}\n") darwinMemory.limits))}
-          if [ -n "$over" ]; then fail "C5 memory" "''${over# } above its limit"; else ok "C5 memory"; fi
-        ''}
+          if [ -n "$over" ]; then fail "C5 memory" "''${over# } above its limit"; else ok "C5 memory"; fi'')}
 ```
 
 The mutant's `to` is `pid=$(awk -F' = ' '$1 == "\tpid" { print $2; exit }' <<< "$(${darwinMemory.launchctl} print system/org.nixos.otelcol 2> /dev/null)")`.
@@ -255,10 +256,11 @@ jj st --no-pager >/dev/null
 L=logs/s5-evidence/3.3-envelope-$(/bin/date -u +%Y%m%dT%H%M%SZ).log
 nix build .#checks.x86_64-linux.otel-envelope -L 2>&1 | tee "$L" | grep -E '^(ok|mutant|FAIL)'
 NIX_SHOW_STATS=1 NIX_SHOW_STATS_PATH=/tmp/otel-envelope-stats.json nix eval --option eval-cache false --raw .#.checks.x86_64-linux.otel-envelope.drvPath >/dev/null && jq '.gc.totalBytes, .cpuTime' /tmp/otel-envelope-stats.json | tee -a "$L"
-(cd $DEPLOY && nix eval --raw .#nixosConfigurations.magnetite.config.systemd.services.otel-envelope.serviceConfig.ExecStart) | diff - <(nix eval --raw .#nixosConfigurations.magnetite.config.systemd.services.otel-envelope.serviceConfig.ExecStart) && echo "nixos envelope unchanged" | tee -a "$L"
+for h in electrum magnetite; do printf '%s %s %s\n' "$h" "$(cd $DEPLOY && nix eval --raw ".#nixosConfigurations.$h.config.systemd.services.otel-envelope.serviceConfig.ExecStart")" "$(nix eval --raw ".#nixosConfigurations.$h.config.systemd.services.otel-envelope.serviceConfig.ExecStart")"; done | tee -a "$L"
+diff <(cd $DEPLOY && nix eval --json .#nixosConfigurations.magnetite.config.vanixiets.otelCollector.envelopeBudget.notifiedUnits | jq -S .) <(nix eval --json .#nixosConfigurations.magnetite.config.vanixiets.otelCollector.envelopeBudget.notifiedUnits | jq -S .) | tee -a "$L"
 ```
 
-Expected: every existing case and the six darwin cases `ok:`, every existing mutant and `mutant c5WrongPid rejected: c5ProcessAt129`, no `FAIL`; the cost under 0.17 GiB (design D13) and below 536,870,912; `nixos envelope unchanged`, because C5's text renders only with `darwinMemory` (build, evaluation).
+Expected: every existing case and the six darwin cases `ok:`, every existing mutant and `mutant c5WrongPid rejected: c5ProcessAt129`, no `FAIL`; the cost near design D13's 157,711,024 B and below 536,870,912; electrum's two paths equal, because C5's text renders only with `darwinMemory`; magnetite's two paths differ, and the `notifiedUnits` diff shows only the added `"stibnite": [ "otel-envelope" ]`, which the ingress role's envelope budget reads from the host table (build, evaluation).
 Commit, for example "Bound the darwin collectors' resident memory in the delivery envelope".
 
 - [ ] **Step 4: The envelope on stibnite (tasks.md 3.4)**
@@ -352,13 +354,13 @@ The legs' value sources: the step-indexed post lists typed in each leg from FAI 
         ++ map (n: { at = minute (10 + 5 * n); series = lib.optionalAttrs (n == 0) { HostProbeStale = stale; }; }) (lib.range 0 23)
         ++ map (n: { at = minute n; reporting = [ "stibnite" ]; series = lib.optionalAttrs (wake n) { HostProbeStale = stale; }; }) (lib.range 126 140);
       pendingAcrossFreeze = {
-        name = "HostProbeStale true at stibnite's last sample, 2 h silent, then true for 2 runs after wake and false after posts nothing";
+        name = "pendingAcrossFreeze: HostProbeStale true at stibnite's last sample, 2 h silent, then true for 2 runs after wake and false after posts nothing";
         rules = probeStaleRules;
         steps = freezeTimeline (n: n <= 127);
         expect = [ ];
       };
       pendingAfterWake = {
-        name = "HostProbeStale true for 11 min after stibnite wakes fires once, 10 min after wake";
+        name = "pendingAfterWake: HostProbeStale true for 11 min after stibnite wakes fires once, 10 min after wake";
         rules = probeStaleRules;
         steps = freezeTimeline (n: n <= 137);
         # Step 40 is minute 136: 6 runs before the silence, 24 silent, then 126 + 10.
@@ -366,7 +368,7 @@ The legs' value sources: the step-indexed post lists typed in each leg from FAI 
       };
 ```
 
-Add both to `fixtureRehearsal` with `config = probeStaleConfig`, as `twoHostExclusionLeg` is run (`:1782-1785`).
+Add both to `fixtureRehearsal` with `config = probeStaleConfig`, as `twoHostExclusionLeg` is run (`:1782-1785`); each leg's `name` starts with its identifier, because `runLeg` prints and reports a leg by its `name` only (`modules/checks/fleet-alert.nix:1537-1584`).
 Run:
 
 ```bash
@@ -374,11 +376,11 @@ jj st --no-pager >/dev/null
 nix build .#checks.x86_64-linux.fleet-alert -L 2>&1 | tee logs/s5-evidence/3.5-red-$(/bin/date -u +%Y%m%dT%H%M%SZ).log | grep -E 'MISS|FAIL' | head -n 5
 ```
 
-Expected: FAIL with `MISS` lines naming `pendingAcrossFreeze`, which posts `30 [FIRING] HostProbeStale stibnite default` at minute 126 because today's `transition.jq` counts the pending time from minute 5 across the freeze; `pendingAfterWake` misses too, firing at step 30 instead of 40 (RED).
+Expected: FAIL with `MISS` lines naming `pendingAcrossFreeze`, which posts `30 [FIRING] HostProbeStale stibnite default` at minute 126, because today's `transition.jq` counts the pending time from minute 5 across the freeze, and `36 [RESOLVED] HostProbeStale stibnite default` 5 min after the condition clears; `pendingAfterWake` misses too, firing at step 30 instead of 40 (RED; rehearsed on 2026-11-05).
 
 - [ ] **Step 6: Pending time counts only while the host reports (tasks.md 3.6)**
 
-In `modules/nixos/fleet-alert/transition.jq`, replace the unfrozen branch of the reduce (`:179-181`) with:
+In `modules/nixos/fleet-alert/transition.jq`, replace the unfrozen branch of the reduce (`:179-182`) with:
 
 ```jq
           else
@@ -429,14 +431,16 @@ First the legs, from a table where stibnite collects and the two always-on hosts
       onlyStibniteRules = stibnite: builtins.fromJSON (self.lib.fleetAlertRules { inherit lib; hosts = onlyStibniteTable stibnite; }).json;
       stibniteOnlySteps = missing: map (n: { at = gap n; reporting = [ "stibnite" ]; silent = alwaysOnHosts; inherit missing; }) (lib.range 0 7);
       linuxSelectorDarwinOnly = {
-        name = "stibnite, the only host reporting, with every Linux-only selector absent for 35 min, raises nothing";
+        name = "linuxSelectorDarwinOnly: stibnite, the only host reporting, with every Linux-only selector absent for 35 min, raises nothing";
         rules = onlyStibniteRules { collect = true; };
         steps = stibniteOnlySteps linuxSelectors;
         expect = [ ];
       };
       stibniteNotCollecting = {
-        name = "stibnite, not collecting and the only host reporting, with every selector but host memory absent for 35 min, raises nothing";
-        rules = onlyStibniteRules { };
+        name = "stibniteNotCollecting: stibnite, not collecting and the only host reporting, with every selector but host memory absent for 35 min, raises nothing";
+        # Explicit, so the leg keeps its meaning after pull request 2 removes
+        # collect = false from the host table.
+        rules = onlyStibniteRules { collect = false; };
         steps = stibniteOnlySteps (lib.remove "system_memory_usage_bytes" selectors);
         expect = [ ];
       };
@@ -444,7 +448,7 @@ First the legs, from a table where stibnite collects and the two always-on hosts
 
 run in `fixtureRehearsal`, each with `checkConfig` of its own rules; add `platform = "nixos";` to `twoHostRules`' rows `a` and `b` (`:974-985`), which the rules read from Step 7 on.
 Run `nix build .#checks.x86_64-linux.fleet-alert -L 2>&1 | tee logs/s5-evidence/3.7-red-<ts>.log | grep -E 'MISS|FAIL' | head -n 5`.
-Expected: `linuxSelectorDarwinOnly` misses, posting one `[FIRING] RuleSignalMissing` at step 6 for each rule with a Linux-only presence selector, because today every collecting host, stibnite included, is expected for every rule; `stibniteNotCollecting` passes, guarding the `collect` filter that Step 7 keeps (RED).
+Expected: `linuxSelectorDarwinOnly` misses, posting seven `[FIRING] RuleSignalMissing` at step 6, one per rule and Linux-only presence selector (three for `HostMemoryPressure`, one each for `HostOOMKill`, `ZfsPoolUnhealthy`, `SystemdUnitRestartLoop` and `SystemdUnitFailed`), because today every collecting host, stibnite included, is expected for every rule; `stibniteNotCollecting` passes, guarding the `collect` filter that Step 7 keeps (RED; rehearsed on 2026-11-05).
 Then in `modules/nixos/fleet-alert/rules.nix` replace `:48-52`:
 
 ```nix
@@ -482,5 +486,5 @@ Commit, for example "Expect each alert's signals only from the hosts whose platf
 
 Run `nix fmt 2>&1 | tee logs/s5-evidence/3.8-fmt-$(/bin/date -u +%Y%m%dT%H%M%SZ).log` and `nix fmt -- --fail-on-change`; re-measure `otel-collector-darwin`, `otel-envelope`, `fleet-alert`, `otel-collector-config`, `nixos-magnetite` and `darwin-stibnite` with the method of plan Global Constraints and record them beside Task 1's in `logs/s5-evidence/3.8-cost-<ts>.log`.
 Push the commits of Tasks 2 and 3 as one branch off `main@origin` per the repository's jj workflow and open pull request 1, titled in plain words, for example "Collect stibnite's host metrics on darwin over the mutually authenticated ingress".
-Its body describes the change in words: stibnite's row, added with collection off so that magnetite's deploy and stibnite's next activation install only its account and secret files; the darwin role, renderers, probe, wrapper and envelope; the pending-time and expected-host changes in the evaluator; and the `fleet-ingress` run of Step 2, stated as the commit, the host it ran on, the date and the cases that passed, not as a log path; it links CAM-72 and carries no slice, decision, finding, requirement or task code and no pull-request ordinal.
-Expected: `nix fmt -- --fail-on-change` exits 0; nixbot green on the gating checks `otel-collector-darwin`, `otel-envelope`, `fleet-alert`, `otel-collector-config` and `nixos-magnetite`; `darwin-stibnite`'s best-effort result recorded as nixbot reports it (`modules/checks/nixbot-best-effort-darwin.nix:28-29`); each cost below 536,870,912 (command).
+Its body describes the change in words: stibnite's row, added with collection off so that magnetite's deploy and stibnite's next activation install only its account and secret files; the darwin role, renderers, probe, wrapper and envelope; the pending-time and expected-host changes in the evaluator, which reach cinnabar's dead-man evaluator too; the drvPath of Task 2 Step 6's evaluation of stibnite with `collect` overridden to true; and the `fleet-ingress` run of Step 2, stated as the commit, the host it ran on, the date and the cases that passed, not as a log path; it links CAM-72 and carries no slice, decision, finding, requirement or task code and no pull-request ordinal.
+Expected: `nix fmt -- --fail-on-change` exits 0; nixbot green on the gating checks `otel-collector-darwin`, `otel-envelope`, `fleet-alert`, `otel-collector-config` and `nixos-magnetite`; `darwin-stibnite` evaluated, since an evaluation error fails it, and its best-effort build result recorded as nixbot reports it (`modules/checks/nixbot-best-effort-darwin.nix:22-28`); each cost below 536,870,912 (command).

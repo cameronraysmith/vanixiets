@@ -97,18 +97,20 @@ Record the evaluation cost of `fleet-alert` before the step:
 NIX_SHOW_STATS=1 NIX_SHOW_STATS_PATH=/tmp/fleet-alert-stats.json nix eval --option eval-cache false --raw .#.checks.x86_64-linux.fleet-alert.drvPath >/dev/null && jq '.gc.totalBytes, .cpuTime' /tmp/fleet-alert-stats.json | tee logs/s5-evidence/6.2-cost-before-$(/bin/date -u +%Y%m%dT%H%M%SZ).log
 ```
 
-Add to `modules/checks/fleet-alert.nix`, built with the existing `gap` and `minute` helpers and the real `rules` rendered from `flake.lib.observabilityHosts`, with every series name, label and value copied from Step 1's `6.1-names.tsv` and its label read, and the label sets added to `fixtures/series.json`; the two independently defined values each leg relates are the rendered rule set and the fixture's replayed store answers:
+Add to `modules/checks/fleet-alert.nix`, built with the existing `gap` and `minute` helpers and the real `rules` rendered from `flake.lib.observabilityHosts`, with every series name and label copied from Step 1's `6.1-names.tsv` and its label read, and the label sets added to `fixtures/series.json`; the two independently defined values each leg relates are the rendered rule set and the fixture's replayed store answers.
+The fixture cannot replay metric values: `stepAnswers` answers each rule's whole expression with label sets of value `"1"` on the steps whose `series.<Alert>` lists them, and answers presence from `reporting`, `silent` and `missing` (`modules/checks/fleet-alert.nix:842-888`); so each leg states its condition as the steps on which the expression is answered, each leg's `name` starts with its identifier, and the column below names those steps:
 
 | Leg | Replayed answers | Expected posts |
 |---|---|---|
-| `darwinSignalMissing` | stibnite reports `system_memory_usage_bytes` and no `launchd_job_state` for 30 min, its other launchd series present | one `[FIRING] RuleSignalMissing` naming `LaunchdJobNotRunning`, nothing else |
-| `keptAliveStopped` | `launchd_job_state{launchd_label="org.nixos.nix-grpc-daemon", launchd_state="running"}` 0 for 15 min, then 1 | one `[FIRING] LaunchdJobNotRunning stibnite` after 10 min, one `[RESOLVED]` |
-| `envelopeUnloaded` | `launchd_job_state{launchd_label="org.nixos.otel-envelope", launchd_state="unloaded"}` 1 for 15 min, then 0 | one `[FIRING] LaunchdJobNotRunning stibnite` after 10 min, one `[RESOLVED]` |
-| `envelopeFailedNotReported` | `launchd_job_last_exit_code{launchd_label="org.nixos.otel-envelope"}` 1 for 15 min | nothing, the wrapper having posted its own notice |
-| `harmoniaFailedReported` | `launchd_job_last_exit_code{launchd_label="org.nixos.harmonia-gc"}` 1 for 15 min | one `[FIRING] LaunchdJobFailed stibnite` after 5 min, nothing more |
-| `restartLoop` | `launchd_job_runs_total{launchd_label="org.nixos.nix-grpc-daemon"}` rising by 7 within 15 min, then flat | one `[FIRING] LaunchdJobRestartLoop stibnite` on the first run where the 15 min increase exceeds 5, one `[RESOLVED]` once it falls to 5 or below |
-| `probeStale` | stibnite reports memory each run while `node_textfile_mtime_seconds{file=~".*launchd.prom"}` stays at t0 for 20 min | one `[FIRING] HostProbeStale stibnite` once `time() - mtime` has exceeded 300 s for 10 min |
-| `nvmeExpectsStibnite` | stibnite reports memory with no `smartctl_device_*` series for 30 min, pyrite silent | one `[FIRING] RuleSignalMissing` naming `NvmeCriticalWarning` and one naming `NvmeWearHigh` |
+| `darwinSignalMissing` | stibnite reports memory each step and `launchd_job_state` is in `missing` for 30 min, the other launchd selectors present | one `[FIRING] RuleSignalMissing` naming `LaunchdJobNotRunning`, nothing else |
+| `keptAliveStopped` | `series.LaunchdJobNotRunning` holds `{host_name="stibnite", launchd_label="org.nixos.nix-grpc-daemon", launchd_state="running"}` for 15 min, then nothing | one `[FIRING] LaunchdJobNotRunning stibnite` after 10 min, one `[RESOLVED]` |
+| `envelopeUnloaded` | `series.LaunchdJobNotRunning` holds `{host_name="stibnite", launchd_label="org.nixos.otel-envelope", launchd_state="unloaded"}` for 15 min, then nothing | one `[FIRING] LaunchdJobNotRunning stibnite` after 10 min, one `[RESOLVED]` |
+| `envelopeFailedNotReported` | the store's answer to `LaunchdJobFailed`'s expression with the exclusion removed, `{host_name="stibnite", launchd_label="org.nixos.otel-envelope"}`, filtered by the rendered exclusion as `exclusionLeg` filters `SystemdUnitFailed`'s (`modules/checks/fleet-alert.nix:954-963`), for 15 min | nothing, the wrapper having posted its own notice |
+| `harmoniaFailedReported` | `series.LaunchdJobFailed` holds `{host_name="stibnite", launchd_label="org.nixos.harmonia-gc"}` for 15 min | one `[FIRING] LaunchdJobFailed stibnite` after 5 min, nothing more |
+| `restartLoop` | `series.LaunchdJobRestartLoop` holds `{host_name="stibnite", launchd_label="org.nixos.nix-grpc-daemon"}` on the runs where the 15 min increase exceeds 5, then nothing | one `[FIRING] LaunchdJobRestartLoop stibnite` on the first such run, one `[RESOLVED]` 5 min after the last |
+| `probeStale` | stibnite reports memory each run while `series.HostProbeStale` holds `{host_name="stibnite", file="<launchd.prom's path>"}` for 20 min | one `[FIRING] HostProbeStale stibnite` 10 min after the first such run |
+| `nvmeExpectsStibnite` | stibnite reports memory with both `smartctl_device_*` selectors in `missing` for 30 min, pyrite silent | one `[FIRING] RuleSignalMissing` naming `NvmeCriticalWarning` and one naming `NvmeWearHigh` |
+| `stibniteSilent` | `series.LaunchdJobFailed` holds `{host_name="stibnite", launchd_label="org.nixos.harmonia-gc"}` until it fires, then stibnite is in `silent` for 40 min while the expression still answers that label set | after the `[FIRING]`, nothing: no silence, no resolution, no repeat; the darwin counterpart of `laptopSilentLeg`, which covers pyrite and electrum only |
 
 Run:
 
@@ -117,11 +119,12 @@ jj st --no-pager >/dev/null
 nix build .#checks.x86_64-linux.fleet-alert -L 2>&1 | tee logs/s5-evidence/6.2-red-$(/bin/date -u +%Y%m%dT%H%M%SZ).log | grep -E 'FAIL|Leg'
 ```
 
-Expected: FAIL at the first new leg, because no darwin rule exists and the NVMe rules do not expect stibnite; `envelopeFailedNotReported` alone passes before the rules, and is seen failing in Step 3 (RED).
+Expected: FAIL at the first new leg, because no darwin rule exists and the NVMe rules do not expect stibnite; `envelopeFailedNotReported` alone passes before the rules, and is seen failing in Step 3; `stibniteSilent` fails because `LaunchdJobFailed` does not exist (RED).
 
 - [ ] **Step 3: The four darwin rules (tasks.md 6.3)**
 
 In `modules/clan/services/otel-collector/schema.nix`, `launchdLabels` gains `org.nixos.otel-envelope` (A4:121, amended), and the kept-alive set is the list `launchdKeptAlive` beside it, holding the allow-listed labels whose evaluated `KeepAlive` is `true` (A4:123); the darwin fragment asserts that list equals the labels of its evaluated `launchd.daemons` with `serviceConfig.KeepAlive == true` intersected with `launchdLabels`, the two sources being the schema and stibnite's evaluation, shown failing by an `extendModules` override of stibnite setting `launchd.daemons.otel-host-probe.serviceConfig.KeepAlive = true` (negative control).
+A job whose `KeepAlive` is a condition set is outside the kept-alive set and is not widened into it: `org.nixos.omnigent-host-cameron` evaluates `KeepAlive = { SuccessfulExit = false; }`, so launchd restarts it only after a failing exit, and it may exit 0 and stay down legitimately, which `LaunchdJobNotRunning` must not report; a non-zero exit of it is still `LaunchdJobFailed`'s (design D9).
 In `modules/nixos/fleet-alert/rules.nix`, add after the NVMe rules, with `keptAlive` that list joined into an alternation with each `.` written `[.]` (ADR-009's note on GreptimeDB 1.2.1) and `selfNotified` the darwin rows' `notifiedUnits` as `org[.]nixos[.]<unit>`:
 
 ```nix
@@ -150,7 +153,7 @@ nix eval --json .#.checks.x86_64-linux.fleet-alert.rules.rules --apply 'r: map (
 NIX_SHOW_STATS=1 NIX_SHOW_STATS_PATH=/tmp/fleet-alert-stats.json nix eval --option eval-cache false --raw .#.checks.x86_64-linux.fleet-alert.drvPath >/dev/null && jq '.gc.totalBytes, .cpuTime' /tmp/fleet-alert-stats.json | tee -a "$L"
 ```
 
-Expected: promtool's `SUCCESS` with four more rules than at `tasks.md` 1.2; every leg passes, the eight new ones included; to see `envelopeFailedNotReported` fail, the rule is first built without the `selfNotified` exclusion (`6.3-red-noexclusion-<ts>.log`), then with it; the four darwin rules expect `["stibnite"]` and the NVMe rules `["pyrite","stibnite"]` (evaluation); the cost below 536,870,912 and within design D13's estimate.
+Expected: promtool's `SUCCESS` with four more rules than at `tasks.md` 1.2; every leg passes, the nine new ones included; to see `envelopeFailedNotReported` fail, the rule is first built without the `selfNotified` exclusion (`6.3-red-noexclusion-<ts>.log`), then with it; `launchdKeptAlive` is `[ "org.nixos.dnscrypt-proxy" "org.nixos.nix-daemon" "org.nixos.nix-grpc-daemon" "org.nixos.otelcol" "org.nixos.otelcol-process" "org.nixos.prometheus-node-exporter" ]`, without `org.nixos.omnigent-host-cameron`; the four darwin rules expect `["stibnite"]` and the NVMe rules `["pyrite","stibnite"]` (evaluation); the cost below 536,870,912 and within design D13's figure.
 
 - [ ] **Step 4: The pull request (tasks.md 6.4)**
 
@@ -202,9 +205,10 @@ stibnite's probe does not yet read `org.nixos.otel-envelope`, so `envelopeUnload
 - [ ] **Step 6: stibnite's activation of pull request 3 (tasks.md 6.6) [operator]**
 
 The orchestrator asks "Are you at stibnite now, and may I activate pull request 3 on it?" and records the answer with `/bin/date -u` in `logs/s5-evidence/6.6-presence-<ts>.log`; without a recorded yes this step does not run.
-In `$DEPLOY`, after `git -C $REPO fetch origin && git -C $DEPLOY checkout --detach origin/main`:
+In `$DEPLOY`, after `git -C $REPO fetch origin && git -C $DEPLOY checkout --detach origin/main`, and after `recent-activation.sh` prints `no activation since` or its `STOP` is resolved with the operator (Task 4 Step 1):
 
 ```bash
+"$REPO/logs/s5-evidence/recent-activation.sh"
 "$REPO/logs/s5-evidence/mark.sh" STIBNITE_ACTIVATE_EPOCH
 just activate 2>&1 | tee logs/stibnite-$(date +%Y%m%d-%H%M%S).log
 ```

@@ -20,7 +20,7 @@ stibnite's row has `collect = false` throughout this task, so its collecting con
 **Interfaces:**
 - Consumes: Task 1's baselines (`logs/s5-evidence/1.2-baseline-*.log`, re-measured at the gate in `1.4-gate-*.log`), its recordings under `logs/s5-evidence/1.3-fixtures/`, the argument lists and the telemetry setting it recorded; `flake.lib.hosts.magnetite.zt` (`modules/lib/hosts.nix`); `flake.lib.devloopCollection.{keepAttributes,dropBody,deployRecordFile}` as FM:529-543 uses them, with SC's `devloop.tables.deploy_record`; `flake.lib.otelTestPki pkgs` (`modules/vm-tests/otel-test-pki.nix`); the `nix-builders` role's `darwinModule` precedent (`modules/clan/services/nix-builders/flake-module.nix:324-335`, `:360-401`, `:416-417`); `omnigent-host`'s activation pre-step (`modules/darwin/omnigent-host.nix:453-475`); the store-path guard (`modules/darwin/launchd-wait4path.nix:1-46`); nix-darwin's node_exporter module (`nix-darwin/nix-darwin@bb0b90db:modules/services/monitoring/prometheus-node-exporter.nix:35-119`) and daemon `command`/`script` handling (`nix-darwin/nix-darwin@bb0b90db:modules/launchd/default.nix:83-95`, which runs `command` as `/bin/sh -c "/bin/wait4path /nix/store && exec <command>"`); clan's darwin `restartUnits` throw (`clan-core@dbae2101:modules/clan/export-modules/generic-generator.nix:193-208`) and its shared-generator comparison, which ignores `owner`, `group` and `mode` and compares `files`, `prompts`, `dependencies` and `validationHash` (`clan-core@dbae2101:pkgs/clan-cli/clan_lib/vars/generator.py:106-116`, `:203-228`).
 - Produces: everything in plan.md's Interface contract marked Task 2, which Tasks 3 to 6 rely on: `platform` and stibnite's row; the role's `darwinModule` with the `_otelcol` account and the three generators; `flake.lib.otelCollectorDarwin`; `flake.lib.otelHostProbe`; SC's `darwinNodeExporterKeep` and `launchdLabels`; the fragment with its daemons and assertions; `checks.x86_64-linux.otel-collector-darwin` with its case list, which Task 3 Step 1 extends.
-  Two names are added beside the contract and recorded here so later tasks use them: the renderer also returns `node = { listenAddress; port; extraFlags; }`, the node_exporter settings the fragment applies and the check judges (tasks.md 2.4's node clause has no other Linux-evaluable source); and the fragment declares `vanixiets.otelCollector.darwin.agentSettings` and `processSettings`, the rendered configurations as mergeable options, so Step 6's overrides can change a value its assertions judge.
+  Three names are added beside the contract and recorded here so later tasks use them: the renderer also returns `node = { listenAddress; port; extraFlags; }`, the node_exporter settings the fragment applies and the check judges (tasks.md 2.4's node clause has no other Linux-evaluable source); `flake.lib.otelHostProbeLabels { launchdLabels; daemonLabels; }`, in the renderer's file, selects the probe's labels for the fragment and the check alike; and the fragment declares `vanixiets.otelCollector.darwin.agentSettings` and `processSettings`, the rendered configurations as mergeable options, so Step 6's overrides can change a value its assertions judge.
 
 - [ ] **Step 1: The platform field, its assertion seen failing, and stibnite's row (tasks.md 2.1)**
 
@@ -63,7 +63,7 @@ Run:
 ```bash
 jj st --no-pager >/dev/null
 L=logs/s5-evidence/2.1-platform-$(/bin/date -u +%Y%m%dT%H%M%SZ).log
-nix eval --raw .#nixosConfigurations.electrum.config.system.build.toplevel.drvPath 2>&1 | grep -o 'otel-collector: flake.lib.observabilityHosts rows[^"]*' | head -n 1 | tee "$L"
+nix eval --raw .#nixosConfigurations.electrum.config.system.build.toplevel.drvPath 2>&1 | grep -o '^ *error: otel-collector: flake.lib.observabilityHosts rows.*' | head -n 1 | tee "$L"
 ```
 
 Expected: the assertion's message, naming all six rows with `"platform":null` (RED).
@@ -81,7 +81,7 @@ Then, in HT, add `platform = "nixos";` to the `agent` helper after `collect = tr
 ```
 
 stibnite's `notifiedUnits` replace the helper's: `otel-envelope` posts its own notices through the wrapper (Task 3), and no darwin job is named `opentelemetry-collector`.
-Steps 1 to 3 are committed together, so no commit has stibnite's row without the role's `darwinModule` (Step 2).
+Steps 1 to 3 are committed together, so no commit has stibnite's row without the role's `darwinModule` (Step 2), and no commit has the role without Step 3's vars: from Step 2 on, stibnite's configuration installs the shared `ntfy-alerter` token, not encrypted for stibnite until Step 3, and `otel-cert`'s key resolves to `/no-such-path` until Step 3 generates it (design D5 "Deploy order"); this gate is mandatory, and stibnite is never activated from a commit before Step 3.
 Run:
 
 ```bash
@@ -246,10 +246,13 @@ c=vars/per-machine/stibnite/otel-cert/cert.pem/value
 openssl x509 -noout -subject -dates -ext subjectAltName,extendedKeyUsage,keyUsage -in "$c" 2>&1 | tee -a "$L"
 openssl verify -CAfile vars/shared/otel-ca/ca.crt/value "$c" 2>&1 | tee -a "$L"
 ls vars/shared/ntfy-alerter/token/machines/ | tee -a "$L"
-ls vars/shared/otel-ca/ca.key/machines/ 2>/dev/null | tee -a "$L"
+find vars/shared/otel-ca -maxdepth 3 | sort | tee -a "$L"
+ls vars/per-machine/stibnite/otel-cert/key.pem/ | tee -a "$L"
+nix eval --raw '.#darwinConfigurations.stibnite.config.clan.core.vars.generators.otel-cert.files."key.pem".path' | tee -a "$L"; echo
 ```
 
-Expected: `subject=CN=stibnite`, `notAfter` about 3650 days on, `TLS Web Client Authentication`, no SAN extension; `<path>: OK`; seven token readers, stibnite among them; the `otel-ca` reader list, if the pinned clan keeps one for the undeployed key, with stibnite added (command).
+Expected: `subject=CN=stibnite`, `notAfter` about 3650 days on, `TLS Web Client Authentication`, no SAN extension; `<path>: OK`; seven token readers, `stibnite` among them; under `otel-ca` still only `ca.crt/value` and `ca.key/{secret,users/}`, because `otel-ca` has no machine readers; `secret` and `machines/` under stibnite's `key.pem`; a key path other than `/no-such-path`, namely `/run/secrets/vars/per-machine/stibnite/otel-cert/key.pem` (command, evaluation).
+Without each of these, Steps 1 to 3 are not committed and the pull request is not opened (design D5 "Deploy order").
 Commit Steps 1 to 3 after `nix fmt` (plan Global Constraints), for example "Add stibnite to the collection host table with its own collection certificate"; the vars are in this commit.
 
 - [ ] **Step 4: The darwin renderer, its check written first (tasks.md 2.4)**
@@ -293,7 +296,19 @@ It renders both configurations with `flake.lib` data only, never evaluating `dar
       input = {
         r = render { };
         inherit ztAddress;
-        credentialPaths = [ "${pki}/agent.crt" "${pki}/agent.key" "${pki}/ca.crt" "/run/secrets" ];
+        # Compared with their store-path context discarded: lib.hasInfix
+        # matches by regular expression, which rejects a string with context.
+        credentialPaths = map builtins.unsafeDiscardStringContext [ "${pki}/agent.crt" "${pki}/agent.key" "${pki}/ca.crt" "/run/secrets" ];
+        # stibnite's evaluated daemon labels on 2026-11-05 (tasks.md 1.2), the
+        # fragment's four, and a decoy that matches only if a dot is unescaped.
+        daemonLabels = [
+          "org.nixos.activate-system" "org.nixos.dnscrypt-pin-dns" "org.nixos.dnscrypt-proxy" "org.nixos.harmonia-gc"
+          "org.nixos.nix-cleanup-gcroots" "org.nixos.nix-daemon" "org.nixos.nix-grpc-client-identity" "org.nixos.nix-grpc-daemon"
+          "org.nixos.omnigent-host-cameron" "org.nixos.sops-install-secrets"
+          "org.nixos.otelcol" "org.nixos.otelcol-process" "org.nixos.otel-host-probe" "org.nixos.prometheus-node-exporter"
+          "orgXnixosXnix-daemon"
+        ];
+        probeLabels = self.lib.otelHostProbeLabels;
       };
       isLoopback = /* as modules/checks/otel-collector-config.nix:42-45 */;
       collectEndpoints = /* as modules/checks/otel-collector-config.nix:48-60 */;
@@ -311,7 +326,7 @@ It renders both configurations with `flake.lib` data only, never evaluating `dar
           collectEndpoints i.r.process.receivers == [ ]
           && (i.r.process.service.telemetry.metrics.level or null) == "none"
           && !(i.r.process.service.telemetry.metrics ? readers)
-          && lib.all (p: !(lib.hasInfix p (builtins.toJSON i.r.process))) i.credentialPaths
+          && lib.all (p: !(lib.hasInfix p (builtins.unsafeDiscardStringContext (builtins.toJSON i.r.process)))) i.credentialPaths
           && i.r.process.exporters."otlp_http/agent".endpoint == "http://127.0.0.1:4318";
         strictIncludes =
           let s = i.r.agent.receivers."host_metrics/memory".scrapers; in
@@ -328,6 +343,14 @@ It renders both configurations with `flake.lib` data only, never evaluating `dar
           )
           && lib.all (n: i.r.agent.exporters.${n}.endpoint == "https://[${i.ztAddress}]:4318") [ "otlp_http/ingress" "otlp_http/ingress-logs" ]
           && builtins.attrNames i.r.agent.exporters == [ "otlp_http/ingress" "otlp_http/ingress-logs" ];
+        # ADR-004:121's allow-list intersected with the fixture list, typed
+        # here from the decision record, not read from schema.nix.
+        probeLabelsSelected =
+          lib.sort lib.lessThan (i.probeLabels { inherit (self.lib.otelCollectorSchema) launchdLabels; daemonLabels = i.daemonLabels; })
+          == lib.sort lib.lessThan [
+            "org.nixos.dnscrypt-proxy" "org.nixos.harmonia-gc" "org.nixos.nix-cleanup-gcroots" "org.nixos.nix-daemon" "org.nixos.nix-grpc-daemon"
+            "org.nixos.omnigent-host-cameron" "org.nixos.otelcol" "org.nixos.otelcol-process" "org.nixos.prometheus-node-exporter" "org.nixos.sops-install-secrets"
+          ];
       };
       mutants = {
         nodeListenEmpty = { clause = "nodeTextfileOnLoopback"; apply = i: i // { r = lib.recursiveUpdate i.r { node.listenAddress = ""; }; }; };
@@ -335,10 +358,15 @@ It renders both configurations with `flake.lib` data only, never evaluating `dar
         processEndpoint = { clause = "processNoListenerNoCredential"; apply = i: i // { r = lib.recursiveUpdate i.r { process.receivers.otlp.protocols.http.endpoint = "127.0.0.1:4319"; }; }; };
         diskIncludeAll = { clause = "strictIncludes"; apply = i: i // { r = lib.recursiveUpdate i.r { agent.receivers."host_metrics/memory".scrapers.disk.include = { devices = [ ".*" ]; match_type = "regexp"; }; }; }; };
         exporterAddressOther = { clause = "loopbackButIngress"; apply = i: i // { ztAddress = "fddb:4344:343b:14b9:399:930f:39db:40d3"; }; };
+        # modules/lib/otel-collector-darwin.nix with the line after
+        # `# mutant: labelDotUnescaped` given `"."` for `"[.]"`, imported as the
+        # flake-parts module it is (as modules/checks/otel-envelope.nix:190-207).
+        labelDotUnescaped = { clause = "probeLabelsSelected"; apply = i: i // { probeLabels = (mutatedRenderer "labelDotUnescaped" ''"[.]"'' ''"."'').otelHostProbeLabels; }; };
       };
 ```
 
-The value sources of each clause, named here before its mutant: `nodeTextfileOnLoopback`, the renderer's `node` against ADR-003 item 23's flags (`ADR-003-collection-topology.md:112`) typed in the check; `processIdentityOff`, the rendered scraper against ADR-004:89's list typed in the check; `processNoListenerNoCredential`, the rendered `otelcol-process` configuration against the telemetry value Task 1 Step 3 read from the vendored source and the throwaway credential paths the check itself passed in; `strictIncludes`, the rendered scrapers against ADR-003 item 21 and ADR-004:100 typed in the check; `loopbackButIngress`, the rendered endpoints against the loopback pattern and against the address in `vars/shared/zerotier-ip-magnetite-zerotier/ip/value`, where the renderer reads `flake.lib.hosts.magnetite.zt`.
+The value sources of each clause, named here before its mutant: `nodeTextfileOnLoopback`, the renderer's `node` against ADR-003 item 23's flags (`ADR-003-collection-topology.md:112`) typed in the check; `processIdentityOff`, the rendered scraper against ADR-004:89's list typed in the check; `processNoListenerNoCredential`, the rendered `otelcol-process` configuration against the telemetry value Task 1 Step 3 read from the vendored source and the throwaway credential paths the check itself passed in; `strictIncludes`, the rendered scrapers against ADR-003 item 21 and ADR-004:100 typed in the check; `loopbackButIngress`, the rendered endpoints against the loopback pattern and against the address in `vars/shared/zerotier-ip-magnetite-zerotier/ip/value`, where the renderer reads `flake.lib.hosts.magnetite.zt`; `probeLabelsSelected`, `flake.lib.otelHostProbeLabels` over `schema.nix`'s `launchdLabels` and a typed fixture list of stibnite's daemon labels, against the selection typed from ADR-004:121.
+`mutatedRenderer name from to` imports `modules/lib/otel-collector-darwin.nix` with `from` replaced by `to` on the line after `# mutant: <name>`, asserting that line holds `from`, as `modules/checks/otel-envelope.nix:190-207` does for OE.
 The check asserts at evaluation that every clause holds for `input` and that each mutant's own clause fails for `mutant.apply input`, and its `runCommand` (`x86_64-linux` only, like `otel-envelope`) prints `ok: <clause>` for each clause and `mutant <name> rejected: <clause>` for each mutant, then runs the root pin's `otelcol-contrib validate --config <file>` (Task 1 Step 3's argument list) on `pkgs.formats.yaml`-rendered `agent` and `process`, printing `ok: validate <name>`, and, as its negative control, on a copy of `agent` with `exporters."otlp_http/ingress".sending_queue.queue_sizee = 1` added, which must exit non-zero, printing `control validateRejectsUnknownKey rejected`.
 Run:
 
@@ -400,6 +428,23 @@ let
   keep = names: { metric_relabel_configs = [ { source_labels = [ "__name__" ]; regex = keepRegex names; action = "keep"; } ]; };
 in
 {
+  # The probe's labels: the allow-listed glob patterns of SC's launchdLabels
+  # matched against a host's evaluated daemon labels, each dot literal
+  # (ADR-004:121; design D4). checks.x86_64-linux.otel-collector-darwin
+  # judges it over a fixture list with a decoy label.
+  flake.lib.otelHostProbeLabels =
+    { launchdLabels, daemonLabels }:
+    builtins.filter (
+      l:
+      lib.any (
+        p:
+        builtins.match (builtins.replaceStrings [ "." "*" ]
+          # mutant: labelDotUnescaped
+          [ "[.]" ".*" ]
+          p) l != null
+      ) launchdLabels
+    ) daemonLabels;
+
   flake.lib.otelCollectorDarwin =
     { hostName, certFile, keyFile, caFile }:
     let
@@ -482,14 +527,15 @@ in
           "groupbyattrs/compact".keys = [ ];
           "metrics_transform/process".transforms = [ /* FM:313-326 */ ];
           "filter/process-min" = { /* FM:327-332, reading schema.process.minBytes */ };
-          "resource/process".attributes = [ { key = "service.name"; value = "otelcol-process"; action = "upsert"; } ];
         };
         exporters."otlp_http/agent" = { endpoint = "http://127.0.0.1:4318"; sending_queue.enabled = true; };
-        # No listener and no reader: Task 1 Step 3's vendored reading.
+        # No listener and no reader: level none builds no meter reader
+        # (go.opentelemetry.io/collector/service@v0.155.0
+        # service/telemetry/otelconftelemetry/metrics.go:28-30).
         service.telemetry.metrics.level = "none";
         service.pipelines."metrics/process" = {
           receivers = [ "host_metrics/process" ];
-          processors = [ "memory_limiter" "groupbyattrs/compact" "metrics_transform/process" "filter/process-min" "resource/process" ];
+          processors = [ "memory_limiter" "groupbyattrs/compact" "metrics_transform/process" "filter/process-min" ];
           exporters = [ "otlp_http/agent" ];
         };
       };
@@ -503,7 +549,8 @@ in
 ```
 
 The three process processors repeat the NixOS agent's text because FM's agent fragment is a NixOS module the darwin side cannot import, and design D1 keeps the darwin code out of FM; a disagreement between the two shows as `process_memory_usage_bytes` series of stibnite that differ in shape from the NixOS hosts' at Task 5's capture.
-The renderer has no `transform/omnigent-alias`, which design D2 lists: that processor rewrites `systemd.unit.name` (FM:294-297), which no darwin receiver emits, and on darwin the owner alias is written by the probe into `launchd_label` (Step 5).
+The renderer has no `transform/omnigent-alias`, which no longer appears in design D2 either: that processor rewrites `systemd.unit.name` (FM:294-297), which no darwin receiver emits, and on darwin the owner alias is written by the probe into `launchd_label` (Step 5).
+The process configuration sets no `service.name` (design D3): no consumer reads one for process series, and the store would turn it into a `service_name` column only stibnite's rows fill.
 If Task 1 Step 3 found a different darwin `disk` include key or telemetry reader shape at 0.155.0, the renderer and the check use the recorded one.
 Run:
 
@@ -517,12 +564,12 @@ for c in otel-collector-darwin otel-collector-config; do
 done | tee -a "$L"
 ```
 
-Expected: five `ok:` clause lines, two `ok: validate` lines, five `mutant … rejected` lines, `control validateRejectsUnknownKey rejected`, no `FAIL`; `otel-collector-darwin` between about 0.15 and 0.25 GiB (design D13) and below 536,870,912; `otel-collector-config` unchanged from Task 1's figure, since it reads no new key; a figure over the budget stops the task (build).
+Expected: six `ok:` clause lines, two `ok: validate` lines, six `mutant … rejected` lines, `control validateRejectsUnknownKey rejected`, no `FAIL`; `otel-collector-darwin` near design D13's measured 162,481,008 B and below 536,870,912; `otel-collector-config` within about 100 KB of Task 1's figure, which SC's new keys move; a figure over the budget stops the task (build).
 Commit, for example "Render the darwin collector configurations and check them on Linux".
 
 - [ ] **Step 5: The probe, its fixtures first (tasks.md 2.5)**
 
-Copy from `logs/s5-evidence/1.3-fixtures/` into `modules/checks/otel-collector-darwin/`: `launchctl/org.nixos.nix-daemon.{txt,rc}` (a running kept-alive job), `launchctl/org.nixos.omnigent-host-cameron.{txt,rc}`, `launchctl/org.nixos.otelcol.{txt,rc}` (answered `Could not find service`), `launchctl/com.apple.progressd.{txt,rc}` saved as `launchctl/org.nixos.jetsam-killed.{txt,rc}` (a `last exit reason` and no exit-code line), `launchctl/org.nixos.exit-78.{txt,rc}` (Task 1 Step 3's job with `last exit code = 78`, or its marked edited copy), and `smartctl-disk0.json`; the fixtures keep their `pid` lines, which the parser must ignore and the `pidWritten` mutant writes.
+Copy from `logs/s5-evidence/1.3-fixtures/` into `modules/checks/otel-collector-darwin/`, removing from each `launchctl` recording its `environment = { … }` and `default environment = { … }` blocks, which name accounts and paths and could carry a secret set in a job's `EnvironmentVariables`, and which the parser never reads: `launchctl/org.nixos.nix-daemon.{txt,rc}` (a running kept-alive job), `launchctl/org.nixos.omnigent-host-cameron.{txt,rc}`, `launchctl/org.nixos.otelcol.{txt,rc}` (answered `Could not find service`), Task 1 Step 3's idle-reclaimed system job (`com.apple.tzlinkd` on 2026-11-05) saved as `launchctl/org.nixos.jetsam-idle.{txt,rc}` (`last exit reason = JETSAM_REASON_MEMORY_IDLE_EXIT` and no exit-code line), Task 1 Step 3's non-idle job saved as `launchctl/org.nixos.signal-killed.{txt,rc}` (a `last exit reason` other than an idle exit and no exit-code line, or its marked edited copy), `launchctl/org.nixos.exit-78.{txt,rc}` (Task 1 Step 3's job with `last exit code = 78`, or its marked edited copy), and `smartctl-disk0.json`; the fixtures keep their `pid` lines, which the parser must ignore and the `pidWritten` mutant writes.
 Write by hand, from ADR-004:93-95 and the recordings, not from any parser output, `expected/launchd-<label>.prom` for each label and `expected/smartctl.prom`; for a running job the expected text is:
 
 ```text
@@ -540,9 +587,9 @@ launchd_job_last_exit_code{launchd_label="org.nixos.nix-daemon"} 0
 launchd_job_runs_total{launchd_label="org.nixos.nix-daemon"} <runs from the recording>
 ```
 
-`org.nixos.omnigent-host-cameron`'s expected file names `org.nixos.omnigent-host-owner-1` (SC's `ownerAliases`, `schema.nix:48-51`); `org.nixos.otelcol`'s has only the four state lines with `unloaded` 1; `org.nixos.jetsam-killed`'s has `launchd_job_last_exit_code` -1; `org.nixos.exit-78`'s has 78.
+`org.nixos.omnigent-host-cameron`'s expected file names `org.nixos.omnigent-host-owner-1` (SC's `ownerAliases`, `schema.nix:48-51`); `org.nixos.otelcol`'s has only the four state lines with `unloaded` 1; `org.nixos.jetsam-idle`'s has `launchd_job_last_exit_code` 0; `org.nixos.signal-killed`'s has -1; `org.nixos.exit-78`'s has 78.
 `expected/smartctl.prom` has the eight names of `smartctlKeep` with `device="disk0"`, `smartctl_device_temperature` with `temperature_type="current"` too, `# TYPE … counter` for every name but `smartctl_device_smart_status` and `smartctl_device_temperature`, as smartctl_exporter declares them (ADR-004:94), and the values of the recording: `smart_status.passed` as 1, and `nvme_smart_health_information_log`'s `critical_warning`, `media_errors`, `percentage_used`, `available_spare`, `available_spare_threshold` and `num_err_log_entries`.
-Add to the check the probe's cases, each building `self.lib.otelHostProbe` over `pkgs.extend (_: _: { smartmontools = smartctlStub; })`, where `smartctlStub` provides `bin/smartctl` printing `smartctl-disk0.json` when called with exactly `-j -H -A disk0` and exiting 2 otherwise, with `launchctl` a stub that, called with exactly `print system/<label>`, prints `launchctl/<label>.txt` (less a first `#` line) and exits with `launchctl/<label>.rc`, and with `textfileDir` a fresh temporary directory:
+Add to the check the probe's cases, each building `self.lib.otelHostProbe` over `pkgs // { smartmontools = smartctlStub; }`, never `pkgs.extend`, which re-evaluates nixpkgs and on 2026-11-05 more than doubled the check's evaluation cost (design D13), where `smartctlStub` provides `bin/smartctl` printing `smartctl-disk0.json` when called with exactly `-j -H -A disk0` and exiting 2 otherwise, with `launchctl` a stub that, called with exactly `print system/<label>`, prints `launchctl/<label>.txt` (less a first `#` line) and exits with `launchctl/<label>.rc`, and with `textfileDir` a fresh temporary directory:
 
 | Case | Probe arguments | Passes when |
 |---|---|---|
@@ -550,11 +597,12 @@ Add to the check the probe's cases, each building `self.lib.otelHostProbe` over 
 | `exitCode78` | `[ "org.nixos.exit-78" ]` | equals its expected file |
 | `omnigentAlias` | `[ "org.nixos.omnigent-host-cameron" ]`, `ownerAliases` from SC | equals its expected file, and `grep -c cameron launchd.prom` is 0 |
 | `notLoaded` | `[ "org.nixos.otelcol" ]` | equals its expected file |
-| `jetsamKilled` | `[ "org.nixos.jetsam-killed" ]` | equals its expected file |
+| `idleExit` | `[ "org.nixos.jetsam-idle" ]` | equals its expected file |
+| `nonIdleNoExitCode` | `[ "org.nixos.signal-killed" ]` | equals its expected file |
 | `smartctl` | `devices = [ "disk0" ]` | `smartctl.prom` equals `expected/smartctl.prom` |
 | `renamedIntoPlace` | all labels, `devices = [ "disk0" ]` | the directory holds exactly `launchd.prom` and `smartctl.prom`, no temporary file |
 
-and the mutants, each replacing the line after its `# mutant: <name>` marker in the built script and running only its case: `aliasDropped` (`omnigentAlias`), `pidWritten` (`runningJob`), `missingExitCodeAsZero` (`jetsamKilled`).
+and the mutants, each replacing the line after its `# mutant: <name>` marker in the built script and running only its case: `aliasDropped` (`omnigentAlias`), `pidWritten` (`runningJob`), `missingExitCodeAsZero` (`nonIdleNoExitCode`), `idleExitAsFailure` (`idleExit`), the last replacing the idle-exit line with `:`.
 The value sources: the hand-written expected files, from the decision record and the recordings, against the probe's output from the same recordings.
 Run `nix build .#checks.x86_64-linux.otel-collector-darwin -L 2>&1 | tee logs/s5-evidence/2.5-red-<ts>.log | tail -n 3` and see it fail at evaluation, `attribute 'otelHostProbe' missing` (RED).
 Then create `modules/lib/otel-host-probe.nix`:
@@ -588,7 +636,11 @@ Then create `modules/lib/otel-host-probe.nix`:
         : > "$tmp/state"; : > "$tmp/exit"; : > "$tmp/runs"
         # A first-level field of `launchctl print`, indented by one tab.
         field() { awk -F' = ' -v k="$1" '$1 == "\t" k { print $2; exit }' "$tmp/out"; }
-        for label in ${lib.escapeShellArgs labels}; do
+        # Arrays, so a host with one label or one device passes shellcheck,
+        # which rejects a literal single-word `for` list (SC2043).
+        labels=(${lib.escapeShellArgs labels})
+        devices=(${lib.escapeShellArgs devices})
+        for label in "''${labels[@]}"; do
           shown=$label
           if [[ $label == org.nixos.omnigent-host-* ]]; then
             owner=''${label#org.nixos.omnigent-host-}
@@ -602,6 +654,11 @@ Then create `modules/lib/otel-host-probe.nix`:
           else
             case $(field state) in running) st=running ;; "not running") st=not_running ;; *) st=other ;; esac
             code=$(field "last exit code"); code=''${code%%:*}
+            # A jetsam idle exit, launchd's routine reclaim of an idle job,
+            # prints a reason and no exit code; it is no failure (design D4).
+            reason=$(field "last exit reason")
+            # mutant: idleExitAsFailure
+            if [ -z "$code" ] && [ "$reason" = JETSAM_REASON_MEMORY_IDLE_EXIT ]; then code=0; fi
             # mutant: missingExitCodeAsZero
             case $code in "(never exited)") code=0 ;; "" | *[!0-9-]* | -) code=-1 ;; esac
             echo "launchd_job_last_exit_code{launchd_label=\"$shown\"} $code" >> "$tmp/exit"
@@ -613,17 +670,51 @@ Then create `modules/lib/otel-host-probe.nix`:
             echo "launchd_job_state{launchd_label=\"$shown\",launchd_state=\"$s\"} $([ "$s" = "$st" ] && echo 1 || echo 0)" >> "$tmp/state"
           done
         done
-        # … HELP/TYPE lines and the three files concatenated into "$dir/.launchd.prom.$$", then:
+        {
+          echo "# HELP launchd_job_state 1 for the launchd job's current state, 0 for the others."
+          echo "# TYPE launchd_job_state gauge"
+          cat "$tmp/state"
+          if [ -s "$tmp/exit" ]; then
+            echo "# HELP launchd_job_last_exit_code The job's last exit status; 0 if it never exited or was reclaimed idle, -1 if missing otherwise or not an integer."
+            echo "# TYPE launchd_job_last_exit_code gauge"
+            cat "$tmp/exit"
+          fi
+          if [ -s "$tmp/runs" ]; then
+            echo "# HELP launchd_job_runs_total Launches since the job was loaded."
+            echo "# TYPE launchd_job_runs_total counter"
+            cat "$tmp/runs"
+          fi
+        } > "$dir/.launchd.prom.$$"
         mv -f "$dir/.launchd.prom.$$" "$dir/launchd.prom"
-        # smartctl.prom: for each device, `smartctl -j -H -A "$device"` through a jq
-        # program emitting the eight names (counter TYPE as smartctl_exporter
-        # declares them), into "$dir/.smartctl.prom.$$", then renamed.
+        # smartctl.prom: smartctl_exporter's names and TYPEs (ADR-004:92, :94).
+        : > "$tmp/smart"
+        for device in "''${devices[@]}"; do
+          smartctl -j -H -A "$device" > "$tmp/smart.json" || true
+          jq -r --arg d "$device" '
+            def g($n; $t; $v): if $v == null then empty else [$n, $t, ($v | tostring)] end;
+            (.nvme_smart_health_information_log // {}) as $h
+            | g("smartctl_device_smart_status"; "gauge"; (if .smart_status.passed == null then null elif .smart_status.passed then 1 else 0 end)),
+              g("smartctl_device_critical_warning"; "counter"; $h.critical_warning),
+              g("smartctl_device_media_errors"; "counter"; $h.media_errors),
+              g("smartctl_device_percentage_used"; "counter"; $h.percentage_used),
+              g("smartctl_device_available_spare"; "counter"; $h.available_spare),
+              g("smartctl_device_available_spare_threshold"; "counter"; $h.available_spare_threshold),
+              g("smartctl_device_num_err_log_entries"; "counter"; $h.num_err_log_entries),
+              g("smartctl_device_temperature"; "gauge"; .temperature.current)
+            | @tsv' "$tmp/smart.json" | while IFS=$'\t' read -r name type value; do
+              extra=""; [ "$name" = smartctl_device_temperature ] && extra=',temperature_type="current"'
+              printf '%s\t%s\t%s{device="%s"%s} %s\n' "$name" "$type" "$name" "$device" "$extra" "$value"
+            done >> "$tmp/smart"
+        done
+        awk -F'\t' '$1 != last { print "# TYPE " $1 " " $2; last = $1 } { print $3 }' < <(sort -s -t$'\t' -k1,1 "$tmp/smart") > "$dir/.smartctl.prom.$$"
+        mv -f "$dir/.smartctl.prom.$$" "$dir/smartctl.prom"
       '';
     };
 }
 ```
 
-The comment lines above with `…` stand for the HELP/TYPE header text of the expected files and the jq program over the recorded field names; the step writes them in full.
+`runtimeInputs` adds `pkgs.gnugrep` to the tools listed above.
+This text built, passed shellcheck and matched every expected file on magnetite on 2026-11-05, and the built probe ran on stibnite as `nobody` against live `launchctl` and the root pin's `smartctl` in 0.45 s (review rehearsal).
 Run:
 
 ```bash
@@ -633,7 +724,7 @@ nix build .#checks.x86_64-linux.otel-collector-darwin -L 2>&1 | tee "$L" | grep 
 NIX_SHOW_STATS=1 NIX_SHOW_STATS_PATH=/tmp/otel-collector-darwin-stats.json nix eval --option eval-cache false --raw .#.checks.x86_64-linux.otel-collector-darwin.drvPath >/dev/null && jq '.gc.totalBytes, .cpuTime' /tmp/otel-collector-darwin-stats.json | tee -a "$L"
 ```
 
-Expected: the seven probe cases `ok:` beside Step 4's, `mutant aliasDropped rejected: omnigentAlias`, `mutant pidWritten rejected: runningJob`, `mutant missingExitCodeAsZero rejected: jetsamKilled`, no `FAIL`; the cost below 536,870,912 (build).
+Expected: the eight probe cases `ok:` beside Step 4's, `mutant aliasDropped rejected: omnigentAlias`, `mutant pidWritten rejected: runningJob`, `mutant missingExitCodeAsZero rejected: nonIdleNoExitCode`, `mutant idleExitAsFailure rejected: idleExit`, no `FAIL`; `rg -n 'environment = \{' modules/checks/otel-collector-darwin/launchctl/` prints nothing; the cost below 536,870,912 (build, command).
 Commit, for example "Report stibnite's launchd jobs and disk health in a node_exporter textfile".
 
 - [ ] **Step 6: The darwin fragment, its assertions seen failing first (tasks.md 2.6)**
@@ -760,9 +851,12 @@ Then add to the fragment's `config`:
           };
           otel-host-probe = {
             script = "exec ${lib.getExe (flakeLib.otelHostProbe pkgs {
-              # ADR-004:121: the allow-listed labels this host defines.
-              labels = builtins.filter (l: lib.any (p: builtins.match (builtins.replaceStrings [ "." "*" ] [ "[.]" ".*" ] p) l != null) schema.launchdLabels)
-                (lib.mapAttrsToList (_: d: d.serviceConfig.Label) config.launchd.daemons);
+              # ADR-004:121: the allow-listed labels this host defines, selected
+              # by the function the check judges.
+              labels = flakeLib.otelHostProbeLabels {
+                inherit (schema) launchdLabels;
+                daemonLabels = lib.mapAttrsToList (_: d: d.serviceConfig.Label) config.launchd.daemons;
+              };
               devices = flakeLib.observabilityHosts.${config.networking.hostName}.smartDevices;
               inherit (schema) ownerAliases;
               textfileDir = "/var/lib/prometheus-node-exporter/textfile";
@@ -770,13 +864,14 @@ Then add to the fragment's `config`:
             serviceConfig = {
               UserName = "_prometheus-node-exporter"; GroupName = "_prometheus-node-exporter";
               StartInterval = 60; RunAtLoad = true;
-              StandardOutPath = "/var/log/otelcol/otel-host-probe.log"; StandardErrorPath = "/var/log/otelcol/otel-host-probe.log";
+              # launchd opens the log as UserName, so it lives in this account's home.
+              StandardOutPath = "/var/lib/prometheus-node-exporter/otel-host-probe.log"; StandardErrorPath = "/var/lib/prometheus-node-exporter/otel-host-probe.log";
             };
           };
         };
 ```
 
-`/var/log/otelcol` is `_otelcol`'s and mode 0700, so the probe's log goes to the node_exporter's home instead if launchd cannot open it as `_prometheus-node-exporter` [INFERENCE: launchd opens the log paths as root before dropping privileges, as `omnigent-host.nix:453` relies on; the activation in Task 4 shows which]; the step that sees otherwise moves the path to `/var/lib/prometheus-node-exporter/otel-host-probe.log`.
+Each job logs where its own account can open the file, because launchd opens `StandardOutPath` and `StandardErrorPath` as the job's `UserName` (`modules/darwin/shared-reference-tree.nix:22-23`; on stibnite every job's log file is owned by its job's account): `/var/log/otelcol` is `_otelcol`'s, mode 0700, and holds `otelcol`'s, `otel-envelope`'s and root's `otelcol-process`'s logs, and the probe logs into `/var/lib/prometheus-node-exporter/`, `_prometheus-node-exporter`'s home, which nix-darwin's node_exporter module creates with the account and logs into already (`prometheus-node-exporter.nix:84-85`, `:109-116`).
 Then the loopback and calendar overrides again, and the unmodified evaluation, in the scratch tree, appending to `$L`; then a build of the collecting toplevel on stibnite:
 
 ```bash
@@ -792,8 +887,9 @@ cd $REPO && git worktree remove --force $SCRATCH
 ```
 
 Expected: `nodeWildcard` prints the loopback message and `probeCalendar` the calendar message (negative controls); a drvPath; four daemons, `otelcol` `_otelcol` `KeepAlive` true, `otelcol-process` with no `UserName`, `otel-host-probe` `_prometheus-node-exporter` with `StartInterval` 60, `prometheus-node-exporter` `KeepAlive` true, every `StartCalendarInterval` null and every `args` beginning `/bin/sh -c /bin/wait4path /nix/store && exec`; `OTEL_CERT_SHA256` equal to `sha256sum vars/per-machine/stibnite/otel-cert/cert.pem/value`; a built toplevel store path, nothing activated (evaluation, build, negative control).
-The launchd-wait4path assertion (`modules/darwin/launchd-wait4path.nix:41-46`) holds, because every daemon above uses `script`.
+Every daemon above runs behind `/bin/wait4path /nix/store` through `script` or `command`; the launchd-wait4path assertion (`modules/darwin/launchd-wait4path.nix:25-31`) covers only jobs with `RunAtLoad` or a non-false `KeepAlive`, so it judges `otelcol`, `otelcol-process`, `otel-host-probe` and node_exporter, and not Task 3's `otel-envelope`.
 Then evaluate stibnite at the working copy, where `collect` is false: `nix eval --raw .#darwinConfigurations.stibnite.config.system.build.toplevel.drvPath` and `nix eval --json .#darwinConfigurations.stibnite.config.launchd.daemons --apply 'd: builtins.filter (n: builtins.match "otel.*|prometheus-node-exporter" n != null) (builtins.attrNames d)'`, expecting a drvPath and `[]`.
+Because no CI evaluation imports the fragment while `collect` is false (design D13), evaluate the working copy's stibnite with `collect` overridden to true, evaluation only, and record its drvPath for pull request 1's description: `nix eval --impure --raw --expr '((builtins.getFlake (toString ./.)).darwinConfigurations.stibnite.extendModules { modules = [ { imports = [ (builtins.getFlake (toString ./.)).modules.darwin.otel-collector-agent ]; } ]; }).config.system.build.toplevel.drvPath'`, expecting a drvPath, every fragment assertion holding (evaluation).
 
 - [ ] **Step 7: Deploy records from the darwin agent (tasks.md 2.7)**
 

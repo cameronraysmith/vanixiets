@@ -25,18 +25,18 @@ L=logs/s5-evidence/5.1-presence-$(/bin/date -u +%Y%m%dT%H%M%SZ).log
 /bin/date -u
 /usr/bin/pmset -g batt | /usr/bin/head -n 1
 /sbin/ping6 -c 3 fddb:4344:343b:14b9:399:930f:39db:40d2; echo "ping-rc=$?"
-/bin/ps -axo user,command | awk '$1 ~ /^_nixbld/'; echo "builders-listed-above"
+/bin/ps -axo user,command | awk '$1 ~ /^_nixbld/ && $2 !~ /distnoted$/'; echo "builders-listed-above"
 /usr/bin/sudo /usr/sbin/lsof -nP -a -c nix-grpc -iTCP -sTCP:ESTABLISHED; echo "lsof-rc=$?"
 ls logs/s5-evidence/4.1-magnetite-*.log logs/s5-evidence/4.2-stibnite-*.log
 } 2>&1 | tee -a "$L"
 ```
 
-Expected: `Now drawing from 'AC Power'`; `ping-rc=0`; no line above `builders-listed-above` and `lsof-rc=1` (no build and no remote-build connection); both Task 4 logs present and their verifications passed.
+Expected: `Now drawing from 'AC Power'`; `ping-rc=0`; no line above `builders-listed-above` and `lsof-rc=1` (no build and no remote-build connection; launchd keeps one `distnoted agent` per build account at all times, 15 on 2026-11-05, which the filter leaves out); both Task 4 logs present and their verifications passed.
 Without a recorded yes, Steps 2 to 4 do not run.
 
 - [ ] **Step 2: Start stibnite's collection and activate it (tasks.md 5.2) [operator]**
 
-Only after Step 1's recorded yes: in a change off `main@origin`, delete the `collect = false;` in stibnite's row of `modules/lib/observability-hosts.nix` (`stibnite = agent [ "otel-envelope" ] // { platform = "darwin"; smartDevices = [ "disk0" ]; collect = false; };` becomes the same row without `collect = false;`), run `nix fmt` keeping its log, and confirm in `$REPO`:
+Only after Step 1's recorded yes: in a change off `main@origin`, delete the `collect = false;` in stibnite's row of `modules/lib/observability-hosts.nix` (`stibnite = agent [ ] // { platform = "darwin"; notifiedUnits = [ "otel-envelope" ]; smartDevices = [ "disk0" ]; collect = false; };` becomes the same row without `collect = false;`), run `nix fmt` keeping its log, and confirm in `$REPO`:
 
 ```bash
 jj st --no-pager >/dev/null
@@ -46,9 +46,10 @@ nix eval --raw .#darwinConfigurations.stibnite.config.system.build.toplevel.drvP
 
 Expected: `true`, then a drvPath; the darwin fragment's assertions hold, since a failing one stops this evaluation (evaluation).
 Commit it alone with a plain message, for example "Start collecting stibnite's host metrics", open its pull request with the same title and a body saying it starts the collector agent, the process collector, the loopback node exporter, the host probe and the delivery check on stibnite ahead of an activation made with someone at the machine, and let it merge through the queue while the operator stays at stibnite.
-Then, in `$DEPLOY`, after `git -C $REPO fetch origin && git -C $DEPLOY checkout --detach origin/main` and `git -C $DEPLOY log -1 --format='%H %s'` showing the merge:
+Then, in `$DEPLOY`, after `git -C $REPO fetch origin && git -C $DEPLOY checkout --detach origin/main` and `git -C $DEPLOY log -1 --format='%H %s'` showing the merge, and after `"$REPO/logs/s5-evidence/recent-activation.sh"` prints `no activation since` or its `STOP` is resolved with the operator (Task 4 Step 1):
 
 ```bash
+"$REPO/logs/s5-evidence/recent-activation.sh"
 "$REPO/logs/s5-evidence/mark.sh" STIBNITE_ACTIVATE_EPOCH
 just activate 2>&1 | tee logs/stibnite-$(date +%Y%m%d-%H%M%S).log
 "$REPO/logs/s5-evidence/mark.sh" STIBNITE_COLLECT_EPOCH
@@ -109,17 +110,22 @@ sent() { /usr/bin/curl -s http://127.0.0.1:8888/metrics | grep -E '^otelcol_expo
 ```
 
 Expected: the second `otlp_http/ingress` count above the first, which settles C1: the store-built collector reaches the ingress over ZeroTier (A65); the queue sizes near 0 and no growing `send_failed`; every listener of `otelcol-contrib` and `node_expo` on `127.0.0.1`, with `otelcol-process` holding none.
-A count that does not grow stops the sequence: magnetite is not deployed, the operator is told, and the exporter's error is read from the agent's log under `/var/log/otelcol` (`/usr/bin/sudo /usr/bin/tail -n 50 /var/log/otelcol/*`) and recorded; the queue holds the interval meanwhile (design Risks).
+A count that does not grow stops the sequence: magnetite is not deployed, the operator is told, and the exporter's error is read from the agent's log under `/var/log/otelcol` (`/usr/bin/sudo /usr/bin/tail -n 50 /var/log/otelcol/*`) and the probe's at `/var/lib/prometheus-node-exporter/otel-host-probe.log`, and recorded; the queue holds the interval meanwhile (design Risks).
 The store, on magnetite as `regulator`:
 
 ```bash
 logs/s5-evidence/promq.sh 'count by (host_name) (system_memory_usage_bytes)' | tee -a "$L"
 logs/s5-evidence/gsql.sh fleet "SELECT host_name, state, count(*) FROM system_memory_usage_bytes WHERE host_name = 'stibnite' GROUP BY host_name, state ORDER BY state" | tee -a "$L"
+export GSQL_PW_PATH=$(nix eval --raw .#nixosConfigurations.magnetite.config.clan.core.vars.generators.greptimedb-users.files.regulator-password.path)
 logs/s5-evidence/gsql.sh fleet "SELECT DISTINCT table_name FROM information_schema.columns WHERE table_schema = 'fleet' AND column_name = 'host_name' ORDER BY table_name" > logs/s5-evidence/5.3-tables.tsv
-while read -r t; do
-  n=$(logs/s5-evidence/gsql.sh fleet "SELECT count(*) FROM \"$t\" WHERE host_name = 'stibnite' AND greptime_timestamp > now() - INTERVAL '15 minutes'" < /dev/null)
-  [ "${n:-0}" -gt 0 ] && echo "$t $n"
-done < logs/s5-evidence/5.3-tables.tsv | tee -a "$L"
+# One statement per 50 tables: one ssh and one evaluation per table took 1,300 s
+# for 416 tables in the rehearsal on 2026-11-05.
+split -l 50 logs/s5-evidence/5.3-tables.tsv /tmp/s5-tables.
+for f in /tmp/s5-tables.*; do
+  sql=$(awk -v q="'" 'NR > 1 { printf " UNION ALL " } { printf "SELECT %s%s%s AS t, count(*) AS n FROM \"%s\" WHERE host_name = %sstibnite%s AND greptime_timestamp > now() - INTERVAL %s15 minutes%s", q, $1, q, $1, q, q, q, q }' "$f")
+  logs/s5-evidence/gsql.sh fleet "$sql" < /dev/null
+done | awk -F'\t' '$2 > 0' | tee -a "$L"
+rm -f /tmp/s5-tables.*
 ```
 
 Expected: `stibnite` among the PromQL rows; the SQL read of `system_memory_usage_bytes` with `WHERE host_name = 'stibnite'` returns rows, for states `used`, `free` and `inactive`; and the stored tables under `host_name="stibnite"` cover every row of design "Requirement applicability" marked applies: `system_memory_usage_bytes`, `process_memory_usage_bytes`, the `system_disk_*` tables, `system_filesystem_usage_bytes`, `launchd_job_state`, `launchd_job_last_exit_code`, `launchd_job_runs_total`, `node_textfile_mtime_seconds`, `node_textfile_scrape_error`, `up`, A4's eight `smartctl_device_*` names and the `otelcol_*` self-telemetry of SC's keep-list.

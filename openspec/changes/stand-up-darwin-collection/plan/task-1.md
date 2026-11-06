@@ -92,7 +92,7 @@ nix build --no-link --print-out-paths .#checks.x86_64-linux.fleet-alert.promtool
 nix log "$(nix eval --raw .#checks.x86_64-linux.fleet-alert.promtoolRehearsal.drvPath)" | grep -E 'SUCCESS: [0-9]+ rules found' | tee -a "$L"
 ```
 
-Expected: five lines `<check> <bytes> <seconds>`, `otel-envelope` near 0.146 GiB, `fleet-alert` near 0.316 GiB, `otel-collector-config` near 0.443 GiB, each below 536,870,912 (the two machine checks are recorded, not budgeted); the two hashes; six readers `cinnabar electrum galena magnetite pyrite scheelite`; `ca.crt` and `ca.key` under `otel-ca` with their reader entries; one `SUCCESS: <n> rules found`, the rule count Task 3 Step 7 compares with (evaluation, build).
+Expected: five lines `<check> <bytes> <seconds>`, `otel-envelope` near 0.146 GiB, `fleet-alert` near 0.328 GiB (351,940,224 B at `b325407984e6`), `otel-collector-config` near 0.445 GiB, each below 536,870,912 (the two machine checks are recorded, not budgeted); the two hashes; six readers `cinnabar electrum galena magnetite pyrite scheelite`; under `otel-ca` only `ca.crt/value` and `ca.key/{secret,users/}`, no `machines/` directory, because `ca.key` is not deployed and `ca.crt` is not secret; one `SUCCESS: <n> rules found`, the rule count Task 3 Step 7 compares with (evaluation, build).
 Then on stibnite, read-only, appending to the same log:
 
 ```bash
@@ -137,7 +137,7 @@ logs/s5-evidence/promq.sh 'count by (host_name) (system_memory_usage_bytes)' | t
 logs/s5-evidence/gsql.sh devloop "SELECT host, count(*) FROM deploy_record GROUP BY host ORDER BY host" | tee -a "$L"
 ```
 
-Expected: one line per collecting host, magnetite, cinnabar, pyrite, electrum, galena and scheelite, none for stibnite; `deploy_record` rows per host, none for stibnite (runtime on magnetite).
+Expected: one line per collecting host that is up, from magnetite, cinnabar, pyrite, electrum, galena and scheelite, of which electrum, galena and scheelite are provisioned on demand and may be absent (on 2026-11-05 only cinnabar, magnetite and pyrite answered), and none for stibnite; `deploy_record` rows per host, none for stibnite (runtime on magnetite).
 
 - [ ] **Step 3: Rehearse every verification block and probe the vendored consumers (tasks.md 1.3)**
 
@@ -169,8 +169,8 @@ Run on stibnite, in `$REPO`, under `/bin/bash`:
 set -uo pipefail
 F=logs/s5-evidence/1.3-fixtures; mkdir -p "$F/launchctl"
 L=logs/s5-evidence/1.3-rehearsal-$(/bin/date -u +%Y%m%dT%H%M%SZ).log
-SMARTCTL=$(nix build --no-link --print-out-paths .#darwinConfigurations.stibnite.pkgs.smartmontools)/bin/smartctl
-OTELCOL=$(nix build --no-link --print-out-paths .#darwinConfigurations.stibnite.pkgs.opentelemetry-collector-contrib)/bin/otelcol-contrib
+SMARTCTL=$(nix build --no-link --print-out-paths '.#darwinConfigurations.stibnite.pkgs.smartmontools.out')/bin/smartctl
+OTELCOL=$(nix build --no-link --print-out-paths '.#darwinConfigurations.stibnite.pkgs.opentelemetry-collector-contrib.out')/bin/otelcol-contrib
 "$SMARTCTL" --version | head -n 1 | tee -a "$L"
 "$OTELCOL" --version | tee -a "$L"
 sw_vers | tee -a "$L"
@@ -184,10 +184,13 @@ jq -c '{protocol: .device.protocol, model: .model_name, passed: .smart_status.pa
   temp: (.temperature.current // null), exit: .smartctl.exit_status}' "$F/smartctl-disk0.json" | tee -a "$L"
 
 # launchctl print, the probe's argument list: every allow-listed label stibnite evaluates,
-# a label that is not loaded, and a jetsam-killed system job.
+# a label that is not loaded, and a system job that jetsam reclaimed while idle, taken from
+# a survey of the system domain (com.apple.progressd is not a system job: rc 113).
 labels=$(nix eval --json .#darwinConfigurations.stibnite.config.launchd.daemons --apply 'd: map (v: v.serviceConfig.Label) (builtins.attrValues d)' |
   jq -r '.[] | select(test("^org\\.nixos\\.(nix-daemon|nix-grpc-daemon|harmonia-gc|nix-cleanup-gcroots|sops-install-secrets|dnscrypt-proxy|omnigent-host-.*)$"))')
-for l in $labels org.nixos.otelcol com.apple.progressd; do
+idle=$(/bin/launchctl print system | awk '/^\tservices = \{/ { s = 1; next } s && /^\t\}/ { exit } s { print $NF }' |
+  while read -r j; do /bin/launchctl print "system/$j" 2>/dev/null | grep -q $'^\tlast exit reason = JETSAM_REASON_MEMORY_IDLE_EXIT' && { echo "$j"; break; }; done)
+for l in $labels org.nixos.otelcol "$idle"; do
   /usr/bin/sudo -u nobody /bin/launchctl print "system/$l" > "$F/launchctl/$l.txt" 2>&1; rc=$?
   echo "$rc" > "$F/launchctl/$l.rc"
   printf '%s rc=%s %s\n' "$l" "$rc" "$(grep -E '^\s*(state|runs|pid|last exit code|last exit reason) = ' "$F/launchctl/$l.txt" | tr -s '\t ' ' ' | paste -s -d ';' -)" | tee -a "$L"
@@ -197,7 +200,8 @@ pid=$(awk -F' = ' '$1 ~ /^[[:space:]]*pid$/ { print $2; exit }' "$F/launchctl/or
 /usr/bin/sudo -u nobody /bin/ps -o rss= -p "$pid" | tee -a "$L"; echo "ps rc=$?" | tee -a "$L"
 ```
 
-Expected: `smartctl 7.5`, `otelcol-contrib version 0.155.0`, `ProductVersion: 26.7.1`; `smartctl rc=0` and `protocol` `NVMe`, `model` `APPLE SSD AP4096Z`, `passed` true, `cw` 0, `used` 0, as BS "Found while preparing" read on 2026-11-05; for `org.nixos.nix-daemon` `state = running`, a `runs` count, a `pid` and `last exit code = 0`; for `org.nixos.otelcol` `Could not find service` with a non-zero rc; for `com.apple.progressd` a `last exit reason` and no `last exit code` line; one resident size in KiB and `ps rc=0` (runtime, stibnite).
+Expected: `smartctl 7.5`, `otelcol-contrib version 0.155.0`, `ProductVersion: 26.7.1`; `smartctl rc=0` and `protocol` `NVMe`, `passed` true, `cw` 0, `used` 0, `model` null because `-H -A` reads no identity, as BS "Found while preparing" read on 2026-11-05; for `org.nixos.nix-daemon` `state = running`, a `runs` count, a `pid` and `last exit code = 0`; for `org.nixos.otelcol` `Could not find service` with rc 113; for the idle-reclaimed job (`com.apple.tzlinkd` on 2026-11-05) `last exit reason = JETSAM_REASON_MEMORY_IDLE_EXIT` and no `last exit code` line; one resident size in KiB and `ps rc=0` (runtime, stibnite).
+No system job showed a signal on 2026-11-05; the non-idle fixture of Task 2 Step 5 is the per-user job with `last exit reason = JETSAM_REASON_MEMORY_PERPROCESSLIMIT` read from `/bin/launchctl print gui/$(id -u)/<label>`, or, if none is found, a copy of the idle fixture with the reason edited to `JETSAM_REASON_MEMORY_PERPROCESSLIMIT`, saying so in a first comment line the stub strips.
 If `launchctl print` as `nobody` prints less than as `crs58` (a field missing, or `Could not find service` for a loaded job), stop: the probe's account cannot read job state, and design D4 goes back to the operator.
 If no allow-listed job shows `last exit code = 78` today, the exit-78 fixture of Task 2 Step 5 is a copy of `org.nixos.nix-daemon.txt` with that one line edited, and its file says so in a first comment line the stub strips.
 
@@ -247,7 +251,8 @@ EOF
 ```
 
 Expected: `validate rc=0`; a non-zero code naming a key is a vendored-schema fact for Task 2 Step 4 (the darwin `disk` include key, or the telemetry reader shape), recorded and fixed in `plan/task-2.md` before the planning pull request (runtime, stibnite).
-Then read, at the root pin, the telemetry setting that leaves `otelcol-process` without a listener (design D3's `[INFERENCE]`): the collector's `service/telemetry` package in the vendored Go modules of the root pin's `otelcol-contrib`, located with `nix eval --raw .#darwinConfigurations.stibnite.pkgs.opentelemetry-collector-contrib.goModules` (the release wrapper's inner `buildGoModule` is `pkgs/tools/misc/opentelemetry-collector/releases.nix:86-95` if the attribute is absent), and record in the log, as `path:line`, which `service.telemetry.metrics` value creates no reader and no listener; validate a copy of the configuration above reduced to `host_metrics/process`, that setting and `otlp_http` to `http://127.0.0.1:4318`, and record its rc.
+Then read, at the root pin, the telemetry setting that leaves `otelcol-process` without a listener: `otelcol-contrib` sets `proxyVendor = true` (nixpkgs `pkgs/tools/misc/opentelemetry-collector/releases.nix:163`), so its `goModules` (`nix build --no-link --print-out-paths .#darwinConfigurations.stibnite.pkgs.opentelemetry-collector-contrib.goModules`) is a module download cache, from which `go.opentelemetry.io/collector/service/@v/v0.155.0.zip` is unzipped to read `service/telemetry/otelconftelemetry/`.
+On 2026-11-05 the answer was `service.telemetry.metrics.level: none`, for which `createMeterProvider` builds no reader (`metrics.go:28-30`), where the default is a pull reader on `localhost:8888` (`factory.go:48-59`) and `readers` is required only when the level is not `none` (`config.go:52-56`); record the `path:line` read again, and validate a copy of the configuration above reduced to `host_metrics/process`, that setting and `otlp_http` to `http://127.0.0.1:4318`, and record its rc.
 Expected: one cited `path:line` and `validate rc=0` for the reduced configuration; Task 2 Step 4's clause "no telemetry listener" names that value (vendored source, runtime).
 Finally the 8.8 block: an anonymous POST to `fleet-acceptance` from stibnite with `/usr/bin/curl`, expected `403` as on 2026-11-05 (A66), the token never read (runtime, stibnite).
 

@@ -71,11 +71,11 @@ After the recorded yes, and only with no build dispatched to stibnite, rehearse:
 
 ```bash
 L=logs/s5-evidence/8.3-ac2-$(/bin/date -u +%Y%m%dT%H%M%SZ).log
-{ /bin/ps -axo user,command | awk '$1 ~ /^_nixbld/'; echo "builders-listed-above"
+{ /bin/ps -axo user,command | awk '$1 ~ /^_nixbld/ && $2 !~ /distnoted$/'; echo "builders-listed-above"
   /usr/bin/sudo /usr/sbin/lsof -nP -a -c nix-grpc -iTCP -sTCP:ESTABLISHED; echo "lsof-rc=$?"; } 2>&1 | tee "$L"
 ```
 
-Expected: no builder line and `lsof-rc=1`; otherwise wait and reread.
+Expected: no builder line and `lsof-rc=1` (each build account's permanent `distnoted agent` is filtered out); otherwise wait and reread.
 Then (rehearse: echoed):
 
 ```bash
@@ -144,7 +144,7 @@ L=logs/s5-evidence/8.5-reload-$(/bin/date -u +%Y%m%dT%H%M%SZ).log
 /bin/launchctl print system/org.nixos.otelcol | grep -E '^[[:space:]](runs|pid) = ' | tee -a "$L"
 ```
 
-Then `"$REPO/logs/s5-evidence/mark.sh" RELOAD_EPOCH` immediately before `just activate 2>&1 | tee logs/stibnite-$(date +%Y%m%d-%H%M%S).log`.
+Then `"$REPO/logs/s5-evidence/recent-activation.sh"`, which must print `no activation since` or have its `STOP` resolved with the operator (Task 4 Step 1), and `"$REPO/logs/s5-evidence/mark.sh" RELOAD_EPOCH` immediately before `just activate 2>&1 | tee logs/stibnite-$(date +%Y%m%d-%H%M%S).log`.
 Fifteen minutes after `RELOAD_EPOCH`, in `$REPO`:
 
 ```bash
@@ -180,7 +180,10 @@ Thirty minutes after `LID_OPEN_EPOCH`, rehearse: stibnite and magnetite, read-on
 
 ```bash
 . logs/s5-evidence/window.env
-/usr/bin/pmset -g log | grep -E '[[:space:]](Sleep|Wake|DarkWake)[[:space:]]' | awk -v s="$(/bin/date -u -r "$LID_CLOSE_EPOCH" '+%Y-%m-%d')" '$1 >= s' | tee -a "$L"
+# pmset prints local times (-0500 on stibnite) and logs "Delays to Sleep/Wake
+# notifications" lines, so the event type is matched in its own column and
+# the date is local.
+/usr/bin/pmset -g log | awk -v s="$(/bin/date -r "$LID_CLOSE_EPOCH" '+%Y-%m-%d')" '$1 >= s && $4 ~ /^(Sleep|Wake|DarkWake)$/' | tee -a "$L"
 ssh magnetite.zt "bash -c 'sudo journalctl -u fleet-alert -o short-iso --since @$LID_CLOSE_EPOCH --until @$(( LID_OPEN_EPOCH + 1800 )) | grep -E \"stibnite\"; echo grep-rc=\$?'" | tee -a "$L"
 logs/s5-evidence/posts.sh "$LID_CLOSE_EPOCH" 2>&1 | tee -a "$L"
 ```
@@ -194,7 +197,7 @@ On the morning after Step 6, with no operator needed; rehearse: stibnite and mag
 
 ```bash
 L=logs/s5-evidence/8.7-overnight-$(/bin/date -u +%Y%m%dT%H%M%SZ).log
-/usr/bin/pmset -g log | grep -E '[[:space:]](Sleep|Wake|DarkWake)[[:space:]]' | awk -v s="$(/bin/date -u -v-1d '+%Y-%m-%d')" '$1 >= s' | tee "$L"
+/usr/bin/pmset -g log | awk -v s="$(/bin/date -v-1d '+%Y-%m-%d')" '$1 >= s && $4 ~ /^(Sleep|Wake|DarkWake)$/' | tee "$L"
 logs/s5-evidence/6.1-replay.sh 'count by (host_name) (system_memory_usage_bytes{host_name="stibnite"})' "$(( $(/bin/date -u +%s) - 86400 ))" | tee -a "$L"
 ssh magnetite.zt "bash -c 'sudo journalctl -u fleet-alert -o short-iso --since -24h | grep -E \"stibnite\"; echo grep-rc=\$?'" | tee -a "$L"
 /usr/bin/sudo /bin/cat /var/lib/otel-envelope/notify.log | tail -n 20 | tee -a "$L"

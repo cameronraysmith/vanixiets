@@ -85,7 +85,7 @@ Decisions the decision records already make, or that follow from the evidence, a
 - darwin empties `/run` at boot and `sops-install-secrets` reinstalls the secrets at load, which is why `nix-grpc-client-identity` recreates its symlinks at load (`modules/clan/services/nix-builders/flake-module.nix:29-30`, `:66-79`).
 - stibnite reads no fleet secret today: `vars/shared/ntfy-alerter/token/machines/` lists the six NixOS hosts only, and `vars/per-machine/stibnite/` holds `nix-grpc-cert`, `nix-remote-build` and `omnigent-cameron-keychain`.
 - `ntfy-send` on darwin calls `/usr/bin/curl`, because "Endpoint security software on Darwin blocks ad-hoc signed (Nix store) binaries from TCP connections over ZeroTier" (`pkgs/by-name/ntfy-send/package.nix:5-8`), a note written on 2026-03-10 in `02c01646b`.
-- nixbot evaluates `aarch64-darwin` (`modules/nixos/nixbot.nix:93-105`), and every `checks.aarch64-darwin` attribute is `ignoreFailure` (`modules/checks/nixbot-best-effort-darwin.nix:28-29`; `OBS/decisions/ADR-005-dev-loop-instrumentation.md:29`).
+- nixbot evaluates `aarch64-darwin` (`modules/nixos/nixbot.nix:93-105`), and every `checks.aarch64-darwin` build failure is `ignoreFailure`, while an evaluation error fails the check before that modifier is read (`modules/checks/nixbot-best-effort-darwin.nix:22-28`; `OBS/decisions/ADR-005-dev-loop-instrumentation.md:29`).
 - stibnite already writes `/var/log/deploy-record.jsonl` through `flake.modules.darwin.deploy-record` (`modules/system/deploy-record.nix:115-131`); the file held 10 lines, mode 0644, on 2026-11-05.
 
 ### What the pinned collector does on darwin
@@ -93,21 +93,21 @@ Decisions the decision records already make, or that follow from the evidence, a
 - The collector is `opentelemetry-collector-contrib` 0.155.0 with `CGO_ENABLED = 0` (`NixOS/nixpkgs@3a32588c:pkgs/tools/misc/opentelemetry-collector/releases.nix:18`, `:102`), evaluated for stibnite at `/nix/store/xxczsys7g0m26da9wbsv5y10ai5qp3wb-otelcol-contrib-0.155.0`; gopsutil reaches IOKit and libSystem through purego, so cgo is not needed (`gopsutil@v4.26.5:internal/common/common_darwin.go:13`, `:31`).
 - `systemd` receiver: its `start` returns an error off Linux (`contrib@v0.155.0:receiver/systemdreceiver/scraper_nonlinux.go:22-24`), so the agent's current pipelines cannot start on darwin.
 - `memory`: only `used`, `free` and `inactive`, and `system.linux.memory.available` is a no-op (`.../memoryscraper/memory_scraper_others.go:16-20`, `:28-29`).
-- `paging`: usage reports zeros, because darwin's `VirtualMemory` sets no swap fields (`.../pagingscraper/pagefile_others.go:10-20`; `gopsutil@v4.26.5:mem/mem_darwin.go:38-63`).
+- `paging`: usage reports zeros, because darwin's `VirtualMemory` sets no swap fields (`.../pagingscraper/pagefile_others.go:10-20`; `gopsutil@v4.26.5:mem/mem_darwin.go:87-127`, its return at `:117-126`).
 - `disk`: whole IOMedia disks through IOKit; `pending_operations` is always 0 (`gopsutil@v4.26.5:disk/disk_darwin.go:161-189`, `:318-325`).
 - `filesystem`: supported, and `include_virtual_filesystems` is ignored on darwin, which returns every `getfsstat` mount (`.../filesystemscraper/filesystem_scraper_unix.go:4`; `gopsutil@v4.26.5:disk/disk_darwin.go:21-30`).
-- `process`: supported; disk I/O is skipped on darwin, and memory needs `proc_pidinfo` rights over the process, which a non-root collector lacks for other users' processes (`.../processscraper/process_scraper.go:346-349`; `gopsutil@v4.26.5:process/process_darwin.go:323-326`, `:500-537`).
+- `process`: supported; disk I/O is skipped on darwin, and memory needs `proc_pidinfo` rights over the process, which a non-root collector lacks for other users' processes, reading a resident size of 0 without an error (`.../processscraper/process_scraper.go:346-349`; `gopsutil@v4.26.5:process/process_darwin.go:477-492`).
 - `load`, `network` and `system` work; `network` forks `netstat` and `lsof` (`gopsutil@v4.26.5:net/net_darwin.go:175-181`; `net/net_unix.go:25-55`).
 - `file_storage` uses bbolt's `flock` on darwin, released when the process dies (`etcd-io/bbolt@v1.5.0:bolt_unix.go:18-35`).
 - The fleet's exporters retry without limit (`max_elapsed_time = "0s"`), so the give-up check never fires (`opentelemetry-collector@v0.155.0:exporter/exporterhelper/internal/retry_sender.go:82-85`, `:116`); Go's timers do not advance while macOS sleeps (`golang/go#66870`), so tickers and backoffs resume after wake `[INFERENCE]`.
 - `prometheus-smartctl-exporter` is Linux-only (`NixOS/nixpkgs@3a32588c:pkgs/by-name/pr/prometheus-smartctl-exporter/package.nix:39`), while smartmontools 7.5 builds for darwin (`pkgs/by-name/sm/smartmontools/package.nix:103`).
-- smartctl on macOS reaches NVMe through `IONVMeSMARTInterface` and passes through only Identify and Get Log Page, so no self-test runs on an Apple SSD (`smartmontools@RELEASE_7_5:smartmontools/os_darwin.cpp:64`, `:587-602`).
+- smartctl on macOS reaches NVMe through `IONVMeSMARTInterface` and passes through only Identify and Get Log Page, so no self-test runs on an Apple SSD (`smartmontools@RELEASE_7_5:smartmontools/os_darwin.cpp:65`, `:590-605`).
 - node_exporter 1.12.1 runs on darwin with `textfile` among its collectors (`prometheus/node_exporter@v1.12.1:README.md:164`), and nix-darwin's module listens on every address unless `listenAddress` is set.
 
 ### launchd across sleep and clock changes
 
 - `StartInterval`: "If the system is asleep during the time of the next scheduled interval firing, that interval will be missed due to shortcomings in kqueue(3)" (`launchd.plist(5)`, macOS 26.7.1, lines 441-445).
-- `StartCalendarInterval`: "Unlike cron which skips job invocations when the computer is asleep, launchd will start the job the next time the computer wakes up. If multiple intervals transpire before the computer is woken, those events will be coalesced into one event upon wake from sleep" (lines 456-459).
+- `StartCalendarInterval`: "Unlike cron which skips job invocations when the computer is asleep, launchd will start the job the next time the computer wakes up. If multiple intervals transpire before the computer is woken, those events will be coalesced into one event upon wake from sleep" (roff source lines 455-458).
   Its fields are Minute, Hour, Day, Weekday and Month, with no zone key, so it is local time `[INFERENCE]`; the manual says nothing of clock or zone changes.
 - On stibnite the calendar jobs are `harmonia-gc` daily at 03:15 and `nix-cleanup-gcroots` on Sunday at 03:30, local time in `America/New_York` (`nix eval` of `darwinConfigurations.stibnite.config.launchd.daemons`, 2026-11-05).
 - `launchctl print` is not API (`launchctl(1)`), and `launchctl list` prints a negative status for a job killed by a signal.
@@ -156,8 +156,8 @@ Decision (orchestrator, from A3:81 and A3:290): the agent role gains a `darwinMo
 
 Decision (orchestrator, from A3 items 22 to 24): `launchd.daemons.otelcol-process` as root with only the `process` scraper and no listener; `launchd.daemons.otel-host-probe` as `_prometheus-node-exporter` with `StartInterval = 60`; nix-darwin's node_exporter on `127.0.0.1:9100` with only `textfile`.
 
-- Root is required because `proc_pidinfo` reads nothing for another user's process (`gopsutil@v4.26.5:process/process_darwin.go:323-326`; A3:158-165).
-- The probe's parser writes -1 when the `last exit code` line is missing, and stores no `last exit reason`, whose free text would be an unbounded label value (C6).
+- Root is required because `proc_pidinfo` reads nothing for another user's process (`gopsutil@v4.26.5:process/process_darwin.go:477-492`; A3:158-165).
+- The probe's parser writes -1 when the `last exit code` line is missing, except 0 when `last exit reason` is a jetsam idle exit (amended at the plan review, design D4), and stores no `last exit reason`, whose free text would be an unbounded label value (C6).
 - The probe writes SMART under the names the store gives smartctl_exporter's counters on pyrite, and the rules pull request waits until the names are read from the store (S4-R6, first candidate).
 
 ### D3. The certificate and the secrets on darwin

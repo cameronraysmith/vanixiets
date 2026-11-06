@@ -89,7 +89,7 @@ The ingress host's `otel-envelope` SHALL regulate ADR-004's 30 process names per
 #### Scenario: The root process collector is checked
 
 - **WHEN** the same check renders and validates `otelcol-process`'s configuration
-- **THEN** it holds only the `process` scraper with the six identity attributes disabled and the 64 MiB floor, sets `service.name` to `otelcol-process`, has no receiver endpoint, no telemetry listener and no credential path, and exports only to `http://127.0.0.1:4318`, and the mutants `seventhIdentityAttribute` and `processEndpoint` each fail the check
+- **THEN** it holds only the `process` scraper with the six identity attributes disabled and the 64 MiB floor, sets no `service.name`, has no receiver endpoint, no telemetry listener (`service.telemetry.metrics.level` is `none`) and no credential path, and exports only to `http://127.0.0.1:4318`, and the mutants `seventhIdentityAttribute` and `processEndpoint` each fail the check
 
 ### Requirement: The telemetry store and the collector run inside a declared envelope
 

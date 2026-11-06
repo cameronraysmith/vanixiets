@@ -223,12 +223,12 @@ This capability SHALL state what its properties guarantee and what they do not, 
 On each darwin agent host, `org.nixos.otel-host-probe` SHALL run every 60 s as `_prometheus-node-exporter` and replace `launchd.prom`, read from `launchctl print` for each allow-listed launchd job the host defines, and `smartctl.prom` in `/var/lib/prometheus-node-exporter/textfile` by write-then-rename within 30 s, as the scenarios state.
 node_exporter SHALL serve that directory on `127.0.0.1:9100` with only its `textfile` collector.
 
-**Discharged by**: `checks.x86_64-linux.otel-collector-darwin`'s label clause, node_exporter clause and parser fixtures, with the mutants `nodeListenEmpty`, `aliasDropped`, `pidWritten` and `missingExitCodeAsZero`; the operator's signal-kill control on stibnite, resting on world assumption `A62 — launchctl print reports a system job's state, runs and last exit code as unversioned text, and omits the exit code for some killed jobs`.
+**Discharged by**: `checks.x86_64-linux.otel-collector-darwin`'s label clause, node_exporter clause and parser fixtures, with the mutants `nodeListenEmpty`, `labelDotUnescaped`, `aliasDropped`, `pidWritten`, `missingExitCodeAsZero` and `idleExitAsFailure`; the operator's signal-kill control on stibnite, resting on world assumption `A62 — launchctl print reports a system job's state, runs and last exit code as unversioned text, and omits the exit code for some killed jobs`.
 
 #### Scenario: The probe's labels and listener are checked
 
 - **WHEN** `checks.x86_64-linux.otel-collector-darwin` renders the probe and node_exporter for a fixture list of stibnite's daemons
-- **THEN** the probe's labels equal the launchd allow-list in `schema.nix` intersected with that list, node_exporter listens on `127.0.0.1:9100` with `--collector.disable-defaults` and only `--collector.textfile`, and the mutant `nodeListenEmpty` fails the check
+- **THEN** the probe's labels equal the launchd allow-list in `schema.nix` intersected with that list, node_exporter listens on `127.0.0.1:9100` with `--collector.disable-defaults` and only `--collector.textfile`, and the mutants `nodeListenEmpty` and `labelDotUnescaped` each fail the check
 
 #### Scenario: A job's state is parsed
 
@@ -242,8 +242,13 @@ node_exporter SHALL serve that directory on `127.0.0.1:9100` with only its `text
 
 #### Scenario: A job's exit code is missing or not an integer
 
-- **WHEN** a reply has no `last exit code` line, as recorded for a job killed by jetsam, or a value that is not an integer
+- **WHEN** a reply has no `last exit code` line and a `last exit reason` other than a jetsam idle exit, as for a job killed by a signal, or a value that is not an integer
 - **THEN** `launchd_job_last_exit_code` for that label is -1, and the mutant `missingExitCodeAsZero` fails the check
+
+#### Scenario: A job was reclaimed while idle
+
+- **WHEN** a reply has no `last exit code` line and `last exit reason = JETSAM_REASON_MEMORY_IDLE_EXIT`, as recorded for 98 of stibnite's system jobs on 2026-11-05
+- **THEN** `launchd_job_last_exit_code` for that label is 0, and the mutant `idleExitAsFailure` fails the check
 
 #### Scenario: A label is not loaded
 
