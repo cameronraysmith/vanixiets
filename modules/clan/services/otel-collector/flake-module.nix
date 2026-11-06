@@ -328,7 +328,7 @@ in
                 "filter/process-min" = {
                   error_mode = "ignore";
                   metric_conditions = [
-                    ''metric.name == "process.memory.usage" and datapoint.value_int < ${toString schema.process.minBytes}''
+                    ''metric.name == "process.memory.usage" and datapoint.value_int < ${toString schema.process.minBytes.linux}''
                   ];
                 };
               };

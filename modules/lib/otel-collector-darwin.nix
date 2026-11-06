@@ -1,6 +1,7 @@
-# flake.lib.otelCollectorDarwin { hostName; certFile; keyFile; caFile; }: the
-# darwin agent's and otelcol-process's configurations as plain attrsets, from
-# flake.lib data only, so checks.x86_64-linux.otel-collector-darwin judges
+# flake.lib.otelCollectorDarwin { hostName; certFile; keyFile; caFile;
+# fleetExecutables; }: the darwin agent's and otelcol-process's
+# configurations as plain attrsets, from flake.lib data and the arguments
+# only, so checks.x86_64-linux.otel-collector-darwin judges
 # them without evaluating a darwin host (design D2, D3, D13). `targets` and
 # `exporters` are what the darwin otel-envelope probes and reads; `node` is
 # the loopback node_exporter's settings. The Linux-only parts of the NixOS
@@ -48,8 +49,13 @@ in
       certFile,
       keyFile,
       caFile,
+      # The executable names otelcol-process keeps below the darwin floor:
+      # the host's fleet daemons', from SC's darwinFleetExecutables.
+      fleetExecutables,
     }:
     let
+      # The process filter's clause sparing one fleet executable.
+      spared = n: ''resource.attributes["process.executable.name"] != ${builtins.toJSON n}'';
       # As the NixOS agent's exporters (modules/clan/services/otel-collector/
       # flake-module.nix ingressExporter), with the sops paths of otel-cert.
       ingressExporter = queueSize: {
@@ -280,10 +286,19 @@ in
               ];
             }
           ];
+          # Below the darwin floor only the fleet's own executables pass
+          # (SC's process.minBytes.darwin and darwinFleetExecutables; A77).
           "filter/process-min" = {
             error_mode = "ignore";
             metric_conditions = [
-              ''metric.name == "process.memory.usage" and datapoint.value_int < ${toString schema.process.minBytes}''
+              (lib.concatStringsSep " and " (
+                [
+                  ''metric.name == "process.memory.usage"''
+                  "datapoint.value_int < ${toString schema.process.minBytes.darwin}"
+                ]
+                # mutant: keepListIgnored
+                ++ map spared fleetExecutables
+              ))
             ];
           };
         };

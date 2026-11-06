@@ -85,7 +85,7 @@ flowchart LR
 ```
 
 The agent pipelines stamp `host.name` and `vanixiets.database = fleet` on every resource, then export to the in-process `forward` connector on magnetite, and to `otlp_http/ingress`, which reaches the ingress through `otlp/mesh`, on every other host.
-The `metrics/host` pipeline also runs `transform/omnigent-alias`; the `metrics/process` pipeline sums `process.memory.usage` per executable name and drops executables under `process.minBytes` (64 MiB).
+The `metrics/host` pipeline also runs `transform/omnigent-alias`; the `metrics/process` pipeline sums `process.memory.usage` per executable name and drops executables under `process.minBytes.linux` (64 MiB).
 The ingress converts exponential histograms to explicit buckets while the store is below 1.3.0, then the `routing` connector sends each resource to `metrics/<database>` by its `vanixiets.database` attribute.
 Each per-database pipeline deletes `vanixiets.database` and writes through its own `otlp_http/<database>` exporter.
 Each exporter sends `x-greptime-db-name: <database>` and `x-greptime-otlp-metric-promote-resource-attrs` built from `promotedResourceAttributes`, so the store turns those resource attributes into labels.
@@ -151,7 +151,9 @@ Nothing imports `schema.nix` by path; import-tree loads it as a flake-parts modu
   `omnigent-host-<owner>.service` is stored as `omnigent-host-<alias>.service`, so no owner's name becomes a label value.
 - `promotedResourceAttributes`: the resource attributes the store promotes to labels.
 - `nodeExporterKeep`: the node_exporter series the `node` scrape keeps; every other series is dropped.
-- `process.minBytes`: the floor below which an executable's summed `process.memory.usage` is dropped.
+- `process.minBytes`: per platform (`linux`, 64 MiB; `darwin`, 384 MiB), the floor below which an executable's summed `process.memory.usage` is dropped.
+  The darwin floor is higher because macOS RSS counts each process's share of the dyld shared cache and frameworks.
+- `process.darwinFleetExecutables`: launchd label glob to the executable name the darwin process scraper reports; darwin's `otelcol-process` keeps these names below the floor, and the darwin fragment asserts that the globs cover the host's long-running `org.nixos.*` daemons.
 - `devloop.tables`: the `devloop` allow-list, table name to `{ columns, primaryKey, timeIndex }`, each column `{ name; type; nullable; }` with `type` one of `int64`, `string`, `boolean` and `timestamp`.
   From it `modules/nixos/devloop-collection.nix` renders the store's `CREATE TABLE` statements and ingest pipelines, the nixbot queries' column aliases and order, and the gitea-mq and deploy-record keep-lists.
   A column added to an existing table is created by the pipeline's first write of it; a changed type needs an explicit migration.

@@ -4,8 +4,9 @@
 # validated by the root pin's otelcol-contrib 0.155.0, the version stibnite
 # runs: validation reads component configuration, not the platform. Later
 # cases run the probe's parser over launchctl and smartctl output recorded
-# on stibnite at macOS 26.7.1, and the notifier wrapper over a recording
-# ntfy-send. Each clause names its two value sources; each mutant changes
+# on stibnite at macOS 26.7.1, the notifier wrapper over a recording
+# ntfy-send, and otelcol-process's processors over process points. Each
+# clause names its two value sources; each mutant changes
 # one input and runs only its own clause or case, printed as
 # `mutant <name> rejected: <case>`. Relations within one host are the darwin
 # fragment's assertions, not clauses here. Stubbed packages enter as
@@ -16,17 +17,17 @@
     { pkgs, system, ... }:
     let
       pki = self.lib.otelTestPki pkgs;
-      render =
-        args:
-        self.lib.otelCollectorDarwin (
-          {
-            hostName = "stibnite";
-            certFile = "${pki}/agent.crt";
-            keyFile = "${pki}/agent.key";
-            caFile = "${pki}/ca.crt";
-          }
-          // args
+      # The keep-list a host whose daemons all match SC's globs renders with.
+      renderArgs = {
+        hostName = "stibnite";
+        certFile = "${pki}/agent.crt";
+        keyFile = "${pki}/agent.key";
+        caFile = "${pki}/ca.crt";
+        fleetExecutables = lib.unique (
+          builtins.attrValues self.lib.otelCollectorSchema.process.darwinFleetExecutables
         );
+      };
+      render = args: self.lib.otelCollectorDarwin (renderArgs // args);
 
       # A library file with the line after `# mutant: <name>` changed from
       # `from` to `to`, imported as the flake-parts module it is (as
@@ -213,6 +214,18 @@
             "org.nixos.prometheus-node-exporter"
             "org.nixos.sops-install-secrets"
           ];
+        # The darwin floor: the rendered process filter against SC's darwin
+        # floor, which must differ from Linux's (macOS RSS counts shared-cache
+        # pages; A77).
+        processFloorDarwin =
+          let
+            m = self.lib.otelCollectorSchema.process.minBytes;
+          in
+          builtins.isAttrs m
+          && m.darwin != m.linux
+          && lib.hasInfix "datapoint.value_int < ${toString m.darwin}" (
+            builtins.head i.r.process.processors."filter/process-min".metric_conditions
+          );
       };
 
       mutants = {
@@ -522,6 +535,59 @@
         echo "mutant postEveryFailure rejected: passFailFailPass"
         echo "  posts: $(${titles})"
       '';
+
+      # otelcol-process's processors run by the root pin's collector over
+      # recorded-shape points, between an otlpjsonfile receiver and a file
+      # exporter. Value sources: the fixture's three executables, typed with
+      # their outcome from the keep-list's purpose (a fleet executable below
+      # the floor kept, any other below it dropped, one above it kept),
+      # against the names the collector writes. keepListIgnored renders the
+      # filter without the keep-list and runs only this case.
+      filterYaml =
+        r:
+        yaml.generate "otelcol-process-filter.yaml" (
+          r.process
+          // {
+            receivers.otlpjsonfile = {
+              include = [ "@DIR@/in/*.json" ];
+              start_at = "beginning";
+            };
+            exporters.file.path = "@DIR@/out.json";
+            service = r.process.service // {
+              pipelines."metrics/process" = r.process.service.pipelines."metrics/process" // {
+                receivers = [ "otlpjsonfile" ];
+                exporters = [ "file" ];
+              };
+            };
+          }
+        );
+      keepListMutant =
+        (mutatedLib ../lib/otel-collector-darwin.nix "keepListIgnored" "spared fleetExecutables"
+          "spared [ ]"
+        ).otelCollectorDarwin
+          renderArgs;
+      # A shell function body: 0 when exactly the expected names pass, 1 when
+      # others do, 2 when the collector wrote nothing.
+      filterCaseScript = config: ''
+        d=$(mktemp -d); mkdir "$d/in"
+        cp ${fixtures}/process-memory.json "$d/in/"
+        sed "s|@DIR@|$d|g" ${config} > "$d/c.yaml"
+        otelcol-contrib --config "$d/c.yaml" > "$d/log" 2>&1 &
+        pid=$!
+        for _ in $(seq 60); do [ -s "$d/out.json" ] && break; sleep 0.5; done
+        kill "$pid"; wait "$pid" || true
+        if [ ! -s "$d/out.json" ]; then cat "$d/log" >&2; echo "filter case: the collector wrote nothing" >&2; return 2; fi
+        got=$(jq -r '.resourceMetrics[] | select([.scopeMetrics[]?.metrics[]?.sum.dataPoints[]?] | length > 0) | .resource.attributes[] | select(.key == "process.executable.name") | .value.stringValue' "$d/out.json" | sort -u | tr '\n' ' ')
+        echo "  stored: $got" >&2
+        [ "$got" = "otelcol-contrib zen " ]
+      '';
+      filterRuns = ''
+        fc() { ${filterCaseScript (filterYaml input.r)} }
+        if fc 2> "$TMPDIR/fc.err"; then echo "ok: fleetKeptBelowFloor"; cat "$TMPDIR/fc.err"; else cat "$TMPDIR/fc.err"; echo "FAIL: fleetKeptBelowFloor"; exit 1; fi
+        fm() { ${filterCaseScript (filterYaml keepListMutant)} }
+        rc=0; fm 2> "$TMPDIR/fm.err" || rc=$?
+        if [ "$rc" = 1 ]; then echo "mutant keepListIgnored rejected: fleetKeptBelowFloor"; cat "$TMPDIR/fm.err"; else cat "$TMPDIR/fm.err"; echo "FAIL: mutant keepListIgnored on fleetKeptBelowFloor returned $rc"; exit 1; fi
+      '';
     in
     {
       checks = lib.optionalAttrs (system == "x86_64-linux") {
@@ -532,6 +598,7 @@
                 pkgs.opentelemetry-collector-contrib
                 pkgs.diffutils
                 pkgs.gawk
+                pkgs.jq
               ];
             }
             ''
@@ -551,6 +618,7 @@
               fi
               ${probeRuns}
               ${wrapperRuns}
+              ${filterRuns}
               touch $out
             '';
       };

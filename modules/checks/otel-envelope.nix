@@ -87,6 +87,7 @@
             certFile = "c";
             keyFile = "k";
             caFile = "a";
+            fleetExecutables = [ ];
           }).targets;
       launchctlStub = pkgs.writeShellScript "launchctl-stub" ''
         # `print system/<label>`: pid 101 for the agent and 202 for the process

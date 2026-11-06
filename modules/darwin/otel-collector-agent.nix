@@ -53,11 +53,41 @@ in
           lib.filterAttrs (_: d: (d.serviceConfig.KeepAlive or null) == true) config.launchd.daemons
         );
       };
+      # The host's long-running org.nixos.* daemons, KeepAlive true or a
+      # condition set; periodic jobs run a shell, find or jq whose names
+      # would keep the operator's own (design D3).
+      longRunning = lib.mapAttrsToList (_: d: d.serviceConfig.Label) (
+        lib.filterAttrs (
+          _: d:
+          lib.hasPrefix "org.nixos." d.serviceConfig.Label
+          && (
+            d.serviceConfig.KeepAlive or null == true || builtins.isAttrs (d.serviceConfig.KeepAlive or null)
+          )
+        ) config.launchd.daemons
+      );
+      fleetGlobsMatching =
+        label:
+        builtins.filter (
+          g:
+          flakeLib.otelHostProbeLabels {
+            launchdLabels = [ g ];
+            daemonLabels = [ label ];
+          } != [ ]
+        ) (builtins.attrNames schema.process.darwinFleetExecutables);
+      daemonLabels = lib.mapAttrsToList (_: d: d.serviceConfig.Label) config.launchd.daemons;
+      fleetExecutables = lib.unique (
+        lib.concatMap (
+          label: map (g: schema.process.darwinFleetExecutables.${g}) (fleetGlobsMatching label)
+        ) daemonLabels
+      );
+      omnigentPython =
+        if owners == [ ] then null else config.services.omnigent-host.package.python.executable;
       rendered = flakeLib.otelCollectorDarwin {
         hostName = config.networking.hostName;
         certFile = gens.otel-cert.files."cert.pem".path;
         keyFile = gens.otel-cert.files."key.pem".path;
         caFile = pkgs.writeText "otel-ca.crt" gens.otel-ca.files."ca.crt".value;
+        inherit fleetExecutables;
       };
     in
     {
@@ -247,6 +277,15 @@ in
           {
             assertion = lib.sort lib.lessThan schema.launchdKeptAlive == lib.sort lib.lessThan keptAlive;
             message = "otel-collector darwin agent: SC's launchdKeptAlive ${builtins.toJSON schema.launchdKeptAlive} must equal the allow-listed labels whose evaluated KeepAlive is true, ${builtins.toJSON keptAlive}, which LaunchdJobNotRunning expects running (ADR-004:123; design D9).";
+          }
+          {
+            assertion =
+              lib.all (l: builtins.length (fleetGlobsMatching l) == 1) longRunning
+              && (
+                omnigentPython == null
+                || schema.process.darwinFleetExecutables."org.nixos.omnigent-host-*" == omnigentPython
+              );
+            message = "otel-collector darwin agent: each long-running org.nixos.* daemon ${builtins.toJSON longRunning} must match exactly one glob of SC's process.darwinFleetExecutables, and its omnigent-host-* name must be the omnigent package's interpreter ${builtins.toJSON omnigentPython}, so that otelcol-process keeps the fleet's own executables below the darwin floor (design D3; A77).";
           }
         ];
       };

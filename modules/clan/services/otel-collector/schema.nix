@@ -142,11 +142,39 @@
     ];
 
     # process.memory.usage is stored only for executables holding at least
-    # minBytes after same-name aggregation (ADR-003 item 16). ADR-004's
-    # per-host bound of 30 distinct names has no collector stage at contrib
-    # 0.155.0; S1 records the observed count at deployment and S4's
-    # otel-envelope adds its regulator.
-    process.minBytes = 67108864;
+    # minBytes.<platform> after same-name aggregation (ADR-003 item 16).
+    # ADR-004's per-host bound of 30 distinct names has no collector stage
+    # at contrib 0.155.0; S1 records the observed count at deployment and
+    # S4's otel-envelope adds its regulator. The scraper reports RSS on both
+    # platforms (process_scraper.go:321-326), and on darwin RSS counts each
+    # process's mapped share of the dyld shared cache and frameworks, so
+    # ordinary daemons hold 65-300 MiB; darwin's floor is the smallest of
+    # 128, 192, 256, 384 and 512 MiB that kept stibnite's hourly distinct
+    # names at or below 20 from 2026-11-06T05:17Z to 21:14Z (A77).
+    process.minBytes = {
+      linux = 67108864;
+      darwin = 402653184;
+    };
+
+    # The darwin executables kept whatever their size, so that a leak in a
+    # service the fleet runs shows as a trend: per launchd label glob (dots
+    # literal, as launchdLabels), the name the scraper reports, the kernel's
+    # p_comm, which follows symlinks and names an interpreter, not a script
+    # (gopsutil@v4.26.5:process/process_darwin.go:65-87; `ps -o comm=` on
+    # stibnite on 2026-11-06). The darwin fragment asserts that the globs
+    # cover the host's long-running org.nixos.* daemons and that omnigent's
+    # name is its package's interpreter. `nix` and `python3.x` also name the
+    # operator's own processes, which same-name aggregation keeps as one
+    # series each (design D3).
+    process.darwinFleetExecutables = {
+      "org.nixos.dnscrypt-proxy" = "dnscrypt-proxy";
+      "org.nixos.nix-daemon" = "nix";
+      "org.nixos.nix-grpc-daemon" = "nix-grpc-daemon";
+      "org.nixos.omnigent-host-*" = "python3.14";
+      "org.nixos.otelcol" = "otelcol-contrib";
+      "org.nixos.otelcol-process" = "otelcol-contrib";
+      "org.nixos.prometheus-node-exporter" = "node_exporter";
+    };
 
     # Unmeasured estimate of magnetite's `fleet` export rate: about 2000
     # series (ADR-004's ~800 host-level series per NixOS host plus the
