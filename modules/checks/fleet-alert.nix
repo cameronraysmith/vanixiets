@@ -973,12 +973,14 @@
             hosts = {
               a = {
                 collect = true;
+                platform = "nixos";
                 alwaysOn = true;
                 notifiedUnits = [ "unit-a" ];
                 smartDevices = [ ];
               };
               b = {
                 collect = true;
+                platform = "nixos";
                 alwaysOn = false;
                 notifiedUnits = [ "unit-b" ];
                 smartDevices = [ ];
@@ -1473,6 +1475,123 @@
         ];
       };
 
+      # Store errors and silent hosts freeze instance state: a time-relative
+      # rule's pending instance across a freeze. HostProbeStale is the darwin
+      # rules' change; until then this stand-in has ADR-009:134's
+      # expression and `for`, appended to the rendered table for these legs
+      # only, never to the evaluator's deployed rules. Value sources: the
+      # step-indexed posts typed in each leg from the requirement's
+      # scenarios, against the evaluator's posts over the fixture server.
+      probeStale = {
+        alert = "HostProbeStale";
+        expr = "time() - node_textfile_mtime_seconds > 300 or node_textfile_scrape_error == 1";
+        for = 600;
+        severity = "warning";
+        annotations.summary = "stand-in for the darwin probe's staleness rule";
+        presence = [ ];
+        attribution = [ ];
+        database = "fleet";
+        language = "promql";
+      };
+      probeStaleRules = evaluatorRules ++ [ probeStale ];
+      probeStaleConfig = checkConfig probeStaleRules;
+      stale = [
+        {
+          host_name = "stibnite";
+          file = "/var/lib/prometheus-node-exporter/textfile/launchd.prom";
+        }
+      ];
+      # stibnite reports from minute 0 to 5, its probe stale from its last
+      # sample at 5; silent from 10 to 125 (24 runs 5 min apart), the store
+      # answering its last sample at 10 only; then reports from 126 with the
+      # condition as `wake` gives it.
+      freezeTimeline =
+        wake:
+        map (n: {
+          at = minute n;
+          reporting = [ "stibnite" ];
+          series = lib.optionalAttrs (n == 5) { HostProbeStale = stale; };
+        }) (lib.range 0 5)
+        ++ map (n: {
+          at = minute (10 + 5 * n);
+          series = lib.optionalAttrs (n == 0) { HostProbeStale = stale; };
+        }) (lib.range 0 23)
+        ++ map (n: {
+          at = minute n;
+          reporting = [ "stibnite" ];
+          series = lib.optionalAttrs (wake n) { HostProbeStale = stale; };
+        }) (lib.range 126 140);
+      pendingAcrossFreeze = {
+        name = "pendingAcrossFreeze: HostProbeStale true at stibnite's last sample, 2 h silent, then true for 2 runs after wake and false after posts nothing";
+        rules = probeStaleRules;
+        steps = freezeTimeline (n: n <= 127);
+        expect = [ ];
+      };
+      pendingAfterWake = {
+        name = "pendingAfterWake: HostProbeStale true for 11 min after stibnite wakes fires once, 10 min after wake";
+        rules = probeStaleRules;
+        steps = freezeTimeline (n: n <= 137);
+        # Step 40 is minute 136: 6 runs before the silence, 24 silent, then 126 + 10.
+        expect = [ "40 [FIRING] HostProbeStale stibnite default" ];
+      };
+
+      # Expected hosts by platform. Value sources: the Linux-only selectors
+      # typed here from the design's applicability table, against the
+      # presence selectors and expected hosts the rules render from a host
+      # table in which stibnite collects. magnetite and cinnabar are not
+      # marked always-on, so their silence, which leaves stibnite the only
+      # reporting host, raises nothing of its own.
+      linuxSelectors = [
+        "system_linux_memory_available_bytes"
+        "system_paging_usage_bytes"
+        "node_zfs_arc_size"
+        "node_zfs_zpool_state"
+        "node_vmstat_oom_kill"
+        "systemd_unit_state"
+        "systemd_service_restarts_total"
+      ];
+      onlyStibniteTable =
+        stibnite:
+        hosts
+        // {
+          stibnite = hosts.stibnite // stibnite;
+          magnetite = hosts.magnetite // {
+            alwaysOn = false;
+          };
+          cinnabar = hosts.cinnabar // {
+            alwaysOn = false;
+          };
+        };
+      onlyStibniteRules =
+        stibnite:
+        builtins.fromJSON
+          (self.lib.fleetAlertRules {
+            inherit lib;
+            hosts = onlyStibniteTable stibnite;
+          }).json;
+      stibniteOnlySteps =
+        missing:
+        map (n: {
+          at = gap n;
+          reporting = [ "stibnite" ];
+          silent = alwaysOnHosts;
+          inherit missing;
+        }) (lib.range 0 7);
+      linuxSelectorDarwinOnly = {
+        name = "linuxSelectorDarwinOnly: stibnite, the only host reporting, with every Linux-only selector absent for 35 min, raises nothing";
+        rules = onlyStibniteRules { collect = true; };
+        steps = stibniteOnlySteps linuxSelectors;
+        expect = [ ];
+      };
+      stibniteNotCollecting = {
+        name = "stibniteNotCollecting: stibnite, not collecting and the only host reporting, with every selector but host memory absent for 35 min, raises nothing";
+        # Explicit, so the leg keeps its meaning once the host table drops
+        # stibnite's collect = false.
+        rules = onlyStibniteRules { collect = false; };
+        steps = stibniteOnlySteps (lib.remove "system_memory_usage_bytes" selectors);
+        expect = [ ];
+      };
+
       legs =
         map fireAndResolve [
           "HostMemoryPressure"
@@ -1798,6 +1917,24 @@
               evaluator = lib.getExe realEvaluator;
               config = notCollectingConfig;
             } notCollectingLeg}
+            ${lib.concatMapStrings
+              (runLeg {
+                evaluator = lib.getExe realEvaluator;
+                config = probeStaleConfig;
+              })
+              [
+                pendingAcrossFreeze
+                pendingAfterWake
+              ]
+            }
+            ${runLeg {
+              evaluator = lib.getExe realEvaluator;
+              config = checkConfig linuxSelectorDarwinOnly.rules;
+            } linuxSelectorDarwinOnly}
+            ${runLeg {
+              evaluator = lib.getExe realEvaluator;
+              config = checkConfig stibniteNotCollecting.rules;
+            } stibniteNotCollecting}
             mutant_missed=0
             ${lib.concatStrings (lib.mapAttrsToList mutantRun runtimeMutants)}
             if [ -s "$TMPDIR/misses-real" ]; then

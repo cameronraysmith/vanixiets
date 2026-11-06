@@ -1,0 +1,16 @@
+# TYPE smartctl_device_available_spare counter
+smartctl_device_available_spare{device="disk0"} 100
+# TYPE smartctl_device_available_spare_threshold counter
+smartctl_device_available_spare_threshold{device="disk0"} 99
+# TYPE smartctl_device_critical_warning counter
+smartctl_device_critical_warning{device="disk0"} 0
+# TYPE smartctl_device_media_errors counter
+smartctl_device_media_errors{device="disk0"} 0
+# TYPE smartctl_device_num_err_log_entries counter
+smartctl_device_num_err_log_entries{device="disk0"} 0
+# TYPE smartctl_device_percentage_used counter
+smartctl_device_percentage_used{device="disk0"} 0
+# TYPE smartctl_device_smart_status gauge
+smartctl_device_smart_status{device="disk0"} 1
+# TYPE smartctl_device_temperature gauge
+smartctl_device_temperature{device="disk0",temperature_type="current"} 51

@@ -16,74 +16,14 @@
 #
 # Hosts import this module directly or through the otel-collector agent role;
 # the key makes a host doing both load it once. It reads no clan var: the host
-# supplies the token's path.
-{ ... }:
+# supplies the token's path. The posting and episode scripts live in
+# modules/lib/observability-notify-run.nix, which launchd's wrapper shares.
+{ config, ... }:
 let
-  # The notifier's two scripts, a function so that
-  # checks.x86_64-linux.otel-collector-config can rehearse them against a
-  # temporary stamp directory and a recording ntfy-send.
-  observabilityNotifyScripts =
-    pkgs:
-    {
-      ntfySend,
-      stampDir,
-      hostName,
-    }:
-    {
-      # One post per failure episode: skip while the stamp exists. A unit
-      # whose last FAILED was posted less than OBSERVABILITY_NOTIFY_MIN_INTERVAL_SEC
-      # ago opens a `suppressed` episode instead, which the resolve hooks end
-      # without a post. A persistent crash loop therefore yields one
-      # FAILED/RESOLVED pair, then at most one new pair per interval per unit;
-      # detecting crash loops by restart rate belongs to S3. A failed post
-      # writes no stamp, so the next failure posts again. Each posted FAILED
-      # appends `<epoch> <unit> <host>` to failed.log; a suppressed episode
-      # and a failed post append nothing.
-      failed = pkgs.writeShellScript "observability-notify-failed" ''
-        : "''${OBSERVABILITY_NOTIFY_MIN_INTERVAL_SEC:?}"
-        unit="$1"
-        stamp="${stampDir}/$unit"
-        last="${stampDir}/last-failed/$unit"
-        if [ -e "$stamp" ]; then
-          exit 0
-        fi
-        now=$(${pkgs.coreutils}/bin/date +%s)
-        if [ -s "$last" ] && [ $((now - $(< "$last"))) -lt "$OBSERVABILITY_NOTIFY_MIN_INTERVAL_SEC" ]; then
-          echo suppressed > "$stamp"
-          exit 0
-        fi
-        ${ntfySend} "FAILED $unit on ${hostName}" fleet-alerts || exit 1
-        echo posted > "$stamp"
-        ${pkgs.coreutils}/bin/mkdir -p "${stampDir}/last-failed"
-        echo "$now" > "$last"
-        # R9.1 counts these lines (design D9). The evaluator, a DynamicUser,
-        # reads the log, so it is created world-readable.
-        log="${stampDir}/failed.log"
-        [ -e "$log" ] || ${pkgs.coreutils}/bin/install -m 0644 /dev/null "$log"
-        printf '%s %s %s\n' "$now" "$unit" "${hostName}" >> "$log"
-      '';
-
-      # Runs as root (`+`) after a notified unit starts (`start`) or stops
-      # (`stop`); a failed post leaves the stamp for the next chance and never
-      # fails the unit.
-      resolved = pkgs.writeShellScript "observability-notify-resolved" ''
-        mode="$1"
-        unit="$2"
-        stamp="${stampDir}/$unit"
-        if [ -e "$stamp" ] && { [ "$mode" = start ] || [ "''${SERVICE_RESULT:-}" = success ]; }; then
-          if [ "$(< "$stamp")" = suppressed ]; then
-            ${pkgs.coreutils}/bin/rm -f "$stamp"
-          else
-            ${ntfySend} "RESOLVED $unit on ${hostName}" fleet-alerts && ${pkgs.coreutils}/bin/rm -f "$stamp"
-          fi
-        fi
-        exit 0
-      '';
-    };
+  # Inside the NixOS module `config` is the host's; this is the flake's.
+  flakeConfig = config;
 in
 {
-  flake.lib = { inherit observabilityNotifyScripts; };
-
   flake.modules.nixos.observability-notify =
     {
       config,
@@ -93,7 +33,7 @@ in
     }:
     let
       cfg = config.services.observability-notify;
-      notifyScripts = observabilityNotifyScripts pkgs {
+      notifyScripts = flakeConfig.flake.lib.observabilityNotifyScripts pkgs {
         ntfySend = lib.getExe pkgs.ntfy-send;
         stampDir = "/var/lib/observability-notify";
         hostName = config.networking.hostName;

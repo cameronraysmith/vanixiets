@@ -1,0 +1,12 @@
+# HELP launchd_job_state 1 for the launchd job's current state, 0 for the others.
+# TYPE launchd_job_state gauge
+launchd_job_state{launchd_label="org.nixos.jetsam-idle",launchd_state="running"} 1
+launchd_job_state{launchd_label="org.nixos.jetsam-idle",launchd_state="not_running"} 0
+launchd_job_state{launchd_label="org.nixos.jetsam-idle",launchd_state="unloaded"} 0
+launchd_job_state{launchd_label="org.nixos.jetsam-idle",launchd_state="other"} 0
+# HELP launchd_job_last_exit_code The job's last exit status; 0 if it never exited or was reclaimed idle, -1 if missing otherwise or not an integer.
+# TYPE launchd_job_last_exit_code gauge
+launchd_job_last_exit_code{launchd_label="org.nixos.jetsam-idle"} 0
+# HELP launchd_job_runs_total Launches since the job was loaded.
+# TYPE launchd_job_runs_total counter
+launchd_job_runs_total{launchd_label="org.nixos.jetsam-idle"} 2

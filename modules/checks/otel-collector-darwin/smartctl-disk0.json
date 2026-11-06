@@ -1,0 +1,71 @@
+{
+  "json_format_version": [
+    1,
+    0
+  ],
+  "smartctl": {
+    "version": [
+      7,
+      5
+    ],
+    "pre_release": false,
+    "platform_info": "Darwin 25.6.0 arm64",
+    "build_info": "(local build)",
+    "argv": [
+      "smartctl",
+      "-j",
+      "-H",
+      "-A",
+      "disk0"
+    ],
+    "exit_status": 0
+  },
+  "local_time": {
+    "time_t": 1793920238,
+    "asctime": "Thu Nov  5 18:10:38 2026 EST"
+  },
+  "device": {
+    "name": "disk0",
+    "info_name": "disk0",
+    "type": "nvme",
+    "protocol": "NVMe"
+  },
+  "smart_status": {
+    "passed": true,
+    "nvme": {
+      "value": 0
+    }
+  },
+  "nvme_smart_health_information_log": {
+    "nsid": -1,
+    "critical_warning": 0,
+    "temperature": 51,
+    "available_spare": 100,
+    "available_spare_threshold": 99,
+    "percentage_used": 0,
+    "data_units_read": 149059141,
+    "data_units_written": 43461434,
+    "host_reads": 8085381249,
+    "host_writes": 1567454375,
+    "controller_busy_time": 0,
+    "power_cycles": 255,
+    "power_on_hours": 848,
+    "unsafe_shutdowns": 18,
+    "media_errors": 0,
+    "num_err_log_entries": 0
+  },
+  "temperature": {
+    "current": 51
+  },
+  "spare_available": {
+    "current_percent": 100,
+    "threshold_percent": 99
+  },
+  "endurance_used": {
+    "current_percent": 0
+  },
+  "power_cycle_count": 255,
+  "power_on_time": {
+    "hours": 848
+  }
+}

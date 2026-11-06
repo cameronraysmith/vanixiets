@@ -1,0 +1,6 @@
+# HELP launchd_job_state 1 for the launchd job's current state, 0 for the others.
+# TYPE launchd_job_state gauge
+launchd_job_state{launchd_label="org.nixos.otelcol",launchd_state="running"} 0
+launchd_job_state{launchd_label="org.nixos.otelcol",launchd_state="not_running"} 0
+launchd_job_state{launchd_label="org.nixos.otelcol",launchd_state="unloaded"} 1
+launchd_job_state{launchd_label="org.nixos.otelcol",launchd_state="other"} 0

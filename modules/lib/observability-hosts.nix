@@ -1,6 +1,6 @@
 # The agent hosts and what each reports (design D6). The inventory's agent
-# machines, whether each collects, each host's notified units, its SMART
-# devices and the alert rules' always-on hosts, expected hosts and
+# machines, whether each collects, each host's platform, notified units and
+# SMART devices, and the alert rules' always-on hosts, expected hosts and
 # SystemdUnitFailed exclusion are read from here. A host's `collect` turns
 # the agent role on; a host joining the fleet enters with `collect = false`
 # until its watched first deploy. A host joins alwaysOn only by an edit here
@@ -11,6 +11,7 @@
     let
       agent = extra: {
         collect = true;
+        platform = "nixos";
         alwaysOn = false;
         smartDevices = [ ];
         notifiedUnits = [
@@ -52,5 +53,13 @@
       electrum = agent [ ];
       galena = agent [ ];
       scheelite = agent [ ];
+      # A darwin workstation: launchd jobs and the probe's textfile instead of
+      # systemd units; its SMART device is read by the probe (design D4, D7).
+      stibnite = agent [ ] // {
+        platform = "darwin";
+        notifiedUnits = [ "otel-envelope" ];
+        smartDevices = [ "disk0" ];
+        collect = false;
+      };
     };
 }

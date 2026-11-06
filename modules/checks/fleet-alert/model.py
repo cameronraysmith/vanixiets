@@ -225,6 +225,9 @@ def transition(state, observations, now, rules):
             if instance is not None:
                 instances[iid] = dict(instance, absenceFrom=None)
             continue
+        # design D10: a pending instance frozen on the previous run restarts its `for`.
+        if instance is not None and instance["phase"] == "pending" and "absenceFrom" in instance and instance["absenceFrom"] is None:
+            instance = dict(instance, activeSince=now)
         nxt = advance(instance, condition, now)
         if nxt is not None:
             instances[iid] = nxt

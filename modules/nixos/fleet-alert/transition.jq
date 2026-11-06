@@ -17,7 +17,8 @@
 # the instances labelled with it (stand-up-devloop-collection review F7).
 # Frozen time is not absence: absence counts from `absenceFrom`, the run the
 # instance was last seen on or, after a freeze, the first unfrozen run (a
-# state written before the field existed counts from `lastSeen`).
+# state written before the field existed counts from `lastSeen`). A pending
+# instance thawed on this run restarts its `for` at this run.
 # StoreQueryFailing and RuleSignalMissing are raised only if $rules lists
 # them, with their `for`. RuleSignalMissing also reports each host in its
 # `alwaysOn` list that the store answered without for 10 min, counted from
@@ -177,7 +178,13 @@ def transition($observations; $now; $rules):
         | if frozen(($inst // {alert: $cond.rule.alert, labels: $cond.labels, database: $cond.rule.database}); $observations) then
             (if $inst == null then . else .[$id] = ($inst | .absenceFrom = null) end)
           else
-            advance($inst; $cond; $now) as $next
+            # A pending instance frozen on the previous run counts its `for`
+            # from this run: the store answers a sleeping host's last sample
+            # for its lookback, so a condition seen then never held while the
+            # host was awake (design D10). Frozen runs leave absenceFrom null.
+            ( if $inst != null and $inst.phase == "pending" and ($inst | has("absenceFrom")) and $inst.absenceFrom == null
+              then $inst | .activeSince = $now else $inst end ) as $thawed
+            | advance($thawed; $cond; $now) as $next
             | if $next == null then . else .[$id] = $next end
           end) ) as $instances
   | ( $state

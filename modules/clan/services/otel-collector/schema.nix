@@ -98,6 +98,32 @@
       "smartctl_device_temperature"
     ];
 
+    # Darwin node_exporter series kept besides smartctlKeep, which the
+    # probe's textfile writes under the same names (ADR-004:93, :95-96).
+    darwinNodeExporterKeep = [
+      "launchd_job_state"
+      "launchd_job_last_exit_code"
+      "launchd_job_runs_total"
+      "node_textfile_mtime_seconds"
+      "node_textfile_scrape_error"
+    ];
+
+    # ADR-004:121's launchd allow-list, by label, as glob patterns; each
+    # darwin host's probe reads the labels on it that its evaluated
+    # launchd.daemons defines.
+    launchdLabels = [
+      "org.nixos.nix-daemon"
+      "org.nixos.nix-grpc-daemon"
+      "org.nixos.harmonia-gc"
+      "org.nixos.nix-cleanup-gcroots"
+      "org.nixos.sops-install-secrets"
+      "org.nixos.dnscrypt-proxy"
+      "org.nixos.otelcol"
+      "org.nixos.otelcol-process"
+      "org.nixos.prometheus-node-exporter"
+      "org.nixos.omnigent-host-*"
+    ];
+
     # process.memory.usage is stored only for executables holding at least
     # minBytes after same-name aggregation (ADR-003 item 16). ADR-004's
     # per-host bound of 30 distinct names has no collector stage at contrib

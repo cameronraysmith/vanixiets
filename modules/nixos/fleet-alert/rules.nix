@@ -19,9 +19,14 @@
 # StoreQueryFailing and RuleSignalMissing have no expression: transition.jq
 # raises them, and they are listed so their `for` lives in this one table.
 # Every rule's expected hosts and RuleSignalMissing's `alwaysOn` come from
-# `hosts`, flake.lib.observabilityHosts by default (S4 design D9): the
-# expected hosts are the hosts that collect, and for the NVMe rules those
-# of them with SMART devices; `alwaysOn` lists the collecting hosts marked
+# `hosts`, flake.lib.observabilityHosts by default (S4 design D9), among the
+# hosts that collect, by each host's `platform`: HostMemoryPressure,
+# HostOOMKill, ZfsPoolUnhealthy, SystemdUnitRestartLoop and
+# SystemdUnitFailed expect the NixOS hosts, whose selectors darwin never
+# writes; the file-system rules, LocalExporterDown and WeeklyPipelineTest
+# expect every collecting host; the NVMe rules expect the hosts with SMART
+# devices, so far only the NixOS ones, because no darwin SMART series' stored
+# name has been read yet. `alwaysOn` lists the collecting hosts marked
 # always-on, whose own silence it reports: one absent from
 # system_memory_usage_bytes for 10 min while the store answers raises it
 # with that host_name and no `for` (ADR-009 item 16, charter v20).
@@ -45,10 +50,17 @@
       hosts ? config.flake.lib.observabilityHosts,
     }:
     let
-      # A host is expected, or always-on, only once it collects (design D6, D9).
+      # A host is expected, or always-on, only once it collects (S4 design
+      # D6, D9), and only for the selectors its platform writes (design D9):
+      # darwin writes no available memory, paging, ZFS, OOM or systemd series.
       collecting = lib.filterAttrs (_: h: h.collect) hosts;
+      onPlatform = p: builtins.attrNames (lib.filterAttrs (_: h: h.platform == p) collecting);
       agentHosts = builtins.attrNames collecting;
+      nixosHosts = onPlatform "nixos";
+      darwinHosts = onPlatform "darwin";
       smartHosts = builtins.attrNames (lib.filterAttrs (_: h: h.smartDevices != [ ]) collecting);
+      # Until the darwin rules land, the NVMe rules keep their NixOS hosts.
+      nvmeHosts = lib.subtractLists darwinHosts smartHosts;
       presence = expectedHosts: selector: { inherit selector expectedHosts; };
       fsRatio = ''sum by (host_name, mountpoint) (system_filesystem_usage_bytes{state="used"}) / sum by (host_name, mountpoint) (system_filesystem_usage_bytes)'';
 
@@ -99,7 +111,7 @@
           for = "5m";
           severity = "warning";
           annotations.summary = "Available memory, counting the ZFS ARC above its minimum, is below 10 % of total, or swap use is above 85 %";
-          presence = map (presence agentHosts) [
+          presence = map (presence nixosHosts) [
             "system_linux_memory_available_bytes"
             "node_zfs_arc_size"
             "system_memory_usage_bytes"
@@ -113,7 +125,7 @@
           for = "0s";
           severity = "critical";
           annotations.summary = "The kernel killed a process for memory in the last 10 min";
-          presence = [ (presence agentHosts "node_vmstat_oom_kill") ];
+          presence = [ (presence nixosHosts "node_vmstat_oom_kill") ];
           attribution = memoryAttribution;
         }
         {
@@ -122,7 +134,7 @@
           for = "1m";
           severity = "critical";
           annotations.summary = "A ZFS pool is not online";
-          presence = [ (presence agentHosts "node_zfs_zpool_state") ];
+          presence = [ (presence nixosHosts "node_zfs_zpool_state") ];
         }
         {
           alert = "FilesystemFillingWarn";
@@ -148,7 +160,7 @@
           for = "0s";
           severity = "critical";
           annotations.summary = "A laptop's NVMe controller reports a critical warning";
-          presence = [ (presence smartHosts "smartctl_device_critical_warning_total") ];
+          presence = [ (presence nvmeHosts "smartctl_device_critical_warning_total") ];
         }
         {
           alert = "NvmeWearHigh";
@@ -156,7 +168,7 @@
           for = "1h";
           severity = "warning";
           annotations.summary = "A laptop's SSD has used more than 90 % of its rated endurance";
-          presence = [ (presence smartHosts "smartctl_device_percentage_used_total") ];
+          presence = [ (presence nvmeHosts "smartctl_device_percentage_used_total") ];
         }
         {
           alert = "SystemdUnitRestartLoop";
@@ -164,7 +176,7 @@
           for = "0s";
           severity = "warning";
           annotations.summary = "A unit restarted more than 5 times in 15 min";
-          presence = [ (presence agentHosts "systemd_service_restarts_total") ];
+          presence = [ (presence nixosHosts "systemd_service_restarts_total") ];
         }
         {
           alert = "SystemdUnitFailed";
@@ -172,7 +184,7 @@
           for = "5m";
           severity = "warning";
           annotations.summary = "A unit the failure notifier does not report has failed";
-          presence = [ (presence agentHosts "systemd_unit_state") ];
+          presence = [ (presence nixosHosts "systemd_unit_state") ];
         }
         {
           alert = "LocalExporterDown";

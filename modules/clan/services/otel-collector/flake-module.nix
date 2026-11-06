@@ -32,6 +32,7 @@
 { config, ... }:
 let
   nixosModules = config.flake.modules.nixos;
+  darwinModules = config.flake.modules.darwin;
   flakeLib = config.flake.lib;
   schema = config.flake.lib.otelCollectorSchema;
 
@@ -932,6 +933,59 @@ in
         interface = { };
         perInstance =
           { roles, machine, ... }:
+          let
+            # One definition of the CA and the certificate for both module
+            # classes; clan compares a shared generator's files, prompts,
+            # dependencies and validation across machines and ignores owner,
+            # group and mode (clan_lib/vars/generator.py:106-116).
+            otelGenerators =
+              { lib, pkgs }:
+              let
+                isIngress = roles.ingress.machines ? ${machine.name};
+                sans = lib.optionalString isIngress "IP:${flakeLib.hosts.magnetite.zt},DNS:magnetite.zt";
+                usage = if isIngress then "serverAuth,clientAuth" else "clientAuth";
+              in
+              {
+                # Shared: every agent trusts one CA; its key signs at generation time
+                # only and is never deployed (ADR-003 Q2; design D1).
+                otel-ca = {
+                  share = true;
+                  files."ca.key".deploy = false;
+                  files."ca.crt".secret = false;
+                  runtimeInputs = [ pkgs.openssl ];
+                  script = ''
+                    openssl genpkey -algorithm EC -pkeyopt ec_paramgen_curve:P-256 -out "$out"/ca.key
+                    openssl req -x509 -new -key "$out"/ca.key -sha256 -days 3650 -subj "/CN=otel-ca" \
+                      -addext "basicConstraints=critical,CA:TRUE" \
+                      -addext "keyUsage=critical,keyCertSign,cRLSign" \
+                      -addext "subjectKeyIdentifier=hash" -out "$out"/ca.crt
+                  '';
+                };
+                # The SANs and the usage enter validation, so moving a host into the
+                # ingress role regenerates its certificate (design D1).
+                otel-cert = {
+                  dependencies = [ "otel-ca" ];
+                  files."cert.pem".secret = false;
+                  validation = {
+                    subjectAltNames = sans;
+                    extendedKeyUsage = usage;
+                  };
+                  runtimeInputs = [ pkgs.openssl ];
+                  script = ''
+                    openssl genpkey -algorithm EC -pkeyopt ec_paramgen_curve:P-256 -out "$out"/key.pem
+                    openssl req -new -key "$out"/key.pem -subj "/CN=${machine.name}" -out cert.csr
+                    {
+                      echo "basicConstraints=critical,CA:FALSE"
+                      echo "keyUsage=critical,digitalSignature"
+                      echo "extendedKeyUsage=${usage}"
+                      ${lib.optionalString isIngress ''echo "subjectAltName=${sans}"''}
+                    } > cert.ext
+                    openssl x509 -req -in cert.csr -CA "$in"/otel-ca/ca.crt -CAkey "$in"/otel-ca/ca.key \
+                      -set_serial "0x$(openssl rand -hex 16)" -sha256 -days 3650 -extfile cert.ext -out "$out"/cert.pem
+                  '';
+                };
+              };
+          in
           {
             nixosModule =
               {
@@ -943,9 +997,6 @@ in
               let
                 # Static data, so it can select imports without evaluating the host (design D6).
                 collect = flakeLib.observabilityHosts.${machine.name}.collect;
-                isIngress = roles.ingress.machines ? ${machine.name};
-                sans = lib.optionalString isIngress "IP:${flakeLib.hosts.magnetite.zt},DNS:magnetite.zt";
-                usage = if isIngress then "serverAuth,clientAuth" else "clientAuth";
                 restart = lib.optional collect "opentelemetry-collector.service";
                 gens = config.clan.core.vars.generators;
               in
@@ -959,50 +1010,15 @@ in
 
                 config = lib.mkMerge [
                   {
-                    clan.core.vars.generators = {
-                      # Shared: every agent trusts one CA; its key signs at generation time
-                      # only and is never deployed (ADR-003 Q2; design D1).
-                      otel-ca = {
-                        share = true;
-                        files."ca.key".deploy = false;
-                        files."ca.crt".secret = false;
-                        runtimeInputs = [ pkgs.openssl ];
-                        script = ''
-                          openssl genpkey -algorithm EC -pkeyopt ec_paramgen_curve:P-256 -out "$out"/ca.key
-                          openssl req -x509 -new -key "$out"/ca.key -sha256 -days 3650 -subj "/CN=otel-ca" \
-                            -addext "basicConstraints=critical,CA:TRUE" \
-                            -addext "keyUsage=critical,keyCertSign,cRLSign" \
-                            -addext "subjectKeyIdentifier=hash" -out "$out"/ca.crt
-                        '';
-                      };
-                      # The SANs and the usage enter validation, so moving a host into the
-                      # ingress role regenerates its certificate (design D1).
-                      otel-cert = {
-                        dependencies = [ "otel-ca" ];
-                        files."key.pem".restartUnits = restart;
-                        files."cert.pem" = {
-                          secret = false;
-                          restartUnits = restart;
-                        };
-                        validation = {
-                          subjectAltNames = sans;
-                          extendedKeyUsage = usage;
-                        };
-                        runtimeInputs = [ pkgs.openssl ];
-                        script = ''
-                          openssl genpkey -algorithm EC -pkeyopt ec_paramgen_curve:P-256 -out "$out"/key.pem
-                          openssl req -new -key "$out"/key.pem -subj "/CN=${machine.name}" -out cert.csr
-                          {
-                            echo "basicConstraints=critical,CA:FALSE"
-                            echo "keyUsage=critical,digitalSignature"
-                            echo "extendedKeyUsage=${usage}"
-                            ${lib.optionalString isIngress ''echo "subjectAltName=${sans}"''}
-                          } > cert.ext
-                          openssl x509 -req -in cert.csr -CA "$in"/otel-ca/ca.crt -CAkey "$in"/otel-ca/ca.key \
-                            -set_serial "0x$(openssl rand -hex 16)" -sha256 -days 3650 -extfile cert.ext -out "$out"/cert.pem
-                        '';
-                      };
-                    };
+                    # restartUnits only here: clan throws on it on darwin
+                    # (clan-core generic-generator.nix:193-208; design D5).
+                    clan.core.vars.generators = lib.mkMerge [
+                      (otelGenerators { inherit lib pkgs; })
+                      {
+                        otel-cert.files."key.pem".restartUnits = restart;
+                        otel-cert.files."cert.pem".restartUnits = restart;
+                      }
+                    ];
                   }
                   # ca.crt reaches the collector as a store path, so a new CA changes
                   # the configuration and restarts it (design D1). The credentials
@@ -1021,6 +1037,58 @@ in
                       "otel-key:${gens.otel-cert.files."key.pem".path}"
                     ];
                   })
+                ];
+              };
+
+            # Every darwin row, whatever its collect: the collector's account
+            # and its three secrets, so the files have their owner before any
+            # collector runs; the fragment only where collect is true (design
+            # D1, D2, D5). nix-darwin has no tmpfiles and no restartUnits:
+            # the fragment's OTEL_CERT_SHA256 reloads the agent on a reissue.
+            darwinModule =
+              {
+                lib,
+                pkgs,
+                ...
+              }:
+              let
+                # Static data, so it can select imports without evaluating the host (design D6).
+                collect = flakeLib.observabilityHosts.${machine.name}.collect;
+                otelcol = {
+                  owner = "_otelcol";
+                  group = "_otelcol";
+                  mode = "0400";
+                };
+              in
+              {
+                imports = [
+                  darwinModules.ntfy-alerter
+                ]
+                ++ lib.optional collect darwinModules.otel-collector-agent;
+
+                # As nix-grpc-store's darwin module declares nix-grpc-daemon.
+                users.knownGroups = [ "_otelcol" ];
+                users.knownUsers = [ "_otelcol" ];
+                users.groups._otelcol.gid = 536;
+                users.users._otelcol = {
+                  uid = 536;
+                  gid = 536;
+                  home = "/var/empty";
+                  shell = "/usr/bin/false";
+                  isHidden = true;
+                  description = "OpenTelemetry collector agent";
+                };
+
+                clan.core.vars.generators = lib.mkMerge [
+                  (otelGenerators { inherit lib pkgs; })
+                  {
+                    otel-cert.files."key.pem" = otelcol // {
+                      neededFor = "services";
+                    };
+                    ntfy-alerter.files.token = {
+                      inherit (otelcol) owner mode;
+                    };
+                  }
                 ];
               };
           };

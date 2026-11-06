@@ -71,6 +71,32 @@
           ];
         }
       ];
+      # stibnite's envelope: the darwin renderer's job names on the target
+      # stub's port, its exporters, and C5 over stubbed launchctl and ps.
+      # Value sources for C5: the resident sizes the ps stub reports for the
+      # pids the launchctl stub prints, against the limits typed here,
+      # 268,435,456 B and 134,217,728 B, which the fragment passes too.
+      darwinTargets =
+        map (t: t // { url = "http://127.0.0.1:${toString targetPort}/ok"; })
+          (self.lib.otelCollectorDarwin {
+            hostName = "stibnite";
+            certFile = "c";
+            keyFile = "k";
+            caFile = "a";
+          }).targets;
+      launchctlStub = pkgs.writeShellScript "launchctl-stub" ''
+        # `print system/<label>`: pid 101 for the agent and 202 for the process
+        # collector, unless C5_UNLOADED names the label.
+        label=''${2#system/}
+        if [ "$label" = "''${C5_UNLOADED:-}" ]; then echo "Could not find service \"$label\" in domain for system"; exit 113; fi
+        case $label in org.nixos.otelcol) pid=101 ;; org.nixos.otelcol-process) pid=202 ;; *) exit 113 ;; esac
+        printf '%s = {\n\tstate = running\n\tpid = %s\n}\n' "system/$label" "$pid"
+      '';
+      psStub = pkgs.writeShellScript "ps-stub" ''
+        # `-o rss= -p <pid>`: C5_RSS_<pid> KiB.
+        v=C5_RSS_$4
+        echo "  ''${!v:-0}"
+      '';
       # The script as each case runs it, with receivers' targets rendered by
       # targetsOf.
       variantsWith = targetsOf: {
@@ -95,6 +121,18 @@
             storeUrl = "http://127.0.0.1:${toString storePort}";
             notifiedUnits.electrum = [ "otel-envelope" ];
             databases.fleet = "30d";
+          };
+        };
+        darwin = envelope {
+          hostName = "stibnite";
+          targets = darwinTargets;
+          darwinMemory = {
+            launchctl = "${launchctlStub}";
+            ps = "${psStub}";
+            limits = {
+              "org.nixos.otelcol" = 268435456;
+              "org.nixos.otelcol-process" = 134217728;
+            };
           };
         };
       };
@@ -162,6 +200,12 @@
           variants = budgetVariants;
           from = "if [ $((now - since)) -gt 3900 ]; then";
           to = "if false; then";
+        };
+        c5WrongPid = {
+          case = "c5ProcessAt129";
+          variants = [ "darwin" ];
+          from = ''pid=$(awk -F' = ' -v k="$pidKey" '$1 == k { print $2; exit }' <<< "$out")'';
+          to = ''pid=$(awk -F' = ' -v k="$pidKey" '$1 == k { print $2; exit }' <<< "$(${launchctlStub} print system/org.nixos.otelcol 2> /dev/null)")'';
         };
       };
       mutate = name: m: if m.source or false then mutateSource name m else mutateScript name m;
@@ -442,6 +486,42 @@
           run agent "$s" agent-healthy down 0 && at 300 - "$s" 0 && at 4200 - "$s" 0
         }
 
+        # stibnite's envelope (darwin): its two targets, its exporters and C5.
+        case_darwinHealthy() {
+          local s
+          s=$(mktemp -d)
+          local -x C5_RSS_101=102400 C5_RSS_202=65536
+          run darwin "$s" darwin-healthy up 0 && run darwin "$s" darwin-healthy up 0 \
+            && ! grep -q ': FAIL' "$work/out" && grep -q '^otel-envelope: C5 memory: ok$' "$work/out"
+        }
+        case_darwinOtlpRefused() {
+          local s
+          s=$(mktemp -d)
+          local -x C5_RSS_101=102400 C5_RSS_202=65536
+          run darwin "$s" darwin-healthy up 0 && run darwin "$s" darwin-otlp-refused up 1 \
+            && grep -q '^otel-envelope: C4 loss: FAIL .*receiver="otlp"' "$work/out"
+        }
+        case_c5AgentAt255() {
+          local -x C5_RSS_101=261120
+          run darwin "$(mktemp -d)" darwin-healthy up 0
+        }
+        case_c5AgentAt257() {
+          local -x C5_RSS_101=263168
+          run darwin "$(mktemp -d)" darwin-healthy up 1 \
+            && grep -q '^otel-envelope: C5 memory: FAIL org.nixos.otelcol 257 MiB above its limit$' "$work/out"
+        }
+        case_c5ProcessAt129() {
+          local -x C5_RSS_101=102400 C5_RSS_202=132096
+          run darwin "$(mktemp -d)" darwin-healthy up 1 \
+            && grep -q '^otel-envelope: C5 memory: FAIL org.nixos.otelcol-process 129 MiB above its limit$' "$work/out"
+        }
+        # A job with no pid is LaunchdJobNotRunning's, and the agent's absence
+        # C1's, so C5 does not judge it, whatever its size would be.
+        case_c5NotLoaded() {
+          local -x C5_UNLOADED=org.nixos.otelcol-process C5_RSS_101=102400 C5_RSS_202=200000
+          run darwin "$(mktemp -d)" darwin-healthy up 0 && grep -q '^otel-envelope: C5 memory: ok$' "$work/out"
+        }
+
         for c in "$@"; do
           current=$c
           if "case_$c"; then
@@ -475,6 +555,12 @@
         "budgetBreachCleared"
         "budgetRunStale"
         "budgetFreshState"
+        "darwinHealthy"
+        "darwinOtlpRefused"
+        "c5AgentAt255"
+        "c5AgentAt257"
+        "c5ProcessAt129"
+        "c5NotLoaded"
       ];
       allCases = lib.concatStringsSep " " caseNames;
     in

@@ -2,8 +2,8 @@
 #
 # Shared, so it is generated once and every machine that imports this module
 # deploys the same token (clan-core nixosModules/clanCore/vars/interface.nix:
-# 90-100); one module is the single definition, because two copies of a
-# shared script can drift. Every fleet-* publisher reads the token by path,
+# 90-100); one definition serves the nixos and darwin module classes, because
+# two copies of a shared script can drift. Every fleet-* publisher reads the token by path,
 # config.clan.core.vars.generators.ntfy-alerter.files.token.path, through
 # LoadCredential or NTFY_TOKEN_FILE, never on a command line.
 #
@@ -14,8 +14,8 @@
 # cinnabar may hold that file. checks.x86_64-linux.ntfy-provisioning runs
 # both scripts and judges their output.
 { ... }:
-{
-  flake.modules.nixos.ntfy-alerter =
+let
+  generator =
     { pkgs, ... }:
     {
       # `ntfy token generate` prints tk_ plus 29 characters (ntfy 2.28.0
@@ -30,4 +30,8 @@
         '';
       };
     };
+in
+{
+  flake.modules.nixos.ntfy-alerter = generator;
+  flake.modules.darwin.ntfy-alerter = generator;
 }

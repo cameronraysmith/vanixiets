@@ -1,0 +1,70 @@
+system/org.nixos.omnigent-host-cameron = {
+	active count = 1
+	path = /Library/LaunchDaemons/org.nixos.omnigent-host-cameron.plist
+	type = LaunchDaemon
+	state = running
+
+	program = /bin/sh
+	arguments = {
+		/bin/sh
+		-c
+		/bin/wait4path /nix/store && exec /nix/store/xvj0ki2iplsdnnf8rxlpinz7y524rcxk-omnigent-cameron-start
+	}
+
+	working directory = /Users/omnigent-cameron
+
+	stdout path = /Users/omnigent-cameron/.omnigent/logs/host/service.log
+	stderr path = /Users/omnigent-cameron/.omnigent/logs/host/service.log
+
+
+	domain = system
+	username = omnigent-cameron
+
+	umask = 77
+	minimum runtime = 5
+	exit timeout = 5
+	runs = 1
+	pid = 25649
+	immediate reason = speculative
+	forks = 1348
+	execs = 5
+	initialized = 1
+	trampolined = 1
+	started suspended = 0
+	proxy started suspended = 0
+	checked allocations = 0 (queried = 1)
+	checked allocations reason = no host
+	checked allocations flags = 0x0
+	last exit code = (never exited)
+
+	semaphores = {
+		successful exit => 0
+	}
+
+	resource coalition = {
+		ID = 209053
+		type = resource
+		state = active
+		active count = 1
+		name = org.nixos.omnigent-host-cameron
+	}
+
+	jetsam coalition = {
+		ID = 209054
+		type = jetsam
+		state = active
+		active count = 1
+		name = org.nixos.omnigent-host-cameron
+	}
+
+	spawn type = daemon (3)
+	jetsam priority = 40
+	jetsam memory limit (active) = (unlimited)
+	jetsam memory limit (inactive) = (unlimited)
+	jetsamproperties category = daemon
+	submitted job. ignore execute allowed
+	jetsam thread limit = 32
+	cpumon = default
+
+	properties = runatload | creates session | inferred program
+}

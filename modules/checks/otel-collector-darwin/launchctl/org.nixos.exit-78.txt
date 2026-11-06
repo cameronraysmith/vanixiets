@@ -1,0 +1,64 @@
+# Edited copy of org.nixos.nix-daemon's recording: last exit code set to 78; no allow-listed job showed 78 on 2026-11-05.
+system/org.nixos.nix-daemon = {
+	active count = 1
+	path = /Library/LaunchDaemons/org.nixos.nix-daemon.plist
+	type = LaunchDaemon
+	state = running
+
+	program = /bin/sh
+	arguments = {
+		/bin/sh
+		-c
+		/bin/wait4path /nix/store && exec /nix/store/wyp1d6w6h2q137jqhn4akv8w6mg9h8yc-nix-2.35.3/bin/nix-daemon
+	}
+
+
+
+	domain = system
+	minimum runtime = 10
+	exit timeout = 5
+	runs = 3
+	pid = 98733
+	immediate reason = inefficient
+	forks = 28849
+	execs = 3
+	initialized = 1
+	trampolined = 1
+	started suspended = 0
+	proxy started suspended = 0
+	checked allocations = 0 (queried = 1)
+	checked allocations reason = no host
+	checked allocations flags = 0x0
+	last exit code = 78: Function not implemented
+
+	resource coalition = {
+		ID = 86614
+		type = resource
+		state = active
+		active count = 1
+		name = org.nixos.nix-daemon
+	}
+
+	jetsam coalition = {
+		ID = 86615
+		type = jetsam
+		state = active
+		active count = 1
+		name = org.nixos.nix-daemon
+	}
+
+	spawn type = background (5)
+	jetsam priority = 40
+	jetsam memory limit (active) = (unlimited)
+	jetsam memory limit (inactive) = (unlimited)
+	jetsamproperties category = daemon
+	submitted job. ignore execute allowed
+	jetsam thread limit = 32
+	cpumon = default
+	resource limits = {
+		maxfiles (soft) => 1048576
+	}
+
+
+	properties = keepalive | low priority i/o | inferred program
+}

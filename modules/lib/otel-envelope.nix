@@ -2,7 +2,8 @@
 # endpoint every five minutes (ADR-003 R3.2; S4 design D7).
 #
 # flake.lib.otelEnvelope pkgs { hostName; telemetryUrl; targets; exporters;
-# ingress; budget; } is otel-envelope.service's ExecStart. `targets` is a
+# ingress; budget; darwinMemory; } is otel-envelope.service's ExecStart, and
+# on darwin the program of the otel-envelope launchd job. `targets` is a
 # list of { job; url; credential ? null; }, the collector's own scrape
 # targets; a target with a credential is probed with `Authorization: Bearer`
 # read from $CREDENTIALS_DIRECTORY/<credential> and passed to curl on stdin.
@@ -23,6 +24,14 @@
 #   otelcol_exporter_enqueue_failed_*. On the ingress host otlp/mesh
 #   refusals and the store exporters' enqueue failures are back-pressure
 #   that the agents' queues absorb; a full store queue fails C3.
+# - C5 memory (darwin, with `darwinMemory` = { launchctl; ps; limits; }):
+#   launchd bounds no memory, so each label of `limits` whose job prints a
+#   pid in `launchctl print system/<label>` has its resident size read with
+#   `ps -o rss= -p <pid>` and fails above its limit in bytes, the NixOS
+#   MemoryMax analogue. A job with no pid is not judged: a stopped job is
+#   LaunchdJobNotRunning's, and the agent's absence C1's. Without
+#   `darwinMemory` the script's text is unchanged, so every NixOS
+#   envelope's store path stays as it was.
 #
 # With `budget` = { storeUrl; notifiedUnits; databases; } (the ingress host,
 # S4 design D8), a run whose minute is 00 (OTEL_ENVELOPE_MINUTE, default the
@@ -63,7 +72,9 @@
 #   existed, counts from the first run that found none, so it fails only
 #   when a whole calendar hour has passed it without a budget run.
 #
-# $STATE_DIRECTORY/state holds one `<key> <value>` line per loss series,
+# STATE_DIRECTORY is read from the environment, which systemd's
+# StateDirectory sets on NixOS and the launchd job's EnvironmentVariables on
+# darwin. $STATE_DIRECTORY/state holds one `<key> <value>` line per loss series,
 # keyed without the labels that change at every collector start, plus
 # `telemetry 0|1` and `down:<target> 0|1`, and with `budget` one
 # `budget:<clause> ok|FAIL <message>` line per budget clause (its spaces as
@@ -298,6 +309,7 @@ in
       exporters,
       ingress ? false,
       budget ? null,
+      darwinMemory ? null,
     }:
     pkgs.writeShellApplication {
       name = "otel-envelope";
@@ -450,7 +462,29 @@ in
             if awk -v i="$inc" 'BEGIN { exit !(i > 0) }'; then echo "$key +$inc" >> "$tmp/loss"; fi
           done
         fi
-        if [ -s "$tmp/loss" ]; then fail "C4 loss" "$(tr '\n' ' ' < "$tmp/loss")"; else ok "C4 loss"; fi
+        if [ -s "$tmp/loss" ]; then fail "C4 loss" "$(tr '\n' ' ' < "$tmp/loss")"; else ok "C4 loss"; fi${
+          lib.optionalString (darwinMemory != null) (
+            "\n"
+            + ''
+              over=""
+              # launchctl print's first-level `pid`, indented by one tab.
+              pidKey="$(printf '\t')pid"
+              while read -r label limit; do
+                [ -n "$label" ] || continue
+                out=$(${darwinMemory.launchctl} print "system/$label" 2> /dev/null || true)
+                # mutant: c5WrongPid
+                pid=$(awk -F' = ' -v k="$pidKey" '$1 == k { print $2; exit }' <<< "$out")
+                [ -n "$pid" ] || continue
+                rss=$(${darwinMemory.ps} -o rss= -p "$pid" | tr -d ' ') || continue
+                if [ $((rss * 1024)) -gt "$limit" ]; then over="$over $label $((rss / 1024)) MiB"; fi
+              done <<< ${
+                lib.escapeShellArg (
+                  lib.concatStrings (lib.mapAttrsToList (l: b: "${l} ${toString b}\n") darwinMemory.limits)
+                )
+              }
+              if [ -n "$over" ]; then fail "C5 memory" "''${over# } above its limit"; else ok "C5 memory"; fi''
+          )
+        }
         ${lib.optionalString (budget != null) (budgetClauses pkgs budget)}
 
         mv "$next" "$state"

@@ -1,0 +1,66 @@
+system/com.apple.tzlinkd = {
+	active count = 2
+	path = /System/Library/LaunchDaemons/com.apple.tzlinkd.plist
+	type = LaunchDaemon
+	state = running
+
+	program = /usr/libexec/tzlinkd
+
+
+	domain = system
+	minimum runtime = 10
+	base minimum runtime = 10
+	exit timeout = 5
+	runs = 2
+	pid = 69512
+	immediate reason = ipc (mach)
+	forks = 0
+	execs = 1
+	initialized = 1
+	trampolined = 1
+	started suspended = 0
+	proxy started suspended = 0
+	checked allocations = 0 (queried = 1)
+	checked allocations reason = no host
+	checked allocations flags = 0x0
+	last exit reason = JETSAM_REASON_MEMORY_IDLE_EXIT
+	last jetsam exit details = JETSAM_REASON_MEMORY_IDLE_EXIT
+
+	endpoints = {
+		"com.apple.tzlink" = {
+			port = 0x39903
+			active = 1
+			managed = 1
+			reset = 0
+			hide = 0
+			watching = 0
+		}
+	}
+
+	resource coalition = {
+		ID = 591
+		type = resource
+		state = active
+		active count = 1
+		name = com.apple.tzlinkd
+	}
+
+	jetsam coalition = {
+		ID = 592
+		type = jetsam
+		state = active
+		active count = 1
+		name = com.apple.tzlinkd
+	}
+
+	spawn type = adaptive (6)
+	jetsam priority = 40
+	jetsam memory limit (active) = (unlimited)
+	jetsam memory limit (inactive) = (unlimited)
+	jetsamproperties category = daemon
+	jetsam thread limit = 32
+	cpumon = default
+	exponential throttling grace limit = 10
+
+	properties = supports transactions | system service | exponential throttling | tle system
+}
