@@ -68,9 +68,9 @@ Three spikes were run before this change opened: a sandboxed build of the instal
 
 ## Risks / Trade-offs
 
-- [Risk] omp's default relay directory moves (`$XDG_DATA_HOME/omp` created, or an omp profile used) → the loaded directory and omp's updater diverge silently, and the extension stops following upgrades. Mitigation: world assumption A63 with its violation condition, and the README hazard; the `directory` option can be pointed at the new location.
-- [Risk] Helium stops identifying unpacked extensions by resolved path → the extension ID changes or the updater stops recognising the directory. Mitigation: world assumption A61; the per-profile load would need repeating once.
-- [Risk] omp's relay stops refreshing or reloading the loaded extension (A62) → after an upgrade the browser runs the old extension until the person reloads it in each profile. Mitigation: activation still writes the new files, so a manual reload suffices; task 5.4 records the first observed upgrade.
+- [Risk] omp's default relay directory moves (`$XDG_DATA_HOME/omp` created, or an omp profile used) → the loaded directory and omp's updater diverge silently, and the extension stops following upgrades. Mitigation: world assumption A69 with its violation condition, and the README hazard; the `directory` option can be pointed at the new location.
+- [Risk] Helium stops identifying unpacked extensions by resolved path → the extension ID changes or the updater stops recognising the directory. Mitigation: world assumption A67; the per-profile load would need repeating once.
+- [Risk] omp's relay stops refreshing or reloading the loaded extension (A68) → after an upgrade the browser runs the old extension until the person reloads it in each profile. Mitigation: activation still writes the new files, so a manual reload suffices; task 5.4 records the first observed upgrade.
 - [Trade-off] Activation and omp's updater both write the same directory; between activations it holds whatever omp last wrote. Accepted: both write upstream's files for an omp release, and the updater never writes an older release over a newer one.
 - [Trade-off] One manual load per Helium profile remains. Accepted per D5.
 - [Risk] Once loaded, any omp session that requests the relay drives the person's signed-in browser, including sites Bitwarden has filled. Accepted: the opt-in is per request (D4); the change confers no isolation beyond that.

@@ -4,11 +4,11 @@ linear_story_id: "691c9e9f-548d-40f1-8424-3490a2ab4795"
 linear_story_identifier: CAM-79
 linear_story_title: Deliver the omp browser relay extension declaratively
 linear_story_url: https://linear.app/cameronraysmith/issue/CAM-79/deliver-the-omp-browser-relay-extension-declaratively
-linear_story_state: In Review
+linear_story_state: Done
 linear_team: CAM
 linear_project: pi-agent-environment
-last_synced_state: In Review
-last_synced_at: "2026-11-05T23:43:35Z"
+last_synced_state: Done
+last_synced_at: "2026-11-06T00:59:05Z"
 review_round: 0
 attempt_log:
   - at: "2026-11-05T22:48:30Z"
@@ -23,6 +23,10 @@ attempt_log:
     transition: In Progress->In Review
     outcome: posted
     note: T3 on verify.md (PASS WITH WARNINGS; 5.2 loaded in one of six Helium profiles, 5.4 deferred); state confirmed In Review by readback and comment posted.
+  - at: "2026-11-06T00:59:05Z"
+    transition: In Review->Done
+    outcome: posted
+    note: T4 after archive to openspec/changes/archive/2026-11-05-deliver-omp-browser-relay; spec mirror created OpenSpec documents browser-relay-delivery (3818e4f0-8aa1-43c2-bedc-da9db0e44d57) and browser-relay-delivery-interface (f765de2b-e8e5-4f1e-a1f3-60b921d4cfe6) in pi-agent-environment and updated the shared world-assumptions document (a7f9d24e-8fe2-4120-9ba0-e7d4d3a23fe1); state confirmed Done by readback and comment posted. Task 5.4 archived undischarged by the person's decision, follow-up CAM-80.
 ---
 
 ## Why
@@ -65,7 +69,7 @@ It confers no isolation between the agent and the person's browser once the pers
 
 ### Modified Capabilities
 
-- `world-assumptions` [world]: adds A61 (Helium identifies an unpacked extension by its folder's resolved path), A62 (omp's relay refreshes and reloads only the extension folder that is its own and only toward a newer release) and A63 (omp's default relay folder is `~/.omp/browser-relay/extension` while no XDG data folder or profile for omp exists), and adds the designation rows this change's behavioral nouns need, giving `browser` and `release` a second sense.
+- `world-assumptions` [world]: adds A67 (Helium identifies an unpacked extension by its folder's resolved path), A68 (omp's relay refreshes and reloads only the extension folder that is its own and only toward a newer release) and A69 (omp's default relay folder is `~/.omp/browser-relay/extension` while no XDG data folder or profile for omp exists), and adds the designation rows this change's behavioral nouns need, giving `browser` and `release` a second sense.
 
 ## Impact
 

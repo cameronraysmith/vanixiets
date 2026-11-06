@@ -297,12 +297,25 @@ A term found to denote two distinct phenomena within this repository's vocabular
 | dashboard group | — | the group of people the identity provider lets into the dashboard service | shared |
 | admitted person | — | a person the identity provider has let into the dashboard service as a member of the dashboard group | shared |
 | identity provider | — | the service that authenticates the fleet's people and tells another service who they are and whether to let them in, Kanidm here | shared |
-| browser | — | the program on a person's own device through which the person views the dashboard service | world-only |
+| browser | dashboard | the program on a person's own device through which the person views the dashboard service | world-only |
+| browser | relay | the program on a host of the fleet, Helium, in which the person works with their own browser profiles, signed-in sites and browser extensions such as the password manager | shared |
+| browser profile | — | one separate set of a browser's signed-in sites, browser extensions and their settings, of which a person may keep several in one browser | shared |
+| browser extension | — | a program a browser profile runs alongside the pages it shows, with the access to them the person grants it | shared |
+| password manager | — | the browser extension, Bitwarden here, from which the person fills their stored sign-in details into sites | world-only |
+| browser policy | — | a setting imposed on a browser from outside it, which the person cannot change from within that browser | shared |
+| relay | — | the part of the agent that listens on the person's host for the relay extension and passes the agent's browser requests to it | shared |
+| relay extension | — | the browser extension through which the relay drives tabs of the person's browser, published with each agent release | shared |
+| extension folder | — | the one folder in an account's private home from which a browser profile loads the relay extension and into which the relay writes a newer release of it | shared |
+| unpacked load | — | the person's act, once in a browser profile, of telling the browser to run a browser extension from a folder on the host rather than from the browser's extension catalogue | world-only |
+| extension identity | — | the identifier a browser assigns a loaded browser extension, under which a browser profile keeps that extension's settings and permissions | shared |
+| tab | — | one page a browser profile shows, which the person, or an agent through the relay, can open, read and act on | shared |
+| browser request | — | an agent's request to open, read or act on a page, carried out in a browser the agent runs for itself or, when the request asks for the relay, in the person's browser | shared |
+| release | agent | a version of the agent's software its publisher ships, together with the relay extension of the same version | world-only |
 
 #### Scenario: The terms with two senses are read
 
 - **WHEN** the table is read for terms that carry two senses in this repository
-- **THEN** twenty-two terms carry two senses today and are disambiguated by separate rows rather than left to context: `session`, `package`, `policy`, `@`, `mutation`, `activation`, `probe`, `machine`, `host`, `interface`, `repository`, `build service`, `database`, `hostname`, `evaluator`, `person`, `writer`, `account`, `build`, `path`, `credential`, and `identifier`
+- **THEN** twenty-four terms carry two senses today and are disambiguated by separate rows rather than left to context: `session`, `package`, `policy`, `@`, `mutation`, `activation`, `probe`, `machine`, `host`, `interface`, `repository`, `build service`, `database`, `hostname`, `evaluator`, `person`, `writer`, `account`, `build`, `path`, `credential`, `identifier`, `browser`, and `release`
 
 #### Scenario: A term resolves to two phenomena
 
@@ -714,3 +727,39 @@ Any requirement whose discharge depends on this fact SHALL name it explicitly, a
 
 - **WHEN** a firewall or proxy change blocks port 80, or issuance for a magnetite name fails
 - **THEN** this assumption is void, and the `fleet-dashboard-interface` requirement `The dashboard hostname resolves to magnetite` no longer yields a certificate a browser accepts until DNS-01 or another route is configured
+
+### Requirement: A67 — Helium identifies an unpacked extension by the resolved path of its folder
+
+It is true of Helium, the Chromium-based browser this fleet installs on its darwin hosts, at release 0.20.3.1 where it was observed, independent of what this fleet builds, that a browser extension loaded unpacked is recorded under the fully resolved path of the folder it was loaded from, symbolic links followed, and that when its manifest carries no `key` its extension identity is derived from that recorded path, so one folder path keeps one extension identity however the folder's contents change, and a symbolic link whose target changes yields a new extension identity.
+Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL be treated as losing its discharge once this assumption's violation condition below is observed.
+
+**Evidence**: on stibnite, loading a symbolic link to a store path unpacked made Helium record the store path, not the link, and assign the extension identity derived from the store path; Chromium derives an unpacked extension's identity from a hash of its absolute path when the manifest has no `key`.
+
+#### Scenario: Helium stops identifying an unpacked extension by its resolved folder path
+
+- **WHEN** a Helium release records an unpacked extension under the path as given rather than resolved, or derives its extension identity from anything other than that path when the manifest has no `key`
+- **THEN** this assumption is void, and the `browser-relay-delivery` requirements `Each browser profile loads the relay extension once` and `The loaded relay extension follows the agent release without being reloaded by hand` lose the discharge argument that a fixed extension folder keeps one extension identity across agent releases
+
+### Requirement: A68 — omp's relay refreshes only its own extension folder, only toward a newer release, and then reloads the extension
+
+It is true of omp at the release this fleet deploys, 18.16.0 when this was recorded, independent of what this fleet builds, that when a relay extension reporting an older release than the relay's own is connected to omp's relay and no client is using it, the relay rewrites its extension folder, but only if the extension identity derived from that folder's resolved path equals the connected extension's identity and the folder does not already hold a newer release than the relay's own, deferring the update while a client or an attached tab is using the extension; that the rewrite leaves files whose content is already identical untouched; that after the rewrite the relay tells the extension to reload; that the extension reloads itself on that message; and that no setting disables this.
+Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL be treated as losing its discharge once this assumption's violation condition below is observed.
+
+**Evidence**: omp source at `github.com/can1357/oh-my-pi` (`v18.16.0-620-gb7221d9948`): `packages/coding-agent/src/tools/browser/relay/server.ts:49-62` (identity and folder-version tests before `writeRelayExtension`), `extension-files.ts:50-53` (identical files skipped), `bridge.ts:786-823` (update only for an outdated extension with no client or attached tab, deferred otherwise) and `bridge.ts:816` (reload message), extension `background.ts:283-285` (reload on that message).
+
+#### Scenario: omp's relay stops refreshing or reloading the loaded extension
+
+- **WHEN** an omp release stops rewriting the extension folder for a connected extension of an older release, changes the identity test so the folder a person loaded no longer matches, or stops sending or obeying the reload
+- **THEN** this assumption is void, and the `browser-relay-delivery` requirement `The loaded relay extension follows the agent release without being reloaded by hand` loses its discharge, leaving each browser profile on the older relay extension until the person reloads it
+
+### Requirement: A69 — omp's default relay extension folder is `~/.omp/browser-relay/extension` while no XDG data folder or profile for omp exists
+
+It is true of omp at the release this fleet deploys, independent of what this fleet builds, that its relay extension folder is `<getBrowserRelayDir()>/extension` with `getBrowserRelayDir()` resolving `dirs.rootSubdir("browser-relay", "data")`, which for an account whose `$XDG_DATA_HOME/omp` does not exist and which runs omp under no profile is `~/.omp/browser-relay/extension`.
+Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL be treated as losing its discharge once this assumption's violation condition below is observed.
+
+**Evidence**: `packages/utils/src/dirs.ts:450` and `:811-812` and `packages/coding-agent/src/tools/browser/relay/extension-files.ts:31` at the same revision; on stibnite for `crs58`, `$XDG_DATA_HOME/omp` did not exist and `~/.omp` was a real directory when this was recorded.
+
+#### Scenario: omp's relay extension folder moves
+
+- **WHEN** an account's `$XDG_DATA_HOME/omp` comes to exist, omp runs under a profile, or an omp release changes where `getBrowserRelayDir()` or the `extension` subfolder resolves
+- **THEN** this assumption is void, and the `browser-relay-delivery` requirements `The relay extension is present for every account that runs the agent on a macOS host` and `The loaded relay extension follows the agent release without being reloaded by hand` lose the discharge argument that the folder the fleet fills and a browser profile loads is the folder omp's relay writes

@@ -1,6 +1,6 @@
 ## ADDED Requirements
 
-### Requirement: A61 — Helium identifies an unpacked extension by the resolved path of its folder
+### Requirement: A67 — Helium identifies an unpacked extension by the resolved path of its folder
 
 It is true of Helium, the Chromium-based browser this fleet installs on its darwin hosts, at release 0.20.3.1 where it was observed, independent of what this fleet builds, that a browser extension loaded unpacked is recorded under the fully resolved path of the folder it was loaded from, symbolic links followed, and that when its manifest carries no `key` its extension identity is derived from that recorded path, so one folder path keeps one extension identity however the folder's contents change, and a symbolic link whose target changes yields a new extension identity.
 Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL be treated as losing its discharge once this assumption's violation condition below is observed.
@@ -12,7 +12,7 @@ Any requirement whose discharge depends on this fact SHALL name it explicitly, a
 - **WHEN** a Helium release records an unpacked extension under the path as given rather than resolved, or derives its extension identity from anything other than that path when the manifest has no `key`
 - **THEN** this assumption is void, and the `browser-relay-delivery` requirements `Each browser profile loads the relay extension once` and `The loaded relay extension follows the agent release without being reloaded by hand` lose the discharge argument that a fixed extension folder keeps one extension identity across agent releases
 
-### Requirement: A62 — omp's relay refreshes only its own extension folder, only toward a newer release, and then reloads the extension
+### Requirement: A68 — omp's relay refreshes only its own extension folder, only toward a newer release, and then reloads the extension
 
 It is true of omp at the release this fleet deploys, 18.16.0 when this was recorded, independent of what this fleet builds, that when a relay extension reporting an older release than the relay's own is connected to omp's relay and no client is using it, the relay rewrites its extension folder, but only if the extension identity derived from that folder's resolved path equals the connected extension's identity and the folder does not already hold a newer release than the relay's own, deferring the update while a client or an attached tab is using the extension; that the rewrite leaves files whose content is already identical untouched; that after the rewrite the relay tells the extension to reload; that the extension reloads itself on that message; and that no setting disables this.
 Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL be treated as losing its discharge once this assumption's violation condition below is observed.
@@ -24,7 +24,7 @@ Any requirement whose discharge depends on this fact SHALL name it explicitly, a
 - **WHEN** an omp release stops rewriting the extension folder for a connected extension of an older release, changes the identity test so the folder a person loaded no longer matches, or stops sending or obeying the reload
 - **THEN** this assumption is void, and the `browser-relay-delivery` requirement `The loaded relay extension follows the agent release without being reloaded by hand` loses its discharge, leaving each browser profile on the older relay extension until the person reloads it
 
-### Requirement: A63 — omp's default relay extension folder is `~/.omp/browser-relay/extension` while no XDG data folder or profile for omp exists
+### Requirement: A69 — omp's default relay extension folder is `~/.omp/browser-relay/extension` while no XDG data folder or profile for omp exists
 
 It is true of omp at the release this fleet deploys, independent of what this fleet builds, that its relay extension folder is `<getBrowserRelayDir()>/extension` with `getBrowserRelayDir()` resolving `dirs.rootSubdir("browser-relay", "data")`, which for an account whose `$XDG_DATA_HOME/omp` does not exist and which runs omp under no profile is `~/.omp/browser-relay/extension`.
 Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL be treated as losing its discharge once this assumption's violation condition below is observed.

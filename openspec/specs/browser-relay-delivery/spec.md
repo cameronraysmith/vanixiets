@@ -1,10 +1,16 @@
-## ADDED Requirements
+# browser-relay-delivery Specification
+
+## Purpose
+
+This capability (stratum: `behavioral`) states what the fleet requires of the agent's browser relay: that the relay extension is present on each macOS host of the fleet for every account that runs the agent and matches the agent release; that each browser profile loads it once and keeps its extension identity across agent releases; that the loaded relay extension follows a newer agent release without the person reloading it; that an agent drives the person's browser only when a browser request asks for the relay; and that the fleet leaves every browser profile's browser extensions to the person.
+
+## Requirements
 
 ### Requirement: The relay extension is present for every account that runs the agent on a macOS host
 
 On each host of the fleet that runs macOS, every account whose configuration installs the agent SHALL find the relay extension in an extension folder in its private home after each activation, matching the agent release installed for that account, without the person or an agent fetching or installing it by hand.
 No host of the fleet that does not run macOS SHALL receive an extension folder.
-The discharge of this requirement depends on assumption A63.
+The discharge of this requirement depends on assumption A69.
 
 #### Scenario: A macOS host is activated for an account that runs the agent
 
@@ -19,7 +25,7 @@ The discharge of this requirement depends on assumption A63.
 ### Requirement: Each browser profile loads the relay extension once
 
 A person SHALL need to perform the unpacked load of the extension folder at most once per browser profile on a given host, and the relay extension's extension identity in that browser profile SHALL stay the same across every later agent release, so that the browser profile keeps the extension's settings and permissions.
-The discharge of this requirement depends on assumption A61.
+The discharge of this requirement depends on assumption A67.
 
 #### Scenario: The agent is upgraded after a browser profile loaded the extension
 
@@ -29,7 +35,7 @@ The discharge of this requirement depends on assumption A61.
 ### Requirement: The loaded relay extension follows the agent release without being reloaded by hand
 
 After a configuration carrying a newer agent release is activated, the relay extension a browser profile runs SHALL come to report that release once the relay next connects to it while no browser request is using it, without the person reloading the extension or performing the unpacked load again.
-The discharge of this requirement depends on assumptions A61, A62 and A63.
+The discharge of this requirement depends on assumptions A67, A68 and A69.
 
 #### Scenario: The relay connects after an agent upgrade
 

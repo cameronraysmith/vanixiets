@@ -1,4 +1,11 @@
-## ADDED Requirements
+# browser-relay-delivery-interface Specification
+
+## Purpose
+
+This capability (stratum: `interface`) states the properties at the machine's interface that discharge the `browser-relay-delivery` requirements: the `omp-browser-relay-extension` package as omp's own install output with its version-stamp check; the folder `programs.omp.browserRelay.extension.directory` that activation leaves real, account-writable and equal to the package; delivery by default on darwin only; the absence of `browser.relay` from omp's managed configuration; and the absence of any Helium extension or debugger policy.
+Trust boundary: these requirements guarantee only what the flake builds and what Home Manager activation writes; how Helium derives an extension's identity, whether a person has loaded the folder in a browser profile, what omp's relay writes into the folder between activations, and whether omp honours a per-request relay choice rest on world assumptions A67, A68 and A69 and on omp itself, and nothing here confers isolation between an agent and the person's browser once the extension is loaded.
+
+## Requirements
 
 ### Requirement: The extension package is omp's own install output for the deployed omp release
 
@@ -73,7 +80,7 @@ Defaults that are not Chromium policy, such as the `SUAutomaticallyUpdate` key a
 ### Requirement: Trust boundary of the delivery interface
 
 These requirements SHALL be read as guaranteeing only what the flake builds and what Home Manager activation writes, observed by building the package and the darwin home and host checks and by inspecting the folder after activation.
-They SHALL NOT be read as guaranteeing how Helium derives an extension's identity, whether a person has loaded the folder in any browser profile, what omp's relay writes into the folder between activations, whether omp honours or refuses a per-request relay choice, or any isolation between an agent and the person's browser once the extension is loaded; those rest on world assumptions A61, A62 and A63 and on omp itself.
+They SHALL NOT be read as guaranteeing how Helium derives an extension's identity, whether a person has loaded the folder in any browser profile, what omp's relay writes into the folder between activations, whether omp honours or refuses a per-request relay choice, or any isolation between an agent and the person's browser once the extension is loaded; those rest on world assumptions A67, A68 and A69 and on omp itself.
 
 #### Scenario: A property outside the boundary is claimed
 

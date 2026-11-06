@@ -31,7 +31,7 @@ If any items fail, list their id and issues:
 |---|---|---|
 | `stand-up-gitea-mq-on-magnetite` | change | its `world-assumptions` MODIFIED `Grounded vocabulary for behavioral requirements` omits the main spec's scenario "The terms with two senses are read"; outside this change, and named in design.md's Open Questions |
 | `stand-up-nixbot-on-magnetite` | change | the same omission; outside this change |
-| `deliver-omp-browser-relay` | change | valid; warnings only: four `browser-relay-delivery-interface` requirements and A61, A62, A63 have statements over 500 characters |
+| `deliver-omp-browser-relay` | change | valid; warnings only: four `browser-relay-delivery-interface` requirements and A67, A68, A69 have statements over 500 characters |
 
 The box stays unchecked because two other changes fail; this change is valid.
 After this file was written, `openspec validate deliver-omp-browser-relay` printed `Change 'deliver-omp-browser-relay' is valid`.
@@ -44,14 +44,15 @@ After this file was written, `openspec validate deliver-omp-browser-relay` print
 
 Ticked before this verification: 1.1, 1.2, 2.1, 2.2, 2.3, 3.1, 4.1, 6.2.
 Ticked by this verification from the evidence of §9: 5.1 and 5.3.
+Ticked by the Addendum after the person's decision Q1 rescoped them to the Helium profile `sciexp`: 5.2 and 6.1.
 
 **Incomplete tasks** (if any):
 
 | Task | Reason incomplete | Blocks archive? |
 |---|---|---|
-| 5.2 Load the folder unpacked in each Helium profile | the person loaded the folder in one of the six Helium profiles, `sciexp` (Profile 2); its acceptance says "each profile"; the badge reading "on" was not recorded | yes as written; open question Q1 decides whether the other five profiles are in scope |
-| 5.4 Confirm the loaded extension follows an omp upgrade | open by design until the first `llm-agents` omp bump deployed to stibnite after 5.1 (design D3, A62) | yes as written; open question Q2 |
-| 6.1 Verify the relay path end to end | its claim "every Helium profile runs it under one extension ID" rests on 5.2, observed in one profile only; the other two claims are observed (§9.1, §9.3) | yes, with 5.2 |
+| 5.4 Confirm the loaded extension follows an omp upgrade | open by design until the first `llm-agents` omp bump deployed to stibnite after 5.1 (design D3, A68) | no, by the person's decision Q2 (Addendum): recorded undischarged and carried by follow-up CAM-80 |
+
+Before the Addendum this table also listed 5.2 (loaded in one of six profiles, `sciexp`, against an acceptance naming each profile) and 6.1 (resting on 5.2); both were rescoped to `sciexp` and ticked.
 
 ---
 
@@ -65,7 +66,7 @@ compare against the corresponding main capability spec:
 |---|---|---|
 | `browser-relay-delivery` | pending sync | no main spec yet; ADDS five requirements; created at archive |
 | `browser-relay-delivery-interface` | pending sync | no main spec yet; ADDS six requirements; created at archive |
-| `world-assumptions` | pending sync | ADDS A61, A62, A63; MODIFIES `Grounded vocabulary for behavioral requirements`: every main row carried except `browser`, which splits into the senses `dashboard` (main's definition) and `relay`, plus thirteen new rows (§8a.3) |
+| `world-assumptions` | pending sync | ADDS A67, A68, A69; MODIFIES `Grounded vocabulary for behavioral requirements`: every main row carried except `browser`, which splits into the senses `dashboard` (main's definition) and `relay`, plus thirteen new rows (§8a.3) |
 
 ---
 
@@ -75,7 +76,7 @@ compare against the corresponding main capability spec:
 |---|---|---|---|
 | D1 | the package is `omp browser-relay install --dir $out` run by the deployed omp, with a stamp check | BRDI `The extension package is omp's own install output for the deployed omp release` | none; the build, `--rebuild`, the `diff -r` against upstream's v18.16.0 zip and the stamp mutant are in §9.1 |
 | D2 | an activation copy into a fixed real directory, refusing a symbolic link | BRDI `Activation leaves a real, account-writable extension folder holding exactly the package`; BRD `Each browser profile loads the relay extension once` | none; the symlink refusal and the post-activation inspection are in §9.1 and §9.2 |
-| D3 | omp's relay refreshes and reloads the loaded extension after an upgrade | BRD `The loaded relay extension follows the agent release without being reloaded by hand`; A62 | not observed; task 5.4 |
+| D3 | omp's relay refreshes and reloads the loaded extension after an upgrade | BRD `The loaded relay extension follows the agent release without being reloaded by hand`; A68 | not observed; task 5.4 |
 | D4 | no `browser.relay` in managed settings | BRDI `omp's managed configuration leaves the relay off by default`; BRD `An agent drives the person's browser only when a request asks for it` | none; task 2.2 and §9.3 |
 | D5 | darwin only by default; no Helium policy | BRDI `The extension folder is delivered by default on darwin only`, `The fleet sets no Helium extension or debugger policy`; BRD `The fleet leaves every browser profile's extensions to the person` | none; tasks 2.3 and 6.2 |
 
@@ -162,9 +163,9 @@ tasks.md carries no `Discharges:` clauses, so the tasks below are mapped by this
 
 | Requirement | Discharged by (S, tasks, evidence) | Under (W) | Status |
 |---|---|---|---|
-| BRD `The relay extension is present for every account that runs the agent on a macOS host` | BRDI `Activation leaves a real, account-writable extension folder…`, `…delivered by default on darwin only`; tasks 2.1, 5.1, 6.2 (§9.1, §9.2) | A63 | observed for `crs58` on stibnite after the 23:26 UTC activation; no other darwin host activated; A63 configured and not violated: at about 23:41 UTC `/Users/crs58/.local/share/omp` did not exist and `~/.omp` was a real directory |
-| BRD `Each browser profile loads the relay extension once` | BRDI `Activation leaves a real…` (fixed path); task 5.2 | A61 | partly observed: one load in one profile, under ID `oijoeegnoohbebikmcjkffchcokmdndn`, equal to the ID predicted from sha256 of the path (A61 observed for this path on Helium 0.20.3.1); identity across a later release not yet observed (5.4) |
-| BRD `The loaded relay extension follows the agent release without being reloaded by hand` | task 5.4 | A61, A62, A63 | undischarged; follow-up task 5.4 at the next `llm-agents` omp bump |
+| BRD `The relay extension is present for every account that runs the agent on a macOS host` | BRDI `Activation leaves a real, account-writable extension folder…`, `…delivered by default on darwin only`; tasks 2.1, 5.1, 6.2 (§9.1, §9.2) | A69 | observed for `crs58` on stibnite after the 23:26 UTC activation; no other darwin host activated; A69 configured and not violated: at about 23:41 UTC `/Users/crs58/.local/share/omp` did not exist and `~/.omp` was a real directory |
+| BRD `Each browser profile loads the relay extension once` | BRDI `Activation leaves a real…` (fixed path); task 5.2 | A67 | observed in the one profile in scope, `sciexp` (Addendum Q1): one load, under ID `oijoeegnoohbebikmcjkffchcokmdndn`, equal to the ID predicted from sha256 of the path (A67 observed for this path on Helium 0.20.3.1); identity across a later release not yet observed (5.4, CAM-80) |
+| BRD `The loaded relay extension follows the agent release without being reloaded by hand` | task 5.4 | A67, A68, A69 | undischarged at archive by the person's decision Q2; follow-up CAM-80 at the next `llm-agents` omp bump |
 | BRD `An agent drives the person's browser only when a request asks for it` | BRDI `omp's managed configuration leaves the relay off by default`; tasks 2.2, 5.3 (§9.3) | — (rests on omp) | observed once each way on 2026-11-05: one request with `app.relay: true` drove a Helium tab; one without opened on omp's headless browser and added no relay tab |
 | BRD `The fleet leaves every browser profile's extensions to the person` | BRDI `The fleet sets no Helium extension or debugger policy`; task 2.3 | — | discharged at evaluation; the person loading the extension by hand in §9.3 is consistent with it |
 | BRDI `The extension package is omp's own install output for the deployed omp release` | tasks 1.1, 1.2, 4.1; CI (§9.1) | — | discharged |
@@ -173,9 +174,9 @@ tasks.md carries no `Discharges:` clauses, so the tasks below are mapped by this
 | BRDI `omp's managed configuration leaves the relay off by default` | task 2.2 | — | discharged at evaluation |
 | BRDI `The fleet sets no Helium extension or debugger policy` | task 2.3 | — | discharged at evaluation |
 | BRDI `Trust boundary of the delivery interface` | its own statement; §8d | — | discharged by statement |
-| world-assumptions `A61 — Helium identifies an unpacked extension by the resolved path of its folder` | world assumption; §9.3 | — | observed once: the recorded path and the ID match the prediction on Helium 0.20.3.1 |
-| world-assumptions `A62 — omp's relay refreshes only its own extension folder…` | world assumption; task 5.4 | — | not observed; the relay and extension reported the same release 18.16.0, so no refresh was due |
-| world-assumptions `A63 — omp's default relay extension folder is ~/.omp/browser-relay/extension…` | world assumption | — | configured and not violated (row 1) |
+| world-assumptions `A67 — Helium identifies an unpacked extension by the resolved path of its folder` | world assumption; §9.3 | — | observed once: the recorded path and the ID match the prediction on Helium 0.20.3.1 |
+| world-assumptions `A68 — omp's relay refreshes only its own extension folder…` | world assumption; task 5.4 | — | not observed; the relay and extension reported the same release 18.16.0, so no refresh was due |
+| world-assumptions `A69 — omp's default relay extension folder is ~/.omp/browser-relay/extension…` | world assumption | — | configured and not violated (row 1) |
 | world-assumptions `Grounded vocabulary for behavioral requirements` (MODIFIED) | §8a | — | discharged; findings in §8a.2 |
 
 ### 8c. Alphabet check
@@ -240,7 +241,9 @@ The call without `app.relay`, `browser.open({name:'no-relay-probe', url:'https:/
 **Cross-check of purpose (not a task of this change).**
 From that relay tab the person's omnigent 0.21.0 session listed hosts `stibnite-cameron`, `magnetite-cameron` and `pyrite-cameron`, all online; a new Oh My Pi session on `pyrite-cameron` ran one shell tool printing `pyrite`, `omnigent-cameron`, `omnigent 0.21.0 (built 2026-11-05T04:24:41Z)` and `/nix/store/5lpg7j8y8lf8c4zv318yi4rmgyn5yhip-curl-8.22.0-bin/bin/curl`.
 
-### 9.4 Open questions for the person
+### 9.4 Questions for the person
+
+Both were answered on 2026-11-05; see the Addendum.
 
 - **Q1.** Which Helium profiles are in scope for 5.2 and 6.1? Design D2 and D5 speak of six stibnite profiles; one was loaded. If all six, load the folder in the other five, record each profile's ID (expected `oijoeegnoohbebikmcjkffchcokmdndn`) and the badge reading "on", then tick 5.2 and 6.1; if fewer, amend 5.2's and 6.1's acceptance to name them.
 - **Q2.** Does archive wait for 5.4, or does 5.4 move to a follow-up issue so the change can archive with BRD `The loaded relay extension follows the agent release without being reloaded by hand` recorded undischarged?
@@ -250,9 +253,28 @@ From that relay tab the person's omnigent 0.21.0 session listed hosts `stibnite-
 ## Overall Decision
 
 - [ ] (pass) PASS — may proceed to finishing-a-development-branch and archive
-- [x] (warn) PASS WITH WARNINGS — may proceed to subsequent steps but note: `5.2 observed in one of six Helium profiles, without the badge reading, so 5.2 and 6.1 stay open pending Q1; 5.4 is deferred to the next omp bump (Q2); repository-wide validation fails on two unrelated changes`
+- [x] (warn) PASS WITH WARNINGS — may proceed to subsequent steps but note: `5.2 and 6.1 rescoped to the Helium profile sciexp (Q1) and ticked; the badge reading "on" was not recorded by the verifier and rests on the person's report; 5.4 and BRD "The loaded relay extension follows the agent release without being reloaded by hand" are undischarged at archive, carried by CAM-80 (Q2); repository-wide validation fails on two unrelated changes`
 - [ ] (fail) FAIL — return to the failed artifact, correct it, then re-run verify
 
 **Next step**:
 
-CAM-79 moved to In Review at 2026-11-05T23:43:35Z (confirmed by readback). The person answers Q1 and Q2 and completes 5.2 and 6.1 in the profiles in scope; 5.4 closes at the next `llm-agents` omp bump deployed to stibnite, or moves to a follow-up before archive.
+CAM-79 moved to In Review at 2026-11-05T23:43:35Z (confirmed by readback). After the Addendum the change archives; 5.4 is carried by CAM-80 and closes at the next `llm-agents` omp bump deployed to stibnite.
+
+---
+
+## Addendum (2026-11-05): the person's decisions, and the assumption renumbering
+
+**Q1: the `sciexp` profile only.**
+The relay is loaded only in the Helium profile `sciexp` (Profile 2), by choice, because loading it hands omp control of that profile.
+Tasks 5.2 and 6.1 were reworded to name `sciexp` alone and ticked on the evidence of §9.3: `sciexp`'s Secure Preferences record ID `oijoeegnoohbebikmcjkffchcokmdndn` at `/Users/crs58/.omp/browser-relay/extension` with `disable_reasons []`, and the relay's `/json/version` reported extension and relay 18.16.0.
+The badge reading "on" was not recorded when §9.3 was written; the person reports having seen it after the relay started.
+That report is recorded as the person's, not as verifier-observed evidence, and the warning stays.
+
+**Q2: archive now; 5.4 undischarged.**
+Task 5.4 stays unchecked, and BRD `The loaded relay extension follows the agent release without being reloaded by hand` is recorded undischarged at archive, with A68 not yet observed.
+Follow-up: [CAM-80](https://linear.app/cameronraysmith/issue/CAM-80/confirm-the-omp-relay-extension-reloads-itself-after-an-omp-bump), to be closed at the first `llm-agents` omp bump deployed to stibnite with the observation 5.4 names, in the `sciexp` profile.
+
+**World assumptions renumbered A61–A63 → A67–A69.**
+The active change `stand-up-darwin-collection`, another session's live work, already numbers its own world assumptions A61 to A66, and main ended at A60.
+This change archives first, so it absorbs the renumbering and the other change keeps its numbers: A61 became A67 (Helium identifies an unpacked extension by the resolved path of its folder), A62 became A68 (omp's relay refreshes only its own extension folder…), and A63 became A69 (omp's default relay extension folder…).
+Every reference in this change's proposal, design, tasks, delta specs and this report was renumbered; no reference existed outside the change directory, and no other change was touched.
