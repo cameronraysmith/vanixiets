@@ -295,7 +295,9 @@ Read a down email by what `fleet-alerts` shows beside it:
 - `[FIRING] AlertEvaluatorSilent magnetite`: magnetite's evaluator or its path to cinnabar is down; the dead-man stops pinging when its 10-minute window holds no heartbeat, so the email follows the alert by about 10 minutes.
 - `FAILED fleet-deadman.service on cinnabar`: the alert path works and only the ping to `hc-ping.com` failed.
 
-A dead-man failure during an ntfy outage posts no `FAILED fleet-deadman.service on cinnabar`, not even after ntfy returns, because the notifier posts to the stopped ntfy and does not retry; for that window the email is the only signal.
+A dead-man failure during an ntfy outage posts no `FAILED fleet-deadman.service on cinnabar`, because the notifier posts to the stopped ntfy and does not retry.
+The notifier unit then stays failed, so about a minute after ntfy returns magnetite's evaluator posts `[FIRING] SystemdUnitFailed cinnabar` for `observability-notify@fleet-deadman.service.service`, as it did on 2026-11-04 at 15:51Z after the external watch's acceptance stopped ntfy.
+That alert stays open until the unit's failed state is cleared, which a deploy of cinnabar does or `sudo systemctl reset-failed observability-notify@fleet-deadman.service.service` does by hand; until then a second failure of the same notifier raises no new alert.
 
 For maintenance that stops ntfy, caddy or zerotierone on cinnabar, or magnetite's evaluator, for longer than 10 minutes, pause the check in healthchecks.io after the dead-man's last `external ping accepted` and within 15 minutes of it.
 A ping to a paused check resumes it, so a pause made before that last ping is undone by it, and the first ping after the maintenance resumes the check by itself.
