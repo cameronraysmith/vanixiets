@@ -59,7 +59,6 @@
         platform = "darwin";
         notifiedUnits = [ "otel-envelope" ];
         smartDevices = [ "disk0" ];
-        collect = false;
       };
     };
 }
