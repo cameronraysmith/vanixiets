@@ -184,12 +184,13 @@ Commit, for example "Share the failure notifier's posting code between systemd a
 - [ ] **Step 3: C5 and the darwin envelope cases, seen failing first (tasks.md 3.3)**
 
 Measure `otel-envelope`'s cost first, against Task 1's figure.
-The value sources of C5's cases: the resident sizes the `ps` stub reports for the pids the `launchctl` stub prints, against the limits O5 set, 268,435,456 B and 134,217,728 B, typed in the case table, where the fragment passes them as `darwinMemory.limits` (Step 4).
+The value sources of C5's cases: the physical footprints in the recorded `top -l 1 -pid <pid> -stats pid,mem` text (`modules/checks/otel-envelope/fixtures/top/`, stibnite's own on 2026-11-06 with the pids rewritten to the stubs' 101 and 202) that the `top` stub prints for the pids the `launchctl` stub prints, against the limits O5 set, 268,435,456 B and 134,217,728 B, typed in the case table, where the fragment passes them as `darwinMemory.limits` (Step 4).
+The footprint is measured rather than the resident size, because `ps -o rss=` also counts the mapped collector binary's file-backed pages (design D12's defect note); the `ps` stub stays only for the mutant that reads the resident size.
 Write the fixtures `modules/checks/otel-envelope/fixtures/darwin-healthy.prom` (the agent's two exporters' `otelcol_exporter_queue_size` and `_capacity` as in `agent-healthy.prom`, plus `otelcol_receiver_refused_metric_points{receiver="otlp",transport="http"} 0` for `otelcol-process`'s loopback receiver) and `darwin-otlp-refused.prom` (that counter at 7), and in `modules/checks/otel-envelope.nix` add the variant, its stubs and the cases:
 
 ```nix
       # stibnite's envelope: the darwin renderer's job names on the stub's
-      # ports, its exporters, and C5 over stubbed launchctl and ps.
+      # ports, its exporters, and C5 over stubbed launchctl and top.
       darwinTargets = map (t: t // { url = "http://127.0.0.1:${toString targetPort}/ok"; })
         (self.lib.otelCollectorDarwin { hostName = "stibnite"; certFile = "c"; keyFile = "k"; caFile = "a"; }).targets;
       launchctlStub = pkgs.writeShellScript "launchctl-stub" ''
@@ -204,20 +205,36 @@ Write the fixtures `modules/checks/otel-envelope/fixtures/darwin-healthy.prom` (
         # `-o rss= -p <pid>`: C5_RSS_<pid> KiB.
         v=C5_RSS_$4; echo "  ''${!v:-0}"
       '';
+      topStub = pkgs.writeShellScript "top-stub" ''
+        # `-l 1 -pid <pid> -stats pid,mem`: fixtures/top/<C5_TOP_<pid>>.txt,
+        # nothing if that is unset, and no answer if it is `hang`.
+        v=C5_TOP_$4
+        case ''${!v:-} in
+          "") ;;
+          hang) exec sleep 60 ;;
+          *) cat "${./otel-envelope/fixtures/top}/''${!v}.txt" ;;
+        esac
+      '';
 ```
 
-with `darwin = envelope { hostName = "stibnite"; targets = darwinTargets; darwinMemory = { launchctl = "${launchctlStub}"; ps = "${psStub}"; limits = { "org.nixos.otelcol" = 268435456; "org.nixos.otelcol-process" = 134217728; }; }; };` in `variantsWith`, its exporters the default agent pair, and:
+with `darwin = envelope { hostName = "stibnite"; targets = darwinTargets; darwinMemory = { launchctl = "${launchctlStub}"; top = "${topStub}"; limits = { "org.nixos.otelcol" = 268435456; "org.nixos.otelcol-process" = 134217728; }; }; };` in `variantsWith`, its exporters the default agent pair, and:
 
 | Case | Environment | Runs: fixture → expected exit |
 |---|---|---|
-| `darwinHealthy` | `C5_RSS_101=102400 C5_RSS_202=65536` | darwin-healthy → 0, darwin-healthy → 0, every clause `ok`, `C5 memory: ok` |
+| `darwinHealthy` | `C5_TOP_101=agent-134M C5_TOP_202=process-102M` | darwin-healthy → 0, darwin-healthy → 0, every clause `ok`, `C5 memory: ok` |
 | `darwinOtlpRefused` | as `darwinHealthy` | darwin-healthy → 0, darwin-otlp-refused → 1, `C4 loss: FAIL` naming `receiver="otlp"` |
-| `c5AgentAt255` | `C5_RSS_101=261120` | darwin-healthy → 0 |
-| `c5AgentAt257` | `C5_RSS_101=263168` | darwin-healthy → 1, `C5 memory: FAIL org.nixos.otelcol 257 MiB` |
-| `c5ProcessAt129` | `C5_RSS_101=102400 C5_RSS_202=132096` | darwin-healthy → 1, `C5 memory: FAIL org.nixos.otelcol-process 129 MiB` |
-| `c5NotLoaded` | `C5_UNLOADED=org.nixos.otelcol-process` | darwin-healthy → 0, `C5 memory: ok`: a job without a pid is `LaunchdJobNotRunning`'s, and the agent's absence is C1's |
+| `c5ProcessResidentOver` | as `darwinHealthy`, plus `C5_RSS_101=223664 C5_RSS_202=183792` | darwin-healthy → 0, `C5 memory: ok`: stibnite's recorded 102 MiB footprint beside its 179 MiB resident size |
+| `c5AgentAt255` | `C5_TOP_101=agent-255M C5_TOP_202=process-102M` | darwin-healthy → 0, `C5 memory: ok` |
+| `c5AgentAt257` | `C5_TOP_101=agent-257M C5_TOP_202=process-102M` | darwin-healthy → 1, `C5 memory: FAIL org.nixos.otelcol 257 MiB above its limit` |
+| `c5AgentGigabyte` | `C5_TOP_101=agent-1G+ C5_TOP_202=process-102M` | darwin-healthy → 1, `C5 memory: FAIL org.nixos.otelcol 1024 MiB above its limit` |
+| `c5ProcessKibibytes` | `C5_TOP_101=agent-134M C5_TOP_202=process-2144K` | darwin-healthy → 0, `C5 memory: ok` |
+| `c5ProcessAt129` | `C5_TOP_101=agent-134M C5_TOP_202=process-129M` | darwin-healthy → 1, `C5 memory: FAIL org.nixos.otelcol-process 129 MiB above its limit` |
+| `c5MemUnparsable` | `C5_TOP_101=agent-134M C5_TOP_202=process-unparsable` | darwin-healthy → 1, `C5 memory: FAIL org.nixos.otelcol-process: no MEM for pid 202 in top's output (102)` |
+| `c5ProcessGone` | `C5_TOP_101=agent-134M C5_TOP_202=gone` | darwin-healthy → 1, `… (absent)` |
+| `c5TopHangs` | `C5_TOP_101=agent-134M C5_TOP_202=hang` | darwin-healthy → 1, `C5 memory: FAIL org.nixos.otelcol-process: top failed or did not answer within 10 s` |
+| `c5NotLoaded` | `C5_UNLOADED=org.nixos.otelcol-process C5_TOP_101=agent-134M C5_TOP_202=process-129M` | darwin-healthy → 0, `C5 memory: ok`: a job without a pid is `LaunchdJobNotRunning`'s, and the agent's absence is C1's |
 
-and the mutant `c5WrongPid`, which reads every label's pid from the agent's `launchctl print` and runs only `c5ProcessAt129`.
+and the mutants `c5WrongPid`, which reads every label's pid from the agent's `launchctl print` and runs only `c5ProcessAt129`, `c5ReadsRss`, which reads the `ps` stub's resident size and runs only `c5ProcessResidentOver`, and `c5UnreadablePasses`, which skips an unreadable MEM field and runs only `c5MemUnparsable`.
 The cases add the target stub as the existing agent cases do (`run darwin "$s" darwin-healthy up 0`), with the environment exported before `run`.
 Run:
 
@@ -226,29 +243,43 @@ jj st --no-pager >/dev/null
 nix build .#checks.x86_64-linux.otel-envelope 2>&1 | tee logs/s5-evidence/3.3-red-$(/bin/date -u +%Y%m%dT%H%M%SZ).log | tail -n 3
 ```
 
-Expected: FAIL at evaluation, `function 'anonymous lambda' called with unexpected argument 'darwinMemory'` (RED).
+Expected: FAIL at evaluation, `function 'anonymous lambda' called with unexpected argument 'darwinMemory'` (RED); for the move from `ps` to `top` (2026-11-06), the C5 cases fail on the `ps` code first, `c5ProcessResidentOver` with `org.nixos.otelcol-process 179 MiB above its limit` (`logs/s5-evidence/c5-top-red-20261106T052719Z.log`).
 Then extend OE: the arguments gain `darwinMemory ? null`; the header gains C5's paragraph and says `STATE_DIRECTORY` is read from the environment, which systemd's `StateDirectory` sets on NixOS and the launchd plist's `EnvironmentVariables` on darwin (the script has required it since S4, `:329`, so no code changes for it); C5 is appended to C4's line (`:453`), so that without `darwinMemory` the script's text, and every NixOS envelope's store path, stay as they are (an interpolation on a line of its own would leave an empty line in every NixOS script; rehearsed 2026-11-05):
 
 ```nix
         if [ -s "$tmp/loss" ]; then fail "C4 loss" "$(tr '\n' ' ' < "$tmp/loss")"; else ok "C4 loss"; fi${lib.optionalString (darwinMemory != null) ("\n" + ''
-          # C5 (darwin; design D6, O5): launchd bounds no memory, so each
-          # collector's resident size is read from its pid in `launchctl print`
-          # and compared with its limit. A job with no pid is not judged here.
-          over=""
+          memory=""
+          # launchctl print's first-level `pid`, indented by one tab.
+          pidKey="$(printf '\t')pid"
           while read -r label limit; do
             [ -n "$label" ] || continue
             out=$(${darwinMemory.launchctl} print "system/$label" 2> /dev/null || true)
             # mutant: c5WrongPid
-            pid=$(awk -F' = ' '$1 == "\tpid" { print $2; exit }' <<< "$out")
+            pid=$(awk -F' = ' -v k="$pidKey" '$1 == k { print $2; exit }' <<< "$out")
             [ -n "$pid" ] || continue
-            rss=$(${darwinMemory.ps} -o rss= -p "$pid" | tr -d ' ') || continue
-            if [ $((rss * 1024)) -gt "$limit" ]; then over="$over $label $((rss / 1024)) MiB"; fi
+            if ! timeout 10 ${darwinMemory.top} -l 1 -pid "$pid" -stats pid,mem > "$tmp/top" 2> /dev/null; then
+              memory+="$label: top failed or did not answer within 10 s; "
+              continue
+            fi
+            # mutant: c5ReadsRss
+            mem=$(awk -v p="$pid" '$1 == "PID" { h = 1; next } h && $1 == p { print $2; exit }' "$tmp/top")
+            bytes=$(awk -v m="$mem" 'BEGIN {
+              if (m !~ /^[0-9]+(\.[0-9]+)?[BKMG][+-]?$/) exit
+              sub(/[+-]$/, "", m)
+              printf "%.0f\n", substr(m, 1, length(m) - 1) * 1024 ^ (index("BKMG", substr(m, length(m))) - 1)
+            }')
+            # mutant: c5UnreadablePasses
+            if [ -z "$bytes" ]; then
+              memory+="$label: no MEM for pid $pid in top's output (''${mem:-absent}); "
+              continue
+            fi
+            if [ "$bytes" -gt "$limit" ]; then memory+="$label $((bytes / 1048576)) MiB above its limit; "; fi
           done <<< ${lib.escapeShellArg (lib.concatStrings (lib.mapAttrsToList (l: b: "${l} ${toString b}\n") darwinMemory.limits))}
-          if [ -n "$over" ]; then fail "C5 memory" "''${over# } above its limit"; else ok "C5 memory"; fi'')}
+          if [ -n "$memory" ]; then fail "C5 memory" "''${memory%; }"; else ok "C5 memory"; fi'')}
 ```
 
-The mutant's `to` is `pid=$(awk -F' = ' '$1 == "\tpid" { print $2; exit }' <<< "$(${darwinMemory.launchctl} print system/org.nixos.otelcol 2> /dev/null)")`.
-`/bin/launchctl` and `/bin/ps` are darwin system binaries, called by the absolute paths the fragment passes, not from `runtimeInputs` (plan Global Constraints).
+The mutants' `to` lines: `c5WrongPid` reads `<<< "$(${launchctlStub} print system/org.nixos.otelcol 2> /dev/null)"`, `c5ReadsRss` is `mem=$(${psStub} -o rss= -p "$pid" | tr -d ' ')K`, and `c5UnreadablePasses` is `if [ -z "$bytes" ]; then continue; fi; if false; then`.
+`/bin/launchctl` and `/usr/bin/top` are darwin system binaries, called by the absolute paths the fragment passes, not from `runtimeInputs` (plan Global Constraints); `top` is setuid root, so `_otelcol` reads root's `otelcol-process` (world assumption A70).
 Run:
 
 ```bash
@@ -260,8 +291,8 @@ for h in electrum magnetite; do printf '%s %s %s\n' "$h" "$(cd $DEPLOY && nix ev
 diff <(cd $DEPLOY && nix eval --json .#nixosConfigurations.magnetite.config.vanixiets.otelCollector.envelopeBudget.notifiedUnits | jq -S .) <(nix eval --json .#nixosConfigurations.magnetite.config.vanixiets.otelCollector.envelopeBudget.notifiedUnits | jq -S .) | tee -a "$L"
 ```
 
-Expected: every existing case and the six darwin cases `ok:`, every existing mutant and `mutant c5WrongPid rejected: c5ProcessAt129`, no `FAIL`; the cost near design D13's 157,711,024 B and below 536,870,912; electrum's two paths equal, because C5's text renders only with `darwinMemory`; magnetite's two paths differ, and the `notifiedUnits` diff shows only the added `"stibnite": [ "otel-envelope" ]`, which the ingress role's envelope budget reads from the host table (build, evaluation).
-Commit, for example "Bound the darwin collectors' resident memory in the delivery envelope".
+Expected: every existing case and the twelve darwin cases `ok:`, every existing mutant and `mutant c5WrongPid rejected: c5ProcessAt129`, `mutant c5ReadsRss rejected: c5ProcessResidentOver` and `mutant c5UnreadablePasses rejected: c5MemUnparsable`, no `FAIL`; the cost near design D13's 158,006,224 B and below 536,870,912; electrum's two paths equal, because C5's text renders only with `darwinMemory`; magnetite's two paths differ, and the `notifiedUnits` diff shows only the added `"stibnite": [ "otel-envelope" ]`, which the ingress role's envelope budget reads from the host table (build, evaluation).
+Commit, for example "Bound the darwin collectors' physical footprint in the delivery envelope".
 
 - [ ] **Step 4: The envelope on stibnite (tasks.md 3.4)**
 
@@ -287,7 +318,7 @@ In `modules/darwin/otel-collector-agent.nix`, add `"otel-envelope"` to `own`, so
                 inherit (rendered) targets exporters;
                 darwinMemory = {
                   launchctl = "/bin/launchctl";
-                  ps = "/bin/ps";
+                  top = "/usr/bin/top";
                   # The NixOS MemoryMax analogues (FM:619; O5).
                   limits = { "org.nixos.otelcol" = 268435456; "org.nixos.otelcol-process" = 134217728; };
                 };

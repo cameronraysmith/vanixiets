@@ -72,10 +72,14 @@
         }
       ];
       # stibnite's envelope: the darwin renderer's job names on the target
-      # stub's port, its exporters, and C5 over stubbed launchctl and ps.
-      # Value sources for C5: the resident sizes the ps stub reports for the
-      # pids the launchctl stub prints, against the limits typed here,
-      # 268,435,456 B and 134,217,728 B, which the fragment passes too.
+      # stub's port, its exporters, and C5 over stubbed launchctl and top.
+      # Value sources for C5: the physical footprints in the recorded top
+      # text (fixtures/top/, stibnite's own on 2026-11-06 with the pids
+      # rewritten to the launchctl stub's and the MEM values the cases name)
+      # that the top stub prints for the pids the launchctl stub prints,
+      # against the limits typed here, 268,435,456 B and 134,217,728 B,
+      # which the fragment passes too. The ps stub's resident sizes are what
+      # a C5 reading RSS, the c5ReadsRss mutant, would see instead.
       darwinTargets =
         map (t: t // { url = "http://127.0.0.1:${toString targetPort}/ok"; })
           (self.lib.otelCollectorDarwin {
@@ -96,6 +100,16 @@
         # `-o rss= -p <pid>`: C5_RSS_<pid> KiB.
         v=C5_RSS_$4
         echo "  ''${!v:-0}"
+      '';
+      topStub = pkgs.writeShellScript "top-stub" ''
+        # `-l 1 -pid <pid> -stats pid,mem`: fixtures/top/<C5_TOP_<pid>>.txt,
+        # nothing if that is unset, and no answer if it is `hang`.
+        v=C5_TOP_$4
+        case ''${!v:-} in
+          "") ;;
+          hang) exec sleep 60 ;;
+          *) cat "${./otel-envelope/fixtures/top}/''${!v}.txt" ;;
+        esac
       '';
       # The script as each case runs it, with receivers' targets rendered by
       # targetsOf.
@@ -128,7 +142,7 @@
           targets = darwinTargets;
           darwinMemory = {
             launchctl = "${launchctlStub}";
-            ps = "${psStub}";
+            top = "${topStub}";
             limits = {
               "org.nixos.otelcol" = 268435456;
               "org.nixos.otelcol-process" = 134217728;
@@ -206,6 +220,18 @@
           variants = [ "darwin" ];
           from = ''pid=$(awk -F' = ' -v k="$pidKey" '$1 == k { print $2; exit }' <<< "$out")'';
           to = ''pid=$(awk -F' = ' -v k="$pidKey" '$1 == k { print $2; exit }' <<< "$(${launchctlStub} print system/org.nixos.otelcol 2> /dev/null)")'';
+        };
+        c5ReadsRss = {
+          case = "c5ProcessResidentOver";
+          variants = [ "darwin" ];
+          from = ''mem=$(awk -v p="$pid" '$1 == "PID" { h = 1; next } h && $1 == p { print $2; exit }' "$tmp/top")'';
+          to = ''mem=$(${psStub} -o rss= -p "$pid" | tr -d ' ')K'';
+        };
+        c5UnreadablePasses = {
+          case = "c5MemUnparsable";
+          variants = [ "darwin" ];
+          from = ''if [ -z "$bytes" ]; then'';
+          to = ''if [ -z "$bytes" ]; then continue; fi; if false; then'';
         };
       };
       mutate = name: m: if m.source or false then mutateSource name m else mutateScript name m;
@@ -490,35 +516,69 @@
         case_darwinHealthy() {
           local s
           s=$(mktemp -d)
-          local -x C5_RSS_101=102400 C5_RSS_202=65536
+          local -x C5_TOP_101=agent-134M C5_TOP_202=process-102M
           run darwin "$s" darwin-healthy up 0 && run darwin "$s" darwin-healthy up 0 \
             && ! grep -q ': FAIL' "$work/out" && grep -q '^otel-envelope: C5 memory: ok$' "$work/out"
         }
         case_darwinOtlpRefused() {
           local s
           s=$(mktemp -d)
-          local -x C5_RSS_101=102400 C5_RSS_202=65536
+          local -x C5_TOP_101=agent-134M C5_TOP_202=process-102M
           run darwin "$s" darwin-healthy up 0 && run darwin "$s" darwin-otlp-refused up 1 \
             && grep -q '^otel-envelope: C4 loss: FAIL .*receiver="otlp"' "$work/out"
         }
+        # stibnite on 2026-11-06: otelcol-process resident at 179 MiB, most
+        # of it the mapped binary's file-backed pages, with a physical
+        # footprint of 102 MiB, within its 128 MiB.
+        case_c5ProcessResidentOver() {
+          local -x C5_TOP_101=agent-134M C5_TOP_202=process-102M C5_RSS_101=223664 C5_RSS_202=183792
+          run darwin "$(mktemp -d)" darwin-healthy up 0 && grep -q '^otel-envelope: C5 memory: ok$' "$work/out"
+        }
         case_c5AgentAt255() {
-          local -x C5_RSS_101=261120
-          run darwin "$(mktemp -d)" darwin-healthy up 0
+          local -x C5_TOP_101=agent-255M C5_TOP_202=process-102M
+          run darwin "$(mktemp -d)" darwin-healthy up 0 && grep -q '^otel-envelope: C5 memory: ok$' "$work/out"
         }
         case_c5AgentAt257() {
-          local -x C5_RSS_101=263168
+          local -x C5_TOP_101=agent-257M C5_TOP_202=process-102M
           run darwin "$(mktemp -d)" darwin-healthy up 1 \
             && grep -q '^otel-envelope: C5 memory: FAIL org.nixos.otelcol 257 MiB above its limit$' "$work/out"
         }
+        # top's G suffix, and the `+` it appends to a grown value.
+        case_c5AgentGigabyte() {
+          local -x C5_TOP_101=agent-1G+ C5_TOP_202=process-102M
+          run darwin "$(mktemp -d)" darwin-healthy up 1 \
+            && grep -q '^otel-envelope: C5 memory: FAIL org.nixos.otelcol 1024 MiB above its limit$' "$work/out"
+        }
+        case_c5ProcessKibibytes() {
+          local -x C5_TOP_101=agent-134M C5_TOP_202=process-2144K
+          run darwin "$(mktemp -d)" darwin-healthy up 0 && grep -q '^otel-envelope: C5 memory: ok$' "$work/out"
+        }
         case_c5ProcessAt129() {
-          local -x C5_RSS_101=102400 C5_RSS_202=132096
+          local -x C5_TOP_101=agent-134M C5_TOP_202=process-129M
           run darwin "$(mktemp -d)" darwin-healthy up 1 \
             && grep -q '^otel-envelope: C5 memory: FAIL org.nixos.otelcol-process 129 MiB above its limit$' "$work/out"
+        }
+        # A MEM field C5 cannot read, or none, fails rather than passes.
+        case_c5MemUnparsable() {
+          local -x C5_TOP_101=agent-134M C5_TOP_202=process-unparsable
+          run darwin "$(mktemp -d)" darwin-healthy up 1 \
+            && grep -q "^otel-envelope: C5 memory: FAIL org.nixos.otelcol-process: no MEM for pid 202 in top's output (102)$" "$work/out"
+        }
+        # top's text for a pid that exited after launchctl printed it.
+        case_c5ProcessGone() {
+          local -x C5_TOP_101=agent-134M C5_TOP_202=gone
+          run darwin "$(mktemp -d)" darwin-healthy up 1 \
+            && grep -q "^otel-envelope: C5 memory: FAIL org.nixos.otelcol-process: no MEM for pid 202 in top's output (absent)$" "$work/out"
+        }
+        case_c5TopHangs() {
+          local -x C5_TOP_101=agent-134M C5_TOP_202=hang
+          run darwin "$(mktemp -d)" darwin-healthy up 1 \
+            && grep -q '^otel-envelope: C5 memory: FAIL org.nixos.otelcol-process: top failed or did not answer within 10 s$' "$work/out"
         }
         # A job with no pid is LaunchdJobNotRunning's, and the agent's absence
         # C1's, so C5 does not judge it, whatever its size would be.
         case_c5NotLoaded() {
-          local -x C5_UNLOADED=org.nixos.otelcol-process C5_RSS_101=102400 C5_RSS_202=200000
+          local -x C5_UNLOADED=org.nixos.otelcol-process C5_TOP_101=agent-134M C5_TOP_202=process-129M
           run darwin "$(mktemp -d)" darwin-healthy up 0 && grep -q '^otel-envelope: C5 memory: ok$' "$work/out"
         }
 
@@ -557,9 +617,15 @@
         "budgetFreshState"
         "darwinHealthy"
         "darwinOtlpRefused"
+        "c5ProcessResidentOver"
         "c5AgentAt255"
         "c5AgentAt257"
+        "c5AgentGigabyte"
+        "c5ProcessKibibytes"
         "c5ProcessAt129"
+        "c5MemUnparsable"
+        "c5ProcessGone"
+        "c5TopHangs"
         "c5NotLoaded"
       ];
       allCases = lib.concatStringsSep " " caseNames;

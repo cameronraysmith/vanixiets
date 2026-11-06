@@ -304,3 +304,15 @@ Any requirement whose discharge depends on this fact SHALL name it explicitly, a
 
 - **WHEN** an anonymous post from stibnite to a `fleet-*` topic is accepted, or cinnabar's access entries for the `fleet-*` topics change
 - **THEN** this assumption is void, and the `fleet-alerting-interface` requirements `The alerter token travels only as a file` and `This capability states its own trust boundary` and the `host-metrics-collection` requirement `A failed collection or store job notifies a person` lose the argument that stibnite's notices need the `alerter` token and that holding it is the extent of stibnite's exposure
+
+### Requirement: A70 — macOS top prints a process's physical footprint as unversioned text to an unprivileged account
+
+It is true of `/usr/bin/top` on macOS 26.7.1, independent of what this fleet builds, that `top -l 1 -pid <pid> -stats pid,mem` prints a process's physical footprint as unversioned text, a MEM field with a `B`, `K`, `M` or `G` suffix, to an unprivileged account for a root-owned process too, as `top` is setuid.
+Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL be treated as losing its discharge once this assumption's violation condition below is observed.
+
+**Evidence**: on stibnite on 2026-11-06, `top(1)` described `mem` as "Physical memory footprint of the process" and `/usr/bin/top` was `-r-sr-xr-x root wheel`; run as `_otelcol` it printed `102M` for the root-owned `otelcol-process` and `134M` for the agent, where `/usr/bin/footprint` as root printed `phys_footprint: 102 MB` and `134 MB` and `ps -o rss=` 183,792 KiB and 223,664 KiB, while `/usr/bin/footprint` as `_otelcol` found no process for the root-owned pid; across all processes it printed values with the suffixes `K`, `M` and `G`, a second sample (`-l 2`) appended `+` or `-` to a changed value, and a pid that does not exist printed the header with no `PID MEM` line (`logs/s5-evidence/c5-top-recording-20261106T052605Z.log`); the recorded texts are `otel-envelope`'s fixtures, every darwin envelope run is its monitor, and a macOS major-version upgrade is the event at which it is recorded again.
+
+#### Scenario: top changes what it prints
+
+- **WHEN** a macOS release reshapes `top`'s logging-mode output or its MEM field, measures MEM other than as the physical footprint, or stops answering an unprivileged account for another account's process
+- **THEN** this assumption is void, and the `fleet-ingress-interface` requirement `otel-envelope regulates each agent from its own collector` and the `telemetry-store-interface` requirement `The telemetry store and the collector run inside a declared envelope` lose the argument that the darwin envelope bounds each collector's physical footprint, until the memory clause is rewritten against the new text; an unreadable field already fails the clause

@@ -159,7 +159,7 @@ Then the vendored consumers, each with the exact argument list its consumer runs
 |---|---|---|
 | `otel-host-probe`, disk health (design D4) | `<root pin smartmontools>/bin/smartctl -j -H -A disk0` | `_prometheus-node-exporter`; rehearsed as `nobody`, since the account does not exist before Task 4 |
 | `otel-host-probe`, job state (design D4) | `/bin/launchctl print system/org.nixos.<label>` | the same |
-| `otel-envelope` C5 (design D6) | `/bin/launchctl print system/org.nixos.otelcol` and `system/org.nixos.otelcol-process`, then `/bin/ps -o rss= -p <pid>` | `_otelcol`; rehearsed as `nobody` |
+| `otel-envelope` C5 (design D6) | `/bin/launchctl print system/org.nixos.otelcol` and `system/org.nixos.otelcol-process`, then `/usr/bin/top -l 1 -pid <pid> -stats pid,mem`, whose MEM is the physical footprint, the kernel's own accounting, where `ps -o rss=` also counts the mapped binary's file-backed pages | `_otelcol`; rehearsed as `nobody` |
 | `launchd.daemons.otelcol` (design D2) | `otelcol-contrib --config <store path>` behind `/bin/sh -c '/bin/wait4path /nix/store && exec …'` | `_otelcol` |
 | `otel-collector-darwin`'s validate case (design D13) | `otelcol-contrib validate --config <file>` | the check's build user on `x86_64-linux` |
 
@@ -195,12 +195,12 @@ for l in $labels org.nixos.otelcol "$idle"; do
   echo "$rc" > "$F/launchctl/$l.rc"
   printf '%s rc=%s %s\n' "$l" "$rc" "$(grep -E '^\s*(state|runs|pid|last exit code|last exit reason) = ' "$F/launchctl/$l.txt" | tr -s '\t ' ' ' | paste -s -d ';' -)" | tee -a "$L"
 done
-# C5's read: the resident size of a running job's pid, unprivileged.
+# C5's read: the physical footprint of a running root job's pid, unprivileged, through setuid top.
 pid=$(awk -F' = ' '$1 ~ /^[[:space:]]*pid$/ { print $2; exit }' "$F/launchctl/org.nixos.nix-daemon.txt")
-/usr/bin/sudo -u nobody /bin/ps -o rss= -p "$pid" | tee -a "$L"; echo "ps rc=$?" | tee -a "$L"
+/usr/bin/sudo -u nobody /usr/bin/top -l 1 -pid "$pid" -stats pid,mem | tail -n 2 | tee -a "$L"; echo "top rc=$?" | tee -a "$L"
 ```
 
-Expected: `smartctl 7.5`, `otelcol-contrib version 0.155.0`, `ProductVersion: 26.7.1`; `smartctl rc=0` and `protocol` `NVMe`, `passed` true, `cw` 0, `used` 0, `model` null because `-H -A` reads no identity, as BS "Found while preparing" read on 2026-11-05; for `org.nixos.nix-daemon` `state = running`, a `runs` count, a `pid` and `last exit code = 0`; for `org.nixos.otelcol` `Could not find service` with rc 113; for the idle-reclaimed job (`com.apple.tzlinkd` on 2026-11-05) `last exit reason = JETSAM_REASON_MEMORY_IDLE_EXIT` and no `last exit code` line; one resident size in KiB and `ps rc=0` (runtime, stibnite).
+Expected: `smartctl 7.5`, `otelcol-contrib version 0.155.0`, `ProductVersion: 26.7.1`; `smartctl rc=0` and `protocol` `NVMe`, `passed` true, `cw` 0, `used` 0, `model` null because `-H -A` reads no identity, as BS "Found while preparing" read on 2026-11-05; for `org.nixos.nix-daemon` `state = running`, a `runs` count, a `pid` and `last exit code = 0`; for `org.nixos.otelcol` `Could not find service` with rc 113; for the idle-reclaimed job (`com.apple.tzlinkd` on 2026-11-05) `last exit reason = JETSAM_REASON_MEMORY_IDLE_EXIT` and no `last exit code` line; a `PID MEM` line and the pid's row with a MEM such as `32M`, and `top rc=0` (runtime, stibnite).
 No system job showed a signal on 2026-11-05; the non-idle fixture of Task 2 Step 5 is the per-user job with `last exit reason = JETSAM_REASON_MEMORY_PERPROCESSLIMIT` read from `/bin/launchctl print gui/$(id -u)/<label>`, or, if none is found, a copy of the idle fixture with the reason edited to `JETSAM_REASON_MEMORY_PERPROCESSLIMIT`, saying so in a first comment line the stub strips.
 If `launchctl print` as `nobody` prints less than as `crs58` (a field missing, or `Could not find service` for a loaded job), stop: the probe's account cannot read job state, and design D4 goes back to the operator.
 If no allow-listed job shows `last exit code = 78` today, the exit-78 fixture of Task 2 Step 5 is a copy of `org.nixos.nix-daemon.txt` with that one line edited, and its file says so in a first comment line the stub strips.

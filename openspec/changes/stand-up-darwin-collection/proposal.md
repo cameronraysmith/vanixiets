@@ -31,7 +31,7 @@ Decisions tagged `O<n>` were made by the operator on 2026-11-05, each as `design
 - `otel-cert` is issued to stibnite without `restartUnits`, which clan throws on darwin; its key is owned by `_otelcol`, and a reissue reloads the agent through its plist (D5).
 
 **Regulation and notices on darwin**
-- `otel-envelope` runs every 5 min from `StartInterval` with `flake.lib.otelEnvelope`'s C1 to C4 over the darwin agent and a C5 bounding the two collectors' resident memory at 256 MiB and 128 MiB, since launchd bounds none (D6, O5).
+- `otel-envelope` runs every 5 min from `StartInterval` with `flake.lib.otelEnvelope`'s C1 to C4 over the darwin agent and a C5 bounding the two collectors' physical footprint, read from `top`, at 256 MiB and 128 MiB, since launchd bounds none; the footprint is the kernel's own accounting, whereas the resident size also counts the mapped collector binary's file-backed pages (D6, O5).
 - A platform-neutral notifier wrapper posts `FAILED` and `RESOLVED` for the envelope to `fleet-alerts` with the existing shared `ntfy-alerter` token, of which stibnite becomes the seventh reader through `clan vars fix`; the token is required, because ntfy refused an anonymous post to a `fleet-*` topic from stibnite on 2026-11-05 (D5, D6, O2).
 - No S5 launchd job uses a calendar schedule, held by an assertion, so no S5 schedule depends on the wall clock across a clock change (D8).
 

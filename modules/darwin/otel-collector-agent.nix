@@ -172,7 +172,7 @@ in
                   inherit (rendered) targets exporters;
                   darwinMemory = {
                     launchctl = "/bin/launchctl";
-                    ps = "/bin/ps";
+                    top = "/usr/bin/top";
                     # The NixOS MemoryMax analogues (ADR-003 envelope).
                     limits = {
                       "org.nixos.otelcol" = 268435456;

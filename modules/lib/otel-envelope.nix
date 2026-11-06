@@ -24,14 +24,20 @@
 #   otelcol_exporter_enqueue_failed_*. On the ingress host otlp/mesh
 #   refusals and the store exporters' enqueue failures are back-pressure
 #   that the agents' queues absorb; a full store queue fails C3.
-# - C5 memory (darwin, with `darwinMemory` = { launchctl; ps; limits; }):
+# - C5 memory (darwin, with `darwinMemory` = { launchctl; top; limits; }):
 #   launchd bounds no memory, so each label of `limits` whose job prints a
-#   pid in `launchctl print system/<label>` has its resident size read with
-#   `ps -o rss= -p <pid>` and fails above its limit in bytes, the NixOS
-#   MemoryMax analogue. A job with no pid is not judged: a stopped job is
-#   LaunchdJobNotRunning's, and the agent's absence C1's. Without
-#   `darwinMemory` the script's text is unchanged, so every NixOS
-#   envelope's store path stays as it was.
+#   pid in `launchctl print system/<label>` has its physical footprint read
+#   from the MEM field of `top -l 1 -pid <pid> -stats pid,mem` (a number with
+#   a B, K, M or G suffix and an optional trailing + or -), and fails above
+#   its limit in bytes, the NixOS MemoryMax analogue. The footprint is the
+#   kernel's own accounting (jetsam's, Activity Monitor's), where the
+#   resident size also counts the mapped binary's file-backed pages; top is
+#   setuid root, so the envelope's unprivileged user reads it for root's
+#   otelcol-process too. A top that fails or does not answer within 10 s,
+#   or a MEM field that is absent or unreadable, fails the clause. A job
+#   with no pid is not judged: a stopped job is LaunchdJobNotRunning's, and
+#   the agent's absence C1's. Without `darwinMemory` the script's text is
+#   unchanged, so every NixOS envelope's store path stays as it was.
 #
 # With `budget` = { storeUrl; notifiedUnits; databases; } (the ingress host,
 # S4 design D8), a run whose minute is 00 (OTEL_ENVELOPE_MINUTE, default the
@@ -466,7 +472,7 @@ in
           lib.optionalString (darwinMemory != null) (
             "\n"
             + ''
-              over=""
+              memory=""
               # launchctl print's first-level `pid`, indented by one tab.
               pidKey="$(printf '\t')pid"
               while read -r label limit; do
@@ -475,14 +481,29 @@ in
                 # mutant: c5WrongPid
                 pid=$(awk -F' = ' -v k="$pidKey" '$1 == k { print $2; exit }' <<< "$out")
                 [ -n "$pid" ] || continue
-                rss=$(${darwinMemory.ps} -o rss= -p "$pid" | tr -d ' ') || continue
-                if [ $((rss * 1024)) -gt "$limit" ]; then over="$over $label $((rss / 1024)) MiB"; fi
+                if ! timeout 10 ${darwinMemory.top} -l 1 -pid "$pid" -stats pid,mem > "$tmp/top" 2> /dev/null; then
+                  memory+="$label: top failed or did not answer within 10 s; "
+                  continue
+                fi
+                # mutant: c5ReadsRss
+                mem=$(awk -v p="$pid" '$1 == "PID" { h = 1; next } h && $1 == p { print $2; exit }' "$tmp/top")
+                bytes=$(awk -v m="$mem" 'BEGIN {
+                  if (m !~ /^[0-9]+(\.[0-9]+)?[BKMG][+-]?$/) exit
+                  sub(/[+-]$/, "", m)
+                  printf "%.0f\n", substr(m, 1, length(m) - 1) * 1024 ^ (index("BKMG", substr(m, length(m))) - 1)
+                }')
+                # mutant: c5UnreadablePasses
+                if [ -z "$bytes" ]; then
+                  memory+="$label: no MEM for pid $pid in top's output (''${mem:-absent}); "
+                  continue
+                fi
+                if [ "$bytes" -gt "$limit" ]; then memory+="$label $((bytes / 1048576)) MiB above its limit; "; fi
               done <<< ${
                 lib.escapeShellArg (
                   lib.concatStrings (lib.mapAttrsToList (l: b: "${l} ${toString b}\n") darwinMemory.limits)
                 )
               }
-              if [ -n "$over" ]; then fail "C5 memory" "''${over# } above its limit"; else ok "C5 memory"; fi''
+              if [ -n "$memory" ]; then fail "C5 memory" "''${memory%; }"; else ok "C5 memory"; fi''
           )
         }
         ${lib.optionalString (budget != null) (budgetClauses pkgs budget)}

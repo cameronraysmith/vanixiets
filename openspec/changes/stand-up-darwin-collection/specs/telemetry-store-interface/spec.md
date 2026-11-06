@@ -94,10 +94,10 @@ The ingress host's `otel-envelope` SHALL regulate ADR-004's 30 process names per
 ### Requirement: The telemetry store and the collector run inside a declared envelope
 
 The machine SHALL run `greptimedb.service` under the static user `greptimedb` with `MemoryHigh=3G`, `MemoryMax=4G`, `MemorySwapMax=0`, `OOMScoreAdjust=500` and a lower `CPUWeight`, magnetite's collector with `MemoryMax=512M` and `OOMScoreAdjust=300`, below the build service's evaluator at 900, and other NixOS agents' collectors with `MemoryMax=256M`.
-On a darwin host, which launchd bounds in no memory, the agent SHALL run with a 150 MiB `memory_limiter` and 30 MiB spike and `otelcol-process` with 64 MiB and 16 MiB, and the darwin `otel-envelope` SHALL fail above 256 MiB and 128 MiB resident.
+On a darwin host, which launchd bounds in no memory, the agent SHALL run with a 150 MiB `memory_limiter` and 30 MiB spike and `otelcol-process` with 64 MiB and 16 MiB, and the darwin `otel-envelope` SHALL fail above 256 MiB and 128 MiB of physical footprint, the kernel's own accounting, which unlike the resident size excludes the mapped binary's clean file-backed pages.
 The dataset `zroot/root/greptimedb` SHALL carry `quota=16G`, `reservation=12G` and `com.sun:auto-snapshot=false`, applied or asserted at boot.
 
-**Discharged by**: the evaluation-time envelope check (R7.1) with its mutants, the agent role's limiter assertion on every NixOS host without the ingress role, `checks.x86_64-linux.otel-collector-darwin`'s rendered limiters, `checks.x86_64-linux.otel-envelope`'s darwin memory cases with the mutant `c5WrongPid`, the hourly envelope regulator, the on-demand OOM-order test, and the operator's 24-hour memory measurement on stibnite.
+**Discharged by**: the evaluation-time envelope check (R7.1) with its mutants, the agent role's limiter assertion on every NixOS host without the ingress role, `checks.x86_64-linux.otel-collector-darwin`'s rendered limiters, `checks.x86_64-linux.otel-envelope`'s darwin memory cases with the mutants `c5WrongPid`, `c5ReadsRss` and `c5UnreadablePasses`, the hourly envelope regulator, the on-demand OOM-order test, and the operator's 24-hour memory measurement on stibnite, resting on world assumption `A70 — macOS top prints a process's physical footprint as unversioned text to an unprivileged account`.
 
 #### Scenario: The evaluation-time envelope check runs with its mutants
 
@@ -117,7 +117,7 @@ The dataset `zroot/root/greptimedb` SHALL carry `quota=16G`, `reservation=12G` a
 #### Scenario: The darwin collectors' memory is measured
 
 - **WHEN** stibnite has collected for 24 hours, and again after the operator's suspend of stibnite
-- **THEN** the operator records both collectors' maximum resident memory, and confirms or changes the darwin `otel-envelope`'s two limits before the launchd alert rules ship
+- **THEN** the operator records both collectors' maximum physical footprint, and confirms or changes the darwin `otel-envelope`'s two limits before the launchd alert rules ship
 
 #### Scenario: The hourly envelope regulator finds the store over its envelope
 

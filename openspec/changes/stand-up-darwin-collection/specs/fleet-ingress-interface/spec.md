@@ -104,9 +104,10 @@ On a darwin agent host the 150 MiB `memory_limiter` with a 30 MiB spike allowanc
 ### Requirement: otel-envelope regulates each agent from its own collector
 
 Every agent host SHALL run `otel-envelope` every 5 minutes, failing when its collector's telemetry at `127.0.0.1:8888` or a declared scrape target is unanswered on two consecutive runs, an exporter's queue reaches 90% of its capacity, or a loss counter increased, an absent loss counter reading as zero, as the scenarios state.
-On a NixOS host it SHALL run as `otel-envelope.service`; on a darwin host as `org.nixos.otel-envelope`, a `StartInterval = 300` job run as `_otelcol` under `observability-notify-run`, which SHALL also fail when `org.nixos.otelcol`'s resident memory exceeds 256 MiB or `org.nixos.otelcol-process`'s exceeds 128 MiB.
+On a NixOS host it SHALL run as `otel-envelope.service`; on a darwin host as `org.nixos.otel-envelope`, a `StartInterval = 300` job run as `_otelcol` under `observability-notify-run`, which SHALL also fail when `org.nixos.otelcol`'s physical footprint exceeds 256 MiB or `org.nixos.otelcol-process`'s exceeds 128 MiB, or when either running job's footprint cannot be read within 10 seconds.
+The footprint, the kernel's own accounting of a process's memory, is the measure, because the resident size also counts the file-backed pages of the mapped collector binary.
 
-**Discharged by**: `checks.x86_64-linux.otel-envelope` with its mutants, its darwin cases and its mutant `c5WrongPid`; `checks.x86_64-linux.otel-collector-darwin`'s wrapper cases; `vmTests.x86_64-linux.fleet-ingress`'s loss, back-pressure, crash-loop and long-running cases; the operator's stopped-collector and stopped-exporter controls on cinnabar and stopped-collector control on stibnite.
+**Discharged by**: `checks.x86_64-linux.otel-envelope` with its mutants, its darwin cases and its mutants `c5WrongPid`, `c5ReadsRss` and `c5UnreadablePasses`; `checks.x86_64-linux.otel-collector-darwin`'s wrapper cases; `vmTests.x86_64-linux.fleet-ingress`'s loss, back-pressure, crash-loop and long-running cases; the operator's stopped-collector and stopped-exporter controls on cinnabar and stopped-collector control on stibnite; resting on world assumption `A70 — macOS top prints a process's physical footprint as unversioned text to an unprivileged account`.
 
 #### Scenario: The loss counters are read
 
@@ -145,8 +146,18 @@ On a NixOS host it SHALL run as `otel-envelope.service`; on a darwin host as `or
 
 #### Scenario: A darwin collector holds too much memory
 
-- **WHEN** the darwin cases give the envelope a stub `launchctl` that prints each job's `pid` and a stub `ps -o rss=` reporting 255 MiB, then 257 MiB, for `org.nixos.otelcol`, and 129 MiB for `org.nixos.otelcol-process`
-- **THEN** the 255 MiB run passes, the 257 MiB and 129 MiB runs fail on the memory clause, and the mutant `c5WrongPid`, which reads the resident memory of another pid, fails the check
+- **WHEN** the darwin cases give the envelope a stub `launchctl` that prints each job's `pid` and a stub `top` that prints recorded `top -l 1 -pid <pid> -stats pid,mem` text with a MEM of 255 MiB, then 257 MiB, then `1G+`, for `org.nixos.otelcol`, and 129 MiB, then `2144K`, for `org.nixos.otelcol-process`
+- **THEN** the 255 MiB and `2144K` runs pass, the 257 MiB, `1G+` and 129 MiB runs fail on the memory clause naming the job and its MiB, and the mutant `c5WrongPid`, which reads another pid's footprint, fails the check
+
+#### Scenario: A darwin collector's resident size exceeds its limit while its footprint does not
+
+- **WHEN** the stub `top` prints stibnite's recorded footprint of 102 MiB for `org.nixos.otelcol-process` while its resident size, recorded at 179 MiB on 2026-11-06, exceeds 128 MiB
+- **THEN** the memory clause passes, and the mutant `c5ReadsRss`, which reads the resident size, fails the check
+
+#### Scenario: A darwin collector's footprint cannot be read
+
+- **WHEN** the stub `top` prints a MEM field without a unit, prints no row for the pid, or does not answer within 10 seconds
+- **THEN** the memory clause fails naming the job, and the mutant `c5UnreadablePasses`, which passes an unreadable field, fails the check
 
 #### Scenario: stibnite's collector is stopped at acceptance
 
