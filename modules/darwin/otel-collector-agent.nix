@@ -47,6 +47,12 @@ in
         in
         lib.optional (m != null) (builtins.head m)
       ) (builtins.attrNames config.launchd.daemons);
+      keptAlive = flakeLib.otelHostProbeLabels {
+        inherit (schema) launchdLabels;
+        daemonLabels = lib.mapAttrsToList (_: d: d.serviceConfig.Label) (
+          lib.filterAttrs (_: d: (d.serviceConfig.KeepAlive or null) == true) config.launchd.daemons
+        );
+      };
       rendered = flakeLib.otelCollectorDarwin {
         hostName = config.networking.hostName;
         certFile = gens.otel-cert.files."cert.pem".path;
@@ -197,7 +203,8 @@ in
         # fleetBytesPerMinute and ADR-003's 512 MiB envelope; each listener
         # against the loopback pattern; the fragment's daemons'
         # StartCalendarInterval against null; the host's omnigent-host-<owner>
-        # daemons against SC's ownerAliases.
+        # daemons against SC's ownerAliases; SC's launchdKeptAlive against the
+        # allow-listed labels of the host's daemons whose KeepAlive is true.
         assertions = [
           {
             assertion =
@@ -236,6 +243,10 @@ in
               lib.all (o: schema.ownerAliases ? ${o}) owners
               && lib.all (a: lib.all (o: !(lib.hasInfix o a)) owners) (builtins.attrValues schema.ownerAliases);
             message = "otel-collector darwin agent: every omnigent-host-<owner> launchd daemon needs an alias in ownerAliases that does not contain an owner's name; owners ${builtins.toJSON owners}";
+          }
+          {
+            assertion = lib.sort lib.lessThan schema.launchdKeptAlive == lib.sort lib.lessThan keptAlive;
+            message = "otel-collector darwin agent: SC's launchdKeptAlive ${builtins.toJSON schema.launchdKeptAlive} must equal the allow-listed labels whose evaluated KeepAlive is true, ${builtins.toJSON keptAlive}, which LaunchdJobNotRunning expects running (ADR-004:123; design D9).";
           }
         ];
       };

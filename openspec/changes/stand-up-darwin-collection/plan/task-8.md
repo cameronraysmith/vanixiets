@@ -10,7 +10,7 @@ Every step that stops, kills, reloads or sleeps anything ends with `posts.sh` ov
 - Create (git-ignored): `logs/s5-evidence/8.<n>-*.log`; `logs/s5-evidence/window.env` gains `OTELCOL_STOP_EPOCH`, `OTELCOL_START_EPOCH`, `GRPC_STOP_EPOCH`, `GRPC_START_EPOCH`, `KILL_EPOCH`, `KICKSTART_EPOCH`, `RELOAD_EPOCH`, `LID_CLOSE_EPOCH`, `LID_OPEN_EPOCH`
 
 **Interfaces:**
-- Consumes: Tasks 4 to 6 deployed and activated; `mark.sh`, `posts.sh`, `gsql.sh`, `promq.sh`, `6.1-replay.sh`, `rss.tsv` and its sampler; `window.env`.
+- Consumes: Tasks 4 to 6 deployed and activated; `mark.sh`, `posts.sh`, `gsql.sh`, `promq.sh`, `6.1-stibnite-replay.sh`, `rss.tsv` and its sampler; `window.env`.
 - Produces: the acceptance records `verify.md` cites, and the observed values that confirm or amend design D12's `[INFERENCE]` about `SIGTERM`'s exit code.
 
 - [ ] **Step 1: A day of envelopes and the stored bounds (tasks.md 8.1)**
@@ -29,8 +29,8 @@ for k in StandardOutPath StandardErrorPath; do
   printf '%s FAIL lines: ' "$p"; /usr/bin/sudo grep -c 'FAIL' "$p"
 done
 } 2>&1 | tee "$L"
-logs/s5-evidence/6.1-replay.sh 'time() - node_textfile_mtime_seconds{host_name="stibnite"} > 120' "$s" | tee -a "$L"
-logs/s5-evidence/6.1-replay.sh 'count by (host_name) (system_memory_usage_bytes{host_name="stibnite"})' "$s" | tee -a "$L"
+logs/s5-evidence/6.1-stibnite-replay.sh 'time() - node_textfile_mtime_seconds{host_name="stibnite"} > 120' "$s" | tee -a "$L"
+logs/s5-evidence/6.1-stibnite-replay.sh 'count by (host_name) (system_memory_usage_bytes{host_name="stibnite"})' "$s" | tee -a "$L"
 logs/s5-evidence/gsql.sh fleet "SELECT count(DISTINCT launchd_label) FROM launchd_job_state WHERE host_name = 'stibnite' AND greptime_timestamp >= to_timestamp_seconds($s) AND greptime_timestamp < to_timestamp_seconds($e)" | tee -a "$L"
 logs/s5-evidence/gsql.sh fleet "SELECT count(DISTINCT process_executable_name) FROM process_memory_usage_bytes WHERE host_name = 'stibnite' AND greptime_timestamp >= to_timestamp_seconds($s) AND greptime_timestamp < to_timestamp_seconds($e)" | tee -a "$L"
 awk -v s="$s" -v e="$e" '$1 >= s && $1 < e { if ($2 != "NA" && $2 > a) a = $2; if ($3 != "NA" && $3 > p) p = $3; n++ } END { printf "samples %d otelcol max %d KiB otelcol-process max %d KiB\n", n, a, p }' logs/s5-evidence/rss.tsv | tee -a "$L"
@@ -94,7 +94,7 @@ Fifteen minutes after the start, rehearse: stibnite and magnetite, read-only:
 
 ```bash
 . logs/s5-evidence/window.env
-logs/s5-evidence/6.1-replay.sh 'launchd_job_state{host_name="stibnite", launchd_label="org.nixos.nix-grpc-daemon", launchd_state="unloaded"} == 1' "$GRPC_STOP_EPOCH" | tee -a "$L"
+logs/s5-evidence/6.1-stibnite-replay.sh 'launchd_job_state{host_name="stibnite", launchd_label="org.nixos.nix-grpc-daemon", launchd_state="unloaded"} == 1' "$GRPC_STOP_EPOCH" | tee -a "$L"
 ssh magnetite.zt "bash -c 'sudo journalctl -u fleet-alert -o cat --since @$GRPC_STOP_EPOCH | grep -E \"stibnite\"; echo grep-rc=\$?'" | tee -a "$L"
 logs/s5-evidence/posts.sh "$GRPC_STOP_EPOCH" 2>&1 | tee -a "$L"
 ```
@@ -198,7 +198,7 @@ On the morning after Step 6, with no operator needed; rehearse: stibnite and mag
 ```bash
 L=logs/s5-evidence/8.7-overnight-$(/bin/date -u +%Y%m%dT%H%M%SZ).log
 /usr/bin/pmset -g log | awk -v s="$(/bin/date -v-1d '+%Y-%m-%d')" '$1 >= s && $4 ~ /^(Sleep|Wake|DarkWake)$/' | tee "$L"
-logs/s5-evidence/6.1-replay.sh 'count by (host_name) (system_memory_usage_bytes{host_name="stibnite"})' "$(( $(/bin/date -u +%s) - 86400 ))" | tee -a "$L"
+logs/s5-evidence/6.1-stibnite-replay.sh 'count by (host_name) (system_memory_usage_bytes{host_name="stibnite"})' "$(( $(/bin/date -u +%s) - 86400 ))" | tee -a "$L"
 ssh magnetite.zt "bash -c 'sudo journalctl -u fleet-alert -o short-iso --since -24h | grep -E \"stibnite\"; echo grep-rc=\$?'" | tee -a "$L"
 /usr/bin/sudo /bin/cat /var/lib/otel-envelope/notify.log | tail -n 20 | tee -a "$L"
 ```

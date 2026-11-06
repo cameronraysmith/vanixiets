@@ -13,7 +13,7 @@ Step 6 (`tasks.md` 10.1) runs on the day of the close-out, before Step 5's archi
 - Create (git-ignored): `logs/s5-evidence/9.<n>-*.log`, `logs/s5-evidence/10.1-integration-<ts>.log`
 
 **Interfaces:**
-- Consumes: every `logs/s5-evidence/` record of Tasks 1 to 8; S4's archived `verify.md`, `review.md` and `retrospective.md` as forms; `gsql.sh`, `promq.sh`, `6.1-replay.sh`, `posts.sh`, `window.env`.
+- Consumes: every `logs/s5-evidence/` record of Tasks 1 to 8; S4's archived `verify.md`, `review.md` and `retrospective.md` as forms; `gsql.sh`, `promq.sh`, `6.1-stibnite-replay.sh`, `posts.sh`, `window.env`.
 - Produces: the archived change and the synced specs.
 
 - [ ] **Step 1: `verify.md` (tasks.md 9.1)**
@@ -85,7 +85,7 @@ for m in system_memory_usage_bytes process_memory_usage_bytes system_filesystem_
   printf '%s ' "$m"; logs/s5-evidence/promq.sh "count by (host_name) (count_over_time(${m}{host_name=\"stibnite\"}[24h]))" | tr '\n' ' '; echo
 done | tee "$L"
 for d in $(awk '/^system_disk_/' logs/s5-evidence/5.3-tables.tsv); do printf '%s ' "$d"; logs/s5-evidence/promq.sh "count by (host_name) (count_over_time(${d}{host_name=\"stibnite\"}[24h]))"; done | tee -a "$L"
-logs/s5-evidence/6.1-replay.sh 'count by (host_name) (system_memory_usage_bytes{host_name="stibnite"})' "$t" | tee -a "$L"
+logs/s5-evidence/6.1-stibnite-replay.sh 'count by (host_name) (system_memory_usage_bytes{host_name="stibnite"})' "$t" | tee -a "$L"
 /usr/bin/pmset -g log | grep -E '[[:space:]](Sleep|Wake)[[:space:]]' | tail -n 400 | tee -a "$L" >/dev/null
 lines=$(/usr/bin/wc -l < /var/log/deploy-record.jsonl | tr -d ' ')
 rows=$(logs/s5-evidence/gsql.sh devloop "SELECT count(*) FROM deploy_record WHERE host = 'stibnite'")

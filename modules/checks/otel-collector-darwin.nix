@@ -69,7 +69,7 @@
           "/run/secrets"
         ];
         # stibnite's evaluated daemon labels on 2026-11-05 (tasks.md 1.2), the
-        # fragment's four, and a decoy that matches only if a dot is unescaped.
+        # fragment's five, and a decoy that matches only if a dot is unescaped.
         daemonLabels = [
           "org.nixos.activate-system"
           "org.nixos.dnscrypt-pin-dns"
@@ -84,6 +84,7 @@
           "org.nixos.otelcol"
           "org.nixos.otelcol-process"
           "org.nixos.otel-host-probe"
+          "org.nixos.otel-envelope"
           "org.nixos.prometheus-node-exporter"
           "orgXnixosXnix-daemon"
         ];
@@ -208,6 +209,7 @@
             "org.nixos.omnigent-host-cameron"
             "org.nixos.otelcol"
             "org.nixos.otelcol-process"
+            "org.nixos.otel-envelope"
             "org.nixos.prometheus-node-exporter"
             "org.nixos.sops-install-secrets"
           ];

@@ -38,7 +38,46 @@
       "job": "smartctl",
       "service_instance_id": "127.0.0.1:9633",
       "service_name": "smartctl"
+    },
+    "LaunchdJobNotRunning": {
+      "host_name": "stibnite",
+      "instance": "127.0.0.1:9100",
+      "job": "node",
+      "launchd_label": "org.nixos.nix-grpc-daemon",
+      "launchd_state": "running",
+      "service_instance_id": "127.0.0.1:9100",
+      "service_name": "node"
+    },
+    "LaunchdJobFailed": {
+      "host_name": "stibnite",
+      "instance": "127.0.0.1:9100",
+      "job": "node",
+      "launchd_label": "org.nixos.harmonia-gc",
+      "service_instance_id": "127.0.0.1:9100",
+      "service_name": "node"
+    },
+    "LaunchdJobRestartLoop": {
+      "host_name": "stibnite",
+      "instance": "127.0.0.1:9100",
+      "job": "node",
+      "launchd_label": "org.nixos.nix-grpc-daemon",
+      "service_instance_id": "127.0.0.1:9100",
+      "service_name": "node"
+    },
+    "HostProbeStale": {
+      "file": "/var/lib/prometheus-node-exporter/textfile/launchd.prom",
+      "host_name": "stibnite",
+      "instance": "127.0.0.1:9100",
+      "job": "node",
+      "service_instance_id": "127.0.0.1:9100",
+      "service_name": "node"
     }
+  },
+  "selectors": {
+    "LaunchdJobNotRunning": "launchd_job_state",
+    "LaunchdJobFailed": "launchd_job_last_exit_code",
+    "LaunchdJobRestartLoop": "launchd_job_runs_total",
+    "HostProbeStale": "node_textfile_mtime_seconds"
   },
   "attribution": [
     [

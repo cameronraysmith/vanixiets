@@ -8,11 +8,11 @@ The rules' runtime negative controls are Task 8 Steps 3 and 4, which make `Launc
 
 **Files:**
 - Modify: `modules/nixos/fleet-alert/rules.nix` (the four darwin rules, their expected hosts, `smartHosts` with stibnite), `modules/clan/services/otel-collector/schema.nix` (`launchdLabels` gains `org.nixos.otel-envelope`; the kept-alive label set), `modules/checks/fleet-alert.nix` and its fixtures under `modules/checks/fleet-alert/fixtures/` (the eight legs)
-- Create (git-ignored): `logs/s5-evidence/6.<n>-*.log`, `logs/s5-evidence/6.1-replay.sh`, `logs/s5-evidence/6.1-names.tsv`
+- Create (git-ignored): `logs/s5-evidence/6.<n>-*.log`, `logs/s5-evidence/6.1-stibnite-replay.sh`, `logs/s5-evidence/6.1-names.tsv`
 
 **Interfaces:**
 - Consumes: `flake.lib.fleetAlertRules` with `nixosHosts`, `darwinHosts` and `smartHosts` (Task 3); `flake.lib.otelCollectorSchema.launchdLabels` (Task 2); `flake.lib.observabilityHosts`' `notifiedUnits`; `STIBNITE_COLLECT_EPOCH`, `5.3-tables.tsv` and `rss.tsv` (Task 5); `gsql.sh`, `promq.sh`, `mark.sh`, `posts.sh`.
-- Produces: the deployed darwin rules, read by Task 8 Steps 3 to 7; `6.1-replay.sh`, reused by Task 8 Step 1 and Task 9 Step 6.
+- Produces: the deployed darwin rules, read by Task 8 Steps 3 to 7; `6.1-stibnite-replay.sh`, whose `EXPR [START]` form is reused by Task 8 Step 1 and Task 9 Step 6.
 
 - [ ] **Step 1: Stored names, the replay and the memory maxima (tasks.md 6.1)**
 
@@ -26,11 +26,11 @@ logs/s5-evidence/gsql.sh fleet "SELECT launchd_label, launchd_state, count(*) FR
 
 Expected: the tables `launchd_job_state`, `launchd_job_last_exit_code`, `launchd_job_runs_total`, `node_textfile_mtime_seconds`, `node_textfile_scrape_error` and A4's eight `smartctl_device_*` names, with tags `launchd_label`, `launchd_state` (values `running`, `not_running`, `unloaded`, `other`), `file` and `device`; each allow-listed label stibnite evaluates, `org.nixos.omnigent-host-<alias>` and no owner's name among them.
 A table or label name that differs from design D9's expressions blocks Step 4 until the operator decides whether the probe or the rules change.
-Create `logs/s5-evidence/6.1-replay.sh` (git-ignored), which runs one PromQL expression as `regulator` through `query_range` at the evaluator's 60 s step from `STIBNITE_COLLECT_EPOCH` to now, in chunks of at most 10,000 points, and prints one line per contiguous run of points per series:
+Create `logs/s5-evidence/6.1-stibnite-replay.sh` (git-ignored), which runs one PromQL expression as `regulator` through `query_range` at the evaluator's 60 s step from `STIBNITE_COLLECT_EPOCH` to now, in chunks of at most 10,000 points, and prints one line per contiguous run of points per series (as built on 2026-11-06 it follows `logs/s4-evidence/5.7-pyrite-replay.sh`: with no expression it replays the rules below with each `for` applied as `transition.jq` does, and with `EXPR [START]` it prints EXPR's runs):
 
 ```bash
 #!/usr/bin/env bash
-# 6.1-replay.sh EXPR [START]: replays EXPR at a 60 s step; prints "<host> <label> <first ts> <last ts> <max value> <minutes>" per run.
+# 6.1-stibnite-replay.sh EXPR [START]: replays EXPR at a 60 s step; prints "<host> <label> <first ts> <last ts> <max value> <minutes>" per run.
 set -euo pipefail
 d=$(cd "$(dirname "$0")" && pwd)
 . "$d/window.env"
@@ -58,7 +58,7 @@ The run splitting is controlled first: replaying `count by (host_name) (system_m
 Replay, each restricted to stibnite, with `kept` the kept-alive allow-listed labels read from stibnite's evaluation (`nix eval --json .#darwinConfigurations.stibnite.config.launchd.daemons --apply 'ds: builtins.filter (n: (ds.${n}.serviceConfig.KeepAlive or null) == true) (builtins.attrNames ds)'`, intersected with `launchdLabels` and prefixed `org.nixos.`):
 
 ```bash
-r=logs/s5-evidence/6.1-replay.sh
+r=logs/s5-evidence/6.1-stibnite-replay.sh
 kept='org[.]nixos[.](dnscrypt-proxy|nix-daemon|nix-grpc-daemon|otelcol|otelcol-process|prometheus-node-exporter)'
 fs='sum by (host_name, mountpoint) (system_filesystem_usage_bytes{host_name="stibnite", state="used"}) / sum by (host_name, mountpoint) (system_filesystem_usage_bytes{host_name="stibnite"})'
 {
@@ -123,7 +123,7 @@ Expected: FAIL at the first new leg, because no darwin rule exists and the NVMe 
 
 - [ ] **Step 3: The four darwin rules (tasks.md 6.3)**
 
-In `modules/clan/services/otel-collector/schema.nix`, `launchdLabels` gains `org.nixos.otel-envelope` (A4:121, amended), and the kept-alive set is the list `launchdKeptAlive` beside it, holding the allow-listed labels whose evaluated `KeepAlive` is `true` (A4:123); the darwin fragment asserts that list equals the labels of its evaluated `launchd.daemons` with `serviceConfig.KeepAlive == true` intersected with `launchdLabels`, the two sources being the schema and stibnite's evaluation, shown failing by an `extendModules` override of stibnite setting `launchd.daemons.otel-host-probe.serviceConfig.KeepAlive = true` (negative control).
+In `modules/clan/services/otel-collector/schema.nix`, `launchdLabels` gains `org.nixos.otel-envelope` (A4:121, amended), and the kept-alive set is the list `launchdKeptAlive` beside it, holding the allow-listed labels whose evaluated `KeepAlive` is `true` (A4:123); the darwin fragment asserts that list equals the labels of its evaluated `launchd.daemons` with `serviceConfig.KeepAlive == true` intersected with `launchdLabels`, the two sources being the schema and stibnite's evaluation, shown failing by an `extendModules` override of stibnite setting `launchd.daemons.otel-envelope.serviceConfig.KeepAlive = true` (negative control; an allow-listed label is needed, since an override of `otel-host-probe`, which is not allow-listed, leaves the assertion true).
 A job whose `KeepAlive` is a condition set is outside the kept-alive set and is not widened into it: `org.nixos.omnigent-host-cameron` evaluates `KeepAlive = { SuccessfulExit = false; }`, so launchd restarts it only after a failing exit, and it may exit 0 and stay down legitimately, which `LaunchdJobNotRunning` must not report; a non-zero exit of it is still `LaunchdJobFailed`'s (design D9).
 In `modules/nixos/fleet-alert/rules.nix`, add after the NVMe rules, with `keptAlive` that list joined into an alternation with each `.` written `[.]` (ADR-009's note on GreptimeDB 1.2.1) and `selfNotified` the darwin rows' `notifiedUnits` as `org[.]nixos[.]<unit>`:
 

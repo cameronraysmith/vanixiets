@@ -110,7 +110,8 @@
 
     # ADR-004:121's launchd allow-list, by label, as glob patterns; each
     # darwin host's probe reads the labels on it that its evaluated
-    # launchd.daemons defines.
+    # launchd.daemons defines. org.nixos.otel-envelope is listed so a
+    # stopped or unloaded envelope is visible through the store (design D9).
     launchdLabels = [
       "org.nixos.nix-daemon"
       "org.nixos.nix-grpc-daemon"
@@ -120,8 +121,24 @@
       "org.nixos.dnscrypt-proxy"
       "org.nixos.otelcol"
       "org.nixos.otelcol-process"
+      "org.nixos.otel-envelope"
       "org.nixos.prometheus-node-exporter"
       "org.nixos.omnigent-host-*"
+    ];
+
+    # The allow-listed labels whose evaluated KeepAlive is true (ADR-004:123),
+    # which LaunchdJobNotRunning expects running; the darwin fragment asserts
+    # this list against its host's evaluated launchd.daemons. A job whose
+    # KeepAlive is a condition set, as omnigent-host-<owner>'s
+    # { SuccessfulExit = false; }, may exit 0 and stay down legitimately, so
+    # it is outside the list (design D9).
+    launchdKeptAlive = [
+      "org.nixos.dnscrypt-proxy"
+      "org.nixos.nix-daemon"
+      "org.nixos.nix-grpc-daemon"
+      "org.nixos.otelcol"
+      "org.nixos.otelcol-process"
+      "org.nixos.prometheus-node-exporter"
     ];
 
     # process.memory.usage is stored only for executables holding at least

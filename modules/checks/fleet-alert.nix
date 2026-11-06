@@ -55,7 +55,11 @@
 # theirs are the file-system expressions' `by` labels. The NVMe rules' names
 # and label sets are pyrite's as stored on 2026-11-01
 # (logs/s4-evidence/5.3-smart-20261101T063202Z.log), where the exporter's
-# counter-typed fields carry `_total`. The fixture server cannot evaluate PromQL,
+# counter-typed fields carry `_total`. The darwin rules' label sets and the
+# names in its `selectors` are stibnite's as stored on 2026-11-06, read as
+# regulator with the shapes the store answers to those rules' expressions,
+# which carry no __name__ (logs/s5-evidence/6.1-replay-20261106T144527Z.log).
+# The fixture server cannot evaluate PromQL,
 # so the SystemdUnitFailed exclusion leg replays only the failed units the
 # rendered exclusion regex keeps, matched here with the full-match
 # semantics PromQL uses for `!~`.
@@ -1476,31 +1480,11 @@
       };
 
       # Store errors and silent hosts freeze instance state: a time-relative
-      # rule's pending instance across a freeze. HostProbeStale is the darwin
-      # rules' change; until then this stand-in has ADR-009:134's
-      # expression and `for`, appended to the rendered table for these legs
-      # only, never to the evaluator's deployed rules. Value sources: the
-      # step-indexed posts typed in each leg from the requirement's
-      # scenarios, against the evaluator's posts over the fixture server.
-      probeStale = {
-        alert = "HostProbeStale";
-        expr = "time() - node_textfile_mtime_seconds > 300 or node_textfile_scrape_error == 1";
-        for = 600;
-        severity = "warning";
-        annotations.summary = "stand-in for the darwin probe's staleness rule";
-        presence = [ ];
-        attribution = [ ];
-        database = "fleet";
-        language = "promql";
-      };
-      probeStaleRules = evaluatorRules ++ [ probeStale ];
-      probeStaleConfig = checkConfig probeStaleRules;
-      stale = [
-        {
-          host_name = "stibnite";
-          file = "/var/lib/prometheus-node-exporter/textfile/launchd.prom";
-        }
-      ];
+      # rule's pending instance across a freeze, over the rendered
+      # HostProbeStale. Value sources: the step-indexed posts typed in each
+      # leg from the requirement's scenarios, against the evaluator's posts
+      # over the fixture server.
+      stale = [ fixtures.series.HostProbeStale ];
       # stibnite reports from minute 0 to 5, its probe stale from its last
       # sample at 5; silent from 10 to 125 (24 runs 5 min apart), the store
       # answering its last sample at 10 only; then reports from 126 with the
@@ -1523,13 +1507,11 @@
         }) (lib.range 126 140);
       pendingAcrossFreeze = {
         name = "pendingAcrossFreeze: HostProbeStale true at stibnite's last sample, 2 h silent, then true for 2 runs after wake and false after posts nothing";
-        rules = probeStaleRules;
         steps = freezeTimeline (n: n <= 127);
         expect = [ ];
       };
       pendingAfterWake = {
         name = "pendingAfterWake: HostProbeStale true for 11 min after stibnite wakes fires once, 10 min after wake";
-        rules = probeStaleRules;
         steps = freezeTimeline (n: n <= 137);
         # Step 40 is minute 136: 6 runs before the silence, 24 silent, then 126 + 10.
         expect = [ "40 [FIRING] HostProbeStale stibnite default" ];
@@ -1592,6 +1574,173 @@
         expect = [ ];
       };
 
+      # The darwin rules (design D9). Value sources: the rendered rule table,
+      # in which stibnite collects on darwin, against the fixture's replayed
+      # store answers, whose label sets and selector names are stibnite's as
+      # stored (fixtures `series` and `selectors`). Each leg states its
+      # condition as the steps on which the store answers the rule's
+      # expression with a label set; stibnite reports host memory on each
+      # step unless the leg says otherwise, so its instances are not frozen.
+      darwinSeries = alert: extra: fixtures.series.${alert} // extra;
+      onStibnite = step: { reporting = [ "stibnite" ]; } // step;
+      # LaunchdJobFailed's exclusion as rendered, matched with the
+      # full-match semantics PromQL uses for `!~`; none while no rule or no
+      # exclusion is rendered, so the fixture then answers every label set.
+      launchdKeeps =
+        let
+          rule = lib.findFirst (r: r.alert == "LaunchdJobFailed") null evaluatorRules;
+          m = if rule == null then null else builtins.match ''.*launchd_label!~"([^"]*)".*'' rule.expr;
+        in
+        labels: m == null || builtins.match (builtins.head m) labels.launchd_label == null;
+      failedOn =
+        label:
+        builtins.filter launchdKeeps [ (darwinSeries "LaunchdJobFailed" { launchd_label = label; }) ];
+
+      darwinSignalMissing = {
+        name = "darwinSignalMissing: stibnite reporting host memory with no launchd_job_state for 30 min, the other launchd selectors present, raises one RuleSignalMissing for LaunchdJobNotRunning";
+        steps = map (
+          n:
+          onStibnite {
+            at = gap n;
+            missing = [ fixtures.selectors.LaunchdJobNotRunning ];
+          }
+        ) (lib.range 0 7);
+        expect = [ "6 [FIRING] RuleSignalMissing default" ];
+        messages = [
+          "rule=LaunchdJobNotRunning"
+          "selector=${fixtures.selectors.LaunchdJobNotRunning}"
+        ];
+      };
+      # A label set answered on minutes 0 to 14 and not after: one FIRING
+      # at 10, one RESOLVED 5 min after it was last seen at 14.
+      notRunningFor15 = labels: {
+        steps = map (
+          n:
+          onStibnite {
+            at = minute n;
+            series = lib.optionalAttrs (n <= 14) {
+              LaunchdJobNotRunning = [ (darwinSeries "LaunchdJobNotRunning" labels) ];
+            };
+          }
+        ) (lib.range 0 20);
+        expect = [
+          "10 [FIRING] LaunchdJobNotRunning stibnite default"
+          "19 [RESOLVED] LaunchdJobNotRunning stibnite default"
+        ];
+      };
+      keptAliveStopped = notRunningFor15 { } // {
+        name = "keptAliveStopped: nix-grpc-daemon's running state 0 for 15 min fires one LaunchdJobNotRunning stibnite after 10 min and resolves once";
+      };
+      envelopeUnloaded =
+        notRunningFor15 {
+          launchd_label = "org.nixos.otel-envelope";
+          launchd_state = "unloaded";
+        }
+        // {
+          name = "envelopeUnloaded: otel-envelope unloaded for 15 min fires one LaunchdJobNotRunning stibnite after 10 min and resolves once";
+        };
+      envelopeFailedNotReported = {
+        name = "envelopeFailedNotReported: otel-envelope's non-zero exit for 15 min, which the rendered exclusion removes, posts no LaunchdJobFailed";
+        steps = map (
+          n:
+          onStibnite {
+            at = minute n;
+            series.LaunchdJobFailed = failedOn "org.nixos.otel-envelope";
+          }
+        ) (lib.range 0 15);
+        expect = [ ];
+      };
+      harmoniaFailedReported = {
+        name = "harmoniaFailedReported: harmonia-gc's non-zero exit for 15 min fires one LaunchdJobFailed stibnite after 5 min and nothing more";
+        steps = map (
+          n:
+          onStibnite {
+            at = minute n;
+            series.LaunchdJobFailed = failedOn "org.nixos.harmonia-gc";
+          }
+        ) (lib.range 0 15);
+        expect = [ "5 [FIRING] LaunchdJobFailed stibnite default" ];
+      };
+      # nix-grpc-daemon relaunched once a minute from minute -3, so its
+      # 15 min increase exceeds 5 on minutes 3 to 7, after which it stays up.
+      restartLoop = {
+        name = "restartLoop: nix-grpc-daemon's 15 min launch increase above 5 on minutes 3 to 7 fires one LaunchdJobRestartLoop stibnite at 3 and resolves once at 12";
+        steps = map (
+          n:
+          onStibnite {
+            at = minute n;
+            series = lib.optionalAttrs (n >= 3 && n <= 7) {
+              LaunchdJobRestartLoop = [ (darwinSeries "LaunchdJobRestartLoop" { }) ];
+            };
+          }
+        ) (lib.range 0 14);
+        expect = [
+          "3 [FIRING] LaunchdJobRestartLoop stibnite default"
+          "12 [RESOLVED] LaunchdJobRestartLoop stibnite default"
+        ];
+      };
+      probeStaleLeg = {
+        name = "probeStale: launchd.prom stale for 20 min while stibnite reports fires one HostProbeStale stibnite 10 min after the first stale run";
+        steps = map (
+          n:
+          onStibnite {
+            at = minute n;
+            series.HostProbeStale = [ (darwinSeries "HostProbeStale" { }) ];
+          }
+        ) (lib.range 0 19);
+        expect = [ "10 [FIRING] HostProbeStale stibnite default" ];
+      };
+      nvmeExpectsStibnite = {
+        name = "nvmeExpectsStibnite: stibnite reporting host memory with no SMART series for 30 min while pyrite is silent raises one RuleSignalMissing for each NVMe rule";
+        steps = map (
+          n:
+          onStibnite {
+            at = gap n;
+            silent = [ "pyrite" ];
+            missing = smartSelectors;
+          }
+        ) (lib.range 0 6);
+        expect = [
+          "6 [FIRING] RuleSignalMissing default"
+          "6 [FIRING] RuleSignalMissing default"
+        ];
+        messages = [
+          "rule=NvmeCriticalWarning"
+          "rule=NvmeWearHigh"
+        ];
+      };
+      # The darwin counterpart of laptopSilentLeg: harmonia-gc's failure
+      # fires at 5, then stibnite is silent from 10 to 45 while the store
+      # still answers the label set.
+      stibniteSilent = {
+        name = "stibniteSilent: stibnite silent for 40 min with LaunchdJobFailed firing posts nothing after the FIRING: no silence, no resolution, no repeat";
+        steps =
+          map (
+            n:
+            onStibnite {
+              at = minute n;
+              series.LaunchdJobFailed = failedOn "org.nixos.harmonia-gc";
+            }
+          ) (lib.range 0 5)
+          ++ map (n: {
+            at = minute (10 + 5 * n);
+            silent = [ "stibnite" ];
+            series.LaunchdJobFailed = failedOn "org.nixos.harmonia-gc";
+          }) (lib.range 0 7);
+        expect = [ "5 [FIRING] LaunchdJobFailed stibnite default" ];
+      };
+      darwinLegs = [
+        darwinSignalMissing
+        keptAliveStopped
+        envelopeUnloaded
+        envelopeFailedNotReported
+        harmoniaFailedReported
+        restartLoop
+        probeStaleLeg
+        nvmeExpectsStibnite
+        stibniteSilent
+      ];
+
       legs =
         map fireAndResolve [
           "HostMemoryPressure"
@@ -1616,7 +1765,10 @@
           retryLeg
           burnRuleLeg
           devloopFailureLeg
-        ];
+          pendingAcrossFreeze
+          pendingAfterWake
+        ]
+        ++ darwinLegs;
 
       runStep =
         leg: step:
@@ -1917,16 +2069,6 @@
               evaluator = lib.getExe realEvaluator;
               config = notCollectingConfig;
             } notCollectingLeg}
-            ${lib.concatMapStrings
-              (runLeg {
-                evaluator = lib.getExe realEvaluator;
-                config = probeStaleConfig;
-              })
-              [
-                pendingAcrossFreeze
-                pendingAfterWake
-              ]
-            }
             ${runLeg {
               evaluator = lib.getExe realEvaluator;
               config = checkConfig linuxSelectorDarwinOnly.rules;

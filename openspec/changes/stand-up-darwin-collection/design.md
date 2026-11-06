@@ -300,6 +300,7 @@ Each row names a signal or regulator that a main requirement or an ADR places on
   - AC4 (Q6): one lid-closed sleep of at least 30 min after at least an hour of collection; afterwards the queues at `127.0.0.1:8888` drain to 0, `otel-envelope` and `otel-host-probe` each run within one interval of wake, the textfile's mtime is fresh, and no evaluator post or notice names stibnite from sleep until 30 min after wake; then a natural overnight sleep is read from the same logs.
   - Every deploy step reads `journalctl -u fleet-alert -u 'observability-notify@*' --since <deploy start>` on magnetite and the wrapper's log on stibnite, and records each post with its cause.
   - Defect found at AC1 (2026-11-06): after the watched activation C5 failed with `org.nixos.otelcol-process 178 MiB above its limit`, reading `ps -o rss=`, while `/usr/bin/footprint` printed a physical footprint of 101 MB for the same process (the agent 134 MB; the Linux agents' cgroup memory 89 MiB on pyrite and 120 MiB on magnetite); C5 now reads the footprint through `top`, because RSS counts the mapped binary's resident file-backed pages that the kernel neither charges to the process nor reclaims under jetsam.
+  - C5's limits before pull request 3 (O5, 2026-11-06): kept at 256 MiB and 128 MiB, from the physical footprint read with `top` at about 15:40Z, `otelcol` 134M and `otelcol-process` 106M (about 52 % and 83 % of their limits), and 105 consecutive passing C5 runs since the fix above; this replaces the per-minute resident-memory samples the plan first read, which measured the quantity C5 no longer bounds and were never captured.
 - **Rationale**: AC1 to AC4, HP:107-112 and the CAM-72 comment; `nix-grpc-daemon` is kept alive and its absence breaks only builds dispatched to stibnite, while `dnscrypt-proxy` would break stibnite's DNS and `nix-daemon` the deploy tooling.
 
 ### D13: Checks and evaluation cost
@@ -317,7 +318,7 @@ Each row names a signal or regulator that a main requirement or an ADR places on
 |---|---|---|---|
 | `otel-collector-darwin`, new | none | 162,481,008 B (0.151 GiB), measured on 2026-11-05 over the plan's code with `pkgs // { … }` stubs; 344,895,440 B with two `pkgs.extend` | two rendered configurations, the probe and the wrapper from `flake.lib` and the root pin's `pkgs`, the class of `otel-envelope` |
 | `otel-envelope` | 157,616,512 B at `b325407984e6` (`tasks.md` 1.2) | 158,006,224 B measured on 2026-11-06 with C5 reading the footprint through `top` and its darwin cases (`logs/s5-evidence/c5-top-cost-20261106T053106Z.log`) | the darwin cases and C5 |
-| `fleet-alert` | 351,940,224 B at `b325407984e6` (`tasks.md` 1.2) | 358,938,432 B measured with Task 3's legs and changes | the platform field, four rules, the TJ change and its legs |
+| `fleet-alert` | 351,940,224 B at `b325407984e6` (`tasks.md` 1.2) | 373,999,568 B measured on 2026-11-06 with the four darwin rules and their nine legs (358,938,432 B with Task 3's legs and changes alone) | the platform field, four rules, the TJ change and its legs |
 
 ### Spec deltas beyond the proposal's list
 

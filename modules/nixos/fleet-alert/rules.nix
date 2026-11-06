@@ -25,8 +25,12 @@
 # SystemdUnitFailed expect the NixOS hosts, whose selectors darwin never
 # writes; the file-system rules, LocalExporterDown and WeeklyPipelineTest
 # expect every collecting host; the NVMe rules expect the hosts with SMART
-# devices, so far only the NixOS ones, because no darwin SMART series' stored
-# name has been read yet. `alwaysOn` lists the collecting hosts marked
+# devices; the four launchd and probe rules expect the darwin hosts (S5
+# design D9). LaunchdJobNotRunning expects running the kept-alive labels of
+# flake.lib.otelCollectorSchema.launchdKeptAlive and reports any
+# allow-listed label unloaded; LaunchdJobFailed excludes the darwin hosts'
+# notifiedUnits as org.nixos.<unit>, which post their own notices, so one
+# failure is reported once. `alwaysOn` lists the collecting hosts marked
 # always-on, whose own silence it reports: one absent from
 # system_memory_usage_bytes for 10 min while the store answers raises it
 # with that host_name and no `for` (ADR-009 item 16, charter v20).
@@ -59,10 +63,23 @@
       nixosHosts = onPlatform "nixos";
       darwinHosts = onPlatform "darwin";
       smartHosts = builtins.attrNames (lib.filterAttrs (_: h: h.smartDevices != [ ]) collecting);
-      # Until the darwin rules land, the NVMe rules keep their NixOS hosts.
-      nvmeHosts = lib.subtractLists darwinHosts smartHosts;
       presence = expectedHosts: selector: { inherit selector expectedHosts; };
       fsRatio = ''sum by (host_name, mountpoint) (system_filesystem_usage_bytes{state="used"}) / sum by (host_name, mountpoint) (system_filesystem_usage_bytes)'';
+      # Each dot written [.], as notifiedRegex below.
+      launchdRegex =
+        labels: lib.concatMapStringsSep "|" (builtins.replaceStrings [ "." ] [ "[.]" ]) labels;
+      keptAlive = launchdRegex config.flake.lib.otelCollectorSchema.launchdKeptAlive;
+      selfNotified = launchdRegex (
+        map (unit: "org.nixos.${unit}") (
+          lib.unique (
+            lib.naturalSort (
+              lib.concatMap (h: h.notifiedUnits) (
+                builtins.attrValues (lib.filterAttrs (_: h: h.platform == "darwin") hosts)
+              )
+            )
+          )
+        )
+      );
 
       # Appended to HostMemoryPressure and HostOOMKill messages (ADR-009 item
       # 5); the evaluator substitutes the firing host for <host>.
@@ -160,7 +177,7 @@
           for = "0s";
           severity = "critical";
           annotations.summary = "A laptop's NVMe controller reports a critical warning";
-          presence = [ (presence nvmeHosts "smartctl_device_critical_warning_total") ];
+          presence = [ (presence smartHosts "smartctl_device_critical_warning_total") ];
         }
         {
           alert = "NvmeWearHigh";
@@ -168,7 +185,39 @@
           for = "1h";
           severity = "warning";
           annotations.summary = "A laptop's SSD has used more than 90 % of its rated endurance";
-          presence = [ (presence nvmeHosts "smartctl_device_percentage_used_total") ];
+          presence = [ (presence smartHosts "smartctl_device_percentage_used_total") ];
+        }
+        {
+          alert = "LaunchdJobNotRunning";
+          expr = ''launchd_job_state{launchd_state="running", launchd_label=~"${keptAlive}"} == 0 or launchd_job_state{launchd_state="unloaded"} == 1'';
+          for = "10m";
+          severity = "warning";
+          annotations.summary = "A kept-alive launchd job is not running, or an allow-listed job is not loaded";
+          presence = [ (presence darwinHosts "launchd_job_state") ];
+        }
+        {
+          alert = "LaunchdJobFailed";
+          expr = ''launchd_job_last_exit_code{launchd_label!~"${selfNotified}"} != 0'';
+          for = "5m";
+          severity = "warning";
+          annotations.summary = "A launchd job's last exit was not clean";
+          presence = [ (presence darwinHosts "launchd_job_last_exit_code") ];
+        }
+        {
+          alert = "LaunchdJobRestartLoop";
+          expr = "increase(launchd_job_runs_total[15m]) > 5";
+          for = "0s";
+          severity = "warning";
+          annotations.summary = "A launchd job relaunched more than five times in 15 minutes";
+          presence = [ (presence darwinHosts "launchd_job_runs_total") ];
+        }
+        {
+          alert = "HostProbeStale";
+          expr = "time() - node_textfile_mtime_seconds > 300 or node_textfile_scrape_error == 1";
+          for = "10m";
+          severity = "warning";
+          annotations.summary = "A darwin host's probe has stopped writing its textfile";
+          presence = [ (presence darwinHosts "node_textfile_mtime_seconds") ];
         }
         {
           alert = "SystemdUnitRestartLoop";
