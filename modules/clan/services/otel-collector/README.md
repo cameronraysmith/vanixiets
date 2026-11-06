@@ -2,7 +2,7 @@
 
 This clan service collects fleet metrics into the GreptimeDB telemetry store and carries the dev-loop record's logs into `devloop`, and its `agent` role imports the failure notifier that posts unit failures to ntfy.
 It has two roles, `agent` and `ingress`, assigned in `modules/clan/inventory/services/otel-collector.nix`: `agent` on every host of `flake.lib.observabilityHosts`, and `ingress` on magnetite alone.
-The roles import the plain NixOS modules `flake.modules.nixos.otel-collector-agent` and `flake.modules.nixos.otel-collector-ingress`, so the container tests import them without clan.
+The roles import the plain NixOS modules `flake.modules.nixos.otel-collector-agent` and `flake.modules.nixos.otel-collector-ingress`, so the container tests import them without clan, and on a darwin host the `agent` role's `darwinModule` imports `flake.modules.darwin.otel-collector-agent` (see "Darwin agents").
 The clan `agent` role reads the `otel-ca`, `otel-cert` and `ntfy-alerter` vars, and the clan `ingress` role reads the `collector-password` and `regulator-password` files of `greptimedb-users`.
 
 The NixOS module runs one collector per host, so both roles' fragments merge into one `services.opentelemetry-collector` and one `opentelemetry-collector.service`.
@@ -11,13 +11,14 @@ Both roles import `collectorCore`, which carries the shared module key `vanixiet
 
 ## Agent hosts and the host table
 
-`flake.lib.observabilityHosts` in `modules/lib/observability-hosts.nix` lists the agent hosts, magnetite, cinnabar, pyrite, electrum, galena and scheelite, each with `collect`, `alwaysOn`, `notifiedUnits` and `smartDevices`.
+`flake.lib.observabilityHosts` in `modules/lib/observability-hosts.nix` lists the agent hosts, magnetite, cinnabar, pyrite, electrum, galena, scheelite and stibnite, each with `platform`, `collect`, `alwaysOn`, `notifiedUnits` and `smartDevices`.
+`platform` is `"nixos"` from the `agent` helper and `"darwin"` on stibnite's row, and an assertion in the clan inventory's `otel-collector` instance requires each row's `platform` to equal the machine's `machineClass` in `modules/clan/inventory/machines.nix`.
 The inventory generates `roles.agent.machines` from that table, so a host joins the agent role by a row there.
 On every row, whatever its `collect`, the clan agent role declares the `otel-ca` and `otel-cert` generators and imports `flake.modules.nixos.ntfy-alerter`, so one vars step covers every host.
 `collect` gates everything else the role runs on the host: the agent fragment, `vanixiets.otelCollector.caFile` and `smartDevices`, the notifier's `units` and `tokenFile`, and the collector's `otel-cert` and `otel-key` credentials.
 On a host that does not collect, the certificate and the token are uploaded files that no unit reads.
 A new host is therefore added with `collect = false`, and turned on by its own one-line change setting `collect = true`, merged immediately before the host's watched deploy, which magnetite's deploy follows, because magnetite's evaluator takes its expected and always-on hosts from the same table (runbook, "Adding an agent host").
-`alwaysOn` marks magnetite and cinnabar, the hosts whose silence the alert rules report, and only pyrite lists `smartDevices`, `[ "/dev/nvme0" ]`.
+`alwaysOn` marks magnetite and cinnabar, the hosts whose silence the alert rules report, and only pyrite and stibnite list `smartDevices`, `[ "/dev/nvme0" ]` and `[ "disk0" ]`.
 
 ## Export by role
 
@@ -269,6 +270,60 @@ When it is set, the template loads the file as the credential `alerter-token` wi
 `ntfy-send` sends the token as an `Authorization: Bearer` header on curl's stdin, never on a command line.
 With `tokenFile` unset the notifier posts anonymously, which ntfy refuses on `fleet-*` topics once cinnabar's access entries are in force.
 
+## Darwin agents
+
+stibnite is the only darwin agent host; its row sets `platform = "darwin"`, `notifiedUnits = [ "otel-envelope" ]` and `smartDevices = [ "disk0" ]`.
+On every darwin row, whatever its `collect`, the agent role's `perInstance.darwinModule` in `flake-module.nix` declares the `_otelcol` account (uid and gid 536, in `users.knownUsers` and `users.knownGroups`, home `/var/empty`, shell `/usr/bin/false`) and the generators `otel-ca`, `otel-cert` and, through `flake.modules.darwin.ntfy-alerter`, `ntfy-alerter`.
+`otel-cert`'s `key.pem` and the `ntfy-alerter` token are owned by `_otelcol` with mode `0400`, and the key has `neededFor = "services"`, so both have their owner before any collector runs.
+`restartUnits` is set only in the NixOS module, because clan-core throws on it on darwin (`clan-core generic-generator.nix:193-208`); instead the `otelcol` plist carries `OTEL_CERT_SHA256`, the sha256 of `otel-cert`'s committed `cert.pem`, so a reissued certificate changes the plist and nix-darwin reloads the job.
+Where `collect` is true the role also imports `flake.modules.darwin.otel-collector-agent` from `modules/darwin/otel-collector-agent.nix`, the fragment that runs collection.
+
+The fragment's activation pre-step, ordered before launchd loads the jobs, creates `/var/lib/opentelemetry-collector/queue`, `/var/lib/otel-envelope` and `/var/log/otelcol` for `_otelcol` with mode `0700`, and `/var/lib/prometheus-node-exporter/textfile` for `_prometheus-node-exporter`.
+State lives under `/var`, because darwin empties `/run` at boot.
+launchd opens a job's `StandardOutPath` as the job's `UserName`, so each job logs into a directory its own account owns.
+Every job runs behind `/bin/wait4path /nix/store` through nix-darwin's `script` or `command`, and none uses `StartCalendarInterval`, which a fragment assertion enforces, because launchd coalesces calendar firings missed in sleep and interprets them in local time.
+The fragment declares five launchd jobs:
+
+| Label | Account | Schedule | Runs | Log |
+|---|---|---|---|---|
+| `org.nixos.otelcol` | `_otelcol` | `KeepAlive`, `RunAtLoad` | the agent, after waiting for `otel-cert`'s key path | `/var/log/otelcol/otelcol.log` |
+| `org.nixos.otelcol-process` | root | `KeepAlive`, `RunAtLoad` | the process collector, with no listener and no credential | `/var/log/otelcol/otelcol-process.log` |
+| `org.nixos.prometheus-node-exporter` | `_prometheus-node-exporter` | `KeepAlive` (nix-darwin's module) | node_exporter on `127.0.0.1:9100` with only the `textfile` collector | nix-darwin's default |
+| `org.nixos.otel-host-probe` | `_prometheus-node-exporter` | `StartInterval = 60`, `RunAtLoad` | the probe | `/var/lib/prometheus-node-exporter/otel-host-probe.log` |
+| `org.nixos.otel-envelope` | `_otelcol` | `StartInterval = 300` | the envelope under the notifier wrapper | `/var/log/otelcol/otel-envelope.log` |
+
+The configurations come from `flake.lib.otelCollectorDarwin` in `modules/lib/otel-collector-darwin.nix`, which renders them from `flake.lib` data and its arguments only, so `checks.x86_64-linux.otel-collector-darwin` validates and tests them on Linux without evaluating a darwin host.
+Its `agent` runs `host_metrics/memory` with `memory`, a `disk` scraper on `disk0` and a `filesystem` scraper on `/System/Volumes/Data`, both by `strict` match, with `system.disk.io_time` and `system.disk.pending_operations` disabled; the `otlp` receiver on `127.0.0.1:4318`, which only `otelcol-process` feeds; the `node` scrape of `127.0.0.1:9100` keeping `schema.darwinNodeExporterKeep` and `schema.smartctlKeep`; the `otelcol` scrape of `127.0.0.1:8888`; and `file_log/deploy-record` with the NixOS agents' id and settings into `logs/devloop-deploy_record`.
+It has no `systemd` receiver, no paging or available-memory series and no `transform/omnigent-alias`, because the probe writes the owner's alias itself.
+`otlp_http/ingress` and `otlp_http/ingress-logs` export as on a NixOS agent, with queues of 400 MiB and 16 MiB in `file_storage` and the `otel-cert` key and certificate at their sops paths, behind a 150 MiB limiter with a 30 MiB spike allowance.
+Its `process` configuration runs `host_metrics/process` with the six identity attributes disabled, a 64 MiB limiter with a 16 MiB spike allowance, the NixOS agent's compaction and per-executable sum, and `filter/process-min`, which drops a summed point below `process.minBytes.darwin`, 384 MiB, unless its executable is one of the host's fleet executables; it exports to the agent's `127.0.0.1:4318` and sets `service.telemetry.metrics.level = "none"`, so it opens no listener.
+The fleet executables are the names of `process.darwinFleetExecutables` whose label globs match the host's daemons, and the floor is higher than Linux's 64 MiB because macOS RSS counts each process's share of the dyld shared cache, which put 50 to 70 names an hour on stibnite at 64 MiB against the budget of 30 (#3744).
+`flake.lib.otelHostProbeLabels` selects the probe's labels: the patterns of `schema.launchdLabels` matched, dots literal, against the host's evaluated `launchd.daemons`.
+
+`flake.lib.otelHostProbe` (`modules/lib/otel-host-probe.nix`) is the probe.
+It makes exactly two kinds of vendored call: `/bin/launchctl print system/<label>` per selected label, and the root pin's `smartctl -j -H -A <device>` per `smartDevices` entry.
+From the first it writes `launchd_job_state` for the states `running`, `not_running`, `unloaded` and `other`, `launchd_job_last_exit_code` and `launchd_job_runs_total` into `launchd.prom`; it never writes `pid`, and writes each `org.nixos.omnigent-host-<owner>` label as `org.nixos.omnigent-host-<alias>` from `schema.ownerAliases`.
+A label answered `Could not find service` is written in state `unloaded` with no exit code and no runs series.
+`(never exited)` is written as exit code 0; a missing `last exit code` line is written 0 when `last exit reason` is `JETSAM_REASON_MEMORY_IDLE_EXIT`, launchd's routine reclaim of an idle job, and -1 otherwise, as for a job killed by a signal; a value that is not an integer is written -1.
+From the second it writes smartctl_exporter's eight names under that exporter's `# TYPE`s into `smartctl.prom`, so the store gives stibnite's SMART series the `_total` names pyrite's carry.
+Each file is written to a temporary name in the textfile directory and renamed.
+The parser's fixtures under `modules/checks/otel-collector-darwin/launchctl/` are `launchctl print` replies recorded on stibnite at macOS 26.7.1 with their `environment` blocks removed, beside `smartctl-disk0.json` and the expected `.prom` files under `expected/`.
+Two are marked as edited copies, because no allow-listed job showed them when the replies were recorded: `org.nixos.exit-78`, and `org.nixos.signal-killed`, whose non-idle `last exit reason` is assumed.
+
+`flake.lib.observabilityNotifyRun` (`modules/lib/observability-notify-run.nix`) is the notifier wrapper, the launchd counterpart of `OnFailure` and the resolve hooks.
+`observability-notify-run -- <command>` runs the command and exits with its code; it posts `FAILED <label> on <host>` when a run fails after a pass or a first run fails, and `RESOLVED <label> on <host>` when a run passes after a posted `FAILED`.
+It shares the `failed` and `resolved` scripts with the NixOS template through `flake.lib.observabilityNotifyScripts`, so the stamps, the 900 s rate limit and the post format are the same on both platforms.
+On stibnite its stamps live in `/var/lib/otel-envelope` and each posted `FAILED` appends a line to `/var/lib/otel-envelope/notify.log`; its posts, and a failed post, are logged in `/var/log/otelcol/otel-envelope.log` with the envelope's output.
+It sets `NTFY_TOKEN_FILE` to the token's path only for `ntfy-send`'s calls, and `ntfy-send` posts with `/usr/bin/curl -sfk` on darwin, as the store curl does with `-sfk` on Linux, so neither verifies ntfy.zt's certificate (tracked in Linear (CAM-87); `pkgs/by-name/ntfy-send/package.nix`).
+A failed `FAILED` post writes no stamp, so the next failing run posts again; no unit stays failed, so nothing like `SystemdUnitFailed` reports it.
+
+On stibnite `otel-envelope` judges `C1` to `C4` against the targets `node` and `otelcol` and the exporters `otlp_http/ingress` and `otlp_http/ingress-logs` that `flake.lib.otelCollectorDarwin` renders, with `STATE_DIRECTORY=/var/lib/otel-envelope`.
+launchd bounds no memory, so the darwin envelope adds `C5 memory`, from the `darwinMemory` argument of `flake.lib.otelEnvelope`: for each job that `launchctl print` shows with a `pid`, it reads the physical footprint from the MEM field of `/usr/bin/top -l 1 -pid <pid> -stats pid,mem`, and fails above 256 MiB for `org.nixos.otelcol` and 128 MiB for `org.nixos.otelcol-process`, the NixOS `MemoryMax` analogues.
+The footprint is the kernel's own accounting, which jetsam uses; the resident size that `ps -o rss=` reports also counts the mapped 357 MiB collector binary's file-backed pages, and read 178 MiB for `otelcol-process` when its footprint was 101 MB (#3740).
+`top` is setuid root, so `_otelcol` reads root's `otelcol-process`; a `top` that fails or does not answer within 10 s, or an absent or unreadable MEM field, fails the clause.
+The limits were confirmed on 2026-11-06 from footprints of 134M for `otelcol` and 106M for `otelcol-process` and 105 consecutive passing runs.
+Without `darwinMemory` the script's text is unchanged, so no NixOS envelope changes.
+
 ## Hazards
 
 - `otel-ca` certificates have no revocation: a host's lost `otel-cert` key can write to `otlp/mesh` until `otel-ca` and every `otel-cert` are regenerated and deployed (runbook, "Rotating otel-ca").
@@ -290,6 +345,8 @@ With `tokenFile` unset the notifier posts anonymously, which ntfy refuses on `fl
 Module assertions run whenever a host imports the modules:
 
 - agent: the six process identity attributes are disabled; node_exporter and the smartctl exporter do not open the firewall; the notified units are services with an `ExecStart` and include `opentelemetry-collector` and `otel-envelope`; at most 40 services, notifier instances apart, match `systemdUnits`; every `omnigent-host-<owner>` service has an alias that contains no owner's name; and, off the ingress host, the queues and limiter keep the envelope of "Export by role".
+- darwin fragment (`modules/darwin/otel-collector-agent.nix`), which stibnite's activation evaluates before it switches: both ingress exporters queue in `file_storage` by bytes with unlimited retry and the metrics queue holds 24 h at `fleetBytesPerMinute`; the two queues sum below 512 MiB; every receiver, telemetry and node_exporter listener and `otelcol-process`'s exporter is on loopback; none of the five jobs sets `StartCalendarInterval`; every `omnigent-host-<owner>` daemon has an alias free of owner names; `schema.launchdKeptAlive` equals the allow-listed labels whose evaluated `KeepAlive` is `true`; and every long-running `org.nixos.*` daemon matches exactly one glob of `process.darwinFleetExecutables`, the omnigent glob naming the omnigent package's interpreter.
+- clan inventory: each host-table row's `platform` equals its machine's `machineClass`.
 - ingress: the store's `services.greptimedb.databases` names equal `otelCollectorSchema.databases` whenever the host runs the store.
 - `modules/nixos/greptimedb.nix`: listeners on loopback, unused protocols off, a static user provider, usage reporting off, `MemoryHigh` in whole gibibytes.
 - `modules/nixos/observability-notify.nix`: with `tokenFile` set, every notified unit's resolve hooks run under `env NTFY_TOKEN_FILE=<tokenFile>`.
@@ -302,7 +359,13 @@ Its build runs `observability-notify-rehearsal`, which drives the notifier scrip
 
 `checks.x86_64-linux.greptimedb-envelope` (`modules/checks/greptimedb-envelope.nix`) covers the store side: R7.1's memory and kill-order relations, R1.1, R8.2 file ownership, disko against the dataset binding, the PromQL read path, the users-file generator run, the SQL helper and table clause against recorded answers, and R7.2 against recorded cgroup files.
 
-`checks.x86_64-linux.otel-envelope` (`modules/checks/otel-envelope.nix`) runs `otel-envelope`'s script against recorded collector telemetry served on loopback, one case per sequence of runs, and requires each mutant of the script to fail its case; it also holds the budget clauses to minute `00` and to the ingress host, and needs no running collector or store.
+`checks.x86_64-linux.otel-envelope` (`modules/checks/otel-envelope.nix`) runs `otel-envelope`'s script against recorded collector telemetry served on loopback, one case per sequence of runs, and requires each mutant of the script to fail its case; it also holds the budget clauses to minute `00` and to the ingress host, runs a darwin case set over stibnite-shaped telemetry and `C5` over recorded `top` text with the mutants `c5WrongPid`, `c5ReadsRss` and `c5UnreadablePasses`, and needs no running collector or store.
+
+`checks.x86_64-linux.otel-collector-darwin` (`modules/checks/otel-collector-darwin.nix`) renders the darwin agent's and `otelcol-process`'s configurations from `flake.lib.otelCollectorDarwin` and runs the root pin's Linux `otelcol-contrib validate` over each.
+It judges R3.1's darwin clauses: node_exporter on `127.0.0.1` with only `textfile`, `otelcol-process` with the six attributes disabled and no endpoint, listener or credential path, item 21's include lists, every endpoint on loopback except the exporters', whose address equals `vars/shared/zerotier-ip-magnetite-zerotier/ip/value`, and the probe's labels against a fixture list of stibnite's daemons.
+It runs the probe over the recorded `launchctl print` and `smartctl` replies and compares its files with the expected ones; runs the wrapper over a recording `ntfy-send`; and feeds process points to the rendered `filter/process-min` in a running collector, which must keep the fleet executables below the floor.
+Each mutant runs only its own clause or case, printed as `mutant <name> rejected: <case>`, among them `labelDotUnescaped`, `aliasDropped`, `pidWritten`, `missingExitCodeAsZero`, `idleExitAsFailure`, `postEveryFailure` and `keepListIgnored`.
+It establishes nothing about a darwin process starting: launchd's loading of the jobs, the collector's start on macOS and its connection over ZeroTier were observed at stibnite's activation.
 
 `checks.x86_64-linux.nixos-magnetite` builds the toplevel, which runs nixpkgs' `otelcol-contrib validate` on the rendered collector configuration.
 

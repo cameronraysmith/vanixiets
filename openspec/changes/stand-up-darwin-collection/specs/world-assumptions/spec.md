@@ -319,7 +319,7 @@ Any requirement whose discharge depends on this fact SHALL name it explicitly, a
 
 ### Requirement: A77 — macOS resident size counts each process's mapped share of the shared cache, so ordinary processes read tens to hundreds of MiB
 
-It is true of macOS 26.7.1, independent of what this fleet builds, that the resident size the pinned process scraper records as `process.memory.usage` on darwin counts the dyld shared cache and frameworks a process maps, so ordinary daemons read 65-300 MiB, and that the name it reports is the kernel's `p_comm`, which follows symlinks and names an interpreter rather than a script.
+It is true of macOS 26.7.1, independent of what this fleet builds, that the darwin process scraper's resident size counts mapped shared-cache pages, so ordinary daemons read 65-300 MiB, and that its process name is the kernel's `p_comm`.
 Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL be treated as losing its discharge once this assumption's violation condition below is observed.
 
 **Source**: the value is `proc_pidinfo`'s `pti_resident_size` (`contrib@v0.155.0:receiver/hostmetricsreceiver/internal/scraper/processscraper/process_scraper.go:321-326`; `gopsutil@v4.26.5:process/process_darwin.go:477-492`), and the name is `p_comm` (`process_darwin.go:65-87`).

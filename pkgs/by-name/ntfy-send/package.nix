@@ -2,10 +2,17 @@
 # One source for every delivery: the home-manager tools command installs it,
 # and system units run it from ExecStart.
 #
-# Endpoint security software on Darwin blocks ad-hoc signed (Nix store)
-# binaries from TCP connections over ZeroTier. The preamble injects
-# NTFY_CURL_BIN, the eval-time-resolved curl path, so Darwin uses /usr/bin/curl
-# while Linux uses the curl from runtimeInputs.
+# The preamble injects NTFY_CURL_BIN, the eval-time-resolved curl path:
+# /usr/bin/curl on Darwin, the curl from runtimeInputs on Linux. Both run with
+# -sfk, so neither verifies ntfy.zt's certificate. The Darwin choice came from
+# a note of 2026-03-10 that endpoint security blocks Nix store binaries from
+# TCP over ZeroTier; on 2026-11-06 a store-built otelcol-contrib on stibnite
+# reached the ingress over ZeroTier, and the store curl, run as _otelcol with
+# --cacert modules/machines/nixos/cinnabar/pki/caddy-root-ca.crt, fetched
+# https://ntfy.zt/v1/health with HTTP 200 and verification on (without the CA,
+# exit 60), so that reason no longer holds. Verifying ntfy.zt in every ntfy
+# client, and correcting the same endpoint-security claim in ntfy-send.sh's
+# --help text, is tracked in Linear (CAM-87).
 #
 # NTFY_TOKEN_FILE, when set and non-empty, names a file holding an ntfy access
 # token, such as the `alerter` token that fleet-* topics require. The script

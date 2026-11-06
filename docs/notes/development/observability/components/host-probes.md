@@ -53,9 +53,10 @@ Probe output rules (ADR-003 item 23):
 - A label that `launchctl` cannot find is written with state `unloaded`.
 - Each `org.nixos.omnigent-host-<owner>` label is written as `org.nixos.omnigent-host-<alias>` from the owner-to-alias attrset in `schema.nix`, `flake.lib.otelCollectorSchema.ownerAliases = { cameron = "owner-1"; janettesmith = "owner-2"; }` (ADR-003 item 17).
 - `pid` is never written.
-- `(never exited)` is written as exit code 0, and any exit-code field that is not an integer as -1.
+- `(never exited)` is written as exit code 0; a missing `last exit code` line is written 0 when `last exit reason` is `JETSAM_REASON_MEMORY_IDLE_EXIT`, launchd's routine reclaim of an idle on-demand job, and -1 otherwise, as for a job killed by a signal; and any exit-code field that is not an integer is written -1 (ADR-003 item 23; charter v29).
+  On 2026-11-05, 98 of stibnite's 441 system jobs showed an idle exit with no exit-code line while healthy, so writing it as a failure would fire `LaunchdJobFailed` on routine reclaim.
 
-Launchd job allow-list (ADR-004): `org.nixos.nix-daemon`, `org.nixos.nix-grpc-daemon`, `org.nixos.harmonia-gc`, `org.nixos.nix-cleanup-gcroots`, `org.nixos.sops-install-secrets`, `org.nixos.dnscrypt-proxy`, `org.nixos.otelcol`, `org.nixos.otelcol-process`, `org.nixos.prometheus-node-exporter` and `org.nixos.omnigent-host-*`.
+Launchd job allow-list (ADR-004): `org.nixos.nix-daemon`, `org.nixos.nix-grpc-daemon`, `org.nixos.harmonia-gc`, `org.nixos.nix-cleanup-gcroots`, `org.nixos.sops-install-secrets`, `org.nixos.dnscrypt-proxy`, `org.nixos.otelcol`, `org.nixos.otelcol-process`, `org.nixos.otel-envelope`, `org.nixos.prometheus-node-exporter` and `org.nixos.omnigent-host-*`; `org.nixos.otel-envelope` is listed so a stopped or unloaded envelope is visible through the store (charter v29).
 `schema.nix` renders the jobs whose evaluated `serviceConfig.KeepAlive` is `true` for ADR-009's `LaunchdJobNotRunning` rule (ADR-004).
 
 ## Configuration surface
@@ -64,7 +65,7 @@ Launchd job allow-list (ADR-004): `org.nixos.nix-daemon`, `org.nixos.nix-grpc-da
 - In the same file, `agent` role darwin module: nix-darwin's `services.prometheus.exporters.node` with `listenAddress = "127.0.0.1"` and `--collector.disable-defaults --collector.textfile --collector.textfile.directory=/var/lib/prometheus-node-exporter/textfile`; `launchd.daemons.otel-host-probe` as a `pkgs.writeShellApplication` over `/bin/launchctl`, the root pin's `smartmontools` and `jq`, generated from `schema.nix`, writing by write-then-rename; and the agent's scrape of `127.0.0.1:9100` with the darwin keep-list (ADR-003 items 23 and 24, Implementation surface).
 - In `modules/lib/observability-hosts.nix`, `flake.lib.observabilityHosts`: each host's `smartDevices`, `[ "/dev/nvme0" ]` on pyrite and, from S5, `[ "disk0" ]` on stibnite, which the `agent` role reads (ADR-003 Implementation surface; charter v23).
 - In `modules/clan/services/otel-collector/schema.nix`: the node_exporter, darwin textfile and smartctl_exporter keep-lists, the launchd job allow-list, the owner-to-alias attrset and the kept-alive job set (ADR-004 Implementation surface).
-- In `modules/checks/otel-collector-config.nix`: R3.1's exporter and probe assertions and the recorded `launchctl print` fixtures (ADR-003).
+- In `modules/checks/otel-collector-config.nix`: R3.1's NixOS exporter assertions; in `modules/checks/otel-collector-darwin.nix`: R3.1's darwin probe assertions and the recorded `launchctl print` and `smartctl` fixtures under `modules/checks/otel-collector-darwin/` (ADR-003; charter v29).
 - In `modules/checks/otel-redaction.nix`: R4.1's `launchd_job_state` alias fixture and `smartctl_device` `serial_number` fixture (ADR-004).
 - Packages: `prometheus-node-exporter` 1.12.1, `prometheus-smartctl-exporter` 0.15.0, which logs `version=0.15.0` on pyrite (2026-11-01), and `smartmontools` 7.5 from the root pin (ADR-003 Context; `NixOS/nixpkgs@ac1faec4:pkgs/by-name/sm/smartmontools/package.nix:103`).
 - Flake inputs: none added (ADR-003 Implementation surface).
@@ -76,14 +77,16 @@ Envelopes (ADR-003):
 
 - Exporters on NixOS: `prometheus-node-exporter` and `prometheus-smartctl-exporter` each run with `MemoryMax = 64M`.
 - Darwin host-signal processes: the probe finishes within its 60 s interval and node_exporter runs only the `textfile` collector; launchd bounds none of their memory (`research/otel-collector-topology.md` F12, F15).
+  The two darwin collectors beside them are bounded by the darwin `otel-envelope`'s `C5` at a physical footprint of 256 MiB and 128 MiB (`components/otel-collector.md`; charter v29).
+- Clock changes: every darwin job of this component runs kept alive or on `StartInterval`, never `StartCalendarInterval`, which the darwin fragment asserts; the calendar jobs it observes, `harmonia-gc` (daily 03:15) and `nix-cleanup-gcroots` (Sunday 03:30), run once on a daylight-saving change day, because neither time falls in the repeated or the skipped hour, and a run missed in sleep is coalesced into one run at wake (`launchd.plist(5)`).
 - Host signals per NixOS host: 16 node_exporter series, and on pyrite 10 smartctl series, inside the per-host figure that also counts the collector's process, unit and paging series.
 - Host signals per darwin host: at most 30 allow-listed launchd jobs at six series each, 8 SMART series per device, 3 textfile metadata series and 1 `up` series.
 - Exposure: no exporter binds outside loopback.
 
 Regulators:
 
-- R3.1, deterministic, build time, in `checks.x86_64-linux.otel-collector-config`: every `prometheus` receiver target is `127.0.0.1`; both NixOS exporters set `listenAddress = "127.0.0.1"` and `openFirewall = false`; darwin node_exporter's `listenAddress` is `127.0.0.1` with only the `textfile` collector enabled; the probe's label list equals the launchd allow-list in `schema.nix` intersected with the host's `launchd.daemons` (ADR-003).
-- R3.1 also runs the probe's parser over recorded `launchctl print` output from stibnite, one running job, one with `last exit code = 78`, one `org.nixos.omnigent-host-cameron` and one reply for an unloaded label, and asserts the expected `launchd_job_*` lines with the alias label, the `unloaded` state and no `pid` (ADR-003).
+- R3.1, deterministic, build time: in `checks.x86_64-linux.otel-collector-config`, every NixOS `prometheus` receiver target is `127.0.0.1` and both NixOS exporters set `listenAddress = "127.0.0.1"` and `openFirewall = false`; in `checks.x86_64-linux.otel-collector-darwin`, darwin node_exporter's `listenAddress` is `127.0.0.1` with only the `textfile` collector enabled and the probe's label list equals the launchd allow-list in `schema.nix` intersected with a fixture list of stibnite's daemons (ADR-003; charter v29).
+- `otel-collector-darwin` also runs the probe over recorded `launchctl print` output from stibnite under `modules/checks/otel-collector-darwin/` (a running job, one with `last exit code = 78`, `org.nixos.omnigent-host-cameron`, an unloaded label, a job ended by a signal and a jetsam idle exit) and recorded `smartctl` output, and asserts the expected `launchd_job_*` and SMART lines with the alias label, the `unloaded` state and no `pid` (ADR-003; charter v29).
 - R3.2, runtime: each host's own `otel-envelope` probes the scrape targets its collector declares and fails when one does not answer `GET` with 200 within 10 s on two consecutive runs (ADR-003; charter v23).
 - R4.1, deterministic, build time: the launchd alias and `serial_number` fixtures leave no owner name and no `serial_number` in the output (ADR-004).
 - R4.2, runtime: the ingress host's `otel-envelope` fails when a host exceeds 30 `launchd_label` values (ADR-004; charter v23).
@@ -105,7 +108,7 @@ Regulators:
 - pyrite's Apple NVMe controller answers smartctl's health log on `/dev/nvme0`; if it does not, pyrite's exporter is removed (ADR-003 Q15).
 - `RuleSignalMissing` reports a missing `smartctl_device_critical_warning_total` for pyrite within 30 min of deploy if pyrite reports host memory but no SMART series (ADR-009).
 - `_prometheus-node-exporter` reads `disk0`'s health log on stibnite, as `nobody` did on 2026-10-15 (ADR-003 Q18).
-- `launchctl print` encodes a signal termination as an integer, or the probe writes -1 for it (ADR-003 Q18; ADR-003 item 23).
+- A job ended by a signal, whose `launchctl print` shows no exit-code line and a non-idle `last exit reason`, reads -1 (ADR-003 Q18; ADR-003 item 23; charter v29).
 - A `darwin-rebuild switch` with a changed `otelcol` plist on stibnite fires neither `LaunchdJobFailed` nor `LaunchdJobNotRunning` (ADR-009).
 - R3.2 fails within 10 min after one host's `prometheus-node-exporter` is stopped (ADR-003).
 - R3.1 fails on a darwin node_exporter `listenAddress` of the empty string and on an exporter `listenAddress` of `0.0.0.0` (ADR-003).

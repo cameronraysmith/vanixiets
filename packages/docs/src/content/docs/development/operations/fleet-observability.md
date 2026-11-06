@@ -3,13 +3,13 @@ title: Fleet observability
 description: "Operating the fleet's telemetry store, metrics collectors, dev-loop record and alerting: dashboard access, querying devloop, alerts and failure notices on fleet-alerts, the dead-man on cinnabar, agent hosts and their certificates, the ingress, the hourly and five-minute envelopes, the daily reconcile, credential rotation and retention."
 ---
 
-This runbook is for the operator of the fleet's telemetry store, its collectors, its dev-loop record, alerting and the dashboard, as deployed by slices S1 to S4 and S6.
-It assumes SSH access to `magnetite.zt` and `cinnabar.zt` over ZeroTier, and to cinnabar as `root@49.13.68.78` over its public address, `sudo` on both, and a vanixiets checkout with the `clan` CLI on the workstation.
+This runbook is for the operator of the fleet's telemetry store, its collectors, its dev-loop record, alerting and the dashboard, as deployed by slices S1 to S6.
+It assumes SSH access to `magnetite.zt` and `cinnabar.zt` over ZeroTier, and to cinnabar as `root@49.13.68.78` over its public address, `sudo` on both, a vanixiets checkout with the `clan` CLI on the workstation, and, for the darwin agent, a shell with `sudo` on stibnite.
 The maintainer contract for the collector lives in `modules/clan/services/otel-collector/README.md`; the failure notifier lives in `modules/nixos/observability-notify.nix`, the alert evaluator and the dead-man in `modules/nixos/fleet-alert.nix`, and the rules in `modules/nixos/fleet-alert/rules.nix`.
 
 ## What runs where
 
-S1's store and collector, S2's dev-loop collection and S3's alert evaluator run on magnetite; ntfy and S3's dead-man run on cinnabar; S4's collector agent runs on every NixOS host whose `collect` is true in `flake.lib.observabilityHosts` and exports to magnetite's ingress.
+S1's store and collector, S2's dev-loop collection and S3's alert evaluator run on magnetite; ntfy and S3's dead-man run on cinnabar; S4's collector agent runs on every NixOS host whose `collect` is true in `flake.lib.observabilityHosts` and exports to magnetite's ingress, and S5's darwin agent does the same on stibnite (see "The darwin agent on stibnite").
 
 - `greptimedb.service` runs GreptimeDB standalone, listening only on loopback: HTTP on `127.0.0.1:4000` and gRPC on `127.0.0.1:4001`.
 - Its WAL and caches live on the ZFS dataset `zroot/root/greptimedb` at `/var/lib/greptimedb`, with a 16G quota and a 12G reservation.
@@ -48,7 +48,7 @@ A member who has joined also sees an `Observability` tile under `https://account
 The views are in the project `fleet`:
 
 - `fleet-hosts`, selected by `host_name`: memory and ARC pressure, swap, the largest processes, OOM kills, ZFS file systems, pools and ARC, failed and restarting units, exporter health and NVMe health.
-  It shows magnetite, cinnabar and pyrite; stibnite appears once CAM-72 runs a collector there.
+  Its host list is every host that stores `system_memory_usage_bytes`, stibnite among them since 2026-11-06; stibnite has no ZFS, OOM-kill or unit series, and no panel shows its launchd jobs.
   Its units panels read the units the collector stores, which do not include `perses` itself.
 - `devloop`: pull-request queue wait at the 50th, 90th and 99th percentile, formation to landing per batch, build outcomes per day and deploys per host.
 
@@ -222,6 +222,10 @@ A `critical` alert that stays firing is posted again once every 24 hours; a `war
 | `RuleSignalMissing <host>` | warning | an always-on host (`alwaysOn` in `flake.lib.observabilityHosts`: magnetite and cinnabar) has sent no memory signal for about 15 min while the store answers, with selector `system_memory_usage_bytes`: a query still returns the last sample for the store's 5-min lookback, and the evaluator then counts 10 min (14 min 33 s after the last sample at acceptance); that host's alerts are frozen meanwhile | first that host's collector, `systemctl status opentelemetry-collector` and `sudo journalctl -u opentelemetry-collector -n 100 --no-pager`, then its export path to magnetite's ingress and the store; that host's `FAILED otel-envelope.service` notice, if one arrived, names the cause |
 | `AlertEvaluatorSilent` | critical | cinnabar's dead-man saw no heartbeat on `fleet-heartbeat` for 10 min; it runs every 5 min, so it fires up to 15 min after the evaluator stops (14 min 28 s at acceptance) and resolves within about 5 min of its return (4 min 12 s) | on magnetite `systemctl status fleet-alert.timer fleet-alert.service` and `sudo journalctl -u fleet-alert -n 50 --no-pager`; also check magnetite is up and on the mesh |
 | `AlertBudgetExceeded` | none, posted at `default` | more than 10 `FIRING` messages, or more than 3 for stibnite or for pyrite, were posted in 24 hours | the alerts have become noise; read the 24 hours of `fleet-alerts` and tune the rule that dominates, through a pull request |
+| `LaunchdJobNotRunning` | warning | for 10 min, a kept-alive launchd job (`launchdKeptAlive` in `schema.nix`: `dnscrypt-proxy`, `nix-daemon`, `nix-grpc-daemon`, `otelcol`, `otelcol-process`, `prometheus-node-exporter`, each under `org.nixos.`) was not running, or an allow-listed job was not loaded; only darwin hosts, stibnite, are expected to report it | on stibnite `sudo launchctl print system/<label>` and the job's log, then "Clearing a crashed kept-alive job" under "The darwin agent on stibnite"; a job that is not loaded needs an activation |
+| `LaunchdJobFailed` | warning | for 5 min, an allow-listed launchd job's last exit code was not 0; -1 means the job ended without an exit code for a reason other than launchd's idle reclaim, as a signal kill does; `org.nixos.otel-envelope` is excluded, because it posts its own `FAILED` notice | on stibnite `sudo launchctl print system/<label>` for `last exit code` and `last exit reason`, and the job's log; a calendar job such as `harmonia-gc` keeps it firing until its next clean run; for a kept-alive job see "Clearing a crashed kept-alive job" |
+| `LaunchdJobRestartLoop` | warning | a launchd job launched more than 5 times in 15 min | the job's log on stibnite; launchd relaunches a kept-alive job about 10 s after each exit |
+| `HostProbeStale` | warning | for 10 min, a textfile of stibnite's probe was over 300 s old, or node_exporter could not read it, so the launchd and SMART values are stale and the darwin rules are blind | on stibnite `sudo launchctl print system/org.nixos.otel-host-probe` and `/var/lib/prometheus-node-exporter/otel-host-probe.log`; its time while stibnite sleeps does not count, because a pending alert restarts its clock when the host reports again |
 
 While a host reports no `system_memory_usage_bytes`, its alerts are frozen: they neither resolve nor post again, so a sleeping laptop does not churn, and their 5 minutes of absence start only when the host reports again.
 
@@ -236,7 +240,8 @@ The email does not watch the phone's `fleet-alerts` subscription, so a Monday wi
 
 Unit failures go to the same topic as plain messages without a title.
 The notified units of each host are its `notifiedUnits` in `modules/lib/observability-hosts.nix`.
-On every collecting host they are `opentelemetry-collector` and `otel-envelope`; magnetite adds `greptimedb`, `greptimedb-schema`, `greptimedb-envelope`, `fleet-alert`, `devloop-pg-grants`, `devloop-reconcile`, `perses` and its `zfs-set-*` and `zfs-assert-*` oneshots, and cinnabar adds `fleet-deadman`.
+On every collecting NixOS host they are `opentelemetry-collector` and `otel-envelope`; magnetite adds `greptimedb`, `greptimedb-schema`, `greptimedb-envelope`, `fleet-alert`, `devloop-pg-grants`, `devloop-reconcile`, `perses` and its `zfs-set-*` and `zfs-assert-*` oneshots, and cinnabar adds `fleet-deadman`.
+On stibnite only `otel-envelope` posts its own notices, as `FAILED otel-envelope on stibnite` without `.service` (see "Reading FAILED otel-envelope on stibnite"); its other jobs report through the launchd alerts.
 Print the current list for a host:
 
 ```sh
@@ -248,6 +253,7 @@ nix eval --json .#nixosConfigurations.<host>.config.services.observability-notif
 
 A `FAILED fleet-alert.service on magnetite` means a run could not post its heartbeat or an alert, or reached its post deadline; `sudo journalctl -u fleet-alert -n 50 --no-pager` on magnetite names the post.
 A deploy that restarts the store, ZeroTier or ntfy fails the evaluator run that falls inside the restart, as on 2026-10-25, when a deploy of magnetite stopped the store and ZeroTier for about 20 s and a deploy of cinnabar stopped ntfy and ZeroTier for about 17 s; one failed run during such a deploy, followed by a passing run a minute later, is the deploy, not a fault, but its `FAILED` notice may never arrive, because the notifier cannot post while ZeroTier or ntfy is down and the switch clears the failed instance.
+A deploy's switch can also stop a timer's run in flight: on 2026-11-06 magnetite's deploy stopped a `fleet-alert.service` run (`code=killed, status=15/TERM`), which posted `FAILED fleet-alert.service on magnetite`, and the next run 12 s later posted its `RESOLVED`; this happened once in 25 magnetite deploys over 14 days (CAM-85).
 After a deploy, look for notices that were never posted with `sudo journalctl -u 'observability-notify@*' --since '<deploy start>' --no-pager`; a `Failed with result` line marks one.
 A `FAILED fleet-deadman.service on cinnabar` means ntfy did not refuse the anonymous probe with 403, the heartbeat poll failed, a post failed, or the ping to `hc-ping.com` was not answered `OK`; `sudo journalctl -u fleet-deadman -n 20 --no-pager` on cinnabar shows which.
 A `FAILED devloop-reconcile.service on magnetite` means a day of `devloop` differs from its sources, or a source could not be read; "When devloop-reconcile fails" under "Querying devloop" says what each clause means.
@@ -486,7 +492,7 @@ Every host trusts `otel-ca`'s `ca.crt`, which reaches the collector as a store p
 
 ### Adding an agent host
 
-First add the host's row to `modules/lib/observability-hosts.nix` with `collect = false`, for example `<host> = agent [ ] // { collect = false; };`, with `smartDevices` if the host has an NVMe disk to watch and `alwaysOn = true` only for a permanently provisioned host.
+First add the host's row to `modules/lib/observability-hosts.nix` with `collect = false`, for example `<host> = agent [ ] // { collect = false; };`, with `smartDevices` if the host has an NVMe disk to watch and `alwaysOn = true` only for a permanently provisioned host; a darwin host's row also needs `platform = "darwin"` (see "Adding a darwin host").
 Then, on the workstation, make the host a reader of the two shared vars and generate its certificate, comparing the hashes of the shared values before and after every command:
 
 ```sh
@@ -524,24 +530,29 @@ The certificates have no revocation: the ingress accepts any unexpired certifica
 Regenerate the CA and then every host's certificate under it:
 
 ```sh
-clan vars generate magnetite --regenerate --generator otel-ca
-for host in magnetite cinnabar pyrite electrum galena scheelite; do
-  clan vars generate "$host" --regenerate --generator otel-cert
+CLAN_NO_COMMIT=1 clan vars generate magnetite --regenerate --generator otel-ca
+for host in magnetite cinnabar pyrite electrum galena scheelite stibnite; do
+  CLAN_NO_COMMIT=1 clan vars generate "$host" --regenerate --generator otel-cert
   openssl verify -CAfile vars/shared/otel-ca/ca.crt/value "vars/per-machine/$host/otel-cert/cert.pem/value"
 done
 ```
 
+Every clan vars command carries `CLAN_NO_COMMIT=1`, because clan otherwise commits the vars itself outside the change; commit them with jj in the rotation's own change.
+
 Every `openssl verify` must print `OK` against the new CA.
 Land the vars change through a pull request, then deploy every collecting host and magnetite last, each from a fresh worktree of `origin/main`.
 Each deployed agent restarts with the new certificate and CA, and until magnetite is deployed the old ingress and the new agent refuse each other, so the agent's persistent queue holds its exports; once magnetite trusts the new CA, the queues drain.
-cinnabar deploys over its public address and pyrite only with someone at it (see "Deploying cinnabar and pyrite"); a host whose `collect` is false reads neither file, and its next deploy uploads the new ones.
+cinnabar deploys over its public address and pyrite only with someone at it (see "Deploying cinnabar and pyrite"); stibnite is activated at the machine with `just activate`, which reloads its agent because the certificate's hash is in the job's plist; a host whose `collect` is false reads neither file, and its next deploy uploads the new ones.
 After magnetite's deploy, check on each agent that `curl -s http://127.0.0.1:8888/metrics | grep '^otelcol_exporter_queue_size'` falls to 0.
 
 ### What the certificates do not prove
 
 - Any holder of a certificate from `otel-ca` can write series under any host name: the ingress checks that the certificate is signed by `otel-ca`, not that the `host.name` it sends matches the certificate's name.
+  A lost or stolen laptop's key, pyrite's or stibnite's, therefore stays valid until `otel-ca` is rotated, and the rotation above covers stibnite.
 - ZeroTier carries the packets and authenticates nothing here: membership of the network reaches port 4318 on magnetite, and only a certificate gets past the handshake.
 - Nothing here proves that a series reached the store end to end: each host's `otel-envelope` judges its own collector's queues and loss counters, and `RuleSignalMissing <host>` reports an always-on host's silence, but no check compares what an agent sent with what the store holds.
+- The `alerter` token is on every collecting host, stibnite included, so a compromised stibnite, like a compromised pyrite, can post to any `fleet-*` topic; an anonymous post to a `fleet-*` topic is refused with 403, as one from stibnite was on 2026-11-05.
+- `ntfy-send` does not verify ntfy.zt's certificate: it runs `curl -sfk`, the store curl on Linux and `/usr/bin/curl` on darwin, so whoever answers for ntfy.zt on the mesh receives the token; verification in every ntfy client is tracked in Linear (CAM-87).
 
 ## The ingress and its refusal
 
@@ -605,7 +616,7 @@ On magnetite the run at minute `00` of each UTC hour also prints the budget clau
 | `B5 devloop-rows: FAIL` | `devloop` received over 100,000 rows in 24 hours | a receiver replay or a changed nixbot query, which re-sends that query's whole history once (see "Replaying a gap") |
 | `B6 ttl: FAIL <database> <ttl>, declared <ttl>` | a database's retention differs from `schema.nix`'s, or is absent | `systemctl status greptimedb-schema`, which sets the retention when the store starts |
 
-`otel-envelope: B3 per-host: launchd_label table absent` is a note, not a failure, while no darwin host reports launchd jobs.
+`otel-envelope: B3 per-host: launchd_label table absent` is a note, not a failure, printed while no darwin host has stored launchd jobs; since stibnite reports them, the table exists and `B3` counts its labels.
 Between budget runs, every run repeats each `B` clause the last budget run failed, its line ending `(carried from the budget run at <time>)`, so a breach stays one failure episode, posting `RESOLVED` only after a budget run passes; a fix therefore shows as resolved at the next minute `00`, or at once with the forced run below.
 
 | Line | Meaning | Check first |
@@ -621,6 +632,81 @@ sudo systemctl start otel-envelope
 sudo journalctl -u otel-envelope -o cat -n 50 | grep '^otel-envelope: '
 sudo systemctl revert otel-envelope
 ```
+
+## The darwin agent on stibnite
+
+stibnite, a nix-darwin laptop, runs five launchd jobs from `modules/darwin/otel-collector-agent.nix`, as `modules/clan/services/otel-collector/README.md` ("Darwin agents") describes:
+
+- `org.nixos.otelcol`, the agent, as `_otelcol` (uid 536), kept alive, exporting to magnetite's ingress with stibnite's `otel-cert`;
+- `org.nixos.otelcol-process`, a root collector of per-process memory with no listener and no credential, kept alive, feeding the agent on `127.0.0.1:4318`;
+- `org.nixos.prometheus-node-exporter`, kept alive, serving only the probe's textfiles on `127.0.0.1:9100`;
+- `org.nixos.otel-host-probe`, every 60 s as `_prometheus-node-exporter`, writing launchd job state and `disk0`'s SMART health;
+- `org.nixos.otel-envelope`, every 300 s as `_otelcol`, judging the agent and posting its own notices.
+
+Their logs are `/var/log/otelcol/otelcol.log`, `/var/log/otelcol/otelcol-process.log`, `/var/log/otelcol/otel-envelope.log` and `/var/lib/prometheus-node-exporter/otel-host-probe.log`.
+Read any job's state, runs and last exit with `sudo launchctl print system/org.nixos.<label>`.
+Nothing is collected while stibnite sleeps: interval jobs skip the sleep, and its alerts are frozen until it reports memory again.
+
+On 2026-11-06 the store-built collector reached the ingress over ZeroTier from its first start, its sent points growing from 725 to 971 in 60 s with none failed, against an older note in `ntfy-send` that macOS endpoint security blocks store-built programs from ZeroTier; no allow rule or signing was needed.
+
+### Adding a darwin host
+
+A darwin host follows "Adding an agent host" with three differences.
+Its row names its platform and the one notified label, for example stibnite's `agent [ ] // { platform = "darwin"; notifiedUnits = [ "otel-envelope" ]; smartDevices = [ "disk0" ]; collect = false; }`, and an inventory assertion fails evaluation if `platform` differs from the machine's `machineClass` in `modules/clan/inventory/machines.nix`.
+uid and gid 536 must be free on the machine for `_otelcol`; check with `dscl . -list /Users UniqueID` before the first activation.
+The row, the role's darwin declarations and the vars of the vars step land in one commit, because a darwin activation from a commit whose `ntfy-alerter` token is not yet encrypted for the host fails to install its secrets.
+The vars step is the one above: `CLAN_NO_COMMIT=1 clan vars fix <host> --generator otel-ca` and `--generator ntfy-alerter`, `CLAN_NO_COMMIT=1 clan vars generate <host> --generator otel-cert`, with the `shared` hash check after each, never `clan vars generate` on `otel-ca` or `ntfy-alerter`, and `CLAN_NO_COMMIT=1` on every clan vars command so the vars are committed with jj in the change's own commit.
+
+A darwin host is activated at the machine, not deployed from the workstation.
+Before each activation read the last lines of `/var/log/deploy-record.jsonl` and `readlink /run/current-system`, and wait for the person who made any activation in the last hour, because another session may be activating the same machine.
+Activate from a fresh worktree detached at `origin/main`, or from the primary checkout when `jj diff --from main@origin --to @ --name-only` lists nothing outside `openspec/` and `logs/`:
+
+```sh
+just activate 2>&1 | tee logs/stibnite-$(date +%Y%m%d-%H%M%S).log
+```
+
+With `collect` false, the activation installs only the account and the two secrets: `id _otelcol` prints uid 536, and `sudo ls -l` of `/run/secrets/vars/per-machine/<host>/otel-cert/key.pem` and the `ntfy-alerter` token shows `-r--------` owned by `_otelcol`.
+Then merge the one-line change removing `collect = false`, activate the same way, and check that `sudo launchctl print system/org.nixos.<label>` shows `state = running` for `otelcol`, `otelcol-process` and `prometheus-node-exporter`, and that `otel-host-probe` and `otel-envelope` are loaded.
+Then deploy magnetite, as for any agent host, so that its evaluator expects the new host's darwin signals.
+
+### Reading FAILED otel-envelope on stibnite
+
+`FAILED otel-envelope on stibnite` and `RESOLVED otel-envelope on stibnite`, without `.service`, are the darwin envelope's own notices, posted by its wrapper `observability-notify-run` with the same once-per-episode rule and 15-minute limit as the NixOS notifier.
+The envelope's output goes to the file named by its plist's `StandardOutPath`:
+
+```sh
+f=$(/usr/bin/plutil -extract StandardOutPath raw /Library/LaunchDaemons/org.nixos.otel-envelope.plist)
+grep '^otel-envelope: ' "$f" | tail -n 5
+```
+
+That file, `/var/log/otelcol/otel-envelope.log`, also logs the wrapper's posts and any failed post.
+Each posted `FAILED` appends `<epoch> otel-envelope stibnite` to `/var/lib/otel-envelope/notify.log`, which records failures only; the episode stamps are beside it in `/var/lib/otel-envelope`.
+
+| Line | Meaning | Check first |
+|---|---|---|
+| `C1 telemetry: FAIL` | the agent's `127.0.0.1:8888` did not answer on this run and the previous one | `sudo launchctl print system/org.nixos.otelcol` and `/var/log/otelcol/otelcol.log` |
+| `C2 targets: FAIL node ...` or `otelcol ...` | node_exporter or the agent's telemetry did not answer twice | `sudo launchctl print system/org.nixos.prometheus-node-exporter`, or the agent as for `C1` |
+| `C3 queue: FAIL otlp_http/ingress...` | an export queue reached 90% of its 400 MiB or 16 MiB | the path to magnetite: `ping6 -c 3 fddb:4344:343b:14b9:399:930f:39db:40d2`, ZeroTier, and magnetite's collector |
+| `C4 loss: FAIL <series> +<n>` | the agent gave up on, refused or failed to enqueue data since the last run | `/var/log/otelcol/otelcol.log` for the exporter's errors; the data is lost, not delayed |
+| `C5 memory: FAIL org.nixos.<label> <n> MiB above its limit` | the job's physical footprint, the MEM field of `/usr/bin/top -l 1 -pid <pid> -stats pid,mem`, exceeded 256 MiB for `otelcol` or 128 MiB for `otelcol-process`, the darwin counterpart of `MemoryMax` | `top -l 1 -pid <pid> -stats pid,mem` again; a footprint that keeps growing is a leak, so kickstart the job after reading its log |
+| `C5 memory: FAIL org.nixos.<label>: top failed or did not answer within 10 s` | the clause could not read the footprint, which fails rather than passes | `/usr/bin/top -l 1 -stats pid,mem` by hand |
+
+`C5` reads the footprint, the kernel's own accounting, and not the resident size that `ps -o rss=` shows, which also counts the collector binary's mapped pages: on 2026-11-06 `otelcol-process` read 178 MiB resident against a footprint of 101 MB.
+To run the envelope at once rather than wait up to 5 minutes, `sudo launchctl kickstart system/org.nixos.otel-envelope`; a passing run after a posted `FAILED` posts `RESOLVED otel-envelope on stibnite`.
+A stopped or unloaded envelope posts nothing itself; `LaunchdJobNotRunning` reports it unloaded, since `org.nixos.otel-envelope` is on the launchd allow-list.
+
+### Clearing a crashed kept-alive job
+
+launchd restarts a kept-alive job about 10 s after it exits, but the probe keeps reporting the last exit code, so `LaunchdJobFailed` stays firing after a crash although the job runs again.
+Read the cause first, `sudo launchctl print system/org.nixos.<label>` for `last exit code` and `last exit reason`, and the job's log, and fix it if it will recur.
+Then restart the job so that its last exit is a clean one:
+
+```sh
+sudo launchctl kickstart -k system/org.nixos.<label>
+```
+
+`-k` stops the running instance with `SIGTERM` and starts it again; once the probe reads exit code 0, within a minute, `LaunchdJobFailed` resolves 5 minutes later.
+Whether `otelcol-process`'s exit on `SIGTERM` reads 0 has not yet been observed on stibnite; if `last exit code` stays non-zero after a kickstart, record it.
 
 ## Deploying cinnabar and pyrite
 
@@ -959,9 +1045,9 @@ The declaration does not set the TTL: the change that creates the table sets it,
 
 ## Not covered yet
 
-- S2 left for later slices: stibnite's deploy records, collected once S5 runs a collector there, while `devloop-reconcile` checks magnetite's records alone; and attributing a `dependency_failed` attribute to the derivation that failed under it, which would need error text or dependency edges that S2 does not store; the dashboards over `devloop` landed with S6 as the `devloop` view.
-- S3 left for later slices: the launchd and `HostProbeStale` rules (S5); the external watch of cinnabar and ntfy themselves landed with CAM-76 (#3716), under "The external watch".
-- S5: stibnite on darwin.
+- S2 left for later slices: `devloop-reconcile` checks magnetite's deploy records alone, although stibnite's are collected since S5; and attributing a `dependency_failed` attribute to the derivation that failed under it, which would need error text or dependency edges that S2 does not store; the dashboards over `devloop` landed with S6 as the `devloop` view.
+- S3 left for later slices: the external watch of cinnabar and ntfy themselves landed with CAM-76 (#3716), under "The external watch"; the launchd and `HostProbeStale` rules landed with S5.
+- S5: landed with CAM-72 (#3736, #3739, #3740, #3743, #3744): stibnite's darwin agent, under "The darwin agent on stibnite".
 - S6: landed with CAM-73 (#3720, #3721): the views at `obs.scientistexperience.net` behind Kanidm, under "Reaching the dashboard"; the SSH tunnel stays as the operator's fallback.
 - S7: omp telemetry and journald logs into `agent` and `fleet`.
 - S8: the Parquet export of the store and its reader.
