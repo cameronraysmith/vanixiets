@@ -22,7 +22,7 @@ Restoring a module re-registers its options but does not turn the corresponding 
   Then set `services.beads-ui.enable = true;` on the darwin machine that should run it.
 
 - `clan-service-beads-ui/` — originally `modules/clan/services/beads-ui/` (directory, including its `README.md`).
-  Defines the `clan.modules.beads-ui` clan service (systemd role) with its own `enable` option under the role's settings.
+  Defines the `flake.clan.modules.beads-ui` clan service (systemd role) with its own `enable` option under the role's settings.
   Restore: `mv modules/_disabled/clan-service-beads-ui modules/clan/services/beads-ui`.
   Then set `enable = true;` in the instance's role settings (see the sibling inventory file below).
 

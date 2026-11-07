@@ -909,7 +909,7 @@ in
       ];
     };
 
-  clan.modules.otel-collector =
+  flake.clan.modules.otel-collector =
     { ... }:
     {
       _class = "clan.service";

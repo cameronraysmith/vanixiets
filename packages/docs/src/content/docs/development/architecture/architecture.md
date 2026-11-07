@@ -132,7 +132,7 @@ This enables feature-based organization where capabilities are defined once and 
 The clan subsystem orchestrates deployment across the machine fleet and manages system-level secrets.
 Clan provides machine registry, inventory system for service coordination, vars/generators for secret generation, and deployment tooling.
 
-**Machine registry**: All machines registered in clan.machines.* with platform specification and configuration imports.
+**Machine registry**: All machines registered in flake.clan.machines.* with platform specification and configuration imports.
 Registry serves as authoritative list of infrastructure members.
 
 **Inventory system**: Service instances defined with roles assigned to specific machines.
@@ -404,7 +404,7 @@ This two-step registration enables auto-discovery while maintaining explicit cla
 **ClanModules importing modules**: Clan inventory instances can import shared configuration from namespaces.
 Service modules reference config.flake.modules.common.* for cross-machine shared configuration.
 
-Integration point: clan.inventory.instances.\<service\>.module imports from namespaces.
+Integration point: flake.clan.inventory.instances.\<service\>.module imports from namespaces.
 
 ### Terranix to clan interface
 
@@ -659,7 +659,7 @@ Home aggregates: modules/home/ organized by aspect with auto-merging exports.
 
 ### Clan implementation
 
-Machine registry: modules/clan/machines.nix defines clan.machines.* with imports from namespaces.
+Machine registry: modules/clan/machines.nix defines flake.clan.machines.* with imports from namespaces.
 
 Inventory instances: modules/clan/inventory/services/ defines service coordination.
 

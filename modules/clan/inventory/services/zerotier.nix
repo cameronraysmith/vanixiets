@@ -1,7 +1,7 @@
 # Zerotier VPN with cinnabar as controller, NixOS peers, and external darwin members
 { config, ... }:
 {
-  clan.inventory.instances.zerotier = {
+  flake.clan.inventory.instances.zerotier = {
     module = {
       name = "zerotier";
       input = "clan-core";

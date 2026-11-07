@@ -1,6 +1,6 @@
 { inputs, ... }:
 {
-  clan = {
+  flake.clan = {
     meta.name = "test-clan";
     meta.description = "Phase 0: Architectural validation + infrastructure deployment";
 

@@ -449,7 +449,7 @@ in
 ```nix
 { config, ... }:
 {
-  clan.machines = {
+  flake.clan.machines = {
     # ... existing machines
     newhost = {
       imports = [ config.flake.modules.darwin."machines/darwin/newhost" ];

@@ -1,5 +1,5 @@
 {
-  clan.inventory.instances.hermes-agent = {
+  flake.clan.inventory.instances.hermes-agent = {
     module = {
       name = "hermes-agent";
       input = "self";

@@ -34,7 +34,7 @@
 # work only that builder could take fails with `missing system features`.
 { inputs, ... }:
 {
-  clan.modules.nix-builders =
+  flake.clan.modules.nix-builders =
     { lib, ... }:
     let
       port = 50051;

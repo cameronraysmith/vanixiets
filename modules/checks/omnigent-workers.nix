@@ -481,7 +481,7 @@
         (
           (import ../clan/services/omnigent/flake-module.nix {
             inherit config;
-          }).clan.modules.omnigent
+          }).flake.clan.modules.omnigent
             { inherit lib; }
         ).roles.host.interface;
       clanSettings =

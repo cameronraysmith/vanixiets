@@ -4,7 +4,7 @@
   ...
 }:
 {
-  clan.inventory.instances.user-tara = {
+  flake.clan.inventory.instances.user-tara = {
     module = {
       name = "users";
       input = "clan-core";

@@ -1,6 +1,6 @@
 { lib, ... }:
 {
-  clan.machines = lib.genAttrs [ "magnetite" "pyrite" ] (
+  flake.clan.machines = lib.genAttrs [ "magnetite" "pyrite" ] (
     _:
     { pkgs, ... }:
     {

@@ -652,7 +652,7 @@ NixOS hosts are registered in the clan inventory for multi-machine coordination:
 
 ```nix
 # modules/clan/machines.nix
-clan.machines = {
+flake.clan.machines = {
   cinnabar = {
     nixpkgs.hostPlatform = "x86_64-linux";
     imports = [ config.flake.modules.nixos."machines/nixos/cinnabar" ];

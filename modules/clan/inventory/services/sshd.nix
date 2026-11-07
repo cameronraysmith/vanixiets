@@ -4,7 +4,7 @@
 # Darwin CA trust is handled separately in modules/darwin/ssh-ca-trust.nix
 # searchDomains activates CA generators (required on pre-PR#6802 clan-core)
 {
-  clan.inventory.instances = {
+  flake.clan.inventory.instances = {
     sshd = {
       module = {
         name = "sshd";

@@ -1,6 +1,6 @@
 # Emergency access via root SSH keys for recovery scenarios
 {
-  clan.inventory.instances.emergency-access = {
+  flake.clan.inventory.instances.emergency-access = {
     module = {
       name = "emergency-access";
       input = "clan-core";

@@ -12,7 +12,7 @@
     stibnite = "aarch64-darwin";
   };
 
-  clan.inventory.machines = {
+  flake.clan.inventory.machines = {
     cinnabar = {
       tags = [
         "nixos"
