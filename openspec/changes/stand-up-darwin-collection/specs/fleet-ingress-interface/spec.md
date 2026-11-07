@@ -253,7 +253,7 @@ node_exporter SHALL serve that directory on `127.0.0.1:9100` with only its `text
 
 #### Scenario: A job's exit code is missing or not an integer
 
-- **WHEN** a reply has no `last exit code` line and a `last exit reason` other than a jetsam idle exit, as for a job killed by a signal, or a value that is not an integer
+- **WHEN** a reply has no `last exit code` line and no `last exit reason` of a jetsam idle exit, as for a job killed by a signal, whose reply prints no `last exit reason`, only `last terminating signal = Killed: 9` (recorded for `org.nixos.otelcol-process` on 2026-11-07), or a value that is not an integer
 - **THEN** `launchd_job_last_exit_code` for that label is -1, and the mutant `missingExitCodeAsZero` fails the check
 
 #### Scenario: A job was reclaimed while idle

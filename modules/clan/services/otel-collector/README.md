@@ -304,11 +304,12 @@ The fleet executables are the names of `process.darwinFleetExecutables` whose la
 It makes exactly two kinds of vendored call: `/bin/launchctl print system/<label>` per selected label, and the root pin's `smartctl -j -H -A <device>` per `smartDevices` entry.
 From the first it writes `launchd_job_state` for the states `running`, `not_running`, `unloaded` and `other`, `launchd_job_last_exit_code` and `launchd_job_runs_total` into `launchd.prom`; it never writes `pid`, and writes each `org.nixos.omnigent-host-<owner>` label as `org.nixos.omnigent-host-<alias>` from `schema.ownerAliases`.
 A label answered `Could not find service` is written in state `unloaded` with no exit code and no runs series.
-`(never exited)` is written as exit code 0; a missing `last exit code` line is written 0 when `last exit reason` is `JETSAM_REASON_MEMORY_IDLE_EXIT`, launchd's routine reclaim of an idle job, and -1 otherwise, as for a job killed by a signal; a value that is not an integer is written -1.
+`(never exited)` is written as exit code 0; a missing `last exit code` line is written 0 when `last exit reason` is `JETSAM_REASON_MEMORY_IDLE_EXIT`, launchd's routine reclaim of an idle job, and -1 otherwise, as for a job killed by a signal, whose reply has no `last exit reason` either, only `last terminating signal`; a value that is not an integer is written -1.
 From the second it writes smartctl_exporter's eight names under that exporter's `# TYPE`s into `smartctl.prom`, so the store gives stibnite's SMART series the `_total` names pyrite's carry.
 Each file is written to a temporary name in the textfile directory and renamed.
 The parser's fixtures under `modules/checks/otel-collector-darwin/launchctl/` are `launchctl print` replies recorded on stibnite at macOS 26.7.1 with their `environment` blocks removed, beside `smartctl-disk0.json` and the expected `.prom` files under `expected/`.
-Two are marked as edited copies, because no allow-listed job showed them when the replies were recorded: `org.nixos.exit-78`, and `org.nixos.signal-killed`, whose non-idle `last exit reason` is assumed.
+One is marked as an edited copy, because no allow-listed job showed it when the replies were recorded: `org.nixos.exit-78`.
+`org.nixos.signal-killed` is `org.nixos.otelcol-process`'s reply after its `SIGKILL` on 2026-11-07, with its `default environment` block removed as well (tasks.md 8.4): `runs = 2`, no `last exit code` or `last exit reason` line, and `last terminating signal = Killed: 9`.
 
 `flake.lib.observabilityNotifyRun` (`modules/lib/observability-notify-run.nix`) is the notifier wrapper, the launchd counterpart of `OnFailure` and the resolve hooks.
 `observability-notify-run -- <command>` runs the command and exits with its code; it posts `FAILED <label> on <host>` when a run fails after a pass or a first run fails, and `RESOLVED <label> on <host>` when a run passes after a posted `FAILED`.

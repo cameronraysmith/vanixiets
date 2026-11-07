@@ -27,8 +27,11 @@
 # expect every collecting host; the NVMe rules expect the hosts with SMART
 # devices; the four launchd and probe rules expect the darwin hosts (S5
 # design D9). LaunchdJobNotRunning expects running the kept-alive labels of
-# flake.lib.otelCollectorSchema.launchdKeptAlive and reports any
-# allow-listed label unloaded; LaunchdJobFailed excludes the darwin hosts'
+# flake.lib.otelCollectorSchema.launchdKeptAlive and reports any other
+# allow-listed label unloaded; its two arms select disjoint labels, because
+# the probe writes all four states for every label, so a kept-alive label
+# unloaded, running 0 and unloaded 1, is one instance, not two (tasks.md
+# 8.3a). LaunchdJobFailed excludes the darwin hosts'
 # notifiedUnits as org.nixos.<unit>, which post their own notices, so one
 # failure is reported once. `alwaysOn` lists the collecting hosts marked
 # always-on, whose own silence it reports: one absent from
@@ -189,7 +192,7 @@
         }
         {
           alert = "LaunchdJobNotRunning";
-          expr = ''launchd_job_state{launchd_state="running", launchd_label=~"${keptAlive}"} == 0 or launchd_job_state{launchd_state="unloaded"} == 1'';
+          expr = ''launchd_job_state{launchd_state="running", launchd_label=~"${keptAlive}"} == 0 or launchd_job_state{launchd_state="unloaded", launchd_label!~"${keptAlive}"} == 1'';
           for = "10m";
           severity = "warning";
           annotations.summary = "A kept-alive launchd job is not running, or an allow-listed job is not loaded";

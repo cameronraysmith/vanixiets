@@ -108,7 +108,7 @@ Regulators:
 - pyrite's Apple NVMe controller answers smartctl's health log on `/dev/nvme0`; if it does not, pyrite's exporter is removed (ADR-003 Q15).
 - `RuleSignalMissing` reports a missing `smartctl_device_critical_warning_total` for pyrite within 30 min of deploy if pyrite reports host memory but no SMART series (ADR-009).
 - `_prometheus-node-exporter` reads `disk0`'s health log on stibnite, as `nobody` did on 2026-10-15 (ADR-003 Q18).
-- A job ended by a signal, whose `launchctl print` shows no exit-code line and a non-idle `last exit reason`, reads -1 (ADR-003 Q18; ADR-003 item 23; charter v29).
+- A job ended by a signal, whose `launchctl print` shows no exit-code line and no `last exit reason`, only `last terminating signal`, reads -1, as `org.nixos.otelcol-process` did after its `SIGKILL` on stibnite on 2026-11-07 (ADR-003 Q18; ADR-003 item 23; charter v29).
 - A `darwin-rebuild switch` with a changed `otelcol` plist on stibnite fires neither `LaunchdJobFailed` nor `LaunchdJobNotRunning` (ADR-009).
 - R3.2 fails within 10 min after one host's `prometheus-node-exporter` is stopped (ADR-003).
 - R3.1 fails on a darwin node_exporter `listenAddress` of the empty string and on an exporter `listenAddress` of `0.0.0.0` (ADR-003).

@@ -15,12 +15,13 @@
 #   and post only with NTFY_TOKEN_FILE naming the fixture credential, and
 #   the alert posts of the leg must equal its list; the two-database leg
 #   also requires the server to record each rule's query once on its path
-#   and database. The eight runtime mutants (no state write, `for` 0, no
+#   and database. The nine runtime mutants (no state write, `for` 0, no
 #   store freeze, no absence freeze, no update of when each host last
 #   reported, every query sent to fleet, every instance frozen when any
-#   database fails, and magnetite the only always-on host) must each
-#   produce a non-empty failure list; the store freezes only the instances
-#   of the database that failed (review F7). The legs about pyrite render
+#   database fails, magnetite the only always-on host, and
+#   LaunchdJobNotRunning's unloaded arm without its kept-alive exclusion)
+#   must each produce a non-empty failure list; the store freezes only the
+#   instances of the database that failed (review F7). The legs about pyrite render
 #   the host table with its `collect` forced, since it does not collect
 #   on main yet.
 # - propertyRehearsal: fleet-alert/test_transition.py compares transition.jq
@@ -62,7 +63,9 @@
 # The fixture server cannot evaluate PromQL,
 # so the SystemdUnitFailed exclusion leg replays only the failed units the
 # rendered exclusion regex keeps, matched here with the full-match
-# semantics PromQL uses for `!~`.
+# semantics PromQL uses for `!~`, and LaunchdJobNotRunning's legs replay
+# the probe's four state series for one label as the rendered expression's
+# two arms select them (design D9; tasks.md 8.3a).
 # Nor can it run SQL: vmTests.x86_64-linux.devloop-ingest's burnRule case
 # runs PullRequestQueueWaitBurn's query on GreptimeDB 1.2.1 (design D1, D16).
 { self, lib, ... }:
@@ -1611,15 +1614,73 @@
           "selector=${fixtures.selectors.LaunchdJobNotRunning}"
         ];
       };
-      # A label set answered on minutes 0 to 14 and not after: one FIRING
-      # at 10, one RESOLVED 5 min after it was last seen at 14.
-      notRunningFor15 = labels: {
+      # The probe's four launchd_job_state series for one label in one state
+      # (modules/lib/otel-host-probe.nix), each label set with its value.
+      probeStates =
+        label: state:
+        map
+          (s: {
+            labels = darwinSeries "LaunchdJobNotRunning" {
+              launchd_label = label;
+              launchd_state = s;
+            };
+            value = if s == state then 1 else 0;
+          })
+          [
+            "running"
+            "not_running"
+            "unloaded"
+            "other"
+          ];
+      # LaunchdJobNotRunning's two arms as a rule list renders them: the
+      # kept-alive regex of the running arm and the exclusion of the unloaded
+      # arm, null if it has none. A rendered expression of another shape
+      # fails the evaluation.
+      notRunningArms =
+        rulesList:
+        let
+          rule = lib.findFirst (
+            r: r.alert == "LaunchdJobNotRunning"
+          ) (throw "fleet-alert check: no LaunchdJobNotRunning rule") rulesList;
+          m = builtins.match ''launchd_job_state[{]launchd_state="running", launchd_label=~"([^"]*)"[}] == 0 or launchd_job_state[{]launchd_state="unloaded"(, launchd_label!~"([^"]*)")?[}] == 1'' rule.expr;
+        in
+        if m == null then
+          throw "fleet-alert check: LaunchdJobNotRunning's expression has an unmodelled shape: ${rule.expr}"
+        else
+          {
+            kept = builtins.elemAt m 0;
+            excluded = builtins.elemAt m 2;
+          };
+      # The store's answer to that expression over the probe's series: each
+      # arm selects with the full-match semantics PromQL uses for `=~` and
+      # `!~`, and the answer is their union, the arms' label sets differing
+      # in launchd_state.
+      notRunningAnswer =
+        rulesList: series:
+        let
+          arms = notRunningArms rulesList;
+          runningArm =
+            s:
+            s.labels.launchd_state == "running"
+            && builtins.match arms.kept s.labels.launchd_label != null
+            && s.value == 0;
+          unloadedArm =
+            s:
+            s.labels.launchd_state == "unloaded"
+            && (arms.excluded == null || builtins.match arms.excluded s.labels.launchd_label == null)
+            && s.value == 1;
+        in
+        map (s: s.labels) (builtins.filter (s: runningArm s || unloadedArm s) series);
+      # The answer on minutes 0 to 14 and none after: one FIRING at 10, one
+      # RESOLVED 5 min after it was last seen at 14.
+      notRunningFor15 = rulesList: label: state: {
+        rules = rulesList;
         steps = map (
           n:
           onStibnite {
             at = minute n;
             series = lib.optionalAttrs (n <= 14) {
-              LaunchdJobNotRunning = [ (darwinSeries "LaunchdJobNotRunning" labels) ];
+              LaunchdJobNotRunning = notRunningAnswer rulesList (probeStates label state);
             };
           }
         ) (lib.range 0 20);
@@ -1628,17 +1689,20 @@
           "19 [RESOLVED] LaunchdJobNotRunning stibnite default"
         ];
       };
-      keptAliveStopped = notRunningFor15 { } // {
-        name = "keptAliveStopped: nix-grpc-daemon's running state 0 for 15 min fires one LaunchdJobNotRunning stibnite after 10 min and resolves once";
+      keptAliveStopped = notRunningFor15 evaluatorRules "org.nixos.nix-grpc-daemon" "not_running" // {
+        name = "keptAliveStopped: nix-grpc-daemon not running for 15 min fires one LaunchdJobNotRunning stibnite after 10 min and resolves once";
       };
-      envelopeUnloaded =
-        notRunningFor15 {
-          launchd_label = "org.nixos.otel-envelope";
-          launchd_state = "unloaded";
-        }
+      # 8.3's bootout: a kept-alive label unloaded has running 0 and unloaded
+      # 1, which must make one instance, not one per arm.
+      keptAliveUnloaded =
+        rulesList:
+        notRunningFor15 rulesList "org.nixos.nix-grpc-daemon" "unloaded"
         // {
-          name = "envelopeUnloaded: otel-envelope unloaded for 15 min fires one LaunchdJobNotRunning stibnite after 10 min and resolves once";
+          name = "keptAliveUnloaded: nix-grpc-daemon unloaded for 15 min, its running 0 and unloaded 1 both written, fires one LaunchdJobNotRunning stibnite after 10 min and resolves once";
         };
+      envelopeUnloaded = notRunningFor15 evaluatorRules "org.nixos.otel-envelope" "unloaded" // {
+        name = "envelopeUnloaded: otel-envelope, not kept alive, unloaded for 15 min fires one LaunchdJobNotRunning stibnite after 10 min and resolves once";
+      };
       envelopeFailedNotReported = {
         name = "envelopeFailedNotReported: otel-envelope's non-zero exit for 15 min, which the rendered exclusion removes, posts no LaunchdJobFailed";
         steps = map (
@@ -1732,6 +1796,7 @@
       darwinLegs = [
         darwinSignalMissing
         keptAliveStopped
+        (keptAliveUnloaded evaluatorRules)
         envelopeUnloaded
         envelopeFailedNotReported
         harmoniaFailedReported
@@ -1928,6 +1993,29 @@
           );
           legs = [ cinnabarSilentLeg ];
         };
+        # 8.3's defect restored: the unloaded arm without its kept-alive
+        # exclusion answers a booted-out kept-alive label twice.
+        notRunningBothArms =
+          let
+            rulesList = map (
+              r:
+              if r.alert == "LaunchdJobNotRunning" then
+                r
+                // {
+                  expr =
+                    mutateText "notRunningBothArms" '', launchd_label!~"${(notRunningArms evaluatorRules).excluded}"''
+                      ""
+                      r.expr;
+                }
+              else
+                r
+            ) evaluatorRules;
+          in
+          {
+            evaluator = realEvaluator;
+            config = checkConfig rulesList;
+            legs = [ (keptAliveUnloaded rulesList) ];
+          };
       };
 
       mutantRun = name: mutant: ''
