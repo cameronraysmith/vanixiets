@@ -5,7 +5,7 @@ Nothing here commits code; Step 3 is the gate every implementation commit waits 
 
 **Files:**
 - Create (committed): `openspec/changes/bind-mesh-writes-to-their-host/review-plan.md`
-- Create (git-ignored): `logs/cam81-evidence/1.<n>-*.log`, `logs/cam81-evidence/1.4-rehearsal/`, `logs/cam81-evidence/1.5-probe/`
+- Create (git-ignored): `logs/cam81-evidence/1.<n>-*.log`, `logs/cam81-evidence/1.4-rehearsal/`, `logs/cam81-evidence/1.5-probe/` (the collector configuration, the Caddyfile and `socket-test.nix`)
 
 **Interfaces:**
 - Consumes: `main@origin`; `$DEPLOY` (plan Global Constraints).
@@ -68,7 +68,9 @@ ssh root@magnetite.scientistexperience.net 'bash -c "z=\$(ip -j link show | jq -
 
 Expected: a count; a host-key prompt is answered by comparing with `ssh-keyscan` over ZeroTier, and the answer is recorded.
 
-- [ ] **Step 5: The vendored filter probe (tasks.md 1.5) [gate]**
+- [ ] **Step 5: The vendored probe (tasks.md 1.5) [gate]**
+
+Its filter cases become the cases of `checks.x86_64-linux.mesh-binding` (Task 4 Step 3), so this step is that check's first run.
 
 Read the consumer's argument list:
 
@@ -94,12 +96,14 @@ processors:
     metric_conditions:
       - 'not (otelcol.client.metadata["x-vanixiets-host"][0] == "alpha" or otelcol.client.metadata["x-vanixiets-host"][0] == "beta")'
       - 'resource.attributes["host.name"] != otelcol.client.metadata["x-vanixiets-host"][0]'
+      - 'resource.attributes["vanixiets.database"] != "fleet"'
       - 'datapoint.attributes["host.name"] != nil or datapoint.attributes["host_name"] != nil'
   filter/mesh-host-logs:
     error_mode: ignore
     log_conditions:
       - 'not (otelcol.client.metadata["x-vanixiets-host"][0] == "alpha" or otelcol.client.metadata["x-vanixiets-host"][0] == "beta")'
       - 'resource.attributes["host.name"] != otelcol.client.metadata["x-vanixiets-host"][0]'
+      - 'not (resource.attributes["vanixiets.database"] == "devloop" and resource.attributes["vanixiets.table"] == "deploy_record")'
       - 'log.attributes["host"] != nil and log.attributes["host"] != otelcol.client.metadata["x-vanixiets-host"][0]'
       - 'log.attributes["host.name"] != nil or log.attributes["host_name"] != nil'
 exporters:
@@ -111,6 +115,15 @@ service:
     logs/mesh: { receivers: [otlp/mesh], processors: [memory_limiter, filter/mesh-host-logs], exporters: [debug] }
 ```
 
-Run it with the pinned binary, `mkdir -p /tmp/cam81-probe && <otelcol-contrib> --config=file:logs/cam81-evidence/1.5-probe/config.yaml`, and post through the socket with `curl --unix-socket /tmp/cam81-probe/otlp.sock http://x/v1/metrics -H 'Content-Type: application/json'`: a gauge with resource `host.name=alpha` and header `X-Vanixiets-Host: alpha`; the same with header `beta`; one with header `alpha` and a point attribute `host_name=beta`; a deploy record (`/v1/logs`) with header `alpha` and attribute `host=beta`; a matching record; a request without the header; and one with header name `x-VANIXIETS-host: alpha`.
-Expected: the debug exporter prints only the matching gauge, the matching record and the mixed-case request; every request answers 200; `curl -s 127.0.0.1:18888/metrics | grep -E 'otelcol_processor_filter_(datapoints|logs)_filtered'` shows the dropped counts with `filter="filter/mesh-host-metrics"` and `filter="filter/mesh-host-logs"`, and the series names as printed, with or without `_total`, are what Task 4 Step 1's fixtures use.
+The allow-list conditions are written here as literals for the two-host table; 4.4's renderer produces them from the values the agent role stamps.
+Run it with the pinned binary, `mkdir -p /tmp/cam81-probe && <otelcol-contrib> --config=file:logs/cam81-evidence/1.5-probe/config.yaml`, and post through the socket with `curl --unix-socket /tmp/cam81-probe/otlp.sock http://x/v1/metrics -H 'Content-Type: application/json'`: a gauge with resource `host.name=alpha`, `vanixiets.database=fleet` and header `X-Vanixiets-Host: alpha`; the same with header `beta`; one with header `alpha` and a point attribute `host_name=beta`; a deploy record (`/v1/logs`) with resource `vanixiets.database=devloop`, `vanixiets.table=deploy_record`, header `alpha` and attribute `host=beta`; a matching record; a record with header `alpha`, resource `host.name=alpha`, `vanixiets.database=devloop` and `vanixiets.table=ci_build`; a request without the header; and one with header name `x-VANIXIETS-host: alpha`.
+Expected: the debug exporter prints only the matching gauge, the matching record and the mixed-case request; every request answers 200; `curl -s 127.0.0.1:18888/metrics | grep -E 'otelcol_processor_(filter_(datapoints|logs)_filtered|incoming_items)'` shows the dropped counts with `filter="filter/mesh-host-metrics"` and `filter="filter/mesh-host-logs"` and each filter's incoming-items series, and the series names as printed, with or without `_total`, are what Task 4 Step 1's fixtures use.
 If a condition is rejected at start, or a request lands where it should not, the conditions are corrected here and `design.md` D5 is amended before Task 4.
+
+caddy, with the root pin's caddy and the argument list nixpkgs' `services.caddy` writes into its unit's `ExecStart` at the root pin (`caddy run --config <file> --adapter caddyfile`), recorded as run: under `logs/cam81-evidence/1.5-probe/pki/`, `openssl` issues a scratch CA, a site certificate with `IP:127.0.0.1` and `IP:::1`, an `alpha` client certificate with `URI:spiffe://vanixiets/host/alpha` and a `nosan` client certificate; write `logs/cam81-evidence/1.5-probe/Caddyfile` in design D3's form for `alpha` at `127.0.0.1` and `beta` at `::1`, the two loopback addresses every local host carries, its mesh site on `https://127.0.0.1:4318` and `https://[::1]:4318`, `admin off`, the metrics site `http://127.0.0.1:2019` with `bind 127.0.0.1`, the server named `mesh`, `reverse_proxy` to the probe collector's socket, and `tls {$CREDENTIALS_DIRECTORY}/otel-cert {$CREDENTIALS_DIRECTORY}/otel-key` with `CREDENTIALS_DIRECTORY` exported to a directory holding the site certificate and key under those names.
+Post with `--cert alpha.crt` to `https://127.0.0.1:4318` (a matching write) and to `https://[::1]:4318` (alpha's certificate from beta's address), and with the `nosan` certificate to `https://127.0.0.1:4318`, each without SNI by addressing the site by IP.
+Expected: caddy starts, so the placeholder resolves; the matching write reaches the debug exporter with `x-vanixiets-host: alpha`; the other two get 403; `curl -s 127.0.0.1:2019/metrics | grep -E '^caddy_http_request'` prints the series names and the `server="mesh"` and `code="403"` labels, which Task 4 Step 1's caddy fixtures copy; `openssl s_client -connect 127.0.0.1:4318 -noservername` shows the site certificate chosen without SNI.
+
+The socket form, as a throwaway container test `logs/cam81-evidence/1.5-probe/socket-test.nix`, a `runNixOSTest` with systemd-nspawn containers because magnetite has no `/dev/kvm` (A32), built with `nix build -f logs/cam81-evidence/1.5-probe/socket-test.nix --option builders "$(grep 930f /etc/nix/machines | head -1)"`: the node declares `users.groups.otelcol-mesh = { }`, a test account in it, `systemd.tmpfiles.rules = [ "d /run/otelcol-mesh 2770 root otelcol-mesh" ]`, and a service with `DynamicUser = true`, `SupplementaryGroups = [ "otelcol-mesh" ]`, `ReadWritePaths = [ "/run/otelcol-mesh" ]` and `UMask = "0007"` running the pinned `otelcol-contrib` with `otlp/mesh` on `/run/otelcol-mesh/otlp.sock`.
+Its script asserts that the test account's `curl --unix-socket /run/otelcol-mesh/otlp.sock` answers, that `runuser -u nobody -- curl --unix-socket …` fails with a permission error, and that `stat -c '%U %G %a'` of the directory reads `root otelcol-mesh 2770` and of the socket names group `otelcol-mesh` with group write.
+Expected: all three hold, and the form goes into Task 4 Step 4 unchanged; if the service cannot reach the directory or the socket's group differs, the same test with `Group = "otelcol-mesh"` beside `DynamicUser` decides the fallback, and design D3 records which form passed.

@@ -31,6 +31,7 @@ nix eval --json ".#nixosConfigurations.$h.config.services.opentelemetry-collecto
 
 Run it for each present NixOS collecting host; on stibnite run `curl -fsS 127.0.0.1:9100/metrics` and `127.0.0.1:8888/metrics` through the same `grep -c`.
 Expected: every count is 0, as on 2026-11-06; a non-zero count stops the task, because the point rule would drop honest data.
+Then repeat Task 3 Step 5's gate into the same log: every collecting row reads its URI SAN where its collector loads it, or carries the operator's recorded decision accepting the loss of its backlog; a row with neither stops the task.
 
 - [ ] **Step 2: The MAC gate (tasks.md 5.2) [gate] [operator]**
 
@@ -99,5 +100,14 @@ z=$(ip -j link show | jq -r '.[] | select(.ifname|startswith("zt")) | .ifname')
 ip -6 neigh del <address> dev "$z"     # each wrong entry; emulation answers the next solicitation
 ```
 
-Then revert pull request 2 through the merge queue and, in `$DEPLOY` at the reverted `origin/main`, `clan machines update magnetite --target-host root@magnetite.scientistexperience.net 2>&1 | tee logs/magnetite-$(date +%Y%m%d-%H%M%S).log`.
-Expected: `otlp/mesh` back on the ZeroTier address, no caddy, no permanent entries, the agents' queues draining; the outcome or `not run` is recorded in `logs/cam81-evidence/5.5-rollback-<ts>.log`.
+networkd may reinstall an entry it manages on the next link event, so the pre-binding configuration is deployed at once, without waiting for the merge queue, under plan Global Constraints' rollback exception; on stibnite, with `<first>` the first commit pull request 2 put on `origin/main`:
+
+```bash
+git -C "$DEPLOY" checkout --detach "<first>^"
+(cd "$DEPLOY" && clan machines update magnetite --target-host root@magnetite.scientistexperience.net 2>&1 | tee "$REPO/logs/magnetite-$(date +%Y%m%d-%H%M%S).log")
+```
+
+Then, in the public session on magnetite, `ip -j -6 neigh show dev "$z" nud permanent | jq -c '[.[] | {dst, lladdr}]'` reads the entries absent.
+
+Then revert pull request 2 through the merge queue and deploy the reverted `origin/main` by the ordinary rule.
+Expected: `otlp/mesh` back on the ZeroTier address, no caddy, no permanent entry for any collecting host after the rollback deploy, the agents' queues draining; the outcome or `not run` is recorded in `logs/cam81-evidence/5.5-rollback-<ts>.log`.

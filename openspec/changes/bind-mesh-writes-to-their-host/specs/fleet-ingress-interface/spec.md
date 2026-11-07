@@ -4,7 +4,7 @@
 
 `flake.lib.observabilityHosts` SHALL map each agent host to its `platform`, `collect`, `alwaysOn`, `notifiedUnits` and `smartDevices`, `flake.lib.hosts` SHALL give each agent host's overlay address as its `zt` attribute, and the collector's `agent` role machines and whether each collects, each host's notified units, the evaluator's always-on hosts, expected hosts by platform and `SystemdUnitFailed` exclusion, and the devices whose disk health is read SHALL be read from it.
 Each row's `platform`, `nixos` or `darwin`, SHALL equal the `machineClass` that `modules/clan/inventory/machines.nix` gives the same machine.
-Each agent host's `zt` address SHALL equal its second source, `vars/shared/zerotier-ip-<host>-zerotier/ip/value` for a clan ZeroTier peer and the controller's `allowedIps` entry for an external member, SHALL lie in the network's rfc4193 /88 for `db4344343b14b903`, and SHALL be written in compressed form; the ingress's identity map, its binding filters and its pinned neighbour entries SHALL be rendered from these two tables.
+Each agent host's `zt` address SHALL equal its second source, `vars/shared/zerotier-ip-<host>-zerotier/ip/value` for a clan ZeroTier peer and the controller's `externalMembers` entry of the same name for an external member, SHALL lie in the rfc4193 /88 formed from the network id in `vars/shared/zerotier-network-zerotier/network-id/value`, and SHALL be lower case and equal to its own canonical RFC 5952 rendering; the ingress's identity map, its binding filters and its pinned neighbour entries SHALL be rendered from these two tables.
 
 **Discharged by**: the agent role's per-host assertions with their `extendModules` overrides; `checks.x86_64-linux.otel-collector-config`'s address clause with its mutants `addressDigitChanged` and `externalAddressDiffers`; the `otel-collector` inventory instance's platform assertion with its scratch-edit control; `checks.x86_64-linux.fleet-alert`'s exclusion, absence and platform legs.
 
@@ -30,15 +30,16 @@ Each agent host's `zt` address SHALL equal its second source, `vars/shared/zerot
 
 #### Scenario: An agent host's overlay address disagrees with its second source
 
-- **WHEN** `checks.x86_64-linux.otel-collector-config` compares each agent host's `flake.lib.hosts` address with its ZeroTier vars file or the controller's `allowedIps`, and a mutant changes one digit of pyrite's address or gives stibnite an address the controller does not list
+- **WHEN** `checks.x86_64-linux.otel-collector-config` compares each agent host's `flake.lib.hosts` address with its ZeroTier vars file or the controller's `externalMembers` entry of the same name, and a mutant changes one digit of pyrite's address or gives stibnite another external member's listed address
 - **THEN** each mutant fails the check naming the host, and the unmutated tables pass with every address inside the network's /88
 
 ### Requirement: The collection CA issues each agent host one certificate
 
 The clan vars generator `otel-ca` SHALL be shared, with `ca.key` never deployed and `ca.crt` public, and `otel-cert` SHALL issue each agent host a P-256 certificate signed by it, valid 3650 days, with CN the machine name, the URI SAN `spiffe://vanixiets/host/<machine>` and `extendedKeyUsage=clientAuth`, or on the ingress host `serverAuth,clientAuth` with the same URI SAN followed by `IP:<flake.lib.hosts.magnetite.zt>` and `DNS:magnetite.zt`.
 On a darwin agent host the key SHALL be owned by `_otelcol` with mode `0400` and declared without `restartUnits`, and the agent's plist SHALL carry the certificate's sha256 as `OTEL_CERT_SHA256`, so a reissued certificate reloads the agent.
+Each agent host's `networking.hostName`, which its agent stamps as `host.name` and its deploy records as `host`, SHALL equal the machine name its URI SAN carries.
 
-**Discharged by**: the plan's `openssl` reading of each issued certificate and its hash check after every vars step; `vmTests.x86_64-linux.fleet-ingress`'s refusal and delivery cases; stibnite's evaluation of the agent role's `darwinModule`; the operator's reading of the darwin key's owner and mode after stibnite's routine activation.
+**Discharged by**: the plan's `openssl` reading of each issued certificate and its hash check after every vars step; the agent role's host-name assertion on NixOS and darwin with its `extendModules` override `hostNameDiffers`; `vmTests.x86_64-linux.fleet-ingress`'s refusal and delivery cases; stibnite's evaluation of the agent role's `darwinModule`; the operator's reading of the darwin key's owner and mode after stibnite's routine activation.
 
 #### Scenario: The ingress host's certificate is read
 
@@ -73,10 +74,10 @@ On a darwin agent host the key SHALL be owned by `_otelcol` with mode `0400` and
 ### Requirement: The ingress receiver accepts only certificate holders on magnetite's ZeroTier address
 
 On the ingress host, caddy SHALL be the only listener on `[${flake.lib.hosts.magnetite.zt}]:4318`, serving TLS 1.3 only with magnetite's `otel-cert` and requiring a client certificate that verifies against `otel-ca`, and TCP 4318 SHALL be open on `zt+` only.
-The collector's `otlp/mesh` SHALL be an OTLP/HTTP receiver on the Unix socket `/run/otelcol-mesh/otlp.sock` with `include_metadata: true`, in a directory whose group, `otelcol-mesh`, holds only the collector's and caddy's accounts, so no other account on magnetite can connect to it; caddy SHALL forward every accepted request to it unchanged except for the identity header it sets.
+The collector's `otlp/mesh` SHALL be an OTLP/HTTP receiver on the Unix socket `/run/otelcol-mesh/otlp.sock` with `include_metadata: true`, in a directory owned by `root:otelcol-mesh` with mode 2770, where `otelcol-mesh` is held only by the collector's unit and caddy's account, so no other account on magnetite can connect to it; caddy SHALL forward every accepted request to it unchanged except for the identity header it sets.
 No collector endpoint SHALL be off loopback.
 
-**Discharged by**: R3.1's endpoint clause in `checks.x86_64-linux.otel-collector-config` with its mutants; magnetite's socket-group assertion with its `extendModules` override; `vmTests.x86_64-linux.fleet-ingress`'s refusal and socket-access cases; the operator's refused request from stibnite at deploy.
+**Discharged by**: R3.1's endpoint clause in `checks.x86_64-linux.otel-collector-config` with its mutants; magnetite's socket-group assertion over every unit's `Group` and `SupplementaryGroups` and every account's `extraGroups`, with its `extendModules` override `extraSocketMember`; the vendored probe's socket case; `vmTests.x86_64-linux.fleet-ingress`'s refusal and socket-access cases; the operator's refused request from stibnite at deploy.
 
 #### Scenario: The endpoint is evaluated
 
@@ -112,17 +113,17 @@ This capability SHALL state what its properties guarantee and what they do not, 
 #### Scenario: The properties above are read as a set
 
 - **WHEN** the properties of this capability are read as a set
-- **THEN** what they establish is that each agent host holds a certificate from `otel-ca` naming it in a URI SAN, that the ingress accepts a mesh write only from a holder whose SAN names a collecting host and only from that host's overlay address, at TLS 1.3, that it stores a mesh write only under that host, that magnetite pins each collecting host's neighbour entry, that each agent, darwin included, queues and retries toward it, that the darwin probe writes launchd job state and disk health for the loopback node_exporter, and that `otel-envelope` regulates each collector and the fleet budget, each as far as its check, assertion, container test or recorded observation reaches
+- **THEN** what they establish is that each agent host holds a certificate from `otel-ca` naming it in a URI SAN, that the ingress accepts a mesh write only from a holder whose SAN names a collecting host and only from that host's overlay address, at TLS 1.3, that it stores a mesh write only under that host and only into the database and table an agent writes for its signal, that magnetite pins each collecting host's neighbour entry, that each agent, darwin included, queues and retries toward it, that the darwin probe writes launchd job state and disk health for the loopback node_exporter, and that `otel-envelope` regulates each collector and the fleet budget, each as far as its check, assertion, container test or recorded observation reaches
 
 #### Scenario: A guarantee about a certificate holder is sought
 
 - **WHEN** someone asks whether a host can write series only under its own name
-- **THEN** the answer is yes over the mesh, as far as the binding's container test, C6 and the spoofing acceptance reach: a write is accepted only from the host its certificate's URI SAN names, at that host's overlay address, and stored only under that host; it is no for writers the binding does not see: root on a collecting host can write anything as that host, any local account on an agent host can inject points as that host through its loopback agent, and root on magnetite can write anything as any host
+- **THEN** the answer is yes over the mesh, as far as the binding's container test, `mesh-binding`, C6 and the spoofing acceptance reach: a write is accepted only from the host its certificate's URI SAN names, at that host's overlay address, and stored only under that host and only into the streams an agent writes, `fleet` metrics and `devloop` deploy records; it is no for writers the binding does not see: root on a collecting host can write any series or deploy record as that host, though not into another database or table, any local account on an agent host can inject points as that host through its loopback agent, and root on magnetite can write anything as any host
 
 #### Scenario: A guarantee about a copied key is sought
 
 - **WHEN** someone asks whether a copy of one host's `otel-key` lets another member write
-- **THEN** the answer is no over the mesh: caddy refuses the copy from any overlay address but the named host's, and magnetite's pinned entry sends the named host's replies only to it; a writer on the named host itself, or on a future path that does not arrive over the overlay network, is not refused by the address
+- **THEN** the answer is no over the mesh: caddy refuses the copy from any overlay address but the named host's, and magnetite's pinned entry sends the named host's replies only to it; a writer on the named host itself, or on a future path that does not arrive over the overlay network, is not refused by the address; a copy refused during the TLS handshake, or used from the named host's spoofed address, which never completes a connection, reaches neither caddy's 403 count nor C6, so it is stopped but not detected
 
 #### Scenario: A guarantee about a lost key is sought
 
@@ -156,7 +157,7 @@ This capability SHALL state what its properties guarantee and what they do not, 
 caddy SHALL map a verified client certificate's first URI SAN, `spiffe://vanixiets/host/<host>`, to that collecting host and its `flake.lib.hosts` address, the ingress host excluded, and SHALL answer 403 without forwarding when the SAN maps to no host or the peer address differs from the mapped one.
 For an accepted request it SHALL set `X-Vanixiets-Host` to the mapped host, replacing any client value, and pass the collector's status and body back unchanged.
 
-**Discharged by**: magnetite's table-agreement assertion with its `extendModules` overrides; `vmTests.x86_64-linux.fleet-ingress`'s binding cases; the 403 control at acceptance; resting on world assumption `A75 — caddy 2.11.7 exposes a verified client certificate's URI SANs, replaces a forwarded header, passes an upstream status through, and counts a response status`.
+**Discharged by**: `vmTests.x86_64-linux.fleet-ingress`'s binding cases, which run the identity map, the filters and the neighbours rendered from one list; the 403 control at acceptance; resting on world assumption `A75 — caddy 2.11.7 exposes a verified client certificate's URI SANs, replaces a forwarded header, passes an upstream status through, and counts a response status`.
 
 #### Scenario: A collecting host writes from its own address
 
@@ -195,10 +196,10 @@ For an accepted request it SHALL set `X-Vanixiets-Host` to the mapped host, repl
 
 ### Requirement: A mesh write is stored only under the host that sent it
 
-Every pipeline receiving `otlp/mesh` SHALL begin with `memory_limiter` and its signal's binding filter, `filter/mesh-host-metrics` in `metrics/mesh` and `filter/mesh-host-logs` in `logs/mesh`, and `metrics/ingress` and `logs/ingress` SHALL receive only `forward`.
-A binding filter SHALL drop a resource whose `host.name` differs from `X-Vanixiets-Host` or whose header is absent, a log record whose `host` differs from it, and a point or record carrying its own host attribute.
+Every pipeline receiving `otlp/mesh` SHALL begin with `memory_limiter` and its signal's binding filter, and `metrics/ingress` and `logs/ingress` SHALL receive only `forward`.
+A binding filter SHALL drop a resource whose `host.name` differs from `X-Vanixiets-Host`, whose header is absent, or whose `vanixiets.database` and `vanixiets.table` are not a pair an agent sets for that signal, a log record whose `host` differs from the header, and a point or record carrying its own host attribute.
 
-**Discharged by**: magnetite's pipeline-coverage assertion with its `extendModules` overrides `meshInIngress`, `logsMeshUnfiltered` and `tracesMeshUnfiltered`; `vmTests.x86_64-linux.fleet-ingress`'s mismatch cases; the forced mismatch at acceptance; resting on world assumption `A76 — The collector's filter answers success for a dropped write and counts it per processor`.
+**Discharged by**: magnetite's pipeline-coverage assertion with its `extendModules` overrides `meshInIngress` and `logsMeshUnfiltered`; R3.1's clause rejecting any traces pipeline; `checks.x86_64-linux.mesh-binding`, which runs the pinned collector over the filter text magnetite renders; `vmTests.x86_64-linux.fleet-ingress`'s mismatch and foreign-table cases; the forced mismatch at acceptance; resting on world assumption `A76 — The collector's filter answers success for a dropped write and counts it per processor`.
 
 #### Scenario: A resource names another host
 
@@ -215,10 +216,15 @@ A binding filter SHALL drop a resource whose `host.name` differs from `X-Vanixie
 - **WHEN** `fleet-ingress` posts with electrum's test certificate a metric whose resource `host.name` is `electrum` and whose data point carries `host_name="cinnabar"`
 - **THEN** the point is not stored and the filter's counter rises
 
+#### Scenario: A write names a database or table no agent writes
+
+- **WHEN** `fleet-ingress` posts with electrum's test certificate from electrum's address a log record whose resource `host.name` is `electrum`, `vanixiets.database` is `devloop` and `vanixiets.table` is `ci_build`
+- **THEN** the sender receives 200, no `ci_build` row is stored from it, and `otelcol_processor_filter_logs_filtered{filter="filter/mesh-host-logs"}` rises
+
 #### Scenario: A pipeline receives mesh writes without the binding
 
-- **WHEN** an `extendModules` override of magnetite adds `otlp/mesh` to `metrics/ingress`, removes the filter from `logs/mesh`, or adds a `traces/mesh` pipeline without a binding filter
-- **THEN** magnetite's evaluation fails on the pipeline-coverage assertion naming the pipeline
+- **WHEN** an `extendModules` override of magnetite adds `otlp/mesh` to `metrics/ingress` or removes the filter from `logs/mesh`
+- **THEN** magnetite's evaluation fails on the pipeline-coverage assertion naming the pipeline, while a traces pipeline is rejected by R3.1
 
 #### Scenario: Every collecting host keeps writing after the binding's deploy
 
@@ -230,7 +236,7 @@ A binding filter SHALL drop a resource whose `host.name` differs from `X-Vanixie
 magnetite SHALL hold on its ZeroTier link a permanent neighbour entry for every other collecting host's overlay address, naming `flake.lib.zerotierMac` of that address, installed by networkd from `systemd.network.networks."09-zerotier".neighbors`.
 A deploy that changes these entries SHALL run only after each present collecting host's computed MAC has been read equal to the MAC magnetite's live neighbour table holds for it.
 
-**Discharged by**: `checks.x86_64-linux.otel-collector-config`'s MAC clause over the pairs recorded from magnetite's live table, with its mutant `macBytesReversed`; magnetite's table-agreement assertion; the pre-deploy MAC gate; C6's neighbour clause; `vmTests.x86_64-linux.fleet-ingress`'s neighbour case; the spoofing acceptance; resting on world assumptions `A71 — ZeroTier delivers a frame for a member's MAC only to that member, whose MAC derives from its node id and the network id`, `A72 — ZeroTier neither inspects an inbound neighbour advertisement nor ties an rfc4193 address to the member sending from it`, `A73 — Linux never changes a permanent neighbour entry on an advertisement, and lets an overriding advertisement rewrite a non-permanent one` and `A74 — The fleet's overlay network assigns rfc4193 addresses with neighbour emulation and carries only the accept-all rule`.
+**Discharged by**: `checks.x86_64-linux.otel-collector-config`'s MAC clause over the pairs recorded from magnetite's live table, with its mutant `macBytesReversed`; the pre-deploy MAC gate; C6's neighbour clause; `vmTests.x86_64-linux.fleet-ingress`'s neighbour case, whose entries are installed by `ip`, so networkd's installation path is judged only by C6 and the operator-present zerotierone restart; the spoofing acceptance; resting on world assumptions `A71 — ZeroTier delivers a frame for a member's MAC only to that member, whose MAC derives from its node id and the network id`, `A72 — ZeroTier neither inspects an inbound neighbour advertisement nor ties an rfc4193 address to the member sending from it`, `A73 — Linux never changes a permanent neighbour entry on an advertisement, and lets an overriding advertisement rewrite a non-permanent one` and `A74 — The fleet's overlay network assigns rfc4193 addresses with neighbour emulation and carries only the accept-all rule`.
 
 #### Scenario: The MAC function is checked against magnetite's live table
 
@@ -259,10 +265,10 @@ A deploy that changes these entries SHALL run only after each present collecting
 
 ### Requirement: otel-envelope on the ingress host fails when the binding refuses or drops a write
 
-The ingress host's `otel-envelope` SHALL fail its clause C6 on any run after which a binding filter's drop counter or caddy's mesh-site 403 count rose, or a collecting host's pinned entry is missing, not permanent, or names another MAC; an absent counter reads zero and a counter below its recorded value counts its current value.
+The ingress host's `otel-envelope` SHALL fail its clause C6 on any run after which a binding filter's drop counter or caddy's mesh-site 403 count rose, a collecting host's pinned entry is missing, not permanent, or names another MAC, or a liveness series a previous run recorded is absent; an absent drop or refusal counter reads zero, and a counter below its recorded value counts its current value.
 Its target clause SHALL also probe caddy's metrics on `127.0.0.1:2019`.
 
-**Discharged by**: `checks.x86_64-linux.otel-envelope`'s C6 cases with their mutants `c6IgnoresFilter`, `c6IgnoresRefusal` and `c6IgnoresNeighbour`; `vmTests.x86_64-linux.fleet-ingress`'s binding cases, each reading C6; the forced mismatch and the 403 control at acceptance.
+**Discharged by**: `checks.x86_64-linux.otel-envelope`'s C6 cases with their mutants `c6IgnoresFilter`, `c6IgnoresRefusal`, `c6IgnoresNeighbour` and `c6IgnoresLiveness`; `vmTests.x86_64-linux.fleet-ingress`'s binding cases, each reading C6; the forced mismatch and the 403 control at acceptance.
 
 #### Scenario: A filter drop is read
 
@@ -279,6 +285,11 @@ Its target clause SHALL also probe caddy's metrics on `127.0.0.1:2019`.
 - **WHEN** the C6 cases give the envelope a neighbour table in which one collecting host's entry is `STALE`, another's names a different MAC, and a third is absent
 - **THEN** the run fails on C6 naming all three, and the mutant `c6IgnoresNeighbour` fails the check
 
+#### Scenario: A liveness series disappears
+
+- **WHEN** the C6 cases give the envelope a run in which a binding filter's incoming-items series, recorded on the previous run, is absent
+- **THEN** the run fails on C6 naming the series, and the mutant `c6IgnoresLiveness` fails the check
+
 #### Scenario: A mismatched write is forced at acceptance
 
 - **WHEN** after the binding's deploy the operator posts from pyrite, with pyrite's own certificate, one metric whose `host.name` is `cinnabar`
@@ -286,9 +297,15 @@ Its target clause SHALL also probe caddy's metrics on `127.0.0.1:2019`.
 
 ### Requirement: The ingress proxy runs inside a declared envelope
 
-caddy on magnetite SHALL run with `MemoryMax = 128M` and `OOMScoreAdjust = 700`, below the evaluator's and above Perses', the store's and the collector's, SHALL load magnetite's `otel-cert` and `otel-key` only through `LoadCredential`, SHALL be restarted by a reissue of either through `restartUnits`, SHALL serve its admin and metrics endpoint on `127.0.0.1:2019` only, and SHALL be a notified unit of magnetite.
+caddy on magnetite SHALL run with `MemoryMax = 128M` and `OOMScoreAdjust = 700`, below the evaluator's and above Perses', the store's and the collector's, SHALL load magnetite's `otel-cert` and `otel-key` only through `LoadCredential`, restarting on a reissue of either, and SHALL be a notified unit of magnetite.
+It SHALL run with `admin off` and reloads off, and serve only its metrics on `http://127.0.0.1:2019`.
 
-**Discharged by**: magnetite's kill-order assertion with caddy added and its `extendModules` override swapping caddy's and Perses' values; the agent role's notified-unit assertion; R3.1's endpoint clause; the resident-memory reading over the first day after the binding's deploy.
+**Discharged by**: magnetite's kill-order assertion with caddy added and its `extendModules` override swapping caddy's and Perses' values; the agent role's notified-unit assertion; R3.1's endpoint clause; `vmTests.x86_64-linux.fleet-ingress`'s case `adminLoadIgnored`; the resident-memory reading over the first day after the binding's deploy.
+
+#### Scenario: A local account posts a configuration to caddy
+
+- **WHEN** `fleet-ingress` sends `POST /load` to `127.0.0.1:2019` with a configuration that drops the 403 and sets `X-Vanixiets-Host` to a fixed host
+- **THEN** a write from an unlisted address still gets 403, and a client-sent `X-Vanixiets-Host` is still replaced by the mapped host
 
 #### Scenario: The kill order is evaluated
 

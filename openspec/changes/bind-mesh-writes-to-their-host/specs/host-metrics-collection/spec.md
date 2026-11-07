@@ -19,4 +19,4 @@ A series another agent host, or any other overlay member, sends to the telemetry
 #### Scenario: A collection certificate is copied to another overlay member
 
 - **WHEN** a copy of cinnabar's collection certificate is used from any overlay member other than cinnabar
-- **THEN** the telemetry store keeps nothing it sends, and the operator is told within one regulator period
+- **THEN** the telemetry store keeps nothing it sends, and the operator is told within one regulator period of each request it sends that the ingress refuses at HTTP; a copy refused during the TLS handshake, or sending from cinnabar's own overlay address without being cinnabar, never reaches HTTP, and the operator is not told of it
