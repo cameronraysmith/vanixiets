@@ -5,7 +5,7 @@ let
   credentialOptions = config.flake.lib.omnigentWorkerCredentialOptions;
 in
 {
-  clan.modules.omnigent =
+  flake.clan.modules.omnigent =
     { lib, ... }:
     {
       _class = "clan.service";

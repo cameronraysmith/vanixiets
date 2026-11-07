@@ -1,6 +1,6 @@
 { ... }:
 {
-  clan.modules.openclaw =
+  flake.clan.modules.openclaw =
     { ... }:
     {
       _class = "clan.service";

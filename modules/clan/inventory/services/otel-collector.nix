@@ -5,13 +5,13 @@
 { config, lib, ... }:
 let
   hosts = config.flake.lib.observabilityHosts;
-  machines = config.clan.inventory.machines;
+  machines = config.flake.clan.inventory.machines;
   mismatched = lib.filterAttrs (
     name: h: (h.platform or null) != (machines.${name}.machineClass or null)
   ) hosts;
 in
 {
-  clan.inventory.instances.otel-collector = {
+  flake.clan.inventory.instances.otel-collector = {
     module = {
       name = "otel-collector";
       input = "self";

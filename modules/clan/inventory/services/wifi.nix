@@ -11,7 +11,7 @@
 # denotes is decided in design.md D14. Targeting is machine-scoped because no
 # `wireless` tag exists and pyrite is the sole taker.
 {
-  clan.inventory.instances.wifi = {
+  flake.clan.inventory.instances.wifi = {
     module = {
       name = "wifi";
       input = "clan-core";

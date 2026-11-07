@@ -20,7 +20,7 @@ let
   };
 in
 {
-  clan.inventory.instances.nix-builders = {
+  flake.clan.inventory.instances.nix-builders = {
     module = {
       name = "nix-builders";
       input = "self";

@@ -5,7 +5,7 @@
   ...
 }:
 {
-  clan.inventory.instances.user-crs58 = {
+  flake.clan.inventory.instances.user-crs58 = {
     module = {
       name = "users";
       input = "clan-core";

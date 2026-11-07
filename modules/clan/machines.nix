@@ -1,6 +1,6 @@
 { config, ... }:
 {
-  clan.machines = {
+  flake.clan.machines = {
     cinnabar = {
       imports = [ config.flake.modules.nixos."machines/nixos/cinnabar" ];
     };

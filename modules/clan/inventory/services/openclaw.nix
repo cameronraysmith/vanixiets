@@ -1,5 +1,5 @@
 {
-  clan.inventory.instances.openclaw = {
+  flake.clan.inventory.instances.openclaw = {
     module = {
       name = "openclaw";
       input = "self";

@@ -300,7 +300,7 @@ Use clan inventory user instances when:
 This pattern is NixOS-specific.
 For darwin machines, continue using the integrated user setup described above.
 
-### The clan.inventory.instances.user-* pattern
+### The flake.clan.inventory.instances.user-* pattern
 
 Clan inventory instances combine system user creation with home-manager integration:
 
@@ -308,7 +308,7 @@ Clan inventory instances combine system user creation with home-manager integrat
 # modules/clan/inventory/services/users/myuser.nix
 { inputs, ... }:
 {
-  clan.inventory.instances.user-myuser = {
+  flake.clan.inventory.instances.user-myuser = {
     module = {
       name = "users";
       input = "clan-core";
@@ -444,7 +444,7 @@ Here's a complete user instance configuration:
 ```nix
 { inputs, ... }:
 {
-  clan.inventory.instances.user-admin = {
+  flake.clan.inventory.instances.user-admin = {
     module = {
       name = "users";
       input = "clan-core";

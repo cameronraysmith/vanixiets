@@ -153,7 +153,7 @@ home-manager.users.crs58.imports = with config.flake.modules.homeManager; [
 
 ```nix
 # modules/clan/machines.nix
-clan.machines = {
+flake.clan.machines = {
   stibnite = {
     nixpkgs.hostPlatform = "aarch64-darwin";
     imports = [ config.flake.modules.darwin."machines/darwin/stibnite" ];
@@ -169,7 +169,7 @@ clan.machines = {
 
 ```nix
 # modules/clan/inventory/services/zerotier.nix
-inventory.instances.zerotier = {
+flake.clan.inventory.instances.zerotier = {
   roles.controller.machines."cinnabar" = { };
   roles.peer.machines = {
     "electrum" = { };

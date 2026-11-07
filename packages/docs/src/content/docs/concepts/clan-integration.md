@@ -20,11 +20,11 @@ Clan orchestrates NixOS deployments but doesn't replace NixOS modules.
 
 ### Machine registry
 
-Clan maintains the registry of machines and their deployment targets via `clan.machines.*`:
+Clan maintains the registry of machines and their deployment targets via `flake.clan.machines.*`:
 
 ```nix
 # modules/clan/machines.nix
-clan.machines = {
+flake.clan.machines = {
   stibnite = {
     nixpkgs.hostPlatform = "aarch64-darwin";
     imports = [ config.flake.modules.darwin."machines/darwin/stibnite" ];
@@ -38,11 +38,11 @@ clan.machines = {
 
 ### Inventory system
 
-The inventory assigns machines to service roles via `clan.inventory.*`:
+The inventory assigns machines to service roles via `flake.clan.inventory.*`:
 
 ```nix
 # modules/clan/inventory/services/zerotier.nix
-inventory.instances.zerotier = {
+flake.clan.inventory.instances.zerotier = {
   roles.controller.machines."cinnabar" = { };
   roles.peer.machines = {
     "electrum" = { };

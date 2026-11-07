@@ -1,6 +1,6 @@
 { ... }:
 {
-  clan.modules.beads-ui =
+  flake.clan.modules.beads-ui =
     { ... }:
     {
       _class = "clan.service";

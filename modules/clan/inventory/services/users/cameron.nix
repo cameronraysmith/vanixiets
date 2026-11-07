@@ -5,7 +5,7 @@
   ...
 }:
 {
-  clan.inventory.instances.user-cameron = {
+  flake.clan.inventory.instances.user-cameron = {
     module = {
       name = "users";
       input = "clan-core";

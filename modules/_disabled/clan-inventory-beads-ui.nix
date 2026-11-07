@@ -1,5 +1,5 @@
 {
-  clan.inventory.instances.beads-ui = {
+  flake.clan.inventory.instances.beads-ui = {
     module = {
       name = "beads-ui";
       input = "self";

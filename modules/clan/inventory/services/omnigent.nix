@@ -39,7 +39,7 @@ let
   };
 in
 {
-  clan.inventory.instances.omnigent = {
+  flake.clan.inventory.instances.omnigent = {
     module = {
       name = "omnigent";
       input = "self";

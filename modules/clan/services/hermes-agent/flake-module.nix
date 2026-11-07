@@ -1,6 +1,6 @@
 { inputs, ... }:
 {
-  clan.modules.hermes-agent =
+  flake.clan.modules.hermes-agent =
     { ... }:
     {
       _class = "clan.service";
