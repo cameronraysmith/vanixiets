@@ -263,11 +263,11 @@ Any requirement whose discharge depends on this fact SHALL name it explicitly, a
 It is true of Linux 6.18, independent of what this fleet builds, that an advertisement never changes a permanent neighbour entry, that an unsolicited one with the override flag rewrites a reachable or stale entry, and that networkd installs a `[Neighbor]` entry as permanent.
 Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL be treated as losing its discharge once this assumption's violation condition below is observed.
 
-**Evidence**: `__neigh_update` returns without change for a `NUD_PERMANENT` or `NUD_NOARP` entry unless the update is administrative (`linux@v6.18.58:net/core/neighbour.c:1351-1353`), and replaces a valid entry's address under the override flag (:1414-1427); `ndisc_recv_na` passes the override flag through (`net/ipv6/ndisc.c:1100-1108`); networkd installs `[Neighbor]` entries as permanent (`systemd@v258:src/network/networkd-neighbor.c:293`, read for the pinned systemd 262 by the container test's neighbour leg); the container test's neighbour leg and C6's reading of magnetite's live neighbour table are its monitors.
+**Evidence**: `__neigh_update` returns without change for a `NUD_PERMANENT` or `NUD_NOARP` entry unless the update is administrative (`linux@v6.18.58:net/core/neighbour.c:1351-1353`), and replaces a valid entry's address under the override flag (:1414-1427); `ndisc_recv_na` passes the override flag through (`net/ipv6/ndisc.c:1100-1108`); networkd installs `[Neighbor]` entries as permanent (`systemd@v258:src/network/networkd-neighbor.c:293`); the container test's neighbour leg monitors the kernel's handling of entries it installs with `ip -6 neigh replace`, and networkd's installation on magnetite's ZeroTier link is monitored only by C6's reading of magnetite's live neighbour table and the operator-present zerotierone restart.
 
 #### Scenario: A kernel or networkd version changes neighbour handling
 
-- **WHEN** magnetite's kernel moves off 6.18 or its systemd moves, and the container test's neighbour leg finds a pinned entry changed by an advertisement or installed as other than permanent, or C6 reads a collecting host's entry as not permanent
+- **WHEN** magnetite's kernel moves off 6.18 or its systemd moves, and the container test's neighbour leg finds a pinned entry changed by an advertisement, or C6 reads a collecting host's entry as missing or not permanent
 - **THEN** this assumption is void, and the `fleet-ingress-interface` requirement `magnetite pins each collecting host's neighbour entry` loses its discharge until the entries are installed by another means
 
 ### Requirement: A74 — The fleet's overlay network assigns rfc4193 addresses with neighbour emulation and carries only the accept-all rule
@@ -287,7 +287,7 @@ Any requirement whose discharge depends on this fact SHALL name it explicitly, a
 It is true of caddy 2.11.7, independent of what this fleet builds, that `{http.request.tls.client.san.uris.0}` is a verified certificate's first URI SAN, `header_up` replaces a client's header, `reverse_proxy` passes the upstream's status through, and the `metrics` option counts a `respond` status.
 Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL be treated as losing its discharge once this assumption's violation condition below is observed.
 
-**Evidence**: `caddy@v2.11.7:modules/caddyhttp/replacer.go:500-545`; `modules/caddytls/connpolicy.go:622-637`, :850-861; `modules/caddyhttp/headers/caddyfile.go:281-285`; `headers/headers.go:258-275`; `reverseproxy/reverseproxy.go:702-716`, :1313, :1326; `caddyhttp/metrics.go:103-163`, :346-385; the container test's binding legs are its monitor.
+**Evidence**: `caddy@v2.11.7:modules/caddyhttp/replacer.go:500-545`; `modules/caddytls/connpolicy.go:622-637`, :850-861; `modules/caddyhttp/headers/caddyfile.go:281-285`; `headers/headers.go:258-275`; `reverseproxy/reverseproxy.go:702-716`, :1313, :1326; `caddyhttp/metrics.go:103-163`, :346-385; the container test's binding legs are its monitor, and the ingress role's assertion `config.services.caddy.package.version == "2.11.7"` fails evaluation when caddy moves, its message requiring the container test to be rerun and this assumption updated.
 
 #### Scenario: A caddy version changes one of these behaviours
 
@@ -299,9 +299,9 @@ Any requirement whose discharge depends on this fact SHALL name it explicitly, a
 It is true of otelcol-contrib 0.155.0, independent of what this fleet builds, that a filter dropping a request's data answers the sender 200, and that it counts dropped points and records in `otelcol_processor_filter_datapoints_filtered` and `otelcol_processor_filter_logs_filtered` labelled with its id.
 Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL be treated as losing its discharge once this assumption's violation condition below is observed.
 
-**Evidence**: `filterprocessor@v0.155.0:logs.go:115-121`, `metadata.yaml:28-43`, `telemetry.go:45`; the processor helper turns `ErrSkipProcessingData` into success (`processorhelper/logs.go:64-65`); the header the filter compares is read lower-cased as a string slice (`client@v1.61.0:client.go:146-175`; `pkg/ottl@v0.155.0:contexts/internal/ctxotelcol/client.go:194-215`, `otelcol.go:44-61`); the plan's vendored probe and the container test's mismatch legs are its monitors.
+**Evidence**: `filterprocessor@v0.155.0:logs.go:115-121`, `metadata.yaml:28-43`, `telemetry.go:45`; the processor helper turns `ErrSkipProcessingData` into success (`processorhelper/logs.go:64-65`); the header the filter compares is read lower-cased as a string slice (`client@v1.61.0:client.go:146-175`; `pkg/ottl@v0.155.0:contexts/internal/ctxotelcol/client.go:194-215`, `otelcol.go:44-61`); the plan's vendored probe, `checks.x86_64-linux.mesh-binding`, which reruns the pinned collector over magnetite's rendered filters on every bump of the pin, and the container test's mismatch legs are its monitors.
 
 #### Scenario: A collector version changes the filter's answer or counter
 
-- **WHEN** the collector moves off 0.155.0, and the vendored probe or the container test finds a dropped write answered with another status, the counter renamed or unlabelled, or the header read differently
+- **WHEN** the collector moves off 0.155.0, and `mesh-binding`, the vendored probe or the container test finds a dropped write answered with another status, the counter renamed or unlabelled, or the header read differently
 - **THEN** this assumption is void, and the `fleet-ingress-interface` requirements `A mesh write is stored only under the host that sent it` and `otel-envelope on the ingress host fails when the binding refuses or drops a write` lose their discharge until C6 and the filter are rewritten against the new version

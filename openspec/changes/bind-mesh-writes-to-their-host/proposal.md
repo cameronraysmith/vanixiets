@@ -42,7 +42,7 @@ Decisions tagged `O<n>` were made by the operator on 2026-11-06, each as `design
 
 **Regulation**
 - magnetite's `otel-envelope` gains C6, failing when the binding filter drops a write, caddy refuses one, or a collecting host's neighbour entry is not permanent with its derived MAC; C2 watches caddy's metrics endpoint (D6).
-- `flake.lib.hosts` becomes the one source of every collecting host's ZeroTier address, checked against the clan vars and the controller's `allowedIps` (D7).
+- `flake.lib.hosts` becomes the one source of every collecting host's ZeroTier address, checked against the clan vars and the controller's external members, which become keyed by name (D7).
 
 **Deployment**
 - Implementation starts only after `stand-up-darwin-collection` archives (O6).
@@ -58,7 +58,7 @@ The binding narrows an existing capability's trust boundary rather than adding a
 ### Modified Capabilities
 
 - `fleet-ingress-interface` (stratum: `interface`): `One host table declares the agent hosts and what each reports` gains each host's overlay address from `flake.lib.hosts`, checked against its second source; `The collection CA issues each agent host one certificate` adds the URI SAN and the reissue; `The ingress receiver accepts only certificate holders on magnetite's ZeroTier address` moves the listener to caddy and the receiver to a socket; five requirements are added: `A mesh write is accepted only from the host its certificate names, at that host's overlay address`, `A mesh write is stored only under the host that sent it`, `magnetite pins each collecting host's neighbour entry`, `otel-envelope on the ingress host fails when the binding refuses or drops a write` and `The ingress proxy runs inside a declared envelope`; `This capability states its own trust boundary` is rewritten.
-  Trust boundary: a certificate holder writes over the mesh only under its own host, and only from its own overlay address; root on a collecting host can still write anything as that host, a local account on an agent host can still inject points as that host through its loopback agent, root on magnetite can write anything, a stolen laptop writes as itself until deauthorized on cinnabar, and certificates still have no revocation; nothing here guarantees a series reaches the store end to end.
+  Trust boundary: a certificate holder writes over the mesh only under its own host, only from its own overlay address, and only into the database and table an agent writes for its signal; root on a collecting host can still write any series or deploy record as that host, a local account on an agent host can still inject points as that host through its loopback agent, root on magnetite can write anything, a stolen laptop writes as itself until deauthorized on cinnabar, and certificates still have no revocation; a refusal during the TLS handshake and a connection from a spoofed address go undetected; nothing here guarantees a series reaches the store end to end.
 - `telemetry-store-interface` (stratum: `interface`): `This capability states its own trust boundary` gains `A guarantee about a series' host is sought`: yes over the mesh, no for root on magnetite and for magnetite's own in-process path.
 - `devloop-collection-interface` (stratum: `interface`): `This capability states its own trust boundary` changes `A guarantee about a record's host is sought` to yes over the mesh, no for magnetite's own rows.
 - `host-metrics-collection` (stratum: `behavioral`): adds `A series is stored only under the host that gathered it` (O7).

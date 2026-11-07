@@ -4,22 +4,37 @@ Implements `tasks.md` 2.1–2.5 (design D2, D4, D7; FII `One host table declares
 It is pull request 1; it starts only after Task 1 Step 3 passed.
 
 **Files:**
-- Modify: `modules/lib/hosts.nix`, `modules/checks/otel-collector-config.nix`, `modules/clan/services/otel-collector/flake-module.nix` (the `otel-cert` generator only)
+- Modify: `modules/lib/hosts.nix`, `modules/clan/inventory/services/zerotier.nix` (external members keyed by name), `modules/checks/otel-collector-config.nix`, `modules/clan/services/otel-collector/flake-module.nix` (the `otel-cert` generator and the agent role's host-name assertion)
 - Create: `modules/lib/zerotier-mac.nix`, `modules/checks/otel-collector-config/zerotier-macs.json`
 - Regenerate (committed): `vars/per-machine/<machine>/otel-cert/` for the seven collecting hosts
 
 **Interfaces:**
-- Consumes: `flake.lib.observabilityHosts`; `vars/shared/zerotier-ip-<host>-zerotier/ip/value`; `modules/clan/inventory/services/zerotier.nix`'s `allowedIps`.
+- Consumes: `flake.lib.observabilityHosts`; `vars/shared/zerotier-ip-<host>-zerotier/ip/value`; `vars/shared/zerotier-network-zerotier/network-id/value`; `modules/clan/inventory/services/zerotier.nix`'s external members.
 - Produces: `flake.lib.hosts.<host>.zt`, `flake.lib.zerotierMac`, the URI SAN on every `otel-cert`.
 
 - [ ] **Step 1: The address clause, failing first (tasks.md 2.1)**
 
-Its two sources: `flake.lib.hosts.<host>.zt` (first-party registry) and, for each collecting host, `vars/shared/zerotier-ip-<host>-zerotier/ip/value` if it exists, else the `allowedIps` entry of `modules/clan/inventory/services/zerotier.nix` whose comment names the host (stibnite), read by importing the inventory module's evaluated `settings.allowedIps` and the host table's names; the clause also requires each address to start with `fddb:4344:343b:14b9:399:93`, to have eight groups and no group with a leading zero.
+First, in `modules/clan/inventory/services/zerotier.nix`, replace the commented `allowedIps` list on cinnabar's controller with an attribute set keyed by name, keeping each member's comment as its key and its member ID beside it:
+
+```nix
+externalMembers = {
+  blackphos = "fddb:4344:343b:14b9:399:930e:e971:d9e0"; # darwin, member ID 0ee971d9e0
+  stibnite = "fddb:4344:343b:14b9:399:9324:19d9:3451"; # darwin, member ID 2419d93451
+  argentum = "fddb:4344:343b:14b9:399:93f7:54d5:ad7e"; # darwin, member ID f754d5ad7e
+  rosegold = "fddb:4344:343b:14b9:399:9315:3431:ee8"; # darwin, member ID 1534310ee8
+  pixel7 = "fddb:4344:343b:14b9:399:939f:c45d:577c"; # android, member ID 9fc45d577c
+  pixel11 = "fddb:4344:343b:14b9:399:933c:8999:9bb8"; # android, member ID 3c89999bb8
+};
+```
+
+bound in a `let` and passed as `allowedIps = lib.attrValues externalMembers`; `nix eval --json` of the controller's evaluated `allowedIps` before and after lists the same six addresses (evaluation).
+The clause's two sources: `flake.lib.hosts.<host>.zt` (first-party registry) and, for each collecting host, `vars/shared/zerotier-ip-<host>-zerotier/ip/value` if it exists, else `externalMembers.<host>` (stibnite), read from the inventory module's evaluated `externalMembers`.
+The clause also requires each address to lie in the /88 formed from `vars/shared/zerotier-network-zerotier/network-id/value` (`fd` followed by the network id, then `9993`, which gives `fddb:4344:343b:14b9:399:93` for `db4344343b14b903`), to have eight groups, to be lower case, and to equal its own canonical RFC 5952 rendering, which with eight groups means no group with a leading zero.
 Add it to `modules/checks/otel-collector-config.nix` beside R3.1, with the mutants:
 - `addressDigitChanged`: `flake.lib.hosts.pyrite.zt` with its last digit changed;
-- `externalAddressDiffers`: `flake.lib.hosts.stibnite.zt` set to blackphos's `allowedIps` address.
+- `externalAddressDiffers`: `flake.lib.hosts.stibnite.zt` set to `externalMembers.blackphos`, an address the controller lists, which a membership test would accept and the by-name comparison rejects.
 
-Run `nix build .#checks.x86_64-linux.otel-collector-config -L`.
+Run `nix build .#.checks.x86_64-linux.otel-collector-config -L`.
 Expected: FAIL naming the six hosts missing from `flake.lib.hosts`.
 Then add to `modules/lib/hosts.nix`, keeping its header:
 
@@ -83,9 +98,13 @@ Then write `modules/lib/zerotier-mac.nix`, which implements `MAC::fromAddress` (
 ```
 
 This body was evaluated on 2026-11-06 against the pinned nixpkgs `lib` and returned the five recorded MACs, and `02:ac:20:0a:3a:ac` for rosegold's `…:9315:3431:ee8`, whose last group has three digits.
-Expected after: the check passes and rejects `macBytesReversed`; `nix eval --raw .#lib.zerotierMac --apply 'f: f { network = "db4344343b14b903"; address = "fddb:4344:343b:14b9:399:9324:19d9:3451"; }'` prints `02:9d:0d:e2:00:15` (build, evaluation).
+Expected after: the check passes and rejects `macBytesReversed`, the MAC clause being the regulator; as a smoke reading only, `nix eval --raw .#lib.zerotierMac --apply 'f: f { network = "db4344343b14b903"; address = "fddb:4344:343b:14b9:399:9324:19d9:3451"; }'` prints `02:9d:0d:e2:00:15` (build, evaluation).
 
-- [ ] **Step 3: The URI SAN (tasks.md 2.3)**
+- [ ] **Step 3: The host-name assertion and the URI SAN (tasks.md 2.3)**
+
+First add to the agent role, in its NixOS module and its `darwinModule`, an assertion that `config.networking.hostName == machine.name`, with the message naming both values, because the agent stamps `host.name` and deploy records stamp `host` from `networking.hostName` (FM:150, :301-302; `modules/system/deploy-record.nix:103-106`, :120-123) while the SAN carries `machine.name`.
+Override `hostNameDiffers`: an `extendModules` override of cinnabar setting `networking.hostName = "cinnabar-typo"`.
+Expected: every agent host evaluates, and the override fails cinnabar's evaluation with the assertion's message (evaluation).
 
 In the `otel-cert` generator of `modules/clan/services/otel-collector/flake-module.nix` (FM:941-986), replace the SAN binding:
 
@@ -95,7 +114,7 @@ In the `otel-cert` generator of `modules/clan/services/otel-collector/flake-modu
 ```
 
 and write `echo "subjectAltName=${sans}"` unconditionally in `cert.ext`; `validation.subjectAltNames = sans` is unchanged in form; the `otel-ca` definition is not touched.
-Expected: `nix eval --json .#nixosConfigurations.cinnabar.config.clan.core.vars.generators.otel-cert.validation` shows `URI:spiffe://vanixiets/host/cinnabar`, magnetite's shows the URI followed by its IP and DNS SANs, and `nix eval --json` of `generators.otel-ca` on magnetite equals 1.2's (evaluation).
+Expected: as a smoke reading only, `nix eval --json .#nixosConfigurations.cinnabar.config.clan.core.vars.generators.otel-cert.validation` shows `URI:spiffe://vanixiets/host/cinnabar` and magnetite's shows the URI followed by its IP and DNS SANs, Step 4's `openssl` reading being the regulator; `nix eval --json` of `generators.otel-ca` on magnetite equals the same `nix eval` run in the same step at the change's parent commit (`git+file://$REPO?rev=<parent>#nixosConfigurations.magnetite…`) (evaluation).
 
 - [ ] **Step 4: The vars step (tasks.md 2.4)**
 
@@ -119,4 +138,4 @@ Commit the regenerated vars with Step 3's change.
 - [ ] **Step 5: Format and open pull request 1 (tasks.md 2.5)**
 
 `nix fmt`, keeping its log; `nix fmt -- --fail-on-change`; record each changed check's cost; open the pull request in plain words (for example "Name each collecting host in its collection certificate and record every host's ZeroTier address").
-Expected: nixbot green on `otel-collector-config`, `otel-envelope` and `nixos-magnetite`, and `darwin-stibnite` evaluates (command).
+Expected: nixbot green on `otel-collector-config`, `otel-envelope` and `nixos-magnetite`, and `darwin-stibnite` evaluates; each changed check's cost below 536,870,912 B, and the machine checks' cost before and after by the same method, any rise put to the operator (command).

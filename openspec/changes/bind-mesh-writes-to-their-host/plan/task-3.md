@@ -80,4 +80,7 @@ Expected: `no activation since`; two different hashes; `state = running` with a 
 - [ ] **Step 5: The reissued-certificate gate (tasks.md 3.4) [gate]**
 
 Collect the four SAN readings of Steps 2 to 4 into `logs/cam81-evidence/3.4-san-gate-<ts>.log`, and for stibnite add `sudo openssl x509 -noout -ext subjectAltName -in "$(nix eval --raw '.#darwinConfigurations.stibnite.config.clan.core.vars.generators.otel-cert.files."cert.pem".path')"`.
-Expected: magnetite, cinnabar, pyrite and stibnite each read their URI SAN from the file their collector loads; a host that does not stops Task 5.
+List every collecting row of `flake.lib.observabilityHosts` (`nix eval --json .#lib.observabilityHosts --apply 'builtins.mapAttrs (_: r: r.collect)'`) beside its reading.
+A host absent now, pyrite off the mesh or stibnite asleep, is read when it returns and before Task 5 Step 3; otherwise the orchestrator asks: "<host> still holds its old certificate; once the binding deploys, caddy answers it 403 and its exporter drops up to 24 h of queued data. Do you accept that loss, or should Task 5 wait for it?"; the answer and its time are recorded in the log.
+electrum, galena and scheelite, not provisioned and holding no backlog, are listed as taking their certificate from the committed vars when next provisioned.
+Expected: magnetite, cinnabar, pyrite and stibnite each read their URI SAN from the file their collector loads, or carry the operator's recorded decision; a host with neither stops Task 5.
