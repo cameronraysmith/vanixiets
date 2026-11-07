@@ -23,13 +23,14 @@ served() {
 }
 {
   echo "== served before"; served
+  echo "== caddy's loaded pki before"; ssh cinnabar.zt "bash -c 'curl -s localhost:2019/config/apps/pki; echo'"
   ssh cinnabar.zt 'tail -n 1 /var/log/deploy-record.jsonl'
   nixbot-logs queue
   echo "CINNABAR_SWITCH_EPOCH=$(/bin/date -u +%s)" | tee -a "$REPO/logs/cam87-evidence/window.env"
 } 2>&1 | tee "logs/cam87-evidence/3.1-cinnabar-$(/bin/date -u +%Y%m%dT%H%M%SZ).log"
 ```
 
-Expected: `OK` against RV, the same intermediate as Task 1 Step 3 or a weekly renewal of it, `Queue is empty`.
+Expected: `OK` against RV, the same intermediate as Task 1 Step 3 or a weekly renewal of it; caddy's loaded `pki` configuration, read from its admin endpoint, which the rendered Caddyfile leaves on, names no configured root; `Queue is empty`.
 
 - [ ] **Step 2: Deploy and after (3.1)**
 
@@ -41,10 +42,11 @@ cd "$DEPLOY" && clan machines update cinnabar 2>&1 | tee logs/cinnabar-$(date +%
   ssh cinnabar.zt 'tail -n 1 /var/log/deploy-record.jsonl'
   ssh cinnabar.zt "bash -c 'systemctl is-active caddy; sudo stat -c \"%U %a %n\" /run/secrets/vars/per-machine/cinnabar/caddy-root-ca/root.key; sudo journalctl -u caddy --since @$CINNABAR_SWITCH_EPOCH --no-pager | grep -iE \"pki|root|intermediate|error\" | tail -20'"
   echo "== served after"; served
+  echo "== caddy's loaded pki after"; ssh cinnabar.zt "bash -c 'curl -s localhost:2019/config/apps/pki; echo'"
   curl -s --cacert "$rv" https://ntfy.zt/v1/health; echo
   "$REPO/logs/cam87-evidence/read-posts.sh" "$CINNABAR_SWITCH_EPOCH"
 } 2>&1 | tee -a "$log"
 ```
 
 `CINNABAR_SWITCH_EPOCH` is sourced from `window.env` before the block; the local shell expands it into the remote command.
-Expected: the deploy log ends without error and its deploy record is the only new one; `active`; `caddy 400 …/root.key`; caddy's journal shows the PKI app provisioning without error, and a root path naming the var where caddy logs one; the served intermediate verifies `OK` against RV, the same as before or reissued, either recorded; `{"healthy":true…}`; every post since the switch has a cause written under `## Causes`.
+Expected: the deploy log ends without error and its deploy record is the only new one; `active`; `caddy 400 …/root.key`; caddy's journal shows the PKI app provisioning without error, and a root path naming the var where caddy logs one; the served intermediate verifies `OK` against RV, the same as before or reissued, either recorded; caddy's loaded `pki` configuration names `certificate_authorities.local.root` with `/run/secrets/vars/per-machine/cinnabar/caddy-root-ca/root.key` and RV's store path, which the served chain cannot show, because the stored root and the var are the same root and key; `{"healthy":true…}`; every post since the switch has a cause written under `## Causes`.

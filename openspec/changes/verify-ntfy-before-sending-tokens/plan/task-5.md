@@ -49,7 +49,7 @@ leg servedHeld r1.crt 18441 ok || exit 1
 leg servedInOverlap overlap.crt 18442 ok || exit 1
 leg servedDrifted r1.crt 18442 "does not verify" || exit 1
 leg rootExpiring r3.crt 18443 "expires" || exit 1
-sed -e 's/ -verify_return_error//' -e 's/^verified=.*/verified=0/' "$check" > verificationSkipped
+sed 's/^verified=0$/verified=1/' "$check" > verificationSkipped
 if leg servedDrifted r1.crt 18442 "does not verify" verificationSkipped; then echo "FAIL: mutant verificationSkipped passed"; exit 1; fi
 echo "mutant verificationSkipped rejected"
 sed 's/openssl x509 -checkend/true/' "$check" > expirySkipped
@@ -121,7 +121,7 @@ Create `modules/lib/caddy-root-check.nix`:
 }
 ```
 
-The `verified=0` and `-verify_return_error` texts are those the mutant's `sed` edits; the step confirms with `diff` of the built script and the mutant that exactly those lines change.
+The `verified=0` line, at the start of a line in the built script, is the text the mutant's `sed` turns into `verified=1`, so the mutant accepts whatever chain it is served and must pass `servedDrifted`; the step confirms with `diff` of the built script and the mutant that exactly that line changes.
 Run `jj st --no-pager >/dev/null`, build the check and record its cost.
 Expected: every leg prints `ok:`, both mutants print `rejected`, the scan's lines are unchanged, and the cost stays under 536,870,912 B.
 Commit: "caddy-root-check: verify the chain caddy serves against its root and warn before expiry".

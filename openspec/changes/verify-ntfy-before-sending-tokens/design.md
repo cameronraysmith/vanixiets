@@ -57,7 +57,7 @@ Stakeholders are the operator, who receives every alert and permission notice an
 | `modules/nixos/caddy-local-root.nix` | new: `flake.modules.nixos.caddy-local-root`, options `vanixiets.caddyLocalRoot.{certFile,keyFile,fingerprint}`, caddy's `pki` global option from them and the build-time check `caddy-root-from-vars` (D11) |
 | `modules/machines/nixos/cinnabar/caddy-root-ca.nix` | new: the generator `caddy-root-ca`, the import of `caddy-local-root` with the vars' paths and the recorded fingerprint (D10, D11) |
 | `modules/vm-tests/caddy-root-from-vars.nix` | new: the reinstall test of D11 |
-| `vars/per-machine/cinnabar/caddy-root-ca/` | new: `root.key` (secret, reader cinnabar and the sops users), `root.crt/value` (public), imported (D12) |
+| `vars/per-machine/cinnabar/caddy-root-ca/` | new: `root.key` (secret, readers `machines/cinnabar` and the importing admin's user entry), `root.crt/value` (public), imported (D12) |
 | `modules/machines/nixos/cinnabar/pki/caddy-root-ca.crt` | removed; RV replaces it |
 | `modules/darwin/zt-services-trust.nix` | reads RV |
 | `pkgs/by-name/ntfy-send/ntfy-send.sh` | a check `: "${NTFY_CACERT:?…}"` after `--help`, then `-sf --cacert "$NTFY_CACERT" -m 5`; `--help` documents `NTFY_CACERT` and drops the endpoint-security paragraph |
@@ -76,12 +76,13 @@ Stakeholders are the operator, who receives every alert and permission notice an
 
 cinnabar declares a per-machine generator `caddy-root-ca` with two files:
 
-- `root.key`: `secret = true`, `owner = "caddy"`, `group = "caddy"`, `mode = "0400"`, `neededFor = "services"`, `restartUnits = [ "caddy.service" ]`, deployed to `/run/secrets/vars/per-machine/cinnabar/caddy-root-ca/root.key`; its sops readers are cinnabar's age key and the repository's sops users, today `cameron`, as for `otel-cert/key.pem`.
+- `root.key`: `secret = true`, `owner = "caddy"`, `group = "caddy"`, `mode = "0400"`, `neededFor = "services"`, `restartUnits = [ "caddy.service" ]`, deployed to `/run/secrets/vars/per-machine/cinnabar/caddy-root-ca/root.key`; its sops readers are `machines/cinnabar` and the user entry of the admin running `clan vars set`, `users/cameron` or `users/crs58`, which hold one age key, as for `otel-cert/key.pem`; clan adds the machine, its default groups and the running admin's entry and no other sops user (`clan-core@dbae2101:pkgs/clan-cli/clan_cli/secrets/secrets.py:170-235`).
 - `root.crt`: `secret = false`, its value committed at RV and its `path` a store path.
 
 The generator has no prompts and no `validation`, and its `script` only fails, printing `caddy-root-ca is imported from cinnabar's caddy storage with clan vars set, never generated; see the runbook`.
 So `clan vars generate` and `clan machines update` cannot mint a root: with the files present the generator counts as current, because a generator whose `validation` is unset and that has no stored hash is valid (`clan-core@dbae2101:pkgs/clan-cli/clan_lib/vars/_types.py:400-409`, `generator.py:443-459`), and with a file missing the script fails and the deploy stops.
 Boundary: vendored versus first-party; the fail-only script is first-party, and the behaviour it relies on is clan-core's, recorded as A83.
+Neither the import nor any later step writes the key to a local file outside cinnabar: D12 runs `clan vars set` with its temporary directory on a RAM disk, and the key exists in clear only in the memory of `ssh`, the pipe and clan that carry it.
 
 Alternatives: prompts of type `multiline-hidden` for the key and certificate, rejected because the key would pass through a terminal and the operator's clipboard; `clan vars import` of an exported tree, rejected because it needs the key written to a local directory first; a generator that mints a root, rejected by O8, because the operator's Android phone trusts the existing root by hand.
 
@@ -123,22 +124,39 @@ A rotation changes the option with the var (D7).
 
 ### D12: The one-time import (O9; operator-gated)
 
-The import runs on stibnite in the primary checkout, in the commit that declares the generator, before caddy's `pki` option exists, with the operator present; nothing writes the key to a local file:
+The import runs on stibnite in the primary checkout, in the commit that declares the generator, before caddy's `pki` option exists, with the operator present; nothing writes the key to a local file.
+`clan vars set` writes a secret's value to a `NamedTemporaryFile` in `/dev/shm`, or in Python's temporary directory where `/dev/shm` is missing, as on stibnite, whose `TMPDIR` is on disk under `/var/folders`; `sops encrypt --in-place` then overwrites that file with the ciphertext, and clan copies it into the vars tree and unlinks it (`clan-core@dbae2101:pkgs/clan-cli/clan_cli/secrets/sops.py:527-555`; `getsops/sops@v3.13.3:cmd/sops/main.go:894-895`).
+Python takes its temporary directory from `TMPDIR`, so the two commands run with `TMPDIR` on a RAM disk made for the step and detached after it:
 
 ```bash
+dev=$(/usr/bin/hdiutil attach -nomount ram://2097152 | awk 'NR == 1 { print $1 }')
+/usr/sbin/diskutil erasevolume APFS cam87ram "$dev"
+/usr/bin/sudo /usr/sbin/diskutil enableOwnership /Volumes/cam87ram
+/usr/bin/sudo /usr/bin/touch /Volumes/cam87ram/.metadata_never_index
+/usr/bin/sudo /usr/bin/install -d -m 0700 -o "$(id -u)" -g "$(id -g)" /Volumes/cam87ram/tmp
+export TMPDIR=/Volumes/cam87ram/tmp
 ssh cinnabar.zt 'sudo cat /var/lib/caddy/.local/share/caddy/pki/authorities/local/root.key' \
   | CLAN_NO_COMMIT=1 clan vars set cinnabar caddy-root-ca/root.key
 ssh cinnabar.zt 'sudo cat /var/lib/caddy/.local/share/caddy/pki/authorities/local/root.crt' \
   | CLAN_NO_COMMIT=1 clan vars set cinnabar caddy-root-ca/root.crt
+# the comparisons below
+unset TMPDIR
+/usr/bin/hdiutil detach "$dev"
 ```
 
+`diskutil erasevolume` formats and mounts the attached device in one step; a volume under `/Volumes` ignores ownership until `enableOwnership`, which the `0700` directory needs; `.metadata_never_index` keeps Spotlight from reading the volume's files into its index on the system disk.
+The step's log records that `df "$TMPDIR"` names the RAM disk, that `tempfile.gettempdir()` in clan's own interpreter prints `/Volumes/cam87ram/tmp`, that the directory holds no file at its top level, where `NamedTemporaryFile` writes, after the commands, and that `hdiutil detach` succeeds.
+That shows where clan's temporary files went, which the code path above makes the only place the key is written in clear; no check can show that a deleted file was never written elsewhere.
+The key still exists in clear in the memory of `ssh`, the pipe and clan, which no file holds; macOS encrypts swap.
 `clan vars set` reads a non-terminal stdin to the end and stores it through the file's store, encrypting a secret with sops (`clan-core@dbae2101:pkgs/clan-cli/clan_lib/vars/set.py:38-72`); `CLAN_NO_COMMIT=1` leaves the files to the change's own commit.
 The path is caddy's `dataDir` (`/var/lib/caddy`, `services.caddy.dataDir`) plus caddy's storage prefix, confirmed read-only on 2026-11-06.
 The step then verifies, printing no key:
 
 - RV's sha256 fingerprint equals the recorded one and the live `root.crt`'s;
 - `clan vars get cinnabar caddy-root-ca/root.key | openssl pkey -pubout | sha256sum` equals `openssl x509 -in RV -pubkey -noout | sha256sum`;
-- `vars/per-machine/cinnabar/caddy-root-ca/root.key/machines/` lists `cinnabar`, and `users/` the sops users.
+- the reader entries of `vars/per-machine/cinnabar/caddy-root-ca/root.key/` are exactly `machines/cinnabar` and one of `users/cameron` or `users/crs58`; any other entry, a group included, stops the step.
+
+Alternative: keeping the default temporary directory and restating the guarantee as a transient `0600` file that clan unlinks, rejected because it weakens a stated property to save the RAM disk's commands.
 
 No `clan vars generate --regenerate` runs on this generator in this change; a regeneration would only reach the failing script.
 
@@ -182,7 +200,8 @@ In the sandbox it makes a P-256 CA `other` and a leaf for `DNS:ntfy.zt` signed b
 | `foreignRefusedBuilt` | the built wrapper | its own (RV) | exit 60, nothing recorded |
 | `ownAccepted` | source NS | `other` | exit 0, body recorded |
 | `bundleAccepted` | source NS | RV followed by `other` | exit 0, body recorded |
-| `caUnset` | source NS | unset | non-zero exit before curl runs |
+
+`NTFY_CACERT` unset or empty is judged in TT, whose stub curl records its argv only when curl runs: cases `caUnset` and `caEmpty` require a non-zero exit with no recorded argv, and the mutant `cacertGuardDropped`, NS without its `: "${NTFY_CACERT:?…}"` line, runs only `caEmpty`, because `set -u` alone also stops the unset case.
 
 The two values each case relates are the CA file given to curl and the CA that signed the server's leaf, made independently in the sandbox.
 Mutant `insecure`: NS with `--cacert "$NTFY_CACERT"` replaced by `-k`, run only on `foreignRefusedSource`, which then exits 0 with a recorded body, so the test reports the mutant rejected.
@@ -190,7 +209,7 @@ The test also asserts that `--help` documents `NTFY_CACERT` and no longer contai
 RV's acceptance by caddy's real server cannot be shown in a sandbox, because the key is not in it; the rehearsal before the window and every post after it show it.
 
 The wrapper reaches its own test through a `let` binding, `pkg = writeShellApplication { …; passthru.tests.tls-verification = callPackage ./test-tls-verification.nix { ntfySend = pkg; }; }`, which Nix evaluates lazily.
-TT keeps its stub curl and changes only its expected argument lists to `-sf --cacert <ca> -m 5 [-H @-]` and sets `NTFY_CACERT`.
+TT keeps its stub curl, changes its expected argument lists to `-sf --cacert <ca> -m 5 [-H @-]`, sets `NTFY_CACERT=/ca`, a path the stub never reads, and gains `caUnset`, `caEmpty` and `cacertGuardDropped`.
 
 ### D5: The client scan
 
@@ -203,6 +222,8 @@ The check holds three declared lists: clients, `[ "pkgs/by-name/ntfy-send/ntfy-s
 | `modules/machines/nixos/cinnabar/zt-dns.nix` | serves the name; its curl reaches the ZeroTier controller on localhost |
 | `modules/nixos/fleet-alert.nix` | the dead-man's curl reaches ntfy's own listener over HTTP; its posts go through `ntfy-send` |
 | `pkgs/by-name/ntfy-send/package.nix` | builds the client and names curl's path |
+| `modules/vm-tests/caddy-root-from-vars.nix` | a VM test; its curl verifies with `--cacert` against a root made in the test, inside the VM |
+| `modules/lib/observability-notify-run.nix` | its comment says how `ntfy-send` posts; the notifier posts through `ntfy-send` and runs no curl |
 | `pkgs/by-name/ntfy-send/test-token-transport.nix`, `test-tls-verification.nix` | exempt: tests holding a curl stub and the `insecure` mutant |
 | `modules/checks/ntfy-tls-verification.nix` and its directory | exempt: this check, its scanner and mutant fixtures |
 
@@ -210,9 +231,11 @@ The check holds three declared lists: clients, `[ "pkgs/by-name/ntfy-send/ntfy-s
 |---|---|---|---|
 | A, no insecure flag | in a file naming `ntfy.zt`, outside the test and check files above, a command line invoking `curl`, `wget` or `CURL_BIN`, with backslash continuations joined, carries `-k`, `--insecure` or a short-option cluster containing `k` | the file's text; curl's option grammar (`curl/curl@curl-8_22_0:docs/cmdline-opts/insecure.md`) | `insecureShort` (`--cacert …` replaced by `-k` in NS), `insecureCluster` (`-sf` replaced by `-sfk`), `insecureLong` (`--insecure` added), `insecureContinued` (a hook-shaped file with `curl \`, then `  -k \`, then the URL) |
 | B, declared clients verify | a declared client is missing from the tree or carries no `--cacert` | the declared list; the file's text | `clientMissing` (NS removed), `cacertDropped` (`--cacert …` removed, nothing added) |
-| C, no undeclared client | a file naming `ntfy.zt` and invoking `curl` or `wget` is in neither list | the two lists; the tree | `undeclaredClient` (a new `modules/x/post.sh` with a verifying curl to `https://ntfy.zt/x`) |
+| C, no undeclared client | a file naming `ntfy.zt` and invoking `curl` or `wget` is in neither list; a mention in a comment counts | the two lists; the tree | `undeclaredClient` (a new `modules/x/post.sh` with a verifying curl to `https://ntfy.zt/x`) |
 
 The unmutated tree passes all three clauses, and each mutant fails with its clause's message, so the scanner cannot pass by finding nothing (B) or by judging only what it found (C).
+Clause C counts a mention of `curl` or `wget` anywhere in a file, comments included, so a file that only mentions one beside `ntfy.zt` is declared a non-client with its reason; the check's header says so.
+The false positive costs one declaration and errs towards review.
 
 ### D6: cinnabar checks the root caddy serves, weekly (Q2)
 
@@ -238,7 +261,7 @@ Legs in `ntfy-tls-verification`, each serving a leaf through an intermediate wit
 | `rootExpiring` | R3, 100 days | R3 | fails, "expires" |
 
 The values related are the chain the server presents against the bundle, and the configured root's `notAfter` against the clock.
-Mutants `verificationSkipped` (the `-verify_return_error` and return-code test removed) runs only `servedDrifted`, and `expirySkipped` (the `-checkend` test removed) runs only `rootExpiring`.
+Mutants `verificationSkipped` (the script made to accept whatever it was served, `verified=0` set to `verified=1`) runs only `servedDrifted`, and `expirySkipped` (the `-checkend` test removed) runs only `rootExpiring`.
 
 Alternatives: comparing caddy's stored `root.crt` with the bundle, the first plan, dropped because after D11 the stored root is unused and the comparison would judge a file nothing serves; a Linear issue due in 2035, rejected as a reminder nothing checks; a clause in `fleet-deadman`, rejected because failing the dead-man for a warning would stop its pings and report an outage that is not one.
 
@@ -249,8 +272,8 @@ Rotation is a runbook procedure, written in RB by this change and run before 203
 1. On cinnabar, in a directory only root reads, generate a P-256 key and a self-signed root matching RV's extensions, `basicConstraints=critical,CA:TRUE,pathlen:1` and `keyUsage=critical,keyCertSign,cRLSign`, valid 3600 days, named `Caddy Local Authority - <year> ECC Root`, as caddy's own template does (`modules/caddypki/certificates.go:26-31`).
 2. Set RV to the old root followed by the new one with `CLAN_NO_COMMIT=1 clan vars set cinnabar caddy-root-ca/root.crt`; caddy keeps using the first certificate and the unchanged key; merge and deploy every running host, reading every post; install the new root on the phone by hand.
 3. Set `root.key` to the new key and RV to the new root followed by the old one, set cinnabar's `vanixiets.caddyLocalRoot.fingerprint` to the new root's, merge, and, before deploying cinnabar, move `intermediate.crt` and `intermediate.key` out of caddy's storage, so caddy issues an intermediate under the new root instead of loading the old one (`ca.go:345-375`); deploy cinnabar.
-4. Run `caddy-root-check` by hand and post one message from each host.
-5. Set RV to the new root alone; merge; deploy every running host again.
+4. Run `caddy-root-check` by hand, and from stibnite verify the chain served for `ntfy.zt` against the new root alone, `openssl s_client -connect ntfy.zt:443 -servername ntfy.zt -CAfile <new root> -verify_return_error`; post one message from each host. caddy's leaf for `ntfy.zt` lives 12 hours and is stored with the intermediate that signed it (`modules/caddytls/internalissuer.go:200`), so caddy can serve a chain to the old root after step 3, which `caddy-root-check` against the two-root RV does not distinguish; the read against the new root alone observes the switch.
+5. Only after step 4's read against the new root alone verifies, set RV to the new root alone; merge; deploy every running host again. Stored leaves are not moved; if the read does not verify, step 5 waits for the leaf's renewal and the read is repeated.
 
 caddy refuses to load a key that does not match RV's first certificate, so a step 3 with the two files out of order fails caddy's reload and leaves the old root serving.
 ZT imports the root into the System keychain by its common name; whether `security add-trusted-cert` imports both PEMs of an overlap is checked at the first rotation, since it affects only browsers on darwin, not any `ntfy.zt` client.
@@ -259,7 +282,7 @@ ZT imports the root into the System keychain by its common name; whether `securi
 
 caddy's switch to the vars deploys on its own, before any client changes, so a failure there is caddy's alone and no client's acceptance depends on it:
 
-1. After pull request 1 merges, cinnabar deploys from the deploy worktree. Before and after, the served chain for `ntfy.zt` is read from stibnite with `openssl s_client -showcerts`, and its intermediate is verified against RV with `openssl verify`; the stored root's fingerprint and the configured root's are read on cinnabar, and caddy's journal is read for the PKI app's provisioning. The intermediate may be the same or reissued; both are correct.
+1. After pull request 1 merges, cinnabar deploys from the deploy worktree. Before and after, the served chain for `ntfy.zt` is read from stibnite with `openssl s_client -showcerts`, and its intermediate is verified against RV with `openssl verify`; the stored root's fingerprint and the configured root's are read on cinnabar, and caddy's journal is read for the PKI app's provisioning. The intermediate may be the same or reissued; both are correct. Because the stored root and the var are the same root and key, the served chain cannot show where caddy loads its root from, so caddy's loaded configuration is also read on cinnabar before and after, read-only, with `curl -s localhost:2019/config/apps/pki`; caddy's admin endpoint is on there, since the rendered Caddyfile has no `admin off`, and after the switch it names the vars' paths.
 2. After pull requests 2 and 3 merge, the window deploys magnetite, then cinnabar, then pyrite over its LAN address with the operator present, then stibnite by the operator's `just activate` after the deploy-record check.
 
 magnetite goes first in the window because its evaluator reads cinnabar's new `notifiedUnits` from the host table, and its heartbeat each minute is the first live sign that the new client is accepted.
@@ -285,7 +308,7 @@ electrum, galena and scheelite are not provisioned and take the change at their 
 
 - [Risk] The import stores the wrong certificate or a key that does not match → Mitigation: D12's fingerprint and public-key comparisons before commit; D11's `recorded root` clause fails cinnabar's build; caddy refuses a mismatched key at reload and keeps serving the old configuration, so `clan machines update` reports the failed reload.
 - [Risk] caddy loads a stale intermediate the configured root did not sign → Mitigation: today's stored intermediate was signed by the same key; the rotation procedure removes it; the weekly check verifies the served chain.
-- [Trade-off, security] The root's key moves from one file on cinnabar's disk into the repository, sops-encrypted to cinnabar's age key and the sops users, today `cameron`; anyone holding one of those private keys, or root on cinnabar, can sign a certificate every client trusts, and an encrypted copy now lives in every clone and in the forge → accepted by O11, because a reinstall without it would mint a root no client trusts, the operator's phone included; the sops users are the same people who already hold root on cinnabar.
+- [Trade-off, security] The root's key moves from one file on cinnabar's disk into the repository, sops-encrypted to cinnabar's age key and the importing admin's age key, which `users/cameron` and `users/crs58` hold; anyone holding one of those private keys, or root on cinnabar, can sign a certificate every client trusts, and an encrypted copy now lives in every clone and in the forge → accepted by O11, because a reinstall without it would mint a root no client trusts, the operator's phone included; the admin key's holder already holds root on cinnabar, and the other sops users are not recipients unless someone adds them (A81).
 - [Risk] A typo in the root's path or the flags makes every post fail after deploy → Mitigation: D4 builds the wrapper and shows it refusing a foreign server and its source accepting a trusted one; the probe posts with the merged package on each host before anything deploys; magnetite deploys first and its heartbeat shows acceptance within a minute.
 - [Risk] R9.5's evaluation-time reading of `-m` changes → Mitigation: `-m 5` stays literal, and magnetite's evaluation passes in task 4.3 (C5).
 - [Risk] The hooks change behaviour when routed through `ntfy-send` → Mitigation: same topic, headers, timeout and exit handling; an acceptance task posts once through each hook on stibnite and reads the message back.
@@ -309,7 +332,7 @@ Rollback: before the window, reverting pull request 1 and deploying cinnabar ret
 If magnetite's heartbeats stop after its deploy, the window stops, and the revert deploys magnetite alone.
 The imported vars stay committed through any rollback; they are the root caddy already holds.
 
-Acceptance: the chain cinnabar serves verifies against RV before and after caddy's switch; `vmTests.x86_64-linux.caddy-root-from-vars` shows a caddy with empty storage serving under the configured root; each host's deployed `ntfy-send` posts to `fleet-acceptance` with the token and is read back; on magnetite, the deployed `ntfy-send` pointed at the ingress's address with `--connect-to` exits 60 and nothing arrives; each hook on stibnite posts once to `stibnite`; `caddy-root-check` passes on cinnabar and fails when run by hand against `otel-ca`'s certificate and with a 10-year threshold; 24 hours pass with every post explained and no email from the watch service.
+Acceptance: the chain cinnabar serves verifies against RV before and after caddy's switch, and caddy's loaded configuration names the vars' paths after it; `vmTests.x86_64-linux.caddy-root-from-vars` shows a caddy with empty storage serving under the configured root; each host's deployed `ntfy-send` posts to `fleet-acceptance` with the token and is read back; on magnetite, the deployed `ntfy-send` pointed at the ingress's address with `--connect-to` exits 60; each hook on stibnite posts once to `stibnite`; `caddy-root-check` passes on cinnabar and fails when run by hand against `otel-ca`'s certificate and with a 10-year threshold; 24 hours pass with every post explained and no email from the watch service.
 
 ## Open Questions
 

@@ -24,9 +24,9 @@ Create `pkgs/by-name/ntfy-send/test-tls-verification.nix`:
 # `--connect-to ntfy.zt:443:127.0.0.1:<port>`, whose leaf a CA made here
 # ("other") signed. Under caddy's root the source script and the built wrapper
 # are refused (curl exit 60) and the server records nothing; under "other",
-# and under a file holding caddy's root then "other", the post is accepted;
-# with NTFY_CACERT unset the script exits before curl. The mutant replaces
-# --cacert with -k and runs only the first case, which it must pass.
+# and under a file holding caddy's root then "other", the post is accepted.
+# The mutant replaces --cacert with -k and runs only the first case, which it
+# must pass.
 {
   lib,
   runCommand,
@@ -89,18 +89,16 @@ runCommand "ntfy-send-test-tls-verification"
     port=$(cat port)
     export NTFY_CURL_BIN=${lib.getExe curl}
 
-    # post WHO [CA]: WHO is `built` or a script path; CA, when given, is
-    # NTFY_CACERT, and when empty NTFY_CACERT is unset. Sets $rc and $got.
+    # post WHO [CA]: WHO is `built` or a script path; CA, given with a script,
+    # is NTFY_CACERT. Sets $rc and $got.
     post() {
       local who=$1 ca=''${2:-}
       : > received
       rc=0
       if [ "$who" = built ]; then
         ${lib.getExe ntfySend} hello t --connect-to "ntfy.zt:443:127.0.0.1:$port" > /dev/null 2>&1 || rc=$?
-      elif [ -n "$ca" ]; then
-        NTFY_CACERT=$ca ${bash}/bin/bash "$who" hello t --connect-to "ntfy.zt:443:127.0.0.1:$port" > /dev/null 2>&1 || rc=$?
       else
-        env -u NTFY_CACERT ${bash}/bin/bash "$who" hello t --connect-to "ntfy.zt:443:127.0.0.1:$port" > /dev/null 2>&1 || rc=$?
+        NTFY_CACERT=$ca ${bash}/bin/bash "$who" hello t --connect-to "ntfy.zt:443:127.0.0.1:$port" > /dev/null 2>&1 || rc=$?
       fi
       got=$(cat received)
     }
@@ -124,10 +122,6 @@ runCommand "ntfy-send-test-tls-verification"
     post ${./ntfy-send.sh} "$work/bundle.crt"
     [ "$rc" = 0 ] && [ "$got" = hello ] || { echo "FAIL bundleAccepted: exit $rc, received '$got'"; exit 1; }
     echo "ok: bundleAccepted"
-
-    post ${./ntfy-send.sh}
-    [ "$rc" != 0 ] && [ -z "$got" ] || { echo "FAIL caUnset: exit $rc, received '$got'"; exit 1; }
-    echo "ok: caUnset"
 
     ${bash}/bin/bash ${./ntfy-send.sh} --help > help.txt
     grep -q '^  NTFY_CACERT ' help.txt || { echo "FAIL help: NTFY_CACERT undocumented"; exit 1; }
@@ -164,7 +158,7 @@ Expected: FAIL at `foreignRefusedSource: exit 0, received 'hello'`, because `-k`
 
 - [ ] **Step 2: The token test, red (4.2)**
 
-In `pkgs/by-name/ntfy-send/test-token-transport.nix`, set `export NTFY_CACERT=/ca` beside `NTFY_CURL_BIN`, and change the three expected lists:
+In `pkgs/by-name/ntfy-send/test-token-transport.nix`, set `export NTFY_CACERT=/ca` beside `NTFY_CURL_BIN`, a path the stub never reads, and change the three expected lists:
 
 ```bash
     [ "$(cat "$REC/argv")" = "$(printf '%s\n' -sf --cacert /ca -m 5 -H @-)"$'\n'"$caller" ] || { echo "FAIL: token set: argv is not -H @- before the caller's arguments"; return 1; }
@@ -172,8 +166,39 @@ In `pkgs/by-name/ntfy-send/test-token-transport.nix`, set `export NTFY_CACERT=/c
     [ "$(cat "$REC/argv")" = "$(printf '%s\n' -sf --cacert /ca -m 5)"$'\n'"$caller" ] || { echo "FAIL: token empty: argv changed"; return 1; }
 ```
 
+Add, after the argv mutant, the cases `caUnset` and `caEmpty` and the mutant `cacertGuardDropped`; the stub records argv only when curl runs, so "before curl runs" is observed as no `$REC/argv`:
+
+```bash
+  # caUnset, caEmpty SCRIPT: without a CA file the script exits non-zero
+  # before curl runs, so the stub records no argv.
+  caUnset() {
+    run "$1" -u NTFY_CACERT
+    [ "$status" != 0 ] && [ ! -e "$REC/argv" ] || { echo "FAIL: caUnset: exit $status, argv $(cat "$REC/argv" 2>/dev/null | tr '\n' ' ')"; return 1; }
+    echo "ok: caUnset: exit $status before curl"
+  }
+  caEmpty() {
+    run "$1" NTFY_CACERT=
+    [ "$status" != 0 ] && [ ! -e "$REC/argv" ] || { echo "FAIL: caEmpty: exit $status, argv $(cat "$REC/argv" 2>/dev/null | tr '\n' ' ')"; return 1; }
+    echo "ok: caEmpty: exit $status before curl"
+  }
+  caUnset ${./ntfy-send.sh}
+  caEmpty ${./ntfy-send.sh}
+
+  # cacertGuardDropped: the script without its NTFY_CACERT guard runs curl with
+  # an empty --cacert, which only the guard stops; set -u alone stops the unset
+  # case, so the mutant runs only caEmpty.
+  substitute ${./ntfy-send.sh} "$work/guardless.sh" \
+    --replace-fail ': "''${NTFY_CACERT:?ntfy-send: NTFY_CACERT names no CA file}"' ':'
+  if caEmpty "$work/guardless.sh"; then
+    echo "FAIL: mutant cacertGuardDropped passed caEmpty"
+    exit 1
+  fi
+  echo "mutant cacertGuardDropped rejected"
+```
+
+The test's header comment gains one sentence stating the two cases and the mutant.
 Run `nix build .#checks.x86_64-linux.package-ntfy-send-test-token-transport -L --option builders "$(grep 930f /etc/nix/machines | head -1)"`.
-Expected: FAIL at `token set: argv is not -H @- before the caller's arguments`.
+Expected: FAIL at `token set: argv is not -H @- before the caller's arguments`; the new cases and their mutant run after the argv cases, so they are first judged in Step 3.
 
 - [ ] **Step 3: The script and package, green (4.3)**
 
@@ -308,7 +333,7 @@ Run `jj st --no-pager >/dev/null`, then build and evaluate:
 ```
 
 The two `aarch64-darwin` builds run on stibnite.
-Expected: every case prints `ok:`, `mutant insecure rejected` and the token test's argv mutant rejected on both systems; the wrapper exports `NTFY_CURL_BIN=curl` and an `NTFY_CACERT` equal to RV; `fleet-alert` passes and magnetite's evaluation succeeds, so R9.5's assertions still read a 5 s post timeout.
+Expected: every case prints `ok:`, `mutant insecure rejected`, the token test's argv mutant rejected and `mutant cacertGuardDropped rejected` on both systems; the wrapper exports `NTFY_CURL_BIN=curl` and an `NTFY_CACERT` equal to RV; `fleet-alert` passes and magnetite's evaluation succeeds, so R9.5's assertions still read a 5 s post timeout.
 Record the cost of the two package tests and of `fleet-alert` after the change by the plan's method.
 Commit: "ntfy-send: verify ntfy.zt's certificate against caddy's root".
 
@@ -373,6 +398,9 @@ Create `modules/checks/ntfy-tls-verification.nix`:
 # declared client is missing or passes no --cacert; its sources are the
 # declared list and the file. Clause C fails when a file naming ntfy.zt and
 # invoking curl or wget is in no list; its sources are the lists and the tree.
+# Clause C counts a mention of curl or wget anywhere in a file, comments
+# included, so a file that only mentions one beside ntfy.zt is declared a
+# non-client with its reason.
 # Each mutant changes one copy of the tree and runs only its clause.
 { lib, ... }:
 {
@@ -400,6 +428,8 @@ Create `modules/checks/ntfy-tls-verification.nix`:
         modules/machines/nixos/cinnabar/zt-dns.nix	serves the name; its curl reaches the ZeroTier controller on localhost
         modules/nixos/fleet-alert.nix	the dead-man's curl reaches ntfy's own listener over HTTP; posts go through ntfy-send
         pkgs/by-name/ntfy-send/package.nix	builds the client and names curl's path
+        modules/vm-tests/caddy-root-from-vars.nix	a VM test whose curl verifies with --cacert against a root made in the test, inside the VM
+        modules/lib/observability-notify-run.nix	a comment on how ntfy-send posts; the notifier posts through ntfy-send and runs no curl
       '';
       exempt = pkgs.writeText "ntfy-exempt" ''
         pkgs/by-name/ntfy-send/test-token-transport.nix	a recording curl stub
@@ -462,8 +492,8 @@ Run `jj st --no-pager >/dev/null`, record the check's cost by the plan's method,
 nix build .#checks.x86_64-linux.ntfy-tls-verification -L --option builders "$(grep 930f /etc/nix/machines | head -1)" 2>&1 | tee "logs/cam87-evidence/4.4-red-$(/bin/date -u +%Y%m%dT%H%M%SZ).log"
 ```
 
-Expected: `FAIL: the repository's tree`, with `FAIL A:` lines naming `modules/home/tools/hooks/notify-permission-prompt.sh:45` and `modules/home/tools/hooks/notify-permission-wait.sh:17`, and `FAIL C:` lines naming both files.
-To see the mutants before the hooks change, temporarily run the mutant block over a tree whose two hook files are removed in the copy, and confirm each prints `mutant <name> rejected`; that temporary edit is not committed.
+Expected: `FAIL: the repository's tree`, with `FAIL A:` lines naming `modules/home/tools/hooks/notify-permission-prompt.sh:45` and `modules/home/tools/hooks/notify-permission-wait.sh:17`, and `FAIL C:` lines naming both files and `modules/home/tools/hooks/default.nix`, which names `ntfy.zt` and lists `curl` in the two hooks' `runtimeInputs` until Step 5.
+To see the mutants before the hooks change, temporarily run the mutant block over a tree whose three hook files named above are removed in the copy, and confirm each prints `mutant <name> rejected`; that temporary edit is not committed.
 If the cost exceeds 536,870,912 B, replace `tree` with `self`'s source (`"${self}"`, from the module's `self` argument) and record the cost again.
 
 - [ ] **Step 5: The hooks through ntfy-send, green (4.5)**
@@ -520,7 +550,7 @@ rg -n -- '/usr/bin/curl|-sfk' modules pkgs
 
 Expected: matches only inside `modules/checks/ntfy-tls-verification.nix`'s mutant lines.
 
-- [ ] **Step 7: Pull request 1 (4.7)**
+- [ ] **Step 7: Pull request 2 (4.7)**
 
 Run `nix fmt 2>&1 | tee logs/cam87-evidence/4.7-fmt-<ts>.log` and `nix fmt -- --fail-on-change`; record each changed check's cost after the change; open pull request 2, titled "Verify ntfy.zt's certificate in every ntfy client", whose description states in words what the TLS test, the token test and the scan establish, and which hosts' closures change.
 Expected: nixbot green on `package-ntfy-send-test-tls-verification`, `package-ntfy-send-test-token-transport`, `ntfy-tls-verification`, `hook-gate-dangerous-commands`, `fleet-alert`, `otel-collector-config`, `otel-collector-darwin` and `nixos-magnetite`; `darwin-stibnite` evaluates, with its best-effort build recorded; the pull request merges through the queue.

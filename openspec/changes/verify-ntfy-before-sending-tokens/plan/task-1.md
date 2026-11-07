@@ -12,7 +12,7 @@ Nothing here changes code or deploys; Step 4 posts only to `fleet-acceptance`.
 
 - [ ] **Step 1: Plan review (1.1)**
 
-Dispatch one read-only subagent of the default `task` type on an Opus model with this brief: read `brainstorm.md`, `design.md`, `tasks.md`, `plan.md`, `plan/` and `specs/` of this change, and answer the four holistic questions (critical oversights; significant architecture improvements; checks that cannot fail, clauses restating the line they judge, and properties nothing covers; checks or mechanisms costing more than the invariant they protect); list every test case, check clause, leg, build-time check and assertion of Tasks 2, 4 and 5 with its two value sources, and judge the import procedure of Task 2 Step 4 and the security trade-off of storing caddy's root key as clan vars; write `review-plan.md` with a severity summary and a findings table.
+Dispatch one read-only subagent of the default `task` type on an Opus model with this brief: read `brainstorm.md`, `design.md`, `tasks.md`, `plan.md`, `plan/` and `specs/` of this change, and answer the four holistic questions (critical oversights; significant architecture improvements; checks that cannot fail, clauses restating the line they judge, and properties nothing covers; checks or mechanisms costing more than the invariant they protect); list every test case, check clause, leg, build-time check and assertion of Tasks 2 to 5 with its two value sources, and judge the import procedure of Task 2 Step 4 and the security trade-off of storing caddy's root key as clan vars; write `review-plan.md` with a severity summary and a findings table.
 Append a dispositions table with one row per finding, each with the recommendation from `brainstorm.md` or the review; the operator decides each row in the session.
 Apply the accepted rows to the artifacts, then run:
 
@@ -33,7 +33,7 @@ git -C "$REPO" fetch origin
   git -C "$REPO" rev-parse origin/main
   openspec list --json | jq -r '.changes[].name'
   git -C "$REPO" ls-tree -d --name-only origin/main openspec/changes/archive/ | grep stand-up-darwin-collection
-  rg -n 'A7[89] |A8[0-2] ' openspec/specs || echo "no A78-A82 in the corpus"
+  rg -n 'A7[89] |A8[0-3] ' openspec/specs || echo "no A78-A83 in the corpus"
   rg -n '^- v30 ' docs/notes/development/observability/charter.md || echo "no charter v30"
 } 2>&1 | tee "logs/cam87-evidence/1.2-gate-$(/bin/date -u +%Y%m%dT%H%M%SZ).log"
 ```

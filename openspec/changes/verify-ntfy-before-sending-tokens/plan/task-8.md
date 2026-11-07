@@ -28,7 +28,7 @@ Expected: the v30 entry; the second search prints only historical charter entrie
 In `packages/docs/src/content/docs/development/operations/fleet-observability.md`:
 - Line 190's `curl -sk 'https://ntfy.zt/fleet-alerts/json?poll=1&since=1h'` becomes `curl -s --cacert vars/per-machine/cinnabar/caddy-root-ca/root.crt/value 'https://ntfy.zt/fleet-alerts/json?poll=1&since=1h'`, run from the repository root, and every other `curl -sk` against `ntfy.zt` in the file the same.
 - Line 555's note records that `ntfy-send` verifies `ntfy.zt` against caddy's root on both platforms with the store curl since CAM-87, and that the hooks post through it.
-- A new section "caddy's root" states: that caddy's root and key are cinnabar's clan vars `caddy-root-ca`, imported on <date of tasks.md 2.4> with fingerprint `7E:78…2E:82` and readers cinnabar and the sops users, and that `clan vars generate` cannot mint them; the security trade-off of design "Risks / Trade-offs"; that a reinstall restores the root by deploying cinnabar; that caddy stops issuing from 2035-11-29 (A79); what a `FAILED caddy-root-check.service on cinnabar` means for each of its two messages; and design D7's five rotation steps, with the commands of each.
+- A new section "caddy's root" states: that caddy's root and key are cinnabar's clan vars `caddy-root-ca`, imported on <date of tasks.md 2.4> with fingerprint `7E:78…2E:82` and readers `machines/cinnabar` and the user entry tasks.md 2.4 recorded, `users/cameron` or `users/crs58`, which hold one age key, and that `clan vars generate` cannot mint them; the security trade-off of design "Risks / Trade-offs"; that a reinstall restores the root by deploying cinnabar; that caddy stops issuing from 2035-11-29 (A79); what a `FAILED caddy-root-check.service on cinnabar` means for each of its two messages; and design D7's five rotation steps, with the commands of each.
 
 ```bash
 f=packages/docs/src/content/docs/development/operations/fleet-observability.md
@@ -38,7 +38,7 @@ rg -n "curl -sk .https://ntfy" "$f" || echo "no unverified ntfy curl"
 
 Expected: each term found; `no unverified ntfy curl`.
 
-- [ ] **Step 3: The modules README and pull request 3 (8.3)**
+- [ ] **Step 3: The modules README and pull request 4 (8.3)**
 
 In `modules/README.md`, after the fleet-alerting checks paragraph (around line 55), add two sentences: `checks.x86_64-linux.ntfy-tls-verification` scans `modules/` and `pkgs/` for an `ntfy.zt` client passing `-k` or `--insecure` or undeclared, and runs `flake.lib.caddyRootCheck` over roots made in the sandbox; it does not observe the chain caddy serves, which cinnabar's weekly `caddy-root-check` verifies; `caddy-root-from-vars`, built with cinnabar's toplevel, adapts caddy's configuration and compares the configured root with the vars and the recorded fingerprint; `vmTests.x86_64-linux.caddy-root-from-vars` shows a caddy with empty storage serving under a configured root.
 Run `nix fmt`, keep its log, run `nix fmt -- --fail-on-change`, and open pull request 4, titled "Document ntfy.zt certificate verification and caddy's root as clan vars".

@@ -5,7 +5,7 @@
 `ntfy-send` SHALL pass curl `--cacert` with the file in `NTFY_CACERT`, which its built wrapper sets to the store copy of `vars/per-machine/cinnabar/caddy-root-ca/root.crt/value`, SHALL never pass `-k` or `--insecure`, and SHALL exit non-zero before curl runs when `NTFY_CACERT` is unset or empty.
 It SHALL run its own `runtimeInputs` curl on every platform, and every script that posts to `ntfy.zt` SHALL post through it.
 
-**Discharged by**: `checks.<system>.package-ntfy-send-test-tls-verification` with its `insecure` mutant and `checks.<system>.package-ntfy-send-test-token-transport`, resting on world assumptions `A80 — curl given a CA file trusts only that file's certificates, any of them, and -k disables verification` and, on stibnite, `A82 — A store-built curl on stibnite reaches ntfy.zt over ZeroTier from a launchd job's account`; the rehearsal posts before the deploy window, the posts read after it, and the acceptance control against the ingress's address.
+**Discharged by**: `checks.<system>.package-ntfy-send-test-tls-verification` with its `insecure` mutant and `checks.<system>.package-ntfy-send-test-token-transport` with its cases `caUnset` and `caEmpty` and its mutant `cacertGuardDropped`, resting on world assumptions `A80 — curl given a CA file trusts only that file's certificates, any of them, and -k disables verification` and, on stibnite, `A82 — A store-built curl on stibnite reaches ntfy.zt over ZeroTier from a launchd job's account`; the rehearsal posts before the deploy window, the posts read after it, and the acceptance control against the ingress's address.
 
 #### Scenario: A server for ntfy.zt presents a certificate from another CA
 
@@ -19,8 +19,8 @@ It SHALL run its own `runtimeInputs` curl on every platform, and every script th
 
 #### Scenario: No CA file is given
 
-- **WHEN** the source script runs with `NTFY_CACERT` unset
-- **THEN** it exits non-zero before curl runs, and no request reaches the server
+- **WHEN** `package-ntfy-send-test-token-transport` runs the source script with `NTFY_CACERT` unset, and then set to the empty string, against its recording curl stub
+- **THEN** it exits non-zero each time and the stub records no argv, so curl never ran, and a mutant without the script's `NTFY_CACERT` check, run on the empty case, reaches curl and is rejected
 
 #### Scenario: Verification is switched off
 
@@ -40,7 +40,7 @@ It SHALL run its own `runtimeInputs` curl on every platform, and every script th
 #### Scenario: A deployed host is pointed at another server
 
 - **WHEN** at acceptance magnetite's delivered `ntfy-send` runs with `--connect-to ntfy.zt:443:<magnetite's ingress address>:4318`, whose certificate the collection CA signed
-- **THEN** it exits 60 and the ingress receives no request, which the operator records
+- **THEN** it exits 60, curl's code for a peer certificate that does not verify, which the operator records
 
 ### Requirement: No ntfy.zt client in the repository skips verification
 
@@ -109,7 +109,7 @@ cinnabar SHALL declare a generator `caddy-root-ca`, with a secret `root.key` own
 #### Scenario: caddy's adapter reads the configured root
 
 - **WHEN** cinnabar's toplevel builds
-- **THEN** `caddy adapt` of the rendered Caddyfile names the generator's `root.crt` and `root.key` paths as `apps.pki.certificate_authorities.local.root`, and an override dropping the `pki` block fails the build
+- **THEN** `caddy adapt` of the rendered Caddyfile names the configured `certFile` and `keyFile` as `apps.pki.certificate_authorities.local.root`, and an override dropping the `pki` block fails the build
 
 #### Scenario: The var holds another certificate
 
@@ -119,7 +119,7 @@ cinnabar SHALL declare a generator `caddy-root-ca`, with a secret `root.key` own
 #### Scenario: The vars are imported
 
 - **WHEN** the operator imports the root and key from caddy's storage with `CLAN_NO_COMMIT=1 clan vars set`
-- **THEN** the var's fingerprint equals the recorded one and the live stored root's, the decrypted key's public key equals the certificate's, `root.key`'s readers are cinnabar and the sops users, no key is printed or written to a local file, and the operator records all of it
+- **THEN** the var's fingerprint equals the recorded one and the live stored root's, the decrypted key's public key equals the certificate's, `root.key`'s readers are exactly `machines/cinnabar` and one of `users/cameron` or `users/crs58`, which hold one age key, and no key is printed or written to a local file, because clan's temporary file holding it lies on a RAM disk detached after the import, while the key exists in clear in the memory of the processes and the pipe that carry it; the operator records all of it
 
 #### Scenario: A regeneration is attempted
 

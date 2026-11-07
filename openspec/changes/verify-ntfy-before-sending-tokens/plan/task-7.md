@@ -20,11 +20,9 @@ rc=0
 sudo env NTFY_TOKEN_FILE=<token> "$ns/bin/ntfy-send" "cam87 foreign" fleet-acceptance --connect-to "ntfy.zt:443:[$ip]:4318" > /dev/null 2>&1 || rc=$?
 echo "rc=$rc"
 EOF
-sleep 60
-"$REPO/logs/cam87-evidence/read-posts.sh" "$(( $(/bin/date -u +%s) - 300 ))" | grep -c 'cam87 foreign'
 ```
 
-Expected: `rc=60` and a count of 0; tee to `logs/cam87-evidence/7.1-foreign-<ts>.log`.
+Expected: `rc=60`, curl's code for a peer certificate that does not verify, which is the observation that separates a verifying client from one passing `-k`; the ingress never forwards to ntfy, so the topic is not read for the post; tee to `logs/cam87-evidence/7.1-foreign-<ts>.log`.
 
 - [ ] **Step 2: The hooks post through ntfy-send (7.2) [operator]**
 

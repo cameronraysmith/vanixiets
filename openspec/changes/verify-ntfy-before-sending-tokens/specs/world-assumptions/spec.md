@@ -273,14 +273,14 @@ Any requirement whose discharge depends on this fact SHALL name it explicitly, a
 
 ### Requirement: A81 — caddy's root key is readable only by cinnabar's root and caddy accounts and by the sops recipients of its var
 
-It is true of the fleet that caddy's root key exists only as cinnabar's deployed var and caddy's stored copy, both readable only by `caddy` and root, and as the repository's sops-encrypted var, which only cinnabar's age key and the sops users can decrypt.
+It is true of the fleet that caddy's root key exists only as cinnabar's deployed var and caddy's stored copy, both readable only by `caddy` and root, and as the repository's sops-encrypted var, whose recipients are `machines/cinnabar` and the importing admin's age key.
 Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL be treated as losing its discharge once this assumption's violation condition below is observed.
 
-**Evidence**: the deployed var is owned by `caddy` with mode `0400` (design D10); on 2026-11-06 `stat` on cinnabar showed caddy's stored `root.key` written 2026-01-27T14:29:17Z, owner `caddy`, mode `600`, on `zroot/root/nixos`; cinnabar's per-machine secrets are encrypted to `machines/cinnabar` and `users/cameron` (`vars/per-machine/cinnabar/otel-cert/key.pem/`); the import step records the new var's recipients; a change of the sops users, a reinstall of cinnabar, or a copy of the key made during a rotation is the event at which this is read again.
+**Evidence**: the deployed var is owned by `caddy` with mode `0400` (design D10); on 2026-11-06 `stat` on cinnabar showed caddy's stored `root.key` written 2026-01-27T14:29:17Z, owner `caddy`, mode `600`, on `zroot/root/nixos`; `clan vars set` encrypts a secret to the machine, the machine's default groups and the running admin's user entry, and to no other sops user (`clan-core@dbae2101:pkgs/clan-cli/clan_cli/secrets/secrets.py:170-235`, `clan_lib/vars/secret_modules/sops.py:183-214`); `sops/users/` holds `cameron`, `christophersmith`, `crs58`, `janettesmith` and `raquel`, of which `cameron` and `crs58` hold the same age key, the importing admin's, so the var's reader entries are `machines/cinnabar` and one of `users/cameron` or `users/crs58`, and `christophersmith`, `janettesmith` and `raquel` are not recipients unless someone adds them; cinnabar's per-machine secrets are encrypted to `machines/cinnabar` and `users/cameron` (`vars/per-machine/cinnabar/otel-cert/key.pem/`); the import step records the new var's reader entries and stops on any other; a change of the sops users, a reinstall of cinnabar, or a copy of the key made during a rotation is the event at which this is read again.
 
 #### Scenario: The root key reaches someone else
 
-- **WHEN** the key is decrypted or copied by anyone outside cinnabar's root and `caddy` accounts and the sops users, a sops user's private key is lost, or the var gains a recipient
+- **WHEN** the key is decrypted or copied by anyone outside cinnabar's root and `caddy` accounts and the var's recipients, a recipient's private key is lost, or the var gains a recipient
 - **THEN** this assumption is void, and the `fleet-alerting` requirement `A host posts to the notification service only over a verified connection` no longer implies that only cinnabar can answer a verified connection, until the root is rotated
 
 ### Requirement: A82 — A store-built curl on stibnite reaches ntfy.zt over ZeroTier from a launchd job's account
