@@ -909,6 +909,20 @@ clan-show:
 clan-metadata:
   {{nix_cmd}} flake metadata
 
+## observability
+
+# PromQL against magnetite's telemetry store: just obs-promql [--table] '<query>' [--start T --end T --step D]
+[group('observability')]
+[positional-arguments]
+obs-promql *args:
+  {{nix_cmd}} run --no-warn-dirty .#obs-query -- promql "$@"
+
+# SQL against a database of magnetite's telemetry store: just obs-sql <db> [--table] '<sql>'
+[group('observability')]
+[positional-arguments]
+obs-sql db *args:
+  {{nix_cmd}} run --no-warn-dirty .#obs-query -- sql "$@"
+
 ## docs
 
 # Install workspace dependencies

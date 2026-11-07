@@ -217,7 +217,7 @@ A `critical` alert that stays firing is posted again once every 24 hours; a `war
 | `LocalExporterDown` | warning | a loopback exporter the collector scrapes, job `node` or `smartctl`, has been down for 10 min, so the rules that read it are blind; at acceptance it fired about 10 min after the node exporter stopped | the message's `job` label names it; for `node`, `sudo systemctl restart prometheus-node-exporter`, then check `up{job="node"}` in the dashboard |
 | `WeeklyPipelineTest` | info | the weekly test: it fires once each Monday between 09:00 and 09:05 New York time | nothing; its absence on a Monday morning means the path from the store to the phone is broken |
 | `PullRequestQueueWaitBurn` | warning | for 1 h, at least 10 pull-request builds that started finished their first attempt in the trailing 24 h and more than 10% of those first attempts waited over 1 h from creation to start | list the slow builds and follow "When PullRequestQueueWaitBurn fires" under "Querying devloop" |
-| `StoreQueryFailing` | critical | the store has not answered the evaluator's queries on one database for 3 min; the message names the database, there is one instance per failing database, and only that database's alerts are frozen meanwhile, so a `devloop` failure leaves the `fleet` alerts working | `systemctl status greptimedb greptimedb-schema` and `sudo journalctl -u greptimedb -n 100 --no-pager` on magnetite, and `sudo journalctl -u fleet-alert -n 20 --no-pager`, which names the failed database; for `devloop` alone, also `devloop_sql 'SHOW TABLES'` under "Querying devloop"; starting the store also starts `greptimedb-schema` again; that database's alerts resume when the store answers it |
+| `StoreQueryFailing` | critical | the store has not answered the evaluator's queries on one database for 3 min; the message names the database, there is one instance per failing database, and only that database's alerts are frozen meanwhile, so a `devloop` failure leaves the `fleet` alerts working | `systemctl status greptimedb greptimedb-schema` and `sudo journalctl -u greptimedb -n 100 --no-pager` on magnetite, and `sudo journalctl -u fleet-alert -n 20 --no-pager`, which names the failed database; for `devloop` alone, also `just obs-sql devloop 'SHOW TABLES'` under "Querying devloop"; starting the store also starts `greptimedb-schema` again; that database's alerts resume when the store answers it |
 | `RuleSignalMissing` | warning | a rule's input series has been absent for 30 min while its expected host reports memory, so the rule can no longer fire; the message's `rule` and `selector` labels name both | find the metric's producer: the collector config, the node exporter, or a renamed metric in a dependency update |
 | `RuleSignalMissing <host>` | warning | an always-on host (`alwaysOn` in `flake.lib.observabilityHosts`: magnetite and cinnabar) has sent no memory signal for about 15 min while the store answers, with selector `system_memory_usage_bytes`: a query still returns the last sample for the store's 5-min lookback, and the evaluator then counts 10 min (14 min 33 s after the last sample at acceptance); that host's alerts are frozen meanwhile | first that host's collector, `systemctl status opentelemetry-collector` and `sudo journalctl -u opentelemetry-collector -n 100 --no-pager`, then its export path to magnetite's ingress and the store; that host's `FAILED otel-envelope.service` notice, if one arrived, names the cause |
 | `AlertEvaluatorSilent` | critical | cinnabar's dead-man saw no heartbeat on `fleet-heartbeat` for 10 min; it runs every 5 min, so it fires up to 15 min after the evaluator stops (14 min 28 s at acceptance) and resolves within about 5 min of its return (4 min 12 s) | on magnetite `systemctl status fleet-alert.timer fleet-alert.service` and `sudo journalctl -u fleet-alert -n 50 --no-pager`; also check magnetite is up and on the mesh |
@@ -755,33 +755,31 @@ Every night `devloop-reconcile` compares the previous UTC day with the sources, 
 
 ### Reaching the SQL API
 
-The `devloop` view at `obs.` charts queue wait, formation to landing, build outcomes and deploys; for any other query, both read-only accounts can read `devloop`: `perses` from the workstation through the tunnel of "The operator's fallback: the embedded dashboard", and `regulator` on magnetite.
+The `devloop` view at `obs.` charts queue wait, formation to landing, build outcomes and deploys; for any other query, both read-only accounts can read `devloop`: `perses` from the workstation through the tunnel of "The operator's fallback: the embedded dashboard", and `regulator` through `obs-query`.
 In the embedded dashboard, set the connection database to `devloop` and use Table Query.
-In a shell, define a helper that gives curl the password on standard input, so it never appears on a command line.
-On the workstation, with the tunnel open:
+From a vanixiets checkout on the workstation, `just obs-sql <database> '<sql>'` runs one SQL statement as `regulator`, and `just obs-promql '<query>'` one PromQL query against `fleet`, a range query with `--start`, `--end` and `--step`; both wrap `nix run .#obs-query`, whose `tql <database> '<tql>'` runs TQL.
+The query travels to magnetite over SSH on standard input, and there `sudo` reads the password and curl receives it through a file descriptor, so neither the query nor the password appears on a command line and the password never leaves magnetite.
+Each prints the store's JSON answer, or an aligned table with `--table`, and exits 1 when the store reports an error, whether by HTTP status or in an answer's body.
 
 ```sh
-devloop_sql() {
-  printf 'user = "perses:%s"\n' "$(clan vars get magnetite greptimedb-users/perses-password)" |
-    curl --config - --silent --show-error --fail-with-body \
-      'http://127.0.0.1:4000/v1/sql?db=devloop' --data-urlencode "sql=$1" |
-    jq -r '.output[0].records | (.schema.column_schemas | map(.name)), (.rows[] | map(if . == null then "NULL" else tostring end)) | @tsv'
-}
+just obs-sql devloop --table 'SHOW TABLES'
+just obs-promql --table 'count(up) by (host_name)'
 ```
 
-On magnetite:
+The first lists the four tables, and the second counts each host's `up` series in `fleet`.
+The database is `obs-sql`'s first argument, or the embedded dashboard's connection database; a query run against `public` finds no table.
+
+On magnetite itself, which needs no checkout, query with curl in bash; the statement goes on standard input and the password through a file descriptor, as `obs-query` sends them:
 
 ```sh
-devloop_sql() {
-  printf 'user = "regulator:%s"\n' "$(sudo cat /run/secrets/vars/per-machine/magnetite/greptimedb-users/regulator-password)" |
-    curl --config - --silent --show-error --fail-with-body \
-      'http://127.0.0.1:4000/v1/sql?db=devloop' --data-urlencode "sql=$1" |
-    jq -r '.output[0].records | (.schema.column_schemas | map(.name)), (.rows[] | map(if . == null then "NULL" else tostring end)) | @tsv'
-}
+printf '%s' 'SHOW TABLES' |
+  curl -sS --fail-with-body \
+    --config <(printf 'user = "regulator:%s"\n' "$(sudo cat /run/secrets/vars/per-machine/magnetite/greptimedb-users/regulator-password)") \
+    -H 'x-greptime-db-name: devloop' --data-urlencode 'sql@-' http://127.0.0.1:4000/v1/sql | jq .
 ```
 
-`devloop_sql 'SHOW TABLES'` then lists the four tables.
-The database comes from `?db=devloop` or from the embedded dashboard's connection database; a query run against `public` finds no table.
+For PromQL, send `--data-urlencode 'query@-'` to `http://127.0.0.1:4000/v1/prometheus/api/v1/query` with `x-greptime-db-name: fleet`.
+
 The queries below quote identifiers in double quotes, as `SHOW CREATE TABLE` prints them.
 
 ### The four tables
@@ -885,7 +883,7 @@ Flakiness and abandonment are computed when a query runs, so a change to their d
 A deploy's `closure` is the `outputs_out` of the passing `checks.x86_64-linux.nixos-magnetite` attribute of every build that produced that system:
 
 ```sh
-devloop_sql "$(cat <<'SQL'
+just obs-sql devloop --table "$(cat <<'SQL'
 SELECT d."ts", d."closure", a."commit_sha", a."branch", a."pr_number", a."build_id"
 FROM "deploy_record" d
 JOIN "ci_attribute" a ON a."outputs_out" = d."closure"
@@ -972,7 +970,7 @@ sudo systemctl start opentelemetry-collector
 
 The receiver then starts from its beginning and sends every row again, and the store keeps one row per key and time, so only the missing rows are added.
 nixbot keeps 90 days of builds, and the journal keeps `gitea-mq.service`'s lines only until journald rotates them out, about five weeks on magnetite in October 2026, so a replay restores only what the source still holds.
-A replay of `sqlquery/ci_attribute` sends about 200,000 rows in about 20 minutes; wait until `devloop_sql 'SELECT count(*) FROM "ci_attribute"'` stops rising, then rerun the failed day as above.
+A replay of `sqlquery/ci_attribute` sends about 200,000 rows in about 20 minutes; wait until `just obs-sql devloop 'SELECT count(*) FROM "ci_attribute"'` stops rising, then rerun the failed day as above.
 Start a `sqlquery` replay only while the store answers: about 200,000 attribute rows at roughly 0.5 KiB each exceed the 32 MiB sending queue of `otlp_http/devloop_ci_attribute`, and the receiver has already advanced its position past the rows a full queue refuses, so a replay into a stopped store loses most of what it sends.
 A record the store's pipeline cannot convert fails the whole OTLP request with HTTP 400, which the exporter drops as permanent, while `sqlquery` has already advanced its cursor past it; so one bad record can lose up to 10,000 nixbot rows, one page, or a batch of journal or deploy-record lines.
 No alert reports that at once: `C1`, `C2`, `C3` or `C6` fails the next morning, and the replay above restores the rows once the cause is fixed.
@@ -989,7 +987,7 @@ A replay of `sqlquery/ci_attribute` exceeds it the same way, once.
 Count the stored rows per day:
 
 ```sh
-devloop_sql "$(cat <<'SQL'
+just obs-sql devloop --table "$(cat <<'SQL'
 SELECT date_trunc('day', "finished_at") AS "day", count(*) AS "rows"
 FROM "ci_attribute"
 WHERE "finished_at" >= now() - INTERVAL '14 days'
@@ -1012,7 +1010,7 @@ A missing `devloop` or `ci_build` table fails the query, which freezes only the 
 When it fires, list the slow builds:
 
 ```sh
-devloop_sql "$(cat <<'SQL'
+just obs-sql devloop --table "$(cat <<'SQL'
 SELECT c."build_id", c."pr_number", c."branch", c."created_at", c."started_at", c."finished_at"
 FROM "ci_build" c
 JOIN (SELECT "build_id", min("finished_at") AS "first_finished" FROM "ci_build" GROUP BY "build_id") f
