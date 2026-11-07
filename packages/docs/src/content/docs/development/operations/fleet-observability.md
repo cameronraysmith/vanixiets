@@ -706,7 +706,7 @@ sudo launchctl kickstart -k system/org.nixos.<label>
 ```
 
 `-k` stops the running instance with `SIGTERM` and starts it again; once the probe reads exit code 0, within a minute, `LaunchdJobFailed` resolves 5 minutes later.
-Whether `otelcol-process`'s exit on `SIGTERM` reads 0 has not yet been observed on stibnite; if `last exit code` stays non-zero after a kickstart, record it.
+On stibnite on 2026-11-07, `kickstart -k` of `otelcol-process` at 05:48Z, after a `SIGKILL`, left `last exit code = 0`, and `LaunchdJobFailed` resolved at 05:53Z; if `last exit code` stays non-zero after a kickstart, record it.
 
 ## Deploying cinnabar and pyrite
 

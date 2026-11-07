@@ -90,6 +90,15 @@
           "orgXnixosXnix-daemon"
         ];
         probeLabels = self.lib.otelHostProbeLabels;
+        # Source A of the envelope clauses: stibnite's evaluated fragment,
+        # whose limiter and C5 values are literals there, not in flake.lib.
+        fragment = {
+          inherit (self.darwinConfigurations.stibnite.config.vanixiets.otelCollector.darwin)
+            agentSettings
+            processSettings
+            envelopeMemoryLimits
+            ;
+        };
       };
 
       isLoopback =
@@ -134,7 +143,11 @@
       # the rendered endpoints against the loopback pattern and against the
       # address in vars/, where the renderer reads flake.lib.hosts;
       # probeLabelsSelected, flake.lib.otelHostProbeLabels over schema.nix's
-      # launchdLabels and the fixture labels, against ADR-004:121's selection.
+      # launchdLabels and the fixture labels, against ADR-004:121's selection;
+      # limitersAsDeclared and c5LimitsAsDeclared, stibnite's evaluated
+      # fragment against ADR-003 item 8 and its darwin envelope (:227-228),
+      # typed here; otlpFeedsHostOnly, the fragment's agent pipelines against
+      # ADR-003 item 22's routing of otelcol-process's points.
       clauses = i: {
         nodeTextfileOnLoopback =
           i.r.node.listenAddress == "127.0.0.1"
@@ -214,17 +227,42 @@
             "org.nixos.prometheus-node-exporter"
             "org.nixos.sops-install-secrets"
           ];
-        # The darwin floor: the rendered process filter against SC's darwin
-        # floor, which must differ from Linux's (macOS RSS counts shared-cache
-        # pages; A77).
-        processFloorDarwin =
+        limitersAsDeclared =
           let
-            m = self.lib.otelCollectorSchema.process.minBytes;
+            limiter = mibs: {
+              check_interval = "1s";
+              limit_mib = builtins.elemAt mibs 0;
+              spike_limit_mib = builtins.elemAt mibs 1;
+            };
+            leads =
+              s:
+              lib.all (p: builtins.head p.processors == "memory_limiter") (
+                builtins.attrValues s.service.pipelines
+              );
           in
-          builtins.isAttrs m
-          && m.darwin != m.linux
-          && lib.hasInfix "datapoint.value_int < ${toString m.darwin}" (
-            builtins.head i.r.process.processors."filter/process-min".metric_conditions
+          i.fragment.agentSettings.processors.memory_limiter == limiter [
+            150
+            30
+          ]
+          &&
+            i.fragment.processSettings.processors.memory_limiter == limiter [
+              64
+              16
+            ]
+          && leads i.fragment.agentSettings
+          && leads i.fragment.processSettings;
+        c5LimitsAsDeclared =
+          i.fragment.envelopeMemoryLimits == {
+            "org.nixos.otelcol" = 256 * 1024 * 1024;
+            "org.nixos.otelcol-process" = 128 * 1024 * 1024;
+          };
+        otlpFeedsHostOnly =
+          let
+            p = i.fragment.agentSettings.service.pipelines;
+          in
+          builtins.elem "otlp" p."metrics/host".receivers
+          && lib.all (n: !(builtins.elem "otlp" p.${n}.receivers)) (
+            builtins.filter (lib.hasPrefix "logs/") (builtins.attrNames p)
           );
       };
 
@@ -281,6 +319,52 @@
               probeLabels =
                 (mutatedLib ../lib/otel-collector-darwin.nix "labelDotUnescaped" ''"[.]"'' ''"."'')
                 .otelHostProbeLabels;
+            };
+        };
+        agentLimiterRaised = {
+          clause = "limitersAsDeclared";
+          apply =
+            i:
+            lib.recursiveUpdate i {
+              fragment.agentSettings.processors.memory_limiter.limit_mib = 151;
+            };
+        };
+        processSpikeRaised = {
+          clause = "limitersAsDeclared";
+          apply =
+            i:
+            lib.recursiveUpdate i {
+              fragment.processSettings.processors.memory_limiter.spike_limit_mib = 17;
+            };
+        };
+        c5LimitsSwapped = {
+          clause = "c5LimitsAsDeclared";
+          apply =
+            i:
+            lib.recursiveUpdate i {
+              fragment.envelopeMemoryLimits = {
+                "org.nixos.otelcol" = i.fragment.envelopeMemoryLimits."org.nixos.otelcol-process";
+                "org.nixos.otelcol-process" = i.fragment.envelopeMemoryLimits."org.nixos.otelcol";
+              };
+            };
+        };
+        c5AgentLimitChanged = {
+          clause = "c5LimitsAsDeclared";
+          apply =
+            i:
+            lib.recursiveUpdate i {
+              fragment.envelopeMemoryLimits."org.nixos.otelcol" = 268435457;
+            };
+        };
+        otlpFeedsLogs = {
+          clause = "otlpFeedsHostOnly";
+          apply =
+            i:
+            lib.recursiveUpdate i {
+              fragment.agentSettings.service.pipelines."logs/devloop-deploy_record".receivers = [
+                "file_log/deploy-record"
+                "otlp"
+              ];
             };
         };
       };

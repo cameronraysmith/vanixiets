@@ -100,12 +100,22 @@ in
           type = lib.types.attrsOf lib.types.anything;
           description = "otelcol-process's rendered configuration, flake.lib.otelCollectorDarwin's `process`.";
         };
+        envelopeMemoryLimits = lib.mkOption {
+          type = lib.types.attrsOf lib.types.ints.positive;
+          internal = true;
+          readOnly = true;
+          description = "C5's physical-footprint limit in bytes per launchd label, the NixOS MemoryMax analogues (ADR-003 envelope), read by otel-envelope.";
+        };
       };
 
       config = {
         vanixiets.otelCollector.darwin = {
           agentSettings = rendered.agent;
           processSettings = rendered.process;
+          envelopeMemoryLimits = {
+            "org.nixos.otelcol" = 268435456;
+            "org.nixos.otelcol-process" = 134217728;
+          };
         };
 
         # Ordered as omnigent-host's: after users are created, before launchd
@@ -209,11 +219,7 @@ in
                   darwinMemory = {
                     launchctl = "/bin/launchctl";
                     top = "/usr/bin/top";
-                    # The NixOS MemoryMax analogues (ADR-003 envelope).
-                    limits = {
-                      "org.nixos.otelcol" = 268435456;
-                      "org.nixos.otelcol-process" = 134217728;
-                    };
+                    limits = cfg.envelopeMemoryLimits;
                   };
                 }
               ))

@@ -22,8 +22,8 @@
 #   LaunchdJobNotRunning's unloaded arm without its kept-alive exclusion)
 #   must each produce a non-empty failure list; the store freezes only the
 #   instances of the database that failed (review F7). The legs about pyrite render
-#   the host table with its `collect` forced, since it does not collect
-#   on main yet.
+#   the host table with its `collect` forced each way, so they hold whatever
+#   pyrite's row says.
 # - propertyRehearsal: fleet-alert/test_transition.py compares transition.jq
 #   with the reference model fleet-alert/model.py over derandomized
 #   Hypothesis timelines over two databases, holds both to leaving fleet's
@@ -1188,9 +1188,9 @@
       };
 
       # design D9: the rules read their expected and always-on hosts from
-      # flake.lib.observabilityHosts. pyrite does not collect on main until
-      # its own pull request, so the legs about pyrite render the real table
-      # with its `collect` set each way.
+      # flake.lib.observabilityHosts. The legs about pyrite render the real
+      # table with its `collect` set each way, so they hold whatever pyrite's
+      # row says.
       tableWith =
         pyrite:
         builtins.fromJSON

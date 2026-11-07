@@ -269,8 +269,10 @@ in
             limit_mib = 64;
             spike_limit_mib = 16;
           };
-          # Compaction (empty keys) merges same-named processes before
-          # the sum (ADR-003 item 16).
+          # Compaction (empty keys) and aggregate_labels are meant to sum
+          # same-named processes, but aggregate_labels keys points by the
+          # full nanosecond timestamp, which the scraper stamps per
+          # process, so each process keeps its own point (ADR-003 item 16).
           "groupbyattrs/compact".keys = [ ];
           "metrics_transform/process".transforms = [
             {
