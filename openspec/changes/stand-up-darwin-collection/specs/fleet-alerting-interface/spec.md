@@ -57,7 +57,7 @@ The machine SHALL declare the alert rules once in `modules/nixos/fleet-alert/rul
 
 - **WHEN** the rule table is rendered
 - **THEN** `LaunchdJobNotRunning` is `launchd_job_state{launchd_state="running", launchd_label=~"<kept-alive labels>"} == 0 or launchd_job_state{launchd_state="unloaded", launchd_label!~"<kept-alive labels>"} == 1` for 10 min, `LaunchdJobFailed` `launchd_job_last_exit_code{launchd_label!~"<labels in notifiedUnits>"} != 0` for 5 min, `LaunchdJobRestartLoop` `increase(launchd_job_runs_total[15m]) > 5` with no `for`, and `HostProbeStale` `time() - node_textfile_mtime_seconds > 300 or node_textfile_scrape_error == 1` for 10 min, each at `warning`
-- **AND** `<kept-alive labels>` is rendered from `schema.nix`'s launchd allow-list, which holds `org.nixos.otel-envelope`, restricted to the labels whose evaluated `KeepAlive` is true on a darwin row, and `<labels in notifiedUnits>` from the `org.nixos.<unit>` label of each unit in the darwin rows' `notifiedUnits`, each with its literal dots written `[.]`
+- **AND** `<kept-alive labels>` is rendered from `schema.nix`'s kept-alive list `launchdKeptAlive`, held equal by the darwin fragment's assertion to the labels of `schema.nix`'s launchd allow-list, which holds `org.nixos.otel-envelope`, whose evaluated `KeepAlive` is true on the darwin row, and `<labels in notifiedUnits>` from the `org.nixos.<unit>` label of each unit in the darwin rows' `notifiedUnits`, each with its literal dots written `[.]`
 
 #### Scenario: An expression does not parse
 

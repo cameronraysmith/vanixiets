@@ -53,7 +53,7 @@ Signal scope for the first deployment:
 | Host metrics, 60 s | `host_metrics` on every agent (ADR-003) | fleet | `fleet` |
 | Service metrics, 60 s | gitea, niks3, nixbot, nginx, zerotierone (ADR-003) | fleet, dev-loop for nixbot aggregates | `fleet` |
 | Unit logs | `journald` on NixOS, allow-listed units only | fleet | `fleet` |
-| Per-process memory, 60 s | `process` scraper on NixOS agents and, through the root `otelcol-process`, on darwin agents, summed per executable, points below 64 MiB dropped on NixOS and below 384 MiB on darwin unless the executable is one of the host's long-running fleet executables (ADR-003 item 22; charter v29) | fleet | `fleet` |
+| Per-process memory, 60 s | `process` scraper on NixOS agents and, through the root `otelcol-process`, on darwin agents, one point per process under its executable name (same-named processes are not summed), points below 64 MiB dropped on NixOS and below 384 MiB on darwin unless the executable is one of the host's long-running fleet executables (ADR-003 items 16 and 22; charter v29) | fleet | `fleet` |
 | systemd unit state and restarts, 60 s | `systemd` receiver on NixOS agents, allow-listed units only (ADR-003) | fleet | `fleet` |
 | launchd job state, last exit code and launches, 60 s | `otel-host-probe` textfile through a loopback node_exporter on darwin agents, allow-listed jobs only (ADR-003) | fleet | `fleet` |
 | ZFS pool state, ARC, OOM-kill count, 60 s | loopback node_exporter on NixOS agents (ADR-003) | fleet | `fleet` |

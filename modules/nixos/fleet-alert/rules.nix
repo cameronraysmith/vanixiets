@@ -161,7 +161,7 @@
           expr = fsRatio + " > 0.85";
           for = "15m";
           severity = "warning";
-          annotations.summary = "A ZFS file system is more than 85 % full";
+          annotations.summary = "A file system is more than 85 % full";
           presence = [ (presence agentHosts "system_filesystem_usage_bytes") ];
         }
         {
@@ -169,7 +169,7 @@
           expr = fsRatio + " > 0.95";
           for = "5m";
           severity = "critical";
-          annotations.summary = "A ZFS file system is more than 95 % full";
+          annotations.summary = "A file system is more than 95 % full";
           presence = [ (presence agentHosts "system_filesystem_usage_bytes") ];
         }
         # smartctl_exporter declares these fields counters, and the store

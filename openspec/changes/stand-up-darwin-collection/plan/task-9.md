@@ -104,3 +104,23 @@ All of it is written to `verify.md` §Integration beside the controls of Task 8 
 ### §11 Applied review findings
 
 Filled from Step 3's `review.md` dispositions: one step per applied finding, each naming its `tasks.md` §11 item, the files it changes, its verification and the interpreter of any command block; no finding is applied before the dispositions table is complete.
+
+Each step below ran locally on stibnite under `/bin/bash`, read-only towards every host; builds ran on magnetite through `--option builders "$(grep 930f /etc/nix/machines | head -1)"` with `--max-jobs 0`.
+
+- [x] **Step 11.1 (F1):** `specs/world-assumptions/spec.md`'s vocabulary block retaken from `openspec/specs/world-assumptions/spec.md` with this change's rows re-added; verified by Step 4's `comm`.
+- [x] **Step 11.2 (F2):** `specs/telemetry-store-interface/spec.md` and `specs/host-metrics-collection/spec.md`; verified by Step 1's check and `validate`.
+- [x] **Step 11.3 (F3):** `modules/darwin/otel-collector-agent.nix` (the option `envelopeMemoryLimits`), `modules/checks/otel-collector-darwin.nix` (three clauses, five mutants), `specs/telemetry-store-interface/spec.md`, `design.md` D13; verified by `nix build .#checks.x86_64-linux.otel-collector-darwin -L` on magnetite, the cost by the preamble's method, and stibnite's `system.build.toplevel.drvPath` evaluated on one snapshot of the working copy with and without the code edits (`logs/s5-evidence/9.x-drvpath-*.log`).
+- [x] **Step 11.4 (F4):** `design.md` D12 and its amendment line, `tasks.md` 8.1 and 8.6, TSI's measurement scenario; verified by reading.
+- [x] **Step 11.5 (F5):** `tasks.md` 5.3a, 6.6a and 9.1, `design.md`'s list of delta additions; verified by Step 1's check.
+- [x] **Step 11.6 (F6):** `tasks.md` 3.8 and 7.4; verified by `gh pr checks 3736` and `gh pr checks 3745`.
+- [x] **Step 11.7 (F7):** WA's table and HMC; verified by `verify.md` §8a.2.
+- [x] **Step 11.8 (F8):** WA's A64; verified by `validate`.
+- [x] **Step 11.9 (F9):** `modules/lib/observability-hosts.nix`, `modules/checks/fleet-alert.nix`; verified by Step 2's `rg` and `nix build .#checks.x86_64-linux.fleet-alert` on magnetite.
+- [x] **Step 11.10 (F10):** the runbook, `ADR-009-alerting.md` and `components/fleet-alert.md`; verified by reading against `8.4-signal-…` and `8.5-reload-…`.
+- [x] **Step 11.11 (F11):** `specs/fleet-alerting-interface/spec.md`; the deferred issue's text in `logs/s5-evidence/new-issues.md`.
+- [x] **Step 11.12 (F12):** `modules/checks/otel-collector-darwin.nix`; verified with Step 11.3's build and cost.
+- [x] **Step 11.13 (F13):** `modules/nixos/fleet-alert/rules.nix`; verified by `fleet-alert`'s build; it reaches magnetite at its next deploy, after 2026-11-08T19:23Z.
+- [x] **Step 11.14 (F14):** `tasks.md` 8.3a.
+- [x] **Step 11.15 (F15):** `design.md`'s Risks; the deferred issue's text in `logs/s5-evidence/new-issues.md`.
+- [x] **Step 11.16 (F18):** the collector README, `flake-module.nix`, `modules/lib/otel-collector-darwin.nix` and `schema.nix` comments, ADR-003, ADR-004, ADR-009 and `design.md` D3; verified by `rg -n 'summed|same-name aggregation|merges same-named'` over those files.
+- [x] **Step 11.17 (F19):** `tasks.md` preamble and 2.4, `logs/s5-evidence/base.sh`, the 8.3a cost log's note.

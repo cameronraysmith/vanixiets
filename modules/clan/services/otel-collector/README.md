@@ -86,7 +86,8 @@ flowchart LR
 ```
 
 The agent pipelines stamp `host.name` and `vanixiets.database = fleet` on every resource, then export to the in-process `forward` connector on magnetite, and to `otlp_http/ingress`, which reaches the ingress through `otlp/mesh`, on every other host.
-The `metrics/host` pipeline also runs `transform/omnigent-alias`; the `metrics/process` pipeline sums `process.memory.usage` per executable name and drops executables under `process.minBytes.linux` (64 MiB).
+The `metrics/host` pipeline also runs `transform/omnigent-alias`; the `metrics/process` pipeline drops `process.memory.usage` points under `process.minBytes.linux` (64 MiB).
+Each stored point is one process's resident memory: the pipeline's `aggregate_labels` sum keys points by their attributes and full nanosecond timestamp, and the scraper stamps each process separately, so same-named processes are not summed and a name is stored when any one of its processes reaches the floor; the per-executable sum is CAM-88's.
 The ingress converts exponential histograms to explicit buckets while the store is below 1.3.0, then the `routing` connector sends each resource to `metrics/<database>` by its `vanixiets.database` attribute.
 Each per-database pipeline deletes `vanixiets.database` and writes through its own `otlp_http/<database>` exporter.
 Each exporter sends `x-greptime-db-name: <database>` and `x-greptime-otlp-metric-promote-resource-attrs` built from `promotedResourceAttributes`, so the store turns those resource attributes into labels.
@@ -152,7 +153,7 @@ Nothing imports `schema.nix` by path; import-tree loads it as a flake-parts modu
   `omnigent-host-<owner>.service` is stored as `omnigent-host-<alias>.service`, so no owner's name becomes a label value.
 - `promotedResourceAttributes`: the resource attributes the store promotes to labels.
 - `nodeExporterKeep`: the node_exporter series the `node` scrape keeps; every other series is dropped.
-- `process.minBytes`: per platform (`linux`, 64 MiB; `darwin`, 384 MiB), the floor below which an executable's summed `process.memory.usage` is dropped.
+- `process.minBytes`: per platform (`linux`, 64 MiB; `darwin`, 384 MiB), the floor below which one process's `process.memory.usage` point is dropped; an executable whose processes are each below the floor is not stored, however large their total.
   The darwin floor is higher because macOS RSS counts each process's share of the dyld shared cache and frameworks.
 - `process.darwinFleetExecutables`: launchd label glob to the executable name the darwin process scraper reports; darwin's `otelcol-process` keeps these names below the floor, and the darwin fragment asserts that the globs cover the host's long-running `org.nixos.*` daemons.
 - `devloop.tables`: the `devloop` allow-list, table name to `{ columns, primaryKey, timeIndex }`, each column `{ name; type; nullable; }` with `type` one of `int64`, `string`, `boolean` and `timestamp`.
@@ -296,7 +297,7 @@ The configurations come from `flake.lib.otelCollectorDarwin` in `modules/lib/ote
 Its `agent` runs `host_metrics/memory` with `memory`, a `disk` scraper on `disk0` and a `filesystem` scraper on `/System/Volumes/Data`, both by `strict` match, with `system.disk.io_time` and `system.disk.pending_operations` disabled; the `otlp` receiver on `127.0.0.1:4318`, which only `otelcol-process` feeds; the `node` scrape of `127.0.0.1:9100` keeping `schema.darwinNodeExporterKeep` and `schema.smartctlKeep`; the `otelcol` scrape of `127.0.0.1:8888`; and `file_log/deploy-record` with the NixOS agents' id and settings into `logs/devloop-deploy_record`.
 It has no `systemd` receiver, no paging or available-memory series and no `transform/omnigent-alias`, because the probe writes the owner's alias itself.
 `otlp_http/ingress` and `otlp_http/ingress-logs` export as on a NixOS agent, with queues of 400 MiB and 16 MiB in `file_storage` and the `otel-cert` key and certificate at their sops paths, behind a 150 MiB limiter with a 30 MiB spike allowance.
-Its `process` configuration runs `host_metrics/process` with the six identity attributes disabled, a 64 MiB limiter with a 16 MiB spike allowance, the NixOS agent's compaction and per-executable sum, and `filter/process-min`, which drops a summed point below `process.minBytes.darwin`, 384 MiB, unless its executable is one of the host's fleet executables; it exports to the agent's `127.0.0.1:4318` and sets `service.telemetry.metrics.level = "none"`, so it opens no listener.
+Its `process` configuration runs `host_metrics/process` with the six identity attributes disabled, a 64 MiB limiter with a 16 MiB spike allowance, the NixOS agent's compaction and `aggregate_labels` stages, which leave each process its own point, and `filter/process-min`, which drops a process's point below `process.minBytes.darwin`, 384 MiB, unless its executable is one of the host's fleet executables; it exports to the agent's `127.0.0.1:4318` and sets `service.telemetry.metrics.level = "none"`, so it opens no listener.
 The fleet executables are the names of `process.darwinFleetExecutables` whose label globs match the host's daemons, and the floor is higher than Linux's 64 MiB because macOS RSS counts each process's share of the dyld shared cache, which put 50 to 70 names an hour on stibnite at 64 MiB against the budget of 30 (#3744).
 `flake.lib.otelHostProbeLabels` selects the probe's labels: the patterns of `schema.launchdLabels` matched, dots literal, against the host's evaluated `launchd.daemons`.
 

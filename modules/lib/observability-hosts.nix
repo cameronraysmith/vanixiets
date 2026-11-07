@@ -2,9 +2,9 @@
 # machines, whether each collects, each host's platform, notified units and
 # SMART devices, and the alert rules' always-on hosts, expected hosts and
 # SystemdUnitFailed exclusion are read from here. A host's `collect` turns
-# the agent role on; a host joining the fleet enters with `collect = false`
-# until its watched first deploy. A host joins alwaysOn only by an edit here
-# when it becomes permanently provisioned (ADR-009 item 16).
+# the agent role on; a host joining the fleet enters with its `collect`
+# false until its watched first deploy. A host joins alwaysOn only by an
+# edit here when it becomes permanently provisioned (ADR-009 item 16).
 { ... }:
 {
   flake.lib.observabilityHosts =

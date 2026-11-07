@@ -44,12 +44,12 @@ On a darwin agent host the collector SHALL scrape only node_exporter on `127.0.0
 
 ### Requirement: The collector's configuration bounds what it gathers
 
-The machine SHALL configure each agent host's collector so that per-process memory carries no per-process identifier and covers only executables holding at least 64 MiB, and node_exporter's series pass a keep-list.
+The machine SHALL configure each agent host's collector so that per-process memory carries no per-process identifier and covers only processes holding at least the host platform's floor, 64 MiB on a NixOS host and 384 MiB on a darwin host, and node_exporter's series pass a keep-list.
 On a NixOS host per-unit signals SHALL cover the `schema.nix` allow-list with at most 40 matching units besides `observability-notify@` instances, paging SHALL report usage only, and file systems SHALL cover the host's ZFS mountpoints.
-On a darwin host the `disk` and `filesystem` scrapers SHALL include only `disk0` and `/System/Volumes/Data` by `strict` match, and per-process memory SHALL be gathered only by the root `otelcol-process`, as the scenarios state.
+On a darwin host the `disk` and `filesystem` scrapers SHALL include only `disk0` and `/System/Volumes/Data` by `strict` match, per-process memory SHALL be gathered only by the root `otelcol-process`, and the fleet's own executables named in `schema.nix`'s `process.darwinFleetExecutables` SHALL be kept below the floor, as the scenarios state.
 The ingress host's `otel-envelope` SHALL regulate ADR-004's 30 process names per host.
 
-**Discharged by**: the evaluation-time collector check (R3.1) with its mutants; the agent module's assertions with their overrides; `checks.x86_64-linux.otel-collector-darwin`'s clauses with their mutants `seventhIdentityAttribute`, `processEndpoint` and `diskIncludeAll`; nixpkgs' build-time `otelcol-contrib validate` and the darwin check's `otelcol-contrib validate`; `fleet-ingress-interface` requirement `otel-envelope on the ingress host regulates the fleet budget`.
+**Discharged by**: the evaluation-time collector check (R3.1) with its mutants; the agent module's assertions with their overrides; `checks.x86_64-linux.otel-collector-darwin`'s clauses with their mutants `seventhIdentityAttribute`, `processEndpoint`, `diskIncludeAll` and `otlpFeedsLogs`, and its `fleetKeptBelowFloor` case with the mutant `keepListIgnored`; the darwin fragment's assertion that each long-running `org.nixos.*` daemon matches exactly one glob of `process.darwinFleetExecutables`; nixpkgs' build-time `otelcol-contrib validate` and the darwin check's `otelcol-contrib validate`; `fleet-ingress-interface` requirement `otel-envelope on the ingress host regulates the fleet budget`; resting, for the darwin floor, on world assumption `A77 — macOS resident size counts each process's mapped share of the shared cache, so ordinary processes read tens to hundreds of MiB`.
 
 #### Scenario: The collector check runs with its mutants
 
@@ -83,13 +83,18 @@ The ingress host's `otel-envelope` SHALL regulate ADR-004's 30 process names per
 
 #### Scenario: The darwin agent's configuration is checked
 
-- **WHEN** `checks.x86_64-linux.otel-collector-darwin` renders the darwin agent's configuration from `flake.lib` data only and validates it with the root pin's `otelcol-contrib validate`
-- **THEN** validation passes, the `disk` scraper includes only `disk0` and the `filesystem` scraper only `/System/Volumes/Data`, both by `strict` match, `system.disk.io_time` and `system.disk.pending_operations` are disabled, no `paging` scraper, `system.linux.memory.available` or `systemd` receiver is present, the `otlp` receiver feeds `metrics/host` and no logs pipeline, and the mutant `diskIncludeAll` fails the check
+- **WHEN** `checks.x86_64-linux.otel-collector-darwin` renders the darwin agent's configuration from `flake.lib` data only and validates it with the root pin's `otelcol-contrib validate`, and reads the agent's pipelines from stibnite's evaluated darwin fragment
+- **THEN** validation passes, the `disk` scraper includes only `disk0` and the `filesystem` scraper only `/System/Volumes/Data`, both by `strict` match, `system.disk.io_time` and `system.disk.pending_operations` are disabled, no `paging` scraper, `system.linux.memory.available` or `systemd` receiver is present, the `otlp` receiver feeds `metrics/host` and no logs pipeline, and the mutants `diskIncludeAll` and `otlpFeedsLogs` each fail the check
 
 #### Scenario: The root process collector is checked
 
 - **WHEN** the same check renders and validates `otelcol-process`'s configuration
-- **THEN** it holds only the `process` scraper with the six identity attributes disabled and the 64 MiB floor, sets no `service.name`, has no receiver endpoint, no telemetry listener (`service.telemetry.metrics.level` is `none`) and no credential path, and exports only to `http://127.0.0.1:4318`, and the mutants `seventhIdentityAttribute` and `processEndpoint` each fail the check
+- **THEN** it holds only the `process` scraper with the six identity attributes disabled and the 384 MiB floor, sets no `service.name`, has no receiver endpoint, no telemetry listener (`service.telemetry.metrics.level` is `none`) and no credential path, and exports only to `http://127.0.0.1:4318`, and the mutants `seventhIdentityAttribute` and `processEndpoint` each fail the check
+
+#### Scenario: The darwin fleet executables are kept below the floor
+
+- **WHEN** the same check runs the root pin's collector with `otelcol-process`'s filter over process points of a fleet executable below 384 MiB, another executable below it, and an executable above it
+- **THEN** the collector writes the fleet executable's and the large executable's points and drops the other, and the mutant `keepListIgnored`, whose filter omits the keep-list, fails the case
 
 ### Requirement: The telemetry store and the collector run inside a declared envelope
 
@@ -97,7 +102,7 @@ The machine SHALL run `greptimedb.service` under the static user `greptimedb` wi
 On a darwin host, which launchd bounds in no memory, the agent SHALL run with a 150 MiB `memory_limiter` and 30 MiB spike and `otelcol-process` with 64 MiB and 16 MiB, and the darwin `otel-envelope` SHALL fail above 256 MiB and 128 MiB of physical footprint, the kernel's own accounting, which unlike the resident size excludes the mapped binary's clean file-backed pages.
 The dataset `zroot/root/greptimedb` SHALL carry `quota=16G`, `reservation=12G` and `com.sun:auto-snapshot=false`, applied or asserted at boot.
 
-**Discharged by**: the evaluation-time envelope check (R7.1) with its mutants, the agent role's limiter assertion on every NixOS host without the ingress role, `checks.x86_64-linux.otel-collector-darwin`'s rendered limiters, `checks.x86_64-linux.otel-envelope`'s darwin memory cases with the mutants `c5WrongPid`, `c5ReadsRss` and `c5UnreadablePasses`, the hourly envelope regulator, the on-demand OOM-order test, and the operator's 24-hour memory measurement on stibnite, resting on world assumption `A70 — macOS top prints a process's physical footprint as unversioned text to an unprivileged account`.
+**Discharged by**: the evaluation-time envelope check (R7.1) with its mutants, the agent role's limiter assertion on every NixOS host without the ingress role, `checks.x86_64-linux.otel-collector-darwin`'s clauses over stibnite's evaluated darwin fragment with the mutants `agentLimiterRaised`, `processSpikeRaised`, `c5LimitsSwapped` and `c5AgentLimitChanged`, `checks.x86_64-linux.otel-envelope`'s darwin memory cases with the mutants `c5WrongPid`, `c5ReadsRss` and `c5UnreadablePasses`, the hourly envelope regulator, the on-demand OOM-order test, and the operator's 24-hour memory measurement on stibnite, resting on world assumption `A70 — macOS top prints a process's physical footprint as unversioned text to an unprivileged account`.
 
 #### Scenario: The evaluation-time envelope check runs with its mutants
 
@@ -111,13 +116,13 @@ The dataset `zroot/root/greptimedb` SHALL carry `quota=16G`, `reservation=12G` a
 
 #### Scenario: A darwin host's envelope is evaluated
 
-- **WHEN** `checks.x86_64-linux.otel-collector-darwin` renders the darwin agent's and `otelcol-process`'s configurations
-- **THEN** the agent's `memory_limiter` is 150 MiB with a 30 MiB spike and `otelcol-process`'s 64 MiB with a 16 MiB spike, and the darwin `otel-envelope` is given the limits 268,435,456 B for `org.nixos.otelcol` and 134,217,728 B for `org.nixos.otelcol-process`, whose failing and passing cases `fleet-ingress-interface` requirement `otel-envelope regulates each agent from its own collector` states
+- **WHEN** `checks.x86_64-linux.otel-collector-darwin` reads stibnite's evaluated darwin fragment
+- **THEN** the agent's `memory_limiter` is 150 MiB with a 30 MiB spike and `otelcol-process`'s 64 MiB with a 16 MiB spike, each pipeline of both begins with `memory_limiter`, and the limits the fragment gives the darwin `otel-envelope` are 268,435,456 B for `org.nixos.otelcol` and 134,217,728 B for `org.nixos.otelcol-process`, whose failing and passing cases `fleet-ingress-interface` requirement `otel-envelope regulates each agent from its own collector` states; the mutants `agentLimiterRaised`, `processSpikeRaised`, `c5LimitsSwapped` and `c5AgentLimitChanged` each fail the check
 
 #### Scenario: The darwin collectors' memory is measured
 
-- **WHEN** stibnite has collected for 24 hours, and again after the operator's suspend of stibnite
-- **THEN** the operator records both collectors' maximum physical footprint, and confirms or changes the darwin `otel-envelope`'s two limits before the launchd alert rules ship
+- **WHEN** the launchd alert rules are about to ship, and again once stibnite has collected for 24 hours
+- **THEN** before the rules ship the operator confirms or changes the darwin `otel-envelope`'s two limits from a physical-footprint reading of each collector and the envelope's passing runs, and over the 24 hours the operator records both collectors' maximum physical footprint, and the maximum after a sleep when the window holds one
 
 #### Scenario: The hourly envelope regulator finds the store over its envelope
 

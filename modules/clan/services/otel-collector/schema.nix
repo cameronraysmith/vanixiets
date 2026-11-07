@@ -141,8 +141,9 @@
       "org.nixos.prometheus-node-exporter"
     ];
 
-    # process.memory.usage is stored only for executables holding at least
-    # minBytes.<platform> after same-name aggregation (ADR-003 item 16).
+    # process.memory.usage is stored only for processes holding at least
+    # minBytes.<platform>; each point is one process, so an executable is
+    # stored when any one of its processes reaches the floor (ADR-003 item 16).
     # ADR-004's per-host bound of 30 distinct names has no collector stage
     # at contrib 0.155.0; S1 records the observed count at deployment and
     # S4's otel-envelope adds its regulator. The scraper reports RSS on both
@@ -164,8 +165,9 @@
     # stibnite on 2026-11-06). The darwin fragment asserts that the globs
     # cover the host's long-running org.nixos.* daemons and that omnigent's
     # name is its package's interpreter. `nix` and `python3.x` also name the
-    # operator's own processes, which same-name aggregation keeps as one
-    # series each (design D3).
+    # operator's own processes; each is one series because the store's series
+    # key is the name, and same-named points stored in the same millisecond
+    # become one row (design D3).
     process.darwinFleetExecutables = {
       "org.nixos.dnscrypt-proxy" = "dnscrypt-proxy";
       "org.nixos.nix-daemon" = "nix";
