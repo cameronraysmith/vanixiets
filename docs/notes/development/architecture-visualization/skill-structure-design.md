@@ -17,7 +17,7 @@ Design specification for the `preferences-architecture-diagramming` skill, synth
 The architecture diagramming skill occupies the semantic middle layer in a three-layer visualization stack.
 
 The bottom layer is `text-to-visual-iteration`, which provides the mechanical compile-inspect-refine loop.
-It owns artifact conventions (SVG/PNG/PDF triple output), the post-processing pipeline (svgo, resvg, svg2pdf), the dual-feedback iteration loop (structural SVG inspection plus multimodal bitmap perception), and the toolchain dispatch table mapping source formats to compilers.
+It owns artifact conventions (SVG/PNG/PDF triple output), the post-processing pipeline (svgo, resvg, rsvg-convert), the dual-feedback iteration loop (structural SVG inspection plus multimodal bitmap perception), and the toolchain dispatch table mapping source formats to compilers.
 This layer is format-agnostic: it handles D2, Mermaid, TikZ, Typst, PlantUML, and Graphviz identically.
 
 The middle layer is `preferences-architecture-diagramming`, which provides the semantic framework for architectural visualization.
@@ -397,7 +397,7 @@ D2's node and edge labeling is a first-class feature with support for multi-line
 Richards/Ford recommend showing directionality and communication type.
 D2 supports arrow styles (directional, bidirectional), line styles (solid, dashed, dotted), and labels on edges, mapping directly to the synchronous/asynchronous line convention.
 
-D2 produces native SVG output, integrating directly with the `text-to-visual-iteration` post-processing pipeline (svgo, resvg, svg2pdf).
+D2 produces native SVG output, integrating directly with the `text-to-visual-iteration` post-processing pipeline (svgo, resvg, rsvg-convert).
 The `--layout elk` option provides the hierarchical graph layout that C4 diagrams require.
 
 The existing D2 conventions in `preferences-event-modeling` (color palette, swimlane pattern, per-step output) demonstrate D2's suitability for structured architecture diagrams.

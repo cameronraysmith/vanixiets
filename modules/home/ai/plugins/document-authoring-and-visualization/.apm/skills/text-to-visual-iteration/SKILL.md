@@ -8,7 +8,7 @@ description: >
   and multimodal bitmap vision for dual-channel feedback. Use when authoring,
   compiling, or iteratively refining any text-to-visual pipeline, choosing output
   formats, setting up build artifact directories, post-processing SVG output
-  (svgo, resvg, svg2pdf), or optimizing layout and graphical properties through
+  (svgo, resvg, rsvg-convert), or optimizing layout and graphical properties through
   successive compilation cycles.
 ---
 
@@ -25,7 +25,7 @@ Generate three output formats per source file:
 
 1. SVG — primary output, optimized via svgo
 2. PNG — accessory, rasterized via resvg for high-fidelity output
-3. PDF — accessory, converted via svg2pdf
+3. PDF — accessory, converted via rsvg-convert (librsvg) as vector output
 
 The three-format convention ensures portability across web (SVG), documents and slides (PDF), and contexts requiring bitmap images (PNG).
 
@@ -36,7 +36,7 @@ After compiling source to SVG, run the post-processing chain:
 ```bash
 svgo input.svg -o optimized.svg
 resvg optimized.svg output.png --width <target-width>
-svg2pdf optimized.svg output.pdf
+rsvg-convert --format pdf --output output.pdf optimized.svg
 ```
 
 For batch processing, iterate over source files and preserve the filename stem across outputs.

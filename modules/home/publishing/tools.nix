@@ -9,6 +9,7 @@
         ghostscript
         imagemagick
         impressive # pkgs/by-name - PDF presentations with OpenGL transitions
+        librsvg # provides rsvg-convert
         markdown-tree-parser # pkgs/by-name
         mermaid-cli # provides mmdc
         poppler-utils
@@ -16,7 +17,6 @@
         quarto-bin # pkgs/by-name
         resvg
         shot-scraper
-        svg2pdf
         svgo
       ];
     };

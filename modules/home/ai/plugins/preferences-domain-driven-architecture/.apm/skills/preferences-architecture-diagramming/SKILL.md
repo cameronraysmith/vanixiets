@@ -21,7 +21,7 @@ It defers to the mechanical layer for how to compile and refine the output artif
 
 This skill occupies the middle of a three-layer visualization stack.
 
-The bottom layer is `text-to-visual-iteration`, which provides the compile-inspect-refine loop, artifact conventions (SVG/PNG/PDF triple output), the post-processing pipeline (svgo, resvg, svg2pdf), and the toolchain dispatch table.
+The bottom layer is `text-to-visual-iteration`, which provides the compile-inspect-refine loop, artifact conventions (SVG/PNG/PDF triple output), the post-processing pipeline (svgo, resvg, rsvg-convert), and the toolchain dispatch table.
 When a chapter specifies a diagram to produce, conclude with "compile and refine per the text-to-visual-iteration workflow" rather than re-specifying mechanical steps.
 The format selection decision tree in this skill determines which toolchain row in the bottom layer's dispatch table applies.
 
