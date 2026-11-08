@@ -24,7 +24,9 @@
 #   must each produce a non-empty failure list; the store freezes only the
 #   instances of the database that failed (review F7). The legs about pyrite render
 #   the host table with its `collect` forced each way, so they hold whatever
-#   pyrite's row says.
+#   pyrite's row says. Each leg, each mutant and the server's controls is a
+#   derivation of its own in fixtureRehearsal's passthru, which requires
+#   them all, so they build in parallel.
 # - propertyRehearsal: fleet-alert/test_transition.py compares transition.jq
 #   with the reference model fleet-alert/model.py over derandomized
 #   Hypothesis timelines over two databases, holds both to leaving fleet's
@@ -2135,21 +2137,22 @@
           };
       };
 
-      mutantRun = name: mutant: ''
-        echo "=== mutant ${name}"
-        misses="$TMPDIR/misses-${name}"
-        : > "$misses"
-        ${lib.concatMapStrings (runLeg {
-          evaluator = lib.getExe mutant.evaluator;
-          inherit (mutant) config;
-        }) mutant.legs}
-        if [ -s "$misses" ]; then
-          echo "mutant ${name} rejected: $(head -n 1 "$misses")"
-        else
-          echo "FAIL: mutant ${name} produced no failure" >&2
-          mutant_missed=1
-        fi
-      '';
+      # A mutant passes only when its legs record a miss.
+      mutantCheck =
+        name: mutant:
+        fixtureCheck "mutant-${name}" (runsOf mutant.legs) "R9.2: the runtime mutant ${name} fails a leg" ''
+          echo "=== mutant ${name}"
+          ${lib.concatMapStrings (runLeg {
+            evaluator = lib.getExe mutant.evaluator;
+            inherit (mutant) config;
+          }) mutant.legs}
+          if [ -s "$misses" ]; then
+            echo "mutant ${name} rejected: $(head -n 1 "$misses")"
+          else
+            echo "FAIL: mutant ${name} produced no failure" >&2
+            exit 1
+          fi
+        '';
 
       controlQuery = "SELECT 1 AS value";
       controlResponses = pkgs.writeText "fleet-alert-control-responses.json" (
@@ -2223,9 +2226,17 @@
         echo "ok: fixture server refusals, the SQL answer shape and the concurrency guard"
       '';
 
-      fixtureRehearsal =
-        pkgs.runCommand "fleet-alert-fixtures"
+      # Each leg, each mutant and the server's controls is its own
+      # derivation, so they build in parallel and cache apart: a leg's runs
+      # are sequential, and each run spawns some hundred jq and curl
+      # processes, about a second, so one derivation holding all of them
+      # took over 12 min. `runs`, in passthru, is the number of evaluator
+      # runs the derivation performs, which the work budget below bounds.
+      fixtureCheck =
+        id: runs: description: body:
+        pkgs.runCommand "fleet-alert-fixtures-${id}"
           {
+            passthru = { inherit runs; };
             nativeBuildInputs = [
               pkgs.coreutils
               pkgs.curl
@@ -2234,63 +2245,108 @@
               pkgs.jq
               pkgs.python3
             ];
-            meta.description = "R9.2: the evaluator against a replaying fixture server; every leg passes and every runtime mutant fails a leg";
+            meta.description = description;
           }
           ''
             set -euo pipefail
             server_pid=
             trap '[ -z "$server_pid" ] || kill "$server_pid" 2>/dev/null || true' EXIT
+            misses="$TMPDIR/misses"
+            : > "$misses"
             miss() {
               printf 'MISS %s\n' "$*" >&2
               printf '%s\n' "$*" >> "$misses"
             }
-            ${serverControls}
-            misses="$TMPDIR/misses-real"
-            : > "$misses"
-            ${lib.concatMapStrings (runLeg {
-              evaluator = lib.getExe realEvaluator;
-              config = realConfig;
-            }) legs}
+            ${body}
+            touch "$out"
+          '';
+      # A leg's derivation name is its name's alphanumeric words.
+      legId =
+        leg:
+        builtins.substring 0 100 (
+          lib.concatStringsSep "-" (
+            lib.filter (w: builtins.isString w && w != "") (builtins.split "[^A-Za-z0-9]+" leg.name)
+          )
+        );
+      runsOf = lib.foldl' (n: leg: n + lib.length leg.steps) 0;
+      legCheck =
+        config: leg:
+        lib.nameValuePair (legId leg) (
+          fixtureCheck (legId leg) (runsOf [ leg ]) "R9.2: ${leg.name}" ''
             ${runLeg {
               evaluator = lib.getExe realEvaluator;
-              config = twoDatabaseConfig;
-            } twoDatabaseLeg}
-            ${runLeg {
-              evaluator = lib.getExe realEvaluator;
-              config = twoHostConfig;
-            } twoHostExclusionLeg}
-            ${lib.concatMapStrings
-              (runLeg {
-                evaluator = lib.getExe realEvaluator;
-                config = pyriteConfig;
-              })
-              [
-                laptopSilentLeg
-                nvmeExpectsPyriteLeg
-                nvmeLeg
-              ]
-            }
-            ${runLeg {
-              evaluator = lib.getExe realEvaluator;
-              config = notCollectingConfig;
-            } notCollectingLeg}
-            ${runLeg {
-              evaluator = lib.getExe realEvaluator;
-              config = checkConfig linuxSelectorDarwinOnly.rules;
-            } linuxSelectorDarwinOnly}
-            ${runLeg {
-              evaluator = lib.getExe realEvaluator;
-              config = checkConfig stibniteNotCollecting.rules;
-            } stibniteNotCollecting}
-            mutant_missed=0
-            ${lib.concatStrings (lib.mapAttrsToList mutantRun runtimeMutants)}
-            if [ -s "$TMPDIR/misses-real" ]; then
-              echo "FAIL: the evaluator failed these legs:" >&2
-              cat "$TMPDIR/misses-real" >&2
+              inherit config;
+            } leg}
+            if [ -s "$misses" ]; then
+              echo "FAIL: the evaluator failed this leg:" >&2
+              cat "$misses" >&2
               exit 1
             fi
-            echo "ok: every leg passed"
-            [ "$mutant_missed" = 0 ]
+            echo "ok: the leg passed"
+          ''
+        );
+      legChecks =
+        map (legCheck realConfig) legs
+        ++ [
+          (legCheck twoDatabaseConfig twoDatabaseLeg)
+          (legCheck twoHostConfig twoHostExclusionLeg)
+        ]
+        ++ map (legCheck pyriteConfig) [
+          laptopSilentLeg
+          nvmeExpectsPyriteLeg
+          nvmeLeg
+        ]
+        ++ [
+          (legCheck notCollectingConfig notCollectingLeg)
+          (legCheck (checkConfig linuxSelectorDarwinOnly.rules) linuxSelectorDarwinOnly)
+          (legCheck (checkConfig stibniteNotCollecting.rules) stibniteNotCollecting)
+        ];
+      # The work budget, in evaluator runs, checked at evaluation: no
+      # derivation may run more than maxFixtureRuns, nor all of them more
+      # than fixtureRunBudget. Measured on magnetite (16 vCPU) on
+      # 2026-11-08, building these derivations 8 at a time, a run took
+      # 1.35 s in the longest leg (70 runs, 95 s) and 1.44 s on average
+      # (808 runs, 1164 s of work); with nixbot building beside them it
+      # took up to 2.5 s. A leg's runs are sequential, so 75 runs keep a
+      # derivation near 100 s; 1000 runs in all is about 24 min of work,
+      # about 1.5 min on 16 cores, so the longest leg stays the bound.
+      maxFixtureRuns = 75;
+      fixtureRunBudget = 1000;
+      fixtureParts =
+        let
+          byLeg = lib.listToAttrs legChecks;
+          parts = {
+            controls = fixtureCheck "controls" 0 "R9.2: the fixture server's own clauses" serverControls;
+          }
+          // byLeg
+          // lib.mapAttrs' (
+            name: mutant: lib.nameValuePair "mutant-${name}" (mutantCheck name mutant)
+          ) runtimeMutants;
+          over = lib.filterAttrs (_: part: part.runs > maxFixtureRuns) parts;
+          total = lib.foldl' (n: part: n + part.runs) 0 (lib.attrValues parts);
+        in
+        assert lib.assertMsg (
+          lib.length (lib.attrNames byLeg) == lib.length legChecks
+        ) "fleet-alert check: two fixture legs share a derivation name";
+        assert lib.assertMsg (over == { }) (
+          "fleet-alert check: fixture derivations over the work budget of ${toString maxFixtureRuns} evaluator runs each: "
+          + lib.concatStringsSep ", " (
+            lib.mapAttrsToList (name: part: "${name} (${toString part.runs})") over
+          )
+        );
+        assert lib.assertMsg (total <= fixtureRunBudget)
+          "fleet-alert check: the fixture derivations run the evaluator ${toString total} times, over the budget of ${toString fixtureRunBudget}";
+        parts;
+      fixtureRehearsal =
+        pkgs.runCommand "fleet-alert-fixtures"
+          {
+            passthru = fixtureParts;
+            meta.description = "R9.2: the evaluator against a replaying fixture server; every leg passes and every runtime mutant fails a leg";
+          }
+          ''
+            ${lib.concatMapStrings (part: ''
+              test -e ${part}
+            '') (lib.attrValues fixtureParts)}
             touch "$out"
           '';
 
