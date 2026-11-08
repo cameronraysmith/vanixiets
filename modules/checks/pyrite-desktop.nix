@@ -219,7 +219,7 @@ in
             && toString home.programs.quickshell.package == toString pkgs.quickshell
             && declaredRef "dms-src" == dmsSrcVersion
             && dmsSrcVersion == "v${pkgs.dux-shell.version}"
-            && pkgs.dux-greeter.version == "2.0.0"
+            && pkgs.dux-greeter.version == "2.1.0"
             &&
               map toString options.programs.niri.enable.declarations == [
                 "${inputs.nixpkgs}/nixos/modules/programs/wayland/niri.nix"
@@ -238,7 +238,7 @@ in
             && unit.Service.ExecStart == [ "${lib.getExe pkgs.dux-shell} run --session" ]
             && unit.Service.Type == "notify"
             && unit.Service.NotifyAccess == "main"
-            && !(unit.Service ? BusName)
+            && (unit.Service.BusName or null) == "org.freedesktop.Notifications"
             && !config.programs.dux-shell.enable
             && !home.programs.quickshell.systemd.enable
             && niri.settings.includes == [ ]
