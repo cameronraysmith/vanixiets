@@ -3,7 +3,9 @@
 # `-H @-` reads, so it is on no argv. It runs the source script, not the built
 # wrapper, so that NTFY_CURL_BIN can name a curl stub recording its argv and
 # stdin. The same assertions run against a mutant of the script that passes the
-# header with -H and must reject it.
+# header with -H and must reject it. caUnset and caEmpty require the script to
+# exit before curl runs when NTFY_CACERT is unset or empty, and the mutant
+# cacertGuardDropped, the script without its NTFY_CACERT guard, runs only caEmpty.
 {
   runCommand,
   bash,
@@ -20,6 +22,7 @@ runCommand "ntfy-send-test-token-transport" { } ''
   STUB
   chmod +x "$work/curl"
   export NTFY_CURL_BIN="$work/curl"
+  export NTFY_CACERT=/ca
   caller=$(printf '%s\n' -H "Title: t" -d hello https://ntfy.zt/fleet-acceptance)
 
   # run SCRIPT ENV...: runs SCRIPT under `env ENV...` with the stub recording
@@ -41,19 +44,19 @@ runCommand "ntfy-send-test-token-transport" { } ''
     [ "$status" = 0 ] || { echo "FAIL: token set: exit $status"; return 1; }
     if grep -qF "$token" "$REC/argv"; then echo "FAIL: token set: the token is on curl's argv"; return 1; fi
     [ "$(cat "$REC/stdin")" = "Authorization: Bearer $token" ] || { echo "FAIL: token set: stdin is not exactly the header"; return 1; }
-    [ "$(cat "$REC/argv")" = "$(printf '%s\n' -sfk -m 5 -H @-)"$'\n'"$caller" ] || { echo "FAIL: token set: argv is not -H @- before the caller's arguments"; return 1; }
+    [ "$(cat "$REC/argv")" = "$(printf '%s\n' -sf --cacert /ca -m 5 -H @-)"$'\n'"$caller" ] || { echo "FAIL: token set: argv is not -H @- before the caller's arguments"; return 1; }
     echo "ok: token set: header on stdin, -H @- on argv, token on no argv"
 
     run "$script" -u NTFY_TOKEN_FILE
     [ "$status" = 0 ] || { echo "FAIL: token unset: exit $status"; return 1; }
     [ ! -s "$REC/stdin" ] || { echo "FAIL: token unset: curl got stdin"; return 1; }
-    [ "$(cat "$REC/argv")" = "$(printf '%s\n' -sfk -m 5)"$'\n'"$caller" ] || { echo "FAIL: token unset: argv changed"; return 1; }
+    [ "$(cat "$REC/argv")" = "$(printf '%s\n' -sf --cacert /ca -m 5)"$'\n'"$caller" ] || { echo "FAIL: token unset: argv changed"; return 1; }
     echo "ok: token unset: argv unchanged, no stdin"
 
     run "$script" NTFY_TOKEN_FILE=
     [ "$status" = 0 ] || { echo "FAIL: token empty: exit $status"; return 1; }
     [ ! -s "$REC/stdin" ] || { echo "FAIL: token empty: curl got stdin"; return 1; }
-    [ "$(cat "$REC/argv")" = "$(printf '%s\n' -sfk -m 5)"$'\n'"$caller" ] || { echo "FAIL: token empty: argv changed"; return 1; }
+    [ "$(cat "$REC/argv")" = "$(printf '%s\n' -sf --cacert /ca -m 5)"$'\n'"$caller" ] || { echo "FAIL: token empty: argv changed"; return 1; }
     echo "ok: token empty: argv unchanged, no stdin"
 
     run "$script" NTFY_TOKEN_FILE="$work/missing"
@@ -75,5 +78,31 @@ runCommand "ntfy-send-test-token-transport" { } ''
     exit 1
   fi
   echo "ok: the mutant passing the header on argv was rejected"
+
+  # caUnset, caEmpty SCRIPT: without a CA file the script exits non-zero
+  # before curl runs, so the stub records no argv.
+  caUnset() {
+    run "$1" -u NTFY_CACERT
+    [ "$status" != 0 ] && [ ! -e "$REC/argv" ] || { echo "FAIL: caUnset: exit $status, argv $(cat "$REC/argv" 2>/dev/null | tr '\n' ' ')"; return 1; }
+    echo "ok: caUnset: exit $status before curl"
+  }
+  caEmpty() {
+    run "$1" NTFY_CACERT=
+    [ "$status" != 0 ] && [ ! -e "$REC/argv" ] || { echo "FAIL: caEmpty: exit $status, argv $(cat "$REC/argv" 2>/dev/null | tr '\n' ' ')"; return 1; }
+    echo "ok: caEmpty: exit $status before curl"
+  }
+  caUnset ${./ntfy-send.sh}
+  caEmpty ${./ntfy-send.sh}
+
+  # cacertGuardDropped: the script without its NTFY_CACERT guard runs curl with
+  # an empty --cacert, which only the guard stops; set -u alone stops the unset
+  # case, so the mutant runs only caEmpty.
+  substitute ${./ntfy-send.sh} "$work/guardless.sh" \
+    --replace-fail ': "''${NTFY_CACERT:?ntfy-send: NTFY_CACERT names no CA file}"' ':'
+  if caEmpty "$work/guardless.sh"; then
+    echo "FAIL: mutant cacertGuardDropped passed caEmpty"
+    exit 1
+  fi
+  echo "mutant cacertGuardDropped rejected"
   touch "$out"
 ''
