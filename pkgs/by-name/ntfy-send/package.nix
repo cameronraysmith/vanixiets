@@ -8,7 +8,7 @@
 # a note of 2026-03-10 that endpoint security blocks Nix store binaries from
 # TCP over ZeroTier; on 2026-11-06 a store-built otelcol-contrib on stibnite
 # reached the ingress over ZeroTier, and the store curl, run as _otelcol with
-# --cacert modules/machines/nixos/cinnabar/pki/caddy-root-ca.crt, fetched
+# --cacert on caddy's root, then a file under cinnabar's machine module, fetched
 # https://ntfy.zt/v1/health with HTTP 200 and verification on (without the CA,
 # exit 60), so that reason no longer holds. Verifying ntfy.zt in every ntfy
 # client, and correcting the same endpoint-security claim in ntfy-send.sh's

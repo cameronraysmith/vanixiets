@@ -4,7 +4,8 @@
     { config, lib, ... }:
     let
       cfg = config.services.zt-services-trust;
-      caddyCert = ../machines/nixos/cinnabar/pki/caddy-root-ca.crt;
+      # caddy's root, the public file of cinnabar's clan vars generator caddy-root-ca.
+      caddyCert = ../../vars/per-machine/cinnabar/caddy-root-ca/root.crt/value;
     in
     {
       options.services.zt-services-trust.enable = lib.mkEnableOption "Caddy internal CA trust for .zt services";
