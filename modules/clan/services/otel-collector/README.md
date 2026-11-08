@@ -316,7 +316,7 @@ One is marked as an edited copy, because no allow-listed job showed it when the 
 `observability-notify-run -- <command>` runs the command and exits with its code; it posts `FAILED <label> on <host>` when a run fails after a pass or a first run fails, and `RESOLVED <label> on <host>` when a run passes after a posted `FAILED`.
 It shares the `failed` and `resolved` scripts with the NixOS template through `flake.lib.observabilityNotifyScripts`, so the stamps, the 900 s rate limit and the post format are the same on both platforms.
 On stibnite its stamps live in `/var/lib/otel-envelope` and each posted `FAILED` appends a line to `/var/lib/otel-envelope/notify.log`; its posts, and a failed post, are logged in `/var/log/otelcol/otel-envelope.log` with the envelope's output.
-It sets `NTFY_TOKEN_FILE` to the token's path only for `ntfy-send`'s calls, and `ntfy-send` posts with `/usr/bin/curl -sfk` on darwin, as the store curl does with `-sfk` on Linux, so neither verifies ntfy.zt's certificate (tracked in Linear (CAM-87); `pkgs/by-name/ntfy-send/package.nix`).
+It sets `NTFY_TOKEN_FILE` to the token's path only for `ntfy-send`'s calls, and `ntfy-send` posts with the store curl on both platforms and verifies `ntfy.zt` against caddy's root (`pkgs/by-name/ntfy-send/package.nix`).
 A failed `FAILED` post writes no stamp, so the next failing run posts again; no unit stays failed, so nothing like `SystemdUnitFailed` reports it.
 
 On stibnite `otel-envelope` judges `C1` to `C4` against the targets `node` and `otelcol` and the exporters `otlp_http/ingress` and `otlp_http/ingress-logs` that `flake.lib.otelCollectorDarwin` renders, with `STATE_DIRECTORY=/var/lib/otel-envelope`.

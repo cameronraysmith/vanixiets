@@ -19,8 +19,9 @@
 # when a run fails after a pass or a first run fails, RESOLVED when a run
 # passes after a posted FAILED, nothing for a new episode within
 # minIntervalSec of the last FAILED. ntfy-send reads the token through
-# NTFY_TOKEN_FILE, set only for its calls; on darwin it posts with
-# /usr/bin/curl. checks.x86_64-linux.otel-collector-darwin runs it over a
+# NTFY_TOKEN_FILE, set only for its calls; on darwin, as on NixOS, it posts
+# with the store curl and verifies ntfy.zt against caddy's root.
+# checks.x86_64-linux.otel-collector-darwin runs it over a
 # recording ntfy-send.
 { lib, ... }:
 let

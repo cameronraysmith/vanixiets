@@ -13,10 +13,8 @@ NTFY_TOPIC=$(hostname -s)
 REPO_NAME=$(basename "$(git rev-parse --show-toplevel 2>/dev/null || pwd)")
 MESSAGE="Waiting for permission: ${TOOL_NAME}: ${BRIEF}"
 
-# Best-effort delivery; never fail the caller.
-curl -sfk -m 5 \
+# Best-effort delivery through ntfy-send; never fail the caller.
+ntfy-send "$MESSAGE" "$NTFY_TOPIC" \
   -H "Title: Permission: ${TOOL_NAME}" \
   -H "Priority: default" \
-  -H "Tags: lock,${REPO_NAME}" \
-  -d "$MESSAGE" \
-  "https://ntfy.zt/${NTFY_TOPIC}" &>/dev/null || true
+  -H "Tags: lock,${REPO_NAME}" &>/dev/null || true

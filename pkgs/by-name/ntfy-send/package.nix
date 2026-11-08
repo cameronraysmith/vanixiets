@@ -1,18 +1,16 @@
 # ntfy-send: post a push notification to the fleet's ntfy server (ntfy.zt).
 # One source for every delivery: the home-manager tools command installs it,
-# and system units run it from ExecStart.
+# system units and launchd jobs run it, and the agent permission hooks post
+# through it.
 #
-# The preamble injects NTFY_CURL_BIN, the eval-time-resolved curl path:
-# /usr/bin/curl on Darwin, the curl from runtimeInputs on Linux. Both run with
-# -sfk, so neither verifies ntfy.zt's certificate. The Darwin choice came from
-# a note of 2026-03-10 that endpoint security blocks Nix store binaries from
-# TCP over ZeroTier; on 2026-11-06 a store-built otelcol-contrib on stibnite
-# reached the ingress over ZeroTier, and the store curl, run as _otelcol with
-# --cacert on caddy's root, then a file under cinnabar's machine module, fetched
-# https://ntfy.zt/v1/health with HTTP 200 and verification on (without the CA,
-# exit 60), so that reason no longer holds. Verifying ntfy.zt in every ntfy
-# client, and correcting the same endpoint-security claim in ntfy-send.sh's
-# --help text, is tracked in Linear (CAM-87).
+# The preamble exports NTFY_CURL_BIN=curl, the curl from runtimeInputs on every
+# platform, and NTFY_CACERT, the store copy of caddy's root, the public value
+# of cinnabar's clan vars caddy-root-ca
+# (vars/per-machine/cinnabar/caddy-root-ca/root.crt/value), which every post's
+# --cacert names, so ntfy-send verifies ntfy.zt's certificate and posts
+# nothing to a server that cannot present a chain to that root. The file may
+# hold two roots while a rotation overlaps them (the fleet observability
+# runbook, "caddy's root").
 #
 # NTFY_TOKEN_FILE, when set and non-empty, names a file holding an ntfy access
 # token, such as the `alerter` token that fleet-* topics require. The script
@@ -20,25 +18,37 @@
 # the printf builtin into curl's stdin, which curl reads with `-H @-`, so the
 # token is on no process's argv. Unset, the post is anonymous, which host
 # topics accept. passthru.tests.token-transport runs the source script against
-# a recording curl stub, with a mutant that passes the header on argv.
+# a recording curl stub, with a mutant that passes the header on argv;
+# passthru.tests.tls-verification runs it and the built wrapper against a
+# loopback TLS server, with a mutant that passes -k.
 {
   lib,
-  stdenv,
   curl,
   callPackage,
   writeShellApplication,
+  caddyRootCa ? ../../../vars/per-machine/cinnabar/caddy-root-ca/root.crt/value,
 }:
-writeShellApplication {
-  name = "ntfy-send";
-  runtimeInputs = lib.optional (!stdenv.hostPlatform.isDarwin) curl;
-  text = ''
-    export NTFY_CURL_BIN=${if stdenv.hostPlatform.isDarwin then "/usr/bin/curl" else "curl"}
-    ${builtins.readFile ./ntfy-send.sh}
-  '';
-  passthru.tests.token-transport = callPackage ./test-token-transport.nix { };
-  meta = {
-    description = "Send push notification via ntfy.zt (Apple-signed curl on Darwin)";
-    license = lib.licenses.mit;
-    mainProgram = "ntfy-send";
+let
+  ntfy-send = writeShellApplication {
+    name = "ntfy-send";
+    runtimeInputs = [ curl ];
+    text = ''
+      export NTFY_CURL_BIN=curl
+      export NTFY_CACERT=${caddyRootCa}
+      ${builtins.readFile ./ntfy-send.sh}
+    '';
+    passthru.tests = {
+      token-transport = callPackage ./test-token-transport.nix { };
+      tls-verification = callPackage ./test-tls-verification.nix {
+        ntfySend = ntfy-send;
+        inherit caddyRootCa;
+      };
+    };
+    meta = {
+      description = "Send push notification via ntfy.zt, verifying its certificate against caddy's root";
+      license = lib.licenses.mit;
+      mainProgram = "ntfy-send";
+    };
   };
-}
+in
+ntfy-send

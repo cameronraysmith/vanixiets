@@ -79,7 +79,7 @@
       notify-permission-wait = pkgs.writeShellApplication {
         name = "notify-permission-wait";
         runtimeInputs = with pkgs; [
-          curl
+          ntfy-send
           git
           coreutils
         ];
@@ -159,6 +159,7 @@
         name = "gate-dangerous-commands";
         runtimeInputs = [
           notify-permission-wait
+          pkgs.ntfy-send
           pkgs.jq
           pkgs.gnugrep
         ];
@@ -168,7 +169,7 @@
       notify-permission-prompt = pkgs.writeShellApplication {
         name = "notify-permission-prompt";
         runtimeInputs = with pkgs; [
-          curl
+          ntfy-send
           git
           jq
           coreutils

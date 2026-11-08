@@ -25,7 +25,10 @@
           "handler"
           "wrapper"
         ];
-        ntfy-send = [ "token-transport" ];
+        ntfy-send = [
+          "tls-verification"
+          "token-transport"
+        ];
         playwright-cli = [ "smoke" ];
         stack-land = [ "integration" ];
         vanixiets-docs = [
