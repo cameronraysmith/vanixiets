@@ -44,9 +44,14 @@
         // {
           alwaysOn = true;
         };
-      cinnabar = agent [ "fleet-deadman" ] // {
-        alwaysOn = true;
-      };
+      cinnabar =
+        agent [
+          "fleet-deadman"
+          "caddy-root-check"
+        ]
+        // {
+          alwaysOn = true;
+        };
       pyrite = agent [ ] // {
         smartDevices = [ "/dev/nvme0" ];
       };
