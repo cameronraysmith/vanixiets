@@ -17,20 +17,14 @@ import {
 } from "./report/validate-report.ts";
 
 // The subset of Playwright's JSON report the validator reads.
-type ResultsFixture = {
-  errors: unknown[];
-  stats: JsonStats;
-  suites: {
-    specs: {
-      id: string;
-      tests: {
-        expectedStatus: TestStatus;
-        status: TestOutcome;
-        results: { status: TestStatus; retry: number; attachments: { path: string }[] }[];
-      }[];
-    }[];
-  }[];
+type JsonTestFixture = {
+  projectName: string;
+  expectedStatus: TestStatus;
+  status: TestOutcome;
+  results: { status: TestStatus; retry: number; attachments: { path: string }[] }[];
 };
+type JsonSpecFixture = { file: string; title: string; tests: JsonTestFixture[] };
+type ResultsFixture = { errors: unknown[]; stats: JsonStats; suites: { specs: JsonSpecFixture[] }[] };
 type Fixture = {
   root: string;
   completion: Completion;
@@ -41,6 +35,18 @@ type Fixture = {
 
 // Deliberately corrupts typed evidence the way an untrusted producer could.
 const corrupt = <T>(value: unknown): T => value as T;
+
+// Playwright's JSON reporter merges one spec's tests across projects.
+function mergedSpecs(tests: Completion["tests"], template: JsonTestFixture): JsonSpecFixture[] {
+  const specs = new Map<string, JsonSpecFixture>();
+  for (const { project, case: testCase } of tests) {
+    const [file, title] = testCase.split("::");
+    const spec = specs.get(testCase) ?? { file, title, tests: [] };
+    spec.tests.push({ ...template, projectName: project });
+    specs.set(testCase, spec);
+  }
+  return [...specs.values()];
+}
 
 function fixture(t: TestContext, failed = false): Fixture {
   const root = mkdtempSync(join(tmpdir(), "docs-report-"));
@@ -84,9 +90,11 @@ function fixture(t: TestContext, failed = false): Fixture {
       {
         specs: [
           {
-            id: "reader-chromium",
+            file: "reader-journey.spec.ts",
+            title: "damaged guide is rejected by the real reader journey",
             tests: [
               {
+                projectName: "chromium",
                 expectedStatus: "passed",
                 status: outcome,
                 results: [{ status, retry: 0, attachments: attachments.map((path) => ({ path })) }],
@@ -226,6 +234,12 @@ const mutations: [string, (data: Fixture) => void][] = [
     "duplicate test",
     ({ completion }) => {
       completion.tests.push(completion.tests[0]);
+    },
+  ],
+  [
+    "JSON project disagreement",
+    ({ results }) => {
+      results.suites[0].specs[0].tests[0].projectName = "webkit";
     },
   ],
   [
@@ -412,16 +426,16 @@ test("well-formed partial scenario inventory is rejected even when counts agree"
   data.metadata.provenance.projects = "chromium,webkit";
   data.completion.projects = ["chromium", "webkit"];
   const template = data.completion.tests[0];
-  const spec = data.results.suites[0].specs[0];
+  const json = data.results.suites[0].specs[0].tests[0];
   data.completion.tests = ["chromium", "webkit"].flatMap((project) =>
     names.map((name, index) => ({ ...template, project, id: `${project}-${index}`, case: name })),
   );
-  data.results.suites[0].specs = data.completion.tests.map(({ id }) => ({ ...spec, id }));
+  data.results.suites[0].specs = mergedSpecs(data.completion.tests, json);
   data.results.stats.expected = names.length * 2;
   data.save();
   assert.equal(validateReport(data.root).passed, true);
   data.completion.tests.pop();
-  data.results.suites[0].specs.pop();
+  data.results.suites[0].specs = mergedSpecs(data.completion.tests, json);
   data.results.stats.expected--;
   data.save();
   assert.throws(() => validateReport(data.root), /partial\/unexpected scenario matrix/);
@@ -434,9 +448,9 @@ for (const system of ["aarch64-darwin", "x86_64-linux"]) {
     data.metadata.provenance.config = "playwright.config.ts";
     data.metadata.provenance.system = system;
     const template = data.completion.tests[0];
-    const spec = data.results.suites[0].specs[0];
+    const json = data.results.suites[0].specs[0].tests[0];
     data.completion.tests = names.map((name, index) => ({ ...template, id: `case-${index}`, case: name }));
-    data.results.suites[0].specs = names.map((_, index) => ({ ...spec, id: `case-${index}` }));
+    data.results.suites[0].specs = mergedSpecs(data.completion.tests, json);
     data.results.stats.expected = names.length;
     data.save();
     assert.throws(() => validateReport(data.root), /required browser engines/);
@@ -452,7 +466,7 @@ for (const [system, projects] of engineMatrices) {
     const data = fixture(t);
     const names = requiredCases["playwright.config.ts"];
     const template = data.completion.tests[0];
-    const spec = data.results.suites[0].specs[0];
+    const json = data.results.suites[0].specs[0].tests[0];
     const saveMatrix = (engines: Engine[]) => {
       data.metadata.provenance.config = "playwright.config.ts";
       data.metadata.provenance.system = system;
@@ -461,7 +475,7 @@ for (const [system, projects] of engineMatrices) {
       data.completion.tests = engines.flatMap((project) =>
         names.map((name, index) => ({ ...template, project, id: `${project}-${index}`, case: name })),
       );
-      data.results.suites[0].specs = data.completion.tests.map(({ id }) => ({ ...spec, id }));
+      data.results.suites[0].specs = mergedSpecs(data.completion.tests, json);
       data.results.stats.expected = data.completion.tests.length;
       data.save();
     };

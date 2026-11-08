@@ -49,7 +49,10 @@ export type RunMetadata = { schemaVersion: 1; exitCode: number; provenance: Prov
 /** completion.json as parsed: errors are only counted, never interpreted. */
 export type ParsedCompletion = Omit<Completion, "errors"> & { errors: unknown[] };
 export type JsonAttempt = Pick<JSONReportTestResult, "retry"> & { status: TestStatus; attachments: string[] };
-export type JsonTest = Pick<JSONReportTest, "status" | "expectedStatus"> & { id: string; results: JsonAttempt[] };
+// Keyed like CompletionTest: Playwright merges one spec's tests across projects
+// under a single spec ID, so the ID cannot identify a JSON test.
+export type JsonTest = Pick<JSONReportTest, "status" | "expectedStatus"> &
+  Pick<CompletionTest, "project" | "case"> & { results: JsonAttempt[] };
 export type JsonStats = Pick<JSONReport["stats"], TestOutcome>;
 export type JsonResults = { errors: unknown[]; stats: JsonStats; tests: JsonTest[] };
 export type Evidence = { metadata: RunMetadata; completion: ParsedCompletion; results: JsonResults };
@@ -207,10 +210,11 @@ function parseCompletion(value: unknown): ParsedCompletion {
   };
 }
 
-function parseJsonTest(id: string, value: unknown): JsonTest {
+function parseJsonTest(testCase: string, value: unknown): JsonTest {
   const test = record(value, "JSON test");
   return {
-    id,
+    project: text(test.projectName, "JSON test project"),
+    case: testCase,
     status: member(test.status, outcomes, "JSON test status"),
     expectedStatus: member(test.expectedStatus, testStatuses, "JSON expected status"),
     results: list(test.results, "JSON results").map((entry) => {
@@ -233,8 +237,8 @@ function parseSuites(value: unknown): JsonTest[] {
     return [
       ...list(suite.specs, "specs").flatMap((specEntry) => {
         const spec = record(specEntry, "spec");
-        const id = text(spec.id, "spec ID");
-        return list(spec.tests, "spec tests").map((test) => parseJsonTest(id, test));
+        const testCase = `${text(spec.file, "spec file")}::${text(spec.title, "spec title")}`;
+        return list(spec.tests, "spec tests").map((test) => parseJsonTest(testCase, test));
       }),
       ...(suite.suites === undefined ? [] : parseSuites(suite.suites)),
     ];
@@ -292,7 +296,8 @@ export function judge(root: string, { metadata, completion, results }: Evidence)
   );
   check(results.tests.length === tests.length, "test inventory disagreement");
   check(new Set(tests.map((test) => test.id)).size === tests.length, "duplicate test ID");
-  check(new Set(results.tests.map((test) => test.id)).size === tests.length, "duplicate JSON test ID");
+  const key = (test: Pick<CompletionTest, "project" | "case">) => `${test.project}::${test.case}`;
+  check(new Set(results.tests.map(key)).size === tests.length, "duplicate JSON test");
 
   const counts: Record<TestOutcome, number> = { expected: 0, unexpected: 0, skipped: 0, flaky: 0 };
   let infrastructureRetries = 0;
@@ -300,7 +305,7 @@ export function judge(root: string, { metadata, completion, results }: Evidence)
     check(test.outcome !== "skipped", "skipped/unknown outcome");
     check(test.expectedStatus === "passed", "expected failures/skips are not evidence of success");
     counts[test.outcome]++;
-    const json = results.tests.find((entry) => entry.id === test.id);
+    const json = results.tests.find((entry) => key(entry) === key(test));
     check(json !== undefined, "missing JSON test");
     check(json.status === test.outcome, "outcome disagreement");
     check(json.expectedStatus === test.expectedStatus, "expected status disagreement");

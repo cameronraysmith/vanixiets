@@ -209,7 +209,8 @@
 
         const counts = { expected: 0, unexpected: 0, skipped: 0, flaky: 0 };
         const tests = [];
-        const specs = [];
+        // Playwright's JSON reporter merges one spec's tests across projects.
+        const specs = new Map();
         const cases = requiredCases[config];
         for (const project of projects) {
           for (const [index, name] of cases.entries()) {
@@ -227,19 +228,17 @@
             counts[outcome]++;
             const id = project + "-" + index;
             tests.push({ id, project, case: name, title: name, outcome, expectedStatus: "passed", attempts });
-            specs.push({
-              id,
-              tests: [
-                {
-                  expectedStatus: "passed",
-                  status: outcome,
-                  results: attempts.map(({ status, retry, attachments }) => ({
-                    status,
-                    retry,
-                    attachments: attachments.map((path) => ({ path })),
-                  })),
-                },
-              ],
+            const [file, title] = name.split("::");
+            if (!specs.has(name)) specs.set(name, { file, title, tests: [] });
+            specs.get(name).tests.push({
+              projectName: project,
+              expectedStatus: "passed",
+              status: outcome,
+              results: attempts.map(({ status, retry, attachments }) => ({
+                status,
+                retry,
+                attachments: attachments.map((path) => ({ path })),
+              })),
             });
           }
         }
@@ -253,7 +252,10 @@
             tests,
           }),
         );
-        write("playwright-report/results.json", JSON.stringify({ errors: [], stats: counts, suites: [{ specs }] }));
+        write(
+          "playwright-report/results.json",
+          JSON.stringify({ errors: [], stats: counts, suites: [{ specs: [...specs.values()] }] }),
+        );
         write(
           "run.json",
           JSON.stringify({

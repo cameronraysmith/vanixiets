@@ -45,6 +45,7 @@ The producer retains:
 - `test-results/`: original traces, screenshots, videos, and error context; `runner.log`: original runner stdout/stderr.
 
 The validator first parses the three JSON files into types taken from the completion reporter and Playwright's published JSON report declarations, rejecting any value outside them, then reconciles the completion inventory, JSON report, exit status, per-attempt results, and counts.
+It joins a completion test to its JSON report test by project and `case`, the JSON spec's `file::title`: from Playwright 1.65 the JSON reporter merges one spec's tests across projects under a single spec `id`, so that `id` no longer identifies a test.
 Each attempt is classified by an exhaustive match on Playwright's `TestStatus`: `passed`; a `failed` product failure; an infrastructure failure (`failed`, `timedOut`, or `interrupted` with an infrastructure kind); or invalid, which includes every `skipped` attempt.
 `policy.ts` specifies the required scenario/project matrix independently of test discovery, including the reader journey.
 Its independently declared engine policy requires Chromium and WebKit on Darwin, and Chromium, Firefox, and WebKit on Linux.
