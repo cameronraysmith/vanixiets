@@ -130,6 +130,31 @@ let
             '';
           };
         };
+
+        ovnfs = {
+          enable = lib.mkOption {
+            type = lib.types.bool;
+            default = false;
+            description = ''
+              Whether to point omp's `ovnfs.path` setting at
+              {option}`programs.omp.ovnfs.package`, without putting ovnfs on PATH.
+
+              That setting alone turns omp's ovnfs integration on: from 18.17.0
+              omp treats ovnfs as present whenever `ovnfs.path`, else `ovnfs` on
+              PATH, resolves to an executable (src/task/settings.ts
+              ovnfsCommand). The system prompt then carries a "Separate
+              checkouts" rule that agents MUST use `ovnfs new` rather than
+              `git worktree add`, `git clone` or `cp -r` unless the user asks for
+              those (src/prompts/system/system-prompt.md), `grep` and `glob`
+              inside an ovnfs checkout search through its daemon, and the bash
+              git guard names ovnfs in its hints. Isolated subagents use ovnfs
+              checkouts only where `task.isolation.enabled` (off by default) is
+              set and `isolation.backend` is `auto`; this option sets neither.
+            '';
+          };
+
+          package = lib.mkPackageOption pkgs "ovnfs" { };
+        };
       };
 
       config = {
@@ -218,6 +243,9 @@ let
             # src/session/settings-stream-fn.ts). Off upstream; kept for
             # sessions where Fable is picked by hand.
             providers.anthropic.serverSideFallback = lib.mkDefault true;
+            ovnfs = lib.mkIf cfg.ovnfs.enable {
+              path = lib.getExe cfg.ovnfs.package;
+            };
             # Mnemopi is omp's local memory backend: a SQLite store the agent
             # opens in-process (src/mnemopi/state.ts hands the Mnemopi library a
             # dbPath and a bank), with no service, no token and no network hop
