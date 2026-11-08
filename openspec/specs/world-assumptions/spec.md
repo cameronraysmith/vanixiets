@@ -261,7 +261,7 @@ A term found to denote two distinct phenomena within this repository's vocabular
 | deploy | — | one activation, in the machine sense, of a configuration on a host, including the one each NixOS boot performs | shared |
 | deploy record | — | the entry a host writes at each deploy naming the host, the closure it activated, the closure it replaced and the time | shared |
 | closure | — | the complete built system a configuration produces for one host, identified by its store path | shared |
-| collected host | — | a host whose deploy records a collector ships to the telemetry store: magnetite, cinnabar and pyrite, and not yet stibnite | shared |
+| collected host | — | a host whose deploy records a collector ships to the telemetry store: magnetite, cinnabar, pyrite and stibnite | shared |
 | error text | — | the free-form message the build service keeps when an attribute or a build fails, which can carry compiler output and repository content | shared |
 | message body | — | the free text of a log record, as distinct from the named fields parsed out of it | shared |
 | free text | — | any value whose content is not drawn from a fixed or bounded set, such as an error message or a whole log line | world-only |
@@ -311,11 +311,18 @@ A term found to denote two distinct phenomena within this repository's vocabular
 | tab | — | one page a browser profile shows, which the person, or an agent through the relay, can open, read and act on | shared |
 | browser request | — | an agent's request to open, read or act on a page, carried out in a browser the agent runs for itself or, when the request asks for the relay, in the person's browser | shared |
 | release | agent | a version of the agent's software its publisher ships, together with the relay extension of the same version | world-only |
+| darwin host | — | an agent host that runs macOS under nix-darwin, stibnite today, whose jobs launchd starts and whose job states and disk health its probe reads, as distinct from the NixOS hosts | shared |
+| launchd job | — | a job or service a darwin host's launchd starts from its declaration, whose state, runs and last exit code launchd reports for as long as it is loaded, and of which launchd reports nothing once it is not loaded | shared |
+| kept-alive job | — | a launchd job that launchd restarts whenever it stops, so that it is expected to be running whenever its darwin host is awake | shared |
+| probe | darwin host | the job on a darwin host that once a minute, while the host is awake, reads each allow-listed launchd job's state and the host's disk health and writes them where the collector gathers them | shared |
+| sleep | — | a laptop's suspended state, in which it runs nothing and sends nothing until it wakes | world-only |
+| dark wake | — | a brief wake of a sleeping laptop for maintenance, without its panel lit, after which it sleeps again | world-only |
+| watched launchd jobs | — | the fleet's single list of launchd job labels whose state, runs and last exit code a darwin host's probe reads, each job on it an allow-listed launchd job | shared |
 
 #### Scenario: The terms with two senses are read
 
 - **WHEN** the table is read for terms that carry two senses in this repository
-- **THEN** twenty-four terms carry two senses today and are disambiguated by separate rows rather than left to context: `session`, `package`, `policy`, `@`, `mutation`, `activation`, `probe`, `machine`, `host`, `interface`, `repository`, `build service`, `database`, `hostname`, `evaluator`, `person`, `writer`, `account`, `build`, `path`, `credential`, `identifier`, `browser`, and `release`
+- **THEN** twenty-four terms carry more than one sense today and are disambiguated by separate rows rather than left to context: `session`, `package`, `policy`, `@`, `mutation`, `activation`, `probe`, `machine`, `host`, `interface`, `repository`, `build service`, `database`, `hostname`, `evaluator`, `person`, `writer`, `account`, `build`, `path`, `credential`, `identifier`, `browser`, and `release`, of which `probe` carries three and every other term two
 
 #### Scenario: A term resolves to two phenomena
 
@@ -763,3 +770,101 @@ Any requirement whose discharge depends on this fact SHALL name it explicitly, a
 
 - **WHEN** an account's `$XDG_DATA_HOME/omp` comes to exist, omp runs under a profile, or an omp release changes where `getBrowserRelayDir()` or the `extension` subfolder resolves
 - **THEN** this assumption is void, and the `browser-relay-delivery` requirements `The relay extension is present for every account that runs the agent on a macOS host` and `The loaded relay extension follows the agent release without being reloaded by hand` lose the discharge argument that the folder the fleet fills and a browser profile loads is the folder omp's relay writes
+
+### Requirement: A61 — launchd misses a StartInterval firing during sleep and coalesces missed StartCalendarInterval firings into one run at wake
+
+It is true of launchd on macOS 26.7.1, independent of what this fleet builds, that a `StartInterval` firing due during sleep is skipped, and that `StartCalendarInterval` firings missed during sleep become one run at wake, with no time-zone field.
+Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL be treated as losing its discharge once this assumption's violation condition below is observed.
+
+**Evidence**: `launchd.plist(5)` on stibnite at macOS 26.7.1, read on 2026-11-05, states at lines 441-445 that a `StartInterval` firing due while the system is asleep "will be missed due to shortcomings in kqueue(3)", and at lines 455-458 that, unlike cron, launchd starts a `StartCalendarInterval` job at the next wake and coalesces several missed intervals into one event (line numbers of the roff source `/usr/share/man/man5/launchd.plist.5`); its calendar fields are Minute, Hour, Day, Weekday and Month with no zone key, and the manual says nothing of clock or zone changes; stibnite's two calendar jobs, `harmonia-gc` daily at 03:15 and `nix-cleanup-gcroots` on Sunday at 03:30 in `America/New_York`, fall in neither the repeated nor the skipped hour of a daylight-saving change; a macOS major-version upgrade on stibnite is the event at which this manual is read again, and the absence of any `otel-envelope` run in stibnite's logs between a recorded sleep and its wake is its monitor.
+
+#### Scenario: launchd changes how it treats sleep
+
+- **WHEN** a macOS release starts a `StartInterval` job for intervals that fell due during sleep, starts a `StartCalendarInterval` job more than once at wake for coalesced firings or not at all, or adds a time zone to the calendar
+- **THEN** this assumption is void, and the `fleet-ingress-interface` requirement `No darwin collection job runs on a calendar schedule`, the `fleet-alerting` requirement `An unreachable telemetry store or a silent host freezes alerts` and the `fleet-alerting-interface` requirement `Store errors and silent hosts freeze instance state` lose the argument that a sleeping darwin host runs no collection job and that its existing calendar jobs run once per due time
+
+### Requirement: A62 — launchctl print reports a system job's state, runs and last exit code as unversioned text, and omits the exit code for some killed jobs
+
+It is true of `launchctl` on macOS 26.7.1, independent of what this fleet builds, that `launchctl print system/<label>` prints a job's `state`, `runs` and `last exit code` as unversioned text, `Could not find service` when not loaded, and for some killed jobs no exit code.
+Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL be treated as losing its discharge once this assumption's violation condition below is observed.
+
+**Evidence**: on stibnite on 2026-11-05, `launchctl print system/org.nixos.nix-daemon` printed `state = running`, `runs = 3`, `pid` and `last exit code = 0`, `launchctl print system/org.nixos.nix-cleanup-gcroots` printed `state = not running` and its calendar, and a label that is not loaded printed `Could not find service`; a read-only survey of the 441 jobs in the system domain found 98, among them the running `com.apple.tzlinkd`, that printed `last exit reason = JETSAM_REASON_MEMORY_IDLE_EXIT` and no `last exit code` line, found exit codes printed as bare integers or `(never exited)`, and found no job printing a signal; of 475 jobs in the operator's per-user domain one printed `last exit reason = JETSAM_REASON_MEMORY_PERPROCESSLIMIT` and no exit-code line; on 2026-11-07, after `kill -KILL` of `org.nixos.otelcol-process`'s pid, launchd relaunched it and `launchctl print` as `nobody` printed `runs = 2`, a new `pid`, `last terminating signal = Killed: 9` and neither a `last exit code` nor a `last exit reason` line, which the probe wrote as -1, and after `launchctl kickstart -k` it printed `last exit code = 0` (`logs/s5-evidence/8.4-signal-20261107T054220Z.log`), so a signal kill omits the exit code without naming a reason; the same text was printed to an unprivileged account as to the operator's; `launchctl(1)` says its print output is not API; the probe's parser fixtures, recorded on stibnite at macOS 26.7.1, among them that signal-killed reply as `org.nixos.signal-killed`, and `RuleSignalMissing` on the launchd selectors are its monitors, and a macOS major-version upgrade on stibnite is the event at which the fixtures are recorded again.
+
+#### Scenario: launchctl changes what it prints
+
+- **WHEN** a macOS release renames or reshapes the `state`, `runs` or `last exit code` lines, changes the answer for a label that is not loaded, or a re-recorded fixture differs from the recorded one
+- **THEN** this assumption is void, and the `fleet-ingress-interface` requirement `The darwin probe reports each allow-listed launchd job and the host's disk health in a textfile` and the `fleet-alerting` requirement `Each known failure class on a host reaches a person as an alert` lose the discharge argument that the probe's series state each launchd job's state, runs and last exit code, until the parser is rewritten against the new text
+
+### Requirement: A63 — stibnite's internal SSD answers the SMART health read without privilege at the pinned smartmontools
+
+It is true of stibnite's internal `APPLE SSD AP4096Z`, `disk0`, independent of what this fleet builds, that smartmontools 7.5's `smartctl -j -H -A disk0` returns its NVMe health log, with its overall status, critical warning and wear, to an account without administrative authority.
+Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL be treated as losing its discharge once this assumption's violation condition below is observed.
+
+**Evidence**: on 2026-11-05 at macOS 26.7.1 (25G241) on an Apple M5 Pro, smartctl 7.5 from the root pin (`NixOS/nixpkgs@3a32588c`) with exactly `-j -H -A disk0` exited 0 as `crs58` and as `nobody`, reporting protocol `NVMe`, `smart_status.passed` true, `critical_warning` 0 and `percentage_used` 0 for device `APPLE SSD AP4096Z`; the probe's own account, `_prometheus-node-exporter`, did not yet exist and is read before deploy; a smartmontools version change or a macOS major-version upgrade on stibnite is the event at which this read is repeated, and `RuleSignalMissing` on the disk-health selectors once stibnite is an expected host for them is its monitor.
+
+#### Scenario: The SSD stops answering an unprivileged read
+
+- **WHEN** a macOS update or a smartmontools bump makes the read fail without privilege, or the store holds no `smartctl_device_critical_warning_total` for stibnite while stibnite reports its memory signal
+- **THEN** this assumption is void, and the `host-metrics-collection` requirement `Each agent host contributes its own signals to the telemetry store`, the `fleet-ingress-interface` requirement `A laptop's disk health is read on the host and served on loopback` and the `fleet-alerting` requirement `Each known failure class on a host reaches a person as an alert` lose the discharge argument for stibnite's disk health
+
+### Requirement: A64 — stibnite sleeps and wakes in the dark many times a day
+
+It is true of stibnite, independent of what this fleet builds, that with Power Nap on it sleeps and wakes about 20 to 140 times a day, most of those wakes being dark wakes of seconds in which its kept-alive jobs resume briefly before it sleeps again.
+Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL be treated as losing its discharge once this assumption's violation condition below is observed.
+
+**Evidence**: on 2026-11-05 `pmset -g` on stibnite reported `sleep 1`, `standby 1`, `hibernatemode 3` and `powernap 1`, and its power log held 132 `Sleep`, 137 `Wake` and 124 `DarkWake` entries for 2026-11-03 and 92, 98 and 87 for 2026-11-04; on 2026-11-07 its power log held 37, 22, 69, 132, 92, 38 and 66 `Sleep` entries for the local days 2026-10-31 to 2026-11-06, and `pmset -g` printed `sleep 0 (sleep prevented by omp, …)`, agent sessions' power assertions keeping stibnite awake; the counts of `pmset -g log` across a lid-closed sleep and a natural overnight sleep at acceptance are its monitor, and a macOS major-version upgrade or a change of these power settings is the event at which they are counted again.
+
+#### Scenario: stibnite's sleep pattern changes
+
+- **WHEN** Power Nap is turned off or the power settings change, stibnite's power log shows a daily count of sleeps or dark wakes far outside this range, or a dark wake lasts long enough for the evaluator to see stibnite report on several consecutive passes
+- **THEN** this assumption is void, and the `fleet-alerting` requirement `An unreachable telemetry store or a silent host freezes alerts` and the `fleet-alerting-interface` requirement `Store errors and silent hosts freeze instance state` lose the argument that their pending-time and freeze cases model stibnite's sleep, until those cases are re-derived from the new pattern
+
+### Requirement: A65 — A store-built binary on stibnite reaches the ingress over ZeroTier
+
+It is true of stibnite at macOS 26.7.1, independent of what this fleet builds, that a program built in the Nix store can open a TCP connection over the ZeroTier network to the ingress on magnetite, which then refuses the connection at the TLS handshake only for want of a collection certificate.
+Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL be treated as losing its discharge once this assumption's violation condition below is observed.
+
+**Evidence**: on 2026-11-05 a store-built curl 8.22.0 on stibnite reached `[fddb:4344:343b:14b9:399:930f:39db:40d2]:4318` and was refused with `tlsv13 alert certificate required`, as `/usr/bin/curl` was, against the note at `pkgs/by-name/ntfy-send/package.nix:5-6` that darwin blocks store binaries from TCP over ZeroTier; stibnite's ZeroTier is the macOS ZeroTier One application, outside nix-darwin; the collector's own first export from stibnite after its activation is its monitor, and a macOS major-version upgrade or an endpoint-security change on stibnite is the event at which it is observed again.
+
+#### Scenario: stibnite blocks store-built programs from the overlay network
+
+- **WHEN** the store-built collector on stibnite cannot connect to the ingress while `/usr/bin/curl` can, or a macOS release or endpoint-security product blocks store-built programs from ZeroTier
+- **THEN** this assumption is void, and the `host-metrics-collection` requirements `Each agent host contributes its own signals to the telemetry store` and `A failed collection or store job notifies a person`, whose notifier on stibnite is also store-built, and the `devloop-collection-interface` requirement `Each agent host's collector ships its own deploy records` lose the argument that stibnite's signals, notices and deploy records leave the host
+
+### Requirement: A66 — ntfy refuses an anonymous post to a fleet topic from stibnite
+
+It is true of ntfy as cinnabar runs it, independent of stibnite's configuration, that a post to a `fleet-*` topic from stibnite over ZeroTier without a token is refused with 403, because cinnabar's access entries let `alerter` alone write the `fleet-*` topics and everyone else only read them.
+Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL be treated as losing its discharge once this assumption's violation condition below is observed.
+
+**Evidence**: on 2026-11-05 an anonymous POST from stibnite over ZeroTier to a `fleet-*` topic was refused with 403, under cinnabar's entries `alerter:fleet-*:rw` and `*:fleet-*:ro`, which A38 orders; so stibnite's senders need the `alerter` token, which stibnite reads as the seventh reader of the existing shared `ntfy-alerter` generator, and a compromised stibnite holding it can post to any `fleet-*` topic, as pyrite can today; the anonymous POST repeated at acceptance is its monitor, and a ntfy version change on cinnabar is the event at which it is repeated.
+
+#### Scenario: An anonymous post from stibnite is accepted
+
+- **WHEN** an anonymous post from stibnite to a `fleet-*` topic is accepted, or cinnabar's access entries for the `fleet-*` topics change
+- **THEN** this assumption is void, and the `fleet-alerting-interface` requirements `The alerter token travels only as a file` and `This capability states its own trust boundary` and the `host-metrics-collection` requirement `A failed collection or store job notifies a person` lose the argument that stibnite's notices need the `alerter` token and that holding it is the extent of stibnite's exposure
+
+### Requirement: A70 — macOS top prints a process's physical footprint as unversioned text to an unprivileged account
+
+It is true of `/usr/bin/top` on macOS 26.7.1, independent of what this fleet builds, that `top -l 1 -pid <pid> -stats pid,mem` prints a process's physical footprint as unversioned text, a MEM field with a `B`, `K`, `M` or `G` suffix, to an unprivileged account for a root-owned process too, as `top` is setuid.
+Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL be treated as losing its discharge once this assumption's violation condition below is observed.
+
+**Evidence**: on stibnite on 2026-11-06, `top(1)` described `mem` as "Physical memory footprint of the process" and `/usr/bin/top` was `-r-sr-xr-x root wheel`; run as `_otelcol` it printed `102M` for the root-owned `otelcol-process` and `134M` for the agent, where `/usr/bin/footprint` as root printed `phys_footprint: 102 MB` and `134 MB` and `ps -o rss=` 183,792 KiB and 223,664 KiB, while `/usr/bin/footprint` as `_otelcol` found no process for the root-owned pid; across all processes it printed values with the suffixes `K`, `M` and `G`, a second sample (`-l 2`) appended `+` or `-` to a changed value, and a pid that does not exist printed the header with no `PID MEM` line (`logs/s5-evidence/c5-top-recording-20261106T052605Z.log`); the recorded texts are `otel-envelope`'s fixtures, every darwin envelope run is its monitor, and a macOS major-version upgrade is the event at which it is recorded again.
+
+#### Scenario: top changes what it prints
+
+- **WHEN** a macOS release reshapes `top`'s logging-mode output or its MEM field, measures MEM other than as the physical footprint, or stops answering an unprivileged account for another account's process
+- **THEN** this assumption is void, and the `fleet-ingress-interface` requirement `otel-envelope regulates each agent from its own collector` and the `telemetry-store-interface` requirement `The telemetry store and the collector run inside a declared envelope` lose the argument that the darwin envelope bounds each collector's physical footprint, until the memory clause is rewritten against the new text; an unreadable field already fails the clause
+
+### Requirement: A77 — macOS resident size counts each process's mapped share of the shared cache, so ordinary processes read tens to hundreds of MiB
+
+It is true of macOS 26.7.1, independent of what this fleet builds, that the darwin process scraper's resident size counts mapped shared-cache pages, so ordinary daemons read 65-300 MiB, and that its process name is the kernel's `p_comm`.
+Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL be treated as losing its discharge once this assumption's violation condition below is observed.
+
+**Source**: the value is `proc_pidinfo`'s `pti_resident_size` (`contrib@v0.155.0:receiver/hostmetricsreceiver/internal/scraper/processscraper/process_scraper.go:321-326`; `gopsutil@v4.26.5:process/process_darwin.go:477-492`), and the name is `p_comm` (`process_darwin.go:65-87`).
+
+**Evidence**: stibnite's stored `process_memory_usage_bytes` from 2026-11-06T05:17Z to 21:14Z, as `regulator` (`logs/s5-evidence/cam72-stibnite-names-*.log`, `cam72-hourly-floors-*.log`), held 82 names above the 64 MiB floor, among them `WindowServer` at most 296 MiB, `corespotlightd` 243 MiB, `loginwindow` 193 MiB, `mds_stores` 135 MiB, `logd` 78 MiB and `otelcol-contrib` 230 MiB, the last against a physical footprint `top` printed as 102M and 134M (A70); the hourly distinct-name peak was 70 at 64 MiB, 43 at 128, 31 at 192, 21 at 256, 12 at 384 and 9 at 512 MiB, where pyrite peaked at 15 and magnetite at 37 at 64 MiB, and `otel-envelope` on magnetite failed B3 with `stibnite process_executable_name 63` from 15:00Z; `ps -o comm=` on stibnite showed `nix` for `org.nixos.nix-daemon`, `python3.14` for `org.nixos.omnigent-host-cameron` and `node_exporter` and `dnscrypt-proxy` as the children of their `-start` wrappers; `process.minBytes.darwin` and `process.darwinFleetExecutables` rest on it, and B3 over stibnite's rows is its monitor; a macOS major-version upgrade or a contrib pin that reports another memory figure is the event at which the distribution is read again.
+
+#### Scenario: darwin resident size no longer counts the shared cache, or names change
+
+- **WHEN** the darwin process scraper reports a figure other than `pti_resident_size`, a macOS release stops counting shared-cache pages in it, or a fleet daemon's process reports a name other than its `process.darwinFleetExecutables` entry
+- **THEN** this assumption is void, and the `host-metrics-collection` requirement `Series cardinality stays bounded` loses the argument that a 384 MiB darwin floor with the fleet's executables kept holds stibnite at or below 20 names an hour, and the argument that every fleet executable stays visible below the floor, until the distribution is measured again and the floor and map follow it

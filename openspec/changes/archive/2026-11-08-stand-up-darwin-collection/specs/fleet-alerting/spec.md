@@ -3,10 +3,18 @@
 ### Requirement: Each known failure class on a host reaches a person as an alert
 
 A person SHALL be told by an alert naming the alert rule and the host when, on a host that reports to the telemetry store, memory pressure holds, the kernel kills a process for memory, a storage pool is not online, a unit restarts more than 5 times in 15 minutes, a unit no notifier reports has failed, a source the collector reads stops answering, a file system is nearly full, or a laptop's disk is failing or worn.
-On a darwin host the same SHALL hold when a kept-alive job is not running, an allow-listed launchd job is not loaded, a launchd job no notifier reports has a non-zero last exit code, a launchd job starts more than 5 times in 15 minutes, or the probe's readings stop being refreshed or cannot be read.
-Memory alerts SHALL name the three processes holding the most memory on that host.
 
 **Discharged by**: `fleet-alerting-interface` requirements `The evaluator queries each rule's database as the regulators' store account`, `Alert rules are rendered from one Nix source to the evaluator and to promtool`, `Alerts are posted to fleet-alerts with a title and a severity priority` and `ntfy counts each mesh client as its own visitor`, and `fleet-ingress-interface` requirements `The darwin probe reports each allow-listed launchd job and the host's disk health in a textfile` and `A laptop's disk health is read on the host and served on loopback`, resting on world assumptions `A33 — The fleet's notification service on cinnabar is reachable over ZeroTier and is the single delivery path`, `A40 — ntfy rate-limits a client by its address masked to a prefix, taken from a trusted proxy's forwarding header`, `A41 — caddy reaches ntfy from ::1 and forwards the mesh client's address`, `A51 — pyrite's NVMe controller answers the SMART health log at the pinned smartmontools`, `A62 — launchctl print reports a system job's state, runs and last exit code as unversioned text, and omits the exit code for some killed jobs` and `A63 — stibnite's internal SSD answers the SMART health read without privilege at the pinned smartmontools`; `checks.x86_64-linux.fleet-alert` with its fixture sequence, its darwin legs and `promtool` pass, the replay of the new rules over stored history before they ship, the deploy-time watch of each rule's signal that `A missing signal is itself reported` states, and the operator's recorded stop of a kept-alive job on stibnite at acceptance, discharge it.
+
+#### Scenario: The failure classes of a darwin host
+
+- **WHEN** a darwin host reports to the telemetry store
+- **THEN** On a darwin host the same SHALL hold when a kept-alive job is not running, an allow-listed launchd job is not loaded, a launchd job no notifier reports has a non-zero last exit code, a launchd job starts more than 5 times in 15 minutes, or the probe's readings stop being refreshed or cannot be read.
+
+#### Scenario: A memory alert names the processes behind it
+
+- **WHEN** memory pressure holds, or the kernel kills a process for memory, on a host that reports to the telemetry store
+- **THEN** Memory alerts SHALL name the three processes holding the most memory on that host.
 
 #### Scenario: A storage pool degrades
 
@@ -97,9 +105,13 @@ Memory alerts SHALL name the three processes holding the most memory on that hos
 
 While the telemetry store does not answer the evaluator's queries on one database, no alert instance read from that database SHALL resolve or be repeated, alert instances read from databases that answer SHALL keep being evaluated, and a person SHALL be told, naming the database, once queries on it have failed for 3 minutes.
 While a host reports no memory signal, no alert instance for that host SHALL resolve or be repeated, and each SHALL resume once the host reports again.
-An alert instance that has not yet fired SHALL count toward its holding time only passes after its host last resumed reporting, so a condition seen before a laptop's sleep SHALL fire only once it has held for its holding time while the laptop reports.
 
 **Discharged by**: `fleet-alerting-interface` requirement `Store errors and silent hosts freeze instance state`, resting on world assumptions `A61 — launchd misses a StartInterval firing during sleep and coalesces missed StartCalendarInterval firings into one run at wake` and `A64 — stibnite sleeps and wakes in the dark many times a day`; `checks.x86_64-linux.fleet-alert`'s store-error, `devloop`-failure, silent-host, `pendingAcrossFreeze` and `pendingAfterWake` fixture legs, its store-freeze, host-freeze and `allDatabasesFreeze` mutants, and its property test against the reference model's store and host freezes and its holding-time restart discharge it; the scenario "A freeze ends with the condition gone" is discharged by the same check's `storeThawLeg` and `hostThawLeg` fixture legs and its `test_resolve_follows_unfrozen_absence` property over `transition.jq` and the reference model; the operator's recorded suspend of stibnite and the logs of its next overnight sleep discharge the sleep scenarios at acceptance.
+
+#### Scenario: A pending alert instance counts its holding time from its host's return
+
+- **WHEN** an alert instance that has not yet fired was seen before its host stopped reporting, and the host reports again
+- **THEN** An alert instance that has not yet fired SHALL count toward its holding time only passes after its host last resumed reporting, so a condition seen before a laptop's sleep SHALL fire only once it has held for its holding time while the laptop reports.
 
 #### Scenario: The telemetry store stops answering
 

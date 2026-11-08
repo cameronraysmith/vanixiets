@@ -97,9 +97,13 @@ The machine SHALL declare the alert rules once in `modules/nixos/fleet-alert/rul
 ### Requirement: Each rule's presence selector is watched
 
 Each rule's presence selector SHALL be the bare metric name of its expression, except `up{job="node"}` for `LocalExporterDown`, and the evaluator SHALL raise `RuleSignalMissing`, `warning`, for a rule whose selector has returned no series for 30 min while an expected host reports `system_memory_usage_bytes`.
-A rule's expected hosts SHALL be the hosts of `flake.lib.observabilityHosts` whose `collect` is true and that write its selector, as the scenarios below state: those whose `platform` is `nixos`, those with `smartDevices`, those whose `platform` is `darwin`, or all of them.
 
 **Discharged by**: `checks.x86_64-linux.fleet-alert`'s signal-gap fixture legs, with its legs `linuxSelectorDarwinOnly`, `stibniteNotCollecting`, `darwinSignalMissing` and `nvmeExpectsStibnite`; `fleet-ingress-interface` requirement `One host table declares the agent hosts and what each reports`, whose assertion compares each row's `platform` with the inventory's `machineClass`; the operator's recorded observation that no `RuleSignalMissing` fires within 30 min of the evaluator's first run with the fleet's expected hosts, with its negative control, and within 30 min of the deploy that adds the darwin rules.
+
+#### Scenario: A rule's expected hosts are drawn from the host table
+
+- **WHEN** a rule's expected hosts are computed
+- **THEN** A rule's expected hosts SHALL be the hosts of `flake.lib.observabilityHosts` whose `collect` is true and that write its selector, as the scenarios below state: those whose `platform` is `nixos`, those with `smartDevices`, those whose `platform` is `darwin`, or all of them.
 
 #### Scenario: Expected hosts follow each host's platform
 
@@ -156,9 +160,13 @@ A rule's expected hosts SHALL be the hosts of `flake.lib.observabilityHosts` who
 When a query fails or times out, the evaluator SHALL stop querying that database for the run, leave unchanged every instance whose rule reads it, keep evaluating rules on databases that answered, and raise `StoreQueryFailing`.
 A database whose queries the run's query deadline did not reach SHALL count as failed for that run.
 While a host returns no `system_memory_usage_bytes`, the evaluator SHALL leave every instance labelled with that host unchanged, as the scenarios below state.
-A `pending` instance that was frozen on the previous run and is not frozen on this one SHALL have its `activeSince` set to this run, so its `for` counts only runs on which its database answers and its host reports.
 
 **Discharged by**: `checks.x86_64-linux.fleet-alert`'s store-error, `devloop`-failure, silent-host, `pendingAcrossFreeze` and `pendingAfterWake` fixture legs, its store-freeze, host-freeze and `allDatabasesFreeze` mutants, and its property test against the reference model's per-database store freeze, host freeze and pending restart, whose two-database property was shown failing against the all-freeze transition before the change and whose `pendingAcrossFreeze` leg was shown failing against the transition that kept pending time across a freeze; the operator's recorded suspend of stibnite at acceptance.
+
+#### Scenario: A pending instance's `for` restarts after a freeze
+
+- **WHEN** a `pending` instance was frozen on the previous run and is not frozen on this one
+- **THEN** A `pending` instance that was frozen on the previous run and is not frozen on this one SHALL have its `activeSince` set to this run, so its `for` counts only runs on which its database answers and its host reports.
 
 #### Scenario: A database's queries fail
 
@@ -218,9 +226,13 @@ A `pending` instance that was frozen on the previous run and is not frozen on th
 ### Requirement: The alerter token travels only as a file
 
 The `ntfy-alerter` generator, shared by magnetite, cinnabar, pyrite, electrum, galena, scheelite and stibnite, SHALL hold only the `alerter` token, as `token` with mode `0400`, owned on stibnite by `_otelcol`, and SHALL gain a reader only through `clan vars fix`, never by being generated again; the per-machine `ntfy-alerter-env` generator, declared on cinnabar only, SHALL derive `ntfy-env` from that token.
-`ntfy-send` SHALL, when `NTFY_TOKEN_FILE` is set, send `Authorization: Bearer` with that file's token without placing it on curl's argument list, and every `fleet-*` publisher, stibnite's notifier wrapper among them, SHALL pass the token to it through `NTFY_TOKEN_FILE`.
 
 **Discharged by**: `checks.<system>.package-ntfy-send-test-token-transport` with its argv mutant; the resolve-hook assertion in `observability-notify.nix`, shown able to fail by an `extendModules` override; `checks.x86_64-linux.otel-collector-darwin`'s notifier wrapper cases over a recording `ntfy-send`; the vars step's records of the decrypted token's sha256 before and after stibnite is added as a reader; the cutover order, resting on world assumption `A39 — ntfy refuses a request whose token it does not know, even where anonymous access is allowed`; the `alerter`-authenticated heartbeat requests recorded during the cutover; once `*:fleet-*:ro` is in force, the forced failure notice delivered with `alerter` and regulator R9.3's `AlertEvaluatorSilent`, both of which ntfy refuses without the token; and stibnite's refused anonymous post and accepted wrapper post at acceptance, resting on world assumption `A66 — ntfy refuses an anonymous post to a fleet topic from stibnite`.
+
+#### Scenario: A `fleet-*` publisher passes the token to `ntfy-send`
+
+- **WHEN** a `fleet-*` publisher posts through `ntfy-send`
+- **THEN** `ntfy-send` SHALL, when `NTFY_TOKEN_FILE` is set, send `Authorization: Bearer` with that file's token without placing it on curl's argument list, and every `fleet-*` publisher, stibnite's notifier wrapper among them, SHALL pass the token to it through `NTFY_TOKEN_FILE`.
 
 #### Scenario: The sender is run with a recording curl
 

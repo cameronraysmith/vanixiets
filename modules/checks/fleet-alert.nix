@@ -1570,8 +1570,7 @@
       };
       stibniteNotCollecting = {
         name = "stibniteNotCollecting: stibnite, not collecting and the only host reporting, with every selector but host memory absent for 35 min, raises nothing";
-        # Explicit, so the leg keeps its meaning once the host table drops
-        # stibnite's collect = false.
+        # Explicit, so the leg holds whatever stibnite's row says.
         rules = onlyStibniteRules { collect = false; };
         steps = stibniteOnlySteps (lib.remove "system_memory_usage_bytes" selectors);
         expect = [ ];

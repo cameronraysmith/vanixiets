@@ -138,9 +138,9 @@ magnetite's collector SHALL run `journald/gitea-mq` with `units: [gitea-mq.servi
 
 ### Requirement: Each agent host's collector ships its own deploy records
 
-Each agent host's collector SHALL read `/var/log/deploy-record.jsonl` through `file_log/deploy-record`, defined in the agent role, with `start_at: beginning`, `storage: file_storage` and `json_parser`, keeping `host`, `closure`, `previous_closure` and `ts`, under the receiver id and settings magnetite used before, so magnetite's stored offset carries over.
+Each agent host's collector SHALL read `/var/log/deploy-record.jsonl` through `file_log/deploy-record`, defined in the agent role for NixOS hosts and in `flake.lib.otelCollectorDarwin`'s agent configuration for darwin hosts, with `start_at: beginning`, `storage: file_storage` and `json_parser`, keeping `host`, `closure`, `previous_closure` and `ts`, under the receiver id and settings magnetite used before, so magnetite's stored offset carries over.
 
-**Discharged by**: `devloop-reconcile`'s comparison of deploy records on magnetite; `vmTests.x86_64-linux.devloop-ingest`'s first-start case; `vmTests.x86_64-linux.fleet-ingress`'s delivery case; the operator's line-count comparison at each agent host's first deploy.
+**Discharged by**: `devloop-reconcile`'s comparison of deploy records on magnetite; `vmTests.x86_64-linux.devloop-ingest`'s first-start case; `vmTests.x86_64-linux.fleet-ingress`'s delivery case; `checks.x86_64-linux.otel-collector-darwin`'s `otelcol-contrib validate` case over the rendered darwin agent configuration; the operator's line-count comparison at each agent host's first deploy or activation.
 
 #### Scenario: The receiver reads another file
 
@@ -161,6 +161,16 @@ Each agent host's collector SHALL read `/var/log/deploy-record.jsonl` through `f
 
 - **WHEN** cinnabar and pyrite are first deployed with the agent role
 - **THEN** the operator records, for each, the line count of its `/var/log/deploy-record.jsonl` and its `deploy_record` row count, and a difference is a finding
+
+#### Scenario: The darwin agent configuration is rendered
+
+- **WHEN** `flake.lib.otelCollectorDarwin`'s agent configuration is evaluated
+- **THEN** its `logs/devloop-deploy_record` pipeline takes `file_log/deploy-record` through `resource/devloop-deploy_record` with the deploy-record keep-list rendered from the devloop allow-list and ends in `otlp_http/ingress-logs`, and `otel-collector-darwin` validates the configuration with the root pin's `otelcol-contrib`
+
+#### Scenario: stibnite is first activated with the agent
+
+- **WHEN** stibnite is first activated with its collector after its `collect` is set
+- **THEN** the operator records the line count of stibnite's `/var/log/deploy-record.jsonl`, which `flake.modules.darwin.deploy-record` has appended to since before stibnite had a collector, and stibnite's `deploy_record` row count, and a difference is a finding
 
 ### Requirement: The devloop tables are pre-created with keys, a time index and deduplication
 
@@ -378,7 +388,12 @@ This capability SHALL state what its properties guarantee and what they do not, 
 #### Scenario: A guarantee about other hosts is sought
 
 - **WHEN** someone asks whether deploys on hosts other than magnetite reach `devloop` and are reconciled
-- **THEN** the answer is no for reconciliation: every NixOS agent host ships its records through the ingress, but `devloop-reconcile` compares magnetite's alone, the darwin machines ship none until they run collectors of their own, and the snippets are held by the build-time check only on the five x86_64-linux NixOS machines
+- **THEN** the answer is no for reconciliation: every NixOS agent host and stibnite ship their records through the ingress, but `devloop-reconcile` compares magnetite's alone, stibnite's are compared only by the operator at its first activation, the darwin machines without a collector ship none until they run collectors of their own, and the snippets are held by the build-time check only on the five x86_64-linux NixOS machines
+
+#### Scenario: A guarantee about a sleeping host's records is sought
+
+- **WHEN** someone asks whether a deploy record stibnite writes reaches `devloop` while stibnite sleeps or is off the mesh
+- **THEN** the answer is no: stibnite's collector sends nothing while it sleeps or cannot reach the ingress, and its records arrive only after it is awake and reaches the ingress again
 
 #### Scenario: A guarantee about a record's host is sought
 

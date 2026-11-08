@@ -8,9 +8,13 @@
 ### Requirement: One host table declares the agent hosts and what each reports
 
 `flake.lib.observabilityHosts` SHALL map each agent host to its `platform`, `collect`, `alwaysOn`, `notifiedUnits` and `smartDevices`, and the collector's `agent` role machines and whether each collects, each host's notified units, the evaluator's always-on hosts, expected hosts by platform and `SystemdUnitFailed` exclusion, and the devices whose disk health is read SHALL be read from it.
-Each row's `platform`, `nixos` or `darwin`, SHALL equal the `machineClass` that `modules/clan/inventory/machines.nix` gives the same machine.
 
 **Discharged by**: the agent role's per-host assertions with their `extendModules` overrides; the `otel-collector` inventory instance's platform assertion with its scratch-edit control; `checks.x86_64-linux.fleet-alert`'s exclusion, absence and platform legs.
+
+#### Scenario: Each row's platform follows the inventory
+
+- **WHEN** `flake.lib.observabilityHosts` and `modules/clan/inventory/machines.nix` are evaluated
+- **THEN** Each row's `platform`, `nixos` or `darwin`, SHALL equal the `machineClass` that `modules/clan/inventory/machines.nix` gives the same machine.
 
 #### Scenario: The table is evaluated
 
@@ -35,9 +39,13 @@ Each row's `platform`, `nixos` or `darwin`, SHALL equal the `machineClass` that 
 ### Requirement: The collection CA issues each agent host one certificate
 
 The clan vars generator `otel-ca` SHALL be shared, with `ca.key` never deployed and `ca.crt` public, and `otel-cert` SHALL issue each agent host a P-256 certificate signed by it, valid 3650 days, with CN the machine name and `extendedKeyUsage=clientAuth`, or on the ingress host `serverAuth,clientAuth` with `IP:<flake.lib.hosts.magnetite.zt>` and `DNS:magnetite.zt` as SANs.
-On a darwin agent host the key SHALL be owned by `_otelcol` with mode `0400` and declared without `restartUnits`, and the agent's plist SHALL carry the certificate's sha256 as `OTEL_CERT_SHA256`, so a reissued certificate reloads the agent.
 
 **Discharged by**: the plan's `openssl` reading of each issued certificate and its hash check after every vars step; `vmTests.x86_64-linux.fleet-ingress`'s refusal and delivery cases; stibnite's evaluation of the agent role's `darwinModule`; the operator's reading of the darwin key's owner and mode after stibnite's routine activation.
+
+#### Scenario: A darwin agent host's certificate is wired to its agent
+
+- **WHEN** `otel-cert` is declared on a darwin agent host
+- **THEN** On a darwin agent host the key SHALL be owned by `_otelcol` with mode `0400` and declared without `restartUnits`, and the agent's plist SHALL carry the certificate's sha256 as `OTEL_CERT_SHA256`, so a reissued certificate reloads the agent.
 
 #### Scenario: The ingress host's certificate is read
 
@@ -67,9 +75,13 @@ On a darwin agent host the key SHALL be owned by `_otelcol` with mode `0400` and
 ### Requirement: Each agent exports by its role
 
 On the ingress host the agent's pipelines SHALL end in `forward`, and on every other agent host, darwin included, in `otlp_http/ingress` for metrics and `otlp_http/ingress-logs` for logs, each to `https://[${flake.lib.hosts.magnetite.zt}]:4318` with its `otel-cert`, `ca_file` the `otel-ca` certificate, `min_version: "1.3"`, a `file_storage` queue of 400 MiB and 16 MiB with the `bytes` sizer, and retry without a time limit.
-On a darwin agent host the 150 MiB `memory_limiter` with a 30 MiB spike allowance SHALL be the agent's only memory bound inside the process, because launchd bounds no memory.
 
 **Discharged by**: the agent role's queue assertion with its `extendModules` override; the darwin fragment's queue assertions with their `extendModules` overrides; `checks.x86_64-linux.otel-collector-darwin`'s exporter-address clause with its mutant `exporterAddressOther`; `vmTests.x86_64-linux.fleet-ingress`'s delivery and back-pressure cases; the measured queue rate at cinnabar's first deploy; the exporter's sent points at stibnite's first activation, resting on world assumption `A65 — A store-built binary on stibnite reaches the ingress over ZeroTier`.
+
+#### Scenario: A darwin agent's memory is bounded inside the process
+
+- **WHEN** a darwin agent host's collector is configured
+- **THEN** On a darwin agent host the 150 MiB `memory_limiter` with a 30 MiB spike allowance SHALL be the agent's only memory bound inside the process, because launchd bounds no memory.
 
 #### Scenario: An agent's queue is evaluated
 
@@ -104,10 +116,18 @@ On a darwin agent host the 150 MiB `memory_limiter` with a 30 MiB spike allowanc
 ### Requirement: otel-envelope regulates each agent from its own collector
 
 Every agent host SHALL run `otel-envelope` every 5 minutes, failing when its collector's telemetry at `127.0.0.1:8888` or a declared scrape target is unanswered on two consecutive runs, an exporter's queue reaches 90% of its capacity, or a loss counter increased, an absent loss counter reading as zero, as the scenarios state.
-On a NixOS host it SHALL run as `otel-envelope.service`; on a darwin host as `org.nixos.otel-envelope`, a `StartInterval = 300` job run as `_otelcol` under `observability-notify-run`, which SHALL also fail when `org.nixos.otelcol`'s physical footprint exceeds 256 MiB or `org.nixos.otelcol-process`'s exceeds 128 MiB, or when either running job's footprint cannot be read within 10 seconds.
-The footprint, the kernel's own accounting of a process's memory, is the measure, because the resident size also counts the file-backed pages of the mapped collector binary.
 
 **Discharged by**: `checks.x86_64-linux.otel-envelope` with its mutants, its darwin cases and its mutants `c5WrongPid`, `c5ReadsRss` and `c5UnreadablePasses`; `checks.x86_64-linux.otel-collector-darwin`'s wrapper cases; `vmTests.x86_64-linux.fleet-ingress`'s loss, back-pressure, crash-loop and long-running cases; the operator's stopped-collector and stopped-exporter controls on cinnabar and stopped-collector control on stibnite; resting on world assumption `A70 — macOS top prints a process's physical footprint as unversioned text to an unprivileged account`.
+
+#### Scenario: The envelope runs as each platform's job
+
+- **WHEN** `otel-envelope` is installed on an agent host
+- **THEN** On a NixOS host it SHALL run as `otel-envelope.service`; on a darwin host as `org.nixos.otel-envelope`, a `StartInterval = 300` job run as `_otelcol` under `observability-notify-run`, which SHALL also fail when `org.nixos.otelcol`'s physical footprint exceeds 256 MiB or `org.nixos.otelcol-process`'s exceeds 128 MiB, or when either running job's footprint cannot be read within 10 seconds.
+
+#### Scenario: The darwin envelope measures the physical footprint
+
+- **WHEN** the darwin envelope reads a running job's memory
+- **THEN** The footprint, the kernel's own accounting of a process's memory, is the measure, because the resident size also counts the file-backed pages of the mapped collector binary.
 
 #### Scenario: The loss counters are read
 
@@ -167,9 +187,13 @@ The footprint, the kernel's own accounting of a process's memory, is the measure
 ### Requirement: A laptop's disk health is read on the host and served on loopback
 
 On each host whose `smartDevices` is non-empty, its disk health SHALL be read on that host and reach its collector on loopback under smartctl_exporter's metric names, filtered by SC's smartctl keep-list.
-On a NixOS host `prometheus-smartctl-exporter` SHALL serve it on `127.0.0.1:9633` with `MemoryMax=64M`, granting `smartctl-exporter-access` read and write on each device before every start; on a darwin host the probe SHALL write `smartctl -j -H -A <device>` into `smartctl.prom`, typing as a counter each field the exporter declares a counter, for the loopback node_exporter to serve.
 
 **Discharged by**: R3.1's loopback clause; `otel-envelope`'s target clause; `checks.x86_64-linux.otel-collector-darwin`'s smartctl fixture; the operator's stored SMART reads on pyrite and stibnite after their deploys, resting on world assumptions `A51 — pyrite's NVMe controller answers the SMART health log at the pinned smartmontools` and `A63 — stibnite's internal SSD answers the SMART health read without privilege at the pinned smartmontools`.
+
+#### Scenario: Each platform serves the disk health its own way
+
+- **WHEN** a host whose `smartDevices` is non-empty is configured
+- **THEN** On a NixOS host `prometheus-smartctl-exporter` SHALL serve it on `127.0.0.1:9633` with `MemoryMax=64M`, granting `smartctl-exporter-access` read and write on each device before every start; on a darwin host the probe SHALL write `smartctl -j -H -A <device>` into `smartctl.prom`, typing as a counter each field the exporter declares a counter, for the loopback node_exporter to serve.
 
 #### Scenario: pyrite is deployed
 

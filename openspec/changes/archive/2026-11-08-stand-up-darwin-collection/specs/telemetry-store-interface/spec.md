@@ -45,11 +45,19 @@ On a darwin agent host the collector SHALL scrape only node_exporter on `127.0.0
 ### Requirement: The collector's configuration bounds what it gathers
 
 The machine SHALL configure each agent host's collector so that per-process memory carries no per-process identifier and covers only processes holding at least the host platform's floor, 64 MiB on a NixOS host and 384 MiB on a darwin host, and node_exporter's series pass a keep-list.
-On a NixOS host per-unit signals SHALL cover the `schema.nix` allow-list with at most 40 matching units besides `observability-notify@` instances, paging SHALL report usage only, and file systems SHALL cover the host's ZFS mountpoints.
-On a darwin host the `disk` and `filesystem` scrapers SHALL include only `disk0` and `/System/Volumes/Data` by `strict` match, per-process memory SHALL be gathered only by the root `otelcol-process`, and the fleet's own executables named in `schema.nix`'s `process.darwinFleetExecutables` SHALL be kept below the floor, as the scenarios state.
 The ingress host's `otel-envelope` SHALL regulate ADR-004's 30 process names per host.
 
 **Discharged by**: the evaluation-time collector check (R3.1) with its mutants; the agent module's assertions with their overrides; `checks.x86_64-linux.otel-collector-darwin`'s clauses with their mutants `seventhIdentityAttribute`, `processEndpoint`, `diskIncludeAll` and `otlpFeedsLogs`, and its `fleetKeptBelowFloor` case with the mutant `keepListIgnored`; the darwin fragment's assertion that each long-running `org.nixos.*` daemon matches exactly one glob of `process.darwinFleetExecutables`; nixpkgs' build-time `otelcol-contrib validate` and the darwin check's `otelcol-contrib validate`; `fleet-ingress-interface` requirement `otel-envelope on the ingress host regulates the fleet budget`; resting, for the darwin floor, on world assumption `A77 — macOS resident size counts each process's mapped share of the shared cache, so ordinary processes read tens to hundreds of MiB`.
+
+#### Scenario: A NixOS host's collector is configured
+
+- **WHEN** a NixOS host's collector is configured
+- **THEN** On a NixOS host per-unit signals SHALL cover the `schema.nix` allow-list with at most 40 matching units besides `observability-notify@` instances, paging SHALL report usage only, and file systems SHALL cover the host's ZFS mountpoints.
+
+#### Scenario: A darwin host's collector is configured
+
+- **WHEN** a darwin host's collector is configured
+- **THEN** On a darwin host the `disk` and `filesystem` scrapers SHALL include only `disk0` and `/System/Volumes/Data` by `strict` match, per-process memory SHALL be gathered only by the root `otelcol-process`, and the fleet's own executables named in `schema.nix`'s `process.darwinFleetExecutables` SHALL be kept below the floor, as the scenarios state.
 
 #### Scenario: The collector check runs with its mutants
 
@@ -99,10 +107,14 @@ The ingress host's `otel-envelope` SHALL regulate ADR-004's 30 process names per
 ### Requirement: The telemetry store and the collector run inside a declared envelope
 
 The machine SHALL run `greptimedb.service` under the static user `greptimedb` with `MemoryHigh=3G`, `MemoryMax=4G`, `MemorySwapMax=0`, `OOMScoreAdjust=500` and a lower `CPUWeight`, magnetite's collector with `MemoryMax=512M` and `OOMScoreAdjust=300`, below the build service's evaluator at 900, and other NixOS agents' collectors with `MemoryMax=256M`.
-On a darwin host, which launchd bounds in no memory, the agent SHALL run with a 150 MiB `memory_limiter` and 30 MiB spike and `otelcol-process` with 64 MiB and 16 MiB, and the darwin `otel-envelope` SHALL fail above 256 MiB and 128 MiB of physical footprint, the kernel's own accounting, which unlike the resident size excludes the mapped binary's clean file-backed pages.
 The dataset `zroot/root/greptimedb` SHALL carry `quota=16G`, `reservation=12G` and `com.sun:auto-snapshot=false`, applied or asserted at boot.
 
 **Discharged by**: the evaluation-time envelope check (R7.1) with its mutants, the agent role's limiter assertion on every NixOS host without the ingress role, `checks.x86_64-linux.otel-collector-darwin`'s clauses over stibnite's evaluated darwin fragment with the mutants `agentLimiterRaised`, `processSpikeRaised`, `c5LimitsSwapped` and `c5AgentLimitChanged`, `checks.x86_64-linux.otel-envelope`'s darwin memory cases with the mutants `c5WrongPid`, `c5ReadsRss` and `c5UnreadablePasses`, the hourly envelope regulator, the on-demand OOM-order test, and the operator's 24-hour memory measurement on stibnite, resting on world assumption `A70 — macOS top prints a process's physical footprint as unversioned text to an unprivileged account`.
+
+#### Scenario: A darwin host's agent is bounded in memory
+
+- **WHEN** a darwin host's agent, `otelcol-process` and `otel-envelope` are configured
+- **THEN** On a darwin host, which launchd bounds in no memory, the agent SHALL run with a 150 MiB `memory_limiter` and 30 MiB spike and `otelcol-process` with 64 MiB and 16 MiB, and the darwin `otel-envelope` SHALL fail above 256 MiB and 128 MiB of physical footprint, the kernel's own accounting, which unlike the resident size excludes the mapped binary's clean file-backed pages.
 
 #### Scenario: The evaluation-time envelope check runs with its mutants
 
@@ -152,10 +164,14 @@ The dataset `zroot/root/greptimedb` SHALL carry `quota=16G`, `reservation=12G` a
 ### Requirement: Credentials exist only as activation-resolved files owned by non-worker users
 
 Every store credential, every `otel-cert` key and every darwin host's copy of the `alerter` token SHALL reach its consumer as a file resolved when its host's configuration is activated, readable only by its owner, owned by no omnigent worker account, and absent from the configuration that produced it.
-Replacing the account file SHALL restart the telemetry store, replacing the `collector` password or a NixOS host's `otel-cert` SHALL restart that host's collector, replacing a darwin host's `otel-cert` SHALL reload `org.nixos.otelcol` through its plist, and replacing the `perses` password SHALL restart `perses.service`.
 On a darwin host `otelcol-process` SHALL hold no credential.
 
 **Discharged by**: the evaluation-time ownership check (R8.2) with its mutant, magnetite's credential-holder assertion (R8.2), which admits `fleet-alert`, `devloop-reconcile` and `otel-envelope` as `regulator-password` holders and `perses` as the `perses-password` holder, the evaluation-time envelope check (R7.1) with its restart-on-rotation mutant, the `otel-cert` generator's `restartUnits` on NixOS, the darwin agent's `OTEL_CERT_SHA256`, `perses-password`'s `restartUnits`, `checks.x86_64-linux.otel-collector-darwin`'s no-credential clause on `otelcol-process`, and the operator's reading of the darwin files' owner and mode after stibnite's routine activation.
+
+#### Scenario: A credential is replaced
+
+- **WHEN** the account file, a password or an `otel-cert` is replaced
+- **THEN** Replacing the account file SHALL restart the telemetry store, replacing the `collector` password or a NixOS host's `otel-cert` SHALL restart that host's collector, replacing a darwin host's `otel-cert` SHALL reload `org.nixos.otelcol` through its plist, and replacing the `perses` password SHALL restart `perses.service`.
 
 #### Scenario: The credential files are evaluated
 
@@ -226,9 +242,13 @@ The machine SHALL rewrite each `omnigent-host-<owner>.service` unit name to `omn
 ### Requirement: Failure notices are posted to one topic
 
 The machine SHALL define `observability-notify@.service` in `flake.modules.nixos.observability-notify` on every NixOS agent host, posting through the one `ntfy-send` package to `fleet-alerts` with the `alerter` token and logging each posted `FAILED` in `/var/lib/observability-notify/failed.log`, and SHALL set `OnFailure=observability-notify@%n.service` on the units the scenarios below name.
-On every darwin agent host `org.nixos.otel-envelope` SHALL run under `observability-notify-run`, which posts `FAILED <label> on <host>` and `RESOLVED <label> on <host>` through the same posting code and `ntfy-send` to `fleet-alerts` with the `alerter` token, at most one `FAILED` per label per 900 s, appending each posted `FAILED` to `/var/lib/otel-envelope/notify.log`, the log path its caller names.
 
 **Discharged by**: the failure-wiring clause and notifier rehearsal of the evaluation-time collector check (R3.1) with their mutants, the agent role's notified-unit assertion on every NixOS agent host, `checks.<system>.package-ntfy-send-test-token-transport` with its argv mutant, the resolve-hook assertion in `observability-notify.nix`, shown able to fail by an `extendModules` override, `checks.x86_64-linux.otel-collector-darwin`'s wrapper cases with the mutant `postEveryFailure`, and the operator's recorded deliveries.
+
+#### Scenario: The darwin envelope posts through the notifier wrapper
+
+- **WHEN** `org.nixos.otel-envelope` runs on a darwin agent host
+- **THEN** On every darwin agent host `org.nixos.otel-envelope` SHALL run under `observability-notify-run`, which posts `FAILED <label> on <host>` and `RESOLVED <label> on <host>` through the same posting code and `ntfy-send` to `fleet-alerts` with the `alerter` token, at most one `FAILED` per label per 900 s, appending each posted `FAILED` to `/var/lib/otel-envelope/notify.log`, the log path its caller names.
 
 #### Scenario: Each named unit has the failure handler
 

@@ -915,13 +915,13 @@ clan-metadata:
 [group('observability')]
 [positional-arguments]
 obs-promql *args:
-  {{nix_cmd}} run --no-warn-dirty .#obs-query -- promql "$@"
+  @{{nix_cmd}} run --no-warn-dirty .#obs-query -- promql "$@"
 
 # SQL against a database of magnetite's telemetry store: just obs-sql <db> [--table] '<sql>'
 [group('observability')]
 [positional-arguments]
 obs-sql db *args:
-  {{nix_cmd}} run --no-warn-dirty .#obs-query -- sql "$@"
+  @{{nix_cmd}} run --no-warn-dirty .#obs-query -- sql "$@"
 
 ## docs
 

@@ -3,9 +3,13 @@
 ### Requirement: Each agent host contributes its own signals to the telemetry store
 
 The collector on each provisioned agent host SHALL write that host's memory, per-process memory and file-system signals, a laptop's disk health, on each agent host other than a darwin host its compressed swap, unit, storage-pool and out-of-memory signals, on a darwin host the state of its launchd jobs, and on magnetite the signals its services publish about themselves, to the `fleet` database, gathering each from a source on that host.
-The collector SHALL write only series to the `fleet` database, no log records and no traces; the dev-loop records it writes are required by `devloop-collection`.
 
 **Discharged by**: `telemetry-store-interface` requirements `Ingest is OTLP over HTTP with a database header`, `Scrape targets are reached on loopback` and `The collector's configuration bounds what it gathers`, and `fleet-ingress-interface` requirements `The ingress receiver accepts only certificate holders on magnetite's ZeroTier address`, `Each agent exports by its role`, `A laptop's disk health is read on the host and served on loopback` and `The darwin probe reports each allow-listed launchd job and the host's disk health in a textfile`, resting on world assumptions `A50 — electrum, galena and scheelite exist only while provisioned on demand`, `A51 — pyrite's NVMe controller answers the SMART health log at the pinned smartmontools`, `A62 — launchctl print reports a system job's state, runs and last exit code as unversioned text, and omits the exit code for some killed jobs`, `A63 — stibnite's internal SSD answers the SMART health read without privilege at the pinned smartmontools` and `A65 — A store-built binary on stibnite reaches the ingress over ZeroTier`; the evaluation-time regulator over magnetite's collector configuration, the darwin collector check over stibnite's rendered collector configurations, the agent role's assertions, the darwin agent's assertions, the container runtime tests and the operator's confirmation at each host's first deploy or activation discharge it.
+
+#### Scenario: The collector writes only series to the fleet database
+
+- **WHEN** the collector writes to the `fleet` database
+- **THEN** The collector SHALL write only series to the `fleet` database, no log records and no traces; the dev-loop records it writes are required by `devloop-collection`.
 
 #### Scenario: magnetite's collector configuration is evaluated
 
@@ -92,9 +96,13 @@ Every series the collector writes SHALL carry the name of the host it was gather
 
 The collector SHALL bound how many series each signal produces on each agent host, and no per-process signal SHALL carry an identifier that changes with each process started, such as its process number or command line.
 The collector's signals about itself SHALL carry no identifier that changes with each start of the collector.
-On a darwin host the collector SHALL report the state of at most 30 launchd jobs, each named on the fleet's list of watched launchd jobs, and no launchd job's signal SHALL carry its process number.
 
 **Discharged by**: `telemetry-store-interface` requirement `The collector's configuration bounds what it gathers` and `fleet-ingress-interface` requirements `otel-envelope on the ingress host regulates the fleet budget` and `The darwin probe reports each allow-listed launchd job and the host's disk health in a textfile`; the evaluation-time regulator over magnetite's collector configuration and its mutants, the agent role's assertions, the collector module's assertion that the per-process identifiers are disabled, the darwin collector check's per-process and probe cases with their mutants, the darwin process floor of 384 MiB with the fleet executables kept below it, resting on world assumption `A77 — macOS resident size counts each process's mapped share of the shared cache, so ordinary processes read tens to hundreds of MiB`, the hourly budget regulator with its container-test fixtures, and the operator's count of stibnite's stored names over its first day discharge it.
+
+#### Scenario: A darwin host's launchd jobs are bounded
+
+- **WHEN** the collector on a darwin host reports its launchd jobs
+- **THEN** On a darwin host the collector SHALL report the state of at most 30 launchd jobs, each named on the fleet's list of watched launchd jobs, and no launchd job's signal SHALL carry its process number.
 
 #### Scenario: The bounds are evaluated
 
@@ -211,9 +219,13 @@ The collector SHALL store the name of each Omnigent worker's unit or launchd job
 ### Requirement: A failed collection or store job notifies a person
 
 A failure of the collector or of its periodic regulator on any agent host, or on magnetite of the telemetry store, the unit that sets up its databases, its hourly envelope regulator, or any unit that applies or confirms a disk-share setting, SHALL produce, from that host, a failure notice on the fleet's notification service naming the failed unit and the host.
-On a darwin host, whose launchd hands no failure to the notifier, a failure of the collector SHALL produce, from that host, a failure notice naming the periodic regulator that finds it and the host, and a stopped or failed launchd job of the collector SHALL reach a person as an alert.
 
 **Discharged by**: `telemetry-store-interface` requirements `Failure notices are posted to one topic`, which posts with the notification service's credential, and `A failure episode ends at the unit's next successful start or exit`, `fleet-ingress-interface` requirements `One host table declares the agent hosts and what each reports` and `otel-envelope regulates each agent from its own collector`, and `fleet-alerting` requirement `Each known failure class on a host reaches a person as an alert`, resting on world assumptions `A33 — The fleet's notification service on cinnabar is reachable over ZeroTier and is the single delivery path`, `A37 — ntfy provisions users, access entries and tokens from its declaration, and refuses to start on an undeclared user` and `A66 — ntfy refuses an anonymous post to a fleet topic from stibnite`; the evaluation-time collector regulator's failure-wiring case with its mutants, the agent role's notified-unit assertion on every agent host, `checks.<system>.package-ntfy-send-test-token-transport`, the resolve-hook assertion in `observability-notify.nix`, shown able to fail by an `extendModules` override, and the darwin collector check's notifier cases with their mutant, discharge that every unit of the kinds named here hands its failure to the notifier with the credential; the operator's recorded deliveries discharge the rest.
+
+#### Scenario: A darwin host's collector fails
+
+- **WHEN** the collector, or a launchd job of the collector, fails or stops on a darwin host
+- **THEN** On a darwin host, whose launchd hands no failure to the notifier, a failure of the collector SHALL produce, from that host, a failure notice naming the periodic regulator that finds it and the host, and a stopped or failed launchd job of the collector SHALL reach a person as an alert.
 
 #### Scenario: A watched unit fails at first activation
 
