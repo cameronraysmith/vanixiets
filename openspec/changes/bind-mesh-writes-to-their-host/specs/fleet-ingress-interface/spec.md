@@ -3,10 +3,28 @@
 ### Requirement: One host table declares the agent hosts and what each reports
 
 `flake.lib.observabilityHosts` SHALL map each agent host to its `platform`, `collect`, `alwaysOn`, `notifiedUnits` and `smartDevices`, `flake.lib.hosts` SHALL give each agent host's overlay address as its `zt` attribute, and the collector's `agent` role machines and whether each collects, each host's notified units, the evaluator's always-on hosts, expected hosts by platform and `SystemdUnitFailed` exclusion, and the devices whose disk health is read SHALL be read from it.
-Each row's `platform`, `nixos` or `darwin`, SHALL equal the `machineClass` that `modules/clan/inventory/machines.nix` gives the same machine.
-Each agent host's `zt` address SHALL equal its second source, `vars/shared/zerotier-ip-<host>-zerotier/ip/value` for a clan ZeroTier peer and the controller's `externalMembers` entry of the same name for an external member, SHALL lie in the rfc4193 /88 formed from the network id in `vars/shared/zerotier-network-zerotier/network-id/value`, and SHALL be lower case and equal to its own canonical RFC 5952 rendering; the ingress's identity map, its binding filters and its pinned neighbour entries SHALL be rendered from these two tables.
 
 **Discharged by**: the agent role's per-host assertions with their `extendModules` overrides; `checks.x86_64-linux.otel-collector-config`'s address clause with its mutants `addressDigitChanged` and `externalAddressDiffers`; the `otel-collector` inventory instance's platform assertion with its scratch-edit control; `checks.x86_64-linux.fleet-alert`'s exclusion, absence and platform legs.
+
+#### Scenario: Each row's platform follows the inventory
+
+- **WHEN** `flake.lib.observabilityHosts` and `modules/clan/inventory/machines.nix` are evaluated
+- **THEN** Each row's `platform`, `nixos` or `darwin`, SHALL equal the `machineClass` that `modules/clan/inventory/machines.nix` gives the same machine.
+
+#### Scenario: Each agent host's overlay address equals its second source
+
+- **WHEN** `flake.lib.hosts` and each agent host's ZeroTier vars file or `externalMembers` entry are evaluated
+- **THEN** Each agent host's `zt` address SHALL equal its second source, `vars/shared/zerotier-ip-<host>-zerotier/ip/value` for a clan ZeroTier peer and the controller's `externalMembers` entry of the same name for an external member.
+
+#### Scenario: Each agent host's overlay address is canonical and inside the network
+
+- **WHEN** `flake.lib.hosts` and `vars/shared/zerotier-network-zerotier/network-id/value` are evaluated
+- **THEN** Each agent host's `zt` address SHALL lie in the rfc4193 /88 formed from the network id in `vars/shared/zerotier-network-zerotier/network-id/value`, and SHALL be lower case and equal to its own canonical RFC 5952 rendering.
+
+#### Scenario: The ingress's rendered tables follow the host tables
+
+- **WHEN** the ingress's configuration is rendered from `flake.lib.observabilityHosts` and `flake.lib.hosts`
+- **THEN** The ingress's identity map, its binding filters and its pinned neighbour entries SHALL be rendered from these two tables.
 
 #### Scenario: The table is evaluated
 
@@ -36,10 +54,18 @@ Each agent host's `zt` address SHALL equal its second source, `vars/shared/zerot
 ### Requirement: The collection CA issues each agent host one certificate
 
 The clan vars generator `otel-ca` SHALL be shared, with `ca.key` never deployed and `ca.crt` public, and `otel-cert` SHALL issue each agent host a P-256 certificate signed by it, valid 3650 days, with CN the machine name, the URI SAN `spiffe://vanixiets/host/<machine>` and `extendedKeyUsage=clientAuth`, or on the ingress host `serverAuth,clientAuth` with the same URI SAN followed by `IP:<flake.lib.hosts.magnetite.zt>` and `DNS:magnetite.zt`.
-On a darwin agent host the key SHALL be owned by `_otelcol` with mode `0400` and declared without `restartUnits`, and the agent's plist SHALL carry the certificate's sha256 as `OTEL_CERT_SHA256`, so a reissued certificate reloads the agent.
-Each agent host's `networking.hostName`, which its agent stamps as `host.name` and its deploy records as `host`, SHALL equal the machine name its URI SAN carries.
 
 **Discharged by**: the plan's `openssl` reading of each issued certificate and its hash check after every vars step; the agent role's host-name assertion on NixOS and darwin with its `extendModules` override `hostNameDiffers`; `vmTests.x86_64-linux.fleet-ingress`'s refusal and delivery cases; stibnite's evaluation of the agent role's `darwinModule`; the operator's reading of the darwin key's owner and mode after stibnite's routine activation.
+
+#### Scenario: A darwin agent host's certificate is wired to its agent
+
+- **WHEN** `otel-cert` is declared on a darwin agent host
+- **THEN** On a darwin agent host the key SHALL be owned by `_otelcol` with mode `0400` and declared without `restartUnits`, and the agent's plist SHALL carry the certificate's sha256 as `OTEL_CERT_SHA256`, so a reissued certificate reloads the agent.
+
+#### Scenario: Each agent host's name is the one its certificate names
+
+- **WHEN** an agent host's configuration is evaluated
+- **THEN** Each agent host's `networking.hostName`, which its agent stamps as `host.name` and its deploy records as `host`, SHALL equal the machine name its URI SAN carries.
 
 #### Scenario: The ingress host's certificate is read
 
@@ -74,10 +100,14 @@ Each agent host's `networking.hostName`, which its agent stamps as `host.name` a
 ### Requirement: The ingress receiver accepts only certificate holders on magnetite's ZeroTier address
 
 On the ingress host, caddy SHALL be the only listener on `[${flake.lib.hosts.magnetite.zt}]:4318`, serving TLS 1.3 only with magnetite's `otel-cert` and requiring a client certificate that verifies against `otel-ca`, and TCP 4318 SHALL be open on `zt+` only.
-The collector's `otlp/mesh` SHALL be an OTLP/HTTP receiver on the Unix socket `/run/otelcol-mesh/otlp.sock` with `include_metadata: true`, in a directory owned by `root:otelcol-mesh` with mode 2770, where `otelcol-mesh` is held only by the collector's unit and caddy's account, so no other account on magnetite can connect to it; caddy SHALL forward every accepted request to it unchanged except for the identity header it sets.
 No collector endpoint SHALL be off loopback.
 
 **Discharged by**: R3.1's endpoint clause in `checks.x86_64-linux.otel-collector-config` with its mutants; magnetite's socket-group assertion over every unit's `Group` and `SupplementaryGroups` and every account's `extraGroups`, with its `extendModules` override `extraSocketMember`; the vendored probe's socket case; `vmTests.x86_64-linux.fleet-ingress`'s refusal and socket-access cases; the operator's refused request from stibnite at deploy.
+
+#### Scenario: The collector's mesh receiver is a socket only caddy and the collector reach
+
+- **WHEN** magnetite's collector and caddy are configured
+- **THEN** The collector's `otlp/mesh` SHALL be an OTLP/HTTP receiver on the Unix socket `/run/otelcol-mesh/otlp.sock` with `include_metadata: true`, in a directory owned by `root:otelcol-mesh` with mode 2770, where `otelcol-mesh` is held only by the collector's unit and caddy's account, so no other account on magnetite can connect to it; caddy SHALL forward every accepted request to it unchanged except for the identity header it sets.
 
 #### Scenario: The endpoint is evaluated
 

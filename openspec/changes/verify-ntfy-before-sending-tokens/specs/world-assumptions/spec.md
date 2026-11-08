@@ -208,20 +208,34 @@ A term found to denote two distinct phenomena within this repository's vocabular
 | dashboard group | — | the group of people the identity provider lets into the dashboard service | shared |
 | admitted person | — | a person the identity provider has let into the dashboard service as a member of the dashboard group | shared |
 | identity provider | — | the service that authenticates the fleet's people and tells another service who they are and whether to let them in, Kanidm here | shared |
-| browser | — | the program on a person's own device through which the person views the dashboard service | world-only |
+| browser | dashboard | the program on a person's own device through which the person views the dashboard service | world-only |
+| browser | relay | the program on a host of the fleet, Helium, in which the person works with their own browser profiles, signed-in sites and browser extensions such as the password manager | shared |
+| browser profile | — | one separate set of a browser's signed-in sites, browser extensions and their settings, of which a person may keep several in one browser | shared |
+| browser extension | — | a program a browser profile runs alongside the pages it shows, with the access to them the person grants it | shared |
+| password manager | — | the browser extension, Bitwarden here, from which the person fills their stored sign-in details into sites | world-only |
+| browser policy | — | a setting imposed on a browser from outside it, which the person cannot change from within that browser | shared |
+| relay | — | the part of the agent that listens on the person's host for the relay extension and passes the agent's browser requests to it | shared |
+| relay extension | — | the browser extension through which the relay drives tabs of the person's browser, published with each agent release | shared |
+| extension folder | — | the one folder in an account's private home from which a browser profile loads the relay extension and into which the relay writes a newer release of it | shared |
+| unpacked load | — | the person's act, once in a browser profile, of telling the browser to run a browser extension from a folder on the host rather than from the browser's extension catalogue | world-only |
+| extension identity | — | the identifier a browser assigns a loaded browser extension, under which a browser profile keeps that extension's settings and permissions | shared |
+| tab | — | one page a browser profile shows, which the person, or an agent through the relay, can open, read and act on | shared |
+| browser request | — | an agent's request to open, read or act on a page, carried out in a browser the agent runs for itself or, when the request asks for the relay, in the person's browser | shared |
+| release | agent | a version of the agent's software its publisher ships, together with the relay extension of the same version | world-only |
 | darwin host | — | an agent host that runs macOS under nix-darwin, stibnite today, whose jobs launchd starts and whose job states and disk health its probe reads, as distinct from the NixOS hosts | shared |
 | launchd job | — | a job or service a darwin host's launchd starts from its declaration, whose state, runs and last exit code launchd reports for as long as it is loaded, and of which launchd reports nothing once it is not loaded | shared |
 | kept-alive job | — | a launchd job that launchd restarts whenever it stops, so that it is expected to be running whenever its darwin host is awake | shared |
 | probe | darwin host | the job on a darwin host that once a minute, while the host is awake, reads each allow-listed launchd job's state and the host's disk health and writes them where the collector gathers them | shared |
 | sleep | — | a laptop's suspended state, in which it runs nothing and sends nothing until it wakes | world-only |
 | dark wake | — | a brief wake of a sleeping laptop for maintenance, without its panel lit, after which it sleeps again | world-only |
+| watched launchd jobs | — | the fleet's single list of launchd job labels whose state, runs and last exit code a darwin host's probe reads, each job on it an allow-listed launchd job | shared |
 | service authority | — | the private key that signs the certificates of the fleet's mesh-only names, `ntfy.zt` among them, together with the root certificate that identifies it, both kept as cinnabar's encrypted clan vars from which cinnabar's caddy loads them | shared |
 | verified connection | — | a connection to a mesh-only name on which the connecting host has checked that the server's certificate chains to a root the repository keeps, so that only a holder of the service authority's key can answer it | shared |
 
 #### Scenario: The terms with two senses are read
 
 - **WHEN** the table is read for terms that carry two senses in this repository
-- **THEN** twenty-two terms carry more than one sense today and are disambiguated by separate rows rather than left to context: `session`, `package`, `policy`, `@`, `mutation`, `activation`, `probe`, `machine`, `host`, `interface`, `repository`, `build service`, `database`, `hostname`, `evaluator`, `person`, `writer`, `account`, `build`, `path`, `credential`, and `identifier`, of which `probe` carries three and every other term two
+- **THEN** twenty-four terms carry more than one sense today and are disambiguated by separate rows rather than left to context: `session`, `package`, `policy`, `@`, `mutation`, `activation`, `probe`, `machine`, `host`, `interface`, `repository`, `build service`, `database`, `hostname`, `evaluator`, `person`, `writer`, `account`, `build`, `path`, `credential`, `identifier`, `browser`, and `release`, of which `probe` carries three and every other term two
 
 #### Scenario: A term resolves to two phenomena
 
