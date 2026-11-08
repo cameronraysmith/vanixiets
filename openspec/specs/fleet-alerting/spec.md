@@ -15,7 +15,7 @@ A person SHALL be told by an alert naming the alert rule and the host when, on a
 #### Scenario: The failure classes of a darwin host
 
 - **WHEN** a darwin host reports to the telemetry store
-- **THEN** On a darwin host the same SHALL hold when a kept-alive job is not running, an allow-listed launchd job is not loaded, a launchd job no notifier reports has a non-zero last exit code, a launchd job starts more than 5 times in 15 minutes, or the probe's readings stop being refreshed or cannot be read.
+- **THEN** On a darwin host the same SHALL hold when a kept-alive job is not running, an allow-listed launchd job is not loaded, a launchd job no notifier reports has a non-zero last exit code, counted for a kept-alive job only within 30 minutes after launchd last started it, a launchd job starts more than 5 times in 15 minutes, or the probe's readings stop being refreshed or cannot be read.
 
 #### Scenario: A memory alert names the processes behind it
 
@@ -86,6 +86,16 @@ A person SHALL be told by an alert naming the alert rule and the host when, on a
 
 - **WHEN** stibnite's envelope fails and its last exit code stays non-zero
 - **THEN** the person receives the notifier's failure notice for the envelope and no alert for the same failure, which the build-time alert regulator confirms by replaying that exit code
+
+#### Scenario: A kept-alive job runs again after an abnormal exit
+
+- **WHEN** stibnite's kept-alive job `org.nixos.nix-daemon` ends without an exit code, launchd starts it again, and it keeps running with that end as its last exit
+- **THEN** one alert titled `[FIRING] LaunchdJobFailed stibnite` is posted 5 minutes after the start and one titled `[RESOLVED] LaunchdJobFailed stibnite` about 35 minutes after it, with no action by the operator, which the build-time alert regulator's `keptAliveRestarted` leg confirms from replayed results and the replay over stibnite's stored history of 2026-11-08 confirms against the store
+
+#### Scenario: A kept-alive job crashes
+
+- **WHEN** stibnite's kept-alive job `org.nixos.otelcol-process` is killed and launchd starts it again
+- **THEN** one alert titled `[FIRING] LaunchdJobFailed stibnite` is posted 5 minutes after the start, which the build-time alert regulator's `keptAliveCrashed` leg confirms from replayed results, and a job that launchd cannot keep running is reported as not running or as relaunching in a loop instead
 
 #### Scenario: A launchd job relaunches in a loop
 
