@@ -15,11 +15,12 @@
 #   and post only with NTFY_TOKEN_FILE naming the fixture credential, and
 #   the alert posts of the leg must equal its list; the two-database leg
 #   also requires the server to record each rule's query once on its path
-#   and database. The nine runtime mutants (no state write, `for` 0, no
+#   and database. The ten runtime mutants (no state write, `for` 0, no
 #   store freeze, no absence freeze, no update of when each host last
 #   reported, every query sent to fleet, every instance frozen when any
-#   database fails, magnetite the only always-on host, and
-#   LaunchdJobNotRunning's unloaded arm without its kept-alive exclusion)
+#   database fails, magnetite the only always-on host,
+#   LaunchdJobNotRunning's unloaded arm without its kept-alive exclusion,
+#   and LaunchdJobFailed without its kept-alive arm's launch window)
 #   must each produce a non-empty failure list; the store freezes only the
 #   instances of the database that failed (review F7). The legs about pyrite render
 #   the host table with its `collect` forced each way, so they hold whatever
@@ -63,9 +64,11 @@
 # The fixture server cannot evaluate PromQL,
 # so the SystemdUnitFailed exclusion leg replays only the failed units the
 # rendered exclusion regex keeps, matched here with the full-match
-# semantics PromQL uses for `!~`, and LaunchdJobNotRunning's legs replay
+# semantics PromQL uses for `!~`, LaunchdJobNotRunning's legs replay
 # the probe's four state series for one label as the rendered expression's
-# two arms select them (design D9; tasks.md 8.3a).
+# two arms select them (design D9; tasks.md 8.3a), and LaunchdJobFailed's
+# legs replay one job's last exit and the minute its launch count last
+# rose as that expression's two arms select it (CAM-92 design D3).
 # Nor can it run SQL: vmTests.x86_64-linux.devloop-ingest's burnRule case
 # runs PullRequestQueueWaitBurn's query on GreptimeDB 1.2.1 (design D1, D16).
 { self, lib, ... }:
@@ -1585,18 +1588,73 @@
       # step unless the leg says otherwise, so its instances are not frozen.
       darwinSeries = alert: extra: fixtures.series.${alert} // extra;
       onStibnite = step: { reporting = [ "stibnite" ]; } // step;
-      # LaunchdJobFailed's exclusion as rendered, matched with the
-      # full-match semantics PromQL uses for `!~`; none while no rule or no
-      # exclusion is rendered, so the fixture then answers every label set.
-      launchdKeeps =
+      # LaunchdJobFailed's arms as a rule list renders them: `excluded`, the
+      # exclusion of the arm that judges a job by its last exit alone, and
+      # `relaunched`, null when the expression has no second arm, else the
+      # kept-alive regex, the notified exclusion and the window in minutes of
+      # the arm that judges a kept-alive job only while its launch count rose
+      # within that window. A rendered expression of another shape fails the
+      # evaluation.
+      failedArms =
+        rulesList:
         let
-          rule = lib.findFirst (r: r.alert == "LaunchdJobFailed") null evaluatorRules;
-          m = if rule == null then null else builtins.match ''.*launchd_label!~"([^"]*)".*'' rule.expr;
+          rule = lib.findFirst (
+            r: r.alert == "LaunchdJobFailed"
+          ) (throw "fleet-alert check: no LaunchdJobFailed rule") rulesList;
+          m = builtins.match ''launchd_job_last_exit_code[{]launchd_label!~"([^"]*)"[}] != 0( or [(]launchd_job_last_exit_code[{]launchd_label=~"([^"]*)", launchd_label!~"([^"]*)"[}] != 0 and on [(]host_name, launchd_label[)] increase[(]launchd_job_runs_total[[]([0-9]+)m[]][)] > 0[)])?'' rule.expr;
         in
-        labels: m == null || builtins.match (builtins.head m) labels.launchd_label == null;
+        if m == null then
+          throw "fleet-alert check: LaunchdJobFailed's expression has an unmodelled shape: ${rule.expr}"
+        else
+          {
+            excluded = builtins.elemAt m 0;
+            relaunched =
+              if builtins.elemAt m 1 == null then
+                null
+              else
+                {
+                  kept = builtins.elemAt m 2;
+                  notified = builtins.elemAt m 3;
+                  window = lib.toInt (builtins.elemAt m 4);
+                };
+          };
+      # The store's answer to that expression at minute n over the probe's
+      # series of some jobs, each { label; exit; launchedAt ? null; }, the
+      # minute its launch count last rose: each arm selects with the
+      # full-match semantics PromQL uses for `=~` and `!~`, the launch count
+      # rose within the window when the launch is less than the window before
+      # n, and the answer is the arms' union.
+      failedAnswer =
+        rulesList: n: jobs:
+        let
+          arms = failedArms rulesList;
+          matches = re: label: builtins.match re label != null;
+          launchedWithin =
+            window: job: (job.launchedAt or null) != null && n >= job.launchedAt && n - job.launchedAt < window;
+          judged =
+            job:
+            job.exit != 0
+            && (
+              !matches arms.excluded job.label
+              || (
+                arms.relaunched != null
+                && matches arms.relaunched.kept job.label
+                && !matches arms.relaunched.notified job.label
+                && launchedWithin arms.relaunched.window job
+              )
+            );
+        in
+        map (job: darwinSeries "LaunchdJobFailed" { launchd_label = job.label; }) (
+          builtins.filter judged jobs
+        );
       failedOn =
         label:
-        builtins.filter launchdKeeps [ (darwinSeries "LaunchdJobFailed" { launchd_label = label; }) ];
+        failedAnswer evaluatorRules 0 [
+          {
+            inherit label;
+            exit = 1;
+          }
+        ];
 
       darwinSignalMissing = {
         name = "darwinSignalMissing: stibnite reporting host memory with no launchd_job_state for 30 min, the other launchd selectors present, raises one RuleSignalMissing for LaunchdJobNotRunning";
@@ -1724,6 +1782,43 @@
         ) (lib.range 0 15);
         expect = [ "5 [FIRING] LaunchdJobFailed stibnite default" ];
       };
+      # One job whose last exit is `exit` from minute 0, its launch count
+      # last rising at minute 0, answered on minutes 0 to `last`.
+      failedSinceLaunch = rulesList: label: exit: last: {
+        rules = rulesList;
+        steps = map (
+          n:
+          onStibnite {
+            at = minute n;
+            series.LaunchdJobFailed = failedAnswer rulesList n [
+              {
+                inherit label exit;
+                launchedAt = 0;
+              }
+            ];
+          }
+        ) (lib.range 0 last);
+      };
+      # The nix-daemon abort of 2026-11-08: launchd relaunched the job, which
+      # runs, and kept its abnormal exit as the last one.
+      keptAliveRestarted =
+        rulesList:
+        failedSinceLaunch rulesList "org.nixos.nix-daemon" (-1) 40
+        // {
+          name = "keptAliveRestarted: nix-daemon relaunched at minute 0 after an abnormal exit, running since with its last exit still -1, fires one LaunchdJobFailed stibnite at 5 and resolves once at 34, 30 min after its launch and 5 min after it was last seen";
+          expect = [
+            "5 [FIRING] LaunchdJobFailed stibnite default"
+            "34 [RESOLVED] LaunchdJobFailed stibnite default"
+          ];
+        };
+      keptAliveCrashed = failedSinceLaunch evaluatorRules "org.nixos.otelcol-process" (-1) 10 // {
+        name = "keptAliveCrashed: otelcol-process relaunched at minute 0 after a SIGKILL, its last exit -1 for 10 min, fires one LaunchdJobFailed stibnite at 5";
+        expect = [ "5 [FIRING] LaunchdJobFailed stibnite default" ];
+      };
+      notKeptAliveHeld = failedSinceLaunch evaluatorRules "org.nixos.harmonia-gc" 1 40 // {
+        name = "notKeptAliveHeld: harmonia-gc, not kept alive, launched at minute 0 and exiting 1, fires one LaunchdJobFailed stibnite at 5 and stays firing through minute 40";
+        expect = [ "5 [FIRING] LaunchdJobFailed stibnite default" ];
+      };
       # nix-grpc-daemon relaunched once a minute from minute -3, so its
       # 15 min increase exceeds 5 on minutes 3 to 7, after which it stays up.
       restartLoop = {
@@ -1799,6 +1894,9 @@
         envelopeUnloaded
         envelopeFailedNotReported
         harmoniaFailedReported
+        (keptAliveRestarted evaluatorRules)
+        keptAliveCrashed
+        notKeptAliveHeld
         restartLoop
         probeStaleLeg
         nvmeExpectsStibnite
@@ -2014,6 +2112,26 @@
             evaluator = realEvaluator;
             config = checkConfig rulesList;
             legs = [ (keptAliveUnloaded rulesList) ];
+          };
+        # CAM-92's defect restored: a kept-alive job's abnormal last exit
+        # counted for as long as the relaunched job runs.
+        failedIgnoresLaunch =
+          let
+            rulesList = map (
+              r:
+              if r.alert == "LaunchdJobFailed" then
+                r
+                // {
+                  expr = ''launchd_job_last_exit_code{launchd_label!~"${(failedArms evaluatorRules).relaunched.notified}"} != 0'';
+                }
+              else
+                r
+            ) evaluatorRules;
+          in
+          {
+            evaluator = realEvaluator;
+            config = checkConfig rulesList;
+            legs = [ (keptAliveRestarted rulesList) ];
           };
       };
 

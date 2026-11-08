@@ -1,12 +1,12 @@
 ---
 title: Fleet observability and CCV feedback-loop charter
-status: charter v29
-date: 2026-11-06
+status: charter v31
+date: 2026-11-08
 ---
 
 # Fleet observability and CCV feedback-loop charter
 
-Charter version: v29.
+Charter version: v31.
 A revision is a version bump with a dated entry under "Revision history"; the text of an earlier version is never edited in place.
 
 ## Objective
@@ -419,3 +419,9 @@ A research unit that meets ambiguity returns it in its questions section; the or
   - Notices: a failed `observability-notify@` unit is reported by `SystemdUnitFailed` once ntfy returns (#3737, CAM-84); a deploy's switch can stop a timer's run in flight and post one `FAILED` for it, as magnetite's deploy did to a `fleet-alert.service` run on 2026-11-06 (CAM-85).
   - Operating rules (O1, O2): every clan vars command carries `CLAN_NO_COMMIT=1`, so the vars are committed with jj in the change's own commit; a darwin host is activated with `just activate` from a worktree detached at `origin/main`, or, by the operator's choice of 2026-11-06, from the primary checkout when it differs from `main@origin` only under `openspec/` and `logs/`.
   - Amended in place: ADR-003's status line (:10), item 22 (:109 to :111, which no longer sets or routes by `service.name`, because the darwin process points enter the agent's `metrics/host` pipeline through its `otlp` receiver), item 23 (:113), Consequences (:213), Operating envelope (:227 to :229), R3.1 (:239, :243 to :246, whose darwin clauses and `launchctl print` fixtures live in `checks.x86_64-linux.otel-collector-darwin`, not `otel-collector-config`), R3.2 (:248, :249), failure notification (:258) and Implementation surface (:295, :297, :299); ADR-004's status line (:11), signal table (:56), launchd keep-list (:96, the exit-code rule as deployed: 0 after a jetsam idle exit, -1 after a signal kill or for a non-integer field, otherwise the code), launchd allow-list (:122, :123) and Consequences (:190 to :192); ADR-009's status line (:16), item 17 (:106, :107) and the `LaunchdJobNotRunning` and `LaunchdJobFailed` rows (:133, :134); `components/otel-collector.md` (:35 to :38, :51, :83, :89, :104 to :106, :123, :124, :126, :133, :134); `components/host-probes.md` (:56, :57, :59, :68, :80, :81, :88, :89, :111); `components/fleet-alert.md` (:18, :87, :88); `pkgs/by-name/ntfy-send/package.nix`'s note; the collector's README; `modules/README.md`; and the operator runbook `packages/docs/src/content/docs/development/operations/fleet-observability.md`.
+
+- v31 (2026-11-08): the decision of CAM-92 (`openspec/changes/resolve-a-restarted-kept-alive-jobs-failure/`), the operator's O2 of 2026-11-08; no earlier text is edited beyond the status, date and version lines, and this charter's D1–D9, the requirements and the acceptance criteria are unchanged.
+  - `LaunchdJobFailed` for a kept-alive job (O2; design D1, D2): on 2026-11-08 at 03:13:49Z an activation that changed only `/etc/nix/nix.conf` sent `SIGHUP` to `org.nixos.nix-daemon` on stibnite, nix 2.35.3 aborted during static destruction (NixOS/nix#16517, in no released nix), and launchd relaunched the daemon with `Abort trap: 6` as its last exit, which the probe writes as -1; the rule read that exit for as long as the daemon ran, so its instance could resolve only after an operator's `kickstart -k`, as acceptance 8.4's did on 2026-11-07. A kept-alive job's non-zero last exit now counts only while `increase(launchd_job_runs_total[30m]) > 0` for the same host and label, so a crash fires after 5 min and resolves about 35 min after the relaunch; a job that is not kept alive keeps the rule as before, a job that stays down is `LaunchdJobNotRunning`'s and a crash loop `LaunchdJobRestartLoop`'s. GreptimeDB 1.2.1's `increase` counts a reset of the launch count to a positive value, as Prometheus does.
+  - The probe is unchanged (O3 rejected), so `launchd_job_last_exit_code` still states launchd's last exit as found.
+  - The nix follow-up (design D4): when a nix release carrying NixOS/nix#16517 reaches nixpkgs, `modules/system/nix-package.nix` moves from `nixVersions.nix_2_35` to `nixVersions.latest`; nix is not built in the fleet.
+  - Amended in place: ADR-009's status line, its `LaunchdJobFailed` row, Consequences and Q10's resolution; `components/fleet-alert.md` (:28, :88); and the operator runbook's `LaunchdJobFailed` row and "Clearing a crashed kept-alive job".

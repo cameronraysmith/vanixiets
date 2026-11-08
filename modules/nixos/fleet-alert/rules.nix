@@ -33,8 +33,11 @@
 # unloaded, running 0 and unloaded 1, is one instance, not two (tasks.md
 # 8.3a). LaunchdJobFailed excludes the darwin hosts'
 # notifiedUnits as org.nixos.<unit>, which post their own notices, so one
-# failure is reported once. `alwaysOn` lists the collecting hosts marked
-# always-on, whose own silence it reports: one absent from
+# failure is reported once; a kept-alive job's abnormal last exit stays
+# launchd's last exit while the relaunched job runs, so its arm counts it
+# only while the job's run count rose in the last 30 min, and the instance
+# resolves once the job has run that long (CAM-92). `alwaysOn` lists the
+# collecting hosts marked always-on, whose own silence it reports: one absent from
 # system_memory_usage_bytes for 10 min while the store answers raises it
 # with that host_name and no `for` (ADR-009 item 16, charter v20).
 #
@@ -200,7 +203,7 @@
         }
         {
           alert = "LaunchdJobFailed";
-          expr = ''launchd_job_last_exit_code{launchd_label!~"${selfNotified}"} != 0'';
+          expr = ''launchd_job_last_exit_code{launchd_label!~"${selfNotified}|${keptAlive}"} != 0 or (launchd_job_last_exit_code{launchd_label=~"${keptAlive}", launchd_label!~"${selfNotified}"} != 0 and on (host_name, launchd_label) increase(launchd_job_runs_total[30m]) > 0)'';
           for = "5m";
           severity = "warning";
           annotations.summary = "A launchd job's last exit was not clean";
