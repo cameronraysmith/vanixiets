@@ -142,8 +142,10 @@
           extraPackages = [ pkgs.zfs ];
         };
 
-        # ZFS-backed container storage
-        virtualisation.containers.storage.settings = {
+        # ZFS-backed storage for rootful podman only: rootless podman also reads
+        # the common storage.conf drop-in, and cannot use the root-owned dataset
+        # or paths, so it keeps its per-user defaults.
+        virtualisation.containers.storage.rootful.settings = {
           storage.driver = "zfs";
           storage.graphroot = "/var/lib/containers/storage";
           storage.runroot = "/run/containers/storage";
