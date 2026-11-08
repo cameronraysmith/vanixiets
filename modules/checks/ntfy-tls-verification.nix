@@ -13,7 +13,9 @@
 # included, so a file that only mentions one beside ntfy.zt is declared a
 # non-client with its reason.
 # Each mutant changes one copy of the tree and runs only its clause.
-{ lib, ... }:
+# The same check judges flake.lib.caddyRootCheck, which cinnabar runs weekly,
+# against chains served by openssl s_server on loopback (design D6).
+{ config, lib, ... }:
 {
   perSystem =
     { pkgs, system, ... }:
@@ -66,6 +68,7 @@
               nativeBuildInputs = [
                 pkgs.gawk
                 pkgs.gnugrep
+                pkgs.openssl
               ];
             }
             ''
@@ -98,6 +101,56 @@
               mutant clientMissing B "is missing" "rm $ns"
               mutant cacertDropped B "passes no --cacert" "sed -i 's/ --cacert \"\$NTFY_CACERT\"//' $ns"
               mutant undeclaredClient C modules/x/post.sh "mkdir -p modules/x && printf 'curl --cacert ca https://ntfy.zt/x\n' > modules/x/post.sh"
+
+              # Root-check legs (design D6): a root, an intermediate under it and a leaf
+              # for ntfy.zt, served by openssl s_server on loopback; validities relative to
+              # this build's clock. The values related are the served chain against the
+              # bundle, and the bundle's first root's notAfter against the clock.
+              mkroot() {
+                openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:prime256v1 -nodes -keyout "$1.key" -sha256 -days "$2" \
+                  -subj "/CN=$1" -addext basicConstraints=critical,CA:TRUE,pathlen:1 -addext keyUsage=critical,keyCertSign,cRLSign -out "$1.crt" 2>/dev/null
+                openssl req -new -newkey ec -pkeyopt ec_paramgen_curve:prime256v1 -nodes -keyout "$1-int.key" -subj "/CN=$1 int" -out "$1-int.csr" 2>/dev/null
+                printf 'basicConstraints=critical,CA:TRUE,pathlen:0\nkeyUsage=critical,keyCertSign,cRLSign\n' > int.ext
+                openssl x509 -req -in "$1-int.csr" -CA "$1.crt" -CAkey "$1.key" -CAcreateserial -days 30 -extfile int.ext -out "$1-int.crt" 2>/dev/null
+                openssl req -new -newkey ec -pkeyopt ec_paramgen_curve:prime256v1 -nodes -keyout "$1-leaf.key" -subj "/CN=ntfy.zt" -out "$1-leaf.csr" 2>/dev/null
+                printf 'subjectAltName=DNS:ntfy.zt\nextendedKeyUsage=serverAuth\n' > leaf.ext
+                openssl x509 -req -in "$1-leaf.csr" -CA "$1-int.crt" -CAkey "$1-int.key" -CAcreateserial -days 7 -extfile leaf.ext -out "$1-leaf.crt" 2>/dev/null
+              }
+              cd "$(mktemp -d)"
+              mkroot r1 400; mkroot r2 400; mkroot r3 100
+              cat r1.crt r2.crt > overlap.crt
+              # serve ROOT PORT: serves ROOT's leaf with its intermediate on 127.0.0.1:PORT.
+              serve() { openssl s_server -quiet -accept "127.0.0.1:$2" -cert "$1-leaf.crt" -key "$1-leaf.key" -cert_chain "$1-int.crt" -www & sleep 0.5; }
+              serve r1 18441; serve r2 18442; serve r3 18443
+              # LEG_CA and LEG_ADDR, not BUNDLE and CONNECT, which shellcheck's SC2153
+              # reads as misspellings of the script's own bundle and connect.
+              check=${
+                lib.getExe (
+                  config.flake.lib.caddyRootCheck pkgs {
+                    bundle = "$LEG_CA";
+                    connect = "$LEG_ADDR";
+                    servername = "ntfy.zt";
+                  }
+                )
+              }
+              # leg NAME BUNDLE PORT EXPECTED [SCRIPT]: EXPECTED is ok or a message fragment.
+              leg() {
+                local name=$1 bundle=$2 port=$3 expected=$4 script=''${5:-$check} found rc=0
+                found=$(LEG_CA=$bundle LEG_ADDR=127.0.0.1:$port bash "$script" 2>&1) || rc=$?
+                if [ "$expected" = ok ]; then [ "$rc" = 0 ] || { echo "FAIL $name: exit $rc: $found"; return 1; }
+                else [ "$rc" != 0 ] && grep -qF -- "$expected" <<< "$found" || { echo "FAIL $name: exit $rc: $found"; return 1; }; fi
+                echo "ok: $name"
+              }
+              leg servedHeld r1.crt 18441 ok || exit 1
+              leg servedInOverlap overlap.crt 18442 ok || exit 1
+              leg servedDrifted r1.crt 18442 "does not verify" || exit 1
+              leg rootExpiring r3.crt 18443 "expires" || exit 1
+              sed 's/^verified=0$/verified=1/' "$check" > verificationSkipped
+              if leg servedDrifted r1.crt 18442 "does not verify" verificationSkipped; then echo "FAIL: mutant verificationSkipped passed"; exit 1; fi
+              echo "mutant verificationSkipped rejected"
+              sed 's/openssl x509 -checkend/true/' "$check" > expirySkipped
+              if leg rootExpiring r3.crt 18443 "expires" expirySkipped; then echo "FAIL: mutant expirySkipped passed"; exit 1; fi
+              echo "mutant expirySkipped rejected"
               touch $out
             '';
       };
