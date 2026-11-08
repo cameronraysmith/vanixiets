@@ -10,8 +10,8 @@ let
   release = kernel.modDirVersion;
   kernelBuild = "${kernel.dev}/lib/modules/${release}/build";
 in
-assert lib.assertMsg (kernel.version == "6.18.58" && release == "6.18.58")
-  "hci-uart-macbook: only Linux 6.18.58 has been checked; revalidate source, prepared configuration, ABI and effective module selection before updating";
+assert lib.assertMsg (kernel.version == "6.18.60" && release == "6.18.60")
+  "hci-uart-macbook: only Linux 6.18.60 has been checked; revalidate source, prepared configuration, ABI and effective module selection before updating";
 kernel.stdenv.mkDerivation {
   pname = "hci-uart-macbook";
   version = "0-unstable-2026-09-14-${release}";
@@ -79,9 +79,9 @@ kernel.stdenv.mkDerivation {
     chmod -R u+w prepared
     test "$(cat prepared/include/config/kernel.release)" = '${release}'
     sha256sum -c <<'HASHES'
-    8936b0d8b31bc78bcba83ee9ad1bea62e60276ef10349071d82428dcfcdb7a19  prepared/.config
-    c1c469c366ecd609b73aaee89d99b33d42103b7547407af6e5a78536e0956f7b  prepared/Module.symvers
-    083a87ea737027f675da6872898199e1fdac186aae74e76cab02475f91f7512a  prepared/include/generated/autoconf.h
+    6cb9690f19cb43c049de78029cfe0ab4b32753bba57c563209d98fb9e9946bd6  prepared/.config
+    76aebcefa7f1932bc7857eeb54211ebcdf46cff1de6aace73662a3452ccb2fbb  prepared/Module.symvers
+    145d792349a6724566714016ae9ef4af5f2e22e531d74d266dba140bb6f42fba  prepared/include/generated/autoconf.h
     HASHES
     flagsArray=()
     concatTo flagsArray makeFlags makeFlagsArray
