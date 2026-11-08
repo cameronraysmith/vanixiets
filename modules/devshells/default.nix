@@ -123,8 +123,8 @@
         # The playwright-web-flake default devShell is intentionally not inherited;
         # select the browser set explicitly. Use the full flake set (chromium,
         # firefox, webkit) on both platforms: the fork carries a side-by-side
-        # darwin webkit layout whose newest base build is macOS-26 (rev 2359,
-        # matching playwright 1.63.0) alongside a macOS-14 fallback, plus the
+        # darwin webkit layout whose newest base build is macOS-26 (rev 2388,
+        # matching playwright 1.65.0) alongside a macOS-14 fallback, plus the
         # Linux webkit builds, so the all-browser local `just docs-test` passes.
         # The hermetic e2e check in pkgs/by-name/vanixiets-docs/package.nix now
         # uses this same browser set on both platforms; the nixpkgs-chromium
