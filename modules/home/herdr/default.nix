@@ -28,9 +28,32 @@
           exec ${herdr} pane run "$pane_id" "$*"
         '';
       };
+      # Copy stdin to the attached client's clipboard from a pane on a remote
+      # host. herdr forwards OSC 52 that reaches a pane's pty to the client,
+      # but a process whose stdout is captured (an agent's tool call, `cb`'s
+      # OSC 52 fallback) never writes to that pty, so this writes to the pane
+      # shell's terminal directly. herdr drops writes over 192 KiB decoded
+      # without reporting it (crates/ghostty-vt/src/lib.rs), hence the check.
+      osc52Pane = pkgs.writeShellApplication {
+        name = "osc52-pane";
+        runtimeInputs = [
+          pkgs.coreutils
+          pkgs.jq
+        ];
+        text = ''
+          shell_pid="$(${herdr} pane process-info --current | jq -er '.result.process_info.shell_pid')"
+          pane_tty="$(readlink "/proc/$shell_pid/fd/0")"
+          payload="$(base64 -w0)"
+          if [ "''${#payload}" -gt 262144 ]; then
+            echo "osc52-pane: input exceeds the 192 KiB herdr forwards" >&2
+            exit 1
+          fi
+          printf '\033]52;c;%s\a' "$payload" > "$pane_tty"
+        '';
+      };
     in
     {
-      home.packages = [ htab ];
+      home.packages = [ htab ] ++ lib.optional pkgs.stdenv.hostPlatform.isLinux osc52Pane;
       programs.herdr = {
         enable = true;
         package = flake.inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.herdr;
