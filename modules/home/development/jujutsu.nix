@@ -171,11 +171,6 @@ let
             '';
           };
 
-          user = {
-            name = lib.mkDefault "";
-            email = lib.mkDefault "";
-          };
-
           signing =
             if personal then
               {

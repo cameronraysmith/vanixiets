@@ -31,6 +31,10 @@ let
 in
 {
   config.flake.lib.mkUserIdentity = mkUserIdentity;
+  config.flake.lib.vcsAuthor = meta: {
+    name = meta.fullname;
+    email = meta.gitEmail;
+  };
 
   options.flake.users = lib.mkOption {
     description = ''

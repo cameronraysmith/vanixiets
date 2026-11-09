@@ -123,14 +123,14 @@ The stakeholders are each person with a profile, whose commits should carry thei
 - [Risk] Forcing the human default in a worker home would throw in the fixture and fail evaluation on real hosts (no `flake.users."omnigent-cameron"`) → Mitigation: adapters always set `vcs.author`; the capability fixture sets it explicitly; the throw guard surfaces any regression.
 - [Risk] The worker option change ripples into fixtures (R1) → Mitigation: under D3′ only the `owner` type changes and the credential policy shape does not, so `credentials-test.py` and its JSON fixtures are untouched; the Linux, Darwin and capability fixtures already use profile keys.
 - [Risk] The README's controller gates compare protected projections against fixed baselines that permit only Janette's identity fields (R4); those gates are outside this repository → Mitigation: the amendment names the new author fields so a controller can widen its allowance; this change does not claim those gates pass.
-- [Risk] A stacked step could land without the next one, because a queue batch can split on failure → Mitigation: each step leaves `main` correct and regulated on its own; step 2 keeps Janette's `extraHomeModules` binding and its `identityBinding` obligation, which still pass, and step 3 removes both in the same commit that adds `authorBinding` and its mutants.
+- [Risk] The pull request is rebase-merged, so each of its three commits lands on `main` separately, but CI builds only the head commit → Mitigation: each commit leaves `main` correct and regulated on its own and is built locally against its named checks before it is sealed; step 2 keeps Janette's `extraHomeModules` binding and its `identityBinding` obligation, which still pass, and step 3 removes both in the same commit that adds `authorBinding` and its mutants.
 - [Risk] Other open changes (`bind-mesh-writes-to-their-host`, `verify-ntfy-before-sending-tokens`) also replace the full designation table in `world-assumptions` → Mitigation: whichever archives later rebases its table on the synced one; assumption numbers A84 and A85 do not collide with A71 to A83.
 - [Trade-off] stibnite's worker author is not observed directly by any check → accepted, matching `credentialWiring` (Q3); unlike `credentialWiring`, `authorBinding` is absent from Darwin hosts' cases rather than reported as met.
 - [Trade-off] `modules/clan/services/omnigent/README.md` says stibnite's obligations are outside CI, while `nixbot.toml` (2026-10-13) evaluates `aarch64-darwin` checks best-effort → recorded as an open question, not changed here.
 
 ## Migration Plan
 
-Three stacked pull requests, each one commit, each independently evaluable.
+One pull request of three commits on the bookmark `unify-vcs-author-identity`, rebase-merged so each commit lands on `main` separately, each independently evaluable.
 
 1. D1′ and D2′: rule, home-manager module, `jujutsu.nix` default removal, six human profiles.
    Worker homes do not import `vcs-author` yet; their jj `name = ""` disappears (unset), which jj treats the same.
@@ -143,6 +143,36 @@ Each step is independently shippable: after step 1 human homes carry a complete 
 Deployment order after landing: magnetite, pyrite and stibnite first (workers and Cameron's human home), then the hosts carrying the other affected human profiles (argentum, blackphos, rosegold, galena, scheelite) at the operator's discretion; a host's behavior changes only when it deploys.
 Then D5 in the omnigent-cameron checkout on magnetite.
 Rollback is reverting the stack and redeploying; the repository-local workaround can be reapplied with the same two commands as before.
+
+## Gate 1 modality verdicts
+
+This table is the pre-apply spec-and-feature alignment record required by `openspec-bdd-bridge`.
+No row routes to a Gherkin scenario, so this change lays out no `.feature` file.
+The repository has no BDD runner (no pytest-bdd, cucumber or behave dependency, and no `.feature` file in the tree), so a laid-out scenario would be an unbound surface nothing executes.
+Every observable here is either a property of an evaluated configuration, witnessed by `nix eval`, the machine checks and the `omnigent-worker-inventory` mutants, or a property of a deployed account, witnessed by post-activation smoke run by the operator.
+A `world`-stratum requirement is witnessed by its own violation condition; an `interface`-stratum requirement is witnessed at the machine boundary.
+
+| Requirement | Capability | Stratum | Modality | Witness |
+|---|---|---|---|---|
+| A commit names the person it is recorded for | `commit-author-identity` | behavioral | build gate (`nix eval`) and smoke (deployment) | tasks 1.5, 2.2, 3.1, 4.1, 5.1 |
+| No commit is recorded with an empty author name | `commit-author-identity` | behavioral | build gate (type error, fleet obligation, mutants) and smoke (deployment) | tasks 1.6, 3.1, 3.2, 4.3, 5.1 |
+| A person's commits carry their author address, not their sign-in address | `commit-author-identity` | behavioral | build gate (`nix eval`) and smoke (deployment) | tasks 2.3, 2.4, 5.2 |
+| A person's signed commits verify against their author address | `commit-author-identity` | behavioral | build gate (`nix eval` of `allowed_signers`, expected-drift mutant) | tasks 1.5, 3.2; no task signs and verifies a commit on a deployed account |
+| An Omnigent worker runs only for a person with a profile | `commit-author-identity` | behavioral | build gate (`nix eval`, owner-refusal case) | tasks 2.1, 3.2 |
+| A change to a profile reaches every account of that person at its host's next deploy | `commit-author-identity` | behavioral | build gate (single derivation evaluated for every home) | tasks 1.2, 1.5, 2.2; no task edits a profile and redeploys |
+| The author interface's trust boundary is evaluated and delivered configuration | `commit-author-identity-interface` | interface | capability text and documentation | specs text, task 3.3 |
+| One rule derives an author from a profile | `commit-author-identity-interface` | interface | build gate (`nix eval`, `vcsAuthorFixture`) | tasks 1.2, 3.2 |
+| Every home sets git and jj author from one non-empty pair | `commit-author-identity-interface` | interface | build gate (`nix eval`, type error, home checks) | tasks 1.3, 1.5, 1.6, 1.7 |
+| The signer principal is the author address | `commit-author-identity-interface` | interface | build gate (`nix eval`, `authorBoundExpectedDrift`) | tasks 1.5, 3.2 |
+| A worker's owner is a profile key | `commit-author-identity-interface` | interface | build gate (`nix eval`, `ownerOutsideProfiles`, existing JSON round trip) | tasks 2.1, 3.2 |
+| A worker's author is its owner's profile, set by the host | `commit-author-identity-interface` | interface | build gate (`nix eval`, capability fixture with throwing `users`) | tasks 2.2, 2.3, 2.6 |
+| The sign-in address is unchanged | `commit-author-identity-interface` | interface | build gate (`nix eval`) and smoke (deployment) | tasks 2.4, 5.2 |
+| Every Linux worker's author is regulated against its owner's profile | `commit-author-identity-interface` | interface | build gate (fleet obligation in machine checks, control and five mutants, check key lists) | tasks 3.1, 3.2, 3.5, 5.3 |
+| A84 — jj refuses to push a commit recorded while user.name was empty, until the commit is re-authored | `world-assumptions` | world | violation-condition witness | its own scenario |
+| A85 — Repository and environment author settings take precedence over account settings | `world-assumptions` | world | violation-condition witness | its own scenario |
+| Grounded vocabulary for behavioral requirements | `world-assumptions` | world | designation table and its lint | the table itself |
+
+No row carries an `est-property`, `est-contract`, or `est-symbolic` modality, so this change carries no executable-specification-testing obligation and lays out no EST artifact.
 
 ## Open Questions
 

@@ -1,3 +1,19 @@
+---
+linear_story_id: c4bf6d64-8d63-4d34-b49a-f7c6d1383d06
+linear_story_identifier: CAM-98
+linear_story_title: Unify VCS author identity
+linear_story_url: https://linear.app/cameronraysmith/issue/CAM-98/unify-vcs-author-identity
+linear_story_state: In Progress
+linear_team: CAM
+linear_project: omnigent-magnetite
+last_synced_state: In Progress
+last_synced_at: "2026-11-09T01:28:33Z"
+review_round: 0
+attempt_log:
+  - { at: "2026-11-09T01:14:48Z", transition: "Backlog->Todo", outcome: "posted", note: "created CAM-98 in Todo with seeded description; bind comment not posted" }
+  - { at: "2026-11-09T01:28:33Z", transition: "Todo->In Progress", outcome: "posted", note: "task 1.1 ticked; transition comment not posted" }
+---
+
 ## Why
 
 A person's commit author is restated per profile, per worker and per credential policy, and each copy covers only what its originating commit needed.

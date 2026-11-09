@@ -16,9 +16,10 @@ One fleet obligation, `authorBinding`, regulates every Linux worker's author ins
 ## Global constraints
 
 - Work in `/home/omnigent-cameron/projects/vanixiets`; it is jj-colocated, so a detached git `HEAD` is normal and must not be reattached.
-- Three stacked changes, one commit each: step 1 (D1′ and D2′), step 2 (D3′), step 3 (D4′); each must leave `main` correct and regulated on its own, because a queue batch can split on failure.
+- One pull request of three commits on the bookmark `unify-vcs-author-identity`: step 1 (D1′ and D2′), step 2 (D3′), step 3 (D4′); it is rebase-merged, so each commit lands on `main` separately while CI builds only the head, and each must leave `main` correct and regulated on its own.
 - Janette's `extraHomeModules` author binding and its `identityBinding` obligation stay through step 2 and are removed only in step 3, in the same commit that adds `authorBinding` and its mutants.
 - jj commits run no git hooks: run `just lint` before each commit.
+- `@` stays an empty working-copy commit atop the chain tip: each step's change is created first with `jj new --no-edit <previous tip> -m "<message>"`, the bookmark moved to it, `@` re-parented with `jj rebase -s @ -d <step change>`, and the step's edits routed into it with `jj squash --into <step change> -u -k -- <paths>`; never `jj commit`, which moves `@`.
 - Do not run `nix flake check`, `just check` or `just check-fast`; build only the named checks.
 - Workers receive only `vcs.author.name` and `vcs.author.email`; no human module, `contentPrivate`, sops material or age key reaches a worker home, and the `users = throw "worker imported a whole-user alias"` guard in `modules/checks/omnigent-workers.nix` stays.
 - `expected.omnigentEmail` stays `meta.email`; signing options, token selection and `defaultOwner` are unchanged.
@@ -353,7 +354,7 @@ Expected: all builds succeed; both darwin evaluations print a store path.
 just lint
 nix eval --json '.#.checks.x86_64-linux' --apply builtins.attrNames | diff - "$OUT/checks-x86_64-linux-before.json"
 nix eval --json '.#.checks.aarch64-darwin' --apply builtins.attrNames | diff - "$OUT/checks-aarch64-darwin-before.json"
-jj commit -m "home: derive git and jj author from the person record through one vcs.author option"
+jj squash --into <step-1 change> -u -k -- <step-1 paths>   # change described "home: derive git and jj author from the person record through one vcs.author option"
 ```
 
 If `just lint` (deadnix) reports `flake` as an unused argument in a profile whose only use was the author block, remove that argument and rerun.
@@ -554,7 +555,7 @@ Expected: only `omnigent-cameron` on magnetite and pyrite differs, where `git` g
 just lint
 nix eval --json '.#.checks.x86_64-linux' --apply builtins.attrNames | diff - "$OUT/checks-x86_64-linux-before.json"
 nix eval --json '.#.checks.aarch64-darwin' --apply builtins.attrNames | diff - "$OUT/checks-aarch64-darwin-before.json"
-jj commit -m "omnigent: type worker owner as a profile key and set each worker's author from it"
+jj squash --into <step-2 change> -u -k -- <step-2 paths>   # change described "omnigent: type worker owner as a profile key and set each worker's author from it"
 ```
 
 Expected: both `diff`s print nothing.
@@ -795,12 +796,12 @@ nix build --no-link .#checks.x86_64-linux.nixos-magnetite .#checks.x86_64-linux.
 just lint
 nix eval --json '.#.checks.x86_64-linux' --apply builtins.attrNames | diff - "$OUT/checks-x86_64-linux-before.json"
 nix eval --json '.#.checks.aarch64-darwin' --apply builtins.attrNames | diff - "$OUT/checks-aarch64-darwin-before.json"
-jj commit -m "omnigent: regulate every Linux worker's author against its owner's profile, replacing Janette's binding"
+jj squash --into <step-3 change> -u -k -- <step-3 paths>   # change described "omnigent: regulate every Linux worker's author against its owner's profile, replacing Janette's binding"
 ```
 
 Expected: builds succeed, both `diff`s print nothing.
-Publication follows `git-stacked-pr-integration`: one pull request per change, the topmost labelled `merge-queue`, no auto-merge on any member.
-No step relies on landing in the same batch as another: each was built and its obligations evaluated at its own commit.
+Publication: `just lint`, `jj git push --bookmark unify-vcs-author-identity`, then one pull request with `gh pr create --head unify-vcs-author-identity --base main`, enqueued with `gh pr merge <PR> --auto --rebase`.
+CI builds only the head commit, so each commit was built and its obligations evaluated locally at its own position in the chain.
 
 ## Task 11: Deploy, remove the workaround, verify delivered state
 

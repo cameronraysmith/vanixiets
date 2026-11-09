@@ -194,7 +194,7 @@ let
           mode = "0400";
           path = "${config.xdg.configHome}/git/allowed_signers";
           content = ''
-            ${flake.users.crs58.meta.email} namespaces="git" ${config.sops.placeholder."ssh-public-key"}
+            ${config.vcs.author.email} namespaces="git" ${config.sops.placeholder."ssh-public-key"}
           '';
         };
 
@@ -355,9 +355,6 @@ let
       # TODO: Investigate sops-nix symlink option or activation script approach
 
       programs.git.settings = {
-        user.name = flake.users.crs58.meta.fullname;
-        user.email = flake.users.crs58.meta.email;
-
         # buzz-nsec keeps the default sops path while git-credentials and
         # aws-credentials at :77-84 set explicit ones. That asymmetry is two
         # different requirements, not an inconsistency: those two consumers need
@@ -381,11 +378,6 @@ let
           ];
           useHttpPath = true;
         };
-      };
-
-      programs.jujutsu.settings.user = {
-        name = flake.users.crs58.meta.fullname;
-        email = flake.users.crs58.meta.email;
       };
     };
 in

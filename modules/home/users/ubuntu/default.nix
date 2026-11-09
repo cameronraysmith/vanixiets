@@ -87,13 +87,8 @@ let
       # costs no secret. `development/git.nix` points
       # `gpg.ssh.allowedSignersFile` at this path.
       xdg.configFile."git/allowed_signers".text = ''
-        ${flake.users.ubuntu.meta.email} namespaces="git" ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBTeBMUfte7k9yugPtmVLJONiwxZtyoNotfwBOMAEHGz
+        ${config.vcs.author.email} namespaces="git" ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBTeBMUfte7k9yugPtmVLJONiwxZtyoNotfwBOMAEHGz
       '';
-
-      programs.git.settings = {
-        user.name = flake.users.ubuntu.meta.fullname;
-        user.email = flake.users.ubuntu.meta.email;
-      };
 
       # Devin sources $ENVRC under `set -a` at the top of every exec shell, and
       # $ENVRC sources this file, so this runs before every tool call. That is the
