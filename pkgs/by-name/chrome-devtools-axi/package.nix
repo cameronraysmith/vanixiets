@@ -38,7 +38,7 @@ buildNpmPackage {
   nodejs = nodejs_22;
 
   npmDepsFetcherVersion = 2;
-  npmDepsHash = "sha256-rYv7X3C4OQr2PbUO0RNaCRIIRpHzqVi/0nxfgE619i0=";
+  npmDepsHash = "sha256-siek10YzXX1asVZKJftbLcq6m2RpbrhLQTgNqC4zBIc=";
 
   makeCacheWritable = true;
 
