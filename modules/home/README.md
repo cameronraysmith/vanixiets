@@ -96,7 +96,7 @@ The fifth builds the sandbox profile that the Devin snapshot activates.
 - `core/` — fontconfig, XDG, Catppuccin, session variables, SSH, Bitwarden; imported by every user.
 - `database/` — database engines and clients (PostgreSQL, SQLite, DuckDB, DataFusion, Turso, Supabase).
 - `development/` — editors (LazyVim neovim, helix), version control (git, jujutsu, radicle), terminal emulators (ghostty) and the fonts they render, general and Nix development tools, and their configuration; agent CLIs live in `agents/`.
-- `herdr/` — the herdr terminal multiplexer and `browser-terminal`, its ttyd front end for the sandbox; secret-free.
+- `herdr/` — the herdr terminal multiplexer, `browser-terminal`, its ttyd front end for the sandbox, and the `htab` and `osc52-pane` helpers; secret-free.
 - `languages/` — one file per language toolchain (Rust, TypeScript, Go, Scala, Python, Haskell, OCaml, Elixir, proof assistants) at the latest stable version nixpkgs ships.
   For quick experiments with other versions, use proto as a dynamic version manager or a reproducible language-specific flake instead of editing these files.
 - `modules/` — option-declaring home-manager modules consumed by aggregates: `agents-md`, and `managed-configs`, which writes configuration files an application also rewrites at runtime as declared settings plus app-owned keys kept from the existing file.
