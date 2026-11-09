@@ -292,6 +292,7 @@ in
                   imports = [
                     flakeConfig.flake.modules.homeManager.omnigent-worker
                     deliveries.${name}.homeModule
+                    { vcs.author = flakeConfig.flake.lib.vcsAuthor flakeConfig.flake.users.${worker.owner}.meta; }
                   ]
                   ++ worker.extraHomeModules;
                   home.stateVersion = lib.mkDefault config.system.stateVersion;

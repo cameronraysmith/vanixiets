@@ -3,6 +3,7 @@ let
   nixosModules = config.flake.modules.nixos;
   darwinModules = config.flake.modules.darwin;
   credentialOptions = config.flake.lib.omnigentWorkerCredentialOptions;
+  profileKeys = builtins.attrNames config.flake.users;
 in
 {
   flake.clan.modules.omnigent =
@@ -80,8 +81,8 @@ in
                       description = "Explicit static credential sources and expected identities; all delivery defaults off.";
                     };
                     owner = lib.mkOption {
-                      type = lib.types.nonEmptyStr;
-                      description = "Intended human owner, verified separately during enrollment.";
+                      type = lib.types.enum profileKeys;
+                      description = "Person this worker runs for, as a flake.users key, verified separately during enrollment.";
                     };
                     user = lib.mkOption {
                       type = lib.types.str;

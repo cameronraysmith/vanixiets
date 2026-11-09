@@ -294,14 +294,10 @@ in
               format = "ssh";
               signByDefault = true;
             };
-            settings = {
-              user.email = policy.expected.gitEmail;
-              gpg.ssh.allowedSignersFile = toString signers;
-            };
+            settings.gpg.ssh.allowedSignersFile = toString signers;
           })
         ];
         programs.jujutsu.settings = lib.mkIf (policy.signingKey != null) {
-          user.email = policy.expected.gitEmail;
           signing = {
             key = policy.signingKey;
             behavior = lib.mkForce "own";

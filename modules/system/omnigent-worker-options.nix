@@ -1,5 +1,6 @@
-{ lib, ... }:
+{ config, lib, ... }:
 let
+  profileKeys = lib.attrNames config.flake.users;
   credentialSourceOptions = {
     enable = lib.mkEnableOption "delivery of this explicitly selected static credential";
     generator = lib.mkOption {
@@ -107,8 +108,8 @@ let
               options = {
                 enable = lib.mkEnableOption "foreground execution for this enrolled worker";
                 owner = lib.mkOption {
-                  type = lib.types.nonEmptyStr;
-                  description = "Intended human association; enrollment must verify application ownership separately.";
+                  type = lib.types.enum profileKeys;
+                  description = "Person this worker runs for, as a flake.users key; its author and expected identities derive from that profile. Enrollment must verify application ownership separately.";
                 };
                 user = lib.mkOption {
                   type = lib.types.strMatching "[a-z_][a-z0-9_-]*";

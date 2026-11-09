@@ -46,8 +46,6 @@ let
 
   selection = credentials: config.flake.lib.omnigentCredentialSelection credentials;
 
-  ownerMeta = owner: config.flake.users.${if owner == "cameron" then "crs58" else owner}.meta;
-
   accountObligations =
     {
       hostConfig,
@@ -187,7 +185,7 @@ let
         worker:
         let
           credentials = worker.credentials;
-          meta = ownerMeta worker.owner;
+          meta = config.flake.users.${worker.owner}.meta;
         in
         credentials.signingKey == {
           enable = true;

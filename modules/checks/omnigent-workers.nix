@@ -40,6 +40,10 @@
               home.homeDirectory =
                 if pkgs.stdenv.hostPlatform.isDarwin then "/Users/omnigent-fixture" else "/home/omnigent-fixture";
               home.stateVersion = "25.11";
+              vcs.author = {
+                name = "Worker fixture";
+                email = "worker@example.invalid";
+              };
             }
           ]
           ++ extra;
@@ -58,14 +62,8 @@
             linearApiKeys = { };
           };
           programs.git.settings = {
-            user.name = "Worker fixture";
-            user.email = "worker@example.invalid";
             commit.gpgSign = false;
             tag.gpgSign = "off";
-          };
-          programs.jujutsu.settings.user = {
-            name = "Worker fixture";
-            email = "worker@example.invalid";
           };
           home.file."example.md".text =
             "Documentation example: /home/human/project is an example path, not an input.";
