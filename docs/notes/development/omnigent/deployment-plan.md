@@ -1104,3 +1104,10 @@ The fleet obligations replace Janette's binding with `authorBinding` over every 
 A controller comparing protected projections against the fixed baselines recorded above must allow `programs.git.settings.user.name`, `programs.jujutsu.settings.user.name` and `programs.jujutsu.settings.user.email` for these homes.
 The Janette identity amendment above remains the record of that change.
 The requirements, design and task ledger for this amendment are in the OpenSpec change `openspec/changes/unify-vcs-author-identity/`, or under `openspec/changes/archive/` once it is archived.
+
+## jj sign-on-push revset amendment, 2026-11-09
+
+jj 0.47.1 deprecates the boolean `git.sign-on-push` in favor of the `revsets.git-sign-on-push` revset, so `modules/home/development/jujutsu.nix` now sets the revset: `"~signed() & mine()"` for personal homes, the value jj migrates `true` to, and `"none()"` otherwise, which matches the former `false`.
+Worker homes therefore lose `programs.jujutsu.settings.git.sign-on-push = false` and gain `programs.jujutsu.settings.revsets.git-sign-on-push = "none()"`; no signing key, signing behavior or push-time signing changes.
+The worker capability assertion in `modules/home/ai/omnigent/worker.nix` now requires the boolean key to be absent and the revset to be `none()`.
+A controller comparing protected projections against the fixed baselines recorded above must allow those two `programs.jujutsu.settings` paths for every worker and human home.

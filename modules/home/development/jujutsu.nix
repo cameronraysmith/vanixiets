@@ -106,6 +106,7 @@ let
 
           revsets = {
             sign = "sign(@)";
+            git-sign-on-push = if personal then "~signed() & mine()" else "none()";
           };
 
           templates = {
@@ -209,10 +210,6 @@ let
 
             # Block push of WIP, private, or conflicted commits
             private-commits = "private()";
-
-            # Sign commits before pushing (upstream jujutsu supports revset syntax)
-            # Options: true, false, "mine()", "~signed()", "~signed() & mine()", etc.
-            sign-on-push = personal;
 
             # Write Jujutsu change IDs to git commit headers for radicle integration
             # Enables Radicle to track change identity across patch revisions
