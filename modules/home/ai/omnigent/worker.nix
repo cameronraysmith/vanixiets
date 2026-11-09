@@ -156,7 +156,8 @@ in
                 && config.programs.jujutsu.settings.signing.behavior == "drop"
             )
             && !gitSigning
-            && !config.programs.jujutsu.settings.git.sign-on-push;
+            && !(config.programs.jujutsu.settings.git ? sign-on-push)
+            && (config.programs.jujutsu.settings.revsets.git-sign-on-push or "none()") == "none()";
           message =
             if signingAllowed then
               "Omnigent worker signing must use only the adapter-delivered private key."
