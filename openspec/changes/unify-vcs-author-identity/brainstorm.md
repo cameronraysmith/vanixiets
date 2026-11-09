@@ -181,3 +181,8 @@ The first draft relied on the three steps landing in one queue batch, because st
 The orchestrating agent rejected that on 2026-11-08: a batch can split on failure, so each step must leave `main` correct and regulated on its own.
 Accepted resolution: step 2 keeps Janette's `extraHomeModules` binding and its `identityBinding` obligation, which still pass because they define the same strings the adapter sets, and step 3 removes both in the same commit that adds `authorBinding` and its mutants.
 The amendment goes in `deployment-plan.md` only, with one sentence cross-referencing this change, and the `deploy-omnigent-magnetite` artifacts are not edited.
+
+Refinement D, publication shape.
+On 2026-11-09 the user chose one bookmarked chain of three commits published as a single pull request with `gh`, rebase-merged, over three stacked pull requests.
+Each commit still lands on `main` separately and must leave it correct and regulated on its own, but CI builds only the head, so the first two commits rest on local builds of their named checks.
+One pull request lands in one queue batch, so Refinement C's batch-split concern no longer arises; its ordering of Janette's binding removal is kept for per-commit correctness.

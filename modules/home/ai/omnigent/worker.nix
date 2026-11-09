@@ -103,6 +103,7 @@ in
         "gh"
         "git"
         "jujutsu"
+        "vcs-author"
         "neovim"
         "linear"
         "repository-acquisition"

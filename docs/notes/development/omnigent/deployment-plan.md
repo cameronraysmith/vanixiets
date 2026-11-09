@@ -1092,3 +1092,15 @@ Require switch exit 0, exactly one copy of all four rules, stability after one s
 Capture complete outputs and individual exits, and stop on failure: pinned NixOS firewall reload failure can remove its base firewall jump.
 If the same logind race recurs, stop and re-evaluate rather than retrying, changing accounts, restarting logind or deleting pending lists.
 Cinnabar duplicate cleanup requires its own later activation approval; full Omnigent application acceptance remains separate.
+
+## VCS author identity amendment, 2026-11-09
+
+Every git and jj author in the fleet now derives from one rule, `flake.lib.vcsAuthor meta = { name = meta.fullname; email = meta.gitEmail; }`, held by the home-manager option `vcs.author`.
+Human homes default it from their own profile; the NixOS and Darwin adapters set it in each worker home from `flake.users.${worker.owner}.meta`.
+Worker `owner` is now typed as a `flake.users` key in the worker options and the clan interface.
+Janette's `extraHomeModules` author binding, the hand-passed meta and the credential module's `user.email` are removed; her worker's author and `expected` values are unchanged.
+Cameron's workers gain a git and jj name, and the raquel, tara, christophersmith, ubuntu and janettesmith human profiles gain a jj author; no address, signer principal, signing key or token changes.
+The fleet obligations replace Janette's binding with `authorBinding` over every Linux worker, whose mutants run once in `checks.x86_64-linux.omnigent-worker-inventory`; stibnite's worker is covered through the shared module.
+A controller comparing protected projections against the fixed baselines recorded above must allow `programs.git.settings.user.name`, `programs.jujutsu.settings.user.name` and `programs.jujutsu.settings.user.email` for these homes.
+The Janette identity amendment above remains the record of that change.
+The requirements, design and task ledger for this amendment are in the OpenSpec change `openspec/changes/unify-vcs-author-identity/`, or under `openspec/changes/archive/` once it is archived.

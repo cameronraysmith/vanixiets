@@ -1,42 +1,43 @@
 { config, ... }:
 let
-  janetteAuthor = {
-    name = config.flake.users.janettesmith.meta.fullname;
-    email = config.flake.users.janettesmith.meta.gitEmail;
-  };
-  workerCredentials = user: meta: labels: {
-    signingKey = {
-      enable = true;
-      generator = "${user}-signing-key";
-      file = "key";
+  workerCredentials =
+    owner: user: labels:
+    let
+      meta = config.flake.users.${owner}.meta;
+    in
+    {
+      signingKey = {
+        enable = true;
+        generator = "${user}-signing-key";
+        file = "key";
+      };
+      githubTokens = builtins.listToAttrs (
+        map (owner: {
+          name = owner;
+          value = {
+            enable = true;
+            generator = "${user}-github-token-${owner}";
+            file = "token";
+            expectedLogin = meta.githubUser;
+          };
+        }) ([ "sciexp" ] ++ (if user == "omnigent-cameron" then [ "cameronraysmith" ] else [ ]))
+      );
+      defaultOwner = if user == "omnigent-cameron" then "cameronraysmith" else "sciexp";
+      linearApiKeys = builtins.listToAttrs (
+        map (label: {
+          name = label;
+          value = {
+            enable = true;
+            generator = "${user}-linear-${label}";
+          };
+        }) labels
+      );
+      expected = {
+        gitEmail = meta.gitEmail;
+        signingPublicKey = builtins.head meta.sshKeys;
+        omnigentEmail = meta.email;
+      };
     };
-    githubTokens = builtins.listToAttrs (
-      map (owner: {
-        name = owner;
-        value = {
-          enable = true;
-          generator = "${user}-github-token-${owner}";
-          file = "token";
-          expectedLogin = meta.githubUser;
-        };
-      }) ([ "sciexp" ] ++ (if user == "omnigent-cameron" then [ "cameronraysmith" ] else [ ]))
-    );
-    defaultOwner = if user == "omnigent-cameron" then "cameronraysmith" else "sciexp";
-    linearApiKeys = builtins.listToAttrs (
-      map (label: {
-        name = label;
-        value = {
-          enable = true;
-          generator = "${user}-linear-${label}";
-        };
-      }) labels
-    );
-    expected = {
-      gitEmail = meta.gitEmail;
-      signingPublicKey = builtins.head meta.sshKeys;
-      omnigentEmail = meta.email;
-    };
-  };
 in
 {
   flake.clan.inventory.instances.omnigent = {
@@ -57,7 +58,7 @@ in
             enable = true;
             owner = "cameron";
             user = "omnigent-cameron";
-            credentials = workerCredentials "omnigent-cameron" config.flake.users.crs58.meta [
+            credentials = workerCredentials "cameron" "omnigent-cameron" [
               "personal"
               "work"
             ];
@@ -66,7 +67,7 @@ in
             enable = true;
             owner = "janettesmith";
             user = "omnigent-janettesmith";
-            credentials = workerCredentials "omnigent-janettesmith" config.flake.users.janettesmith.meta [
+            credentials = workerCredentials "janettesmith" "omnigent-janettesmith" [
               "personal"
             ];
           };
@@ -83,7 +84,7 @@ in
             enable = true;
             owner = "cameron";
             user = "omnigent-cameron";
-            credentials = workerCredentials "omnigent-cameron" config.flake.users.crs58.meta [
+            credentials = workerCredentials "cameron" "omnigent-cameron" [
               "personal"
               "work"
             ];
@@ -92,7 +93,7 @@ in
             enable = true;
             owner = "janettesmith";
             user = "omnigent-janettesmith";
-            credentials = workerCredentials "omnigent-janettesmith" config.flake.users.janettesmith.meta [
+            credentials = workerCredentials "janettesmith" "omnigent-janettesmith" [
               "personal"
             ];
           };
@@ -108,7 +109,7 @@ in
           enable = true;
           owner = "cameron";
           user = "omnigent-cameron";
-          credentials = workerCredentials "omnigent-cameron" config.flake.users.crs58.meta [
+          credentials = workerCredentials "cameron" "omnigent-cameron" [
             "personal"
             "work"
           ];
@@ -116,25 +117,11 @@ in
       };
       extraModules = [
         (
-          { config, lib, ... }:
+          { config, ... }:
           {
             services.omnigent-host.environment.PI_CODING_AGENT_DIR = "${
               config.users.users.${config.services.omnigent-host.user}.home
             }/.atomic/agent";
-            services.omnigent-host.workers =
-              lib.mkIf
-                (builtins.elem config.networking.hostName [
-                  "magnetite"
-                  "pyrite"
-                ])
-                {
-                  janettesmith.extraHomeModules = [
-                    {
-                      programs.git.settings.user = janetteAuthor;
-                      programs.jujutsu.settings.user = janetteAuthor;
-                    }
-                  ];
-                };
           }
         )
       ];

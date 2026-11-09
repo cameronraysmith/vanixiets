@@ -36,16 +36,9 @@ let
           mode = "0400";
           path = "${config.xdg.configHome}/git/allowed_signers";
           content = ''
-            ${flake.users.christophersmith.meta.email} namespaces="git" ${
-              config.sops.placeholder."ssh-public-key"
-            }
+            ${config.vcs.author.email} namespaces="git" ${config.sops.placeholder."ssh-public-key"}
           '';
         };
-      };
-
-      programs.git.settings = {
-        user.name = flake.users.christophersmith.meta.fullname;
-        user.email = flake.users.christophersmith.meta.email;
       };
     };
 in

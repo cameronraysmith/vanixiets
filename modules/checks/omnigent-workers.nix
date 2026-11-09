@@ -40,6 +40,10 @@
               home.homeDirectory =
                 if pkgs.stdenv.hostPlatform.isDarwin then "/Users/omnigent-fixture" else "/home/omnigent-fixture";
               home.stateVersion = "25.11";
+              vcs.author = {
+                name = "Worker fixture";
+                email = "worker@example.invalid";
+              };
             }
           ]
           ++ extra;
@@ -58,14 +62,8 @@
             linearApiKeys = { };
           };
           programs.git.settings = {
-            user.name = "Worker fixture";
-            user.email = "worker@example.invalid";
             commit.gpgSign = false;
             tag.gpgSign = "off";
-          };
-          programs.jujutsu.settings.user = {
-            name = "Worker fixture";
-            email = "worker@example.invalid";
           };
           home.file."example.md".text =
             "Documentation example: /home/human/project is an example path, not an input.";
@@ -510,6 +508,36 @@
             }
           ];
         }).config.flake.users.fixture.meta.gitEmail;
+      authorBound = config.flake.lib.omnigentFleetObligations.authorBound;
+      authorMeta = {
+        fullname = "Fixture Person";
+        gitEmail = "author@example.invalid";
+      };
+      authorHome = gitUser: jjUser: {
+        programs.git.settings.user = gitUser;
+        programs.jujutsu.settings.user = jjUser;
+      };
+      fixtureAuthor = {
+        name = "Fixture Person";
+        email = "author@example.invalid";
+      };
+      ownerAccepted =
+        owner:
+        (builtins.tryEval (
+          builtins.deepSeq
+            (lib.evalModules {
+              modules = [
+                clanHostInterface
+                {
+                  workers.fixture = {
+                    inherit owner;
+                    user = "omnigent-fixture";
+                  };
+                }
+              ];
+            }).config.workers.fixture.owner
+            true
+        )).success;
       inventoryCases = {
         publicRecipient = lib.hasInfix "&janettesmith-user age1mqfqckczkulpne7265j5cxn0pspdlxd3d0kav368u2c2fwknnc4qe27dec" (
           builtins.readFile ../../.sops.yaml
@@ -552,6 +580,55 @@
               }).config
               true
           )).success;
+        vcsAuthorFixture =
+          config.flake.lib.vcsAuthor {
+            fullname = "Fixture";
+            email = "primary@example.invalid";
+            gitEmail = "author@example.invalid";
+          } == {
+            name = "Fixture";
+            email = "author@example.invalid";
+          };
+        ownerOutsideProfiles = ownerAccepted "cameron" && !ownerAccepted "nobody";
+        authorBoundControl = authorBound {
+          meta = authorMeta;
+          expected.gitEmail = "author@example.invalid";
+          home = authorHome fixtureAuthor fixtureAuthor;
+        };
+        authorBoundWrongName =
+          !authorBound {
+            meta = authorMeta;
+            expected.gitEmail = "author@example.invalid";
+            home = authorHome (fixtureAuthor // { name = "Someone Else"; }) (
+              fixtureAuthor // { name = "Someone Else"; }
+            );
+          };
+        authorBoundEmptyName =
+          !authorBound {
+            meta = authorMeta // {
+              fullname = "";
+            };
+            expected.gitEmail = "author@example.invalid";
+            home = authorHome (fixtureAuthor // { name = ""; }) (fixtureAuthor // { name = ""; });
+          };
+        authorBoundJjMismatch =
+          !authorBound {
+            meta = authorMeta;
+            expected.gitEmail = "author@example.invalid";
+            home = authorHome fixtureAuthor (fixtureAuthor // { email = "primary@example.invalid"; });
+          };
+        authorBoundMissingGitName =
+          !authorBound {
+            meta = authorMeta;
+            expected.gitEmail = "author@example.invalid";
+            home = authorHome { email = "author@example.invalid"; } fixtureAuthor;
+          };
+        authorBoundExpectedDrift =
+          !authorBound {
+            meta = authorMeta;
+            expected.gitEmail = "primary@example.invalid";
+            home = authorHome fixtureAuthor fixtureAuthor;
+          };
       };
 
       # Pure credential policy over a synthetic vars-shaped view, the form the host adapter
