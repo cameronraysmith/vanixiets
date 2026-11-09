@@ -24,25 +24,22 @@ let
     magnetite = "omni.scientistexperience.net";
   };
 
-  janetteMeta = config.flake.users.janettesmith.meta;
-  janetteAuthor = {
-    name = janetteMeta.fullname;
-    email = janetteMeta.gitEmail;
-  };
-
-  identityBinding =
-    modules:
-    (lib.evalModules {
-      modules = [
-        {
-          options.programs = lib.mkOption { type = lib.types.attrs; };
-        }
-      ]
-      ++ modules;
-    }).config == {
-      programs.git.settings.user = janetteAuthor;
-      programs.jujutsu.settings.user = janetteAuthor;
-    };
+  authorBound =
+    {
+      meta,
+      expected,
+      home,
+    }:
+    let
+      git = home.programs.git.settings.user or { };
+      jj = home.programs.jujutsu.settings.user or { };
+    in
+    meta.fullname != ""
+    && (git.name or null) == meta.fullname
+    && (git.email or null) == meta.gitEmail
+    && (jj.name or null) == meta.fullname
+    && (jj.email or null) == meta.gitEmail
+    && expected.gitEmail == meta.gitEmail;
 
   selection = credentials: config.flake.lib.omnigentCredentialSelection credentials;
 
@@ -230,19 +227,6 @@ let
         ) (lib.attrValues (selection credentials))
       ) (lib.attrValues workers);
 
-      identityBoundHomeModules = lib.all (owner: identityBinding workers.${owner}.extraHomeModules) (
-        lib.filter (owner: owner == "janettesmith") declaredOwners
-      );
-
-      identityBindingDiscriminates =
-        !identityBinding [
-          {
-            programs.git.settings.user = janetteAuthor;
-            programs.jujutsu.settings.user = janetteAuthor;
-            programs.unrelated.enable = true;
-          }
-        ];
-
       serverDomain = lib.all (domain: hostConfig.services.omnigent.domain == domain) (
         lib.optional (serverDomains ? ${machine}) serverDomains.${machine}
       );
@@ -424,11 +408,23 @@ let
           else
             lib.all (name: linux name credentialed.${name}) (lib.attrNames credentialed)
         );
+    }
+    # Darwin worker homes are standalone generations absent from the host configuration;
+    # the shared vcs-author module and adapter code are exercised through the Linux hosts.
+    // lib.optionalAttrs (!isDarwin) {
+      authorBinding = lib.all (
+        worker:
+        authorBound {
+          meta = config.flake.users.${worker.owner}.meta;
+          expected = worker.credentials.expected;
+          home = hostConfig.home-manager.users.${worker.user};
+        }
+      ) (lib.attrValues workers);
     };
 in
 {
   flake.lib.omnigentFleetObligations = {
-    inherit expectedOwners;
+    inherit expectedOwners authorBound;
 
     failures =
       machine: hostConfig:

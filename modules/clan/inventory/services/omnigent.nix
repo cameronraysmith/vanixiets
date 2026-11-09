@@ -1,9 +1,5 @@
 { config, ... }:
 let
-  janetteAuthor = {
-    name = config.flake.users.janettesmith.meta.fullname;
-    email = config.flake.users.janettesmith.meta.gitEmail;
-  };
   workerCredentials =
     owner: user: labels:
     let
@@ -121,25 +117,11 @@ in
       };
       extraModules = [
         (
-          { config, lib, ... }:
+          { config, ... }:
           {
             services.omnigent-host.environment.PI_CODING_AGENT_DIR = "${
               config.users.users.${config.services.omnigent-host.user}.home
             }/.atomic/agent";
-            services.omnigent-host.workers =
-              lib.mkIf
-                (builtins.elem config.networking.hostName [
-                  "magnetite"
-                  "pyrite"
-                ])
-                {
-                  janettesmith.extraHomeModules = [
-                    {
-                      programs.git.settings.user = janetteAuthor;
-                      programs.jujutsu.settings.user = janetteAuthor;
-                    }
-                  ];
-                };
           }
         )
       ];
