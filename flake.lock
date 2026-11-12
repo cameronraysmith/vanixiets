@@ -3,16 +3,16 @@
     "argocd-helm-src": {
       "flake": false,
       "locked": {
-        "lastModified": 1794070514,
-        "narHash": "sha256-bhKiB06DAHR4+rBQ9BSZuaRJ1KTb7LezNgK8O4R+G/I=",
+        "lastModified": 1794409475,
+        "narHash": "sha256-QUKY7T3kCcF8DuRhvuCsnNgkBwD762XXibzqmRM/UA4=",
         "owner": "argoproj",
         "repo": "argo-helm",
-        "rev": "f3509e3e20a3472ad88426b419602af59da97d64",
+        "rev": "9348ef01b9d92d181ee7775abf5bc9c5870a93c7",
         "type": "github"
       },
       "original": {
         "owner": "argoproj",
-        "ref": "argo-cd-10.15.0",
+        "ref": "argo-cd-10.18.0",
         "repo": "argo-helm",
         "type": "github"
       }
