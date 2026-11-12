@@ -91,7 +91,6 @@ fi
 if [ -n "$REASON" ]; then
   BRIEF=$(echo "$COMMAND" | head -c 200)
   notify-permission-wait "Bash" "$BRIEF" &>/dev/null &
-  disown
 
   cat << EOF
 {"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"ask","permissionDecisionReason":"$REASON"}}

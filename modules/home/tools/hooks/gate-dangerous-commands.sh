@@ -173,7 +173,7 @@ kill_targets_are_explicit_pids() {
 }
 
 # Fire-and-forget NOTICE via ntfy-send when a relaxed gate arm permits an action
-# that previously escalated. Backgrounded with disown so PreToolUse stays sync-fast.
+# that previously escalated. Backgrounded so PreToolUse stays sync-fast.
 # Reads $COMMAND from outer scope; first arg is a short category label.
 notify_permitted() {
   local category="$1"
@@ -187,7 +187,6 @@ notify_permitted() {
     -H "Priority: low" \
     -H "Tags: information_source,${repo_name}" \
     >/dev/null 2>&1 &
-  disown
 }
 
 # Inspect git push args (everything after 'push'); return 0 when the push is
@@ -441,7 +440,6 @@ fi
 # Match found: notify before escalating to user approval
 BRIEF=$(echo "$COMMAND" | head -c 200)
 notify-permission-wait "Bash" "$BRIEF" &>/dev/null &
-disown
 
 cat << EOF
 {"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"ask","permissionDecisionReason":"$REASON"}}
