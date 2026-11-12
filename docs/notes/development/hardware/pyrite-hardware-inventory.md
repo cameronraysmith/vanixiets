@@ -71,9 +71,17 @@ The blob ships in `linux-firmware` under a redistributable licence, so this hard
 
 One cosmetic gap accompanies it: `brcmf_c_process_clm_blob: no clm_blob available (err=-2), device may have limited channels available`.
 
-Bluetooth presents as `hci0`, a BCM4350C0.
-The kernel logs `Bluetooth: hci0: BCM: firmware Patch file not found, tried: 'brcm/BCM.hcd'`.
-Whether Bluetooth is functional was not tested and remains open.
+Bluetooth presents as `hci0`, a BCM4350C0 on the UART (`hci_uart_bcm`), running its ROM firmware (`BCM (003.001.134) build 1532`).
+The kernel logs `Bluetooth: hci0: BCM: firmware Patch file not found, tried: 'brcm/BCM.hcd'`: its chip table has no entry for this Apple variant, so it tries only the generic name, and `linux-firmware` ships no patch for this part.
+It also logs `BCM: failed to write update baudrate (-16)`, yet the link carries AAC audio to AirPods Max cleanly, so it runs fast enough at the speed it starts at.
+
+Bluetooth works, observed on 2026-11-12 with AirPods Max: pairing, AAC playback and reconnecting from the desktop after a `bluetoothd` restart.
+Two behaviours of this controller shape how a device is paired:
+
+- The desktop's "Pair" can stall: in three of four attempts the controller held the remote-name request on the open link for 20 s, Linux waits for that name before authenticating, and the headphones hung up.
+  Instead, put the device in pairing mode (AirPods Max: hold the noise control button until the light flashes white) and use "Connect", or `bluetoothctl connect <address>`, which paired at the first attempt.
+- If "Connect" then fails at once, `bluetoothd` can be holding an earlier connect request that never completes, answering every new one with `org.bluez.Error.InProgress`; `sudo systemctl restart bluetooth` clears it.
+  This was seen once, right after the first pairing, and not on reconnecting.
 
 The only non-loopback interface is `wlp2s0`.
 This machine has no wired NIC and no virtio devices.
@@ -129,6 +137,6 @@ That is the same b43 misdetection arriving by a second route, and it is the reas
 
 ## Open questions
 
-Whether Bluetooth functions is untested; the missing `brcm/BCM.hcd` patch file is logged but its consequence was not observed.
+Whether the 20 s remote-name stall comes from this controller's unpatched firmware or from the AirPods Max was not settled; a remote-name request with no link open answered within 5 s.
 
 Whether this unit needs the `d3cold` suspend workaround documented for Apple-NVMe MacBookPro13,x and 14,x models, and whether it helps, was not tested — the machine was never suspended during recon.
