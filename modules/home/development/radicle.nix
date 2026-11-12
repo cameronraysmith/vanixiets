@@ -18,8 +18,6 @@
       nodeEnv.RAD_HOME = radHome;
     in
     {
-      home.packages = [ pkgs.radicle-tui ];
-
       sops.secrets.ssh-signing-key.path = "${radHome}/keys/radicle";
 
       programs.radicle = {

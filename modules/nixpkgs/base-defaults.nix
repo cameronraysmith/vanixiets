@@ -31,9 +31,9 @@
   ...
 }:
 let
-  # radicle-node (and radicle-tui, which propagates it) is marked insecure for
-  # every release to date: the node transport sends data in cleartext after the
-  # handshake, and the handshake lets a peer present a Node ID it does not own
+  # radicle-node is marked insecure for every release to date: the node
+  # transport sends data in cleartext after the handshake, and the handshake
+  # lets a peer present a Node ID it does not own
   # (https://radicle.dev/2026/09/23/disclosure-of-vulnerability-in-network-protocol,
   # NixOS/nixpkgs#566450). Both flaws cost confidentiality, not integrity:
   # signed references still reject objects tampered with in transit. The fleet
