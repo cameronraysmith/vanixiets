@@ -14,6 +14,9 @@
   cmake,
   perl,
   which,
+  pkg-config,
+  aws-lc,
+  zstd,
 }:
 rustPlatform.buildRustPackage (finalAttrs: {
   pname = "xsra";
@@ -36,6 +39,12 @@ rustPlatform.buildRustPackage (finalAttrs: {
     cmake
     perl
     which
+    pkg-config
+  ];
+
+  buildInputs = [
+    aws-lc
+    zstd
   ];
 
   # ncbi-vdb-sys vendors an old zlib whose zutil.h defines fdopen as a macro,

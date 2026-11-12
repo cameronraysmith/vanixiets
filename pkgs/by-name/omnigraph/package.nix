@@ -6,6 +6,8 @@
   protobuf,
   cmake,
   pkg-config,
+  aws-lc,
+  zstd,
 }:
 rustPlatform.buildRustPackage (finalAttrs: {
   pname = "omnigraph";
@@ -42,6 +44,11 @@ rustPlatform.buildRustPackage (finalAttrs: {
     protobuf
     cmake
     pkg-config
+  ];
+
+  buildInputs = [
+    aws-lc
+    zstd
   ];
 
   cargoBuildFlags = [

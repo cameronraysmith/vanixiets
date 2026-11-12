@@ -1,7 +1,10 @@
 # buzz-cli - command-line client for a Buzz relay.
 #
 # reqwest 0.13's `rustls` feature implies `__rustls-aws-lc-rs`, so aws-lc-sys
-# is compiled from source. aws-lc-sys defaults to its CcBuilder backend;
+# is in the build. Newer nixpkgs' cargo setup hook exports
+# AWS_LC_SYS_USE_SYSTEM=1, so aws-lc-sys links the aws-lc in buildInputs,
+# located through pkg-config. Where nixpkgs does not export it, aws-lc-sys
+# compiles AWS-LC from source with its CcBuilder backend;
 # AWS_LC_SYS_CMAKE_BUILDER forces the cmake backend instead, matching nixpkgs'
 # own unconditional aws-lc-sys crate override (default-crate-overrides.nix:58-62),
 # whose comment notes the cc backend fails at least on Darwin. cmake is
@@ -22,6 +25,8 @@
   rustPlatform,
   source,
   cmake,
+  pkg-config,
+  aws-lc,
 }:
 rustPlatform.buildRustPackage (finalAttrs: {
   pname = "buzz-cli";
@@ -38,7 +43,11 @@ rustPlatform.buildRustPackage (finalAttrs: {
     "buzz"
   ];
 
-  nativeBuildInputs = [ cmake ];
+  nativeBuildInputs = [
+    cmake
+    pkg-config
+  ];
+  buildInputs = [ aws-lc ];
   dontUseCmakeConfigure = true;
 
   env.AWS_LC_SYS_CMAKE_BUILDER = "1";
