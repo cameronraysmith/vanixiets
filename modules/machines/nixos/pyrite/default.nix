@@ -19,28 +19,49 @@ in
       ...
     }:
     let
-      greeterConfig =
-        (inputs.home-manager.lib.homeManagerConfiguration {
-          inherit pkgs;
-          modules = [
-            inputs.niri-flake.homeModules.config
-            {
-              home.username = "dms-greeter";
-              home.homeDirectory = "/var/lib/dms-greeter";
-              home.stateVersion = "26.05";
-              programs.niri = {
-                package = config.programs.niri.package;
-                settings = {
-                  input.power-key-handling.enable = false;
-                  environment.DMS_RUN_GREETER = "1";
-                  hotkey-overlay.skip-at-startup = true;
-                  gestures.hot-corners.enable = false;
-                  layout.background-color = "#000000";
-                };
-              };
+      # niri-flake renders settings to KDL only through a derivation; customConfig must be an evaluation-time string and nixbot forbids import-from-derivation.
+      greeterConfig = ''
+        input {
+            keyboard {
+                xkb {
+                    layout ""
+                    model ""
+                    rules ""
+                    variant ""
+                }
+                repeat-delay 600
+                repeat-rate 25
+                track-layout "global"
             }
-          ];
-        }).config.programs.niri.finalConfig;
+            touchpad {
+                tap
+                natural-scroll
+            }
+            disable-power-key-handling
+        }
+        screenshot-path "~/Pictures/Screenshots/Screenshot from %Y-%m-%d %H-%M-%S.png"
+        layout {
+            gaps 16
+            struts {
+                left 0
+                right 0
+                top 0
+                bottom 0
+            }
+            focus-ring { width 4; }
+            border { off; }
+            background-color "#000000"
+            default-column-width
+            center-focused-column "never"
+        }
+        cursor {
+            xcursor-theme "default"
+            xcursor-size 24
+        }
+        hotkey-overlay { skip-at-startup; }
+        environment { "DMS_RUN_GREETER" "1"; }
+        gestures { hot-corners { off; }; }
+      '';
     in
     {
       imports = [
