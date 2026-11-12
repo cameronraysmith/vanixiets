@@ -136,7 +136,7 @@ Each NixOS collector runs outside every worker UID, the darwin agent runs as `_o
 omp runs with `OTEL_LOGS_EXPORTER=none` and without the content-capture variable (ADR-005 Decision; ADR-008 Q6).
 
 On ntfy, the user `alerter` alone may publish to `fleet-*` topics, anonymous clients may read them, and every other topic keeps anonymous read-write access (ADR-009 item 12).
-Delivery to `ntfy.zt` follows `ntfy-send`'s `-k` convention, so the `alerter` token's confidentiality rests on ZeroTier encryption and cinnabar's dnsmasq (ADR-009 Consequences).
+Delivery to `ntfy.zt` verifies caddy's certificate against the root in the repository, so the `alerter` token reaches only a holder of that root's key (ADR-009 Consequences).
 
 ## Data lifecycle
 
