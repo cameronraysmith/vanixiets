@@ -149,11 +149,11 @@ A lint behaviour or a configuration key that changed with the release fails `per
 Alerts and failure notices go to the ntfy topic `fleet-alerts` at `https://ntfy.zt/fleet-alerts`.
 `ntfy.zt` resolves only through cinnabar's dnsmasq and listens only on cinnabar's ZeroTier addresses, so a subscriber must be a ZeroTier member of the fleet network.
 caddy serves it with a certificate from its internal CA, so a subscriber must also trust caddy's root certificate.
-The root certificate is committed at `modules/machines/nixos/cinnabar/pki/caddy-root-ca.crt` (`CN=Caddy Local Authority - 2026 ECC Root`, SHA-256 fingerprint `7E:78:F6:7C:83:BD:DC:81:51:FF:EB:8F:82:1A:68:5D:02:89:9F:93:27:33:7F:9B:F2:41:9B:F9:3B:AA:2E:82`); caddy's live copy on cinnabar is `/var/lib/caddy/.local/share/caddy/pki/authorities/local/root.crt`.
-Before installing it anywhere, check that the committed file is still the live one:
+The root certificate is the public value of cinnabar's clan vars `caddy-root-ca`, committed at `vars/per-machine/cinnabar/caddy-root-ca/root.crt/value` (`CN=Caddy Local Authority - 2026 ECC Root`, SHA-256 fingerprint `7E:78:F6:7C:83:BD:DC:81:51:FF:EB:8F:82:1A:68:5D:02:89:9F:93:27:33:7F:9B:F2:41:9B:F9:3B:AA:2E:82`); caddy loads it from the deployed vars (see "caddy's root"), and the copy caddy stored before it did so is `/var/lib/caddy/.local/share/caddy/pki/authorities/local/root.crt`.
+Before installing it anywhere, check that the committed file is still the one caddy holds:
 
 ```sh
-openssl x509 -in modules/machines/nixos/cinnabar/pki/caddy-root-ca.crt -noout -fingerprint -sha256
+openssl x509 -in vars/per-machine/cinnabar/caddy-root-ca/root.crt/value -noout -fingerprint -sha256
 ssh cinnabar.zt 'sudo cat /var/lib/caddy/.local/share/caddy/pki/authorities/local/root.crt' | openssl x509 -noout -fingerprint -sha256
 ```
 
@@ -163,13 +163,13 @@ On macOS, a darwin host that enables `services.zt-services-trust` installs the c
 On a Mac without it, install it by hand:
 
 ```sh
-sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain modules/machines/nixos/cinnabar/pki/caddy-root-ca.crt
+sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain vars/per-machine/cinnabar/caddy-root-ca/root.crt/value
 ```
 
 Then open `https://ntfy.zt/fleet-alerts` in a browser, allow notifications, and keep the tab open.
 The server configures no web push, so a browser shows notifications only while the page is open.
 
-On Android, join the ZeroTier network in the ZeroTier app, copy `caddy-root-ca.crt` to the phone, and install it as a CA certificate under Settings, in Encryption & credentials → Install a certificate → CA certificate; the menus above that entry differ between Android versions.
+On Android, join the ZeroTier network in the ZeroTier app, copy `vars/per-machine/cinnabar/caddy-root-ca/root.crt/value` to the phone as `caddy-root-ca.crt`, and install it as a CA certificate under Settings, in Encryption & credentials → Install a certificate → CA certificate; the menus above that entry differ between Android versions.
 Install the ntfy app from F-Droid or Google Play, and in it add a subscription to topic `fleet-alerts` on the server `https://ntfy.zt` (use another server, not `ntfy.sh`).
 Do not accept the app's offer to trust the server's certificate ("Your connection is not private"): the app then pins that exact leaf certificate and trusts nothing else for the server, and caddy replaces the leaf every 12 hours, so the subscription fails with "Certificate fingerprint mismatch" at the next renewal.
 With caddy's root installed as a CA certificate, the app needs no pin; if one exists, delete the `ntfy.zt` entry under the app's Settings → Advanced → Trusted certificates.
@@ -184,15 +184,139 @@ sudo NTFY_TOKEN_FILE=/run/secrets/vars/shared/ntfy-alerter/token "$(command -v n
 
 The phone should show it within seconds.
 
-From a shell on any mesh host, poll recent messages:
+From the repository root on any mesh host, poll recent messages:
 
 ```sh
-curl -sk 'https://ntfy.zt/fleet-alerts/json?poll=1&since=1h' | jq -c '{time, title, priority, message}'
+curl -s --cacert vars/per-machine/cinnabar/caddy-root-ca/root.crt/value 'https://ntfy.zt/fleet-alerts/json?poll=1&since=1h' | jq -c '{time, title, priority, message}'
 ```
 
-`-k` skips certificate verification; without it, `curl` on a host that does not trust caddy's root certificate fails with `unable to get local issuer certificate`.
-Pass `--cacert` with a copy of `caddy-root-ca.crt` to verify instead, or post through `ntfy-send`, which uses `-k` as every fleet sender does.
+`--cacert` makes curl accept only a chain to caddy's root, whatever the host's own trust store holds; outside the repository, pass a copy of that file.
+Do not replace it with `-k`, which accepts any server answering for `ntfy.zt`; `ntfy-send` verifies against the same root, which its closure carries.
 ntfy keeps each topic's messages on disk for a week, so they survive ntfy restarts and a poll or a reconnecting phone sees at most the last week.
+
+## caddy's root
+
+caddy's local authority on cinnabar signs `ntfy.zt`'s certificate under a root that is cinnabar's clan vars `caddy-root-ca`.
+Its `root.crt` is public, committed at `vars/per-machine/cinnabar/caddy-root-ca/root.crt/value`, and its `root.key` is secret, deployed to `/run/secrets/vars/per-machine/cinnabar/caddy-root-ca/root.key` with owner `caddy` and mode `0400`.
+caddy loads both through its `pki` global option, set by `modules/nixos/caddy-local-root.nix`, and cinnabar's build-time check `caddy-root-from-vars` fails if caddy's adapted configuration names other files or if the root's fingerprint differs from the one recorded in `modules/machines/nixos/cinnabar/caddy-root-ca.nix`.
+Every client reads the same file: `ntfy-send` carries it in its closure as a store path, and `services.zt-services-trust` installs it into a darwin host's System keychain.
+
+### The import
+
+The root and key are the ones caddy generated on 2026-01-27.
+The operator (crs58) imported them on 2026-11-08 at 15:43:24Z, piping each file from caddy's storage on cinnabar into `CLAN_NO_COMMIT=1 clan vars set cinnabar caddy-root-ca/<file>`, with `TMPDIR` on a RAM disk that was detached afterwards, so the key's clear text reached no disk.
+The imported root is `CN=Caddy Local Authority - 2026 ECC Root`, SHA-256 fingerprint `7E:78:F6:7C:83:BD:DC:81:51:FF:EB:8F:82:1A:68:5D:02:89:9F:93:27:33:7F:9B:F2:41:9B:F9:3B:AA:2E:82`, valid until 2035-12-06 14:29:17 GMT.
+The key's readers are `machines/cinnabar` and `users/cameron`; the sops users `cameron` and `crs58` hold one age key.
+`clan vars generate` cannot mint them: the generator's script only fails, and a generator whose files exist counts as current.
+Never run `clan vars generate` with `--regenerate` on `caddy-root-ca`; replace its files only with `clan vars set`, as the rotation below does.
+
+The key in the repository is a security trade-off.
+It is sops-encrypted to cinnabar's age key and the importing admin's age key, so an encrypted copy lives in every clone and in the forge, and anyone holding one of those private keys, or root on cinnabar, can sign a certificate every `ntfy.zt` client trusts.
+The alternative was worse: a reinstall of cinnabar without the key would mint a root no client trusts, the operator's phone included.
+The admin key's holder already holds root on cinnabar, and no other sops user is a recipient; adding one to the var gives that person the same power.
+
+### After a reinstall of cinnabar
+
+Deploy cinnabar; the vars restore the root:
+
+```sh
+clan machines update cinnabar --target-host root@49.13.68.78
+```
+
+The deploy writes `root.key` from the vars and caddy loads the root from them, so caddy serves the same root; with empty storage it issues a new intermediate under it.
+Then check the served chain from a mesh host at the repository root, and run the weekly check once by hand on cinnabar:
+
+```sh
+openssl s_client -connect ntfy.zt:443 -servername ntfy.zt -CAfile vars/per-machine/cinnabar/caddy-root-ca/root.crt/value -verify_return_error </dev/null
+ssh root@cinnabar.zt 'systemctl start caddy-root-check; journalctl -u caddy-root-check -n 3 --no-pager -o cat'
+```
+
+`Verify return code: 0 (ok)` and the line `caddy-root-check: served chain verifies against root 7E:78:…:2E:82, expires Dec  6 14:29:17 2035 GMT` mean every client trusts cinnabar again.
+
+### When caddy-root-check fails
+
+`caddy-root-check.timer` runs `caddy-root-check.service` on cinnabar every Monday at 14:00 UTC.
+The service reads the chain caddy serves for `ntfy.zt` on `ntfy.zt:443`, verifies it against the store copy of `root.crt`, and requires the root to stay valid for at least 180 more days; on success it logs `caddy-root-check: served chain verifies against root <fingerprint>, expires <notAfter>`.
+A failure posts `FAILED caddy-root-check.service on cinnabar`; `sudo journalctl -u caddy-root-check -n 20 --no-pager` on cinnabar shows one of two messages.
+
+- `caddy-root-check: the chain served for ntfy.zt does not verify against <bundle>`: whatever answers on `ntfy.zt:443` serves a chain that does not end at the repository's root, such as a caddy that has minted its own root, a stale intermediate, or another server.
+  Every `ntfy-send` refuses the same chain, so every post on every host stops, this `FAILED` notice included, and the report is the external watch's down email about 15 minutes after the dead-man's last accepted ping, with nothing new on `fleet-alerts`.
+  On cinnabar, compare `curl -s localhost:2019/config/apps/pki` with the vars' paths and read `sudo journalctl -u caddy --since -1h --no-pager` for the PKI app's errors; deploying cinnabar from `origin/main` restores the configured root.
+- `caddy-root-check: caddy's root expires <notAfter>, within <days> days`: the root expires within 180 days; rotate it as below.
+  The unit stays failed until the rotation, with one notice per failure episode.
+
+caddy stops its local authority once the root has less than the 7-day intermediate lifetime left, from 2035-11-29 14:29:17Z, so after that date no certificate is issued for `ntfy.zt` and every post stops; the check fails from its first run after 2035-06-09 14:29:17Z, 180 days before the root's expiry.
+
+### Rotating caddy's root
+
+Rotate before 2035-06-09, or as soon as `caddy-root-check` reports the root's expiry.
+Every step is the operator's, and each merge lands through a pull request; run every `clan vars set` with `CLAN_NO_COMMIT=1` from the repository root, and the one that sets the key with `TMPDIR` on a RAM disk, as the import did.
+
+1. On cinnabar, in a directory only root reads, generate a P-256 key and a self-signed root with RV's extensions, valid 3600 days and named as caddy's own template names a root:
+
+   ```sh
+   ssh root@cinnabar.zt 'bash -s' <<'EOS'
+   umask 077
+   d=/root/caddy-root-rotation; mkdir -m 700 "$d"; cd "$d"
+   nix shell nixpkgs#openssl -c bash -c '
+     openssl ecparam -name prime256v1 -genkey -noout -out root.key
+     openssl req -x509 -new -key root.key -sha256 -days 3600 \
+       -subj "/CN=Caddy Local Authority - $(date -u +%Y) ECC Root" \
+       -addext "basicConstraints=critical,CA:TRUE,pathlen:1" \
+       -addext "keyUsage=critical,keyCertSign,cRLSign" -out root.crt
+     openssl x509 -in root.crt -noout -subject -enddate -fingerprint -sha256'
+   EOS
+   ```
+
+2. Set RV to the old root followed by the new one; caddy keeps using the first certificate and the unchanged key:
+
+   ```sh
+   { cat vars/per-machine/cinnabar/caddy-root-ca/root.crt/value; ssh root@cinnabar.zt 'cat /root/caddy-root-rotation/root.crt'; } \
+     | CLAN_NO_COMMIT=1 clan vars set cinnabar caddy-root-ca/root.crt
+   ```
+
+   Merge, then deploy every running host, magnetite, cinnabar, pyrite and stibnite, as "Deploying cinnabar and pyrite" describes, reading every post since each deploy's start; install the new root on the phone by hand beside the old one.
+
+3. Set `root.key` to the new key and RV to the new root followed by the old one, and set `vanixiets.caddyLocalRoot.fingerprint` in `modules/machines/nixos/cinnabar/caddy-root-ca.nix` to the new root's fingerprint from step 1:
+
+   ```sh
+   ssh root@cinnabar.zt 'cat /root/caddy-root-rotation/root.key' | CLAN_NO_COMMIT=1 clan vars set cinnabar caddy-root-ca/root.key
+   { ssh root@cinnabar.zt 'cat /root/caddy-root-rotation/root.crt'; openssl x509 -in vars/per-machine/cinnabar/caddy-root-ca/root.crt/value; } \
+     | CLAN_NO_COMMIT=1 clan vars set cinnabar caddy-root-ca/root.crt
+   ```
+
+   `openssl x509` prints only the file's first certificate, the old root.
+   Merge, and before deploying cinnabar move caddy's stored intermediate aside, so caddy issues one under the new root instead of loading the old one; then deploy cinnabar:
+
+   ```sh
+   ssh root@cinnabar.zt 'mkdir -m 700 /root/caddy-intermediate-old && mv /var/lib/caddy/.local/share/caddy/pki/authorities/local/intermediate.{crt,key} /root/caddy-intermediate-old/'
+   clan machines update cinnabar --target-host root@49.13.68.78
+   ```
+
+   caddy refuses a key that does not match RV's first certificate, so a step 3 with the two certificates out of order fails caddy's reload and leaves the old root serving.
+
+4. Run `caddy-root-check` by hand, verify the served chain against the new root alone from the repository root, and post one message from each host, running the last line on each:
+
+   ```sh
+   ssh root@cinnabar.zt 'systemctl start caddy-root-check; journalctl -u caddy-root-check -n 3 --no-pager -o cat'
+   openssl x509 -in vars/per-machine/cinnabar/caddy-root-ca/root.crt/value -out "$TMPDIR/new-root.crt"
+   openssl s_client -connect ntfy.zt:443 -servername ntfy.zt -CAfile "$TMPDIR/new-root.crt" -verify_return_error </dev/null
+   sudo NTFY_TOKEN_FILE=/run/secrets/vars/shared/ntfy-alerter/token "$(command -v ntfy-send)" "rotation check $(hostname -s)" fleet-acceptance
+   ```
+
+   caddy's leaf for `ntfy.zt` lives 12 hours and is stored with the intermediate that signed it, so caddy can still serve a chain to the old root after step 3, which `caddy-root-check` against the two-root RV does not tell apart; only the read against the new root alone shows the switch.
+   If it does not verify, wait for the leaf's renewal and read again.
+
+5. Only after step 4's read verifies, set RV to the new root alone, merge, and deploy every running host again:
+
+   ```sh
+   openssl x509 -in vars/per-machine/cinnabar/caddy-root-ca/root.crt/value | CLAN_NO_COMMIT=1 clan vars set cinnabar caddy-root-ca/root.crt
+   ```
+
+   Stored leaves are not moved.
+   After this deploy, remove `/root/caddy-root-rotation` and `/root/caddy-intermediate-old` on cinnabar.
+
+`services.zt-services-trust` imports the root into a darwin host's System keychain by its common name; whether it imports both certificates of the overlap is checked at the first rotation, and it affects only browsers on darwin, not any `ntfy.zt` client.
 
 ## Reading alerts
 
@@ -552,7 +676,7 @@ After magnetite's deploy, check on each agent that `curl -s http://127.0.0.1:888
 - ZeroTier carries the packets and authenticates nothing here: membership of the network reaches port 4318 on magnetite, and only a certificate gets past the handshake.
 - Nothing here proves that a series reached the store end to end: each host's `otel-envelope` judges its own collector's queues and loss counters, and `RuleSignalMissing <host>` reports an always-on host's silence, but no check compares what an agent sent with what the store holds.
 - The `alerter` token is on every collecting host, stibnite included, so a compromised stibnite, like a compromised pyrite, can post to any `fleet-*` topic; an anonymous post to a `fleet-*` topic is refused with 403, as one from stibnite was on 2026-11-05.
-- `ntfy-send` does not verify ntfy.zt's certificate: it runs `curl -sfk`, the store curl on Linux and `/usr/bin/curl` on darwin, so whoever answers for ntfy.zt on the mesh receives the token; verification in every ntfy client is tracked in Linear (CAM-87).
+- Since CAM-87, deployed on 2026-11-08, `ntfy-send` verifies `ntfy.zt` against caddy's root with the store curl on Linux and darwin alike, and the permission hooks post through it, so a server answering for `ntfy.zt` on the mesh without a chain to that root receives neither the token nor the message; whoever holds the root's key can still pass, which "caddy's root" states.
 
 ## The ingress and its refusal
 

@@ -53,6 +53,8 @@ It also runs the dead-man against a loopback ntfy stand-in, with a configuration
 Relations within one host are module and host assertions, so evaluating that host fails when they break: on the host that enables the dead-man, its URL is ntfy's listener, ntfy's access entries refuse anonymous writes to the heartbeat and alert topics, let `alerter` write both and decide no host-named topic, and the dead-man is ordered after `ntfy-sh`, `caddy` and `zerotierone` without wanting them; and with a token set, `nixos/observability-notify.nix` requires every notified unit's resolve hooks to run under the token file.
 `checks.x86_64-linux.ntfy-provisioning` runs the `ntfy-alerter` generator from `nixos/ntfy-alerter.nix` and cinnabar's `ntfy-alerter-env` generator in the sandbox, and checks the rendered token, password hash and cinnabar's access entries before ntfy could refuse them at start.
 ntfy's enforcement of the access entries, its rate limiting and the rules against real series are verified at deployment, not by these checks.
+`checks.x86_64-linux.ntfy-tls-verification` scans `modules/` and `pkgs/` for an `ntfy.zt` client passing `-k` or `--insecure` or undeclared, and runs `flake.lib.caddyRootCheck` over roots made in the sandbox; it does not observe the chain caddy serves, which cinnabar's weekly `caddy-root-check` verifies.
+`caddy-root-from-vars`, built with cinnabar's toplevel, adapts caddy's configuration and compares the configured root with the vars and the recorded fingerprint; `vmTests.x86_64-linux.caddy-root-from-vars` shows a caddy with empty storage serving under a configured root.
 The dev-loop checks are gated the same way and need no runtime host.
 `checks.x86_64-linux.devloop-queries` requires nixbot's abandonment patch, `nixos/nixbot-abandon-optional-attributes.patch`, to contain `flake.lib.devloopCollection.abandonMarker` in its production context, the three added lines that return it for an abandoned attribute.
 It also applies the nixbot input's migrations to a sandboxed PostgreSQL, creates the two reader roles with the column grants rendered by `nixos/devloop-collection.nix`, loads fixture rows, and runs the two export queries as `opentelemetry-collector` and the reconcile's queries as `devloop-reconcile`; it requires `abandoned` to be true only for the marker row, no result cell to contain a fixture error string, `outputs_out` to be empty for a null `outputs`, and the five-minute overlap and tied rows to be read, and it rejects the mutants `renameCached`, `selectError`, `grantWithoutError`, `errorUnderAlias`, `reconcileGrantWithoutFinishedAt` and `currentFinishIgnoresDuplicates`.
@@ -77,6 +79,7 @@ nix build .#vmTests.x86_64-linux.greptimedb-pipeline          # Magnetite, uid-r
 nix build .#vmTests.x86_64-linux.devloop-ingest               # Magnetite, uid-range
 nix build .#vmTests.x86_64-linux.fleet-ingress                # Magnetite, uid-range
 nix build .#vmTests.x86_64-linux.perses-greptimedb            # Magnetite, uid-range
+nix build .#vmTests.x86_64-linux.caddy-root-from-vars         # Magnetite, uid-range
 nix build .#vmTests.x86_64-linux.greptimedb-oom-order         # Pyrite, kvm
 ```
 
@@ -97,6 +100,10 @@ Run it on Magnetite before merging any change to the dev-loop receivers, pipelin
 `fleet-ingress` runs the telemetry store, a collector of both roles with its `otlp/mesh` receiver on loopback, and Electrum's evaluated non-ingress collector exporting to it over mutual TLS with throwaway certificates, in one systemd-nspawn container.
 It establishes that the receiver refuses a client without a certificate, with a rogue CA's certificate or at TLS 1.2, that metrics and deploy records cross the ingress into the store, that back-pressure from a stopped store or a refusing limiter fills the agent's queue without loss, that each envelope clause fails on its negative control when run as its unit, and that each budget fixture fails its clause on the ingress host's unit.
 It stands the container's loopback in for Magnetite's ZeroTier address and generates its own certificates, so it establishes nothing about the real address, the `zt+` firewall opening, the deployed certificates or the refusal over the mesh, which are observed at deployment.
+
+`caddy-root-from-vars` runs three systemd-nspawn containers: `restored`, a caddy importing `flake.modules.nixos.caddy-local-root` with a root and key made in the test and empty storage, `minting`, the same caddy without the module, and a client.
+It establishes that the client's curl, given the test root, gets 200 from `restored`, whose served intermediate verifies against that root and whose storage never holds `root.crt`, and exit 60 from `minting`, which mints a root of its own.
+It uses a test root, so it establishes nothing about cinnabar's deployed vars, their sops delivery or the root caddy serves on `ntfy.zt`, which cinnabar's build-time check, its deploy and `caddy-root-check` cover.
 
 `perses-greptimedb` runs the telemetry store with Magnetite's databases, devloop tables and store accounts, Perses from `flake.modules.nixos.perses`, and nginx with the module's vhost on plain HTTP, in one systemd-nspawn container.
 No Kanidm runs: the test replaces the providers with native login, adds a test-only provisioning folder holding one native `User` and `greptimedb-sql-open` (the SQL datasource without `allowHeaders`), and holds the module's assertion to exactly the serving-predicate failures those overrides explain.
