@@ -23,47 +23,55 @@
           default = { };
           example = lib.literalExpression ''
             {
-              operator.actor = "act-cameron";
-              servers.prod.url = "https://graph.example.com";
-              defaults = {
-                server = "prod";
+              version = 1;
+              targets.prod = {
+                kind = "server";
+                endpoint = "https://graph.example.com";
                 default_graph = "knowledge";
+                auth = {
+                  provider = "token";
+                  source.store = { };
+                };
+              };
+              defaults = {
+                target = "prod";
                 output = "table";
               };
-              clusters.brain.root = "s3://acme/clusters/brain";
-              profiles.staging = {
-                server = "staging";
-                default_graph = "knowledge";
-              };
               aliases.triage = {
-                server = "prod";
+                target = "prod";
                 graph = "knowledge";
                 query = "weekly_triage";
-                args = [ "since" ];
+                params.limit = 20;
               };
             }
           '';
           description = ''
             Contents of the operator configuration at
-            {file}`~/.omnigraph/config.yaml` — the per-person surface declaring
-            identity and ergonomics, as against the team-owned `cluster.yaml`
-            that declares what the system is. Documented keys are
-            `operator.actor` (the default `--as` identity), `servers` (named
-            endpoints, whose names key the stored credentials), `defaults` (the
-            flat no-flag scope), `clusters` (admin-only storage roots),
-            `profiles` (named scope bundles selected with `--profile`), and
-            `aliases` (personal short names bound to stored queries). See
-            <https://github.com/ModernRelay/omnigraph/blob/main/docs/user/cli/reference.md>.
+            {file}`~/.omnigraph/config.yaml` — the per-person surface naming
+            destinations and ergonomics, as against the team-owned
+            `cluster.yaml` that declares what the system is. The keys are
+            `version` (always `1`), `targets` (named destinations selected with
+            `--target`, each owning its endpoint and `auth` source), `profiles`
+            (managed-service identities), `defaults` (`target`, `profile`,
+            `output`), and `aliases` (personal short names bound to a target,
+            a graph and a stored read query). See
+            <https://github.com/ModernRelay/omnigraph/blob/main/docs/user/cli/targets.md>.
 
             Freeform rather than typed per key: no logic in this module reads a
-            key, and omnigraph loads unknown keys with a warning so that a file
-            written for a newer CLI still works on an older one. A typed surface
-            would convert that tolerance into an evaluation error.
+            key, and upstream publishes the schema
+            (`docs/user/cli/operator-config.schema.json`) and checks it with
+            `omnigraph config validate`. Omnigraph refuses the whole file on any
+            unknown field, so a configuration written for an older CLI must be
+            migrated with the package.
 
-            Rendered to a read-only symlink into the Nix store. Nothing in the
-            CLI writes this file; `omnigraph login` and `omnigraph logout` write
-            only {file}`~/.omnigraph/credentials`, which this module deliberately
-            leaves unmanaged so the bearer token stays out of Nix.
+            Rendered to a read-only symlink into the Nix store, which omnigraph
+            accepts: it keeps authentication state in the writable
+            {file}`~/.omnigraph`, and only explicit configuration edits such as
+            `omnigraph target add` need a writable file. A `store` token source
+            lives in the OS secure store, installed with
+            `omnigraph credentials set --target <name> --stdin`, which this
+            module deliberately leaves unmanaged so the bearer token stays out
+            of Nix.
           '';
         };
       };
@@ -72,10 +80,10 @@
         home.packages = [ cfg.package ];
 
         # No token may be added here. Omnigraph resolves a bearer token only
-        # from OMNIGRAPH_TOKEN_<NAME>, the [<name>] section of
-        # ~/.omnigraph/credentials, or OMNIGRAPH_BEARER_TOKEN, and upstream
-        # specifies this file as carrying "no tokens in this file, ever". That
-        # is what makes a world-readable store path an acceptable target.
+        # from the source a target's `auth` names (the secure store, a named
+        # environment variable, a file or a helper command), and upstream
+        # forbids tokens in this YAML. That is what makes a world-readable
+        # store path an acceptable target.
         home.file.".omnigraph/config.yaml".source = yaml.generate "omnigraph-config.yaml" cfg.settings;
       };
     };

@@ -3,9 +3,10 @@
 #
 # The probe from modules/lib/omnigraph-readiness.nix is the server unit's
 # ExecStartPost. omnigraph-server exits within seconds when it cannot boot and
-# opens graphs only at startup, so a dead main process, a quarantined graph or
-# a short served-graph count can never turn into readiness; before this probe
-# each of them held the start job open for the full readiness timeout.
+# opens graphs only at startup, so a dead main process, a graph blocked after
+# loading or a short served-graph count can never turn into readiness; before
+# this probe each of them held the start job open for the full readiness
+# timeout.
 #
 # Every row builds the probe through self.lib.omnigraphReadinessProbe, the
 # function the NixOS module calls, and runs it against a loopback stub of
@@ -37,26 +38,42 @@
         timeout = 3;
       };
 
-      # A v0.11.0 ReadinessOutput.
+      # A v0.15.0 ReadinessOutput. /readyz answers 503 while any graph is
+      # loading and once shutdown has begun, 200 otherwise.
       readiness =
         {
           ready ? true,
           served,
-          quarantined ? 0,
+          loading ? 0,
+          blocked ? 0,
+          status ? if blocked > 0 then "degraded" else "serving",
         }:
         {
-          inherit ready;
-          status = if ready then "serving" else "draining";
+          inherit ready status;
+          booted_serving_digest = "sha256:${lib.fixedWidthString 64 "0" ""}";
           state_revision = 1;
+          state_cas = "sha256:${lib.fixedWidthString 64 "1" ""}";
           served_graph_count = served;
-          quarantined_graph_count = quarantined;
-          shutdown_grace_seconds = 30;
+          ready_graph_count = served - loading - blocked;
+          loading_graph_count = loading;
+          blocked_graph_count = blocked;
+          shutdown_grace_seconds = 25;
         };
+      loading = [
+        503
+        (readiness {
+          ready = false;
+          served = 2;
+          loading = 2;
+          status = "loading";
+        })
+      ];
       draining = [
         503
         (readiness {
           ready = false;
           served = 2;
+          status = "draining";
         })
       ];
 
@@ -205,23 +222,41 @@
           requests = 1;
         }
         {
-          name = "a quarantined graph fails fast";
+          name = "a graph blocked after loading fails fast";
           probe = probeExpected;
           responses = [
             [
               200
               (readiness {
                 served = 2;
-                quarantined = 1;
+                blocked = 1;
               })
             ]
           ];
           status = 1;
           expect = [
-            "quarantined 1 graph(s) during startup"
-            "graph quarantined during startup"
-            "omnigraph-cluster status"
+            "finished startup with 1 blocked graph(s)"
+            "journalctl -u omnigraph-server"
+            "GET /graphs"
           ];
+          maxElapsed = 10;
+          requests = 1;
+        }
+        {
+          name = "a blocked graph fails fast without an expected count";
+          probe = probeAny;
+          responses = [
+            [
+              200
+              (readiness {
+                served = 2;
+                blocked = 2;
+                status = "blocked";
+              })
+            ]
+          ];
+          status = 1;
+          expect = [ "finished startup with 2 blocked graph(s)" ];
           maxElapsed = 10;
           requests = 1;
         }
@@ -240,11 +275,11 @@
           requests = 1;
         }
         {
-          name = "503 then 200 is transient";
+          name = "503 while loading, then 200, is transient";
           probe = probeExpected;
           responses = [
-            draining
-            draining
+            loading
+            loading
             [
               200
               (readiness { served = 2; })
@@ -307,7 +342,7 @@
               pkgs.gnugrep
               pkgs.python3
             ];
-            meta.description = "behavioural check: the omnigraph-server readiness probe fails fast on a dead server, quarantined or missing graphs, and waits out transient 503s";
+            meta.description = "behavioural check: the omnigraph-server readiness probe fails fast on a dead server, blocked or missing graphs, and waits out transient 503s";
           }
           ''
             set -euo pipefail

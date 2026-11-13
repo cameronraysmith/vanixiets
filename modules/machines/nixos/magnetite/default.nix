@@ -22,8 +22,8 @@ in
       omnigraphCookbooks = pkgs.fetchFromGitHub {
         owner = "ModernRelay";
         repo = "omnigraph-cookbooks";
-        rev = "7978b30199c8172b5fba612aef3c5b42f15f5e72";
-        hash = "sha256-zdh4RPcZjASYaorsl1LAfvBLZ6WYfxiCbVKjxhCbtfQ=";
+        rev = "c13bac144fcf5692fab38b83fc09705d37789d6e";
+        hash = "sha256-807iN/pe/JVlPPcKuz8+KfGXv72UJGl18fo5x4ElpWQ=";
       };
 
       # The telemetry store's dataset (ADR-007 E7.3; design D5): one source for
@@ -458,13 +458,11 @@ in
       services.omnigraph = {
         enable = true;
 
-        # A fresh root for omnigraph 0.11. The previous root,
-        # s3://sciexp/omnigraph/clusters/dev-graph, holds a graph written by a
-        # pre-0.9 development build at internal manifest schema v19, which 0.11
-        # refuses to open and cannot upgrade in place. It stays untouched as
-        # the export source and rollback copy; upstream's parallel-root cutover
-        # (docs/user/operations/upgrade.md, "Cluster cutover") applies.
-        storageUri = "s3://sciexp/omnigraph/clusters/dev-graph-v9";
+        # A fresh root for omnigraph 0.15, initialized by the bootstrap unit.
+        # The previous root, s3://sciexp/omnigraph/clusters/dev-graph-v9, held
+        # only disposable stub data written by 0.11, so nothing was exported
+        # into this one.
+        storageUri = "s3://sciexp/omnigraph/clusters/dev-graph-v10";
 
         s3 = {
           endpointUrl = "https://1ece4a9a8f092f8cbdd679d22b9ecb1f.r2.cloudflarestorage.com";
@@ -474,6 +472,12 @@ in
         bindAddress = magnetite.zt;
         port = 8090;
         requireAllGraphs = true;
+        # Clients reach /mcp through cinnabar's omnigraph.zt TLS front, and
+        # the server refuses an MCP request whose Host it does not list.
+        extraFlags = [
+          "--mcp-allowed-host"
+          "omnigraph.zt"
+        ];
 
         environmentFile = config.clan.core.vars.generators.omnigraph-r2.files."env".path;
         bearerTokensFile =

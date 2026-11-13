@@ -54,40 +54,54 @@ in
         name = "omnigraph-cluster-apply";
         runtimeInputs = [
           cfg.package
+          pkgs.coreutils
+          pkgs.gnused
           pkgs.jq
         ];
         text = ''
-          if ! importOutput=$(omnigraph cluster import --config ${clusterConfigDir} --json); then
-            printf '%s\n' "$importOutput"
-            jq -e '.diagnostics[]? | select(.code == "state_already_exists")' \
-              <<<"$importOutput" >/dev/null
-          fi
-          applyStatus=0
-          applyOutput=$(omnigraph --as ${lib.escapeShellArg cfg.cluster.actor} \
-            cluster apply --config ${clusterConfigDir} --json) || applyStatus=$?
-          printf '%s\n' "$applyOutput"
+          storage=${lib.escapeShellArg cfg.storageUri}
+          applyErr=$(mktemp)
+          trap 'rm -f -- "$applyErr"' EXIT
 
-          # `ok` is `!has_errors`, so the warnings that leave changes unapplied
-          # — approval_required, apply_dependency_blocked,
-          # dependency_not_applied, cluster_recovery_pending — all exit 0. Each
-          # rides a Blocked disposition and leaves a residual, which `converged`
-          # catches. cluster_recovery_pending also fires standalone out of the
-          # recovery sweep, which only marks the graph Drifted and leaves the
-          # ledger digests `converged` compares untouched — yet the server
-          # quarantines that graph — so that code needs its own check.
+          # A fresh root needs no import: a direct apply creates the ledger and
+          # the declared graphs. It exits nonzero unless the deployment
+          # completed and converged.
+          applyStatus=0
+          applyOutput=$(omnigraph --as ${lib.escapeShellArg cfg.cluster.actor} --target "$storage" \
+            cluster apply --config ${clusterConfigDir} --json 2>"$applyErr") || applyStatus=$?
+          cat "$applyErr" >&2
+          printf '%s\n' "$applyOutput"
           if [ "$applyStatus" -ne 0 ] \
-            || ! jq -e '.ok and .converged and ([.diagnostics[]?
-                        | select(.code == "cluster_recovery_pending")] | length == 0)' \
-              <<<"$applyOutput" >/dev/null; then
-            printf 'omnigraph cluster apply did not converge (exit %s)\n' \
-              "$applyStatus" >&2
+            || ! jq -e '.status == "complete" and .result.converged' <<<"$applyOutput" >/dev/null; then
+            printf 'omnigraph cluster apply did not converge (exit %s)\n' "$applyStatus" >&2
             jq -r '.diagnostics[]? | "\(.severity) \(.code) \(.path): \(.message)"' \
-              <<<"$applyOutput" >&2 || true
-            jq -r '.changes[]? | select(.disposition != "applied" and .disposition != "derived")
-                   | "\(.disposition // "unplanned") \(.resource): \(.reason // "")"' \
               <<<"$applyOutput" >&2 || true
             exit 1
           fi
+
+          # A direct apply keeps its unleased admission lock after it exits,
+          # and the server refuses to boot past it. This process has exited,
+          # so its storage I/O has settled and the lock it reported may be
+          # released; any other holder (a server's leased lock, an earlier
+          # writer) is left alone for an operator to investigate.
+          appliedLock=$(sed -n 's/^Admission lock: \([^;]*\);.*/\1/p' "$applyErr")
+          if ! statusOutput=$(omnigraph --target "$storage" cluster status --json); then
+            printf '%s\n' "$statusOutput" >&2
+            printf 'omnigraph cluster status failed after apply; the admission lock %s was not released\n' \
+              "''${appliedLock:-(unreported)}" >&2
+            exit 1
+          fi
+          heldLock=$(jq -r '.lock_id // empty' <<<"$statusOutput")
+          if [ -z "$heldLock" ]; then
+            exit 0
+          fi
+          if [ -z "$appliedLock" ] || [ "$heldLock" != "$appliedLock" ]; then
+            printf '%s\n' "$statusOutput" >&2
+            printf 'the cluster admission lock %s is not the one this apply reported (%s); not releasing it\n' \
+              "$heldLock" "''${appliedLock:-none}" >&2
+            exit 1
+          fi
+          omnigraph --target "$storage" cluster force-unlock "$heldLock" --json
         '';
       };
 
@@ -126,23 +140,27 @@ in
           export OMNIGRAPH_HOME
           trap 'rm -rf -- "$OMNIGRAPH_HOME"' EXIT
           cd ${lib.escapeShellArg clusterEtcPath}
-          # Only apply and approve are actor-bound; the read-only verbs
-          # (validate, plan, observe, status, refresh, import, force-unlock)
-          # reject --as outright rather than ignoring it.
-          actorArgs=()
+          # Every verb but validate addresses the storage root through
+          # --target. Only plan, apply and upgrade-ledger take --as; the
+          # others reject it rather than ignoring it.
+          targetArgs=(--target ${lib.escapeShellArg cfg.storageUri})
           case "''${1-}" in
-            apply | approve)
-              actorArgs=(--as ${lib.escapeShellArg cfg.cluster.actor})
+            validate)
+              targetArgs=()
+              ;;
+            plan | apply | upgrade-ledger)
+              targetArgs+=(--as ${lib.escapeShellArg cfg.cluster.actor})
               ;;
           esac
-          omnigraph "''${actorArgs[@]}" cluster "$@"
+          omnigraph "''${targetArgs[@]}" cluster "$@"
         '';
       };
 
-      # Graphs the applied cluster revision declares. A root that was imported
-      # but never applied boots with none of them and still passes /readyz,
-      # even under --require-all-graphs, so the probe holds the served count
-      # to this number when the server is meant to serve the whole cluster.
+      # Graphs the applied cluster revision declares. A revision applied from
+      # elsewhere with fewer graphs (an empty cluster included) boots and
+      # passes /readyz, even under --require-all-graphs, so the probe holds the
+      # registered count to this number when the server is meant to serve the
+      # whole cluster.
       declaredGraphCount = builtins.length (lib.attrNames (cfg.cluster.settings.graphs or { }));
 
       # Fails the start job within seconds when the server process has
@@ -181,7 +199,6 @@ in
       bootstrapScript = flakeLib.omnigraphBootstrap pkgs {
         omnigraph = cfg.package;
         applyProgram = lib.getExe applyScript;
-        configDir = clusterConfigDir;
         storageUri = cfg.storageUri;
       };
 
@@ -283,24 +300,19 @@ in
           type = lib.types.bool;
           default = false;
           description = ''
-            Refuse to serve unless the cluster boots entirely clean.
+            Refuse to serve unless every graph in the applied revision opens.
 
-            Broader than the quarantine framing upstream's server documentation
-            gives it: the server bails whenever the boot snapshot carries any
-            diagnostic at all, of any severity and about any resource, before it
-            has opened a single dataset. A warning that leaves every graph
-            healthy is fatal too. Skipped graphs and graphs that fail to open
-            are then also fatal, at the later stages that detect them.
+            With this set, no graph serves until all of them have opened, and a
+            single graph that fails to open stops the server. By default a
+            failed graph stays registered as blocked and the healthy graphs
+            still serve.
 
-            By default those same diagnostics are logged as warnings and the
-            healthy graphs still serve.
-
-            None of them clear by retrying — they clear through a cluster
-            `refresh` or `apply` — so enabling this also caps `omnigraph-server`
-            at five start attempts, after which it stays `failed` until
-            `systemctl reset-failed`. Left off, the unit is left to restart
-            indefinitely, because the failures it can then still fail on are
-            transient ones that do clear.
+            Such failures do not clear by retrying — they clear through a
+            corrective `cluster apply` or a storage restore — so enabling this
+            also caps `omnigraph-server` at five start attempts, after which it
+            stays `failed` until `systemctl reset-failed`. Left off, the unit is
+            left to restart indefinitely, because the failures it can then
+            still fail on are transient ones that do clear.
           '';
         };
 
@@ -311,28 +323,29 @@ in
             Seconds the readiness probe waits for `/readyz` to answer before
             failing the `omnigraph-server` start job.
 
-            `omnigraph-server` opens every dataset in the cluster from storage
-            before it binds its listener, and it implements no `sd_notify`
-            handshake, so systemd would otherwise report the unit active for
-            the whole of that window while the port still refuses connections.
-            An `ExecStartPost` probe closes the gap, which makes this bound the
+            `omnigraph-server` binds its listener before it opens the graphs,
+            answers `/readyz` with 503 while any graph is still loading, and
+            implements no `sd_notify` handshake, so systemd would otherwise
+            report the unit active while no graph can be served yet. An
+            `ExecStartPost` probe closes the gap, which makes this bound the
             unit's effective startup budget: `TimeoutStartSec` is derived from
             it with five minutes of headroom, so that an unready server fails
             through the probe's own diagnostic rather than through systemd's
             generic timeout.
 
             The probe does not spend this budget on a server that cannot come
-            up. Every boot failure — a missing cluster state, a strict
-            {option}`services.omnigraph.requireAllGraphs` refusal, an
-            unreadable graph — exits the server before it binds, and the probe
-            fails the start job within seconds once the main process is gone,
-            rather than polling a dead port until the deadline. With
+            up. A boot failure — a missing or unapplied cluster state, a held
+            admission lock, a strict
+            {option}`services.omnigraph.requireAllGraphs` refusal, a cluster
+            whose graphs all fail — exits the server, and the probe fails the
+            start job within seconds once the main process is gone, rather than
+            polling until the deadline. It also fails at once when loading has
+            finished with a graph blocked, and, with
             {option}`services.omnigraph.requireAllGraphs` and
-            {option}`services.omnigraph.cluster.enable` both set, it also fails
-            at once when `/readyz` reports fewer served graphs than
-            `cluster.settings.graphs` declares: the server registers no graph
-            after boot, so that shortfall never resolves without an apply and a
-            restart.
+            {option}`services.omnigraph.cluster.enable` both set, when `/readyz`
+            reports fewer registered graphs than `cluster.settings.graphs`
+            declares: the server opens graphs only at startup, so neither
+            resolves without an apply or restore and a restart.
 
             Scale it with the cluster. Startup cost grows with the number of
             datasets and with the latency of the store they are read from.
@@ -409,19 +422,27 @@ in
 
               Also exposes that directory at `${clusterEtcPath}` and installs
               the `omnigraph` CLI along with an `omnigraph-cluster` wrapper, so
-              that the recovery commands (`status`, `refresh`, `force-unlock
-              <LOCK_ID>`) are runnable ad hoc. Every `omnigraph cluster`
-              subcommand is addressed by configuration directory alone — there
-              is no storage-URI form — and the rendered directory is an
-              anonymous store path. The wrapper runs from `${clusterEtcPath}`,
-              passes {option}`services.omnigraph.cluster.actor` as `--as` on
-              the actor-bound subcommands alone (`apply`, `approve`), since
-              the read-only verbs reject that flag, and reads
+              that the recovery commands (`status`, `force-unlock <LOCK_ID>`,
+              `upgrade-ledger --writers-stopped`) are runnable ad hoc. The
+              wrapper runs from `${clusterEtcPath}`, so `--config` defaults to
+              the rendered directory; addresses every subcommand but `validate`
+              to {option}`services.omnigraph.storageUri` with `--target`; passes
+              {option}`services.omnigraph.cluster.actor` as `--as` on `plan`,
+              `apply` and `upgrade-ledger` alone, since the other verbs reject
+              that flag; and reads
               {option}`services.omnigraph.environmentFile` for the storage
               credentials, which omnigraph accepts only from the process
               environment. That file is readable by root alone, so the wrapper
               must run as root; it refuses with that instruction rather than
               falling through to the instance metadata service and hanging.
+
+              Every direct writer, `omnigraph-cluster apply` included, retains
+              the cluster's admission lock after it exits, and the server
+              refuses to boot past it. Stop `omnigraph-server` before a direct
+              write, then release the lock the command reported with
+              `omnigraph-cluster force-unlock <LOCK_ID>` before starting it
+              again. The `omnigraph-cluster-apply` unit does that release
+              itself.
 
               Disable to serve a cluster whose configuration is applied from
               elsewhere; {option}`services.omnigraph.storageUri` alone is then
@@ -499,7 +520,7 @@ in
             default = "system";
             description = ''
               Actor recorded against every change `omnigraph cluster apply`
-              executes, and against the approval artifacts it consumes.
+              executes.
             '';
           };
 
@@ -510,19 +531,27 @@ in
               Whether to run `omnigraph cluster apply` automatically: at boot,
               and again whenever the rendered configuration directory changes.
 
-              Left off, converging is an operator action
-              (`systemctl restart omnigraph-cluster-apply.service`, then restart
-              `omnigraph-server`). The verb is `restart`, not `start`: the unit
-              sets `RemainAfterExit`, without which a changed configuration
-              directory could never re-trigger it, so once it has run it stays
+              A direct apply requires the server stopped, and the unit releases
+              the admission lock its apply leaves behind once the deployment
+              converges. A run while `omnigraph-server` holds the cluster's lock
+              is refused, so a configuration change re-triggered on a running
+              server fails until the server is stopped.
+
+              Left off, converging is an operator action (stop
+              `omnigraph-server`, `systemctl restart
+              omnigraph-cluster-apply.service`, then start `omnigraph-server`).
+              The verb is `restart`, not `start`: the unit sets
+              `RemainAfterExit`, without which a changed configuration directory
+              could never re-trigger it, so once it has run it stays
               `active (exited)` and `start` returns 0 without converging
               anything.
 
-              Off is the safer default because apply creates a missing graph
-              without ceremony: were the storage root lost out of band, an
-              automatic apply would recreate it empty and report an ordinary
-              create. First initialization of a fresh root does not need this
-              on: {option}`services.omnigraph.cluster.bootstrap.enable` applies
+              Off is the safer default because apply initializes a root that
+              holds no cluster state without ceremony: were the storage root
+              lost out of band, an automatic apply would recreate it empty and
+              report an ordinary deployment. First initialization of a fresh
+              root does not need this on:
+              {option}`services.omnigraph.cluster.bootstrap.enable` applies
               exactly once, and refuses to when the root was initialized
               before and has since gone missing.
             '';
@@ -577,7 +606,7 @@ in
         optimize = {
           enable = lib.mkOption {
             type = lib.types.bool;
-            default = true;
+            default = false;
             description = ''
               Whether to run `omnigraph optimize` on a timer. Omnigraph commits
               with Lance's automatic cleanup disabled, so fragment and index
@@ -589,6 +618,13 @@ in
               collects old versions. Reclaiming versions needs `omnigraph
               cleanup`, which is destructive and is deliberately not automated
               here.
+
+              Off by default because optimize runs only directly against
+              storage, never through the server, and a direct writer needs the
+              cluster's admission lock: it is refused while `omnigraph-server`
+              holds that lock, and a run while the server is stopped retains
+              its own lock, which then blocks the server's next start until
+              `omnigraph-cluster force-unlock <LOCK_ID>` releases it.
             '';
           };
 
@@ -858,11 +894,11 @@ in
               graph:
               lib.escapeShellArgs [
                 (lib.getExe cfg.package)
-                "--cluster"
+                "optimize"
+                "--target"
                 cfg.storageUri
                 "--graph"
                 graph
-                "optimize"
                 "--json"
               ]
             ) cfg.optimize.graphs;
