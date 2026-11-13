@@ -98,6 +98,7 @@ in
 
         additionalCasks = [
           "steipete/tap/codexbar"
+          "antigravity"
           "dbeaver-community"
           "gpg-suite"
           "inkscape"
