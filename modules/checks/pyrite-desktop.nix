@@ -219,7 +219,7 @@ in
             && toString home.programs.quickshell.package == toString pkgs.quickshell
             && declaredRef "dms-src" == dmsSrcVersion
             && dmsSrcVersion == "v${pkgs.dux-shell.version}"
-            && pkgs.dux-greeter.version == "2.1.0"
+            && pkgs.dux-greeter.version == "2.1.2"
             &&
               map toString options.programs.niri.enable.declarations == [
                 "${inputs.nixpkgs}/nixos/modules/programs/wayland/niri.nix"
