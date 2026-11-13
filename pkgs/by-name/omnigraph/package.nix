@@ -1,94 +1,83 @@
+# Upstream release binaries rather than a source build: no shared Hydra builds or
+# caches the roughly 880-crate ThinLTO build, so every bump cost a local rebuild of
+# well over an hour. The last source build is commit 61b6d92f.
 {
   lib,
   stdenv,
-  rustPlatform,
+  fetchurl,
   fetchFromGitHub,
-  protobuf,
-  cmake,
-  pkg-config,
-  aws-lc,
-  zstd,
+  autoPatchelfHook,
+  versionCheckHook,
 }:
-rustPlatform.buildRustPackage (finalAttrs: {
+stdenv.mkDerivation (finalAttrs: {
   pname = "omnigraph";
   version = "0.15.0";
 
-  # rev is the v0.15.0 tag peel rather than tag = "v${version}": upstream's release builds stamp
-  # OMNIGRAPH_SOURCE_VERSION with the source commit sha, which env below reads from src.rev.
-  src = fetchFromGitHub {
-    owner = "ModernRelay";
-    repo = "omnigraph";
-    rev = "373834b4c1c4b29cf0ddd64bee9565f98c60cc26";
-    hash = "sha256-fDjXKhh/jAXST0SGoPsGkFDIZtpGF9NxCxGd7H4snBA=";
-  };
+  src = finalAttrs.passthru.sources.${stdenv.hostPlatform.system};
 
-  cargoHash = "sha256-4Q1MKSETAjrZ67Q+LucV5gBSYjBDXPyPNOoTkuqKXLM=";
+  # Each archive unpacks to three top-level executables and no directory.
+  sourceRoot = ".";
 
-  # Workaround for the stdarch/LLVM 21 signature mismatch on the AVX-512 VNNI intrinsics retyped by
-  # https://github.com/llvm/llvm-project/pull/155194; the deleted lines are runtime-dispatch arms,
-  # so removing them falls back to the AVX2 and scalar kernels.
-  postPatch = ''
-    lanceDistance="$cargoDepsCopy/source-registry-0/lance-linalg-13.0.0/src/distance"
+  dontConfigure = true;
+  dontBuild = true;
+  # Upstream ships stripped binaries; the macOS ones carry a Developer ID
+  # signature that stripping would invalidate.
+  dontStrip = true;
 
-    substituteInPlace "$lanceDistance/dot_u8.rs" \
-      --replace-fail "return |a, b| unsafe { x86::dot_u8_avx512_vnni(a, b) };" ""
+  nativeBuildInputs = lib.optionals stdenv.hostPlatform.isLinux [ autoPatchelfHook ];
 
-    substituteInPlace "$lanceDistance/l2_u8.rs" \
-      --replace-fail "return |a, b| unsafe { x86::l2_u8_avx512_vnni(a, b) };" ""
+  buildInputs = lib.optionals stdenv.hostPlatform.isLinux [
+    stdenv.cc.cc.lib # libgcc_s.so.1
+  ];
 
-    substituteInPlace "$lanceDistance/cosine_u8.rs" \
-      --replace-fail "return |a, b| unsafe { x86::cosine_u8_accum_avx512_vnni(a, b) };" ""
+  installPhase = ''
+    runHook preInstall
+    install -Dm755 -t $out/bin omnigraph omnigraph-server omnigraph-azure-admission
+    runHook postInstall
   '';
 
-  nativeBuildInputs = [
-    protobuf
-    cmake
-    pkg-config
-  ];
-
-  buildInputs = [
-    aws-lc
-    zstd
-  ];
-
-  cargoBuildFlags = [
-    "-p"
-    "omnigraph-cli"
-    "-p"
-    "omnigraph-server"
-  ];
-
-  env = {
-    OMNIGRAPH_SOURCE_VERSION = finalAttrs.src.rev;
-  }
-  # ctor emits its constructor into __TEXT,__text_startup, past the +/-128 MiB reach of the ARM64
-  # b/bl branching back into __text, and ld64's island pass skips that section; upstream's macos-14
-  # release job sets the same flag. force-frame-pointers is restated because setting RUSTFLAGS
-  # suppresses rather than merges with nixpkgs' [target.<triple>].rustflags.
-  // lib.optionalAttrs stdenv.hostPlatform.isDarwin {
-    RUSTFLAGS = "-C code-model=large -C force-frame-pointers=yes";
-  };
-
-  doCheck = false;
-
+  # `omnigraph --version` prints `omnigraph <version>`; omnigraph-server has no
+  # --version flag, so it gets a --help smoke test.
+  nativeInstallCheckInputs = [ versionCheckHook ];
   doInstallCheck = true;
-  installCheckPhase = ''
-    runHook preInstallCheck
-
-    "$out/bin/omnigraph" --help > /dev/null
+  postInstallCheck = ''
     "$out/bin/omnigraph-server" --help > /dev/null
-
-    runHook postInstallCheck
   '';
 
-  passthru.updateScript = ./update.sh;
+  passthru = {
+    sources = {
+      "x86_64-linux" = fetchurl {
+        url = "https://github.com/ModernRelay/omnigraph/releases/download/v${finalAttrs.version}/omnigraph-linux-x86_64.tar.gz";
+        hash = "sha256-1zEs5Jq8pHprtHlWtph9MvZQ+pFni+Gr0Q4Cgkk3uxU=";
+      };
+      "aarch64-linux" = fetchurl {
+        url = "https://github.com/ModernRelay/omnigraph/releases/download/v${finalAttrs.version}/omnigraph-linux-arm64.tar.gz";
+        hash = "sha256-+hCCY2uzkn1h3PnSK7TgjrD7RG0I50ZziGnkDDY7R1U=";
+      };
+      "aarch64-darwin" = fetchurl {
+        url = "https://github.com/ModernRelay/omnigraph/releases/download/v${finalAttrs.version}/omnigraph-macos-arm64.tar.gz";
+        hash = "sha256-x4PcnQ42YLdKnC5sVZG/Hk35p2POMilYUmwIcunKGuw=";
+      };
+    };
+    # The release archives carry only the executables; the upstream agent skill
+    # (deployed by modules/home/tools/omnigraph.nix) comes from the tagged tree.
+    skillSrc = fetchFromGitHub {
+      owner = "ModernRelay";
+      repo = "omnigraph";
+      tag = "v${finalAttrs.version}";
+      hash = "sha256-fDjXKhh/jAXST0SGoPsGkFDIZtpGF9NxCxGd7H4snBA=";
+    };
+    updateScript = ./update.sh;
+  };
 
   meta = {
     homepage = "https://github.com/ModernRelay/omnigraph";
     description = "Lakehouse graph database server and CLI";
+    changelog = "https://github.com/ModernRelay/omnigraph/releases/tag/v${finalAttrs.version}";
     license = lib.licenses.mit;
     mainProgram = "omnigraph";
     maintainers = with lib.maintainers; [ cameronraysmith ];
-    platforms = lib.platforms.linux ++ lib.platforms.darwin;
+    platforms = builtins.attrNames finalAttrs.passthru.sources;
+    sourceProvenance = with lib.sourceTypes; [ binaryNativeCode ];
   };
 })

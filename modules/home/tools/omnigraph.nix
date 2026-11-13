@@ -88,8 +88,8 @@
       };
     };
 
-  # The upstream omnigraph skill, from the same pinned source the client is
-  # built from, so it always describes the deployed CLI and server version.
+  # The upstream omnigraph skill, from the source tree tagged with the release
+  # the client binaries come from, so it describes the deployed CLI and server.
   # This lives on the ai aggregate because aiSkills is declared there; tools
   # reaches users (christophersmith) who do not import ai, and an aiSkills
   # definition in the tools module would fail to evaluate for them.
@@ -106,7 +106,7 @@
       aiSkills.extraSkills =
         lib.mkIf ((options.programs ? omnigraph) && config.programs.omnigraph.enable)
           {
-            omnigraph = "${config.programs.omnigraph.package.src}/skills/omnigraph";
+            omnigraph = "${config.programs.omnigraph.package.skillSrc}/skills/omnigraph";
           };
     };
 }
