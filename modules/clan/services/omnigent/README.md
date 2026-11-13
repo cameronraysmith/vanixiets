@@ -259,11 +259,14 @@ See the [deployment plan](../../../../docs/notes/development/omnigent/deployment
 Every enabled GitHub entry must expect the same person; resource owners are not authenticated user identities.
 `linearApiKeys` is keyed only by the masked labels `personal` and `work`; each default-off entry names a generator `<worker-user>-linear-<label>` with fixed files `key`, `workspace`, `workspace-id` and `viewer-email`.
 All four files are secret services files: the workspace slug and verifier identities must never be Nix literals.
-Enabled sources declare per-person shared hidden-prompt Clan generators (`share = true`), with secret services files owned by the worker and mode `0400` on each host.
+Enabled sources other than the signing key declare per-person shared hidden-prompt Clan generators (`share = true`), with secret services files owned by the worker and mode `0400` on each host.
 They do not enroll values automatically.
 The adapters check the declared ciphertext source and consume `files.<name>.path`; personal bundles, age identities and `hm-sops-bridge` enrollment remain prohibited.
 All five inventory workers now declare signing-key and GitHub-token sources while execution remains disabled.
 Signing generators use `<worker-user>-signing-key` (file `key`); GitHub generators use `<worker-user>-github-token-<owner>` (file `token`), with canonical expected identities derived from person metadata.
+A signing generator has no prompt: it declares `dependencies = [ "<person>-commit-signing-key" ]` and copies that generator's `key`, where `<person>` is the owner's profile after `flake.userAliases`, so the worker holds its owner's commit signing key, which no host authorizes for login and no secret is encrypted to.
+Its `expected.signingPublicKey` is the owner's `meta.signingKey`, and `flake.lib.commitSigningObligations.workerSigningKey` fails a host whose worker declares anything else or whose signing generator takes a prompt again.
+Rotating the owner's key with `clan vars generate --regenerate --generator <person>-commit-signing-key` regenerates the worker copies in the same run.
 Cameron's workers select GitHub owners `sciexp` and `cameronraysmith`, with `defaultOwner = "cameronraysmith"`; Janette's select only `sciexp`, also her `defaultOwner`.
 Cameron's workers select `personal` and `work`; Janette's select only `personal`.
 Claude setup-token delivery remains disabled.
@@ -271,7 +274,7 @@ These declarations do not enroll ciphertext: the real machine configuration must
 Worker `enable = false` does not bypass that prerequisite for building or deploying the machine.
 The fleet obligations read the five declarations and their generator files directly from each real machine configuration, without synthetic delivery copies.
 They do not assert the missing-source diagnostics themselves: an unenrolled worker's assertions fail its machine check through the toplevel that check already forces, and the obligation message reproduces them.
-See the deployment plan's enrollment sequence for the exact generator and multiline signing-key commands.
+See the deployment plan's enrollment sequence for the exact generator commands; its signing-key pipelines are retired by the commit signing key amendment there.
 
 Git and jj sign with the selected private-key file, using the declared public key and canonical Git email for `allowed_signers`.
 Git's absolute HTTPS helper uses the token-reading `programs.gh.package` wrapper.

@@ -34,7 +34,7 @@ let
       );
       expected = {
         gitEmail = meta.gitEmail;
-        signingPublicKey = builtins.head meta.sshKeys;
+        signingPublicKey = meta.signingKey;
         omnigentEmail = meta.email;
       };
     };

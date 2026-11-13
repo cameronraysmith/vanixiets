@@ -10,6 +10,12 @@
       sshKeys = [
         "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKPi1aUkaTAykqzTEQI1lr8qTpPMxXcyxZwilVECIzAM"
       ];
+      retiredSigningKeys = [
+        {
+          key = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKPi1aUkaTAykqzTEQI1lr8qTpPMxXcyxZwilVECIzAM";
+          validBefore = null;
+        }
+      ];
     };
     aggregates = with config.flake.modules.homeManager; [
       base-sops

@@ -28,6 +28,8 @@ let
     };
 
   flakeSystems = config.systems;
+  flakeLib = config.flake.lib;
+  signingKeyLine = lib.types.strMatching "ssh-ed25519 [A-Za-z0-9+/]+=*( .*)?";
 in
 {
   config.flake.lib.mkUserIdentity = mkUserIdentity;
@@ -93,6 +95,40 @@ in
                   and clan inventory services. Consumed by per-host
                   `users.users.<u>.openssh.authorizedKeys.keys` setters.
                 '';
+              };
+              signingKey = lib.mkOption {
+                type = lib.types.nullOr signingKeyLine;
+                default = lib.fileContents (
+                  ../../../vars/shared
+                  + "/${flakeLib.commitSigningGenerator (flakeLib.signingPerson name)}/key.pub/value"
+                );
+                defaultText = lib.literalExpression ''lib.fileContents "vars/shared/<person>-commit-signing-key/key.pub/value"'';
+                description = ''
+                  Public half of the key this person signs commits with, read
+                  from the committed public file of their clan vars generator.
+                  No host may authorize it for login and no secret may be
+                  encrypted to it. Null only for a person whose every host is in
+                  `flake.lib.commitSigningLegacyMachines`, whose homes sign with
+                  the login key until that host is enrolled.
+                '';
+              };
+              retiredSigningKeys = lib.mkOption {
+                type = lib.types.listOf (
+                  lib.types.submodule {
+                    options = {
+                      key = lib.mkOption {
+                        type = signingKeyLine;
+                        description = "Public half of a key that signed earlier commits.";
+                      };
+                      validBefore = lib.mkOption {
+                        type = lib.types.nullOr (lib.types.strMatching "[0-9]{14}Z");
+                        description = "Cutover as YYYYMMDDhhmmssZ; null keeps the key accepted without a bound.";
+                      };
+                    };
+                  }
+                );
+                default = [ ];
+                description = "Keys that signed this person's earlier commits, kept in allowed_signers.";
               };
             };
             systems = lib.mkOption {

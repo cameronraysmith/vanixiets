@@ -1,5 +1,5 @@
-# Git configuration with SSH signing, delta diff, lazygit, allowed_signers
-# Note: User-specific values (name, email, ssh key) should be set in user modules
+# Git configuration with delta diff and lazygit; signing is set by vcs-signing.nix
+# Note: User-specific values (name, email) should be set in user modules
 { ... }:
 let
   content =
@@ -23,19 +23,6 @@ let
       programs.git = {
         package = pkgs.gitFull;
         enable = true;
-
-        # SSH signing: agent-based on Darwin (Bitwarden), direct key on Linux
-        signing = lib.mkIf personal (
-          lib.mkDefault {
-            key =
-              if pkgs.stdenv.hostPlatform.isDarwin then
-                config.sops.secrets.ssh-public-key.path # Bitwarden agent
-              else
-                config.sops.secrets.ssh-signing-key.path; # passwordless private key
-            format = "ssh";
-            signByDefault = true;
-          }
-        );
 
         lfs = {
           enable = true;
@@ -96,7 +83,6 @@ let
             autoStash = true;
             updateRefs = true;
           };
-          gpg.ssh.allowedSignersFile = lib.mkIf personal "${config.home.homeDirectory}/.config/git/allowed_signers";
           log.showSignature = false; # --[no-]show-signature
           alias = {
             a = "add";
@@ -178,12 +164,6 @@ let
           };
         };
       };
-
-      # allowed_signers file for SSH signature verification
-      # User modules should provide allowed_signers content
-      # Example: home.file."${config.xdg.configHome}/git/allowed_signers".text = ''
-      #   ${user.email} namespaces="git" ${user.sshKey}
-      # '';
     };
 in
 {

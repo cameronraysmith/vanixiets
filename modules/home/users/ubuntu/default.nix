@@ -67,9 +67,11 @@ let
         environment.XDG_RUNTIME_DIR = sopsDir;
 
         secrets = {
-          # Git and jujutsu signing read the private key directly on Linux, and
-          # `development/radicle.nix` places it at ~/.radicle/keys/radicle.
+          # `development/radicle.nix` places the login key at ~/.radicle/keys/radicle.
           ssh-signing-key = {
+            mode = "0400";
+          };
+          commit-signing-key = {
             mode = "0400";
           };
           linear-api-key-personal = { };
@@ -81,14 +83,9 @@ let
         templates."linear-credentials.toml" = flake.lib.mkLinearCredentialsTemplate config;
       };
 
-      # The other users render allowed_signers through a sops placeholder
-      # because their signing key's public half is itself withheld. This one is
-      # already published as a GitHub signing key, so it is written directly and
-      # costs no secret. `development/git.nix` points
-      # `gpg.ssh.allowedSignersFile` at this path.
-      xdg.configFile."git/allowed_signers".text = ''
-        ${config.vcs.author.email} namespaces="git" ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBTeBMUfte7k9yugPtmVLJONiwxZtyoNotfwBOMAEHGz
-      '';
+      # The one profile on no clan machine: it signs with its own sops entry
+      # rather than a generated `<person>-commit-signing-key` var.
+      vcs.signing.keyFile = config.sops.secrets.commit-signing-key.path;
 
       # Devin sources $ENVRC under `set -a` at the top of every exec shell, and
       # $ENVRC sources this file, so this runs before every tool call. That is the

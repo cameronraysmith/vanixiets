@@ -4,7 +4,6 @@
 let
   content =
     {
-      config,
       pkgs,
       flake,
       ...
@@ -27,17 +26,8 @@ let
           ssh-signing-key = {
             mode = "0400";
           };
-          ssh-public-key = { };
           bitwarden-email = { };
           atuin-key = { };
-        };
-
-        templates."allowed_signers" = {
-          mode = "0400";
-          path = "${config.xdg.configHome}/git/allowed_signers";
-          content = ''
-            ${config.vcs.author.email} namespaces="git" ${config.sops.placeholder."ssh-public-key"}
-          '';
         };
       };
     };

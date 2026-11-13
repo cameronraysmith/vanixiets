@@ -133,6 +133,13 @@ let
       );
       command = mode: "${lib.getExe pkgs.python3} ${./credentials.py} ${policyFile} ${mode}";
       expected = worker.credentials.expected;
+      # The signing key is copied from the owner's generated commit signing key,
+      # so regenerating that generator regenerates this one in the same run.
+      signingGenerator =
+        if worker.credentials.signingKey.enable then worker.credentials.signingKey.generator else null;
+      personSigningGenerator = config.flake.lib.commitSigningGenerator (
+        config.flake.lib.signingPerson worker.owner
+      );
     in
     {
       enabled = selected != { };
@@ -226,17 +233,29 @@ let
             inherit group;
             mode = "0400";
           });
-          prompts = lib.genAttrs files (file: {
-            type = "hidden";
-            persist = lib.hasPrefix "${worker.user}-linear-" generator;
-            description = "Approved ${worker.user} credential for ${generator}/${file}";
-          });
           runtimeInputs = [ pkgs.coreutils ];
-          script = lib.concatMapStringsSep "\n" (file: ''
-            test -s "$prompts/${file}"
-            cp "$prompts/${file}" "$out/${file}"
-          '') files;
         }
+        // (
+          if generator == signingGenerator then
+            {
+              dependencies = [ personSigningGenerator ];
+              script = lib.concatMapStringsSep "\n" (file: ''
+                cp "$in/${personSigningGenerator}/key" "$out/${file}"
+              '') files;
+            }
+          else
+            {
+              prompts = lib.genAttrs files (file: {
+                type = "hidden";
+                persist = lib.hasPrefix "${worker.user}-linear-" generator;
+                description = "Approved ${worker.user} credential for ${generator}/${file}";
+              });
+              script = lib.concatMapStringsSep "\n" (file: ''
+                test -s "$prompts/${file}"
+                cp "$prompts/${file}" "$out/${file}"
+              '') files;
+            }
+        )
       ) (lib.groupBy (source: source.generator) (lib.attrValues selected));
       templates = lib.optionalAttrs (linear != { } && linearPresent) {
         ${templateName} = derived.linearTemplate // {

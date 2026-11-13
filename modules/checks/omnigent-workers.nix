@@ -538,6 +538,21 @@
             }).config.workers.fixture.owner
             true
         )).success;
+      workerSigning =
+        overrides:
+        config.flake.lib.commitSigningObligations.workerSigningKey (
+          {
+            expected.signingPublicKey = config.flake.users.cameron.meta.signingKey;
+            ownerMeta = config.flake.users.cameron.meta;
+            loginKeys = lib.concatMap (user: user.meta.sshKeys) (lib.attrValues config.flake.users);
+            generator = {
+              dependencies = [ "crs58-commit-signing-key" ];
+              prompts = { };
+            };
+            person = "crs58";
+          }
+          // overrides
+        );
       inventoryCases = {
         publicRecipient = lib.hasInfix "&janettesmith-user age1mqfqckczkulpne7265j5cxn0pspdlxd3d0kav368u2c2fwknnc4qe27dec" (
           builtins.readFile ../../.sops.yaml
@@ -628,6 +643,18 @@
             meta = authorMeta;
             expected.gitEmail = "primary@example.invalid";
             home = authorHome fixtureAuthor fixtureAuthor;
+          };
+        workerSigningControl = workerSigning { };
+        expectedLoginKey =
+          !workerSigning {
+            expected.signingPublicKey = lib.head config.flake.users.cameron.meta.sshKeys;
+          };
+        workerKeyPrompted =
+          !workerSigning {
+            generator = {
+              dependencies = [ ];
+              prompts.key.type = "hidden";
+            };
           };
       };
 

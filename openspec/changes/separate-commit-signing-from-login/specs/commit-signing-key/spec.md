@@ -55,8 +55,9 @@ The password vault's key agent SHALL serve logins only, and SHALL NOT be asked t
 ### Requirement: A person's commits are signed by their signing key under their author address
 
 From the deploy of this change on a host, every signed commit recorded there for a person, by their account or by an Omnigent worker they own, SHALL be signed by that person's signing key, and the signer principal a verifier pairs with that key SHALL remain the person's author address.
+Until the cutover, a host that cannot yet receive a generated key, blackphos alone, SHALL sign with the person's retired key, still without an agent or interaction.
 
-**Discharged by**: `commit-signing-key-interface` requirements `Every person's home signs with the signing key file`, `The signers file lists the signing key and each retired key under the author address` and `A worker's declared signing key is its owner's signing key`, and the corpus requirement `The signer principal is the author address`.
+**Discharged by**: `commit-signing-key-interface` requirements `Every person's home signs with the signing key file`, `The signers file lists the signing key and each retired key under the author address`, `A worker's declared signing key is its owner's signing key` and `One named list holds the machines that sign with the login key`, and the corpus requirement `The signer principal is the author address`.
 
 #### Scenario: Janette's signed commit is verified on rosegold
 
@@ -67,6 +68,11 @@ From the deploy of this change on a host, every signed commit recorded there for
 
 - **WHEN** a host carrying a person's account has not deployed this change
 - **THEN** commits recorded there are still signed by the retired key, which verifiers and the forge still accept until the cutover
+
+#### Scenario: Raquel signs on blackphos before the cutover
+
+- **WHEN** Raquel's account on blackphos signs a commit after blackphos has deployed this change
+- **THEN** it is signed by her retired key, the login key, from its file and without any key agent being asked, and verifies under her author address
 
 ### Requirement: A signing key opens no secret
 

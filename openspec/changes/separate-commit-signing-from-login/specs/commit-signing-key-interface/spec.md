@@ -22,21 +22,84 @@ The limits below SHALL NOT be cited as checked.
 
 ### Requirement: Each profile records one signing key
 
-`flake.users.<key>.meta` SHALL declare `signingKey`, an OpenSSH `ssh-ed25519` public key line with no default, and `retiredSigningKeys`, a list of `{ key; validBefore; }` where `key` is such a line and `validBefore` is null or a UTC timestamp `YYYYMMDDhhmmssZ`, defaulting to the empty list.
+`flake.users.<key>.meta` SHALL declare `signingKey`, null or an OpenSSH `ssh-ed25519` public key line, and `retiredSigningKeys`, a list of `{ key; validBefore; }` where `key` is such a line and `validBefore` is null or a UTC timestamp `YYYYMMDDhhmmssZ`, defaulting to the empty list.
 
 #### Scenario: Cameron's profile is evaluated
 
 - **WHEN** `nix eval .#users.crs58.meta.signingKey` and `nix eval .#users.crs58.meta.retiredSigningKeys` are evaluated
 - **THEN** the first is a key absent from every profile's `sshKeys`, and the second contains `ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINdO9rInDa9HvdtZZxmkgeEdAlTupCy3BgA/sqSGyUH+`
 
+### Requirement: A profile's signing key is read from its generator's public file
+
+`signingKey` SHALL default to the contents of the committed `vars/shared/<person>-commit-signing-key/key.pub/value`, where `<person>` is the profile key after `flake.userAliases`; the ubuntu profile, on no clan machine, SHALL set it literally.
+
+#### Scenario: The cameron alias is evaluated
+
+- **WHEN** `nix eval .#users.cameron.meta.signingKey` is evaluated
+- **THEN** it equals the contents of `vars/shared/crs58-commit-signing-key/key.pub/value`
+
+### Requirement: Each person's signing key is one generated clan var
+
+Every NixOS or nix-darwin host carrying a person's home or Omnigent worker, except a host in `flake.lib.commitSigningLegacyMachines`, SHALL declare `clan.core.vars.generators."<person>-commit-signing-key"` with `share = true`, no prompt, a script running `ssh-keygen -t ed25519 -N ''`, and a file `key.pub` with `secret = false`.
+
+#### Scenario: A host carrying Cameron's home is evaluated
+
+- **WHEN** `nixosConfigurations.cinnabar.config.clan.core.vars.generators` is evaluated
+- **THEN** it contains `crs58-commit-signing-key`, shared, with no prompt
+
+### Requirement: Each person's generated key file is owned by the person's account where their home is
+
+The generator's secret file `key` SHALL have mode `0400` and be owned by the person's account on a host with their home and by `root` elsewhere, and the case `personGenerator` of `commitSigningObligations.failures` SHALL fail on a host where the generator or any of these attributes is missing or differs.
+
+#### Scenario: Janette's generator on magnetite is evaluated
+
+- **WHEN** `nixosConfigurations.magnetite.config.clan.core.vars.generators.janettesmith-commit-signing-key` is evaluated
+- **THEN** it is shared with no prompt, and its `key` file is owned by `root`, because magnetite carries Janette's workers but not her home
+
+#### Scenario: The mutants are evaluated
+
+- **WHEN** `checks.x86_64-linux.commit-signing-key` applies `personGenerator` to one correct synthetic host and to `generatorMissing`, `generatorPrompted` and `generatorWrongOwner`
+- **THEN** the control holds and each mutant fails, and the check fails if any outcome is inverted
+
 ### Requirement: A profile's signing key is none of the fleet's login keys
 
-For every profile, the key material of `signingKey` (its type and base64 fields, ignoring any comment) SHALL differ from that of every entry of every profile's `sshKeys` and of its own `retiredSigningKeys`, and `checks.x86_64-linux.commit-signing-key` SHALL assert this over every `flake.users` entry.
+For every profile whose `signingKey` is not null, its key material (type and base64 fields, ignoring any comment) SHALL differ from that of every entry of every profile's `sshKeys` and of its own `retiredSigningKeys`, and `checks.x86_64-linux.commit-signing-key` SHALL assert this over every `flake.users` entry.
 
 #### Scenario: The mutants are evaluated
 
 - **WHEN** `checks.x86_64-linux.commit-signing-key` applies the predicate to `signingKeyIsLoginKey` (`signingKey` is `head meta.sshKeys`, the key `expected.signingPublicKey` named before this change), `signingKeyIsRecommentedLoginKey` (the same key with another comment) and `signingKeyIsOthersLoginKey` (another profile's login key)
 - **THEN** each fails the predicate, and the check fails if any of these outcomes is inverted
+
+### Requirement: One named list holds the machines that sign with the login key
+
+`flake.lib.commitSigningLegacyMachines` SHALL be `[ "blackphos" ]`.
+A listed host SHALL declare no `*-commit-signing-key` generator and no signing worker, and each of its homes SHALL sign with its sops `ssh-signing-key` file through `agentFreeSshKeygen`.
+The cases `legacyNoGenerator` and `legacyUnenrolled` SHALL fail a listed host that declares one, or that has `sops/machines/<name>`.
+
+#### Scenario: blackphos is evaluated
+
+- **WHEN** `darwinConfigurations.blackphos.config` is evaluated
+- **THEN** it declares no `*-commit-signing-key` generator, its crs58 and raquel homes sign with their `ssh-signing-key` path through `agentFreeSshKeygen`, and `commitSigningObligations.failures` is `[]`
+
+#### Scenario: blackphos is enrolled but stays listed
+
+- **WHEN** `sops/machines/blackphos` exists while `commitSigningLegacyMachines` still lists blackphos
+- **THEN** blackphos's machine check fails naming `legacyUnenrolled`, and `checks.x86_64-linux.commit-signing-key` holds `enrolledMachineListed`, which applies the predicate to magnetite, an enrolled machine
+
+### Requirement: A signing key is null exactly where every host is listed
+
+The case `signingKeyPresence` SHALL fail a host carrying a person's home or worker whose `signingKey` is null while the host is unlisted, or not null while the host is listed and every machine in `vars/shared/<person>-commit-signing-key/key/machines` is listed.
+`checks.x86_64-linux.commit-signing-key` SHALL hold its controls and mutants.
+
+#### Scenario: raquel's profile is evaluated
+
+- **WHEN** `nix eval .#users.raquel.meta.signingKey` is evaluated
+- **THEN** it is null, because blackphos is raquel's only host, and her login key is her one `retiredSigningKeys` entry
+
+#### Scenario: The mutants are evaluated
+
+- **WHEN** `checks.x86_64-linux.commit-signing-key` applies `signingKeyPresent` to `presenceControl`, `presenceGenerated`, `nullKeyOffLegacy`, `nullKeyGeneratedElsewhere` and `keyWithoutGeneration`
+- **THEN** both controls hold and each mutant fails, and the check fails if any outcome is inverted
 
 ### Requirement: Every configured login source of a host is enumerated
 
@@ -45,7 +108,7 @@ For every profile, the key material of `signingKey` (its type and base64 fields,
 #### Scenario: magnetite's sources are enumerated
 
 - **WHEN** `loginSources` is applied to `nixosConfigurations.magnetite.config`
-- **THEN** it includes entries for `root`, `cameron`, `crs58` and every Omnigent worker account, and the initrd's entries where magnetite enables initrd SSH
+- **THEN** it reads every declared account, `root` and the Omnigent worker accounts included, and returns entries for `root`, `cameron` and `crs58` and the initrd's entries, the worker accounts authorizing no key
 
 ### Requirement: A login source the enumeration cannot read fails closed
 
@@ -73,13 +136,22 @@ The case `signingKeyUnauthorized` of `flake.lib.commitSigningObligations.failure
 
 ### Requirement: Every person's home signs with the signing key file
 
-`flake.modules.homeManager.vcs-signing`, key `vanixiets/vcs-signing-home-module`, imported by `development`, SHALL declare `sops.secrets.commit-signing-key` with mode `0400` and set git's `signing` to `{ key = <that secret's path>; format = "ssh"; signByDefault = true; }` and jj's `signing` to `{ behavior = "own"; backend = "ssh"; key = <that secret's path>; }`.
+`flake.modules.homeManager.vcs-signing`, key `vanixiets/vcs-signing-home-module`, imported by `development`, SHALL declare `vcs.signing.keyFile`, and when it is set SHALL set git's `signing` to `{ key = <keyFile>; format = "ssh"; signByDefault = true; }` and jj's `signing` to `{ behavior = "own"; backend = "ssh"; key = <keyFile>; }`.
 `git.nix` and `jujutsu.nix` SHALL set no signing key, and `git.nix` SHALL have no darwin signing branch.
 
 #### Scenario: stibnite's human home is evaluated
 
 - **WHEN** `darwinConfigurations.stibnite.config.home-manager.users.crs58.programs.git.signing.key` is evaluated
-- **THEN** it is the `commit-signing-key` secret's path, not the `ssh-public-key` secret's path it was before this change
+- **THEN** it is the `key` path of `crs58-commit-signing-key` on stibnite, not the `ssh-public-key` secret's path it was before this change
+
+### Requirement: A home's signing key file comes from its machine's generator
+
+`vcs.signing.keyFile` SHALL default to the `key` path of `osConfig`'s `<person>-commit-signing-key` in a home embedded in a host declaring it, to the home's sops `ssh-signing-key` path on a host in `commitSigningLegacyMachines`, and to null otherwise; the ubuntu profile SHALL set it to its home-manager sops secret `commit-signing-key`.
+
+#### Scenario: A standalone home of a clan profile is evaluated
+
+- **WHEN** `homeConfigurations."crs58@x86_64-linux".config.vcs.signing.keyFile` is evaluated
+- **THEN** it is null, and that home configures no signing key
 
 ### Requirement: Every person's home signs through the agent-free program
 
@@ -101,7 +173,7 @@ The case `signingKeyUnauthorized` of `flake.lib.commitSigningObligations.failure
 
 ### Requirement: A home's signing configuration is regulated on every host
 
-The case `homeSigningBound` of `commitSigningObligations.failures` SHALL fail on a host if, for any `home-manager.users.<name>` that is a `flake.users` key, git's and jj's signing keys differ from each other or from that home's `commit-signing-key` path, either program differs from `agentFreeSshKeygen` for that host's packages, or the signers file differs from the lines the obligation assembles from `meta.signingKey`, `meta.retiredSigningKeys` and `meta.gitEmail`.
+The case `homeSigningBound` SHALL fail a host if, for any `home-manager.users.<name>` that is a `flake.users` key, git's or jj's signing key differs from that person's generator `key` path (the `ssh-signing-key` path on a listed host), either program differs from the host's `agentFreeSshKeygen`, or the signers file differs from the lines the obligation assembles from `meta.signingKey`, `meta.retiredSigningKeys` and `meta.gitEmail`.
 
 #### Scenario: The darwin branch returns
 
@@ -119,7 +191,7 @@ The case `homeSigningBound` of `commitSigningObligations.failures` SHALL fail on
 
 #### Scenario: Cameron's signers file in phase A
 
-- **WHEN** `homeConfigurations."crs58@x86_64-linux".config.xdg.configFile."git/allowed_signers".text` is evaluated after phase A
+- **WHEN** `darwinConfigurations.stibnite.config.home-manager.users.crs58.xdg.configFile."git/allowed_signers".text` is evaluated after phase A
 - **THEN** it holds two lines with principal `cameron.ray.smith@gmail.com`: his signing key, then his login key with no `valid-before`
 
 #### Scenario: Cameron's signers file in phase B
@@ -156,14 +228,28 @@ The case `workerSigningKey` of `commitSigningObligations.failures` SHALL fail on
 - **WHEN** `checks.x86_64-linux.omnigent-worker-inventory` applies `workerSigningKey` to `expectedLoginKey`, a worker whose `expected.signingPublicKey` is its owner's `head meta.sshKeys`
 - **THEN** the predicate fails, and the check fails if it holds
 
+#### Scenario: The worker generator takes a prompt again
+
+- **WHEN** `checks.x86_64-linux.omnigent-worker-inventory` applies `workerSigningKey` to `workerKeyPrompted`, a worker whose signing generator has a hidden prompt and no dependency on its owner's generator
+- **THEN** the predicate fails, and the check fails if it holds
+
 #### Scenario: The delivered worker key still is the login key
 
 - **WHEN** a worker host deploys with `expected.signingPublicKey` set to the owner's signing key while the worker's delivered key file still holds the owner's login key
 - **THEN** `omnigent-worker-verify` fails with `signing public key mismatch`
 
+### Requirement: A worker's signing key is derived from its owner's generator
+
+Each worker's signing generator `omnigent-<owner>-signing-key` SHALL keep its name, file `key`, `share = true`, owner the worker account and mode `0400`, and SHALL declare `dependencies = [ "<person>-commit-signing-key" ]` and no prompt, with a script that copies the dependency's `key`; `workerSigningKey` SHALL fail on a host where it does not.
+
+#### Scenario: Cameron's worker generator is evaluated
+
+- **WHEN** `nixosConfigurations.magnetite.config.clan.core.vars.generators.omnigent-cameron-signing-key` is evaluated
+- **THEN** its `dependencies` are `[ "crs58-commit-signing-key" ]`, it has no prompt, and its `key` path is `/run/secrets/vars/shared/omnigent-cameron-signing-key/key` as before this change
+
 ### Requirement: A signing key is no decryption identity
 
-`checks.x86_64-linux.commit-signing-key` SHALL fail if the `ssh-to-age` recipient of any profile's `signingKey` appears in `.sops.yaml`, any `sops/users/*/key.json` or `sops/machines/*/key.json`, or the sops metadata of any file under `secrets/` or any `secret` file under `vars/`.
+`checks.x86_64-linux.commit-signing-key` SHALL fail if the `ssh-to-age` recipient of any profile's `signingKey` appears in `.sops.yaml`, any `sops/users/*/key.json` or `sops/machines/*/key.json`, or the sops metadata of any file under `secrets/` other than a dotfile placeholder, or of any `secret` file under `vars/`.
 It SHALL fail closed on an empty recipient set, a file it cannot parse in its sops format, or an `ssh-to-age` error.
 
 #### Scenario: A signing key is added as a sops recipient

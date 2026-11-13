@@ -106,7 +106,8 @@ let
 
           revsets = {
             sign = "sign(@)";
-            git-sign-on-push = if personal then "~signed() & mine()" else "none()";
+            git-sign-on-push =
+              if personal && config.vcs.signing.keyFile != null then "~signed() & mine()" else "none()";
           };
 
           templates = {
@@ -172,25 +173,9 @@ let
             '';
           };
 
-          signing =
-            if personal then
-              {
-                # Sign own commits, drop existing signatures
-                behavior = "own";
-
-                # Use ssh backend as opposed to GPG
-                backend = "ssh";
-
-                # Reuse git's allowedSignersFile for signature verification
-                # to enable unified signature verification across git and jujutsu
-                backends.ssh.allowed-signers = lib.mkDefault "${config.home.homeDirectory}/.config/git/allowed_signers";
-
-                # sops-nix manages user-level secrets for home-manager
-                # private key stored in encrypted secrets/home-manager/users/{user}/secrets.yaml
-                key = lib.mkDefault config.sops.secrets.ssh-signing-key.path;
-              }
-            else
-              { behavior = "drop"; };
+          # Personal homes sign through vcs-signing.nix, which sets behavior, backend
+          # and key together so a home without a key file is not told to sign.
+          signing = lib.mkIf (!personal) { behavior = "drop"; };
 
           ui = {
             editor = "nvim";

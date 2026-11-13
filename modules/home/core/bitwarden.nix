@@ -30,8 +30,7 @@
         SSH_AUTH_SOCK = socketPath;
       };
 
-      # Linux: systemd user ssh-agent for git signing and SSH authentication
-      # Add signing key once per session: ssh-add ~/.config/sops-nix/secrets/ssh-signing-key
+      # Linux: systemd user ssh-agent for SSH authentication
       services.ssh-agent.enable = !isDarwin;
     };
 }

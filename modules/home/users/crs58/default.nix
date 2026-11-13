@@ -147,7 +147,7 @@ let
       };
 
       # sops-nix configuration for crs58/cameron user
-      # 23 secrets: development + ai + shell aggregates
+      # 22 secrets: development + ai + shell aggregates
       sops = {
         defaultSopsFile = flake.inputs.self + "/secrets/home-manager/users/crs58/secrets.yaml";
         secrets = {
@@ -155,7 +155,6 @@ let
           ssh-signing-key = {
             mode = "0400";
           };
-          ssh-public-key = { }; # For allowed_signers generation
           glm-api-key = { };
           tm-source-drive-data-root = { };
           firecrawl-api-key = { };
@@ -200,16 +199,6 @@ let
           niks3-auth-token = {
             path = "${config.xdg.configHome}/niks3/auth-token";
           };
-        };
-
-        # Generate allowed_signers file using sops.templates
-        # Simpler than activation script - uses same pattern as rbw and mcp-servers
-        templates."allowed_signers" = {
-          mode = "0400";
-          path = "${config.xdg.configHome}/git/allowed_signers";
-          content = ''
-            ${config.vcs.author.email} namespaces="git" ${config.sops.placeholder."ssh-public-key"}
-          '';
         };
 
         templates."linear-credentials.toml" = flake.lib.mkLinearCredentialsTemplate config;

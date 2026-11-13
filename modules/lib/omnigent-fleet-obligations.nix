@@ -209,22 +209,31 @@ let
         &&
           credentials.expected == {
             gitEmail = meta.gitEmail;
-            signingPublicKey = lib.head meta.sshKeys;
+            signingPublicKey = meta.signingKey;
             omnigentEmail = meta.email;
           }
         && lib.all (
-          source:
+          name:
           let
+            source = (selection credentials).${name};
             generator = generators.${source.generator};
             file = generator.files.${source.file};
+            personGenerator = config.flake.lib.commitSigningGenerator (
+              config.flake.lib.signingPerson worker.owner
+            );
           in
-          generator.prompts.${source.file}.type == "hidden"
+          (
+            if name == "signingKey" then
+              generator.prompts == { } && generator.dependencies == [ personGenerator ]
+            else
+              generator.prompts.${source.file}.type == "hidden"
+          )
           && generator.share
           && file.secret
           && file.neededFor == "services"
           && file.owner == worker.user
           && file.mode == "0400"
-        ) (lib.attrValues (selection credentials))
+        ) (lib.attrNames (selection credentials))
       ) (lib.attrValues workers);
 
       serverDomain = lib.all (domain: hostConfig.services.omnigent.domain == domain) (

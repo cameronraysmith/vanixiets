@@ -11,6 +11,15 @@
       # instead, so there is no bridge deployment to name.
       sopsAgeKeyId = null;
       sshKeys = [ ];
+      # The one profile on no clan machine: its key is the home-manager sops
+      # entry `commit-signing-key`, not a generated clan var.
+      signingKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINTr2Jio/Qi41YjYKSmSqwzUyL3NwJf6ae2tQRSIrRtD cameron.ray.smith@gmail.com commit signing";
+      retiredSigningKeys = [
+        {
+          key = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBTeBMUfte7k9yugPtmVLJONiwxZtyoNotfwBOMAEHGz";
+          validBefore = null;
+        }
+      ];
     };
 
     # The account exists only inside a hosted x86_64-linux sandbox, so the

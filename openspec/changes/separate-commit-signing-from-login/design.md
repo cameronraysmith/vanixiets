@@ -46,18 +46,26 @@ This change depends on `unify-vcs-author-identity`, which fixes the signer princ
 
 ## Decisions
 
-### D1: the person's sops file is the one source of each signing key
+### D1′ (2026-11-13, replacing D1): one clan vars shared generator per person holds the signing key
 
-- **Choice**: the operator generates each new key pair once, writes the private half as `commit-signing-key` in `secrets/home-manager/users/<user>/secrets.yaml`, records the public half as `meta.signingKey`, and fills each worker's existing generator with `sops -d --extract '["commit-signing-key"]' … | CLAN_NO_COMMIT=1 clan vars set <machine> omnigent-<owner>-signing-key/key`.
-- **Rationale**: home secrets already reach every crs58, cameron and janettesmith home this way on both platforms and in standalone `homeConfigurations`; the private key's recipients stay `admin`, `dev` and the person; the worker credential contract, `mkDelivery`, and the `declaredCredentials` and `credentialDelivery` obligations keep their hidden-prompt shape.
-- **Alternatives considered**: a clan vars shared generator that runs `ssh-keygen`, delivered to human accounts as a system secret and copied into the worker generator through `dependencies`.
-  Rejected because standalone home configurations cannot read a system secret path, every host carrying the home would become a recipient of the private key, and the worker generator's prompt type and every credential obligation would change.
-- **Trade-off**: the worker copy is a second ciphertext kept equal by a pipeline; the enrollment check detects drift on workers, and the post-deploy signing smoke detects it on human homes.
-- **Boundary**: source versus delivered. The sops entry and the vars ciphertext are sources; the delivered files are `~/.config/sops-nix/secrets/commit-signing-key` and `/run/secrets/vars/omnigent-<owner>-signing-key/key`, observed only after activation.
+- **Choice**: each machine that carries a person's home or Omnigent worker declares `clan.core.vars.generators."<person>-commit-signing-key"` with `share = true`, `runtimeInputs = [ pkgs.openssh ]`, a secret file `key` (mode `0400`, owned by the person's account where the home is and by `root` elsewhere) and a public file `key.pub` (`secret = false`), and the script `ssh-keygen -q -t ed25519 -N '' -C '<meta.gitEmail> commit signing' -f $out/key`, with `$out/key.pub` written by the same call.
+  `<person>` is the canonical profile key after `flake.userAliases`, so the cameron and crs58 accounts share `crs58-commit-signing-key`.
+  No key is made by hand; rotation is `clan vars generate --regenerate --generator <person>-commit-signing-key`.
+  The one documented exception is `ubuntu`, a standalone home on no clan machine, which keeps a home-manager sops entry `commit-signing-key` holding an already generated key (public half ending `…QRSIrRtD`, `logs/parity/new-signing-keys.pub`).
+- **Rationale**: the person's homes and workers read one generated key, so no second ciphertext is synchronized by hand and the deployment plan's `sops -d --extract | clan vars set` signing pipeline (`docs/notes/development/omnigent/deployment-plan.md:974-982`) is retired.
+  This repository's home-manager sops arrangement for personal secrets (`modules/nixos/hm-sops-bridge.nix:5-6`) has no OpenSpec change or ADR (`:33-34`); clan-core documents vars for shared and user-scoped material (`docs/src/guides/vars/vars-concepts.md:69,75`, `vars-advanced-examples.md:84,127,145`, pinned `dbae21013`), and clan-infra uses them for machine keys and per-user service credentials (`modules/mailserver.nix:166`, `modules/samba.nix:136`, `008b3ecb`); none of these references delivers a person's git signing key either way.
+- **Withdrawn choice (D1)**: the operator generated each key by hand into the person's `secrets/home-manager/users/<user>/secrets.yaml` and piped it into each worker generator with `clan vars set`.
+  It kept the worker contract's hidden prompt and reached standalone home configurations, but carried a second ciphertext kept equal only by that pipeline, with drift detected only by the worker enrollment check and a signing smoke; the user withdrew it for the generated source above.
+- **Trade-off**: every machine carrying the person's home or worker becomes a recipient of the private key; root on those machines can already read the home-manager-decrypted copy, so no new reader is added.
+  Owner, group and mode may differ per machine for a shared generator, and every other attribute must match (clan-core `pkgs/clan-cli/clan_lib/vars/generator.py:106-116,272-296`), which is why `key` is deployed on every declaring machine and owned by `root` where the person has no home.
+  blackphos has no clan machine age key yet (no `sops/machines/blackphos`), so it declares no generator in this slice and its homes keep the login key file (D9).
+  Standalone `homeConfigurations` of clan profiles see no `osConfig` and configure no signing key.
+- **Boundary**: source versus delivered. The vars ciphertext and public file are sources; the delivered file is the sops-nix path of `vars/shared/<person>-commit-signing-key/key` on each machine, observed only after activation. Vendored versus first-party: clan-core's vars and sops backends are used unmodified.
 
 ### D2: an explicit signing key in the person record
 
-- **Choice**: `meta.signingKey` (an `ssh-ed25519` line, no default) and `meta.retiredSigningKeys` (`listOf { key; validBefore = null or "YYYYMMDDhhmmssZ"; }`, default `[]`) in `modules/home/users/lib.nix`, set in each `meta.nix`.
+- **Choice**: `meta.signingKey` (an `ssh-ed25519` line) and `meta.retiredSigningKeys` (`listOf { key; validBefore = null or "YYYYMMDDhhmmssZ"; }`, default `[]`) in `modules/home/users/lib.nix`; `signingKey` defaults to `lib.fileContents` of the committed `vars/shared/<person>-commit-signing-key/key.pub/value`, and ubuntu sets its literal.
+  Reading the committed public file at flake level, rather than a machine configuration's `.value`, keeps `flake.users` static data that check key sets and every machine can read without forcing a machine fixpoint (`preferences-nix-checks-architecture`, "Key-set strictness").
   `omnigent.nix:37` and `omnigent-fleet-obligations.nix:212` switch from `head meta.sshKeys` to `meta.signingKey`; every login consumer listed in brainstorm F8 keeps `sshKeys`.
 - **Rationale**: one key per purpose (NIST SP 800-57 Part 1 Rev. 5 §5.2, reasons 2 and 3, as in Context): the signing key is copied wherever unattended signing runs, so it must be neither a login key nor a decryption identity; the worker contract and the signers file therefore need a public key that is neither, and the order of `sshKeys` should carry no meaning.
 - **Alternatives considered**: a second position in `sshKeys`, rejected because `sshKeys` is exactly the login list and `admins.nix:24` copies every wheel user's list to root.
@@ -65,9 +73,10 @@ This change depends on `unify-vcs-author-identity`, which fixes the signer princ
 
 ### D3: one home module and one agent-free program for git and jj
 
-- **Choice**: a new `flake.modules.homeManager.vcs-signing` (`modules/home/development/vcs-signing.nix`, key `vanixiets/vcs-signing-home-module`), imported by `development`, declares `sops.secrets.commit-signing-key` (mode 0400), sets git `signing` to that path with format `ssh`, `gpg.ssh.program` and jj `signing.backends.ssh.program` to `flake.lib.agentFreeSshKeygen pkgs`, jj `signing.key` to the same path, and both tools' signers path.
+- **Choice**: a new `flake.modules.homeManager.vcs-signing` (`modules/home/development/vcs-signing.nix`, key `vanixiets/vcs-signing-home-module`), imported by `development`, declares `vcs.signing.keyFile` (null or a path), defaulting to `osConfig.clan.core.vars.generators."<person>-commit-signing-key".files.key.path` when the home is embedded in a machine that declares the generator, the same pattern by which `modules/home/ai/cognee/default.nix:16-30` and `modules/home/ai/omnigent/credentials.nix:92-125` read machine facts, and to null when standalone; ubuntu's profile sets it to its own `sops.secrets.commit-signing-key.path`.
+  When `keyFile` is set it sets git `signing` to it with format `ssh`, `gpg.ssh.program` and jj `signing.backends.ssh.program` to `flake.lib.agentFreeSshKeygen pkgs`, jj `signing.key` to the same path, and both tools' signers path; `.path` resolves each platform's layout (evaluated 2026-11-13 as `/run/secrets/vars/shared/<generator>/key` on magnetite and stibnite).
   `agentFreeSshKeygen` is `pkgs.writeShellScriptBin "ssh-keygen"` running `unset SSH_AUTH_SOCK` then `exec ${pkgs.openssh}/bin/ssh-keygen "$@"`.
-  git.nix loses its `signing` block, including the darwin branch; jujutsu.nix keeps `behavior` and `backend` for personal homes and loses `key` and `allowed-signers`.
+  git.nix loses its `signing` block, including the darwin branch; jujutsu.nix loses its personal `signing` block, so `behavior`, `backend`, `key` and both paths are set by `vcs-signing` only when a key file exists, and its `git-sign-on-push` revset is `none()` in a home without one, so a standalone home is neither told to sign nor to sign on push.
 - **Rationale**: removing `SSH_AUTH_SOCK` is the only way to make A93 irrelevant; one program used by both tools is one artifact a Linux build can exercise.
   nixpkgs' `ssh-keygen` by store path is withheld from darwin `PATH` only for the SSH client's ZeroTier routing (A90), which signing does not involve.
 - **Alternatives considered**: Apple's `/usr/bin/ssh-keygen` behind the same `unset` on darwin (works, but untestable in a Linux build and versioned by macOS updates); `IdentityAgent none` (an `ssh_config` option `ssh-keygen -Y` does not read); relying on the new key being absent from every agent (true today, unenforceable).
@@ -90,17 +99,22 @@ This change depends on `unify-vcs-author-identity`, which fixes the signer princ
 - **Rationale**: A94; jj's `git-sign-on-push` revset `~signed() & mine()` (`jujutsu.nix:109`) treats an old-key signature as signed and would push it unchanged.
 - **Boundary**: external forge state; no check observes it.
 
-### D6: worker vars switch in the same commit as the expected key
+### D6′ (2026-11-13, replacing D6): the worker generator derives its key from the person's generator
 
-- **Choice**: the commit that sets `expected.signingPublicKey = meta.signingKey` also carries the re-set `vars/shared/omnigent-cameron-signing-key/key/secret` and `vars/shared/omnigent-janettesmith-signing-key/key/secret`.
-- **Rationale**: the enrollment check compares the delivered key with the declared one; both change at the same deploy, and the login key leaves the worker's delivered file then.
-- **Boundary**: source versus delivered; the old ciphertext stays in history, readable only by the existing recipients.
+- **Choice**: `mkDelivery` in `modules/home/ai/omnigent/credentials.nix` gives the signing source's generator `omnigent-<owner>-signing-key` `dependencies = [ "<person>-commit-signing-key" ]` and the script `cp "$in/<person>-commit-signing-key/key" "$out/key"`, with no prompt; its name, file `key`, `share = true`, owner `omnigent-<owner>`, mode `0400` and delivered path stay, so `credentials.py` and the credential contract's delivery assertions are unchanged.
+  `declaredCredentials` and the generator-shape assertion in `omnigent-fleet-obligations.nix` (`prompts.<file>.type == "hidden"`, line 221) require the dependency form for the signing source instead of a hidden prompt; the other credential sources keep their prompts.
+  The commit that sets `expected.signingPublicKey = meta.signingKey` also carries the regenerated worker ciphertext.
+- **Rationale**: a vars file has one owner per machine (clan-core `nixosModules/clanCore/vars/secret/sops/generators-to-sops.nix:28-35,53-60`), and both the person's account and the worker must read the key.
+  Two equal files in the person's generator would rename the worker's source, which `declaredCredentials` asserts; a shared group with mode `0440` would break the contract's owner-is-the-worker, mode `0400` assertion (`credentials.nix:152-166`) and add a group to worker accounts.
+  clan regenerates dependents with a requested generator (`pkgs/clan-cli/clan_lib/vars/graph.py:131-139`), so rotating the person's key rotates every worker copy in the same run.
+- **Boundary**: source versus delivered; the old worker ciphertext stays in history, readable only by its existing recipients.
 
 ### D7: regulation as fleet obligations plus one check
 
-- **Choice**: `modules/lib/commit-signing.nix` defines `flake.lib.commitSigningObligations` with `loginSources`, the predicates `unauthorized`, `homeSigningBound` and `workerSigningKey`, and `failures name hostConfig` over the cases `signingKeyUnauthorized`, `homeSigningBound` and `workerSigningKey`; `modules/checks/machines.nix` asserts it beside `omnigentFleetObligations` and `deployRecordObligations`.
+- **Choice**: `modules/lib/commit-signing.nix` defines `flake.lib.commitSigningObligations` with `loginSources`, the predicates `unauthorized`, `personGenerator`, `homeSigningBound`, `workerSigningKey`, `signingKeyPresent` and `unenrolled`, and `failures name hostConfig` over the cases `signingKeyUnauthorized`, `signingKeyPresence` and `homeSigningBound` on every host, `personGenerator` and `workerSigningKey` off the legacy list, and `legacyNoGenerator` and `legacyUnenrolled` on it (D9); `modules/checks/machines.nix` asserts it beside `omnigentFleetObligations` and `deployRecordObligations`.
+  `personGenerator` requires every person with a home or worker on the host to have a declared `<person>-commit-signing-key` with `share = true`, no prompt, a secret `key` owned by that person's account where the home is (else `root`) with mode `0400`, and a public `key.pub`; `homeSigningBound` compares each embedded home's `vcs.signing.keyFile` with that generator's `key` path; `workerSigningKey` also requires the worker generator's `dependencies` to be exactly `[ "<person>-commit-signing-key" ]` with no prompt.
   A new `checks.x86_64-linux.commit-signing-key` (`modules/checks/commit-signing-key.nix`) holds the profile relation, each predicate's control and mutants, the agent test of `agentFreeSshKeygen`, the `valid-before` round trip, and the `ssh-to-age` recipient comparison with its fixture mutant.
-  `declaredCredentials` switches to `meta.signingKey`, and `omnigent-worker-inventory` gains `expectedLoginKey`.
+  `declaredCredentials` switches to `meta.signingKey` and the dependency form, and `omnigent-worker-inventory` gains `workerSigningControl`, `expectedLoginKey` and `workerKeyPrompted`.
 - **Rationale**: per-host facts ride on machine checks that already force each host (`check-vacuity.md`, mechanism mismatch); the profile relation, the program's runtime behaviour and the recipient scan are not host facts, need a build for the last two, and cost one gated attribute that evaluates no host.
   Expected values in `homeSigningBound` are assembled from `meta` fields inside the obligation, not by calling `allowedSigners`, so a defect in the renderer is not reproduced in its own expectation.
   `loginSources` fails closed on any source it cannot read, and iterates declared accounts rather than found keys.
@@ -109,15 +123,27 @@ This change depends on `unify-vcs-author-identity`, which fixes the signer princ
 
 ### D8: scope covers every profile
 
-- **Choice**: every profile gets `signingKey`; for christophersmith, raquel and tara the operator first compares their sops `ssh-public-key` with their `sshKeys` (public halves only), keeping an existing signing key that is not a login key by copying it into `commit-signing-key`, and generating one otherwise; ubuntu gets a new key because its current one is its decryption identity (brainstorm F7).
-- **Rationale**: the brief covers every commit by a person; the `signingKey` field is required, so a narrower scope would need a nullable field and a second convention.
+- **Choice**: every profile gets `signingKey`: crs58 (with its cameron alias), janettesmith, christophersmith and tara from their generators, ubuntu from its sops exception, and raquel null until blackphos is enrolled (D9); the operator first compares each person's sops `ssh-public-key` with their `sshKeys` (public halves only) to decide which old public key `retiredSigningKeys` keeps for past commits (2026-11-13: for every person it is the login key).
+- **Rationale**: the brief covers every commit by a person; `signingKey` is null only where D9's legacy list allows it, and `signingKeyPresence` keeps that one exception from becoming a second convention.
 - **Accepted**: the user confirmed this scope, the new key for ubuntu, and the "opens no secret" requirement (brainstorm, "Questions and accepted answers" 1, 2 and 4).
+
+### D9 (2026-11-13): blackphos stays on the login key until it is enrolled
+
+- **Choice**: `flake.lib.commitSigningLegacyMachines = [ "blackphos" ]` is the one named list of machines without a clan machine key.
+  A listed machine declares no `*-commit-signing-key` generator and no signing worker; each of its homes sets `vcs.signing.keyFile` to its sops `ssh-signing-key` path (the login key file, which Radicle already places at `~/.radicle/keys/radicle`) and signs through `agentFreeSshKeygen`, with signers rendered from the profile, so no signing path anywhere goes through an agent and git's darwin Bitwarden branch is deleted rather than kept for one machine.
+  `meta.signingKey` is nullable; raquel, whose only host is blackphos, sets it to null and keeps her login key as a `retiredSigningKeys` entry, and gets no new key in this slice; crs58's home on blackphos signs with the login key while its signers list the new key and the login key.
+- **Regulation**: `signingKeyPresence` fails a host where a home's or worker's person has a null key off the list, or a key while every machine their generated key is encrypted to is on the list (read from `vars/shared/<person>-commit-signing-key/key/machines`), so the null keys are exactly the people whose every host is listed; `legacyNoGenerator` fails a listed machine that declares a generator or a signing worker, and `legacyUnenrolled` fails a listed machine that has `sops/machines/<name>`, so enrolling a machine forces its removal from the list.
+- **Rationale**: the user excluded blackphos from this slice on 2026-11-13; making the exclusion a named, checked list keeps it from spreading silently.
+- **Consequence**: enrolling blackphos, removing it from the list, generating `raquel-commit-signing-key` and dropping raquel's null are prerequisites of phase B (task 6.0); until then the login key still signs commits on blackphos, so the phase B `valid-before` cannot be authored.
 
 ## Risks / Trade-offs
 
 - [Risk] A host deploys phase A before the forge knows the new key → its pushes lose the verified mark (behavioral requirement violated) → Mitigation: tasks gate every deploy on the public API listing the new key.
-- [Risk] The worker copy and the sops entry drift → the worker fails enrollment and stops being ready → Mitigation: both come from one pipeline run in the same commit; `omnigent-worker-verify` is a post-deploy task.
-- [Risk] A home activates before sops-nix has decrypted `commit-signing-key` (darwin launchd ordering, `radicle.nix` comment) → signing fails until the agent runs → accepted; unchanged from today's jj behaviour.
+- [Risk] A worker copy drifts from its person's key → the worker fails enrollment and stops being ready → Mitigation: under D6′ the worker generator copies the person's generator and is regenerated with it (`graph.py:131-139`); `workerSigningKey` regulates the dependency and `omnigent-worker-verify` is a post-deploy task.
+- [Risk] A machine that carries a person's home or worker is not a vars recipient (blackphos today) → that home cannot decrypt a generated key → Mitigation: D9 lists blackphos as the one legacy machine, whose homes sign with the login key file through the agent-free program; `legacyUnenrolled` forces its removal from the list once enrolled, and `personGenerator` fails any unlisted machine where the generator is missing.
+- [Risk] The legacy path keeps the login key signing commits on blackphos → that machine does not yet meet "a signing key admits no login" → accepted as a recorded transitional state of phase A; enrolling blackphos is a prerequisite of phase B (D9).
+- [Risk] Shared generator definitions differ between machines in anything but owner, group or mode → `clan vars` refuses to generate (`generator.py:272-296`) → Mitigation: one function builds the generator for every machine; only `owner` varies.
+- [Risk] A home activates before sops-nix has decrypted the key (darwin launchd ordering) → signing fails until it is decrypted → accepted; unchanged from today's jj behaviour.
 - [Risk] Backdated commits signed by the retired key verify in git (A91) → accepted; the forge bound is D5.
 - [Trade-off] jj shows pre-cutover commits as of unknown principal after phase B (A92) → accepted.
 - [Trade-off] One new check attribute on `x86_64-linux` → accepted for the build-time cases; no host is evaluated in it.
@@ -127,17 +153,19 @@ This change depends on `unify-vcs-author-identity`, which fixes the signer princ
 
 ## Migration Plan
 
-Phase 0, operator, before any commit: discovery for christophersmith, raquel and tara; key generation into each sops file in a tmpfs; GitHub registrations; worker vars re-set.
+Phase 0, before any deploy: discover each person's old signing public key; once step 1's generator module is in the working copy, run `CLAN_NO_COMMIT=1 clan vars generate <machine> --generator <person>-commit-signing-key` once per person for crs58, janettesmith, christophersmith and tara (the generator is shared, so one run serves every machine) and route the result into step 1; once step 2 declares the worker dependency, run `CLAN_NO_COMMIT=1 clan vars generate magnetite --generator omnigent-<owner>-signing-key --regenerate` for cameron and janettesmith and route the result into step 2; then register the generated public keys on GitHub before any deploy.
+blackphos is not enrolled in phase A (D9).
+ubuntu's key is already generated and stored in its sops file.
 Phase A, one pull request, three commits, each evaluable on its own:
 
-1. Profile fields and values, `allowedSigners`, `agentFreeSshKeygen`, `vcs-signing`, git and jj edits, profile clean-up, sops entries.
-2. Worker contract: inventory and `declaredCredentials` to `meta.signingKey`, the vars ciphertext, `expectedLoginKey`.
-3. `commitSigningObligations`, `machines.nix`, `commit-signing-key`, README and the dated deployment-plan amendment.
+1. Profile fields and values, the per-person generator module, `allowedSigners`, `agentFreeSshKeygen`, `vcs-signing`, git and jj edits, profile clean-up, the generated `vars/shared/<person>-commit-signing-key` files, ubuntu's sops entry.
+2. Worker contract: `mkDelivery`'s dependency form, inventory and `declaredCredentials` to `meta.signingKey`, the regenerated worker ciphertext.
+3. `commitSigningObligations`, `machines.nix`, `commit-signing-key`, the worker-inventory mutants, README and the dated deployment-plan amendment retiring the manual signing pipeline.
 
-Deploy order: magnetite, pyrite and stibnite first (workers and Cameron's homes, removing the login key from worker files), with `omnigent-worker-verify` and a signing smoke on each; then rosegold (Janette's home), cinnabar, electrum, galena, scheelite, argentum and blackphos.
+Deploy order: magnetite, pyrite and stibnite first (workers and Cameron's homes, removing the login key from worker files), with `omnigent-worker-verify` and a signing smoke on each; then rosegold (Janette's home), cinnabar, electrum, galena, scheelite and argentum; blackphos deploys too, where git moves from the Bitwarden agent to the login key file through the agent-free program.
 Until a host deploys it keeps signing with the login key, which phase A still accepts and GitHub still registers.
 
-Phase B, one commit, after every host has deployed and every checkout's mutable old-key commits are re-signed: `validBefore` set and made non-null; then the operator removes the login keys' GitHub signing registrations and confirms an old pushed commit keeps its verified mark.
+Phase B, one commit, after blackphos is enrolled and removed from the legacy list with raquel's key generated (task 6.0), every host has deployed, and every checkout's mutable old-key commits are re-signed: `validBefore` set and made non-null; then the operator removes the login keys' GitHub signing registrations and confirms an old pushed commit keeps its verified mark.
 
 Rollback in phase A is a revert and redeploy; GitHub still accepts the login key.
 Rollback after phase B also needs the login key's registration re-added.

@@ -3,15 +3,16 @@ linear_story_id: CAM-100
 linear_story_identifier: CAM-100
 linear_story_title: "Sign commits with a key that cannot log in"
 linear_story_url: https://linear.app/cameronraysmith/issue/CAM-100/sign-commits-with-a-key-that-cannot-log-in
-linear_story_state: Todo
+linear_story_state: In Progress
 linear_team: CAM
 linear_project: workstation-parity
-last_synced_state: Todo
-last_synced_at: "2026-11-13T21:45:51Z"
+last_synced_state: In Progress
+last_synced_at: "2026-11-14T00:38:41Z"
 review_round: 0
 max_review_rounds: 3
 attempt_log:
   - { at: "2026-11-13T21:45:51Z", transition: "Backlog->Todo", outcome: "posted", note: "Issue CAM-100 created in Todo in project 69d5244a4e10 with description seeded from proposal.md; binding, state, project and labels confirmed by read-only view" }
+  - { at: "2026-11-14T00:38:41Z", transition: "Todo->In Progress", outcome: "posted", note: "apply gate: first tasks.md checkboxes; description replaced with the clan-vars design from proposal.md (Why and What Changes); state and description confirmed by read-only view" }
 ---
 
 ## Why
@@ -29,13 +30,17 @@ On darwin, git signs through the Bitwarden agent, so an unattended commit waits 
 
 **Signing key**
 - From: each profile's commits are signed with the private half of its login key (sops `ssh-signing-key`), whose public half is `head meta.sshKeys` or a sops `ssh-public-key` placeholder.
-- To: each profile records a dedicated `meta.signingKey` whose public half no host authorizes for login and no secret is encrypted to; its private half is a new per-person sops entry `commit-signing-key`, and its old key is kept in `meta.retiredSigningKeys`.
-- Reason: a signing key that admits no login and opens no secret can be given to agents.
-- Impact: new key pairs for every profile whose signing key is its login key (Cameron and Janette confirmed; christophersmith, raquel and tara to be checked; ubuntu because its key is its decryption identity), each registered as a GitHub signing key where the person has a GitHub account.
+- To: each profile records a dedicated `meta.signingKey` whose public half no host authorizes for login and no secret is encrypted to, and keeps its old key in `meta.retiredSigningKeys`.
+  The key pair is made by one clan vars shared generator per person, `<person>-commit-signing-key` (`share = true`), whose script runs `ssh-keygen`; its secret file `key` holds the private half and its public file `key.pub` (`secret = false`) the public half, which `meta.signingKey` reads from `vars/shared/<person>-commit-signing-key/key.pub/value`.
+  No key is made by hand, and rotation is `clan vars generate --regenerate`.
+  The one exception is `ubuntu`, a standalone home on no clan machine, which keeps a home-manager sops entry `commit-signing-key` holding an already generated key.
+- Reason: a signing key that admits no login and opens no secret can be given to agents; one generated source serves the person's homes and workers alike.
+- Impact: every clan profile but raquel gets a generated key (Cameron, Janette, christophersmith, tara), each registered as a GitHub signing key where the person has a GitHub account; every machine carrying a person's home or worker becomes a recipient of that person's key, except blackphos, which has no clan machine key yet.
+  blackphos is the one machine named in `flake.lib.commitSigningLegacyMachines`: it declares no generator, its homes (crs58, raquel) sign with the login key file through the agent-free program as a recorded transitional state, raquel, whose only host it is, gets no new key in this change, and enrolling blackphos is a prerequisite of the phase B cutover.
 
 **Signing mechanism**
 - From: git signs through the agent on darwin and with the key file on Linux; jj signs with the key file through `ssh-keygen` on `PATH`, which consults `SSH_AUTH_SOCK` first.
-- To: one home module, `vcs-signing`, sets git and jj to sign with the `commit-signing-key` file through one program that unsets `SSH_AUTH_SOCK` before running nixpkgs' `ssh-keygen`; git's darwin branch is removed.
+- To: one home module, `vcs-signing`, sets git and jj to sign with the generated key's delivered file (read through `osConfig` from the machine's generator; ubuntu's from its sops entry) through one program that unsets `SSH_AUTH_SOCK` before running nixpkgs' `ssh-keygen`; git's darwin branch is removed.
 - Reason: no commit waits on a vault or a prompt, on either laptop.
 - Impact: darwin git stops using the Bitwarden agent; the Bitwarden agent keeps serving SSH login.
 
@@ -45,16 +50,16 @@ On darwin, git signs through the Bitwarden agent, so an unattended commit waits 
 - Reason: public halves are not secret, and old commits keep verifying in git.
 
 **Workers**
-- From: `expected.signingPublicKey = head meta.sshKeys`, and worker vars holding the owner's login key.
-- To: `expected.signingPublicKey = meta.signingKey`, and worker vars re-set from `commit-signing-key` in the same commit.
-- Impact: the enrollment check passes only with the new key; the login key leaves every worker's delivered files at the next deploy of magnetite, pyrite and stibnite.
+- From: `expected.signingPublicKey = head meta.sshKeys`, and worker vars holding the owner's login key, filled by hand through `sops -d --extract | clan vars set` (`docs/notes/development/omnigent/deployment-plan.md:974-982`).
+- To: `expected.signingPublicKey = meta.signingKey`, and the worker generator `omnigent-<owner>-signing-key` keeps its name, file, owner, mode and delivered path but takes its key from the owner's `<person>-commit-signing-key` through `dependencies` instead of a hidden prompt; the manual pipeline is retired.
+- Impact: the enrollment check passes only with the new key; regenerating the person's generator regenerates every worker copy in the same run; the login key leaves every worker's delivered files at the next deploy of magnetite, pyrite and stibnite.
 
 **Regulation**
 - New fleet obligations `flake.lib.commitSigningObligations`, asserted by every existing machine check, that enumerate every login-authorization source of the evaluated host and require no profile's signing key in any, bind every human home's git and jj signing to the key file and the agent-free program, and bind every worker's declared signing key to its owner's.
 - One new check attribute, `checks.x86_64-linux.commit-signing-key`, holding the profile-level relations, the predicates' controls and mutants, the program's agent test, and the comparison of each signing key's age image with every sops recipient.
 
 **Removals**
-- git's darwin signing branch, the sops `allowed_signers` templates and `ssh-public-key` declarations in five profiles, ubuntu's literal signers file, git and jj references to `ssh-signing-key`, and, in phase B, the login key's GitHub signing registrations.
+- git's darwin signing branch, the sops `allowed_signers` templates and `ssh-public-key` declarations in five profiles, ubuntu's literal signers file, git and jj references to `ssh-signing-key`, the worker signing generator's hidden prompt and the deployment plan's manual signing pipeline, and, in phase B, the login key's GitHub signing registrations.
 
 Login authorization, the login key, Radicle's identity and the signer principal are unchanged.
 
@@ -77,10 +82,10 @@ stibnite's worker home is a standalone home-manager generation that `checks.aarc
 
 ## Impact
 
-Code: `modules/home/users/lib.nix`, the six `modules/home/users/*/meta.nix` and `default.nix` profiles, a new `modules/home/development/vcs-signing.nix`, `modules/home/development/{git,jujutsu}.nix`, `modules/home/core/bitwarden.nix` (comment), a new `modules/lib/commit-signing.nix`, `modules/checks/machines.nix`, a new `modules/checks/commit-signing-key.nix`, `modules/clan/inventory/services/omnigent.nix`, `modules/lib/omnigent-fleet-obligations.nix` and `modules/checks/omnigent-workers.nix`.
+Code: `modules/home/users/lib.nix`, the six `modules/home/users/*/meta.nix` and `default.nix` profiles, a new `modules/home/development/vcs-signing.nix`, `modules/home/development/{git,jujutsu}.nix`, `modules/home/core/bitwarden.nix` (comment), a new `modules/lib/commit-signing.nix`, a new system module declaring each person's generator on NixOS and nix-darwin, `modules/home/ai/omnigent/credentials.nix` (`mkDelivery`'s signing generator), `modules/checks/machines.nix`, a new `modules/checks/commit-signing-key.nix`, `modules/clan/inventory/services/omnigent.nix`, `modules/lib/omnigent-fleet-obligations.nix` and `modules/checks/omnigent-workers.nix`.
 The inert login-key literal in `modules/clan/inventory/services/emergency-access.nix` delivers nothing and is left for a separate change.
-Secrets: a `commit-signing-key` entry in each affected `secrets/home-manager/users/<user>/secrets.yaml`, the `ssh-public-key` entries removed there, and re-set ciphertext under `vars/shared/omnigent-cameron-signing-key/key` and `vars/shared/omnigent-janettesmith-signing-key/key`; no clan generator, sops recipient or bridge key is added or changed.
-Documentation: `modules/clan/services/omnigent/README.md` and a dated amendment in `docs/notes/development/omnigent/deployment-plan.md` replacing the enrollment pipeline's `ssh-signing-key` extraction.
+Secrets: new clan vars `vars/shared/<person>-commit-signing-key/{key,key.pub}` for crs58, janettesmith, christophersmith and tara, regenerated ciphertext under `vars/shared/omnigent-{cameron,janettesmith}-signing-key/key`, a `commit-signing-key` entry in `secrets/home-manager/users/ubuntu/secrets.yaml`, and the `ssh-public-key` entries removed from the five human sops files; blackphos's first machine key and raquel's generated key follow in phase B.
+Documentation: `modules/clan/services/omnigent/README.md` and a dated amendment in `docs/notes/development/omnigent/deployment-plan.md` retiring the manual signing pipeline.
 Forge: new GitHub signing keys on `cameronraysmith` and `janetteasmith` before any deploy; removal of the login keys' signing registrations in phase B.
 Hosts whose closures change at deploy: every host with a human home (cinnabar, electrum, galena, scheelite, magnetite, pyrite, argentum, blackphos, rosegold, stibnite), and the workers on magnetite, pyrite and stibnite.
 Check attributes: `checks.x86_64-linux` gains `commit-signing-key`; no other attribute is added or renamed.

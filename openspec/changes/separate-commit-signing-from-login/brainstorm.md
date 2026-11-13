@@ -122,7 +122,7 @@ O1b, clan vars shared generator as the one source: a generator such as `commit-s
 No person handles the private key and the worker copy follows regeneration.
 The costs: human home modules would read a system-level secret path, which standalone `homeConfigurations` cannot supply; every machine key of a host carrying the person's home becomes a recipient of the private key, where O1a's recipients stay `admin`, `dev` and the person; the worker generator changes from hidden-prompt to dependency-copy, which changes `mkDelivery` for every credential and the `declaredCredentials` and `credentialDelivery` obligations that assert `prompts.<file>.type == "hidden"`; and darwin human homes would gain a dependency on clan vars delivery for a home secret, which they do not have today.
 
-Recommendation: O1a.
+Recommendation at the time: O1a. Superseded on 2026-11-13 by the user's decision for clan vars; see "Decision revision, 2026-11-13" below.
 
 ### Q2: the public-key contract
 
@@ -151,6 +151,7 @@ Register each new public half as a signing key before any host deploys, keep the
 ### Q6: workers
 
 Re-set `omnigent-cameron-signing-key/key` and `omnigent-janettesmith-signing-key/key` from the new sops entry in the same commit that switches `expected.signingPublicKey`, so the enrollment check and the delivered key change at the same deploy.
+Superseded on 2026-11-13: the worker generator now derives its key from the person's generator (see "Decision revision, 2026-11-13").
 
 ### Q7: order
 
@@ -177,6 +178,7 @@ So after this change the passphrase-less login key file still exists on every hu
 ## Questions and accepted answers
 
 1. Scope beyond Cameron and Janette: included. christophersmith, raquel and tara are in scope, starting with a comparison of each person's signing public half (sops `ssh-public-key`) with their login public half (`sshKeys`); a person whose signing key is already not a login key keeps it.
+   Since the 2026-11-13 revision every clan person gets a generated key, so the comparison now only decides which old public key each person's `retiredSigningKeys` keeps for verifying past commits.
 2. ubuntu, whose signing key is its own sops decryption identity (F7): it gets a new signing key.
 3. Janette's GitHub signing registration on `janetteasmith`: an operator step, performed by the user or by Janette.
 4. "A signing key opens no secret": kept.
@@ -190,3 +192,36 @@ So after this change the passphrase-less login key file still exists on every hu
 - Radicle keeps its identity.
 - Login authorization is unchanged by this change.
 - No commit signed during the migration carries a signature GitHub does not mark verified.
+
+## Decision revision, 2026-11-13: clan vars hold the signing key
+
+The user decided that the signing key moves from per-person home-manager sops entries (O1a) to clan vars (a form of O1b).
+
+Decision: one shared generator per person, `<person>-commit-signing-key` with `share = true`, whose script runs `ssh-keygen -t ed25519 -N '' -C '<meta.gitEmail> commit signing'` itself, with a secret file `key` for the private half and a file `key.pub` with `secret = false` for the public half.
+No key is made by hand; rotation is `clan vars generate --regenerate`.
+The person's home on each clan machine and the person's Omnigent workers read the same generated key, so the second ciphertext synchronized by hand that O1a carried disappears, and the deployment plan's `sops -d --extract | clan vars set` signing pipeline (`docs/notes/development/omnigent/deployment-plan.md:974-982`) is retired.
+The one exception is `ubuntu`, a standalone home-manager profile on no clan machine, which keeps a home-manager sops entry `commit-signing-key`; its key is already generated and stored, public half `ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINTr2Jio/Qi41YjYKSmSqwzUyL3NwJf6ae2tQRSIrRtD cameron.ray.smith@gmail.com commit signing` (`logs/parity/new-signing-keys.pub`).
+
+Evidence weighed.
+This repository keeps personal secrets, signing keys included, in home-manager sops (`modules/nixos/hm-sops-bridge.nix:5-6`), and that arrangement has no OpenSpec change or ADR (`:33-34`).
+Upstream, clan-core documents vars for user-scoped and shared material (`docs/src/guides/vars/vars-concepts.md:69` `neededFor = "users"`, `:75` `share = true`; `vars-advanced-examples.md:84,127,145`, at the pinned `dbae21013`), and clan-infra uses vars for machine keys and per-user service credentials (`modules/mailserver.nix:166`, `modules/samba.nix:136`, `git.clan.lol/clan/clan-infra` at `008b3ecb`).
+None of these references delivers a person's git signing key either way.
+
+Trade-off: every machine carrying the person's home or worker becomes a recipient of the private key; root on those machines can already read the home-manager-decrypted copy, so no new reader is added.
+
+Questions this revision raised, answered from clan-core and this repository:
+
+- R1, ownership: a vars file has one `owner`, `group` and `mode` per machine (clan-core `nixosModules/clanCore/vars/secret/sops/generators-to-sops.nix:28-35,53-60`), and both the person's account and the worker account must read the key.
+  Two files with equal content would change the worker credential contract's generator and file names, which `declaredCredentials` asserts; a shared group would break the contract's owner-is-the-worker, mode `0400` assertion (`modules/home/ai/omnigent/credentials.nix:152-166`).
+  Chosen: the existing worker generator `omnigent-<owner>-signing-key` keeps its name, file, owner, mode and delivered path, and declares `dependencies = [ "<person>-commit-signing-key" ]` with a script that copies `$in/<person>-commit-signing-key/key` to `$out/key`, replacing its hidden prompt.
+  clan regenerates dependents with the requested generator (`pkgs/clan-cli/clan_lib/vars/graph.py:131-139`, `requested_closure` calls `add_dependents`), so regenerating the person's generator regenerates every worker copy in the same run; `credentials.py` and the delivered path are unchanged.
+- R2, path into the home: home modules already read machine facts through `osConfig` when embedded and see `null` when standalone (`modules/home/ai/cognee/default.nix:16-30`, `modules/home/ai/omnigent/credentials.nix:92-125`).
+  `vcs-signing` takes the key path from `osConfig.clan.core.vars.generators.<person>-commit-signing-key.files.key.path`, which resolves each platform's layout (evaluated 2026-11-13: `/run/secrets/vars/shared/omnigent-cameron-signing-key/key` on both magnetite and stibnite for the existing worker var), and from its own sops entry only for ubuntu.
+- R3, public key: `meta.signingKey` defaults to the committed `vars/shared/<person>-commit-signing-key/key.pub/value`, read at flake level, rather than to a machine configuration's `.value`, because `flake.users` is static data that check key sets and every machine read, and must not force a machine fixpoint (`preferences-nix-checks-architecture`, "Key-set strictness").
+- R4, which machines: each machine declares the generator of every person with a home or a worker there, owned by that person's account where the home is and by `root` elsewhere (owner, group and mode may differ across machines for a shared generator, `pkgs/clan-cli/clan_lib/vars/generator.py:106-116`; every other attribute must match, `:272-296`).
+  Cameron's generator reaches all ten clan machines, Janette's rosegold, magnetite and pyrite, Christopher's argentum, Raquel's blackphos and Tara's galena and scheelite.
+  The person name is the canonical profile key after `flake.userAliases`, so `cameron` resolves to `crs58-commit-signing-key`.
+  blackphos has no clan machine age key yet (no `sops/machines/blackphos`, no `sops/secrets/blackphos-age.key`), so it must be enrolled as a vars recipient before Cameron's and Raquel's homes there can receive the key.
+  Revised later on 2026-11-13 (design.md D9): blackphos is excluded from this slice instead of enrolled; it is the one machine in `flake.lib.commitSigningLegacyMachines`, declares no generator, its homes sign with the login key file through the agent-free program, Raquel gets no new key yet, and enrolling blackphos becomes a prerequisite of the phase B cutover.
+  ubuntu is the only profile on no clan machine.
+  Standalone `homeConfigurations` entries of the other profiles have no `osConfig`, so they configure no signing key; [INFERENCE] they are not activated on any clan machine (`modules/apps/bootstrap/home-bootstrap.sh` targets sandbox profiles).
