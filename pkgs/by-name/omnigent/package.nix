@@ -50,22 +50,10 @@ let
     inherit version omnigent-client;
   };
 
-  # nixpkgs master carries openai-agents 0.22.0, which needs openai>=3, while
-  # master still ships openai 2.53; 0.20.0 is the newest release that accepts
-  # openai<3. Every 0.18+ release caps websockets<17 below nixpkgs' 17.0.1 and
-  # the nixpkgs recipe omits the websockets dependency. Remove this pin once
-  # master carries nixpkgs b745875580cb and the openai 3.x bump
-  # (NixOS/nixpkgs#564353).
-  # https://pypi.org/pypi/openai-agents/0.20.0/json
+  # openai-agents 0.22.0 caps websockets<17, below nixpkgs' 17.0.1.
+  # https://pypi.org/pypi/openai-agents/0.22.0/json
   openai-agents = py.openai-agents.overridePythonAttrs (old: {
-    version = "0.20.0";
-    src = fetchPypi {
-      pname = "openai_agents";
-      version = "0.20.0";
-      hash = "sha256-prN5VId4aKwjOHaifaseKkYcU+y9X89uGeLSdtPoSM0=";
-    };
-    dependencies = old.dependencies ++ [ py.websockets ];
-    pythonRelaxDeps = [ "websockets" ];
+    pythonRelaxDeps = old.pythonRelaxDeps ++ [ "websockets" ];
   });
   omnigent = py.buildPythonPackage {
     pname = "omnigent";

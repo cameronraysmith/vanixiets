@@ -161,6 +161,24 @@
                 varsDir = config.clan.core.vars.generators;
                 openrouterEnvPath = varsDir.${settings.openrouterApiKeyGenerator}.files."OPENROUTER_API_KEY".path;
                 matrixPasswordEnvPath = varsDir.${settings.matrixBotPasswordGenerator}.files."MATRIX_PASSWORD".path;
+
+                # nixpkgs rolled patchelf back from 0.19.2 to 0.15.2, but upstream's
+                # nix/pm-packages.nix applies the 0.19-only fix for NixOS/patchelf#674
+                # (patchelf#672) unconditionally, and it does not apply to 0.15.2, so
+                # every pm package and its consumers (hermes-agent, hermes-tui, web,
+                # webapp) fail to build. 0.15.2 predates the regression the patch
+                # fixes, so below 0.19 the pm packages are rebuilt with an unpatched
+                # patchelf by handing upstream a patchelf whose overrideAttrs drops the
+                # patch. From 0.19 on the package stays upstream's. Delete this once
+                # upstream makes the patch conditional or nixpkgs returns to 0.19.
+                patchelfRolledBack = lib.versionOlder pkgs.patchelf.version "0.19";
+                pmPackagesWithUnpatchedPatchelf = lib.filterAttrs (_: lib.isDerivation) (
+                  pkgs.callPackage "${inputs.hermes-agent}/nix/pm-packages.nix" {
+                    patchelf = pkgs.patchelf // {
+                      overrideAttrs = _: pkgs.patchelf;
+                    };
+                  }
+                );
               in
               {
                 imports = [ inputs.hermes-agent.nixosModules.default ];
@@ -186,6 +204,11 @@
                   user = settings.serviceUser;
                   group = "users";
                   stateDir = userHome;
+                  package = lib.mkIf patchelfRolledBack (
+                    inputs.hermes-agent.packages.${pkgs.stdenv.hostPlatform.system}.default.override {
+                      pmPackages = pmPackagesWithUnpatchedPatchelf;
+                    }
+                  );
 
                   # Deep-merge into config.yaml. Native matrix.* policy and the
                   # platforms.matrix.extra.* declarative bootstrap path replace the

@@ -10,8 +10,15 @@ let
   release = kernel.modDirVersion;
   kernelBuild = "${kernel.dev}/lib/modules/${release}/build";
 in
-assert lib.assertMsg (kernel.version == "6.18.60" && release == "6.18.60")
-  "hci-uart-macbook: only Linux 6.18.60 has been checked; revalidate source, prepared configuration, ABI and effective module selection before updating";
+# Linux 6.18.60 -> 6.18.63 revalidation: the patch target drivers/bluetooth/hci_bcm.c
+# is byte-identical. The only change compiled into this hci_uart.ko is two bounds
+# checks in hci_bcsp.c, a protocol the BCM serdev path never uses; it alone moves
+# the srcversion. Every other change under drivers/bluetooth and drivers/tty (btusb,
+# bfusb, btnxpuart, btrsi, hci_nokia, hci_vhci, serial_core, 8250 and other serial
+# drivers) is in-kernel only and not part of this module. The prepared .config and
+# autoconf.h differ only in the release and rustc version strings.
+assert lib.assertMsg (kernel.version == "6.18.63" && release == "6.18.63")
+  "hci-uart-macbook: only Linux 6.18.63 has been checked; revalidate source, prepared configuration, ABI and effective module selection before updating";
 kernel.stdenv.mkDerivation {
   pname = "hci-uart-macbook";
   version = "0-unstable-2026-09-14-${release}";
@@ -79,9 +86,9 @@ kernel.stdenv.mkDerivation {
     chmod -R u+w prepared
     test "$(cat prepared/include/config/kernel.release)" = '${release}'
     sha256sum -c <<'HASHES'
-    6cb9690f19cb43c049de78029cfe0ab4b32753bba57c563209d98fb9e9946bd6  prepared/.config
-    76aebcefa7f1932bc7857eeb54211ebcdf46cff1de6aace73662a3452ccb2fbb  prepared/Module.symvers
-    145d792349a6724566714016ae9ef4af5f2e22e531d74d266dba140bb6f42fba  prepared/include/generated/autoconf.h
+    e436cfb17359ea48eae27d98e998b2e84c78dafa8351652da7cb34f8f8863d5d  prepared/.config
+    e8369fae7c20eeb179ea6c453cf105ba4396770de60b87aa64e38587255c1409  prepared/Module.symvers
+    ddf428e4209c2ce363817e3aed9cdb6778b5d7b556431a9c2a2dd74b598514d3  prepared/include/generated/autoconf.h
     HASHES
     flagsArray=()
     concatTo flagsArray makeFlags makeFlagsArray
@@ -111,7 +118,7 @@ kernel.stdenv.mkDerivation {
     test -s "$module.cer"
     test "$(find "$out" -type f | wc -l)" -eq 2
     test "$(modinfo -F name "$module")" = hci_uart
-    test "$(modinfo -F srcversion "$module")" = 36378DEB88C10B003AC8D9B
+    test "$(modinfo -F srcversion "$module")" = 08EDC4DC96F685051041C6D
     case "$(modinfo -F vermagic "$module")" in
       '${release} '*) ;;
       *) echo 'Module/kernel release mismatch' >&2; exit 1 ;;

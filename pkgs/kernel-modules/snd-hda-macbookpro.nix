@@ -12,8 +12,16 @@ let
   kernelBuild = "${kernel.dev}/lib/modules/${kernel.modDirVersion}/build";
   appleFlags = "-DAPPLE_PINSENSE_FIXUP -DAPPLE_CODECS -DCONFIG_SND_HDA_RECONFIG=1 -Wno-unused-variable -Wno-unused-function";
 in
-assert lib.assertMsg (kernel.version == "6.18.60")
-  "snd-hda-macbookpro: only Linux 6.18.60 has been checked; revalidate the source/header layout and module selection before changing this boundary";
+# Linux 6.18.60 -> 6.18.63 revalidation: the patch targets sound/hda/codecs/cirrus,
+# codecs/generic.h and common/hda_auto_parser.h are byte-identical. The only change
+# compiled into this module is a new acomp_requested_resume bitfield in
+# include/sound/hda_codec.h's struct hda_codec; the module compiles against the same
+# kernel's header and none of its sources carries a copy of struct hda_codec, so the
+# layout stays consistent. The other sound/hda changes (common/codec.c, sysfs.c,
+# core/device.c, controllers/intel.c and the realtek, hdmi, via, conexant and tas2781
+# codecs) are in-kernel only and not part of this module.
+assert lib.assertMsg (kernel.version == "6.18.63")
+  "snd-hda-macbookpro: only Linux 6.18.63 has been checked; revalidate the source/header layout and module selection before changing this boundary";
 stdenv.mkDerivation {
   pname = "snd-hda-macbookpro";
   version = "0-unstable-2026-09-06-${kernel.modDirVersion}";
