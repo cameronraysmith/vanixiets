@@ -1,21 +1,24 @@
 # Create-once bootstrap for an omnigraph cluster storage root.
 #
-# omnigraph-server refuses to start on a root without cluster state, and a
-# root imported but never applied boots serving no graphs. Running
-# `omnigraph cluster apply` automatically on every start would fix a fresh
-# root, but it would also silently recreate an empty cluster over a root that
-# was lost, which is why services.omnigraph keeps `cluster.apply.auto` off.
+# omnigraph-server refuses to start on a root without applied cluster state.
+# Running `omnigraph cluster apply` automatically on every start would fix a
+# fresh root, but it would also silently recreate an empty cluster over a root
+# that was lost, which is why services.omnigraph keeps `cluster.apply.auto`
+# off.
 #
 # This program separates the two cases with an initialization marker kept
 # outside the root, so it survives loss of the root: strip trailing slashes
 # from the storage URI, split it into parent and basename, and the marker is
 # `<parent>/_omnigraph-markers/<basename>.initialized`
-# (s3://sciexp/omnigraph/clusters/dev-graph-v9 ->
-# s3://sciexp/omnigraph/clusters/_omnigraph-markers/dev-graph-v9.initialized).
+# (s3://sciexp/omnigraph/clusters/dev-graph-v10 ->
+# s3://sciexp/omnigraph/clusters/_omnigraph-markers/dev-graph-v10.initialized).
 # A sibling `<root>.initialized` would share the root's string prefix, so a
 # prefix delete of the root would take the marker with it; a separate
 # directory does not. The cluster state comes from
-# `omnigraph cluster status --json`, which is read-only and lock-free:
+# `omnigraph --target <storageUri> cluster status --json`, which is read-only
+# and takes no lock. It succeeds with the ledger's status when the root holds
+# state, and fails with the single diagnostic `state_missing` when it does not;
+# any other outcome is an error:
 #
 #   state found,  marker present  no-op
 #   state found,  marker absent   write the marker (adopt the existing root)
@@ -36,8 +39,8 @@
 # basename once trailing slashes are stripped (`s3://bucket/`, `/`), which
 # has no parent to hold its marker.
 #
-# applyProgram is the caller's converge program (import tolerating existing
-# state, then apply); it is invoked, never reimplemented here.
+# applyProgram is the caller's converge program (apply, then release the
+# admission lock it retains); it is invoked, never reimplemented here.
 { lib, ... }:
 let
   markerDirName = "_omnigraph-markers";
@@ -103,7 +106,6 @@ in
     {
       omnigraph,
       applyProgram,
-      configDir,
       storageUri,
     }:
     let
@@ -191,7 +193,6 @@ in
       bootstrapText = ''
         storage_uri=${lib.escapeShellArg storageUri}
         marker=${lib.escapeShellArg location.marker}
-        config_dir=${lib.escapeShellArg (toString configDir)}
 
         say() { printf 'omnigraph-cluster-bootstrap: %s\n' "$*"; }
         err() { printf 'omnigraph-cluster-bootstrap: %s\n' "$*" >&2; }
@@ -204,15 +205,18 @@ in
 
         ${if location.kind == "s3" then s3Functions else localFunctions}
 
-        if ! status_output=$(omnigraph cluster status --config "$config_dir" --json); then
+        status_rc=0
+        status_output=$(omnigraph --target "$storage_uri" cluster status --json) || status_rc=$?
+        if [ "$status_rc" -eq 0 ] \
+          && jq -e '.ledger_id | type == "string"' <<<"$status_output" >/dev/null 2>&1; then
+          state_found=true
+        elif [ "$status_rc" -ne 0 ] \
+          && jq -e '.ok == false and ([.diagnostics[]?.code] == ["state_missing"])' \
+            <<<"$status_output" >/dev/null 2>&1; then
+          state_found=false
+        else
           printf '%s\n' "$status_output" >&2
-          err "omnigraph cluster status failed for $storage_uri; nothing was applied"
-          exit 1
-        fi
-        if ! state_found=$(jq -r '.state_observations.state_found' <<<"$status_output") \
-          || { [ "$state_found" != true ] && [ "$state_found" != false ]; }; then
-          printf '%s\n' "$status_output" >&2
-          err "omnigraph cluster status reported no boolean .state_observations.state_found for $storage_uri; nothing was applied"
+          err "omnigraph cluster status for $storage_uri exited $status_rc without a ledger status or a state_missing refusal; nothing was applied"
           exit 1
         fi
 

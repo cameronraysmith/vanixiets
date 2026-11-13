@@ -9,8 +9,11 @@
 # real program and asserts its exit status, its output, whether the converge
 # program ran, and what happened to the marker.
 #
-# `omnigraph` is a stub answering `cluster status --json` with a scripted
-# state_found (or an error-severity failure) and logging its argv. The
+# `omnigraph` is a stub answering `--target <root> cluster status --json` the
+# way omnigraph 0.15 does, scripted per row: a ledger status and exit 0 when
+# the root holds state, the single `state_missing` diagnostic and exit 1 when
+# it does not, another diagnostic and exit 1 for a failed read, or exit 0
+# without a ledger status; it logs its argv. The
 # converge program is a stub that logs each run, notes whether the marker
 # already existed, and fails on request. S3 markers go to a loopback S3
 # stand-in that serves HEAD and PUT from a directory, logs every request with
@@ -22,7 +25,8 @@
 # state and no marker applies once, then writes the marker; no state with a
 # marker refuses, never applies, leaves the marker, and names the marker and
 # the deliberate-reset instruction; a failed apply exits 1 with no marker; a
-# failed status call exits 1 without applying. The marker sits in
+# failed status call, or a successful one without a ledger status, exits 1
+# without applying. The marker sits in
 # `_omnigraph-markers/` beside the root, never inside it. For S3, a HEAD
 # answering 500 exits 1 without applying, AWS_ENDPOINT_URL serves when
 # AWS_ENDPOINT_URL_S3 is unset, and every request is path-style and
@@ -34,26 +38,32 @@
   perSystem =
     { pkgs, system, ... }:
     let
-      configDir = "/rehearsal/cluster-config";
       bucket = "rehearsal";
       accessKey = "rehearsal-access-key";
 
       stubOmnigraph = pkgs.writeShellScriptBin "omnigraph" ''
         printf '%s\n' "$*" >> "$STUB_OMNIGRAPH_LOG"
-        if [ "$*" != "cluster status --config ${configDir} --json" ]; then
-          echo "stub omnigraph: unexpected invocation: $*" >&2
-          exit 97
-        fi
+        case "$*" in
+          "--target "*" cluster status --json") ;;
+          *)
+            echo "stub omnigraph: unexpected invocation: $*" >&2
+            exit 97
+            ;;
+        esac
         case "$STUB_STATE" in
           found)
-            echo '{"ok":true,"state_observations":{"state_found":true},"diagnostics":[]}'
+            echo '{"canonical_root":"rehearsal","ledger_id":"01JREHEARSALLEDGER000000000","state_revision":1,"result_revision":1,"next_sequence":2,"lock_id":null,"outstanding_id":null,"lookup":null}'
             ;;
           missing)
-            echo '{"ok":true,"state_observations":{"state_found":false},"diagnostics":[{"severity":"warning","code":"state_missing"}]}'
+            echo '{"ok":false,"diagnostics":[{"code":"state_missing","severity":"error","path":"cluster","message":"cluster ledger is missing"}]}'
+            exit 1
             ;;
           error)
-            echo '{"ok":false,"diagnostics":[{"severity":"error","code":"state_read_error"}]}'
+            echo '{"ok":false,"diagnostics":[{"code":"state_read_failed","severity":"error","path":"cluster","message":"storage read failed"}]}'
             exit 1
+            ;;
+          malformed)
+            echo '{"ok":true}'
             ;;
         esac
       '';
@@ -69,13 +79,15 @@
         self.lib.omnigraphBootstrap pkgs {
           omnigraph = stubOmnigraph;
           applyProgram = stubApply;
-          inherit configDir storageUri;
+          inherit storageUri;
         };
 
-      s3Bootstrap = mkBootstrap "s3://${bucket}/clusters/dev-graph/";
+      s3Root = "s3://${bucket}/clusters/dev-graph/";
+      s3Bootstrap = mkBootstrap s3Root;
       s3MarkerKey = "/${bucket}/clusters/_omnigraph-markers/dev-graph.initialized";
       # Relative, so each row resolves it under its own working directory.
-      localBootstrap = mkBootstrap "store/root/";
+      localRoot = "store/root/";
+      localBootstrap = mkBootstrap localRoot;
       localMarker = "store/_omnigraph-markers/root.initialized";
       bucketRootBootstrap = mkBootstrap "s3://${bucket}/";
       slashRootBootstrap = mkBootstrap "/";
@@ -206,7 +218,8 @@
             applies() { grep -c . "$STUB_APPLY_LOG" || true; }
             expect_no_apply() { [ "$(applies)" = 0 ] || fail "applied: $(cat "$STUB_APPLY_LOG")"; }
             expect_status_once() {
-              [ "$(cat "$STUB_OMNIGRAPH_LOG")" = "cluster status --config ${configDir} --json" ] \
+              if [ "$backend" = s3 ]; then root=${s3Root}; else root=${localRoot}; fi
+              [ "$(cat "$STUB_OMNIGRAPH_LOG")" = "--target $root cluster status --json" ] \
                 || fail "omnigraph saw: $(cat "$STUB_OMNIGRAPH_LOG")"
             }
             puts() { jq -c 'select(.method == "PUT")' "$requests"; }
@@ -279,6 +292,16 @@
               expect_no_apply
               expect_no_put
               expect_no_marker
+
+              row_setup "$backend: status succeeds without a ledger status" "$backend" malformed absent
+              run_backend
+              expect_rc 1
+              expect_status_once
+              expect_no_apply
+              expect_no_put
+              expect_no_marker
+              grep -qF "without a ledger status or a state_missing refusal" "$TMPDIR/stderr" \
+                || fail "did not explain the unrecognized status"
             done
 
             # The marker lives beside the root, never inside it.

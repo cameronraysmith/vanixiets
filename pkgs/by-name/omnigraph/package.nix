@@ -11,24 +11,24 @@
 }:
 rustPlatform.buildRustPackage (finalAttrs: {
   pname = "omnigraph";
-  version = "0.11.0";
+  version = "0.15.0";
 
-  # rev is the v0.11.0 tag peel rather than tag = "v${version}": upstream's release builds stamp
+  # rev is the v0.15.0 tag peel rather than tag = "v${version}": upstream's release builds stamp
   # OMNIGRAPH_SOURCE_VERSION with the source commit sha, which env below reads from src.rev.
   src = fetchFromGitHub {
     owner = "ModernRelay";
     repo = "omnigraph";
-    rev = "1523b4ab43f16c6ed4802c21393e5bdb66c6622b";
-    hash = "sha256-cdrDqvnmfEUJtx/T9ojVEYGmOv93RZzCO3z7KG+nYBU=";
+    rev = "373834b4c1c4b29cf0ddd64bee9565f98c60cc26";
+    hash = "sha256-fDjXKhh/jAXST0SGoPsGkFDIZtpGF9NxCxGd7H4snBA=";
   };
 
-  cargoHash = "sha256-dumK9yeVHQtYG4g5WA+yw4a+5DQzxPoXHmpDMdBkYo8=";
+  cargoHash = "sha256-4Q1MKSETAjrZ67Q+LucV5gBSYjBDXPyPNOoTkuqKXLM=";
 
   # Workaround for the stdarch/LLVM 21 signature mismatch on the AVX-512 VNNI intrinsics retyped by
   # https://github.com/llvm/llvm-project/pull/155194; the deleted lines are runtime-dispatch arms,
   # so removing them falls back to the AVX2 and scalar kernels.
   postPatch = ''
-    lanceDistance="$cargoDepsCopy/source-registry-0/lance-linalg-11.0.0/src/distance"
+    lanceDistance="$cargoDepsCopy/source-registry-0/lance-linalg-13.0.0/src/distance"
 
     substituteInPlace "$lanceDistance/dot_u8.rs" \
       --replace-fail "return |a, b| unsafe { x86::dot_u8_avx512_vnni(a, b) };" ""

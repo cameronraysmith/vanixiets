@@ -1,4 +1,7 @@
-{ ... }:
+{ config, ... }:
+let
+  inherit (config.flake.lib.hosts) magnetite;
+in
 {
   flake.modules.nixos."machines/nixos/cinnabar" =
     { pkgs, ... }:
@@ -31,6 +34,17 @@
             extraConfig = ''
               tls internal
               reverse_proxy [::1]:2586
+            '';
+          };
+          "omnigraph.zt" = {
+            listenAddresses = meshListenAddrs;
+            # The 0.14+ CLI refuses a token over plain HTTP to anything but
+            # loopback, so magnetite's omnigraph-server is reached through this
+            # TLS front. The original Host passes through, which /mcp admits
+            # only because magnetite lists omnigraph.zt in --mcp-allowed-host.
+            extraConfig = ''
+              tls internal
+              reverse_proxy [${magnetite.zt}]:8090
             '';
           };
           "radicle.zt" = {
