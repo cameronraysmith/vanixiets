@@ -241,7 +241,11 @@ in
             && (unit.Service.BusName or null) == "org.freedesktop.Notifications"
             && !config.programs.dux-shell.enable
             && !home.programs.quickshell.systemd.enable
-            && niri.settings.includes == [ ]
+            &&
+              niri.settings.includes == {
+                before = [ ];
+                after = [ ];
+              }
             && niri.settings.spawn-at-startup == [ ]
             && lib.all (name: !(builtins.hasAttr name home.systemd.user.services)) competingUnits
             && lib.all (name: !(config.systemd.user.services.${name}.enable or false)) competingUnits
