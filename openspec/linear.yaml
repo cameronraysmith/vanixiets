@@ -108,3 +108,9 @@ projects:
         id: "3b3af5d5-4d05-4e2d-97fd-88595f9440fd"
       "fleet-dashboard-interface":
         id: "4a7767c0-6588-4958-b772-b06bf882e3e1"
+  "workstation-parity":
+    # slugId, for the reason recorded on the sibling entries.
+    id: "69d5244a4e10"
+    name: "Workstation parity between stibnite and pyrite"
+    teams: ["CAM"]
+    archive_documents: {}
