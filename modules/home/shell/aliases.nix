@@ -19,7 +19,7 @@
         dl = "aria2c -x 16 -s 16 -k 1M";
         dr = "docker container run --interactive --rm --tty";
         g = "git";
-        gemi = "bunx -p @google/gemini-cli gemini";
+        gemi = "agy";
         ghd = "gh-dash";
         ghe = "github_email";
         gbc = "git branch --sort=-committerdate | grep -v '^\*\|main' | fzf --multi | xargs git branch -d";
