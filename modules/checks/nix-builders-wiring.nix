@@ -47,6 +47,7 @@
       ];
       dispatchers = [
         "magnetite"
+        "pyrite"
         "stibnite"
       ];
 
@@ -247,41 +248,47 @@
         map plain stibnite.users.users.${sessionUser}.openssh.authorizedKeys.keys
       );
 
+      toMagnetite = expectedDispatch {
+        builder = "magnetite";
+        systems = [ "x86_64-linux" ];
+        maxJobs = 8;
+        speedFactor = 2;
+        supportedFeatures = [
+          "big-parallel"
+          "nixos-test"
+          "uid-range"
+          "recursive-nix"
+        ];
+      };
+      toPyrite = expectedDispatch {
+        builder = "pyrite";
+        systems = [ "x86_64-linux" ];
+        maxJobs = 1;
+        speedFactor = 1;
+        supportedFeatures = [
+          "kvm"
+          "nixos-test"
+        ];
+      };
+      toStibnite = expectedDispatch {
+        builder = "stibnite";
+        systems = [ "aarch64-darwin" ];
+        maxJobs = 16;
+        speedFactor = 1;
+        supportedFeatures = [
+          "apple-virt"
+          "big-parallel"
+        ];
+      };
+
       stibniteDispatch = [
-        (expectedDispatch {
-          builder = "magnetite";
-          systems = [ "x86_64-linux" ];
-          maxJobs = 8;
-          speedFactor = 2;
-          supportedFeatures = [
-            "big-parallel"
-            "nixos-test"
-            "uid-range"
-            "recursive-nix"
-          ];
-        })
-        (expectedDispatch {
-          builder = "pyrite";
-          systems = [ "x86_64-linux" ];
-          maxJobs = 1;
-          speedFactor = 1;
-          supportedFeatures = [
-            "kvm"
-            "nixos-test"
-          ];
-        })
+        toMagnetite
+        toPyrite
       ];
-      magnetiteDispatch = [
-        (expectedDispatch {
-          builder = "stibnite";
-          systems = [ "aarch64-darwin" ];
-          maxJobs = 16;
-          speedFactor = 1;
-          supportedFeatures = [
-            "apple-virt"
-            "big-parallel"
-          ];
-        })
+      magnetiteDispatch = [ toStibnite ];
+      pyriteDispatch = [
+        toMagnetite
+        toStibnite
       ];
     in
     {
@@ -298,6 +305,10 @@
             magnetite = {
               hosts = hosts "magnetite";
               dispatch = dispatched "magnetite";
+            };
+            pyrite = {
+              hosts = hosts "pyrite";
+              dispatch = dispatched "pyrite";
             };
             dispatchers = lib.genAttrs dispatchers dispatcherSide;
             builders = lib.genAttrs builders builderSide;
@@ -316,6 +327,11 @@
               # rosegold and argentum are excluded until the binary cache
               # holds nixbot's darwin outputs.
               dispatch = builtins.listToAttrs magnetiteDispatch;
+            };
+            pyrite = {
+              hosts = sortStrings (map (entry: entry.name) pyriteDispatch);
+              # rosegold and argentum are excluded, as in stibnite's entry.
+              dispatch = builtins.listToAttrs pyriteDispatch;
             };
             dispatchers = lib.genAttrs dispatchers expectedDispatcherSide;
             builders = lib.genAttrs builders expectedBuilderSide;

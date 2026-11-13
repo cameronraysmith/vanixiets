@@ -109,6 +109,20 @@ in
           "argentum"
         ];
       };
+      # pyrite has two cores and travels, so it sends x86_64-linux work to
+      # magnetite, which builds it natively, and aarch64-darwin work to
+      # stibnite. max-jobs stays above zero, so when no builder is reachable
+      # nix falls back to building locally. Its builders substitute from the
+      # same binary cache rather than receive dependencies over ZeroTier.
+      # rosegold and argentum are excluded, as in stibnite's entry; the
+      # service never makes a dispatcher its own builder.
+      pyrite.settings = {
+        buildersUseSubstitutes = true;
+        exclude = [
+          "rosegold"
+          "argentum"
+        ];
+      };
     };
   };
 }
