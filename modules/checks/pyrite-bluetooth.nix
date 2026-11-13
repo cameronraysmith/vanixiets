@@ -70,7 +70,7 @@
             modinfo -F "$field" "$expected" | sort > candidate-field
             diff -u native-field candidate-field
           done
-          for name in bluetooth btbcm btqca pwrseq_core 8250 8250_dw intel_lpss intel_lpss_pci brcmfmac brcmutil; do
+          for name in bluetooth btbcm btqca pwrseq_core 8250 8250_dw intel_lpss intel_lpss_pci brcmutil; do
             selected=$(modinfo -b ${tree} -k ${release} -F filename "$name")
             native=$(modinfo -b ${kernel.modules} -k ${release} -F filename "$name")
             if test "$native" = '(builtin)'; then
@@ -80,7 +80,7 @@
             fi
             echo "preserved $name: $selected"
           done
-          for name in zfs snd_hda_codec_cs8409; do
+          for name in zfs snd_hda_codec_cs8409 brcmfmac; do
             selected=$(modinfo -b ${tree} -k ${release} -F filename "$name")
             case "$(readlink -f "$selected")" in
               ${

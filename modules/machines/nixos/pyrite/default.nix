@@ -237,6 +237,12 @@ in
       boot.extraModulePackages = [
         (config.boot.kernelPackages.callPackage ../../../../pkgs/kernel-modules/snd-hda-macbookpro.nix { })
         (config.boot.kernelPackages.callPackage ../../../../pkgs/kernel-modules/hci-uart-macbook.nix { })
+        # Since 6.18.61's backport cc03f779a328 maps msgbuf RX packet IDs DMA_FROM_DEVICE,
+        # the BCM4350 firmware's reads of posted RX buffers fault under intel_iommu=on
+        # ("PTE Read access is not set") and it stops answering dcmd queries. This rebuilds
+        # brcmfmac and its vendor sub-modules with upstream 7ed5dce55fa8, which maps them
+        # bidirectionally again. Drop it once the kernel carries 7ed5dce55fa8.
+        (config.boot.kernelPackages.callPackage ../../../../pkgs/kernel-modules/brcmfmac-vtd-rx.nix { })
       ];
 
       # Stated explicitly, not inherited from facter's bare-metal mkDefault branch (dead
