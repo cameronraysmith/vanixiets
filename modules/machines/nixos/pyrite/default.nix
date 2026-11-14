@@ -506,6 +506,9 @@ in
         {
           settings = {
             "org/gnome/desktop/session".idle-delay = lib.gvariant.mkUint32 1800;
+            # The GNOME portal serves this as org.freedesktop.appearance color-scheme, which Zen's
+            # "system" theme follows; DMS writes it only when its light/dark mode is toggled.
+            "org/gnome/desktop/interface".color-scheme = "prefer-dark";
             "org/gnome/settings-daemon/plugins/power" = {
               power-button-action = "nothing";
               sleep-inactive-ac-timeout = lib.gvariant.mkInt32 0;
