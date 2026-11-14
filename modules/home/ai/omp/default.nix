@@ -150,6 +150,11 @@ let
               git guard names ovnfs in its hints. Isolated subagents use ovnfs
               checkouts only where `task.isolation.enabled` (off by default) is
               set and `isolation.backend` is `auto`; this option sets neither.
+
+              The operator decided on 2026-11-14 that ovnfs is not to be enabled on any machine in the near term.
+              It is packaged (pkgs/by-name/ovnfs) to follow its development.
+              Enabling it makes every omp session's system prompt require `ovnfs new` for separate checkouts, which contradicts the fleet context's jj development join and worktree rules.
+              ovnfs 0.5 and later create non-colocated jj workspaces, which this flake repository does not support: modules/home/ai/plugins/agent-context-vcs-jj/.apm/instructions/040-worktree-interop-and-external-frameworks.instructions.md states that a non-colocated jj workspace is never valid in a flake repository.
             '';
           };
 
