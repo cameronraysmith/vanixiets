@@ -130,19 +130,10 @@
           # ====================
 
           "*" = {
-            # platform-specific SSH agent integration
-            # note: SSH_AUTH_SOCK is set by modules/home/core/bitwarden.nix
-            # - Darwin: uses bitwarden desktop app SSH agent + keychain fallback
-            # - Linux: uses bitwarden desktop app SSH agent (if enabled in bitwarden.nix)
-            AddKeysToAgent =
-              if pkgs.stdenv.hostPlatform.isDarwin then
-                "yes" # add to both bitwarden agent and macOS keychain
-              else
-                "confirm"; # prompt before adding to agent on linux
-
-            # Identity files auto-discovered from SSH agent (via SSH_AUTH_SOCK).
-            # No explicit IdentityFile needed - prevents "no such identity" errors
-            # when the file doesn't exist on headless servers.
+            # The agent (SSH_AUTH_SOCK), AddKeysToAgent and per-host key pins
+            # are set by modules/home/core/ssh-identity.nix. Without a pin,
+            # identities come from the agent, so no IdentityFile is needed on
+            # hosts that lack the default key files.
 
             # security defaults
             ForwardAgent = false; # override per-host as needed

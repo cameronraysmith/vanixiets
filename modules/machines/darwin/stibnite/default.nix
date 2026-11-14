@@ -247,7 +247,7 @@ in
         };
 
         users.crs58 = {
-          imports = flakeUsers.crs58.modules;
+          imports = flakeUsers.crs58.modules ++ [ inputs.self.modules.homeManager.bitwarden-key-pins ];
 
           home.packages = [
             pkgs.aeneas

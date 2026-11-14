@@ -219,16 +219,6 @@ in
       polkitU2fIndex = polkitAuthIndex "pam_u2f.so";
       polkitUnixIndex = polkitAuthIndex "pam_unix.so";
       bitwardenSocket = "${home.home.homeDirectory}/.bitwarden-ssh-agent.sock";
-      pinnedKey =
-        host:
-        let
-          block = home.programs.ssh.settings.${host}.data or { };
-          file = home.home.file.${lib.removePrefix "~/" (block.IdentityFile or "")} or { };
-        in
-        if (block.IdentitiesOnly or false) == true then lib.trim (file.text or "") else null;
-      loginKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINdO9rInDa9HvdtZZxmkgeEdAlTupCy3BgA/sqSGyUH+";
-      # The key https://github.com/cameronraysmith.keys lists for authentication.
-      githubAuthKey = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDFGXo7HSSakYB5eEvp22xKmNrMwpI7OTlB3RqP+mGagbggljJP/YBmUCptstAMsZuKeMRXjm6UXUgNeUhECLZQHEDy2+Mrm42OM0svsMqlgZj1ZZdY1yYcquKQO4oyx7CjPOj7NXqSueZmpcwYRJFU7xQO421wb9rNewxCRs8jwRr5beTCUF0MuGLNEJGPMPk++d6Mkd3TYojE524AAoDWgx5z2WavZnewuYYd8PAGrFO4yWQn6LX50qYq2bPo53J/7CT9KwEo4ZaYl6TiSb9x3Oj+iUiTMNBmKBLSMYyj7eV8CU4iIXYqySvEf/mA7EytZnKT37cYo25CMAsobCHZ07htv6bbW+FPb1jehjT96Oo6i0zVGIs/gptw1k9xXSTS0GxfQ1P0XK7+9RZE7bWw/kxepF+OzLcvKKz3SdPEb/SOmqPoq4AFalljM0iwi8DXmH2dhp1Ughh4ImQQxVGrq+U2EwuSZEQHuSXlvfB/MKj2yvcF0BYhPaYfCLovq5LbXXu1QpnL/C9FiY21ehmVFZwHvo+L8y2NxwCaoXYuPGwGc5kH5fNjBh/S7RpypV+oHHGY90lGV6CoQpxXb65rI/ob7cTR2npWUC577fmidYTSmOqU3HhewcZDgxf2iZkVCm7F/Sb2tga3BClr3lV92EBFm9JsayzM9DLuAIz7rQ==";
     in
     {
       assertions = [
@@ -457,10 +447,6 @@ in
             && !(config.environment.sessionVariables ? SSH_AUTH_SOCK)
             && !(config.environment.variables ? SSH_AUTH_SOCK)
             && !lib.hasInfix "SSH_AUTH_SOCK" config.environment.extraInit;
-        }
-        {
-          message = "pyrite desktop: fleet hosts pin the login key and GitHub its authentication key";
-          assertion = pinnedKey "*.zt" == loginKey && pinnedKey "github.com" == githubAuthKey;
         }
         {
           message = "pyrite desktop: ssh_known_hosts carries GitHub's host key";
