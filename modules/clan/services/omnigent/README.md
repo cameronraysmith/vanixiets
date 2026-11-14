@@ -74,7 +74,7 @@ Home Manager creates the private log directory with mode `0700` after `writeBoun
 
 A sleeping laptop shows offline and reconnects automatically on wake or network return; offline is expected, not a fault.
 There is no network-state load restriction or disabled restart.
-An expired login after the roughly 30-day refresh grant can cause throttled foreground restart loops, unlike upstream `service_entry`'s permanent-failure exit mapping.
+An expired login after the server's refresh-grant lifetime can cause throttled foreground restart loops, unlike upstream `service_entry`'s permanent-failure exit mapping.
 Inspect the declared log and run `omnigent login https://omni.scientistexperience.net` again as the selected user to renew credentials.
 
 `NoNewPrivileges` has no launchd analogue.
@@ -344,7 +344,7 @@ nix run .#omnigent-worker-login -- stibnite cameron codex
 
 `claude` starts subscription login; `codex` starts device login.
 `omnigent` renews the worker's own Omnigent login: it runs `omnigent login` against the server role's domain and prints a `/auth/login` URL to open within five minutes, signing in through Kanidm as the worker's owner.
-The login's refresh grant expires 30 days after that login (`OMNIGENT_GRANT_MAX_LIFETIME_DAYS` on the server overrides it), after which the host fails with "stored login session … has EXPIRED" and needs this renewal again.
+The login's refresh grant expires `OMNIGENT_GRANT_MAX_LIFETIME_DAYS` after that login, 90 days once the server role deploys it (omnigent's default is 30), after which the host fails with "stored login session … has EXPIRED", exits 78, and needs this renewal again; renew ahead of that date, or when the unit's failure notice arrives.
 `atomic`, `omp` and `pi` open their interactive interfaces, where `/login` selects the intended provider.
 Each login receives its own refresh state even when the underlying subscription is shared.
 `verify` runs the GitHub, Linear, signing-key and Omnigent identity verifier; it does not attest model login or a model turn.
