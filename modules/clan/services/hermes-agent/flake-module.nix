@@ -393,10 +393,12 @@
                 # activation becomes a no-op instead of a corruption.
                 #
                 # This is a defect in the vendor's closed-source moshi-hook
-                # binary, not in hermes-agent, and it is not fixed by moving
-                # either side forward: 0.3.16 and 0.3.26 both corrupt the same
-                # input, and nix/configMergeScript.nix is byte-identical at the
-                # pinned rev, at v2026.9.14 and at upstream main.
+                # binary, not in hermes-agent: 0.3.16, 0.3.26 and 0.4.30 all
+                # corrupt the same input, and nix/configMergeScript.nix is
+                # byte-identical at the pinned rev, at v2026.9.14 and at
+                # upstream main. moshi-hook fixed it in 0.4.47, as verified
+                # against 0.4.55; the guard stays until a real hermes deploy
+                # on the fixed binary confirms it can go.
                 system.activationScripts =
                   let
                     hermesConfig = "${userHome}/.hermes/config.yaml";

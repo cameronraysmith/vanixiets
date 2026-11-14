@@ -193,9 +193,13 @@
           # that file, `moshi-hook set usage-collection` will fail against a
           # read-only store path; that is accepted, since this repository is
           # the source of truth for the setting, not the CLI.
+          #
+          # auto_update is pinned off because Nix owns the binary, and the
+          # vendor made self-update the default in 0.4.34.
           xdg.configFile."moshi/config.toml".text = ''
             [gateway]
             usage_collection = ${lib.boolToString cfg.usageCollection}
+            auto_update = "off"
           '';
 
           launchd.agents.moshi-hook = lib.mkIf pkgs.stdenv.hostPlatform.isDarwin {
