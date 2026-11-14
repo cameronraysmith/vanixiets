@@ -176,6 +176,9 @@ in
               User = cfg.user;
               WorkingDirectory = userHome;
               Restart = "on-failure";
+              # omnigent exits 78 (EX_CONFIG) when its stored login has expired; only
+              # `omnigent login` fixes that, so restarting just loops until it does.
+              RestartPreventExitStatus = 78;
               RestartSec = 5;
               MemoryHigh = "6G";
               MemoryMax = "8G";
@@ -355,6 +358,8 @@ in
                   UMask = "0077";
                   NoNewPrivileges = true;
                   Restart = "on-failure";
+                  # Exit 78 is an expired login; see the single-host unit above.
+                  RestartPreventExitStatus = 78;
                   RestartSec = 5;
                   MemoryHigh = "6G";
                   MemoryMax = "8G";

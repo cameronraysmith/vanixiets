@@ -284,6 +284,7 @@ let
           && service.WorkingDirectory == home
           && service.UMask == "0077"
           && service.NoNewPrivileges
+          && service.RestartPreventExitStatus == 78
           && lib.elem "SSH_AUTH_SOCK" service.UnsetEnvironment
           && lib.elem "SSH_AGENT_PID" service.UnsetEnvironment
           && identity unit.environment
