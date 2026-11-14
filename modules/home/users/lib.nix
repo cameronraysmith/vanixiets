@@ -121,8 +121,8 @@ in
                         description = "Public half of a key that signed earlier commits.";
                       };
                       validBefore = lib.mkOption {
-                        type = lib.types.nullOr (lib.types.strMatching "[0-9]{14}Z");
-                        description = "Cutover as YYYYMMDDhhmmssZ; null keeps the key accepted without a bound.";
+                        type = lib.types.strMatching "[0-9]{14}Z";
+                        description = "Cutover as UTC YYYYMMDDhhmmssZ; signatures by the key verify only when the commit claims an earlier time.";
                       };
                     };
                   }

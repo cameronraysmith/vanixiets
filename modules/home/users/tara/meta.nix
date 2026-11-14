@@ -13,7 +13,7 @@
       retiredSigningKeys = [
         {
           key = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHwVoxa3ZO+DA+Tun3vthf2oiY2itTqSA5t9lm5Ac8vg";
-          validBefore = null;
+          validBefore = "20261114195233Z";
         }
       ];
     };

@@ -88,6 +88,7 @@ This change depends on `unify-vcs-author-identity`, which fixes the signer princ
 - **Choice**: `flake.lib.allowedSigners { principal; signingKey; retiredSigningKeys; }` renders `~/.config/git/allowed_signers` as a plain `xdg.configFile`; the five sops `allowed_signers` templates, the `ssh-public-key` declarations and ubuntu's literal go.
   Phase A records the login key in `retiredSigningKeys` with `validBefore = null`; phase B sets `validBefore` to the cutover, the UTC time at which phase B is authored, after every host has deployed phase A.
   The phase B commit also narrows `validBefore` to a non-null timestamp, removing the null branch.
+  The cutover recorded on 2026-11-14 is `20261114195233Z`, one literal shared by every profile's retired keys.
 - **Rationale**: public keys are not secret; a `valid-before` written before every host signs with the new key would make the old key's fresh commits fail git verification on hosts not yet deployed.
 - **Limits**: git admits backdated forgeries by any holder of the retired key (A91), and jj shows old signatures as of unknown principal after the cutover (A92); the forge's registration removal is the bound that counts (D5).
 - **Boundary**: source versus delivered.
@@ -134,14 +135,21 @@ This change depends on `unify-vcs-author-identity`, which fixes the signer princ
   `meta.signingKey` is nullable; raquel, whose only host is blackphos, sets it to null and keeps her login key as a `retiredSigningKeys` entry, and gets no new key in this slice; crs58's home on blackphos signs with the login key while its signers list the new key and the login key.
 - **Regulation**: `signingKeyPresence` fails a host where a home's or worker's person has a null key off the list, or a key while every machine their generated key is encrypted to is on the list (read from `vars/shared/<person>-commit-signing-key/key/machines`), so the null keys are exactly the people whose every host is listed; `legacyNoGenerator` fails a listed machine that declares a generator or a signing worker, and `legacyUnenrolled` fails a listed machine that has `sops/machines/<name>`, so enrolling a machine forces its removal from the list.
 - **Rationale**: the user excluded blackphos from this slice on 2026-11-13; making the exclusion a named, checked list keeps it from spreading silently.
-- **Consequence**: enrolling blackphos, removing it from the list, generating `raquel-commit-signing-key` and dropping raquel's null are prerequisites of phase B (task 6.0); until then the login key still signs commits on blackphos, so the phase B `valid-before` cannot be authored.
+- **Consequence**: enrolling blackphos, removing it from the list, generating `raquel-commit-signing-key` and dropping raquel's null were prerequisites of phase B (task 6.0); until then the login key still signs commits on blackphos, so the phase B `valid-before` cannot be authored.
+  D10 supersedes this consequence.
+
+### D10 (2026-11-14): phase B proceeds without blackphos
+
+- **Choice**: blackphos was wiped and is not in use, and a replacement Mac may come later, so no machine exists to enroll and task 6.0 is not applicable while blackphos is absent.
+  blackphos stays in `commitSigningLegacyMachines` with its configuration unchanged and raquel keeps `signingKey = null`; phase B is authored without waiting for it, and bounds every retired key, raquel's and ubuntu's included.
+- **Consequence**: were blackphos's configuration deployed again, its homes would sign with a login key whose signatures stop verifying at the cutover, so a returning or replacement machine is enrolled first: it gets a clan machine key, leaves the list (which `legacyUnenrolled` forces), and raquel gets a generated key.
 
 ## Risks / Trade-offs
 
 - [Risk] A host deploys phase A before the forge knows the new key → its pushes lose the verified mark (behavioral requirement violated) → Mitigation: tasks gate every deploy on the public API listing the new key.
 - [Risk] A worker copy drifts from its person's key → the worker fails enrollment and stops being ready → Mitigation: under D6′ the worker generator copies the person's generator and is regenerated with it (`graph.py:131-139`); `workerSigningKey` regulates the dependency and `omnigent-worker-verify` is a post-deploy task.
 - [Risk] A machine that carries a person's home or worker is not a vars recipient (blackphos today) → that home cannot decrypt a generated key → Mitigation: D9 lists blackphos as the one legacy machine, whose homes sign with the login key file through the agent-free program; `legacyUnenrolled` forces its removal from the list once enrolled, and `personGenerator` fails any unlisted machine where the generator is missing.
-- [Risk] The legacy path keeps the login key signing commits on blackphos → that machine does not yet meet "a signing key admits no login" → accepted as a recorded transitional state of phase A; enrolling blackphos is a prerequisite of phase B (D9).
+- [Risk] The legacy path keeps the login key signing commits on blackphos → that machine does not yet meet "a signing key admits no login" → accepted as a recorded transitional state of phase A; with blackphos absent, phase B proceeds without it and a returning machine is enrolled first (D10).
 - [Risk] Shared generator definitions differ between machines in anything but owner, group or mode → `clan vars` refuses to generate (`generator.py:272-296`) → Mitigation: one function builds the generator for every machine; only `owner` varies.
 - [Risk] A home activates before sops-nix has decrypted the key (darwin launchd ordering) → signing fails until it is decrypted → accepted; unchanged from today's jj behaviour.
 - [Risk] Backdated commits signed by the retired key verify in git (A91) → accepted; the forge bound is D5.
@@ -165,7 +173,8 @@ Phase A, one pull request, three commits, each evaluable on its own:
 Deploy order: magnetite, pyrite and stibnite first (workers and Cameron's homes, removing the login key from worker files), with `omnigent-worker-verify` and a signing smoke on each; then rosegold (Janette's home), cinnabar, electrum, galena, scheelite and argentum; blackphos deploys too, where git moves from the Bitwarden agent to the login key file through the agent-free program.
 Until a host deploys it keeps signing with the login key, which phase A still accepts and GitHub still registers.
 
-Phase B, one commit, after blackphos is enrolled and removed from the legacy list with raquel's key generated (task 6.0), every host has deployed, and every checkout's mutable old-key commits are re-signed: `validBefore` set and made non-null; then the operator removes the login keys' GitHub signing registrations and confirms an old pushed commit keeps its verified mark.
+Phase B, one commit, after every present host has deployed and every checkout's mutable old-key commits are re-signed: `validBefore` set to `20261114195233Z` and made non-null; blackphos is absent and stays listed (D10).
+Deploy order: phase B changes only the rendered signers files, so every host with a human home deploys it (magnetite, pyrite, stibnite, rosegold, cinnabar, electrum, galena, scheelite and argentum), Cameron's and Janette's hosts before the forge step; then the operator removes the login keys' GitHub signing registrations (`cameronraysmith` key 670975; Janette's) and confirms an old pushed commit keeps its verified mark.
 
 Rollback in phase A is a revert and redeploy; GitHub still accepts the login key.
 Rollback after phase B also needs the login key's registration re-added.
