@@ -56,18 +56,14 @@
               "Mod+Shift+E".action = quit;
               # Mirrors stibnite's Raycast Cmd+Alt hotkeys; Mod is Super, the Mac keyboard's Cmd.
               "Mod+Alt+F".action = maximize-window-to-edges;
-              # Halves experiment: O1 keeps the window tiled in niri's scrolling strip, O2 floats it onto an exact half of the working area.
-              # The operator tries both on pyrite and the losing variant is removed.
-              "Mod+Alt+Left".action = act [
-                "set-column-width 50%"
-                "move-column-to-first"
-              ];
-              "Mod+Alt+Right".action = act [
-                "set-column-width 50%"
-                "move-column-to-last"
-              ];
-              "Mod+Alt+Shift+Left".action = floatHalf "0%";
-              "Mod+Alt+Shift+Right".action = floatHalf "50%";
+              # niri can't place a tiled column on half of the current view, only centre it,
+              # so the halves float, as Raycast's do; the rarer jump to the strip's ends keeps tiling.
+              "Mod+Alt+Left".action = floatHalf "0%";
+              "Mod+Alt+Right".action = floatHalf "50%";
+              "Mod+Alt+Shift+Left".action = move-column-to-first;
+              "Mod+Alt+Shift+Right".action = move-column-to-last;
+              "Mod+Alt+Down".action = move-window-to-tiling;
+              "Mod+Alt+Up".action = switch-focus-between-floating-and-tiling;
             }
           )
           // lib.optionalAttrs (config.programs.dank-material-shell.enable or false) (
