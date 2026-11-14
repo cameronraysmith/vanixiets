@@ -34,8 +34,8 @@ let
       # configuration is unreachable here and only collides with them.
       programs.bash.enable = lib.mkForce false;
 
-      # `core/bitwarden.nix` starts ssh-agent as a systemd user service on
-      # Linux, and the sandbox has no systemd user manager to run it.
+      # `core/ssh-identity.nix` starts ssh-agent wherever Bitwarden's agent is
+      # off, and the sandbox has no systemd user manager to run it.
       services.ssh-agent.enable = lib.mkForce false;
 
       # The sandbox image ships only the C.UTF-8 locale, so core's en_US.UTF-8
