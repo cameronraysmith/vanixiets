@@ -5,9 +5,9 @@ let
   signingPerson = username: config.flake.userAliases.${username} or username;
   commitSigningGenerator = person: "${person}-commit-signing-key";
 
-  # Machines whose homes still sign with the login key (`ssh-signing-key`) because
-  # they have no clan machine key to receive a generated var; enrolling one is a
-  # prerequisite of the phase B cutover. Only these may omit the generated key.
+  # Machines whose homes sign with the login key (`ssh-signing-key`) because they
+  # have no clan machine key to receive a generated var; that key's signatures
+  # stop verifying at its cutover. Only these may omit the generated key.
   commitSigningLegacyMachines = [ "blackphos" ];
 
   signerLine =
@@ -23,10 +23,7 @@ let
     lib.concatMapStrings (line: line + "\n") (
       lib.optional (signingKey != null) (signerLine principal "" signingKey)
       ++ map (
-        retired:
-        signerLine principal (lib.optionalString (
-          retired.validBefore != null
-        ) '',valid-before="${retired.validBefore}"'') retired.key
+        retired: signerLine principal '',valid-before="${retired.validBefore}"'' retired.key
       ) retiredSigningKeys
     );
 
@@ -124,10 +121,7 @@ let
       expectedSigners =
         lib.optionalString (meta.signingKey != null) (line "" meta.signingKey)
         + lib.concatMapStrings (
-          retired:
-          line (
-            if retired.validBefore == null then "" else '',valid-before="${retired.validBefore}"''
-          ) retired.key
+          retired: line '',valid-before="${retired.validBefore}"'' retired.key
         ) meta.retiredSigningKeys;
     in
     keyPath != null

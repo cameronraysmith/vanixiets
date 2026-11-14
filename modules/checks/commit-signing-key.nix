@@ -22,6 +22,23 @@
         !lib.elem (keyMaterial meta.signingKey) (
           map keyMaterial (login ++ map (retired: retired.key) meta.retiredSigningKeys)
         );
+      bounded =
+        signers: signingKey:
+        lib.all (
+          line:
+          let
+            fields = lib.splitString " " line;
+          in
+          signingKey != null
+          && keyMaterial (lib.concatStringsSep " " (lib.drop 2 fields)) == keyMaterial signingKey
+          || builtins.match ''namespaces="git",valid-before="[0-9]{14}Z"'' (lib.elemAt fields 1) != null
+        ) (lib.filter (line: line != "") (lib.splitString "\n" signers));
+      renderedSigners =
+        meta:
+        config.flake.lib.allowedSigners {
+          principal = meta.gitEmail;
+          inherit (meta) signingKey retiredSigningKeys;
+        };
       crs58 = users.crs58.meta;
 
       fixtureKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFixtureSigningKeyFixtureSigningKeyFixture0 fixture";
@@ -83,11 +100,15 @@
         retiredSigningKeys = [
           {
             key = "ssh-ed25519 AAAAold";
-            validBefore = null;
+            validBefore = "20260101000000Z";
           }
         ];
       };
       homeSigners = ''
+        a@example.invalid namespaces="git" ssh-ed25519 AAAAnew
+        a@example.invalid namespaces="git",valid-before="20260101000000Z" ssh-ed25519 AAAAold
+      '';
+      unboundedSigners = ''
         a@example.invalid namespaces="git" ssh-ed25519 AAAAnew
         a@example.invalid namespaces="git" ssh-ed25519 AAAAold
       '';
@@ -127,6 +148,12 @@
         profilesApart = lib.all (user: user.meta.signingKey == null || apart user.meta loginKeys) (
           lib.attrValues users
         );
+        retiredBounded = lib.all (user: bounded (renderedSigners user.meta) user.meta.signingKey) (
+          lib.attrValues users
+        );
+        boundedControl = bounded homeSigners homeMeta.signingKey;
+        retiredUnbounded = !bounded unboundedSigners homeMeta.signingKey;
+        retiredUnboundedWithoutSigningKey = !bounded unboundedSigners null;
         signingKeyIsLoginKey = !apart (crs58 // { signingKey = lib.head crs58.sshKeys; }) loginKeys;
         signingKeyIsRecommentedLoginKey =
           !apart (crs58 // { signingKey = "${keyMaterial (lib.head crs58.sshKeys)} other"; }) loginKeys;
@@ -205,6 +232,10 @@
             signers = ''
               a@example.invalid namespaces="git" ssh-ed25519 AAAAnew
             '';
+          });
+        homeUnboundedRetired =
+          !bound (home {
+            signers = unboundedSigners;
           });
 
         presenceControl = o.signingKeyPresent {

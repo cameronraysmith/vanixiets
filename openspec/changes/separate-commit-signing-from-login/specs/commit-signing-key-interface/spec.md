@@ -22,7 +22,8 @@ The limits below SHALL NOT be cited as checked.
 
 ### Requirement: Each profile records one signing key
 
-`flake.users.<key>.meta` SHALL declare `signingKey`, null or an OpenSSH `ssh-ed25519` public key line, and `retiredSigningKeys`, a list of `{ key; validBefore; }` where `key` is such a line and `validBefore` is null or a UTC timestamp `YYYYMMDDhhmmssZ`, defaulting to the empty list.
+`flake.users.<key>.meta` SHALL declare `signingKey`, null or an OpenSSH `ssh-ed25519` public key line, and `retiredSigningKeys`, a list of `{ key; validBefore; }` where `key` is such a line and `validBefore` is a UTC timestamp `YYYYMMDDhhmmssZ`, the cutover, defaulting to the empty list.
+Every profile's retired keys SHALL carry the one cutover `20261114195233Z`, the UTC time at which phase B was authored.
 
 #### Scenario: Cameron's profile is evaluated
 
@@ -182,27 +183,31 @@ The case `homeSigningBound` SHALL fail a host if, for any `home-manager.users.<n
 
 #### Scenario: The mutants are evaluated
 
-- **WHEN** `checks.x86_64-linux.commit-signing-key` applies the predicate to `homeConfigurations."ubuntu@x86_64-linux"`, one correct synthetic home, and four mutants: git's key at the `ssh-public-key` path, no program set, jj's key at the `ssh-signing-key` path, and a signers file missing the retired key's line
+- **WHEN** `checks.x86_64-linux.commit-signing-key` applies the predicate to `homeConfigurations."ubuntu@x86_64-linux"`, one correct synthetic home, and five mutants: git's key at the `ssh-public-key` path, no program set, jj's key at the `ssh-signing-key` path, a signers file missing the retired key's line, and a signers file whose retired key's line lacks its `valid-before` (`homeUnboundedRetired`)
 - **THEN** ubuntu's home and the control hold and each mutant fails, and the check fails if any outcome is inverted
 
 ### Requirement: The signers file lists the signing key and each retired key under the author address
 
-`vcs-signing` SHALL write `~/.config/git/allowed_signers` from `flake.lib.allowedSigners` as the line `<vcs.author.email> namespaces="git" <meta.signingKey>` and, per `retiredSigningKeys` entry, `<vcs.author.email> namespaces="git"[,valid-before="<validBefore>"] <key>`, the option present when `validBefore` is not null; git's `gpg.ssh.allowedSignersFile` and jj's `signing.backends.ssh.allowed-signers` SHALL name that file.
+`vcs-signing` SHALL write `~/.config/git/allowed_signers` from `flake.lib.allowedSigners` as the line `<vcs.author.email> namespaces="git" <meta.signingKey>` and, per `retiredSigningKeys` entry, `<vcs.author.email> namespaces="git",valid-before="<validBefore>" <key>`; git's `gpg.ssh.allowedSignersFile` and jj's `signing.backends.ssh.allowed-signers` SHALL name that file.
 
-#### Scenario: Cameron's signers file in phase A
+#### Scenario: Cameron's signers file after the cutover
 
-- **WHEN** `darwinConfigurations.stibnite.config.home-manager.users.crs58.xdg.configFile."git/allowed_signers".text` is evaluated after phase A
-- **THEN** it holds two lines with principal `cameron.ray.smith@gmail.com`: his signing key, then his login key with no `valid-before`
-
-#### Scenario: Cameron's signers file in phase B
-
-- **WHEN** the same attribute is evaluated after phase B
-- **THEN** the login key's line carries `valid-before="<cutover>"`, where `<cutover>` is the `validBefore` recorded in his profile
+- **WHEN** `darwinConfigurations.stibnite.config.home-manager.users.crs58.xdg.configFile."git/allowed_signers".text` is evaluated
+- **THEN** it holds two lines with principal `cameron.ray.smith@gmail.com`: his signing key, then his login key with `valid-before="20261114195233Z"`, the `validBefore` recorded in his profile
 
 #### Scenario: A retired signature is verified around the cutover
 
 - **WHEN** `checks.x86_64-linux.commit-signing-key` verifies, through `agentFreeSshKeygen`, a signature by a retired test key against a signers line with `valid-before`, once with `-Overify-time` before the bound and once after it
 - **THEN** the first succeeds and the second fails
+
+### Requirement: Every retired key's signers line carries its cutover
+
+Every line of a profile's rendered signers file other than its signing key's SHALL carry `valid-before`, and `checks.x86_64-linux.commit-signing-key` SHALL hold this as `retiredBounded` over every profile, with the control `boundedControl`.
+
+#### Scenario: A retired key's bound is dropped
+
+- **WHEN** `checks.x86_64-linux.commit-signing-key` evaluates a signers text whose retired key's line has no `valid-before`, with a signing key line (`retiredUnbounded`) and without one (`retiredUnboundedWithoutSigningKey`)
+- **THEN** both are found unbounded, and the check fails if either outcome is inverted
 
 ### Requirement: Each worker's signers file stays one line
 
