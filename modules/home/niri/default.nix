@@ -18,23 +18,58 @@
         };
 
         binds =
-          (with config.lib.niri.actions; {
-            "Mod+Return".action = spawn (lib.getExe config.programs.ghostty.package);
-            "Mod+Q".action = close-window;
-            "Mod+Left".action = focus-column-left;
-            "Mod+Right".action = focus-column-right;
-            "Mod+Up".action = focus-window-up;
-            "Mod+Down".action = focus-window-down;
-            "Mod+Shift+Left".action = move-column-left;
-            "Mod+Shift+Right".action = move-column-right;
-            "Mod+Shift+Up".action = move-window-up;
-            "Mod+Shift+Down".action = move-window-down;
-            "Mod+Page_Up".action = focus-workspace-up;
-            "Mod+Page_Down".action = focus-workspace-down;
-            "Mod+Shift+Page_Up".action = move-window-to-workspace-up;
-            "Mod+Shift+Page_Down".action = move-window-to-workspace-down;
-            "Mod+Shift+E".action = quit;
-          })
+          (
+            with config.lib.niri.actions;
+            let
+              # One bind holds one action; chained steps go through niri's own IPC.
+              act =
+                steps:
+                spawn-sh (
+                  lib.concatMapStringsSep " && " (
+                    step: "${lib.getExe config.programs.niri.package} msg action ${step}"
+                  ) steps
+                );
+              floatHalf =
+                x:
+                act [
+                  "move-window-to-floating"
+                  "set-window-width 50%"
+                  "set-window-height 100%"
+                  "move-floating-window -x ${x} -y 0%"
+                ];
+            in
+            {
+              "Mod+Return".action = spawn (lib.getExe config.programs.ghostty.package);
+              "Mod+Q".action = close-window;
+              "Mod+Left".action = focus-column-left;
+              "Mod+Right".action = focus-column-right;
+              "Mod+Up".action = focus-window-up;
+              "Mod+Down".action = focus-window-down;
+              "Mod+Shift+Left".action = move-column-left;
+              "Mod+Shift+Right".action = move-column-right;
+              "Mod+Shift+Up".action = move-window-up;
+              "Mod+Shift+Down".action = move-window-down;
+              "Mod+Page_Up".action = focus-workspace-up;
+              "Mod+Page_Down".action = focus-workspace-down;
+              "Mod+Shift+Page_Up".action = move-window-to-workspace-up;
+              "Mod+Shift+Page_Down".action = move-window-to-workspace-down;
+              "Mod+Shift+E".action = quit;
+              # Mirrors stibnite's Raycast Cmd+Alt hotkeys; Mod is Super, the Mac keyboard's Cmd.
+              "Mod+Alt+F".action = maximize-window-to-edges;
+              # Halves experiment: O1 keeps the window tiled in niri's scrolling strip, O2 floats it onto an exact half of the working area.
+              # The operator tries both on pyrite and the losing variant is removed.
+              "Mod+Alt+Left".action = act [
+                "set-column-width 50%"
+                "move-column-to-first"
+              ];
+              "Mod+Alt+Right".action = act [
+                "set-column-width 50%"
+                "move-column-to-last"
+              ];
+              "Mod+Alt+Shift+Left".action = floatHalf "0%";
+              "Mod+Alt+Shift+Right".action = floatHalf "50%";
+            }
+          )
           // lib.optionalAttrs (config.programs.dank-material-shell.enable or false) (
             let
               ipc =
