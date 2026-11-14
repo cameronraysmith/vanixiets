@@ -302,17 +302,23 @@ Any requirement whose discharge depends on this fact SHALL name it explicitly, a
 - **WHEN** a Bitwarden macOS build distributed outside the Mac App Store offers every capability the operator uses from the App Store build
 - **THEN** this assumption is void, and the `workstation-parity` requirement `Secrets stay in one password vault reachable from both laptops` loses the argument for installing Bitwarden on stibnite from the Mac App Store
 
-### Requirement: A88 — Apple's bundled SSH client has no built-in FIDO middleware
+### Requirement: A88 — Apple's bundled SSH client has no built-in FIDO provider, and an external provider is loadable
 
-It is true of the OpenSSH client Apple ships with macOS, independent of what this fleet builds, that it carries no built-in middleware for using a credential held on a FIDO2 security key.
+It is true of Apple's bundled OpenSSH client, independent of what this fleet builds, that it has no built-in FIDO2 provider and that its security key helper can load an external provider library.
 Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL be treated as losing its discharge once this assumption's violation condition below is observed.
 
-**Evidence**: operator-stated when the parity program was scoped on 2026-11-13 [INFERENCE: verify on stibnite by attempting an `ed25519-sk` login with `/usr/bin/ssh`].
+**Evidence**: verified 2026-11-13 on stibnite (macOS 26.7.1): `OpenSSH-323` `openssh/config.h` defines `ENABLE_SK` without `ENABLE_SK_INTERNAL`; `/usr/libexec/ssh-sk-helper` has `com.apple.private.security.clear-library-validation`.
+An `ed25519-sk` login through `/usr/bin/ssh` with an external provider is untried [INFERENCE].
 
-#### Scenario: Apple's SSH client uses a security key credential
+#### Scenario: Apple's SSH client uses a security key credential without an external provider
 
-- **WHEN** `/usr/bin/ssh` on stibnite opens a remote shell with a credential held on a security key, without an external middleware library supplied to it
-- **THEN** this assumption is void, and the `workstation-parity-interface` requirement `stibnite's operator home keeps Apple's SSH client` loses the argument that a security key SSH credential on stibnite would need a client other than the one it keeps
+- **WHEN** `/usr/bin/ssh` on stibnite opens a remote shell with a credential held on a security key, without `SecurityKeyProvider` naming an external library
+- **THEN** this assumption is void, and the `workstation-parity-interface` requirement `stibnite's operator home keeps Apple's SSH client` loses the argument that a security key SSH credential on stibnite would need an external provider library alongside the client it keeps
+
+#### Scenario: Apple's security key helper stops loading external providers
+
+- **WHEN** a macOS update removes `com.apple.private.security.clear-library-validation` from `/usr/libexec/ssh-sk-helper`, or the helper refuses an external `SecurityKeyProvider` library
+- **THEN** this assumption is void for its second part, and any later decision to use a security key SSH credential on stibnite through Apple's client loses its discharge
 
 ### Requirement: A89 — pyrite has no fingerprint reader
 

@@ -11,11 +11,7 @@
     }:
     let
       isDarwin = pkgs.stdenv.hostPlatform.isDarwin;
-
-      # On Darwin, bitwarden is installed via homebrew MAS and enabled by default
-      # On NixOS, it's disabled by default to avoid circular dependencies
-      # (checking config.home.packages would create infinite recursion)
-      bitwardenEnabled = isDarwin;
+      cfg = config.programs.bitwarden-ssh-agent;
 
       # https://bitwarden.com/help/ssh-agent/#tab-macos-6VN1DmoAVFvm7ZWD95curS
       socketPath = inputs.self.lib.bitwardenSocketPath {
@@ -24,13 +20,28 @@
       };
     in
     {
-      # SSH agent provider: Bitwarden on Darwin, systemd ssh-agent on Linux
-      # https://bitwarden.com/help/ssh-agent/#configure-bitwarden-ssh-agent
-      home.sessionVariables = lib.mkIf bitwardenEnabled {
-        SSH_AUTH_SOCK = socketPath;
+      options.programs.bitwarden-ssh-agent.enable = lib.mkOption {
+        type = lib.types.bool;
+        default = isDarwin;
+        defaultText = lib.literalExpression "pkgs.stdenv.hostPlatform.isDarwin";
+        description = ''
+          Whether the Bitwarden Desktop SSH agent is the session's SSH agent.
+          When enabled, SSH_AUTH_SOCK points at its socket and the systemd user
+          ssh-agent is not started; when disabled on Linux, the systemd user
+          ssh-agent provides SSH_AUTH_SOCK.
+          https://bitwarden.com/help/ssh-agent/#configure-bitwarden-ssh-agent
+        '';
       };
 
-      # Linux: systemd user ssh-agent for SSH authentication
-      services.ssh-agent.enable = !isDarwin;
+      config = {
+        home.sessionVariables = lib.mkIf cfg.enable {
+          SSH_AUTH_SOCK = socketPath;
+        };
+        systemd.user.sessionVariables = lib.mkIf (cfg.enable && !isDarwin) {
+          SSH_AUTH_SOCK = socketPath;
+        };
+
+        services.ssh-agent.enable = !isDarwin && !cfg.enable;
+      };
     };
 }

@@ -13,10 +13,10 @@ Raycast's exported hotkeys (`logs/parity/raycast-hotkeys.json`) are the global C
 Observed divergences that the slices close:
 
 - pyrite's niri touchpad sets `natural-scroll = true` (`modules/home/niri/default.nix:16`), while stibnite sets natural scrolling off (`modules/darwin/system-defaults/nsglobaldomain.nix`).
-- The fleet-wide key list is `flake.users.crs58.meta.sshKeys` (`modules/home/users/crs58/meta.nix:10`), consumed by `modules/system/admins.nix:20`, `modules/clan/inventory/services/users/cameron.nix:50` and `modules/machines/darwin/stibnite/default.nix:132`; it holds one unlabelled `ssh-ed25519` key and two phone keys.
-- Git signing on stibnite uses the Bitwarden agent's public key (`modules/home/development/git.nix:27-34`, commit `3cd8189f8`); on Linux it uses a passphrase-less private key file from sops, so unattended agents can sign (commits `1f5307618`, `f22380648`), and pyrite's interactive account holds no such key.
+- The fleet-wide key list is `flake.users.crs58.meta.sshKeys` (`modules/home/users/crs58/meta.nix:10`), consumed by `modules/system/admins.nix:20`, `modules/clan/inventory/services/users/cameron.nix:50` and `modules/machines/darwin/stibnite/default.nix:132`; it holds the unlabelled vault login key `…sqSGyUH+` and two phone keys.
+- Before the signing change, git on stibnite signed through the Bitwarden agent (`modules/home/development/git.nix:27-34`, commit `3cd8189f8`) and Linux signed with a passphrase-less sops key file (commits `1f5307618`, `f22380648`); `separate-commit-signing-from-login`, deployed in its phase A, moved every home to a dedicated per-person clan-vars signing key signed through `agentFreeSshKeygen`.
 - stibnite's Nix OpenSSH is withheld on purpose: Nix OpenSSH's BSD sockets cannot route over ZeroTier's feth interfaces, while Apple's ssh uses Network.framework (`modules/home/security/tools.nix:21-22`).
-- stibnite's Bitwarden SSH agent currently offers 19 keys, and Bitwarden's agent tries every vault key in turn with no per-host selection, against sshd's default `MaxAuthTries` of 6 (<https://bitwarden.com/help/about-ssh/>, "Agent limitations").
+- Bitwarden's agent tries every vault key in turn with no per-host selection (<https://bitwarden.com/help/about-ssh/>, "Agent limitations"), and the vault offers 19 keys (every person's login key, host keys, CI keys) to every server, against sshd's default `MaxAuthTries` of 6 (finding F26).
 - pyrite's Zen comes from `youwen5/zen-browser-flake` as a bare package (`modules/home/zen-browser/default.nix`); stibnite's comes from the `zen` cask.
 - `programs.zed-editor.package = null` on every platform (`modules/home/development/zed/default.nix:17`), so pyrite has Zed's configuration but no binary.
 
@@ -77,23 +77,28 @@ Observed divergences that the slices close:
 - **Status**: DECIDED; which GUI pinentry each OS uses is a detail of the slice.
 - **Boundary**: vendored versus first-party: `rbw` and its home-manager module are vendored from nixpkgs and home-manager; any pinentry wrapper is first-party.
 
-### D6: SSH identity and signing — OPEN pending a spike
+### D6: SSH identity — DECIDED 2026-11-14
 
-- **Withdrawn choice**: cross-enrolled YubiKey FIDO2 resident `ed25519-sk` keys for SSH and git signing (pyrite's primary on 32720759, stibnite's on 32720546, a second credential for each on the other's YubiKey), with stibnite using Nix OpenSSH.
-  The operator withdrew it on 2026-11-13 because stibnite must keep Apple's `/usr/bin/ssh` (A90), which lacks FIDO middleware (A88) [INFERENCE: verify]; the Mac App Store Bitwarden application and its socket carry code-signing and sandbox expectations; and a touch per signature cannot serve the unattended agents that sign commits today.
-- **Evidence**: Bitwarden's agent serves only Ed25519 and RSA vault keys and tries each in turn with no per-host selection (<https://bitwarden.com/help/about-ssh/>, "Supported key types" and "Agent limitations"); stibnite's agent offers 19 keys against sshd's default `MaxAuthTries` 6.
-  Linux unattended signing uses a passphrase-less sops key file (`1f5307618`, `f22380648`); darwin signs through the Bitwarden agent (`3cd8189f8`).
-- **Spike questions**:
-  - Q2.1: can nixpkgs Bitwarden Desktop on pyrite be the SSH agent, unlocking through polkit, PAM and pam_u2f with a YubiKey touch [INFERENCE: verify]?
-  - Q2.2: is nixpkgs `bitwarden-desktop` cached, and what would Flatpak's sandbox imply for the agent socket and polkit?
-  - Q2.3: what single rule governs unattended signing, consistent with the signer principal of `unify-vcs-author-identity`?
-  - Q2.4: does stibnite need any YubiKey SSH key at all?
-  - Q2.5: should a YubiKey key exist only as a vault-independent emergency login from pyrite?
-- **Consilience target**: one ssh-identity capability module replacing the `isDarwin` branches in `modules/home/core/ssh.nix`, `modules/home/core/bitwarden.nix`, `modules/home/development/git.nix` and `modules/home/development/jujutsu.nix`; one key source, the Bitwarden vault, for interactive SSH and signing on both laptops; per-platform code only where forced: the socket path (`modules/lib/bitwarden-socket-path.nix`), the ssh binary, and the unlock method (Touch ID on stibnite, polkit with pam_u2f on pyrite); and one shared rule for unattended signing.
-- **Constraints any outcome honours**: stibnite keeps Apple's `/usr/bin/ssh` (A90); no host is offered more keys before the right one than its sshd's `MaxAuthTries`; unattended signing needs no touch; the signer principal stays the one `commit-author-identity-interface` fixes.
-- **Status**: OPEN; the spike's answers become a decided entry here before S2's implementation tasks start.
-- **Boundary**: source versus delivered: public keys are in source and reach each host's authorized keys only at that host's deploy; private keys live in the vault, a sops secret, or a security key, never in source.
-  Vendored versus first-party: Bitwarden Desktop and its agent are vendored; the ssh-identity module is first-party.
+- **Choice**: The Bitwarden vault holds the login keys and serves interactive SSH login on both laptops; commit signing never uses an agent (D6 defers signing entirely to `separate-commit-signing-from-login`, whose phase A is deployed).
+  stibnite is unchanged: Mac App Store Bitwarden, Touch ID unlock, Apple's `/usr/bin/ssh` (A90).
+  On pyrite:
+  - nixpkgs `bitwarden-desktop` is in `environment.systemPackages`, because its polkit action `com.bitwarden.Bitwarden.unlock` loads only from the system profile.
+  - "Unlock with system authentication" goes through polkit, with `pam_u2f` on the `polkit-1` PAM service only: control `sufficient`, `cue`, origin and appid `pam://pyrite`, authfile from the committed public enrollment `modules/machines/nixos/pyrite/u2f-keys` (YubiKey 32720759; 32720546 to be appended as backup).
+  - The `polkit-agent-helper@` sandbox override is mirrored from nixpkgs' global-u2f branch, which nixpkgs applies only when u2f is enabled globally.
+  - Login and the DMS lock screen stay password-only.
+  - Bitwarden's socket is the only SSH agent: home-manager's `ssh-agent` and `gcr-ssh-agent` are off, through a new `programs.bitwarden-ssh-agent.enable` option in `modules/home/core/bitwarden.nix` (default `isDarwin`).
+  - Keys are pinned per host with `IdentitiesOnly`: `*.zt` to the login key `…sqSGyUH+` (`~/.ssh/bitwarden-login.pub`), `github.com` to the RSA authentication key `…AIz7rQ==` (`~/.ssh/bitwarden-github.pub`), since GitHub holds the login key only as a signing key.
+  - pyrite imports srvos's `shared/common/well-known-hosts.nix` for the GitHub, GitLab and sourcehut host keys; it imports no srvos profile.
+- **Rationale**: one key source for login on both laptops; pyrite gets a touch unlock without a fingerprint reader (A89) and without weakening login or the lock screen; pinning is required, not optional, because the vault offers 19 keys to every server (F26); signing needs no unlock, so unattended agents sign whatever the vault's state.
+- **Spike evidence**:
+  - Q2.1 (2026-11-14, deployed from branch `pyrite-bitwarden-yubikey`): the YubiKey enrolled with one touch and no PIN (`logs/parity/pamu2fcfg-pyrite-32720759.out`); the vault unlocked by touch through polkit (helper ran 10:25:57–10:26:05 EST, operator confirmed); after a full logout and login the session's `SSH_AUTH_SOCK` is Bitwarden's socket; `ssh magnetite.zt` and `ssh stibnite.zt` offer only the login key through Bitwarden and authenticate; `ssh -T git@github.com` offers only the RSA key and authenticates.
+  - Q2.2 to Q2.4 (`logs/parity/ssh-identity-spike-q2-q4.md`): `bitwarden-desktop` 2026.10.2 at the pin is on cache.nixos.org but not the fleet cache; its polkit action loads only through `environment.systemPackages`; a Flatpak would also need the policy installed host-side; all signing becomes unattended through a key file, with Bitwarden only for login; no host or use case needs a hardware-backed key from stibnite.
+  - Q2.5, a YubiKey `sk` key as a vault-independent emergency login from pyrite: deferred, optional.
+- **Withdrawn alternative (history)**: cross-enrolled YubiKey FIDO2 resident `ed25519-sk` keys for SSH and git signing (pyrite's primary on 32720759, stibnite's on 32720546, a second credential for each on the other's YubiKey), with stibnite using Nix OpenSSH.
+  The operator withdrew it on 2026-11-13 because stibnite must keep Apple's `/usr/bin/ssh` (A90), which has no built-in FIDO provider, although its security key helper can load an external one (A88, verified against apple-oss-distributions/OpenSSH tag `OpenSSH-323` and stibnite's `ssh-sk-helper` entitlements); the Mac App Store Bitwarden application and its socket carry code-signing and sandbox expectations; and a touch per signature cannot serve the unattended agents that sign commits.
+- **Remaining**: the backup YubiKey enrollment, the reboot check, the same per-host pinning on stibnite, and the shared ssh-identity capability module replacing the `isDarwin` branches in `modules/home/core/ssh.nix` and `modules/home/core/bitwarden.nix` (the git and jj signing branches went away in the signing change), with platform-specific code only for the socket path (`modules/lib/bitwarden-socket-path.nix`), the ssh binary and the unlock method.
+- **Boundary**: source versus delivered: the public enrollment and the pinned public keys are in source; the private login keys stay in the vault and the YubiKey's credential on the YubiKey.
+  Vendored versus first-party: `bitwarden-desktop`, `pam_u2f` and srvos's host-key list are vendored; the agent option, the PAM wiring, the sandbox override and the pins are first-party.
 
 ### D7: window chords declared once as chord to intent
 
@@ -152,7 +157,9 @@ Each sub-project opens with its own decision record before implementation.
 ## Risks / Trade-offs
 
 - [Risk] Any change to the operator's authorized keys changes every host's closure, and a host that has not deployed still refuses a new key → Mitigation: keep the existing key until each host's deploy record shows the new closure, and prove login from both laptops before retiring anything.
-- [Risk] An agent offering many keys exhausts `MaxAuthTries` before the right key is tried → Mitigation: the spike's design selects keys per host or reduces the offered set, and S2's acceptance includes a login to every host.
+- [Risk] A host pattern without a pin falls back to offering all 19 vault keys and exhausts `MaxAuthTries` (F26) → Mitigation: pin every host pattern the operator logs in to, on both laptops, and check the pins in `pyrite-desktop`.
+- [Risk] After Bitwarden restarts, the touch unlock is unavailable until one master-password unlock, so a reboot leaves pyrite without an agent until the operator types it → Mitigation: the reboot check confirms the sequence; accepted as Bitwarden's documented behaviour.
+- [Risk] A single enrolled YubiKey is a single point of failure for touch unlock on pyrite → Mitigation: append YubiKey 32720546 to `u2f-keys`; the master password remains a fallback.
 - [Risk] `maximize-window-to-edges` may be absent from the pinned niri or may cover the DMS bar → Mitigation: verify the action against the pinned niri and observe it on pyrite before closing S3.
 - [Risk] Replacing the Zen input changes pyrite's browser package and may lose the existing profile → Mitigation: back up the profile directory before activation; profile state is in scope only with Q8.
 - [Risk] Moving casks or App Store applications to other mechanisms invalidates TCC grants (A86) → Mitigation: Phase 0 records each kept application's grants before any mechanism changes.
@@ -164,10 +171,10 @@ Each sub-project opens with its own decision record before implementation.
 Slices ship in order S1, S2, S3, then the sub-projects, each as one pull request.
 Every slice is evaluated before merge; x86_64-linux builds run on magnetite, and aarch64-darwin attributes are evaluated only, built at the operator's activation on stibnite.
 
-If S2's decided design changes the operator's authorized keys, its deployment order matters because it edits a shared list that every host's closure reads: each host authorizing the operator's keys (cinnabar, electrum, argentum, rosegold, galena, scheelite, magnetite, pyrite, stibnite, blackphos) accepts a new key only once it deploys.
-Deploy the hosts reachable today first, then pyrite and stibnite, and confirm each host's deploy record before relying on a new key there; hosts provisioned only on demand (electrum, galena, scheelite) pick it up at their next provisioning.
+S2's decided design changes no authorized keys, so it changes only pyrite's closure (and stibnite's when its pins land).
+If a later decision changes the operator's authorized keys, its deployment order matters because it edits a shared list every host's closure reads: each host authorizing the operator's keys (cinnabar, electrum, argentum, rosegold, galena, scheelite, magnetite, pyrite, stibnite, blackphos) accepts a new key only once it deploys; deploy the hosts reachable today first, then pyrite and stibnite, and confirm each deploy record before relying on the key there.
 
-Rollback for every slice is reverting its pull request and redeploying the affected hosts; S2 keeps the existing key authorized until login from both laptops is proven, so a rollback never locks the operator out.
+Rollback for every slice is reverting its pull request and redeploying the affected hosts; reverting S2 on pyrite restores home-manager's `ssh-agent` and `gcr-ssh-agent`.
 
 ## Open Questions
 
@@ -177,7 +184,6 @@ Rollback for every slice is reverting its pull request and redeploying the affec
 - Q6: install-mechanism policy per OS (no recommendation recorded).
 - Q7: stibnite as an always-reachable home machine, with pmset AC sleep 0, womp 1, battery sleep 1, and closed-lid behaviour unknown [INFERENCE] (no recommendation recorded).
 - Q8: state in scope (recommended yes, last).
-- Q2.1 to Q2.5: the SSH identity and signing spike (D6).
+- Q2.5: a YubiKey `sk` key as a vault-independent emergency login from pyrite (deferred, optional).
 - sudo through pam_u2f on pyrite (OPEN) and rbw unlock by YubiKey [INFERENCE: verify].
-- Retiring the unlabelled `ssh-ed25519` key after S2 (operator confirmation).
 - How stibnite consumes the chord table (Phase 0).

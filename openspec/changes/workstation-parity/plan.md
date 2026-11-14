@@ -9,7 +9,7 @@ Each later sub-project (groups 10 to 14 in tasks.md) opens by recording its deci
 1. Phase 0 (group 1) runs first and produces no code: the inventory with declaration statuses, the baseline count, the job catalogue and the discovery records.
    Its files go in a location the operator chooses; this change does not create them.
 2. S1 (group 2) is delivered by its own owner; this plan only records its merge.
-3. S2 (groups 3 and 4): the spike (tasks 3.1 to 3.5) produces findings and a DECIDED D6 entry, not code; its micro-steps and commits are added here once D6 is decided, centred on `feat(ssh): add one ssh-identity module for both laptops`; `feat(rbw): declare rbw with a graphical pinentry` ships independently.
+3. S2 (groups 3 and 4): the spike is answered and D6 is DECIDED; pyrite's Bitwarden agent, polkit touch unlock and per-host pins were deployed from branch `pyrite-bitwarden-yubikey`; the remaining commits are the backup YubiKey enrollment, stibnite's per-host pins, `refactor(ssh): one ssh-identity module for both laptops`, and its checks; `feat(rbw): declare rbw with a graphical pinentry` ships independently.
 4. S3 (groups 5 and 6): `feat(niri): generate chord binds from one chord table`, then the half-window chords after the operator chooses O1 or O2, then the keyboard modifier and Caps Lock settings after Q4 and Q5 are decided.
 5. Shared-layer fixes (group 7), one commit each: CA trust on pyrite, Zed on Linux, fonts in Nix, darwin-only command gating.
 6. Declarative Zen (group 8), then desktop behaviour (group 9), then the sub-projects in group order.
@@ -29,5 +29,5 @@ Long commands write complete output to `logs/workstation-parity-<step>-$(date +%
 ## Deploy and acceptance
 
 Activation is a separate operator act for every slice.
-For S2, deploy order follows design.md's migration plan: reachable hosts first, then pyrite and stibnite, reading every alert or notice posted since each deploy started.
+For S2, only pyrite and stibnite deploy, since no authorized key changes.
 Physical acceptance (unlock prompts, logins, chords, key feel, browser fill, screenshots) is recorded by the operator and has no evaluation-only equivalent.

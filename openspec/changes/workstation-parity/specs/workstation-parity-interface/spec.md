@@ -21,30 +21,49 @@ aarch64-darwin attributes in this capability SHALL be claimed from evaluation on
 
 ### Requirement: stibnite's operator home keeps Apple's SSH client
 
-Whatever SSH identity design is decided, the `ssh` that the operator's home on stibnite resolves first SHALL remain Apple's `/usr/bin/ssh`, and a Nix OpenSSH client MUST NOT be placed ahead of it (A90).
+The `ssh` that the operator's home on stibnite resolves first SHALL remain Apple's `/usr/bin/ssh`, and a Nix OpenSSH client MUST NOT be placed ahead of it (A90).
 
 #### Scenario: Resolve the SSH client on stibnite
 
 - **WHEN** stibnite's operator home packages are evaluated, and `command -v ssh` is run in the operator's login shell after activation
 - **THEN** no Nix `openssh` client is among the home packages, and `command -v ssh` prints `/usr/bin/ssh`
 
-### Requirement: Unattended signing needs no touch
+### Requirement: Commit signing uses no SSH agent and needs no touch
 
-Whatever signing design is decided, an agent signing a commit with no person present SHALL be able to sign without a touch or other interactive confirmation, under the signer principal the `commit-author-identity-interface` capability fixes.
+Commit signing on both laptops SHALL follow the `commit-signing-key-interface` capability: it MUST NOT go through an SSH agent, and a signer with no person present MUST sign without a touch or other interactive confirmation, under the signer principal the `commit-author-identity-interface` capability fixes.
 
 #### Scenario: Evaluate an unattended signer's configuration
 
 - **WHEN** the git signing configuration of an account an unattended agent signs from is evaluated
-- **THEN** its signing key is one that signs without a touch, and its principal is the one `commit-author-identity-interface` fixes
+- **THEN** its signing program asks no key agent, its key signs without a touch, and its principal is the one `commit-author-identity-interface` fixes
 
-### Requirement: No host is offered more keys than its sshd tries
+### Requirement: Interactive SSH login goes through the Bitwarden agent with one pinned key per host
 
-Whatever SSH identity design is decided, the operator's SSH client configuration on each laptop SHALL offer each fleet host the key that host accepts within that host's sshd `MaxAuthTries`, which defaults to 6.
+On both laptops, interactive SSH login SHALL go through the Bitwarden SSH agent, and the operator's SSH client configuration MUST pin, per host pattern, the one public key that host accepts, with `IdentitiesOnly`, so no host is offered more keys than its sshd's `MaxAuthTries`, which defaults to 6.
+On pyrite, `*.zt` MUST be pinned to `~/.ssh/bitwarden-login.pub` and `github.com` to `~/.ssh/bitwarden-github.pub`.
 
-#### Scenario: Log in to every host with the agent holding many keys
+#### Scenario: Log in to a host while the vault offers many keys
 
-- **WHEN** the operator's agent holds more keys than a host's `MaxAuthTries` and the operator opens a remote shell to that host
-- **THEN** the host accepts the operator before refusing for too many authentication failures
+- **WHEN** the Bitwarden agent holds more keys than a host's `MaxAuthTries` and the operator opens a remote shell to that host
+- **THEN** the client offers only the pinned key, and the host accepts the operator
+
+### Requirement: pyrite's only SSH agent is Bitwarden's, unlocked through polkit
+
+pyrite SHALL install `bitwarden-desktop` in `environment.systemPackages`, so that its polkit action `com.bitwarden.Bitwarden.unlock` loads, and the operator's home MUST enable `programs.bitwarden-ssh-agent` with home-manager's `services.ssh-agent` and `services.gnome.gcr-ssh-agent` disabled.
+
+#### Scenario: Evaluate pyrite's agent configuration
+
+- **WHEN** pyrite's system and cameron home are evaluated
+- **THEN** `bitwarden-desktop` is a system package, the Bitwarden agent is enabled, and neither other agent is enabled
+
+### Requirement: pyrite's touch unlock is confined to polkit
+
+pyrite SHALL enable `pam_u2f` on the `polkit-1` PAM service only, with control `sufficient`, `cue`, origin and appid `pam://pyrite`, and the authfile from the committed `modules/machines/nixos/pyrite/u2f-keys`; the `polkit-agent-helper@` sandbox MUST admit the security key, and login and the DMS lock screen MUST stay password-only.
+
+#### Scenario: Evaluate pyrite's PAM services
+
+- **WHEN** pyrite's `security.pam.services` are evaluated
+- **THEN** only `polkit-1` carries a `pam_u2f` rule with those settings, and the login, greeter and `dankshell` services carry none
 
 ### Requirement: pyrite's niri binds the decided chords from one chord table
 

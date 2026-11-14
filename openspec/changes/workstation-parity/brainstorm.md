@@ -40,7 +40,7 @@ The launcher is the DMS launcher on pyrite, where `Mod+Space` already works, and
 Clipboard history is DMS's clipboard on pyrite.
 On stibnite, Maccy is redundant with Raycast's clipboard history and is removed in a later cleanup.
 
-### Q2 Bitwarden roles — DECIDED; SSH identity — OPEN pending a spike
+### Q2 Bitwarden roles — DECIDED; SSH identity — DECIDED 2026-11-14 after a spike
 
 Bitwarden holds secrets.
 `rbw`, the Rust Bitwarden CLI, gives command-line and script access on both machines with a GUI pinentry, as in `Mic92/dotfiles` `home-manager/desktop.nix:78-79`.
@@ -52,7 +52,7 @@ The operator withdrew that decision on 2026-11-13; the SSH identity is OPEN pend
 
 - Bitwarden's SSH agent serves only Ed25519 and RSA keys from the vault and tries every vault key in turn, with no per-host selection (<https://bitwarden.com/help/about-ssh/>, "Supported key types" and "Agent limitations"); stibnite's agent currently offers 19 keys, against sshd's default `MaxAuthTries` of 6.
 - stibnite must keep Apple's `/usr/bin/ssh`: Nix OpenSSH's BSD sockets cannot route over ZeroTier's feth interfaces, while Apple's ssh uses Network.framework (`modules/home/security/tools.nix:21-22`); the Mac App Store Bitwarden application and its socket also carry code-signing and sandbox expectations.
-- Apple's `/usr/bin/ssh` lacks built-in FIDO middleware [INFERENCE: verify], so a YubiKey SSH key on stibnite would need a client stibnite cannot use.
+- Apple's `/usr/bin/ssh` lacks built-in FIDO middleware [INFERENCE: verify], so a YubiKey SSH key on stibnite would need a client stibnite cannot use. (Verified later on 2026-11-13: no built-in provider, but an external `SecurityKeyProvider` library is loadable; see A88.)
 - Unattended agents sign commits: Linux signs with a passphrase-less sops key file (commits `1f5307618`, `f22380648`), and darwin signs through the Bitwarden agent (`3cd8189f8`); a hardware key that needs a touch per signature cannot sign unattended.
 
 Spike questions:
@@ -64,6 +64,30 @@ Spike questions:
 - Q2.5: Should a YubiKey key exist only as a vault-independent emergency login from pyrite?
 
 Consilience target: one ssh-identity capability module replacing the scattered `isDarwin` branches in `core/ssh.nix`, `core/bitwarden.nix`, `development/git.nix` and `development/jujutsu.nix`; one key source, the Bitwarden vault, for interactive SSH and signing on both machines; per-platform code only where forced (the socket path through `modules/lib/bitwarden-socket-path.nix`, the ssh binary, and the unlock method, Touch ID or polkit with pam_u2f); and one shared rule for unattended signing.
+
+#### Decision, approved by the operator on 2026-11-13 and 2026-11-14
+
+The Bitwarden vault holds the login keys and serves interactive SSH login on both laptops.
+Commit signing never uses an agent: the separate change `separate-commit-signing-from-login`, deployed in its phase A, gives each person a dedicated clan-vars signing key signed through `agentFreeSshKeygen`.
+This replaces "one key source for interactive SSH and signing" in the consilience target above: the vault is the key source for login only.
+
+stibnite is unchanged: Mac App Store Bitwarden, Touch ID unlock, Apple's `/usr/bin/ssh`.
+
+On pyrite:
+
+- nixpkgs `bitwarden-desktop` goes in `environment.systemPackages`, because its polkit action `com.bitwarden.Bitwarden.unlock` loads only from the system profile.
+- "Unlock with system authentication" goes through polkit, with `pam_u2f` on the `polkit-1` PAM service only: control `sufficient`, `cue`, origin and appid `pam://pyrite`, authfile from the committed public enrollment `modules/machines/nixos/pyrite/u2f-keys` (YubiKey 32720759; 32720546 to be appended as backup).
+- The `polkit-agent-helper@` sandbox override is mirrored from nixpkgs' global-u2f branch.
+- Login and the DMS lock screen stay password-only.
+- Bitwarden's socket is pyrite's only SSH agent: home-manager's `ssh-agent` and `gcr-ssh-agent` are off, through a new `programs.bitwarden-ssh-agent.enable` option in `modules/home/core/bitwarden.nix` (default `isDarwin`).
+- Keys are pinned per host, because the vault offers 19 keys (every person's login key, host keys, CI keys) to every server (finding F26): `*.zt` to the login key `…sqSGyUH+` (`~/.ssh/bitwarden-login.pub`), and `github.com` to the RSA authentication key `…AIz7rQ==` (`~/.ssh/bitwarden-github.pub`), since GitHub holds the login key only as a signing key.
+- pyrite imports srvos's `shared/common/well-known-hosts.nix` for the GitHub, GitLab and sourcehut host keys; it imports no srvos profile.
+
+Spike answers:
+
+- Q2.1 (2026-11-14, deployed from branch `pyrite-bitwarden-yubikey`): the YubiKey enrolled with one touch and no PIN; the vault unlocked by touch through polkit (helper ran 10:25:57–10:26:05 EST, operator confirmed); after a full logout and login the session's `SSH_AUTH_SOCK` is Bitwarden's socket; `ssh magnetite.zt` and `ssh stibnite.zt` offer only the login key through Bitwarden and authenticate; `ssh -T git@github.com` offers only the RSA key and authenticates.
+- Q2.2 to Q2.4: answered in `logs/parity/ssh-identity-spike-q2-q4.md`.
+- Q2.5, a YubiKey `sk` key as a vault-independent emergency login: deferred, optional.
 
 ### Q3 Window chords — partly DECIDED, one OPEN
 
@@ -111,7 +135,7 @@ Phase 0 is discovery: which applications are actually used, which macOS TCC gran
 Phase 1 has three slices:
 
 - S1: pyrite dispatches builds to magnetite (in progress elsewhere).
-- S2: an SSH identity for both machines, authorized fleet-wide, so pyrite reaches every host including `stibnite.zt`; originally a YubiKey identity, now a spike on Q2.1 to Q2.5 followed by the decided slice.
+- S2: an SSH identity for both machines, so pyrite reaches every host including `stibnite.zt`; originally a YubiKey identity, then a spike on Q2.1 to Q2.5, now decided as the Bitwarden agent with per-host key pinning and polkit touch unlock on pyrite.
 - S3: window chords.
 
 Sub-projects from the earlier triage follow:
@@ -129,4 +153,4 @@ Each slice is an independently shippable pull request.
 ## Scope notes
 
 The ZSA keyboard on pyrite comes later; the built-in keyboard comes first.
-pyrite has no fingerprint reader, so the YubiKey fills that role where it can: sudo through pam_u2f (OPEN), unlocking a Bitwarden agent through polkit and pam_u2f (Q2.1, [INFERENCE: verify]), and rbw unlock [INFERENCE: verify].
+pyrite has no fingerprint reader, so the YubiKey fills that role where it can: sudo through pam_u2f (OPEN), unlocking the Bitwarden vault through polkit and pam_u2f (verified 2026-11-14), and rbw unlock [INFERENCE: verify].

@@ -67,6 +67,9 @@ in
       imports = [
         inputs.home-manager.nixosModules.home-manager
         inputs.nixos-hardware.nixosModules.apple-macbook-pro-14-1
+        # srvos's server profile carries these on other hosts; pyrite takes only the
+        # GitHub, GitLab and sourcehut host keys, not the profile.
+        "${inputs.srvos}/shared/common/well-known-hosts.nix"
       ]
       ++ (with flakeModules; [
         base
@@ -458,7 +461,7 @@ in
       services.tlp.enable = false;
       services.accounts-daemon.enable = true;
       services.gnome.gnome-keyring.enable = true;
-      services.gnome.gcr-ssh-agent.enable = true;
+      services.gnome.gcr-ssh-agent.enable = false;
       security.polkit.enable = true;
       security.rtkit.enable = true;
       hardware.bluetooth.enable = true;
@@ -529,7 +532,34 @@ in
         gptfdisk
         age
         libfido2
+        # In the system profile, not cameron's home: polkit reads actions only from
+        # /run/current-system/sw/share/polkit-1/actions, and the package ships
+        # com.bitwarden.Bitwarden.unlock there for "Unlock with system authentication".
+        bitwarden-desktop
       ];
+
+      # A YubiKey touch answers polkit prompts in place of the password; the global
+      # u2f switch stays off so dankshell and login remain password-only.
+      security.pam.u2f.settings = {
+        authfile = pkgs.writeText "u2f-keys" (builtins.readFile ./u2f-keys);
+        origin = "pam://pyrite";
+        appid = "pam://pyrite";
+        cue = true;
+      };
+      security.pam.services.polkit-1.u2f = {
+        enable = true;
+        control = "sufficient";
+      };
+      # nixpkgs applies these only under the global security.pam.u2f.enable
+      # (nixos/modules/security/polkit.nix), which stays off here.
+      systemd.services."polkit-agent-helper@".serviceConfig = {
+        PrivateDevices = false;
+        DeviceAllow = [
+          "/dev/urandom r"
+          "char-hidraw rw"
+        ];
+        ProtectHome = "read-only";
+      };
 
       # Increase MaxAuthTries to accommodate agent forwarding with many keys
       # Default is 6, but Bitwarden SSH agent may have 10+ keys loaded
@@ -668,6 +698,28 @@ in
         ];
         # Validate with the exact derivation installed by nixpkgs' NixOS module.
         programs.niri.package = config.programs.niri.package;
+        programs.bitwarden-ssh-agent.enable = true;
+        # Bitwarden's agent offers every vault key and has no per-request key
+        # selection (https://bitwarden.com/help/about-ssh/), so fleet and GitHub
+        # connections pin one key each through its public half. GitHub
+        # authenticates cameronraysmith with this RSA key; the login key is
+        # registered there only as a signing key.
+        home.file.".ssh/bitwarden-login.pub".text = ''
+          ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINdO9rInDa9HvdtZZxmkgeEdAlTupCy3BgA/sqSGyUH+
+        '';
+        home.file.".ssh/bitwarden-github.pub".text = ''
+          ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDFGXo7HSSakYB5eEvp22xKmNrMwpI7OTlB3RqP+mGagbggljJP/YBmUCptstAMsZuKeMRXjm6UXUgNeUhECLZQHEDy2+Mrm42OM0svsMqlgZj1ZZdY1yYcquKQO4oyx7CjPOj7NXqSueZmpcwYRJFU7xQO421wb9rNewxCRs8jwRr5beTCUF0MuGLNEJGPMPk++d6Mkd3TYojE524AAoDWgx5z2WavZnewuYYd8PAGrFO4yWQn6LX50qYq2bPo53J/7CT9KwEo4ZaYl6TiSb9x3Oj+iUiTMNBmKBLSMYyj7eV8CU4iIXYqySvEf/mA7EytZnKT37cYo25CMAsobCHZ07htv6bbW+FPb1jehjT96Oo6i0zVGIs/gptw1k9xXSTS0GxfQ1P0XK7+9RZE7bWw/kxepF+OzLcvKKz3SdPEb/SOmqPoq4AFalljM0iwi8DXmH2dhp1Ughh4ImQQxVGrq+U2EwuSZEQHuSXlvfB/MKj2yvcF0BYhPaYfCLovq5LbXXu1QpnL/C9FiY21ehmVFZwHvo+L8y2NxwCaoXYuPGwGc5kH5fNjBh/S7RpypV+oHHGY90lGV6CoQpxXb65rI/ob7cTR2npWUC577fmidYTSmOqU3HhewcZDgxf2iZkVCm7F/Sb2tga3BClr3lV92EBFm9JsayzM9DLuAIz7rQ==
+        '';
+        programs.ssh.settings = {
+          "*.zt" = {
+            IdentitiesOnly = true;
+            IdentityFile = "~/.ssh/bitwarden-login.pub";
+          };
+          "github.com" = {
+            IdentitiesOnly = true;
+            IdentityFile = "~/.ssh/bitwarden-github.pub";
+          };
+        };
       };
     };
 }

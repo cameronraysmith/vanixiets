@@ -68,6 +68,24 @@ in
           cp ${configuration} "$out/config.kdl"
           cp ${launcher} "$out/launcher"
         '';
+      checks.pyrite-bitwarden-unlock =
+        let
+          machine = config.flake.nixosConfigurations.pyrite;
+          cfg = machine.config;
+          pkgs = machine.pkgs;
+          grep = "${pkgs.gnugrep}/bin/grep";
+          # pamu2fcfg enrollment of YubiKey 32720759 on pyrite.
+          enrolled = "wbQkIcFPc8ZPBnA+bv6Q1Mrt8JCMg5zNLLqQEKKLtJ0sX8/TQLheF50rdm1jilbDRFW4y+HuKH6AJyAQ9QNNWQ==,XQiB0F5NY5qU5w6Coo2WRDycGgTm7dxPAmBWcvU/IaHfvADIFnPK/9/7lqcF9RlXNfQ0I333IMt+Ax7bxFVZ2A==,es256,+presence";
+          authfile = cfg.security.pam.u2f.settings.authfile;
+        in
+        pkgs.runCommand "pyrite-bitwarden-unlock" { } ''
+          policy=${cfg.system.path}/share/polkit-1/actions/com.bitwarden.Bitwarden.policy
+          ${grep} -F 'id="com.bitwarden.Bitwarden.unlock"' "$policy"
+          ${grep} -E '^cameron:(.*:)?${lib.escapeRegex enrolled}(:|$)' ${authfile}
+          mkdir -p "$out"
+          cp "$policy" "$out/com.bitwarden.Bitwarden.policy"
+          cp ${authfile} "$out/u2f-keys"
+        '';
     };
   flake.modules.nixos."machines/nixos/pyrite" =
     {
@@ -193,6 +211,24 @@ in
       greetdPam = config.security.pam.services.greetd;
       nativeGreeterModule = "${inputs.nixpkgs}/nixos/modules/services/display-managers/dux-greeter.nix";
       enabledRules = rules: lib.filterAttrs (_: rule: rule.enable) rules;
+      polkitPam = config.security.pam.services.polkit-1;
+      u2f = config.security.pam.u2f;
+      polkitHelper = config.systemd.services."polkit-agent-helper@".serviceConfig;
+      polkitAuthLines = lib.filter (lib.hasPrefix "auth ") (lib.splitString "\n" polkitPam.text);
+      polkitAuthIndex = module: lib.lists.findFirstIndex (lib.hasInfix "/${module}") null polkitAuthLines;
+      polkitU2fIndex = polkitAuthIndex "pam_u2f.so";
+      polkitUnixIndex = polkitAuthIndex "pam_unix.so";
+      bitwardenSocket = "${home.home.homeDirectory}/.bitwarden-ssh-agent.sock";
+      pinnedKey =
+        host:
+        let
+          block = home.programs.ssh.settings.${host}.data or { };
+          file = home.home.file.${lib.removePrefix "~/" (block.IdentityFile or "")} or { };
+        in
+        if (block.IdentitiesOnly or false) == true then lib.trim (file.text or "") else null;
+      loginKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINdO9rInDa9HvdtZZxmkgeEdAlTupCy3BgA/sqSGyUH+";
+      # The key https://github.com/cameronraysmith.keys lists for authentication.
+      githubAuthKey = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDFGXo7HSSakYB5eEvp22xKmNrMwpI7OTlB3RqP+mGagbggljJP/YBmUCptstAMsZuKeMRXjm6UXUgNeUhECLZQHEDy2+Mrm42OM0svsMqlgZj1ZZdY1yYcquKQO4oyx7CjPOj7NXqSueZmpcwYRJFU7xQO421wb9rNewxCRs8jwRr5beTCUF0MuGLNEJGPMPk++d6Mkd3TYojE524AAoDWgx5z2WavZnewuYYd8PAGrFO4yWQn6LX50qYq2bPo53J/7CT9KwEo4ZaYl6TiSb9x3Oj+iUiTMNBmKBLSMYyj7eV8CU4iIXYqySvEf/mA7EytZnKT37cYo25CMAsobCHZ07htv6bbW+FPb1jehjT96Oo6i0zVGIs/gptw1k9xXSTS0GxfQ1P0XK7+9RZE7bWw/kxepF+OzLcvKKz3SdPEb/SOmqPoq4AFalljM0iwi8DXmH2dhp1Ughh4ImQQxVGrq+U2EwuSZEQHuSXlvfB/MKj2yvcF0BYhPaYfCLovq5LbXXu1QpnL/C9FiY21ehmVFZwHvo+L8y2NxwCaoXYuPGwGc5kH5fNjBh/S7RpypV+oHHGY90lGV6CoQpxXb65rI/ob7cTR2npWUC577fmidYTSmOqU3HhewcZDgxf2iZkVCm7F/Sb2tga3BClr3lV92EBFm9JsayzM9DLuAIz7rQ==";
     in
     {
       assertions = [
@@ -363,12 +399,76 @@ in
             && config.services.power-profiles-daemon.enable
             && !config.services.tlp.enable
             && config.services.gnome.gnome-keyring.enable
-            && config.services.gnome.gcr-ssh-agent.enable
             && config.hardware.bluetooth.enable
             && config.services.hardware.bolt.enable
             && config.services.udisks2.enable
             && config.services.libinput.enable
             && config.security.rtkit.enable;
+        }
+        {
+          message = "pyrite desktop: polkit unlocks Bitwarden by YubiKey touch";
+          assertion =
+            lib.elem (toString pkgs.bitwarden-desktop) (map toString config.environment.systemPackages)
+            && lib.elem "/share/polkit-1" config.environment.pathsToLink
+            && !u2f.enable
+            && polkitPam.u2f.enable
+            && polkitPam.u2f.control == "sufficient"
+            && polkitPam.rules.auth.u2f.enable
+            && polkitPam.rules.auth.u2f.control == "sufficient"
+            && u2f.settings.origin == "pam://pyrite"
+            && u2f.settings.appid == "pam://pyrite"
+            && u2f.settings.cue
+            && polkitU2fIndex != null
+            && polkitUnixIndex != null
+            && polkitU2fIndex < polkitUnixIndex
+            && (
+              let
+                line = builtins.elemAt polkitAuthLines polkitU2fIndex;
+              in
+              lib.hasPrefix "auth sufficient " line
+              && lib.all (setting: lib.elem setting (lib.splitString " " line)) [
+                "authfile=${u2f.settings.authfile}"
+                "origin=pam://pyrite"
+                "appid=pam://pyrite"
+                "cue"
+              ]
+            )
+            && lib.all (service: !lib.hasInfix "pam_u2f" service.text) [
+              pam
+              loginPam
+            ]
+            && (polkitHelper.PrivateDevices or true) == false
+            && lib.all (rule: lib.elem rule (lib.toList (polkitHelper.DeviceAllow or [ ]))) [
+              "/dev/urandom r"
+              "char-hidraw rw"
+            ]
+            && (polkitHelper.ProtectHome or null) == "read-only";
+        }
+        {
+          message = "pyrite desktop: Bitwarden Desktop is the only SSH agent";
+          assertion =
+            !config.services.gnome.gcr-ssh-agent.enable
+            && !config.programs.ssh.startAgent
+            && !home.services.ssh-agent.enable
+            && !home.services.gpg-agent.enableSshSupport
+            && home.programs.bitwarden-ssh-agent.enable
+            && (home.home.sessionVariables.SSH_AUTH_SOCK or null) == bitwardenSocket
+            && (home.systemd.user.sessionVariables.SSH_AUTH_SOCK or null) == bitwardenSocket
+            && !(config.environment.sessionVariables ? SSH_AUTH_SOCK)
+            && !(config.environment.variables ? SSH_AUTH_SOCK)
+            && !lib.hasInfix "SSH_AUTH_SOCK" config.environment.extraInit;
+        }
+        {
+          message = "pyrite desktop: fleet hosts pin the login key and GitHub its authentication key";
+          assertion = pinnedKey "*.zt" == loginKey && pinnedKey "github.com" == githubAuthKey;
+        }
+        {
+          message = "pyrite desktop: ssh_known_hosts carries GitHub's host key";
+          assertion =
+            (config.programs.ssh.knownHosts."github.com".publicKey or null) != null
+            && lib.any (lib.hasPrefix "github.com ssh-ed25519 ") (
+              lib.splitString "\n" (config.environment.etc."ssh/ssh_known_hosts".text or "")
+            );
         }
         {
           # Two DHCP clients on one link give it two leases and two default
