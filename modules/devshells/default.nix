@@ -155,7 +155,7 @@
           pkgs.ssh-to-age
           pkgs.sops
           # Identity administration; version tracks the kanidm server on magnetite
-          pkgs.kanidm_1_11
+          pkgs.kanidm_1_12
           # Kubernetes cluster management
           pkgs.clusterctl
           pkgs.kluctl
