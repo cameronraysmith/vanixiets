@@ -84,6 +84,7 @@ The operator approved `RestartPreventExitStatus=78` on 2026-11-14; it lands with
 
 - [ ] 9.1 Set niri `repeat-delay` 225 and `repeat-rate` 33 on pyrite — verify: `nix eval` of `programs.niri.settings.input.keyboard`; the operator's key-hold comparison with stibnite after activation.
 - [ ] 9.2 Set pyrite's touchpad `natural-scroll` false and keep `tap` true — verify: `nix eval` of `programs.niri.settings.input.touchpad`.
+  Done in the user session's niri configuration and the DankGreeter's on 2026-11-14 at the operator's request; ticked after the operator confirms the direction on pyrite.
 - [ ] 9.3 Set pyrite's niri `screenshot-path` inside `~/Downloads` — verify: `nix eval` of `screenshot-path`; a screenshot taken after activation lands in `~/Downloads`.
 - [ ] 9.4 Compare stibnite's 28 Dock persistent applications with DMS pinned applications and declare pyrite's pinned set — verify: `nix eval` of the DMS pinned applications, each mapped to a job catalogue row.
 

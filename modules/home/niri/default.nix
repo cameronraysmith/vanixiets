@@ -11,9 +11,10 @@
         input = {
           # logind also ignores this key on pyrite; neither handler may suspend it.
           power-key-handling.enable = false;
+          # Matches stibnite, where natural scrolling is off: content moves the way the fingers do.
           touchpad = {
             tap = true;
-            natural-scroll = true;
+            natural-scroll = false;
           };
           # Matches stibnite, where Caps Lock sends Escape.
           keyboard.xkb.options = "caps:escape";
@@ -54,6 +55,8 @@
               "Mod+Shift+Page_Up".action = move-window-to-workspace-up;
               "Mod+Shift+Page_Down".action = move-window-to-workspace-down;
               "Mod+Shift+E".action = quit;
+              # Mirrors stibnite's Mission Control; niri's own default for the overview is Mod+O.
+              "Ctrl+Up".action = toggle-overview;
               # Mirrors stibnite's Raycast Cmd+Alt hotkeys; Mod is Super, the Mac keyboard's Cmd.
               "Mod+Alt+F".action = maximize-window-to-edges;
               # niri can place a tiled column on half of the view only relative to its neighbour, so a

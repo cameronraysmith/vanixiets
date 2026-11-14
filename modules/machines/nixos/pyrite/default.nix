@@ -35,7 +35,6 @@ in
             }
             touchpad {
                 tap
-                natural-scroll
             }
             disable-power-key-handling
         }
