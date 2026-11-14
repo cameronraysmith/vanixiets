@@ -89,17 +89,18 @@ Spike answers:
 - Q2.2 to Q2.4: answered in `logs/parity/ssh-identity-spike-q2-q4.md`.
 - Q2.5, a YubiKey `sk` key as a vault-independent emergency login: deferred, optional.
 
-### Q3 Window chords — partly DECIDED, one OPEN
+### Q3 Window chords — DECIDED 2026-11-14
 
 Raycast's hotkeys are the only custom hotkeys besides the global one.
 Command+Space opens the launcher (DECIDED).
 Command+Option+F is Raycast Window Management "maximize", which fills the screen without entering fullscreen; on pyrite it maps to niri's `maximize-window-to-edges` (DECIDED) [INFERENCE: the DMS bar stays visible; verify on pyrite].
-Command+Option+Left and Command+Option+Right put the window on the left or right half (OPEN between two options):
+Command+Option+Left and Command+Option+Right put the window on the left or right half; two options were tried on pyrite:
 
 - O1, tiled: set the column to 50% width and move the column left or right.
 - O2, floating: float the window and size and position it to exactly half the output.
 
-The recommendation is O1, to be decided by trying both on pyrite.
+The operator chose O2 on 2026-11-14: niri can't place a tiled column on half of the current view, so O1 moved it to an end of the whole strip.
+O1's move stays on Command+Option+Shift+Left and Right; Command+Option+Down returns a window to tiling, and Command+Option+Up switches focus between floating and tiled windows.
 
 ### Q4 Modifier semantics on pyrite's built-in keyboard — OPEN
 

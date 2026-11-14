@@ -60,7 +60,12 @@ Operator-run after the stack lands and only once 2.8 is verified.
 - [x] 6.2 Set each `retiredSigningKeys` entry's `validBefore` to the UTC time of authoring, and narrow `validBefore` to a non-null timestamp, removing the null branch that phase A used — verify: `nix eval` of the signers text shows `valid-before="<cutover>"`; `nix build .#checks.x86_64-linux.commit-signing-key`
   - Cutover `20261114195233Z`, set on every profile's retired keys (crs58, janettesmith, christophersmith, tara, raquel, ubuntu); `retiredBounded` and `homeUnboundedRetired` in `commit-signing-key` hold every rendered retired line to a `valid-before`.
 - [ ] 6.3 Deploy phase B everywhere, recording alerts as in 5.1 — verify: `git verify-commit` on a pre-cutover commit signed by the login key reports good; a scratch commit signed with the login key at the present time is rejected
+  - Deployed 2026-11-14 to pyrite, magnetite and cinnabar, each of whose `allowed_signers` carries `valid-before="20261114195233Z"`, and to stibnite by `just activate`; rosegold, argentum, electrum, galena and scheelite are deferred at the operator's discretion, as in 5.3.
+  - On stibnite, the pre-cutover commit `61b6d92f` (2026-11-13) verifies as `Good "git" signature for cameron.ray.smith@gmail.com`; a scratch commit signed with the login key after the cutover is cryptographically valid but no longer attributed (`allowed_signers:2: key has expired`, status `U`).
 - [ ] 6.4 Operator step, after 6.3 has reached every host carrying Cameron's or Janette's home or worker: remove the login keys' signing registrations (`cameronraysmith` key 670975; Janette's) — verify: the public API no longer lists them, and a commit pushed before removal still shows `verified: true`
+  - `cameronraysmith`'s registration of the login key (signing key 670975) was removed on 2026-11-14 after stibnite's activation; the API now lists only the crs58 and ubuntu signing keys added in 2.8, and `61b6d92f` still reports `verified: true`, reason `valid`.
+  - Janette's registration on `janetteasmith` remains, pending her sign-in.
+  - Until the deferred hosts are deployed, a commit they sign with the login key shows as unverified on GitHub.
 
 ## 7. Integration Verification
 

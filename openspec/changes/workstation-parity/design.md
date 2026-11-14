@@ -86,7 +86,7 @@ Observed divergences that the slices close:
   - "Unlock with system authentication" goes through polkit, with `pam_u2f` on the `polkit-1` PAM service only: control `sufficient`, `cue`, origin and appid `pam://pyrite`, authfile from the committed public enrollment `modules/machines/nixos/pyrite/u2f-keys` (YubiKey 32720759; 32720546 to be appended as backup).
   - The `polkit-agent-helper@` sandbox override is mirrored from nixpkgs' global-u2f branch, which nixpkgs applies only when u2f is enabled globally.
   - Login and the DMS lock screen stay password-only.
-  - Bitwarden's socket is the only SSH agent: home-manager's `ssh-agent` and `gcr-ssh-agent` are off, through a new `programs.bitwarden-ssh-agent.enable` option in `modules/home/core/bitwarden.nix` (default `isDarwin`).
+  - Bitwarden's socket is the only SSH agent: home-manager's `ssh-agent` and `gcr-ssh-agent` are off, through the `programs.bitwarden-ssh-agent.enable` option (default `isDarwin`), now in `modules/home/core/ssh-identity.nix`, which replaced `bitwarden.nix` in #3872.
   - Keys are pinned per host with `IdentitiesOnly`: `*.zt` to the login key `…sqSGyUH+` (`~/.ssh/bitwarden-login.pub`), `github.com` to the RSA authentication key `…AIz7rQ==` (`~/.ssh/bitwarden-github.pub`), since GitHub holds the login key only as a signing key.
   - pyrite imports srvos's `shared/common/well-known-hosts.nix` for the GitHub, GitLab and sourcehut host keys; it imports no srvos profile.
 - **Rationale**: one key source for login on both laptops; pyrite gets a touch unlock without a fingerprint reader (A89) and without weakening login or the lock screen; pinning is required, not optional, because the vault offers 19 keys to every server (F26); signing needs no unlock, so unattended agents sign whatever the vault's state.
@@ -96,7 +96,8 @@ Observed divergences that the slices close:
   - Q2.5, a YubiKey `sk` key as a vault-independent emergency login from pyrite: deferred, optional.
 - **Withdrawn alternative (history)**: cross-enrolled YubiKey FIDO2 resident `ed25519-sk` keys for SSH and git signing (pyrite's primary on 32720759, stibnite's on 32720546, a second credential for each on the other's YubiKey), with stibnite using Nix OpenSSH.
   The operator withdrew it on 2026-11-13 because stibnite must keep Apple's `/usr/bin/ssh` (A90), which has no built-in FIDO provider, although its security key helper can load an external one (A88, verified against apple-oss-distributions/OpenSSH tag `OpenSSH-323` and stibnite's `ssh-sk-helper` entitlements); the Mac App Store Bitwarden application and its socket carry code-signing and sandbox expectations; and a touch per signature cannot serve the unattended agents that sign commits.
-- **Remaining**: the backup YubiKey enrollment, the reboot check, the same per-host pinning on stibnite, and the shared ssh-identity capability module replacing the `isDarwin` branches in `modules/home/core/ssh.nix` and `modules/home/core/bitwarden.nix` (the git and jj signing branches went away in the signing change), with platform-specific code only for the socket path (`modules/lib/bitwarden-socket-path.nix`), the ssh binary and the unlock method.
+- **Remaining**: the reboot check (3.9).
+  The backup YubiKey turned out unnecessary (3.8), and the per-host pinning on stibnite and the shared ssh-identity module landed in #3872 (3.10, 3.11).
 - **Boundary**: source versus delivered: the public enrollment and the pinned public keys are in source; the private login keys stay in the vault and the YubiKey's credential on the YubiKey.
   Vendored versus first-party: `bitwarden-desktop`, `pam_u2f` and srvos's host-key list are vendored; the agent option, the PAM wiring, the sandbox override and the pins are first-party.
 
@@ -104,9 +105,12 @@ Observed divergences that the slices close:
 
 - **Choice**: One first-party table maps each chord to an intent (launcher, fill screen, left half, right half); niri's binds on pyrite are generated from it.
   Command+Space is the launcher; Command+Option+F maps to niri's `maximize-window-to-edges` [INFERENCE: the DMS bar stays visible; verify on pyrite].
-  Command+Option+Left and Right are OPEN between O1 (tiled: column to 50% width, then move the column) and O2 (floating: float and size to exactly half), recommended O1 after trying both on pyrite.
+  Command+Option+Left and Right are O2, floating, DECIDED on 2026-11-14 after trying both on pyrite: the window floats on exactly the left or right half of the output, as Raycast's windows do.
+  niri 26.04 has no action placing a tiled column on half of the current view, only `center-column` and `center-visible-columns`, so O1 moved the column to the first or last position of the whole strip instead.
+  O1's move stays on Command+Option+Shift+Left and Right, for the rarer jump to the strip's ends.
+  Command+Option+Down returns a floated window to tiling (`move-window-to-tiling`), and Command+Option+Up moves focus between the floating and tiled windows (`switch-focus-between-floating-and-tiling`), so a snapped window has a way back without the mouse.
 - **Rationale**: Principle 5: declaring the chord once lets stibnite's side be checked against the same table, even while Raycast stores its own hotkeys.
-- **Status**: launcher and fill screen DECIDED; halves OPEN.
+- **Status**: launcher, fill screen and halves DECIDED; whether the DMS bar stays visible under fill screen is still to be observed (5.3).
   How stibnite consumes the table (Raycast import or documentation only) is a Phase 0 question.
 - **Boundary**: first-party niri configuration; Raycast's hotkey store is outside this repository.
 
@@ -164,7 +168,7 @@ Each sub-project opens with its own decision record before implementation.
 - [Risk] Replacing the Zen input changes pyrite's browser package and may lose the existing profile → Mitigation: back up the profile directory before activation; profile state is in scope only with Q8.
 - [Risk] Moving casks or App Store applications to other mechanisms invalidates TCC grants (A86) → Mitigation: Phase 0 records each kept application's grants before any mechanism changes.
 - [Trade-off] Raycast's hotkeys stay in Raycast's database, so stibnite's chord side may remain imperative → accepted until Phase 0 shows a declared import path.
-- [Trade-off] O1 tiled halves differ from Raycast's exact halves when other columns exist → accepted pending the operator's trial of both options.
+- [Trade-off] Floated halves leave niri's tiling layout and sit above the tiled columns of their workspace → accepted: it matches Raycast's behaviour on stibnite, and Command+Option+Down returns a window to tiling.
 
 ## Migration Plan
 
@@ -178,7 +182,7 @@ Rollback for every slice is reverting its pull request and redeploying the affec
 
 ## Open Questions
 
-- Q3: half-window chords, O1 or O2 (recommended O1, decided on pyrite).
+- Q3: half-window chords: DECIDED on 2026-11-14, floating (O2), with O1's move kept on the shifted chords.
 - Q4: modifier semantics on pyrite's built-in keyboard (no recommendation recorded).
 - Q5: Caps Lock to Escape mechanism on both machines (no recommendation recorded).
 - Q6: install-mechanism policy per OS (no recommendation recorded).
