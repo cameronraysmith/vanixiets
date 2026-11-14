@@ -12,20 +12,21 @@
 # (go 1.26) refuses under the GOTOOLCHAIN=local that nixpkgs builds with.
 buildGo127Module (finalAttrs: {
   pname = "ovnfs";
-  version = "0.3.0";
+  version = "0.6.0";
 
   src = fetchFromGitHub {
     owner = "stencil-hq";
     repo = "ovnfs";
     tag = "v${finalAttrs.version}";
-    hash = "sha256-oTjkIZ88xXXpIVMeCOob/kt2BRgsh9QGjC5CJQnhM1E=";
+    hash = "sha256-yu3Qo0n5ooF9IN7a9+MosucDbZPM+yJKK6PDN6fmr0M=";
   };
 
   vendorHash = "sha256-BBC1CkTN/7WDqMX0+L9GuSNIogKxKamBSuY3TQwIC9Q=";
 
   # Matches upstream's release builds (.goreleaser.yaml). On Darwin this also
-  # leaves out the cgo-only FSEvents watcher (watch/watch_darwin.go), so the
-  # daemon behaves as the published macOS binary does.
+  # leaves out the cgo-only FSEvents watcher (watch/watch_darwin.go) and the
+  # phys_footprint memory probe (footprint_darwin.go, which then reports 0), so
+  # the daemon behaves as the published macOS binary does.
   env.CGO_ENABLED = "0";
 
   ldflags = [
@@ -41,9 +42,10 @@ buildGo127Module (finalAttrs: {
 
   nativeBuildInputs = lib.optionals stdenv.hostPlatform.isLinux [ makeBinaryWrapper ];
 
-  # Linux mounts go through fusermount3 found on PATH (mount_linux.go). --suffix
-  # keeps NixOS's setuid /run/wrappers/bin/fusermount3 ahead of the store copy,
-  # which cannot mount as non-root; nixpkgs rclone and plakar wrap the same way.
+  # Linux mounts go through fusermount3 found on PATH (fuse/mount_linux.go).
+  # --suffix keeps NixOS's setuid /run/wrappers/bin/fusermount3 ahead of the
+  # store copy, which cannot mount as non-root; nixpkgs rclone and plakar wrap
+  # the same way.
   postInstall = lib.optionalString stdenv.hostPlatform.isLinux ''
     wrapProgram $out/bin/ovnfs \
       --suffix PATH : ${lib.makeBinPath [ fuse3 ]}
