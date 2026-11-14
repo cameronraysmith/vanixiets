@@ -210,8 +210,8 @@
     extra-substituters = [
       "https://cache.nixos.org"
       "https://nix-community.cachix.org"
-      "https://cache.numtide.com"
-      "https://cache.clan.lol"
+      "https://cache.numtide.com?priority=42"
+      "https://cache.clan.lol?priority=42"
       "https://pyproject-nix.cachix.org"
       "https://catppuccin.cachix.org"
       "https://cache.nixos-cuda.org"
