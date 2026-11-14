@@ -51,9 +51,14 @@
       };
 
       config = lib.mkIf (key != null) {
-        xdg.configFile."git/allowed_signers".text = allowedSigners {
-          principal = config.vcs.author.email;
-          inherit (meta) signingKey retiredSigningKeys;
+        xdg.configFile."git/allowed_signers" = {
+          text = allowedSigners {
+            principal = config.vcs.author.email;
+            inherit (meta) signingKey retiredSigningKeys;
+          };
+          # Homes activated before this module hold a symlink here into the
+          # retired sops-nix template; home-manager otherwise refuses to clobber it.
+          force = true;
         };
         programs.git = {
           signing = {
