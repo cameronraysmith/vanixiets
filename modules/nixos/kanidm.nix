@@ -10,8 +10,8 @@
 # the filesystem rather than via LoadCredential avoids two nixpkgs ACME assertions
 # that LoadCredential alone failed at deploy time, and provides no rotation
 # downside since kanidm holds the TLS chain in process memory and requires restart
-# for rotation either way. Hostname is a literal FQDN; package is pinned to
-# kanidmWithSecretProvisioning_1_11.
+# for rotation either way. Hostname is a literal FQDN; the package is the 1.12
+# release with secret provisioning.
 #
 # Clan-vars secret generators (admin-password, idm-admin-password, oauth2-synapse)
 # declared inline below; admin passwords are wired into
@@ -172,7 +172,7 @@ in
       };
 
       services.kanidm = {
-        package = pkgs.kanidmWithSecretProvisioning_1_11;
+        package = pkgs.kanidmWithSecretProvisioning_1_12;
 
         server.enable = true;
 
