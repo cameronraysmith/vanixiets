@@ -15,5 +15,7 @@ Every query of `device_grants` in these tasks is read-only and prints no token h
 
 ## 3. Merge and deploy (gated on 2.1)
 
-- [ ] 3.1 Enqueue pull request #3873 only after 2.1 passes, and the same day: under 7 days the 2026-11-14 grants expire on 2026-11-21 (command).
-- [ ] 3.2 Deploy magnetite from the merged commit, discarding the deploy tree's edit. — verify: on magnetite `systemctl show -p Environment omnigent` includes `OMNIGENT_GRANT_MAX_LIFETIME_DAYS=90`, and the server's journal since the start shows no warning about the variable (command).
+- [x] 3.1 Enqueue pull request #3873 only after 2.1 passes, and the same day: under 7 days the 2026-11-14 grants expire on 2026-11-21 (command).
+  Enqueued after nixbot passed and merged at 2026-11-14 22:12:11Z.
+- [x] 3.2 Deploy magnetite from the merged commit, discarding the deploy tree's edit. — verify: on magnetite `systemctl show -p Environment omnigent` includes `OMNIGENT_GRANT_MAX_LIFETIME_DAYS=90`, and the server's journal since the start shows no warning about the variable (command).
+  Deployed from `main` at 2026-11-14 22:13:39Z after discarding the edit: the environment shows `OMNIGENT_GRANT_MAX_LIFETIME_DAYS=90`, the journal since the start has no line about it, 0 failed units, and both worker hosts are active.

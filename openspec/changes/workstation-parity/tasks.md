@@ -52,16 +52,18 @@ The operator approved `RestartPreventExitStatus=78` on 2026-11-14; it lands with
   niri 26.04 lists the action, and niri-flake's `niri validate` passed for pyrite's configuration in #3869 and again with the decided halves.
 - [ ] 5.3 Observe fill screen on pyrite and record whether the DMS bar stays visible — verify: the operator's observation after activation.
 - [x] 5.4 Try O1 and O2 for the half-window chords on pyrite and record the operator's choice — verify: the recorded decision in design.md with the option that was not chosen and why.
-  Decided 2026-11-14: O2, floating; see D7.
+  Decided 2026-11-14: first O2, floating; after O2 overlapped a filled window, O3, tiled; see D7.
 - [ ] 5.5 Implement the chosen half-window chords from the chord table — verify: `nix eval` of the binds, niri validation exit 0, and the operator's observation of both halves.
-  The binds are implemented, directly rather than from a chord table (5.1 is open), and validated; the operator's observation follows pyrite's next activation.
+  O3 is implemented, directly rather than from a chord table (5.1 is open); the operator's observation follows pyrite's next activation.
 - [ ] 5.6 Record stibnite's side of the chord table through the mechanism found in 1.9 — verify: the chord table and Raycast's exported hotkeys agree, compared against `logs/parity/raycast-hotkeys.json`.
 
 ## 6. Keyboard modifiers and Caps Lock
 
 - [ ] 6.1 Decide the modifier semantics of pyrite's built-in keyboard (Q4) — verify: the decision recorded in design.md with the rejected option.
 - [ ] 6.2 Decide the Caps Lock to Escape mechanism for both laptops' built-in keyboards (Q5) — verify: the decision recorded in design.md.
+  Decided for pyrite on 2026-11-14: niri's `caps:escape` (D8); stibnite's declaration waits on the ZSA check.
 - [ ] 6.3 Implement the decided modifier and Caps Lock settings for the built-in keyboards — verify: `nix eval` of the delivered settings on both laptops, and the operator's key test after activation.
+  pyrite's `caps:escape` is implemented; the operator's key test follows pyrite's next activation.
 
 ## 7. Shared-layer fixes
 

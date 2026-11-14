@@ -105,10 +105,10 @@ Observed divergences that the slices close:
 
 - **Choice**: One first-party table maps each chord to an intent (launcher, fill screen, left half, right half); niri's binds on pyrite are generated from it.
   Command+Space is the launcher; Command+Option+F maps to niri's `maximize-window-to-edges` [INFERENCE: the DMS bar stays visible; verify on pyrite].
-  Command+Option+Left and Right are O2, floating, DECIDED on 2026-11-14 after trying both on pyrite: the window floats on exactly the left or right half of the output, as Raycast's windows do.
-  niri 26.04 has no action placing a tiled column on half of the current view, only `center-column` and `center-visible-columns`, so O1 moved the column to the first or last position of the whole strip instead.
-  O1's move stays on Command+Option+Shift+Left and Right, for the rarer jump to the strip's ends.
-  Command+Option+Down returns a floated window to tiling (`move-window-to-tiling`), and Command+Option+Up moves focus between the floating and tiled windows (`switch-focus-between-floating-and-tiling`), so a snapped window has a way back without the mouse.
+  Command+Option+Left and Right are O3, tiled, DECIDED on 2026-11-14: the column is set to 50% width and moved one position left or right, so two such columns share the view as a left and a right half and nothing overlaps.
+  niri 26.04 has no action placing a tiled column on half of the current view, only `center-column` and `center-visible-columns`, so a tiled half is relative to its neighbour rather than a fixed half of the screen.
+  O1 (50% width, moved to the first or last position of the whole strip) jumped too far, and O2 (floating on exactly half the output) left the window above the strip, where filling the screen with another window overlapped it; O1's move stays on Command+Option+Shift+Left and Right.
+  Command+Option+Down (`move-window-to-tiling`) and Command+Option+Up (`switch-focus-between-floating-and-tiling`) stay bound for windows that float for other reasons.
 - **Rationale**: Principle 5: declaring the chord once lets stibnite's side be checked against the same table, even while Raycast stores its own hotkeys.
 - **Status**: launcher, fill screen and halves DECIDED; whether the DMS bar stays visible under fill screen is still to be observed (5.3).
   How stibnite consumes the table (Raycast import or documentation only) is a Phase 0 question.
@@ -116,9 +116,9 @@ Observed divergences that the slices close:
 
 ### D8: modifier semantics and Caps Lock
 
-- **Choice**: none yet.
+- **Choice**: Caps Lock sends Escape on pyrite's built-in keyboard through niri's `input.keyboard.xkb.options = "caps:escape"`, matching stibnite's one-way mapping (DECIDED 2026-11-14; macOS can remap Caps Lock but not Escape, so stibnite has no swap to match).
+  Declaring stibnite's side (nix-darwin `system.keyboard.remapCapsLockToEscape`) waits on a check that it, applied to every keyboard through `hidutil`, does not interfere with the ZSA keyboard's Left Control and Left Command swap, which stibnite also sets per keyboard.
   Modifier semantics on pyrite's built-in keyboard (Command as Super for niri, or Command as Control for applications) is OPEN (Q4).
-  Caps Lock to Escape on both machines is OPEN (Q5): stibnite sets it per keyboard through System Settings today, with the built-in keyboard first and the ZSA keyboard, which also swaps Left Control and Left Command on stibnite, later.
 - **Boundary**: the stibnite mappings are imperative state in `com.apple.keyboard.modifiermapping.*`; any declared replacement is first-party.
 
 ### D9: shared-layer fixes
@@ -168,7 +168,7 @@ Each sub-project opens with its own decision record before implementation.
 - [Risk] Replacing the Zen input changes pyrite's browser package and may lose the existing profile → Mitigation: back up the profile directory before activation; profile state is in scope only with Q8.
 - [Risk] Moving casks or App Store applications to other mechanisms invalidates TCC grants (A86) → Mitigation: Phase 0 records each kept application's grants before any mechanism changes.
 - [Trade-off] Raycast's hotkeys stay in Raycast's database, so stibnite's chord side may remain imperative → accepted until Phase 0 shows a declared import path.
-- [Trade-off] Floated halves leave niri's tiling layout and sit above the tiled columns of their workspace → accepted: it matches Raycast's behaviour on stibnite, and Command+Option+Down returns a window to tiling.
+- [Trade-off] A tiled half is relative to the neighbouring column, not a fixed half of the screen like Raycast's → accepted: floating halves overlapped a filled window, and tiled halves keep the strip in charge of every window.
 
 ## Migration Plan
 
@@ -182,9 +182,9 @@ Rollback for every slice is reverting its pull request and redeploying the affec
 
 ## Open Questions
 
-- Q3: half-window chords: DECIDED on 2026-11-14, floating (O2), with O1's move kept on the shifted chords.
+- Q3: half-window chords: DECIDED on 2026-11-14, tiled (O3), after O2 (floating) overlapped filled windows; O1's move stays on the shifted chords.
 - Q4: modifier semantics on pyrite's built-in keyboard (no recommendation recorded).
-- Q5: Caps Lock to Escape mechanism on both machines (no recommendation recorded).
+- Q5: Caps Lock to Escape: DECIDED for pyrite on 2026-11-14 (`caps:escape`); stibnite's declaration waits on the ZSA check.
 - Q6: install-mechanism policy per OS (no recommendation recorded).
 - Q7: stibnite as an always-reachable home machine, with pmset AC sleep 0, womp 1, battery sleep 1, and closed-lid behaviour unknown [INFERENCE] (no recommendation recorded).
 - Q8: state in scope (recommended yes, last).

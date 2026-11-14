@@ -99,20 +99,20 @@ Command+Option+Left and Command+Option+Right put the window on the left or right
 - O1, tiled: set the column to 50% width and move the column left or right.
 - O2, floating: float the window and size and position it to exactly half the output.
 
-The operator chose O2 on 2026-11-14: niri can't place a tiled column on half of the current view, so O1 moved it to an end of the whole strip.
-O1's move stays on Command+Option+Shift+Left and Right; Command+Option+Down returns a window to tiling, and Command+Option+Up switches focus between floating and tiled windows.
+The operator first chose O2 on 2026-11-14, because niri can't place a tiled column on half of the current view and O1 moved it to an end of the whole strip.
+Filling the screen with another window then left the floating half on top of it, so the operator switched the same day to O3, tiled: 50% width and one position left or right, so two such columns share the view; O1's move stays on Command+Option+Shift+Left and Right.
 
 ### Q4 Modifier semantics on pyrite's built-in keyboard — OPEN
 
 The choice is between Command acting as Super for niri and Command acting as Control for applications.
 No recommendation was recorded.
 
-### Q5 Caps Lock to Escape on both machines — OPEN
+### Q5 Caps Lock to Escape on both machines — DECIDED for pyrite 2026-11-14
 
-stibnite currently remaps Caps Lock to Escape imperatively, per keyboard, through System Settings.
+stibnite currently remaps Caps Lock to Escape imperatively, per keyboard, through System Settings; macOS can remap Caps Lock but not Escape, so the mapping is one-way.
 The built-in keyboard comes first.
 A ZSA Moonlander-class keyboard follows later; on stibnite it currently swaps Left Control and Left Command imperatively.
-No recommendation was recorded.
+The operator chose `caps:escape` for pyrite on 2026-11-14, matching stibnite; declaring stibnite's side waits on checking nix-darwin's all-keyboards remap against the ZSA swap.
 
 ### Q6 Install-mechanism policy per OS — OPEN
 

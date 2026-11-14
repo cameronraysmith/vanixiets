@@ -15,6 +15,8 @@
             tap = true;
             natural-scroll = true;
           };
+          # Matches stibnite, where Caps Lock sends Escape.
+          keyboard.xkb.options = "caps:escape";
         };
 
         binds =
@@ -29,13 +31,11 @@
                     step: "${lib.getExe config.programs.niri.package} msg action ${step}"
                   ) steps
                 );
-              floatHalf =
-                x:
+              tiledHalf =
+                direction:
                 act [
-                  "move-window-to-floating"
-                  "set-window-width 50%"
-                  "set-window-height 100%"
-                  "move-floating-window -x ${x} -y 0%"
+                  "set-column-width 50%"
+                  "move-column-${direction}"
                 ];
             in
             {
@@ -56,10 +56,10 @@
               "Mod+Shift+E".action = quit;
               # Mirrors stibnite's Raycast Cmd+Alt hotkeys; Mod is Super, the Mac keyboard's Cmd.
               "Mod+Alt+F".action = maximize-window-to-edges;
-              # niri can't place a tiled column on half of the current view, only centre it,
-              # so the halves float, as Raycast's do; the rarer jump to the strip's ends keeps tiling.
-              "Mod+Alt+Left".action = floatHalf "0%";
-              "Mod+Alt+Right".action = floatHalf "50%";
+              # niri can place a tiled column on half of the view only relative to its neighbour, so a
+              # half is 50% width moved one column along; floating halves overlapped filled windows.
+              "Mod+Alt+Left".action = tiledHalf "left";
+              "Mod+Alt+Right".action = tiledHalf "right";
               "Mod+Alt+Shift+Left".action = move-column-to-first;
               "Mod+Alt+Shift+Right".action = move-column-to-last;
               "Mod+Alt+Down".action = move-window-to-tiling;
