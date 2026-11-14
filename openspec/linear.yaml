@@ -12,7 +12,8 @@ teams:
 projects:
   "pi-agent-environment":
     id: "d7d743a19249"
-    name: "Pi agent environment"
+    # Renamed from "Pi agent environment" on 2026-11-14; the key stays for existing bindings.
+    name: "Agent environment"
     teams: ["CAM"]
     archive_documents:
       "browser-relay-delivery":
