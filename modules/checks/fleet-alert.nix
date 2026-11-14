@@ -5,7 +5,8 @@
 # Five parts, each a derivation in passthru so it can be built alone:
 # - promtoolRehearsal: `promtool check rules` over the YAML rendered from
 #   modules/nixos/fleet-alert/rules.nix, and a malformed-expression mutant
-#   that promtool must reject.
+#   that promtool must reject; `promtool test rules` on
+#   OmnigentLoginGrantExpiring, and a threshold-in-days mutant it must fail.
 # - fixtureRehearsal: the evaluator, flake.lib.fleetAlertEvaluator built with
 #   a recording ntfy-send, runs in the build sandbox against
 #   fleet-alert/fixture_server.py, which replays canned answers to the
@@ -117,11 +118,72 @@
           rules.yaml
       );
 
+      # OmnigentLoginGrantExpiring evaluated by promtool's PromQL engine from
+      # the Unix epoch (omnigent-login-grant-lifetime tasks.md 3.3). owner-1's
+      # earliest grant expires 14 days and 1 hour after the epoch, so it is
+      # quiet at 30 min and firing at 2 h; owner-2's, 10 days later, never
+      # fires. The mutant compares with days, a plausible unit slip, and runs
+      # only the firing case, which it must fail.
+      grantRule = ruleNamed "OmnigentLoginGrantExpiring";
+      grantSeries =
+        owner:
+        "omnigent_login_grant_expiry_timestamp_seconds{host_name=\"magnetite\", omnigent_owner=\"${owner}\"}";
+      grantFiring = {
+        eval_time = "2h";
+        alertname = grantRule.alert;
+        exp_alerts = [
+          {
+            exp_labels = {
+              inherit (grantRule) severity;
+              host_name = "magnetite";
+              omnigent_owner = "owner-1";
+            };
+            exp_annotations = grantRule.annotations;
+          }
+        ];
+      };
+      grantRuleTest =
+        name: rulesFile: cases:
+        pkgs.writeText "fleet-alert-${name}.yaml" (
+          builtins.toJSON {
+            rule_files = [ "${rulesFile}" ];
+            evaluation_interval = "1m";
+            tests = [
+              {
+                interval = "1m";
+                input_series = [
+                  {
+                    series = grantSeries "owner-1";
+                    values = "1213200x180";
+                  }
+                  {
+                    series = grantSeries "owner-2";
+                    values = "2073600x180";
+                  }
+                ];
+                alert_rule_test = cases;
+              }
+            ];
+          }
+        );
+      grantTest = grantRuleTest "grant-expiring" rulesYaml [
+        {
+          eval_time = "30m";
+          alertname = grantRule.alert;
+          exp_alerts = [ ];
+        }
+        grantFiring
+      ];
+      grantDaysMutant = grantRuleTest "grant-expiring-days" (pkgs.writeText
+        "fleet-alert-rules-grant-days.yaml"
+        (mutateText "grantThresholdInDays" "time() < 1209600" "time() < 14" rules.yaml)
+      ) [ grantFiring ];
+
       promtoolRehearsal =
         pkgs.runCommand "fleet-alert-promtool"
           {
             nativeBuildInputs = [ pkgs.prometheus.cli ];
-            meta.description = "R9.2: every rendered rule parses as PromQL, and a malformed expression is rejected";
+            meta.description = "R9.2: every rendered rule parses as PromQL, and a malformed expression is rejected; OmnigentLoginGrantExpiring fires within 14 days and not before, and a threshold in days is rejected";
           }
           ''
             set -euo pipefail
@@ -133,6 +195,16 @@
             fi
             cat malformed.log
             echo "mutant malformedExpression rejected"
+            promtool test rules ${grantTest}
+            if promtool test rules ${grantDaysMutant} > grant-days.log 2>&1; then
+              cat grant-days.log
+              echo "FAIL: promtool passed the grantThresholdInDays mutant" >&2
+              exit 1
+            fi
+            cat grant-days.log
+            grep -qF "alertname: OmnigentLoginGrantExpiring, time: 2h" grant-days.log \
+              || { echo "FAIL: the grantThresholdInDays mutant failed for another reason" >&2; exit 1; }
+            echo "mutant grantThresholdInDays rejected"
             touch "$out"
           '';
 

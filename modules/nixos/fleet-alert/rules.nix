@@ -26,7 +26,10 @@
 # writes; the file-system rules, LocalExporterDown and WeeklyPipelineTest
 # expect every collecting host; the NVMe rules expect the hosts with SMART
 # devices; the four launchd and probe rules expect the darwin hosts (S5
-# design D9). LaunchdJobNotRunning expects running the kept-alive labels of
+# design D9); OmnigentLoginGrantExpiring expects the collecting NixOS hosts
+# that run the Omnigent server, so a lost grant series raises
+# RuleSignalMissing (omnigent-login-grant-lifetime design D4).
+# LaunchdJobNotRunning expects running the kept-alive labels of
 # flake.lib.otelCollectorSchema.launchdKeptAlive and reports any other
 # allow-listed label unloaded; its two arms select disjoint labels, because
 # the probe writes all four states for every label, so a kept-alive label
@@ -69,6 +72,10 @@
       nixosHosts = onPlatform "nixos";
       darwinHosts = onPlatform "darwin";
       smartHosts = builtins.attrNames (lib.filterAttrs (_: h: h.smartDevices != [ ]) collecting);
+      # The hosts running the Omnigent server, whose collector reads the
+      # login grants; modules/nixos/omnigent.nix asserts that its host is
+      # listed whenever it collects.
+      omnigentServerHosts = lib.intersectLists [ "magnetite" ] nixosHosts;
       presence = expectedHosts: selector: { inherit selector expectedHosts; };
       fsRatio = ''sum by (host_name, mountpoint) (system_filesystem_usage_bytes{state="used"}) / sum by (host_name, mountpoint) (system_filesystem_usage_bytes)'';
       # Each dot written [.], as notifiedRegex below.
@@ -271,6 +278,17 @@
           for = "1h";
           severity = "warning";
           annotations.summary = "More than one in ten of the at least 10 pull-request builds whose first attempt finished in the last 24 h waited over an hour to start; the value is that share";
+        }
+        # 1209600 s is 14 days, written out because the value is compared
+        # with seconds; the series is the earliest expiry of each owner's
+        # redeemed CLI login grants (omnigent-login-grant-lifetime design D3).
+        {
+          alert = "OmnigentLoginGrantExpiring";
+          expr = "omnigent_login_grant_expiry_timestamp_seconds - time() < 1209600";
+          for = "15m";
+          severity = "warning";
+          annotations.summary = "An owner's earliest Omnigent CLI login grant expires within 14 days, after which a worker holding it cannot refresh and stops; the value is the seconds left. Log that owner's workers in again; the instance resolves once the server purges the superseded grant at its lifetime";
+          presence = [ (presence omnigentServerHosts "omnigent_login_grant_expiry_timestamp_seconds") ];
         }
         {
           alert = "StoreQueryFailing";
