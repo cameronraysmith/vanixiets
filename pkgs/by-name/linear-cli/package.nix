@@ -1,227 +1,79 @@
+# Upstream release binaries: 3.0 rewrote the CLI in Rust, replacing the Deno
+# source build. This trusts upstream's release artifacts rather than building
+# from source.
 {
   lib,
   stdenv,
   fetchurl,
   fetchFromGitHub,
-  makeWrapper,
-  deno,
-  jq,
-  coreutils,
-  xz,
+  autoPatchelfHook,
   versionCheckHook,
 }:
-
-let
-  version = "2.6.0";
-
-  # Prebuilt deno-compile binaries published per tag by cargo-dist. Only the
-  # Darwin artifacts are usable (see the Linux note below).
-  binaries = {
-    aarch64-darwin = {
-      url = "https://github.com/schpet/linear-cli/releases/download/v${version}/linear-aarch64-apple-darwin.tar.xz";
-      hash = "sha256-uavdS1rsFEWeQ0oomSA3V96K6EfwVerk8frue7H7wHg=";
-    };
-    x86_64-darwin = {
-      url = "https://github.com/schpet/linear-cli/releases/download/v${version}/linear-x86_64-apple-darwin.tar.xz";
-      hash = "sha256-CKuhmvTwBinl6JqwQBfTHRhXP7ydySIoCChwL9riej8=";
-    };
-  };
-
-  # `src` is the upstream SOURCE tree (NOT the binary). Consumers inject the
-  # bundled agent skill via `${pkgs.linear-cli.src}/skills/linear-cli` (see
-  # modules/home/development/linear.nix flake.lib.linearSkills), so `src` must
-  # remain the upstream source tree on every platform.
-  src = fetchFromGitHub {
-    owner = "schpet";
-    repo = "linear-cli";
-    # v${version} tag commit
-    rev = "196315343d2bc58f30ca5d5ab40f4eb6a449fd71";
-    hash = "sha256-wInqzwamLoWgIU6qDaOjgblBuqUJRQmhs5xg4+Npabo=";
-  };
-
-  # Darwin: the upstream prebuilt deno-compile single-file executable.
-  binDist = fetchurl {
-    inherit
-      (binaries.${stdenv.hostPlatform.system}
-        or (throw "linear-cli: unsupported darwin system ${stdenv.hostPlatform.system}")
-      )
-      url
-      hash
-      ;
-  };
-
-  # Linux: a fixed-output derivation (network permitted) that materialises the
-  # gitignored `src/__codegen__/` and vendors all dependencies in a REPRODUCIBLE
-  # form. The raw DENO_DIR cache is not reproducible (per-fetch jsr/npm metadata,
-  # SQLite analysis/v8 caches, random scripts-warned nonces, path-keyed gen/),
-  # so we vendor the jsr/https deps as plain source files via
-  # `deno cache --vendor` (deterministic) and keep only the content-addressed
-  # npm packages from DENO_DIR, dropping the non-deterministic metadata and
-  # regenerable caches. The main derivation builds offline against these with
-  # `vendor = true` and `--cached-only`.
-  denoDeps = stdenv.mkDerivation {
-    pname = "linear-cli-deno-deps";
-    inherit version src;
-
-    nativeBuildInputs = [ deno ];
-
-    dontConfigure = true;
-
-    buildPhase = ''
-      runHook preBuild
-
-      export HOME="$TMPDIR/home"
-      export DENO_DIR="$TMPDIR/deno_dir"
-      export DENO_NO_UPDATE_CHECK=1
-      mkdir -p "$HOME" "$DENO_DIR"
-
-      # Generate src/__codegen__/{gql.ts,graphql.ts,index.ts} from the committed
-      # graphql/schema.graphql via @graphql-codegen/cli.
-      deno task codegen
-
-      # Vendor jsr/https deps as plain source files (deterministic); also
-      # populates the npm cache under $DENO_DIR/npm.
-      deno cache --vendor src/main.ts
-
-      # Reduce DENO_DIR to its reproducible, runtime-necessary subset (the
-      # content-addressed npm packages). Drop the non-deterministic or
-      # regenerable artifacts: remote/ (now vendored), analysis & v8 caches, the
-      # path-keyed gen/ tree, scripts-warned nonces, and npm registry metadata.
-      ( cd "$DENO_DIR"
-        rm -rf remote gen node_compat_bin
-        find . -name '*_analysis_cache_v2*' -delete
-        find . -name 'v8_code_cache_v2*' -delete
-        find . -name '.scripts-warned-*' -delete
-        find . -name 'registry.json' -delete
-      )
-
-      runHook postBuild
-    '';
-
-    installPhase = ''
-      runHook preInstall
-
-      mkdir -p "$out"
-      cp -r "$DENO_DIR" "$out/deno_dir"
-      cp -r vendor "$out/vendor"
-      cp -r src/__codegen__ "$out/codegen"
-
-      runHook postInstall
-    '';
-
-    dontFixup = true;
-
-    outputHashMode = "recursive";
-    outputHashAlgo = "sha256";
-    outputHash = "sha256-GLU6adDR+D+wfhmzKpjdIx8yqUTy406Wn1u5+pUUCj4=";
-  };
-in
 stdenv.mkDerivation (finalAttrs: {
   pname = "linear-cli";
-  inherit version src;
+  version = "3.1.0";
 
-  # Two install strategies, selected by host platform:
-  #
-  #   Darwin: install the upstream prebuilt deno-compile single-file executable
-  #   directly. It is a Deno SEA that locates its embedded payload relative to
-  #   its own file image, so patchelf/strip must never touch it; on Darwin the
-  #   Mach-O loads cleanly without modification.
-  #
-  #   Linux: the prebuilt SEA cannot be made to work in Nix. Rewriting its ELF
-  #   interpreter (autoPatchelfHook --set-interpreter) corrupts the embedded
-  #   payload, and launching it through the Nix dynamic loader breaks
-  #   /proc/self/exe so Deno can no longer find its payload ("Could not find
-  #   standalone binary section"). Instead we run from source with a `deno run`
-  #   wrapper over the nixpkgs `deno` (which has the correct Nix interpreter),
-  #   following the nixpkgs `era` package pattern. The dependencies are pure
-  #   JS/TS (cliffy, graphql, valibot, remark, @std/*) with no native addons,
-  #   so no patching is required.
+  src = finalAttrs.passthru.sources.${stdenv.hostPlatform.system};
 
-  nativeBuildInputs = [
-    versionCheckHook
-  ]
-  ++ lib.optionals stdenv.hostPlatform.isDarwin [ xz ]
-  ++ lib.optionals stdenv.hostPlatform.isLinux [
-    makeWrapper
-    jq
-  ];
-
-  dontUnpack = stdenv.hostPlatform.isDarwin;
   dontConfigure = true;
   dontBuild = true;
+  # The darwin binary carries an ad-hoc linker signature that stripping would
+  # invalidate.
+  dontStrip = true;
 
-  # On Darwin the prebuilt SEA must not be modified by ELF/strip fixups.
-  dontStrip = stdenv.hostPlatform.isDarwin;
-  dontPatchELF = stdenv.hostPlatform.isDarwin;
+  nativeBuildInputs = lib.optionals stdenv.hostPlatform.isLinux [ autoPatchelfHook ];
 
-  installPhase =
-    lib.optionalString stdenv.hostPlatform.isDarwin ''
-      runHook preInstall
-      tar xf "${binDist}"
-      install -Dm755 linear-*/linear "$out/bin/linear"
-      runHook postInstall
-    ''
-    + lib.optionalString stdenv.hostPlatform.isLinux ''
-      runHook preInstall
+  buildInputs = lib.optionals stdenv.hostPlatform.isLinux [
+    stdenv.cc.cc.lib # libgcc_s.so.1
+  ];
 
-      mkdir -p "$out/lib"
-      cp -r ./. "$out/lib"
+  installPhase = ''
+    runHook preInstall
+    install -Dm755 linear $out/bin/linear
+    runHook postInstall
+  '';
 
-      # Drop in the codegen output and vendored jsr/https sources that upstream
-      # gitignores / does not ship.
-      mkdir -p "$out/lib/src/__codegen__"
-      cp -r ${denoDeps}/codegen/. "$out/lib/src/__codegen__/"
-      cp -r ${denoDeps}/vendor "$out/lib/vendor"
-
-      # Resolve vendored jsr/https sources offline, and force global npm
-      # resolution (nodeModulesDir = none) so deno never tries to create a local
-      # node_modules symlink farm inside the read-only store at runtime.
-      jq '.vendor = true | .nodeModulesDir = "none"' "$out/lib/deno.json" > "$out/lib/deno.json.tmp"
-      mv "$out/lib/deno.json.tmp" "$out/lib/deno.json"
-
-      # The vendored npm packages live in the read-only store, but deno also
-      # wants to WRITE its dep/node/v8 analysis caches to DENO_DIR at runtime.
-      # Pointing DENO_DIR at the store makes those writes fail ("Failed to open
-      # cache file ... performance may be degraded") on every real subcommand.
-      # So at runtime we use a writable per-user DENO_DIR and symlink the store's
-      # npm cache into it: deno reads npm through the symlink and persists its
-      # perf caches in the writable dir.
-      #
-      # The setup must be self-contained: versionCheckHook (and hardened runtime
-      # contexts like systemd units) invoke the program via `env
-      # --ignore-environment`, i.e. with no PATH and no HOME. Hence absolute
-      # coreutils paths and a HOME-less fallback (a fresh temp dir) for the
-      # cache root. `--quiet` mutes deno's "Ignored build scripts"
-      # lifecycle-script diagnostic for dev-only deps (e.g. npm:lefthook).
-      makeWrapper ${lib.getExe deno} "$out/bin/linear" \
-        --run 'deno_dir="''${XDG_CACHE_HOME:-''${HOME:-$(${coreutils}/bin/mktemp -d)}/.cache}/linear-cli/deno"; ${coreutils}/bin/mkdir -p "$deno_dir"; ${coreutils}/bin/ln -sfn ${denoDeps}/deno_dir/npm "$deno_dir/npm"; export DENO_DIR="$deno_dir"' \
-        --set DENO_NO_UPDATE_CHECK "1" \
-        --add-flags "run --quiet --cached-only --no-check -A $out/lib/src/main.ts"
-
-      runHook postInstall
-    '';
-
+  nativeInstallCheckInputs = [ versionCheckHook ];
   doInstallCheck = true;
-  versionCheckProgramArg = "--version";
 
   passthru = {
+    sources = {
+      "aarch64-darwin" = fetchurl {
+        url = "https://github.com/schpet/linear-cli/releases/download/v${finalAttrs.version}/linear-aarch64-apple-darwin.tar.xz";
+        hash = "sha256-u6gc884Z80hvGtpSz5hBqNdJ/KcWM46mhOazsIpwaVQ=";
+      };
+      "x86_64-darwin" = fetchurl {
+        url = "https://github.com/schpet/linear-cli/releases/download/v${finalAttrs.version}/linear-x86_64-apple-darwin.tar.xz";
+        hash = "sha256-2ePOpPVwO/wqPJhifku2nXUyrzmp1SMWUCWpAVOS4Lc=";
+      };
+      "x86_64-linux" = fetchurl {
+        url = "https://github.com/schpet/linear-cli/releases/download/v${finalAttrs.version}/linear-x86_64-unknown-linux-gnu.tar.xz";
+        hash = "sha256-v3cSCXzmoB6KN53oNX7KZtV0gFAgHTNrp4e2rTaH8+c=";
+      };
+      "aarch64-linux" = fetchurl {
+        url = "https://github.com/schpet/linear-cli/releases/download/v${finalAttrs.version}/linear-aarch64-unknown-linux-gnu.tar.xz";
+        hash = "sha256-SwsVtpRk6LamZSkNcCgXZUviEkzx1Y+tfX7VdU+UMdc=";
+      };
+    };
+    # The release archives carry only the executable; the upstream agent skill
+    # (flake.lib.linearSkills, apm-skills-compose) comes from the tagged tree.
+    # `rev` is the full tag commit because the apm.yml drift guard compares it.
+    skillSrc = fetchFromGitHub {
+      owner = "schpet";
+      repo = "linear-cli";
+      rev = "02571d34be662e5487204841fb80bf23ed79b4f0";
+      hash = "sha256-Bk4UPFqKVFH51iqiEhCSVfy/CX8CBnD8pHMMCIT83Pw=";
+    };
     updateScript = ./update.sh;
-    inherit denoDeps;
   };
 
   meta = {
     description = "Manage Linear issues from the command line";
     homepage = "https://github.com/schpet/linear-cli";
-    license = lib.licenses.mit;
+    changelog = "https://github.com/schpet/linear-cli/releases/tag/v${finalAttrs.version}";
+    license = lib.licenses.isc;
     mainProgram = "linear";
-    platforms = [
-      "aarch64-darwin"
-      "x86_64-darwin"
-      "x86_64-linux"
-      "aarch64-linux"
-    ];
-    sourceProvenance =
-      lib.optionals stdenv.hostPlatform.isDarwin [ lib.sourceTypes.binaryNativeCode ]
-      ++ lib.optionals stdenv.hostPlatform.isLinux [ lib.sourceTypes.fromSource ];
+    platforms = builtins.attrNames finalAttrs.passthru.sources;
+    sourceProvenance = with lib.sourceTypes; [ binaryNativeCode ];
   };
 })

@@ -82,9 +82,9 @@
 
   # Flake-pinned schpet/linear-cli source tree feeding apm's git checkout cache so
   # the skill-bundle remote dep resolves with zero network. linearCliRev (the v tag
-  # commit pinned by pkgs.linear-cli.src) is the single SHA source of truth,
+  # commit pinned by pkgs.linear-cli.skillSrc) is the single SHA source of truth,
   # reconciled against the apm.yml pin by the drift guard in the build script.
-  linearCliSrc ? inputs.self.packages.${stdenv.hostPlatform.system}.linear-cli.src,
+  linearCliSrc ? inputs.self.packages.${stdenv.hostPlatform.system}.linear-cli.skillSrc,
   linearCliRev ? linearCliSrc.rev,
 
   playwrightCli ? inputs.self.packages.${stdenv.hostPlatform.system}.playwright-cli,

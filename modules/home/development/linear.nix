@@ -1,6 +1,6 @@
 { config, ... }:
 {
-  flake.lib.linearSkills = pkgs: { linear-cli = "${pkgs.linear-cli.src}/skills/linear-cli"; };
+  flake.lib.linearSkills = pkgs: { linear-cli = "${pkgs.linear-cli.skillSrc}/skills/linear-cli"; };
 
   flake.modules.homeManager.linear = { pkgs, ... }: {
     home.packages = [ pkgs.linear-cli ];

@@ -58,9 +58,9 @@ let
       #
       # `linear-cli` is declared in planning-and-development/apm.yml for marketplace
       # consumers (openspec-linear-sync drives it). Nix users receive it from
-      # `flake.lib.linearSkills` (pkgs.linear-cli.src/skills/linear-cli) only where the
+      # `flake.lib.linearSkills` (pkgs.linear-cli.skillSrc/skills/linear-cli) only where the
       # linear module or the user opts in, so it is withheld from the unconditional
-      # compose delivery. Both paths ship the same pin (pkgs.linear-cli.src.rev).
+      # compose delivery. Both paths ship the same pin (pkgs.linear-cli.skillSrc.rev).
       excludedUpstreamSkills = [
         "tdd"
         "writing-for-agents"

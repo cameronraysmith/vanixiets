@@ -5,16 +5,15 @@
 # Update linear-cli (schpet/linear-cli) to the latest release.
 #
 # Rewrites, in package.nix:
-#   1. the `version = "...";` let-binding
-#   2. the two Darwin prebuilt-binary `hash = "...";` lines (one per platform,
-#      paired to each preceding `url` line)
-#   3. the `src` fetchFromGitHub `rev = "...";` line (the 40-hex commit the
+#   1. the `version = "...";` line
+#   2. the four prebuilt-binary `hash = "...";` lines (one per platform, paired
+#      to each preceding `url` line)
+#   3. the `skillSrc` fetchFromGitHub `rev = "...";` line (the 40-hex commit the
 #      v$VERSION tag points at) and the `hash = "...";` line following it
-#   4. the Linux source build's `denoDeps.outputHash`
 #
 # and, in modules/home/ai/plugins/planning-and-development/apm.yml, the `ref:`
-# line of the `git: schpet/linear-cli` entry, which must equal the src rev (the
-# apm-skills-compose drift guard enforces it).
+# line of the `git: schpet/linear-cli` entry, which must equal the skillSrc rev
+# (the apm-skills-compose drift guard enforces it).
 #
 # Usage: ./update.sh [VERSION]   (VERSION overrides the latest-release lookup)
 
@@ -50,11 +49,11 @@ else
 fi
 
 # Platform map: nix system -> release artifact filename (URL leaf segment).
-# Only the platforms package.nix pins as prebuilt binaries; Linux builds from
-# the source tree, so its release artifacts have no hash line to update.
 declare -A platform_map=(
   ["aarch64-darwin"]="linear-aarch64-apple-darwin.tar.xz"
   ["x86_64-darwin"]="linear-x86_64-apple-darwin.tar.xz"
+  ["x86_64-linux"]="linear-x86_64-unknown-linux-gnu.tar.xz"
+  ["aarch64-linux"]="linear-aarch64-unknown-linux-gnu.tar.xz"
 )
 
 for platform in "${!platform_map[@]}"; do
@@ -74,6 +73,10 @@ for platform in "${!platform_map[@]}"; do
   # line immediately followed by one hash line per platform.
   sed -i'' -e "/${artifact}/{ n; s|hash = \"sha256-[^\"]*\"|hash = \"${sri_hash}\"|; }" "$PKG_NIX"
 
+  if ! grep -qF "hash = \"${sri_hash}\"" "$PKG_NIX"; then
+    echo "error: failed to rewrite the ${platform} hash in ${PKG_NIX}" >&2
+    exit 1
+  fi
   echo "  ${platform}: ${sri_hash}"
 done
 
@@ -92,9 +95,8 @@ if [[ ! "$src_rev" =~ ^[0-9a-f]{40}$ ]]; then
   exit 1
 fi
 
-# Source tree hash for the `src` fetchFromGitHub block. Rewrite the 40-hex
-# `rev = "...";` line, advance to the following `hash =` line, and substitute
-# (distinct from the two binary hashes above).
+# Source tree hash for the `skillSrc` fetchFromGitHub block. Rewrite the 40-hex
+# `rev = "...";` line, advance to the following `hash =` line, and substitute.
 echo "Prefetching source tree (v${latest_version} = ${src_rev})..."
 src_raw="$(nix-prefetch-url --unpack "https://github.com/${REPO}/archive/${src_rev}.tar.gz")"
 src_sri="$(nix hash to-sri --type sha256 "$src_raw")"
@@ -105,9 +107,14 @@ if [[ -z "$src_sri" || "$src_sri" == "null" ]]; then
 fi
 
 sed -i'' -e "/rev = \"[0-9a-f]\{40\}\";/{ s|rev = \"[0-9a-f]\{40\}\"|rev = \"${src_rev}\"|; n; s|hash = \"sha256-[^\"]*\"|hash = \"${src_sri}\"|; }" "$PKG_NIX"
-echo "  src: ${src_rev} ${src_sri}"
 
-# Keep the apm marketplace pin in step with the src rev: match the
+if ! grep -qF "hash = \"${src_sri}\"" "$PKG_NIX"; then
+  echo "error: failed to rewrite the skillSrc hash in ${PKG_NIX}" >&2
+  exit 1
+fi
+echo "  skillSrc: ${src_rev} ${src_sri}"
+
+# Keep the apm marketplace pin in step with the skillSrc rev: match the
 # `git: schpet/linear-cli` entry, advance to its following `ref:` line, and
 # substitute.
 sed -i'' -e "/git: schpet\/linear-cli\$/{ n; s|ref: [0-9a-f]\{40\}|ref: ${src_rev}|; }" "$APM_YML"
@@ -117,35 +124,5 @@ if ! grep -qF "ref: ${src_rev}" "$APM_YML"; then
   exit 1
 fi
 echo "  apm.yml ref: ${src_rev}"
-
-echo "Prefetching x86_64-linux Deno dependencies..."
-fake_hash="sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
-sed -i'' -e "s|outputHash = \"sha256-[^\"]*\";|outputHash = \"${fake_hash}\";|" "$PKG_NIX"
-
-if ! grep -qF "outputHash = \"${fake_hash}\";" "$PKG_NIX"; then
-  echo "error: failed to replace denoDeps.outputHash with the probe hash" >&2
-  exit 1
-fi
-
-deno_deps_log="$(mktemp)"
-trap 'rm -f "$deno_deps_log"' EXIT
-
-if nix build "${REPO_ROOT}#packages.x86_64-linux.linear-cli.denoDeps" \
-  --max-jobs 0 \
-  --no-link \
-  -L 2>&1 | tee "$deno_deps_log"; then
-  echo "error: denoDeps unexpectedly matched the probe hash" >&2
-  exit 1
-fi
-
-deno_deps_hash="$(sed -n 's/^[[:space:]]*got:[[:space:]]*\(sha256-[^[:space:]]*\)$/\1/p' "$deno_deps_log" | tail -1)"
-
-if [[ -z "$deno_deps_hash" ]]; then
-  echo "error: x86_64-linux denoDeps build failed without producing a fixed-output hash" >&2
-  exit 1
-fi
-
-sed -i'' -e "s|outputHash = \"${fake_hash}\";|outputHash = \"${deno_deps_hash}\";|" "$PKG_NIX"
-echo "  denoDeps (x86_64-linux): ${deno_deps_hash}"
 
 echo "Updated linear-cli to ${latest_version}"
