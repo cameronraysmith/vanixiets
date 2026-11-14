@@ -91,11 +91,18 @@ Deleting a ref one does not own must be refused or guarded wherever it can happe
 
 Options: drop the global `fetch.prune = true`; keep it and rely on guidance forbidding plain `git fetch` in a jj primary; or set `fetch.prune = false` locally in this repository's shared config, which every tree then reads (A103).
 The detector in D7 can report a pruned tracked ref after the fact; it cannot prevent one.
+Baseline (tasks 1.7, `logs/vcs-1.7-prune-baseline-20261114-172309.log`): after the forge deletes a tracked branch, a plain `git fetch` from a linked worktree under `fetch.prune = true` deletes `refs/remotes/origin/feature`. The primary's next jj command then abandons the chain's commit, rebases the working-copy commit off it, and deletes the local bookmark as well as `feature@origin`. With `fetch.prune = false` nothing is lost.
 
 ### D9: shared-state writes from devshell entry (C2, C3) — OPEN
 
 The absolute `core.hooksPath` already satisfies C3.
 Open: whether the unguarded `git config` call (`default.nix:98`) needs a retry or a compare-before-write to survive the lock contention A103 describes, and whether the context tier test needs to change for worker accounts; tasks 1.1 and 1.2 decide by measurement.
+Evidence (tasks 1.1, 1.2; recorded, not decided):
+- The tier test reads only the entering account's own `$HOME/.claude/CLAUDE.md`. Both Omnigent workers on magnetite have one from home-manager and get tier `default`; with it absent the tier is `full` and the tree's context is still complete. Neither case reads another account's home (`logs/vcs-1.1-worker-*-20261114-1723*.log`).
+- Six concurrent entries in pairs of fresh linked worktrees produced no lock error and left the absolute value.
+- A `config.lock` held across a whole entry fails all three writes with an `error: could not lock config file` line each, while the entry still exits 0; the earlier absolute value survives and hooks still run.
+- A lock held from just after git-hooks.nix's relative `.git/hooks` write, during primary entry with a stale hook link, leaves `core.hooksPath = .git/hooks`. From then on, commits in every linked worktree exit 0 with no hook run and no `Change-Id`, and nothing reports it (`logs/vcs-1.2-concurrent-entry-20261114-172506.log`).
+- Ordinary concurrent entries never held `config.lock` past git's one-second wait in these runs; the hold was produced deliberately. [INFERENCE: outside a test, such a hold would come from a stale lock left by a killed git process.]
 
 ## Risks / Trade-offs
 

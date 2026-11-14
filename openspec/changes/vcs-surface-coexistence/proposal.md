@@ -3,15 +3,16 @@ linear_story_id: CAM-102
 linear_story_identifier: CAM-102
 linear_story_title: "Make jj workspaces, git worktrees and ovnfs checkouts coexist safely"
 linear_story_url: https://linear.app/cameronraysmith/issue/CAM-102/make-jj-workspaces-git-worktrees-and-ovnfs-checkouts-coexist-safely
-linear_story_state: Todo
+linear_story_state: In Progress
 linear_team: CAM
 linear_project: pi-agent-environment
-last_synced_state: Todo
-last_synced_at: "2026-11-14T20:08:59Z"
+last_synced_state: In Progress
+last_synced_at: "2026-11-14T22:30:44Z"
 review_round: 0
 max_review_rounds: 3
 attempt_log:
   - { at: "2026-11-14T20:08:59Z", transition: "Backlog->Todo", outcome: "posted", note: "Project d7d743a19249 renamed to Agent environment; issue CAM-102 created in Todo with description seeded from proposal.md; state, project and labels confirmed by read-only view" }
+  - { at: "2026-11-14T22:30:44Z", transition: "Todo->In Progress", outcome: "posted", note: "apply gate: tasks 1.1, 1.2 and 1.7 checked; state confirmed by read-only view" }
 ---
 
 ## Why
