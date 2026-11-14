@@ -104,13 +104,13 @@ Observed divergences that the slices close:
 ### D7: window chords declared once as chord to intent
 
 - **Choice**: One first-party table maps each chord to an intent (launcher, fill screen, left half, right half); niri's binds on pyrite are generated from it.
-  Command+Space is the launcher; Command+Option+F maps to niri's `maximize-window-to-edges` [INFERENCE: the DMS bar stays visible; verify on pyrite].
+  Command+Space is the launcher; Command+Option+F maps to niri's `maximize-window-to-edges`; the DMS bar auto-hides and, when revealed, overlays the filled window (observed on pyrite on 2026-11-14).
   Command+Option+Left and Right are O3, tiled, DECIDED on 2026-11-14: the column is set to 50% width and moved one position left or right, so two such columns share the view as a left and a right half and nothing overlaps.
   niri 26.04 has no action placing a tiled column on half of the current view, only `center-column` and `center-visible-columns`, so a tiled half is relative to its neighbour rather than a fixed half of the screen.
   O1 (50% width, moved to the first or last position of the whole strip) jumped too far, and O2 (floating on exactly half the output) left the window above the strip, where filling the screen with another window overlapped it; O1's move stays on Command+Option+Shift+Left and Right.
   Command+Option+Down (`move-window-to-tiling`) and Command+Option+Up (`switch-focus-between-floating-and-tiling`) stay bound for windows that float for other reasons.
 - **Rationale**: Principle 5: declaring the chord once lets stibnite's side be checked against the same table, even while Raycast stores its own hotkeys.
-- **Status**: launcher, fill screen and halves DECIDED; whether the DMS bar stays visible under fill screen is still to be observed (5.3).
+- **Status**: launcher, fill screen and halves DECIDED and confirmed on pyrite on 2026-11-14.
   How stibnite consumes the table (Raycast import or documentation only) is a Phase 0 question.
 - **Boundary**: first-party niri configuration; Raycast's hotkey store is outside this repository.
 
@@ -164,7 +164,7 @@ Each sub-project opens with its own decision record before implementation.
 - [Risk] A host pattern without a pin falls back to offering all 19 vault keys and exhausts `MaxAuthTries` (F26) → Mitigation: pin every host pattern the operator logs in to, on both laptops, and check the pins in `pyrite-desktop`.
 - [Risk] After Bitwarden restarts, the touch unlock is unavailable until one master-password unlock, so a reboot leaves pyrite without an agent until the operator types it → Mitigation: the reboot check confirms the sequence; accepted as Bitwarden's documented behaviour.
 - [Risk] A single enrolled YubiKey is a single point of failure for touch unlock on pyrite → Mitigation: append YubiKey 32720546 to `u2f-keys`; the master password remains a fallback.
-- [Risk] `maximize-window-to-edges` may be absent from the pinned niri or may cover the DMS bar → Mitigation: verify the action against the pinned niri and observe it on pyrite before closing S3.
+- [Risk] `maximize-window-to-edges` may be absent from the pinned niri or may cover the DMS bar → resolved: niri 26.04 has the action, and the auto-hiding DMS bar overlays the filled window when revealed (2026-11-14).
 - [Risk] Replacing the Zen input changes pyrite's browser package and may lose the existing profile → Mitigation: back up the profile directory before activation; profile state is in scope only with Q8.
 - [Risk] Moving casks or App Store applications to other mechanisms invalidates TCC grants (A86) → Mitigation: Phase 0 records each kept application's grants before any mechanism changes.
 - [Trade-off] Raycast's hotkeys stay in Raycast's database, so stibnite's chord side may remain imperative → accepted until Phase 0 shows a declared import path.

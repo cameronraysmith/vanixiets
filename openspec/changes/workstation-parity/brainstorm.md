@@ -93,7 +93,7 @@ Spike answers:
 
 Raycast's hotkeys are the only custom hotkeys besides the global one.
 Command+Space opens the launcher (DECIDED).
-Command+Option+F is Raycast Window Management "maximize", which fills the screen without entering fullscreen; on pyrite it maps to niri's `maximize-window-to-edges` (DECIDED) [INFERENCE: the DMS bar stays visible; verify on pyrite].
+Command+Option+F is Raycast Window Management "maximize", which fills the screen without entering fullscreen; on pyrite it maps to niri's `maximize-window-to-edges` (DECIDED); the auto-hiding DMS bar overlays the filled window when revealed (observed on pyrite on 2026-11-14).
 Command+Option+Left and Command+Option+Right put the window on the left or right half; two options were tried on pyrite:
 
 - O1, tiled: set the column to 50% width and move the column left or right.

@@ -50,11 +50,12 @@ The operator approved `RestartPreventExitStatus=78` on 2026-11-14; it lands with
 - [ ] 5.1 Add the first-party chord table and generate pyrite's niri binds from it, with `Mod+Space` for the DMS launcher and `Mod+Alt+F` for `maximize-window-to-edges` — verify: `nix eval` of the generated binds shows both, with every existing bind unchanged.
 - [x] 5.2 Confirm the pinned niri provides `maximize-window-to-edges` and validates the generated configuration — verify: the installed niri validator, built on magnetite, exits 0.
   niri 26.04 lists the action, and niri-flake's `niri validate` passed for pyrite's configuration in #3869 and again with the decided halves.
-- [ ] 5.3 Observe fill screen on pyrite and record whether the DMS bar stays visible — verify: the operator's observation after activation.
+- [x] 5.3 Observe fill screen on pyrite and record whether the DMS bar stays visible — verify: the operator's observation after activation.
+  Observed by the operator on 2026-11-14: the DMS bar is set to auto-hide, and when revealed at the top edge it overlays the filled window as intended, so fill screen and the bar don't conflict.
 - [x] 5.4 Try O1 and O2 for the half-window chords on pyrite and record the operator's choice — verify: the recorded decision in design.md with the option that was not chosen and why.
   Decided 2026-11-14: first O2, floating; after O2 overlapped a filled window, O3, tiled; see D7.
-- [ ] 5.5 Implement the chosen half-window chords from the chord table — verify: `nix eval` of the binds, niri validation exit 0, and the operator's observation of both halves.
-  O3 is implemented, directly rather than from a chord table (5.1 is open); the operator's observation follows pyrite's next activation.
+- [x] 5.5 Implement the chosen half-window chords from the chord table — verify: `nix eval` of the binds, niri validation exit 0, and the operator's observation of both halves.
+  O3 is implemented, directly rather than from a chord table (5.1 is open), validated by niri-flake, and deployed to pyrite (#3875); the operator confirmed on 2026-11-14 that two halves share the view and filling the screen with another window moves them along the strip without overlap.
 - [ ] 5.6 Record stibnite's side of the chord table through the mechanism found in 1.9 — verify: the chord table and Raycast's exported hotkeys agree, compared against `logs/parity/raycast-hotkeys.json`.
 
 ## 6. Keyboard modifiers and Caps Lock
@@ -63,7 +64,7 @@ The operator approved `RestartPreventExitStatus=78` on 2026-11-14; it lands with
 - [ ] 6.2 Decide the Caps Lock to Escape mechanism for both laptops' built-in keyboards (Q5) — verify: the decision recorded in design.md.
   Decided for pyrite on 2026-11-14: niri's `caps:escape` (D8); stibnite's declaration waits on the ZSA check.
 - [ ] 6.3 Implement the decided modifier and Caps Lock settings for the built-in keyboards — verify: `nix eval` of the delivered settings on both laptops, and the operator's key test after activation.
-  pyrite's `caps:escape` is implemented; the operator's key test follows pyrite's next activation.
+  pyrite's `caps:escape` is implemented and deployed (#3875), and the operator confirmed on 2026-11-14 that Caps Lock sends Escape; stibnite's side waits on the ZSA check (D8).
 
 ## 7. Shared-layer fixes
 
