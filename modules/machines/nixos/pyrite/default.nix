@@ -379,9 +379,7 @@ in
       # `sysctl -w kernel.hung_task_panic=1 kernel.hung_task_timeout_secs=30`. efi_pstore
       # records the panic to EFI variables in the SPI boot ROM, surviving the dead NVMe that
       # erases the journal; systemd-pstore.service is wantedBy sysinit.target by default, so
-      # the archive path needs no config here. mem_sleep_default is deliberately left
-      # unpinned: s2idle was tested and also hung, so the failure is storage, not
-      # sleep-state selection.
+      # the archive path needs no config here.
       boot.kernel.sysctl."kernel.panic" = 20;
 
       # Suspend/resume kernel params for the s2idle/display half (untested; documented
@@ -408,6 +406,15 @@ in
         # power briefly, and 15 warm reboots with it never lost the chip
         # (warm-reboot trials, 2026-10-26).
         [ "reboot=pci" ]
+        # Resume from deep (S3) re-enables the non-boot CPUs one at a time, and onlining
+        # core 1 (CPUs 1 and 3) took 0.5-6 s on every resume and up to 761 s on some, with
+        # the displays, network and userspace still down, so a resume looked like a machine
+        # that would not wake (boot-clock power:suspend_resume traces, 2026-11-15; the
+        # preemption model made no difference). s2idle takes no CPU offline: 8/8 cycles
+        # resumed in 63 s. The pre-fix s2idle failure in the archived design (D22) predates
+        # the NVMe d3cold fix. The cost is standby drain: this platform reaches neither
+        # S0ix nor PC10 (slp_s0_residency_usec stays 0).
+        [ "mem_sleep_default=s2idle" ]
       ];
 
       services.displayManager.gdm.enable = false;
