@@ -7,6 +7,8 @@
 
       programs.niri.settings = {
         layout.focus-ring.enable = false;
+        # stibnite's com.apple.screencapture location; the DMS screenshot binds below use the same directory.
+        screenshot-path = "~/Downloads/Screenshot from %Y-%m-%d %H-%M-%S.png";
 
         input = {
           # logind also ignores this key on pyrite; neither handler may suspend it.
@@ -84,6 +86,28 @@
               ipc =
                 config.lib.niri.actions.spawn (lib.getExe config.programs.dank-material-shell.package) "ipc"
                   "call";
+              # macOS sends Cmd+Shift captures to a file and their Ctrl variants to the clipboard only,
+              # and a region is taken on mouse release.
+              shot =
+                mode: target:
+                config.lib.niri.actions.spawn (
+                  [
+                    (lib.getExe config.programs.dank-material-shell.package)
+                    "screenshot"
+                    mode
+                  ]
+                  ++ lib.optional (mode == "region") "--no-confirm"
+                  ++ (
+                    if target == "file" then
+                      [
+                        "--no-clipboard"
+                        "--dir"
+                        "${config.home.homeDirectory}/Downloads"
+                      ]
+                    else
+                      [ "--no-file" ]
+                  )
+                );
             in
             {
               "Mod+Space" = {
@@ -102,6 +126,26 @@
               "Mod+Shift+Slash" = {
                 action = ipc "keybinds" "toggle" "niri";
                 hotkey-overlay.title = "Keyboard shortcuts";
+              };
+              "Mod+Shift+3" = {
+                action = shot "full" "file";
+                hotkey-overlay.title = "Screenshot of the screen to ~/Downloads";
+              };
+              "Mod+Ctrl+Shift+3" = {
+                action = shot "full" "clipboard";
+                hotkey-overlay.title = "Screenshot of the screen to the clipboard";
+              };
+              "Mod+Shift+4" = {
+                action = shot "region" "file";
+                hotkey-overlay.title = "Screenshot of a region to ~/Downloads";
+              };
+              "Mod+Ctrl+Shift+4" = {
+                action = shot "region" "clipboard";
+                hotkey-overlay.title = "Screenshot of a region to the clipboard";
+              };
+              "Mod+Shift+5" = {
+                action = shot "window" "file";
+                hotkey-overlay.title = "Screenshot of the focused window to ~/Downloads";
               };
               "Super+Alt+L" = {
                 action = ipc "lock" "lock";
