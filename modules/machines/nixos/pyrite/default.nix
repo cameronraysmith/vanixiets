@@ -475,7 +475,10 @@ in
       services.gvfs.enable = true;
       services.gnome.sushi.enable = true;
       # System-level so ~/.config/mimeapps.list, which holds operator-set defaults, stays untouched.
-      xdg.mime.defaultApplications."inode/directory" = "org.gnome.Nautilus.desktop";
+      xdg.mime.defaultApplications = {
+        "inode/directory" = "org.gnome.Nautilus.desktop";
+        "application/pdf" = "org.gnome.Papers.desktop";
+      };
       security.pam.services.dankshell = { };
       services.displayManager.defaultSession = null;
       # Nothing on this machine suspends itself on idle. Resume from suspend fails in roughly
@@ -546,6 +549,7 @@ in
         # com.bitwarden.Bitwarden.unlock there for "Unlock with system authentication".
         bitwarden-desktop
         nautilus
+        papers
       ];
 
       # A YubiKey touch answers polkit prompts in place of the password; the global
@@ -707,6 +711,9 @@ in
           flakeHomeModules.zen-browser
           flakeHomeModules.bitwarden-key-pins
         ];
+        # Zathura, themed by catppuccin.zathura, is the LaTeX preview and presentation viewer;
+        # Papers stays the default for PDFs.
+        programs.zathura.enable = true;
         # Validate with the exact derivation installed by nixpkgs' NixOS module.
         programs.niri.package = config.programs.niri.package;
       };
