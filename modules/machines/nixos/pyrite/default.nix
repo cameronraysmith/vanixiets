@@ -711,17 +711,10 @@ in
           flakeHomeModules.dms
           flakeHomeModules.zen-browser
           flakeHomeModules.bitwarden-key-pins
+          flakeHomeModules.linux-workstation
         ];
-        # Zathura, themed by catppuccin.zathura, is the LaTeX preview and presentation viewer;
-        # Papers stays the default for PDFs.
-        programs.zathura.enable = true;
         # Validate with the exact derivation installed by nixpkgs' NixOS module.
         programs.niri.package = config.programs.niri.package;
-        # The shared zed module leaves the package null for stibnite's Homebrew cask and for
-        # headless homes; only this laptop installs the Nix-built editor.
-        programs.zed-editor.package = pkgs.zed-editor;
-        programs.calibre.enable = true;
-        home.packages = [ pkgs.gdu ];
       };
     };
 }

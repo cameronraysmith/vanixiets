@@ -101,6 +101,8 @@ The operator approved `RestartPreventExitStatus=78` on 2026-11-14; it lands with
 - [ ] 10.2 Place each used application in one bucket: share as-is, same application with Linux packaging, different tool for the same job, no good Linux equivalent (binary derivation or stibnite remotely), or darwin by nature — verify: one bucket per application in the job catalogue, using 1.3 to 1.6.
 - [ ] 10.3 Declare the unmanaged applications on stibnite that stay, and remove Maccy — verify: `nix eval` of stibnite's casks and App Store applications; the probe's unmanaged list shrinks when rerun after activation.
 - [ ] 10.4 Ship each bucket's Linux implementations as their own pull requests — verify: per pull request, `nix eval` and a build on magnetite of pyrite's home.
+  Progress: pyrite's GUI applications (Zed from nixpkgs, Calibre, Zathura, gdu) moved from its host block into `flake.modules.homeManager.linux-workstation` (`modules/home/linux-workstation/`), which only homes with a graphical session import.
+  The module adds Delta from `github:zed-industries/delta-nix`, exposed as `zed-delta` so `delta` stays the git pager, and Antigravity Hub from the locked `llm-agents` input.
 
 ## 11. Containers and VMs on Linux
 

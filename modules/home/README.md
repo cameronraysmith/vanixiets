@@ -99,6 +99,7 @@ The fifth builds the sandbox profile that the Devin snapshot activates.
 - `herdr/` — the herdr terminal multiplexer, `browser-terminal`, its ttyd front end for the sandbox, and the `htab` and `osc52-pane` helpers; secret-free.
 - `languages/` — one file per language toolchain (Rust, TypeScript, Go, Scala, Python, Haskell, OCaml, Elixir, proof assistants) at the latest stable version nixpkgs ships.
   For quick experiments with other versions, use proto as a dynamic version manager or a reproducible language-specific flake instead of editing these files.
+- `linux-workstation/` — GUI applications for graphical Linux homes (Zed, Calibre, Zathura, gdu, Delta as `zed-delta`, Antigravity Hub); imported per host by machines with a graphical session, never by headless homes or through `aggregates`.
 - `modules/` — option-declaring home-manager modules consumed by aggregates: `agents-md`, and `managed-configs`, which writes configuration files an application also rewrites at runtime as declared settings plus app-owned keys kept from the existing file.
 - `publishing/` — document and media production (Quarto, ImageMagick, PDF tools, SVG tools, mermaid, asciinema).
 - `security/` — secrets and key handling (age, sops, ssh-to-age, Bitwarden CLI, YubiKey, gitleaks, aws-vault).

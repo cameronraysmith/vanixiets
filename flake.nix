@@ -151,6 +151,12 @@
 
     llm-agents.url = "github:numtide/llm-agents.nix";
 
+    # Delta repackages Zed Industries' release binaries and publishes no binary
+    # cache, so following nixpkgs forfeits nothing; its README requires it so
+    # the bundled glibc matches the host's Mesa.
+    delta.url = "github:zed-industries/delta-nix";
+    delta.inputs.nixpkgs.follows = "nixpkgs";
+
     hunk.url = "github:modem-dev/hunk";
     hunk.inputs.nixpkgs.follows = "nixpkgs";
     hunk.inputs.bun2nix.follows = "bun2nix";

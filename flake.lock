@@ -310,6 +310,26 @@
         "url": "https://git.clan.lol/clan/data-mesher/archive/main.tar.gz"
       }
     },
+    "delta": {
+      "inputs": {
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1793817749,
+        "narHash": "sha256-uoHixlZnIo3hA6VGjV1zkVQEoAhI2EB4jP9nWltMy2Y=",
+        "owner": "zed-industries",
+        "repo": "delta-nix",
+        "rev": "5749237bd9c9da0661e5480bcc0301968fcf039d",
+        "type": "github"
+      },
+      "original": {
+        "owner": "zed-industries",
+        "repo": "delta-nix",
+        "type": "github"
+      }
+    },
     "direnv-instant": {
       "inputs": {
         "flake-parts": [
@@ -1719,6 +1739,7 @@
         "cilium-src": "cilium-src",
         "clan-core": "clan-core",
         "cognee-nix": "cognee-nix",
+        "delta": "delta",
         "direnv-instant": "direnv-instant",
         "disko": "disko",
         "dms-src": "dms-src",
