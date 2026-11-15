@@ -9,15 +9,15 @@ The pyrite cameron DMS settings SHALL enable `autoHide` on the existing `default
 - **WHEN** the pyrite cameron DMS settings are rendered
 - **THEN** the default bar has `autoHide` set to true and all other bar fields remain unchanged
 
-### Requirement: Host-local install-only Zen Browser
+### Requirement: Host-local Zen Browser
 
-The pyrite cameron home package set SHALL contain exactly one wrapped Zen Browser from youwen5/zen-browser-flake revision `4036109214cf20632000558935bd823b901fa886`, following the root nixpkgs input.
-Other host and user package sets, existing browsers, browser defaults and profile configuration SHALL remain unchanged.
+The pyrite cameron home package set SHALL contain exactly one wrapped Zen Browser, the beta variant from 0xc000022070/zen-browser-flake, following the root nixpkgs and home-manager inputs.
+Its profile configuration is owned by workstation-parity design D10; other host and user package sets, existing browsers and browser defaults SHALL remain unchanged.
 
 #### Scenario: Browser package is prepared
 
 - **WHEN** the pyrite cameron home package set is built
-- **THEN** it includes a Zen Browser desktop entry backed by the wrapped executable without a browser-default or profile migration
+- **THEN** it includes the `zen-beta.desktop` entry backed by the wrapped executable without a browser-default change
 
 #### Scenario: Another configuration is evaluated
 

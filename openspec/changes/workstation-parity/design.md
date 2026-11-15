@@ -132,9 +132,10 @@ Observed divergences that the slices close:
 
 ### D10: declarative Zen on both machines
 
-- **Choice**: Replace the `youwen5/zen-browser-flake` input with `0xc000022070/zen-browser-flake` and use its home-manager module on both machines, including the Bitwarden extension.
+- **Choice**: Replace the `youwen5/zen-browser-flake` input with `0xc000022070/zen-browser-flake` and use its home-manager module, including the Bitwarden extension; pyrite first, with stibnite decided after the operator has used pyrite's declared Zen (decided 2026-11-15).
 - **Rationale**: Principle 5: what pyrite needs declared is declared for stibnite too.
-- **Open detail**: whether the module installs Zen on Darwin or only configures a cask-installed Zen depends on the TCC findings of Phase 0 and on the module's Darwin support [INFERENCE: unverified; acquire the source before deciding].
+- **Shape on pyrite**: one profile declared at its existing directory, so Zen keeps it; stibnite's URL bar CSS and deliberate preferences in `userChrome`/`settings`; its custom shortcuts and search engines; extensions through `policies.ExtensionSettings` with `normal_installed`. Spaces, pins and essentials stay with Sync; `extensions.settings` is avoided because it disables `ExtensionStorageIDB` profile-wide.
+- **Darwin, if adopted**: the module can configure the cask's Zen.app with `package = null`, and writes policies to the `app.zen-browser.zen` defaults domain, leaving the signed bundle untouched.
 - **Boundary**: vendored versus first-party: the module is vendored and pinned; profile, policy and extension settings are first-party.
 
 ### D11: desktop behaviour

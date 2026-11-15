@@ -38,8 +38,12 @@
     dms-src.url = "github:duxlabs-dev/dux-shell/v2.1.2";
     dms-src.flake = false;
 
-    zen-browser.url = "github:youwen5/zen-browser-flake";
+    # The flake repackages upstream release binaries and publishes no binary
+    # cache, so following our nixpkgs and home-manager forfeits no
+    # substitution; home-manager.follows makes its Firefox module code ours.
+    zen-browser.url = "github:0xc000022070/zen-browser-flake";
     zen-browser.inputs.nixpkgs.follows = "nixpkgs";
+    zen-browser.inputs.home-manager.follows = "home-manager";
 
     sops-nix.url = "github:Mic92/sops-nix";
     sops-nix.inputs.nixpkgs.follows = "nixpkgs";

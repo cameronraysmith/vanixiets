@@ -76,8 +76,10 @@ The operator approved `RestartPreventExitStatus=78` on 2026-11-14; it lands with
 ## 8. Declarative Zen on both laptops
 
 - [ ] 8.1 Back up pyrite's and stibnite's Zen profiles before any change — verify: a dated archive of each profile directory outside the repository.
-- [ ] 8.2 Replace the `youwen5/zen-browser-flake` input with `0xc000022070/zen-browser-flake`, following root nixpkgs, preserving every other lock node — verify: a semantic `flake.lock` comparison in which only the Zen nodes change.
+- [x] 8.2 Replace the `youwen5/zen-browser-flake` input with `0xc000022070/zen-browser-flake`, following root nixpkgs, preserving every other lock node — verify: a semantic `flake.lock` comparison in which only the Zen nodes change.
+  Done 2026-11-15, following root nixpkgs and home-manager; the node-by-node comparison changed only the `zen-browser` node, and no youwen5 node remains.
 - [ ] 8.3 Configure Zen through the module's home-manager module on both laptops, with the Bitwarden extension declared and the Darwin install mechanism chosen from 1.4 and 1.10 — verify: `nix eval` of both homes; the pyrite home builds on magnetite.
+  pyrite configured 2026-11-15 (D10) and built on magnetite; stibnite waits on the operator's experience with pyrite.
 - [ ] 8.4 Confirm the Bitwarden extension fills a sign-in page in Zen on both laptops — verify: the operator's observation after activation.
 
 ## 9. Desktop behaviour

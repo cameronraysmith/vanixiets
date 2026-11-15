@@ -31,16 +31,17 @@ in
         let
           machine = config.flake.nixosConfigurations.pyrite;
           pkgs = machine.pkgs;
-          zen = inputs.zen-browser.packages.${system}.zen-browser;
+          zen = machine.config.home-manager.users.cameron.programs.zen-browser.finalPackage;
         in
         pkgs.runCommand "pyrite-zen-desktop" { } ''
-          desktop=${zen}/share/applications/zen.desktop
+          desktop=${zen}/share/applications/zen-beta.desktop
           ${pkgs.desktop-file-utils}/bin/desktop-file-validate "$desktop"
-          ${pkgs.gnugrep}/bin/grep -Fx 'Name=Zen Browser' "$desktop"
-          ${pkgs.gnugrep}/bin/grep -Fx 'Exec=zen --name zen %U' "$desktop"
-          test -x ${zen}/bin/zen
+          ${pkgs.gnugrep}/bin/grep -Fx 'Name=Zen Browser (Beta)' "$desktop"
+          ${pkgs.gnugrep}/bin/grep -Fx 'Exec=zen-beta --name zen-beta %U' "$desktop"
+          ${pkgs.gnugrep}/bin/grep -Fx 'StartupWMClass=zen-beta' "$desktop"
+          test -x ${zen}/bin/zen-beta
           mkdir -p "$out"
-          cp "$desktop" "$out/zen.desktop"
+          cp "$desktop" "$out/zen-beta.desktop"
         '';
       checks.pyrite-dankgreeter-config =
         let
@@ -226,14 +227,12 @@ in
           message = "pyrite desktop: one wrapped Zen Browser in cameron's home";
           assertion =
             inputs.zen-browser.inputs.nixpkgs.outPath == inputs.nixpkgs.outPath
+            && inputs.zen-browser.inputs.home-manager.outPath == inputs.home-manager.outPath
+            && lib.getName home.programs.zen-browser.finalPackage == "zen-beta"
             &&
-              builtins.length (
-                builtins.filter (
-                  package:
-                  toString package
-                  == toString inputs.zen-browser.packages.${pkgs.stdenv.hostPlatform.system}.zen-browser
-                ) home.home.packages
-              ) == 1;
+              map toString (
+                builtins.filter (package: lib.hasPrefix "zen" (lib.getName package)) home.home.packages
+              ) == [ (toString home.programs.zen-browser.finalPackage) ];
         }
         {
           message = "pyrite desktop: native package identities and configuration pins";
