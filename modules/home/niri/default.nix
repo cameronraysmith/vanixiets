@@ -48,8 +48,10 @@
                 hotkey-overlay.title = "Terminal";
               };
               "Mod+Q".action = close-window;
-              "Mod+Left".action = focus-column-left;
-              "Mod+Right".action = focus-column-right;
+              # Focus loops past either end of the strip; niri's layout itself has two ends,
+              # so the view scrolls across, and column moves still stop at the ends.
+              "Mod+Left".action = focus-column-left-or-last;
+              "Mod+Right".action = focus-column-right-or-first;
               "Mod+Up".action = focus-window-up;
               "Mod+Down".action = focus-window-down;
               "Mod+Shift+Left".action = move-column-left;
