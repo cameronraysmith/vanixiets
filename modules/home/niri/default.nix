@@ -40,7 +40,11 @@
                 ];
             in
             {
-              "Mod+Return".action = spawn (lib.getExe config.programs.ghostty.package);
+              # A spawn bind without a title is listed by its store path in the DMS shortcuts window.
+              "Mod+Return" = {
+                action = spawn (lib.getExe config.programs.ghostty.package);
+                hotkey-overlay.title = "Terminal";
+              };
               "Mod+Q".action = close-window;
               "Mod+Left".action = focus-column-left;
               "Mod+Right".action = focus-column-right;
@@ -61,8 +65,14 @@
               "Mod+Alt+F".action = maximize-window-to-edges;
               # niri can place a tiled column on half of the view only relative to its neighbour, so a
               # half is 50% width moved one column along; floating halves overlapped filled windows.
-              "Mod+Alt+Left".action = tiledHalf "left";
-              "Mod+Alt+Right".action = tiledHalf "right";
+              "Mod+Alt+Left" = {
+                action = tiledHalf "left";
+                hotkey-overlay.title = "Tile window as left half";
+              };
+              "Mod+Alt+Right" = {
+                action = tiledHalf "right";
+                hotkey-overlay.title = "Tile window as right half";
+              };
               "Mod+Alt+Shift+Left".action = move-column-to-first;
               "Mod+Alt+Shift+Right".action = move-column-to-last;
               "Mod+Alt+Down".action = move-window-to-tiling;
@@ -103,46 +113,57 @@
               "XF86AudioRaiseVolume" = {
                 allow-when-locked = true;
                 action = ipc "audio" "increment" "3";
+                hotkey-overlay.title = "Volume up";
               };
               "XF86AudioLowerVolume" = {
                 allow-when-locked = true;
                 action = ipc "audio" "decrement" "3";
+                hotkey-overlay.title = "Volume down";
               };
               "XF86AudioMute" = {
                 allow-when-locked = true;
                 action = ipc "audio" "mute";
+                hotkey-overlay.title = "Mute audio";
               };
               "XF86AudioMicMute" = {
                 allow-when-locked = true;
                 action = ipc "audio" "micmute";
+                hotkey-overlay.title = "Mute microphone";
               };
               "XF86MonBrightnessUp" = {
                 allow-when-locked = true;
                 action = ipc "brightness" "increment" "5" "";
+                hotkey-overlay.title = "Display brightness up";
               };
               "XF86MonBrightnessDown" = {
                 allow-when-locked = true;
                 action = ipc "brightness" "decrement" "5" "";
+                hotkey-overlay.title = "Display brightness down";
               };
               "XF86KbdBrightnessUp" = {
                 allow-when-locked = true;
                 action = ipc "brightness" "increment" "5" "leds:spi::kbd_backlight";
+                hotkey-overlay.title = "Keyboard backlight up";
               };
               "XF86KbdBrightnessDown" = {
                 allow-when-locked = true;
                 action = ipc "brightness" "decrement" "5" "leds:spi::kbd_backlight";
+                hotkey-overlay.title = "Keyboard backlight down";
               };
               "XF86AudioPlay" = {
                 allow-when-locked = true;
                 action = ipc "mpris" "playPause";
+                hotkey-overlay.title = "Play or pause media";
               };
               "XF86AudioNext" = {
                 allow-when-locked = true;
                 action = ipc "mpris" "next";
+                hotkey-overlay.title = "Next track";
               };
               "XF86AudioPrev" = {
                 allow-when-locked = true;
                 action = ipc "mpris" "previous";
+                hotkey-overlay.title = "Previous track";
               };
             }
           );
