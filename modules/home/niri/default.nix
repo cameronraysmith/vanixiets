@@ -98,6 +98,11 @@
                 action = ipc "settings" "toggle";
                 hotkey-overlay.title = "Shell settings";
               };
+              # niri's own default here is its hotkey overlay; the DMS window is searchable and lists every bind.
+              "Mod+Shift+Slash" = {
+                action = ipc "keybinds" "toggle" "niri";
+                hotkey-overlay.title = "Keyboard shortcuts";
+              };
               "Super+Alt+L" = {
                 action = ipc "lock" "lock";
                 hotkey-overlay.title = "Lock screen";
