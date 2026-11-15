@@ -14,7 +14,10 @@
       {
         programs.zed-editor = {
           enable = true;
-          package = null;
+          # Null by default because stibnite's binary comes from the `zed` Homebrew cask;
+          # a host that wants a Nix-built Zed overrides it, keeping this file the single
+          # source of the settings, keymaps and extensions.
+          package = lib.mkDefault null;
           # When true (default), home-manager merges Nix settings with existing
           # settings.json via activation script. When false, creates a read-only
           # symlink to Nix store (pure but prevents Zed UI edits).

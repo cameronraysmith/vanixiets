@@ -550,6 +550,7 @@ in
         bitwarden-desktop
         nautilus
         papers
+        baobab
       ];
 
       # A YubiKey touch answers polkit prompts in place of the password; the global
@@ -716,6 +717,11 @@ in
         programs.zathura.enable = true;
         # Validate with the exact derivation installed by nixpkgs' NixOS module.
         programs.niri.package = config.programs.niri.package;
+        # The shared zed module leaves the package null for stibnite's Homebrew cask and for
+        # headless homes; only this laptop installs the Nix-built editor.
+        programs.zed-editor.package = pkgs.zed-editor;
+        programs.calibre.enable = true;
+        home.packages = [ pkgs.gdu ];
       };
     };
 }

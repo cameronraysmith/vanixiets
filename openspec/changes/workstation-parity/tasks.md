@@ -69,7 +69,8 @@ The operator approved `RestartPreventExitStatus=78` on 2026-11-14; it lands with
 ## 7. Shared-layer fixes
 
 - [ ] 7.1 Add the caddy `.zt` root CA and the local k8s development CA to pyrite's trust store from the same first-party source stibnite uses — verify: `nix eval` shows the same two certificates in both laptops' declarations; after activation, `curl` to a `.zt` service from pyrite succeeds without `--insecure`.
-- [ ] 7.2 Give Linux a Zed package while Darwin keeps a null package — verify: `nix eval` of `programs.zed-editor.package` on both homes; the pyrite home builds on magnetite.
+- [ ] 7.2 Give pyrite's home a Zed package while every other home, stibnite's included, keeps a null package — verify: `nix eval` of `programs.zed-editor.package` on pyrite's and stibnite's homes and on the other Linux homes; the pyrite home builds on magnetite.
+  Declared 2026-11-15: the shared zed module's package is `lib.mkDefault null` and pyrite's cameron home sets `pkgs.zed-editor`; `nix eval` shows pyrite's cameron at `zed-editor-1.28.1`, stibnite, magnetite, cinnabar and every standalone home still null, and `userSettings` unchanged on each host; pyrite's system built on magnetite (`/nix/store/jxqgrxm8fi1kbclanp67zbl31y76wkkm-nixos-system-pyrite-26.11.20261114.82566df`); waits on activation and the operator opening Zed.
 - [ ] 7.3 Declare the fifteen fonts as Nix packages on both laptops and remove them from `caskFonts` — verify: `nix eval` of the font packages on both homes and of stibnite's casks; after activation, `fc-list` on pyrite and Font Book on stibnite show each font.
 - [ ] 7.4 Install `dnsreset` only on Darwin and print `zerotier-join`'s launchctl hint only on Darwin — verify: `nix eval` of both homes' packages, and the built `zerotier-join` on pyrite contains no `launchctl`.
 
