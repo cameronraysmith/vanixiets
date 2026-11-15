@@ -23,6 +23,8 @@
 
         settings = {
           showClipboard = true;
+          # DMS ignores the en_US locale for weather units; this also switches pressure to inHg.
+          useFahrenheit = true;
           barConfigs = [
             {
               id = "default";
