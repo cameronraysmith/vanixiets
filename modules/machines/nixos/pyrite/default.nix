@@ -469,6 +469,13 @@ in
       services.libinput.enable = true;
 
       programs.niri.enable = true;
+      # xdg-desktop-portal-gnome (niri-portals.conf default=gnome) implements the file chooser
+      # with Nautilus since 47, so Nautilus (in systemPackages below) is the portal's dependency
+      # as well as the file manager.
+      services.gvfs.enable = true;
+      services.gnome.sushi.enable = true;
+      # System-level so ~/.config/mimeapps.list, which holds operator-set defaults, stays untouched.
+      xdg.mime.defaultApplications."inode/directory" = "org.gnome.Nautilus.desktop";
       security.pam.services.dankshell = { };
       services.displayManager.defaultSession = null;
       # Nothing on this machine suspends itself on idle. Resume from suspend fails in roughly
@@ -538,6 +545,7 @@ in
         # /run/current-system/sw/share/polkit-1/actions, and the package ships
         # com.bitwarden.Bitwarden.unlock there for "Unlock with system authentication".
         bitwarden-desktop
+        nautilus
       ];
 
       # A YubiKey touch answers polkit prompts in place of the password; the global
