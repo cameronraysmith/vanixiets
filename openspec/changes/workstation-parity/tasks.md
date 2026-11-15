@@ -77,11 +77,13 @@ The operator approved `RestartPreventExitStatus=78` on 2026-11-14; it lands with
 ## 8. Declarative Zen on both laptops
 
 - [ ] 8.1 Back up pyrite's and stibnite's Zen profiles before any change — verify: a dated archive of each profile directory outside the repository.
+  pyrite: `~/backups/zen-pyrite-20261115-001954.tar.gz` (119 MB, 1586 entries) was taken with Zen closed before the 2026-11-15 activation, and removed at the operator's request once the declared Zen proved itself; stibnite's backup is due before any change there.
 - [x] 8.2 Replace the `youwen5/zen-browser-flake` input with `0xc000022070/zen-browser-flake`, following root nixpkgs, preserving every other lock node — verify: a semantic `flake.lock` comparison in which only the Zen nodes change.
   Done 2026-11-15, following root nixpkgs and home-manager; the node-by-node comparison changed only the `zen-browser` node, and no youwen5 node remains.
 - [ ] 8.3 Configure Zen through the module's home-manager module on both laptops, with the Bitwarden extension declared and the Darwin install mechanism chosen from 1.4 and 1.10 — verify: `nix eval` of both homes; the pyrite home builds on magnetite.
   pyrite configured 2026-11-15 (D10) and built on magnetite; stibnite waits on the operator's experience with pyrite.
 - [ ] 8.4 Confirm the Bitwarden extension fills a sign-in page in Zen on both laptops — verify: the operator's observation after activation.
+  pyrite: the operator confirmed on 2026-11-15 that the policy-installed Bitwarden extension works in Zen; stibnite's half waits on 8.3.
 
 ## 9. Desktop behaviour
 
@@ -104,6 +106,7 @@ The operator approved `RestartPreventExitStatus=78` on 2026-11-14; it lands with
   Progress: pyrite's GUI applications (Zed from nixpkgs, Calibre, Zathura, gdu) moved from its host block into `flake.modules.homeManager.linux-workstation` (`modules/home/linux-workstation/`), which only homes with a graphical session import.
   The module adds Delta from `github:zed-industries/delta-nix`, exposed as `zed-delta` so `delta` stays the git pager, and Antigravity Hub from the locked `llm-agents` input.
   pyrite's cameron home also gains a read-only Google Drive remote, `gdrive` (`drive.readonly`), in its own rclone config that a sops-nix template renders (0600) from crs58's client secret and token, kept out of `programs.rclone` because its `rclone-config` service passes secrets as process arguments; `rclone-gdrive` runs rclone against that config, and the on-demand `calibre-library-sync` command (`modules/home/linux-workstation/calibre-library-sync.nix`) mirrors `gdrive:Library/{theory,experiment,philosophy}` one-way into `~/Calibre/<library>`: it refuses while Calibre runs, shows a dry-run summary and asks before syncing, and has no timer, because calibre's FAQ warns that a library inside a cloud-sync folder loses data.
+  The operator confirmed on 2026-11-15 that the full mirror completed (dry run: "Mirror is up to date.") and that the three libraries open in Calibre on pyrite.
 
 ## 11. Containers and VMs on Linux
 
