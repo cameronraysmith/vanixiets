@@ -61,6 +61,11 @@
         };
       };
 
+      # Qt in the DMS shell takes its icon theme from GTK (QT_QPA_PLATFORMTHEME=gtk3), and home-manager
+      # applies gtk.iconTheme only with gtk.enable. catppuccin.gtk.icon (autoEnable) then supplies
+      # Papirus-Dark; with no icon theme installed every named launcher icon failed to resolve.
+      gtk.enable = true;
+
       programs.quickshell.systemd.enable = false;
       systemd.user.services.dms = {
         Unit = {
