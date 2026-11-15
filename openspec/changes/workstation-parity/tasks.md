@@ -103,6 +103,7 @@ The operator approved `RestartPreventExitStatus=78` on 2026-11-14; it lands with
 - [ ] 10.4 Ship each bucket's Linux implementations as their own pull requests — verify: per pull request, `nix eval` and a build on magnetite of pyrite's home.
   Progress: pyrite's GUI applications (Zed from nixpkgs, Calibre, Zathura, gdu) moved from its host block into `flake.modules.homeManager.linux-workstation` (`modules/home/linux-workstation/`), which only homes with a graphical session import.
   The module adds Delta from `github:zed-industries/delta-nix`, exposed as `zed-delta` so `delta` stays the git pager, and Antigravity Hub from the locked `llm-agents` input.
+  pyrite's cameron home also gains a read-only Google Drive remote, `gdrive` (`drive.readonly`), in its own rclone config that a sops-nix template renders (0600) from crs58's client secret and token, kept out of `programs.rclone` because its `rclone-config` service passes secrets as process arguments; `rclone-gdrive` runs rclone against that config, and the on-demand `calibre-library-sync` command (`modules/home/linux-workstation/calibre-library-sync.nix`) mirrors `gdrive:Library/{theory,experiment,philosophy}` one-way into `~/Calibre/<library>`: it refuses while Calibre runs, shows a dry-run summary and asks before syncing, and has no timer, because calibre's FAQ warns that a library inside a cloud-sync folder loses data.
 
 ## 11. Containers and VMs on Linux
 
