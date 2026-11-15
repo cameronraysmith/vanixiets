@@ -64,9 +64,11 @@
           # sizes match but times differ. --checksum would instead read and
           # hash all ~16 GB of the local mirror on every run. Four transfers
           # and eight checkers are rclone's defaults, which stay under Drive's
-          # per-user request rate; --fast-list lists each library in a few
+          # per-user request rate; --transfers raises the parallelism for a
+          # first full download of many small files, and Drive's pacer backs
+          # off on rateLimitExceeded. --fast-list lists each library in a few
           # recursive calls instead of one call per book directory.
-          readonly common=(--config ${lib.escapeShellArg gdriveConfig} --drive-skip-gdocs --fast-list --transfers 4 --checkers 8)
+          common=(--config ${lib.escapeShellArg gdriveConfig} --drive-skip-gdocs --fast-list --checkers 8)
 
           usage() {
             cat <<'EOF'
@@ -81,6 +83,7 @@
             --yes, -y          skip the confirmation prompt
             --bwlimit RATE     pass a bandwidth limit to rclone (e.g. 2M);
                                default unlimited
+            --transfers N      parallel file downloads, 1-64 (default 4)
             --library NAME     only this library; repeatable
                                (theory, experiment, philosophy)
             -h, --help         show this help
@@ -113,6 +116,7 @@
           assume_yes=0
           dry_run_only=0
           bwlimit=""
+          transfers=4
           while (($#)); do
             case $1 in
               --yes | -y) assume_yes=1 ;;
@@ -123,6 +127,12 @@
                 shift
                 ;;
               --bwlimit=*) bwlimit=''${1#*=} ;;
+              --transfers)
+                (($# >= 2)) || die "--transfers needs a number"
+                transfers=$2
+                shift
+                ;;
+              --transfers=*) transfers=''${1#*=} ;;
               --library)
                 (($# >= 2)) || die "--library needs a name"
                 add_library "$2"
@@ -143,6 +153,11 @@
           if ((''${#libraries[@]} == 0)); then
             libraries=("''${all_libraries[@]}")
           fi
+          if ! [[ $transfers =~ ^[0-9]+$ ]] || ((transfers < 1 || transfers > 64)); then
+            die "--transfers must be a whole number from 1 to 64"
+          fi
+          common+=(--transfers "$transfers")
+          readonly common
 
           # Matches the GUI, calibre-parallel and calibre-server whether the
           # command line shows the wrapper (.../bin/calibre) or the Python
