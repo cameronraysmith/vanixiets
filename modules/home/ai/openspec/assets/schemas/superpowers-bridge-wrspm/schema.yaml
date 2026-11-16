@@ -275,8 +275,7 @@ artifacts:
       Only after BOTH return positive numbers, proceed to invoke
       the verification skill below.
 
-      Use the Skill tool to invoke **openspec-verify-change** (the
-      `/opsx:verify` slash command is its user-facing equivalent).
+      Use the Skill tool to invoke **openspec-verify-change**.
 
       IMPORTANT timing note:
       - Unlike other artifacts, verify.md is produced AFTER the apply
@@ -669,7 +668,7 @@ apply:
     5. **Archive (sync spec delta + move folder)**:
 
        After retrospective.md is written, run `openspec archive -y`
-       (or invoke `/opsx:archive`). The CLI resolves all paths itself;
+       (or invoke the `openspec-archive-change` skill). The CLI resolves all paths itself;
        in repo-local mode this:
        - syncs the delta specs (the files reported by
          `artifactPaths.specs.existingOutputPaths`) into the

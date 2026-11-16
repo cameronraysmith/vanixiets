@@ -50,23 +50,6 @@
           '';
         };
 
-        delivery = lib.mkOption {
-          type = lib.types.enum [
-            "both"
-            "skills"
-            "commands"
-          ];
-          default = "skills";
-          example = "both";
-          description = ''
-            How OpenSpec delivers workflow artifacts: as Claude skills, as slash
-            commands, or both. Defaults to `skills`: the `/opsx:*` slash commands
-            are 1:1 duplicates of the `openspec-*` skills, and the non-Claude
-            harnesses (codex, opencode, droid, hermes) consume skills, not
-            commands, so the command tree is redundant.
-          '';
-        };
-
         workflows = lib.mkOption {
           type = lib.types.listOf lib.types.str;
           default = [
@@ -124,7 +107,6 @@
           default = {
             featureFlags = { };
             profile = cfg.profile;
-            delivery = cfg.delivery;
             workflows = cfg.workflows;
             telemetry = {
               noticeSeen = true;
@@ -136,7 +118,6 @@
             {
               featureFlags = { };
               profile = config.programs.openspec.profile;
-              delivery = config.programs.openspec.delivery;
               workflows = config.programs.openspec.workflows;
               telemetry = {
                 noticeSeen = true;
@@ -149,8 +130,8 @@
             Freeform contents of OpenSpec's global
             {file}`$XDG_CONFIG_HOME/openspec/config.json`, validated upstream by a
             passthrough zod schema. Defaults are derived from
-            {option}`programs.openspec.profile`, {option}`programs.openspec.delivery`,
-            and {option}`programs.openspec.workflows`; override or extend here for
+            {option}`programs.openspec.profile` and
+            {option}`programs.openspec.workflows`; override or extend here for
             keys this module does not model.
 
             Written as a managed copy each activation; keys not declared here are
