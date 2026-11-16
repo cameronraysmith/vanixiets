@@ -15,14 +15,12 @@
   stdenv,
   fetchurl,
   autoPatchelfHook,
-  openssl,
-  zlib,
   versionCheckHook,
 }:
 
 stdenv.mkDerivation (finalAttrs: {
   pname = "golem-binary";
-  version = "1.5.10";
+  version = "1.6.3";
 
   src =
     finalAttrs.passthru.sources.${stdenv.hostPlatform.system}
@@ -38,8 +36,6 @@ stdenv.mkDerivation (finalAttrs: {
 
   buildInputs = lib.optionals stdenv.hostPlatform.isLinux [
     stdenv.cc.cc.lib # libgcc_s.so.1
-    openssl
-    zlib
   ];
 
   installPhase = ''
@@ -56,19 +52,19 @@ stdenv.mkDerivation (finalAttrs: {
     sources = {
       "x86_64-linux" = fetchurl {
         url = "https://github.com/golemcloud/golem/releases/download/v${finalAttrs.version}/golem-x86_64-unknown-linux-gnu";
-        hash = "sha256-dPFhDs5HS1KM5GO30MpSwRTetnovDx5JWAoYKJLFWVI=";
+        hash = "sha256-yyquaOaDCci/vpPz6e4TABWtJHEJwpJYyLwPSlDRO1E=";
       };
       "aarch64-linux" = fetchurl {
         url = "https://github.com/golemcloud/golem/releases/download/v${finalAttrs.version}/golem-aarch64-unknown-linux-gnu";
-        hash = "sha256-YjEj9bW47S3BBfBSkT/o16goUUnHn3hO/bODbY1fF8I=";
+        hash = "sha256-K2D6KwJX2tOP9Nf9/kNQlSrZFslZ3QuLEVgRY90Lqyg=";
       };
       "x86_64-darwin" = fetchurl {
         url = "https://github.com/golemcloud/golem/releases/download/v${finalAttrs.version}/golem-x86_64-apple-darwin";
-        hash = "sha256-P1iYd69btlxejdbKARsS6B0dAlMZNNOfTyTVWm/5KGI=";
+        hash = "sha256-jpvjynX6EDsojHVK0CpacOE0pSshwCpxrl/aplZYdoQ=";
       };
       "aarch64-darwin" = fetchurl {
         url = "https://github.com/golemcloud/golem/releases/download/v${finalAttrs.version}/golem-aarch64-apple-darwin";
-        hash = "sha256-sUmvxYPEcXHmkoaOJ1RMRoP/q74gztKGYiUwASUqgK8=";
+        hash = "sha256-lx4o0l4J6aU7LJZbgOmjGE+DHe6R0pl35Jplax2j1fI=";
       };
     };
     updateScript = ./update.sh;

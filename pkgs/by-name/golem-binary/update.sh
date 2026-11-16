@@ -11,11 +11,14 @@ current_version="$(sed -n 's/.*version = "\(.*\)";/\1/p' "$PKG_NIX" | head -1)"
 
 # golemcloud/golem is a monorepo: /releases/latest may return tags from
 # sibling components (e.g. golem-ts-v1.1.0 from the TypeScript SDK).
-# Filter to bare semver tags (vMAJOR.MINOR.PATCH) which mark CLI/server releases.
+# Filter to bare semver tags (vMAJOR.MINOR.PATCH) which mark CLI/server releases,
+# then take the highest version: maintenance releases of an older line (e.g. a
+# 1.5.x published after 1.6.y) can precede newer lines in the API's date order.
 latest_tag="$(curl -fsSL \
   -H "Accept: application/vnd.github+json" \
   "https://api.github.com/repos/golemcloud/golem/releases?per_page=100" \
-  | jq -r '[.[] | select(.tag_name | test("^v[0-9]+\\.[0-9]+\\.[0-9]+$"))] | .[0].tag_name')"
+  | jq -r '[.[] | select(.tag_name | test("^v[0-9]+\\.[0-9]+\\.[0-9]+$")) | .tag_name]
+      | max_by(ltrimstr("v") | split(".") | map(tonumber))')"
 latest_version="${latest_tag#v}"
 
 if [[ -z "$latest_version" || "$latest_version" == "null" ]]; then
