@@ -1,0 +1,362 @@
+Count only effects the project still defines in the "N failing" count.
+
+The count took the newest run of each effect and counted those that
+failed. An effect that was renamed or removed never runs again, so its
+last failure stayed counted for good. An effect now counts only while
+the newest default-branch effects pass whose definitions evaluated lists
+it (its onPush rows and checks, found by effects_branch since a merge
+reuses its PR or batch build), and a scheduled effect only while its
+schedule is in scheduled_effects.
+
+diff --git a/nixbot/db_gen/web.py b/nixbot/db_gen/web.py
+index 2e92ffa..5c57c4e 100644
+--- a/nixbot/db_gen/web.py
++++ b/nixbot/db_gen/web.py
+@@ -717,17 +717,51 @@ GROUP BY e.status
+ """
+ 
+ WEB_PROJECT_FAILING_EFFECTS: typing.Final[str] = """-- name: WebProjectFailingEffects :one
+-SELECT count(*) AS count FROM (
++WITH latest AS (
+     SELECT DISTINCT ON (
+-        CASE WHEN kind LIKE 'tag:%' THEN 'tag' ELSE kind END,
+-        name, schedule_name
+-    ) status
+-    FROM effect_runs
+-    WHERE project_id = $1
+-    ORDER BY CASE WHEN kind LIKE 'tag:%' THEN 'tag' ELSE kind END,
+-             name, schedule_name, id DESC
+-) latest
+-WHERE status IN ('failed', 'dependency_failed')
++        CASE WHEN e.kind LIKE 'tag:%' THEN 'tag' ELSE e.kind END,
++        e.name, e.schedule_name
++    ) e.kind, e.name, e.schedule_name, e.status
++    FROM effect_runs e
++    WHERE e.project_id = $1
++    ORDER BY CASE WHEN e.kind LIKE 'tag:%' THEN 'tag' ELSE e.kind END,
++             e.name, e.schedule_name, e.id DESC
++),
++source_build AS (
++    SELECT b.id FROM builds b JOIN projects p ON p.id = b.project_id
++    WHERE b.project_id = $1
++      AND b.effects_branch = p.default_branch AND b.effects_pr_number IS NULL
++      AND EXISTS (SELECT 1 FROM effect_runs r
++                  WHERE r.build_id = b.id AND r.owner = 'build')
++      AND NOT EXISTS (SELECT 1 FROM effect_eval_errors x
++                      WHERE x.build_id = b.id
++                        AND x.source IN ('onPush', 'onEvent'))
++    ORDER BY b.number DESC LIMIT 1
++),
++defined (trigger, effect) AS (
++    SELECT 'push', r.name
++    FROM effect_runs r JOIN source_build c ON c.id = r.build_id
++    WHERE r.kind = 'push'
++    UNION
++    SELECT split_part(r.name, '.', 1), substr(r.name, strpos(r.name, '.') + 1)
++    FROM effect_runs r JOIN source_build c ON c.id = r.build_id
++    WHERE r.kind = 'check' AND r.name NOT LIKE 'schedule.%'
++    UNION
++    SELECT 'schedule', s.schedule_name || '.' || s.effect
++    FROM scheduled_effects s WHERE s.project_id = $1
++)
++SELECT count(*) AS count FROM latest l
++WHERE l.status IN ('failed', 'dependency_failed')
++  AND (CASE
++           WHEN l.kind = 'push' OR l.kind LIKE 'tag:%' THEN 'push'
++           WHEN l.kind = 'check' THEN split_part(l.name, '.', 1)
++           ELSE l.kind
++       END,
++       CASE
++           WHEN l.kind = 'check' THEN substr(l.name, strpos(l.name, '.') + 1)
++           WHEN l.kind = 'schedule' THEN l.schedule_name || '.' || l.name
++           ELSE l.name
++       END) IN (SELECT trigger, effect FROM defined)
+ """
+ 
+ WEB_LATEST_BUILD_STATUS: typing.Final[str] = """-- name: WebLatestBuildStatus :one
+diff --git a/nixbot/queries/web.sql b/nixbot/queries/web.sql
+index 0e59da2..83ed47b 100644
+--- a/nixbot/queries/web.sql
++++ b/nixbot/queries/web.sql
+@@ -312,18 +312,62 @@ GROUP BY e.status;
+ -- name: WebProjectFailingEffects :one
+ -- Effects whose latest run failed. An effect is its name under one
+ -- trigger; every tag counts as the trigger "tag", so a later tag that
+--- succeeds clears an earlier tag's failure.
+-SELECT count(*) AS count FROM (
++-- succeeds clears an earlier tag's failure. Only effects the project
++-- still defines count: a renamed or removed effect never runs again, so
++-- its last failure would otherwise count forever.
++WITH latest AS (
+     SELECT DISTINCT ON (
+-        CASE WHEN kind LIKE 'tag:%' THEN 'tag' ELSE kind END,
+-        name, schedule_name
+-    ) status
+-    FROM effect_runs
+-    WHERE project_id = $1
+-    ORDER BY CASE WHEN kind LIKE 'tag:%' THEN 'tag' ELSE kind END,
+-             name, schedule_name, id DESC
+-) latest
+-WHERE status IN ('failed', 'dependency_failed');
++        CASE WHEN e.kind LIKE 'tag:%' THEN 'tag' ELSE e.kind END,
++        e.name, e.schedule_name
++    ) e.kind, e.name, e.schedule_name, e.status
++    FROM effect_runs e
++    WHERE e.project_id = $1
++    ORDER BY CASE WHEN e.kind LIKE 'tag:%' THEN 'tag' ELSE e.kind END,
++             e.name, e.schedule_name, e.id DESC
++),
++-- The newest default-branch effects pass whose definitions evaluated.
++-- Its onPush rows and checks list every effect: checks cover all onEvent
++-- and onSchedule effects plus the onPush effects gated off there.
++-- effects_branch, not branch: a merge reuses the build of its PR or
++-- merge-queue batch, and a pull request's build carries the base branch.
++source_build AS (
++    SELECT b.id FROM builds b JOIN projects p ON p.id = b.project_id
++    WHERE b.project_id = $1
++      AND b.effects_branch = p.default_branch AND b.effects_pr_number IS NULL
++      AND EXISTS (SELECT 1 FROM effect_runs r
++                  WHERE r.build_id = b.id AND r.owner = 'build')
++      AND NOT EXISTS (SELECT 1 FROM effect_eval_errors x
++                      WHERE x.build_id = b.id
++                        AND x.source IN ('onPush', 'onEvent'))
++    ORDER BY b.number DESC LIMIT 1
++),
++-- (trigger, effect) pairs. A check is named <trigger>.<effect>, with
++-- schedule.<schedule>.<effect> for schedules, which come from the
++-- schedules table instead: it holds exactly the current ones.
++defined (trigger, effect) AS (
++    SELECT 'push', r.name
++    FROM effect_runs r JOIN source_build c ON c.id = r.build_id
++    WHERE r.kind = 'push'
++    UNION
++    SELECT split_part(r.name, '.', 1), substr(r.name, strpos(r.name, '.') + 1)
++    FROM effect_runs r JOIN source_build c ON c.id = r.build_id
++    WHERE r.kind = 'check' AND r.name NOT LIKE 'schedule.%'
++    UNION
++    SELECT 'schedule', s.schedule_name || '.' || s.effect
++    FROM scheduled_effects s WHERE s.project_id = $1
++)
++SELECT count(*) AS count FROM latest l
++WHERE l.status IN ('failed', 'dependency_failed')
++  AND (CASE
++           WHEN l.kind = 'push' OR l.kind LIKE 'tag:%' THEN 'push'
++           WHEN l.kind = 'check' THEN split_part(l.name, '.', 1)
++           ELSE l.kind
++       END,
++       CASE
++           WHEN l.kind = 'check' THEN substr(l.name, strpos(l.name, '.') + 1)
++           WHEN l.kind = 'schedule' THEN l.schedule_name || '.' || l.name
++           ELSE l.name
++       END) IN (SELECT trigger, effect FROM defined);
+ 
+ -- name: WebLatestBuildStatus :one
+ SELECT status FROM builds WHERE project_id = $1 ORDER BY number DESC LIMIT 1;
+diff --git a/nixbot/tests/test_web.py b/nixbot/tests/test_web.py
+index 28268ad..27d18a3 100644
+--- a/nixbot/tests/test_web.py
++++ b/nixbot/tests/test_web.py
+@@ -2282,6 +2282,13 @@ def test_project_tabs_link_builds_and_effects(client: WebHarness) -> None:
+             "SELECT id FROM projects WHERE forge_repo_id = 'web-1'"
+         )
+         await ctx.pool.execute("DELETE FROM effect_runs WHERE schedule_name = 'tab'")
++        # A current schedule: only effects the project defines count.
++        await ctx.pool.execute(
++            "INSERT INTO scheduled_effects"
++            " (project_id, schedule_name, effect, when_spec)"
++            " VALUES ($1, 'tab', 'x', '{}') ON CONFLICT DO NOTHING",
++            project_id,
++        )
+         await _insert_scheduled_run(
+             ctx.pool, project_id, schedule_name="tab", effect="x", status="failed"
+         )
+@@ -2296,52 +2303,153 @@ def test_project_tabs_link_builds_and_effects(client: WebHarness) -> None:
+     assert re.search(r'effects"\s+aria-current="page"', effects)
+ 
+ 
+-def test_failing_badge_counts_effects_whose_latest_run_failed(
+-    client: WebHarness,
+-) -> None:
+-    """A failure stops counting once the same effect succeeds again, and
+-    every tag is one effect for this."""
+-    ctx = client.ctx
++class _FailingEffects:
++    """A project of its own for the failing-effects count, with builds
++    carrying effect rows the way the orchestrator leaves them."""
+ 
+-    async def failing() -> int:
+-        project_id = await ctx.pool.fetchval(
+-            "SELECT id FROM projects WHERE forge_repo_id = 'web-1'"
++    def __init__(self, client: WebHarness, name: str) -> None:
++        self.client = client
++        self.pool = client.ctx.pool
++        self.project_id: int = client.run(
++            insert_project(self.pool, name=name, forge_repo_id=name)
+         )
+-        return int(await ctx.queries.failing_effects(project_id))
++        self.number = 0
+ 
+-    async def run(kind: str, name: str, status: str, schedule: str | None) -> None:
+-        project_id = await ctx.pool.fetchval(
+-            "SELECT id FROM projects WHERE forge_repo_id = 'web-1'"
++    def build(self, *, pr_number: int | None = None, eval_error: str = "") -> int:
++        """A succeeded build whose effects ran for the default branch, or
++        for a pull request into it. eval_error: the source whose effect
++        definitions failed to evaluate."""
++        self.number += 1
++
++        async def insert() -> int:
++            build_id = await insert_build(
++                self.pool,
++                self.project_id,
++                number=self.number,
++                status="succeeded",
++                pr_number=pr_number,
++            )
++            await self.pool.execute(
++                "UPDATE builds SET effects_commit_sha = 'sha',"
++                " effects_branch = 'main', effects_pr_number = $2 WHERE id = $1",
++                build_id,
++                pr_number,
++            )
++            if eval_error:
++                await self.pool.execute(
++                    "INSERT INTO effect_eval_errors (build_id, source, error)"
++                    " VALUES ($1, $2, 'boom')",
++                    build_id,
++                    eval_error,
++                )
++            return build_id
++
++        return self.client.run(insert())
++
++    def run(
++        self,
++        build_id: int | None,
++        kind: str,
++        name: str,
++        status: str,
++        schedule: str | None = None,
++    ) -> None:
++        self.client.run(
++            self.pool.execute(
++                "INSERT INTO effect_runs (project_id, kind, build_id,"
++                " schedule_name, name, status, finished_at)"
++                " VALUES ($1, $2, $3, $4, $5, $6, now())",
++                self.project_id,
++                kind,
++                build_id,
++                schedule,
++                name,
++                status,
++            )
+         )
+-        build_id = (
+-            None
+-            if kind == "schedule"
+-            else await ctx.pool.fetchval(
+-                "SELECT id FROM builds WHERE project_id = $1 LIMIT 1", project_id
++
++    def schedule(self, schedule: str, effect: str) -> None:
++        self.client.run(
++            self.pool.execute(
++                "INSERT INTO scheduled_effects"
++                " (project_id, schedule_name, effect, when_spec)"
++                " VALUES ($1, $2, $3, '{}')",
++                self.project_id,
++                schedule,
++                effect,
+             )
+         )
+-        await ctx.pool.execute(
+-            "INSERT INTO effect_runs (project_id, kind, build_id, schedule_name,"
+-            " name, status, finished_at) VALUES ($1, $2, $3, $4, $5, $6, now())",
+-            project_id,
+-            kind,
+-            build_id,
+-            schedule,
+-            name,
+-            status,
++
++    def failing(self) -> int:
++        return int(
++            self.client.run(self.client.ctx.queries.failing_effects(self.project_id))
+         )
+ 
+-    client.run(ctx.pool.execute("DELETE FROM effect_runs"))
+-    assert client.run(failing()) == 0
+-    client.run(run("schedule", "gc", "failed", "nightly"))
+-    client.run(run("tag:v1", "release", "failed", None))
+-    assert client.run(failing()) == 2
++
++def test_failing_badge_counts_effects_whose_latest_run_failed(
++    client: WebHarness,
++) -> None:
++    """A failure stops counting once the same effect succeeds again, and
++    every tag is one effect for this."""
++    p = _FailingEffects(client, "failing-latest")
++    main = p.build()
++    p.run(main, "push", "release", "succeeded")
++    p.schedule("nightly", "gc")
++    assert p.failing() == 0
++    p.run(None, "schedule", "gc", "failed", "nightly")
++    p.run(main, "tag:v1", "release", "failed")
++    assert p.failing() == 2
+     # The next tag succeeding clears the tag failure, a later schedule run
+     # the schedule failure.
+-    client.run(run("tag:v2", "release", "succeeded", None))
+-    assert client.run(failing()) == 1
+-    client.run(run("schedule", "gc", "succeeded", "nightly"))
+-    assert client.run(failing()) == 0
++    p.run(main, "tag:v2", "release", "succeeded")
++    assert p.failing() == 1
++    p.run(None, "schedule", "gc", "succeeded", "nightly")
++    assert p.failing() == 0
++
++
++def test_failing_badge_counts_only_effects_still_defined(
++    client: WebHarness,
++) -> None:
++    """A renamed or removed effect never runs again, so its last failure
++    stops counting. The newest default-branch effects pass and the
++    current schedules say which effects the project defines."""
++    p = _FailingEffects(client, "failing-defined")
++    # Failures of effects since renamed and of a schedule since removed.
++    p.run(p.build(pr_number=1), "pull_request", "deploy-preview", "failed")
++    p.run(p.build(pr_number=1), "check", "push.deploy-old", "failed")
++    p.run(None, "schedule", "gc", "failed", "nightly")
++    main = p.build()
++    p.run(main, "push", "deploy", "succeeded")
++    p.run(main, "check", "pull_request.preview", "succeeded")
++    assert p.failing() == 0
++
++    # A current effect whose newest run failed counts, under its own
++    # trigger and as the check of a pull request.
++    p.run(p.build(pr_number=2), "pull_request", "preview", "failed")
++    assert p.failing() == 1
++    p.run(p.build(pr_number=2), "check", "push.deploy", "failed")
++    assert p.failing() == 2
++    p.run(p.build(pr_number=3), "check", "push.deploy", "succeeded")
++    # A newer default-branch pass whose onEvent definitions failed to
++    # evaluate lists no checks; the last good pass still defines them.
++    broken = p.build(eval_error="onEvent")
++    p.run(broken, "push", "deploy", "succeeded")
++    assert p.failing() == 1
++
++    # Its newest run skipped or succeeded, a current effect does not count.
++    p.run(p.build(pr_number=4), "pull_request", "preview", "skipped")
++    assert p.failing() == 0
++    p.run(p.build(pr_number=5), "pull_request", "preview", "failed")
++    p.run(p.build(pr_number=6), "pull_request", "preview", "succeeded")
++    assert p.failing() == 0
++
++    # Renaming `preview` drops its failure with the next default-branch pass.
++    p.run(p.build(pr_number=7), "pull_request", "preview", "failed")
++    assert p.failing() == 1
++    renamed = p.build()
++    p.run(renamed, "push", "deploy", "succeeded")
++    p.run(renamed, "check", "pull_request.docs-preview", "succeeded")
++    assert p.failing() == 0
+ 
+ 
+ def test_old_schedule_history_url_redirects(client: WebHarness) -> None:
