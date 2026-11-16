@@ -78,7 +78,9 @@ The operator approved `RestartPreventExitStatus=78` on 2026-11-14; it lands with
 
 ## 7. Shared-layer fixes
 
-- [ ] 7.1 Add the caddy `.zt` root CA and the local k8s development CA to pyrite's trust store from the same first-party source stibnite uses — verify: `nix eval` shows the same two certificates in both laptops' declarations; after activation, `curl` to a `.zt` service from pyrite succeeds without `--insecure`.
+- [x] 7.1 Add the caddy `.zt` root CA and the local k8s development CA to pyrite's trust store from the same first-party source stibnite uses — verify: `nix eval` shows the same two certificates in both laptops' declarations; after activation, `curl` to a `.zt` service from pyrite succeeds without `--insecure`.
+  Done 2026-11-16 (#3901): `flake.modules.nixos.workstation-ca-trust` adds `vars/per-machine/cinnabar/caddy-root-ca/root.crt/value` and `kubernetes/clusters/local/pki/root_ca.crt` to pyrite's `security.pki.certificateFiles`, the same files stibnite's `zt-services-trust` and host module declare.
+  On pyrite the bundle carries both roots with the source fingerprints (`7E:78:…:2E:82`, `1B:2B:…:ED:63`), `curl https://ntfy.zt/` returns 200 without `--insecure`, and `openssl s_client -verify_return_error` returns `0 (ok)`.
 - [x] 7.2 Give pyrite's home a Zed package while every other home, stibnite's included, keeps a null package — verify: `nix eval` of `programs.zed-editor.package` on pyrite's and stibnite's homes and on the other Linux homes; the pyrite home builds on magnetite.
   Declared 2026-11-15: the shared zed module's package is `lib.mkDefault null` and pyrite's cameron home sets `pkgs.zed-editor`; `nix eval` shows pyrite's cameron at `zed-editor-1.28.1`, stibnite, magnetite, cinnabar and every standalone home still null, and `userSettings` unchanged on each host; pyrite's system built on magnetite (`/nix/store/jxqgrxm8fi1kbclanp67zbl31y76wkkm-nixos-system-pyrite-26.11.20261114.82566df`); waits on activation and the operator opening Zed.
   Re-checked 2026-11-16 after the move into `modules/home/linux-workstation` (#3887, #3888): `nix eval` gives `zed-editor-1.28.1` for pyrite's cameron and null for stibnite's crs58, every other NixOS and nix-darwin cameron/crs58/tara/raquel/janettesmith/christophersmith home, and every standalone `homeConfigurations` entry.
@@ -142,7 +144,11 @@ The operator approved `RestartPreventExitStatus=78` on 2026-11-14; it lands with
 ## 11. Containers and VMs on Linux
 
 - [ ] 11.1 Record the container and VM jobs stibnite's Colima, OrbStack and Podman Desktop serve, and choose native Linux implementations — verify: the job catalogue rows and a decision record.
-- [ ] 11.2 Declare the chosen runtime on pyrite — verify: `nix eval` of pyrite's configuration; pyrite's system builds on magnetite.
+  Decided 2026-11-15 by the operator: Incus for system containers and VMs, Podman with a Docker-compatible socket for compose, devcontainers and testcontainers, no Docker daemon or libvirt on pyrite, and heavy k3d or ctlptl work on magnetite's Docker over ssh.
+  Not ticked: the job catalogue rows wait on 1.8.
+- [x] 11.2 Declare the chosen runtime on pyrite — verify: `nix eval` of pyrite's configuration; pyrite's system builds on magnetite.
+  Done 2026-11-16 (#3902): `modules/machines/nixos/pyrite/containers.nix` declares Incus on ZFS (`zroot/incus`, `incusbr0` at `10.0.100.1/24`) and Podman with `dockerCompat` and the Docker socket, on the nftables firewall, with the ZeroTier MSS clamp ported to both backends.
+  pyrite's system built on magnetite and is deployed: an Incus container launched and resolved DNS, `podman run hello-world` ran, Docker Compose 5.7.0 talked to the Podman API, and both clamp VM tests passed on pyrite.
 
 ## 12. Backups
 
