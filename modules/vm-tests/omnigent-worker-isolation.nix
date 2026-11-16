@@ -1,4 +1,5 @@
-# Runtime wiring of the Omnigent worker runtime-isolation guards.
+# Runtime wiring of the Omnigent worker runtime-isolation guards and of
+# per-worker container access.
 #
 # What this establishes, and only on a KVM-capable x86_64-linux host:
 #   1. the private-home precondition is wired as ExecStartPre on the real
@@ -13,7 +14,20 @@
 #   4. the unit's declared hardening (User, UMask, NoNewPrivileges, and the
 #      unsetting of SSH_AUTH_SOCK and SSH_AGENT_PID) is in effect in the process
 #      systemd actually spawns, demonstrated against values injected into systemd's
-#      default environment plus a control variable that is expected to survive.
+#      default environment plus a control variable that is expected to survive;
+#   5. container access is per worker and survives that hardening: one worker
+#      selects containers.engine = "rootless-podman" and incus = "restricted", the
+#      other keeps the defaults. The rootless worker's spawned process carries
+#      XDG_RUNTIME_DIR, DOCKER_HOST, CONTAINER_HOST and the extended runner
+#      passthrough list, and the default worker's carries none of them. Its
+#      lingering user manager holds podman.socket listening with podman.service
+#      inactive until first use. From a cold start (no pause process), under
+#      NoNewPrivileges and the unit's own environment, a dockerTools image loaded
+#      offline runs through the docker CLI via DOCKER_HOST and through the podman
+#      CLI in remote mode via CONTAINER_HOST. Neither worker can open the rootful
+#      /run/podman/podman.sock, the default worker cannot reach the rootless
+#      worker's socket, the rootless worker is confined to its own restricted
+#      Incus project, and the default worker cannot reach either Incus socket.
 #
 # What this does NOT establish, and must never be described as establishing:
 #   - It is not a sandbox and says nothing about confining hostile code running
@@ -28,6 +42,13 @@
 #     untested here rather than faked with synthetic vars scaffolding.
 #   - It lives in the non-gating vmTests lane and runs only when a KVM-capable
 #     builder is reachable, so it is on-demand evidence, not coverage.
+#   - It never launches an Incus instance: that needs a network image, so the
+#     restricted project is shown to exist and confine the worker, not to run
+#     workloads. Nothing pulls from a registry either; the only container image
+#     is built with dockerTools and loaded from the store.
+#   - Rootless podman runs here inside one VM with its own kernel; it says
+#     nothing about a host's subuid ranges, cgroup delegation or storage driver
+#     beyond what this VM's defaults provide.
 #
 # The evaluation-time siblings remain the cheap, fleet-wide regulators:
 # checks.x86_64-linux.omnigent-worker-linux already executes the emitted ExecStartPre
@@ -59,8 +80,13 @@
               cameron = "omnigent-cameron";
               janettesmith = "omnigent-janettesmith";
             };
+            # The worker that selects container access; the other keeps the
+            # defaults and serves as the control.
+            containerOwner = "cameron";
+            containerUser = workers.${containerOwner};
             account = user: {
               inherit (reference.users.users.${user})
+                uid
                 isNormalUser
                 home
                 homeMode
@@ -78,6 +104,13 @@
               ${pkgs.coreutils}/bin/env > "$HOME/omnigent-test.env"
               exec ${pkgs.coreutils}/bin/sleep infinity
             '';
+            # Offline image: dockerTools packs the closure of its command, so no
+            # registry is reachable or needed.
+            probeImage = pkgs.dockerTools.buildLayeredImage {
+              name = "omnigent-probe";
+              tag = "test";
+              config.Cmd = [ "${pkgs.hello}/bin/hello" ];
+            };
           in
           pkgs.testers.runNixOSTest {
             name = "omnigent-worker-isolation";
@@ -119,11 +152,63 @@
                 workers = lib.mapAttrs (owner: user: {
                   enable = true;
                   inherit owner user;
+                  containers = lib.mkIf (owner == containerOwner) {
+                    engine = "rootless-podman";
+                    incus = "restricted";
+                  };
                 }) workers;
+              };
+              # Room for the Incus daemon and a rootless podman service.
+              virtualisation.memorySize = 2048;
+              # The rootful socket the workers must stay out of, and the per-user
+              # podman.socket the rootless worker uses.
+              virtualisation.podman.enable = true;
+              # Incus refuses the iptables firewall. The preseed gives incus-user a
+              # storage pool and network to build each restricted project from.
+              networking.nftables.enable = true;
+              virtualisation.incus = {
+                enable = true;
+                preseed = {
+                  networks = [
+                    {
+                      name = "incusbr0";
+                      type = "bridge";
+                      config = {
+                        "ipv4.address" = "10.0.100.1/24";
+                        "ipv4.nat" = "true";
+                        "ipv6.address" = "none";
+                      };
+                    }
+                  ];
+                  storage_pools = [
+                    {
+                      name = "default";
+                      driver = "dir";
+                    }
+                  ];
+                  profiles = [
+                    {
+                      name = "default";
+                      devices = {
+                        eth0 = {
+                          name = "eth0";
+                          network = "incusbr0";
+                          type = "nic";
+                        };
+                        root = {
+                          path = "/";
+                          pool = "default";
+                          type = "disk";
+                        };
+                      };
+                    }
+                  ];
+                };
               };
             };
             testScript = ''
               import json
+              import shlex
 
               owners = {"cameron": "omnigent-cameron", "janettesmith": "omnigent-janettesmith"}
 
@@ -192,6 +277,115 @@
                       assert env["USER"] == user, env
                       assert env["HOME"] == f"/home/{user}", env
                       assert machine.succeed(f"stat -c %U /home/{user}/omnigent-test.env").strip() == user
+
+              rootless = "${containerUser}"
+              control = next(u for u in owners.values() if u != rootless)
+              rootless_uid = "${toString reference.users.users.${containerUser}.uid}"
+              runtime_dir = f"/run/user/{rootless_uid}"
+              socket = f"unix://{runtime_dir}/podman/podman.sock"
+              probe_image = "${probeImage}"
+
+              def as_worker(user, command, expect_success=True):
+                  # The unit's own process environment, account and NoNewPrivileges,
+                  # which is what a session forked from the runner inherits.
+                  owner = next(o for o, u in owners.items() if u == user)
+                  pid = machine.succeed(
+                      f"systemctl show -p MainPID --value omnigent-host-{owner}.service"
+                  ).strip()
+                  machine.succeed(f"tr '\\0' '\\n' < /proc/{pid}/environ > /run/{user}.env")
+                  run = (
+                      "systemd-run --quiet --wait --pipe --collect "
+                      f"-p User={user} -p Group={user} -p NoNewPrivileges=yes "
+                      f"-p EnvironmentFile=/run/{user}.env -p WorkingDirectory=/home/{user} "
+                      f"-- /bin/sh -c {shlex.quote(command)}"
+                  )
+                  return machine.succeed(run) if expect_success else machine.fail(run)
+
+              def user_unit_state(unit):
+                  # setpriv rather than `systemctl --user -M`, whose stdio bridge opens
+                  # a PAM login session for the worker.
+                  return machine.execute(
+                      f"setpriv --reuid={rootless} --regid={rootless} --init-groups "
+                      f"env XDG_RUNTIME_DIR={runtime_dir} systemctl --user is-active {unit}"
+                  )[1].strip()
+
+              def recorded_env(user):
+                  return dict(
+                      line.split("=", 1)
+                      for line in machine.succeed(f"cat /home/{user}/omnigent-test.env").splitlines()
+                      if "=" in line
+                  )
+
+              with subtest("container environment reaches only the rootless worker"):
+                  env = recorded_env(rootless)
+                  assert env["XDG_RUNTIME_DIR"] == runtime_dir, env
+                  assert env["DOCKER_HOST"] == socket, env
+                  assert env["CONTAINER_HOST"] == socket, env
+                  assert env["OMNIGENT_RUNNER_ENV_PASSTHROUGH"] == (
+                      "PI_ACP_PI_COMMAND,PI_CODING_AGENT_DIR,DOCKER_HOST,CONTAINER_HOST"
+                  ), env
+                  assert "/run/wrappers/bin" in env["PATH"].split(":"), env
+                  env = recorded_env(control)
+                  for name in ("XDG_RUNTIME_DIR", "DOCKER_HOST", "CONTAINER_HOST"):
+                      assert name not in env, (name, env)
+                  assert env["OMNIGENT_RUNNER_ENV_PASSTHROUGH"] == (
+                      "PI_ACP_PI_COMMAND,PI_CODING_AGENT_DIR"
+                  ), env
+
+              with subtest("the lingering user manager holds podman socket-activated and cold"):
+                  machine.wait_for_unit(f"user@{rootless_uid}.service")
+                  machine.wait_for_file(f"{runtime_dir}/podman/podman.sock")
+                  assert user_unit_state("podman.socket") == "active"
+                  assert user_unit_state("podman.service") == "inactive"
+                  machine.fail(f"pgrep -u {rootless} podman")
+                  # The control worker selects nothing, so it has no user manager.
+                  machine.fail(f"test -e /run/user/$(id -u {control})")
+
+              with subtest("cold start under NoNewPrivileges needs the remote podman CLI"):
+                  # Control: a local podman CLI cannot create the rootless user
+                  # namespace, because NoNewPrivileges voids the setuid newuidmap.
+                  as_worker(rootless, "env -u CONTAINER_HOST podman info", expect_success=False)
+                  machine.fail(f"pgrep -u {rootless} podman")
+                  info = as_worker(
+                      rootless,
+                      "podman info --format '{{.Host.ServiceIsRemote}} {{.Host.Security.Rootless}}'",
+                  )
+                  assert info.split() == ["true", "true"], info
+                  assert user_unit_state("podman.service") == "active"
+                  as_worker(rootless, f"podman load -i {probe_image}")
+                  out = as_worker(rootless, "podman run --rm omnigent-probe:test")
+                  assert "Hello, world!" in out, out
+                  out = as_worker(rootless, "docker run --rm omnigent-probe:test")
+                  assert "Hello, world!" in out, out
+
+              with subtest("rootful and foreign podman sockets stay out of reach"):
+                  ping = "curl -sf --unix-socket {} http://d/_ping"
+                  # Controls: root reaches the rootful socket and the owner its own.
+                  assert machine.succeed(ping.format("/run/podman/podman.sock")) == "OK"
+                  assert as_worker(rootless, ping.format(f"{runtime_dir}/podman/podman.sock")) == "OK"
+                  for user in owners.values():
+                      as_worker(user, ping.format("/run/podman/podman.sock"), expect_success=False)
+                  as_worker(control, ping.format(f"{runtime_dir}/podman/podman.sock"), expect_success=False)
+
+              with subtest("restricted Incus confines the rootless worker to its own project"):
+                  machine.wait_for_unit("incus-preseed.service")
+                  project = f"user-{rootless_uid}"
+                  assert as_worker(rootless, "incus project get-current").strip() == project
+                  assert as_worker(rootless, f"incus project get {project} restricted").strip() == "true"
+                  listed = as_worker(rootless, "incus project list -f csv -c n").splitlines()
+                  assert len(listed) == 1 and listed[0].split()[0] == project, listed
+                  # The admin socket stays with root and incus-admin.
+                  as_worker(
+                      rootless,
+                      "curl -sf --unix-socket /var/lib/incus/unix.socket http://d/1.0",
+                      expect_success=False,
+                  )
+                  for path in ("/var/lib/incus/unix.socket", "/var/lib/incus/unix.socket.user"):
+                      as_worker(control, f"curl -sf --unix-socket {path} http://d/1.0", expect_success=False)
+
+              with subtest("container probes leave no workload behind"):
+                  as_worker(rootless, "podman rmi omnigent-probe:test")
+                  assert as_worker(rootless, "podman ps -aq").strip() == ""
 
               with subtest("a home that stops being private at runtime prevents ExecStart"):
                   user = owners["cameron"]
