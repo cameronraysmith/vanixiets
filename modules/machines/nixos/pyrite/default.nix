@@ -370,6 +370,56 @@ in
         };
       };
 
+      # A warm reboot leaves the BCM4350 powered and running (brcmfmac and hci_bcm have no
+      # .shutdown), and about one ACPI reboot in five came up with the chip silent. The
+      # firmware's reset path for it is RP09 _PS3/_PS0 (APPD/APPU), which acts only while
+      # SLTP is 0, i.e. before the kernel's _TTS(5), so it must run from userspace before
+      # systemd-reboot. Unbinding hci_uart_bcm powers Bluetooth down (BTPD); unbinding
+      # brcmfmac and runtime-suspending the root port holds the chip in reset (DRST), and
+      # resuming releases it so nothing is left asserted across the reset. The endpoint
+      # needs d3cold_allowed=1 for the port to suspend, which disable-d3cold-all clears
+      # before sleeps. Exits 0 on every path so it can never block a reboot.
+      systemd.services.reboot-quiesce-radios = {
+        description = "Reset the BCM4350 and power off its Bluetooth before a warm reboot";
+        unitConfig.DefaultDependencies = false;
+        wantedBy = [ "reboot.target" ];
+        before = [ "systemd-reboot.service" ];
+        after = [
+          "NetworkManager.service"
+          "wpa_supplicant.service"
+          "bluetooth.service"
+        ];
+        serviceConfig = {
+          Type = "oneshot";
+          TimeoutStartSec = 15;
+          ExecStart = pkgs.writeShellScript "reboot-quiesce-radios" ''
+            w=/sys/bus/pci/devices/0000:02:00.0
+            if [ ! -e "$w" ]; then echo "wifi 0000:02:00.0 absent, nothing to quiesce"; exit 0; fi
+            p=$(${pkgs.coreutils}/bin/dirname "$(${pkgs.coreutils}/bin/readlink -f "$w")")
+            state() { echo "port $(${pkgs.coreutils}/bin/basename "$p") $(cat "$p/power/runtime_status") $(cat "$p/power_state")"; }
+            wait_port() {
+              for _ in $(${pkgs.coreutils}/bin/seq 1 30); do
+                [ "$(cat "$p/power/runtime_status")" = "$1" ] && return 0
+                ${pkgs.coreutils}/bin/sleep 0.1
+              done
+              return 1
+            }
+            if [ -e /sys/bus/serial/drivers/hci_uart_bcm/serial0-0 ]; then
+              echo serial0-0 > /sys/bus/serial/drivers/hci_uart_bcm/unbind && echo "bluetooth unbound"
+            fi
+            if [ -e /sys/bus/pci/drivers/brcmfmac/0000:02:00.0 ]; then
+              echo 0000:02:00.0 > /sys/bus/pci/drivers/brcmfmac/unbind && echo "brcmfmac unbound"
+            fi
+            echo 1 > "$w/d3cold_allowed"
+            echo auto > "$w/power/control"
+            wait_port suspended && echo "chip held in reset: $(state)" || echo "port did not suspend: $(state)"
+            echo on > "$w/power/control"
+            wait_port active && echo "reset released: $(state)" || echo "port did not resume: $(state)"
+            exit 0
+          '';
+        };
+      };
+
       # Panic-reboot fallback (D22). Auto-reboot 20 s after a kernel panic returns this
       # machine, which cannot be power-cycled or rebooted remotely, to the stage-1 unlock
       # prompt instead of leaving it dark. The panic-on-hang knobs (kernel.hung_task_panic,
@@ -398,14 +448,11 @@ in
           "nvme.noacpi=1"
           "pci=noaer"
         ])
-        # The default ACPI reset (0x06 to port 0xCF9) keeps the power rails up, and Apple's
-        # firmware cuts the BCM4350's power only when the OS asks first (ARPT.PDEN), which
-        # Linux never does, so about one warm reboot in five came up with the chip silent
-        # (brcmf_chip_recognition: MMIO read failed: 0xffffffff), wifi and Bluetooth both
-        # lost until a power-off: 3 of 14 in the journal. The PCI reset (0x0E) drops the
-        # power briefly, and 15 warm reboots with it never lost the chip
-        # (warm-reboot trials, 2026-10-26).
-        [ "reboot=pci" ]
+        # ACPI reset (0x06 to port 0xCF9) restarts on battery and on AC; the PCI reset
+        # (0x0E) and an EFI cold reset cycle power and, on battery, leave the machine off
+        # (2026-11-16 trials). The BCM4350 that ACPI resets used to leave silent is reset
+        # before the reboot by reboot-quiesce-radios instead.
+        [ "reboot=acpi" ]
         # Resume from deep (S3) re-enables the non-boot CPUs one at a time, and onlining
         # core 1 (CPUs 1 and 3) took 0.5-6 s on every resume and up to 761 s on some, with
         # the displays, network and userspace still down, so a resume looked like a machine

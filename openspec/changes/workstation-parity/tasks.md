@@ -107,6 +107,9 @@ The operator approved `RestartPreventExitStatus=78` on 2026-11-14; it lands with
 - [ ] 9.8 Reach pyrite from other home clients promptly after it resumes — verify: `ping 192.168.50.35` from stibnite answers within a minute of pyrite's wake.
   Progress 2026-11-15: pyrite re-associates and works outbound within about a minute, but the Verizon CHR30A router black-holes traffic from its other wireless clients to pyrite for 5–13+ minutes after any re-association, on either mesh node or band; `ssh pyrite.zt` returns after 1–3 minutes through ZeroTier's relay.
   Not fixable on pyrite (access-control block, BSSID pin and random MAC ruled out); the firmware report or own access points are tracked in CAM-105.
+- [x] 9.9 Make a warm reboot on pyrite restart by itself with Wi-Fi and Bluetooth intact — verify: supervised warm reboots on battery restart with no button press, the BCM4350 probing (`Firmware: BCM4350`, no `MMIO read failed`) and Bluetooth reporting `chip id 92`.
+  Done 2026-11-16: since 2026-11-15 the power-cycling resets (`reboot=pci`, EFI cold) left pyrite off on battery while restarting on AC, so pyrite now reboots through `reboot=acpi`, and `reboot-quiesce-radios` first unbinds Bluetooth (firmware BTPD) and brcmfmac and runtime-suspends root port 00:1d.0, so the firmware's RP09 `_PS3`/`_PS0` reset the chip before the CF9 reset.
+  10 plain warm reboots and 3 after an s2idle suspend passed, restarting in 11–17 s; Thunderbolt, lost on every suspend, came back with each reboot.
 
 ## 10. GUI application triage
 
