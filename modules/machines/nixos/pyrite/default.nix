@@ -80,6 +80,7 @@ in
         nix-eval-lock
         shared-reference-tree
         ssh-known-hosts
+        workstation-ca-trust
         zt-dns
       ]);
 
