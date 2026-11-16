@@ -32,8 +32,10 @@
 # aggregate, a skipped_local attribute) reproduces it byte for byte. A
 # repeat run is a no-op and a fresh destination receives identical bytes.
 # Every rejected run exits 1 with its exact message and leaves no receipt
-# or staging directory behind: another report's --out, a missing, failed,
-# unfetchable or unrealisable report, traversal, absolute or symlinked
+# or staging directory behind: another report's --out, a missing,
+# unfetchable or unrealisable report, a failed report outside a failed
+# event build (main mode, or a build nixbot records as succeeded), traversal,
+# absolute or symlinked
 # attachments (a screenshot, a video), a screenshot that is not PNG, a video
 # that is not EBML, a trace that is not a ZIP, an error context that is not
 # UTF-8 or holds a NUL, build/report identity mismatches, a wrong event
@@ -77,6 +79,15 @@
 # ("reused for head ..., same tree"), every marker records `head` (the build
 # rev when the event has no headRev), and a reused build of main's report
 # supersedes a current comment.
+#
+# A failed build that stopped before producing the report (evaluation
+# failed with no attributes, or the report attribute failed or
+# dependency_failed) declines: `no report (build N: <status>)`, exit 0,
+# nothing published. For a pull request with a current comment it posts the
+# exact superseded body naming both revs and writes a superseded marker with
+# a null obs, which later decline, unaffected and affected runs parse; an
+# affected run replaces it with a current marker. Without a marker it stays
+# silent.
 { ... }:
 {
   perSystem =
@@ -116,6 +127,8 @@
       mainRev2 = "3333333333333333333333333333333333333333";
       affectedRev = "4444444444444444444444444444444444444444";
       laterRev = "5555555555555555555555555555555555555555";
+      # A main commit whose only build failed with a failed report.
+      failedMainRev = "cccccccccccccccccccccccccccccccccccccccc";
       revertedRev = "6666666666666666666666666666666666666666";
       # Pull request heads whose tree an earlier build already built.
       reusedHeadRev = "7777777777777777777777777777777777777777";
@@ -810,6 +823,15 @@
                 '{build: {number: $n, status: $status, commit_sha: $rev, tree_hash: (if $tree == "" then null else $tree end)}, attributes: $attributes}' \
                 > "$STUB_STATE/builds/$1.json"
             }
+            # eval_failed_build <number> <aggregate status> <commit>: a build
+            # whose evaluation failed, with an error and no attributes, as
+            # nixbot records one.
+            eval_failed_build() {
+              jq -n --argjson n "$1" --arg status "$2" --arg rev "$3" \
+                '{build: {number: $n, status: $status, commit_sha: $rev, tree_hash: null,
+                  error: "nix-eval-jobs failed with exit code 1:\nerror: cannot update unlocked flake input"}, attributes: []}' \
+                > "$STUB_STATE/builds/$1.json"
+            }
             # attr <name> <status> <out> [<cached>]: one attribute entry.
             attr() {
               jq -nc --arg attr "$1" --arg status "$2" --arg out "$3" --argjson cached "''${4:-false}" \
@@ -987,20 +1009,60 @@
 
             # --- unavailable evidence: reported, never rebuilt
 
-            build 25 succeeded ${rev} "[$other]"
-            event 25
+            # An evaluated failed build without the report attribute is a
+            # fault, not a build that stopped before the report.
+            build 25 failed ${rev} "[$other]"
+            event 25 failed
             run missing-attr event --out "$pub/missing-attr"
             rejected 25 "evidence unavailable: nixbot build 25 has no attribute ${reportAttr}" "$pub/missing-attr"
 
-            build 26 failed ${rev} "[$(report failed ${reports.passing})]"
-            event 26 failed
-            run failed-attr event --out "$pub/failed-attr"
-            rejected 26 "evidence unavailable: nixbot build 26 attribute ${reportAttr} is \"failed\"" "$pub/failed-attr"
+            # A failed report in a build nixbot records as succeeded, and an
+            # evaluation error on a succeeded build, are faults too.
+            build 68 succeeded ${rev} "[$(report failed ${reports.passing})]"
+            event 68
+            run failed-attr-succeeded-build event --out "$pub/failed-attr-succeeded-build"
+            rejected 68 "evidence unavailable: nixbot build 68 attribute ${reportAttr} is \"failed\"" \
+              "$pub/failed-attr-succeeded-build"
+
+            eval_failed_build 69 succeeded ${rev}
+            event 69
+            run eval-error-succeeded-build event --out "$pub/eval-error-succeeded-build"
+            rejected 69 "evidence unavailable: nixbot build 69 has no attribute ${reportAttr}" \
+              "$pub/eval-error-succeeded-build"
 
             build 27 succeeded ${rev} "[$(report succeeded ${unrealisable})]"
             event 27
             run unrealisable event --out "$pub/unrealisable"
             rejected 27 "evidence unavailable: cannot realise ${unrealisable}" "$pub/unrealisable"
+
+            # --- no report: a failed build that stopped before the report
+            # declines, publishing nothing.
+
+            # declined <build number> <status> <out>: exit 0 with the no
+            # report line, the build's one request, and nothing at <out>.
+            declined() {
+              expect_status 0
+              expect_lines "PUBLISH-EVIDENCE: no report (build $1: $2)"
+              expect_build_requests "$1"
+              [ ! -e "$3" ] || fail "a declined run created $3"
+            }
+
+            # The report's own derivation failed (the Playwright
+            # browser-revision guard fails it so).
+            build 26 failed ${rev} "[$other, $(report failed ${reports.passing})]"
+            event 26 failed
+            run no-report-failed event --out "$pub/no-report-failed"
+            declined 26 failed "$pub/no-report-failed"
+
+            build 66 failed ${rev} "[$(report dependency_failed ${reports.passing})]"
+            event 66 failed
+            run no-report-dependency-failed event --out "$pub/no-report-dependency-failed"
+            declined 66 dependency_failed "$pub/no-report-dependency-failed"
+
+            eval_failed_build 67 failed ${rev}
+            event 67 failed
+            run no-report-eval-failed event --out "$pub/no-report-eval-failed"
+            declined 67 "evaluation failed" "$pub/no-report-eval-failed"
 
             event 28
             run build-not-found event --out "$pub/not-found"
@@ -1247,11 +1309,13 @@
               echo "$ttl30/pr/$1.json"
             }
             # marker <pr> <state> <obs> <build> <rev> [<head>]: a marker's exact
-            # bytes; <head> defaults to <rev> (a fresh build of the head).
+            # bytes; <head> defaults to <rev> (a fresh build of the head), and
+            # an empty <obs> is null (a build that produced no report).
             marker() {
               jq -nc --argjson pr "$1" --arg state "$2" --arg obs "$3" --argjson build "$4" --arg rev "$5" \
                 --arg head "''${6:-$5}" \
-                '{schemaVersion: 1, pr: $pr, state: $state, obs: $obs, build: $build, rev: $rev, head: $head}'
+                '{schemaVersion: 1, pr: $pr, state: $state, obs: (if $obs == "" then null else $obs end),
+                  build: $build, rev: $rev, head: $head}'
             }
             expect_marker() {
               local key
@@ -1404,6 +1468,18 @@
             expect_status 1
             expect_line "error: NIXBOT_API_URL is not set: main resolves the build of --rev through nixbot's build API, which nixbot exposes to an effect only with its task token"
             expect_build_requests none
+
+            # failed-attr-main: main mode never declines; a failed report of
+            # --rev's build is unavailable evidence.
+            jq -n '{items: [{number: 74, commit_sha: "${failedMainRev}", status: "failed"}], page: 1, has_next: false}' \
+              > "$STUB_STATE/commits/${failedMainRev}.json"
+            build 74 failed ${failedMainRev} "[$(report failed ${reports.passing})]"
+            run failed-attr-main main --rev ${failedMainRev} --upload
+            expect_status 1
+            expect_lines
+            expect_line "error: evidence unavailable: nixbot build 74 attribute ${reportAttr} is \"failed\""
+            expect_s3
+            expect_no_comment
 
             run main-missing-rev main --upload
             expect_status 2
@@ -1593,6 +1669,85 @@
             expect_s3 "$(req HEAD 200 ro "$p90/receipt.json")" "$(req GET 200 rw30 "$(marker_key 8)")"
             expect_no_comment
             diff -r "$TMPDIR/objects.malformed" "$objects" || fail "a malformed marker changed the bucket"
+
+            # --- no report on a pull request (pull request 14, whose
+            # comment is current for build 51's failing report).
+            marker 14 current "$f_obs" 51 ${affectedRev} | seed "$(marker_key 14)"
+            cp -a "$objects" "$TMPDIR/objects.no-report"
+
+            # pr-no-report: a later build of the pull request failed before
+            # its report, so the current comment no longer describes the pull
+            # request: superseded once, naming both revs, with a null obs.
+            build 80 failed ${laterRev} "[$other, $(report dependency_failed ${reports.passing})]"
+            event 80 failed ${laterRev} 14
+            run pr-no-report event --upload
+            expect_status 0
+            expect_lines \
+              "PUBLISH-EVIDENCE: no report (build 80: dependency_failed)" \
+              "PUBLISH-EVIDENCE: superseded #14"
+            expect_api "$(api_build 80)" "$api_comment"
+            expect_s3 \
+              "$(req GET 200 rw30 "$(marker_key 14)")" \
+              "$(req PUT 200 rw30 "$(marker_key 14)" application/json)"
+            expect_comments 1
+            printf '### Browser evidence: superseded\n\nBuild 80 of this pull request, rev `%s`, failed before producing the docs report (`dependency_failed`), so the evidence previously linked here (rev `%s`) no longer describes this pull request.\n' \
+              ${lib.substring 0 12 laterRev} ${lib.substring 0 12 affectedRev} > "$TMPDIR/expected-comment.md"
+            expect_comment_body "$TMPDIR/expected-comment.md"
+            expect_marker 14 superseded "" 80 ${laterRev}
+            diff -r -x pr "$TMPDIR/objects.no-report" "$objects" || fail "a declined run wrote evidence objects"
+            cp -a "$objects" "$TMPDIR/objects.no-report-superseded"
+
+            # pr-no-report-again: the superseded marker is parsed and left.
+            run pr-no-report-again event --upload
+            expect_status 0
+            expect_lines "PUBLISH-EVIDENCE: no report (build 80: dependency_failed)"
+            expect_api "$(api_build 80)"
+            expect_s3 "$(req GET 200 rw30 "$(marker_key 14)")"
+            expect_no_comment
+            diff -r "$TMPDIR/objects.no-report-superseded" "$objects" || fail "a second decline changed the bucket"
+
+            # pr-after-no-report-unaffected: an unaffected run parses the
+            # null-obs superseded marker and stays silent.
+            build 81 succeeded ${revertedRev} "[$(report succeeded ${reports.passing})]"
+            event 81 succeeded ${revertedRev} 14
+            run pr-after-no-report-unaffected event --upload
+            expect_status 0
+            expect_lines "PUBLISH-EVIDENCE: unaffected (report $p_obs already published from main)"
+            expect_api "$(api_build 81)"
+            expect_s3 "$(req HEAD 200 ro "$p90/receipt.json")" "$(req GET 200 rw30 "$(marker_key 14)")"
+            expect_no_comment
+            diff -r "$TMPDIR/objects.no-report-superseded" "$objects" || fail "an unaffected run changed the bucket"
+
+            # pr-after-no-report-affected: an affected build comments again
+            # and replaces the null-obs marker with a current one.
+            build 82 failed ${affectedRev} "[$(report succeeded ${reports.failing})]"
+            event 82 failed ${affectedRev} 14
+            run pr-after-no-report-affected event --upload
+            expect_status 0
+            expect_lines \
+              "PUBLISH-EVIDENCE: unchanged (report $f_obs, passed=false)" \
+              "PUBLISH-EVIDENCE: commented #14"
+            expect_api "$(api_build 82)" "$api_comment"
+            expect_s3 \
+              "$(req HEAD 404 ro "$ttl90/v1/$f_obs/receipt.json")" \
+              "$(req GET 200 rw30 "$f30/receipt.json")" \
+              "$(req PUT 200 rw30 "$(marker_key 14)" application/json)"
+            expect_comments 1
+            expect_comment_has "[build 82](https://nixbot.example/builds/82) at \`${lib.substring 0 12 affectedRev}\`"
+            expect_marker 14 current "$f_obs" 82 ${affectedRev}
+            diff -r -x pr "$TMPDIR/objects.no-report" "$objects" || fail "a later build of the report wrote new objects"
+
+            # pr-no-report-silent: a pull request without a marker never had
+            # a comment, so its declined build stays silent.
+            eval_failed_build 83 failed ${laterRev}
+            event 83 failed ${laterRev} 15
+            run pr-no-report-silent event --upload
+            expect_status 0
+            expect_lines "PUBLISH-EVIDENCE: no report (build 83: evaluation failed)"
+            expect_api "$(api_build 83)"
+            expect_s3 "$(req GET 404 rw30 "$(marker_key 15)")"
+            expect_no_comment
+            expect_no_marker 15
 
             # --- one run per settled pull request build, on pull request 9,
             # then the unknown-extension, sanitised-name and summary rows on

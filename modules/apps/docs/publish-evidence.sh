@@ -57,6 +57,14 @@ Subcommands:
                              screenshot, video, error context and trace (in
                              Playwright's hosted trace viewer), and links
                              its receipt
+                  A failed build that stopped before producing the report
+                  declines: its evaluation failed (an error and no
+                  attributes), or the report attribute is failed or
+                  dependency_failed. Nothing is published, and with
+                  --upload a current comment of this program on the pull
+                  request is replaced once by a note that the build, naming
+                  its rev and the superseded evidence's, produced no report.
+                  Any other absent report is evidence unavailable.
   main            default-branch push: resolve the newest nixbot build of
                   --rev through the build API or, when nixbot reused a
                   build of the same tree (none of --rev itself), the newest
@@ -85,12 +93,14 @@ At least one of --out and --upload is required.
 Pull request marker: the comment's state is recorded at
 projects/vanixiets/browser-evidence/ttl-30d/pr/<pr>.json as
 {"schemaVersion":1,"pr":N,"state":"current"|"superseded","obs","build","rev","head"},
-where rev is the build's commit and head the pull request head it settled
-for (pullRequest.headRev, or rev when the event names none); the two
-differ when nixbot reused a build of an identical tree. It is
-written current after each affected comment and superseded after the
-superseding comment. Two builds of one pull request finishing out of order
-race on it: the run that finishes last wins.
+where obs is the report's <obs>, rev is the build's commit and head the
+pull request head it settled for (pullRequest.headRev, or rev when the
+event names none); the two differ when nixbot reused a build of an
+identical tree. obs is null only in a superseded marker written by a
+build that produced no report. It is written current after each affected
+comment and superseded after the superseding comment. Two builds of one
+pull request finishing out of order race on it: the run that finishes
+last wins.
 
 Output:
   PUBLISH-EVIDENCE: published (report <obs>, passed=<bool>)
@@ -101,11 +111,14 @@ Output:
   PUBLISH-EVIDENCE: unaffected (report <obs> already published from main)
   PUBLISH-EVIDENCE: commented #<pr>    the pull request comment is current
   PUBLISH-EVIDENCE: superseded #<pr>   the comment now says it is superseded
+  PUBLISH-EVIDENCE: no report (build <n>: <status>)
+                  event: the failed build produced no report; <status> is
+                  "evaluation failed", "failed" or "dependency_failed"
 
-Exit status: 0 published, unchanged or unaffected; 1 evidence unavailable
-or rejected, a destination holding a different publication, or a failed
-probe, upload, comment or marker update (a retry is idempotent); 2 usage
-error.
+Exit status: 0 published, unchanged, unaffected or no report; 1 evidence
+unavailable or rejected, a destination holding a different publication,
+or a failed probe, upload, comment or marker update (a retry is
+idempotent); 2 usage error.
 
 Environment:
   NIXBOT_EVENT_KIND, NIXBOT_EVENT_JSON  event; set by nixbot
@@ -342,6 +355,141 @@ else
   build_source="build $build_number of --rev,"
 fi
 
+# --- temporary credentials, signed locally exactly as Cloudflare's
+# r2/examples/authenticate-r2-temp-credentials: an HS256 JWT keyed by the
+# parent secret, for one scope and prefix of this bucket for 15 minutes.
+# Its secret is the JWT's SHA-256, its session token base64("jwt/" + JWT),
+# its access key id the parent's. A run writes only its own tier (a pull
+# request's ttl-30d also holds its marker), and a pull request reads ttl-90d
+# read-only, so it can never write main's evidence.
+
+# mint <scope> <prefix>: prints {secretAccessKey, sessionToken}. The parent
+# secret reaches only this node process, through its own environment.
+# shellcheck disable=SC2016 # JavaScript, not shell expansions
+mint() {
+  R2_PARENT_SECRET="$parent_secret" \
+    MINT_ENDPOINT="$s3_endpoint" \
+    MINT_ACCOUNT="$CLOUDFLARE_ACCOUNT_ID" \
+    MINT_ACCESS_KEY_ID="$R2_EVIDENCE_ACCESS_KEY_ID" \
+    MINT_BUCKET="$bucket" \
+    MINT_SCOPE="$1" \
+    MINT_PREFIX="$2" \
+    node -e '
+      const crypto = require("node:crypto");
+      const env = process.env;
+      const b64url = (data) => Buffer.from(data).toString("base64url");
+      const iat = Math.floor(Date.now() / 1000);
+      const claims = {
+        bucket: env.MINT_BUCKET,
+        scope: env.MINT_SCOPE,
+        paths: { prefixPaths: [env.MINT_PREFIX], objectPaths: [] },
+        sub: env.MINT_ACCOUNT,
+        iss: env.MINT_ACCESS_KEY_ID,
+        aud: new URL(env.MINT_ENDPOINT).host,
+        iat,
+        exp: iat + 900,
+      };
+      const input = b64url(JSON.stringify({ alg: "HS256", typ: "JWT" })) + "." + b64url(JSON.stringify(claims));
+      const jwt = input + "." +
+        crypto.createHmac("sha256", Buffer.from(env.R2_PARENT_SECRET, "utf8")).update(input).digest("base64url");
+      process.stdout.write(JSON.stringify({
+        secretAccessKey: crypto.createHash("sha256").update(jwt).digest("hex"),
+        sessionToken: Buffer.from("jwt/" + jwt).toString("base64"),
+      }));
+    '
+}
+
+# s3 <rw|ro> <response file> <key> <curl args...>: one request for <key>,
+# SigV4 signed with that temporary credential, which reaches curl through
+# its config on stdin rather than argv. Prints the HTTP status (000: none).
+s3() {
+  local secret token response=$2 key=$3
+  case "$1" in
+    rw) secret="$rw_secret" token="$rw_token" ;;
+    ro) secret="$ro_secret" token="$ro_token" ;;
+  esac
+  shift 3
+  curl -sS --config - --aws-sigv4 aws:amz:auto:s3 -o "$response" -w '%{http_code}' \
+    "$@" "$s3_endpoint/$bucket/$key" <<EOF || :
+user = "$R2_EVIDENCE_ACCESS_KEY_ID:$secret"
+header = "x-amz-security-token: $token"
+EOF
+}
+
+# --- the pull request comment, upserted by marker through nixbot's task
+# API (nixbot-pr-comment's protocol), so a retry edits the same comment.
+# The API can only upsert, so the marker object records whether this
+# program's comment is current: an affected run writes it current after
+# commenting; an unaffected run, or a failed build that produced no report,
+# replaces a current comment once with a superseded body. Two builds of one
+# pull request finishing out of order race on the comment and marker; the
+# run that finishes last wins.
+
+marker_key=""
+[[ -z "$pr_number" ]] || marker_key="$key_root/ttl-30d/pr/$pr_number.json"
+
+# exit_unless_comment_current: exits 0 unless the marker records this
+# program's comment as current: none was ever posted, or it is already
+# superseded. A current marker names its report (obs) and rev, which it
+# leaves in marker_rev; only a superseded one may have a null obs, written
+# when a build produced no report.
+marker_rev=""
+exit_unless_comment_current() {
+  local code state
+  code="$(s3 rw "$tmpdir/marker.json" "$marker_key")"
+  case "$code" in
+    200) ;;
+    404) exit 0 ;;
+    *) die "cannot read $bucket/$marker_key: HTTP $code" ;;
+  esac
+  state="$(jq -r '
+    def hex40: type == "string" and test("^[0-9a-f]{40}$");
+    if type == "object" and (.rev | hex40) and (
+      (.state == "current" and (.obs | type == "string"))
+      or (.state == "superseded" and (.obs == null or (.obs | type == "string"))))
+    then .state else error("bad marker") end' \
+    "$tmpdir/marker.json" 2>/dev/null)" || die "malformed marker $bucket/$marker_key"
+  [[ "$state" == current ]] || exit 0
+  marker_rev="$(jq -r '.rev' "$tmpdir/marker.json")"
+}
+
+# exit_without_comment_token: exits 0 with a note when nixbot gave no task
+# token to comment with.
+exit_without_comment_token() {
+  if [[ -z "${NIXBOT_API_TOKEN:-}" ]]; then
+    echo "PUBLISH-EVIDENCE: no comment on #$pr_number: NIXBOT_API_TOKEN is not set" >&2
+    exit 0
+  fi
+  [[ "$NIXBOT_API_TOKEN" =~ ^[A-Za-z0-9._~+/=-]+$ ]] || die "malformed NIXBOT_API_TOKEN"
+}
+
+# comment_and_mark <current|superseded> <obs>: upserts $tmpdir/comment.md
+# as this program's comment, then records the marker. <obs> is empty, and
+# the marker's obs null, for a build that produced no report.
+comment_and_mark() {
+  local state=$1 code
+  jq -n --rawfile body "$tmpdir/comment.md" --arg marker "$comment_marker" \
+    '{body: $body, marker: $marker}' >"$tmpdir/comment.json"
+  code="$(curl -sS --config - -o "$tmpdir/comment.out" -w '%{http_code}' \
+    -H "Content-Type: application/json" --data-binary "@$tmpdir/comment.json" \
+    "$NIXBOT_API_URL/api/v1/pr-comment" <<EOF || :
+header = "Authorization: Bearer $NIXBOT_API_TOKEN"
+EOF
+  )"
+  [[ "$code" == 2?? ]] || die "comment on #$pr_number failed: HTTP $code"
+  if [[ "$state" == superseded ]]; then
+    echo "PUBLISH-EVIDENCE: superseded #$pr_number"
+  else
+    echo "PUBLISH-EVIDENCE: commented #$pr_number"
+  fi
+  jq -nc --argjson pr "$pr_number" --arg state "$state" --arg obs "$2" \
+    --argjson build "$build_number" --arg rev "$rev" --arg head "${pr_head:-$rev}" \
+    '{schemaVersion: 1, pr: $pr, state: $state, obs: (if $obs == "" then null else $obs end),
+      build: $build, rev: $rev, head: $head}' >"$tmpdir/marker.json"
+  code="$(s3 rw /dev/null "$marker_key" --upload-file "$tmpdir/marker.json" -H "Content-Type: application/json")"
+  [[ "$code" == 2?? ]] || die "marker update failed: PUT $bucket/$marker_key returned HTTP $code"
+}
+
 echo "=== publish-evidence (build $build_number at ${rev:0:12}, $build_status) ==="
 
 # --- the recorded report output, by build number: nothing is evaluated, and
@@ -355,9 +503,45 @@ api_identity="$(jq -r --arg key "$identity_key" '[.build.number, .build[$key]] |
 [[ "$api_identity" == "$build_number $identity" ]] ||
   rejected "nixbot build $build_number is $(jq -c --arg key "$identity_key" --arg label "$identity_label" '{number: .build.number, ($label): .build[$key]}' <<<"$build_json"), not $build_source $build_number at $identity"
 attribute="$(jq -c --arg attr "$report_attr" 'first(.attributes[]? | select(.attr == $attr)) // empty' <<<"$build_json")"
+attr_status="$(jq -c '.status' <<<"$attribute")"
+
+# A failed build that stopped before producing the report has no evidence
+# to publish, and its own status already reports why: its evaluation failed
+# (an error and no attributes), or the report derivation or one of its
+# dependencies failed. The run declines, publishing nothing, and supersedes
+# a current pull request comment, which no longer describes the pull
+# request. Any other absent report is a fault (exit 1 below).
+no_report=""
+if [[ "$mode" == event ]] && jq -e '.build.status == "failed"' <<<"$build_json" >/dev/null; then
+  if jq -e '.attributes == [] and (.build.error | type == "string" and length > 0)' <<<"$build_json" >/dev/null; then
+    no_report="evaluation failed"
+  else
+    case "$attr_status" in
+      '"dependency_failed"' | '"failed"') no_report="$(jq -r '.status' <<<"$attribute")" ;;
+    esac
+  fi
+fi
+if [[ -n "$no_report" ]]; then
+  echo "PUBLISH-EVIDENCE: no report (build $build_number: $no_report)"
+  if [[ "$upload" == true && -n "$pr_number" ]]; then
+    credential="$(mint object-read-write "$key_root/$tier/")" || die "cannot sign a temporary R2 credential"
+    rw_secret="$(jq -r '.secretAccessKey' <<<"$credential")"
+    rw_token="$(jq -r '.sessionToken' <<<"$credential")"
+    unset credential parent_secret
+    exit_unless_comment_current
+    exit_without_comment_token
+    {
+      echo "### Browser evidence: superseded"
+      echo
+      echo "Build $build_number of this pull request, rev \`${rev:0:12}\`, failed before producing the docs report (\`$no_report\`), so the evidence previously linked here (rev \`${marker_rev:0:12}\`) no longer describes this pull request."
+    } >"$tmpdir/comment.md"
+    comment_and_mark superseded ""
+  fi
+  exit 0
+fi
+
 [[ -n "$attribute" ]] ||
   unavailable "nixbot build $build_number has no attribute $report_attr"
-attr_status="$(jq -c '.status' <<<"$attribute")"
 case "$attr_status" in
   '"succeeded"' | '"skipped_local"') ;;
   *) unavailable "nixbot build $build_number attribute $report_attr is $attr_status" ;;
@@ -454,69 +638,6 @@ esac
 identity='[.identity.attribute, .identity.outPath]'
 obs="$(jq -nj --arg attribute "$report_attr" --arg outPath "$report" \
   '[$attribute, $outPath] | tojson' | sha256sum | cut -c1-32)"
-marker_key=""
-[[ -z "$pr_number" ]] || marker_key="$key_root/ttl-30d/pr/$pr_number.json"
-
-# --- temporary credentials, signed locally exactly as Cloudflare's
-# r2/examples/authenticate-r2-temp-credentials: an HS256 JWT keyed by the
-# parent secret, for one scope and prefix of this bucket for 15 minutes.
-# Its secret is the JWT's SHA-256, its session token base64("jwt/" + JWT),
-# its access key id the parent's. A run writes only its own tier (a pull
-# request's ttl-30d also holds its marker), and a pull request reads ttl-90d
-# read-only, so it can never write main's evidence.
-
-# mint <scope> <prefix>: prints {secretAccessKey, sessionToken}. The parent
-# secret reaches only this node process, through its own environment.
-# shellcheck disable=SC2016 # JavaScript, not shell expansions
-mint() {
-  R2_PARENT_SECRET="$parent_secret" \
-    MINT_ENDPOINT="$s3_endpoint" \
-    MINT_ACCOUNT="$CLOUDFLARE_ACCOUNT_ID" \
-    MINT_ACCESS_KEY_ID="$R2_EVIDENCE_ACCESS_KEY_ID" \
-    MINT_BUCKET="$bucket" \
-    MINT_SCOPE="$1" \
-    MINT_PREFIX="$2" \
-    node -e '
-      const crypto = require("node:crypto");
-      const env = process.env;
-      const b64url = (data) => Buffer.from(data).toString("base64url");
-      const iat = Math.floor(Date.now() / 1000);
-      const claims = {
-        bucket: env.MINT_BUCKET,
-        scope: env.MINT_SCOPE,
-        paths: { prefixPaths: [env.MINT_PREFIX], objectPaths: [] },
-        sub: env.MINT_ACCOUNT,
-        iss: env.MINT_ACCESS_KEY_ID,
-        aud: new URL(env.MINT_ENDPOINT).host,
-        iat,
-        exp: iat + 900,
-      };
-      const input = b64url(JSON.stringify({ alg: "HS256", typ: "JWT" })) + "." + b64url(JSON.stringify(claims));
-      const jwt = input + "." +
-        crypto.createHmac("sha256", Buffer.from(env.R2_PARENT_SECRET, "utf8")).update(input).digest("base64url");
-      process.stdout.write(JSON.stringify({
-        secretAccessKey: crypto.createHash("sha256").update(jwt).digest("hex"),
-        sessionToken: Buffer.from("jwt/" + jwt).toString("base64"),
-      }));
-    '
-}
-
-# s3 <rw|ro> <response file> <key> <curl args...>: one request for <key>,
-# SigV4 signed with that temporary credential, which reaches curl through
-# its config on stdin rather than argv. Prints the HTTP status (000: none).
-s3() {
-  local secret token response=$2 key=$3
-  case "$1" in
-    rw) secret="$rw_secret" token="$rw_token" ;;
-    ro) secret="$ro_secret" token="$ro_token" ;;
-  esac
-  shift 3
-  curl -sS --config - --aws-sigv4 aws:amz:auto:s3 -o "$response" -w '%{http_code}' \
-    "$@" "$s3_endpoint/$bucket/$key" <<EOF || :
-user = "$R2_EVIDENCE_ACCESS_KEY_ID:$secret"
-header = "x-amz-security-token: $token"
-EOF
-}
 
 rw_secret="" rw_token="" ro_secret="" ro_token=""
 if [[ "$upload" == true ]]; then
@@ -692,35 +813,16 @@ if [[ "$unaffected" == false || -n "$out" ]]; then
   fi
 fi
 
-# --- the pull request comment, upserted by marker through nixbot's task
-# API (nixbot-pr-comment's protocol), so a retry edits the same comment.
-# The API can only upsert, so the marker object records whether this
-# program's comment is current: an affected run writes it current after
-# commenting; an unaffected run replaces a current comment once with the
-# superseded body. Two builds of one pull request finishing out of order
-# race on the comment and marker; the run that finishes last wins.
+# --- the pull request comment (see comment_and_mark).
 
 if [[ "$upload" == true && -n "$pr_number" ]]; then
   if [[ "$unaffected" == true ]]; then
-    code="$(s3 rw "$tmpdir/marker.json" "$marker_key")"
-    case "$code" in
-      200) ;;
-      # No comment was ever posted: stay silent.
-      404) exit 0 ;;
-      *) die "cannot read $bucket/$marker_key: HTTP $code" ;;
-    esac
-    marker_state="$(jq -r 'if type == "object" and (.state == "current" or .state == "superseded") then .state else error("bad marker") end' \
-      "$tmpdir/marker.json" 2>/dev/null)" || die "malformed marker $bucket/$marker_key"
-    [[ "$marker_state" == current ]] || exit 0
+    exit_unless_comment_current
     marker_state=superseded
   else
     marker_state=current
   fi
-  if [[ -z "${NIXBOT_API_TOKEN:-}" ]]; then
-    echo "PUBLISH-EVIDENCE: no comment on #$pr_number: NIXBOT_API_TOKEN is not set" >&2
-    exit 0
-  fi
-  [[ "$NIXBOT_API_TOKEN" =~ ^[A-Za-z0-9._~+/=-]+$ ]] || die "malformed NIXBOT_API_TOKEN"
+  exit_without_comment_token
   if [[ "$marker_state" == superseded ]]; then
     {
       echo "### Browser evidence: superseded"
@@ -800,23 +902,5 @@ if [[ "$upload" == true && -n "$pr_number" ]]; then
       echo "Evidence kept ${retention%d} days."
     } >"$tmpdir/comment.md"
   fi
-  jq -n --rawfile body "$tmpdir/comment.md" --arg marker "$comment_marker" \
-    '{body: $body, marker: $marker}' >"$tmpdir/comment.json"
-  code="$(curl -sS --config - -o "$tmpdir/comment.out" -w '%{http_code}' \
-    -H "Content-Type: application/json" --data-binary "@$tmpdir/comment.json" \
-    "$NIXBOT_API_URL/api/v1/pr-comment" <<EOF || :
-header = "Authorization: Bearer $NIXBOT_API_TOKEN"
-EOF
-  )"
-  [[ "$code" == 2?? ]] || die "comment on #$pr_number failed: HTTP $code"
-  if [[ "$marker_state" == superseded ]]; then
-    echo "PUBLISH-EVIDENCE: superseded #$pr_number"
-  else
-    echo "PUBLISH-EVIDENCE: commented #$pr_number"
-  fi
-  jq -nc --argjson pr "$pr_number" --arg state "$marker_state" --arg obs "$obs" \
-    --argjson build "$build_number" --arg rev "$rev" --arg head "${pr_head:-$rev}" \
-    '{schemaVersion: 1, pr: $pr, state: $state, obs: $obs, build: $build, rev: $rev, head: $head}' >"$tmpdir/marker.json"
-  code="$(s3 rw /dev/null "$marker_key" --upload-file "$tmpdir/marker.json" -H "Content-Type: application/json")"
-  [[ "$code" == 2?? ]] || die "marker update failed: PUT $bucket/$marker_key returned HTTP $code"
+  comment_and_mark "$marker_state" "$obs"
 fi

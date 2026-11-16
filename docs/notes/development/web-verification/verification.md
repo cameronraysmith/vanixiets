@@ -174,7 +174,9 @@ Implemented behavior:
 - The build is fetched from nixbot's build API by number, or in `main` mode by commit; its number and `commit_sha` must equal the event's or the selected build's.
   The aggregate build may have failed.
 - The `checks.x86_64-linux.package-vanixiets-docs-test-e2e-report` attribute must be `succeeded` or `skipped_local`, carry a boolean `cached`, and have a realisable store output.
-  Otherwise the program prints `evidence unavailable` and exits 1 without evaluating or building anything.
+  Otherwise the program prints `evidence unavailable` and exits 1 without evaluating or building anything, except in `event` mode for a build nixbot records as `failed` that stopped before producing the report: its evaluation failed (an error and no attributes), or the report attribute is `failed` (including the Playwright browser-revision guard) or `dependency_failed`.
+  Such a run prints `PUBLISH-EVIDENCE: no report (build <n>: <status>)`, publishes nothing, exits 0, and with `--upload` replaces a `current` pull request comment once with a superseded note naming the build's revision and the superseded evidence's, writing a `superseded` marker whose `obs` is null.
+  A missing report attribute in an evaluated build, an unrealisable succeeded report, an API or validation failure, and every `main` mode case still exit 1.
 - Before validation, attachment paths must be relative and normalised, and selected files must be regular files with no symlinked path component.
   Attachments are selected by extension and must match their type: `.png` the PNG signature, `.webm` the EBML header `1a45dfa3`, `.zip` the ZIP local file header `504b0304`, and `.md` valid UTF-8 without a NUL byte; other extensions are ignored, and a selected file failing its check is rejected by name ([D9 amendment](decisions.md#amendment-failure-attachments)).
   Report provenance must name `x86_64-linux` and `playwright.config.ts`.
@@ -240,6 +242,9 @@ Each upload row asserts the exit status, the exact output lines, the S3 requests
 Every row now invokes the `event` subcommand in place of `build-finished`.
 
 Further rows cover `main` mode's lookups (`main-no-build`, `main-no-api-url`, `main-missing-rev`, `rev-outside-main`), `missing-r2-env`, `upload-500`, a refused comment (`pr-comment-refused`), a corrupted remote receipt (`pr-receipt-conflict`), a superseding run without `NIXBOT_API_TOKEN` (`pr-reverted-no-token`), and a malformed marker (`pr-marker-malformed`).
+
+Decline rows cover a failed build that produced no report: `no-report-eval-failed`, `no-report-dependency-failed`, and `no-report-failed` publish nothing with `--out` and exit 0; `pr-no-report` supersedes a `current` comment with the exact body and a `superseded` marker whose `obs` is null, `pr-no-report-again` then stays silent, `pr-after-no-report-unaffected` parses that marker and stays silent, `pr-after-no-report-affected` replaces it with a `current` marker, and `pr-no-report-silent` declines without a marker and writes nothing.
+The faults beside them still exit 1: `missing-attr` in an evaluated failed build, `failed-attr-main` (a `failed` report in `main` mode), `failed-attr-succeeded-build` (a `failed` report in a build nixbot records as succeeded), `eval-error-succeeded-build`, and `unrealisable`.
 
 The stub verifies the claims and signature and enforces the scope and prefix itself; it does not show that R2 enforces them.
 R2's own enforcement was checked only by hand, for schema version 2, with a read-write credential on the earlier whole-evidence prefix `projects/vanixiets/browser-evidence/`: it wrote, read, and deleted `projects/vanixiets/browser-evidence/ttl-30d/v1/_token-check/probe.txt` and was refused for `projects/vanixiets/x` and `omnigraph/x`.

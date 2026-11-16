@@ -56,6 +56,9 @@ The publisher replaces it once with a short note, headed `Browser evidence: supe
 The note names the shared report, the build, and the revision, and carries no links.
 A pull request that never had a comment stays silent.
 
+A later build that fails before producing a report at all (its evaluation, the report, or a dependency of it failed) also supersedes the comment, because the evidence no longer describes the pull request's head.
+Its note names the failed build, its revision, and the revision of the evidence it supersedes.
+
 When two builds of one pull request finish out of order, the comment reflects whichever finished last, even when that is not the newest build.
 
 ## What a comment contains
