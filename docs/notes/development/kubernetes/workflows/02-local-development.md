@@ -846,6 +846,20 @@ kubectl get ingress <ingress-name> -o yaml
 kubectl describe ingress <ingress-name>
 ```
 
+*External names SERVFAIL inside the k3d cluster on OrbStack (known issue, not fixed)*
+
+CoreDNS's default `.:53` block forwards to `/etc/resolv.conf`, which k3s takes from the node container.
+Under OrbStack that file names the k3d network gateway (`nameserver 192.168.100.1`), and the gateway does not answer DNS.
+Observed 2026-11-16 on stibnite: an in-cluster `nslookup github.com 10.43.0.10` returned SERVFAIL, CoreDNS logged `read udp …->192.168.100.1:53: i/o timeout` and `connection refused`, and `nslookup github.com 1.1.1.1` from the same pod resolved.
+The offline integration path (`just k3d-integration`) does not need external names: its manifests come from `file:///manifests`, and the `<x>.<a.b.c.d>.sslip.io` route hostnames are answered in-cluster by the stanza `k3d-configure-dns` adds.
+The workaround direction is an explicit upstream for `.:53` (for example `forward . 1.1.1.1 8.8.8.8` in place of `/etc/resolv.conf`); it is not applied.
+
+```bash
+kubectl run dnsq --rm -i --restart=Never --image=busybox:1.36 -- nslookup github.com 10.43.0.10
+kubectl logs -n kube-system deploy/coredns --tail=50 | grep 192.168.100.1
+docker exec k3d-dev-server-0 cat /etc/resolv.conf
+```
+
 ## Stopping and resuming
 
 The k3d cluster maintains state between sessions.
