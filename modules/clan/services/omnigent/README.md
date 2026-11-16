@@ -31,7 +31,7 @@ Both platforms derive HOME and working directory from `config.users.users.${cfg.
 The aliases map reuses `crs58`'s Home Manager content under `cameron`; it does not rename Unix accounts.
 Home Manager enables `programs.omnigent` with the same package and renders `host.name` and the shared ACP definitions into writable `~/.omnigent/config.yaml` through `managedConfigs`.
 Each activation rewrites the file from the declaration, keeping only `host.host_id` and `server` from the existing file; it must not become a Nix-store symlink.
-All three hosts use the exact shared `Atomic` / `bunx pi-acp@0.0.34` and `Oh My Pi` / `omp acp` rows from `modules/home/ai/omnigent/acp.nix`.
+All three hosts use the exact shared `Atomic` / `<pi-acp store path>/bin/pi-acp` (`pkgs/by-name/pi-acp`, so no session start fetches from npm) and `Oh My Pi` / `omp acp` rows from `modules/home/ai/omnigent/acp.nix`.
 Both rows disable `omnigent_mcp` and `inject_system_prompt`; Atomic allows `PI_ACP_PI_COMMAND` and `PI_CODING_AGENT_DIR`, while omp's `env_passthrough` is exactly empty so Atomic state does not reach omp.
 
 The host environment carries `PI_ACP_PI_COMMAND=atomic`, `PI_CODING_AGENT_DIR=<selected-home>/.atomic/agent`, and `OMNIGENT_RUNNER_ENV_PASSTHROUGH=PI_ACP_PI_COMMAND,PI_CODING_AGENT_DIR`.

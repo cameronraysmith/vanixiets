@@ -141,7 +141,7 @@
         }
       );
       pathIndex = entry: lib.lists.findFirstIndex (e: e == entry) null workerPath;
-      acp = config.flake.lib.omnigentACP;
+      acp = config.flake.lib.omnigentACP pkgs;
       cases = {
         composition = lib.all (a: a.assertion) cfg.assertions;
         compositeInvalid = sortedEqual (map (a: a.message) (
