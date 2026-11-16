@@ -4,6 +4,7 @@ Usage:
   ghq-writer-client get [--lazy] [--update] [--tags] TARGET
   ghq-writer-client deepen N PATH
   ghq-writer-client promote PATH
+  ghq-writer-client hydrate REV PATH
 """
 
 import json
@@ -30,6 +31,8 @@ def request(argv):
         return {"action": "deepen", "depth": int(argv[1]), "path": os.path.realpath(argv[2])}
     if len(argv) == 2 and argv[0] == "promote":
         return {"action": "promote", "path": os.path.realpath(argv[1])}
+    if len(argv) == 3 and argv[0] == "hydrate":
+        return {"action": "hydrate", "rev": argv[1], "path": os.path.realpath(argv[2])}
     raise SystemExit(__doc__)
 
 

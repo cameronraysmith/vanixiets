@@ -2,10 +2,13 @@
 
 Every refused request class must be refused without touching the shared root,
 an unauthorized caller must be refused, and one accepted request (deepen over a
-file:// fixture) must change the repository it names.
+file:// fixture) must change the repository it names. An update that changes an
+LFS path fast-forwards to its pointer file, and hydrate fetches the blobs a
+revision needs.
 """
 
 import grp
+import hashlib
 import importlib.machinery
 import json
 import os
@@ -76,6 +79,14 @@ refused = {
     "not json": b"get github.com/a/b",
     "unknown field": {"action": "get", "target": "github.com/a/b", "force": True},
     "tags not boolean": {"action": "get", "target": "github.com/a/b", "tags": "yes"},
+    "hydrate range": {"action": "hydrate", "rev": "main..HEAD", "path": clone},
+    "hydrate option": {"action": "hydrate", "rev": "-x", "path": clone},
+    "hydrate reflog": {"action": "hydrate", "rev": "HEAD@{1}", "path": clone},
+    "hydrate tree path": {"action": "hydrate", "rev": "HEAD:f", "path": clone},
+    "hydrate empty rev": {"action": "hydrate", "rev": "", "path": clone},
+    "hydrate rev not a string": {"action": "hydrate", "rev": 1, "path": clone},
+    "hydrate path outside root": {"action": "hydrate", "rev": "HEAD", "path": work},
+    "hydrate unknown field": {"action": "hydrate", "rev": "HEAD", "path": clone, "depth": 1},
 }
 failures = []
 for name, request in refused.items():
@@ -174,6 +185,85 @@ git("clone", "-q", "--no-tags", url, bare)
 ask({"action": "get", "target": "bare", "tags": True}, tags_cfg)
 if tags(bare):
     failures.append(f"a bare target must not name <root>/<target>: {tags(bare)}")
+
+# The fixtures below need the lazy fetches a blobless checkout makes.
+os.environ.pop("GIT_NO_LAZY_FETCH")
+
+
+def put(path, text):
+    with open(path, "w") as handle:
+        handle.write(text)
+
+
+def lfs_pointer(content):
+    return f"version https://git-lfs.github.com/spec/v1\noid sha256:{hashlib.sha256(content).hexdigest()}\nsize {len(content)}\n"
+
+
+# LFS: the writer runs no LFS filter, even in a clone whose own configuration
+# requires git-lfs, which is not on the writer's PATH; LFS paths hold pointer
+# files, and an update that changes one fast-forwards. The control clone, with
+# the same configuration and no policy, fails the same update.
+lfs_up = os.path.join(work, "lfs-up")
+os.makedirs(lfs_up)
+git("init", "-q", "-b", "main", cwd=lfs_up)
+put(os.path.join(lfs_up, ".gitattributes"), "*.bin filter=lfs diff=lfs merge=lfs -text\n")
+put(os.path.join(lfs_up, "a.bin"), lfs_pointer(b"one"))
+git("add", ".", cwd=lfs_up)
+git("commit", "-q", "-m", "one", cwd=lfs_up)
+lfs_clone = os.path.join(root, "github.com", "o", "lfs")
+lfs_control = os.path.join(work, "lfs-control")
+for repo in (lfs_clone, lfs_control):
+    git("clone", "-q", f"file://{lfs_up}", repo)
+    git("config", "filter.lfs.process", "git-lfs filter-process", cwd=repo)
+    git("config", "filter.lfs.required", "true", cwd=repo)
+put(os.path.join(lfs_up, "a.bin"), lfs_pointer(b"two"))
+git("commit", "-q", "-am", "two", cwd=lfs_up)
+reply = ask({"action": "get", "target": "github.com/o/lfs", "update": True}, tags_cfg)
+with open(os.path.join(lfs_clone, "a.bin")) as handle:
+    checked_out = handle.read()
+if reply["exit"] != 0 or checked_out != lfs_pointer(b"two") or git("rev-parse", "HEAD", cwd=lfs_clone) != git("rev-parse", "HEAD", cwd=lfs_up):
+    failures.append(f"an update changing an LFS path must fast-forward to its pointer: {reply} {checked_out!r}")
+control = subprocess.run(
+    ["git", "-c", "protocol.file.allow=always", "pull", "-q", "--ff-only"], cwd=lfs_control, capture_output=True,
+    env=dict(os.environ, GIT_CONFIG_NOSYSTEM="1", GIT_CONFIG_GLOBAL="/dev/null"),
+)
+if control.returncode == 0:
+    failures.append("control: the LFS fixture's update succeeded without the writer's policy, so the case is vacuous")
+
+# Hydrate: every object a revision's tree needs arrives in the blobless clone,
+# over an allowed protocol only, and a revision the clone lacks is skipped.
+blobs = os.path.join(work, "blobs")
+os.makedirs(blobs)
+git("init", "-q", "-b", "main", cwd=blobs)
+git("config", "uploadpack.allowFilter", "true", cwd=blobs)
+for i in range(3):
+    put(os.path.join(blobs, "f"), f"v{i}\n")
+    git("add", "f", cwd=blobs)
+    git("commit", "-q", "-m", f"v{i}", cwd=blobs)
+lazy = os.path.join(root, "github.com", "o", "blobs")
+git("clone", "-q", "--depth", "1", "--filter=blob:none", f"file://{blobs}", lazy)
+git("fetch", "-q", "--deepen", "2", cwd=lazy)
+
+
+def show_local(rev):
+    return subprocess.run(
+        ["git", "show", f"{rev}:f"], cwd=lazy, capture_output=True, text=True,
+        env=dict(os.environ, GIT_NO_LAZY_FETCH="1", GIT_CONFIG_NOSYSTEM="1", GIT_CONFIG_GLOBAL="/dev/null"),
+    )
+
+
+if show_local("HEAD~2").returncode == 0:
+    failures.append("hydrate: HEAD~2's blob was present before hydrating, so the case is vacuous")
+reply = ask({"action": "hydrate", "rev": "HEAD~2", "path": lazy}, config(protocols=("https",)))
+if "failed:" not in reply["stdout"] or show_local("HEAD~2").returncode == 0:
+    failures.append(f"hydrate over a protocol not allowed must fail: {reply}")
+reply = ask({"action": "hydrate", "rev": "HEAD~2", "path": lazy}, tags_cfg)
+shown = show_local("HEAD~2")
+if reply["exit"] != 0 or "hydrated:" not in reply["stdout"] or shown.stdout != "v0\n":
+    failures.append(f"hydrate must make HEAD~2's blobs present: {reply} {shown}")
+reply = ask({"action": "hydrate", "rev": "no-such-tag", "path": lazy}, tags_cfg)
+if "skip:" not in reply["stdout"]:
+    failures.append(f"hydrate of a revision the clone lacks must be skipped: {reply}")
 
 # A connection that never completes its request is closed with a refusal.
 ours, theirs = socket.socketpair()

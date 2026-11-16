@@ -106,15 +106,30 @@ runCommand "ghq-shared-test-wrapper"
 
     echo "case: ghq-sync --tags applies to fetch mode only"
     usage=$(${ghq-sync}/bin/ghq-sync --help)
-    for mode in "--deepen 1" --full; do
+    for mode in "--deepen 1" --full "--hydrate v1"; do
       status=0
       got=$(GHQ_ROOT="$work/shared-link" ${ghq-sync}/bin/ghq-sync --tags $mode github.com/o/r 2>&1) || status=$?
-      want="error: --tags cannot be combined with --deepen or --full''${nl}''${nl}$usage"
+      want="error: --tags cannot be combined with --deepen, --full or --hydrate''${nl}''${nl}$usage"
       if [ "$status" != 2 ] || [ "$got" != "$want" ]; then
         printf 'FAIL: ghq-sync --tags %s -> exit %s:\n%s\n' "$mode" "$status" "$got"
         exit 1
       fi
       echo "ok: ghq-sync --tags $mode -> exit 2"
+    done
+
+    echo "case: ghq-sync --hydrate hands a revision to the writer and refuses anything else"
+    M="$work/shared/github.com/o/r/mod"
+    GHQ_ROOT="$work/shared-link" GHQ_SYNC_DELEGATE="$work/client" expect_sync 0 "client hydrate v1.2~1 $M" --hydrate v1.2~1 "$M"
+    GHQ_ROOT="$work/shared-link" GHQ_SYNC_DELEGATE="$work/client" expect_sync 0 "would hydrate v1.2: $M" -n --hydrate v1.2 "$M"
+    for rev in a..b -x 'HEAD@{1}' HEAD:f ""; do
+      status=0
+      got=$(GHQ_ROOT="$work/shared-link" GHQ_SYNC_DELEGATE="$work/client" ${ghq-sync}/bin/ghq-sync --hydrate "$rev" "$M" 2>&1) || status=$?
+      want="error: --hydrate requires a ref or object name, optionally with ~N or ^N: $rev''${nl}''${nl}$usage"
+      if [ "$status" != 2 ] || [ "$got" != "$want" ]; then
+        printf 'FAIL: ghq-sync --hydrate %s -> exit %s:\n%s\n' "$rev" "$status" "$got"
+        exit 1
+      fi
+      echo "ok: ghq-sync --hydrate '$rev' -> exit 2"
     done
 
     echo "case: GHQ_ROOT overrides git configuration"

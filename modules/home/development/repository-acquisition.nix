@@ -1,6 +1,7 @@
 { config, ... }:
 let
   homeModules = config.flake.modules.homeManager;
+  lfsPolicy = config.flake.lib.sharedReferenceTreeLfsPolicy;
 in
 {
   # A host that shares one ghq tree (modules/system/shared-reference-tree.nix) sets
@@ -25,6 +26,12 @@ in
     }:
     let
       root = config.programs.ghq-shared.root;
+      # git matches gitdir: against the repository's resolved path as well, and
+      # on darwin /var resolves to /private/var.
+      rootForms = [
+        root
+      ]
+      ++ lib.optional (pkgs.stdenv.hostPlatform.isDarwin && lib.hasPrefix "/var/" root) "/private${root}";
     in
     {
       key = "vanixiets/ghq-home-module";
@@ -46,6 +53,13 @@ in
             # uses a bare repository only when named with --git-dir.
             safe.bareRepository = "explicit";
           };
+          # The shared tree holds LFS pointer files as committed, and this account
+          # cannot write the LFS cache an LFS filter would use there, so its git runs
+          # no LFS filter under the root, as the tree's writer does.
+          programs.git.includes = map (form: {
+            condition = "gitdir:${form}/";
+            contents.filter.lfs = lfsPolicy;
+          }) rootForms;
           # Activation rather than home.file: Home Manager refuses to replace an
           # existing ~/ghq directory, which stays until ghq-shared-migrate moves it.
           home.activation.ghqSharedLink = lib.hm.dag.entryAfter [ "writeBoundary" ] ''

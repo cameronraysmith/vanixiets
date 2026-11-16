@@ -5,13 +5,17 @@ usage() {
   cat <<'USAGE'
 ghq-sync - lazy, partial-clone-aware ghq wrapper for the Category-2 reference
 tree. Fetches repositories as shallow blobless clones, updates them, deepens
-their history in place, and promotes lazy clones to full clones on demand.
+their history in place, promotes lazy clones to full clones, and hydrates the
+blobs a revision needs, on demand.
 
 Usage:
   ghq-sync [TARGET...]              lazy fetch (shallow + blobless + no-recursive)
   ghq-sync -u|--update [TARGET...]  lazy fetch, then ghq's native update per repo
   ghq-sync --deepen N [TARGET...]   deepen history by N commits in place
   ghq-sync --full [TARGET...]       promote a lazy clone to a full clone in place
+  ghq-sync --hydrate REV [TARGET...]
+                                    fetch every object REV's tree needs that the
+                                    partial clone lacks
   ghq-sync --seed-zoxide [QUERY]    register `ghq list -p [QUERY]` repos with
                                     zoxide, no network access
   ghq-sync --all [QUERY]            operate over `ghq list [QUERY]` (implies -u
@@ -33,6 +37,11 @@ Options:
                    keeping the blobless partial filter.
   --full           Promote each resolved lazy clone to a full clone in place. A
                    target that is not yet cloned is cloned fully (plain ghq get).
+  --hydrate REV    Make every blob and tree of REV's tree present in each
+                   resolved partial clone, keeping its filter and depth, so that
+                   `git show REV:PATH` and checkouts of REV need no lazy fetch.
+                   REV is a ref or object name, optionally with ~N or ^N, and its
+                   commit must already be in the clone (fetch tags with -u --tags).
   --seed-zoxide [QUERY]
                    Register every repo in `ghq list -p [QUERY]` with zoxide
                    without any network access, printing one `added: <path>` line
@@ -43,25 +52,27 @@ Options:
   --tags           On a host-shared tree, also fetch the remote's tags; full clones
                    always fetch tags on update, shallow clones fetch absent tags at
                    depth 1 without moving their history boundary (fetch mode).
-  -j, --jobs N     Bounded concurrency for --deepen/--full (default: 6).
-  -n, --dry-run    Print intended actions for --deepen/--full/--all/--seed-zoxide;
-                   no mutation.
+  -j, --jobs N     Bounded concurrency for --deepen/--full/--hydrate (default: 6).
+  -n, --dry-run    Print intended actions for --deepen/--full/--hydrate/--all/
+                   --seed-zoxide; no mutation.
   -h, --help       Show this help and exit.
 
 Fetch mode is a transparent pass-through to `ghq get --shallow --partial blobless
 --no-recursive -P [-u]`; ghq's own output and exit status are preserved. The
---deepen and --full modes print exactly one status line per repo (deepened:,
-promoted to full:, skip: <reason>, or failed:) and continue past per-repo errors.
+--deepen, --full and --hydrate modes print exactly one status line per repo
+(deepened:, promoted to full:, hydrated:, skip: <reason>, or failed:) and
+continue past per-repo errors.
 
-Repositories fetched, updated, deepened, or promoted are also registered with
-zoxide as a silent side effect; fetch mode stays output-transparent, so
-`ghq-sync ... | cb copy` still captures exactly ghq's own output. --seed-zoxide
-prints one `added: <path>` line per indexed repo.
+Repositories fetched, updated, deepened, promoted, or hydrated are also
+registered with zoxide as a silent side effect; fetch mode stays
+output-transparent, so `ghq-sync ... | cb copy` still captures exactly ghq's own
+output. --seed-zoxide prints one `added: <path>` line per indexed repo.
 
 Environment:
-  GHQ_SYNC_DELEGATE  Executable that carries out --deepen and in-place --full
-                     work on a host-shared tree this account cannot write; it
-                     is called as `deepen N PATH` or `promote PATH`.
+  GHQ_SYNC_DELEGATE  Executable that carries out --deepen, in-place --full and
+                     --hydrate work on a host-shared tree this account cannot
+                     write; it is called as `deepen N PATH`, `promote PATH` or
+                     `hydrate REV PATH`.
   GHQ_SYNC_NO_ZOXIDE Skip zoxide registration (the shared tree's writer).
 USAGE
 }
@@ -74,6 +85,12 @@ die() {
 
 is_pos_int() {
   [[ "$1" =~ ^[1-9][0-9]*$ ]]
+}
+
+# Ref or object name, optionally with ~N or ^N; no ranges, reflogs or options.
+# The writer's request handler applies the same rule.
+is_revision() {
+  [[ "$1" =~ ^[A-Za-z0-9][A-Za-z0-9._/+-]*([~^][0-9]*)*$ ]] && [[ "$1" != *..* ]]
 }
 
 # An existing directory under $(ghq root) becomes its repository's
@@ -224,6 +241,63 @@ full_one() {
   return 0
 }
 
+hydrate_one() {
+  local target="$1" path tree listed line before="" count=0
+  local missing=()
+  path="$(resolve_repo "$target")"
+  if [ -z "$path" ]; then
+    printf 'skip: %s (not cloned)\n' "$target"
+    return 0
+  fi
+  if [ "$dry_run" = 1 ]; then
+    printf 'would hydrate %s: %s\n' "$hydrate_rev" "$path"
+    return 0
+  fi
+  if [ -n "${GHQ_SYNC_DELEGATE:-}" ]; then
+    "$GHQ_SYNC_DELEGATE" hydrate "$hydrate_rev" "$path" || printf 'failed: %s\n' "$path"
+    return 0
+  fi
+  # GIT_NO_LAZY_FETCH keeps every probe local: a lazy fetch would fetch objects
+  # one by one, and would make an absent revision look present.
+  if ! GIT_NO_LAZY_FETCH=1 git -C "$path" rev-parse --verify --quiet --end-of-options "$hydrate_rev^{commit}" >/dev/null 2>&1 \
+    || ! tree="$(GIT_NO_LAZY_FETCH=1 git -C "$path" log -1 --no-walk --format=%T --end-of-options "$hydrate_rev^{commit}" 2>/dev/null)" \
+    || [ -z "$tree" ]; then
+    printf 'skip: %s (%s is not a commit in this clone; fetch it first, for example with ghq-sync -u --tags)\n' "$path" "$hydrate_rev"
+    return 0
+  fi
+  # Each pass fetches, in one request, every object the walk found missing; a
+  # tree that arrives can reveal further missing objects beneath it, and the
+  # walk cannot start until the root tree itself is present. The same objects
+  # missing twice means the remote did not send them.
+  while :; do
+    if ! GIT_NO_LAZY_FETCH=1 git -C "$path" cat-file -e "$tree" 2>/dev/null; then
+      listed="?$tree"
+    elif ! listed="$(GIT_NO_LAZY_FETCH=1 git -C "$path" rev-list --objects --no-object-names --missing=print "$tree" 2>/dev/null)"; then
+      printf 'failed: %s\n' "$path"
+      return 0
+    fi
+    missing=()
+    while IFS= read -r line; do
+      case "$line" in
+        '?'*) missing+=("${line#\?}") ;;
+      esac
+    done <<<"$listed"
+    if [ "${#missing[@]}" -eq 0 ]; then
+      break
+    fi
+    if [ "${missing[*]}" = "$before" ] \
+      || ! printf '%s\n' "${missing[@]}" | git -C "$path" -c fetch.negotiationAlgorithm=noop fetch \
+        --no-tags --no-write-fetch-head --recurse-submodules=no --filter=blob:none --stdin origin >/dev/null 2>&1; then
+      printf 'failed: %s\n' "$path"
+      return 0
+    fi
+    before="${missing[*]}"
+    count=$((count + ${#missing[@]}))
+  done
+  printf 'hydrated: %s (%s, %s objects fetched)\n' "$path" "$hydrate_rev" "$count"
+  return 0
+}
+
 run_pool() {
   local worker="$1"
   shift
@@ -244,6 +318,7 @@ all=0
 dry_run=0
 jobs=6
 deepen_n=""
+hydrate_rev=""
 targets=()
 
 while [ "$#" -gt 0 ]; do
@@ -263,6 +338,16 @@ while [ "$#" -gt 0 ]; do
       shift
       mode=deepen
       deepen_n="$1"
+      ;;
+    --hydrate=*)
+      mode=hydrate
+      hydrate_rev="${1#*=}"
+      ;;
+    --hydrate)
+      if [ "$#" -lt 2 ]; then die "--hydrate requires a revision"; fi
+      shift
+      mode=hydrate
+      hydrate_rev="$1"
       ;;
     -j=* | --jobs=*) jobs="${1#*=}" ;;
     -j | --jobs)
@@ -295,8 +380,11 @@ fi
 if [ "$mode" = deepen ] && ! is_pos_int "$deepen_n"; then
   die "--deepen requires a positive integer: $deepen_n"
 fi
-if [ "$tags" = 1 ] && { [ "$mode" = deepen ] || [ "$mode" = full ]; }; then
-  die "--tags cannot be combined with --deepen or --full"
+if [ "$mode" = hydrate ] && ! is_revision "$hydrate_rev"; then
+  die "--hydrate requires a ref or object name, optionally with ~N or ^N: $hydrate_rev"
+fi
+if [ "$tags" = 1 ] && { [ "$mode" = deepen ] || [ "$mode" = full ] || [ "$mode" = hydrate ]; }; then
+  die "--tags cannot be combined with --deepen, --full or --hydrate"
 fi
 
 if [ "$all" = 1 ]; then
@@ -357,6 +445,10 @@ case "$mode" in
     ;;
   full)
     run_pool full_one "${targets[@]}"
+    register_targets "${targets[@]}"
+    ;;
+  hydrate)
+    run_pool hydrate_one "${targets[@]}"
     register_targets "${targets[@]}"
     ;;
   seed)

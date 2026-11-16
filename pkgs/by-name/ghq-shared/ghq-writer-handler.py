@@ -5,6 +5,10 @@ launchd inetdCompatibility), with the connection on file descriptor 0. Reads one
 JSON request, refuses anything outside a fixed action set, runs ghq or ghq-sync
 without a shell, and writes one JSON reply {"stdout", "stderr", "exit"}.
 
+Git runs with no LFS filter, whatever a repository's own configuration says, so
+every working tree holds LFS pointer files exactly as committed; readers' git
+configuration applies the same policy to the shared root.
+
 Usage: ghq-writer-handler CONFIG.json, where CONFIG holds "root", "group" and
 "allowedProtocols".
 """
@@ -26,13 +30,26 @@ TOOL_PATH = "@toolPath@"
 MAX_REQUEST = 4096
 READ_TIMEOUT = 30
 TARGET = re.compile(r"[A-Za-z0-9][A-Za-z0-9._~:/@+%-]*\Z")
+# A revision: a ref name, an object name, or either with ~N or ^N suffixes. No
+# range, reflog, search or option syntax.
+REVISION = re.compile(r"[A-Za-z0-9][A-Za-z0-9._/+-]*(?:[~^][0-9]*)*\Z")
 SCHEME = re.compile(r"([A-Za-z][A-Za-z0-9+.-]*)://")
 FIELDS = {
     "get": {"action", "target", "lazy", "update", "tags"},
     "deepen": {"action", "depth", "path"},
     "promote": {"action", "path"},
+    "hydrate": {"action", "rev", "path"},
 }
 BOOLEANS = ("lazy", "update", "tags")
+# Command-scope configuration outranks a repository's own, so this holds even in
+# a clone whose .git/config names git-lfs. Readers' git applies the same keys to
+# the shared root (modules/home/development/repository-acquisition.nix).
+LFS_POLICY = [
+    "filter.lfs.process=",
+    "filter.lfs.clean=",
+    "filter.lfs.smudge=",
+    "filter.lfs.required=false",
+]
 
 
 class Refused(Exception):
@@ -80,9 +97,17 @@ def check_path(path, root):
     return real
 
 
+def check_revision(rev):
+    if not isinstance(rev, str) or len(rev) > 256 or not REVISION.match(rev):
+        raise Refused("rev must be a ref or object name, optionally with ~N or ^N, starting with a letter or digit")
+    if ".." in rev or rev.endswith((".lock", "/", ".")) or "//" in rev or "/." in rev:
+        raise Refused("rev may not contain '..' or name a malformed ref")
+    return rev
+
+
 def command(request, config):
     if not isinstance(request, dict) or request.get("action") not in FIELDS:
-        raise Refused("action must be one of get, deepen, promote")
+        raise Refused("action must be one of get, deepen, promote, hydrate")
     action = request["action"]
     unknown = set(request) - FIELDS[action]
     if unknown:
@@ -103,11 +128,14 @@ def command(request, config):
         if type(depth) is not int or not 0 < depth <= 1_000_000:
             raise Refused("depth must be a positive integer")
         return [GHQ_SYNC, "--deepen", str(depth), path]
+    if action == "hydrate":
+        return [GHQ_SYNC, "--hydrate", check_revision(request.get("rev")), path]
     return [GHQ_SYNC, "--full", path]
 
 
 def environment(config):
     protocols = ["protocol.allow=never"] + [f"protocol.{p}.allow=always" for p in config["allowedProtocols"]]
+    entries = protocols + LFS_POLICY
     env = {
         "PATH": TOOL_PATH,
         "HOME": "/var/empty",
@@ -117,9 +145,9 @@ def environment(config):
         "GIT_CONFIG_NOSYSTEM": "1",
         "GIT_CONFIG_GLOBAL": "/dev/null",
         "GIT_TERMINAL_PROMPT": "0",
-        "GIT_CONFIG_COUNT": str(len(protocols)),
+        "GIT_CONFIG_COUNT": str(len(entries)),
     }
-    for i, entry in enumerate(protocols):
+    for i, entry in enumerate(entries):
         key, value = entry.split("=", 1)
         env[f"GIT_CONFIG_KEY_{i}"] = key
         env[f"GIT_CONFIG_VALUE_{i}"] = value
