@@ -2,6 +2,63 @@
 {
   perSystem =
     { pkgs, lib, ... }:
+    let
+      # Backend-independent: a veth named like a ZeroTier interface and a SYN
+      # probe that reads the negotiated MSS on both ends, dual-stack.
+      packetOracle = ''
+        import shlex, textwrap
+        machine.succeed("ip netns add peer")
+        machine.succeed("ip link add zttest type veth peer name eth0 netns peer")
+        machine.succeed("ip link set zttest mtu 2800 up")
+        machine.succeed("ip netns exec peer ip link set eth0 mtu 2800 up")
+        machine.succeed("ip netns exec peer ip link set lo up")
+        machine.succeed("ip addr add 192.0.2.1/24 dev zttest")
+        machine.succeed("ip -6 addr add fd00::1/64 dev zttest nodad")
+        machine.succeed("ip netns exec peer ip addr add 192.0.2.2/24 dev eth0")
+        machine.succeed("ip netns exec peer ip -6 addr add fd00::2/64 dev eth0 nodad")
+        machine.succeed("ip netns exec peer sysctl -w net.ipv4.tcp_timestamps=0")
+        probe = """
+        import socket, sys
+        mode, address, offered = sys.argv[1:]
+        s = socket.socket(socket.AF_INET6 if ':' in address else socket.AF_INET)
+        s.settimeout(10)
+        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        s.setsockopt(socket.IPPROTO_TCP, socket.TCP_MAXSEG, int(offered))
+        if mode == 'server':
+            s.bind((address, 8080))
+            s.listen(1)
+            open('/tmp/mss-ready', 'w').close()
+            s, _ = s.accept()
+        else:
+            s.connect((address, 8080))
+        print(s.getsockopt(socket.IPPROTO_TCP, socket.TCP_MAXSEG), flush=True)
+        s.sendall(b'x')
+        assert s.recv(1) == b'x'
+        """
+        machine.succeed("printf %s " + shlex.quote(textwrap.dedent(probe)) + " > /tmp/mss-probe.py")
+
+        def packets(clamped):
+            for address in ("192.0.2.1", "fd00::1"):
+                for offered in (1460, 1200):
+                    expected = min(offered, 1300) if clamped else offered
+                    machine.succeed("rm -f /tmp/mss-ready /tmp/mss-server")
+                    machine.succeed(f"python /tmp/mss-probe.py server {address} {offered} > /tmp/mss-server 2>&1 &")
+                    machine.wait_until_succeeds("test -e /tmp/mss-ready", timeout=10)
+                    result = machine.succeed(f"ip netns exec peer python /tmp/mss-probe.py client {address} {offered}")
+                    assert int(result.strip()) == expected, (address, offered, result)
+                    machine.wait_until_succeeds("test -s /tmp/mss-server", timeout=10)
+                    result = machine.succeed("cat /tmp/mss-server")
+                    assert int(result.strip()) == expected, (address, offered, result)
+      '';
+      node = {
+        imports = [ self.modules.nixos.zerotier-mss-clamp ];
+        networking.firewall.enable = true;
+        networking.firewall.trustedInterfaces = [ "zttest" ];
+        networking.firewall.checkReversePath = false;
+        boot.kernel.sysctl."net.ipv4.tcp_timestamps" = 0;
+        environment.systemPackages = [ pkgs.python3 ];
+      };
+    in
     {
       vmTests = lib.optionalAttrs pkgs.stdenv.hostPlatform.isLinux {
         zerotier-mss-clamp-runtime = pkgs.testers.runNixOSTest {
@@ -12,12 +69,7 @@
           };
           qemu.forceAccel = true;
           nodes.machine = { config, ... }: {
-            imports = [ self.modules.nixos.zerotier-mss-clamp ];
-            networking.firewall.enable = true;
-            networking.firewall.trustedInterfaces = [ "zttest" ];
-            networking.firewall.checkReversePath = false;
-            boot.kernel.sysctl."net.ipv4.tcp_timestamps" = 0;
-            environment.systemPackages = [ pkgs.python3 ];
+            imports = [ node ];
             environment.etc."mss-start".text = config.networking.firewall.extraCommands;
             environment.etc."mss-stop".text = config.networking.firewall.extraStopCommands;
           };
@@ -127,49 +179,7 @@
                         check_rules(1)
                         preserved()
 
-            machine.succeed("ip netns add peer")
-            machine.succeed("ip link add zttest type veth peer name eth0 netns peer")
-            machine.succeed("ip link set zttest mtu 2800 up")
-            machine.succeed("ip netns exec peer ip link set eth0 mtu 2800 up")
-            machine.succeed("ip netns exec peer ip link set lo up")
-            machine.succeed("ip addr add 192.0.2.1/24 dev zttest")
-            machine.succeed("ip -6 addr add fd00::1/64 dev zttest nodad")
-            machine.succeed("ip netns exec peer ip addr add 192.0.2.2/24 dev eth0")
-            machine.succeed("ip netns exec peer ip -6 addr add fd00::2/64 dev eth0 nodad")
-            machine.succeed("ip netns exec peer sysctl -w net.ipv4.tcp_timestamps=0")
-            probe = """
-            import socket, sys
-            mode, address, offered = sys.argv[1:]
-            s = socket.socket(socket.AF_INET6 if ':' in address else socket.AF_INET)
-            s.settimeout(10)
-            s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-            s.setsockopt(socket.IPPROTO_TCP, socket.TCP_MAXSEG, int(offered))
-            if mode == 'server':
-                s.bind((address, 8080))
-                s.listen(1)
-                open('/tmp/mss-ready', 'w').close()
-                s, _ = s.accept()
-            else:
-                s.connect((address, 8080))
-            print(s.getsockopt(socket.IPPROTO_TCP, socket.TCP_MAXSEG), flush=True)
-            s.sendall(b'x')
-            assert s.recv(1) == b'x'
-            """
-            import textwrap
-            machine.succeed("printf %s " + shlex.quote(textwrap.dedent(probe)) + " > /tmp/mss-probe.py")
-
-            def packets(clamped):
-                for address in ("192.0.2.1", "fd00::1"):
-                    for offered in (1460, 1200):
-                        expected = min(offered, 1300) if clamped else offered
-                        machine.succeed("rm -f /tmp/mss-ready /tmp/mss-server")
-                        machine.succeed(f"python /tmp/mss-probe.py server {address} {offered} > /tmp/mss-server 2>&1 &")
-                        machine.wait_until_succeeds("test -e /tmp/mss-ready", timeout=10)
-                        result = machine.succeed(f"ip netns exec peer python /tmp/mss-probe.py client {address} {offered}")
-                        assert int(result.strip()) == expected, (address, offered, result)
-                        machine.wait_until_succeeds("test -s /tmp/mss-server", timeout=10)
-                        result = machine.succeed("cat /tmp/mss-server")
-                        assert int(result.strip()) == expected, (address, offered, result)
+            ${packetOracle}
 
             # Near-match clamps are retained, but must not affect the packet oracle.
             for tool in tools:
@@ -190,6 +200,69 @@
             with subtest("re-enable restores exactly one rule each"):
                 machine.succeed("systemctl start firewall.service")
                 check_rules(1)
+                preserved()
+                packets(True)
+          '';
+        };
+        zerotier-mss-clamp-runtime-nftables = pkgs.testers.runNixOSTest {
+          name = "zerotier-mss-clamp-runtime-nftables";
+          requiredFeatures = {
+            kvm = true;
+            nixos-test = true;
+          };
+          qemu.forceAccel = true;
+          nodes.machine = {
+            imports = [ node ];
+            networking.nftables.enable = true;
+          };
+          testScript = ''
+            start_all()
+            machine.wait_for_unit("nftables.service")
+            clamp = "table inet zerotier-mss-clamp"
+
+            def check_table(count):
+                tables = machine.succeed("nft list tables").splitlines()
+                assert tables.count(clamp) == count, tables
+                if count:
+                    ruleset = machine.succeed(f"nft list {clamp}")
+                    for match in ('iifname "zt*"', 'oifname "zt*"'):
+                        assert ruleset.count(match) == 1, (match, ruleset)
+                    assert ruleset.count("maxseg size set 1300") == 2, ruleset
+                    machine.succeed("nft list chain inet nixos-fw input")
+
+            # Another owner's table, standing in for incus's and podman's, must
+            # survive every lifecycle action on nftables.service.
+            machine.succeed("nft add table inet mss-sentinel")
+            machine.succeed("nft add chain inet mss-sentinel output '{ type filter hook output priority 0; }'")
+            machine.succeed("nft add rule inet mss-sentinel output oifname lo accept")
+            sentinel = machine.succeed("nft list table inet mss-sentinel")
+
+            def preserved():
+                assert machine.succeed("nft list table inet mss-sentinel") == sentinel
+
+            with subtest("initial install"):
+                check_table(1)
+
+            with subtest("bounded reload and restart"):
+                # Reload is the path a nixos-rebuild switch takes, since
+                # nftables.service is reloadIfChanged; it re-runs the ruleset,
+                # which deletes and recreates the clamp table in one transaction.
+                for action in ("reload", "restart"):
+                    machine.succeed(f"systemctl {action} nftables.service")
+                    check_table(1)
+                    preserved()
+
+            ${packetOracle}
+            with subtest("dual-stack SYN negotiation clamps both directions without raising smaller MSS"):
+                packets(True)
+            with subtest("stop removes the clamp and preserves unrelated tables"):
+                machine.succeed("systemctl stop nftables.service")
+                check_table(0)
+                preserved()
+                packets(False)
+            with subtest("re-enable restores exactly one table"):
+                machine.succeed("systemctl start nftables.service")
+                check_table(1)
                 preserved()
                 packets(True)
           '';
