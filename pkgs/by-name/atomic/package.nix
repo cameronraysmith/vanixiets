@@ -10,13 +10,13 @@
 # The npm tarball ships dist/ prebuilt (upstream's prepublishOnly runs
 # `bun run build` plus a shrinkwrap generator), so nothing is compiled here:
 # the build is `npm ci --ignore-scripts` + `npm rebuild` (which runs the
-# dependencies' install scripts, e.g. @embedded-postgres' pg-symlinks
-# recreation) from the shipped npm-shrinkwrap.json, and the install hook packs
+# dependencies' install scripts, e.g. protobufjs' postinstall) from the
+# shipped npm-shrinkwrap.json, and the install hook packs
 # the declared `files` and copies node_modules next to them.
 #
 # Pinning: the registry tarball by its sha256 (cross-checkable against the
 # registry's published integrity) and the dependency closure by npmDepsHash
-# over the shipped npm-shrinkwrap.json (lockfileVersion 3, 386 packages).
+# over the shipped npm-shrinkwrap.json (lockfileVersion 3, 332 packages).
 #
 # Two upstream-shrinkwrap repairs live in npm-dist-repairs.patch:
 #  - the prepublishOnly generator emits the workspace-internal @bastani/*
@@ -46,6 +46,7 @@
   fetchurl,
   makeBinaryWrapper,
   fd,
+  git,
   ripgrep,
   runCommand,
   versionCheckHook,
@@ -60,16 +61,25 @@ buildNpmPackage (finalAttrs: {
 
   src = fetchurl {
     url = "https://registry.npmjs.org/@bastani/atomic/-/atomic-${finalAttrs.version}.tgz";
-    hash = "sha256-WhlVVZoupRAtGWntvucM3aV5RgTOxcm91O9HB3nz2/0=";
+    hash = "sha256-qCYWrxXJrm3rDAois1nj4pUzxJYq5cBJOQ8ca0+zp1o=";
   };
   sourceRoot = "package";
 
   nodejs = nodejs_22;
-  npmDepsHash = "sha256-waRph65rr0q2NblNtI19lKo+zOEXuG5FmAkoGvQSL30=";
+  npmDepsHash = "sha256-PPoQkhtUWbz6ErO2A5LYJZFyzg6TPZ7Tw4A0iVUi/+E=";
 
   postPatch = ''
     patch -p1 < ${./npm-dist-repairs.patch}
   '';
+
+  # From 0.9.71 atomic depends on @modelcontextprotocol/ext-apps 2.x, whose
+  # required peers (@modelcontextprotocol/client and core) the shrinkwrap
+  # omits, so `npm ci` and the install hook's `npm prune` try to resolve them
+  # from the registry and die ENOTCACHED. Nothing in dist/ imports ext-apps,
+  # so the peers are never loaded; skipping peer resolution installs exactly
+  # the shrinkwrap's tree, which carries no `peer: true` entries for this flag
+  # to drop. npmFlags reaches every npm call (ci, rebuild, prune).
+  npmFlags = [ "--legacy-peer-deps" ];
 
   # dist/ is prebuilt in the tarball; there is nothing to npm-run.
   dontNpmBuild = true;
@@ -77,14 +87,16 @@ buildNpmPackage (finalAttrs: {
   nativeBuildInputs = [ makeBinaryWrapper ];
 
   # atomic resolves fd and rg from PATH and otherwise downloads a release
-  # binary from GitHub at first use. PATH is suffixed so the caller's own
-  # tools still win.
+  # binary from GitHub at first use; since 0.9.72 it does the same for git
+  # (a portable dugite-native build, whenever no git >= 2.30.0 is on PATH).
+  # PATH is suffixed so the caller's own tools still win.
   postFixup = ''
     wrapProgram "$out/bin/atomic" \
       --set ATOMIC_SKIP_VERSION_CHECK 1 \
       --suffix PATH : ${
         lib.makeBinPath [
           fd
+          git
           ripgrep
         ]
       }
