@@ -29,6 +29,7 @@
           "tls-verification"
           "token-transport"
         ];
+        pi-acp = [ "initialize" ];
         playwright-cli = [ "smoke" ];
         stack-land = [ "integration" ];
         vanixiets-docs = [

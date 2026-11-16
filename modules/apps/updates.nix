@@ -15,6 +15,11 @@
         program = "${config.packages.atomic.updateScript}";
       };
 
+      apps.update-pi-acp = {
+        type = "app";
+        program = "${config.packages.pi-acp.updateScript}";
+      };
+
       apps.update-claude-code = {
         type = "app";
         program = "${config.packages.claude-code.updateScript}";

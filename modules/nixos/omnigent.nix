@@ -1,6 +1,6 @@
 { config, ... }:
 let
-  acp = config.flake.lib.omnigentACP;
+  omnigentACP = config.flake.lib.omnigentACP;
 in
 {
   flake.modules.nixos.omnigent =
@@ -13,7 +13,7 @@ in
     let
       cfg = config.services.omnigent;
       stateDirectory = "/var/lib/omnigent";
-      configDirectory = pkgs.writeTextDir "config.yaml" (builtins.toJSON { inherit acp; });
+      configDirectory = pkgs.writeTextDir "config.yaml" (builtins.toJSON { acp = omnigentACP pkgs; });
       adminList = pkgs.writeText "omnigent-admins" ''
         cameron.ray.smith@gmail.com
       '';

@@ -1,0 +1,67 @@
+diff --git a/src/acp/agent.ts b/src/acp/agent.ts
+index f3ce031..0da3c06 100644
+--- a/src/acp/agent.ts
++++ b/src/acp/agent.ts
+@@ -750,7 +750,7 @@ export class PiAcpAgent implements ACPAgent {
+         const sessionFile = typeof state?.sessionFile === 'string' ? state.sessionFile : null
+         const messageCount = typeof state?.messageCount === 'number' ? state.messageCount : 0
+ 
+-        if (!sessionFile || messageCount === 0 || !existsSync(sessionFile)) {
++        if (messageCount === 0 || (sessionFile !== null && !existsSync(sessionFile))) {
+           await this.conn.sessionUpdate({
+             sessionId: session.sessionId,
+             update: {
+@@ -765,7 +765,8 @@ export class PiAcpAgent implements ACPAgent {
+         }
+ 
+         try {
+-          const raw = readFileSync(sessionFile, 'utf-8')
++          // atomic's SQLite sessions have no file; messageCount alone guards them.
++          const raw = sessionFile ? readFileSync(sessionFile, 'utf-8') : String(messageCount)
+           if (raw.trim().length === 0) {
+             await this.conn.sessionUpdate({
+               sessionId: session.sessionId,
+@@ -911,6 +912,12 @@ export class PiAcpAgent implements ACPAgent {
+     // Zed currently sends `{}` (no cwd), so we default to the last session cwd to
+     // emulate pi's `/resume` picker (project-scoped).
+     const all = listPiSessions()
++    // atomic's SQLite sessions have no JSONL file: list those this adapter recorded by id.
++    const listed = new Set(all.map(s => s.sessionId))
++    for (const s of this.store.list()) {
++      if (!listed.has(s.sessionId) && !isAbsolute(s.sessionFile)) all.push({ ...s, title: null })
++    }
++    all.sort((a, b) => (b.updatedAt ?? '').localeCompare(a.updatedAt ?? ''))
+ 
+     const effectiveCwd = (params as any).cwd ?? this.lastSessionCwd
+     const filtered = effectiveCwd ? all.filter(s => s.cwd === effectiveCwd) : all
+diff --git a/src/acp/session-store.ts b/src/acp/session-store.ts
+index acc80f2..fb5fc04 100644
+--- a/src/acp/session-store.ts
++++ b/src/acp/session-store.ts
+@@ -48,6 +48,10 @@ export class SessionStore {
+     return db.sessions[sessionId] ?? null
+   }
+ 
++  list(): StoredSession[] {
++    return Object.values(loadFile(this.path).sessions)
++  }
++
+   upsert(entry: { sessionId: string; cwd: string; sessionFile: string }): void {
+     const db = loadFile(this.path)
+     db.sessions[entry.sessionId] = {
+diff --git a/src/acp/session.ts b/src/acp/session.ts
+index 1c97b24..849e7e6 100644
+--- a/src/acp/session.ts
++++ b/src/acp/session.ts
+@@ -229,7 +229,10 @@ export class SessionManager {
+     }
+ 
+     const sessionId = typeof state?.sessionId === 'string' ? state.sessionId : crypto.randomUUID()
+-    const sessionFile = typeof state?.sessionFile === 'string' ? state.sessionFile : null
++    // atomic >= 0.9.38 keeps sessions in SQLite: get_state has no sessionFile and
++    // `--session` takes the session id, so the id is what restore must pass.
++    const sessionFile =
++      typeof state?.sessionFile === 'string' ? state.sessionFile : typeof state?.sessionId === 'string' ? sessionId : null
+ 
+     if (sessionFile) {
+       this.store.upsert({ sessionId, cwd: params.cwd, sessionFile })

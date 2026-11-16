@@ -1,6 +1,6 @@
 { config, ... }:
 let
-  acp = config.flake.lib.omnigentACP;
+  omnigentACP = config.flake.lib.omnigentACP;
   managedConfigsModule = config.flake.modules.homeManager.managedConfigs;
   content =
     legacy:
@@ -13,6 +13,7 @@ let
     }:
     let
       cfg = config.programs.omnigent;
+      acp = omnigentACP pkgs;
       yamlFormat = pkgs.formats.yaml { };
       hostName = if !legacy || osConfig == null then null else osConfig.networking.hostName;
       runner = if !legacy || osConfig == null then { } else osConfig.services.omnigent-host or { };
