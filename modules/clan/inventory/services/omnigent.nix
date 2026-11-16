@@ -62,6 +62,7 @@ in
               "personal"
               "work"
             ];
+            containers.engine = "rootless-podman";
           };
           janettesmith = {
             enable = true;
@@ -70,6 +71,7 @@ in
             credentials = workerCredentials "janettesmith" "omnigent-janettesmith" [
               "personal"
             ];
+            containers.engine = "rootless-podman";
           };
         };
       };
@@ -88,6 +90,10 @@ in
               "personal"
               "work"
             ];
+            containers = {
+              engine = "rootless-podman";
+              incus = "restricted";
+            };
           };
           janettesmith = {
             enable = true;
@@ -96,6 +102,10 @@ in
             credentials = workerCredentials "janettesmith" "omnigent-janettesmith" [
               "personal"
             ];
+            containers = {
+              engine = "rootless-podman";
+              incus = "restricted";
+            };
           };
         };
       };

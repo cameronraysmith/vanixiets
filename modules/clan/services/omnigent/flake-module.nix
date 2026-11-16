@@ -113,6 +113,24 @@ in
                       default = [ ];
                       description = "Nixpkgs attribute names appended after the runtime and worker profile.";
                     };
+                    containers = {
+                      engine = lib.mkOption {
+                        type = lib.types.enum [
+                          "none"
+                          "rootless-podman"
+                        ];
+                        default = "none";
+                        description = "Container engine for the worker's sessions; rootless-podman is Linux-only.";
+                      };
+                      incus = lib.mkOption {
+                        type = lib.types.enum [
+                          "none"
+                          "restricted"
+                        ];
+                        default = "none";
+                        description = "Incus access confined to the worker's own project; requires Incus on the host.";
+                      };
+                    };
                   };
                 }
               );
@@ -165,6 +183,7 @@ in
                       autoApproveDirenv
                       environment
                       credentials
+                      containers
                       ;
                     hostName = lib.mkIf (worker.hostName != null) worker.hostName;
                     workspaceRoot = lib.mkIf (worker.workspaceRoot != null) worker.workspaceRoot;
@@ -195,6 +214,7 @@ in
                       autoApproveDirenv
                       environment
                       credentials
+                      containers
                       ;
                     hostName = lib.mkIf (worker.hostName != null) worker.hostName;
                     workspaceRoot = lib.mkIf (worker.workspaceRoot != null) worker.workspaceRoot;

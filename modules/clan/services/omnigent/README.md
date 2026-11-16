@@ -120,9 +120,12 @@ Before later human-controlled activation, select pyrite's configured `services.o
 
 The inventory prepares Cameron and Janette on magnetite and pyrite, and Cameron alone on stibnite.
 All five workers are currently enabled; disabled preparation remains covered by platform fixtures rather than the live inventory.
-Linux account declarations live in `inventory/services/users/omnigent-workers.nix` and use normal UID/private-group allocation with locked passwords and `0700` homes.
+Linux account declarations live in `inventory/services/users/omnigent-workers.nix` and use private-group allocation with locked passwords and `0700` homes.
+Their UIDs are pinned per host to each host's existing `/var/lib/nixos/uid-map` allocation, because rootless container access names the worker's user manager and runtime directory by UID; a new host pins a free UID before the worker is first created.
 Stibnite declares `omnigent-cameron` with UID/GID `551` and a private `/Users/omnigent-cameron` home, without changing `system.primaryUser`.
-On a host that shares one ghq tree (`services.shared-reference-tree`), a participating worker is also a member of the tree's writer group (`ghq`, or `_ghq` on darwin), which grants read access to that tree and nothing else; the fleet obligations admit exactly that group beside the worker's private group and reject any other.
+On a host that shares one ghq tree (`services.shared-reference-tree`), a participating worker is also a member of the tree's writer group (`ghq`, or `_ghq` on darwin), which grants read access to that tree and nothing else.
+A worker with `containers.incus = "restricted"` is also a member of `incus`.
+The fleet obligations admit exactly those groups beside the worker's private group and reject any other.
 The deployment plan records the operator's allocation approval and separate declared/live collision evidence.
 No provider identity, model grant, SSH key or signing credential is inherited or enrolled by these declarations.
 
@@ -199,6 +202,24 @@ Credential grants and application-admin permissions remain external authority.
 `checks.x86_64-linux.omnigent-worker-linux` covers module composition and configured boundaries; actual selected-harness identity, protected-canary, devshell and lifecycle checks remain required after authorized activation.
 Its account guards are checked by one container configuration in which the enabled Cameron worker violates the private-home, administrative-group, trusted-user and environment guards and the disabled Raquel worker aliases the wheel gid; the failing assertion messages must equal a literal set.
 The same configuration checks disabled-worker preparation and the absence of the legacy host unit, and the build runs Cameron's emitted `ExecStartPre` against private, public, wrong-owner and symlinked homes; per-guard negative attribution, the root, duplicate-account, duplicate-home and public-home fixtures, the numeric/alias sudo matrix and the assertion-filter regression are no longer evaluated.
+
+### Container access
+
+`workers.<name>.containers` selects container access for a worker's sessions on both plain host modules and the serializable Clan role.
+`engine` is `none` or `rootless-podman`, and `incus` is `none` or `restricted`; both default to `none` on every platform.
+`rootless-podman` is Linux-only and requires `virtualisation.podman.enable` and a pinned account UID; `restricted` requires `virtualisation.incus.enable`.
+Darwin accepts only `none` for now.
+Pyrite's workers select `rootless-podman` and `restricted`, magnetite's select `rootless-podman` alone, and stibnite selects nothing.
+
+Sessions are not logins: the runner zygote has no PAM or logind session, so nothing else creates `/run/user/<uid>` or a user manager.
+`rootless-podman` therefore lingers the account, and `omnigent-host-<key>.service` wants and orders after `user@<uid>.service`.
+The user manager socket-activates the account's own `podman.socket`; nothing runs until a client connects.
+The unit sets `XDG_RUNTIME_DIR=/run/user/<uid>`, and both `DOCKER_HOST` and `CONTAINER_HOST` to `unix:///run/user/<uid>/podman/podman.sock`, appending both names to `OMNIGENT_RUNNER_ENV_PASSTHROUGH`, since omnigent's runner allowlist carries `XDG_RUNTIME_DIR` but neither of them.
+Sessions inherit the unit's `NoNewPrivileges`, under which the setuid `newuidmap`/`newgidmap` cannot raise privileges, so a local `podman` CLI cannot create the rootless user namespace; `CONTAINER_HOST` makes it a remote client of the socket-activated service, which runs under the user manager instead.
+Remote mode rejects local-only operations such as `podman unshare`, `podman mount`, `podman system migrate`, `podman system reset` and `run --env-host`; bind mounts of the worker's own paths and `--userns=keep-id` still work, because the service runs as the same user on the same host.
+Its PATH starts with `/run/wrappers/bin` and ends with the host's podman package, the real Docker CLI (`docker-client`, not podman's docker shim), and `docker-compose`.
+`restricted` adds the worker to the `incus` group served by `incus-user`, which confines it to its own restricted project, and appends the host's incus client to the PATH.
+No worker joins `podman`, `docker` or `incus-admin`: the rootful sockets stay out of reach, and the adapter's administrative-group guard rejects all three.
 
 ## Dedicated Darwin workers
 
