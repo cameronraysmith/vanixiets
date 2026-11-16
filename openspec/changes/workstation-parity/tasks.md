@@ -96,6 +96,9 @@ The operator approved `RestartPreventExitStatus=78` on 2026-11-14; it lands with
 - [x] 9.5 Declare pyrite's dark colour-scheme preference — verify: the portal's `org.freedesktop.appearance` `color-scheme` reads 1 after activation, and Zen's "system" theme renders dark.
   pyrite's system dconf database sets `org/gnome/desktop/interface` `color-scheme` to `prefer-dark` as an unlocked default (#3879); before it the key was unset and the portal reported 0, no preference.
   After activation the portal read 1 once its already-running services were restarted, and the operator confirmed on 2026-11-14 that Zen's "system" theme renders dark.
+- [ ] 9.6 Restore the power button on pyrite's DMS lock screen — verify: `nix eval` of the rendered `lockScreenWidgetInstances` shows `lock_power` enabled; the operator sees the button on the lock screen after activation.
+  Progress 2026-11-15: DMS 2.1.2 builds the lock screen from `lockScreenWidgetInstances`, whose default disables `lock_power`, and applies the `lockScreenShowPowerActions` migration only to versioned settings files, so the flag has no effect in nix-generated settings; `modules/home/dms/default.nix` now declares 2.1.2's default list with only `lock_power` enabled, to be re-checked on DMS bumps.
+  The DankGreeter is deliberately unchanged: its only settings input, `configFiles`, is copied by the greetd `preStart` hook that pyrite-dankgreeter D5 disables, and feeding it settings needs its own design.
 
 ## 10. GUI application triage
 

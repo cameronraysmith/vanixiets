@@ -60,6 +60,52 @@
           lockPamExternallyManaged = true;
           loginctlLockIntegration = true;
           lockBeforeSuspend = true;
+          # DMS 2.1.2's lockWidgetDefaults() (dux-qml-common SharedSettingsSpec.js) with Power enabled;
+          # nix-generated settings skip the lockScreenShowPowerActions migration. Re-check on DMS bumps.
+          lockScreenWidgetInstances =
+            let
+              tint = {
+                colorMode = "default";
+                customColor = "#ffffff";
+              };
+              entry = id: widgetType: enabled: config: {
+                inherit id widgetType enabled;
+                config = {
+                  displayPreferences = [ "all" ];
+                  syncPositionAcrossScreens = true;
+                }
+                // config;
+              };
+            in
+            [
+              (entry "lock_clock" "desktopClock" true (
+                {
+                  style = "expressive";
+                  transparency = 0;
+                  weight = 0;
+                  twoTone = true;
+                  showDate = false;
+                  showDigitalSeconds = false;
+                  showAnalogNumbers = false;
+                  showAnalogSeconds = true;
+                  autoPosition = true;
+                }
+                // tint
+              ))
+              (entry "lock_date" "lockDate" false ({ format = "short"; } // tint))
+              (entry "lock_auth" "lockAuth" true {
+                style = "expressive";
+                profileVisibility = "always";
+                passwordVisibility = "always";
+              })
+              (entry "lock_notifications" "lockNotifications" true { mode = 2; })
+              (entry "lock_status" "lockStatus" true {
+                showMediaPlayer = true;
+                showWeather = true;
+                background = false;
+              })
+              (entry "lock_power" "lockPower" true { shape = "round"; })
+            ];
         };
       };
 
