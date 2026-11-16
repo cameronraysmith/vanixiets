@@ -96,9 +96,17 @@ The operator approved `RestartPreventExitStatus=78` on 2026-11-14; it lands with
 - [x] 9.5 Declare pyrite's dark colour-scheme preference — verify: the portal's `org.freedesktop.appearance` `color-scheme` reads 1 after activation, and Zen's "system" theme renders dark.
   pyrite's system dconf database sets `org/gnome/desktop/interface` `color-scheme` to `prefer-dark` as an unlocked default (#3879); before it the key was unset and the portal reported 0, no preference.
   After activation the portal read 1 once its already-running services were restarted, and the operator confirmed on 2026-11-14 that Zen's "system" theme renders dark.
-- [ ] 9.6 Restore the power button on pyrite's DMS lock screen — verify: `nix eval` of the rendered `lockScreenWidgetInstances` shows `lock_power` enabled; the operator sees the button on the lock screen after activation.
+- [x] 9.6 Restore the power button on pyrite's DMS lock screen — verify: `nix eval` of the rendered `lockScreenWidgetInstances` shows `lock_power` enabled; the operator sees the button on the lock screen after activation.
   Progress 2026-11-15: DMS 2.1.2 builds the lock screen from `lockScreenWidgetInstances`, whose default disables `lock_power`, and applies the `lockScreenShowPowerActions` migration only to versioned settings files, so the flag has no effect in nix-generated settings; `modules/home/dms/default.nix` now declares 2.1.2's default list with only `lock_power` enabled, to be re-checked on DMS bumps.
   The DankGreeter is deliberately unchanged: its only settings input, `configFiles`, is copied by the greetd `preStart` hook that pyrite-dankgreeter D5 disables, and feeding it settings needs its own design.
+  Done (#3895): the operator saw the button after a `dms` restart, which a running shell needs to re-read the replaced settings link.
+- [ ] 9.7 Make a manual suspend on pyrite wake reliably — verify: repeated `rtcwake` suspend cycles resume in about the RTC interval; the operator's suspend and wake from the power menu.
+  Progress 2026-11-15: resume from deep (S3) brought core 1 (CPUs 1 and 3) back online in 0.5–6 s every time and up to 761 s on some resumes, with displays, network and userspace still down, which looked like a machine that would not wake (boot-clock `power:suspend_resume` traces).
+  `mem_sleep_default=s2idle` takes no CPU offline: 8 of 8 cycles resumed in 63 s (#3894).
+  Open: the s2idle standby drain on battery (an hour asleep, charge compared), since the platform reaches neither S0ix nor PC10; the S3 root cause is tracked in CAM-104.
+- [ ] 9.8 Reach pyrite from other home clients promptly after it resumes — verify: `ping 192.168.50.35` from stibnite answers within a minute of pyrite's wake.
+  Progress 2026-11-15: pyrite re-associates and works outbound within about a minute, but the Verizon CHR30A router black-holes traffic from its other wireless clients to pyrite for 5–13+ minutes after any re-association, on either mesh node or band; `ssh pyrite.zt` returns after 1–3 minutes through ZeroTier's relay.
+  Not fixable on pyrite (access-control block, BSSID pin and random MAC ruled out); the firmware report or own access points are tracked in CAM-105.
 
 ## 10. GUI application triage
 
