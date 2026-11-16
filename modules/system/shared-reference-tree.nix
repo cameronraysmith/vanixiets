@@ -68,9 +68,20 @@ let
           ) roots;
     in
     if participant then entries == [ "${lib.head roots}/*" ] else !(lib.any encloses entries);
+  # The shared tree holds LFS pointer files exactly as committed: no account's git
+  # runs an LFS filter there. The writer's request handler sets the same keys
+  # (pkgs/by-name/ghq-shared/ghq-writer-handler.py, LFS_POLICY), and each
+  # participant's git configuration sets them for every root form.
+  lfsPolicy = {
+    process = "";
+    clean = "";
+    smudge = "";
+    required = false;
+  };
 in
 {
   flake.modules.nixos.shared-reference-tree-options = options false;
   flake.modules.darwin.shared-reference-tree-options = options true;
   flake.lib.sharedReferenceTreeSafeDirectoriesConform = safeDirectoriesConform;
+  flake.lib.sharedReferenceTreeLfsPolicy = lfsPolicy;
 }

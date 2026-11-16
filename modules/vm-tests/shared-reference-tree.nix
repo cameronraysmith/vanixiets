@@ -161,6 +161,8 @@
                     assert machine.succeed(as_user(user, "ghq list -p fixture/hello")).strip() == P
                     machine.succeed(as_user(user, f"git -C {P} log -1 --oneline"))
                     machine.succeed(as_user(user, f"git -C {P} status"))
+                    # Under the root the reader's git runs no LFS filter, as the writer's does.
+                    assert machine.succeed(as_user(user, f"git -C {P} config --get filter.lfs.required")).strip() == "false"
 
             with subtest("deepen, promote and update go through the writer"):
                 machine.succeed(as_user("omnigent-cameron", f"ghq-sync --deepen 1 {P} | grep -Fx 'deepened: {P}'"))
@@ -168,6 +170,79 @@
                 machine.succeed(as_user("omnigent-cameron", f"ghq-sync --full {P} | grep -Fx 'promoted to full: {P}'"))
                 assert machine.succeed(as_writer(f"git -C {P} rev-parse --is-shallow-repository")).strip() == "false"
                 machine.succeed(as_user("omnigent-cameron", f"ghq get -u {URL}"))
+                assert machine.succeed(f"find {R} ! -user ghq | wc -l").strip() == "0"
+
+            with subtest("hydrate makes a revision's blobs present for readers"):
+                machine.succeed(
+                    "git init -q --bare -b main /srv/git/fixture/blobs.git"
+                    " && git -C /srv/git/fixture/blobs.git config uploadpack.allowFilter true"
+                    " && git init -q -b main /tmp/blobs"
+                    " && for i in 1 2 3; do echo v$i > /tmp/blobs/f && git -C /tmp/blobs add f"
+                    " && git -C /tmp/blobs -c user.name=t -c user.email=t@t commit -q -m v$i; done"
+                    " && git -C /tmp/blobs push -q /srv/git/fixture/blobs.git main"
+                    " && chown -R git:git /srv/git"
+                )
+                B = f"{R}/localhost/fixture/blobs"
+                machine.succeed(as_user("cameron", f"ghq-sync git://localhost/fixture/blobs && ghq-sync --deepen 2 {B}"))
+                machine.fail(as_user("omnigent-cameron", f"GIT_NO_LAZY_FETCH=1 git -C {B} show HEAD~2:f"))
+                out = machine.succeed(as_user("omnigent-cameron", f"ghq-sync --hydrate HEAD~2 {B}"))
+                assert out.startswith(f"hydrated: {B} "), out
+                assert machine.succeed(as_user("omnigent-cameron", f"GIT_NO_LAZY_FETCH=1 git -C {B} show HEAD~2:f")).strip() == "v1"
+                out = machine.fail(as_user("omnigent-cameron", f"{client} hydrate HEAD..main {B} 2>&1"))
+                assert "refused" in out, out
+                assert machine.succeed(f"find {R} ! -user ghq | wc -l").strip() == "0"
+
+            with subtest("LFS paths hold pointer files, updates pass, and readers' git-lfs never runs in the tree"):
+                machine.succeed(
+                    "git init -q --bare -b main /srv/git/fixture/lfs.git"
+                    " && git -C /srv/git/fixture/lfs.git config uploadpack.allowFilter true"
+                    " && git init -q -b main /tmp/lfs"
+                    " && printf '*.bin filter=lfs diff=lfs merge=lfs -text\\n' > /tmp/lfs/.gitattributes"
+                    " && for v in one two; do printf 'version https://git-lfs.github.com/spec/v1\\noid sha256:%s\\nsize 4\\n'"
+                    " $(echo $v | sha256sum | cut -d ' ' -f 1) > /tmp/lfs-pointer-$v; done"
+                    " && cp /tmp/lfs-pointer-one /tmp/lfs/a.bin"
+                    " && git -C /tmp/lfs add .gitattributes a.bin && git -C /tmp/lfs -c user.name=t -c user.email=t@t commit -q -m one"
+                    " && git -C /tmp/lfs push -q /srv/git/fixture/lfs.git main"
+                    " && chown -R git:git /srv/git"
+                    # Configuration that runs git-lfs, as the readers' own git configuration does on the fleet's hosts;
+                    # readers' commands below read it at system scope, beneath their global include.
+                    " && printf '[filter \"lfs\"]\\n\\tprocess = ${nodePkgs.git-lfs}/bin/git-lfs filter-process\\n\\trequired = true\\n'"
+                    " > /etc/gitconfig-lfs"
+                )
+                L = f"{R}/localhost/fixture/lfs"
+                lfs = "GIT_CONFIG_SYSTEM=/etc/gitconfig-lfs"
+                machine.succeed(as_user("cameron", "ghq-sync git://localhost/fixture/lfs"))
+                machine.succeed(f"cmp {L}/a.bin /tmp/lfs-pointer-one")
+                # An LFS cache the readers cannot write, as git-lfs leaves one in a tree it
+                # used; a new mtime at the same size makes git read the file again, through an
+                # LFS filter if one runs.
+                machine.succeed(as_writer(f"mkdir -p {L}/.git/lfs/tmp && touch {L}/a.bin"))
+                for user in readers:
+                    out = machine.succeed(as_user(user, f"{lfs} git -C {L} status --porcelain 2>&1"))
+                    assert out.strip() == "", (user, out)
+                # Control: with git-lfs re-enabled above the include, as a required filter as the
+                # fleet's git configuration sets it, the same read fails writing the LFS cache.
+                out = machine.fail(as_user("cameron",
+                    f"{lfs} git -c 'filter.lfs.process=${nodePkgs.git-lfs}/bin/git-lfs filter-process' -c filter.lfs.required=true"
+                    f" -C {L} status --porcelain 2>&1"))
+                assert "permission denied" in out.lower(), out
+                assert machine.succeed(f"find {L}/.git/lfs -mindepth 2 | wc -l").strip() == "0", "a reader wrote into the LFS cache"
+                machine.succeed(as_writer(f"rm -rf {L}/.git/lfs"))
+                # The clone's own configuration requires git-lfs, which the writer does not have; an
+                # update that changes the LFS path still fast-forwards to the new pointer file.
+                machine.succeed(as_writer(f"git -C {L} config filter.lfs.process 'git-lfs filter-process'"
+                                          f" && git -C {L} config filter.lfs.required true"))
+                machine.succeed(
+                    "cp /tmp/lfs-pointer-two /tmp/lfs/a.bin"
+                    " && git -C /tmp/lfs -c user.name=t -c user.email=t@t commit -q -am two"
+                    " && chown -R root:root /srv/git/fixture/lfs.git"
+                    " && git -C /tmp/lfs push -q /srv/git/fixture/lfs.git main"
+                    " && chown -R git:git /srv/git"
+                )
+                machine.succeed(as_user("omnigent-cameron", "ghq-sync -u git://localhost/fixture/lfs"))
+                machine.succeed(f"cmp {L}/a.bin /tmp/lfs-pointer-two")
+                machine.succeed(as_writer(f"git -C {L} config --unset filter.lfs.process && git -C {L} config --unset filter.lfs.required"))
+                assert machine.succeed(as_writer(f"git -C {L} status --porcelain")).strip() == ""
                 assert machine.succeed(f"find {R} ! -user ghq | wc -l").strip() == "0"
 
             with subtest("tags: full clones on update, shallow clones only with --tags, depth kept"):
@@ -275,7 +350,12 @@
                     "git init -q --bare -b main /srv/git/fixture/mig.git"
                     " && git -C /srv/git/fixture/mig.git config uploadpack.allowFilter true"
                     " && git init -q -b main /tmp/mig && echo one > /tmp/mig/f"
-                    " && git -C /tmp/mig add f && git -C /tmp/mig -c user.name=t -c user.email=t@t commit -q -m one"
+                    # An LFS-tracked path, committed as its pointer file.
+                    " && printf '*.bin filter=lfs diff=lfs merge=lfs -text\\n' > /tmp/mig/.gitattributes"
+                    " && echo real-lfs-content > /tmp/lfs-real"
+                    " && printf 'version https://git-lfs.github.com/spec/v1\\noid sha256:%s\\nsize %s\\n'"
+                    " $(sha256sum /tmp/lfs-real | cut -d ' ' -f 1) $(stat -c %s /tmp/lfs-real) > /tmp/mig/a.bin"
+                    " && git -C /tmp/mig add f .gitattributes a.bin && git -C /tmp/mig -c user.name=t -c user.email=t@t commit -q -m one"
                     " && echo two >> /tmp/mig/f && git -C /tmp/mig -c user.name=t -c user.email=t@t commit -q -am two"
                     " && git -C /tmp/mig push -q /srv/git/fixture/mig.git main"
                     " && chown -R git:git /srv/git"
@@ -285,9 +365,12 @@
                 date = machine.succeed("date +%Y%m%d").strip()
 
                 # cameron, an administrator (wheel): a full clone with a hook, an
-                # uncommitted change, a local-only commit and a setuid file.
+                # uncommitted change, a local-only commit, a setuid file, and an LFS
+                # path holding the content its pointer names, as git-lfs leaves it.
                 machine.succeed(as_user("cameron",
-                    "rm ~/ghq && git clone -q git://localhost/fixture/mig ~/ghq/localhost/fixture/mig"
+                    "rm ~/ghq && git -c 'filter.lfs.smudge=cat >/dev/null; cat /tmp/lfs-real'"
+                    " clone -q git://localhost/fixture/mig ~/ghq/localhost/fixture/mig"
+                    " && cmp ~/ghq/localhost/fixture/mig/a.bin /tmp/lfs-real"
                     " && cd ~/ghq/localhost/fixture/mig"
                     " && printf '#!/bin/sh\\nexit 0\\n' > .git/hooks/post-checkout && chmod +x .git/hooks/post-checkout"
                     " && git -c user.name=c -c user.email=c@c commit -q --allow-empty -m local-only"
@@ -391,8 +474,10 @@
                 expect(machine.succeed("systemctl is-active ghq-writer.socket").strip() == "active",
                        "the writer did not come back after apply")
                 for expected in ["rename cameron: done in", "ownership cameron: done in", "link cameron: done in",
-                                 "cameron: moved 1 repositories"]:
+                                 "cameron: moved 1 repositories", "cameron: set 1 LFS paths back to their pointer files"]:
                     expect(expected in applied, ("apply did not report", expected, applied))
+                expect(machine.execute(f"cmp {M}/a.bin /tmp/mig/a.bin")[0] == 0,
+                       "migration did not set the smudged LFS path back to its pointer file")
                 expect(machine.succeed(f"find {R} -perm /7000 | wc -l").strip() == "0", "a setuid, setgid or sticky bit survived migration")
                 expect(machine.succeed(f"stat -c '%U %a' {R}").strip() == "ghq 750", "the root is not ghq 750")
                 expect(machine.succeed(f"find {R} ! -user ghq | wc -l").strip() == "0", "an entry is not owned by the writer")
@@ -400,7 +485,9 @@
                 expect(machine.succeed(f"find {R} -perm /o=rwx ! -type l | wc -l").strip() == "0", "an entry grants others access")
                 expect(machine.succeed(f"stat -c '%U %a' {S}").strip() == "root 700", "the state directory is not root 700")
                 expect(machine.execute(f"test -x {M}/.git/hooks/post-checkout")[0] == 0, "an administrator's tree was changed beyond ownership and modes")
-                assert "f" in machine.succeed(as_writer(f"git --no-optional-locks -C {M} status --porcelain"))
+                migrated_status = machine.succeed(as_writer(f"git --no-optional-locks -C {M} status --porcelain"))
+                assert "f" in migrated_status
+                expect("a.bin" not in migrated_status, ("the writer sees the LFS path as changed after migration", migrated_status))
                 assert machine.succeed(as_writer(f"git -C {M} log -1 --format=%s")).strip() == "local-only"
 
                 # The non-administrator's tree is set aside, still its own, and its

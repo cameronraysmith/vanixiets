@@ -24,7 +24,11 @@ not moved in stays in ~/ghq.pre-shared-<date>, untouched. Everything moved in
 becomes owned by the writer, gains group read, and loses group write, every
 permission for others and any setuid, setgid or sticky bit. Repositories with
 uncommitted changes or commits on no remote are listed before anything moves;
-they move as they are.
+they move as they are, except for one kind of difference that is not a change:
+an LFS path whose file holds exactly the content its committed pointer names,
+as an account's git-lfs left it, is set back to that pointer file by the
+writer, whose git, like every account's in the shared tree, runs no LFS filter
+there. The content is kept in the state directory, and rollback puts it back.
 
 --set-aside renames an account's ~/ghq to ~/ghq.pre-shared-<date>, still owned
 by the account, links ~/ghq to the shared root, and prints each repository's
@@ -45,6 +49,7 @@ directory is a separate, operator-authorized step this tool never takes.
 import argparse
 import datetime
 import grp
+import hashlib
 import json
 import os
 import pwd
@@ -70,6 +75,15 @@ WRITER_UNIT = "/etc/systemd/system/ghq-writer@.service"
 # Run as root once the tree is closed and the writer stopped, before the move; the NixOS test probes from here.
 HOOK = os.environ.get("GHQ_SHARED_MIGRATE_HOOK")
 GIT_TIMEOUT = 600
+# The shared tree's LFS policy, as the writer's request handler sets it
+# (ghq-writer-handler.py, LFS_POLICY): no LFS filter runs there.
+LFS_POLICY = [
+    ("filter.lfs.process", ""),
+    ("filter.lfs.clean", ""),
+    ("filter.lfs.smudge", ""),
+    ("filter.lfs.required", "false"),
+]
+LFS_POINTER_VERSION = b"version https://git-lfs.github.com/spec/v1\n"
 
 
 def say(*parts):
@@ -251,6 +265,121 @@ def as_account(account, *args):
     except subprocess.TimeoutExpired:
         return None
     return result.stdout.strip() if result.returncode == 0 else None
+
+
+def as_writer(writer, path, *args, stdin=b""):
+    """Run git in path as the writer, as its request handler would: no LFS filter, no network, no lazy fetch."""
+    config = [("protocol.allow", "never"), ("core.fsmonitor", "false"), *LFS_POLICY]
+    env = {
+        "HOME": "/var/empty",
+        "PATH": "/usr/bin:/bin",
+        "LANG": "C.UTF-8",
+        "GIT_TERMINAL_PROMPT": "0",
+        "GIT_CONFIG_NOSYSTEM": "1",
+        "GIT_CONFIG_GLOBAL": "/dev/null",
+        "GIT_NO_LAZY_FETCH": "1",
+        "GIT_LITERAL_PATHSPECS": "1",
+        "GIT_CONFIG_COUNT": str(len(config)),
+    }
+    for index, (key, value) in enumerate(config):
+        env[f"GIT_CONFIG_KEY_{index}"] = key
+        env[f"GIT_CONFIG_VALUE_{index}"] = value
+    return subprocess.run(
+        [GIT, "-C", path, *args],
+        user=writer["uid"],
+        group=writer["gid"],
+        extra_groups=[],
+        env=env,
+        input=stdin,
+        capture_output=True,
+        start_new_session=True,
+        # The writer's service umask: nothing it writes is group-writable or open to others.
+        umask=0o027,
+        timeout=GIT_TIMEOUT,
+    )
+
+
+def lfs_pointer(blob):
+    """The (sha256, size) an LFS pointer file names, or None for any other content."""
+    if not blob.startswith(LFS_POINTER_VERSION) or len(blob) > 1024:
+        return None
+    fields = dict(line.split(b" ", 1) for line in blob.split(b"\n")[1:] if b" " in line)
+    oid, size = fields.get(b"oid", b""), fields.get(b"size", b"")
+    if not oid.startswith(b"sha256:") or len(oid) != 71 or not size.isdigit():
+        return None
+    return oid[7:].decode(), int(size)
+
+
+def sha256_of(path):
+    digest = hashlib.sha256()
+    with open(path, "rb") as handle:
+        for chunk in iter(lambda: handle.read(1 << 20), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def smudged_lfs_paths(repo, writer):
+    """Index paths with the lfs filter attribute whose file holds exactly the content their staged pointer names."""
+    listed = as_writer(writer, repo, "ls-files", "-z", "-s")
+    staged = {}
+    for record in listed.stdout.split(b"\0") if listed.returncode == 0 else []:
+        meta, _, path = record.partition(b"\t")
+        fields = meta.split(b" ")
+        if len(fields) == 3 and fields[0] in (b"100644", b"100755") and fields[2] == b"0":
+            staged[path] = fields[1]
+    if not staged:
+        return []
+    attrs = as_writer(writer, repo, "check-attr", "-z", "--stdin", "filter", stdin=b"\0".join(staged) + b"\0")
+    fields = attrs.stdout.split(b"\0")
+    tracked = [fields[i] for i in range(0, len(fields) - 2, 3) if fields[i + 2] == b"lfs" and fields[i] in staged]
+    if not tracked:
+        return []
+    batch = as_writer(writer, repo, "cat-file", "--batch", stdin=b"".join(staged[path] + b"\n" for path in tracked))
+    out, offset, smudged = batch.stdout, 0, []
+    for path in tracked:
+        end = out.find(b"\n", offset)
+        if end < 0:
+            break
+        header = out[offset:end].split(b" ")
+        offset = end + 1
+        if len(header) != 3 or not header[2].isdigit():
+            continue
+        size = int(header[2])
+        blob = out[offset:offset + size]
+        offset += size + 1
+        named = lfs_pointer(blob)
+        file = os.path.join(repo, os.fsdecode(path))
+        try:
+            st = os.lstat(file)
+        except FileNotFoundError:
+            continue
+        if named and stat.S_ISREG(st.st_mode) and st.st_size == named[1] and sha256_of(file) == named[0]:
+            smudged.append(path)
+    return smudged
+
+
+def restore_lfs_pointers(repo, rel, writer, manifest):
+    """Set each smudged LFS path in repo back to its pointer file, as the writer, keeping the content for rollback."""
+    paths = smudged_lfs_paths(repo, writer)
+    if not paths:
+        return 0
+    kept = os.path.join(manifest.dir, "lfs", rel)
+    index = os.path.join(repo, ".git", "index")
+    manifest.record({"op": "lfs-pointers", "repo": repo, "kept": kept, "paths": [os.fsdecode(path) for path in paths]})
+    os.makedirs(os.path.join(kept, "files"), mode=0o700, exist_ok=True)
+    shutil.copy2(index, os.path.join(kept, "index"), follow_symlinks=False)
+    for path in paths:
+        destination = os.path.join(kept, "files", os.fsdecode(path))
+        os.makedirs(os.path.dirname(destination), mode=0o700, exist_ok=True)
+        # A move keeps the file's inode, owner and mode for rollback.
+        shutil.move(os.path.join(repo, os.fsdecode(path)), destination)
+    checkout = as_writer(writer, repo, "checkout", "--pathspec-from-file=-", "--pathspec-file-nul", stdin=b"\0".join(paths) + b"\0")
+    if checkout.returncode:
+        raise RuntimeError(f"{repo}: restoring LFS pointer files failed: {checkout.stderr.decode(errors='replace').strip()}")
+    # The ownership pass changed every entry's ctime and owner; refresh the index
+    # so the writer's next update does not re-read every file.
+    as_writer(writer, repo, "update-index", "-q", "--refresh")
+    return len(paths)
 
 
 def repositories(tree):
@@ -570,8 +699,13 @@ def migrate(entry, winners, writer, date):
             set_mode(entry["aside"], uid, gid, mode, manifest)
     with Phase(f"link {name}"):
         link_root(entry, writer, manifest)
+    # The writer stays stopped; the root has to be open to it, as link_root leaves it, for its git to run.
+    with Phase(f"lfs pointers {name}"):
+        restored = sum(restore_lfs_pointers(os.path.join(ROOT, rel), rel, writer, manifest) for rel in moved)
     manifest.record({"op": "end"})
     say(f"{name}: moved {len(moved)} repositories into {ROOT}; everything else is in {entry['aside']}")
+    if restored:
+        say(f"{name}: set {restored} LFS paths back to their pointer files; their content is kept under {manifest.dir}/lfs")
 
 
 def set_aside(entry, writer, date):
@@ -705,6 +839,26 @@ def undo(step, account, writer):
             if os.path.islink(step["path"]):
                 os.unlink(step["path"])
             shutil.copy2(step["kept"], step["path"], follow_symlinks=False)
+    elif op == "lfs-pointers":
+        # Each pointer file the writer checked out gives way to the content kept
+        # from that path, then the index kept with it comes back. Neither is
+        # written through a symbolic link, and nothing is put outside the repository.
+        repo = os.path.realpath(step["repo"])
+        for rel in step["paths"]:
+            kept = os.path.join(step["kept"], "files", rel)
+            target = os.path.join(step["repo"], rel)
+            if not os.path.lexists(kept) or os.path.realpath(os.path.dirname(target)) != os.path.join(repo, os.path.dirname(rel)).rstrip("/"):
+                continue
+            if os.path.lexists(target):
+                os.unlink(target)
+            shutil.move(kept, target)
+        index = os.path.join(step["kept"], "index")
+        destination = os.path.join(step["repo"], ".git", "index")
+        if os.path.lexists(index) and os.path.realpath(os.path.dirname(destination)) == os.path.join(repo, ".git"):
+            if os.path.lexists(destination):
+                os.unlink(destination)
+            shutil.copy2(index, destination, follow_symlinks=False)
+            os.unlink(index)
     elif op == "ownership":
         restore_ownership(step["path"], step["sidecar"], account, writer)
     elif op == "rename":

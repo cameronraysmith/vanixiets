@@ -45,6 +45,16 @@ in
                 roots = cfg.rootForms;
                 participant = lib.elem user cfg.participants;
               } (safeDirectories user);
+            lfsPolicy = flakeConfig.flake.lib.sharedReferenceTreeLfsPolicy;
+            runsNoLfsFilter =
+              user:
+              lib.all (
+                form:
+                lib.any (
+                  include:
+                  include.condition == "gitdir:${form}/" && (include.contents.filter.lfs or null) == lfsPolicy
+                ) (hm.${user}.programs.git.includes or [ ])
+              ) cfg.rootForms;
             provision = "/usr/bin/install -d -m 0750 -o ${cfg.writer} -g ${cfg.writer} \"$ghqRoot\"";
             # Everything activation runs before it first touches this daemon's plist;
             # without that reference the ordering checks below would hold vacuously.
@@ -73,6 +83,10 @@ in
             {
               assertion = lib.all conforms (lib.attrNames hm);
               message = "shared-reference-tree: each participant's safe.directory must be exactly ${cfg.root}/*, and no account's may be * or enclose ${cfg.root}.";
+            }
+            {
+              assertion = lib.all runsNoLfsFilter humanParticipants;
+              message = "shared-reference-tree: every participant's git must run no LFS filter in the shared tree: an include with condition gitdir:<form>/ setting filter.lfs to ${builtins.toJSON lfsPolicy}, for each of ${toString cfg.rootForms}.";
             }
             {
               assertion = lib.all (
