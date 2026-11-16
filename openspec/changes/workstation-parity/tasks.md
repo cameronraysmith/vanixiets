@@ -9,11 +9,18 @@
 - [ ] 1.7 Record SSH authentication per host: which account, which authorized keys, and how stibnite's sshd reads them given srvos's `AuthorizedKeysFile none` drop-in — verify: an SSH matrix like `logs/parity/ssh-matrix-20261113-133443.log` with each refusal explained.
 - [ ] 1.8 Seed the job catalogue from the inventory, one row per workstation job with each laptop's implementation or its darwin-by-nature or remote disposition — verify: every application and desktop item of the inventory maps to a job row.
 - [ ] 1.9 Determine how stibnite can consume the chord table (Raycast import, or documentation only) — verify: a recorded finding with the Raycast mechanism tested or ruled out.
-- [ ] 1.10 Acquire `0xc000022070/zen-browser-flake` into the reference tree and record its home-manager module's Darwin support — verify: the module source read at a pinned revision, with Darwin install support stated from that source.
+- [x] 1.10 Acquire `0xc000022070/zen-browser-flake` into the reference tree and record its home-manager module's Darwin support — verify: the module source read at a pinned revision, with Darwin install support stated from that source.
+  Read 2026-11-16 at `ad99018e37999e659ae43f9c6ac126161ca147bc`, both the `ghq` checkout (`/private/var/lib/ghq/github.com/0xc000022070/zen-browser-flake`) and the `zen-browser` node of `flake.lock`.
+  `flake.nix` lists `aarch64-darwin` in `supportedSystems` and exports `homeModules.beta` (the `default`), `twilight` and `twilight-official`.
+  `hm-module/default.nix` builds on home-manager's `mkFirefoxModule` with the Darwin profile path `~/Library/Application Support/Zen` and the defaults domain `app.zen-browser.zen`.
+  `hm-module/package.nix` defaults `darwin.packageMode` to `signed`, which installs the `.app` untouched and routes policies through `targets.darwin.defaults` and native messaging hosts through `mozilla.firefoxNativeMessagingHosts`; `extraPrefs`, `extraPrefsFiles` and `pkcs11Modules` are rejected by assertion in that mode, and `wrapped` enables them at the cost of the upstream signature.
+  So the module can configure the cask's Zen.app with `package = null`, writing policies to `app.zen-browser.zen`, as D10 records.
 
 ## 2. S1: pyrite dispatches builds to magnetite (in progress elsewhere)
 
-- [ ] 2.1 pyrite dispatches x86_64-linux builds to magnetite — verify: the S1 slice's own acceptance, recorded here by reference once its pull request merges.
+- [x] 2.1 pyrite dispatches x86_64-linux builds to magnetite — verify: the S1 slice's own acceptance, recorded here by reference once its pull request merges.
+  Merged as #3852 (`d6b07847`, 2026-11-13); on 2026-11-16 pyrite's `/etc/nix/machines` matches the PR's acceptance line for line, its x86_64-linux entry is magnetite.zt's address, and `builders = @/etc/nix/machines`.
+  magnetite's `nix-grpc-daemon` logged 158 requests from `cn=pyrite` since 2026-11-13, among them `BuildDerivation` of `calibre-library-sync.drv` (2026-11-15 17:58Z) and of niri's `config.kdl.drv` (19:06Z).
 
 ## 3. S2: SSH identity — spike, then the decided slice
 
@@ -26,6 +33,8 @@
 - [x] 3.7 On pyrite, install `bitwarden-desktop` system-wide, confine `pam_u2f` to `polkit-1` with the mirrored `polkit-agent-helper@` sandbox override, make Bitwarden the only SSH agent through `programs.bitwarden-ssh-agent.enable`, pin `*.zt` and `github.com`, and import srvos's well-known hosts — verify: deployed from branch `pyrite-bitwarden-yubikey`; the `pyrite-desktop` assertion "polkit unlocks Bitwarden by YubiKey touch" and `checks.pyrite-bitwarden-unlock`; `ssh magnetite.zt` and `ssh stibnite.zt` offer only the login key and authenticate, and `ssh -T git@github.com` offers only the RSA key and authenticates.
 - [x] 3.8 ~~Enroll backup YubiKey 32720546 on pyrite~~ Not needed, decided by the operator on 2026-11-14: `polkit-1` stacks `pam_u2f` and `pam_unix` both as `sufficient`, so without the enrolled YubiKey every polkit prompt falls back to the account password, and Bitwarden's own fallback is the master password; a second enrolled key adds no recovery path, unlike a LUKS keyslot, where a security key can be the only way in.
 - [ ] 3.9 Check pyrite across a reboot — verify: after reboot and Bitwarden's start, the first unlock asks for the master password once, the next unlock succeeds by touch, and `SSH_AUTH_SOCK` is Bitwarden's socket.
+  Progress 2026-11-16: in the current boot (since 02:05 EST, after the 14 warm reboots of 00:19–02:05), the Bitwarden user unit started at login (02:09:44), its SSH agent listens on `~/.bitwarden-ssh-agent.sock`, and the cameron session's `SSH_AUTH_SOCK` is that socket.
+  The journal has no `polkit-agent-helper@` run and no Bitwarden unlock since that boot, so the master-password-once-then-touch sequence is not evidenced; the operator's observation of the first two unlocks after the next reboot (or a polkit helper run for Bitwarden in the journal after a master-password unlock) settles it.
 - [x] 3.10 Pin per-host keys on stibnite as on pyrite (`*.zt` to the login key, `github.com` to the RSA authentication key), keeping Apple's `/usr/bin/ssh` — verify: `nix eval` of stibnite's SSH match blocks shows `IdentitiesOnly` with the pinned files; after activation, `ssh -v` from stibnite to a `.zt` host and to GitHub offers one key each and authenticates.
   Both laptops import `flake.modules.homeManager.bitwarden-key-pins` (`modules/home/core/ssh-identity.nix`); stibnite's rendered `~/.ssh/config` differs from main's only by `IdentitiesOnly yes` + `IdentityFile ~/.ssh/bitwarden-login.pub` under `Host *.zt`, a new `Host github.com` block pinning `~/.ssh/bitwarden-github.pub`, and `AddKeysToAgent no` (`logs/ssh-identity/stibnite-ssh-config.{main,candidate}`); Apple's `/usr/bin/ssh` (OpenSSH_10.3p1, LibreSSL 3.3.6) offers only the agent key matching a `.pub`-only `IdentityFile` under `IdentitiesOnly yes`, and both agent keys without it (`logs/parity/apple-ssh-pub-identityfile-*.log`).
   Activated 2026-11-14 with #3872: from a terminal outside herdr, `ssh -v magnetite.zt true` offered only `bitwarden-login.pub` (`SHA256:WbnjY1…`) and authenticated, and `ssh -vT git@github.com` offered only `bitwarden-github.pub` (`SHA256:CoaK9g…`) and GitHub greeted cameronraysmith.
@@ -60,7 +69,8 @@ The operator approved `RestartPreventExitStatus=78` on 2026-11-14; it lands with
 
 ## 6. Keyboard modifiers and Caps Lock
 
-- [ ] 6.1 Decide the modifier semantics of pyrite's built-in keyboard (Q4) — verify: the decision recorded in design.md with the rejected option.
+- [x] 6.1 Decide the modifier semantics of pyrite's built-in keyboard (Q4) — verify: the decision recorded in design.md with the rejected option.
+  Decided by the operator on 2026-11-16 and recorded in D8 and Q4: pyrite keeps Control for copy and paste, Super is not remapped to Command, and the application-aware remapper is the rejected option.
 - [ ] 6.2 Decide the Caps Lock to Escape mechanism for both laptops' built-in keyboards (Q5) — verify: the decision recorded in design.md.
   Decided for pyrite on 2026-11-14: niri's `caps:escape` (D8); stibnite's declaration waits on the ZSA check.
 - [ ] 6.3 Implement the decided modifier and Caps Lock settings for the built-in keyboards — verify: `nix eval` of the delivered settings on both laptops, and the operator's key test after activation.
@@ -69,8 +79,11 @@ The operator approved `RestartPreventExitStatus=78` on 2026-11-14; it lands with
 ## 7. Shared-layer fixes
 
 - [ ] 7.1 Add the caddy `.zt` root CA and the local k8s development CA to pyrite's trust store from the same first-party source stibnite uses — verify: `nix eval` shows the same two certificates in both laptops' declarations; after activation, `curl` to a `.zt` service from pyrite succeeds without `--insecure`.
-- [ ] 7.2 Give pyrite's home a Zed package while every other home, stibnite's included, keeps a null package — verify: `nix eval` of `programs.zed-editor.package` on pyrite's and stibnite's homes and on the other Linux homes; the pyrite home builds on magnetite.
+- [x] 7.2 Give pyrite's home a Zed package while every other home, stibnite's included, keeps a null package — verify: `nix eval` of `programs.zed-editor.package` on pyrite's and stibnite's homes and on the other Linux homes; the pyrite home builds on magnetite.
   Declared 2026-11-15: the shared zed module's package is `lib.mkDefault null` and pyrite's cameron home sets `pkgs.zed-editor`; `nix eval` shows pyrite's cameron at `zed-editor-1.28.1`, stibnite, magnetite, cinnabar and every standalone home still null, and `userSettings` unchanged on each host; pyrite's system built on magnetite (`/nix/store/jxqgrxm8fi1kbclanp67zbl31y76wkkm-nixos-system-pyrite-26.11.20261114.82566df`); waits on activation and the operator opening Zed.
+  Re-checked 2026-11-16 after the move into `modules/home/linux-workstation` (#3887, #3888): `nix eval` gives `zed-editor-1.28.1` for pyrite's cameron and null for stibnite's crs58, every other NixOS and nix-darwin cameron/crs58/tara/raquel/janettesmith/christophersmith home, and every standalone `homeConfigurations` entry.
+  The `omnigent-*` homes on magnetite and pyrite report home-manager's own `zed-editor` default but `enable = false`, because they don't import the shared zed module, so nothing installs it.
+  `/nix/store/jg6gsxqw0r0rbbrags9wvl8vs41gzfyy-zed-editor-1.28.1` is in magnetite's store and in pyrite's running system, which puts `zeditor` and `zed-delta` in cameron's profile.
 - [ ] 7.3 Declare the fifteen fonts as Nix packages on both laptops and remove them from `caskFonts` — verify: `nix eval` of the font packages on both homes and of stibnite's casks; after activation, `fc-list` on pyrite and Font Book on stibnite show each font.
 - [ ] 7.4 Install `dnsreset` only on Darwin and print `zerotier-join`'s launchctl hint only on Darwin — verify: `nix eval` of both homes' packages, and the built `zerotier-join` on pyrite contains no `launchctl`.
 
@@ -100,10 +113,12 @@ The operator approved `RestartPreventExitStatus=78` on 2026-11-14; it lands with
   Progress 2026-11-15: DMS 2.1.2 builds the lock screen from `lockScreenWidgetInstances`, whose default disables `lock_power`, and applies the `lockScreenShowPowerActions` migration only to versioned settings files, so the flag has no effect in nix-generated settings; `modules/home/dms/default.nix` now declares 2.1.2's default list with only `lock_power` enabled, to be re-checked on DMS bumps.
   The DankGreeter is deliberately unchanged: its only settings input, `configFiles`, is copied by the greetd `preStart` hook that pyrite-dankgreeter D5 disables, and feeding it settings needs its own design.
   Done (#3895): the operator saw the button after a `dms` restart, which a running shell needs to re-read the replaced settings link.
-- [ ] 9.7 Make a manual suspend on pyrite wake reliably — verify: repeated `rtcwake` suspend cycles resume in about the RTC interval; the operator's suspend and wake from the power menu.
+- [x] 9.7 Make a manual suspend on pyrite wake reliably — verify: repeated `rtcwake` suspend cycles resume in about the RTC interval; the operator's suspend and wake from the power menu.
   Progress 2026-11-15: resume from deep (S3) brought core 1 (CPUs 1 and 3) back online in 0.5–6 s every time and up to 761 s on some resumes, with displays, network and userspace still down, which looked like a machine that would not wake (boot-clock `power:suspend_resume` traces).
   `mem_sleep_default=s2idle` takes no CPU offline: 8 of 8 cycles resumed in 63 s (#3894).
-  Open: the s2idle standby drain on battery (an hour asleep, charge compared), since the platform reaches neither S0ix nor PC10; the S3 root cause is tracked in CAM-104.
+  Open on 2026-11-15, answered below: the s2idle standby drain on battery, since the platform reaches neither S0ix nor PC10; the S3 root cause is tracked in CAM-104.
+  Done 2026-11-16: pyrite runs `mem_sleep_default=s2idle` (`/sys/power/mem_sleep` `[s2idle] deep`), and the operator suspends and wakes it from the power menu and over ssh; the journal shows an overnight s2idle suspend from 02:17 to 10:37 EST that resumed.
+  The operator measured the standby drain off the charger overnight on 2026-11-15/16, 85% to 22%, and accepted it; warm reboots after a suspend are covered by 9.9 (#3899).
 - [ ] 9.8 Reach pyrite from other home clients promptly after it resumes — verify: `ping 192.168.50.35` from stibnite answers within a minute of pyrite's wake.
   Progress 2026-11-15: pyrite re-associates and works outbound within about a minute, but the Verizon CHR30A router black-holes traffic from its other wireless clients to pyrite for 5–13+ minutes after any re-association, on either mesh node or band; `ssh pyrite.zt` returns after 1–3 minutes through ZeroTier's relay.
   Not fixable on pyrite (access-control block, BSSID pin and random MAC ruled out); the firmware report or own access points are tracked in CAM-105.
@@ -121,6 +136,8 @@ The operator approved `RestartPreventExitStatus=78` on 2026-11-14; it lands with
   The module adds Delta from `github:zed-industries/delta-nix`, exposed as `zed-delta` so `delta` stays the git pager, and Antigravity Hub from the locked `llm-agents` input.
   pyrite's cameron home also gains a read-only Google Drive remote, `gdrive` (`drive.readonly`), in its own rclone config that a sops-nix template renders (0600) from crs58's client secret and token, kept out of `programs.rclone` because its `rclone-config` service passes secrets as process arguments; `rclone-gdrive` runs rclone against that config, and the on-demand `calibre-library-sync` command (`modules/home/linux-workstation/calibre-library-sync.nix`) mirrors `gdrive:Library/{theory,experiment,philosophy}` one-way into `~/Calibre/<library>`: it refuses while Calibre runs, shows a dry-run summary and asks before syncing, and has no timer, because calibre's FAQ warns that a library inside a cloud-sync folder loses data.
   The operator confirmed on 2026-11-15 that the full mirror completed (dry run: "Mirror is up to date.") and that the three libraries open in Calibre on pyrite.
+  Shipped on pyrite by 2026-11-16, each merged: Nautilus as file manager and portal file chooser (#3884); Papers as default PDF viewer and Zathura for LaTeX (#3885); declarative Zen (#3886); Zed, Calibre, Baobab and gdu (#3887); the `linux-workstation` module with Delta as `zed-delta` and Antigravity Hub (#3888); the Drive remote and Calibre mirror (#3889, #3890); Bitwarden Desktop (#3862).
+  Not ticked: the verify is per bucket, and the buckets wait on 10.2's job catalogue.
 
 ## 11. Containers and VMs on Linux
 

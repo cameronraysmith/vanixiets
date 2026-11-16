@@ -118,7 +118,8 @@ Observed divergences that the slices close:
 
 - **Choice**: Caps Lock sends Escape on pyrite's built-in keyboard through niri's `input.keyboard.xkb.options = "caps:escape"`, matching stibnite's one-way mapping (DECIDED 2026-11-14; macOS can remap Caps Lock but not Escape, so stibnite has no swap to match).
   Declaring stibnite's side (nix-darwin `system.keyboard.remapCapsLockToEscape`) waits on a check that it, applied to every keyboard through `hidutil`, does not interfere with the ZSA keyboard's Left Control and Left Command swap, which stibnite also sets per keyboard.
-  Modifier semantics on pyrite's built-in keyboard (Command as Super for niri, or Command as Control for applications) is OPEN (Q4).
+  Modifier semantics on pyrite's built-in keyboard: Command stays Super for niri, and applications keep Control for copy and paste with Control+Shift in terminals (DECIDED 2026-11-16, Q4).
+  Rejected: Command as Control for applications through an application-aware remapper (Toshy, xremap or keyd), which needs a niri-aware focused-window query for the terminal exception and re-homing niri's Super binds, for muscle-memory parity alone.
 - **Boundary**: the stibnite mappings are imperative state in `com.apple.keyboard.modifiermapping.*`; any declared replacement is first-party.
 
 ### D9: shared-layer fixes
@@ -184,7 +185,7 @@ Rollback for every slice is reverting its pull request and redeploying the affec
 ## Open Questions
 
 - Q3: half-window chords: DECIDED on 2026-11-14, tiled (O3), after O2 (floating) overlapped filled windows; O1's move stays on the shifted chords.
-- Q4: modifier semantics on pyrite's built-in keyboard (no recommendation recorded).
+- Q4: modifier semantics on pyrite's built-in keyboard — resolved 2026-11-16 in D8: Command stays Super for niri and applications keep Control; the Command-as-Control remapper is rejected.
 - Q5: Caps Lock to Escape: DECIDED for pyrite on 2026-11-14 (`caps:escape`); stibnite's declaration waits on the ZSA check.
 - Q6: install-mechanism policy per OS (no recommendation recorded).
 - Q7: stibnite as an always-reachable home machine, with pmset AC sleep 0, womp 1, battery sleep 1, and closed-lid behaviour unknown [INFERENCE] (no recommendation recorded).
