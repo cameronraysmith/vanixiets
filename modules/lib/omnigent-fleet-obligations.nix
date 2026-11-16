@@ -441,6 +441,27 @@ let
           home = hostConfig.home-manager.users.${worker.user};
         }
       ) (lib.attrValues workers);
+
+      # ACP children receive only omnigent's base allowlist plus each agent's declared
+      # passthrough, so on a host with rootless container access every agent must
+      # declare the socket locators, or its sessions fall back to the rootful socket
+      # and to a local podman that NoNewPrivileges cannot start. Oh My Pi must still
+      # never receive PI_CODING_AGENT_DIR, which points at Atomic's state.
+      acpContainerLocators =
+        !lib.any (worker: worker.containers.engine == "rootless-podman") (lib.attrValues workers)
+        || lib.all (
+          worker:
+          let
+            agents = hostConfig.home-manager.users.${worker.user}.programs.omnigent.settings.acp.agents;
+          in
+          lib.any (agent: agent.name == "Oh My Pi") agents
+          && lib.all (
+            agent:
+            lib.elem "DOCKER_HOST" agent.env_passthrough
+            && lib.elem "CONTAINER_HOST" agent.env_passthrough
+            && (agent.name != "Oh My Pi" || !lib.elem "PI_CODING_AGENT_DIR" agent.env_passthrough)
+          ) agents
+        ) (lib.attrValues workers);
     };
 in
 {

@@ -285,8 +285,10 @@
         os.environ["HOME"] = tempfile.mkdtemp()
         entries = acp_agents(settings)
         assert [entry.name for entry in entries] == ["Atomic", "Oh My Pi"]
-        assert entries[0].env_passthrough == ("PI_ACP_PI_COMMAND", "PI_CODING_AGENT_DIR")
-        assert entries[1].env_passthrough == ()
+        assert entries[0].env_passthrough == (
+            "PI_ACP_PI_COMMAND", "PI_CODING_AGENT_DIR", "DOCKER_HOST", "CONTAINER_HOST"
+        )
+        assert entries[1].env_passthrough == ("DOCKER_HOST", "CONTAINER_HOST")
         for entry in entries:
             generated = _materialize_harness_launcher_file(
                 harness="acp", model=None, system_prompt=None, acp_agent=entry

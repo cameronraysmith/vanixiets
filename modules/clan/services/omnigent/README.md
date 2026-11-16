@@ -32,7 +32,8 @@ The aliases map reuses `crs58`'s Home Manager content under `cameron`; it does n
 Home Manager enables `programs.omnigent` with the same package and renders `host.name` and the shared ACP definitions into writable `~/.omnigent/config.yaml` through `managedConfigs`.
 Each activation rewrites the file from the declaration, keeping only `host.host_id` and `server` from the existing file; it must not become a Nix-store symlink.
 All three hosts use the exact shared `Atomic` / `<pi-acp store path>/bin/pi-acp` (`pkgs/by-name/pi-acp`, so no session start fetches from npm) and `Oh My Pi` / `omp acp` rows from `modules/home/ai/omnigent/acp.nix`.
-Both rows disable `omnigent_mcp` and `inject_system_prompt`; Atomic allows `PI_ACP_PI_COMMAND` and `PI_CODING_AGENT_DIR`, while omp's `env_passthrough` is exactly empty so Atomic state does not reach omp.
+Both rows disable `omnigent_mcp` and `inject_system_prompt`; Atomic allows `PI_ACP_PI_COMMAND` and `PI_CODING_AGENT_DIR`, while omp never receives `PI_CODING_AGENT_DIR`, so Atomic state does not reach omp.
+Both rows also allow `DOCKER_HOST` and `CONTAINER_HOST`, which carry no state; see "Container access".
 
 The host environment carries `PI_ACP_PI_COMMAND=atomic`, `PI_CODING_AGENT_DIR=<selected-home>/.atomic/agent`, and `OMNIGENT_RUNNER_ENV_PASSTHROUGH=PI_ACP_PI_COMMAND,PI_CODING_AGENT_DIR`.
 Do not set a conflicting `ATOMIC_CODING_AGENT_DIR`.
@@ -216,6 +217,9 @@ Sessions are not logins: the runner zygote has no PAM or logind session, so noth
 The user manager socket-activates the account's own `podman.socket`; nothing runs until a client connects.
 The unit sets `XDG_RUNTIME_DIR=/run/user/<uid>`, and both `DOCKER_HOST` and `CONTAINER_HOST` to `unix:///run/user/<uid>/podman/podman.sock`, appending both names to `OMNIGENT_RUNNER_ENV_PASSTHROUGH`, since omnigent's runner allowlist carries `XDG_RUNTIME_DIR` but neither of them.
 Sessions inherit the unit's `NoNewPrivileges`, under which the setuid `newuidmap`/`newgidmap` cannot raise privileges, so a local `podman` CLI cannot create the rootless user namespace; `CONTAINER_HOST` makes it a remote client of the socket-activated service, which runs under the user manager instead.
+Those variables reach native sessions such as Claude Code directly, but ACP harnesses receive only omnigent's base allowlist plus their row's `env_passthrough`, so both shared ACP rows declare `DOCKER_HOST` and `CONTAINER_HOST`.
+The rows do not declare `XDG_RUNTIME_DIR`, which omnigent handles as a desktop-session variable (`omnigent/inner/agent_env.py`); with `CONTAINER_HOST` podman runs remote and the Docker CLI follows `DOCKER_HOST`, so neither client needs it.
+On any Linux host with a `rootless-podman` worker, the `acpContainerLocators` fleet obligation requires every ACP row in each worker's rendered settings to declare both names, and Oh My Pi never to declare `PI_CODING_AGENT_DIR`.
 Remote mode rejects local-only operations such as `podman unshare`, `podman mount`, `podman system migrate`, `podman system reset` and `run --env-host`; bind mounts of the worker's own paths and `--userns=keep-id` still work, because the service runs as the same user on the same host.
 Its PATH starts with `/run/wrappers/bin` and ends with the host's podman package, the real Docker CLI (`docker-client`, not podman's docker shim), and `docker-compose`.
 `restricted` adds the worker to the `incus` group served by `incus-user`, which confines it to its own restricted project, and appends the host's incus client to the PATH.
