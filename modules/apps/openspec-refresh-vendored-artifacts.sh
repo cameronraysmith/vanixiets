@@ -6,9 +6,9 @@
 # openspec stores its skill bodies as compiled javascript, not as static files,
 # so the markdown payloads must be produced by running `openspec init`. this
 # script captures that generated output so it can be committed and shipped through
-# apm-skills-compose without a per-project init. delivery=skills emits only the 12
-# openspec-* skills and no commands/ tree (the /opsx:* commands were 1:1 skill
-# duplicates).
+# apm-skills-compose without a per-project init. since openspec 2.0 init emits
+# only skills (the /opsx:* commands are gone), written once to the shared
+# .agents/skills/ folder and linked from each tool's own skills/ folder.
 #
 # the generated skills are version-portable: no working directory
 # or absolute path is embedded. the only dynamic field is the `generatedBy`
@@ -64,10 +64,10 @@ repo_root="$(git rev-parse --show-toplevel)"
 # superpowers-bridge schema bundle (no skills/).
 skills_target="${repo_root}/modules/home/ai/plugins/planning-and-development/.apm/skills"
 
-# the pinned openspec version is injected by the flake app via runtimeEnv; when
-# running this script standalone, set it explicitly, e.g.
-#   OPENSPEC_VERSION=1.5.0 bash modules/apps/openspec-refresh-vendored-artifacts.sh
-ver="${OPENSPEC_VERSION:?set OPENSPEC_VERSION (injected by the flake app)}"
+# the flake app puts the flake-pinned openspec (the llm-agents package that
+# programs.openspec installs) on PATH, so the vendored skills come from the same
+# artifact the fleet runs. standalone runs use whichever openspec is on PATH.
+ver="$(openspec --version)"
 echo "openspec version: ${ver}"
 
 # generate into a sandboxed temp dir; HOME is redirected so nothing escapes.
@@ -88,7 +88,6 @@ cat > "${xdg}/openspec/config.json" <<'JSON'
 {
   "featureFlags": {},
   "profile": "custom",
-  "delivery": "skills",
   "workflows": ["propose","explore","new","continue","apply","update","ff","sync","archive","bulk-archive","verify","onboard"]
 }
 JSON
@@ -96,13 +95,17 @@ JSON
 (
   cd "${proj}" && HOME="${home}" XDG_CONFIG_HOME="${xdg}" CI=true OPENSPEC_TELEMETRY=0 \
     OPENSPEC_NO_COMPLETIONS=1 DO_NOT_TRACK=1 \
-    bunx "@fission-ai/openspec@${ver}" init --tools claude --force --profile custom </dev/null
+    openspec init --tools claude --force --profile custom </dev/null
 )
 
-# verify the expected layout before clobbering the committed skills.
-generated_skills="${proj}/.claude/skills"
+# verify the expected layout before clobbering the committed skills. openspec 2.0
+# (Fission-AI/OpenSpec#2223) writes each skill once to the shared .agents/skills/
+# and only symlinks it from .claude/skills/, so the canonical copy is read here;
+# a missing folder means the layout moved again and must fail rather than yield
+# zero skills.
+generated_skills="${proj}/.agents/skills"
 if [[ ! -d "${generated_skills}" ]]; then
-  echo "error: expected .claude/skills in generated output" >&2
+  echo "error: expected .agents/skills in generated output; the openspec ${ver} init layout changed" >&2
   exit 1
 fi
 
