@@ -104,14 +104,14 @@ The operator's home on both laptops SHALL configure Zen through the home-manager
 - **WHEN** the operator's home on pyrite and on stibnite is evaluated
 - **THEN** the Zen module is enabled with the Bitwarden extension declared, and `flake.lock` has no `youwen5/zen-browser-flake` node
 
-### Requirement: rbw is declared on both laptops with a graphical pinentry
+### Requirement: The official Bitwarden CLI is the vault client on both laptops
 
-The operator's home on both laptops SHALL enable `rbw` with a graphical pinentry suited to that OS.
+The operator's home on both laptops SHALL install the official Bitwarden CLI, `bw`, from nixpkgs (`bitwarden-cli`), and MUST NOT install or enable `rbw`.
 
-#### Scenario: Evaluate the rbw declaration
+#### Scenario: Evaluate the vault client declaration
 
 - **WHEN** the operator's home on pyrite and on stibnite is evaluated
-- **THEN** `rbw` is enabled, and its pinentry is a graphical program rather than `pinentry-tty` or `pinentry-curses`
+- **THEN** its packages include nixpkgs `bitwarden-cli`, and neither its packages nor `programs.rbw` provide `rbw`
 
 ### Requirement: Fonts are declared in Nix on both laptops
 

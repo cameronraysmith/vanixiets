@@ -48,11 +48,12 @@
 Cross-reference: during the pyrite deploy, the omnigent host units looped on an expired login (exit 78) instead of stopping (`logs/parity/omnigent-restart-loop-pyrite-20261114-102514.log`, `-102520.log`).
 The operator approved `RestartPreventExitStatus=78` on 2026-11-14; it lands with the omnigent service, outside this change, so an expired login becomes one `SystemdUnitFailed` alert.
 
-## 4. Secrets access through rbw
+## 4. Secrets access through the official Bitwarden CLI
 
-- [ ] 4.1 Enable `rbw` on both laptops with a graphical pinentry per OS — verify: `nix eval` of `programs.rbw` on both homes, with the pinentry a graphical program.
-- [ ] 4.2 Unlock `rbw` and read a secret from a script on each laptop — verify: after activation, `rbw get` of a test entry returns its value on each laptop after a graphical unlock prompt.
-- [ ] 4.3 Determine whether `rbw` unlock can use the YubiKey [INFERENCE] — verify: a recorded finding from rbw's documentation or source.
+Revised 2026-11-16 by the operator's decisions recorded in design.md D5: `bw` replaces `rbw` as the command-line vault client, and the former 4.3 (whether `rbw` unlock can use the YubiKey) is dropped, since `bw` unlocks with the master password and no requirement asks for a YubiKey unlock on the command line.
+
+- [ ] 4.1 Confirm the official `bw` is the vault client on both laptops and `rbw` is absent — verify: `nix eval` of the operator's home packages on pyrite and stibnite lists nixpkgs `bitwarden-cli` and no `rbw`, and `programs.rbw` is not enabled on either (aarch64-darwin evaluated only).
+- [ ] 4.2 Unlock `bw` and read a non-secret field from a script on each laptop — verify: after a vault test login item `workstation-parity-bw-probe` with username `parity-probe` and a throwaway password is created, a script on each laptop runs `bw unlock --raw` (master password on the terminal) into `BW_SESSION`, then `bw sync`, then compares `bw get username workstation-parity-bw-probe` with `parity-probe` and prints only the match result; it prints no session token or password, and exits 0 on pyrite and on stibnite.
 
 ## 5. S3: window chords
 

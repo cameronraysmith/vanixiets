@@ -69,13 +69,36 @@ Observed divergences that the slices close:
 - **Status**: DECIDED.
 - **Boundary**: first-party niri binds on pyrite; Raycast's configuration lives in its own database on stibnite (source-versus-delivered: not in this repository).
 
-### D5: secrets in Bitwarden, access by role
+### D5: secrets in Bitwarden's cloud, access by role
 
-- **Choice**: Bitwarden holds secrets.
-  `rbw` gives CLI and script access on both machines with a GUI pinentry, as in `Mic92/dotfiles` `home-manager/desktop.nix:78-79`, where the pinentry is the repository's own `rbw-pinentry` package rather than a nixpkgs one.
-  The Bitwarden browser extension runs in Zen on both machines; the macOS Bitwarden application stays from the Mac App Store (A87).
-- **Status**: DECIDED; which GUI pinentry each OS uses is a detail of the slice.
-- **Boundary**: vendored versus first-party: `rbw` and its home-manager module are vendored from nixpkgs and home-manager; any pinentry wrapper is first-party.
+- **Choice**: Bitwarden's cloud service (bitwarden.com) holds secrets; nothing is self-hosted.
+  Amended by the operator's decisions of 2026-11-16, which replace the 2026-11-13 choice of `rbw` for command-line and script access.
+  Each role uses one of Bitwarden's own clients:
+  - Interactive use and the SSH agent: the Bitwarden desktop application, already deployed on both laptops (D6).
+  - Scripts and the command line: the official `bw` from nixpkgs (`bitwarden-cli`, already in the `security` home aggregate, `modules/home/security/tools.nix:11`) on both laptops.
+    It is the only command-line vault client, and the only one the sops tooling depends on (`retire-legacy-sops-tooling`, CAM-107).
+    `bw unlock` asks for the master password on the terminal, and scripts use the session it returns; it has no pinentry, so the command-line unlock is no longer required to be graphical, while the desktop application keeps the graphical unlock (Touch ID on stibnite, polkit on pyrite) for interactive and SSH use.
+  - The Bitwarden browser extension runs in Zen on both machines; the macOS Bitwarden application stays from the Mac App Store (A87).
+- **Rationale**: `bw` is maintained by the people who change the vault's key formats and releases every two to four weeks (cli-v2026.9.0 on 2026-09-17, cli-v2026.10.0 on 2026-10-15, cli-v2026.10.1 on 2026-10-29); it comes from the nixpkgs pin, so a broken release, such as the 2026.9.0 user-key-id backfill migration that leaves the vault locked against servers lacking its route (bitwarden/clients#23937), arrives only with a lock update.
+  The desktop application already covers interactive and agent use, so no further client is needed.
+- **Rejected alternative: `rbw`** (the 2026-11-13 choice, as in `Mic92/dotfiles` `home-manager/desktop.nix:78-79`):
+  - Upstream `doy/rbw` is unmaintained: its last release (1.15.0) and last commit (`77464d4`) are from 2025-12-31; issue #338, "Project maintainership", has been open since 2026-05-08 with no reply from the maintainer; about six competing forks exist and none is the agreed successor.
+  - Login fails with HTTP 400 when bitwarden.com triggers new-device verification (#318, open since 2026-02-21).
+  - Editing an item that has its own item key re-encrypts it without that key and corrupts it (#364; fixes only in open PRs #368 and #371).
+  - `rbw add` and `rbw edit` fail with HTTP 422 against Vaultwarden 1.37.4 and later (#385; fix in unmerged PR #386).
+  - It parses only EncString types 2, 4 and 6 (`src/cipherstring.rs:43-90`), while Bitwarden's V2 user keys are type 7 (`COSE_ENCRYPT0_TYPE` in the Bitwarden SDK), so it would stop working if the account were upgraded to V2 keys.
+  - Revisit only if a maintained successor appears, for example Bitwarden's Rust CLI in `bitwarden/sdk-internal` `crates/bw`, whose commands are today mostly `todo!()` (`main.rs:105-147`).
+- **Rejected alternative: self-hosted Vaultwarden now**:
+  - Vaultwarden lags the official clients: clients 2026.8.0 and later needed Vaultwarden 1.37.2, and the user-key-id route arrived only in 1.37.4 (#7693).
+  - Its advisories arrive steadily: 1.37.4 fixed seven, including the High 8.1 GHSA-69q9-v8p6-xvx3, and 1.37.5 two more.
+  - It adds a host, a database, TLS, SMTP, backups and monitoring, and buys nothing the fleet lacks today.
+  - Self-hosting makes the vault the root of trust in a circular chain: the vault host's clan vars need its machine key, which is encrypted to admin-user, whose private key lives in the vault; a lost vault host could then be rebuilt only from the offline `&admin` sops key.
+  - Revisit only if Bitwarden moves the SSH agent or SSH-key items out of its free tier or degrades them there, if the vault must be reachable only over ZeroTier, or if data residency is required.
+    Then: a Vaultwarden on a NixOS clan host in the shape of clan-infra's `modules/vaultwarden.nix` (`clan.core.postgresql` with `clan.core.state` backups), with an offsite restic backup as in pinpox/nixos `modules/vaultwarden/default.nix`, deployed only after recovery with the offline `&admin` sops key has been rehearsed.
+- **Evidence**: the client and server research of 2026-11-16 (rbw and `bw` issues, release dates and source lines as cited above; Vaultwarden release notes 1.37.1 to 1.37.5; the reference deployments of Mic92, clan-infra, Qubasa, pinpox and jfly).
+- **Status**: DECIDED 2026-11-16.
+- **Boundary**: vendored versus first-party: `bw`, the desktop application and the browser extension are vendored; the only first-party part is the package list.
+  Source versus delivered: the vault's contents stay on bitwarden.com, outside this repository.
 
 ### D6: SSH identity — DECIDED 2026-11-14
 
@@ -191,5 +214,5 @@ Rollback for every slice is reverting its pull request and redeploying the affec
 - Q7: stibnite as an always-reachable home machine, with pmset AC sleep 0, womp 1, battery sleep 1, and closed-lid behaviour unknown [INFERENCE] (no recommendation recorded).
 - Q8: state in scope (recommended yes, last).
 - Q2.5: a YubiKey `sk` key as a vault-independent emergency login from pyrite (deferred, optional).
-- sudo through pam_u2f on pyrite (OPEN) and rbw unlock by YubiKey [INFERENCE: verify].
+- sudo through pam_u2f on pyrite (OPEN).
 - How stibnite consumes the chord table (Phase 0).

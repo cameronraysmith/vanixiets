@@ -44,6 +44,7 @@ On stibnite, Maccy is redundant with Raycast's clipboard history and is removed 
 
 Bitwarden holds secrets.
 `rbw`, the Rust Bitwarden CLI, gives command-line and script access on both machines with a GUI pinentry, as in `Mic92/dotfiles` `home-manager/desktop.nix:78-79`.
+Superseded 2026-11-16 (design.md D5): the official `bw` from nixpkgs is the command-line and script client and `rbw` is rejected; the vault stays on Bitwarden's cloud.
 The Bitwarden browser extension runs in Zen on both machines.
 The macOS Bitwarden application stays installed from the Mac App Store.
 
@@ -154,4 +155,4 @@ Each slice is an independently shippable pull request.
 ## Scope notes
 
 The ZSA keyboard on pyrite comes later; the built-in keyboard comes first.
-pyrite has no fingerprint reader, so the YubiKey fills that role where it can: sudo through pam_u2f (OPEN), unlocking the Bitwarden vault through polkit and pam_u2f (verified 2026-11-14), and rbw unlock [INFERENCE: verify].
+pyrite has no fingerprint reader, so the YubiKey fills that role where it can: sudo through pam_u2f (OPEN) and unlocking the Bitwarden vault through polkit and pam_u2f (verified 2026-11-14); rbw unlock, listed here until 2026-11-16, no longer applies since rbw was rejected (design.md D5).

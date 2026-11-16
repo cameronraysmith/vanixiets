@@ -54,13 +54,13 @@ An agent signing with no one present MUST be able to sign without a person touch
 ### Requirement: Secrets stay in one password vault reachable from both laptops
 
 The operator's secrets SHALL stay in the password vault.
-On both laptops, the operator MUST be able to read a secret on the command line through a vault client, with any unlock prompt shown graphically, and MUST be able to fill sign-in details in the daily browser through the password manager.
+On both laptops, the operator MUST be able to read a secret on the command line through a vault client, and MUST be able to fill sign-in details in the daily browser through the password manager.
 On stibnite, the desktop Bitwarden application MUST remain installed from the Mac App Store (A87).
 
 #### Scenario: A script reads a secret on either laptop
 
 - **WHEN** a script the operator runs on pyrite or stibnite asks the vault client for a secret
-- **THEN** the vault client returns it from the password vault, after a graphical unlock prompt if the vault client was locked
+- **THEN** the vault client returns it from the password vault, after the operator has unlocked the vault client on the command line if it was locked
 
 #### Scenario: The operator signs in to a site in the daily browser
 
