@@ -16,11 +16,12 @@
 #
 # Pinning: the registry tarball by its sha256 (cross-checkable against the
 # registry's published integrity) and the dependency closure by npmDepsHash
-# over the shipped npm-shrinkwrap.json (lockfileVersion 3, 332 packages).
+# over the shipped npm-shrinkwrap.json (lockfileVersion 3, 343 packages).
 #
 # Two upstream-shrinkwrap repairs live in npm-dist-repairs.patch:
 #  - the prepublishOnly generator emits the workspace-internal @bastani/*
-#    entries (the atomic-natives* platform set plus pi-ai) without
+#    entries (the atomic-natives* platform set plus the atomic-ai, -tui,
+#    -agent-core, -codemode, -schema and -telemetry forks) without
 #    `integrity`, which nix's prefetch-npm-deps parser refuses outright
 #    ("non-git dependencies should have associated integrity"); the patch adds
 #    the registry's published sha512 for each. update.sh selects them by the
@@ -61,12 +62,12 @@ buildNpmPackage (finalAttrs: {
 
   src = fetchurl {
     url = "https://registry.npmjs.org/@bastani/atomic/-/atomic-${finalAttrs.version}.tgz";
-    hash = "sha256-qCYWrxXJrm3rDAois1nj4pUzxJYq5cBJOQ8ca0+zp1o=";
+    hash = "sha256-i8cOLX3PkS24Bd8YZrpVw7nNrOolTtgGCIuIVBRnqCc=";
   };
   sourceRoot = "package";
 
   nodejs = nodejs_22;
-  npmDepsHash = "sha256-PPoQkhtUWbz6ErO2A5LYJZFyzg6TPZ7Tw4A0iVUi/+E=";
+  npmDepsHash = "sha256-hLMDZ/E6m8+miyAfWNEOwtMaQigk9iVG3BrC81dWgSM=";
 
   postPatch = ''
     patch -p1 < ${./npm-dist-repairs.patch}
