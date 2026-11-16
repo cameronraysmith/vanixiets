@@ -189,19 +189,22 @@ let
             them straight into `~/.pi/agent/extensions/`, and atomic picks them up
             anyway. `getAgentDirs` (packages/coding-agent/src/config.ts:376) returns
             `[~/.atomic/agent, ~/.pi/agent]` with no filesystem test -- the only
-            escapes are the ATOMIC_CODING_AGENT_DIR environment variable and atomic
-            being named pi -- and `addAutoDiscoveredResources`
+            escapes are setting ATOMIC_CODING_AGENT_DIR or its PI_CODING_AGENT_DIR
+            alias, and atomic being named pi -- and `addAutoDiscoveredResources`
             (core/package-manager-auto-resources.ts:188) scans both roots' extension
             directories additively. So a populated `~/.atomic/agent` does not
             suppress the pi root, and every `.ts` file placed there runs under both
             agents whether or not either settings file mentions it. This option is
             the only surface on which pi-only scope can be stated.
 
-            edit-write-policy.ts reads a top-level `path` off the tool input, which
-            is pi's `edit` and `write` schema. atomic's `write` also has `path`, but
-            its `edit` takes a single hashline `input` string under
-            `additionalProperties: false`, so a `path` can never reach the policy
-            from atomic and every atomic edit was refused as malformed input.
+            edit-write-policy.ts is here although atomic runs it too: from atomic
+            0.9.72 atomic's `edit` is pi's `path` + `edits[]` tool, so the policy
+            judges atomic's calls as it does pi's. atomic loads its own copy, the
+            store path modules/home/ai/atomic/default.nix declares in `extensions`,
+            because the pi root this file sits in is not scanned when
+            ATOMIC_CODING_AGENT_DIR or PI_CODING_AGENT_DIR is set, as it is for
+            every Omnigent session. Excluding pi's copy keeps an interactive atomic
+            session from registering the same handler twice.
           '';
         };
 
