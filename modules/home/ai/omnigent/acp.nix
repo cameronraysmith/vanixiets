@@ -2,7 +2,7 @@
   flake.lib.omnigentACP.agents = [
     {
       name = "Atomic";
-      command = "bunx pi-acp@0.0.33";
+      command = "bunx pi-acp@0.0.34";
       omnigent_mcp = false;
       inject_system_prompt = false;
       env_passthrough = [
