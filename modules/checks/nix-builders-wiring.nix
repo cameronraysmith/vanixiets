@@ -202,7 +202,9 @@
             if isDarwin machine then
               null
             else
-              builtins.elem 50051 (config.networking.firewall.interfaces."zt+".allowedTCPPorts or [ ]);
+              builtins.elem 50051 (
+                config.networking.firewall.interfaces.${self.lib.zerotierInterfaces config}.allowedTCPPorts or [ ]
+              );
           globalPort =
             if isDarwin machine then null else builtins.elem 50051 config.networking.firewall.allowedTCPPorts;
           sshBuildAccounts = builtins.filter (user: config.users.users ? ${user}) [

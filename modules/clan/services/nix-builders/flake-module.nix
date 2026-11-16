@@ -7,7 +7,7 @@
 # an untrusted user cannot receive unsigned paths the caller evaluated itself.
 # `exclude` decides where a dispatcher sends work, not who is authorized.
 #
-# The port is reachable only over ZeroTier. NixOS opens it on `zt+` and binds the
+# The port is reachable only over ZeroTier. NixOS opens it on the ZeroTier interfaces and binds the
 # wildcard through socket activation. nix-darwin has no per-interface firewall,
 # so darwin builders bind their ZeroTier address and KeepAlive retries until that
 # address exists after boot; launchd has no socket activation, so idleTimeout is
@@ -32,7 +32,10 @@
 # An unreachable builder costs connection retries, after which nix marks it
 # disabled for the rest of the hook's lifetime and falls back to a local build;
 # work only that builder could take fails with `missing system features`.
-{ inputs, ... }:
+{ inputs, config, ... }:
+let
+  inherit (config.flake.lib) zerotierInterfaces;
+in
 {
   flake.clan.modules.nix-builders =
     { lib, ... }:
@@ -346,16 +349,18 @@
             ...
           }:
           {
-            nixosModule = {
-              imports = [
-                inputs.nix-grpc-store.nixosModules.server
-                (mkBuilderModule { inherit roles machine; })
-              ];
-              # Socket activation binds the wildcard at boot, before ZeroTier
-              # is up; the firewall keeps the port off every other interface.
-              services.nix-grpc-daemon.listen = "[::]:${toString port}";
-              networking.firewall.interfaces."zt+".allowedTCPPorts = [ port ];
-            };
+            nixosModule =
+              { config, ... }:
+              {
+                imports = [
+                  inputs.nix-grpc-store.nixosModules.server
+                  (mkBuilderModule { inherit roles machine; })
+                ];
+                # Socket activation binds the wildcard at boot, before ZeroTier
+                # is up; the firewall keeps the port off every other interface.
+                services.nix-grpc-daemon.listen = "[::]:${toString port}";
+                networking.firewall.interfaces.${zerotierInterfaces config}.allowedTCPPorts = [ port ];
+              };
 
             darwinModule =
               { config, pkgs, ... }:

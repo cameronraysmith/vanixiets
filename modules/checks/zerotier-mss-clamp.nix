@@ -1,9 +1,10 @@
 # Structural check that the zerotier MSS clamp reaches exactly the NixOS
 # members of the clan zerotier controller and peer roles, through the roles'
-# extraModules (modules/clan/inventory/services/zerotier.nix). The module's
-# own firewall branches and the clamp's behaviour are covered by
-# vmTests.x86_64-linux.zerotier-mss-clamp-runtime. Linux hosts only, so the
-# check is defined for x86_64-linux alone.
+# extraModules (modules/clan/inventory/services/zerotier.nix), and that each
+# member carries the variant for its own firewall backend and no other. The
+# clamp's behaviour on each backend is covered by
+# vmTests.x86_64-linux.zerotier-mss-clamp-runtime{,-nftables}. Linux hosts
+# only, so the check is defined for x86_64-linux alone.
 { self, ... }:
 {
   perSystem =
@@ -40,10 +41,27 @@
           name = "zerotier-mss-clamp";
           actual = lib.genAttrs hosts (
             name:
-            lib.hasInfix "TCPMSS --set-mss 1300"
-              self.nixosConfigurations.${name}.config.networking.firewall.extraCommands
+            let
+              cfg = self.nixosConfigurations.${name}.config.networking;
+              table = cfg.nftables.tables.zerotier-mss-clamp or null;
+            in
+            lib.optional (lib.hasInfix "TCPMSS --set-mss 1300" cfg.firewall.extraCommands) "iptables"
+            ++ lib.optional (
+              cfg.nftables.enable
+              && table != null
+              && table.enable
+              && lib.hasInfix "maxseg size set 1300" table.content
+            ) "nftables"
           );
-          expected = lib.genAttrs hosts (name: builtins.elem name members);
+          expected = lib.genAttrs hosts (
+            name:
+            lib.optional (builtins.elem name members) (
+              if self.nixosConfigurations.${name}.config.networking.nftables.enable then
+                "nftables"
+              else
+                "iptables"
+            )
+          );
         };
       };
     };
