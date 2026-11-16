@@ -24,7 +24,11 @@
 # fresh or reused for a head with an identical tree, and build_finished only
 # when a build finishes, so pullRequest serves succeeded builds and
 # buildFinished, filtered to failed, serves failed ones (and failed builds
-# outside a pull request). A reused failed build delivers neither, so a head
+# outside a pull request). Most failed builds stop before the report (their
+# evaluation, the report or a dependency of it failed), and nixbot's `when`
+# cannot select on an attribute's status, so the program itself declines
+# such a build: it publishes nothing, exits 0, and supersedes a current
+# comment. A reused failed build delivers neither, so a head
 # that reuses a failed build gets no evidence run: a known gap. Neither
 # trigger sets `when.permission`, which max(actor, author) satisfies and bots
 # such as renovate fail; trust is nixbot's CI approval, which holds an

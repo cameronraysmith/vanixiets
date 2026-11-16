@@ -191,6 +191,7 @@ For a pull request it first checks, with a read-only credential, whether `main` 
 Otherwise it uploads to `ttl-30d` and posts or edits one comment through nixbot's `pr-comment` API with the verdict and counts, the build number and revision, a table of failed attempts linking each one's screenshot, video, error context, and trace (through `https://trace.playwright.dev`), a link to the receipt, the retention, and a note that no identical report has been published from `main` in the last 90 days.
 When the build was reused for a newer head, the build line adds `(reused for head <head>, same tree)` and the marker records the head.
 If an earlier build of the same pull request commented and a later one is unaffected, the run replaces the comment with a superseded note and logs `PUBLISH-EVIDENCE: superseded #<number>`; it tracks this in a marker object under `ttl-30d/pr/`, because `pr-comment` can only upsert.
+A failed build that stopped before producing the report (its evaluation failed, or the report or one of its dependencies failed) has nothing to publish: the run logs `PUBLISH-EVIDENCE: no report (build <number>: <status>)`, exits 0, and supersedes an earlier comment of the pull request the same way.
 When two builds of one pull request finish out of order, the one that finishes last decides the comment.
 
 The report's output path is input-addressed, so a dependency bump in the site's closure is affected even when its screenshots are pixel-identical to `main`'s.
@@ -204,7 +205,7 @@ It publishes that build's report to `ttl-90d`, without a comment.
 Objects go to the R2 bucket `sciexp` under `projects/vanixiets/browser-evidence/<tier>/v1/<obs>/`, where `<obs>` is derived from the report's attribute and Nix output path only, so every build with the same report writes the same keys and each tier receives a report at most once.
 An identical existing receipt (schema version 3) logs `PUBLISH-EVIDENCE: unchanged`, and a different one fails as a conflict.
 Each run signs 15-minute temporary credentials with the R2 token, read-write on its own tier's prefix and, for a pull request, read-only on `ttl-90d/`, so a pull request run cannot write into `main`'s tier; it reads `NIXBOT_API_URL` and `NIXBOT_API_TOKEN` from nixbot rather than the secrets schema.
-The run log prints `PUBLISH-EVIDENCE: published|unchanged (report <obs>, passed=<bool>)`, `PUBLISH-EVIDENCE: uploaded <url>` when the run wrote the receipt, `PUBLISH-EVIDENCE: unaffected (report <obs> already published from main)`, and, for a pull request, `PUBLISH-EVIDENCE: commented #<number>` or `PUBLISH-EVIDENCE: superseded #<number>`.
+The run log prints `PUBLISH-EVIDENCE: published|unchanged (report <obs>, passed=<bool>)`, `PUBLISH-EVIDENCE: uploaded <url>` when the run wrote the receipt, `PUBLISH-EVIDENCE: unaffected (report <obs> already published from main)`, `PUBLISH-EVIDENCE: no report (build <number>: <status>)` for a failed build that produced none, and, for a pull request, `PUBLISH-EVIDENCE: commented #<number>` or `PUBLISH-EVIDENCE: superseded #<number>`.
 
 **Evidence URL:** `https://evidence.vanixiets.net/vanixiets/browser-evidence/<tier>/v1/<obs>/<file>` (the object key after `projects/`), served read-only by the Worker `sciexp-evidence` (`packages/evidence-worker/`, deployed with wrangler): GET and HEAD, `.png`, `.json`, `.webm`, `.zip`, and `.md` only, no listing; `.zip` traces are downloads that `https://trace.playwright.dev` alone may fetch cross-origin.
 Bucket lifecycle rules delete `ttl-30d` objects after 30 days and `ttl-90d` objects after 90 days.
@@ -276,7 +277,7 @@ just docs-tail
 **nixbot/effects fails on a pull request:** one of the effect dependencies failed to build, usually a rehearsal.
 Build `deploy-docs-rehearsal`, `release-rehearsal`, or `publish-evidence-rehearsal` with `-L` to see the program output against the stubs.
 
-**The browser-evidence run fails:** its log names the step; `evidence unavailable` means the build has no realisable report, `conflict` means another receipt already holds that key, and an upload or comment failure names the key or HTTP status.
+**The browser-evidence run fails:** its log names the step; `evidence unavailable` means the build should have a report but has no realisable one (a failed build that never produced it logs `no report` and succeeds instead), `conflict` means another receipt already holds that key, and an upload or comment failure names the key or HTTP status.
 A rerun is idempotent: it finds the same receipt and logs `unchanged`.
 A comment the GitHub API refuses can mean nixbot's GitHub App lacks `Pull requests: Read and write`; after granting it, wait out nixbot's 48-minute installation token cache or restart nixbot before rerunning.
 
