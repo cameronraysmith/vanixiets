@@ -96,6 +96,18 @@ Any requirement whose discharge depends on this fact SHALL name it explicitly, a
 - **WHEN** magnetite's `allowed-users` is narrowed so the updater's transient account is not admitted, or the daemon's sandbox or substituters change so that the update tasks can no longer evaluate or build
 - **THEN** this assumption is void, every update task fails, and under A109 the `dependency-update-service` requirement `Every pushed update commit is a consistent commit` loses its discharge until the account is admitted
 
+### Requirement: A115 — systemd does not start an already-active service when its timer elapses
+
+It is true of systemd, independent of what this fleet builds, that when a timer elapses while the unit it activates is still active, that unit is left running and not restarted, and no second instance of it is spawned.
+Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL lose its discharge once the violation condition below is observed.
+
+**Evidence**: systemd.timer(5): "Note that in case the unit to activate is already active at the time the timer elapses it is not restarted, but simply left running. There is no concept of spawning new service instances in this case." The nixpkgs Renovate module's unit keeps the default `Type=simple` and ends its script with `exec renovate` (M:138-140, 171-179), so the unit stays active for the whole run.
+
+#### Scenario: A timer starts a second run beside an active one
+
+- **WHEN** a pinned systemd starts or restarts a service unit whose timer elapses while the unit is still active, or the Renovate unit becomes a oneshot or `RemainAfterExit` unit that is inactive or active outside its run
+- **THEN** this assumption is void, and the `dependency-update-interface` requirement `The updater runs on a fixed schedule within a bounded envelope` loses its discharge for the scenario that a timer firing during a run starts no second instance
+
 ---
 
 ## MODIFIED Requirements

@@ -12,7 +12,7 @@ magnetite's evaluated configuration SHALL enable the nixpkgs `services.renovate`
 #### Scenario: The timer fires during a run
 
 - **WHEN** `renovate.timer` elapses while `renovate.service` is still active
-- **THEN** no second instance starts, because the unit is still active
+- **THEN** no second instance starts, because the unit is still active, under world assumption `A115 — systemd does not start an already-active service when its timer elapses`
 
 ### Requirement: The application key is read only by a privileged pre-start step
 

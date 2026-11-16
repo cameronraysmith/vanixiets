@@ -121,6 +121,47 @@ Stakeholders: the operator, who creates the App, populates its key, disables the
 
 Rollback: before step 5, removing `renovate` from magnetite's aspect list and redeploying stops the instance with no forge-side effect. After step 5, re-enable the Mend app and revert the Phase 2 pull request, which restores `regenerate-lock-files.yaml` and `gitIgnoredAuthors`; the App can be uninstalled independently.
 
+## Gate 1 modality verdicts
+
+This table is the pre-apply spec-and-feature alignment record.
+It carries one row per requirement in this change's three delta specs, with the capability's stratum tag from the proposal and the modality that witnesses the requirement.
+
+No row routes to a Gherkin scenario, so this change lays out no `.feature` file.
+The repository has no BDD runner (no pytest-bdd, cucumber or behave dependency, and no `.feature` file in the tree), so a laid-out scenario would be an unbound surface nothing executes.
+Every observable this change asserts is either a property of the evaluated NixOS configuration or of `.github/renovate.json`, which `nix eval` and the flake checks witness, or an observation against magnetite, the updater's journal or the forge, which the dry run and the integration verification witness as smoke tests.
+Where a scenario has no task that observes it, the row says so rather than naming a witness.
+
+| Requirement | Capability | Stratum | Modality | Witness |
+|---|---|---|---|---|
+| The dependency updater proposes updates on a fixed schedule | `dependency-update-service` | behavioral | build gate (`nix eval`) and smoke (deployment, forge) | tasks 4.1, 4.5, 5.2, 9.1; the scenario "A run approaches the hour" is witnessed only as the evaluated `RuntimeMaxSec` (4.5): no task observes a run being stopped |
+| The updater acts under its own forge identity with expiring credentials | `dependency-update-service` | behavioral | smoke (forge, host), build gate (`nix eval`) and content search | tasks 1.2, 1.4, 2.1, 2.3, 4.2, 4.4, 9.1; the scenario "An update task tries to read the application key" by task 5.5, which reads the key as the unit's dynamic user on magnetite and expects a refusal |
+| Every pushed update commit is a consistent commit | `dependency-update-service` | behavioral | build gate (flake checks, negative control), dry run and smoke (forge) | tasks 3.1, 3.2, 4.3, 5.3, 9.1, 9.2 |
+| The npm Playwright pin is derived from the Playwright flake input | `dependency-update-service` | behavioral | dry run and smoke (forge) | tasks 5.3, 7.1, 9.3; both observations depend on an upstream Playwright release occurring, and 9.3 records "pending" otherwise |
+| Merge authorization stays with people | `dependency-update-service` | behavioral | smoke (forge) | tasks 1.5, 9.5 |
+| Exactly one dependency updater writes to the repository | `dependency-update-service` | behavioral | operator procedure and smoke (forge) | tasks 6.1, 6.2, 6.3, 9.4 |
+| The fleet's updater is observed in a dry run before it first writes | `dependency-update-service` | behavioral | dry run (journal) | tasks 5.1, 5.3 |
+| The updater runs on a fixed schedule within a bounded envelope | `dependency-update-interface` | interface | build gate (`nix eval`), smoke (deployment) and world assumption | tasks 4.1, 4.5, 5.2; the scenario "The timer fires during a run" by world assumption A115, not by a task |
+| The application key is read only by a privileged pre-start step | `dependency-update-interface` | interface | build gate (`nix eval`, rendered unit), content search and smoke (host, negative control) | tasks 2.1, 2.3, 4.2, 4.4; the scenario "The sandboxed process looks for the key" by task 5.5 |
+| The forge application holds a fixed permission set over this repository alone | `dependency-update-interface` | interface | smoke (forge) | tasks 1.2, 1.4, 1.5, 8.3 |
+| Update tasks are attached per dependency kind in the repository's configuration | `dependency-update-interface` | interface | build gate (flake checks) and `jq` order and grouping checks | tasks 7.1 (rule order and the ban on grouping bun and flake-reference updates into one branch), 7.2 |
+| Update task commands are admitted by the allowlist, and a check ties the repository's commands to it | `dependency-update-interface` | interface | build gate (flake check, negative controls) | tasks 3.1, 3.2, 4.1 |
+| The tools on the updater's path match the repository's declarations | `dependency-update-interface` | interface | build gate (`nix eval`, negative control) | task 4.3 |
+| The updater neither labels for the queue nor enables auto-merge | `dependency-update-interface` | interface | smoke (forge) | task 9.5 |
+| A full dry run writes nothing to the forge and records each would-be commit | `dependency-update-interface` | interface | dry run (journal and forge) | task 5.3 |
+| This capability states its own trust boundary | `dependency-update-interface` | interface | capability text and documentation | specs text, task 7.5 |
+| A107 — A GitHub App installation token expires an hour after issue and reaches only the installation's repositories | `world-assumptions` | world | violation-condition witness | its own scenario |
+| A108 — Renovate commits through the forge's API under an App identity, and the forge signs those commits | `world-assumptions` | world | violation-condition witness | its own scenario |
+| A109 — Renovate runs post-upgrade tasks between its own artifact updates and the commit, runs only allowlisted commands, and still commits when a task fails | `world-assumptions` | world | violation-condition witness | its own scenario |
+| A110 — Renovate replaces rather than merges a rule's post-upgrade tasks, and applies global rules before the repository's | `world-assumptions` | world | violation-condition witness | its own scenario |
+| A111 — Renovate runs a task command without a shell and passes it only PATH and HOME | `world-assumptions` | world | violation-condition witness | its own scenario |
+| A112 — Renovate leaves a branch another author wrote, and recognizes only dashboard issues it created | `world-assumptions` | world | violation-condition witness | its own scenario |
+| A113 — A full dry run performs artifact updates and tasks and writes nothing to the forge | `world-assumptions` | world | violation-condition witness | its own scenario |
+| A114 — magnetite's nix daemon serves every local account and trusts only root and wheel | `world-assumptions` | world | violation-condition witness | its own scenario |
+| A115 — systemd does not start an already-active service when its timer elapses | `world-assumptions` | world | violation-condition witness | its own scenario |
+| Grounded vocabulary for behavioral requirements | `world-assumptions` | world | designation table and its lint | the table itself |
+
+No row carries an `est-property`, `est-contract`, or `est-symbolic` modality, so this change carries no executable-specification-testing obligation.
+
 ## Open Questions
 
 - None blocking. The App permission trim (Q16) is decided as "after Phase 1" and is task 8.3; whether `flock` serialization with nixbot evaluation is ever needed is left to observed load (D8).
