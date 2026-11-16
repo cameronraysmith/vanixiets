@@ -63,7 +63,8 @@ let
       admittedGroups = [
         user
       ]
-      ++ lib.optional (sharing.enable && lib.elem user sharing.participants) sharing.writer;
+      ++ lib.optional (sharing.enable && lib.elem user sharing.participants) sharing.writer
+      ++ lib.optional (worker.containers.incus == "restricted") "incus";
     in
     worker.owner == owner
     && worker.user == user
@@ -257,7 +258,17 @@ let
             && env.LOGNAME == user
             && env.PI_ACP_PI_COMMAND == "atomic"
             && env.PI_CODING_AGENT_DIR == "${home}/.atomic/agent"
-            && env.OMNIGENT_RUNNER_ENV_PASSTHROUGH == "PI_ACP_PI_COMMAND,PI_CODING_AGENT_DIR";
+            &&
+              env.OMNIGENT_RUNNER_ENV_PASSTHROUGH == lib.concatStringsSep "," (
+                [
+                  "PI_ACP_PI_COMMAND"
+                  "PI_CODING_AGENT_DIR"
+                ]
+                ++ lib.optionals (worker.containers.engine == "rootless-podman") [
+                  "DOCKER_HOST"
+                  "CONTAINER_HOST"
+                ]
+              );
         in
         if isDarwin then
           let

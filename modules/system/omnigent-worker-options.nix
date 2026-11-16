@@ -93,11 +93,25 @@ let
     };
   };
   workerOptions =
-    { config, ... }:
+    { config, pkgs, ... }:
     let
       osConfig = config;
     in
     {
+      # Each platform adapter implements container access; these guards only
+      # reject selections the platform cannot provide.
+      config.assertions = lib.concatLists (
+        lib.mapAttrsToList (name: worker: [
+          {
+            assertion = worker.containers.engine == "none" || pkgs.stdenv.hostPlatform.isLinux;
+            message = "Omnigent worker ${name}: containers.engine \"rootless-podman\" is only available on Linux.";
+          }
+          {
+            assertion = worker.containers.incus == "none" || (osConfig.virtualisation.incus.enable or false);
+            message = "Omnigent worker ${name}: containers.incus \"restricted\" requires virtualisation.incus.enable.";
+          }
+        ]) osConfig.services.omnigent-host.workers
+      );
       options.services.omnigent-host.workers = lib.mkOption {
         default = { };
         description = "Dedicated worker accounts prepared independently of host execution.";
@@ -144,6 +158,36 @@ let
                   type = lib.types.listOf lib.types.package;
                   default = [ ];
                   description = "Executable providers appended after required runtime packages and the worker profile.";
+                };
+                containers = {
+                  engine = lib.mkOption {
+                    type = lib.types.enum [
+                      "none"
+                      "rootless-podman"
+                    ];
+                    default = "none";
+                    description = ''
+                      Container engine reachable from this worker's sessions.
+                      `rootless-podman` lingers the account so its user manager
+                      socket-activates a per-user Podman API, points Docker-API
+                      clients at it, and adds podman, the Docker CLI and
+                      docker-compose to the runner PATH. It never grants the
+                      rootful podman or docker groups.
+                    '';
+                  };
+                  incus = lib.mkOption {
+                    type = lib.types.enum [
+                      "none"
+                      "restricted"
+                    ];
+                    default = "none";
+                    description = ''
+                      Incus access for this worker's sessions. `restricted` joins the
+                      `incus` group served by incus-user, which confines the account
+                      to its own project, and adds the incus client to the runner
+                      PATH. It never grants incus-admin.
+                    '';
+                  };
                 };
                 extraHomeModules = lib.mkOption {
                   type = lib.types.listOf lib.types.deferredModule;

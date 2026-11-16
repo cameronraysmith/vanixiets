@@ -74,6 +74,7 @@ in
         "sudo"
         "admin"
         "docker"
+        "podman"
         "lxd"
         "incus-admin"
         "libvirtd"
@@ -84,6 +85,20 @@ in
       ];
       reservedEnvironment = flakeConfig.flake.lib.omnigentReservedEnvironment { isDarwin = false; };
       hmUnit = worker: "home-manager-${utils.escapeSystemdPath worker.user}.service";
+      rootlessPodman = worker: worker.containers.engine == "rootless-podman";
+      restrictedIncus = worker: worker.containers.incus == "restricted";
+      runtimeDirFor = worker: "/run/user/${toString (account worker).uid}";
+      userManager = worker: "user@${toString (account worker).uid}.service";
+      containerPackages =
+        worker:
+        lib.optionals (rootlessPodman worker) [
+          config.virtualisation.podman.package
+          # The real Docker CLI rather than podman's docker shim, which would
+          # shadow a host's own Docker CLI and ignores DOCKER_HOST.
+          pkgs.docker-client
+          pkgs.docker-compose
+        ]
+        ++ lib.optional (restrictedIncus worker) config.virtualisation.incus.clientPackage;
       workerEnvironment =
         worker:
         worker.environment
@@ -98,15 +113,45 @@ in
           XDG_STATE_HOME = "${homeFor worker}/.local/state";
           PI_ACP_PI_COMMAND = "atomic";
           PI_CODING_AGENT_DIR = "${homeFor worker}/.atomic/agent";
-          OMNIGENT_RUNNER_ENV_PASSTHROUGH = "PI_ACP_PI_COMMAND,PI_CODING_AGENT_DIR";
+          OMNIGENT_RUNNER_ENV_PASSTHROUGH = lib.concatStringsSep "," (
+            [
+              "PI_ACP_PI_COMMAND"
+              "PI_CODING_AGENT_DIR"
+            ]
+            # omnigent's runner allowlist already carries XDG_RUNTIME_DIR but not
+            # DOCKER_HOST or CONTAINER_HOST.
+            ++ lib.optionals (rootlessPodman worker) [
+              "DOCKER_HOST"
+              "CONTAINER_HOST"
+            ]
+          );
           PATH = lib.mkForce (
-            inputs.self.lib.omnigentWorkerPath {
+            # NixOS's setuid wrappers (newuidmap/newgidmap among them) precede
+            # everything as in NixOS's own PATH; under the unit's NoNewPrivileges
+            # they run unprivileged, which is why the podman CLI goes remote below.
+            lib.optionalString (rootlessPodman worker) "/run/wrappers/bin:"
+            + inputs.self.lib.omnigentWorkerPath {
               inherit pkgs;
               home = config.home-manager.users.${worker.user};
-              inherit (worker) extraPackages;
+              extraPackages = worker.extraPackages ++ containerPackages worker;
             }
           );
-        };
+        }
+        # Sessions are not logins, so nothing else supplies a runtime directory;
+        # the lingering user manager creates it and socket-activates podman there.
+        # Sessions inherit the unit's NoNewPrivileges, which voids the setuid
+        # newuidmap a local podman CLI needs to create the user namespace, so
+        # CONTAINER_HOST makes the podman CLI a client of the same socket.
+        // lib.optionalAttrs (rootlessPodman worker) (
+          let
+            socket = "unix://${runtimeDirFor worker}/podman/podman.sock";
+          in
+          {
+            XDG_RUNTIME_DIR = runtimeDirFor worker;
+            DOCKER_HOST = socket;
+            CONTAINER_HOST = socket;
+          }
+        );
     in
     {
       imports = [ flakeConfig.flake.modules.nixos.omnigent-worker-options ];
@@ -284,6 +329,14 @@ in
                   == (if deliveries.${name}.enabled then deliveries.${name}.policy else null);
                 message = "Omnigent worker ${name}: Home Manager credential paths must match the host adapter's allow-list.";
               }
+              {
+                assertion = !rootlessPodman worker || (account worker).uid != null;
+                message = "Omnigent worker ${name}: containers.engine \"rootless-podman\" requires users.users.${worker.user}.uid, which names its user manager and runtime directory; pin it before the worker is first created on a new host, or to the uid already allocated in /var/lib/nixos/uid-map.";
+              }
+              {
+                assertion = !rootlessPodman worker || config.virtualisation.podman.enable;
+                message = "Omnigent worker ${name}: containers.engine \"rootless-podman\" requires virtualisation.podman.enable, which installs the per-user podman.socket.";
+              }
             ]) workers
           );
 
@@ -317,6 +370,18 @@ in
             ) workers
           );
 
+          # Linger gives the worker a user manager, and with it /run/user/<uid> and
+          # the socket-activated rootless podman API, without any login session.
+          users.users = lib.mapAttrs' (_: worker: lib.nameValuePair worker.user { linger = true; }) (
+            lib.filterAttrs (_: rootlessPodman) workers
+          );
+
+          # incus-user serves the incus group, confining each member to its own
+          # restricted project; incus-admin stays out of reach.
+          users.groups.incus = lib.mkIf (lib.any restrictedIncus (lib.attrValues workers)) {
+            members = map (worker: worker.user) (lib.filter restrictedIncus (lib.attrValues workers));
+          };
+
           systemd.slices = lib.mkIf (cfg.workerSliceMemoryMax != null) {
             omnigent = {
               description = "Omnigent workers";
@@ -345,8 +410,9 @@ in
                   "network-online.target"
                   (hmUnit worker)
                 ]
-                ++ secretDependencies name;
-                wants = [ "network-online.target" ];
+                ++ secretDependencies name
+                ++ lib.optional (rootlessPodman worker) (userManager worker);
+                wants = [ "network-online.target" ] ++ lib.optional (rootlessPodman worker) (userManager worker);
                 requires = [ (hmUnit worker) ] ++ secretDependencies name;
                 restartTriggers = [ config.home-manager.users.${worker.user}.home.activationPackage ];
                 environment = workerEnvironment worker;
