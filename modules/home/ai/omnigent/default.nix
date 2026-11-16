@@ -31,8 +31,9 @@ let
             Content of {file}`~/.omnigent/config.yaml`, rewritten on every
             activation. host.host_id, server, and host.name when not declared
             here are kept from the existing file; every other runtime key is
-            dropped. Credentials belong in runtime state, not these
-            store-visible settings.
+            dropped. tui.theme defaults to dark here, since an absent theme makes
+            every session terminal block on omnigent's theme picker. Credentials
+            belong in runtime state, not these store-visible settings.
           '';
         };
       };
@@ -50,6 +51,9 @@ let
                 }
               ) acp.agents;
             };
+            # Activation drops undeclared keys, so a theme chosen at runtime would
+            # not survive a deploy and the next session would prompt again.
+            tui.theme = lib.mkDefault "dark";
           }
           // lib.optionalAttrs (hostName != null && hostName != "") {
             host.name = lib.mkDefault hostName;

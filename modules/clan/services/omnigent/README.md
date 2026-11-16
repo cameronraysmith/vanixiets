@@ -29,8 +29,9 @@ Both carriers derive from one attribute set and use nixpkgs' JSON quoting, so th
 The NixOS runner reads the selected existing account's credentials; both magnetite and pyrite currently select `cameron`, while stibnite selects `crs58`.
 Both platforms derive HOME and working directory from `config.users.users.${cfg.user}.home`; the shared inventory uses that home for Atomic state, and Darwin also uses it for logs.
 The aliases map reuses `crs58`'s Home Manager content under `cameron`; it does not rename Unix accounts.
-Home Manager enables `programs.omnigent` with the same package and renders `host.name` and the shared ACP definitions into writable `~/.omnigent/config.yaml` through `managedConfigs`.
-Each activation rewrites the file from the declaration, keeping only `host.host_id` and `server` from the existing file; it must not become a Nix-store symlink.
+Home Manager enables `programs.omnigent` with the same package and renders `host.name`, the shared ACP definitions and `tui.theme: dark` into writable `~/.omnigent/config.yaml` through `managedConfigs`.
+Each activation rewrites the file from the declaration, keeping only `host.host_id` and `server` from the existing file; it must not become a Nix-store symlink, because omnigent rewrites the file in place through a temporary file and rename.
+The theme is declared because activation drops undeclared keys: a theme chosen through omnigent's picker or `/theme` would not survive the next deploy, and a file without `tui.theme` makes every session terminal block on the theme picker.
 All three hosts use the exact shared `Atomic` / `<pi-acp store path>/bin/pi-acp` (`pkgs/by-name/pi-acp`, so no session start fetches from npm) and `Oh My Pi` / `omp acp` rows from `modules/home/ai/omnigent/acp.nix`.
 Both rows disable `omnigent_mcp` and `inject_system_prompt`; Atomic allows `PI_ACP_PI_COMMAND` and `PI_CODING_AGENT_DIR`, while omp never receives `PI_CODING_AGENT_DIR`, so Atomic state does not reach omp.
 Both rows also allow `DOCKER_HOST` and `CONTAINER_HOST`, which carry no state; see "Container access".
