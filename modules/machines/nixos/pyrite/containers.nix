@@ -8,6 +8,12 @@
   # Sibling-file auto-merge into the pyrite host module, as disko.nix does.
   flake.modules.nixos."machines/nixos/pyrite" =
     { pkgs, ... }:
+    let
+      # Each login's runtime directory, /run/user/<uid>, set by pam_systemd at login
+      # (podman.socket uses the same directory as %t); it can only be referenced, not
+      # resolved at evaluation, for users whose uids are allocated dynamically.
+      rootlessDockerHost = "unix://\${XDG_RUNTIME_DIR}/podman/podman.sock";
+    in
     {
       # Incus refuses the iptables firewall, and podman 6 dropped iptables as a
       # netavark firewall driver. The ZeroTier MSS clamp follows the backend
@@ -84,5 +90,24 @@
         "incus-admin"
         "podman"
       ];
+
+      # Docker-API clients (docker-compose, devcontainers, testcontainers) default
+      # to the logged-in user's rootless socket, which the podman module enables
+      # for every login, so each user's images and containers stay in that user's
+      # own store rather than root's. The rootful socket and /run/docker.sock stay
+      # for jobs that need root, reached with an explicit DOCKER_HOST. podman's own
+      # CLI, `docker` included through dockerCompat, ignores DOCKER_HOST.
+      # extraInit reaches login shells, only where the session has a runtime
+      # directory (su, cron and service-run shells have none, and an empty one
+      # would yield a broken socket path); environment.d reaches each user's
+      # systemd manager, so session-launched applications see it too.
+      environment.extraInit = ''
+        if [ -n "''${XDG_RUNTIME_DIR-}" ]; then
+          export DOCKER_HOST="${rootlessDockerHost}"
+        fi
+      '';
+      environment.etc."environment.d/60-docker-host.conf".text = ''
+        DOCKER_HOST=${rootlessDockerHost}
+      '';
     };
 }
