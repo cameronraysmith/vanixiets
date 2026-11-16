@@ -25,6 +25,14 @@
 # writes into its own extensions/ directory is loaded by atomic without either
 # settings file naming it, and only this key can refuse it. See
 # aiAgentSettings.piOnlyExtensions for the mechanism.
+#
+# It also names pi's edit/write policy by store path, ahead of those
+# force-excludes. atomic resolves an absolute `extensions` entry itself
+# (core/package-manager-resolver.ts resolveConfiguredLocalEntries), so the
+# policy loads from whichever agent directory holds this settings.json,
+# including the PI_CODING_AGENT_DIR=~/.atomic/agent of every Omnigent session,
+# where the ~/.pi/agent copy is never scanned. The force-exclude of that copy
+# keeps an interactive session from loading the policy twice.
 { config, ... }:
 let
   managedConfigsModule = config.flake.modules.homeManager.managedConfigs;
@@ -68,7 +76,10 @@ let
             inherit (config.aiAgentSettings) theme enableInstallTelemetry hideThinkingBlock;
             enableAnalytics = false;
             packages = config.aiAgentSettings.packagesForAtomic;
-            extensions = config.aiAgentSettings.extensionsForAtomic;
+            extensions = [
+              "${../pi/policy/edit-write-policy.ts}"
+            ]
+            ++ config.aiAgentSettings.extensionsForAtomic;
 
             # Three model roles. The session default covers chat, planning, and
             # every workflow stage that pins no model. Implementation runs on

@@ -700,6 +700,11 @@ export async function evaluateEditWrite(
 // cwd-relative path put it inside the repository and permitted a write that
 // really landed in the home directory. The Windows shell-path arm of Pi's
 // normalizePath is omitted; this policy is deployed only to darwin and linux.
+// atomic's resolveToCwd additionally passes the result through mapPathForCwd
+// (core/resume/path-mapping.js), which moves a path under a checkout root that
+// a resume restored into a snapshot worktree to the same place in that
+// worktree. That remap is not mirrored: a session cwd inside such a worktree
+// makes the policy judge the original checkout's path instead.
 const UNICODE_SPACES = /[\u00A0\u2000-\u200A\u202F\u205F\u3000]/g;
 
 export const normalizeToolPath = (target: string, homeDirectory: string): string | undefined => {
@@ -791,16 +796,31 @@ export const createNodePolicyCapabilities: CapabilityFactory = (context) => ({
 // rather than letting resolve() map it to a directory under cwd.
 //
 // This shape is Pi's: both `edit` and `write` declare a required top-level
-// `path` string. It is deliberately not atomic's -- atomic's `edit` takes a
-// single hashline `input` string with `additionalProperties: false`, so no
-// `path` can ever reach this function from that agent. That is why
-// modules/home/ai/agent-settings.nix keeps this extension out of atomic rather
-// than teaching the adapter a second tool grammar.
+// `path` string. From atomic 0.9.72 atomic's `edit` is Pi's `path` + `edits[]`
+// tool too, so the same extraction serves both agents.
 const parseToolInput = (input: unknown): string | undefined => {
   if (input === null || typeof input !== "object") return undefined;
   const path = (input as { readonly path?: unknown }).path;
   if (typeof path !== "string") return undefined;
   return path.trim().length > 0 ? path : undefined;
+};
+
+// atomic 0.9.87's `write` (core/tools/write-selectors.js withWriteSelectors)
+// takes `local://<rest>` before Pi's path handling and writes `<rest>` resolved
+// under the call's cwd (resource-selectors.js fallbackInternalPath, `.+` after
+// the scheme), refusing a `<rest>` that escapes cwd. Judging the raw string
+// instead resolved `<cwd>/local:/<rest>`, a path no tool writes. Its other
+// redirections need nothing here: archive members and SQLite rows are files
+// named before the `:` under cwd, `conflict://` rewrites conflicted files under
+// cwd, and `skill`, `artifact`, `history` and `tool-output` URLs are read-only.
+// Pi's `write` has no `local://` and writes the literal `<cwd>/local:/<rest>`,
+// which lies in the same directory tree, so judging `<rest>` serves both.
+const LOCAL_URL = /^local:\/\/(.+)$/;
+
+const writeTarget = (target: string, cwd: string): string | undefined => {
+  if (!target.startsWith("local://")) return target;
+  const rest = LOCAL_URL.exec(target)?.[1];
+  return rest === undefined ? undefined : resolve(cwd, rest);
 };
 
 export function createEditWriteToolCallHandler(
@@ -809,7 +829,9 @@ export function createEditWriteToolCallHandler(
 ): (event: ToolCallEvent, context: ToolCallContext) => Promise<ToolCallResult> {
   return async (event, context) => {
     if (event.toolName !== "edit" && event.toolName !== "write") return undefined;
-    const target = parseToolInput(event.input);
+    const path = parseToolInput(event.input);
+    const target =
+      path !== undefined && event.toolName === "write" ? writeTarget(path, context.cwd) : path;
     // The one refusal that survives an unreadable request rather than an
     // unrecoverable target: a tool call whose path this policy cannot read is a
     // call it cannot reason about at all, and letting it through would mean

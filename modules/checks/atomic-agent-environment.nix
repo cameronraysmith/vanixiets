@@ -24,7 +24,9 @@
 # so each piOnlyExtensions file must be force-excluded under the
 # root-relative `-extensions/<file>` spelling; the bare basename spelling is a
 # silent no-op. The edit/write policy reached atomic through this gap for three
-# days.
+# days. The policy itself now reaches atomic on purpose, by store path in
+# atomic's own `extensions`, so that it also loads where the pi root is never
+# scanned (PI_CODING_AGENT_DIR set, as in every Omnigent session).
 #
 # Skill sink. ~/.agents/skills is canonical; a ~/.pi/agent/skills sink would
 # shadow it.
@@ -84,6 +86,7 @@
               !lib.any (
                 entry: lib.any (extension: entry == "-${extension}") agentSettings.piOnlyExtensions
               ) atomicExtensions;
+            atomicDeclaresEditWritePolicy = builtins.elem "${../home/ai/pi/policy/edit-write-policy.ts}" atomicExtensions;
             piSpecificSkillsPresent =
               lib.any (name: lib.hasInfix ".pi/agent/skills" name) (builtins.attrNames homeConfig.home.file)
               || lib.any (script: lib.hasInfix ".pi/agent/skills" script) activationScripts;
@@ -97,6 +100,7 @@
             atomicLacksPiOnlyPackages = true;
             everyPiOnlyExtensionExcluded = true;
             noBareBasenameSpelling = true;
+            atomicDeclaresEditWritePolicy = true;
             piSpecificSkillsPresent = false;
           };
         };

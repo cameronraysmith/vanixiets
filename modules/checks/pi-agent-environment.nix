@@ -1127,18 +1127,57 @@
           reason = "malformed";
         }
         {
-          # atomic's edit tool takes a single hashline string under
-          # additionalProperties: false, so no path can ever reach this adapter
-          # from that agent and every atomic edit was refused as malformed.
-          # This row records why the extension is scoped to Pi in
-          # modules/home/ai/agent-settings.nix rather than taught a second tool
-          # grammar; it is the shape the policy must never be asked to judge.
-          name = "adapter cannot read atomic hashline edit input";
+          # atomic 0.9.72 replaced its hashline `input` edit with Pi's `path` +
+          # `edits[]` tool, which is why the extension also loads under atomic
+          # (modules/home/ai/agent-settings.nix piOnlyExtensions is empty).
+          name = "adapter reads atomic multi-edit input";
           scenario = "git-feature";
           tool = "edit";
-          input.input = "[greeter.ts#A18E]\nreplace 1..1:\n+const x = 2;\n";
+          input = {
+            path = "/repo/file.ts";
+            edits = [
+              {
+                oldText = "a";
+                newText = "b";
+              }
+              {
+                oldText = "c";
+                newText = "d";
+              }
+            ];
+          };
+          expected = "pass";
+        }
+        {
+          # atomic's write sends local://<rest> to <rest> under cwd. Judged raw,
+          # "local://src/a.ts" canonicalized outside the /repo inspection
+          # directory and failed open; resolved under cwd it lands in /repo,
+          # which this scenario places outside every repository.
+          name = "adapter judges an atomic local:// write under cwd";
+          scenario = "outside-repository";
+          tool = "write";
+          input.path = "local://src/a.ts";
+          expected = "block";
+          reason = "outside a recognized repository";
+        }
+        {
+          # atomic accepts no empty local:// target, so neither does the policy.
+          name = "adapter blocks an empty atomic local:// write";
+          scenario = "outside-repository";
+          tool = "write";
+          input.path = "local://";
           expected = "block";
           reason = "malformed";
+        }
+        {
+          # Only write redirects local://; edit opens the literal path, which
+          # this fake does not place under /repo, so the row fails open as any
+          # unresolvable target does.
+          name = "adapter leaves a local:// edit path literal";
+          scenario = "outside-repository";
+          tool = "edit";
+          input.path = "local://src/a.ts";
+          expected = "pass";
         }
         {
           name = "adapter permits core exceptions";
