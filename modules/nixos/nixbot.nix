@@ -266,6 +266,8 @@ in
       # the build (dependency_failed) instead of being ignored. Without
       # optional_build_grace (nixbot.toml) a build waits for every
       # ignoreFailure attribute, up to the 3 h build timeout on a sleeping Mac.
+      # A renamed or removed effect's last failed run would otherwise stay in
+      # the web "N failing" count, since it never runs again to clear it.
       #
       # Not patched: _dispatch_build (orchestrator.py) checks ancestry, awaits,
       # then registers, so gitea-mq's back-to-back pushes of one batch ref can
@@ -279,6 +281,7 @@ in
               ./nixbot-gated-reuse-effects-summary.patch
               ./nixbot-ignore-failure-dependents.patch
               ./nixbot-abandon-optional-attributes.patch
+              ./nixbot-failing-effects-defined.patch
             ];
           });
     };
