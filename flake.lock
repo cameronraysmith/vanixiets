@@ -396,17 +396,17 @@
     "easykubenix": {
       "flake": false,
       "locked": {
-        "lastModified": 1794862874,
-        "narHash": "sha256-GMl+0fYH6B6e1Z4Rxs6DCQ0mdDZD6FBGP2aeE2JBy5Q=",
+        "lastModified": 1794945450,
+        "narHash": "sha256-Au3xBmusINN1/EU4hjUWQ93OraCYy5MjMK+WKr0olXU=",
         "owner": "nixidae",
         "repo": "easykubenix",
-        "rev": "711842942fe7ab01cb02f11a5df870d5a097f74d",
+        "rev": "e22fbf576aa43870495de53d558b42bd8e3a2baf",
         "type": "github"
       },
       "original": {
         "owner": "nixidae",
         "repo": "easykubenix",
-        "rev": "711842942fe7ab01cb02f11a5df870d5a097f74d",
+        "rev": "e22fbf576aa43870495de53d558b42bd8e3a2baf",
         "type": "github"
       }
     },

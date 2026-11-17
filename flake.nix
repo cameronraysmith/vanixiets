@@ -192,7 +192,7 @@
 
     # Pinned by revision: upstream changes its module API often and the k3d
     # integration run is not a merge gate, so bump by hand with that run green.
-    easykubenix.url = "github:nixidae/easykubenix/711842942fe7ab01cb02f11a5df870d5a097f74d";
+    easykubenix.url = "github:nixidae/easykubenix/e22fbf576aa43870495de53d558b42bd8e3a2baf";
     easykubenix.flake = false;
 
     cilium-src.url = "github:cilium/cilium/v1.20.4";
