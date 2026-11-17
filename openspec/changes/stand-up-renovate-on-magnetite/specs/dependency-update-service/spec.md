@@ -85,12 +85,14 @@ An update pull request SHALL land only after a person gives merge authorization 
 - **WHEN** an update pull request's required check runs all pass
 - **THEN** it stays open and unqueued until a person gives merge authorization
 
-### Requirement: Exactly one dependency updater writes to the repository
+### Requirement: Each dependency has exactly one updater, and one Renovate instance writes to the repository
 
-At any time at most one dependency updater SHALL write branches, pull requests, comments or a dependency dashboard to the repository.
+Each dependency of the repository SHALL be proposed for update by exactly one dependency updater, and at any time at most one Renovate instance SHALL write branches, pull requests, comments or a dependency dashboard to the repository.
 Before the fleet's dependency updater first writes to the repository, the hosted updater SHALL have stopped writing to it, and the hosted updater's open update pull requests, their branches and its dependency dashboard SHALL have been closed.
 
-**Discharged by**: operator procedure at cutover, not by a machine property; resting on world assumption `A112 — Renovate leaves a branch another author wrote, and recognizes only dashboard issues it created`.
+**Discharged by**: operator procedure at cutover, not by a machine property, for the single Renovate instance; the `dependency-update-interface` requirement `Update tasks are attached per dependency kind in the repository's configuration` together with the nix manager's lock file maintenance staying off, for the split of flake inputs between updaters; resting on world assumption `A112 — Renovate leaves a branch another author wrote, and recognizes only dashboard issues it created`.
+
+**Reworded, 2026-11-17**: this requirement first read "Exactly one dependency updater writes to the repository". By operator decision of 2026-11-17, refreshes of branch-tracking flake inputs stay with a second dependency updater, the GitHub Actions flake updater, which a separate change replaces with nixbot's `flakeUpdate` effect. Renovate and that updater write disjoint sets of dependencies: Renovate takes the flake inputs pinned by revision or tag, the other updater the branch-tracking ones. The invariant that matters is therefore one updater per dependency, plus one Renovate instance.
 
 #### Scenario: The fleet's updater begins writing
 
@@ -101,6 +103,11 @@ Before the fleet's dependency updater first writes to the repository, the hosted
 
 - **WHEN** the hosted updater is still writing to the repository when the fleet's updater starts writing
 - **THEN** this requirement is violated: under A112 each updater skips the other's branches and the two dashboards diverge, so the cutover is incomplete until the hosted updater is stopped and its state closed
+
+#### Scenario: Two updaters propose the same flake input
+
+- **WHEN** a Renovate pull request changes the locked revision of a branch-tracking flake input, or the flake-input updater changes a flake input pinned by revision or tag
+- **THEN** this requirement is violated, because one dependency then has two updaters whose pull requests conflict
 
 ### Requirement: The fleet's updater is observed in a dry run before it first writes
 

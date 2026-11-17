@@ -72,7 +72,7 @@ Any requirement whose discharge depends on this fact SHALL name it explicitly, a
 #### Scenario: Renovate adopts foreign branches or dashboards
 
 - **WHEN** a pinned Renovate updates branches written by another identity without configuration, stops consulting `branchPrefixOld` or changes its default, or adopts a dashboard issue another identity created
-- **THEN** this assumption is void, and the `dependency-update-service` requirement `Exactly one dependency updater writes to the repository` loses the reason for closing the hosted updater's branches and dashboard rather than leaving them
+- **THEN** this assumption is void, and the `dependency-update-service` requirement `Each dependency has exactly one updater, and one Renovate instance writes to the repository` loses the reason for closing the hosted updater's branches and dashboard rather than leaving them
 
 ### Requirement: A113 — A full dry run performs artifact updates and tasks and writes nothing to the forge
 
@@ -367,6 +367,9 @@ A term found to denote two distinct phenomena within this repository's vocabular
 | dependency dashboard | — | the issue on the forge in which the dependency updater lists the updates it has pending, held or awaiting approval | shared |
 | flake input | — | a dependency a forge-hosted repository's flake declares by reference, whose exact version the flake lock file records | shared |
 | comment | — | a message a person or service posts on a pull request or an issue on the forge | shared |
+| Renovate instance | — | one running copy of the dependency updater's software, writing to the forge under one forge identity; the hosted updater and the fleet's updater are two instances | shared |
+| flake-input updater | — | the dependency updater that refreshes the locked revisions of branch-tracking flake inputs, one pull request per input, apart from Renovate | shared |
+| branch-tracking flake input | — | a flake input whose declaration names a branch, or no reference at all, so its locked revision moves whenever that branch does | shared |
 
 #### Scenario: The terms with two senses are read
 

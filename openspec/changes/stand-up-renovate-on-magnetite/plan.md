@@ -24,7 +24,7 @@ tasks.md task 4.2 is Task 4 Step 2 here where the mapping is one to one.
 - App `vanixiets-renovate`, installed on `cameronraysmith/vanixiets` only, not a ruleset bypass actor; permission trim only after Phase 1 (operator Q16).
 - Task bun is the repository's toolchain bun with an assertion equal to `package.json::packageManager` (`bun@1.4.4`) (operator Q17).
 - `allowedCommands` exactly `^nix flake lock$`, `^nix run \.#regenerate-bun-nix$`, `^just bun-repin-playwright$`, `^bun install --ignore-scripts$`; the flake check fails on any unmatched command or an empty command set (operator Q18).
-- `.github/workflows/update-flake-inputs.yaml` was first out of scope (operator Q19); operator decision 2a (2026-11-17) brings it in: Phase 2 deletes it and its `FLAKE_UPDATER_*` credentials and enables nix lock file maintenance in its place (tasks.md 7.6–7.8, 9.8).
+- `.github/workflows/update-flake-inputs.yaml` is not touched (operator Q19). Operator decision 2a (2026-11-17), which would have deleted it and enabled nix lock file maintenance, was withdrawn the same day: branch-tracking flake inputs stay one pull request per input and move to nixbot's `flakeUpdate` effect in a separate change; Renovate's `nix` manager stays on with lock file maintenance off (tasks.md 7.6–7.8, 9.8).
 - Nothing under `modules/nixos/nixbot.nix`, `modules/nixos/gitea-mq.nix`, `modules/nixos/buildbot.nix`, their Apps or the rulesets is edited.
 - nix-managed outputs are verified by `nix eval`/instantiation against `.#nixosConfigurations.magnetite` and `.#checks.x86_64-linux.*`, or on the host after activation; never by reading source.
 - Long or output-heavy commands: `<command> 2>&1 | tee logs/<identifier>-$(date +%Y%m%d-%H%M%S).log`.
