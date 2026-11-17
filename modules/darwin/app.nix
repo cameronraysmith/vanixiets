@@ -1,5 +1,33 @@
-{ ... }:
+# The .#darwin app: activate a nix-darwin configuration with nh, after
+# checking the host's clan machine key.
+#
+# Local activation never installs /var/lib/sops-nix/key.txt (only
+# `clan machines update|install` and `clan vars upload` do), and sops-nix
+# fails to install secrets without it. So for every darwin host whose
+# machine key exists in this repository (sops/secrets/<host>-age.key), the
+# app compares the public key of the installed key file with
+# sops/machines/<host>/key.json before activating, and stops with the remedy
+# when it is missing or different (continuing under --dry). The expected keys
+# are baked in from the flake the app was built from. Only public keys are
+# printed. MACHINE_KEY_FILE overrides the key file path for testing.
+topArgs@{ ... }:
+let
+  inherit (topArgs) lib;
+  machineKeys = lib.filterAttrs (_: v: v != null) (
+    lib.genAttrs (lib.attrNames topArgs.config.flake.darwinConfigurations) (
+      host:
+      if builtins.pathExists (../../sops/secrets + "/${host}-age.key/secret") then
+        (builtins.head (builtins.fromJSON (builtins.readFile (../../sops/machines + "/${host}/key.json"))))
+        .publickey
+      else
+        null
+    )
+  );
+in
 {
+  # Expected machine public keys per darwin host, for the guard below and for inspection.
+  flake.lib.darwinMachineKeys = machineKeys;
+
   perSystem =
     {
       pkgs,
@@ -17,6 +45,7 @@
               name = "darwin-switch";
               runtimeInputs = [
                 pkgs.nh
+                pkgs.age
               ];
               meta.description = "Build and activate the nix-darwin configuration for a hostname (uses nh)";
               text = ''
@@ -65,6 +94,41 @@
                   shift
                 else
                   flake="github:cameronraysmith/vanixiets"
+                fi
+
+                # Machine-key guard: see the header of modules/darwin/app.nix.
+                expected=""
+                case "$hostname" in
+                ${lib.concatStrings (lib.mapAttrsToList (h: k: "  ${h}) expected=${k} ;;\n") machineKeys)}
+                esac
+                dry=0
+                for arg in "$@"; do [ "$arg" = "--dry" ] && dry=1; done
+                if [ -n "$expected" ]; then
+                  key_file="''${MACHINE_KEY_FILE:-/var/lib/sops-nix/key.txt}"
+                  actual=""
+                  found="missing"
+                  if [ -e "$key_file" ]; then
+                    if [ -r "$key_file" ]; then
+                      actual=$(age-keygen -y "$key_file" 2>/dev/null || true)
+                    else
+                      actual=$(sudo ${pkgs.age}/bin/age-keygen -y "$key_file" 2>/dev/null || true)
+                    fi
+                    found="''${actual:-present but unreadable (sudo age-keygen -y failed)}"
+                  fi
+                  if [ "$actual" != "$expected" ]; then
+                    cat >&2 <<-EOF
+                	Machine key check failed for $hostname ($key_file):
+                	  expected: $expected (sops/machines/$hostname/key.json)
+                	  found:    $found
+                	sops-nix cannot install this host's secrets without it.
+                	Install it with: clan vars upload $hostname
+                	EOF
+                    if [ "$dry" -eq 1 ]; then
+                      echo "--dry: continuing despite the machine key check" >&2
+                    else
+                      exit 1
+                    fi
+                  fi
                 fi
 
                 cat <<-EOF

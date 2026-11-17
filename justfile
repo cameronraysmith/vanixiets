@@ -2006,7 +2006,10 @@ sops-rotate:
 update-all-keys:
   fd -e yaml -e json -e enc . secrets/ -x sops updatekeys -y {}
 
-# Provision a bridge secret for NixOS HM key delivery
+# Provision a bridge secret for NixOS HM key delivery.
+# The age private key exists only in the pipe into sops; only ciphertext is
+# written, first to a temporary file and then moved onto the target, so a
+# failure leaves the previous target untouched and no plaintext on disk.
 # Usage: just provision-bridge-key <sops-identity> [bw-item-name]
 # Examples:
 #   just provision-bridge-key raquel              -> looks up sops-raquel-user-ssh
@@ -2030,21 +2033,21 @@ provision-bridge-key identity bw_item=("sops-" + identity + "-user-ssh"):
 
   mkdir -p secrets/bridge
   target="secrets/bridge/{{identity}}-age-key.enc"
+  tmp=$(mktemp)
+  trap 'rm -f "$tmp"' EXIT
 
-  echo "Extracting age private key from Bitwarden item: {{bw_item}}"
+  echo "Encrypting the age key derived from Bitwarden item {{bw_item}} to the bridge recipients..."
   bw get item "{{bw_item}}" 2>/dev/null \
-    | jq -r '.sshKey.privateKey' \
+    | jq -er '.sshKey.privateKey' \
     | ssh-to-age -private-key \
-    > "$target"
+    | sops encrypt --filename-override "$target" --input-type binary --output-type binary /dev/stdin \
+    > "$tmp"
 
-  echo "Encrypting bridge secret to NixOS machine keys..."
-  sops encrypt --input-type binary --output-type binary --in-place "$target"
-
-  echo "Verifying..."
-  if [ ! -s "$target" ]; then
-    echo "Error: bridge secret is empty" >&2
+  if ! jq -e '.sops.age | length > 0' "$tmp" >/dev/null 2>&1; then
+    echo "Error: sops produced no encrypted envelope; $target left unchanged" >&2
     exit 1
   fi
+  mv "$tmp" "$target"
 
   echo "Bridge secret written to: $target"
   echo ""

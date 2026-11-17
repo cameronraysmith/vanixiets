@@ -4,7 +4,7 @@
 #   - Static keys: GitHub, GitLab (external services) - srvos provides these
 #   - Dynamic keys: NixOS zerotier hosts via clan sshd vars
 #   - Static keys: Darwin hosts (macOS system-managed)
-{ lib, ... }:
+{ config, lib, ... }:
 let
   # Shared known_hosts configuration for all SSH clients
   # Any machine (NixOS or darwin) might connect to any infrastructure host
@@ -75,17 +75,15 @@ let
       # ====================
       # Darwin Machines (static SSH host keys)
       # ====================
-      # Keys are macOS system-managed, not clan-generated
-      # Extracted via: ssh-keyscan -t ed25519 <hostname>
+      # Keys are macOS system-managed, not clan-generated; pinned as static data in
+      # flake.lib.darwinHostKeys (modules/lib/darwin-host-keys.nix)
 
       "blackphos.zt" = {
         hostNames = [
           "blackphos.zt"
           "fddb:4344:343b:14b9:399:930e:e971:d9e0" # Zerotier IPv6
         ];
-        # Static key from /etc/ssh/ssh_host_ed25519_key.pub
-        # Verified via ssh-keyscan blackphos.local 2025-11-19
-        publicKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOWFgVKryKvWqDDsmUXKQYLFPQFfVXZj2S8E4TZsTtFc";
+        publicKey = config.flake.lib.darwinHostKeys.blackphos;
       };
 
       "stibnite.zt" = {
@@ -93,9 +91,7 @@ let
           "stibnite.zt"
           "fddb:4344:343b:14b9:399:9324:19d9:3451" # Zerotier IPv6
         ];
-        # Static key from /etc/ssh/ssh_host_ed25519_key.pub
-        # Verified 2026-07-10 (rehomed to new hardware)
-        publicKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIA7eyzXKTI0pjLl1hbU8UuM3VFWq2NqYdf7cBPCcC638";
+        publicKey = config.flake.lib.darwinHostKeys.stibnite;
       };
 
       "argentum.zt" = {
@@ -103,9 +99,7 @@ let
           "argentum.zt"
           "fddb:4344:343b:14b9:399:93f7:54d5:ad7e" # Zerotier IPv6
         ];
-        # Static key from /etc/ssh/ssh_host_ed25519_key.pub
-        # Verified 2025-11-29
-        publicKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJB6ZUkT5+4U0kcfdOUMHo6qRV9qPlzkkCKj0C7Rqh2m";
+        publicKey = config.flake.lib.darwinHostKeys.argentum;
       };
 
       "rosegold.zt" = {
@@ -113,9 +107,7 @@ let
           "rosegold.zt"
           "fddb:4344:343b:14b9:399:9315:3431:ee8" # Zerotier IPv6
         ];
-        # Static key from /etc/ssh/ssh_host_ed25519_key.pub
-        # Verified 2025-11-29
-        publicKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAII6X063DuDUFScs6Za6nx3TnvG9dlJDrTthx7e2aX1XA";
+        publicKey = config.flake.lib.darwinHostKeys.rosegold;
       };
 
       # ====================

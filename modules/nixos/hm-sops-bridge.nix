@@ -76,19 +76,44 @@ flakeArgs@{ inputs, ... }:
       };
 
       config = lib.mkIf (cfg.users != { }) {
-        assertions = lib.mapAttrsToList (username: userCfg: {
-          assertion = builtins.pathExists (
-            inputs.self + "/secrets/bridge/${userCfg.sopsIdentity}-age-key.enc"
-          );
-          message = ''
-            hm-sops-bridge.users.${username} uses sops identity "${userCfg.sopsIdentity}",
-            but secrets/bridge/${userCfg.sopsIdentity}-age-key.enc does not exist.
+        assertions = lib.concatLists (
+          lib.mapAttrsToList (
+            username: userCfg:
+            let
+              host = config.clan.core.settings.machine.name;
+              bridgeFile = inputs.self + "/secrets/bridge/${userCfg.sopsIdentity}-age-key.enc";
+              machineKeyFile = inputs.self + "/sops/machines/${host}/key.json";
+              bridgeExists = builtins.pathExists bridgeFile;
+              # The binary sops store is JSON on disk; recipients are public metadata.
+              recipients = map (r: r.recipient) (builtins.fromJSON (builtins.readFile bridgeFile)).sops.age;
+              machineKey = (builtins.head (builtins.fromJSON (builtins.readFile machineKeyFile))).publickey;
+            in
+            [
+              {
+                assertion = bridgeExists;
+                message = ''
+                  hm-sops-bridge.users.${username} uses sops identity "${userCfg.sopsIdentity}",
+                  but secrets/bridge/${userCfg.sopsIdentity}-age-key.enc does not exist.
 
-            Commit the bridge secret for that identity, or point
-            hm-sops-bridge.users.${username}.sopsIdentity (default:
-            flake.users.${username}.meta.sopsAgeKeyId) at an identity that has one.
-          '';
-        }) cfg.users;
+                  Commit the bridge secret for that identity, or point
+                  hm-sops-bridge.users.${username}.sopsIdentity (default:
+                  flake.users.${username}.meta.sopsAgeKeyId) at an identity that has one.
+                '';
+              }
+              {
+                assertion = !bridgeExists || (builtins.pathExists machineKeyFile && lib.elem machineKey recipients);
+                message = ''
+                  ${host} bridges sops identity "${userCfg.sopsIdentity}" for ${username}, but
+                  secrets/bridge/${userCfg.sopsIdentity}-age-key.enc is not encrypted to ${host}'s
+                  machine key (sops/machines/${host}/key.json), so the host could not decrypt it.
+
+                  Add the ${host} anchor to the secrets/bridge/ rule in .sops.yaml and run
+                  `just update-all-keys`.
+                '';
+              }
+            ]
+          ) cfg.users
+        );
 
         sops.secrets = lib.mapAttrs' (
           username: userCfg:
