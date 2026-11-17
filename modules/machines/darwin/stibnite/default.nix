@@ -100,6 +100,7 @@ in
           "steipete/tap/codexbar"
           "antigravity"
           "dbeaver-community"
+          "google-gemini"
           "gpg-suite"
           "inkscape"
           "keycastr"
