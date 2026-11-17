@@ -26,35 +26,6 @@ keys:
   - &pyrite age1eajmgz9zvq639zjnmqcaklst6u3s7un8k68nd4klnnlswgtrnylq7twk4v
 
 creation_rules:
-  # Per-user signing keys (that user + the operator identity + offline recovery)
-  - path_regex: secrets/users/admin-user/signing-key\.yaml$
-    key_groups:
-      - age:
-        - *admin
-        - *admin-user
-
-  - path_regex: secrets/users/raquel-user/signing-key\.yaml$
-    key_groups:
-      - age:
-        - *admin
-        - *admin-user
-        - *raquel-user
-
-  # Other admin-user secrets (llm-api-keys, mcp-api-keys, etc.)
-  - path_regex: secrets/users/admin-user/.*\.yaml$
-    key_groups:
-      - age:
-        - *admin
-        - *admin-user
-
-  # Other raquel-user secrets
-  - path_regex: secrets/users/raquel-user/.*\.yaml$
-    key_groups:
-      - age:
-        - *admin
-        - *admin-user
-        - *raquel-user
-
   # Home-manager user secrets (two-tier architecture from test-clan)
   - path_regex: secrets/home-manager/users/crs58/.*\.yaml$
     key_groups:

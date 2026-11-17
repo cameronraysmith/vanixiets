@@ -77,14 +77,15 @@ External-dns can automate this after initial bootstrap.
 
 ### Age keys for SOPS
 
-Generate age keys for SOPS encryption of cluster secrets.
+Generate a dedicated age key pair for the cluster's node decryption key.
+Keep it in its own file: `~/.config/sops/age/keys.txt` holds personal keys derived from Bitwarden and must never be overwritten.
 
 ```bash
-# Generate key pair
-age-keygen -o ~/.config/sops/age/keys.txt
+# Generate the cluster key pair in its own file
+( umask 077; age-keygen -o ~/.config/sops/age/cluster-<name>.txt )
 
 # Extract public key for .sops.yaml
-age-keygen -y ~/.config/sops/age/keys.txt
+age-keygen -y ~/.config/sops/age/cluster-<name>.txt
 ```
 
 Configure `.sops.yaml` in your repository with the public key.

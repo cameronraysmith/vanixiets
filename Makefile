@@ -4,7 +4,8 @@
 #
 # 1. Run 'make bootstrap' to install nix and direnv
 # 2. Run 'make verify' to check your installation
-# 3. Run 'make setup-user' to generate age keys for secrets (first time only)
+# 3. Derive your sops age key from your Bitwarden SSH key (first time only; see
+#    "Workstation age key" in packages/docs/src/content/docs/guides/secrets-management.md)
 # 4. Run 'nix develop' to enter the development environment
 # 5. Use 'just ...' to run configuration tasks
 #
@@ -77,7 +78,8 @@ bootstrap: install-nix install-direnv
 	@printf "Next steps:\n"
 	@echo "1. Start a new shell session (to load nix in PATH)"
 	@echo "2. Run 'make verify' to check your installation"
-	@echo "3. Run 'make setup-user' to generate age keys (first time setup)"
+	@echo "3. Derive your sops age key from your Bitwarden SSH key (first time only):"
+	@echo "   see 'Workstation age key' in packages/docs/src/content/docs/guides/secrets-management.md"
 	@echo "4. Run 'nix develop' to enter the development environment"
 	@echo ""
 	@printf "Optional: Auto-activate development environment with direnv\n"
@@ -335,34 +337,12 @@ verify: ## Verify nix installation and environment setup
 ##@ setup
 #-------
 
-.PHONY: setup-user
-setup-user: ## Generate age key for sops-nix secrets (first time user setup)
-	@printf "\nGenerating age key for secrets management...\n\n"
-	@. /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh && \
-	if [ -f ~/.config/sops/age/keys.txt ]; then \
-		printf "⚠️  Age key already exists at ~/.config/sops/age/keys.txt\n"; \
-		printf "To regenerate, manually delete the file first\n"; \
-		printf "\nYour public key is:\n"; \
-		nix shell nixpkgs#age -c age-keygen -y ~/.config/sops/age/keys.txt 2>/dev/null || printf "Error reading existing key\n"; \
-	else \
-		mkdir -p ~/.config/sops/age; \
-		nix shell nixpkgs#age -c age-keygen -o ~/.config/sops/age/keys.txt; \
-		chmod 600 ~/.config/sops/age/keys.txt; \
-		printf "\n● Age key generated successfully!\n\n"; \
-		printf "Your public key is:\n"; \
-		nix shell nixpkgs#age -c age-keygen -y ~/.config/sops/age/keys.txt; \
-		printf "\n⚠️  IMPORTANT: Back up your private key to Bitwarden!\n"; \
-		printf "1. Copy the content of ~/.config/sops/age/keys.txt\n"; \
-		printf "2. Store in Bitwarden as secure note: 'age-key-<username>'\n"; \
-		printf "3. Send your PUBLIC key (shown above) to the admin\n"; \
-		printf "\nSee docs/new-user-host.md for complete setup instructions\n"; \
-	fi
-
 .PHONY: check-secrets
 check-secrets: ## Check if you can decrypt shared secrets (requires age key and admin setup)
 	@printf "\nChecking secrets access...\n\n"
 	@if [ ! -f ~/.config/sops/age/keys.txt ]; then \
-		printf "⊘ No age key found. Run 'make setup-user' first\n"; \
+		printf "⊘ No age key found. Derive it from your Bitwarden SSH key:\n"; \
+		printf "  see 'Workstation age key' in packages/docs/src/content/docs/guides/secrets-management.md\n"; \
 		exit 1; \
 	fi
 	@if nix develop --accept-flake-config --command sops -d secrets/shared.yaml >/dev/null 2>&1; then \

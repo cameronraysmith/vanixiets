@@ -9,7 +9,6 @@
         bt = "btop";
         bm = "btm";
         bazel = "bazelisk";
-        npmbw = "bunx -p @bitwarden/cli bw";
         c = "claude";
         ca = "claude attach";
         ccd = "claude";

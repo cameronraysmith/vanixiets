@@ -116,40 +116,36 @@ Add the user to the machine configuration:
 }
 ```
 
-### Step 3: Create user secrets (legacy sops-nix)
+### Step 3: Create user secrets (legacy sops tree)
 
-User secrets are managed via legacy sops-nix.
+User secrets live in the legacy sops tree, one file per user.
 
-Create the secrets file:
-
-```bash
-# Create encrypted secrets file
-sops secrets/users/raquel.sops.yaml
-```
-
-Example structure:
-
-```yaml
-# secrets/users/raquel.sops.yaml
-github-token: ghp_xxxx
-ssh-signing-key: |
-  -----BEGIN OPENSSH PRIVATE KEY-----
-  ...
-  -----END OPENSSH PRIVATE KEY-----
-```
-
-Add the user's age public key to `.sops.yaml`:
+Add the user's age public key to `.sops.yaml` (the `ssh-to-age` image of the first `sshKeys` entry in the user's `meta.nix`, derived from their Bitwarden SSH key) with a rule for their file:
 
 ```yaml
 keys:
-  - &raquel-blackphos age1xxx...
+  - &raquel-user age1xxx...
 
 creation_rules:
-  - path_regex: secrets/users/raquel\.sops\.yaml$
+  - path_regex: secrets/home-manager/users/raquel/.*\.yaml$
     key_groups:
       - age:
-        - *raquel-blackphos
-        - *admin  # Allow admin to manage
+        - *admin        # offline recovery
+        - *admin-user   # operator, to maintain the file
+        - *raquel-user
+```
+
+Add the anchor to the user table in `modules/checks/sops-correspondence.nix`, then create the secrets file:
+
+```bash
+sops secrets/home-manager/users/raquel/secrets.yaml
+```
+
+Example key names (values are written in the editor and never committed in plaintext):
+
+```yaml
+github-token: <value>
+ssh-signing-key: <value>
 ```
 
 ### Step 4: Reference secrets in user module
@@ -162,7 +158,7 @@ Use sops in the user module, leaving the age key file location to `base-sops`, w
 {
   flake.modules.homeManager."users/raquel" = { pkgs, lib, ... }: {
     sops = {
-      defaultSopsFile = "${inputs.self}/secrets/users/raquel.sops.yaml";
+      defaultSopsFile = "${inputs.self}/secrets/home-manager/users/raquel/secrets.yaml";
       secrets = {
         "github-token" = { };
         "ssh-signing-key" = {
@@ -180,16 +176,8 @@ On a NixOS host that enrolls this user in `hm-sops-bridge`, the bridge assigns t
 
 ### Step 5: Provision the user's age key
 
-On a darwin host, the user generates the key themselves:
-
-```bash
-# As the user (raquel), on the darwin host
-mkdir -p ~/.config/sops/age
-age-keygen -o ~/.config/sops/age/keys.txt
-
-# Display public key - add this to .sops.yaml
-age-keygen -y ~/.config/sops/age/keys.txt
-```
+On a darwin host, the user derives the key from their SSH key in Bitwarden and appends it to `~/.config/sops/age/keys.txt`; follow [Workstation age key](/guides/secrets-management#workstation-age-key).
+Never generate an unrelated age key: the key must be the image of the SSH key the repository records for the user, or the correspondence check fails.
 
 On a clan-managed NixOS host, do not generate a key on the host.
 Set `flake.users.<user>.meta.sopsAgeKeyId`, declare `hm-sops-bridge.users.<user> = { };` on the host, and commit the user's age private key as `secrets/bridge/<id>-age-key.enc` encrypted to that machine's age key.
@@ -533,14 +521,11 @@ Aggregates are defined in `modules/home/_aggregates.nix`.
 
 ## Secrets setup
 
-All users use [sops-nix](/concepts/clan-integration#secrets-management) for personal secrets.
+All users use [sops-nix](/concepts/clan-integration#secrets-management) for personal secrets, in `secrets/home-manager/users/<username>/secrets.yaml`.
 
-### Generate age key
+### Derive your age key
 
-```bash
-mkdir -p ~/.config/sops/age
-age-keygen -o ~/.config/sops/age/keys.txt
-```
+Your key is derived from your SSH key in Bitwarden, never generated separately; follow [Workstation age key](/guides/secrets-management#workstation-age-key).
 
 ### Get public key
 
@@ -550,29 +535,29 @@ age-keygen -y ~/.config/sops/age/keys.txt
 
 ### Add to .sops.yaml
 
-Edit `.sops.yaml` to include the public key:
-
 ```yaml
 keys:
-  - &raquel-blackphos age1xxx...  # Add your key
+  - &raquel-user age1xxx...
 
 creation_rules:
-  - path_regex: secrets/users/raquel\.sops\.yaml$
+  - path_regex: secrets/home-manager/users/raquel/.*\.yaml$
     key_groups:
       - age:
-        - *raquel-blackphos
+        - *admin
+        - *admin-user
+        - *raquel-user
 ```
 
 ### Create secrets file
 
 ```bash
-sops secrets/users/raquel.sops.yaml
+sops secrets/home-manager/users/raquel/secrets.yaml
 ```
 
 ### Verify decryption
 
 ```bash
-sops -d secrets/users/raquel.sops.yaml
+sops -d secrets/home-manager/users/raquel/secrets.yaml >/dev/null && echo ok
 ```
 
 ---
@@ -636,15 +621,11 @@ systemctl --user start sops-nix
 
 **Solution**:
 ```bash
-# Verify key exists
-cat ~/.config/sops/age/keys.txt
-
-# Regenerate if needed
-age-keygen -o ~/.config/sops/age/keys.txt
-
-# Add public key to .sops.yaml
+# Your public keys (the key file must exist)
 age-keygen -y ~/.config/sops/age/keys.txt
 ```
+
+If the file is missing, derive the key again from Bitwarden ([Workstation age key](/guides/secrets-management#workstation-age-key)); it is the same key every time, so `.sops.yaml` needs no change.
 
 ### User module not found
 

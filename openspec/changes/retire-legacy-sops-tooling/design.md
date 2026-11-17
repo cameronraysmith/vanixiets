@@ -146,6 +146,20 @@ The secrets guide is rewritten around this description, from the diagnosis:
 | `openspec/specs/bare-metal-install-path/spec.md:138` | keep (`update-all-keys` stays) | — |
 | `modules/home/ai/plugins/preferences-nix-and-secrets/.apm/skills/preferences-secrets/SKILL.md:567-580` | keep (general guidance) | — |
 
+Passages found by the retired-name sweep during apply (operator-approved, same principle), rewritten in slice 3:
+
+| Location | Action | Task |
+|---|---|---|
+| `packages/docs/…/guides/getting-started.md:39,84-93,280-289` (`make setup-user`) | rewrite to the workstation-key procedure | 6.9 |
+| `packages/docs/…/guides/mcp-server-usage.md:48-121` (`secrets/users/<u>/mcp-api-keys.yaml`) | rewrite to the home-manager secrets file | 6.9 |
+| `packages/docs/…/guides/home-manager-onboarding.md` (`secrets/users/*.sops.yaml`, `age-keygen -o`) | rewrite | 6.9 |
+| `packages/docs/…/development/architecture/architecture.md:293-296,442,567,696` | rewrite paths | 6.9 |
+| `packages/docs/…/development/context/glossary.md:156`, `tutorials/darwin-deployment.md:63-64,334-335` ("clan vars NixOS-only") | rewrite | 6.9 |
+| `packages/docs/…/reference/ci-jobs.md:234`, `development/traceability/test-harness.md:24` (`make setup-user`) | rewrite | 6.9 |
+| `docs/notes/development/kubernetes/workflows/04-hetzner-deployment.md:527-536` (`--field notes` into a `/tmp` file), `03-clusterapi-bootstrap.md:80-88` (overwrote `keys.txt`) | rewrite | 6.9 |
+| `.gitleaksignore:13,15`, `docs/notes/development/hardware/mbp141-nixos-clan-research.md:109` | keep (history allow-list; dated research note) | — |
+| `scripts/verify-no-secrets-in-store.sh:78-91` (looks for `mcp-api-keys.yaml` in the store) | keep; after D20 it only reports its "not found" warning (operator: leave as is) | — |
+
 ## Risks / Trade-offs
 
 - [Risk] Two in-flight changes replace the same `world-assumptions` requirement "Grounded vocabulary for behavioral requirements" (this one and `stand-up-renovate-on-magnetite`); MODIFIED applies by full replacement, so whichever archives second drops the other's rows. → Mitigation: an archive-time task in each change (tasks.md 7.7 here, 9.7 there) merges the table with every row the other change added before the second archives.

@@ -60,8 +60,8 @@ The infrastructure includes four darwin machines and four NixOS machines:
 
 | Aspect | Darwin | NixOS |
 |--------|--------|-------|
-| Deployment | `darwin-rebuild switch` | `clan machines update` |
-| Secrets (clan vars) | Planned (not yet implemented) | clan vars |
+| Deployment | `just activate` | `clan machines update` |
+| Secrets (clan vars) | clan vars; machine key installed once with `clan vars upload <host>` | clan vars; machine key installed by `clan machines update` |
 | Secrets (sops-nix) | sops-nix (user secrets) | sops-nix (user secrets) |
 | Zerotier | Homebrew cask | Nix package |
 | Service management | launchd | systemd |
@@ -331,8 +331,8 @@ ping 10.144.x.y   # Or use the IP directly
 
 ## Step 6: Configure secrets for darwin
 
-Darwin machines use sops-nix for user-level secrets.
-Clan vars darwin support is planned but not yet implemented; currently clan vars only operates on NixOS machines.
+Darwin machines use clan vars for machine secrets and sops-nix for user-level secrets.
+A darwin host with a machine key in the repository needs it installed once with `clan vars upload <hostname>`; `just activate` stops and prints that command while `/var/lib/sops-nix/key.txt` is missing or differs.
 
 ### Ensure your age key exists
 

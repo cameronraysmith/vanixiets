@@ -439,13 +439,6 @@ bootstrap *ARGS:
 bootstrap-verify *ARGS:
   {{nix_cmd}} run --no-warn-dirty .#verify -- {{ARGS}}
 
-# Generate ~/.config/sops/age/keys.txt (mirror of `make setup-user`)
-# Body lives in modules/apps/bootstrap/setup-user.{nix,sh}.
-# Idempotent: re-print public key and exit 0 if the key already exists.
-[group('bootstrap')]
-bootstrap-setup-user *ARGS:
-  {{nix_cmd}} run --no-warn-dirty .#setup-user -- {{ARGS}}
-
 # Bootstrap build home-manager with flake
 [group('nix-home-manager')]
 home-manager-bootstrap-build profile="aarch64-linux":
@@ -1445,72 +1438,6 @@ check-secrets:
 get-kubeconfig:
   @sops exec-env secrets/shared.yaml 'echo "$KUBECONFIG"' > kubeconfig.yaml || echo "KUBECONFIG not found in secrets/shared.yaml"
 
-# Hash-encrypt a file: copy to secrets directory with content-based name and encrypt with sops
-[group('secrets')]
-hash-encrypt source_file user="crs58":
-  #!/usr/bin/env bash
-  set -euo pipefail
-
-  HASH=$(nix hash file --type sha256 --base64 "{{source_file}}" | cut -d'-' -f2 | head -c 32)
-
-  BASE_NAME=$(basename "{{source_file}}" .yaml)
-  BASE_NAME=$(basename "$BASE_NAME" .yml)
-
-  TARGET_DIR="secrets/users/{{user}}"
-  TARGET_FILE="${TARGET_DIR}/${HASH}-${BASE_NAME}.yaml"
-
-  mkdir -p "$TARGET_DIR"
-
-  cp "{{source_file}}" "$TARGET_FILE"
-  echo "Copied {{source_file}} → $TARGET_FILE"
-
-  sops encrypt --in-place "$TARGET_FILE"
-  echo "Encrypted $TARGET_FILE with sops"
-
-  echo "Hash: $HASH"
-  echo "Final path: $TARGET_FILE"
-
-# Verify hash integrity: decrypt secret file and compare hash with original file
-[group('secrets')]
-verify-hash original_file secret_file:
-  #!/usr/bin/env bash
-  set -euo pipefail
-
-  SECRET_BASENAME=$(basename "{{secret_file}}")
-  EXPECTED_HASH=$(echo "$SECRET_BASENAME" | cut -d'-' -f1)
-
-  ACTUAL_HASH=$(nix hash file --type sha256 --base64 "{{original_file}}" | cut -d'-' -f2 | head -c 32)
-
-  TEMP_FILE=$(mktemp)
-  trap "rm -f $TEMP_FILE" EXIT
-
-  sops decrypt "{{secret_file}}" > "$TEMP_FILE"
-
-  DECRYPTED_HASH=$(nix hash file --type sha256 --base64 "$TEMP_FILE" | cut -d'-' -f2 | head -c 32)
-
-  echo "Original file: {{original_file}}"
-  echo "Secret file: {{secret_file}}"
-  echo "Expected hash (from filename): $EXPECTED_HASH"
-  echo "Actual hash (from original): $ACTUAL_HASH"
-  echo "Decrypted hash: $DECRYPTED_HASH"
-  echo
-
-  if [ "$ACTUAL_HASH" = "$EXPECTED_HASH" ]; then
-    echo "Original file hash matches secret filename hash"
-  else
-    echo "Original file hash does NOT match secret filename hash"
-    exit 1
-  fi
-
-  if [ "$DECRYPTED_HASH" = "$ACTUAL_HASH" ]; then
-    echo "Decrypted content matches original file"
-  else
-    echo "Decrypted content does NOT match original file"
-    exit 1
-  fi
-
-  echo "All verification checks passed!"
-
 # Edit a sops encrypted file
 [group('secrets')]
 edit-secret file:
@@ -1937,71 +1864,10 @@ renovate dry_run="true":
 
 ## sops
 
-# Extract key details from Bitwarden (all sops-* keys or specific key)
-[group('sops')]
-sops-extract-keys key="":
-  #!/usr/bin/env bash
-  if [ -n "{{key}}" ]; then
-    scripts/sops/extract-key-details.sh "{{key}}"
-  else
-    scripts/sops/extract-key-details.sh
-  fi
-
-# Update .sops.yaml with keys from Bitwarden
-[group('sops')]
-sops-update-yaml:
-  @scripts/sops/update-sops-yaml.sh
-
-# Deploy host key from Bitwarden to /etc/ssh/ (requires sudo)
-[group('sops')]
-sops-deploy-host-key host:
-  @scripts/sops/deploy-host-key.sh {{host}}
-
-# Validate all SOPS key correspondences (config.nix ↔ Bitwarden ↔ .sops.yaml)
-[group('sops')]
-sops-validate-correspondences:
-  @scripts/sops/validate-correspondences.sh
-
-# Regenerate ~/.config/sops/age/keys.txt from Bitwarden
-[group('sops')]
-sops-sync-keys *FLAGS:
-  @scripts/sops/sync-age-keys.sh {{FLAGS}}
-
-# Full key rotation workflow (interactive)
-[group('sops')]
-sops-rotate:
-  @echo "=== SOPS Key Rotation Workflow ==="
-  @echo ""
-  @echo "Prerequisites:"
-  @echo "  1. Generate new SSH keys in Bitwarden Web UI:"
-  @echo "     - sops-dev-ssh, sops-ci-ssh (repository keys)"
-  @echo "     - sops-admin-user-ssh, sops-raquel-user-ssh (user identity keys)"
-  @echo "     - sops-{hostname}-ssh for each host (host keys)"
-  @echo "  2. Ensure Bitwarden CLI is unlocked: export BW_SESSION=\$(bw unlock --raw)"
-  @echo ""
-  @echo "Press Enter to continue or Ctrl-C to abort..."
-  @read
-  @echo ""
-  @echo "Step 1: Extracting and validating keys from Bitwarden..."
-  @just sops-extract-keys
-  @echo ""
-  @echo "Step 2: Updating .sops.yaml..."
-  @just sops-update-yaml
-  @echo ""
-  @echo "Step 3: Re-encrypting secrets..."
-  @find secrets/ -name "*.yaml" -type f -exec sops updatekeys {} \;
-  @echo ""
-  @echo "Step 4: Validating correspondences..."
-  @just sops-validate-correspondences
-  @echo ""
-  @echo "=== Manual steps remaining ==="
-  @echo "1. Deploy host keys: just sops-deploy-host-key <hostname>"
-  @echo "2. Update GitHub CI secret: gh secret set SOPS_AGE_KEY --repo=\$(gh repo view --json nameWithOwner -q .nameWithOwner)"
-  @echo "3. Test decryption: sops -d secrets/shared.yaml"
-  @echo "4. Commit and push changes"
-  @echo "5. Verify CI pipeline passes"
-
-# Update keys for all encrypted files in secrets directory
+# Re-apply .sops.yaml's creation rules to every file in the legacy secrets/ tree
+# (sops updatekeys). Run after changing an anchor or a rule's recipients; then
+# `sops rotate --in-place` any file that lost a recipient. Clan's own sops store
+# (sops/, vars/) is maintained with clan commands, not this recipe.
 [group('sops')]
 update-all-keys:
   fd -e yaml -e json -e enc . secrets/ -x sops updatekeys -y {}

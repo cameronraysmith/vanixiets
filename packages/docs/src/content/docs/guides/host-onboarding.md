@@ -11,8 +11,8 @@ The workflow differs significantly between darwin (macOS) and NixOS platforms.
 
 | Platform | Hosts | Deployment command | Secrets |
 |----------|-------|-------------------|---------|
-| Darwin (nix-darwin) | stibnite, blackphos, rosegold, argentum | `darwin-rebuild switch` | Legacy sops-nix |
-| NixOS (clan-managed) | cinnabar, electrum, galena, scheelite | `clan machines update` | Clan vars + legacy sops-nix |
+| Darwin (nix-darwin) | stibnite, blackphos, rosegold, argentum | `just activate` | Clan vars (machine key installed with `clan vars upload`) + legacy sops tree |
+| NixOS (clan-managed) | cinnabar, electrum, galena, scheelite, magnetite, pyrite | `clan machines update` | Clan vars + legacy sops tree |
 
 Darwin hosts use nix-darwin with standalone builds.
 NixOS hosts are managed by [clan](/concepts/clan-integration) which handles deployment, secrets generation, and multi-machine coordination.
@@ -101,16 +101,27 @@ nix build .#darwinConfigurations.blackphos.system
 This builds the configuration without applying it.
 If this succeeds, deployment should work.
 
-### Step 5: Deploy configuration
+### Step 5: Install the machine key (hosts with clan vars)
+
+If the repository holds a machine key for this host (`sops/secrets/<hostname>-age.key` exists), install it before the first activation, from a machine that holds the operator identity:
+
+```bash
+clan vars upload <hostname>
+```
+
+This writes `/var/lib/sops-nix/key.txt`, which sops-nix needs to install the host's clan vars.
+A local activation never writes it, and `just activate` refuses to run while it is missing or differs from `sops/machines/<hostname>/key.json`, printing this command.
+A new host gets its machine key the first time `clan vars generate <hostname>` runs.
+
+### Step 6: Deploy configuration
 
 Apply the nix-darwin configuration:
 
 ```bash
-darwin-rebuild switch --flake .#<hostname>
+just activate-darwin <hostname>
 
-# Examples:
-darwin-rebuild switch --flake .#stibnite
-darwin-rebuild switch --flake .#blackphos
+# On the host itself, the hostname is detected:
+just activate
 ```
 
 On first run, you may be prompted to:
@@ -124,55 +135,39 @@ After deployment:
 - Home-manager configurations applied
 - Shell and environment configured
 
-### Step 6: Set up secrets (legacy sops-nix)
+### Step 7: Set up your workstation age key (legacy sops tree)
 
-Darwin hosts currently use legacy sops-nix for secrets.
-Clan vars is the target for all secrets on all platforms, with darwin support planned.
+Your home-manager secrets (`secrets/home-manager/users/<user>/secrets.yaml`) decrypt with your personal age key in `~/.config/sops/age/keys.txt`.
+That key is derived from your SSH key in Bitwarden, never generated separately; follow [Workstation age key](/guides/secrets-management#workstation-age-key).
 
-#### Generate age key
-
-```bash
-# Create sops directory
-mkdir -p ~/.config/sops/age
-
-# Generate age keypair
-age-keygen -o ~/.config/sops/age/keys.txt
-
-# Display public key (you'll need this)
-age-keygen -y ~/.config/sops/age/keys.txt
-```
-
-Save the public key output (starts with `age1...`).
-
-#### Add public key to .sops.yaml
-
-Edit `.sops.yaml` and add your age public key:
+A new user's public key is added to `.sops.yaml` as an anchor named after the identity, with a rule for that user's home secrets (see the [Secrets Setup Tutorial](/tutorials/secrets-setup)):
 
 ```yaml
 keys:
-  - &stibnite-crs58 age1your-public-key-here...
+  - &yourname-user age1...   # ssh-to-age of your first meta.nix sshKeys entry
 
 creation_rules:
-  - path_regex: secrets/users/crs58\.sops\.yaml$
+  - path_regex: secrets/home-manager/users/yourname/.*\.yaml$
     key_groups:
       - age:
-        - *stibnite-crs58
-        # ... other keys
+        - *admin
+        - *admin-user
+        - *yourname-user
 ```
+
+Then run `just update-all-keys` and `nix build .#checks.x86_64-linux.sops-correspondence`.
 
 #### Verify secrets decrypt
 
 ```bash
-# Test decryption
-sops -d secrets/users/crs58.sops.yaml | head -5
+sops -d secrets/home-manager/users/<user>/secrets.yaml >/dev/null && echo ok
 ```
 
 If decryption fails, verify:
-- Age key exists at `~/.config/sops/age/keys.txt`
-- Your public key is listed in `.sops.yaml`
-- The secrets file is encrypted for your key
+- `age-keygen -y ~/.config/sops/age/keys.txt` lists the public key `.sops.yaml` names for you
+- the file's recipients include it (`yq '.sops.age[].recipient' <file>`); if not, run `just update-all-keys`
 
-### Step 7: Install zerotier (darwin-specific)
+### Step 8: Install zerotier (darwin-specific)
 
 Darwin hosts use Homebrew for zerotier (not managed by clan):
 
@@ -203,7 +198,7 @@ ping stibnite.zt
 ping cinnabar.zt
 ```
 
-### Step 8: Verify deployment
+### Step 9: Verify deployment
 
 Check that everything is working:
 
@@ -226,12 +221,12 @@ ls ~/.config/sops-nix/secrets/
 Your darwin host is now:
 - Running nix-darwin with your configuration
 - Connected to the zerotier network
-- Using sops-nix for user secrets
+- Using clan vars for machine secrets and sops-nix for user secrets
 
 For updates, run:
 
 ```bash
-darwin-rebuild switch --flake .#<hostname>
+just activate
 ```
 
 ---
@@ -250,7 +245,7 @@ NixOS hosts are managed by [clan](/concepts/clan-integration), which provides:
 
 Before starting, ensure you have:
 - SSH access to deploy machine (or physical access for initial install)
-- Age key at `~/.config/sops/age/keys.txt` for legacy sops-nix secrets
+- Your personal age key at `~/.config/sops/age/keys.txt` (operator identity, for encrypting secrets to the new host)
 - Cloud provider credentials (for new VMs):
   - Hetzner: API token
   - GCP: Service account JSON
@@ -378,13 +373,13 @@ This:
 
 ### Step 6: Confirm user secret key delivery
 
-User-level secrets (API keys, tokens) still use legacy sops-nix, but a clan-managed NixOS host needs no hand-provisioned `~/.config/sops/age/keys.txt`.
+User-level secrets (API keys, tokens) live in the legacy sops tree, but a clan-managed NixOS host needs no hand-provisioned `~/.config/sops/age/keys.txt`.
 The `hm-sops-bridge` module decrypts `secrets/bridge/<id>-age-key.enc` with the machine's clan age key during system activation, writes it to `/run/secrets/<id>-age-key` owned by the user with mode `0400`, and points that user's home-manager `sops.age.keyFile` at it, overriding the XDG default set by `base-sops`.
 
 Enrolling a user on this host therefore means three declarations rather than a manual key copy:
 - `flake.users.<user>.meta.sopsAgeKeyId` is set in `modules/home/users/<user>/meta.nix`
 - the host declares `hm-sops-bridge.users.<user> = { };` in `modules/machines/nixos/<host>/default.nix`
-- `secrets/bridge/<id>-age-key.enc` exists and is encrypted to this machine's age key
+- `secrets/bridge/<id>-age-key.enc` exists and is encrypted to this machine's age key (add the machine's anchor to the `secrets/bridge/` rule and run `just update-all-keys`; the host's evaluation fails until it is)
 
 Verify on the host after deployment:
 
@@ -394,7 +389,7 @@ systemctl status home-manager-<user>.service
 ```
 
 Encrypting new secrets for a user is still an operator task performed from a workstation holding its own age key.
-See [Legacy sops-nix secrets](#sops-nix-legacy-user-secrets) below for details.
+See [Legacy sops tree](#legacy-sops-tree-user-secrets) below for details.
 
 ### Step 7: Verify zerotier mesh
 
@@ -555,33 +550,33 @@ After the SSH daemon restarts with the new key, SSH connections will work normal
 
 ## Secrets management
 
-This infrastructure uses clan vars for all secrets with legacy sops-nix during migration.
-See [Clan Integration](/concepts/clan-integration#secrets-management) for the complete explanation.
+Secrets live in two sops trees that share one operator identity.
+See the [Secrets Management Guide](/guides/secrets-management) for procedures and [Clan Integration](/concepts/clan-integration#secrets-management) for how clan fits in.
 
-### Clan vars (system secrets)
+### Clan vars (machine secrets)
 
-**Purpose**: Machine-specific, auto-generated secrets
+**Purpose**: Machine-specific, generated secrets
 
 **Contents**:
 - SSH host keys
 - Zerotier network identities
 - LUKS/ZFS encryption passphrases
-- Service credentials
+- Service credentials and certificates
 
 **Generation**:
 ```bash
 clan vars generate <machine>
 ```
 
-**Deployment**: Automatic via `clan machines install` or `clan machines update`
+**Deployment**: `clan machines install` or `clan machines update` on NixOS; on darwin, `clan vars upload <host>` installs the machine key once and `just activate` installs the vars
 
 **Location on target**: `/run/secrets/`
 
-**Platforms**: NixOS (darwin support planned)
+**Platforms**: NixOS and darwin
 
-### sops-nix (legacy user secrets)
+### Legacy sops tree (user secrets)
 
-**Purpose**: User-specific, manually-created secrets
+**Purpose**: User-specific, hand-written secrets
 
 **Contents**:
 - GitHub tokens and API keys
@@ -589,33 +584,25 @@ clan vars generate <machine>
 - Personal credentials
 - MCP server secrets
 
-**Setup**:
+**Setup**: derive your personal age key from your Bitwarden SSH key ([Workstation age key](/guides/secrets-management#workstation-age-key)), then edit your file:
 ```bash
-# Generate age key
-age-keygen -o ~/.config/sops/age/keys.txt
-
-# Add public key to .sops.yaml
-age-keygen -y ~/.config/sops/age/keys.txt
-
-# Create encrypted secrets
-sops secrets/users/<username>.sops.yaml
+sops secrets/home-manager/users/<username>/secrets.yaml
 ```
 
-**Configuration**: Home-manager sops module
+**Configuration**: Home-manager sops module (`sops.defaultSopsFile` in `modules/home/users/<username>/default.nix`)
 
 **Location on target**: `~/.config/sops-nix/secrets/`
 
-**Platforms**: All (darwin and NixOS), with the age key file itself provisioned differently per platform: manually at the XDG path on darwin, and delivered by `hm-sops-bridge` from `/run/secrets/<id>-age-key` on NixOS.
+**Platforms**: All (darwin and NixOS), with the personal key provisioned differently per platform: derived from Bitwarden into the XDG path on darwin, and delivered by `hm-sops-bridge` from `/run/secrets/<id>-age-key` on NixOS.
 
 ### Platform secret comparison
 
 | Aspect | Darwin | NixOS |
 |--------|--------|-------|
-| Clan vars | Available (future) | `clan vars generate`, `/run/secrets/` |
-| sops-nix (legacy) | Age key at XDG path + home-manager | Age key bridged by `hm-sops-bridge` + home-manager |
-| SSH host keys | Manual or existing | Clan vars generated |
+| Clan vars | `clan vars generate`; machine key via `clan vars upload`; `/run/secrets/` | `clan vars generate`, `/run/secrets/` |
+| User secrets | Personal key at XDG path + home-manager | Personal key bridged by `hm-sops-bridge` + home-manager |
+| SSH host keys | macOS-managed, pinned in `flake.lib.darwinHostKeys` | Clan vars generated |
 | Zerotier identity | Homebrew installation generates | Clan vars generated |
-| User API keys | sops-nix (legacy) | sops-nix (legacy) |
 
 ---
 
@@ -680,9 +667,9 @@ This enables coordinated multi-machine deployments and service discovery.
 
 ## Troubleshooting
 
-### Darwin: darwin-rebuild fails
+### Darwin: activation fails
 
-**Symptom**: `darwin-rebuild switch` fails with build errors
+**Symptom**: `just activate` fails with build errors, or stops with "Machine key check failed"
 
 **Diagnosis**:
 ```bash
@@ -691,24 +678,25 @@ nix build .#darwinConfigurations.<hostname>.system --show-trace
 ```
 
 **Common causes**:
+- Machine key missing or stale: run `clan vars upload <hostname>`
 - Missing Xcode CLT: `xcode-select --install`
 - Flake not trusted: Answer `y` to trust prompts
 - Nix store corruption: `sudo nix-store --verify --repair`
 
 ### Darwin: Secrets not decrypting
 
-**Symptom**: `sops -d` fails with "no key could be found"
+**Symptom**: `sops -d` fails with "no key could be found" or "could not decrypt data key"
 
 **Diagnosis**:
 ```bash
-# Check age key exists
-cat ~/.config/sops/age/keys.txt
+# Your public keys
+age-keygen -y ~/.config/sops/age/keys.txt
 
-# Check public key in .sops.yaml
-grep "$(age-keygen -y ~/.config/sops/age/keys.txt)" .sops.yaml
+# The file's recipients
+yq '.sops.age[].recipient' secrets/home-manager/users/<username>/secrets.yaml
 ```
 
-**Solution**: Add your age public key to `.sops.yaml` creation rules.
+**Solution**: derive your key from Bitwarden if it is missing ([Workstation age key](/guides/secrets-management#workstation-age-key)); if your anchor is in `.sops.yaml` but not among the file's recipients, run `just update-all-keys`.
 
 ### NixOS: clan machines install fails
 
@@ -758,8 +746,9 @@ This is a one-time setup per machine.
 
 A successful darwin onboarding:
 - [ ] Nix installed with flakes enabled
-- [ ] `darwin-rebuild switch` completes without errors
-- [ ] Age key at `~/.config/sops/age/keys.txt`
+- [ ] Machine key installed (`clan vars upload <hostname>`) if the host has one
+- [ ] `just activate` completes without errors
+- [ ] Personal age key at `~/.config/sops/age/keys.txt`, derived from Bitwarden
 - [ ] Zerotier connected to network `db4344343b14b903`
 - [ ] Secrets decrypting via sops-nix
 

@@ -179,8 +179,6 @@ SOPS-based secrets management.
 | `export` | - | Export unique secrets to dotenv format | No |
 | `check-secrets` | - | Check secrets are available in sops environment | No |
 | `get-kubeconfig` | - | Save KUBECONFIG to file from sops | No |
-| `hash-encrypt` | `source_file user?` | Hash-encrypt file and store in secrets directory | No |
-| `verify-hash` | `original_file secret_file` | Verify hash integrity of encrypted file | No |
 | `edit-secret` | `file` | Edit a sops encrypted file | No |
 | `new-secret` | `file` | Create a new sops encrypted file | No |
 | `get-shared-secret` | `key` | Show specific secret value from shared secrets | No |
@@ -189,17 +187,12 @@ SOPS-based secrets management.
 
 ## SOPS
 
-SOPS key management and rotation.
+Maintenance of the legacy `.sops.yaml` + `secrets/` tree; see the [secrets guide](/guides/secrets-management/#changing-recipients-and-rotating-keys) for the procedures that use them.
 
 | Recipe | Arguments | Description | CI-tested |
 |--------|-----------|-------------|-----------|
-| `sops-extract-keys` | `key?` | Extract key details from Bitwarden | No |
-| `sops-update-yaml` | - | Update .sops.yaml with keys from Bitwarden | No |
-| `sops-deploy-host-key` | `host` | Deploy host key from Bitwarden to /etc/ssh | No |
-| `sops-validate-correspondences` | - | Validate SOPS key correspondences | No |
-| `sops-sync-keys` | `*FLAGS` | Regenerate ~/.config/sops/age/keys.txt | No |
-| `sops-rotate` | - | Full key rotation workflow (interactive) | No |
-| `update-all-keys` | - | Update keys for all encrypted files | No |
+| `update-all-keys` | - | Re-apply `.sops.yaml` rules to every file under `secrets/` (`sops updatekeys`) | No |
+| `provision-bridge-key` | `identity bw_item?` | Encrypt a user's Bitwarden-derived age key to the NixOS bridge recipients (`secrets/bridge/<identity>-age-key.enc`) | No |
 | `sops-load-agent` | - | Load SOPS launchd agent (darwin only) | No |
 
 ## CI/CD

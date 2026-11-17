@@ -8,8 +8,13 @@
 # This eliminates the manual step of provisioning ~/.config/sops/age/keys.txt
 # on each NixOS host via Bitwarden extraction + SCP.
 #
-# Darwin hosts are unaffected: they continue using the Bitwarden SSH agent
-# workflow with the XDG-path key file (set via mkDefault in base-sops).
+# Darwin homes are unaffected: they read ~/.config/sops/age/keys.txt (the
+# mkDefault in base-sops), which holds the person's key derived from their
+# Bitwarden SSH key; see "Workstation age key" in the secrets guide.
+#
+# Each bridged user also gets an assertion that this host's machine key
+# (sops/machines/<host>/key.json) is a recipient of the bridge file, so a host
+# added without re-encrypting the bridge fails evaluation, not activation.
 #
 # Activation mode, measured 2026-09-18 by `nix eval` over all six NixOS hosts
 # (cinnabar, electrum, galena, magnetite, pyrite, scheelite): sops.useSystemdActivation,

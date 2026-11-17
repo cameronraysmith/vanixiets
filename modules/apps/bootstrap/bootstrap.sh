@@ -55,8 +55,8 @@ printf '=== ● Bootstrap complete ===\n\n'
 printf 'Next steps:\n'
 # shellcheck disable=SC2016  # backticks in strings are literal output, not command substitution
 printf '  1. Run `nix run .#verify` to audit your installation.\n'
-# shellcheck disable=SC2016
-printf '  2. Run `nix run .#setup-user` once to generate your age key.\n'
+printf '  2. Derive your sops age key from your Bitwarden SSH key (first time only): see\n'
+printf '     "Workstation age key" in packages/docs/src/content/docs/guides/secrets-management.md.\n'
 # shellcheck disable=SC2016
 printf '  3. Run `nix develop` to enter the development environment.\n'
 printf '\n'

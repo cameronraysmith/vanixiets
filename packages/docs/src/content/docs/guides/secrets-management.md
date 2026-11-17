@@ -1,643 +1,171 @@
 ---
 title: Secrets management
-description: Managing secrets using clan vars and legacy sops-nix
+description: The two sops trees, the keys that read them, and the procedures that maintain them
 sidebar:
   order: 7
 ---
 
-This guide documents secrets management in the infrastructure.
-Clan vars is the primary secrets system, with legacy sops-nix for supplementary user secrets.
+This guide describes how secrets are arranged in this repository and gives the procedures that maintain them.
+For a learning-oriented walkthrough, see the [Secrets Setup Tutorial](/tutorials/secrets-setup/); for how clan composes the machine side, see [Clan Integration](/concepts/clan-integration#secrets-management).
 
-## Secrets architecture overview
+## Architecture
 
-The infrastructure uses clan vars as the primary secrets system, with some legacy sops-nix patterns remaining.
-See [Clan Integration](/concepts/clan-integration#secrets-management) for the complete architectural explanation.
+vanixiets keeps secrets in two sops trees that share one operator identity.
 
-For a learning-oriented walkthrough of setting up secrets from scratch, see the [Secrets Setup Tutorial](/tutorials/secrets-setup/).
+**Clan's store** (`sops/` and `vars/`) holds admin keys, machine keys and generated secrets.
 
-| Status | Tool | Purpose | Platforms | Generation |
-|--------|------|---------|-----------|------------|
-| Primary | Clan vars | System and user secrets | NixOS (darwin support planned) | Automatic (`clan vars generate`) |
-| Supplementary | sops-nix | User secrets (legacy format) | All (darwin + NixOS) | Manual (age key derivation) |
+- **Admin keys:** `sops/users/{cameron,crs58}/key.json` are both the `ssh-to-age` image of crs58's login key (the first `sshKeys` entry in `modules/home/users/crs58/meta.nix`). The same key is the `.sops.yaml` anchor `&admin-user`, the operator identity.
+- **Machine keys:** `sops/machines/<machine>/key.json` holds each machine's public key, for the six NixOS hosts and for stibnite, rosegold, argentum and gcp-vm. Each private key is in `sops/secrets/<machine>-age.key/secret`, encrypted to the admin user, which is the recovery chain for machine keys.
+- **Generated secrets:** `clan vars generate` writes them under `vars/per-machine/<machine>/` and `vars/shared/`, encrypted to the machine and its users.
+- **On the host:** sops-nix reads the machine key from `/var/lib/sops-nix/key.txt`. Only `clan machines update`, `clan machines install` and `clan vars upload <machine>` write that file; a local activation never does. Darwin hosts are activated locally with `just activate`, so each needs `clan vars upload <host>` once, and the activation guard enforces it (see [Installing a darwin host's machine key](#installing-a-darwin-hosts-machine-key)).
 
-### Current usage patterns
+**The legacy tree** (`.sops.yaml` and `secrets/`) carries the secrets that are not clan vars.
 
-Secrets are split between two systems:
+- **Home-manager user secrets:** `secrets/home-manager/users/<user>/secrets.yaml`, set as `sops.defaultSopsFile` in `modules/home/users/<user>/default.nix`. Each home decrypts them with `~/.config/sops/age/keys.txt` (`modules/home/base/sops.nix`).
+- **Bridge keys:** on NixOS, `hm-sops-bridge` delivers a user's age key from `secrets/bridge/<identity>-age-key.enc`, which is encrypted to the NixOS machine keys, so NixOS homes need no hand-placed `keys.txt`.
+- **Operator credentials:** `secrets/shared.yaml` (forge, DNS, cache and flake-updater credentials), read by `just` recipes. Only the operator identity and the offline recovery key can read it.
+- **Cluster secrets:** `secrets/clusters/local/`, also read in CI through the `SOPS_AGE_KEY` secret (the `&ci` key).
+- **The Devin `ubuntu` profile**, whose key is seeded from `SOPS_AGE_KEY`.
 
-**Clan vars** handles auto-generated, machine-specific secrets on NixOS hosts.
-The vars generator creates SSH keys, zerotier IDs, and other secrets that machines need automatically.
+**Bitwarden** holds the SSH key pairs (items of type SSH key named `sops-<identity>-user-ssh`) whose `ssh-to-age` images are the legacy tree's user recipients. It is the source for a workstation's `keys.txt` entry and for bridge keys. It holds no clan machine key. The `&admin` key is an offline recovery key, not in Bitwarden.
 
-**sops-nix** handles manually-entered user secrets on all platforms.
-API tokens, personal credentials, and signing keys are created by humans using age encryption.
-New user secrets can use clan vars; legacy patterns remain functional.
+The flake check `checks.x86_64-linux.sops-correspondence` keeps the public keys in agreement: user anchors and clan user keys against users' login keys, machine anchors against `sops/machines`, the blackphos host-key anchor against its pinned host key, and every file's recipients against its `.sops.yaml` rule. NixOS hosts also fail evaluation when a bridge key they use is not encrypted to them.
 
-## Clan vars (primary)
+## Clan vars
 
-Clan vars is the primary secrets management system.
-Deployed on NixOS hosts (cinnabar, electrum, galena, scheelite) for system secrets.
-
-### Current clan vars usage
-
-- **SSH host keys** - Machine identity for SSH
-- **Zerotier identities** - Network identity for mesh VPN
-- **LUKS passphrases** - Disk encryption secrets
-- **Service credentials** - Machine-specific service secrets
-
-### Key commands
+Clan vars holds machine and generated secrets: SSH host keys, zerotier identities, service credentials and certificates.
 
 ```bash
-# Generate secrets for a machine
-clan vars generate cinnabar
+# Generate any missing vars for a machine
+clan vars generate <machine>
 
-# View a specific secret
-clan vars get cinnabar ssh.id_ed25519.pub
+# Show a public value
+clan vars get <machine> openssh/ssh.id_ed25519.pub
 
-# Deploy secrets to machine (secrets deploy automatically)
-clan machines update cinnabar
+# Check that every var is encrypted to its current recipients
+clan vars check <machine>
+
+# Deploy a NixOS machine; uploads its machine key and vars, then activates
+clan machines update <machine>
 ```
 
-### Directory structure
-
-Generated secrets are stored encrypted in the vars directory at the repository root:
+Generated secrets are stored encrypted under `vars/`:
 
 ```
 vars/
 ├── per-machine/
 │   └── cinnabar/
 │       ├── openssh/
-│       │   ├── ssh.id_ed25519/
-│       │   │   └── secret   # Private key (encrypted)
-│       │   └── ssh.id_ed25519.pub/
-│       │       └── value    # Public key
-│       └── zerotier/
-│           └── zerotier-identity-secret/
-│               └── secret
-└── shared/
-    └── ...  # Shared secrets across machines
+│       │   ├── ssh.id_ed25519/secret      # private key (encrypted)
+│       │   └── ssh.id_ed25519.pub/value   # public key
+│       └── zerotier/…
+└── shared/…
 ```
 
-### Secrets location on target
+On the host, sops-nix installs them under `/run/secrets/` during activation.
 
-Clan vars deploys secrets to `/run/secrets/` on NixOS machines during system activation.
+## Installing a darwin host's machine key
+
+A darwin host whose machine key exists in the repository (`sops/secrets/<host>-age.key`) needs `/var/lib/sops-nix/key.txt` before its first activation and after any machine-key rotation.
+Without it, sops-nix cannot install the host's secrets and activation fails.
+
+Install it from a machine that holds the operator identity:
 
 ```bash
-# On cinnabar (NixOS)
-ls /run/secrets/
-# ssh.id_ed25519  zerotier/identity.secret
+clan vars upload <host>
 ```
 
-### Rotation procedure
+`just activate` and `just activate-darwin <host>` check the key first.
+When the file is missing or holds a different key, they stop before activating and print the expected and found public keys with this command; with `--dry` they print the same message and continue.
+The expected keys are in `flake.lib.darwinMachineKeys`.
 
-To rotate clan vars secrets:
+## Workstation age key
 
-```bash
-# Regenerate secrets for a machine
-clan vars generate cinnabar
-
-# Deploy the new secrets
-clan machines update cinnabar
-```
-
-Service restart may be required after rotation depending on which secrets changed.
-
-## Legacy sops-nix (supplementary)
-
-sops-nix handles user-level secrets that require manual creation.
-Available on all platforms (darwin and NixOS).
-
-### Current sops-nix usage
-
-- **GitHub tokens** - Personal access tokens, signing keys
-- **API keys** - Anthropic, OpenAI, and other service credentials
-- **Personal credentials** - User-specific service passwords
-- **MCP server secrets** - Model Context Protocol authentication
-
-### Age key bootstrap workflow
-
-The age private key used by sops-nix is derived from your Bitwarden-managed SSH key using `ssh-to-age`.
-This manual bootstrap step is intentional for security.
-
-#### Bitwarden as source of truth
-
-This infrastructure uses Bitwarden as the authoritative source for SSH keys from which age keys are deterministically derived.
-SSH keys are stored in Bitwarden as items named `sops-{identifier}-ssh` (e.g., `sops-crs58-ssh`, `sops-raquel-ssh`).
-Age keys are derived using `ssh-to-age`, which means the same SSH key always produces the same age key.
-
-Three contexts must have corresponding keys for proper secrets management:
-
-1. **Clan user key** in `sops/users/{user}/key.json` (age public key)
-2. **YAML anchor** in `.sops.yaml` (age public key, e.g., `&admin-user`)
-3. **Workstation keyfile** at `~/.config/sops/age/keys.txt` (age private key)
-
-All three must correspond to the same SSH keypair stored in Bitwarden.
-The justfile provides automation for maintaining this correspondence.
-
-#### Justfile automation
-
-The infrastructure provides justfile recipes for managing Bitwarden-derived age keys:
-
-**Extract and display all age public keys:**
-```bash
-just sops-extract-keys
-```
-This retrieves all `sops-*-ssh` items from Bitwarden and displays their corresponding age public keys.
-
-**Regenerate workstation keyfile from Bitwarden:**
-```bash
-just sops-sync-keys
-```
-This extracts your SSH private key from Bitwarden and regenerates `~/.config/sops/age/keys.txt`.
-
-**Validate three-context correspondence:**
-```bash
-just sops-validate-correspondences
-```
-This checks that clan user keys, `.sops.yaml` anchors, and workstation keyfiles all correspond to the same Bitwarden SSH keys.
-
-**Full key rotation workflow:**
-```bash
-just sops-rotate
-```
-This orchestrates the complete key rotation process including validation, re-encryption, and deployment.
-
-#### Three-context validation
-
-Proper secrets management requires consistency across three distinct contexts:
-
-**Context 1: Clan user key** (`sops/users/{user}/key.json`)
-This file contains the age public key for the user's clan identity.
-It is used by clan commands and must match the user's Bitwarden SSH key.
-
-**Context 2: YAML anchor** (`.sops.yaml`)
-The age public key is referenced as a YAML anchor (e.g., `&admin-user`) in creation rules.
-This controls which keys can decrypt specific secrets files.
-
-**Context 3: Workstation keyfile** (`~/.config/sops/age/keys.txt`)
-The age private key must exist on the workstation to decrypt secrets during configuration builds.
-This is generated from the SSH private key in Bitwarden.
-
-**Validation example:**
-```bash
-# Extract public key from clan user
-cat sops/users/crs58/key.json | jq -r '.publickey'
-
-# Extract public key from .sops.yaml
-grep "admin-user" .sops.yaml | awk '{print $3}'
-
-# Derive public key from workstation keyfile
-age-keygen -y ~/.config/sops/age/keys.txt
-
-# All three outputs must match for proper operation
-```
-
-The `just sops-validate-correspondences` recipe automates this verification.
-
-#### Required tools
-
-| Tool | Purpose | Installation |
-|------|---------|--------------|
-| `bw` | Bitwarden CLI for SSH key retrieval | `nix-shell -p bitwarden-cli` |
-| `ssh-to-age` | Derive age keys from SSH keys | `nix-shell -p ssh-to-age` |
-| `sops` | Encrypt/decrypt secrets files | `nix-shell -p sops` |
-| `age` | Age encryption (for verification) | `nix-shell -p age` |
-
-#### Bootstrap procedure
-
-**Step 1: Unlock Bitwarden vault**
+A person's workstation key for the legacy tree is derived from their SSH key in Bitwarden, so it is the same on every workstation and matches the anchor the correspondence check verifies.
+There is no other convention: never generate an unrelated age key for a person.
 
 ```bash
-# Login to Bitwarden CLI (if not already logged in)
-bw login
-
-# Unlock vault and set session
 export BW_SESSION=$(bw unlock --raw)
-```
-
-**Step 2: Derive age keys from Bitwarden SSH key**
-
-```bash
-# Derive age public key (for .sops.yaml and clan user)
-age_pub=$(bw get item "sops-myuser-ssh" | jq -r '.login.password' | ssh-to-age)
-
-# Derive age private key (for workstation keyfile)
-age_priv=$(bw get item "sops-myuser-ssh" | jq -r '.notes' | ssh-to-age -private-key)
-
-# Validate format (age public keys are 63 characters starting with 'age1')
-[[ $age_pub =~ ^age1[a-z0-9]{58}$ ]] && echo "Valid public key format"
-
-# Validate private key format
-[[ $age_priv =~ ^AGE-SECRET-KEY- ]] && echo "Valid private key format"
-```
-
-**Step 3: Deploy age private key to workstation**
-
-```bash
-# Create sops directory if it doesn't exist
-mkdir -p ~/.config/sops/age
-
-# Write age private key to workstation keyfile
-echo "$age_priv" > ~/.config/sops/age/keys.txt
-
-# Set restrictive permissions
-chmod 600 ~/.config/sops/age/keys.txt
-
-# Verify age key exists
-cat ~/.config/sops/age/keys.txt | head -1
-# Should show: AGE-SECRET-KEY-...
-```
-
-**Step 4: Update clan user and .sops.yaml with public key**
-
-```bash
-# Add public key to .sops.yaml as YAML anchor
-# Edit .sops.yaml and add line like:
-#   - &myuser age1abc...xyz
-
-# Create or update clan user key file
-mkdir -p sops/users/myuser
-echo "{\"publickey\": \"$age_pub\"}" > sops/users/myuser/key.json
-
-# Lock Bitwarden vault
+mkdir -p ~/.config/sops/age && chmod 700 ~/.config/sops/age
+pub=$(bw get item sops-<identity>-user-ssh | jq -r .sshKey.publicKey | ssh-to-age)
+if [ -f ~/.config/sops/age/keys.txt ] && age-keygen -y ~/.config/sops/age/keys.txt | grep -qx "$pub"; then
+  echo "already present"
+else
+  ( umask 077
+    bw get item sops-<identity>-user-ssh | jq -r .sshKey.privateKey | ssh-to-age -private-key \
+      >> ~/.config/sops/age/keys.txt )
+fi
 bw lock
 ```
 
-**Step 5: Validate three-context correspondence**
+The procedure only appends: `keys.txt` may hold identities for other repositories, so never overwrite it.
+`bw` is the nixpkgs Bitwarden CLI from the home profile.
+Check the result: `age-keygen -y ~/.config/sops/age/keys.txt` lists the public key that `.sops.yaml` names for you.
+
+## Working with legacy secrets
 
 ```bash
-# Use justfile validation recipe
-just sops-validate-correspondences
+# Edit a user's home secrets (decrypts, opens $EDITOR, re-encrypts)
+sops secrets/home-manager/users/<user>/secrets.yaml
 
-# Or validate manually (see "Three-context validation" above)
+# Check decryption without printing values
+sops -d secrets/home-manager/users/<user>/secrets.yaml >/dev/null && echo ok
+
+# List key names without decrypting
+yq 'del(.sops) | keys' secrets/home-manager/users/<user>/secrets.yaml
 ```
 
-#### Platform-specific notes
-
-**Darwin laptops (stibnite, blackphos, rosegold, argentum):**
-Bitwarden Desktop can serve as an SSH agent, allowing age keys to be derived on-demand without storing SSH private keys on disk.
-The workstation keyfile (`~/.config/sops/age/keys.txt`) must still be manually created using the bootstrap procedure.
-
-**NixOS servers (cinnabar, electrum, galena, scheelite):**
-No GUI available, so use `bw` CLI to extract SSH keys and derive age keys.
-Deploy the age private key to `~/.config/sops/age/keys.txt` before running configuration builds that require secrets decryption.
-
-**CI/CD environments:**
-Store the age private key as a repository secret (e.g., `SOPS_AGE_KEY` in GitHub Actions).
-The CI runner exports this as `SOPS_AGE_KEY_FILE` environment variable for sops to use during builds.
-
-#### Security rationale
-
-The manual bootstrap is intentional for security:
-
-1. **SSH keys remain in Bitwarden** - Not stored in nix store or git
-2. **Age keys derived locally** - Private key material never transmitted
-3. **User controls bootstrap** - Each user manages their own key derivation
-4. **Defense in depth** - Compromising the nix config doesn't expose private keys
-5. **Deterministic derivation** - Same SSH key always produces same age key, enabling validation
-
-### Adding your key to .sops.yaml
-
-After generating your age public key, add it to `.sops.yaml`:
-
-```yaml
-keys:
-  # User keys (legacy sops-nix)
-  - &crs58-stibnite age1abc...xyz
-  - &raquel-blackphos age1def...uvw
-
-creation_rules:
-  - path_regex: secrets/users/crs58\.sops\.yaml$
-    key_groups:
-      - age:
-        - *crs58-stibnite
-
-  - path_regex: secrets/users/raquel\.sops\.yaml$
-    key_groups:
-      - age:
-        - *raquel-blackphos
-```
-
-### Creating and editing secrets
-
-```bash
-# Create new secrets file
-sops secrets/users/crs58.sops.yaml
-
-# Edit existing secrets
-sops secrets/users/crs58.sops.yaml
-
-# View decrypted secrets (read-only)
-sops -d secrets/users/crs58.sops.yaml
-```
-
-Example secrets file structure:
-
-```yaml
-# secrets/users/crs58.sops.yaml
-github-signing-key: |
-  -----BEGIN OPENSSH PRIVATE KEY-----
-  ...
-  -----END OPENSSH PRIVATE KEY-----
-github-token: ghp_xxxxxxxxxxxxxxxxxxxx
-anthropic-api-key: sk-ant-xxxxxxxxxxxxxxxx
-ssh-public-key: ssh-ed25519 AAAA... crs58@stibnite
-```
-
-### Home-manager integration
-
-Reference secrets in home-manager modules using `sops.secrets`:
+Reference a new secret from the user's home module; `defaultSopsFile` already points at the file:
 
 ```nix
-# modules/home/users/crs58/default.nix
-{ config, inputs, ... }:
-{
-  sops.secrets = {
-    "users/crs58/github-signing-key" = {
-      sopsFile = "${inputs.self}/secrets/users/crs58.sops.yaml";
-    };
-    "users/crs58/github-token" = {
-      sopsFile = "${inputs.self}/secrets/users/crs58.sops.yaml";
-    };
-  };
-}
-```
-
-Use secrets in configuration:
-
-```nix
-# Git signing key
-programs.git.signing.key = config.sops.secrets."users/crs58/github-signing-key".path;
-
-# Environment variable from secret
-home.sessionVariables = {
-  ANTHROPIC_API_KEY = "$(cat ${config.sops.secrets."users/crs58/anthropic-api-key".path})";
+# modules/home/users/<user>/default.nix
+sops = {
+  defaultSopsFile = flake.inputs.self + "/secrets/home-manager/users/<user>/secrets.yaml";
+  secrets.my-new-secret = { };
 };
+# elsewhere: config.sops.secrets.my-new-secret.path
 ```
 
-### Secrets location on target
+Deploy with `just activate` (darwin, or a standalone home) or `clan machines update <machine>` (NixOS).
 
-sops-nix decrypts secrets during home-manager activation to:
+## Changing recipients and rotating keys
 
-```bash
-# Check decrypted secrets location
-ls ~/.config/sops-nix/secrets/
+No tool writes `.sops.yaml` or a host key; these are procedures, and the correspondence check confirms the result.
 
-# Secrets are symlinked from this location
-readlink -f ~/.config/sops-nix/secrets/users-crs58-github-token
-```
+**A machine key:** rotate it with clan (`clan vars generate`, `clan vars fix`, `clan secrets key update`), deploy with `clan machines update <machine>` (NixOS) or `clan vars upload <host>` then `just activate` (darwin), and update the machine's `.sops.yaml` anchor if it has one.
 
-### Rotation procedure
+**A recipient of the legacy tree** (adding, replacing or removing a person, machine or host key):
 
-To rotate sops-nix secrets:
+1. Edit the anchor or the rule in `.sops.yaml`.
+2. Re-apply the rules: `just update-all-keys`.
+3. For each file that lost a recipient, renew its data key: `sops rotate --in-place <file>`. `updatekeys` keeps the old data key, so without this a removed recipient could read values written later. Earlier commits stay readable by their recipients of the time; rotate the credential values themselves if that matters.
+4. If a bridge identity is affected, re-provision it: `just provision-bridge-key <identity> [bitwarden-item]`. It encrypts the derived key straight from a pipe; no plaintext touches disk.
+5. Run `nix build .#checks.x86_64-linux.sops-correspondence` and deploy the hosts that read the changed files.
 
-```bash
-# 1. Edit the encrypted secrets file
-sops secrets/users/crs58.sops.yaml
-
-# 2. Update the secret value
-
-# 3. Save and exit (sops re-encrypts automatically)
-
-# 4. Rebuild configuration to deploy
-darwin-rebuild switch --flake .#stibnite  # darwin
-# OR
-clan machines update cinnabar  # NixOS (includes home-manager)
-```
-
-### Adding a new key recipient
-
-When adding a new machine or user that needs access to existing secrets:
-
-```bash
-# 1. Add public key to .sops.yaml
-# Edit .sops.yaml and add the new key anchor
-
-# 2. Update all affected secrets files with the new key
-sops updatekeys secrets/users/crs58.sops.yaml
-
-# 3. Commit the updated .sops.yaml and re-encrypted files
-```
-
-## Platform-specific workflows
-
-### Darwin (stibnite, blackphos, rosegold, argentum)
-
-Darwin hosts use **sops-nix for user-level secrets**.
-Clan vars support for darwin is planned but not yet implemented.
-
-**Secrets workflow:**
-
-1. Bootstrap age key from Bitwarden SSH key (see [Age key bootstrap](#age-key-bootstrap-workflow))
-2. Create user secrets file: `sops secrets/users/<username>.sops.yaml`
-3. Configure home-manager sops module
-4. Deploy: `darwin-rebuild switch --flake .#<hostname>`
-
-**Secrets deployment:**
-
-- Automatic during home-manager activation
-- Location: `~/.config/sops-nix/secrets/`
-- No system-level secrets (no `/run/secrets/`)
-
-### NixOS (cinnabar, electrum, galena, scheelite)
-
-NixOS hosts use clan vars for system secrets and sops-nix for user secrets.
-
-**Clan vars workflow (system secrets):**
-
-```bash
-# Generate machine secrets
-clan vars generate cinnabar
-
-# Deploy (includes secrets)
-clan machines update cinnabar
-```
-
-**sops-nix workflow (user secrets):**
-
-Same as darwin: bootstrap age key, create sops secrets, configure home-manager.
-
-**Secrets deployment:**
-
-- Clan vars: `/run/secrets/` (system activation)
-- sops-nix: `~/.config/sops-nix/secrets/` (home-manager activation)
-
-### Platform comparison
-
-| Aspect | Darwin | NixOS |
-|--------|--------|-------|
-| Clan vars | Planned (not yet implemented) | `clan vars generate`, `/run/secrets/` |
-| sops-nix | Age key + home-manager | Age key + home-manager |
-| SSH host keys | Manual or existing | Clan vars generated |
-| Zerotier identity | Homebrew generates | Clan vars generated |
-| User API keys | sops-nix | sops-nix |
-| Deployment | `darwin-rebuild switch` | `clan machines update` |
-
-## Working with secrets
-
-### Creating new secrets
-
-**For user-level secrets (legacy sops-nix):**
-
-```bash
-# 1. Edit or create secrets file
-sops secrets/users/<username>.sops.yaml
-
-# 2. Add the new secret
-# my-new-secret: secret-value-here
-
-# 3. Reference in home-manager module
-# sops.secrets."users/<username>/my-new-secret" = { ... };
-
-# 4. Deploy configuration
-darwin-rebuild switch --flake .#<hostname>
-```
-
-**For system-level secrets (clan vars - NixOS only):**
-
-System secrets are typically auto-generated by clan vars.
-For custom system secrets, use clan vars generators or add to the machine's vars configuration.
-
-### Editing existing secrets
-
-```bash
-# Open in editor (decrypts → edit → re-encrypts)
-sops secrets/users/crs58.sops.yaml
-
-# Make changes and save
-# sops handles encryption automatically
-```
-
-### Viewing secrets
-
-```bash
-# View decrypted content
-sops -d secrets/users/crs58.sops.yaml
-
-# View specific secret (requires jq)
-sops -d secrets/users/crs58.sops.yaml | yq '.github-token'
-```
-
-### Verifying encryption
-
-```bash
-# Check file is encrypted (should show sops metadata)
-head secrets/users/crs58.sops.yaml
-
-# Expected: sops: section with mac, lastmodified, etc.
-```
+A new NixOS machine that uses the bridge needs its anchor in the `secrets/bridge/` rule and `just update-all-keys` before its configuration evaluates.
 
 ## Troubleshooting
 
-### Clan vars issues (NixOS)
+**Activation stops with "Machine key check failed":** run `clan vars upload <host>`, then activate again.
 
-**Vars not generating:**
+**`sops -d` fails with "could not decrypt data key":** your key is not a recipient of that file. Compare `age-keygen -y ~/.config/sops/age/keys.txt` with the anchors in `.sops.yaml` and the file's `sops.age[].recipient` list; if the anchor is right but the file is stale, run `just update-all-keys`.
 
-```bash
-# Verify machine is registered in clan
-clan machines list
+**"no key could be found":** `~/.config/sops/age/keys.txt` is missing; follow [Workstation age key](#workstation-age-key). Note that sops also tries `~/.ssh/id_ed25519` as an age identity.
 
-# Check vars generator configuration
-cat modules/clan/machines.nix
+**A NixOS host fails evaluation naming a bridge file:** add the host's anchor to the `secrets/bridge/` rule and run `just update-all-keys`.
 
-# Regenerate vars
-clan vars generate <hostname>
-```
-
-**Secrets not appearing at /run/secrets/:**
-
-```bash
-# Verify deployment
-clan machines update <hostname>
-
-# Check systemd service
-systemctl status sops-nix
-
-# Check secrets directory permissions
-ls -la /run/secrets/
-```
-
-**Permission denied on secrets:**
-
-```bash
-# Check owner/group on secret
-ls -la /run/secrets/<secret-name>
-
-# Verify user is in correct group
-groups $(whoami)
-```
-
-### Legacy sops-nix issues (all platforms)
-
-**Cannot decrypt sops file:**
-
-```bash
-# Verify age key exists
-cat ~/.config/sops/age/keys.txt | head -1
-# Should show: AGE-SECRET-KEY-...
-
-# Check your public key is in .sops.yaml
-age-keygen -y ~/.config/sops/age/keys.txt
-# Compare output with keys in .sops.yaml
-
-# Test decryption explicitly
-SOPS_AGE_KEY_FILE=~/.config/sops/age/keys.txt sops -d secrets/users/<user>.sops.yaml
-```
-
-**Age key not found:**
-
-```bash
-# Check key file location
-ls -la ~/.config/sops/age/keys.txt
-
-# If missing, re-bootstrap from Bitwarden (see Age key bootstrap workflow)
-```
-
-**sops.secrets not appearing in home-manager:**
-
-```bash
-# Verify sops module is imported
-# Check home-manager configuration includes sops-nix
-
-# Verify sopsFile path is correct
-# Path should be: "${inputs.self}/secrets/users/<username>.sops.yaml"
-
-# Rebuild and check for errors
-darwin-rebuild switch --flake .#<hostname> 2>&1 | grep -i sops
-```
-
-**Secret path mismatch:**
-
-```bash
-# Check actual decrypted secret location
-ls ~/.config/sops-nix/secrets/
-
-# Secret names use dashes instead of slashes
-# users/crs58/github-token → users-crs58-github-token
-```
-
-### Common errors
-
-**"could not decrypt data key":**
-- Your age public key is not in the creation rules for this file
-- Solution: Add key to `.sops.yaml` and run `sops updatekeys <file>`
-
-**"no key could be found":**
-- Age key file missing or empty
-- Solution: Re-bootstrap age key from Bitwarden
-
-**"MAC mismatch":**
-- File was modified without proper re-encryption
-- Solution: Re-encrypt the file: `sops -e -i <file>`
+**Secrets missing on a NixOS host after deploy:** the fleet decrypts system secrets in the `setupSecrets` activation script, so read the `clan machines update` output for `sops-install-secrets` errors and check `ls -la /run/secrets/`; for a home, check `systemctl --user status sops-nix`.
 
 ## See also
 
-- [Clan Integration](/concepts/clan-integration) - Secrets implementation architecture
-- [Host Onboarding](/guides/host-onboarding) - Platform-specific setup steps
-- [Home-Manager Onboarding](/guides/home-manager-onboarding) - User module patterns
+- [Clan Integration](/concepts/clan-integration) - how clan composes machines and their secrets
+- [Host Onboarding](/guides/host-onboarding) - platform-specific setup steps
+- [Home-Manager Onboarding](/guides/home-manager-onboarding) - user module patterns
 
 ## External references
 
-- [sops documentation](https://github.com/getsops/sops) - SOPS encryption tool
-- [age encryption](https://age-encryption.org/) - Age key management
-- [ssh-to-age](https://github.com/Mic92/ssh-to-age) - SSH to age key derivation
-- [sops-nix](https://github.com/Mic92/sops-nix) - Nix integration for sops
-- [clan vars documentation](https://clan.lol/) - Clan vars system
+- [sops](https://github.com/getsops/sops) and its [key management](https://getsops.io/docs/usage/key-management/) notes
+- [age](https://age-encryption.org/)
+- [ssh-to-age](https://github.com/Mic92/ssh-to-age)
+- [sops-nix](https://github.com/Mic92/sops-nix)
+- [clan vars](https://clan.lol/)

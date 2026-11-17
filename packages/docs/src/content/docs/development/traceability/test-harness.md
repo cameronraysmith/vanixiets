@@ -21,7 +21,7 @@ All local commands run from the repository root.
 | `docs` effect, `pullRequest` trigger | Cloudflare Preview `pr-<number>` for a pull request (`deploy-docs pull-request`), reported as the `docs-preview` check run whose details link is the Preview URL | `just docs-deploy-preview pr-<number>` | PR (informational) |
 | `docs` effect, `pullRequestClosed` trigger | Delete the pull request's Preview (`deploy-docs pull-request-closed`) | None | PR closed or merged |
 | PR Check: `check-fast-forward` | Fast-forward merge is possible | `git merge-base --is-ancestor origin/main HEAD` | PR |
-| CD: `bootstrap-verification` | Makefile bootstrap on clean Ubuntu | `make bootstrap && make verify && make setup-user` | Manual dispatch |
+| CD: `bootstrap-verification` | Makefile bootstrap on clean Ubuntu | `make bootstrap && make verify` | Manual dispatch |
 
 `checks.x86_64-linux` covers the overlay packages, the docs package tests (`package-vanixiets-docs-test-*`), dev shells, the `nixos-*` and `home-manager-*` configurations, and the structure, secrets, and treefmt checks.
 From darwin, `just check-fast auto off x86_64-linux` routes the build to magnetite.
@@ -55,7 +55,7 @@ The following recipes are not exercised by CI:
 | `nixos-bootstrap` | Destructive disk operations |
 | `cache-darwin-system` | Requires darwin hardware |
 | `scan-secrets` | Local gitleaks scan; no CI job runs it |
-| `sops-*` | Requires Bitwarden access |
+| `update-all-keys`, `provision-bridge-key` | Re-encrypt real secrets with the operator identity (and Bitwarden for `provision-bridge-key`); `checks.x86_64-linux.sops-correspondence` checks their result in CI |
 | `docs-deploy-*`, `docs-deployments`, `docs-versions`, `docs-tail` | Run `deploy-docs` locally with `secrets/shared.yaml` credentials; CI deploys through the `docs` effect |
 | `release-package` | Local dry run; CI releases through the `release-packages` effect |
 

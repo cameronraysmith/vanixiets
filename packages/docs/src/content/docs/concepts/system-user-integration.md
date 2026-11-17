@@ -295,38 +295,41 @@ Each user has a module directory in `modules/home/users/<username>/default.nix`:
 
 ### Admin users
 
-Admin users access secrets via:
-1. User's age key (from `~/.config/sops/age/keys.txt`)
-2. Host's SSH key (can decrypt system secrets)
+The admin user's age key (`&admin-user`, derived from crs58's login key, held in `~/.config/sops/age/keys.txt`) is the operator identity.
+It is a recipient of every rule in `.sops.yaml`, alongside the offline recovery key `&admin`, and it alone (with recovery) reads operator credentials:
 
 ```yaml
-# .sops.yaml
+# .sops.yaml (excerpt)
 keys:
-  - &admin age1...
-  - &stibnite-host age1...
+  - &admin age1...        # offline recovery
+  - &admin-user age1...   # operator identity
 
 creation_rules:
-  - path_regex: secrets/users/admin\.sops\.yaml$
+  - path_regex: (secrets/services/.*\.yaml$|secrets/shared\.yaml$|secrets/test\.yaml$)
     key_groups:
       - age:
           - *admin
-          - *stibnite-host
+          - *admin-user
 ```
+
+Host secrets do not use host SSH keys: each machine reads its clan vars with its own machine key (see [Clan Integration](/concepts/clan-integration#secrets-management)).
 
 ### Non-admin users
 
-Non-admin users access only their personal secrets:
+Non-admin users read only their own home-manager secrets; the operator identity is also a recipient so the operator can maintain the file:
 
 ```yaml
-# .sops.yaml
+# .sops.yaml (excerpt)
 keys:
-  - &user age1...
+  - &raquel-user age1...
 
 creation_rules:
-  - path_regex: secrets/users/user\.sops\.yaml$
+  - path_regex: secrets/home-manager/users/raquel/.*\.yaml$
     key_groups:
       - age:
-          - *user
+          - *admin
+          - *admin-user
+          - *raquel-user
 ```
 
 ## Machine fleet user assignments

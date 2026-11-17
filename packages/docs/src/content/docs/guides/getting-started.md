@@ -36,7 +36,7 @@ cd vanixiets
 
 :::note[make vs just]
 This repository uses two task runners: `make` for initial bootstrap (before the devshell exists) and `just` for daily operations (after the devshell is available).
-The Makefile provides `bootstrap`, `verify`, and `setup-user` targets that work without Nix.
+The Makefile provides `bootstrap` and `verify` targets that work without Nix.
 Once you enter the devshell via `direnv allow` or `nix develop`, use `just` commands for all other tasks.
 :::
 
@@ -83,13 +83,11 @@ make verify
 
 ### Step 5: Set up secrets (optional, for existing users)
 
-```bash
-make setup-user
-```
+Derive your sops age key from your SSH key in Bitwarden; follow [Workstation age key](/guides/secrets-management#workstation-age-key).
 
 **What this does:**
 
-- Generates age key at `~/.config/sops/age/keys.txt` for secrets encryption
+- Appends your personal age key to `~/.config/sops/age/keys.txt`, the same key on every workstation you use
 - Skip this if you're just exploring the configuration
 
 ### Step 6: Activate configuration
@@ -281,11 +279,11 @@ If build fails, see [Handling broken packages](/guides/handling-broken-packages)
 
 ### Secrets not decrypting
 
-**Solution:** Ensure your age key is properly set up:
+**Solution:** Ensure your age key is set up and is a recipient of your secrets:
 
 ```bash
-make setup-user                    # Generate age key
-just check-secrets                 # Verify access
+age-keygen -y ~/.config/sops/age/keys.txt                                         # your public keys
+sops -d secrets/home-manager/users/<user>/secrets.yaml >/dev/null && echo ok        # decrypts?
 ```
 
 See [Secrets Management](/guides/secrets-management) for detailed troubleshooting.
