@@ -6,9 +6,10 @@
 #
 # The generator is declared unconditionally so that `clan vars set` can
 # resolve it in magnetite's evaluated configuration. Everything else sits
-# behind services.renovate.enable, which this aspect does not set until the
-# Phase 1 dry-run configuration, so no deploy runs a live updater before the
-# dry-run settings exist.
+# behind services.renovate.enable, which is set only together with the
+# Phase 1 full-dry-run settings (dryRun, the temporary branchPrefix, the
+# global packageRules and debug logging), so the first deployed updater
+# writes nothing to the forge.
 #
 # The key stays at the default root ownership. Only the privileged (`+`)
 # ExecStartPre reads it, to mint a one-hour installation token per run into
@@ -83,27 +84,40 @@ in
         '';
       };
 
-      services.renovate = lib.mkIf cfg.enable {
-        schedule = "*-*-* 00/2:17:00";
-        runtimePackages = [
-          config.nix.package
-          repoBun
-          pkgs.just
-          pkgs.jq
-          pkgs.bash
-        ];
-        settings = {
-          platform = "github";
-          repositories = [ "cameronraysmith/vanixiets" ];
-          autodiscover = false;
-          onboarding = false;
-          requireConfig = "required";
-          binarySource = "global";
-          repositoryCache = "enabled";
-          prCommitsPerRunLimit = 4;
-          inherit (renovateSettings) allowedCommands;
-        };
-      };
+      services.renovate = lib.mkMerge [
+        {
+          enable = true;
+        }
+        (lib.mkIf cfg.enable {
+          schedule = "*-*-* 00/2:17:00";
+          runtimePackages = [
+            config.nix.package
+            repoBun
+            pkgs.just
+            pkgs.jq
+            pkgs.bash
+          ];
+          settings = {
+            platform = "github";
+            repositories = [ "cameronraysmith/vanixiets" ];
+            autodiscover = false;
+            onboarding = false;
+            requireConfig = "required";
+            binarySource = "global";
+            repositoryCache = "enabled";
+            prCommitsPerRunLimit = 4;
+            inherit (renovateSettings) allowedCommands;
+
+            # Phase 1 only; removed by tasks.md 7.4. A full dry run performs
+            # artifact updates and post-upgrade tasks but writes nothing to the
+            # forge; the temporary prefix keeps the hosted app's renovate/*
+            # branches from being read as foreign-modified.
+            dryRun = "full";
+            branchPrefix = "renovate-selfhost/";
+            packageRules = renovateSettings.phase1PackageRules;
+          };
+        })
+      ];
 
       assertions = lib.mkIf cfg.enable [
         {
@@ -113,6 +127,8 @@ in
       ];
 
       systemd.services.renovate = lib.mkIf cfg.enable {
+        # Phase 1 only; removed by tasks.md 7.4.
+        environment.LOG_LEVEL = "debug";
         script = lib.mkBefore ''
           RENOVATE_TOKEN="$(< /run/renovate/token)"
           export RENOVATE_TOKEN
