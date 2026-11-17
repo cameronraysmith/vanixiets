@@ -245,6 +245,32 @@
                 assert machine.succeed(as_writer(f"git -C {L} status --porcelain")).strip() == ""
                 assert machine.succeed(f"find {R} ! -user ghq | wc -l").strip() == "0"
 
+            with subtest("an update follows a default branch renamed upstream"):
+                machine.succeed(
+                    "git init -q --bare -b master /srv/git/fixture/renamed.git"
+                    " && git -C /srv/git/fixture/renamed.git config uploadpack.allowFilter true"
+                    " && git init -q -b master /tmp/renamed && echo one > /tmp/renamed/f"
+                    " && git -C /tmp/renamed add f && git -C /tmp/renamed -c user.name=t -c user.email=t@t commit -q -m one"
+                    " && git -C /tmp/renamed push -q /srv/git/fixture/renamed.git master"
+                    " && chown -R git:git /srv/git"
+                )
+                N = f"{R}/localhost/fixture/renamed"
+                machine.succeed(as_user("cameron", "ghq-sync git://localhost/fixture/renamed"))
+                # Upstream renames master to main, so the clone's only branch is gone.
+                machine.succeed(
+                    "chown -R root:root /srv/git/fixture/renamed.git"
+                    " && git -C /srv/git/fixture/renamed.git branch -m master main"
+                    " && echo two > /tmp/renamed/f && git -C /tmp/renamed -c user.name=t -c user.email=t@t commit -q -am two"
+                    " && git -C /tmp/renamed push -q /srv/git/fixture/renamed.git master:main"
+                    " && chown -R git:git /srv/git"
+                )
+                out = machine.succeed(as_user("omnigent-cameron", "ghq-sync -u git://localhost/fixture/renamed 2>&1"))
+                assert "default branch: master -> main; checked out main" in out, out
+                assert machine.succeed(as_writer(f"git -C {N} symbolic-ref --short HEAD")).strip() == "main"
+                assert machine.succeed(as_writer(f"git -C {N} rev-parse --is-shallow-repository")).strip() == "true"
+                machine.succeed(f"cmp {N}/f /tmp/renamed/f")
+                assert machine.succeed(f"find {R} ! -user ghq | wc -l").strip() == "0"
+
             with subtest("tags: full clones on update, shallow clones only with --tags, depth kept"):
                 machine.succeed(
                     "git init -q --bare -b main /srv/git/fixture/tagged.git"
