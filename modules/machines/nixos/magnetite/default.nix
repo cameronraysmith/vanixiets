@@ -64,6 +64,7 @@ in
         buildbot
         nixbot
         gitea-mq
+        renovate
         gitea
         cognee
         sso-gateway
