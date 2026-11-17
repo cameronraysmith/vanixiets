@@ -46,6 +46,8 @@ Per-file consumer table for the narrowed rule:
 | `secrets/test.yaml` | `justfile:1423` (`show`) only | `&admin-user` | yes |
 | `secrets/services/*.yaml` | none; the directory holds only `.keep` | — | yes (vacuously; the rule governs future files) |
 
+Rules that lose `&dev` and gain `&admin-user` (operator decision, applied in slice 1): the home-manager rules for raquel, janettesmith, christophersmith, tara and ubuntu, and the two `secrets/users/raquel-user/` rules, which had the same `&admin` + `&dev` + user shape. Each file under them is decrypted by its user through that user's key (unchanged) and by the operator through `&admin-user` instead of `&dev`; the `secrets/users/raquel-user/` files are deleted later under D10.
+
 ### D2: Renew the data key of narrowed files, not the credentials
 
 - **Choice**: after `update-all-keys`, run `sops rotate --in-place` on `secrets/shared.yaml` and `secrets/test.yaml`.
