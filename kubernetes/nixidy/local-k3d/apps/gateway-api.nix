@@ -1,10 +1,13 @@
 # Gateway API CRDs Application for Phase 4 bootstrap
 #
-# Adopts existing Gateway API CRDs from Phase 3b (kluctl/easykubenix).
-# ArgoCD takes ownership via ServerSideApply without recreating resources.
+# Adopts the Gateway API CRDs that Phase 3b (kluctl/easykubenix,
+# kubernetes/modules/gateway-api) installs in the foundation stage, and adds
+# the cilium GatewayClass. ArgoCD takes ownership via ServerSideApply without
+# recreating resources.
 #
-# Gateway API CRDs must be installed before Cilium's gatewayAPI.enabled works.
-# Sync wave -2: before Cilium (-1) to ensure CRDs are registered.
+# The CRDs must exist before cilium-operator starts, which is why Phase 3b
+# installs them; this wave ordering (-2, before Cilium at -1) cannot do that,
+# because the operator is already running when ArgoCD syncs.
 {
   lib,
   pkgs,

@@ -52,6 +52,10 @@ in
   # Foundation layer (CNI) - must be deployed and ready before infrastructure
   # ==========================================================================
 
+  # Gateway API CRDs ship with the CNI: cilium-operator starts its Gateway
+  # controller only if they exist when it starts (kubernetes/modules/gateway-api).
+  gateway-api.enable = isFoundation;
+
   # Enable Cilium CNI
   cilium.enable = isFoundation;
   cilium.version = "1.20.2";
