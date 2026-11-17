@@ -3,17 +3,18 @@ linear_story_id: 044c9309-c322-4f73-9bb4-b8afbdb22f7b
 linear_story_identifier: CAM-107
 linear_story_title: "Retire legacy sops tooling and narrow operator-credential readers"
 linear_story_url: https://linear.app/cameronraysmith/issue/CAM-107/retire-legacy-sops-tooling-and-narrow-operator-credential-readers
-linear_story_state: In Progress
+linear_story_state: Done
 linear_team: CAM
 linear_project: workstation-parity
-last_synced_state: In Progress
-last_synced_at: 2026-11-17T04:46:09Z
+last_synced_state: Done
+last_synced_at: 2026-11-17T05:53:21Z
 review_round: 0
 max_review_rounds: 3
 attempt_log:
   - { at: "2026-11-16T23:33:33Z", transition: "Backlog->Todo", outcome: "posted", note: "T1 bind; issue created in project workstation-parity at Todo, description seeded from this proposal, one comment posted" }
   - { at: "2026-11-17T00:01:18Z", transition: "Todo (description re-sync)", outcome: "posted", note: "description re-seeded after operator decisions Q28-Q32 and D25 (dev retired, hash-encrypt and npmbw removed); state unchanged" }
   - { at: "2026-11-17T04:46:09Z", transition: "Todo->In Progress", outcome: "posted", note: "T2 on the first checked tasks.md box (slice 1, group 1); one comment posted" }
+  - { at: "2026-11-17T05:53:21Z", transition: "In Progress->In Review", outcome: "dropped", note: "T3 on verify.md not fired: Linear already Done since 2026-11-17T05:08:34Z, 2 s after #3932 (slice 1) merged, by the operator's account with no bot actor (likely Linear's GitHub integration closing the issue on a merged PR that names CAM-107); strictly-behind rule makes T3 a no-op; Done before archive breaks the lifecycle invariant; state left for the operator to decide" }
 ---
 
 ## Why
