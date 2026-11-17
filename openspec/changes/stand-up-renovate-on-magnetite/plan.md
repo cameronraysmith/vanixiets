@@ -122,12 +122,13 @@ Expected: `{"owner":"root","restartUnits":[]}`, `false`, `{"service":false,"time
 
 **Files:**
 - Create: `modules/checks/renovate-allowed-commands.nix`
+- Modify: `modules/lib/renovate-settings.nix` (Phase 1 global rules as `phase1PackageRules`, added with Task 5 Step 1)
 
 **Interfaces:**
-- Consumes: `config.flake.nixosConfigurations.magnetite.config.services.renovate.settings.{allowedCommands,packageRules}`; `.github/renovate.json`.
+- Consumes: `config.flake.lib.renovateSettings.{allowedCommands,phase1PackageRules}`; `.github/renovate.json` through `builtins.fromJSON`.
 - Produces: `checks.x86_64-linux.renovate-allowed-commands`.
 
-- [ ] **Step 1:** write the check. It is defined for `x86_64-linux` only because reading magnetite's evaluated configuration is the cost `checks.x86_64-linux.nixos-magnetite` already pays.
+- [ ] **Step 1:** write the check, in the same commit as Task 5 Step 1. It reads static flake data and the repository file only, so it costs no host evaluation; it is defined for `x86_64-linux` only so it runs once per build-service run.
 
 ```nix
 # Every postUpgradeTasks command the repository (or, in Phase 1, the module's
@@ -145,11 +146,12 @@ Expected: `{"owner":"root","restartUnits":[]}`, `false`, `{"service":false,"time
     lib.mkIf (system == "x86_64-linux") {
       checks.renovate-allowed-commands =
         let
-          settings = config.flake.nixosConfigurations.magnetite.config.services.renovate.settings;
+          inherit (config.flake.lib) renovateSettings;
           input = pkgs.writeText "renovate-allowed-commands-input.json" (
             builtins.toJSON {
-              allowed = settings.allowedCommands or [ ];
-              globalRules = settings.packageRules or [ ];
+              allowed = renovateSettings.allowedCommands;
+              globalRules = renovateSettings.phase1PackageRules or [ ];
+              repoRules = (builtins.fromJSON (builtins.readFile ../../.github/renovate.json)).packageRules or [ ];
             }
           );
         in
@@ -160,10 +162,9 @@ Expected: `{"owner":"root","restartUnits":[]}`, `false`, `{"service":false,"time
           }
           ''
             jq -n -r \
-              --slurpfile repo ${../../.github/renovate.json} \
               --slurpfile mod ${input} '
               ($mod[0].allowed) as $allowed
-              | [ (($repo[0].packageRules // []) + $mod[0].globalRules)[]
+              | [ ($mod[0].repoRules + $mod[0].globalRules)[]
                   | .postUpgradeTasks.commands // [] | .[] ] as $cmds
               | if ($cmds | length) == 0 then
                   "renovate-allowed-commands: no postUpgradeTasks command found; the check would be vacuous" | halt_error(1)
@@ -196,7 +197,7 @@ Expected: `OK: 4 distinct task commands admitted`.
 
 **Interfaces:**
 - Consumes: App id and installation id (Task 1), key path (Task 2), `withSystem`.
-- Produces: `systemd.services.renovate`, `systemd.timers.renovate`, `services.renovate.settings.allowedCommands` (consumed by Task 3).
+- Produces: `systemd.services.renovate`, `systemd.timers.renovate`, and `flake.lib.renovateSettings.allowedCommands` in `modules/lib/renovate-settings.nix` (read by the aspect and by Task 3's check).
 
 The snippets below are fragments of the one aspect body begun in Task 2: merge every `let` binding into a single `let … in` around the module's attribute set, and merge the `services.renovate` and `systemd.services.renovate` fragments into one set each, because Nix rejects two `x = { … };` bindings of the same attribute in one set literal.
 
@@ -216,12 +217,7 @@ All Task 4 settings sit inside `lib.mkIf config.services.renovate.enable` (with 
           binarySource = "global";
           repositoryCache = "enabled";
           prCommitsPerRunLimit = 4;
-          allowedCommands = [
-            "^nix flake lock$"
-            "^nix run \\.#regenerate-bun-nix$"
-            "^just bun-repin-playwright$"
-            "^bun install --ignore-scripts$"
-          ];
+          inherit (renovateSettings) allowedCommands; # flake.lib.renovateSettings, modules/lib/renovate-settings.nix
         };
       };
 ```
@@ -324,14 +320,21 @@ nix eval .#checks.x86_64-linux.nixos-magnetite.drvPath 2>&1 | tee logs/nixos-mag
 **Files:**
 - Modify: `modules/nixos/renovate.nix`
 
-- [ ] **Step 1:** enable the service and add the temporary settings, each commented `# Phase 1 only; removed by tasks.md 7.4` except `enable`, which stays:
+- [ ] **Step 1:** enable the service and add the temporary settings, each commented `# Phase 1 only; removed by tasks.md 7.4` except `enable`, which stays. The rules go into `flake.lib.renovateSettings.phase1PackageRules` in `modules/lib/renovate-settings.nix`, so Task 3's check reads them without a host evaluation, and the aspect passes them on; Task 3's check lands in this same commit:
 
 ```nix
+      # modules/nixos/renovate.nix
       services.renovate.enable = true;
       services.renovate.settings = {
         dryRun = "full";
         branchPrefix = "renovate-selfhost/";
-        packageRules = [
+        packageRules = renovateSettings.phase1PackageRules;
+      };
+      systemd.services.renovate.environment.LOG_LEVEL = "debug";
+```
+```nix
+      # modules/lib/renovate-settings.nix, inside flake.lib.renovateSettings
+        phase1PackageRules = [
           {
             description = "Regex-manager flake.nix ref bumps never touch flake.lock; re-lock in the same commit.";
             matchManagers = [ "custom.regex" ];
@@ -360,8 +363,6 @@ nix eval .#checks.x86_64-linux.nixos-magnetite.drvPath 2>&1 | tee logs/nixos-mag
             };
           }
         ];
-      };
-      systemd.services.renovate.environment.LOG_LEVEL = "debug";
 ```
 Global rules are concatenated before the repository's (A110), and the repository file is untouched, so the hosted app sees no change. Verify: Task 3 Step 2 passes; M's `validateSettings` derivation instantiates with Task 4 Step 8.
 

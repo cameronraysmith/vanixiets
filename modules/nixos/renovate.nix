@@ -8,19 +8,39 @@
 # resolve it in magnetite's evaluated configuration. Everything else sits
 # behind services.renovate.enable, which this aspect does not set until the
 # Phase 1 dry-run configuration, so no deploy runs a live updater before the
-# key and the dry-run settings both exist.
+# dry-run settings exist.
 #
 # The key stays at the default root ownership. Only the privileged (`+`)
 # ExecStartPre reads it, to mint a one-hour installation token per run into
 # the unit's RuntimeDirectory; the main script moves the token into
-# RENOVATE_TOKEN and deletes the file before Renovate starts. The sandboxed
-# process, where post-upgrade tasks run repository code under Renovate's uid,
-# never sees the key. No restartUnits: each timer run reads the key afresh.
+# RENOVATE_TOKEN and deletes the file before Renovate starts. The module's
+# own `credentials` option is not used: LoadCredential is read at unit start,
+# before any ExecStartPre, so it could carry only the key itself, and every
+# post-upgrade task child, which runs repository code under Renovate's uid,
+# would then reach it. No restartUnits: each timer run reads the key afresh.
 #
-# Hazard until the key is set: `clan machines update` runs every missing
-# generator for every machine before deploying anything, and this script
-# exits non-zero, so deploys from a tree carrying this declaration fail until
-# `clan vars set magnetite renovate-github-app-secret-key/key.pem` has run.
+# Token lifetime: an installation token expires an hour after it is minted
+# and Renovate never refreshes it, so RuntimeMaxSec stops a run at 55 minutes
+# and every run mints a new token.
+#
+# Allowlist coupling: allowedCommands below is the only set of commands
+# Renovate may run as post-upgrade tasks. A refused command still produces a
+# pushed, incomplete commit, so the flake check renovate-allowed-commands
+# requires every postUpgradeTasks command in .github/renovate.json and in any
+# global packageRules here to match one of these patterns.
+#
+# Tool coupling: tasks see only PATH and HOME, so every tool they need comes
+# through runtimePackages. Their bun is the repository's toolchain bun (the
+# one the default dev shell carries), asserted equal to package.json's
+# packageManager, since a different bun can rewrite bun.lock differently.
+#
+# Hazard if the key is ever removed: `clan machines update` runs every
+# missing generator for every machine before deploying anything, and this
+# script exits non-zero, so deploys fail until the key is set again.
+{ config, withSystem, ... }:
+let
+  inherit (config.flake.lib) renovateSettings;
+in
 {
   flake.modules.nixos.renovate =
     {
@@ -30,6 +50,7 @@
       ...
     }:
     let
+      cfg = config.services.renovate;
       gen = config.clan.core.vars.generators;
       # GitHub App vanixiets-renovate and its installation on
       # cameronraysmith/vanixiets. Identifiers, not secrets.
@@ -50,6 +71,8 @@
           chown --reference=/run/renovate /run/renovate/token
         '';
       };
+      repoBun = withSystem pkgs.stdenv.hostPlatform.system ({ pkgs, ... }: pkgs.bun);
+      packageManagerBun = lib.removePrefix "bun@" (lib.importJSON ../../package.json).packageManager;
     in
     {
       clan.core.vars.generators.renovate-github-app-secret-key = {
@@ -60,7 +83,36 @@
         '';
       };
 
-      systemd.services.renovate = lib.mkIf config.services.renovate.enable {
+      services.renovate = lib.mkIf cfg.enable {
+        schedule = "*-*-* 00/2:17:00";
+        runtimePackages = [
+          config.nix.package
+          repoBun
+          pkgs.just
+          pkgs.jq
+          pkgs.bash
+        ];
+        settings = {
+          platform = "github";
+          repositories = [ "cameronraysmith/vanixiets" ];
+          autodiscover = false;
+          onboarding = false;
+          requireConfig = "required";
+          binarySource = "global";
+          repositoryCache = "enabled";
+          prCommitsPerRunLimit = 4;
+          inherit (renovateSettings) allowedCommands;
+        };
+      };
+
+      assertions = lib.mkIf cfg.enable [
+        {
+          assertion = repoBun.version == packageManagerBun;
+          message = "renovate: task bun ${repoBun.version} differs from package.json packageManager bun@${packageManagerBun}; a different bun can rewrite bun.lock";
+        }
+      ];
+
+      systemd.services.renovate = lib.mkIf cfg.enable {
         script = lib.mkBefore ''
           RENOVATE_TOKEN="$(< /run/renovate/token)"
           export RENOVATE_TOKEN
@@ -70,7 +122,17 @@
           ExecStartPre = [ "+${lib.getExe mintToken}" ];
           RuntimeDirectory = "renovate";
           RuntimeDirectoryMode = "0700";
+          RuntimeMaxSec = "55min";
+          Nice = 10;
+          CPUWeight = 20;
+          IOWeight = 20;
+          MemoryHigh = "4G";
+          MemoryMax = "8G";
         };
+      };
+
+      systemd.timers.renovate = lib.mkIf cfg.enable {
+        timerConfig.RandomizedDelaySec = "10min";
       };
     };
 }
