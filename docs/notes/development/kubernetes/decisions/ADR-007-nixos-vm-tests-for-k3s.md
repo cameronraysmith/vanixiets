@@ -68,6 +68,8 @@ The k3d cluster keeps kube-proxy and ServiceLB (`kubernetes/clusters/local-k3d/c
 The production Cilium module sets `kubeProxyReplacement = true`, `routingMode = "tunnel"`, `tunnelProtocol = "geneve"`, `bpf.masquerade = true` (`kubernetes/modules/cilium/default.nix:61-82`), and the production k3s module passes `--disable-kube-proxy` and `--disable=servicelb`.
 The two envelopes differ exactly where Cilium's eBPF datapath, kube-proxy replacement, and LoadBalancer address assignment are concerned.
 
+Amendment (2026-11-16, `feat(k3d): derive the node image from nixpkgs k3s`): `kubernetes/clusters/local-k3d/cluster.yaml` cited above has been replaced by `kubernetes/clusters/local-k3d/ctlptl.nix`, rendered as the `k3d-cluster-config` package (`modules/k3d-cluster-config.nix`) with the same settings and a node image taken from nixpkgs' `k3s`; the paragraph above is kept as originally written.
+
 One consequence is concrete.
 The Chainsaw suite asserts `Gateway/main-gateway` reaches `Programmed=True` (`kubernetes/tests/local-k3d/infrastructure/02-assert-gateway.yaml`, step `infrastructure-gateway` at `kubernetes/tests/local-k3d/chainsaw-test.yaml:38`).
 Cilium marks a Gateway Programmed only after its generated LoadBalancer Service has at least one ingress address (`~/ghq/github.com/cilium/cilium/operator/pkg/gateway-api/status_gateway_address.go:136`, `162`), and until then reports `AddressNotAssigned` (`status_gateway_address.go:70-81`).

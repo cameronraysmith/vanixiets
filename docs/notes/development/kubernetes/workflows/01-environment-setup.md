@@ -83,68 +83,29 @@ brew install kubectl kubernetes-helm cilium-cli k9s kluctl
 
 ## k3d cluster configuration
 
-k3d clusters are configured via YAML files for reproducibility.
+The local k3d cluster is declared as a ctlptl `Cluster` in `kubernetes/clusters/local-k3d/ctlptl.nix` and rendered by the flake as `packages.<system>.k3d-cluster-config`.
 The configuration enables Cilium CNI by disabling k3s bundled networking.
 
 ### Cluster configuration file
 
-Create or review the k3d configuration at `k3d/local-k3d.yaml`:
+`just k3d-up` and `just k3d-down` build the rendered file and pass its store path to `ctlptl apply -f` and `ctlptl delete -f`.
+To inspect it:
 
-```yaml
-apiVersion: k3d.io/v1alpha5
-kind: Simple
-metadata:
-  name: local-k3d
-servers: 1
-agents: 0
-image: rancher/k3s:v1.31.4-k3s1
-kubeAPI:
-  hostIP: "127.0.0.1"
-  hostPort: "6443"
-ports:
-  - port: 80:80
-    nodeFilters:
-      - loadbalancer
-  - port: 443:443
-    nodeFilters:
-      - loadbalancer
-options:
-  k3d:
-    wait: true
-    timeout: "120s"
-  k3s:
-    extraArgs:
-      - arg: --flannel-backend=none
-        nodeFilters:
-          - server:*
-      - arg: --disable-network-policy
-        nodeFilters:
-          - server:*
-      - arg: --disable-kube-proxy
-        nodeFilters:
-          - server:*
-      - arg: --disable=traefik
-        nodeFilters:
-          - server:*
-      - arg: --disable=servicelb
-        nodeFilters:
-          - server:*
-  kubeconfig:
-    updateDefaultKubeconfig: true
-    switchCurrentContext: true
-env:
-  - envVar: K3D_FIX_MOUNTS=1
-    nodeFilters:
-      - server:*
-      - agent:*
+```sh
+jq . "$(nix build --no-link --print-out-paths .#k3d-cluster-config)"
 ```
+
+The node image is `rancher/k3s:v<version>`, where `<version>` is the locked nixpkgs `k3s.version` with its `+k3sN` suffix written as `-k3sN`, the form the upstream image tags use.
+A nixpkgs bump therefore moves the k3d node to the same k3s release the NixOS `services.k3s` module defaults to.
 
 Key configuration points:
 
 - `K3D_FIX_MOUNTS=1` environment variable enables BPF mount propagation for Cilium
 - Flannel, network-policy, and kube-proxy are disabled for Cilium replacement
-- Traefik and servicelb are disabled for custom ingress
+- Traefik is disabled for Cilium Gateway API ingress; ServiceLB stays enabled and assigns the node IP to LoadBalancer services
 - Ports 80/443 are exposed via the k3d load balancer
+- Subnet `192.168.100.0/24` pins the node at `192.168.100.3` for the `*.192.168.100.3.sslip.io` hostnames
+- `/tmp/k3d-manifests` is mounted at `/manifests` for the integration run's `file:///manifests` ArgoCD source
 
 ### ctlptl registry (optional)
 

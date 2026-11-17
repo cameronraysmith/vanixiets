@@ -1184,10 +1184,10 @@ container-release VERSION="1.0.0" TAGS="":
 # Note: DNS configuration happens in k3d-deploy after Cilium CNI is ready
 [group('k3d')]
 k3d-up:
-  # cluster.yaml volume-mounts this host path at /manifests; k3d only warns
+  # The cluster config volume-mounts this host path at /manifests; k3d only warns
   # when it is absent, leaving the mount unusable for the rest of the run.
   @mkdir -p /tmp/k3d-manifests
-  ctlptl apply -f kubernetes/clusters/local-k3d/cluster.yaml
+  ctlptl apply -f "$({{nix_cmd}} build --no-warn-dirty --no-link --print-out-paths .#k3d-cluster-config)"
   @just k3d-bootstrap-secrets
 
 # Bootstrap secrets required before first deployment (idempotent)
@@ -1197,8 +1197,8 @@ k3d-up:
 k3d-bootstrap-secrets *ARGS:
   {{nix_cmd}} run --no-warn-dirty .#k3d-bootstrap-secrets -- {{ARGS}}
 
-# Configure CoreDNS to forward sslip.io queries to public DNS resolvers
-# Required because OrbStack's DNS (192.168.107.1) cannot resolve sslip.io wildcards
+# Configure CoreDNS to answer <name>.<a.b.c.d>.sslip.io in-cluster with a.b.c.d;
+# only other sslip.io names are still forwarded to public DNS resolvers
 # Body lives in modules/apps/cluster/k3d-configure-dns.{nix,sh}.
 [group('k3d')]
 k3d-configure-dns *ARGS:
@@ -1207,7 +1207,7 @@ k3d-configure-dns *ARGS:
 # Delete local k3d cluster
 [group('k3d')]
 k3d-down:
-  ctlptl delete -f kubernetes/clusters/local-k3d/cluster.yaml
+  ctlptl delete -f "$({{nix_cmd}} build --no-warn-dirty --no-link --print-out-paths .#k3d-cluster-config)"
 
 # Show k3d cluster status
 [group('k3d')]

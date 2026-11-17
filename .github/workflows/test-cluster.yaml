@@ -48,8 +48,10 @@ jobs:
           # (modules/devshells/kubernetes.nix), the justfile recipes, the cluster
           # apps they run (modules/apps/cluster/), the kluctl deploy apps
           # (modules/kubernetes.nix), the local-k3d-ci nixidy environment
-          # (modules/nixidy.nix), and the trees those render (kubernetes/).
-          hash-sources: 'kubernetes/**/* modules/apps/cluster/**/* modules/kubernetes.nix modules/nixidy.nix modules/devshells/kubernetes.nix justfile flake.nix flake.lock secrets/** scripts/k3d-test-coverage.sh .github/workflows/test-cluster.yaml .github/actions/setup-nix/action.yml'
+          # (modules/nixidy.nix), the ctlptl cluster config
+          # (modules/k3d-cluster-config.nix, node image from flake.lock's
+          # nixpkgs k3s), and the trees those render (kubernetes/).
+          hash-sources: 'kubernetes/**/* modules/apps/cluster/**/* modules/kubernetes.nix modules/nixidy.nix modules/k3d-cluster-config.nix modules/devshells/kubernetes.nix justfile flake.nix flake.lock secrets/** scripts/k3d-test-coverage.sh .github/workflows/test-cluster.yaml .github/actions/setup-nix/action.yml'
           force-run: ${{ inputs.force_run }}
 
       - name: Prune Docker to free root space

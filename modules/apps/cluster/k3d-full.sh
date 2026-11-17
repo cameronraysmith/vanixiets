@@ -14,8 +14,8 @@ Runs, in order:
 
 The invocation must happen from a directory inside the vanixiets git
 worktree (repo root resolution via `git rev-parse --show-toplevel`),
-since the underlying just recipes reference
-kubernetes/clusters/local-k3d/cluster.yaml by relative path.
+since the underlying just recipes build the cluster config from the
+flake at the working directory (`.#k3d-cluster-config`).
 EOF
     exit 0
     ;;

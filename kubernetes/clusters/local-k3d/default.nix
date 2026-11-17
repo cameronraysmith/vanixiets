@@ -57,7 +57,7 @@ in
   # k3d/OrbStack eBPF accommodations:
   # - Kube-proxy replacement on, as in the production module: cilium >= 1.19
   #   runs its Gateway API controller only with kube-proxy replacement
-  #   (operator/pkg/gateway-api/cell.go), and cluster.yaml disables the k3s
+  #   (operator/pkg/gateway-api/cell.go), and ctlptl.nix disables the k3s
   #   kube-proxy to match. BPF masquerade is left at the module default.
   cilium.helmValues = {
     kubeProxyReplacement = true;

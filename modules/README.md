@@ -31,7 +31,7 @@ A file must also be tracked by git before a flake build can see it, because flak
 - `terranix/` — cloud resource definitions rendered to OpenTofu.
 - `vm-tests/` — on-demand runtime tests exported as `vmTests.<system>.<name>`, outside PR gating: QEMU VM tests needing `kvm`, and systemd-nspawn container tests needing `uid-range`.
 
-Top-level files configure the flake itself: `flake-parts.nix`, `formatting.nix`, `systems.nix`, `debug.nix`, `kubernetes.nix`, and `nixidy.nix`.
+Top-level files configure the flake itself: `flake-parts.nix`, `formatting.nix`, `systems.nix`, `debug.nix`, `kubernetes.nix`, `nixidy.nix`, and `k3d-cluster-config.nix` (the ctlptl configuration of the local k3d cluster, whose node image follows nixpkgs' `k3s`).
 
 ## Shared CLI capabilities
 

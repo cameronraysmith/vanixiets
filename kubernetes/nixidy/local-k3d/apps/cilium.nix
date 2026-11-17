@@ -53,7 +53,7 @@ in
         # Core settings for local dev
         cluster.name = clusterName;
 
-        # kube-proxy replacement on; cluster.yaml disables the k3s kube-proxy
+        # kube-proxy replacement on; clusters/local-k3d/ctlptl.nix disables the k3s kube-proxy
         kubeProxyReplacement = true;
 
         # Use tunnel mode for simplicity (works with any network)
