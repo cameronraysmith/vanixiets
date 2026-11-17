@@ -63,4 +63,4 @@ Implementation touches: a new aspect `modules/nixos/renovate.nix` (service setti
 Outside the repository: the GitHub App and its installation, disabling the Mend app for vanixiets, closing the old Renovate pull requests and #832.
 
 Nothing in nixbot, gitea-mq, buildbot or their Apps and rulesets is edited.
-Out of scope: `.github/workflows/update-flake-inputs.yaml` (a separate later change), auto-enqueueing Renovate pull requests, and any second repository.
+Out of scope: auto-enqueueing Renovate pull requests, and any second repository. `.github/workflows/update-flake-inputs.yaml`, first left to a later change, is now in scope (operator decision, 2026-11-17): Renovate becomes the single updater for every dependency, and Phase 2 deletes that workflow and its credentials.

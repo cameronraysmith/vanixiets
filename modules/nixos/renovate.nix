@@ -138,28 +138,49 @@ in
       ];
 
       systemd.services.renovate = lib.mkIf cfg.enable {
-        # Phase 1 only; removed by tasks.md 7.4. Trace logs every HTTP request
-        # (lib/util/http/http.ts:232, got.ts:37), which task 5.4 needs for the
-        # permission trim. It does not log credentials: the logger replaces
-        # the value of any `authorization` or `token` field
-        # (lib/util/sanitize.ts:7-23 redactedFields, applied by
-        # lib/logger/utils.ts sanitizeValue), and replaces the platform token's
-        # value anywhere in a message, because platform init registers it as a
-        # host rule (lib/modules/platform/index.ts:74-94), host rules register
-        # their token for sanitizing (lib/util/host-rules.ts:268-281), and the
-        # per-repository reset re-adds them (lib/workers/global/index.ts:225-232);
-        # an App token is registered with and without its `x-access-token:`
-        # prefix (lib/util/sanitize.ts:47-64).
-        environment.LOG_LEVEL = "trace";
+        # Phase 1 only; removed by tasks.md 7.4, together with LogsDirectory and
+        # the rotation step below. Task 5.4 needs every GitHub request for the
+        # permission trim. Renovate reports per-URL, per-method counts only at
+        # trace ("HTTP URL statistics", lib/util/stats.ts HttpStats.report; at
+        # debug only per-host totals and the HTTP cache's GET paths), and trace
+        # in the journal produced about 12.5 million lines per run, which
+        # journald's rate limit discarded. So the journal stays at debug and a
+        # trace log file takes the rest (LOG_FILE, LOG_FILE_LEVEL,
+        # lib/logger/bunyan.ts:44-59). The file stream goes through the same
+        # sanitizer as stdout (bunyan.ts serializedSanitizedLogger maps every
+        # stream through withSanitizer, with-sanitizer.ts applying
+        # logger/utils.ts sanitizeValue): `authorization` and `token` fields
+        # are masked (lib/util/sanitize.ts:7-23), and the platform token's value
+        # is replaced anywhere in a message, because platform init registers it
+        # as a host rule (lib/modules/platform/index.ts:74-94), host rules
+        # register their token for sanitizing (lib/util/host-rules.ts:268-281),
+        # the per-repository reset re-adds them
+        # (lib/workers/global/index.ts:225-232), and an App token is registered
+        # with and without its `x-access-token:` prefix
+        # (lib/util/sanitize.ts:47-64). Renovate cannot rotate the file
+        # (with-sanitizer.ts rejects rotating files), so each run first moves
+        # the previous run's file aside: at most two runs stay on disk, each
+        # estimated at 1-2 GB from the 2026-11-17 trace run's line count.
+        environment = {
+          LOG_LEVEL = "debug";
+          LOG_FILE = "/var/log/renovate/trace.ndjson";
+          LOG_FILE_LEVEL = "trace";
+        };
         script = lib.mkBefore ''
           RENOVATE_TOKEN="$(< /run/renovate/token)"
           export RENOVATE_TOKEN
           rm -f /run/renovate/token
         '';
         serviceConfig = {
-          ExecStartPre = [ "+${lib.getExe mintToken}" ];
+          ExecStartPre = [
+            "+${lib.getExe mintToken}"
+            # `-`: the first run has no previous file to move.
+            "-${pkgs.coreutils}/bin/mv -f /var/log/renovate/trace.ndjson /var/log/renovate/trace.previous.ndjson"
+          ];
           RuntimeDirectory = "renovate";
           RuntimeDirectoryMode = "0700";
+          LogsDirectory = "renovate";
+          LogsDirectoryMode = "0700";
           RuntimeMaxSec = "55min";
           Nice = 10;
           CPUWeight = 20;
