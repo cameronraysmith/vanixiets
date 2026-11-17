@@ -242,6 +242,32 @@ Posting the comment requires nixbot's GitHub App to have the repository permissi
 nixbot caches installation tokens for 48 minutes (`nixbot/nixbot/forge/github.py:153-154`), so a permission change on the App takes effect once the cached token expires or after nixbot restarts.
 See [Docs browser evidence](https://github.com/cameronraysmith/vanixiets/blob/main/packages/docs/tests/report/README.md#publication) for reading the evidence.
 
+## Dependency updates
+
+[Renovate](https://docs.renovatebot.com/) runs on magnetite as the NixOS `services.renovate` unit, configured by the `renovate` aspect (`modules/nixos/renovate.nix`), and reads its repository configuration from `.github/renovate.json`.
+It acts as its own GitHub App, `vanixiets-renovate`, installed on this repository only.
+Each run's privileged `ExecStartPre` mints a one-hour installation token from the App's private key, the `renovate-github-app-secret-key` clan vars generator on magnetite, and the key itself never reaches Renovate's process; `RuntimeMaxSec` stops a run at 55 minutes, before the token expires.
+To replace the key, generate a new one on the App's settings page, store it with `clan vars set magnetite renovate-github-app-secret-key/key.pem`, delete the old one on GitHub, and redeploy magnetite.
+
+The timer starts a run every two hours at 17 minutes past, plus up to ten minutes of random delay.
+To run it now, `systemctl start renovate.service` on magnetite; `journalctl -u renovate.service` shows the run.
+Renovate pull requests go through nixbot like any other and are not enqueued automatically: a person enqueues each one into gitea-mq.
+
+Every commit Renovate pushes is complete, so nixbot passes it without a fix-up commit: post-upgrade tasks in `.github/renovate.json` run in the same branch before the commit.
+
+| Update | Tasks in the same commit |
+|--------|--------------------------|
+| A `flake.nix` reference bumped by a custom regex manager (an input pinned to a version tag) | `nix flake lock` |
+| A `package.json` dependency (bun manager) | `nix run .#regenerate-bun-nix` |
+| The `playwright-web-flake` tag | `nix flake lock`, `just bun-repin-playwright`, `bun install --ignore-scripts`, `nix run .#regenerate-bun-nix`, so npm `playwright` equals the flake's driver version |
+
+npm `playwright` and `@playwright/test` are never updated on their own; they follow the flake input.
+Renovate may run only the commands in its `allowedCommands` (`flake.lib.renovateSettings`, `modules/lib/renovate-settings.nix`), and a command it refuses still yields a pushed, incomplete commit, so `checks.x86_64-linux.renovate-allowed-commands` fails when any task command in `.github/renovate.json` is not on that list.
+
+Flake inputs are split between two updaters, so no input has two.
+Renovate updates the inputs pinned to a revision (its `nix` manager, which re-locks the input itself) or to a version tag (the regex managers above); lock file maintenance is off, so it never refreshes the rest.
+Inputs that track a branch are refreshed one pull request per input by `.github/workflows/update-flake-inputs.yaml`, which excludes `playwright-web-flake`.
+
 ## Secrets
 
 Effect secrets are declared once, in `flake.lib.vanixietsEffectSecrets` (`modules/effects/vanixiets/secrets.nix`).
@@ -293,6 +319,7 @@ just check
 ## References
 
 - nixbot: https://github.com/Mic92/nixbot
+- Renovate: https://docs.renovatebot.com/
 - Cloudflare Workers: https://developers.cloudflare.com/workers/
 - Wrangler CLI: https://developers.cloudflare.com/workers/wrangler/
 - semantic-release: https://semantic-release.gitbook.io/

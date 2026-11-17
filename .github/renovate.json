@@ -9,9 +9,6 @@
     "enabled": true
   },
   "labels": ["dependencies"],
-  "gitIgnoredAuthors": [
-    "41898282+github-actions[bot]@users.noreply.github.com"
-  ],
   "customManagers": [
     {
       "description": "Track the tag/ref of every version-pinned github flake input. The nix manager only advances flake.lock along the ref an input already tracks; it never rewrites the ref string in flake.nix, so a tag-pinned input reports nothing at all. Before this manager existed only playwright-web-flake was matched, and cilium-src, argocd-src, argocd-helm-src, gateway-api-src and sops-secrets-operator-src had never once been bumped since the commits that introduced them. The first pattern requires the ref to be an optional v followed by a dotted numeric version, which is what keeps this honest: it declines to match refs with no version (github:owner/repo, deliberate trunk tracking), branch refs (main, master, dev, writeShellApplication, future-26.11), fork labels (cognee-v112) and 40-hex revision pins (zen-browser, niri-flake), whose exactness modules/checks/pyrite-desktop.nix asserts on. dms-src is deliberately a release-tag pin and is matched here: pyrite-desktop.nix asserts that its tag equals the packaged dms-shell version, so a tag PR passes exactly when nixpkgs ships that release. The nix manager opens no digest PRs for it, because a ref-only input carries no original.rev and is left to lock-file maintenance, which is not enabled. Anchoring on .url also keeps .inputs.<x>.follows lines out. The second pattern is narrow on purpose: argo-helm publishes one tag series per chart, so its ref carries an argo-cd- prefix that no general version pattern can accept without also accepting branch names, and the packageRule below gives that one dependency a matching versioning scheme.",
@@ -37,29 +34,11 @@
       "versioning": "regex:^argo-cd-(?<major>\\d+)\\.(?<minor>\\d+)\\.(?<patch>\\d+)$"
     },
     {
-      "description": "One non-major PR for the bun workspace. Every update of a dependency declared in package.json or packages/*/package.json regenerates the shared bun.lock (and, via regenerate-lock-files.yaml, bun.nix), so separate PRs conflict pairwise and land one per CI cycle. Matching the lock file rather than package names tracks the unit of conflict as dependencies come and go: the bun manager attaches the root bun.lock to every workspace member (lib/modules/manager/bun/extract.ts), and matchFileNames tests lock files as well as package files (lib/util/package-rules/files.ts). The coupled groups below override this one because later packageRules win, so a playwright, cloudflare-workers-tooling or astro update that breaks does not hold back routine ones; majors stay separate.",
+      "description": "One non-major PR for the bun workspace. Every update of a dependency declared in package.json or packages/*/package.json regenerates the shared bun.lock (and, through the bun post-upgrade task below, bun.nix), so separate PRs conflict pairwise and land one per CI cycle. Matching the lock file rather than package names tracks the unit of conflict as dependencies come and go: the bun manager attaches the root bun.lock to every workspace member (lib/modules/manager/bun/extract.ts), and matchFileNames tests lock files as well as package files (lib/util/package-rules/files.ts). The coupled groups below override this one because later packageRules win, so a cloudflare-workers-tooling or astro update that breaks does not hold back routine ones; majors stay separate. npm playwright is not updated by the bun manager at all (see the playwright rules at the end).",
       "matchFileNames": ["bun.lock"],
       "matchUpdateTypes": ["minor", "patch"],
       "groupName": "bun workspace non-major",
       "groupSlug": "bun-workspace-non-major"
-    },
-    {
-      "description": "Group playwright across npm and flake.nix into a single PR. The flake driver's browsers.json revision names the PLAYWRIGHT_BROWSERS_PATH directories that the npm playwright-core looks up from its own bundled revision, so when a release changes a browser revision the flake ref and both npm pins must move together; otherwise the docs e2e build stops naming the missing directories. A patch release that keeps every revision may land npm-only while the fork's tag lags. Both the upstream and the fork coordinates are listed so the group survives a fork-drop, and the fork's tags mirror upstream's exactly, so the two coordinates share one continuous version series.",
-      "matchPackageNames": [
-        "playwright",
-        "@playwright/test",
-        "pietdevries94/playwright-web-flake",
-        "cameronraysmith/playwright-web-flake"
-      ],
-      "groupName": "playwright"
-    },
-    {
-      "description": "Pin playwright npm packages to exact versions for flake input sync",
-      "matchPackageNames": [
-        "playwright",
-        "@playwright/test"
-      ],
-      "rangeStrategy": "pin"
     },
     {
       "description": "The rust nightly channel is a derived constraint (aeneas -> charon pin -> required nightly), not a free-floating dependency; surface drift on the dependency dashboard but never open a PR automatically",
@@ -90,6 +69,54 @@
         "conventional-changelog-conventionalcommits"
       ],
       "allowedVersions": "<10"
+    },
+    {
+      "description": "Regex-manager flake.nix ref bumps never touch flake.lock; re-lock in the same commit so nixbot evaluates a complete tree.",
+      "matchManagers": ["custom.regex"],
+      "postUpgradeTasks": {
+        "commands": ["nix flake lock"],
+        "fileFilters": ["flake.lock"],
+        "executionMode": "branch"
+      }
+    },
+    {
+      "description": "bun manager updates bun.lock; regenerate bun.nix from it in the same commit.",
+      "matchManagers": ["bun"],
+      "postUpgradeTasks": {
+        "commands": ["nix run .#regenerate-bun-nix"],
+        "fileFilters": ["bun.nix"],
+        "executionMode": "branch"
+      }
+    },
+    {
+      "description": "npm playwright is derived, not tracked: its version must equal the playwright-web-flake driver (pkgs/by-name/vanixiets-docs/package.nix guards the browsers.json revision match). Renovate never proposes it on its own.",
+      "matchManagers": ["bun"],
+      "matchPackageNames": ["playwright", "@playwright/test"],
+      "enabled": false
+    },
+    {
+      "description": "A playwright-web-flake ref bump re-locks the flake, re-pins npm playwright to the new driver version, reconciles bun.lock and regenerates bun.nix in one commit. Both coordinates are listed so a fork-drop keeps the rule. Must stay after the custom.regex rule: postUpgradeTasks is not mergeable, so this object replaces that one.",
+      "matchManagers": ["custom.regex"],
+      "matchPackageNames": [
+        "cameronraysmith/playwright-web-flake",
+        "pietdevries94/playwright-web-flake"
+      ],
+      "groupName": "playwright",
+      "postUpgradeTasks": {
+        "commands": [
+          "nix flake lock",
+          "just bun-repin-playwright",
+          "bun install --ignore-scripts",
+          "nix run .#regenerate-bun-nix"
+        ],
+        "fileFilters": [
+          "flake.lock",
+          "packages/docs/package.json",
+          "bun.lock",
+          "bun.nix"
+        ],
+        "executionMode": "branch"
+      }
     }
   ]
 }

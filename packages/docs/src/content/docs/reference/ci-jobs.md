@@ -214,6 +214,15 @@ nixbot posts no forge status for event effects, so a failed `pullRequest` or `bu
 The comment needs nixbot's GitHub App to hold `Pull requests: Read and write`; nixbot caches installation tokens for 48 minutes (`nixbot/nixbot/forge/github.py:153-154`), so a permission change takes effect after the cached token expires or nixbot restarts.
 Local equivalent: `nix run .#publish-evidence -- event --out <dir>` with nixbot's event variables set, which stages the bundle without uploading.
 
+## Dependency updates
+
+Renovate runs on magnetite every two hours at 17 minutes past, as the GitHub App `vanixiets-renovate`, and opens pull requests that nixbot builds like any other; see [CI/CD Setup](/about/contributing/ci-cd-setup/#dependency-updates) for its task chains and flake-input split.
+
+| Unit | Purpose | Local equivalent |
+|------|---------|------------------|
+| `renovate.service` (timer `renovate.timer`) | Update dependencies in `.github/renovate.json`'s scope, running each update's post-upgrade tasks in the same commit | `systemctl start renovate.service` and `journalctl -u renovate.service` on magnetite |
+| `checks.x86_64-linux.renovate-allowed-commands` | Every post-upgrade task command is on the instance's allowlist | `nix build .#checks.x86_64-linux.renovate-allowed-commands` |
+
 ## GitHub Actions workflows
 
 ### PR Check (`pr-check.yaml`)
@@ -234,6 +243,11 @@ Manual dispatch only.
 Runs `bootstrap-verification` (the Makefile bootstrap on a clean Ubuntu runner; locally `make bootstrap && make verify`) and the informational `test-cluster` integration workflow.
 Its jobs use per-job content-addressed caching; see [ADR-0016](/development/architecture/adrs/0016-per-job-content-addressed-caching/).
 To force re-execution, dispatch with `force_run: true`.
+
+### Update Flake Inputs (`update-flake-inputs.yaml`)
+
+Runs Tuesday and Friday at 22:00 UTC and on manual dispatch.
+Opens one pull request per flake input that tracks a branch, excluding `playwright-web-flake`; Renovate updates the inputs pinned to a revision or a version tag.
 
 ## Running CI locally
 

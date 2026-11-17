@@ -1,8 +1,7 @@
-# Every postUpgradeTasks command that .github/renovate.json, or the Phase 1
-# global packageRules in flake.lib.renovateSettings, asks Renovate to run must
-# match one of flake.lib.renovateSettings.allowedCommands, the allowlist the
-# renovate aspect gives the instance on magnetite. Renovate turns a refused
-# command into an artifact error and still pushes the branch
+# Every postUpgradeTasks command that .github/renovate.json asks Renovate to
+# run must match one of flake.lib.renovateSettings.allowedCommands, the
+# allowlist the renovate aspect gives the instance on magnetite. Renovate
+# turns a refused command into an artifact error and still pushes the branch
 # (execute-post-upgrade-commands.ts:222-229; update/branch/index.ts:480-500),
 # so drift here would ship incomplete commits. An empty command set fails too,
 # so the check cannot pass vacuously.
@@ -22,7 +21,6 @@
           input = pkgs.writeText "renovate-allowed-commands-input.json" (
             builtins.toJSON {
               allowed = renovateSettings.allowedCommands;
-              globalRules = renovateSettings.phase1PackageRules or [ ];
               repoRules = (lib.importJSON ../../.github/renovate.json).packageRules or [ ];
             }
           );
@@ -35,7 +33,7 @@
           ''
             jq -n -r --slurpfile in ${input} '
               ($in[0].allowed) as $allowed
-              | [ ($in[0].repoRules + $in[0].globalRules)[]
+              | [ $in[0].repoRules[]
                   | .postUpgradeTasks.commands // [] | .[] ] as $cmds
               | if ($cmds | length) == 0 then
                   "renovate-allowed-commands: no postUpgradeTasks command found; the check would be vacuous" | halt_error(1)
