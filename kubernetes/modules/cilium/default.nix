@@ -125,18 +125,6 @@ in
           CiliumNodeConfig = "cilium.io/v2";
           CiliumPodIPPool = "cilium.io/v2alpha1";
         };
-        kubernetes.namespacedMappings = {
-          CiliumCIDRGroup = false;
-          CiliumClusterwideNetworkPolicy = false;
-          CiliumEndpoint = true;
-          CiliumIdentity = false;
-          CiliumL2AnnouncementPolicy = false;
-          CiliumLoadBalancerIPPool = false;
-          CiliumNetworkPolicy = true;
-          CiliumNode = false;
-          CiliumNodeConfig = true;
-          CiliumPodIPPool = false;
-        };
       }
     ];
 }

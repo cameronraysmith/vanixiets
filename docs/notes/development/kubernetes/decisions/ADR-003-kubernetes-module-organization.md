@@ -94,8 +94,8 @@ It imports easykubenix, evaluates cluster configurations, and exposes manifest o
 {
   perSystem = { pkgs, system, ... }:
     let
-      evalCluster = stage: import inputs.easykubenix {
-        inherit pkgs;
+      easykubenix = (import inputs.easykubenix { inherit pkgs; }).lib.easykubenix;
+      evalCluster = stage: easykubenix {
         modules = [
           ../kubernetes          # Shared kubenix modules
           ../clusters/${stage}   # Stage-specific composition
@@ -107,8 +107,8 @@ It imports easykubenix, evaluates cluster configurations, and exposes manifest o
     in
     {
       packages = {
-        k8s-manifests-local = localCluster.manifestYAMLFile;
-        k8s-manifests-production = productionCluster.manifestYAMLFile;
+        k8s-manifests-local-json = localCluster.manifestJSONFile;
+        k8s-manifests-production-json = productionCluster.manifestJSONFile;
       };
     };
 }
@@ -191,7 +191,7 @@ deployments:
 
 Deployment workflow:
 
-1. Build manifests: `nix build .#k8s-manifests-local`
+1. Build manifests: `nix build .#k8s-manifests-local-json`
 2. Deploy via kluctl: `kluctl deploy -t local`
 
 ## Consequences
@@ -244,6 +244,6 @@ nixidy is optimal for Phase 4 (application deployment), while easykubenix handle
 
 - [ADR-001: Local development architecture](./ADR-001-local-dev-architecture.md)
 - [ADR-002: Bootstrap architecture independence](./ADR-002-bootstrap-architecture-independence.md)
-- [easykubenix](https://github.com/Lillecarl/easykubenix)
+- [easykubenix](https://github.com/nixidae/easykubenix)
 - [flake-parts](https://flake.parts/)
 - [import-tree](https://github.com/ryantm/import-tree)

@@ -15,8 +15,8 @@
 #
 # Usage from another easykubenix module:
 #
-#   helm.releases.my-chart.overrides = [
-#     (config.lib.kubernetes.enforceNamespace cfg.namespace)
+#   helm.releases.my-chart.transformers = [
+#     (map (config.lib.kubernetes.enforceNamespace cfg.namespace))
 #   ];
 {
   config,

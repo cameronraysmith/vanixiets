@@ -625,15 +625,6 @@ in
         CiliumNode = "cilium.io/v2";
         CiliumLoadBalancerIPPool = "cilium.io/v2";
       };
-
-      kubernetes.namespacedMappings = {
-        CiliumNetworkPolicy = true;
-        CiliumClusterwideNetworkPolicy = false;
-        CiliumEndpoint = true;
-        CiliumIdentity = false;
-        CiliumNode = false;
-        CiliumLoadBalancerIPPool = false;
-      };
     }
   );
 }
@@ -643,5 +634,5 @@ in
 
 - Upstream Cilium documentation: https://docs.cilium.io/
 - Gateway API specification: https://gateway-api.sigs.k8s.io/
-- easykubenix Helm integration: see local `~/projects/sciops-workspace/easykubenix` repository
+- easykubenix Helm integration: https://github.com/nixidae/easykubenix (`helm.releases`, `ekn.lib.importHelm`)
 - hetzkube Cilium module: `/Users/crs58/projects/sciops-workspace/hetzkube/kubenix/modules/cilium.nix`

@@ -4,7 +4,7 @@
 # manifest outputs as packages and deployment scripts.
 #
 # Usage:
-#   nix build .#k8s-manifests-local          # Build YAML manifests
+#   nix build .#k8s-manifests-local-json     # Build JSON manifests
 #   nix run .#k8s-deploy-local -- --dry-run  # Dry-run kluctl deployment
 #   nix run .#k8s-deploy-local -- --yes      # Deploy with kluctl
 { inputs, ... }:
@@ -14,13 +14,13 @@
     let
       # Evaluate easykubenix with cluster configuration
       # Optional deploymentLayer parameter for staged deployments
+      easykubenix = (import inputs.easykubenix { inherit pkgs; }).lib.easykubenix;
       evalCluster =
         clusterPath:
         {
           deploymentLayer ? "all",
         }:
-        import inputs.easykubenix {
-          inherit pkgs;
+        easykubenix {
           modules = [
             ../kubernetes/modules
             clusterPath
@@ -52,17 +52,12 @@
       };
     in
     {
+      # JSON manifest files only. easykubenix renders YAML through its `ekn`
+      # CLI unless Nix has a `builtins.toYAML` primop, and that CLI's closure
+      # (a patched Nix among it) costs more than the YAML is worth: nothing
+      # here consumes it, and the deploy apps read the module output directly.
       packages = {
-        # YAML manifest file for local cluster
-        k8s-manifests-local = localCluster.manifestYAMLFile;
-
-        # JSON manifest file (alternative format)
         k8s-manifests-local-json = localCluster.manifestJSONFile;
-
-        # YAML manifest file for local k3d cluster
-        k8s-manifests-local-k3d = localK3dCluster.manifestYAMLFile;
-
-        # JSON manifest file for local k3d cluster
         k8s-manifests-local-k3d-json = localK3dCluster.manifestJSONFile;
       };
 

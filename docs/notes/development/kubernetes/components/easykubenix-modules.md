@@ -202,8 +202,9 @@ For cluster-scoped resources, use `none` as the namespace: `kubernetes.objects.n
 
 ## CRD registration
 
-Modules introducing custom resources must register API version mappings and namespace scope.
-Without these mappings, kubenix cannot determine the correct API version or whether resources are namespaced.
+Modules introducing custom resources must register API version mappings.
+Without them, easykubenix cannot determine the correct API version.
+Scope is not declared: an object is cluster-scoped when it sits under `kubernetes.objects.none` and namespaced when it sits under `kubernetes.objects.<namespace>` (upstream removed `kubernetes.namespacedMappings`).
 
 ```nix
 kubernetes.apiMappings = {
@@ -211,13 +212,6 @@ kubernetes.apiMappings = {
   CertificateRequest = "cert-manager.io/v1";
   ClusterIssuer = "cert-manager.io/v1";
   Issuer = "cert-manager.io/v1";
-};
-
-kubernetes.namespacedMappings = {
-  Certificate = true;
-  CertificateRequest = true;
-  ClusterIssuer = false;  # cluster-scoped
-  Issuer = true;
 };
 ```
 
@@ -231,10 +225,6 @@ config = lib.mkMerge [
     kubernetes.apiMappings = {
       Certificate = "cert-manager.io/v1";
       ClusterIssuer = "cert-manager.io/v1";
-    };
-    kubernetes.namespacedMappings = {
-      Certificate = true;
-      ClusterIssuer = false;
     };
   }
   # Only create resources when enabled
@@ -266,15 +256,14 @@ The root kubenix configuration accepts a stage argument and propagates it to all
 
 ```nix
 # kubenix/default.nix
-import easykubenix {
-  inherit pkgs;
+(import easykubenix { inherit pkgs; }).lib.easykubenix {
   modules = [
     ./modules
     ./capi
     ./full
     {
       config = {
-        kluctl.discriminator = stage;
+        ekn.environment = stage;
         inherit stage;
       };
     }
@@ -319,7 +308,7 @@ nix-build -A kubenix --argstr stage capi
 nix-build -A kubenix --argstr stage full
 ```
 
-The kluctl discriminator tracks resources per stage, enabling stage-specific pruning without affecting resources from other stages.
+The environment (`ekn.environment`, passed to kluctl as its discriminator) tracks resources per stage, enabling stage-specific pruning without affecting resources from other stages.
 
 ## ArgoCD module example
 
@@ -364,11 +353,6 @@ in
         Application = "argoproj.io/v1alpha1";
         ApplicationSet = "argoproj.io/v1alpha1";
         AppProject = "argoproj.io/v1alpha1";
-      };
-      kubernetes.namespacedMappings = {
-        Application = true;
-        ApplicationSet = true;
-        AppProject = true;
       };
     }
 
@@ -525,7 +509,7 @@ Pruning removes only resources with matching discriminators, preserving resource
 
 ## Related documentation
 
-- easykubenix source: `~/projects/sciops-workspace/easykubenix`
+- easykubenix source: https://github.com/nixidae/easykubenix (developed in https://github.com/nixidae/nixidae)
 - hetzkube reference implementation: `~/projects/sciops-workspace/hetzkube`
 - kluctl documentation: https://kluctl.io/docs/
 - kubenix library: https://github.com/hall/kubenix

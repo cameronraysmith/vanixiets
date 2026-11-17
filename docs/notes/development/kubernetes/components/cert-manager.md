@@ -62,7 +62,8 @@ in
 
 ### CRD API mappings
 
-When using kubenix or easykubenix, register the cert-manager CRD API versions.
+When using easykubenix, register the cert-manager CRD API versions.
+Scope follows placement (`kubernetes.objects.none` for cluster-scoped objects), so there is no scope mapping to declare.
 
 ```nix
 {
@@ -73,15 +74,6 @@ When using kubenix or easykubenix, register the cert-manager CRD API versions.
     ClusterIssuer = "cert-manager.io/v1";
     Issuer = "cert-manager.io/v1";
     Order = "acme.cert-manager.io/v1";
-  };
-
-  kubernetes.namespacedMappings = {
-    Certificate = true;
-    CertificateRequest = true;
-    Challenge = true;
-    ClusterIssuer = true;
-    Issuer = true;
-    Order = true;
   };
 }
 ```

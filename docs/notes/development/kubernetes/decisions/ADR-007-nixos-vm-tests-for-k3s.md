@@ -99,6 +99,10 @@ The same constraint applies to the Flux configuration artifact introduced by ADR
 The k3d script's phase 1 builds the sibling `local-k3d-ci` environment, which differs only in `nixidy.target.repository = "file:///manifests"` (`modules/nixidy.nix:52`; `modules/apps/cluster/k3d-integration-ci.sh:57`), and its `file:///manifests` grep at line 63 is a pure property of that build; only the runtime consumption of the rendered tree needs a cluster.
 The frozen `local-k3d` prototype (D7.15) is therefore regulated by those on-demand builds and the k3d `integration` job, not by `checks`; `cryolite` has no nixidy environment, so its T1 leaves are the easykubenix render leaf and the purity, provenance, and identity leaves of S0, all evaluating without import-from-derivation.
 
+Amendment (2026-11-16, `feat(kubernetes): move easykubenix to upstream nixidae and adapt to its API`): `k8s-manifests-local-k3d` (and `k8s-manifests-local`) are dropped and only the `-json` manifests remain, because upstream easykubenix renders YAML through its `ekn` CLI.
+Helm releases and YAML imports now parse through `easykubenix/lib/importHelm.nix` and `easykubenix/lib/importYaml.nix`, both via `easykubenix/lib/parseYamlStream.nix`, a derivation, so they still need import-from-derivation; `chart2json` no longer exists.
+The paragraph above is kept as originally written.
+
 ### F6: k3s embeds nix-snapshotter, and its NRI plugin is enabled unless k3s runs in a user namespace
 
 The locked k3s vendors `github.com/pdtpartners/nix-snapshotter v0.4.0` (`~/ghq/github.com/k3s-io/k3s/go.mod:129`).

@@ -46,9 +46,7 @@
       };
 
       blacklist = [
-        "k8s-manifests-local"
         "k8s-manifests-local-json"
-        "k8s-manifests-local-k3d"
         "k8s-manifests-local-k3d-json"
         "fdContainer-aarch64"
         "fdContainer-x86_64"

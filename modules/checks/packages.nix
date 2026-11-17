@@ -14,9 +14,7 @@
     let
       blacklist = [
         # evaluation needs import-from-derivation
-        "k8s-manifests-local"
         "k8s-manifests-local-json"
-        "k8s-manifests-local-k3d"
         "k8s-manifests-local-k3d-json"
         # already exposed under existing check names
         "fdContainer-aarch64"

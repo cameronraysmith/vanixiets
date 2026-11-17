@@ -110,7 +110,7 @@ See [reference architecture](architecture/reference-architecture.md) for the com
 ### Reference repositories
 
 - [hetzkube](https://github.com/Lillecarl/hetzkube) - easykubenix Hetzner example
-- [easykubenix](https://github.com/Lillecarl/easykubenix) - Nix-based Kubernetes manifests
+- [easykubenix](https://github.com/nixidae/easykubenix) - Nix-based Kubernetes manifests (exported from [nixidae](https://github.com/nixidae/nixidae))
 - [nixidy](https://github.com/arnarg/nixidy) - ArgoCD rendered manifests pattern
 
 ### Project context

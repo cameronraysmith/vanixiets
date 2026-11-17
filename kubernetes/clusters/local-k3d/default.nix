@@ -12,7 +12,6 @@
 # declarative Nix. Foundation must be deployed first because infrastructure
 # pods cannot schedule until CNI is ready.
 {
-  lib,
   deploymentLayer ? "all",
   ...
 }:
@@ -22,23 +21,19 @@ let
 in
 {
   # Deploy resources in dependency order via kluctl priority phases.
-  # Priority values create barrier phases: all resources in prio-N complete before prio-N+1 starts.
+  # Priority values create barrier phases: all resources in prio-N are applied
+  # before prio-N+1 starts.
   #
-  # Phase ordering (easykubenix defaults + local overrides):
-  # - prio-10: Namespaces, CustomResourceDefinitions (easykubenix defaults)
-  # - prio-15: SopsSecret CRs (local override, depends on CRD from prio-10)
-  # - default: All workloads (DaemonSets, Deployments, Services, etc.)
+  # easykubenix numbers Helm's InstallOrder in steps of ten
+  # (`ekn.resourcePriority`: Namespace = 20, CustomResourceDefinition = 150,
+  # DaemonSet = 250, Deployment = 290, ...); unlisted kinds go to `default`.
+  # SopsSecret CRs sit at 155: after their CRD, before the workloads that
+  # mount the Secrets they decrypt into.
   #
-  # Cilium Agent (DaemonSet) and Operator (Deployment) must deploy together in
-  # the same phase. Separating them (e.g., DaemonSet = 20) creates circular
-  # dependencies: Agent waits for Operator CRDs, but Operator can't schedule
-  # until Agent provides CNI.
-  #
-  # NOTE: Must use lib.mkOptionDefault to merge with easykubenix defaults,
-  # otherwise this assignment replaces the entire default attrset.
-  kluctl.resourcePriority = lib.mkOptionDefault {
-    SopsSecret = 15;
-  };
+  # Set per entry, never as `mkDefault`/`mkOptionDefault` of an attrset:
+  # upstream defines the defaults as a plain attrset of `mkDefault` leaves, so
+  # a lower-priority attrset definition is discarded whole, silently.
+  ekn.resourcePriority.SopsSecret = 155;
 
   # Cluster identification
   clusterName = "k3d-dev";

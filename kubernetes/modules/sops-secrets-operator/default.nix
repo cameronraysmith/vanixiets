@@ -9,8 +9,8 @@
 # This module demonstrates the canonical easykubenix pattern for operators with CRDs:
 # 1. importyaml for CRD deployment (helm includeCRDs=false by default)
 # 2. apiMappings to register custom resource types with API group/version
-# 3. namespacedMappings to declare scope (namespaced vs cluster-scoped)
-# 4. overrideNamespace to fix charts that don't template metadata.namespace
+# 3. transformers (list-level) to fix charts that don't template metadata.namespace
+# 4. an explicit kluctl file for SopsSecret CRs, which upstream kluctl skips
 #
 # Prerequisites - create age key secret before deploying:
 #   kubectl create namespace sops-secrets-operator
@@ -84,6 +84,21 @@ in
     # apiMappingFile-backed scope table used by config.lib.kubernetes.enforceNamespace.
     kubernetes.apiMappings.SopsSecret = "isindir.github.com/v1alpha3";
 
+    # easykubenix's kluctl project skips every object carrying a top-level
+    # `sops` key (upstream 5187881), treating it as a ksops-style object to be
+    # decrypted at apply time. A SopsSecret is the opposite: the operator
+    # decrypts the CR in-cluster, so it must be applied still encrypted. Put
+    # them back as the prioritised file for their kind, which replaces the
+    # empty one upstream renders for it. The cluster sets the priority
+    # (`ekn.resourcePriority.SopsSecret`); evaluation fails if it is unset.
+    kluctl.files."prio-${toString config.ekn.resourcePriority.SopsSecret}/SopsSecret.yaml" =
+      builtins.toJSON
+        {
+          apiVersion = "v1";
+          kind = "List";
+          items = lib.filter (object: object.kind == "SopsSecret") config.kubernetes.generated;
+        };
+
     helm.releases.${moduleName} = {
       namespace = cfg.namespace;
       chart = "${sops-secrets-operator-src}/chart/helm4/sops-secrets-operator";
@@ -94,8 +109,8 @@ in
       # a correction; it is kept because the shared enforceNamespace helper
       # consults the bundled API resource snapshot to route only namespaced
       # kinds, leaving cluster-scoped objects untouched.
-      overrides = [
-        (config.lib.kubernetes.enforceNamespace cfg.namespace)
+      transformers = [
+        (map (config.lib.kubernetes.enforceNamespace cfg.namespace))
       ];
 
       values = lib.recursiveUpdate {

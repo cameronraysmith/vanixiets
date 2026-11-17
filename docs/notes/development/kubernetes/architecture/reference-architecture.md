@@ -819,7 +819,7 @@ Each provider requires:
 |------|---------|
 | Start local cluster | `just k3d-full` |
 | Stop local cluster | `just k3d-down` |
-| Build local manifests | `nix build .#k8s-manifests-local` |
+| Build local manifests | `nix build .#k8s-manifests-local-json` |
 | Deploy to local | `kluctl deploy --discriminator local -y` |
 | Preview changes | `kluctl deploy --discriminator local --dry-run` |
 | Check Cilium status | `kubectl exec -n kube-system ds/cilium -- cilium status` |
