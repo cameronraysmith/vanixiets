@@ -844,11 +844,11 @@
         "systems": "systems_2"
       },
       "locked": {
-        "lastModified": 1794421724,
-        "narHash": "sha256-5+vx4RLbX8OMFfDeJ2m8ZrBKcToWt0GIOjpVY4MM7pc=",
+        "lastModified": 1794931942,
+        "narHash": "sha256-Cc1qYIqpnMm6t3cgcDiwi1dEw53RNwBaDo7AzMqL7qA=",
         "owner": "modem-dev",
         "repo": "hunk",
-        "rev": "6734751d07968da0d541d7e182c5cc94c7a6b16e",
+        "rev": "57a90b47ca3a581af1f0b88cf9ebae46144e91fd",
         "type": "github"
       },
       "original": {
