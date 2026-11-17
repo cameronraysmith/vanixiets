@@ -77,3 +77,57 @@ The control string `vanixiets-flake-updater` counts 228 files, 18 files, 169 lin
 The object layers replace `git log --all -S`, whose needle would sit in `git`'s argv; they read the same history and more.
 For the two object layers, grep read the needle from a file under `/tmp` that was removed as soon as grep finished and is absent (checked after the scan); no other copy was written.
 This was a deviation from the rule that key material is never written to a file: the file was local to the workstation, existed for about 40 seconds and was deleted, and the operator was informed.
+
+## 4. Landing and deployment (2026-11-17)
+
+### 7.1 Landing
+
+`logs/cam108-task-7.1-20261117-172152.log`: #3951 (body `Part of CAM-108.`, through gitea-mq) merged at 22:16:33Z as `727f2a57`, which `main` contains.
+Its `nixbot/nix-eval`, `nixbot/nix-build` and `nixbot/effects` contexts passed from build 2546, in which the effect check `schedule.flake-update.flake-update` (run 22306) succeeded.
+That check builds the effect's inputs; the effect's derivation, evaluated at `727f2a57`, has `flake-update-rehearsal.drv` among its inputs, and the rehearsal's output is the one built during implementation (`mgj1r1lm…`), so the attribute shows `skipped_local` in builds 2545 and 2546.
+The pull request's earlier head `f97c03e7` (build 2545) failed only `checks.x86_64-linux.treefmt`; the delivery commit gained a formatting-only fix.
+
+### 7.2 Deployment, delivered secrets and posts
+
+`logs/pr-cam-108-flake-update-effect-fix-20261117-171041.log`: `clan machines update magnetite` from `main` exited 0 and restarted `nixbot.service`, active since 22:17:51Z; the key set of `/run/credentials/nixbot.service/effects-secret__github_colon_cameronraysmith_slash_vanixiets` is the seven names, both new ones included, with no value printed.
+`logs/cam108-task-7.2-ntfy-20261117-172100.log`: ntfy.zt history since 22:10:00Z on `fleet-alerts`, `fleet-alert`, `fleet-heartbeat`, `fleet-beat` and the host-named topics `magnetite`, `cinnabar`, `stibnite` and `pyrite` holds only the dead-man's heartbeats (`ok <epoch>` on `fleet-heartbeat`, one a minute); no alert or failure notice was posted.
+
+The deploy's nixbot restart did fail two effect runs, which posted no notice.
+Build 2546 ran `default.docs` and `default.release-packages` once for the push (runs 22308 and 22309, both succeeded) and once for each tag the docs release pushed on `727f2a57` (`@vanixiets/docs-v0.19.0`, `docs-v0`, `docs-v0.19`).
+The tag runs exit 0 at the main-only guard (`EFFECT-GUARD: skipping outside a push to main (event=tag …)`, runs 22312 and 22313); the `docs-v0.19` pair (22318, 22319) was failed by nixbot with "interrupted by a service restart" at 22:17:54Z, three seconds after the restart, and would also have been guard skips.
+Cause: deploy timing, not a defect; their `nixbot/effect …#default.docs` and `…#default.release-packages` commit statuses on `727f2a57` read FAILURE. Build 2542 of `main`'s parent `24bc0a55` ran both effects green. No rerun was made.
+
+### 7.3 Registration
+
+`logs/cam108-task-7.3-schedule-20261117-172125.log`: after build 2546, the first green non-pull-request build of `main` with the change, nixbot's effects page lists schedule `flake-update` with effect `flake-update`, "at 22:00 UTC on Tue, Fri", next run 2026-11-20T22:00:00Z, last run never.
+The landing came after that Tuesday's 22:00Z occurrence, which was therefore not run (design D7's cutover gap); task 9.1's manual run covers it.
+
+## 5. Integration (2026-11-17)
+
+### 9.1 Manual run
+
+The operator pressed run-now on the effects page (no API token was used): run 22320, event `schedule`, 22:21:47–22:27:50Z, succeeded.
+`logs/cam108-task-9.1-run-22320-20261117-172806.log` is its log: one `Update <input>...` line for each of the 56 root inputs other than `playwright-web-flake`, no error or failed input, 23 `Opened …/pull/<n>` lines and `No updates to push` for the rest, and no `ghs_`, `eyJ`, `PRIVATE KEY` or `x-access-token` string.
+The program at `727f2a57` logs nothing on a successful installation lookup, so run 22320's log shows the lookup only through the run's success (the program exits non-zero before nixbot's script when the lookup or the mint fails).
+Task 9.1 stays open for that reason: the program now prints `flake-update: App installation <id> on <owner>/<repo>` after the lookup, never a token or JWT, and `flake-update-rehearsal` asserts the line in case 1 and its absence in case 2; the first run after that change deploys witnesses the lookup in nixbot's log.
+`logs/cam108-task-9.1-prs-20261117-172806.log`: each of #3954–#3976 is authored by `app/vanixiets-flake-updater` on `update-<input>`, its head commit's author and committer are `246545483+vanixiets-flake-updater[bot]@users.noreply.github.com`, it changes only `flake.lock`, and it is open with no label and no auto-merge; none is for `playwright-web-flake`.
+`logs/cam108-task-9.1-status-20261117-172852.log`: `nixbot/nix-eval` had started on all 23, so their webhooks reached nixbot.
+The repository also holds eight `update-*` branches no run of this change touches, left by the old updater for inputs no longer locked (`aeneas`, `agenix`, `nix-fast-build`, `nix-rosetta-builder`, `nixos-generators`, `nvim-treesitter-main`, `worktrunk`) or excluded (`playwright-web-flake`, last pull request #3097, closed 2026-09-18).
+
+### 9.3 Rerun
+
+The operator pressed run-now again: run 22433, event `schedule`, 22:46:44–22:51:03Z, succeeded, from the same `main` (`727f2a57`).
+`logs/cam108-task-9.3-run-22433-20261117-175115.log` has one `Update <input>...` line for each of the 56 inputs and no `ghs_`, `eyJ`, `PRIVATE KEY` or `x-access-token` string; its 23 "Validation Failed" lines are GitHub's "A pull request already exists" answers, which the script treats as success.
+Of the 23 pull-request branches, 21 print `update-<input> is up to date.` and are unchanged; the other 33 inputs print `No updates to push`.
+`logs/cam108-task-9.3-before-20261117-172835.log` against `logs/cam108-task-9.3-after-20261117-175115.log`: 29 of the 31 `update-*` heads are equal, and the app's pull requests after 7.1 are still 23, so the run opened none.
+The two changed heads follow inputs that moved upstream between the runs, not a defect: `llm-agents` from `cd5d0317` to `60ed0dea` and `niks3` from `48598972` to `753b9533` (each run's `Updated input` lines).
+Each new head (`be124c05`, `05eca0d9`) is one bot-authored commit on `727f2a57` changing only `flake.lock`, force-pushed onto the open #3961 and #3962, which kept their numbers.
+
+### 9.6 Hosted runner
+
+`logs/cam108-task-9.6-20261117-172125.log`, read 22:21Z: the newest `update-flake-inputs.yaml` run was created 2026-11-13T01:56:52Z, none after the merge, and the workflow query prints nothing.
+
+### 9.7 One updater per input
+
+`logs/cam108-task-9.7-20261117-172835.log`: the 23 branches of the `app/vanixiets-flake-updater` pull requests created after the merge.
+None is among the three revision-pinned inputs (`catppuccin-bottom`, `catppuccin-starship`, `easykubenix`) or the nine tag-pinned inputs Renovate's regex managers update (`argocd-helm-src`, `argocd-src`, `cilium-src`, `dms-src`, `gateway-api-src`, `lazyvim-nix`, `nix-unit`, `playwright-web-flake`, `sops-secrets-operator-src`); for each of those except the excluded `playwright-web-flake`, runs 22320 and 22433 both printed `No updates to push`, as A127 predicts, and run 22433 opened no pull request, so the set is unchanged after the second live run.
