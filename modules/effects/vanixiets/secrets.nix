@@ -80,6 +80,35 @@ in
         invocations.
       '';
     };
+    FLAKE_UPDATER_APP_ID = {
+      prompt = "flake-updater-app-id";
+      type = "line";
+      description = ''
+        App id of the GitHub App vanixiets-flake-updater, with which the
+        scheduled flake-update effect signs the JWT that mints its per-run
+        installation token.
+      '';
+      helperText = ''
+        The numeric App id, FLAKE_UPDATER_APP_ID in secrets/shared.yaml. Enter
+        to keep existing on subsequent `clan vars generate --regenerate`
+        invocations.
+      '';
+    };
+    FLAKE_UPDATER_PRIVATE_KEY = {
+      prompt = "flake-updater-private-key";
+      type = "multiline-hidden";
+      description = ''
+        PEM private key of the GitHub App vanixiets-flake-updater. The
+        scheduled flake-update effect signs a nine-minute JWT with it and
+        mints a one-hour installation token restricted to this repository with
+        contents and pull_requests write.
+      '';
+      helperText = ''
+        The PEM, FLAKE_UPDATER_PRIVATE_KEY in secrets/shared.yaml, from its
+        BEGIN line to its END line. Enter to keep existing on subsequent
+        `clan vars generate --regenerate` invocations.
+      '';
+    };
   };
 
   flake.modules.nixos.effects-vanixiets-secrets =

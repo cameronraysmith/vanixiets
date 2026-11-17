@@ -40,6 +40,20 @@
 # pull request's failed and later succeeded builds never upload or comment
 # concurrently; a {pr} lock would not do, since nixbot skips it on an event
 # without a pull request. Under it main resolves the build for `--rev` itself.
+#
+# flake-update refreshes the branch-tracking flake inputs on Tuesdays and
+# Fridays at 22:00 UTC, one `update-<input>` branch and pull request per
+# moved input, playwright-web-flake excluded (./flake-update.nix). nixbot runs
+# it from the default branch's tip in a checkout of it; run it by hand with
+# `nbo schedule run flake-update flake-update -f`. It writes as the GitHub
+# App vanixiets-flake-updater: the program signs a JWT with the App's key,
+# looks up the App's installation on this repository and mints a one-hour
+# installation token narrowed to it with contents and pull_requests write,
+# which it revokes on exit. The key is in the run's sandbox for the whole
+# run, in nixbot's read-only secrets file even after the program drops its
+# own copies, and nixbot scopes secrets per repository, not per effect, so
+# any effect declared on main could name these two secrets; this `secrets`
+# list is a convention that review enforces.
 { withSystem, ... }:
 {
   vanixiets.effects = withSystem "x86_64-linux" (
@@ -129,6 +143,27 @@
             forgeToken = true;
             lock = "release-plan-{pr}";
           };
+        };
+      };
+
+      flake-update = {
+        program = config.apps.flake-update.program;
+        rehearsals = [ config.checks.flake-update-rehearsal ];
+        triggers.schedule = {
+          when = {
+            dayOfWeek = [
+              "Tue"
+              "Fri"
+            ];
+            hour = 22;
+            minute = 0;
+          };
+          checkout = true;
+          lock = "flake-update";
+          secrets = [
+            "FLAKE_UPDATER_APP_ID"
+            "FLAKE_UPDATER_PRIVATE_KEY"
+          ];
         };
       };
     }

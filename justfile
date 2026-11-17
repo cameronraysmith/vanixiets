@@ -1521,11 +1521,6 @@ ci-debug-job workflow="ci.yaml" job_name="nix (aarch64-darwin)":
     JOB_ID=$(gh run view "$RUN_ID" --json jobs --jq ".jobs[] | select(.name == \"{{job_name}}\") | .databaseId"); \
     gh run view --job "$JOB_ID" --log
 
-# Trigger ad hoc flake input update on main
-[group('CI/CD')]
-update-flake-inputs:
-    gh workflow run update-flake-inputs.yaml --ref main
-
 # Update github secrets for repo from environment variables
 [group('CI/CD')]
 ghsecrets repo="cameronraysmith/vanixiets": # gitleaks:allow
@@ -1535,8 +1530,6 @@ ghsecrets repo="cameronraysmith/vanixiets": # gitleaks:allow
   @echo
   sops exec-env secrets/shared.yaml 'unset GITHUB_TOKEN && gh secret set CACHIX_AUTH_TOKEN --repo={{ repo }} --body="$CACHIX_AUTH_TOKEN"'
   sops exec-env secrets/shared.yaml 'unset GITHUB_TOKEN && gh secret set FAST_FORWARD_PAT --repo={{ repo }} --body="$FAST_FORWARD_PAT"'
-  sops exec-env secrets/shared.yaml 'unset GITHUB_TOKEN && gh secret set FLAKE_UPDATER_APP_ID --repo={{ repo }} --body="$FLAKE_UPDATER_APP_ID"'
-  sops exec-env secrets/shared.yaml 'unset GITHUB_TOKEN && gh secret set FLAKE_UPDATER_PRIVATE_KEY --repo={{ repo }} --body="$FLAKE_UPDATER_PRIVATE_KEY"'
   @echo
   @echo secrets after updates:
   @echo

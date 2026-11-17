@@ -10,6 +10,7 @@
 #   pullRequest       herculesCI.onEvent.pull_request.<name>
 #   pullRequestClosed herculesCI.onEvent.pull_request_closed.<name>
 #   buildFinished     herculesCI.onEvent.build_finished.<name>
+#   schedule          herculesCI.onSchedule.<name>.outputs.effects.<name>
 #
 # nixbot evaluates onEvent from the default branch whatever pull request the
 # event is about, delivers pull_request once a pull request head built green
@@ -25,11 +26,19 @@
 # credentialed trigger relies on that, since `when.permission` is satisfied
 # by max(actor, PR author) and bots such as renovate report no level.
 #
+# schedule runs from nixbot's schedule sweep at each `when` occurrence (UTC),
+# or by hand with `nbo schedule run <name> <name>`, evaluated and run from the
+# default branch's tip (nixbot/nixbot/schedule_runner.py). The schedule and
+# its one effect are both named after the entry. Its identity token would say
+# `schedule`, never a push to main, so it gets neither the main-only guard nor
+# an audience; `checkout` requests nixbot's pushable checkout of that tip.
+#
 # The rendered script, in order: for main, the effectRunContext guard that
 # ends any run that is not a push to main before a secret is read; exports
 # each secret the trigger declares from $HERCULES_CI_SECRETS_JSON, failing on
 # the first one absent, null or empty; then execs the program with the
-# trigger's arguments, and for main `--rev <rev>`.
+# trigger's arguments, and for main `--rev <rev>`. Every other kind runs
+# unguarded and without `--rev`.
 #
 # nixbot enforces hercules-ci secretsMap semantics: only the destinations named
 # in the map are written into $HERCULES_CI_SECRETS_JSON, and mkEffect declares
@@ -40,9 +49,9 @@
 # receives none of it.
 #
 # Rehearsals are effect inputs that nothing runs: nixbot builds the inputs of
-# every onPush and onEvent effect on pull requests and merge-queue batches
-# without running them, which makes each rehearsal part of the pre-merge
-# nixbot/effects gate.
+# every onPush, onEvent and onSchedule effect on pull requests and merge-queue
+# batches without running them (nixbot/nixbot/effect_checks.py), which makes
+# each rehearsal part of the pre-merge nixbot/effects gate.
 {
   config,
   inputs,
@@ -134,6 +143,61 @@ let
     };
   };
 
+  scheduleTriggerModule = {
+    imports = [ triggerModule ];
+    options = {
+      when = lib.mkOption {
+        default = { };
+        description = ''
+          UTC times of the occurrences, as hercules-ci-effects' onSchedule
+          `when`: every field that is set must hold. Null and empty fields are
+          dropped before they reach that option.
+        '';
+        type = types.submodule {
+          options = {
+            minute = lib.mkOption {
+              type = types.nullOr (types.ints.between 0 59);
+              default = null;
+              description = "Minute of the hour; null lets the scheduler pick one.";
+            };
+            hour = lib.mkOption {
+              type = types.nullOr (
+                types.either (types.ints.between 0 23) (types.listOf (types.ints.between 0 23))
+              );
+              default = null;
+              description = "Hour or hours of the day; null lets the scheduler pick one.";
+            };
+            dayOfWeek = lib.mkOption {
+              type = types.listOf (
+                types.enum [
+                  "Mon"
+                  "Tue"
+                  "Wed"
+                  "Thu"
+                  "Fri"
+                  "Sat"
+                  "Sun"
+                ]
+              );
+              default = [ ];
+              description = "Days of the week; empty for every day.";
+            };
+            dayOfMonth = lib.mkOption {
+              type = types.listOf (types.ints.between 0 31);
+              default = [ ];
+              description = "Days of the month; empty for every day.";
+            };
+          };
+        };
+      };
+      checkout = lib.mkOption {
+        type = types.bool;
+        default = false;
+        description = "Request nixbot's pushable checkout of the default branch's tip (`__nixbot_effect_checkout`).";
+      };
+    };
+  };
+
   entryModule = {
     options = {
       program = lib.mkOption {
@@ -152,6 +216,11 @@ let
           type = types.nullOr (types.submodule finishedTriggerModule);
           default = null;
           description = "Run as a nixbot onEvent build_finished effect, without the main-only guard or appended revision.";
+        };
+        schedule = lib.mkOption {
+          type = types.nullOr (types.submodule scheduleTriggerModule);
+          default = null;
+          description = "Run as the nixbot onSchedule effect named after the entry, without the main-only guard or appended revision.";
         };
       };
     };
@@ -196,6 +265,8 @@ let
     lib.genAttrs trigger.secrets lib.id
     // lib.optionalAttrs trigger.forgeToken { GITHUB_FORGE_TOKEN.type = "GitToken"; };
 
+  presentFields = lib.filterAttrs (_: value: value != null && value != [ ]);
+
   mkEffect =
     kind: rev: name: entry:
     let
@@ -220,7 +291,10 @@ let
           effectScript = renderEffectScript { inherit rev; } kind entry;
         }
         // lib.optionalAttrs (kind == "buildFinished") {
-          passthru.when = lib.filterAttrs (_: value: value != null && value != [ ]) trigger.when;
+          passthru.when = presentFields trigger.when;
+        }
+        // lib.optionalAttrs (kind == "schedule") {
+          __nixbot_effect_checkout = trigger.checkout;
         }
         // lib.optionalAttrs main {
           # Declaring an audience is what makes nixbot expose the identity
@@ -242,7 +316,7 @@ let
     if lib.any (trigger: trigger != null) (builtins.attrValues entry.triggers) then
       entry
     else
-      throw "vanixiets.effects.${name}: declares no trigger; set at least one of triggers.{main,pullRequest,pullRequestClosed,buildFinished}";
+      throw "vanixiets.effects.${name}: declares no trigger; set at least one of triggers.{main,pullRequest,pullRequestClosed,buildFinished,schedule}";
 in
 {
   options.vanixiets.effects = lib.mkOption {
@@ -261,6 +335,10 @@ in
       onEvent.pull_request = effectsFor "pullRequest" null;
       onEvent.pull_request_closed = effectsFor "pullRequestClosed" null;
       onEvent.build_finished = effectsFor "buildFinished" null;
+      onSchedule = lib.mapAttrs (name: effect: {
+        when = presentFields config.vanixiets.effects.${name}.triggers.schedule.when;
+        outputs.effects.${name} = effect;
+      }) (effectsFor "schedule" null);
     };
   };
 }

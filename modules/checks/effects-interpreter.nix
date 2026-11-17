@@ -4,26 +4,34 @@
 # decides whether the program runs, with which secrets and which arguments.
 # Rows render synthetic entries through flake.lib.vanixietsEffectScript,
 # the function modules/effects/vanixiets/registry.nix uses for main,
-# pullRequest, pullRequestClosed and buildFinished, run it the way mkEffect's
-# effectPhase does (eval of the script text), and assert the exit status, the
-# output, and exactly the argv and environment the program saw. Only main runs
-# the guard and receives `--rev`; secrets and the forge token are exported per
-# trigger. Rows marked "registry" render the vanixiets.effects entries
-# themselves, program swapped for the stub, against a secrets file holding
-# every secret, so a trigger that exported another trigger's secret would
-# show it; in particular release-packages' pullRequest run never sees
-# GITHUB_TOKEN. The secretsMap every registry trigger is granted is pinned
-# too, through flake.lib.vanixietsEffectSecretsMap, the function mkEffect
-# uses, since that map is what nixbot writes into the secrets file.
+# pullRequest, pullRequestClosed, buildFinished and schedule, run it the way
+# mkEffect's effectPhase does (eval of the script text), and assert the exit
+# status, the output, and exactly the argv and environment the program saw.
+# Only main runs the guard and receives `--rev`; secrets and the forge token
+# are exported per trigger. Rows marked "registry" render the vanixiets.effects
+# entries themselves, program swapped for the stub, against a secrets file
+# holding every secret, so a trigger that exported another trigger's secret
+# would show it; in particular release-packages' pullRequest run never sees
+# GITHUB_TOKEN, and flake-update's scheduled run sees only the App id and key.
+# The secretsMap every registry trigger is granted is pinned too, through
+# flake.lib.vanixietsEffectSecretsMap, the function mkEffect uses, since that
+# map is what nixbot writes into the secrets file.
 #
-# buildFinished rows use the actual onEvent.build_finished effectScript from
-# an isolated registry evaluation, so a broken event mapping cannot pass by
-# testing the renderer alone. The live browser-evidence registration, read
-# from the flake's herculesCI output, is pinned too: it is an onEvent
-# pull_request and build_finished effect, its build_finished `when` selects
-# failed builds only, neither carries `when.permission` (trust is nixbot's CI
-# approval), and all three runs share one lock, since build_finished may
-# carry no pull request to expand {pr}. Rows passing nixbot's
+# buildFinished and schedule rows use the actual onEvent.build_finished and
+# onSchedule effectScripts from an isolated registry evaluation, so a broken
+# event or schedule mapping cannot pass by testing the renderer alone; the
+# schedule rows run with no identity-token endpoint, as a scheduled run has
+# none. The isolated onSchedule output is pinned too (its name, filtered
+# `when`, checkout request and absent audience), and nix-unit shows an entry
+# with no trigger fails naming every kind. The live browser-evidence and
+# flake-update registrations, read from the flake's herculesCI output, are
+# pinned too: browser-evidence is an onEvent pull_request and build_finished
+# effect, its build_finished `when` selects failed builds only, neither
+# carries `when.permission` (trust is nixbot's CI approval), and all three
+# runs share one lock, since build_finished may carry no pull request to
+# expand {pr}; flake-update is the one effect of its own onSchedule entry,
+# Tuesdays and Fridays at 22:00, with a checkout and no audience, and no
+# onPush or onEvent kind has it. Rows passing nixbot's
 # NIXBOT_API_URL/NIXBOT_API_TOKEN show the rendered script leaves them in
 # the program's environment.
 #
@@ -60,6 +68,8 @@ in
         "GITHUB_FORGE_TOKEN"
         "R2_EVIDENCE_ACCESS_KEY_ID"
         "R2_EVIDENCE_SECRET_ACCESS_KEY"
+        "FLAKE_UPDATER_APP_ID"
+        "FLAKE_UPDATER_PRIVATE_KEY"
         "NIXBOT_API_URL"
         "NIXBOT_API_TOKEN"
       ];
@@ -125,6 +135,32 @@ in
                   rehearsals = [ pkgs.emptyFile ];
                   triggers.pullRequest.lock = "omitted";
                 };
+                scheduled = {
+                  program = stubProgram;
+                  rehearsals = [ pkgs.emptyFile ];
+                  triggers.schedule = {
+                    lock = "scheduled";
+                    args = [
+                      "two words"
+                      "$HOME"
+                    ];
+                    secrets = [ "CLOUDFLARE_API_TOKEN" ];
+                    checkout = true;
+                    when = {
+                      minute = 5;
+                      hour = [
+                        1
+                        13
+                      ];
+                      dayOfWeek = [ "Mon" ];
+                    };
+                  };
+                };
+                scheduleDefaults = {
+                  program = stubProgram;
+                  rehearsals = [ pkgs.emptyFile ];
+                  triggers.schedule.lock = "scheduleDefaults";
+                };
               };
             };
           }
@@ -147,6 +183,8 @@ in
         herculesCI = { };
       };
       finishedEffects = fixtureOutputs.onEvent.build_finished;
+      schedules = fixtureOutputs.onSchedule;
+      scheduledEffect = name: schedules.${name}.outputs.effects.${name};
       structural = {
         eventNames = builtins.attrNames finishedEffects;
         mainNames = builtins.attrNames fixtureOutputs.onPush.default.outputs.effects;
@@ -173,6 +211,35 @@ in
           buildFinished = liveOutputs.onEvent.build_finished.browser-evidence.lock;
           main = liveOutputs.onPush.default.outputs.effects.browser-evidence.lock;
         };
+        scheduleNames = builtins.attrNames schedules;
+        scheduleEffectNames = lib.mapAttrs (
+          _: schedule: builtins.attrNames schedule.outputs.effects
+        ) schedules;
+        scheduleWhen = lib.mapAttrs (_: schedule: schedule.when) schedules;
+        scheduleCheckout = lib.mapAttrs (
+          name: _: (scheduledEffect name).__nixbot_effect_checkout or null
+        ) schedules;
+        scheduleHasAudience = lib.mapAttrs (name: _: scheduledEffect name ? idTokenAudiences) schedules;
+        scheduleLock = (scheduledEffect "scheduled").lock;
+        scheduleSecretsMap = builtins.fromJSON (scheduledEffect "scheduled").secretsMap;
+        # The live flake-update registration nixbot receives, read from the
+        # flake's herculesCI output.
+        liveSchedules = builtins.attrNames liveOutputs.onSchedule;
+        liveFlakeUpdate =
+          let
+            schedule = liveOutputs.onSchedule.flake-update;
+            effect = schedule.outputs.effects.flake-update;
+          in
+          {
+            inherit (schedule) when;
+            effects = builtins.attrNames schedule.outputs.effects;
+            checkout = effect.__nixbot_effect_checkout or null;
+            hasAudience = effect ? idTokenAudiences;
+            inherit (effect) lock;
+          };
+        flakeUpdateOutsideSchedule =
+          liveOutputs.onPush.default.outputs.effects ? flake-update
+          || lib.any (effects: effects ? flake-update) (builtins.attrValues liveOutputs.onEvent);
       };
       expectedStructural = {
         eventNames = [
@@ -187,6 +254,7 @@ in
           main = null;
           pullRequest = null;
           pullRequestClosed = null;
+          schedule = null;
           buildFinished = {
             lock = "defaults";
             args = [ ];
@@ -230,6 +298,55 @@ in
           buildFinished = "browser-evidence";
           main = "browser-evidence";
         };
+        scheduleNames = [
+          "scheduleDefaults"
+          "scheduled"
+        ];
+        scheduleEffectNames = {
+          scheduleDefaults = [ "scheduleDefaults" ];
+          scheduled = [ "scheduled" ];
+        };
+        scheduleWhen = {
+          scheduleDefaults = { };
+          scheduled = {
+            minute = 5;
+            hour = [
+              1
+              13
+            ];
+            dayOfWeek = [ "Mon" ];
+          };
+        };
+        scheduleCheckout = {
+          scheduleDefaults = false;
+          scheduled = true;
+        };
+        scheduleHasAudience = {
+          scheduleDefaults = false;
+          scheduled = false;
+        };
+        scheduleLock = "scheduled";
+        scheduleSecretsMap.CLOUDFLARE_API_TOKEN = "CLOUDFLARE_API_TOKEN";
+        liveSchedules = [ "flake-update" ];
+        # hercules-ci-effects' typed `when` option normalises the declared
+        # { dayOfWeek; hour = 22; minute = 0; }: hour becomes a list and the
+        # unset dayOfMonth null. This is the value nixbot reads.
+        liveFlakeUpdate = {
+          when = {
+            dayOfMonth = null;
+            dayOfWeek = [
+              "Tue"
+              "Fri"
+            ];
+            hour = [ 22 ];
+            minute = 0;
+          };
+          effects = [ "flake-update" ];
+          checkout = true;
+          hasAudience = false;
+          lock = "flake-update";
+        };
+        flakeUpdateOutsideSchedule = false;
       };
 
       mkTokenResponse = claims: ''
@@ -339,7 +456,9 @@ in
       forge.GITHUB_FORGE_TOKEN.data.token = "dummy-forge-token";
       r2.R2_EVIDENCE_ACCESS_KEY_ID.data.value = "dummy-r2-access-key-id";
       r2.R2_EVIDENCE_SECRET_ACCESS_KEY.data.value = "dummy-r2-secret-access-key";
-      everySecret = cloudflare // cloudflareAccount // github // forge // r2;
+      flakeUpdater.FLAKE_UPDATER_APP_ID.data.value = "dummy-app-id";
+      flakeUpdater.FLAKE_UPDATER_PRIVATE_KEY.data.value = "dummy-private-key";
+      everySecret = cloudflare // cloudflareAccount // github // forge // r2 // flakeUpdater;
       r2Env = {
         CLOUDFLARE_ACCOUNT_ID = "dummy-cloudflare-account";
         R2_EVIDENCE_ACCESS_KEY_ID = "dummy-r2-access-key-id";
@@ -387,7 +506,44 @@ in
           main = [ "GITHUB_TOKEN" ];
           pullRequest = [ "GITHUB_FORGE_TOKEN" ];
         };
+        flake-update.schedule = [
+          "FLAKE_UPDATER_APP_ID"
+          "FLAKE_UPDATER_PRIVATE_KEY"
+        ];
       };
+
+      # A throw's message is out of reach of builtins.tryEval, so nix-unit
+      # evaluates the registry alone (no inputs or flake) and matches it.
+      noTriggerTest = pkgs.writeText "effects-registry-no-trigger.tests.nix" ''
+        let
+          lib = import ${pkgs.path}/lib;
+          registry = lib.evalModules {
+            specialArgs = {
+              inputs = { };
+              withSystem = _: _: throw "withSystem is not reached";
+            };
+            modules = [
+              ${../effects/vanixiets/registry.nix}
+              {
+                options.flake.lib = lib.mkOption { type = lib.types.attrs; };
+                options.herculesCI = lib.mkOption { type = lib.types.raw; };
+                config.flake.lib = {
+                  effectRunContext = { };
+                  vanixietsEffectSecrets = { };
+                };
+                config.vanixiets.effects.bare = { };
+              }
+            ];
+          };
+        in
+        {
+          testNoTriggerNamesEveryKind = {
+            expr = registry.config.vanixiets.effects.bare;
+            expectedError.type = "ThrownError";
+            expectedError.msg = "vanixiets\\.effects\\.bare: declares no trigger; set at least one of triggers\\.\\{main,pullRequest,pullRequestClosed,buildFinished,schedule\\}";
+          };
+        }
+      '';
 
       effects-interpreter =
         pkgs.runCommand "effects-interpreter"
@@ -397,6 +553,7 @@ in
               pkgs.coreutils
               pkgs.diffutils
               pkgs.gnugrep
+              pkgs.nix-unit
             ];
             meta.description = "behavioural check: effects interpreter script";
           }
@@ -422,7 +579,44 @@ in
             printf '%s' ${lib.escapeShellArg (builtins.toJSON structural)} | jq -S . > structural
             diff -u structural.expected structural
 
+            echo "--- an entry with no trigger fails naming every kind"
+            mkdir "$TMPDIR/nix-unit"
+            HOME="$TMPDIR/nix-unit" nix-unit --eval-store "$TMPDIR/nix-unit" \
+              --extra-experimental-features 'nix-command flakes' ${noTriggerTest}
+
             ${lib.concatMapStrings row [
+              {
+                name = "schedule maps to an unguarded run with literal argv, no --rev and only its own secrets";
+                kind = "schedule";
+                effectScript = (scheduledEffect "scheduled").effectScript;
+                idTokenEndpoint = false;
+                secretsJson = everySecret;
+                status = 0;
+                argv = [
+                  "two words"
+                  "$HOME"
+                ];
+                env.CLOUDFLARE_API_TOKEN = "dummy-cloudflare-token";
+              }
+              {
+                name = "schedule defaults grant no secrets and append no revision";
+                kind = "schedule";
+                effectScript = (scheduledEffect "scheduleDefaults").effectScript;
+                idTokenEndpoint = false;
+                secretsJson = everySecret;
+                status = 0;
+                argv = [ ];
+                env = { };
+              }
+              {
+                name = "schedule missing declared secret fails before the program runs";
+                kind = "schedule";
+                effectScript = (scheduledEffect "scheduled").effectScript;
+                idTokenEndpoint = false;
+                secretsJson = forge;
+                status = 1;
+                expect = [ "error: CLOUDFLARE_API_TOKEN missing from $HERCULES_CI_SECRETS_JSON" ];
+              }
               {
                 name = "buildFinished maps to an unguarded event with literal argv and only its own secrets";
                 kind = "buildFinished";
@@ -735,6 +929,28 @@ in
                   rev
                 ];
                 env = r2Env;
+              }
+              {
+                name = "registry: flake-update schedule receives exactly the App id and key, without --rev or the guard";
+                kind = "schedule";
+                entry = registry.flake-update;
+                idTokenEndpoint = false;
+                secretsJson = everySecret;
+                status = 0;
+                argv = [ ];
+                env = {
+                  FLAKE_UPDATER_APP_ID = "dummy-app-id";
+                  FLAKE_UPDATER_PRIVATE_KEY = "dummy-private-key";
+                };
+              }
+              {
+                name = "registry: flake-update schedule without the App key fails before the program runs";
+                kind = "schedule";
+                entry = registry.flake-update;
+                idTokenEndpoint = false;
+                secretsJson = removeAttrs everySecret [ "FLAKE_UPDATER_PRIVATE_KEY" ];
+                status = 1;
+                expect = [ "error: FLAKE_UPDATER_PRIVATE_KEY missing from $HERCULES_CI_SECRETS_JSON" ];
               }
             ]}
 

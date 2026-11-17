@@ -2,12 +2,12 @@
 
 ### Requirement: The scheduled update is declared from the repository with a fixed schedule
 
-The flake's `herculesCI` output SHALL declare `onSchedule.flake-update` with `when` equal to `{ dayOfWeek = [ "Tue" "Fri" ]; hour = 22; minute = 0; }` and exactly one effect, `outputs.effects.flake-update`, produced by the vanixiets effects registry's `schedule` trigger kind from the registry entry `flake-update`.
+The flake's `herculesCI` output SHALL declare `onSchedule.flake-update` with the schedule `{ dayOfWeek = [ "Tue" "Fri" ]; hour = 22; minute = 0; }` and exactly one effect, `outputs.effects.flake-update`, produced by the vanixiets effects registry's `schedule` trigger kind from the registry entry `flake-update`.
 
 #### Scenario: The declaration is evaluated
 
 - **WHEN** `herculesCI.onSchedule` is evaluated from the flake
-- **THEN** it has the attribute `flake-update` with that `when`, and `outputs.effects` has exactly the attribute `flake-update`
+- **THEN** it has the attribute `flake-update` whose `when` is `{ dayOfMonth = null; dayOfWeek = [ "Tue" "Fri" ]; hour = [ 22 ]; minute = 0; }`, the value nixbot reads, which hercules-ci-effects' typed `when` option normalises from that schedule, and `outputs.effects` has exactly the attribute `flake-update`
 
 #### Scenario: The registry entry declares no trigger
 

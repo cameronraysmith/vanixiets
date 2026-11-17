@@ -40,6 +40,10 @@ push to main
 
 pull request closed or merged
 └── docs effect           delete the pull request's Cloudflare Preview
+
+Tuesday and Friday, 22:00 UTC (or `nbo schedule run flake-update flake-update -f`)
+└── flake-update effect   one update-<input> branch and pull request
+                          per moved branch-tracking flake input
 ```
 
 ## nixbot contexts
@@ -65,8 +69,9 @@ nixbot instead builds each effect's dependencies as a check, and every effect li
 | `checks.<system>.deploy-docs-rehearsal` | Every `deploy-docs` mode (`production`, `preview`, `pull-request`, `pull-request-closed`, `versions`, `deployments`) against a stub wrangler that also runs each invocation's identical argv through the real pinned wrangler (`deploy --dry-run`, the other commands against a loopback fake Cloudflare API), including a superseded production run, the untrusted `--payload` hardening, the same-repository-or-writer trust rule, each build status and failure path, the `docs-preview` check-run lifecycle, a pull request found closed or superseded before the upload (skipped, with no Cloudflare or nixbot API request) or closed during it (Preview withdrawn), a failed pull request state lookup, Preview teardown when deleted, absent, or failing, `--limit` truncation, and missing secrets | `docs` |
 | `checks.<system>.release-rehearsal` | `release-packages --rev` with the production semantic-release plugins against a local git fixture and a stub GitHub API, including the floating major and minor tags, a superseded rev, and a diverged rev; `release-packages plan` on fixture pull requests through the installation-token path, covering a minor, a major, and no bump, a release-configuration edit that is ignored in favour of `main`'s, a closed or superseded pull request (skipped without cloning), a failed pull request state lookup, a merge conflict, a head mismatch, a missing forge token, and an unused release PAT, with no write to the fixture remote and no release created | `release-packages` |
 | `checks.<system>.publish-evidence-rehearsal` | `publish-evidence event` and `publish-evidence main` against a loopback nixbot API, a chroot store, a stub comment endpoint, a stub GitHub commits endpoint, and a stub S3 endpoint that verifies the temporary credential's JWT claims and SigV4 signature and refuses keys outside its prefix: report selection and validation, upload with the receipt last and create-only, tier selection, an identical retry, a conflicting receipt, a failed upload and its retry, a refused comment, the pull request comment from a `build_finished` or a `pull_request` event, a reused build's comment naming its head and its later return to `main`'s report, a rejected event kind, `main` mode's lookup of the newest build of exactly its commit, its fallback to the newest non-cancelled build of the commit's tree across pages, a listed build whose own tree differs, a commit with neither, a commit whose tree cannot be read, a missing `NIXBOT_API_URL`, a missing or non-`main` `--rev`, missing R2 secrets, and the parent secret's absence from every request | `browser-evidence` |
+| `checks.<system>.flake-update-rehearsal` | `flake-update` against a fake GitHub on loopback (API and git smart HTTP) with a test App key: two runs over `nixpkgs`, `utils` and `playwright-web-flake`, each with a JWT verified against the test key and App id, a token minted for the repository and two permissions, every later API and git request made with it, and its revocation at exit; `update-nixpkgs` and `update-utils` one bot-authored commit ahead of `main` with a pull request each, no `update-playwright-web-flake`, and no head moved by the second run; a 404 installation lookup failing with no push or pull request call; and no line of the key in the checkout, its git objects, the forge or `$HOME` after any run, nor within reach of nixbot's script | `flake-update` |
 
-`checks.<system>.effects-interpreter`, built by `nixbot/nix-build`, checks the script the effects interpreter generates for each trigger kind (`main`, `pullRequest`, `pullRequestClosed`): the main-only guard, secret export, that a trigger never receives another trigger's secrets, the missing-secret failure, the per-trigger forge token, and the program's exact argv, including `--rev`.
+`checks.<system>.effects-interpreter`, built by `nixbot/nix-build`, checks the script the effects interpreter generates for each trigger kind (`main`, `pullRequest`, `pullRequestClosed`, `buildFinished`, `schedule`): the main-only guard, secret export, that a trigger never receives another trigger's secrets, the missing-secret failure, the per-trigger forge token, and the program's exact argv, including `--rev` for `main` only; it also pins the `onSchedule` output of a `schedule` trigger.
 
 On a push to `main` the same context reports the effect runs themselves.
 
@@ -75,12 +80,13 @@ On a push to `main` the same context reports the effect runs themselves.
 | Runner | nixbot on magnetite |
 | Triggers | Pull requests and batches (dependency build); pushes to `main` (effect run) |
 | Required | Yes |
-| Local equivalent | `nix build .#checks.x86_64-linux.deploy-docs-rehearsal .#checks.x86_64-linux.release-rehearsal .#checks.x86_64-linux.publish-evidence-rehearsal` |
+| Local equivalent | `nix build .#checks.x86_64-linux.deploy-docs-rehearsal .#checks.x86_64-linux.release-rehearsal .#checks.x86_64-linux.publish-evidence-rehearsal .#checks.x86_64-linux.flake-update-rehearsal` |
 
 ## Effects
 
 Effects are data entries of `vanixiets.effects` in `modules/effects/vanixiets/effects.nix`.
-Each entry names a program, its rehearsals, and one or more triggers (`main`, `pullRequest`, `pullRequestClosed`, `buildFinished`), each with its own arguments, secrets, lock, and forge-token setting; one interpreter, `modules/effects/vanixiets/registry.nix`, generates a nixbot effect per trigger.
+Each entry names a program, its rehearsals, and one or more triggers (`main`, `pullRequest`, `pullRequestClosed`, `buildFinished`, `schedule`), each with its own arguments, secrets, lock, and forge-token setting; one interpreter, `modules/effects/vanixiets/registry.nix`, generates a nixbot effect per trigger.
+A `schedule` trigger becomes the schedule `onSchedule.<name>` with one effect `outputs.effects.<name>`, evaluated and run from `main`'s tip at each occurrence of its UTC `when`, without the main-only guard or `--rev`.
 A `buildFinished` trigger becomes an onEvent `build_finished` effect, evaluated from `main` and delivered for builds matching its `when` conditions; those conditions select builds and do not authorize anyone, since nixbot's CI approval (`prApproval`) holds a pull request from outside the repository until a maintainer approves it.
 The generated script for a `main` trigger starts with a fail-closed guard that refuses to run unless nixbot's identity token says the event is a push to `refs/heads/main`; any other run is skipped with exit 0 before a secret is read.
 It then exports the trigger's declared secrets, and only those, and execs the program, appending `--rev <commit>` for `main` triggers.
@@ -214,9 +220,29 @@ nixbot posts no forge status for event effects, so a failed `pullRequest` or `bu
 The comment needs nixbot's GitHub App to hold `Pull requests: Read and write`; nixbot caches installation tokens for 48 minutes (`nixbot/nixbot/forge/github.py:153-154`), so a permission change takes effect after the cached token expires or nixbot restarts.
 Local equivalent: `nix run .#publish-evidence -- event --out <dir>` with nixbot's event variables set, which stages the bundle without uploading.
 
+### flake-update
+
+Runs the `flake-update` program, which refreshes each flake input that tracks a branch on its own branch and pull request, as the GitHub App `vanixiets-flake-updater`.
+
+| Attribute | Value |
+|-----------|-------|
+| Program | `flake-update` |
+| Rehearsal | `flake-update-rehearsal` |
+
+| Trigger | nixbot effect | Program | Secrets | Lock | Forge token |
+|---------|---------------|---------|---------|------|-------------|
+| `schedule` (Tuesday and Friday, 22:00 UTC; checkout) | `onSchedule.flake-update.outputs.effects.flake-update` | `flake-update` | `FLAKE_UPDATER_APP_ID`, `FLAKE_UPDATER_PRIVATE_KEY` | `flake-update` | No |
+
+Each run signs a JWT with the App's key, looks up the App's installation on the repository and mints a one-hour installation token restricted to it with `contents` and `pull_requests` write, then runs nixbot's `flakeUpdate` script with `perInput = true` and that token, and revokes the token on exit.
+For every root input of `main`'s `flake.lock` except `playwright-web-flake` it rebuilds `update-<input>` from `main`, runs `nix flake update <input> --commit-lock-file`, pushes when the result differs from the branch on GitHub, and opens the pull request `Update <input>`; commits carry the author and committer `vanixiets-flake-updater[bot]`.
+Pull requests are not auto-merged; a person enqueues them into gitea-mq.
+nixbot posts no forge status for a scheduled run; a failed run shows in its effect log.
+Run it now with `nbo schedule run flake-update flake-update -f`; see [CI/CD Setup](/about/contributing/ci-cd-setup/#flake-update) for the credential handling and this effect's trust boundary.
+
 ## Dependency updates
 
 Renovate runs on magnetite every two hours at 17 minutes past, as the GitHub App `vanixiets-renovate`, and opens pull requests that nixbot builds like any other; see [CI/CD Setup](/about/contributing/ci-cd-setup/#dependency-updates) for its task chains and flake-input split.
+The flake inputs that track a branch are refreshed instead by the scheduled [`flake-update` effect](#flake-update).
 
 | Unit | Purpose | Local equivalent |
 |------|---------|------------------|
@@ -244,11 +270,6 @@ Runs `bootstrap-verification` (the Makefile bootstrap on a clean Ubuntu runner; 
 Its jobs use per-job content-addressed caching; see [ADR-0016](/development/architecture/adrs/0016-per-job-content-addressed-caching/).
 To force re-execution, dispatch with `force_run: true`.
 
-### Update Flake Inputs (`update-flake-inputs.yaml`)
-
-Runs Tuesday and Friday at 22:00 UTC and on manual dispatch.
-Opens one pull request per flake input that tracks a branch, excluding `playwright-web-flake`; Renovate updates the inputs pinned to a revision or a version tag.
-
 ## Running CI locally
 
 ```bash
@@ -266,6 +287,7 @@ nix build .#checks.x86_64-linux.deploy-docs-rehearsal
 nix build .#checks.x86_64-linux.release-rehearsal
 nix build .#checks.x86_64-linux.effects-interpreter
 nix build .#checks.x86_64-linux.publish-evidence-rehearsal
+nix build .#checks.x86_64-linux.flake-update-rehearsal
 
 # Test the docs package
 just test-package docs

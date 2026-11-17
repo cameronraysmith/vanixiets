@@ -23,7 +23,7 @@ vanixiets keeps secrets in two sops trees that share one operator identity.
 
 - **Home-manager user secrets:** `secrets/home-manager/users/<user>/secrets.yaml`, set as `sops.defaultSopsFile` in `modules/home/users/<user>/default.nix`. Each home decrypts them with `~/.config/sops/age/keys.txt` (`modules/home/base/sops.nix`).
 - **Bridge keys:** on NixOS, `hm-sops-bridge` delivers a user's age key from `secrets/bridge/<identity>-age-key.enc`, which is encrypted to the NixOS machine keys, so NixOS homes need no hand-placed `keys.txt`.
-- **Operator credentials:** `secrets/shared.yaml` (forge, DNS, cache and flake-updater credentials), read by `just` recipes. Only the operator identity and the offline recovery key can read it.
+- **Operator credentials:** `secrets/shared.yaml` (forge, DNS and cache credentials), read by `just` recipes. Only the operator identity and the offline recovery key can read it.
 - **Cluster secrets:** `secrets/clusters/local/`, also read in CI through the `SOPS_AGE_KEY` secret (the `&ci` key).
 - **The Devin `ubuntu` profile**, whose key is seeded from `SOPS_AGE_KEY`.
 

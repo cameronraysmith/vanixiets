@@ -10,8 +10,8 @@ The GitHub Actions release and docs-deploy workflows are archived under `.github
 
 ## The rule: secrets are only held by code from main
 
-Effects are the only CI programs that receive deploy secrets (the Cloudflare API token, the GitHub release token, and the R2 token for browser evidence).
-onPush effects run only for pushes to `main`, and onEvent effects, including `build_finished`, are always evaluated from `main`, so the code that holds a secret has always already been reviewed and landed.
+Effects are the only CI programs that receive deploy secrets (the Cloudflare API token, the GitHub release token, the R2 token for browser evidence, and the flake updater App's key).
+onPush effects run only for pushes to `main`, onEvent effects, including `build_finished`, are always evaluated from `main`, and onSchedule effects are evaluated and run from `main`'s tip, so the code that holds a secret has always already been reviewed and landed.
 Secrets are declared per trigger, so a pull request trigger receives only the secrets it declares: the `release-packages` pull request trigger declares none.
 
 An effect contains no behaviour of its own.
@@ -57,8 +57,9 @@ Each effect lists the rehearsal checks for its program among its inputs, so ever
 - `checks.<system>.deploy-docs-rehearsal` runs every `deploy-docs` mode (`production`, `preview`, `pull-request`, `pull-request-closed`, `versions`, and `deployments`) against a stub wrangler that also executes each invocation with the real pinned wrangler and the identical argv: `deploy` with `--dry-run`, and `preview`, `preview delete`, `versions list`, and `deployments list` against a loopback fake Cloudflare API, so an argv wrangler would reject fails the check. It covers the superseded production run; the untrusted `--payload` hardening, including symlink refusal and a payload build command that never runs; the pull request trust rule (a same-repository bot pull request and fork pull requests with a writer as actor or author preview, an untrusted fork is skipped as `neutral`, and a missing `isFork` fails); `succeeded`, `skipped_local`, failed, and missing docs attributes, a malformed event, a failed deploy, and the `docs-preview` check-run lifecycle; a pull request found closed or superseded before the upload, which is skipped without any Cloudflare or nixbot API request, one closed during the upload, whose Preview is withdrawn, and a failed pull request state lookup; teardown of an existing Preview, of one that never existed, and a failed delete; `--limit` truncation of the listings; and missing secrets failing before any network call;
 - `checks.<system>.release-rehearsal` runs `release-packages --rev` with the production semantic-release plugin list against a local git fixture and a stub GitHub API, including the floating major and minor tags from `semantic-release-major-tag`, a superseded rev that main has moved past, and a diverged rev outside main's history; it also runs `release-packages plan` on fixture pull requests through the installation-token path, covering a minor, a major, and no bump, a pull request that edits the release configuration (forecast from main's configuration, its plugin never run), a closed or superseded pull request, which is skipped without cloning, a failed pull request state lookup, a merge conflict, a head mismatch, a missing forge token, and a release PAT in the environment that is never used, and it asserts that a forecast leaves the fixture remote's tags and refs untouched and creates no release;
 - `checks.<system>.publish-evidence-rehearsal` runs `publish-evidence event` and `publish-evidence main` against a loopback nixbot API, a chroot store, a stub comment endpoint, and a stub S3 endpoint that verifies the temporary credentials' JWT claims and SigV4 signature, refuses writes under a read-only credential, and refuses keys outside each credential's prefix. It covers report selection and validation; a `main` upload to `ttl-90d` with the receipt last and create-only, and a later `main` build with the same report that uploads nothing; `main` mode's lookup failures (a commit with no build, a missing `NIXBOT_API_URL`, and a missing or non-`main` `--rev`); an unaffected pull request whose report `main` already published, which uploads and comments nothing; an affected pull request uploaded to `ttl-30d` with a comment and marker, its retry, and a second build with the same report; the same affected run delivered as a `pull_request` event; a reused build whose comment names the head it was reused for and whose marker records it, and a reused build that returns to `main`'s report and supersedes the comment; a rejected event kind such as `pull_request_closed`; a refused comment, a corrupted remote receipt, and a failed upload; a pull request that returns to `main`'s report and supersedes its comment, also without an API token and with a malformed marker; credential confinement, including that no pull request run writes into `ttl-90d`; a build without a pull request; a failing baseline probe; missing R2 secrets; and the parent secret's absence from every request.
+- `checks.<system>.flake-update-rehearsal` runs the `flake-update` program, built by the same function as production with only a stand-in `nix`, against a fake GitHub on loopback (its API and git's smart HTTP protocol through `git http-backend`) with a test App key generated in the build. Two runs over a lock with `nixpkgs`, `utils` and `playwright-web-flake` must each sign a JWT the fake forge verifies against the test key and App id, mint a token restricted to the repository and to `contents` and `pull_requests` write, make every later API and git request with that token and never with the checkout's, and revoke it at exit; the first must leave `update-nixpkgs` and `update-utils` one commit ahead of `main`, authored and committed by the App's bot user, with a pull request each and no `update-playwright-web-flake`, and the second must change no branch head. An installation lookup answering 404 must fail the run with no push and no pull request call. After every run no file in the checkout, its git objects, the forge or `$HOME` may hold a line of the key, the program's private directory must be gone, and while nixbot's script runs no `FLAKE_UPDATER_*` variable or file may hold the key.
 
-The `docs` effect lists `deploy-docs-rehearsal`, `release-packages` lists `release-rehearsal`, and `browser-evidence` lists `publish-evidence-rehearsal`.
+The `docs` effect lists `deploy-docs-rehearsal`, `release-packages` lists `release-rehearsal`, `browser-evidence` lists `publish-evidence-rehearsal`, and `flake-update` lists `flake-update-rehearsal`.
 The rehearsals run the real programs without a token or network access, so a change that breaks the release, deploy, preview, or teardown path fails before it reaches `main`.
 
 `checks.<system>.effects-interpreter` covers the one piece of code between nixbot and a program: the script the interpreter generates for each effect trigger.
@@ -96,9 +97,10 @@ The `browser-evidence` effect does not skip a superseded commit: evidence for ea
 
 Effects are data.
 `modules/effects/vanixiets/effects.nix` declares them as entries of the flake option `vanixiets.effects.<name>`, each naming its program, its rehearsals, and its `triggers`.
-An entry has at least one of the triggers `main`, `pullRequest`, `pullRequestClosed`, and `buildFinished`, and each trigger sets the program's literal arguments, the secrets it reads, its lock, and whether it receives nixbot's forge token.
+An entry has at least one of the triggers `main`, `pullRequest`, `pullRequestClosed`, `buildFinished`, and `schedule`, and each trigger sets the program's literal arguments, the secrets it reads, its lock, and whether it receives nixbot's forge token.
 
-One interpreter, `modules/effects/vanixiets/registry.nix`, turns each trigger into a nixbot effect: `main` into `herculesCI.onPush.default.outputs.effects.<name>`, `pullRequest` into `herculesCI.onEvent.pull_request.<name>`, `pullRequestClosed` into `herculesCI.onEvent.pull_request_closed.<name>`, and `buildFinished` into `herculesCI.onEvent.build_finished.<name>`.
+One interpreter, `modules/effects/vanixiets/registry.nix`, turns each trigger into a nixbot effect: `main` into `herculesCI.onPush.default.outputs.effects.<name>`, `pullRequest` into `herculesCI.onEvent.pull_request.<name>`, `pullRequestClosed` into `herculesCI.onEvent.pull_request_closed.<name>`, `buildFinished` into `herculesCI.onEvent.build_finished.<name>`, and `schedule` into the schedule `herculesCI.onSchedule.<name>` with the one effect `outputs.effects.<name>`.
+A `schedule` trigger carries its UTC `when` (`minute`, `hour`, `dayOfWeek`, `dayOfMonth`) and whether the run gets nixbot's pushable checkout of `main` (`checkout`); nixbot registers schedules after a green non-pull-request build of `main` and runs each occurrence from `main`'s tip, and `nbo schedule run <name> <name> -f` starts one by hand.
 A `buildFinished` trigger also carries nixbot's delivery conditions (`when`), such as the build statuses it is delivered for; these select builds rather than authorize anyone, and the trust gate for pull request builds is nixbot's CI approval (`prApproval` in `modules/nixos/nixbot.nix`), which holds a pull request from outside the repository until a maintainer approves it.
 The script it generates for each trigger does three things, in order:
 
@@ -106,7 +108,7 @@ The script it generates for each trigger does three things, in order:
 2. exports each secret the trigger declares, failing with a specific error on the first one that is absent, null, or empty;
 3. execs the program with the trigger's arguments, followed by `--rev <commit>` for `main` triggers.
 
-`checks.<system>.effects-interpreter` renders synthetic entries with all three trigger kinds through the same function and runs the generated scripts against stubs, asserting the guard's skip on a non-main run, the exported secrets, that a trigger never receives another trigger's secrets, the failure on a missing secret, the forge token of each trigger, and the exact argv the program receives, including `--rev`.
+`checks.<system>.effects-interpreter` renders synthetic entries with every trigger kind through the same function and runs the generated scripts against stubs, asserting the guard's skip on a non-main run, the exported secrets, that a trigger never receives another trigger's secrets, the failure on a missing secret, the forge token of each trigger, and the exact argv the program receives, including `--rev` for `main` only; it also pins the `onSchedule` output, an entry's `when`, checkout request and absence of an identity-token audience.
 
 Programs that report a GitHub check run share one program for it, `github-check-run` (`modules/apps/ci/github-check-run.{nix,sh}`, also `apps.github-check-run`).
 `github-check-run create --repo <owner/name> --name <check> --head-sha <sha>` creates an `in_progress` check run and prints its id; `github-check-run complete --repo <owner/name> --id <id> --conclusion <success|neutral|failure> --title <title> --summary <summary> [--details-url <url>]` completes it.
@@ -242,6 +244,29 @@ Posting the comment requires nixbot's GitHub App to have the repository permissi
 nixbot caches installation tokens for 48 minutes (`nixbot/nixbot/forge/github.py:153-154`), so a permission change on the App takes effect once the cached token expires or after nixbot restarts.
 See [Docs browser evidence](https://github.com/cameronraysmith/vanixiets/blob/main/packages/docs/tests/report/README.md#publication) for reading the evidence.
 
+### flake-update
+
+The `flake-update` effect refreshes the flake inputs that track a branch, each on its own branch and pull request:
+
+| Trigger | nixbot effect | Program | Lock |
+|---------|---------------|---------|------|
+| `schedule` (Tuesday and Friday, 22:00 UTC, with a checkout) | `herculesCI.onSchedule.flake-update.outputs.effects.flake-update` | `flake-update` | `flake-update` |
+
+The program (`modules/effects/vanixiets/flake-update.{nix,sh}`) runs nixbot's own `flakeUpdate` script from the locked `nixbot` input with `perInput = true`: for every root input of `main`'s `flake.lock` except `playwright-web-flake`, it rebuilds the branch `update-<input>` from `main`, runs `nix flake update <input> --commit-lock-file`, force-pushes only when the result differs from the branch on GitHub, and opens a pull request titled `Update <input>` whose body is the lock change, treating GitHub's "already exists" answer as success.
+When `main` already has an input's update, the branch is deleted; one failing input does not stop the others, and the run fails naming them.
+Pull requests are not auto-merged: a person enqueues them into gitea-mq, as Renovate's.
+
+It writes as the GitHub App `vanixiets-flake-updater`, whose commits carry the author and committer `vanixiets-flake-updater[bot] <246545483+vanixiets-flake-updater[bot]@users.noreply.github.com>`.
+Each run reads the App id and key (`FLAKE_UPDATER_APP_ID`, `FLAKE_UPDATER_PRIVATE_KEY`), signs a nine-minute JWT with `gh-token`, looks up the App's installation on the repository named by the checkout's `origin`, and mints a one-hour installation token restricted to that repository with `contents` and `pull_requests` write.
+It deletes its copy of the key and unsets both variables before nixbot's script starts, hands the token to the script in a private secrets file, and revokes it on exit; nixbot's own App, which may only read contents, never writes these branches.
+
+To run it now, `nbo schedule run flake-update flake-update -f`.
+nixbot does not catch up an occurrence it missed while down, and it registers a change to the schedule only after a green non-pull-request build of `main`.
+
+What the repository guarantees here is limited to what it controls: the declared schedule, checkout request and secrets, the generated entry point, the program's credential handling, arguments and commit identity, and the rehearsal.
+When nixbot fires the schedule, how its sandbox isolates a run, GitHub's token semantics, the App's installation and permissions, and whether a refreshed input builds are not.
+In particular the key is in the run's sandbox for the whole run, in nixbot's read-only secrets file even after the program drops its own copies, and nixbot scopes secrets per repository rather than per effect, so any effect declared on `main` could name them; the per-trigger `secrets` list is a convention that review enforces.
+
 ## Dependency updates
 
 [Renovate](https://docs.renovatebot.com/) runs on magnetite as the NixOS `services.renovate` unit, configured by the `renovate` aspect (`modules/nixos/renovate.nix`), and reads its repository configuration from `.github/renovate.json`.
@@ -266,7 +291,7 @@ Renovate may run only the commands in its `allowedCommands` (`flake.lib.renovate
 
 Flake inputs are split between two updaters, so no input has two.
 Renovate updates the inputs pinned to a revision (its `nix` manager, which re-locks the input itself) or to a version tag (the regex managers above); lock file maintenance is off, so it never refreshes the rest.
-Inputs that track a branch are refreshed one pull request per input by `.github/workflows/update-flake-inputs.yaml`, which excludes `playwright-web-flake`.
+Inputs that track a branch are refreshed one pull request per input by the scheduled [`flake-update` effect](#flake-update), which excludes `playwright-web-flake`.
 
 ## Secrets
 
@@ -281,6 +306,7 @@ Each trigger's `secrets` is typed as an enum of the schema's names, and the inte
 | `CLOUDFLARE_ACCOUNT_ID` | `docs`: `main`, `pullRequest`, and `pullRequestClosed`; `browser-evidence`: `main`, `pullRequest`, and `buildFinished` |
 | `GITHUB_TOKEN` (fine-grained PAT, read and write) | `release-packages`: `main` only |
 | `R2_EVIDENCE_ACCESS_KEY_ID`, `R2_EVIDENCE_SECRET_ACCESS_KEY` (R2 token, Object Read & Write on `sciexp` only) | `browser-evidence`: `main`, `pullRequest`, and `buildFinished` |
+| `FLAKE_UPDATER_APP_ID`, `FLAKE_UPDATER_PRIVATE_KEY` (GitHub App `vanixiets-flake-updater`, `contents` and `pull_requests` write) | `flake-update`: `schedule` |
 
 The `pullRequest` triggers of `docs` and `release-packages` also set `forgeToken = true`, which gives them nixbot's per-run GitHub App installation token as `GITHUB_FORGE_TOKEN` for their `docs-preview` and `release-plan` check runs; that token is not an entry of the schema.
 The `browser-evidence` program also reads `NIXBOT_API_URL` and `NIXBOT_API_TOKEN`, which nixbot sets for each effect run, to query its build API and post the pull request comment; neither is an entry of the schema.

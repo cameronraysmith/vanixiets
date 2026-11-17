@@ -207,7 +207,6 @@ CI/CD operations, caching, and release management.
 | `ci-logs-failed` | `workflow?` | View only failed logs from latest workflow run | No |
 | `ci-validate` | `workflow? run_id?` | Validate latest workflow run comprehensively | No |
 | `ci-debug-job` | `workflow? job_name?` | Debug specific failed job | No |
-| `update-flake-inputs` | - | Trigger an ad hoc flake input update on main | No |
 | `ghsecrets` | `repo?` | Update GitHub secrets from sops | No |
 | `list-workflows` | - | List available workflows (via act) | No |
 | `test-flake-workflow` | - | Execute a workflow locally via act | No |
