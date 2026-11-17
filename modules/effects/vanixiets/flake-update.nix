@@ -19,13 +19,14 @@
 # second run sees no input move.
 #   case 1: two runs over a lock with nixpkgs, utils and playwright-web-flake.
 #     Each signs a JWT the forge verifies against the test key and App id,
-#     mints a token restricted to the repository and two permissions, makes
-#     every later API and git request with it and revokes it at exit. After
-#     the first, update-nixpkgs and update-utils are one bot-authored commit
-#     ahead of main and have pull requests, and no update-playwright-web-flake
-#     exists; the second changes no branch head.
-#   case 2: the installation lookup answers 404: the program fails, with no
-#     push and no pull request call.
+#     logs the installation it found, mints a token restricted to the
+#     repository and two permissions, makes every later API and git request
+#     with it and revokes it at exit. After the first, update-nixpkgs and
+#     update-utils are one bot-authored commit ahead of main and have pull
+#     requests, and no update-playwright-web-flake exists; the second changes
+#     no branch head.
+#   case 2: the installation lookup answers 404: the program fails, names no
+#     installation, and makes no push and no pull request call.
 #   case 3, after every run: no file in the checkout, its git objects, the
 #     forge's or $HOME holds a line of the key, the program's private
 #     directory is gone, and while nixbot's script ran (checked by the
@@ -329,6 +330,8 @@ let
           check_no_key "case 1 run 1"
           check_jwt "case 1 run 1"
           check_auth "case 1 run 1"
+          grep -qxF "flake-update: App installation 777 on acme/widget" "case 1 run 1.out" ||
+            fail "case 1 run 1: the log does not name the installation it looked up"
           mint="$(jq -c 'select(.path | endswith("/access_tokens")) | .body' requests | sort -u)"
           [ "$mint" = ${lib.escapeShellArg (builtins.toJSON mintRequest)} ] ||
             fail "case 1 run 1: the mint request is not restricted to the repository and two permissions: $mint"
@@ -374,6 +377,9 @@ let
           run_program "case 2"
           check_no_key "case 2"
           check_jwt "case 2"
+          if grep -qF "flake-update: App installation" "case 2.out"; then
+            fail "case 2: the log names an installation the lookup did not find"
+          fi
           [ "$status" != 0 ] || fail "case 2: the program succeeded without an installation"
           [ "$(heads)" = "$before" ] || fail "case 2: a branch changed without an installation"
           if grep -q receive-pack git-requests; then fail "case 2: something was pushed"; fi

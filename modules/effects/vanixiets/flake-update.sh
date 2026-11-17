@@ -72,6 +72,7 @@ if ! installation="$(github -H @"$private/jwt.header" "$api/repos/$owner/$repo/i
   exit 1
 fi
 installation_id="$(printf '%s' "$installation" | jq -er '.id')"
+echo "flake-update: App installation $installation_id on $owner/$repo"
 request="$(jq -nc --arg repo "$repo" \
   '{repositories: [$repo], permissions: {contents: "write", pull_requests: "write"}}')"
 if ! minted="$(github -X POST -H @"$private/jwt.header" -H 'Content-Type: application/json' \
