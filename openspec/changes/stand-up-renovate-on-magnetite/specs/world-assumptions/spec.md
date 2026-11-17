@@ -62,14 +62,16 @@ Any requirement whose discharge depends on this fact SHALL name it explicitly, a
 
 ### Requirement: A112 — Renovate leaves a branch another author wrote, and recognizes only dashboard issues it created
 
-It is true of Renovate 44.236.2, independent of what this fleet builds, that it does not update an existing branch whose commits another author wrote unless configured to ignore that author, and that it recognizes as its dependency dashboard only an issue its own identity created.
+It is true of Renovate 44.236.2, independent of what this fleet builds, that it does not update an existing branch another author wrote, that it seeks existing branches under `branchPrefixOld` (default `renovate/`) as well as `branchPrefix`, and that it treats only an issue it created as its dashboard.
 Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL lose its discharge once the violation condition below is observed.
 
-**Evidence**: `lib/util/git/index.ts` `isBranchModified`; dashboard lookup filters on the creating identity (`lib/modules/platform/github/graphql.ts:27,90`; `lib/modules/platform/github/index.ts:1416-1428`).
+**Evidence**: `lib/util/git/index.ts` `isBranchModified`; `branchPrefixOld` defaults to `renovate/` (`lib/config/options/index.ts:2248-2254`) and is consulted when no branch exists under `branchPrefix` (`lib/workers/repository/update/branch/index.ts:88-97`; `check-existing.ts:30`), in both places only while `branchPrefix !== branchPrefixOld`; dashboard lookup filters on the creating identity (`lib/modules/platform/github/graphql.ts:27,90`; `lib/modules/platform/github/index.ts:1416-1428`).
+
+**Correction, 2026-11-17**: this assumption first named only the author check, and the cutover design relied on a temporary `branchPrefix` alone to keep the hosted updater's branches out of the first dry run. The old-prefix lookup defeated that: the first dry run adopted all five of the hosted updater's `renovate/*` branches, found them written by another author and skipped them. The lookup is now part of the assumption.
 
 #### Scenario: Renovate adopts foreign branches or dashboards
 
-- **WHEN** a pinned Renovate updates branches written by another identity without configuration, or adopts a dashboard issue another identity created
+- **WHEN** a pinned Renovate updates branches written by another identity without configuration, stops consulting `branchPrefixOld` or changes its default, or adopts a dashboard issue another identity created
 - **THEN** this assumption is void, and the `dependency-update-service` requirement `Exactly one dependency updater writes to the repository` loses the reason for closing the hosted updater's branches and dashboard rather than leaving them
 
 ### Requirement: A113 — A full dry run performs artifact updates and tasks and writes nothing to the forge

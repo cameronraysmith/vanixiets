@@ -110,10 +110,21 @@ in
 
             # Phase 1 only; removed by tasks.md 7.4. A full dry run performs
             # artifact updates and post-upgrade tasks but writes nothing to the
-            # forge; the temporary prefix keeps the hosted app's renovate/*
-            # branches from being read as foreign-modified.
+            # forge.
             dryRun = "full";
+            # The temporary prefix alone does not keep the hosted app's
+            # renovate/* branches out of the run: branchPrefixOld defaults to
+            # `renovate/` (Renovate 44.236.2 lib/config/options/index.ts:2248-2254),
+            # and when a branch under branchPrefix does not exist Renovate
+            # adopts the same-named branch under branchPrefixOld
+            # (lib/workers/repository/update/branch/index.ts:88-97, and for PRs
+            # update/branch/check-existing.ts:30), finds it written by
+            # renovate[bot], treats it as edited and skips it. The first Phase 1
+            # run skipped every candidate branch that way. Setting both to the
+            # same value disables the old-prefix lookup, which both sites guard
+            # with `branchPrefix !== branchPrefixOld`.
             branchPrefix = "renovate-selfhost/";
+            branchPrefixOld = "renovate-selfhost/";
             packageRules = renovateSettings.phase1PackageRules;
           };
         })
@@ -127,8 +138,19 @@ in
       ];
 
       systemd.services.renovate = lib.mkIf cfg.enable {
-        # Phase 1 only; removed by tasks.md 7.4.
-        environment.LOG_LEVEL = "debug";
+        # Phase 1 only; removed by tasks.md 7.4. Trace logs every HTTP request
+        # (lib/util/http/http.ts:232, got.ts:37), which task 5.4 needs for the
+        # permission trim. It does not log credentials: the logger replaces
+        # the value of any `authorization` or `token` field
+        # (lib/util/sanitize.ts:7-23 redactedFields, applied by
+        # lib/logger/utils.ts sanitizeValue), and replaces the platform token's
+        # value anywhere in a message, because platform init registers it as a
+        # host rule (lib/modules/platform/index.ts:74-94), host rules register
+        # their token for sanitizing (lib/util/host-rules.ts:268-281), and the
+        # per-repository reset re-adds them (lib/workers/global/index.ts:225-232);
+        # an App token is registered with and without its `x-access-token:`
+        # prefix (lib/util/sanitize.ts:47-64).
+        environment.LOG_LEVEL = "trace";
         script = lib.mkBefore ''
           RENOVATE_TOKEN="$(< /run/renovate/token)"
           export RENOVATE_TOKEN
