@@ -3,15 +3,16 @@ linear_story_id: 857edfc7-ce19-4090-82c8-e37e281463f4
 linear_story_identifier: CAM-106
 linear_story_title: "Stand up Renovate on magnetite as the dependency updater"
 linear_story_url: https://linear.app/cameronraysmith/issue/CAM-106/stand-up-renovate-on-magnetite-as-the-dependency-updater
-linear_story_state: Todo
+linear_story_state: In Progress
 linear_team: CAM
 linear_project: nixbot-herculesci-cicd
-last_synced_state: Todo
-last_synced_at: 2026-11-16T18:59:21Z
+last_synced_state: In Progress
+last_synced_at: 2026-11-17T04:56:58Z
 review_round: 0
 max_review_rounds: 3
 attempt_log:
   - { at: "2026-11-16T18:59:21Z", transition: "Backlog->Todo", outcome: "posted", note: "T1 bind; issue created in project nixbot-herculesci-cicd at Todo, description seeded from this proposal, one comment posted" }
+  - { at: "2026-11-17T04:56:58Z", transition: "Todo->In Progress", outcome: "posted", note: "T2 on first checked tasks.md box (1.1, 1.3, 1.5); state set by name, one comment posted" }
 ---
 
 ## Why

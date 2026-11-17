@@ -109,8 +109,8 @@ Stakeholders: the operator, who creates the App, populates its key, disables the
 
 ## Migration Plan
 
-1. [wizard] Create the App `vanixiets-renovate` with D2's permissions, webhook off, "Only on this account"; record the App id. Generate a private key; install on vanixiets only; record the installation id.
-2. Operator terminal: `(set +x; CLAN_NO_COMMIT=1 clan vars set magnetite renovate-github-app-secret-key/key.pem < <downloaded pem>)`, then shred the download; the orchestrator routes the ciphertext.
+1. [wizard] Create the App `vanixiets-renovate` with D2's permissions, webhook off, "Only on this account"; record the App id. Install on vanixiets only; record the installation id. No private key yet.
+2. Declare the key generator in a generator-only aspect named in magnetite's aspect list (the service stays disabled), then at once [wizard] generate a private key and, in the operator's terminal, `(set +x; CLAN_NO_COMMIT=1 clan vars set magnetite renovate-github-app-secret-key/key.pem < <downloaded pem>)`, delete the download, and route the ciphertext. These steps run back to back because `clan machines update` runs every missing generator for every machine before deploying, so a tree carrying the declaration without the key cannot deploy any host.
 3. Phase 1 pull request (aspect with dry-run settings, host aspect list, allowlist check); land through nixbot and gitea-mq; `clan machines update magnetite`. Magnetite is the only host whose closure changes.
 4. Start a run; accept when the journal shows the token minted, every task executed with no "not been added to the allowed list" message, and "DRY-RUN: Would commit files" sets containing `flake.lock` for regex bumps, `bun.nix` for bun branches, and the four-file Playwright set for a pending Playwright bump.
 5. [wizard] Disable the Mend app for vanixiets.
