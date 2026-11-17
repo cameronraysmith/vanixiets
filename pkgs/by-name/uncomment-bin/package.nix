@@ -1,7 +1,8 @@
 # uncomment-bin: prebuilt release binaries for the "uncomment" tree-sitter
-# comment remover. Packages upstream's GoReleaser (cargo-zigbuild) artifacts
-# whose asset stem is exactly the Rust target triple, rather than building the
-# Rust source.
+# comment remover. Packages the archives upstream's publish workflow builds
+# with plain `cargo build --release --target <triple>` (Linux inside
+# manylinux_2_28 containers), whose asset stem is exactly the Rust target
+# triple, rather than building the Rust source.
 {
   lib,
   stdenv,
@@ -15,34 +16,35 @@ let
   systemToPlatform = {
     "x86_64-linux" = {
       name = "x86_64-unknown-linux-gnu";
-      hash = "sha256-VOPIsOprfzF3zV83QS6aYpMnTU8vD/P2t5yeZvcD8EQ=";
+      hash = "sha256-Z+ifzX3TEnPYkQlEoFMuu4sqqhPPcWmEmjnbhiaX6Lk=";
     };
     "aarch64-linux" = {
       name = "aarch64-unknown-linux-gnu";
-      hash = "sha256-BQnRYmK8M1fLWEztbqPunR2f15qXqSCY9wiOwzves6M=";
+      hash = "sha256-y7WzLU8PXsOlpQ/9/HNQAwIxMr4Z9RY8J+rWeawI988=";
     };
     "x86_64-darwin" = {
       name = "x86_64-apple-darwin";
-      hash = "sha256-/eLb5ytyZleagTg8XjGmKMj+DFAqmq+8IyigtTtwivU=";
+      hash = "sha256-mGb0VwG70Z4Jg/xVOO8W/JEV2ARMQCJYYZhS+Mlfc+A=";
     };
     "aarch64-darwin" = {
       name = "aarch64-apple-darwin";
-      hash = "sha256-+1mKWw6z3jZpq9LK9bPEdcFZWJTVbppykYydyilX3tg=";
+      hash = "sha256-Vo0UinC5zjAzNDX/wGpkv3nnxSn5E/AMtq+2D3stWWE=";
     };
   };
   platform = systemToPlatform.${system} or (throw "uncomment-bin: unsupported platform ${system}");
 in
 stdenv.mkDerivation (finalAttrs: {
   pname = "uncomment-bin";
-  version = "3.10.2";
+  version = "3.12.1";
 
   src = fetchurl {
-    url = "https://github.com/Goldziher/uncomment/releases/download/v${finalAttrs.version}/uncomment-${platform.name}.tar.gz";
+    url = "https://github.com/polylint/uncomment/releases/download/v${finalAttrs.version}/uncomment-${platform.name}.tar.gz";
     hash = platform.hash;
   };
 
-  # GoReleaser packs the binary plus LICENSE/README/CHANGELOG loose at the
-  # archive root, so stdenv's single-directory unpack detection does not apply.
+  # Each archive holds only the bare `uncomment` binary at its root, with no
+  # top-level directory, so stdenv's single-directory unpack detection does
+  # not apply.
   sourceRoot = ".";
 
   dontConfigure = true;
@@ -71,8 +73,8 @@ stdenv.mkDerivation (finalAttrs: {
 
   meta = {
     description = "Fast tree-sitter based tool to remove comments from source code";
-    homepage = "https://github.com/Goldziher/uncomment";
-    changelog = "https://github.com/Goldziher/uncomment/releases/tag/v${finalAttrs.version}";
+    homepage = "https://github.com/polylint/uncomment";
+    changelog = "https://github.com/polylint/uncomment/releases/tag/v${finalAttrs.version}";
     license = lib.licenses.mit;
     mainProgram = "uncomment";
     platforms = lib.attrNames systemToPlatform;

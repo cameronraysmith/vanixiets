@@ -10,11 +10,14 @@ PKG_NIX="${REPO_ROOT}/pkgs/by-name/uncomment-bin/package.nix"
 current_version="$(sed -n 's/.*version = "\(.*\)";/\1/p' "$PKG_NIX" | head -1)"
 
 # Filter the release list to bare semver tags (vMAJOR.MINOR.PATCH) so that a
-# pre-release or sibling tag cannot be mistaken for the latest CLI release.
+# pre-release or the floating major tag (`v3`, itself published as a release)
+# cannot be mistaken for the latest CLI release, then take the highest version:
+# the API's order is not version order (`v3` is listed ahead of v3.10.4).
 latest_tag="$(curl -fsSL \
   -H "Accept: application/vnd.github+json" \
-  "https://api.github.com/repos/Goldziher/uncomment/releases?per_page=100" \
-  | jq -r '[.[] | select(.tag_name | test("^v[0-9]+\\.[0-9]+\\.[0-9]+$"))] | .[0].tag_name')"
+  "https://api.github.com/repos/polylint/uncomment/releases?per_page=100" \
+  | jq -r '[.[] | select(.prerelease | not) | select(.tag_name | test("^v[0-9]+\\.[0-9]+\\.[0-9]+$")) | .tag_name]
+      | max_by(ltrimstr("v") | split(".") | map(tonumber))')"
 latest_version="${latest_tag#v}"
 
 if [[ -z "$latest_version" || "$latest_version" == "null" ]]; then
@@ -39,7 +42,7 @@ declare -A platform_map=(
 
 for platform in "${!platform_map[@]}"; do
   triple="${platform_map[$platform]}"
-  url="https://github.com/Goldziher/uncomment/releases/download/v${latest_version}/uncomment-${triple}.tar.gz"
+  url="https://github.com/polylint/uncomment/releases/download/v${latest_version}/uncomment-${triple}.tar.gz"
 
   echo "Prefetching ${platform} (${triple})..."
   sri_hash="$(nix store prefetch-file --json --hash-type sha256 "$url" | jq -r .hash)"
