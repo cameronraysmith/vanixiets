@@ -20,6 +20,8 @@ Usage:
                                     zoxide, no network access
   ghq-sync --all [QUERY]            operate over `ghq list [QUERY]` (implies -u
                                     when fetching); combinable with --deepen/--full
+  ghq-sync --audit [QUERY]          read-only: compare `ghq list [QUERY]` with
+                                    GitHub and print the commands to fix drift
 
 Targets:
   A TARGET is anything ghq get accepts (a user/project, host/user/project, or
@@ -46,6 +48,17 @@ Options:
                    Register every repo in `ghq list -p [QUERY]` with zoxide
                    without any network access, printing one `added: <path>` line
                    per repo. Bulk-seeds the directory index from the local tree.
+  --audit [QUERY]  Read-only. Ask GitHub, with this account's `gh` token, about
+                   every github.com repo in `ghq list [QUERY]` (batched GraphQL,
+                   which follows renames and transfers) and print one line per
+                   finding: `renamed:` (with the commands that retire the old
+                   path when the new one is cloned, or relocate it otherwise),
+                   `case:` (letter case differs only), `missing:` (deleted or
+                   private upstream; keep it), `archived:`, and `default branch:`
+                   (the clone follows another branch than upstream's default;
+                   `ghq-sync -u` follows it). The commands are text for an
+                   administrator to run as the tree's writer; the audit itself
+                   changes nothing. Without `gh` or a token it says so and exits 0.
   --all [QUERY]    Use `ghq list [QUERY]` as the target set. The single optional
                    positional is the ghq list QUERY.
   -u, --update     Pass ghq's -u to update already-cloned repos (fetch mode).
@@ -74,6 +87,7 @@ Environment:
                      write; it is called as `deepen N PATH`, `promote PATH` or
                      `hydrate REV PATH`.
   GHQ_SYNC_NO_ZOXIDE Skip zoxide registration (the shared tree's writer).
+  gh                 --audit runs the `gh` on PATH, with its stored token.
 USAGE
 }
 
@@ -298,6 +312,117 @@ hydrate_one() {
   return 0
 }
 
+# The branch a clone follows: a single-branch clone's one fetched branch, or the
+# branch origin/HEAD names in a clone that fetches every branch.
+followed_branch() {
+  local path="$1" refspecs head
+  mapfile -t refspecs < <(git -C "$path" --no-optional-locks config --get-all remote.origin.fetch 2>/dev/null || true)
+  if [ "${#refspecs[@]}" -eq 1 ] && [[ "${refspecs[0]}" =~ ^\+?refs/heads/([^*:]+):refs/remotes/origin/([^*:]+)$ ]]; then
+    printf '%s\n' "${BASH_REMATCH[1]}"
+    return 0
+  fi
+  if head="$(git -C "$path" --no-optional-locks symbolic-ref --short -q refs/remotes/origin/HEAD 2>/dev/null)"; then
+    printf '%s\n' "${head#origin/}"
+  fi
+}
+
+# Print one command line, each word shell-quoted, indented under its finding.
+show_command() {
+  local quoted
+  printf -v quoted ' %q' "$@"
+  printf '   %s\n' "${quoted# }"
+}
+
+audit_one() {
+  local name="$1" info="$2" path="$root/$1" canonical archived upstream followed old_owner new_path findings=0
+  if [ "$info" = null ]; then
+    printf 'missing: %s (deleted or private upstream; keep it, it may be the only copy)\n' "$name"
+    return 1
+  fi
+  canonical="github.com/$(jq -r .nameWithOwner <<<"$info")"
+  archived="$(jq -r .isArchived <<<"$info")"
+  upstream="$(jq -r '.defaultBranchRef.name // empty' <<<"$info")"
+  if [ "$canonical" != "$name" ] && [ "${canonical,,}" = "${name,,}" ]; then
+    printf 'case: %s is %s upstream (letter case only; a case-sensitive filesystem would hold a second clone for the other spelling)\n' "$name" "$canonical"
+    findings=1
+  elif [ "$canonical" != "$name" ]; then
+    findings=1
+    old_owner="$root/${name%/*}"
+    new_path="$root/$canonical"
+    if [ -d "$new_path/.git" ]; then
+      printf 'renamed: %s -> %s (the new path is already cloned; retire the old one)\n' "$name" "$canonical"
+      show_command sudo -u "$writer" mv -- "$path" "$old_owner/.retired-${name##*/}"
+      show_command sudo -u "$writer" rm -rf -- "$old_owner/.retired-${name##*/}"
+    else
+      printf 'renamed: %s -> %s (relocate the clone without fetching it again)\n' "$name" "$canonical"
+      show_command sudo -u "$writer" mkdir -p -m 0750 -- "${new_path%/*}"
+      show_command sudo -u "$writer" mv -n -- "$path" "$new_path"
+      show_command sudo -u "$writer" env -i HOME=/var/empty GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null \
+        "$(command -v git)" -C "$new_path" remote set-url origin "https://$canonical"
+      show_command ghq-sync -u "$canonical"
+    fi
+    show_command sudo -u "$writer" rmdir -- "$old_owner"
+    show_command zoxide remove "$path"
+  fi
+  if [ "$archived" = true ]; then
+    printf 'archived: %s (upstream is read-only; it will not change)\n' "$name"
+    findings=1
+  fi
+  followed="$(followed_branch "$path")"
+  if [ -n "$upstream" ] && [ -n "$followed" ] && [ "$followed" != "$upstream" ]; then
+    printf 'default branch: %s follows %s, upstream default is %s (ghq-sync -u %s follows it)\n' \
+      "$name" "$followed" "$upstream" "$name"
+    findings=1
+  fi
+  # Non-zero when anything was reported, so the caller can count findings.
+  [ "$findings" -eq 0 ]
+}
+
+# Read-only: ask GitHub about every github.com repository in `ghq list [QUERY]`,
+# fifty to a GraphQL request, and report drift with the commands that resolve it.
+# git cannot see a rename, since GitHub's git endpoint answers the old name; the
+# API's repository() follows renames and transfers.
+audit() {
+  local query="$1" names=() name listargs=(list) i j q owner repo reply info checked=0 found=0 root writer
+  if ! command -v gh >/dev/null 2>&1 || ! gh auth token >/dev/null 2>&1; then
+    printf 'audit: no GitHub token (install gh and run: gh auth login); nothing was checked\n' >&2
+    return 0
+  fi
+  root="$(realpath -m -- "$(ghq root)")"
+  writer="$(stat -c %U -- "$root")"
+  if [ -n "$query" ]; then listargs+=("$query"); fi
+  while IFS= read -r name; do
+    if [[ "$name" =~ ^github\.com/[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$ ]]; then
+      names+=("$name")
+    else
+      printf 'skip: %s (not a github.com owner/name)\n' "$name"
+    fi
+  done < <(ghq "${listargs[@]}")
+  for ((i = 0; i < ${#names[@]}; i += 50)); do
+    q='query{'
+    for ((j = i; j < i + 50 && j < ${#names[@]}; j++)); do
+      owner="${names[j]#github.com/}"
+      repo="${owner#*/}"
+      owner="${owner%%/*}"
+      q+="r$j:repository(owner:\"$owner\",name:\"$repo\"){nameWithOwner isArchived defaultBranchRef{name}} "
+    done
+    q+='}'
+    # A repository that is gone answers null with an error beside the others'
+    # data, and gh then exits non-zero; the data is still read.
+    reply="$(gh api graphql -f query="$q" 2>/dev/null)" || true
+    if ! jq -e '.data | type == "object"' >/dev/null 2>&1 <<<"$reply"; then
+      printf 'failed: the GitHub query for %s repositories starting at %s\n' "$((j - i))" "${names[i]}"
+      continue
+    fi
+    for ((j = i; j < i + 50 && j < ${#names[@]}; j++)); do
+      info="$(jq -c --arg k "r$j" '.data[$k]' <<<"$reply")"
+      checked=$((checked + 1))
+      audit_one "${names[j]}" "$info" || found=$((found + 1))
+    done
+  done
+  printf 'audit: %s repositories checked, %s with findings; nothing was changed\n' "$checked" "$found"
+}
+
 run_pool() {
   local worker="$1"
   shift
@@ -327,6 +452,7 @@ while [ "$#" -gt 0 ]; do
     --tags) tags=1 ;;
     --full) mode=full ;;
     --seed-zoxide) mode=seed ;;
+    --audit) mode=audit ;;
     --all) all=1 ;;
     -n | --dry-run) dry_run=1 ;;
     --deepen=*)
@@ -383,6 +509,9 @@ fi
 if [ "$mode" = hydrate ] && ! is_revision "$hydrate_rev"; then
   die "--hydrate requires a ref or object name, optionally with ~N or ^N: $hydrate_rev"
 fi
+if [ "$mode" = audit ] && { [ "$tags" = 1 ] || [ "$update" = 1 ] || [ "$all" = 1 ] || [ "$dry_run" = 1 ]; }; then
+  die "--audit is read-only and takes only an optional QUERY"
+fi
 if [ "$tags" = 1 ] && { [ "$mode" = deepen ] || [ "$mode" = full ] || [ "$mode" = hydrate ]; }; then
   die "--tags cannot be combined with --deepen, --full or --hydrate"
 fi
@@ -398,7 +527,7 @@ if [ "$all" = 1 ]; then
     mapfile -t targets < <(ghq list)
   fi
   if [ "$mode" = fetch ]; then update=1; fi
-elif [ "$mode" != fetch ] && [ "$mode" != seed ] && [ "${#targets[@]}" -eq 0 ]; then
+elif [ "$mode" != fetch ] && [ "$mode" != seed ] && [ "$mode" != audit ] && [ "${#targets[@]}" -eq 0 ]; then
   mapfile -t targets
 fi
 
@@ -450,6 +579,12 @@ case "$mode" in
   hydrate)
     run_pool hydrate_one "${targets[@]}"
     register_targets "${targets[@]}"
+    ;;
+  audit)
+    if [ "${#targets[@]}" -gt 1 ]; then
+      die "--audit accepts at most one QUERY argument"
+    fi
+    audit "${targets[0]:-}"
     ;;
   seed)
     if [ "${#targets[@]}" -gt 1 ]; then

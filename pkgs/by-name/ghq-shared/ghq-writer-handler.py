@@ -222,10 +222,70 @@ def shallow_tags(path, env):
     return results
 
 
+def note(text):
+    return subprocess.CompletedProcess([], 0, text.encode(), b"")
+
+
+def follow_default_branch(path, env):
+    """Follow a change of the remote's default branch before an update.
+
+    The remote's HEAD names its default branch without credentials. A clone that
+    fetches one branch (every lazy clone) is pointed at the new default, fetched
+    at its current depth, and checked out on it, since its old branch may be gone.
+    A full clone gets origin/HEAD moved, and changes branch only when it was on
+    the previous default and has no local change; a clone on any other branch, or
+    with changes, stays where it is. One status line reports what happened.
+    """
+    listed = git(path, env, "ls-remote", "--symref", "origin", "HEAD")
+    match = re.match(rb"ref: refs/heads/(\S+)\tHEAD\n", listed.stdout)
+    if listed.returncode or not match:
+        return []
+    new = match.group(1).decode()
+    if git(path, env, "check-ref-format", "--branch", new).returncode:
+        return []
+    refspecs = git(path, env, "config", "--get-all", "remote.origin.fetch").stdout.decode().split()
+    single = [m.group(1) for m in map(re.compile(r"\+?refs/heads/([^*:]+):refs/remotes/origin/\1\Z").match, refspecs) if m]
+    current = git(path, env, "symbolic-ref", "--short", "-q", "HEAD").stdout.decode().strip()
+    if single and len(single) == len(refspecs):
+        old = single[0] if len(single) == 1 else current
+        if new in single:
+            return []
+        depth = []
+        if git(path, env, "rev-parse", "--is-shallow-repository").stdout.strip() == b"true":
+            depth = ["--depth", git(path, env, "rev-list", "--count", "HEAD").stdout.decode().strip()]
+        results = [git(path, env, "remote", "set-branches", "origin", new),
+                   git(path, env, "fetch", "--no-tags", *depth, "origin", new)]
+        if any(r.returncode for r in results):
+            return results
+        results.append(git(path, env, "checkout", "-q", "-B", new, f"origin/{new}"))
+        if not results[-1].returncode:
+            results.append(note(f"default branch: {old} -> {new}; checked out {new}\n"))
+        return results
+    previous = git(path, env, "symbolic-ref", "-q", "--short", "refs/remotes/origin/HEAD").stdout.decode().strip()
+    old = previous.removeprefix("origin/")
+    fetched = git(path, env, "-c", "remote.origin.followRemoteHEAD=always", "fetch", "--no-tags", "origin")
+    if fetched.returncode or not old or old == new:
+        return [fetched]
+    results = [fetched]
+    dirty = git(path, env, "status", "--porcelain").stdout.strip()
+    if current == old and not dirty:
+        local = git(path, env, "rev-parse", "-q", "--verify", f"refs/heads/{new}").returncode == 0
+        switch = ["checkout", "-q", new] if local else ["checkout", "-q", "--track", "-b", new, f"origin/{new}"]
+        results.append(git(path, env, *switch))
+        if not results[-1].returncode:
+            results.append(note(f"default branch: {old} -> {new}; checked out {new}\n"))
+            return results
+    why = "local changes" if dirty and current == old else "not the previous default"
+    results.append(note(f"default branch: {old} -> {new}; kept {current or 'a detached HEAD'} ({why})\n"))
+    return results
+
+
 def run_get(request, argv, config, env):
-    """ghq get, with the tag fetches the request and clone shape call for."""
+    """ghq get, with the default-branch and tag fetches the request and clone shape call for."""
     results = []
     path = repo_dir(request["target"], config["root"])
+    if path and request.get("update") is True:
+        results.extend(follow_default_branch(path, env))
     full = path and git(path, env, "rev-parse", "--is-shallow-repository").stdout.strip() == b"false"
     if path and full and request.get("update") is True:
         results.append(git(path, env, "fetch", "--tags", "origin"))
@@ -273,6 +333,10 @@ def serve(conn, config):
 
 
 def main():
+    # launchd does not apply a job's Umask to the inetd-style instances it starts per
+    # connection, so the handler sets the writer's umask itself: nothing it writes
+    # is group-writable or open to others, on any host.
+    os.umask(0o027)
     with open(sys.argv[1]) as handle:
         config = json.load(handle)
     conn = socket.socket(fileno=0)

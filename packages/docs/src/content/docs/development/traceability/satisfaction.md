@@ -5,15 +5,15 @@ generated: 2026-11-16
 ---
 
 This file is a projection over `openspec/specs/`, regenerated wholesale at archive time and never patched.
-Its rows come only from the post-sync corpus, one per current requirement; discharge annotations for rows that predate the shared-tree-lfs-pointer-policy archive were carried over from the previous projection by capability and requirement title.
+Its rows come only from the post-sync corpus, one per current requirement; discharge annotations for rows that predate the follow-default-branch-audit-drift archive were carried over from the previous projection by capability and requirement title.
 Discharge annotations come from the owning verification artifacts cited below, not from an agreement between configuration files.
 The `W ∧ S ⇒ R` obligation is separate from implementation refinement and from an archive-ready behavioral verdict.
 Nothing here is an end-to-end guarantee; OpenSpec structure checks are not behavioral validation.
 
 ## Status
 
-The post-sync corpus has **302 requirements across 29 capabilities**: 249 requirement-side rows and 53 world-assumption rows.
-**155 requirement-side rows are discharged — 3 at narrow CAM-41 interface boundaries, 36 from CAM-68's telemetry store slice, 26 from CAM-70's fleet alerting slice, 14 from CAM-77's shared reference tree, 31 from CAM-69's dev-loop collection slice, 8 from CAM-71's Linux fleet collection slice, 3 from CAM-76's external watch of the alert path, 19 from CAM-73's fleet dashboard, 10 from CAM-79's browser relay delivery 2 from CAM-72's darwin collection slice and 3 from shared-tree-lfs-pointer-policy; 94 remain undischarged**, each with a follow-up reference.
+The post-sync corpus has **305 requirements across 29 capabilities**: 252 requirement-side rows and 53 world-assumption rows.
+**158 requirement-side rows are discharged — 3 at narrow CAM-41 interface boundaries, 36 from CAM-68's telemetry store slice, 26 from CAM-70's fleet alerting slice, 14 from CAM-77's shared reference tree, 31 from CAM-69's dev-loop collection slice, 8 from CAM-71's Linux fleet collection slice, 3 from CAM-76's external watch of the alert path, 19 from CAM-73's fleet dashboard, 10 from CAM-79's browser relay delivery 2 from CAM-72's darwin collection slice, 3 from shared-tree-lfs-pointer-policy and 3 from follow-default-branch-audit-drift; 94 remain undischarged**, each with a follow-up reference.
 Of those undischarged rows, 9 name world assumptions but no named specification-side discharge; 85 name neither.
 The 53 world rows remain self-attested, not independently discharged; their monitoring/scenario truth is not re-proved by this projection.
 A13 has real incident evidence, including CAM-59, but no new world-assumption audit is claimed here.
@@ -39,6 +39,7 @@ These behavioral dispositions do not manufacture named specification-side discha
 - CAM-72 evidence/follow-ups: `openspec/changes/archive/2026-11-08-stand-up-darwin-collection/verify.md` §§8a,8b,8c,8d,9,10, `tasks.md` §11, `review.md` and `retrospective.md` §6; follow-ups CAM-88 and the two new issues of `review.md` F11 and F15, not yet filed.
 - CAM-92 evidence/follow-ups: `openspec/changes/archive/2026-11-08-resolve-a-restarted-kept-alive-jobs-failure/verify.md` §§1,7,8a,8b,9 and `tasks.md` §§2,4,6; follow-up CAM-93, the nix daemon's move to a release carrying NixOS/nix#16517 (design D4).
 - shared-tree-lfs-pointer-policy evidence/follow-ups: `openspec/changes/archive/2026-11-16-shared-tree-lfs-pointer-policy/verify.md` §§1,7,8a,8b and `tasks.md` §§1–4: the handler, wrapper and acl package tests built on magnetite and the NixOS VM test built on pyrite, with its negative control; no runtime observation after deployment yet.
+- follow-default-branch-audit-drift evidence/follow-ups: `openspec/changes/archive/2026-11-16-follow-default-branch-audit-drift/verify.md` §§1,7,8a,8b and `tasks.md` §§1–4: the handler, wrapper and acl package tests built on magnetite and the NixOS VM test built on pyrite, with its negative control; no runtime observation after deployment yet.
 - `evidence annotation follow-up` means OpenSpec change `annotate-discharge-evidence` (active or subsequently archived), not implicit acceptance.
 - `V-interface` means the CAM-63 retrospective §6 architecture decision: introduce named interface properties or explicitly decide the corpus discharge convention.
 - `V-vocabulary` means the next sole designation-table owner grounds world/shared terms and relocates machine predicates; CAM-63 verify §8 is agent-executed/non-blocking and NEVER validation.
@@ -394,9 +395,12 @@ Source: `openspec/specs/shared-reference-tree-interface/spec.md`.
 | The writer accepts only constrained requests | interface | handler package test refusal classes, including hydrate revisions, and hydrate over a disallowed protocol; VM malformed requests refused through the client | — | discharged at package-test and VM interfaces; CAM-77 verify §5a; `openspec/changes/archive/2026-11-16-shared-tree-lfs-pointer-policy/tasks.md` 1.2, 4.1 |
 | Migration moves only administrators' trees in place, sets other trees aside, and can be rolled back | interface | VM migration subtest (administrator move and rollback, refusals, set-aside with reacquisition, mid-apply probe, resumed rollback, earlier-format records, smudged LFS content set back to its pointer and restored by rollback), failing with each earlier tool; ACL and writer-stop package test | — | discharged at VM and package-test interfaces; CAM-77 verify §5, §5c–5e; `openspec/changes/archive/2026-11-16-shared-tree-lfs-pointer-policy/tasks.md` 3.1; darwin refusal through its probe only |
 | Each property is backed by evidence that can fail | interface | VM `group-writable` and `broken-control` mutations fail at their subtests; assertion mutations fail evaluation | — | discharged — CAM-77 verify §5 |
-| This capability states its own trust boundary | interface | — | — | undischarged — boundary statement, not a property; follow-up: CAM-77 qualifications |
+| This capability states its own trust boundary | interface | — | — | undischarged — boundary statement, not a property; follow-up: CAM-77 qualifications; the writer's refusal to delete, rename or relocate stated by follow-default-branch-audit-drift (D30) |
 | The shared tree holds LFS pointer files, and the writer runs no LFS filter | interface | handler package test: an update of a clone requiring git-lfs fast-forwards to the new pointer, and a control clone without the policy fails; VM LFS subtest (pointer checkout, the same update), failing on a commit that removes the handler's `LFS_POLICY` | — | discharged at package-test and VM interfaces; `openspec/changes/archive/2026-11-16-shared-tree-lfs-pointer-policy/tasks.md` 1.2, 4.1 |
 | Participating accounts' git runs no LFS filter beneath the shared root | interface | include assertions per root form on stibnite, pyrite and magnetite, each failing under a mutation; VM readers' `git status` with git-lfs configured at system scope, and its control re-enabling git-lfs above the include | — | discharged at evaluation and VM interfaces; `openspec/changes/archive/2026-11-16-shared-tree-lfs-pointer-policy/tasks.md` 2.1, 2.2, 4.1; darwin by evaluation and a read-only stibnite check only |
+| An update follows the remote's default branch | interface | handler package test (lazy clones with the old default deleted and kept; full clones on the old default, with a local change, and on a feature branch), failing against the handler before the change; VM subtest of an upstream renaming `master` to `main`, failing on a commit that drops `follow_default_branch` | — | discharged at package-test and VM interfaces; `openspec/changes/archive/2026-11-16-follow-default-branch-audit-drift/verify.md` §8b |
+| The writer's request handler sets its own umask | interface | handler package test starting every handler with umask 022 and failing on any entry open to others or group-writable, failing against the handler before the change | — | discharged at the package-test interface; `openspec/changes/archive/2026-11-16-follow-default-branch-audit-drift/verify.md` §8b; darwin after deployment and the operator's correction of existing entries pending (§7) |
+| A participating account audits the tree against GitHub without changing it | interface | wrapper package test with a fake `gh` (rename, rename beside the new clone, deleted, archived, case-only and drifted repositories; the tree unchanged; no token); a read-only run over stibnite's tree | — | discharged at the package-test interface; `openspec/changes/archive/2026-11-16-follow-default-branch-audit-drift/verify.md` §8b |
 
 ## shared-reference-tree
 
@@ -681,6 +685,14 @@ Primary disposition record: `openspec/changes/archive/2026-11-16-shared-tree-lfs
 - **Designation findings, not resolved here:** `revision`, `file`, `content` and `upstream` are undesignated, and `acquisition request` does not yet name making a revision readable (verify §8a).
 - **Trust boundary is stated, not discharged:** a repository-local `filter.lfs.*` setting outranks a participant's include; nothing here covers the content an LFS pointer names.
 
+## follow-default-branch-audit-drift qualifications
+
+Primary disposition record: `openspec/changes/archive/2026-11-16-follow-default-branch-audit-drift/verify.md` §8b; pending observations §7; diagnosis in `brainstorm.md`, decisions D28–D32 in `design.md`.
+- **Verdict PASS WITH WARNINGS:** every `tasks.md` item is done, with `tasks.md` carrying the plan and no `plan.md`; the evidence is the package tests built on magnetite, with the handler test failing against the handler before the change, and the NixOS VM test built on pyrite with a negative control that drops the default-branch step.
+- **Not yet observed after deployment:** an update following a renamed default branch through the writer on stibnite and a NixOS host, the darwin handler creating entries without permission for others, and the operator's correction of the 105,754 entries stibnite's writer created open to others before this change.
+- **Decided, not built (D30):** the writer never deletes, renames or relocates a clone; the audit prints the commands an administrator runs as the writer.
+- **Trust boundary is stated, not discharged:** the audit reports what GitHub's API answers for the calling account's token; the default-branch rule relies on the remote naming its `HEAD`.
+
 ## Known limits
 
 This projection contains no formal proof and no claim of end-to-end implementation verification.
@@ -695,5 +707,6 @@ The 19 CAM-73 discharges establish configuration, regulator, container-test and 
 The 10 CAM-79 discharges establish package-check, evaluation and observed behavior on stibnite for `crs58` in the Helium profile `sciexp` only; they assert nothing about other darwin hosts or profiles, about the relay extension following an omp upgrade (CAM-80), or about what an agent does in the person's browser once a request asks for the relay.
 The 2 CAM-72 discharges and its amendments of 31 discharged rows establish configuration, regulator, container-test and observed behavior on stibnite and magnetite only, stibnite's acceptance judged over the window of operator decision O2; they assert nothing about other darwin hosts, which have no collector of their own, nor about launchd's calendar trigger at wake, nor that a host's series are written only under its own name, since a certificate's CN is not bound to `host.name`, nor that a `deploy_record` row's `host` names the host that sent it.
 The 3 shared-tree-lfs-pointer-policy discharges and its amendments of 4 discharged shared-reference-tree rows establish package-test, evaluation and NixOS VM behavior, with darwin by evaluation and a read-only check on stibnite only; they assert nothing about the content an LFS pointer names, nor about a repository whose own configuration sets an LFS filter for a reader.
+The 3 follow-default-branch-audit-drift discharges and its amendment of the shared-reference-tree-interface boundary row establish package-test and NixOS VM behavior, with darwin by evaluation only; they assert nothing about a rename the audit was not run for, nor about GitHub's API answering correctly.
 Pyrite file-db contents and runtime adoption are different evidence; user dconf overrides deliberately remain possible.
 An archive-ready PASS WITH WARNINGS and an undischarged formal row are compatible claims at different boundaries, not a silent acceptance of missing evidence.

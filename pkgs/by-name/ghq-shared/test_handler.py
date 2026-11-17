@@ -19,6 +19,9 @@ import tempfile
 import types
 
 HANDLER = sys.argv[1]
+# Fixtures carry no permission for others, so any such permission in the root
+# below was written by the handler.
+os.umask(0o077)
 work = tempfile.mkdtemp()
 root = os.path.join(work, "root")
 os.makedirs(root)
@@ -42,7 +45,9 @@ def config(group=own_group, protocols=("https",)):
 
 def ask(request, cfg):
     ours, theirs = socket.socketpair()
-    proc = subprocess.Popen([HANDLER, cfg], stdin=theirs, stdout=theirs)
+    # launchd starts each inetd-style handler with umask 022 whatever the job's Umask
+    # key says; the handler must set the writer's umask itself.
+    proc = subprocess.Popen([HANDLER, cfg], stdin=theirs, stdout=theirs, preexec_fn=lambda: os.umask(0o022))
     theirs.close()
     ours.sendall((request if isinstance(request, bytes) else json.dumps(request).encode()) + b"\n")
     ours.shutdown(socket.SHUT_WR)
@@ -264,6 +269,92 @@ if reply["exit"] != 0 or "hydrated:" not in reply["stdout"] or shown.stdout != "
 reply = ask({"action": "hydrate", "rev": "no-such-tag", "path": lazy}, tags_cfg)
 if "skip:" not in reply["stdout"]:
     failures.append(f"hydrate of a revision the clone lacks must be skipped: {reply}")
+
+
+# A default branch renamed upstream. Each upstream starts on master; then either
+# master is renamed to main (the old branch is gone) or main is added with a new
+# commit and made the default while master stays (the old branch still exists).
+def upstream(name):
+    work_tree = os.path.join(work, f"{name}-src")
+    bare = os.path.join(work, f"{name}.git")
+    os.makedirs(work_tree)
+    git("init", "-q", "-b", "master", cwd=work_tree)
+    for i in range(3):
+        put(os.path.join(work_tree, "f"), f"{name}{i}\n")
+        git("add", "f", cwd=work_tree)
+        git("commit", "-q", "-m", f"{name}{i}", cwd=work_tree)
+    git("clone", "-q", "--bare", work_tree, bare)
+    git("config", "uploadpack.allowFilter", "true", cwd=bare)
+    git("remote", "add", "up", bare, cwd=work_tree)
+    return work_tree, bare
+
+
+def make_default(work_tree, bare, keep_old):
+    git("checkout", "-q", "-b", "main", cwd=work_tree)
+    put(os.path.join(work_tree, "f"), "on main\n")
+    git("commit", "-q", "-am", "on main", cwd=work_tree)
+    git("push", "-q", "up", "main", cwd=work_tree)
+    git("symbolic-ref", "HEAD", "refs/heads/main", cwd=bare)
+    if not keep_old:
+        git("branch", "-q", "-D", "master", cwd=bare)
+
+
+def head_branch(path):
+    return git("symbolic-ref", "--short", "-q", "HEAD", cwd=path)
+
+
+renamed = {}
+for case, keep_old in (("gone", False), ("kept", True)):
+    work_tree, bare = upstream(f"default-{case}")
+    lazy_clone = os.path.join(root, "github.com", "o", f"default-{case}")
+    git("clone", "-q", "--depth", "1", "--filter=blob:none", "--no-tags", f"file://{bare}", lazy_clone)
+    renamed[case] = (work_tree, bare, lazy_clone)
+# Full clones of the old-branch-kept upstream: one on the old default, one on the
+# old default with a local change, and one on a feature branch an operator works on.
+_, kept_bare, _ = renamed["kept"]
+full_default = os.path.join(root, "github.com", "o", "default-full")
+full_dirty = os.path.join(root, "github.com", "o", "default-dirty")
+full_feature = os.path.join(root, "github.com", "o", "default-feature")
+for path in (full_default, full_dirty, full_feature):
+    git("clone", "-q", "--no-tags", f"file://{kept_bare}", path)
+put(os.path.join(full_dirty, "f"), "local change\n")
+git("checkout", "-q", "-b", "feature", cwd=full_feature)
+for case, keep_old in (("gone", False), ("kept", True)):
+    work_tree, bare, _ = renamed[case]
+    make_default(work_tree, bare, keep_old)
+
+for case in ("gone", "kept"):
+    work_tree, bare, lazy_clone = renamed[case]
+    reply = ask({"action": "get", "target": f"github.com/o/default-{case}", "update": True}, tags_cfg)
+    if (reply["exit"] != 0 or head_branch(lazy_clone) != "main"
+            or git("rev-parse", "HEAD", cwd=lazy_clone) != git("rev-parse", "main", cwd=bare)
+            or "default branch: master -> main" not in reply["stdout"]):
+        failures.append(f"a lazy clone must follow the default branch to main (old branch {case}): {reply} {head_branch(lazy_clone)}")
+    if git("rev-parse", "--is-shallow-repository", cwd=lazy_clone) != "true" or git("rev-list", "--count", "HEAD", cwd=lazy_clone) != "1":
+        failures.append(f"following the default branch must keep the clone's depth (old branch {case})")
+    if git("config", "--get", "remote.origin.partialclonefilter", cwd=lazy_clone) != "blob:none":
+        failures.append(f"following the default branch must keep the clone's filter (old branch {case})")
+reply = ask({"action": "get", "target": "github.com/o/default-full", "update": True}, tags_cfg)
+if (reply["exit"] != 0 or head_branch(full_default) != "main"
+        or git("symbolic-ref", "refs/remotes/origin/HEAD", cwd=full_default) != "refs/remotes/origin/main"
+        or git("rev-parse", "HEAD", cwd=full_default) != git("rev-parse", "main", cwd=kept_bare)):
+    failures.append(f"a clean full clone on the old default must switch to the new one: {reply} {head_branch(full_default)}")
+feature_head = git("rev-parse", "HEAD", cwd=full_feature)
+reply = ask({"action": "get", "target": "github.com/o/default-feature", "update": True}, tags_cfg)
+if (head_branch(full_feature) != "feature" or git("rev-parse", "HEAD", cwd=full_feature) != feature_head
+        or git("symbolic-ref", "refs/remotes/origin/HEAD", cwd=full_feature) != "refs/remotes/origin/main"
+        or "kept feature" not in reply["stdout"]):
+    failures.append(f"a full clone on a feature branch must stay put while origin/HEAD follows: {reply} {head_branch(full_feature)}")
+reply = ask({"action": "get", "target": "github.com/o/default-dirty", "update": True}, tags_cfg)
+if head_branch(full_dirty) != "master" or "kept master" not in reply["stdout"]:
+    failures.append(f"a full clone with local changes must stay on its branch: {reply} {head_branch(full_dirty)}")
+
+# Writer umask: whatever umask the service starts the handler with, nothing it
+# writes carries a permission for others or group write.
+exposed = [os.path.join(d, n) for d, ds, fs in os.walk(root) for n in ds + fs
+           if not os.path.islink(os.path.join(d, n)) and os.lstat(os.path.join(d, n)).st_mode & 0o027]
+if exposed:
+    failures.append(f"the handler wrote {len(exposed)} entries open to others or group-writable, e.g. {exposed[:3]}")
 
 # A connection that never completes its request is closed with a refusal.
 ours, theirs = socket.socketpair()

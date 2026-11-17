@@ -132,6 +132,59 @@ runCommand "ghq-shared-test-wrapper"
       echo "ok: ghq-sync --hydrate '$rev' -> exit 2"
     done
 
+    echo "case: ghq-sync --audit reports drift from GitHub's answers and changes nothing"
+    A="$work/audit/github.com"
+    for repo in old/repo dup/old dup/new gone/repo arch/repo NixOS/pkgs o/drift; do
+      git init -q -b main "$A/$repo"
+      git -C "$A/$repo" config remote.origin.fetch +refs/heads/main:refs/remotes/origin/main
+    done
+    git -C "$A/o/drift" config remote.origin.fetch +refs/heads/master:refs/remotes/origin/master
+    # A fake gh: a token, and for each aliased repository() in the query the answer a
+    # renamed, transferred, deleted, archived, case-only or drifted repository gets.
+    mkdir -p "$work/gh-bin"
+    cat > "$work/gh-bin/gh" <<'GH'
+    #!${bash}/bin/bash
+    if [ "$1 $2" = "auth token" ]; then echo token; exit 0; fi
+    query=""
+    for arg in "$@"; do case "$arg" in query=*) query=''${arg#query=} ;; esac; done
+    out='{"data":{' sep=""
+    while [[ "$query" =~ r([0-9]+):repository\(owner:\"([^\"]+)\",name:\"([^\"]+)\"\)(.*) ]]; do
+      alias=r''${BASH_REMATCH[1]} name=''${BASH_REMATCH[2]}/''${BASH_REMATCH[3]} query=''${BASH_REMATCH[4]}
+      case "$name" in
+        old/repo) answer='{"nameWithOwner":"new/repo","isArchived":false,"defaultBranchRef":{"name":"main"}}' ;;
+        dup/old) answer='{"nameWithOwner":"dup/new","isArchived":false,"defaultBranchRef":{"name":"main"}}' ;;
+        gone/repo) answer=null ;;
+        arch/repo) answer='{"nameWithOwner":"arch/repo","isArchived":true,"defaultBranchRef":{"name":"main"}}' ;;
+        NixOS/pkgs) answer='{"nameWithOwner":"nixos/pkgs","isArchived":false,"defaultBranchRef":{"name":"main"}}' ;;
+        *) answer="{\"nameWithOwner\":\"$name\",\"isArchived\":false,\"defaultBranchRef\":{\"name\":\"main\"}}" ;;
+      esac
+      out+="$sep\"$alias\":$answer" sep=,
+    done
+    echo "$out}}"
+    exit 1
+    GH
+    chmod +x "$work/gh-bin/gh"
+    before=$(find "$work/audit" -printf '%p %m %T@\n' | sort)
+    got=$(GHQ_ROOT="$work/audit" PATH="$work/gh-bin:$PATH" ${ghq-sync}/bin/ghq-sync --audit 2>&1)
+    for want in \
+      "renamed: github.com/old/repo -> github.com/new/repo (relocate the clone without fetching it again)" \
+      "renamed: github.com/dup/old -> github.com/dup/new (the new path is already cloned; retire the old one)" \
+      "missing: github.com/gone/repo (deleted or private upstream; keep it, it may be the only copy)" \
+      "archived: github.com/arch/repo (upstream is read-only; it will not change)" \
+      "case: github.com/NixOS/pkgs is github.com/nixos/pkgs upstream" \
+      "default branch: github.com/o/drift follows master, upstream default is main (ghq-sync -u github.com/o/drift follows it)" \
+      "audit: 7 repositories checked, 6 with findings; nothing was changed"; do
+      case "$got" in *"$want"*) ;; *) printf 'FAIL: ghq-sync --audit lacks %s in:\n%s\n' "$want" "$got"; exit 1 ;; esac
+    done
+    case "$got" in *"mv -n -- $A/old/repo $A/new/repo"*) ;; *) printf 'FAIL: no relocate command in:\n%s\n' "$got"; exit 1 ;; esac
+    [ "$(find "$work/audit" -printf '%p %m %T@\n' | sort)" = "$before" ] || { echo "FAIL: ghq-sync --audit changed the tree"; exit 1; }
+    echo "ok: ghq-sync --audit"
+    got=$(GHQ_ROOT="$work/audit" PATH="$(dirname "$(command -v git)"):/usr/bin:/bin" ${ghq-sync}/bin/ghq-sync --audit 2>&1) \
+      || { echo "FAIL: ghq-sync --audit without gh exited non-zero: $got"; exit 1; }
+    [ "$got" = "audit: no GitHub token (install gh and run: gh auth login); nothing was checked" ] \
+      || { echo "FAIL: ghq-sync --audit without gh: $got"; exit 1; }
+    echo "ok: ghq-sync --audit without a token"
+
     echo "case: GHQ_ROOT overrides git configuration"
     GHQ_ROOT="$work/other" expect 0 "real get github.com/a/b" get github.com/a/b
 
