@@ -6,6 +6,10 @@ title: "ADR-0011: SOPS secrets management"
 
 Accepted
 
+Superseded in part: machine and generated secrets moved to clan vars, which encrypts them to each machine's own age key, and the Bitwarden-generated host keys, `config.nix` identities and generated `.sops.yaml` described below were retired.
+SOPS with age remains the encryption layer of both trees.
+The current arrangement and procedures are in the [Secrets Management Guide](/guides/secrets-management/).
+
 ## Context
 
 Managing secrets in infrastructure-as-code requires:

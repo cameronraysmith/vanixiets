@@ -290,10 +290,10 @@ Managing secrets with clan vars for machine-level secrets and sops-nix for user-
 
 **sops-nix (user secrets)**:
 
-1. Create secrets/users/\<username\>.sops.yaml file
-2. Edit with sops secrets/users/\<username\>.sops.yaml
+1. Add a creation rule for secrets/home-manager/users/\<username\>/ in .sops.yaml (recovery key, operator identity, the user's key)
+2. Edit with sops secrets/home-manager/users/\<username\>/secrets.yaml
 3. Add secret keys and values in editor
-4. Secrets encrypted with user age keys from ~/.config/sops/age/keys.txt
+4. Secrets decrypt with the user's age key in ~/.config/sops/age/keys.txt (derived from their Bitwarden SSH key), or on NixOS the key hm-sops-bridge delivers
 5. Reference secrets in home-manager modules via sops.secrets
 6. Deployment decrypts secrets to home directory
 
@@ -439,7 +439,7 @@ Deployment decrypts secrets to machine paths.
 
 Integration point: clan.core.facts and age decryption during activation.
 
-**sops-nix to home-manager**: User secrets defined in secrets/users/\<username\>.sops.yaml.
+**sops-nix to home-manager**: User secrets defined in secrets/home-manager/users/\<username\>/secrets.yaml.
 Home-manager modules reference sops.secrets."\<path\>".
 Deployment decrypts secrets to home directory.
 
@@ -564,7 +564,7 @@ Manual secret creation (sops editor)
   ↓
 Age encryption (user keys)
   ↓
-Encrypted storage (secrets/users/<username>.sops.yaml)
+Encrypted storage (secrets/home-manager/users/<username>/secrets.yaml)
   ↓
 home-manager deployment
   ↓
@@ -693,7 +693,7 @@ Composition: modules/nixpkgs/compose.nix defines flake.overlays.default.
 
 Clan vars: vars/ directory with encrypted generated secrets.
 
-sops-nix: secrets/users/ with encrypted user credentials.
+sops-nix: secrets/home-manager/users/\<username\>/ with encrypted user credentials; secrets/bridge/ with NixOS bridge keys; secrets/shared.yaml with operator credentials.
 
 Age keys: .sops.yaml defines machine and user age keys.
 

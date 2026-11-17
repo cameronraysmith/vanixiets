@@ -130,16 +130,10 @@ These recipes are executed by CI jobs:
 
 | File | Line | Command | Risk |
 |------|------|---------|------|
-| secrets-management.md | 206 | `bw login` | Bitwarden CLI login not tested |
-| secrets-management.md | 209 | `bw unlock --raw` | Bitwarden vault unlock not tested |
-| secrets-management.md | 216 | `bw get item` | Bitwarden key extraction not tested |
-| secrets-management.md | 219 | `ssh-to-age -private-key` | Age key derivation not tested |
-| secrets-management.md | 264 | `just sops-validate-correspondences` | Recipe validation not in CI |
-| secrets-management.md | 412 | `sops updatekeys` | Secret re-encryption not tested |
-| secrets-setup.md | 129 | `bw unlock --raw` | Bitwarden unlock not tested |
-| secrets-setup.md | 141-153 | `bw list items`, `bw get attachment` | Bitwarden queries not tested |
-| secrets-setup.md | 169-182 | `ssh-to-age` operations | Key conversion pipeline not tested |
-| secrets-setup.md | 204 | `rm -P` (secure delete) | Secure file deletion not tested |
+| secrets-management.md | Workstation age key | `bw unlock --raw`, `bw get item` | Bitwarden vault unlock and key extraction not tested |
+| secrets-management.md | Workstation age key | `ssh-to-age -private-key` | Age key derivation not tested (the public side is covered by `checks.x86_64-linux.sops-correspondence`) |
+| secrets-management.md | Changing recipients | `just update-all-keys`, `sops rotate` | Secret re-encryption not tested (the resulting recipients are covered by `sops-correspondence`) |
+| secrets-setup.md | Step 2 | `bw get item … .sshKey`, `ssh-to-age` | Bitwarden query and key conversion pipeline not tested |
 
 ### High gaps (infrastructure)
 
@@ -160,7 +154,7 @@ These recipes are executed by CI jobs:
 | darwin-deployment.md | 197 | `darwin-rebuild --list-generations` | Generation listing not tested |
 | darwin-deployment.md | 289 | `brew install --cask zerotier-one` | Homebrew cask not tested |
 | darwin-deployment.md | 471 | Homebrew installer curl | Darwin bootstrap not tested |
-| home-manager-onboarding.md | 185 | `age-keygen -o` | Age key generation not tested |
+| home-manager-onboarding.md | Step 5 | Workstation age key derivation (`bw`, `ssh-to-age`) | Key derivation not tested |
 | home-manager-onboarding.md | 418 | `launchctl` | macOS service management not tested |
 
 ### Low gaps (user environment)
@@ -282,7 +276,7 @@ These documents provide partial traceability that this audit extends and validat
 | set-variables | `just list-packages-json` | Package discovery |
 | preview-release-version | `just preview-version main packages/<name>` | Semantic-release preview |
 | preview-docs-deploy | `just docs-deploy-preview` | Docs preview deployment |
-| bootstrap-verification | `make bootstrap && make verify && make setup-user` | Bootstrap workflow |
+| bootstrap-verification | `make bootstrap && make verify` | Bootstrap workflow |
 | secrets-workflow | Manual encrypt/decrypt test | SOPS mechanics |
 | flake-validation | `just check` | Full flake check |
 | cache-overlay-packages | `just cache-overlay-packages <system>` | Package pre-caching |

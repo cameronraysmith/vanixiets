@@ -231,7 +231,7 @@ A `/fast-forward` comment on a pull request fast-forwards `main` to the pull req
 ### CD (`cd.yaml`)
 
 Manual dispatch only.
-Runs `bootstrap-verification` (the Makefile bootstrap on a clean Ubuntu runner; locally `make bootstrap && make verify && make setup-user`) and the informational `test-cluster` integration workflow.
+Runs `bootstrap-verification` (the Makefile bootstrap on a clean Ubuntu runner; locally `make bootstrap && make verify`) and the informational `test-cluster` integration workflow.
 Its jobs use per-job content-addressed caching; see [ADR-0016](/development/architecture/adrs/0016-per-job-content-addressed-caching/).
 To force re-execution, dispatch with `force_run: true`.
 

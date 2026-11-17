@@ -524,16 +524,12 @@ This is the only secret that must be created manually; all others can use SopsSe
 # Create operator namespace
 kubectl create namespace sops-secrets-operator
 
-# Source age key from Bitwarden (never store in git)
-bw get item "sops-ci-age-key" --field notes > /tmp/age-key.txt
-
-# Create the secret
-kubectl create secret generic sops-age-key-file \
-  --namespace sops-secrets-operator \
-  --from-file=key=/tmp/age-key.txt
-
-# Clean up
-rm /tmp/age-key.txt
+# Derive the age key from the CI SSH key item in Bitwarden and pipe it
+# straight into the Secret (never written to disk, never stored in git)
+bw get item sops-ci-ssh | jq -r .sshKey.privateKey | ssh-to-age -private-key \
+  | kubectl create secret generic sops-age-key-file \
+      --namespace sops-secrets-operator \
+      --from-file=key=/dev/stdin
 ```
 
 ### Deploy sops-secrets-operator

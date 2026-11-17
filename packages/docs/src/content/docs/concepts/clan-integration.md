@@ -140,65 +140,53 @@ home-manager.users.crs58 = {
 ```
 
 Home-manager configuration is defined OUTSIDE clan, using deferred module composition.
-When you run `clan machines update`, home-manager activates as part of system activation.
+When you run `clan machines update` (NixOS) or `just activate` (darwin), home-manager activates as part of system activation.
 Clan doesn't know about home-manager specifically.
 
-### User secrets (legacy sops-nix)
+### User secrets (legacy sops tree)
 
-Some user-level secrets use direct sops-nix configuration alongside clan vars.
+Hand-written user secrets live outside clan vars, in the legacy `.sops.yaml` + `secrets/` tree.
+Each user's home-manager module points sops-nix at that user's file:
 
 ```nix
-# modules/home/core/git.nix
-sops.secrets."users/crs58/github-signing-key" = {
-  sopsFile = "${inputs.self}/secrets/users/crs58.sops.yaml";
+# modules/home/users/crs58/default.nix
+sops = {
+  defaultSopsFile = flake.inputs.self + "/secrets/home-manager/users/crs58/secrets.yaml";
+  secrets.github-token = { };
 };
 ```
-
-New user secrets use clan vars.
 
 ## Secrets management
 
-Clan vars is the primary secrets management system for all secrets (system and user).
-Clan vars uses sops encryption internally and provides unified secret generation, distribution, and management.
+Secrets live in two sops trees that share one operator identity.
+The [Secrets Management Guide](/guides/secrets-management) gives the procedures; this section explains how clan fits in.
 
 ### Secrets architecture
 
-The infrastructure uses clan vars as the primary secrets system, with some legacy sops-nix patterns remaining:
+**Clan vars (machine and generated secrets)**
 
-**Clan vars (primary)**
+- **Generated** by clan vars generators (`clan vars generate <machine>`)
+- **Examples**: SSH host keys, zerotier identities, service credentials, certificates
+- **Storage**: `vars/per-machine/<machine>/` and `vars/shared/`, encrypted to each machine's age key and its users
+- **Machine keys**: public in `sops/machines/<machine>/key.json`; private in `sops/secrets/<machine>-age.key/secret`, encrypted to the admin user
+- **On the host**: sops-nix reads the machine key from `/var/lib/sops-nix/key.txt`, which only `clan machines update`, `clan machines install` and `clan vars upload <machine>` write
 
-- **Generated** by clan vars system
-- **Machine-specific and user-specific** secrets
-- **Examples**: SSH host keys, zerotier identities, LUKS passphrases, user credentials
-- **Managed via**: `clan vars generate`
-- **Storage**: `vars/` directory, encrypted with sops
-
-```nix
-# Vars are generated automatically
-# machines/nixos/cinnabar/vars/zerotier/...
-# machines/darwin/stibnite/vars/user-secrets/...
+```
+vars/per-machine/cinnabar/zerotier/…
+vars/per-machine/stibnite/nix-grpc-cert/…
 ```
 
-**Legacy sops-nix (supplementary)**
+**Legacy sops tree (hand-written secrets)**
 
-- **Manually created** via sops CLI
-- **User-specific** secrets in legacy format
-- **Examples**: Some GitHub tokens, API keys, signing keys, personal credentials
-- **Managed via**: `sops secrets/users/username.sops.yaml`
-- **Storage**: `secrets/` directory, encrypted with age
-
-```nix
-# Secrets manually created and encrypted (legacy)
-sops.secrets."users/crs58/github-token" = {
-  sopsFile = ./secrets/users/crs58.sops.yaml;
-};
-```
+- **Created** with the sops CLI against `.sops.yaml`'s creation rules
+- **Examples**: users' home-manager secrets, operator credentials, cluster secrets, NixOS bridge keys
+- **Storage**: `secrets/home-manager/users/<user>/secrets.yaml`, `secrets/shared.yaml`, `secrets/clusters/local/`, `secrets/bridge/`
+- **Read with**: each person's age key in `~/.config/sops/age/keys.txt` (derived from their Bitwarden SSH key), or on NixOS the bridge key `hm-sops-bridge` delivers
 
 ### Secrets lifecycle
 
-Clan vars handles both generated secrets (SSH keys, service credentials) and manually-created secrets (API tokens, personal credentials).
-The distinction is not about secret type but about creation method.
-New secrets use clan vars; legacy sops-nix patterns remain functional for existing configurations.
+The split is by creation method: clan generates and rotates machine secrets, while people write user secrets by hand.
+`checks.x86_64-linux.sops-correspondence` keeps the public keys both trees name in agreement.
 
 ## Integration patterns
 
@@ -227,16 +215,17 @@ Home-manager modules defined using deferred module composition, deployed via cla
 ### Clan + sops-nix
 
 ```
-Clan vars (primary)             Legacy sops-nix (supplementary)
-───────────────────             ───────────────────────────────
-SSH host keys                   Some GitHub tokens
-Zerotier identities             Some API keys
-LUKS passphrases                Some personal credentials
-User credentials (new)          User credentials (legacy)
+Clan vars (machine secrets)          Legacy sops tree (user secrets)
+───────────────────────────          ───────────────────────────────
+SSH host keys                        Home-manager API tokens, credentials
+Zerotier identities                  Signing keys
+Service credentials, certificates    Operator credentials (shared.yaml)
+Machine keys (sops/machines)         NixOS bridge keys (secrets/bridge)
 ```
 
-Both systems coexist.
-New secrets use clan vars; legacy sops-nix patterns remain functional.
+Both systems use sops-nix on the host.
+On NixOS, `clan machines update` installs the machine key and activates.
+Darwin hosts are activated locally with `just activate`, which never installs the machine key, so each darwin host with a machine key needs `clan vars upload <host>` once; `just activate` stops with that remedy when the key is missing or differs.
 
 ## Machine fleet
 
@@ -244,10 +233,10 @@ Current machines managed by clan:
 
 | Hostname | Type | Platform | Role | Deployment |
 |----------|------|----------|------|------------|
-| stibnite | Darwin laptop | aarch64-darwin | Workstation | `clan machines update` |
-| blackphos | Darwin laptop | aarch64-darwin | Workstation | `clan machines update` |
-| rosegold | Darwin laptop | aarch64-darwin | Workstation | `clan machines update` |
-| argentum | Darwin laptop | aarch64-darwin | Workstation | `clan machines update` |
+| stibnite | Darwin laptop | aarch64-darwin | Workstation | `just activate` (machine key via `clan vars upload`) |
+| blackphos | Darwin laptop | aarch64-darwin | Workstation | `just activate` |
+| rosegold | Darwin laptop | aarch64-darwin | Workstation | `just activate` (machine key via `clan vars upload`) |
+| argentum | Darwin laptop | aarch64-darwin | Workstation | `just activate` (machine key via `clan vars upload`) |
 | cinnabar | NixOS VPS | x86_64-linux | Zerotier controller | `clan machines update` |
 | electrum | NixOS VPS | x86_64-linux | Server | `clan machines update` |
 | galena | NixOS GCP | x86_64-linux | CPU compute | `clan machines update` |

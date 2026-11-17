@@ -124,28 +124,28 @@ The vanixiets repository maintains age keys in `.sops.yaml` with distinct key cl
 
 | Key class | Purpose | Kubernetes usage |
 |-----------|---------|------------------|
-| `&dev` | Development/repository work | Primary cluster decryption key |
-| `&ci` | CI/CD pipelines | GitOps pipeline decryption |
+| `&ci` | CI/CD pipelines (`SOPS_AGE_KEY` in `test-cluster`) | Cluster decryption key for `secrets/clusters/local` |
 | `&admin` | Offline recovery | Emergency access only |
-| `&admin-user` | Admin user identity | User-scoped secrets |
-| `&<host>` | Host-specific keys | Not used in Kubernetes |
+| `&admin-user` | Operator identity | Operator encrypts and maintains cluster secrets |
+| `&<user>-user` | Personal keys | Not used in Kubernetes |
+| machine and host keys | Clan machine keys, darwin host keys | Not used in Kubernetes |
 
-For Kubernetes clusters, the `&dev` or `&ci` key serves as the decryption key depending on whether the cluster operates in development or production mode.
+For Kubernetes clusters, the `&ci` key serves as the in-cluster decryption key; the `secrets/clusters/local/` rule lists `&admin`, `&ci` and `&admin-user`.
 The same age public key appears in both `.sops.yaml` (for encryption) and as a Kubernetes Secret (for decryption).
 
 ### Key distribution to cluster
 
 Key distribution differs between local development and production:
 
-For local development clusters (kind, k3d, minikube):
+For local development clusters (kind, k3d, minikube), derive the age private key from the Bitwarden SSH key item and pipe it straight into the Secret, so it never lands on disk:
 
 ```bash
-# Source the key from Bitwarden or local storage
-bw get item "sops-dev-ssh" --field notes > /tmp/sops-dev-key.txt
-kubectl create secret generic sops-age-key-file \
-  --namespace sops-secrets-operator \
-  --from-file=key=/tmp/sops-dev-key.txt
-rm /tmp/sops-dev-key.txt
+export BW_SESSION=$(bw unlock --raw)
+bw get item sops-ci-ssh | jq -r .sshKey.privateKey | ssh-to-age -private-key \
+  | kubectl create secret generic sops-age-key-file \
+      --namespace sops-secrets-operator \
+      --from-file=key=/dev/stdin
+bw lock
 ```
 
 For production clusters, the age key should be provisioned through the cluster bootstrap process using terranix or ClusterAPI machine configuration, never committed to git.
@@ -386,10 +386,11 @@ helm install sops-secrets-operator sops/sops-secrets-operator \
   --create-namespace \
   -f values-local.yaml
 
-# Create decryption key secret
-kubectl create secret generic sops-age-key-file \
-  --namespace sops-secrets-operator \
-  --from-literal=key="$(bw get item sops-dev-ssh --field notes)"
+# Create decryption key secret (age key derived from the Bitwarden SSH item, never written to disk)
+bw get item sops-ci-ssh | jq -r .sshKey.privateKey | ssh-to-age -private-key \
+  | kubectl create secret generic sops-age-key-file \
+      --namespace sops-secrets-operator \
+      --from-file=key=/dev/stdin
 ```
 
 ### Production clusters

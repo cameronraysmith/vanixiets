@@ -53,7 +53,7 @@ You'll understand Nix flakes, the deferred module composition pattern, direnv in
 **[Secrets Setup](/tutorials/secrets-setup)** — Essential for any real use.
 
 Learn how secrets management works.
-You'll understand secrets management with clan vars and legacy sops-nix, derive age keys from SSH keys, and set up encrypted secrets that deploy with your configuration.
+You'll understand how clan vars and the legacy sops tree divide the fleet's secrets, derive your age key from your Bitwarden SSH key, and set up encrypted secrets that deploy with your configuration.
 
 - **Prerequisites**: Completed Bootstrap to Activation
 - **Teaches**: Age encryption, sops-nix, Bitwarden integration
@@ -104,7 +104,7 @@ Your entry point into this infrastructure.
 Secure credential management from first principles.
 
 **What you'll learn:**
-- Secrets management with clan vars and legacy sops-nix migration
+- How clan vars (machine secrets) and the legacy sops tree (user secrets) divide the work
 - Age key derivation from SSH keys
 - Creating and managing encrypted secrets
 - Platform differences (darwin vs NixOS)

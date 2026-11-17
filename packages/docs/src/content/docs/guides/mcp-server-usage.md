@@ -45,21 +45,19 @@ claude --mcp-config ~/.mcp/nixos.json ~/.mcp/firecrawl.json ~/.mcp/playwright.js
 ## Adding a new MCP server
 
 1. Determine if server requires secrets
-2. If yes, add to your user's secrets file (`secrets/users/{username}/mcp-api-keys.yaml`):
+2. If yes, add the key to your home-manager secrets file:
    ```bash
    # Replace {username} with your actual username (e.g., crs58)
-   sops secrets/users/{username}/mcp-api-keys.yaml
+   sops secrets/home-manager/users/{username}/secrets.yaml
    # Add: new-service-api-key: <value>
    ```
-
-3. Add to `modules/home/all/tools/claude-code/mcp-servers.nix`:
+   and declare it in your user module (`modules/home/users/{username}/default.nix`), where `sops.defaultSopsFile` already points at that file:
    ```nix
-   # If secrets needed (uses config.home.username automatically):
-   sops.secrets."mcp-new-service-api-key" = {
-     sopsFile = mcpSecretsFile;  # Automatically resolves to secrets/users/{username}/
-     key = "new-service-api-key";
-   };
+   sops.secrets.new-service-api-key = { };
+   ```
 
+3. Add a template to `modules/home/ai/claude-code/mcp-servers.nix`:
+   ```nix
    sops.templates.mcp-new-service = {
      mode = "0400";
      path = "${home}/.mcp/new-service.json";
@@ -69,7 +67,7 @@ claude --mcp-config ~/.mcp/nixos.json ~/.mcp/firecrawl.json ~/.mcp/playwright.js
            command = "npx";
            args = [ "-y" "new-service-mcp" ];
            env = {
-             API_KEY = config.sops.placeholder."mcp-new-service-api-key";
+             API_KEY = config.sops.placeholder."new-service-api-key";
            };
          };
        };
@@ -77,7 +75,7 @@ claude --mcp-config ~/.mcp/nixos.json ~/.mcp/firecrawl.json ~/.mcp/playwright.js
    };
    ```
 
-4. Rebuild: `darwin-rebuild switch --flake .#stibnite`
+4. Rebuild: `just activate`
 5. Test: `claude --mcp-config ~/.mcp/new-service.json --help`
 
 ## Special case: mcp-prompt-server
@@ -99,10 +97,10 @@ When you update the project, rebuild it with `npm run build` - no nix rebuild ne
 ```bash
 # 1. Generate new API keys from service providers
 # 2. Update secrets file
-sops secrets/users/crs58/mcp-api-keys.yaml
+sops secrets/home-manager/users/crs58/secrets.yaml
 
 # 3. Rebuild configuration
-darwin-rebuild switch --flake .#stibnite
+just activate
 
 # 4. Test servers with new keys
 claude --mcp-config ~/.mcp/firecrawl.json --help
@@ -118,7 +116,7 @@ claude --mcp-config ~/.mcp/firecrawl.json --help
 
 **Authentication failures** (servers with secrets):
 - Verify secret was substituted: `cat ~/.mcp/<server>.json` (should NOT contain "placeholder")
-- Test decryption: `sops -d secrets/users/crs58/mcp-api-keys.yaml`
+- Test decryption without printing values: `sops -d secrets/home-manager/users/crs58/secrets.yaml >/dev/null && echo ok`
 - Check age key exists: `ls ~/.config/sops/age/keys.txt`
 
 **JSON syntax errors**:

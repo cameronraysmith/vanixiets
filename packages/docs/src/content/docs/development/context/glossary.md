@@ -153,7 +153,7 @@ Synonym: none (clan-core is the repository name, not an alternative term).
 Related: inventory, vars, zerotier, clan vars, service instance.
 
 **clan vars**: Secrets system in clan with centralized generators creating machine-specific outputs.
-Currently NixOS-only; darwin support is planned but not yet implemented.
+Active on NixOS and darwin; each machine reads its vars with its own machine key, which `clan machines update` installs on NixOS and `clan vars upload <host>` installs on darwin.
 Secrets stored in `vars/per-machine/<hostname>/` and `vars/shared/` at repository root.
 Synonym: vars system.
 Related: clan, vars generator, secrets.

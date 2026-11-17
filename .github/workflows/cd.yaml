@@ -85,21 +85,6 @@ jobs:
         if: steps.cache.outputs.should-run == 'true'
         run: make verify
 
-      - name: run make setup-user
-        if: steps.cache.outputs.should-run == 'true'
-        run: make setup-user
-
-      - name: verify age key generated
-        if: steps.cache.outputs.should-run == 'true'
-        run: |
-          if [ ! -f ~/.config/sops/age/keys.txt ]; then
-            echo "age key not generated"
-            exit 1
-          fi
-          echo "age key generated successfully"
-          . /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh && \
-          nix shell nixpkgs#age -c age-keygen -y ~/.config/sops/age/keys.txt
-
       - name: Create job result marker
         if: success() && steps.cache.outputs.should-run == 'true'
         shell: bash
