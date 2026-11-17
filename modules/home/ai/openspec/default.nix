@@ -108,6 +108,11 @@
             featureFlags = { };
             profile = cfg.profile;
             workflows = cfg.workflows;
+            # OpenSpec 2.1 defaults `openspec init` to installing its skills
+            # machine-wide into ~/.agents/skills (Fission-AI/OpenSpec#2241),
+            # the tree home-manager maintains for Codex and Pi; project scope
+            # keeps it inside the repository it runs in.
+            skillsScope = "project";
             telemetry = {
               noticeSeen = true;
               anonymousId = "00000000-0000-0000-0000-000000000000";
@@ -119,6 +124,7 @@
               featureFlags = { };
               profile = config.programs.openspec.profile;
               workflows = config.programs.openspec.workflows;
+              skillsScope = "project";
               telemetry = {
                 noticeSeen = true;
                 anonymousId = "00000000-0000-0000-0000-000000000000";
@@ -131,8 +137,10 @@
             {file}`$XDG_CONFIG_HOME/openspec/config.json`, validated upstream by a
             passthrough zod schema. Defaults are derived from
             {option}`programs.openspec.profile` and
-            {option}`programs.openspec.workflows`; override or extend here for
-            keys this module does not model.
+            {option}`programs.openspec.workflows`, with `skillsScope = "project"`
+            so `openspec init` never installs skills into the home-manager-maintained
+            {file}`~/.agents/skills`; override or extend here for keys this module
+            does not model.
 
             Written as a managed copy each activation; keys not declared here are
             dropped from the existing file.
