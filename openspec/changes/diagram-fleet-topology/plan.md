@@ -83,10 +83,10 @@
 - Consumes: `flake.lib.fleetTopology.files`.
 - Produces: `just topology-generate`.
 
-- [ ] **Step 1:** Add the recipe in group `diagrams`: `mkdir -p packages/docs/diagrams/topology`, then for each of the three names `nix eval --raw ".#lib.fleetTopology.files.\"$f\"" > "packages/docs/diagrams/topology/$f"`.
-- [ ] **Step 2:** Run `just topology-generate` twice. Expected: three files after the first; `jj diff packages/docs/diagrams/topology` unchanged by the second.
+- [ ] **Step 1:** Add the recipe in group `diagrams`: `mkdir -p packages/docs/diagrams/topology`, then for each of the four names (`fleet.json`, `fleet.d2`, `network.d2`, `fleet-table.md`) `nix eval --raw ".#lib.fleetTopology.files.\"$f\"" > "packages/docs/diagrams/topology/$f"`.
+- [ ] **Step 2:** Run `just topology-generate` twice. Expected: four files after the first; `jj diff packages/docs/diagrams/topology` unchanged by the second.
 - [ ] **Step 3:** Read the files against tasks.md 2.2's list; render both with `d2 --layout elk` to `/tmp` and rasterize with `rsvg-convert` to look at them (tasks.md 2.3).
-- [ ] **Step 4: Commit** the recipe and the three files to the chain.
+- [ ] **Step 4: Commit** the recipe and the four files to the chain.
 
 ### Task 4: Freshness check
 
@@ -109,7 +109,7 @@
 - Modify: `modules/devshells/default.nix` (add `pkgs.d2` beside `pkgs.typstWithPackages`)
 - Modify: `justfile` (`diagrams-build`)
 - Modify: `pkgs/by-name/vanixiets-docs/package.nix` (argument `d2`, `nativeBuildInputs`, buildPhase loop)
-- Create: `packages/docs/src/content/docs/concepts/fleet-topology.md`
+- Create: `packages/docs/src/content/docs/concepts/fleet-topology.mdx` (imports `fleet-table.md`, D16)
 - Modify: `packages/docs/src/content/docs/concepts/index.md`, `concepts/architecture-overview.md`, `concepts/build-service-topology.md`
 
 **Interfaces:**

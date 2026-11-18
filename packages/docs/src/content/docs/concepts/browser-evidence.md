@@ -23,9 +23,10 @@ The `browser-evidence` effect publishes an inert subset of that report:
 - `run.json`, the runner's exit code and the report's provenance;
 - `playwright-report/completion.json`, every test's outcome and attempts;
 - for each failed attempt, the files Playwright kept under `test-results/<dir>/`: the screenshot `test-failed-1.png`, the video `video.webm`, the error context `error-context.md`, and the trace `trace.zip`;
+- for a passing attempt, the named view screenshots `view-*.png` a test attached, which Playwright stores as `test-results/<dir>/attachments/<name>-<sha1>.png`; today only the fleet-topology spec attaches them, on Chromium, as `view-fleet.png` and `view-network.png`;
 - `receipt.json`, which describes the publication.
 
-Passing attempts keep no attachments, so a passing run publishes only the metadata.
+Passing attempts keep no other attachments, so a passing run without view screenshots publishes only the metadata.
 The HTML report is not published, because it is executable content; to see it, build the report attribute locally.
 Nothing caps the size of a published file: a trace is about 3 MB, and storage at this scale costs next to nothing.
 
@@ -69,6 +70,7 @@ A comment for a pull request that changes the report shows:
 - the build number, linked to the build, and the first 12 hex digits of its revision, followed by `(reused for head <head>, same tree)` when the build was reused for a newer head;
 - the expected, unexpected, flaky, and skipped test counts;
 - a table of failed attempts, collapsed under a summary, or `No failed attempts.`;
+- a `Rendered views` section when the report carries view screenshots, described [below](#rendered-views);
 - a link to `receipt.json`;
 - that no report identical to this one has been published from `main` in the last 90 days, which is why it is shown;
 - that the evidence is kept 30 days.
@@ -101,6 +103,34 @@ The comment quotes no error message or other text from the report; the test name
 The comment describes the build named in it.
 nixbot reuses a finished build for a new head whose tree is identical, without building again, and the comment then names both the reused build's revision and the head it was reused for.
 A reused build that failed sends no event, so its head gets no comment of its own; the comment keeps naming the earlier build with the same tree.
+
+## Rendered views
+
+When a passing attempt of the report carries view screenshots, the comment adds a section titled `Rendered views` after the failed-attempt table.
+It has one row per view name, showing the base revision's view of that name beside the pull request's, both as images.
+A view's name is its file name without the 40-hex hash Playwright appends when it copies an attachment (a SHA-1 of the source path, not of the image), so `attachments/view-fleet-<sha1>.png` is `view-fleet.png`, and base and head match by that name whatever the hash:
+
+```markdown
+#### Rendered views
+
+Base: `<base rev>`, the merge base with `main`.
+
+| View | Base | Head |
+|---|---|---|
+| `view-fleet.png` | ![base view-fleet.png](<base report>/test-results/<dir>/attachments/view-fleet-<sha1>.png) | ![head view-fleet.png](<base>/test-results/<dir>/attachments/view-fleet-<sha1>.png) |
+| `view-network.png` | unavailable: the base report has no `view-network.png` | ![head view-network.png](<base>/test-results/<dir>/attachments/view-network-<sha1>.png) |
+```
+
+`<base>` is the pull request's bundle URL, as in the failed-attempt table, and `<base report>` is the bundle URL of the base revision's report in `ttl-90d`.
+
+The base revision is resolved in this order.
+nixbot's pull request event carries only the base branch, not a base revision, so the first choice is the merge base of the pull request's head with that branch, read from GitHub's compare API, because the effect has no checkout to run git in.
+Without a merge base, the base is the newest of `main`'s five newest commits whose report is published.
+The base report is the one nixbot built for that revision, read from the `ttl-90d` tier, where `main` publishes.
+When the base report is not published there, has expired, or has no view of that name, the Base cell says `unavailable` and why, and the row still shows the head's view.
+A report without view screenshots gets no `Rendered views` section.
+
+The two images are not compared: they show the change for a reviewer to look at, and pass or fail nothing.
 
 ## Opening a trace
 

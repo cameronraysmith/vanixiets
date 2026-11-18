@@ -7,6 +7,7 @@
   cacert,
   runCommand,
   svgo,
+  d2,
   jq,
   autoPatchelfHook,
   makeFontsConf,
@@ -97,6 +98,7 @@ stdenv.mkDerivation (finalAttrs: {
   nativeBuildInputs = [
     nodejs-slim
     typstWithPackages
+    d2
     svgo
     jq
   ]
@@ -117,9 +119,9 @@ stdenv.mkDerivation (finalAttrs: {
   buildPhase = ''
     runHook preBuild
     ${patchBundledWorkerd}
-    # Mirror just docs-linkcheck's diagram compilation so the nix-built
+    # Mirror just diagrams-build's diagram compilation so the nix-built
     # artifact matches the deployed site with diagrams present (they are
-    # gitignored; only .typ sources are in git).
+    # gitignored; only the .typ and topology/*.d2 sources are in git).
     cd packages/docs
     mkdir -p public/diagrams
     (
@@ -128,6 +130,11 @@ stdenv.mkDerivation (finalAttrs: {
         [ -f "$typ" ] || continue
         name="''${typ%.typ}"
         typst compile --format svg "$typ" "../public/diagrams/$name.svg"
+      done
+      # The fleet map's views (diagram-fleet-topology D8): same svgo pass
+      # below, whose default preset keeps D2's labels as <text>.
+      for view in fleet network; do
+        HOME="$TMPDIR" d2 --layout elk "topology/$view.d2" "../public/diagrams/topology-$view.svg"
       done
     )
     for svg in public/diagrams/*.svg; do
@@ -472,6 +479,25 @@ stdenv.mkDerivation (finalAttrs: {
     in
     runCommand "vanixiets-docs-e2e-action-negative-control" { } ''
       ${nodejs-slim}/bin/node ${../../../packages/docs/tests/report}/check-negative-report.ts ${report} removed-link
+      mkdir -p "$out"
+      ln -s ${report} "$out/report"
+    '';
+
+  # The fleet map's oracle (e2e/fleet-topology.ts) against a served placement
+  # view missing its first host: the unchanged oracle must fail on every
+  # attempt (openspec change diagram-fleet-topology, D14).
+  passthru.tests.e2e-topology-negative-control =
+    let
+      report = finalAttrs.finalPackage.tests.e2e-report.overrideAttrs (old: {
+        pname = "vanixiets-docs-e2e-topology-negative-report";
+        env = old.env // {
+          PLAYWRIGHT_CONFIG = "playwright.topology-negative.config.ts";
+          PLAYWRIGHT_PROJECTS = "chromium";
+        };
+      });
+    in
+    runCommand "vanixiets-docs-e2e-topology-negative-control" { } ''
+      ${nodejs-slim}/bin/node ${../../../packages/docs/tests/report}/check-negative-report.ts ${report} topology
       mkdir -p "$out"
       ln -s ${report} "$out/report"
     '';

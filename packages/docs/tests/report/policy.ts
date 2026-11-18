@@ -12,6 +12,9 @@ export const requiredCases: Readonly<Record<string, readonly string[]>> = {
     "documentation-pages.spec.ts::sidebar contains configured navigation items",
     "documentation-pages.spec.ts::has table of contents on desktop",
     "reader-journey.spec.ts::reader finds bootstrap prerequisites and a guided reading path",
+    "fleet-topology.spec.ts::fleet topology page loads",
+    "fleet-topology.spec.ts::both fleet topology diagrams load",
+    "fleet-topology.spec.ts::every host and network in fleet.json is text in the diagrams",
   ],
   "playwright.negative.config.ts": ["reader-journey.spec.ts::damaged guide is rejected by the real reader journey"],
   "playwright.action-negative.config.ts": [
@@ -19,6 +22,9 @@ export const requiredCases: Readonly<Record<string, readonly string[]>> = {
   ],
   "playwright.webkit-negative.config.ts": [
     "reader-journey.spec.ts::damaged guide is rejected by the real reader journey",
+  ],
+  "playwright.topology-negative.config.ts": [
+    "fleet-topology.spec.ts::dropped host is rejected by the fleet topology oracle",
   ],
 };
 
@@ -40,7 +46,11 @@ export function requiredProjects(system: string, config: string): readonly Engin
   // WebKit failure evidence is required on every system, including Darwin,
   // where the screenshot needs the e2e/fixtures.ts repair.
   if (config === "playwright.webkit-negative.config.ts") return ["webkit"];
-  if (config === "playwright.negative.config.ts" || config === "playwright.action-negative.config.ts") {
+  if (
+    config === "playwright.negative.config.ts" ||
+    config === "playwright.action-negative.config.ts" ||
+    config === "playwright.topology-negative.config.ts"
+  ) {
     return ["chromium"];
   }
   return config === "playwright.config.ts" ? requiredEngines[system] : undefined;

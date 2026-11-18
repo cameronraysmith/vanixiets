@@ -9,6 +9,7 @@ Conceptual documentation to help you understand the architecture and design patt
 ## Overview
 
 - [Architecture overview](/concepts/architecture-overview/) - Understanding the architecture combining deferred module composition, clan, and multi-channel overlay composition
+- [Fleet topology](/concepts/fleet-topology/) - Where each service runs, which fleet networks each host joins, and which host answers each public hostname, generated from the clan inventory
 
 ## Module system foundations
 

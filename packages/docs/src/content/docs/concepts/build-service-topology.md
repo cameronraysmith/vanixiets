@@ -93,4 +93,5 @@ The outermost boundary is the forge application's installation selection, which 
 
 - [Clan Integration](/concepts/clan-integration/) — how `clan machines update` deploys these services
 - [Deferred module composition](/concepts/deferred-module-composition/) — the aspect pattern both services follow
+- [Fleet topology](/concepts/fleet-topology/) — every host's services and networks, magnetite's among them
 - [Secrets management](/guides/secrets-management/) — how `clan.core.vars` credentials reach a service

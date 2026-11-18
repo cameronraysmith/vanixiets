@@ -88,6 +88,21 @@
 # a null obs, which later decline, unaffected and affected runs parse; an
 # affected run replaces it with a current marker. Without a marker it stays
 # silent.
+#
+# Rendered views: a report whose passing attempt references view-fleet and
+# view-network screenshots at Playwright's hashed attachment paths
+# (attachments/view-fleet-<sha1>.png) gets a `Rendered views` section after its
+# failed-attempt result, asserted byte for byte. The base is the report
+# nixbot built for the base revision, read from ttl-90d with the read-only
+# credential only. With a merge base (GitHub's compare API, stubbed) whose
+# report main never published, both base cells say so
+# (pr-views-unpublished-base); with a merge base whose report a real main
+# run published carrying a view-fleet screenshot only, under another hash,
+# so the match is by view name without the hash, the fleet row shows the base
+# image and the network row says the base report has none (pr-views-base);
+# without a merge base, the newest of main's commits whose report is
+# published is the base (pr-views-main-fallback); a report without views
+# gets no section and makes no base request (pr-views-none).
 { ... }:
 {
   perSystem =
@@ -138,6 +153,20 @@
       batchRev = "9999999999999999999999999999999999999999";
       batchTree = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
       unbuiltTree = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+      # The fleet-topology spec's Chromium attempt directory, the base
+      # revisions of the rendered-views rows (one whose report main never
+      # published, one it did), and their heads.
+      viewDir = "test-results/fleet-topology-chromium";
+      # Playwright copies a path attachment to attachments/<name>-<sha1 of
+      # its bytes>.<ext>; the base's fleet view has another hash than the
+      # head's, as a changed image does.
+      headFleet = "${viewDir}/attachments/view-fleet-c40690a8a3f7971c43dfcc429190d1badf632eb2.png";
+      headNetwork = "${viewDir}/attachments/view-network-7ac9ed583e28e122e0ba4835dd16551bb332db56.png";
+      baseFleet = "${viewDir}/attachments/view-fleet-0123456789abcdef0123456789abcdef01234567.png";
+      unpublishedBaseRev = "dddddddddddddddddddddddddddddddddddddddd";
+      publishedBaseRev = "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
+      viewsRev = "abababababababababababababababababababab";
+      fallbackRev = "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd";
       evidenceKeyRoot = "projects/vanixiets/browser-evidence";
       # The Worker URL of evidenceKeyRoot: the key without `projects/`.
       evidenceOrigin = "https://evidence.vanixiets.net/vanixiets/browser-evidence";
@@ -148,7 +177,12 @@
       # report under another store path, which main has not published) and
       # final everywhere else it fails; in `cap` instead the first four cases
       # fail in every project. `steady` passes at the first attempt, so it
-      # has no attachments. The failed attempt references a screenshot,
+      # has no attachments. `views` and `base-views` pass as `steady` does,
+      # but the passing attempt of one Chromium case (the fleet-topology
+      # spec's when policy.ts has it) references view screenshots:
+      # view-fleet and view-network at hashed paths, or a view-fleet of
+      # another hash only.
+      # The failed attempt references a screenshot,
       # video, error context and trace, except in `unknown-extension`, whose
       # attempt references a screenshot, a trace and notes.txt.
       fixture = pkgs.writeText "publish-evidence-report-fixture.mjs" ''
@@ -194,6 +228,7 @@
           variant === "unknown-extension"
             ? [shot, dir + "/notes.txt", "${trace}"]
             : [shot, "${video}", "${errorContext}", "${trace}"];
+        const views = { views: ["${headFleet}", "${headNetwork}"], "base-views": ["${baseFleet}"] }[variant] ?? [];
 
         function write(name, data) {
           mkdirSync(dirname(join(root, name)), { recursive: true });
@@ -224,7 +259,11 @@
         const tests = [];
         // Playwright's JSON reporter merges one spec's tests across projects.
         const specs = new Map();
+        for (const view of views) write(view, png);
         const cases = requiredCases[config];
+        const viewCase =
+          cases.find((name) => name === "fleet-topology.spec.ts::every host and network in fleet.json is text in the diagrams") ??
+          cases.at(-1);
         for (const project of projects) {
           for (const [index, name] of cases.entries()) {
             const passed = { status: "passed", retry: 0, failureKind: null, attachments: [] };
@@ -235,6 +274,9 @@
             } else if (project === projects[0] && name.startsWith("reader-journey.spec.ts::")) {
               if (failing) attempts = [failed];
               else if (variant === "passing" || variant === "recovered") attempts = [failed, { ...passed, retry: 1 }];
+            }
+            if (views.length > 0 && project === projects[0] && name === viewCase) {
+              attempts = [{ ...passed, attachments: views }];
             }
             const outcome =
               attempts.at(-1).status === "failed" ? "unexpected" : attempts.length > 1 ? "flaky" : "expected";
@@ -310,6 +352,8 @@
         "darwin"
         "negative-config"
         "invalid"
+        "views"
+        "base-views"
       ];
 
       # The report tools with the failing test renamed to unsafeTestName.
@@ -413,6 +457,18 @@
                     return self.pr_comment(body)
                 if self.command != "GET":
                     return self.reply(405)
+                github = "/github/repos/cameronraysmith/vanixiets"
+                if url.path == github + "/commits":
+                    branch = urllib.parse.parse_qs(url.query).get("sha", [""])[0]
+                    fixture = state / "branches" / (branch + ".json")
+                    if branch.isalnum() and fixture.is_file():
+                        return self.reply(200, fixture.read_bytes())
+                    return self.reply(404, b'{"message": "Not Found"}')
+                if url.path.startswith(github + "/compare/"):
+                    fixture = state / "compares" / (url.path[len(github + "/compare/"):] + ".json")
+                    if fixture.is_file():
+                        return self.reply(200, fixture.read_bytes())
+                    return self.reply(404, b'{"message": "Not Found"}')
                 if url.path.startswith("/github/repos/cameronraysmith/vanixiets/commits/"):
                     fixture = state / "trees" / (url.path.rsplit("/", 1)[1] + ".json")
                     if fixture.is_file():
@@ -701,6 +757,8 @@
                 "cap"
                 "darwin"
                 "negative-config"
+                "views"
+                "base-views"
               ]
             }; do
               node ${reportTools}/validate-report.ts validate "$report" > /dev/null \
@@ -729,7 +787,8 @@
             fi
 
             export STUB_STATE=$TMPDIR/stub
-            mkdir -p "$STUB_STATE/builds" "$STUB_STATE/commits" "$STUB_STATE/objects" "$STUB_STATE/trees" "$STUB_STATE/pages"
+            mkdir -p "$STUB_STATE/builds" "$STUB_STATE/commits" "$STUB_STATE/objects" "$STUB_STATE/trees" "$STUB_STATE/pages" \
+              "$STUB_STATE/compares" "$STUB_STATE/branches"
             touch "$STUB_STATE/raw.log"
             STUB_ACCOUNT_ID=${accountId} STUB_ACCESS_KEY_ID=${accessKeyId} \
               STUB_PARENT_SECRET=${parentSecret} STUB_TASK_TOKEN=${taskToken} \
@@ -841,16 +900,19 @@
               attr ${reportAttr} "$@"
             }
             # event <number json> [<status> [<rev> [<pull request number>
-            # [<head rev>]]]]: the build_finished or pull_request payload, with
-            # a pullRequest when numbered whose headRev is <head rev>, by
-            # default the build's rev (a fresh build of the head).
+            # [<head rev> [<base ref>]]]]]: the build_finished or
+            # pull_request payload, with a pullRequest when numbered whose
+            # headRev is <head rev>, by default (or when empty) the build's
+            # rev (a fresh build of the head), and whose baseRef, when given,
+            # is <base ref>.
             event() {
               jq -n --argjson n "$1" --arg status "''${2:-succeeded}" --arg rev "''${3:-${rev}}" --arg pr "''${4:-}" \
-                --arg head "''${5:-''${3:-${rev}}}" \
+                --arg head "''${5:-''${3:-${rev}}}" --arg base "''${6:-}" \
                 '{build: {number: $n, url: "https://nixbot.example/builds/\($n)", status: $status,
                   branch: "main", rev: $rev, previousStatus: "succeeded", failedAttrs: []}}
-                + if $pr == "" then {} else {pullRequest: {number: ($pr | tonumber), title: "evidence",
-                  url: "https://github.com/cameronraysmith/vanixiets/pull/\($pr)", headRev: $head}} end' \
+                + if $pr == "" then {} else {pullRequest: ({number: ($pr | tonumber), title: "evidence",
+                  url: "https://github.com/cameronraysmith/vanixiets/pull/\($pr)", headRev: $head}
+                  + if $base == "" then {} else {baseRef: $base} end)} end' \
                 > "$NIXBOT_EVENT_JSON"
             }
             other="$(attr checks.x86_64-linux.other succeeded /nix/store/00000000000000000000000000000000-other)"
@@ -926,9 +988,12 @@
             bundle=(playwright-report/completion.json run.json ${errorContext} ${screenshot} ${trace} ${video})
             unknown_bundle=(playwright-report/completion.json run.json ${screenshot} ${trace})
             steady_bundle=(playwright-report/completion.json run.json)
-            passing_counts='{"expected": 29, "unexpected": 0, "skipped": 0, "flaky": 1}'
-            failing_counts='{"expected": 29, "unexpected": 1, "skipped": 0, "flaky": 0}'
-            steady_counts='{"expected": 30, "unexpected": 0, "skipped": 0, "flaky": 0}'
+            # Every fixture holds one test per policy.ts case and engine; the
+            # passing report has one flaky test, the failing one one failure.
+            tests="$(jq '.tests | length' ${reports.steady}/playwright-report/completion.json)"
+            passing_counts="{\"expected\": $((tests - 1)), \"unexpected\": 0, \"skipped\": 0, \"flaky\": 1}"
+            failing_counts="{\"expected\": $((tests - 1)), \"unexpected\": 1, \"skipped\": 0, \"flaky\": 0}"
+            steady_counts="{\"expected\": $tests, \"unexpected\": 0, \"skipped\": 0, \"flaky\": 0}"
             p_obs="$(obs ${reports.passing})"
             f_obs="$(obs ${reports.failing})"
             s_obs="$(obs ${reports.steady})"
@@ -1530,7 +1595,7 @@
             expect_comments 1
             # The exact body: the failed attempt's row links all four files.
             affected_comment failed \
-              "[build 51](https://nixbot.example/builds/51) at \`${lib.substring 0 12 affectedRev}\`: 29 expected, 1 unexpected, 0 flaky, 0 skipped." \
+              "[build 51](https://nixbot.example/builds/51) at \`${lib.substring 0 12 affectedRev}\`: $((tests - 1)) expected, 1 unexpected, 0 flaky, 0 skipped." \
               "$f_url" \
               "$(failed_table ${lib.escapeShellArg testName} "$(links ttl-30d "$f_obs" screenshot video context trace)")"
             expect_comment_body "$TMPDIR/expected-comment.md"
@@ -1785,7 +1850,7 @@
             expect_receipt "$objects/$s30/receipt.json" ${reports.steady} true "$steady_counts" \
               "$(destination ttl-30d "$s_obs")" "''${steady_bundle[@]}"
             expect_comments 1
-            steady_comment "[build 55](https://nixbot.example/builds/55) at \`${lib.substring 0 12 affectedRev}\`: 30 expected, 0 unexpected, 0 flaky, 0 skipped."
+            steady_comment "[build 55](https://nixbot.example/builds/55) at \`${lib.substring 0 12 affectedRev}\`: $tests expected, 0 unexpected, 0 flaky, 0 skipped."
             expect_comment_body "$TMPDIR/expected-comment.md"
             expect_marker 9 current "$s_obs" 55 ${affectedRev} ${affectedRev}
             cp -a "$objects" "$TMPDIR/objects.pull-request"
@@ -1807,7 +1872,7 @@
             expect_comments 1
             steady_comment "[build 55](https://nixbot.example/builds/55) at \`${lib.substring 0 12 affectedRev}\` (reused for head \`${
               lib.substring 0 12 reusedHeadRev
-            }\`, same tree): 30 expected, 0 unexpected, 0 flaky, 0 skipped."
+            }\`, same tree): $tests expected, 0 unexpected, 0 flaky, 0 skipped."
             expect_comment_body "$TMPDIR/expected-comment.md"
             expect_marker 9 current "$s_obs" 55 ${affectedRev} ${reusedHeadRev}
             diff -r -x pr "$TMPDIR/objects.pull-request" "$objects" || fail "a reused build wrote evidence objects"
@@ -1862,7 +1927,7 @@
               "$(destination ttl-30d "$u_obs")" "''${unknown_bundle[@]}"
             expect_comments 1
             affected_comment failed \
-              "[build 70](https://nixbot.example/builds/70) at \`${lib.substring 0 12 affectedRev}\`: 29 expected, 1 unexpected, 0 flaky, 0 skipped." \
+              "[build 70](https://nixbot.example/builds/70) at \`${lib.substring 0 12 affectedRev}\`: $((tests - 1)) expected, 1 unexpected, 0 flaky, 0 skipped." \
               "$u_url" \
               "$(failed_table ${lib.escapeShellArg testName} "$(links ttl-30d "$u_obs" screenshot trace)")"
             expect_comment_body "$TMPDIR/expected-comment.md"
@@ -1895,7 +1960,7 @@
               "$(destination ttl-30d "$z_obs")" "''${bundle[@]}"
             expect_comments 1
             affected_comment failed \
-              "[build 71](https://nixbot.example/builds/71) at \`${lib.substring 0 12 affectedRev}\`: 29 expected, 1 unexpected, 0 flaky, 0 skipped." \
+              "[build 71](https://nixbot.example/builds/71) at \`${lib.substring 0 12 affectedRev}\`: $((tests - 1)) expected, 1 unexpected, 0 flaky, 0 skipped." \
               "$z_url" \
               "$(failed_block '1 failed attempt: `reader finds a | b path` in chromium 1/1' \
                 "$(failed_row 'reader finds a \| b path' chromium 1 "$(links ttl-30d "$z_obs" screenshot video context trace)")")"
@@ -1923,7 +1988,7 @@
               "$(req PUT 200 rw30 "$(marker_key 12)" application/json)"
             expect_bundle "$objects/$c30" ${reports.cap} "''${bundle[@]}"
             expect_receipt "$objects/$c30/receipt.json" ${reports.cap} false \
-              '{"expected": 18, "unexpected": 12, "skipped": 0, "flaky": 0}' \
+              "{\"expected\": $((tests - 12)), \"unexpected\": 12, \"skipped\": 0, \"flaky\": 0}" \
               "$(destination ttl-30d "$c_obs")" "''${bundle[@]}"
             expect_comments 1
             c_links="$(links ttl-30d "$c_obs" screenshot video context trace)"
@@ -1935,7 +2000,7 @@
               done
             done
             affected_comment failed \
-              "[build 72](https://nixbot.example/builds/72) at \`${lib.substring 0 12 affectedRev}\`: 18 expected, 12 unexpected, 0 flaky, 0 skipped." \
+              "[build 72](https://nixbot.example/builds/72) at \`${lib.substring 0 12 affectedRev}\`: $((tests - 12)) expected, 12 unexpected, 0 flaky, 0 skipped." \
               "$c_url" \
               "$(failed_block "12 failed attempts: \`has correct title and heading\` in chromium 1/1, firefox 1/1, webkit 1/1; \`has accessible links\` in chromium 1/1, firefox 1/1, webkit 1/1; \`navigates to getting started guide\` in chromium 1/1, firefox 1/1, webkit 1/1; +1 more tests" \
                 "''${c_rows[@]}")"
@@ -1967,27 +2032,215 @@
               "$(destination ttl-30d "$r_obs")" "''${bundle[@]}"
             expect_comments 1
             affected_comment passed \
-              "[build 73](https://nixbot.example/builds/73) at \`${lib.substring 0 12 affectedRev}\`: 29 expected, 0 unexpected, 1 flaky, 0 skipped." \
+              "[build 73](https://nixbot.example/builds/73) at \`${lib.substring 0 12 affectedRev}\`: $((tests - 1)) expected, 0 unexpected, 1 flaky, 0 skipped." \
               "$r_url" \
               "$(failed_block "1 failed attempt: \`${testName}\` in chromium 1/2" \
                 "$(failed_row ${lib.escapeShellArg testName} chromium 1 "$(links ttl-30d "$r_obs" screenshot video context trace)")")"
             expect_comment_body "$TMPDIR/expected-comment.md"
             expect_marker 13 current "$r_obs" 73 ${affectedRev}
+
+            # --- rendered views, on pull requests 16 to 19 (see the header).
+            v_obs="$(obs ${reports.views})"
+            v30=$ttl30/v1/$v_obs
+            v_url="${evidenceOrigin}/ttl-30d/v1/$v_obs/"
+            bv_obs="$(obs ${reports.base-views})"
+            bv90=$ttl90/v1/$bv_obs
+            views_bundle=(playwright-report/completion.json run.json ${headFleet} ${headNetwork})
+            base_views_bundle=(playwright-report/completion.json run.json ${baseFleet})
+            api_github() {
+              jq -nc --arg path "/github/repos/cameronraysmith/vanixiets/$1" '{method: "GET", path: $path}'
+            }
+            api_commit() {
+              jq -nc --arg path "/api/repos/github/cameronraysmith/vanixiets/builds?commit=$1" '{method: "GET", path: $path}'
+            }
+            # views_line <build> <rev>: the build line of the views report.
+            views_line() {
+              echo "[build $1](https://nixbot.example/builds/$1) at \`''${2:0:12}\`: $tests expected, 0 unexpected, 0 flaky, 0 skipped."
+            }
+            # views_block <base line> <row...>: `No failed attempts.` and the
+            # Rendered views section, with its Base line unless empty.
+            views_block() {
+              local base=$1
+              shift
+              printf '%s\n' "No failed attempts." "" "#### Rendered views" ""
+              [ -z "$base" ] || printf '%s\n' "Base: $base." ""
+              printf '%s\n' "| View | Base | Head |" "|---|---|---|" "$@"
+            }
+            # view_row <view> <base cell>: the row of <view>, beside the
+            # views report's image in ttl-30d.
+            view_row() {
+              local path=${headNetwork}
+              [ "$1" != view-fleet.png ] || path=${headFleet}
+              echo "| \`$1\` | $2 | ![head $1]($v_url$path) |"
+            }
+            # base_image <view>: the base-views report's image in ttl-90d.
+            base_image() {
+              echo "![base $1](${evidenceOrigin}/ttl-90d/v1/$bv_obs/${baseFleet})"
+            }
+            # expect_comment_lines <line...>: the row's comment.md holds
+            # each line exactly.
+            expect_comment_lines() {
+              local line
+              jq -j '.body' "$STUB_STATE/comments.jsonl" > "$TMPDIR/comment.md"
+              for line in "$@"; do
+                grep -qxF -- "$line" "$TMPDIR/comment.md" || fail "comment.md lacks the line $line"
+              done
+            }
+
+            # views-base-main: main's onPush run publishes the base-views
+            # report of publishedBaseRev to ttl-90d.
+            jq -n '{items: [{number: 93, commit_sha: "${publishedBaseRev}", status: "succeeded"}], page: 1, has_next: false}' \
+              > "$STUB_STATE/commits/${publishedBaseRev}.json"
+            build 93 succeeded ${publishedBaseRev} "[$(report succeeded ${reports.base-views})]"
+            run views-base-main main --rev ${publishedBaseRev} --upload
+            expect_status 0
+            expect_lines \
+              "PUBLISH-EVIDENCE: uploaded ${evidenceOrigin}/ttl-90d/v1/$bv_obs/" \
+              "PUBLISH-EVIDENCE: published (report $bv_obs, passed=true)"
+            expect_api "$(api_commit ${publishedBaseRev})" "$(api_build 93)"
+            expect_s3 "$(upload rw90 "$bv90" "''${base_views_bundle[@]}")"
+            expect_bundle "$objects/$bv90" ${reports.base-views} "''${base_views_bundle[@]}"
+            expect_no_comment
+
+            # pr-views-unpublished-base: the merge base's report (the
+            # recovered one) was never published from main, so both base
+            # cells say so.
+            jq -n '{merge_base_commit: {sha: "${unpublishedBaseRev}"}}' > "$STUB_STATE/compares/main...${viewsRev}.json"
+            jq -n '{items: [{number: 91, commit_sha: "${unpublishedBaseRev}", status: "succeeded"}], page: 1, has_next: false}' \
+              > "$STUB_STATE/commits/${unpublishedBaseRev}.json"
+            build 91 succeeded ${unpublishedBaseRev} "[$(report succeeded ${reports.recovered})]"
+            build 90 succeeded ${viewsRev} "[$(report succeeded ${reports.views})]"
+            event 90 succeeded ${viewsRev} 16 "" main
+            run pr-views-unpublished-base event --upload
+            expect_status 0
+            expect_lines \
+              "PUBLISH-EVIDENCE: uploaded $v_url" \
+              "PUBLISH-EVIDENCE: published (report $v_obs, passed=true)" \
+              "PUBLISH-EVIDENCE: commented #16"
+            expect_api "$(api_build 90)" "$(api_github "compare/main...${viewsRev}")" \
+              "$(api_commit ${unpublishedBaseRev})" "$(api_build 91)" "$api_comment"
+            expect_s3 \
+              "$(req HEAD 404 ro "$ttl90/v1/$v_obs/receipt.json")" \
+              "$(upload rw30 "$v30" "''${views_bundle[@]}")" \
+              "$(req GET 404 ro "$ttl90/v1/$r_obs/receipt.json")" \
+              "$(req PUT 200 rw30 "$(marker_key 16)" application/json)"
+            expect_bundle "$objects/$v30" ${reports.views} "''${views_bundle[@]}"
+            expect_receipt "$objects/$v30/receipt.json" ${reports.views} true "$steady_counts" \
+              "$(destination ttl-30d "$v_obs")" "''${views_bundle[@]}"
+            expect_comments 1
+            unpublished="unavailable: the base report is not published in the last 90 days"
+            affected_comment passed "$(views_line 90 ${viewsRev})" "$v_url" \
+              "$(views_block "\`${lib.substring 0 12 unpublishedBaseRev}\`, the merge base with \`main\`" \
+                "$(view_row view-fleet.png "$unpublished")" "$(view_row view-network.png "$unpublished")")"
+            expect_comment_body "$TMPDIR/expected-comment.md"
+            expect_comment_lines "#### Rendered views" \
+              "| \`view-fleet.png\` | $unpublished | ![head view-fleet.png](''${v_url}${headFleet}) |" \
+              "| \`view-network.png\` | $unpublished | ![head view-network.png](''${v_url}${headNetwork}) |"
+            expect_marker 16 current "$v_obs" 90 ${viewsRev}
+
+            # pr-views-base: the merge base's report is main's base-views
+            # report, which has view-fleet.png only.
+            jq -n '{merge_base_commit: {sha: "${publishedBaseRev}"}}' > "$STUB_STATE/compares/main...${laterRev}.json"
+            build 92 succeeded ${laterRev} "[$(report succeeded ${reports.views})]"
+            event 92 succeeded ${laterRev} 17 "" main
+            run pr-views-base event --upload
+            expect_status 0
+            expect_lines \
+              "PUBLISH-EVIDENCE: unchanged (report $v_obs, passed=true)" \
+              "PUBLISH-EVIDENCE: commented #17"
+            expect_api "$(api_build 92)" "$(api_github "compare/main...${laterRev}")" \
+              "$(api_commit ${publishedBaseRev})" "$(api_build 93)" "$api_comment"
+            expect_s3 \
+              "$(req HEAD 404 ro "$ttl90/v1/$v_obs/receipt.json")" \
+              "$(req GET 200 rw30 "$v30/receipt.json")" \
+              "$(req GET 200 ro "$bv90/receipt.json")" \
+              "$(req GET 200 ro "$bv90/playwright-report/completion.json")" \
+              "$(req PUT 200 rw30 "$(marker_key 17)" application/json)"
+            expect_comments 1
+            no_network='unavailable: the base report has no `view-network.png`'
+            affected_comment passed "$(views_line 92 ${laterRev})" "$v_url" \
+              "$(views_block "\`${lib.substring 0 12 publishedBaseRev}\`, the merge base with \`main\`" \
+                "$(view_row view-fleet.png "$(base_image view-fleet.png)")" "$(view_row view-network.png "$no_network")")"
+            expect_comment_body "$TMPDIR/expected-comment.md"
+            expect_comment_lines "#### Rendered views" \
+              "| \`view-fleet.png\` | ![base view-fleet.png](${evidenceOrigin}/ttl-90d/v1/$bv_obs/${baseFleet}) | ![head view-fleet.png](''${v_url}${headFleet}) |" \
+              "| \`view-network.png\` | $no_network | ![head view-network.png](''${v_url}${headNetwork}) |"
+            expect_marker 17 current "$v_obs" 92 ${laterRev}
+
+            # pr-views-main-fallback: no merge base (the compare API knows
+            # no such head), so main's newest commits are tried in order:
+            # the first's report is unpublished, the second's is the base.
+            jq -n '[{sha: "${unpublishedBaseRev}"}, {sha: "${publishedBaseRev}"}]' > "$STUB_STATE/branches/main.json"
+            build 94 succeeded ${fallbackRev} "[$(report succeeded ${reports.views})]"
+            event 94 succeeded ${fallbackRev} 18 "" main
+            run pr-views-main-fallback event --upload
+            expect_status 0
+            expect_lines \
+              "PUBLISH-EVIDENCE: unchanged (report $v_obs, passed=true)" \
+              "PUBLISH-EVIDENCE: commented #18"
+            expect_api "$(api_build 94)" "$(api_github "compare/main...${fallbackRev}")" \
+              "$(api_github "commits?sha=main&per_page=5")" \
+              "$(api_commit ${unpublishedBaseRev})" "$(api_build 91)" \
+              "$(api_commit ${publishedBaseRev})" "$(api_build 93)" "$api_comment"
+            expect_s3 \
+              "$(req HEAD 404 ro "$ttl90/v1/$v_obs/receipt.json")" \
+              "$(req GET 200 rw30 "$v30/receipt.json")" \
+              "$(req GET 404 ro "$ttl90/v1/$r_obs/receipt.json")" \
+              "$(req GET 200 ro "$bv90/receipt.json")" \
+              "$(req GET 200 ro "$bv90/playwright-report/completion.json")" \
+              "$(req PUT 200 rw30 "$(marker_key 18)" application/json)"
+            expect_comments 1
+            affected_comment passed "$(views_line 94 ${fallbackRev})" "$v_url" \
+              "$(views_block "\`${
+                lib.substring 0 12 publishedBaseRev
+              }\`, the newest commit of \`main\` whose report is published" \
+                "$(view_row view-fleet.png "$(base_image view-fleet.png)")" "$(view_row view-network.png "$no_network")")"
+            expect_comment_body "$TMPDIR/expected-comment.md"
+            expect_comment_lines \
+              "Base: \`${
+                lib.substring 0 12 publishedBaseRev
+              }\`, the newest commit of \`main\` whose report is published."
+            expect_marker 18 current "$v_obs" 94 ${fallbackRev}
+
+            # pr-views-none: the steady report has no view, so its comment
+            # has no section, and no base is looked up although its merge
+            # base is known.
+            jq -n '{merge_base_commit: {sha: "${publishedBaseRev}"}}' > "$STUB_STATE/compares/main...${affectedRev}.json"
+            event 55 succeeded ${affectedRev} 19 "" main
+            run pr-views-none event --upload
+            expect_status 0
+            expect_lines \
+              "PUBLISH-EVIDENCE: unchanged (report $s_obs, passed=true)" \
+              "PUBLISH-EVIDENCE: commented #19"
+            expect_api "$(api_build 55)" "$api_comment"
+            expect_s3 \
+              "$(req HEAD 404 ro "$ttl90/v1/$s_obs/receipt.json")" \
+              "$(req GET 200 rw30 "$s30/receipt.json")" \
+              "$(req PUT 200 rw30 "$(marker_key 19)" application/json)"
+            expect_comments 1
+            steady_comment "[build 55](https://nixbot.example/builds/55) at \`${lib.substring 0 12 affectedRev}\`: $tests expected, 0 unexpected, 0 flaky, 0 skipped."
+            expect_comment_body "$TMPDIR/expected-comment.md"
+            expect_comment_lines "No failed attempts."
+            if grep -qF "Rendered views" "$TMPDIR/comment.md"; then
+              fail "comment.md has a Rendered views section"
+            fi
+            expect_marker 19 current "$s_obs" 55 ${affectedRev}
             NIXBOT_EVENT_KIND=build_finished
 
             rm -rf "$objects"
             mv "$TMPDIR/objects.v3" "$objects"
 
             # 8 pr-credential-confinement, the program's half: across every
-            # pull request row, ttl-90d was only probed (HEAD) and only with
-            # the read-only credential, every other request used the ttl-30d
-            # read-write one, and ttl-90d still holds exactly main's objects.
+            # pull request row, ttl-90d was only read (HEAD, or GET for a
+            # base report's views) and only with the read-only credential,
+            # every other request used the ttl-30d read-write one, and
+            # ttl-90d still holds exactly main's objects.
             name=pr-credential-confinement
             jq -se --arg ttl90 "$ttl90/" --arg ttl30 "$ttl30/" '
               [.[] | select(.row | startswith("pr-"))]
               | length > 0 and all(.[];
                   if .key | startswith($ttl90)
-                  then .method == "HEAD" and .scope == "object-read-only" and .prefix == [$ttl90]
+                  then (.method == "HEAD" or .method == "GET") and .scope == "object-read-only" and .prefix == [$ttl90]
                   else .scope == "object-read-write" and .prefix == [$ttl30] end)' \
               "$TMPDIR/s3-rows.jsonl" > /dev/null \
               || fail "pull request S3 requests $(jq -sc '[.[] | select(.row | startswith("pr-"))]' "$TMPDIR/s3-rows.jsonl")"

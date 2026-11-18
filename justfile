@@ -960,7 +960,7 @@ docs-linkcheck:
 
 ## diagrams
 
-# Compile all typst diagrams to SVG and optimize for web
+# Compile all typst and fleet-topology D2 diagrams to SVG and optimize for web
 [group('diagrams')]
 diagrams-build:
   #!/usr/bin/env bash
@@ -972,6 +972,11 @@ diagrams-build:
     name="${typ%.typ}"
     echo "  $typ -> $name.svg"
     typst compile --format svg "$typ" "../public/diagrams/$name.svg"
+  done
+  echo "Rendering fleet topology views with d2..."
+  for view in fleet network; do
+    echo "  topology/$view.d2 -> topology-$view.svg"
+    d2 --layout elk "topology/$view.d2" "../public/diagrams/topology-$view.svg"
   done
   echo "Optimizing SVGs with svgo..."
   cd ..
@@ -991,6 +996,20 @@ diagrams-compile name:
 [group('diagrams')]
 diagrams-watch:
   cd packages/docs/diagrams && typst watch --format svg reading-paths.typ ../public/diagrams/reading-paths.svg
+
+# Regenerate the committed fleet map (packages/docs/diagrams/topology/) from
+# flake.lib.fleetTopology; checks.x86_64-linux.fleet-topology-fresh fails until
+# a placement change has run this
+[group('diagrams')]
+topology-generate:
+  #!/usr/bin/env bash
+  set -euo pipefail
+  dir=packages/docs/diagrams/topology
+  mkdir -p "$dir"
+  for name in fleet.json fleet.d2 network.d2 fleet-table.md; do
+    nix eval --raw ".#lib.fleetTopology.files.\"$name\"" > "$dir/$name"
+    echo "  $dir/$name"
+  done
 
 # Run all documentation tests
 [group('docs')]

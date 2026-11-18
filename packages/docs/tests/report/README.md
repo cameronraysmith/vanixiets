@@ -91,6 +91,7 @@ It has two modes:
 
 Both modes look up `checks.x86_64-linux.package-vanixiets-docs-test-e2e-report` through nixbot's build API and realise the recorded output; a missing, failed, or unrealisable output is reported as unavailable evidence, never rebuilt.
 They validate the report with the program's own copy of `validate-report.ts` and stage only `run.json`, `playwright-report/completion.json`, and the attachments of attempts selected by extension: `.png` screenshots, `.webm` videos, `.zip` traces, and `.md` error context; other extensions are ignored.
+A passing attempt keeps no attachments except named view screenshots, `view-*.png`, which Playwright stores as `test-results/<dir>/attachments/<name>-<sha1>.png`; today only the fleet-topology spec attaches them, on Chromium, as `view-fleet.png` and `view-network.png`, and they are published like any other `.png`.
 Each selected file must match its type: the PNG signature, the EBML header `1a45dfa3`, the ZIP local file header `504b0304`, or valid UTF-8 without a NUL byte.
 Beside them goes a deterministic `receipt.json` (schema version 3) carrying the report's identity (attribute and output path), provenance, verdict, and file digests, and nothing about the build that produced it.
 No file size is capped; a trace is about 3 MB.
@@ -124,6 +125,7 @@ It shows:
 - the verdict, passed or failed, with the expected, unexpected, skipped, and flaky counts;
 - the build number, linked to the build, and the first 12 hex digits of its revision;
 - a `Failed attempts:` table, or `No failed attempts.`, and a link to `receipt.json`;
+- a `Rendered views` section when passing attempts reference `view-*.png` (below);
 - that the evidence is kept 30 days;
 - that no report identical to this one has been published from `main` in the last 90 days, which is why it is shown.
 
@@ -142,7 +144,14 @@ If a later build of the pull request produces the same report as `main`, the eff
 When two builds of a pull request finish out of order, the comment reflects whichever finished last.
 
 The comment describes the build named in it, which may be older than the pull request's current head when the report was reused from cache; the receipt names no build, since one report serves every build that carries it.
-A passing verdict usually shows `No failed attempts.`, because passing attempts keep no attachments; a flaky test adds rows for the attempts a retry recovered from.
+A passing verdict usually shows `No failed attempts.`, because passing attempts keep no attachments other than view screenshots; a flaky test adds rows for the attempts a retry recovered from.
+
+When a passing attempt references a bundled `view-*.png`, the comment adds a section titled `Rendered views` after the failed attempts, with one row per view name: the name in a code span, the base revision's view of that name as an image, and the pull request's view as an image.
+A view's name is its file name without the `-<40 hex>` hash Playwright appends when it copies an attachment (a SHA-1 of the source path, not of the image), so `attachments/view-fleet-<sha1>.png` is `view-fleet.png`; base and head match by that name whatever the hash.
+The base revision is resolved in order: a base revision in nixbot's pull request event, which carries none, only `baseRef`; else the merge base of the head with `baseRef`, read from GitHub's compare API, because the effect has no checkout to run git in; else the newest of `main`'s five newest commits whose report is published.
+The base report is the one nixbot built for that revision, found as `main` mode finds its build, and its `receipt.json` and `completion.json` are read from `ttl-90d` with the read-only credential.
+A base cell reads `unavailable:` and the reason when the base report is not published there or has no view of that name; the section is never omitted when the report has views.
+A report without `view-*.png` gets no section and makes no base lookup.
 For the HTML report, build the named report attribute locally; it is not published.
 
 ## Failure classification boundary

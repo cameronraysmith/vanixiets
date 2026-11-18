@@ -55,8 +55,9 @@ Subcommands:
                              then one comment on the pull request tabulates
                              its failed attempts with links to their
                              screenshot, video, error context and trace (in
-                             Playwright's hosted trace viewer), and links
-                             its receipt
+                             Playwright's hosted trace viewer), shows its
+                             view screenshots under Rendered views (below),
+                             and links its receipt
                   A failed build that stopped before producing the report
                   declines: its evaluation failed (an error and no
                   attributes), or the report attribute is failed or
@@ -101,6 +102,25 @@ build that produced no report. It is written current after each affected
 comment and superseded after the superseding comment. Two builds of one
 pull request finishing out of order race on it: the run that finishes
 last wins.
+
+Rendered views: when passing attempts of the report reference bundled
+attachments named view-*.png (the fleet-topology spec's Chromium
+screenshots), the affected comment adds a section "Rendered views" after
+the failed attempts, one row per view name: the base revision's view of
+the same name, or "unavailable: <reason>", beside the head's, both as
+images. A view's name is its file name without the -<40 hex> hash
+Playwright appends when it copies an attachment (a SHA-1 of the source
+path, not of the image), so attachments/view-fleet-<sha1>.png is
+view-fleet.png and base and head match by name whatever the hash.
+The base revision is, in order: a base revision of nixbot's event
+(its payload names none, only pullRequest.baseRef); the merge base of the
+head (pullRequest.headRev, else the build's rev) with
+pullRequest.baseRef, from the GitHub compare API, since the effect has no
+checkout to run git in; else the newest of main's 5 newest commits whose
+report ttl-90d holds. The base report is the one nixbot built for that
+revision, found as main finds its build; its receipt and completion.json
+are read from ttl-90d with the read-only credential. A report without
+view-*.png gets no section and makes none of these requests.
 
 Output:
   PUBLISH-EVIDENCE: published (report <obs>, passed=<bool>)
@@ -215,6 +235,7 @@ readonly key_root=projects/vanixiets/browser-evidence
 # is dedicated to untrusted CI content: nothing on vanixiets.net carries
 # authentication, sessions or cookies.
 readonly evidence_host=https://evidence.vanixiets.net
+readonly github_api="${PUBLISH_EVIDENCE_GITHUB_API_URL:-https://api.github.com}"
 readonly comment_marker=vanixiets-browser-evidence
 
 if [[ -n "$out" ]]; then
@@ -261,11 +282,65 @@ rejected() {
   die "evidence rejected: $*"
 }
 
+# build_of <rev>: the nixbot build of <rev>, as JSON {number, status, key,
+# label, identity}: the newest build of exactly <rev> or, when nixbot
+# reused a build of the same tree (none of <rev> itself), the newest
+# non-cancelled build of <rev>'s tree, read from the GitHub API, among the
+# newest 200 builds. key is the build field naming <rev> (commit_sha or
+# tree_hash), label its name in messages (rev or tree), identity its
+# value. Evidence unavailable when there is none.
+build_of() {
+  local rev=$1 key=commit_sha label=rev identity=$1 tree_pages=4
+  local builds_url builds_json selected commit_url tree page page_url page_json number status
+  builds_url="$NIXBOT_API_URL/api/repos/github/$repo/builds?commit=$rev"
+  builds_json="$(curl -fsS --retry 3 "$builds_url")" ||
+    unavailable "cannot list nixbot builds of $rev from $builds_url"
+  # The filter matches a commit prefix: keep exact commits, newest build.
+  selected="$(jq -c --arg rev "$rev" '[.items[]? | select(.commit_sha == $rev)] | max_by(.number) // empty' <<<"$builds_json")" ||
+    unavailable "nixbot builds of $rev response is not JSON"
+  if [[ -z "$selected" ]]; then
+    # nixbot builds a tree once: a push whose tree an earlier build built,
+    # such as a merge-queue batch reusing its pull request's build, has no
+    # build of its own commit. Select what nixbot reused, by its own rule:
+    # the newest non-cancelled build of the same tree (FindReusableBuild).
+    commit_url="$github_api/repos/$repo/commits/$rev"
+    tree="$(curl -fsS --retry 3 -H 'Accept: application/vnd.github+json' "$commit_url" | jq -r '.commit.tree.sha // empty')" ||
+      unavailable "cannot read the tree of $rev from $commit_url"
+    [[ "$tree" =~ ^[0-9a-f]{40}$ ]] || unavailable "no tree for $rev from $commit_url"
+    for ((page = 1; page <= tree_pages; page++)); do
+      page_url="$NIXBOT_API_URL/api/repos/github/$repo/builds?page=$page"
+      page_json="$(curl -fsS --retry 3 "$page_url")" ||
+        unavailable "cannot list nixbot builds from $page_url"
+      selected="$(jq -c --arg tree "$tree" '[.items[]? | select(.tree_hash == $tree and .status != "cancelled")] | max_by(.number) // empty' <<<"$page_json")" ||
+        unavailable "nixbot builds page $page response is not JSON"
+      [[ -z "$selected" && "$(jq -r '.has_next' <<<"$page_json")" == true ]] || break
+    done
+    [[ -n "$selected" ]] ||
+      unavailable "nixbot has no build of $rev, nor of its tree $tree in the newest $tree_pages pages of builds"
+    key=tree_hash label=tree identity="$tree"
+  fi
+  number="$(jq -r '.number | if type == "number" then tostring else "" end' <<<"$selected")"
+  status="$(jq -r '.status | if type == "string" then . else "" end' <<<"$selected")"
+  [[ "$number" =~ ^[0-9]+$ && "$status" =~ ^[a-z_]+$ ]] ||
+    unavailable "malformed nixbot build of $rev: $selected"
+  jq -nc --argjson number "$number" --arg status "$status" --arg key "$key" --arg label "$label" --arg identity "$identity" \
+    '{number: $number, status: $status, key: $key, label: $label, identity: $identity}'
+}
+
+# obs_of <report>: the report's <obs>, which hashes only its attribute and
+# store path, so every build carrying it, on any branch, maps to the same
+# keys.
+obs_of() {
+  jq -nj --arg attribute "$report_attr" --arg outPath "$1" \
+    '[$attribute, $outPath] | tojson' | sha256sum | cut -c1-32
+}
+
 # --- the build: from the event (data only, validated before use) or, for
 # main, from nixbot's builds of --rev.
 
 pr_number=""
 pr_head=""
+pr_base=""
 if [[ "$mode" == event ]]; then
   # build_finished: any build, though the effect subscribes to failed ones
   # only; pull_request: a pull request's build settled green, fresh or
@@ -305,6 +380,11 @@ if [[ "$mode" == event ]]; then
     pr_head="$(jq -r '.pullRequest.headRev // "" | if type == "string" then . else tojson end' "$NIXBOT_EVENT_JSON")"
     [[ -z "$pr_head" || "$pr_head" =~ ^[0-9a-f]{40}$ ]] ||
       die "malformed event (pullRequest.headRev=$(jq -c '.pullRequest.headRev' "$NIXBOT_EVENT_JSON"))"
+    # The branch the pull request merges into, used only for the base of
+    # its rendered views; a name outside plain branch-name characters
+    # counts as none.
+    pr_base="$(jq -r '.pullRequest.baseRef | if type == "string" then . else "" end' "$NIXBOT_EVENT_JSON")"
+    [[ "$pr_base" =~ ^[A-Za-z0-9_-][A-Za-z0-9._-]*(/[A-Za-z0-9_-][A-Za-z0-9._-]*)*$ && "$pr_base" != *..* ]] || pr_base=""
     tier=ttl-30d
   else
     tier=ttl-90d
@@ -316,39 +396,10 @@ else
     die "NIXBOT_API_URL is not set: main resolves the build of --rev through nixbot's build API, which nixbot exposes to an effect only with its task token"
   [[ "$NIXBOT_API_URL" =~ ^https?://[^[:space:]]+$ ]] || die "malformed NIXBOT_API_URL"
   rev="$main_rev"
-  builds_url="$NIXBOT_API_URL/api/repos/github/$repo/builds?commit=$rev"
-  builds_json="$(curl -fsS --retry 3 "$builds_url")" ||
-    unavailable "cannot list nixbot builds of $rev from $builds_url"
-  # The filter matches a commit prefix: keep exact commits, newest build.
-  selected="$(jq -c --arg rev "$rev" '[.items[]? | select(.commit_sha == $rev)] | max_by(.number) // empty' <<<"$builds_json")" ||
-    unavailable "nixbot builds of $rev response is not JSON"
-  identity_key=commit_sha identity_label=rev identity="$rev"
-  if [[ -z "$selected" ]]; then
-    # nixbot builds a tree once: a push whose tree an earlier build built,
-    # such as a merge-queue batch reusing its pull request's build, has no
-    # build of its own commit. Select what nixbot reused, by its own rule:
-    # the newest non-cancelled build of the same tree (FindReusableBuild).
-    commit_url="${PUBLISH_EVIDENCE_GITHUB_API_URL:-https://api.github.com}/repos/$repo/commits/$rev"
-    tree="$(curl -fsS --retry 3 -H 'Accept: application/vnd.github+json' "$commit_url" | jq -r '.commit.tree.sha // empty')" ||
-      unavailable "cannot read the tree of $rev from $commit_url"
-    [[ "$tree" =~ ^[0-9a-f]{40}$ ]] || unavailable "no tree for $rev from $commit_url"
-    tree_pages=4
-    for ((page = 1; page <= tree_pages; page++)); do
-      page_url="$NIXBOT_API_URL/api/repos/github/$repo/builds?page=$page"
-      page_json="$(curl -fsS --retry 3 "$page_url")" ||
-        unavailable "cannot list nixbot builds from $page_url"
-      selected="$(jq -c --arg tree "$tree" '[.items[]? | select(.tree_hash == $tree and .status != "cancelled")] | max_by(.number) // empty' <<<"$page_json")" ||
-        unavailable "nixbot builds page $page response is not JSON"
-      [[ -z "$selected" && "$(jq -r '.has_next' <<<"$page_json")" == true ]] || break
-    done
-    [[ -n "$selected" ]] ||
-      unavailable "nixbot has no build of $rev, nor of its tree $tree in the newest $tree_pages pages of builds"
-    identity_key=tree_hash identity_label=tree identity="$tree"
-  fi
-  build_number="$(jq -r '.number | if type == "number" then tostring else "" end' <<<"$selected")"
-  build_status="$(jq -r '.status | if type == "string" then . else "" end' <<<"$selected")"
-  [[ "$build_number" =~ ^[0-9]+$ && "$build_status" =~ ^[a-z_]+$ ]] ||
-    unavailable "malformed nixbot build of $rev: $selected"
+  found="$(build_of "$rev")" || exit 1
+  read -r build_number build_status identity_key identity_label identity < <(
+    jq -r '"\(.number) \(.status) \(.key) \(.label) \(.identity)"' <<<"$found"
+  )
   # The URL nixbot's own events carry for this build.
   build_event_url="$NIXBOT_API_URL/repos/github/$repo/builds/$build_number"
   tier=ttl-90d
@@ -488,6 +539,138 @@ EOF
       build: $build, rev: $rev, head: $head}' >"$tmpdir/marker.json"
   code="$(s3 rw /dev/null "$marker_key" --upload-file "$tmpdir/marker.json" -H "Content-Type: application/json")"
   [[ "$code" == 2?? ]] || die "marker update failed: PUT $bucket/$marker_key returned HTTP $code"
+}
+
+# --- the rendered views (see usage): each view-*.png that a passing attempt
+# references and the bundle holds, beside the base report's same-named one.
+
+# views_filter, over completion.json with $files the bundle's receipt
+# entries: [{name, path}] by name, the first path of each name. The name
+# is the view's key: the file name without the -<sha1> Playwright appends
+# when it copies an attachment (attachments/view-fleet-<40 hex>.png is
+# view-fleet.png), so a changed image still matches its base. Only
+# servable paths, so a path from a base report in the bucket cannot leave
+# its markdown link either.
+# shellcheck disable=SC2016 # jq, not shell expansions
+readonly views_filter='
+  [$files[] | objects | .path | strings] as $bundled
+  | [.tests[]?.attempts[]? | select(.status == "passed") | .attachments[]? | strings
+      | select(test("^[A-Za-z0-9._-]+(/[A-Za-z0-9._-]+)*$") and IN($bundled[]))
+      | {name: (split("/") | last | sub("-[0-9a-f]{40}\\.png$"; ".png")), path: .}
+      | select(.name | test("^view-[A-Za-z0-9._-]+\\.png$"))]
+  | group_by(.name) | map(min_by(.path))'
+readonly base_candidates=5
+
+# base_published <rev>: when ttl-90d holds the publication of the report
+# nixbot built for <rev>, sets base_obs to its <obs> and leaves its receipt
+# in $tmpdir/base-receipt.json; otherwise sets base_reason and returns 1.
+# A failed probe fails the run, as the baseline probe does.
+base_published() {
+  local found number key identity build_json path receipt_key code
+  base_obs=""
+  if ! found="$(build_of "$1" 2>/dev/null)"; then
+    base_reason="nixbot has no build of the base"
+    return 1
+  fi
+  read -r number key identity < <(jq -r '"\(.number) \(.key) \(.identity)"' <<<"$found")
+  build_json="$(curl -fsS --retry 3 "$NIXBOT_API_URL/api/repos/github/$repo/builds/$number")" || build_json=null
+  path="$(jq -r --argjson number "$number" --arg key "$key" --arg identity "$identity" --arg attr "$report_attr" '
+    if .build.number == $number and (.build[$key] | tostring) == $identity
+    then first(.attributes[]? | select(.attr == $attr and (.status == "succeeded" or .status == "skipped_local"))
+      | .outputs.out | strings) // ""
+    else "" end' <<<"$build_json" 2>/dev/null)" || path=""
+  if ! [[ "$path" =~ ^/nix/store/[0-9a-z]{32}-[A-Za-z0-9+._?=-]+$ ]]; then
+    base_reason="nixbot build $number of the base has no docs report"
+    return 1
+  fi
+  base_obs="$(obs_of "$path")"
+  receipt_key="$key_root/ttl-90d/v1/$base_obs/receipt.json"
+  code="$(s3 ro "$tmpdir/base-receipt.json" "$receipt_key")"
+  case "$code" in
+    200) ;;
+    404)
+      base_obs=""
+      base_reason="the base report is not published in the last 90 days"
+      return 1
+      ;;
+    *) die "base probe failed: GET $bucket/$receipt_key returned HTTP $code" ;;
+  esac
+}
+
+# resolve_base: sets base_note (empty when no base revision is known), and
+# base_obs or base_reason, in the order operator decision Q21 settles:
+# 1. a base revision of nixbot's event: none exists; nixbot's pullRequest
+#    payload is number, title, url, draft, isFork, headRev, headRef,
+#    baseRef, labels, author, merged (nixbot forge_pr.py,
+#    PullRequestInfo.payload);
+# 2. the merge base of the head with pullRequest.baseRef: the effect runs
+#    without a checkout (nixbot mounts its clone only for
+#    __nixbot_effect_checkout, which only scheduled effects set here), so
+#    GitHub's compare API computes it;
+# 3. else the newest of main's newest commits whose report ttl-90d holds.
+# A merge base whose report is unpublished is reported as such: the newest
+# report of main would be another revision's.
+resolve_base() {
+  local merge_base="" candidates="" candidate
+  base_note="" base_obs="" base_reason=""
+  if [[ -n "$pr_base" ]]; then
+    merge_base="$(curl -fsS --retry 3 -H 'Accept: application/vnd.github+json' \
+      "$github_api/repos/$repo/compare/$pr_base...${pr_head:-$rev}" |
+      jq -r '.merge_base_commit.sha | strings')" || merge_base=""
+    [[ "$merge_base" =~ ^[0-9a-f]{40}$ ]] || merge_base=""
+  fi
+  if [[ -n "$merge_base" ]]; then
+    base_note="\`${merge_base:0:12}\`, the merge base with \`$pr_base\`"
+    base_published "$merge_base" || :
+    return 0
+  fi
+  candidates="$(curl -fsS --retry 3 -H 'Accept: application/vnd.github+json' \
+    "$github_api/repos/$repo/commits?sha=main&per_page=$base_candidates" |
+    jq -r '.[]? | objects | .sha | strings | select(test("^[0-9a-f]{40}$"))')" || candidates=""
+  while IFS= read -r candidate; do
+    [[ -n "$candidate" ]] || continue
+    if base_published "$candidate"; then
+      base_note="\`${candidate:0:12}\`, the newest commit of \`main\` whose report is published"
+      return 0
+    fi
+  done <<<"$candidates"
+  base_reason="no report published from \`main\` among its $base_candidates newest commits"
+}
+
+# rendered_views: the Rendered views section of the affected comment, or
+# nothing when the report has no views.
+rendered_views() {
+  local head_views base_views=null completion_key code
+  head_views="$(jq -c --slurpfile files "$tmpdir/files.jsonl" "$views_filter" "$report/playwright-report/completion.json")"
+  [[ "$head_views" != "[]" ]] || return 0
+  resolve_base
+  if [[ -n "$base_obs" ]]; then
+    completion_key="$key_root/ttl-90d/v1/$base_obs/playwright-report/completion.json"
+    code="$(s3 ro "$tmpdir/base-completion.json" "$completion_key")"
+    [[ "$code" == 200 ]] || die "base probe failed: GET $bucket/$completion_key returned HTTP $code"
+    if ! jq -c '.files[]? | objects' "$tmpdir/base-receipt.json" >"$tmpdir/base-files.jsonl" 2>/dev/null ||
+      ! base_views="$(jq -c --slurpfile files "$tmpdir/base-files.jsonl" "$views_filter" \
+        "$tmpdir/base-completion.json" 2>/dev/null)"; then
+      base_views=null
+      base_reason="the base report is unreadable"
+    fi
+  fi
+  # Names are confined by views_filter and reach the markdown only from jq.
+  jq -rn --argjson head "$head_views" --argjson base "$base_views" \
+    --arg head_url "$evidence_url" --arg base_url "$evidence_host/${key_root#projects/}/ttl-90d/v1/$base_obs/" \
+    --arg note "$base_note" --arg reason "$base_reason" '
+    "#### Rendered views", "",
+    (if $note == "" then empty else "Base: \($note).", "" end),
+    "| View | Base | Head |", "|---|---|---|",
+    ($head[] as $view
+      | "| `\($view.name)` | "
+        + (if $base == null then "unavailable: \($reason)"
+          else (first($base[] | select(.name == $view.name)) // null) as $match
+            | if $match == null then "unavailable: the base report has no `\($view.name)`"
+              else "![base \($view.name)](\($base_url + $match.path))" end
+          end)
+        + " | ![head \($view.name)](\($head_url + $view.path)) |"),
+    ""'
 }
 
 echo "=== publish-evidence (build $build_number at ${rev:0:12}, $build_status) ==="
@@ -632,12 +815,10 @@ case "$validator_status" in
   *) die "validate-report.ts exited $validator_status: $(cat "$tmpdir/validator.err")" ;;
 esac
 
-# --- the identity: <obs> hashes only the report's attribute and store path,
-# so every build carrying this report, on any branch, maps to the same keys.
+# --- the identity (see obs_of).
 
 identity='[.identity.attribute, .identity.outPath]'
-obs="$(jq -nj --arg attribute "$report_attr" --arg outPath "$report" \
-  '[$attribute, $outPath] | tojson' | sha256sum | cut -c1-32)"
+obs="$(obs_of "$report")"
 
 rw_secret="" rw_token="" ro_secret="" ro_token=""
 if [[ "$upload" == true ]]; then
@@ -895,6 +1076,7 @@ if [[ "$upload" == true && -n "$pr_number" ]]; then
           end
       ' "$report/playwright-report/completion.json"
       echo
+      rendered_views
       echo "Receipt: [receipt.json](${evidence_url}receipt.json)"
       echo
       echo "No report identical to this one has been published from \`main\` in the last 90 days, so it is shown here."

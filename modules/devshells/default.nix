@@ -184,6 +184,8 @@
           pkgs.github-linguist
           # Document typesetting
           pkgs.typstWithPackages
+          # Fleet topology views (packages/docs/diagrams/topology/*.d2)
+          pkgs.d2
           pkgs.svgo
           # The skills apm deploys into .agents/skills/ shell out to these CLIs.
           # Home-manager supplies them on a fleet machine and nowhere else, so

@@ -1,0 +1,49 @@
+---
+title: Fleet topology
+description: Where each service runs, which fleet networks each host joins, and which host answers each public hostname, generated from the clan inventory
+sidebar:
+  order: 11
+---
+
+import { Content as FleetTable } from "../../../../diagrams/topology/fleet-table.md";
+
+This page is the fleet map: every host and its platform, the services each host runs and the role each service gives it, the fleet networks and their members, and the public hostnames with the host that answers each one.
+Everything on it is generated from the flake; nobody edits the pictures or the tables by hand.
+
+## Placement
+
+![Fleet topology placement view: every host grouped by platform, with its clan service roles and declared services; host names are text in the image](/diagrams/topology-fleet.svg)
+
+Each box is a host.
+Inside it, `instance/role` entries come from the clan inventory, and shaded entries are declared services with their public hostnames and ports.
+Roles that every host holds are listed once, under "on every host".
+
+## Fleet networks and the public edge
+
+![Fleet topology network view: the tincr and ZeroTier fleet networks with their members, and each public hostname pointing at the host that answers it; host names are text in the image](/diagrams/topology-network.svg)
+
+A dashed edge is membership of a fleet network, labelled with the member's role.
+A solid edge from `internet` is a public hostname and the host that answers it.
+
+## Hosts, networks and public hostnames
+
+<FleetTable />
+
+## Derived and declared
+
+Most of the map is derived: hosts, platforms and service roles come from the clan inventory (`modules/clan/inventory/`), and fleet network membership, devices such as phones, and each host's own public endpoints come from the member registry `flake.lib.hosts` (`modules/lib/hosts.nix`).
+The declared services and their hostnames and ports come from `flake.lib.topologyFacts` (`modules/lib/topology-facts.nix`), which is written by hand: declared facts are true only as the operator last recorded them, and nothing checks them against what a host actually runs.
+
+## Updating the map
+
+`flake.lib.fleetTopology` (`modules/lib/fleet-topology.nix`) produces four files committed under `packages/docs/diagrams/topology/`: `fleet.json`, one line per host, service instance, network and declared host; the two D2 views `fleet.d2` and `network.d2`; and the table above, `fleet-table.md`.
+After changing the inventory, the registry or the declared facts, run `just topology-generate` and commit the result with the change, so the reviewer reads the move in the diff of `fleet.json`.
+The check `fleet-topology-fresh` fails a change whose committed files differ from what the flake produces, and rejects a view that is not valid D2.
+`just diagrams-build` and the docs package render the views with `d2 --layout elk` and pass them through the same svgo step as the other diagrams, which keeps every label as text.
+
+## Related
+
+- [Architecture overview](/concepts/architecture-overview/) — the composition patterns behind the hosts on this map
+- [Clan Integration](/concepts/clan-integration/) — the inventory the map reads
+- [Build service topology](/concepts/build-service-topology/) — the build services on magnetite in detail
+- [Browser evidence](/concepts/browser-evidence/) — where a pull request shows these views before and after a change

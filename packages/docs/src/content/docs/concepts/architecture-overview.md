@@ -62,7 +62,7 @@ Clan orchestrates deployments across the machine fleet but doesn't replace under
 - Secrets management with encryption (clan vars)
 - Unified deployment tooling
 
-See [Clan Integration](/concepts/clan-integration/) for detailed explanation.
+See [Clan Integration](/concepts/clan-integration/) for detailed explanation, and [Fleet topology](/concepts/fleet-topology/) for the map of hosts, services and networks generated from the inventory.
 
 ### Packages: Overlay composition (multi-channel fallback)
 

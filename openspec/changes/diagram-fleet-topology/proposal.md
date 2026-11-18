@@ -3,15 +3,16 @@ linear_story_id: CAM-114
 linear_story_identifier: CAM-114
 linear_story_title: "Diagram the fleet topology from the flake"
 linear_story_url: https://linear.app/cameronraysmith/issue/CAM-114/diagram-the-fleet-topology-from-the-flake
-linear_story_state: Todo
+linear_story_state: In Progress
 linear_team: CAM
 linear_project: nixbot-herculesci-cicd
-last_synced_state: Todo
-last_synced_at: "2026-11-18T20:54:19Z"
+last_synced_state: In Progress
+last_synced_at: "2026-11-18T21:44:58Z"
 review_round: 0
 max_review_rounds: 3
 attempt_log:
   - { at: "2026-11-18T20:54:19Z", transition: "Backlog->Todo", outcome: "posted", note: "Issue CAM-114 created in Todo in project 82a27ad740f7 (Migrate to nixbot and herculesCI CI/CD) with description seeded from proposal.md, related to CAM-112; state and project confirmed by read-only view" }
+  - { at: "2026-11-18T21:44:58Z", transition: "Todo->In Progress", outcome: "posted", note: "Operator approved Gate 1 rows G1-G7 and implementation on 2026-11-18 (HIL); state confirmed In Progress by read-only view" }
 ---
 
 ## Why
@@ -25,7 +26,7 @@ Decisions tagged `D<n>` are developed in `design.md`; the operator approved the 
 **A fleet map derived from the flake (tier 1)**
 - From: no map; placement is read file by file.
 - To: `flake.lib.fleetTopology` reads `self.clan.inventory` and `flake.lib.hosts` and produces `fleet.json` (one line per host and per service instance) plus two D2 views, `fleet.d2` (placement by host and platform) and `network.d2` (the tincr and ZeroTier networks with their members, and the public edge) (D1-D4).
-- The three files are committed under `packages/docs/diagrams/topology/`; `just topology-generate` rewrites them (D3).
+- The three files, plus the generated table `fleet-table.md` (D16), are committed under `packages/docs/diagrams/topology/`; `just topology-generate` rewrites them (D3).
 - Impact: non-breaking; no host configuration changes.
 
 **Declared facts outside the inventory (tier 2)**

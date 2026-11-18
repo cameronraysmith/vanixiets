@@ -6,17 +6,28 @@ import { fileURLToPath } from "node:url";
 import { classifyAttempt, judge, parseEvidence } from "./validate-report.ts";
 
 const [root, mode = "damaged-guide"] = process.argv.slice(2);
-assert(root, "usage: check-negative-report.ts REPORT [damaged-guide|removed-link|webkit]");
+assert(root, "usage: check-negative-report.ts REPORT [damaged-guide|removed-link|webkit|topology]");
 assert(
-  mode === "damaged-guide" || mode === "removed-link" || mode === "webkit",
+  mode === "damaged-guide" || mode === "removed-link" || mode === "webkit" || mode === "topology",
   `unknown negative-control mode: ${mode}`,
 );
 const removedLink = mode === "removed-link";
+const topology = mode === "topology";
+// What each control breaks, and the failure the unchanged spec must report.
+const intended = topology
+  ? {
+      title: /dropped host is rejected by the fleet topology oracle/,
+      context: /topology-fleet\.svg/,
+      failure: /host \S+ is not a <text> in \/diagrams\/topology-fleet\.svg/,
+    }
+  : removedLink
+    ? { title: /removed homepage link is rejected/, context: /Getting started/, failure: /locator.click: Timeout/ }
+    : { title: /damaged guide is rejected/, context: /Getting started/, failure: /toBeVisible/ };
 
 const evidence = parseEvidence(root);
 const verdict = judge(root, evidence);
 assert.equal(verdict.passed, false, "negative control unexpectedly passed");
-assert.equal(verdict.counts.unexpected, 1, "expected exactly one failing reader journey");
+assert.equal(verdict.counts.unexpected, 1, "expected exactly one failing test");
 const cliVerdict = spawnSync(process.execPath, [
   fileURLToPath(new URL("./validate-report.ts", import.meta.url)),
   "verdict",
@@ -26,7 +37,7 @@ assert.equal(cliVerdict.status, 1, "completed product failure must exit verdict 
 
 const [test] = evidence.completion.tests;
 assert.equal(test.project, mode === "webkit" ? "webkit" : "chromium", "negative control ran on the wrong engine");
-assert.match(test.title, removedLink ? /removed homepage link is rejected/ : /damaged guide is rejected/);
+assert.match(test.title, intended.title);
 // A deterministic defect must fail every attempt: the retries absorb a stalled
 // navigation on a busy host, never the product failure itself.
 const classes = test.attempts.map((attempt) => classifyAttempt(attempt).kind);
@@ -43,8 +54,8 @@ for (const name of (test.attempts.at(-1)?.attachments ?? []).filter((name) => na
   assert(image.readUInt32BE(16) > 0 && image.readUInt32BE(20) > 0, `failure screenshot has no pixels: ${name}`);
 }
 const results = readFileSync(join(root, "playwright-report/results.json"), "utf8");
-assert.match(results, /Getting started/);
-assert.match(results, removedLink ? /locator.click: Timeout/ : /toBeVisible/);
+assert.match(results, intended.context);
+assert.match(results, intended.failure);
 console.log(
-  `Negative control (${mode}): intended reader failure on ${test.project} rejected; verdict 1, original trace, PNG screenshot and HTML preserved.`,
+  `Negative control (${mode}): intended failure on ${test.project} rejected; verdict 1, original trace, PNG screenshot and HTML preserved.`,
 );

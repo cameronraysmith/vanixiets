@@ -13,7 +13,7 @@ It SHALL NOT read `nixosConfigurations`, `darwinConfigurations`, `clanInternals`
 ### Requirement: The generator reads only named inventory fields
 
 From `inventory`, `mkFleetTopology` SHALL read only `machines.<name>.{machineClass, tags, description}`, each instance's `module.name`, and the attribute names of each role's `machines` and `tags`.
-For an instance whose `module.name` is `tincr` or `zerotier` it SHALL additionally read the attribute names of `roles.peer.settings.devices` and the entries of `roles.controller.machines.<name>.settings.allowedIps`.
+For an instance whose `module.name` is `tincr` or `zerotier` it SHALL additionally read `devices` names under the tincr role `peer` and `allowedIps` entries under each ZeroTier `controller` machine, from every attribute-set layer of those deferred-module `settings`, nested `imports` included.
 
 #### Scenario: A non-overlay instance carries settings
 
@@ -55,10 +55,15 @@ It SHALL NOT restate a member's class, public `endpoints` or overlay addresses, 
 - **WHEN** `flake.lib.topologyFacts` has a key that is not a member of `flake.lib.hosts`
 - **THEN** evaluating `flake.lib.fleetTopology` throws an error naming that key
 
-### Requirement: The fleet map is committed as three text files
+### Requirement: The fleet map is committed as four text files
 
-`flake.lib.fleetTopology.files` SHALL be an attribute set of exactly `fleet.json`, `fleet.d2` and `network.d2`, each a string committed byte for byte at `packages/docs/diagrams/topology/<name>`.
+`flake.lib.fleetTopology.files` SHALL be exactly `fleet.json`, `fleet.d2`, `network.d2` and `fleet-table.md`, each a string committed byte for byte at `packages/docs/diagrams/topology/<name>`.
 `just topology-generate` SHALL write each string there with `nix eval --raw` and build nothing.
+
+#### Scenario: The generated table lists every host
+
+- **WHEN** `fleet-table.md` is read
+- **THEN** it has one row per inventory machine with its platform, service roles, declared services and fleet networks, a table of fleet networks with their members, and a table of public hostnames with host, service and ports
 
 #### Scenario: The committed files are regenerated
 
@@ -96,7 +101,7 @@ It SHALL show an `internet` node with one edge per public hostname, from `hosts.
 
 ### Requirement: A freshness check pins the committed files
 
-`checks.x86_64-linux.fleet-topology-fresh` SHALL fail when any committed file differs from its string in `flake.lib.fleetTopology.files`, printing the differing file and `just topology-generate`, and SHALL fail when `d2 validate` rejects either committed view.
+`checks.x86_64-linux.fleet-topology-fresh` SHALL fail when any committed file differs from its string in `flake.lib.fleetTopology.files` or the directory holds a file the generator does not produce, printing the file and `just topology-generate`, and SHALL fail when `d2 validate` rejects either committed view.
 Its source SHALL be only `packages/docs/diagrams/topology/`, selected with `lib.fileset`.
 
 #### Scenario: The inventory changes without regeneration
@@ -146,15 +151,24 @@ After the svgo pass, every node and edge label of both views SHALL remain the co
 - **WHEN** the delivered `topology-fleet.svg` is parsed as XML
 - **THEN** each `machine/<name>` key of the committed `fleet.json` names a `<text>` element whose content is `<name>`
 
-### Requirement: The concepts page embeds both views as images
+### Requirement: The concepts page embeds both views as images and the generated table
 
-`packages/docs/src/content/docs/concepts/fleet-topology.md` SHALL embed `/diagrams/topology-fleet.svg` and `/diagrams/topology-network.svg` as Markdown images with non-empty alt text, state that `flake.lib.topologyFacts` is declared rather than observed, and name `just topology-generate`; `concepts/index.md`, `concepts/architecture-overview.md` and `concepts/build-service-topology.md` SHALL link it.
+`packages/docs/src/content/docs/concepts/fleet-topology.mdx` SHALL embed `/diagrams/topology-fleet.svg` and `/diagrams/topology-network.svg` as Markdown images with non-empty alt text, render the committed `fleet-table.md` by importing it, state that `flake.lib.topologyFacts` is declared rather than observed, and name `just topology-generate`.
 No dark-theme variant of either view SHALL be rendered.
 
 #### Scenario: The docs package is built with the page
 
 - **WHEN** the `vanixiets-docs` package is built
 - **THEN** its output contains the page `concepts/fleet-topology/` with both images and the declared-facts statement
+
+### Requirement: The concepts page is linked from its neighbours
+
+`concepts/index.md`, `concepts/architecture-overview.md` and `concepts/build-service-topology.md` SHALL each link `/concepts/fleet-topology/`.
+
+#### Scenario: The links are checked
+
+- **WHEN** the docs linkcheck runs
+- **THEN** each of the three pages links the fleet topology page and no link is broken
 
 ### Requirement: A Playwright spec witnesses the page and both views
 
@@ -163,7 +177,7 @@ No dark-theme variant of either view SHALL be rendered.
 #### Scenario: The page and images load
 
 - **WHEN** the e2e suite runs against the built site
-- **THEN** `/concepts/fleet-topology/` answers 200 with the heading `Fleet topology` and the declared-facts statement, and each image has non-empty alt text, `naturalWidth` greater than zero, and a `src` answering 200 with a non-empty `image/svg+xml` body
+- **THEN** `/concepts/fleet-topology/` answers 200 with the heading `Fleet topology`, the declared-facts statement and a table cell for every `machine/<name>` of `fleet.json`, and each image has non-empty alt text, `naturalWidth` greater than zero, and a `src` answering 200 with a non-empty `image/svg+xml` body
 
 ### Requirement: The diagram oracle is derived from the committed fleet.json
 
@@ -195,7 +209,8 @@ On Chromium only, the oracle test SHALL attach element screenshots of the two im
 
 ### Requirement: The evidence comment shows the views before and after
 
-When the published report carries `view-*.png` attachments, the publisher's pull-request comment SHALL include a `Rendered views` section linking each head view and the same-named view from the report published for the pull request's base revision, or stating that the base view is unavailable; `concepts/browser-evidence.md` and `tests/report/README.md` SHALL describe passing-attempt view screenshots.
+When the published report carries `view-*.png` attachments, keyed by file name without the `-<40 hex>` hash Playwright appends to a copied attachment, the publisher's pull-request comment SHALL include a `Rendered views` section linking each head view and the same-keyed view from the report published for the pull request's base revision, or stating why the base view is unavailable.
+`concepts/browser-evidence.md` and `tests/report/README.md` SHALL describe passing-attempt view screenshots.
 
 #### Scenario: The base report has no views
 
@@ -206,6 +221,16 @@ When the published report carries `view-*.png` attachments, the publisher's pull
 
 - **WHEN** a pull request changes the docs report but no test attached a `view-*.png`
 - **THEN** the comment has no `Rendered views` section
+
+### Requirement: The base revision of the views is resolved in a fixed order
+
+The base revision SHALL be, in order, a base-revision field of nixbot's pull-request event when one exists, else the merge base of the head with the event's `baseRef`, else the newest commit of `main` whose report is published.
+A merge base whose report is not published SHALL be reported as unavailable rather than replaced by a newer `main` report.
+
+#### Scenario: The merge base's report is published
+
+- **WHEN** nixbot's event carries no base-revision field and the merge base with `baseRef` has a published report carrying `view-fleet.png`
+- **THEN** the comment shows that report's `view-fleet.png` as the base and names the merge base
 
 ### Requirement: Trust boundary of the fleet map
 
