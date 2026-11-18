@@ -8,12 +8,15 @@ let
   ztDnsServer = config.flake.lib.hosts.cinnabar.zerotier.address;
 in
 {
-  # macOS consults /etc/resolver/<domain> for names under that domain
+  # macOS consults /etc/resolver/<domain> for names under that domain.
+  # `flags a aaaa`: see modules/system/mesh-dns.nix; machine names such as
+  # magnetite.zt have only an AAAA record.
   flake.modules.darwin.zt-dns = {
     environment.etc."resolver/zt" = {
       enable = true;
       text = ''
         nameserver ${ztDnsServer}
+        flags a aaaa
       '';
     };
   };

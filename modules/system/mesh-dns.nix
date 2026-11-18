@@ -11,10 +11,22 @@ in
 {
   # macOS consults /etc/resolver/<domain> for names under that domain, asking
   # the listed name servers in order.
+  #
+  # `flags a aaaa` makes configd mark this resolver "Request A records,
+  # Request AAAA records" whatever the Mac's own connectivity. Without it the
+  # resolver inherits the global flags, which on a Mac without an IPv6 default
+  # route are A only, and getaddrinfo with AI_ADDRCONFIG (what flags=0
+  # defaults to on macOS, and what Chrome, Firefox and curl pass) never asks
+  # for the AAAA records that are the only records of this IPv6-only zone
+  # (finding F34). configd parses the keyword in configd-1405.100.8
+  # dnsinfo/dnsinfo_flatfile.c:74,380-394,520-522 (present since configd-596,
+  # OS X 10.10); resolver(5) does not document it.
+  # checks.x86_64-linux.darwin-mesh-resolver-flags holds every Mac to it.
   flake.modules.darwin.base = {
     environment.etc."resolver/${fleet.domain}" = {
       enable = true;
-      text = lib.concatMapStrings (address: "nameserver ${address}\n") resolverAddresses;
+      text =
+        lib.concatMapStrings (address: "nameserver ${address}\n") resolverAddresses + "flags a aaaa\n";
     };
   };
 
