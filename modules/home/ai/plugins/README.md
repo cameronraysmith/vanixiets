@@ -33,6 +33,39 @@ flowchart LR
 
 `pkgs/by-name/apm-skills-compose/` flattens the packages plus remote apm dependencies such as superpowers into one tree and records its skill names in the committed `skills.json` index (the build fails when they drift; `just agents-skills-index` regenerates it); `../skills/default.nix` then enumerates that index, applies an exclusion list, and delivers the result. A skill present in the composed output but absent from `~/.claude/skills/` is withheld deliberately, not broken — the exclusions and their reasons are in that file.
 
+## Remote apm dependencies
+
+Four packages declare remote apm dependencies: `planning-and-development`, `version-control-and-forge`, `preferences-code-and-collaboration-conventions` and `preferences-operations-and-reliability`.
+Each dependency's commit is written only in the declaring package's `apm.yml`, as a full 40-character SHA; no Nix fetcher repeats it.
+Nix downloads all of them with apm itself in one fixed-output derivation, `apm-deps-<digest>` (`pkgs/by-name/apm-skills-compose/deps.nix`), under the single `apmDepsHash` in `pkgs/by-name/apm-skills-compose/package.nix`, and the compose installs offline from that download.
+The `<digest>` covers every remote entry and apm's version (`pkgs/by-name/apm-skills-compose/guard.nix`, tested by the `eval-apm-guard` check), so a changed ref or apm version renames the download and its build fails with a hash mismatch that prints the new hash, instead of reusing the previous download.
+The guard also fails evaluation on a ref that is not a full SHA, on an entry shape it cannot parse, and on superpowers or agency entries that are not one skill directory each or do not share one ref.
+
+To bump a dependency, edit its `ref:` (for superpowers and agency, every line of the repository together), build `.#apm-skills-compose`, and copy the hash from the mismatch into `apmDepsHash`.
+After the change reaches `main`, `just agents-relock` refreshes the root `apm.lock.yaml`.
+
+Five tools ship their agent skill in the same upstream release as their CLI, and the skill's ref must equal the commit the CLI package records:
+
+| Skill repository | Recorded commit |
+|---|---|
+| `Mergifyio/mergify-cli` | `mergify-cli-bin.sourceRev` |
+| `schpet/linear-cli` | `linear-cli.skillSrc.rev` |
+| `microsoft/playwright-cli` | `playwright-cli.src.rev` |
+| `max-sixty/worktrunk` | `worktrunk-bin.sourceRev` |
+| `github/gh-stack` | `gh-stack.sourceRev` (`modules/nixpkgs/overlays/gh-stack.nix`) |
+
+`modules/checks/structure/cli-skill-release-alignment.nix` holds one check per pair, a negative control, a refetch of `github/gh-stack` at the recorded commit with nixpkgs' source hash, and a byte comparison of the delivered `playwright-cli` skill with the CLI's source.
+The updaters of `mergify-cli-bin`, `worktrunk-bin` and `linear-cli` rewrite the recorded commit and the `apm.yml` ref together; the `apmDepsHash` update follows from the next build.
+
+### For marketplace users
+
+`planning-and-development` depends on 15 superpowers skills from `obra/superpowers` v7.0.2 and on agency's `hickey`, `lowy` and `fact-check`, each declared as its own skill directory (`planning-and-development/apm.yml`).
+apm therefore installs only those skill directories: neither repository's hooks, agency's subagents nor its rule are installed, and a plain `apm install` of this package succeeds for the `agent-skills`, `claude`, `codex`, `copilot`, `cursor`, `gemini` and `opencode` targets (`logs/apm-marketplace-20261118-134756.log`).
+superpowers' SessionStart hook, which loads `using-superpowers` at the start of each session, is deliberately absent; apm 0.36 refuses superpowers' hook files, and upstream declined apm support (obra/superpowers#2681).
+For that hook and the plugin experience, install superpowers natively instead (`/plugin install superpowers@claude-plugins-official`, or its README for other harnesses), and either do not install `planning-and-development` alongside it or remove its superpowers lines, so the same skills are not installed twice.
+These dependencies were tested with apm 0.36.0, the version this repository builds with (`modules/nixpkgs/overlays/apm.nix`).
+Installers other than apm read `../../../../.github/plugin/marketplace.json`, whose entries name only each package's source directory, so they do not resolve `apm.yml` dependencies and install none of the remote skills.
+
 ## Authoring
 
 `SKILL.md` frontmatter needs a `name` matching `[a-z0-9-]` and a `description` at most 1024 characters.

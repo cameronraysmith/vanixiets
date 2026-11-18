@@ -13,7 +13,7 @@
 #
 # and, in modules/home/ai/plugins/planning-and-development/apm.yml, the `ref:`
 # line of the `git: schpet/linear-cli` entry, which must equal the skillSrc rev
-# (the apm-skills-compose drift guard enforces it).
+# (the structure-release-alignment-linear-cli check enforces it).
 #
 # Usage: ./update.sh [VERSION]   (VERSION overrides the latest-release lookup)
 

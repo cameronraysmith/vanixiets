@@ -1,11 +1,12 @@
 # Unified AI agent skills for claude-code, codex, opencode, droid, and hermes-agent
 #
 # First-party skills (apm packages under ../plugins/<package>/.apm/skills, e.g. the
-# openspec-* skills shipped inside planning-and-development) plus superpowers — a
-# regular remote apm dependency resolved offline via the git-cache pre-warm (D11) —
-# are composed offline into a single flat marketplace tree by aiSkills.composed (see
-# compose.nix). Skills are enumerated from the compose's committed name index
-# (aiSkills.composed.skillNames, drift-guarded inside its build) and point into its
+# openspec-* skills shipped inside planning-and-development) plus their remote apm
+# dependencies (superpowers per skill directory, among others; downloaded by
+# apm-deps) are composed offline into a single flat marketplace tree by
+# aiSkills.composed (see compose.nix). Skills are enumerated from the compose's
+# committed name index (aiSkills.composed.skillNames, drift-guarded inside its
+# build) and point into its
 # .claude/skills/ subtree, so each skill deploys under its flat leaf name (the
 # package name never appears in the deployed path) and every skill is all-agent: the
 # historical src/core vs src/claude split is dissolved, so all harnesses receive the
@@ -33,14 +34,15 @@ let
       ...
     }:
     let
-      # First-party skills plus superpowers (a regular remote apm dependency resolved
-      # offline via the git-cache pre-warm, D11) are composed offline by aiSkills.composed (apm-skills-compose),
-      # which emits a flat ${out}/.claude/skills/<skill>/SKILL.md tree. The names come
+      # First-party skills plus their remote apm dependencies (superpowers per skill
+      # directory, among others) are composed offline by aiSkills.composed
+      # (apm-skills-compose) from the apm-deps download, which emits a flat
+      # ${out}/.claude/skills/<skill>/SKILL.md tree. The names come
       # from the compose's committed index, and each value is a string interpolation
       # into that subtree, so evaluation never reads the build output (no
       # import-from-derivation). We deliberately never reference
-      # ${composed}/.claude/settings.json or any hooks/ that superpowers contributes
-      # (design.md D6 / hooks risk note).
+      # ${composed}/.claude/settings.json or any hooks/ that upstream dependencies
+      # contribute (design.md D6 / hooks risk note).
       #
       # mattpocock/skills is adopted whole-plugin, and two of its bare-named skills
       # shadow first-party ecosystems at model-selection time, so they are withheld

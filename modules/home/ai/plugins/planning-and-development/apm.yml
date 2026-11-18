@@ -3,35 +3,49 @@ version: 0.0.0
 description: Planning and development skills — agentic planning-and-development workflow, the bundled OpenSpec change-lifecycle workflow skills, OpenSpec/Linear sync, and project management.
 dependencies:
   apm:
-    # superpowers as a regular (walked) remote dep pinned to the full 40-char SHA
-    # (design.md D11). The nix compose resolves this offline by pre-seeding apm's
-    # git checkout cache from the flake-pinned tree before `apm install`, so it
-    # records a remote-style resolved_commit lock with zero network. The full SHA
-    # is required; a short ref forces a network fetch.
-    - obra/superpowers#b36e0829c6d0140e93cfef2ca599b1b07d4a7797
-    # mattpocock/skills as a walked whole-plugin remote dep (claude-plugin repo:
-    # plugin.json, no apm.yml). apm normalizes its 25 plugin.json-declared skills
-    # (18 engineering + 7 productivity) into flat skills at install; the nix compose
-    # pre-seeds the git checkout cache from the flake-pinned tree for zero-network
-    # resolution. Full 40-char SHA required.
+    # superpowers and agency are consumed one skill directory at a time
+    # (virtual-subdirectory dependencies), so apm never sees either
+    # repository's hooks: apm >=0.36 refuses superpowers' hook pair, and
+    # agency's Stop hook would land in consumers' settings. Every line of a
+    # repository shares one full 40-char SHA; the apm-deps guard fails
+    # evaluation otherwise, and the apm-deps download fails if the superpowers
+    # list differs from upstream skills/ at that commit.
+    - obra/superpowers/skills/brainstorming#22f0b463e7a5e579904dd6211a520321035526f7
+    - obra/superpowers/skills/diagnosing-superpowers#22f0b463e7a5e579904dd6211a520321035526f7
+    - obra/superpowers/skills/dispatching-parallel-agents#22f0b463e7a5e579904dd6211a520321035526f7
+    - obra/superpowers/skills/executing-plans#22f0b463e7a5e579904dd6211a520321035526f7
+    - obra/superpowers/skills/finishing-a-development-branch#22f0b463e7a5e579904dd6211a520321035526f7
+    - obra/superpowers/skills/receiving-code-review#22f0b463e7a5e579904dd6211a520321035526f7
+    - obra/superpowers/skills/requesting-code-review#22f0b463e7a5e579904dd6211a520321035526f7
+    - obra/superpowers/skills/subagent-driven-development#22f0b463e7a5e579904dd6211a520321035526f7
+    - obra/superpowers/skills/systematic-debugging#22f0b463e7a5e579904dd6211a520321035526f7
+    - obra/superpowers/skills/test-driven-development#22f0b463e7a5e579904dd6211a520321035526f7
+    - obra/superpowers/skills/using-git-worktrees#22f0b463e7a5e579904dd6211a520321035526f7
+    - obra/superpowers/skills/using-superpowers#22f0b463e7a5e579904dd6211a520321035526f7
+    - obra/superpowers/skills/verification-before-completion#22f0b463e7a5e579904dd6211a520321035526f7
+    - obra/superpowers/skills/writing-plans#22f0b463e7a5e579904dd6211a520321035526f7
+    - obra/superpowers/skills/writing-skills#22f0b463e7a5e579904dd6211a520321035526f7
+    - srid/agency/.apm/skills/hickey#81455051ccca654c57ad6088838c85e7248ac159
+    - srid/agency/.apm/skills/lowy#81455051ccca654c57ad6088838c85e7248ac159
+    - srid/agency/.apm/skills/fact-check#81455051ccca654c57ad6088838c85e7248ac159
+    # mattpocock/skills is a whole-plugin remote dep (claude-plugin repo:
+    # plugin.json, no apm.yml); apm normalizes its plugin.json-declared skills
+    # into flat skills at install. The commit is pinned here only; Nix downloads
+    # it in apm-deps (pkgs/by-name/apm-skills-compose/deps.nix).
     - mattpocock/skills#6acc160e4e0cd062dbbbd7a1b26ae92855edf07e
-    - git: srid/agency
-      ref: 81455051ccca654c57ad6088838c85e7248ac159
-      skills: [hickey, lowy, fact-check]
     # linear-cli ships one agent skill under skills/linear-cli/ alongside its
     # CLI. openspec-linear-sync in this plugin is linear-cli-driven, so marketplace
     # consumers need the skill propagated with the plugin; the skills subset takes
-    # only that skill directory with its references/ and scripts/ siblings. Same
-    # offline resolution as agency above: the nix compose pre-seeds apm's git
-    # checkout cache from the flake-pinned tree. The ref is the v3.1.0 tag commit
-    # (full 40-char SHA; a short ref forces a network fetch) and must equal
-    # pkgs.linear-cli.skillSrc.rev; the compose drift guard fails the build otherwise,
-    # and pkgs/by-name/linear-cli/update.sh rewrites both in step.
+    # only that skill directory with its references/ and scripts/ siblings. The
+    # commit is pinned here only; Nix downloads it in apm-deps. It is the v3.1.0
+    # tag commit and must equal pkgs.linear-cli.skillSrc.rev
+    # (structure-release-alignment-linear-cli); pkgs/by-name/linear-cli/update.sh
+    # rewrites both in step.
     - git: schpet/linear-cli
       ref: 02571d34be662e5487204841fb80bf23ed79b4f0
       skills: [linear-cli]
-    # Keep the CLI and its skill on the same release source; offline composition
-    # checks this pin against pkgs.playwright-cli.src.rev.
+    # The commit is pinned here only; Nix downloads it in apm-deps. It must equal
+    # pkgs.playwright-cli.src.rev (structure-release-alignment-playwright-cli).
     - git: microsoft/playwright-cli
       ref: 74354ecc7a43da16d91a9bc54fa8db8283a3fcf5
       skills: [playwright-cli]

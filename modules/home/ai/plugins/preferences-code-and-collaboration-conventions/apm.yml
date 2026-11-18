@@ -3,10 +3,8 @@ version: 0.0.0
 description: Code and collaboration conventions — style and conventions, documentation, git version control, git history cleanup, change management, prose clarity, essential complexity.
 dependencies:
   apm:
-    # unslop as a walked remote dep pinned to the full 40-char SHA. The repo root is
-    # itself the skill (SKILL.md plus load-bearing scripts/ and references/ siblings,
-    # no plugin.json or apm.yml), so apm types it a claude_skill. The nix compose
-    # resolves this offline by pre-seeding apm's git checkout cache from the
-    # flake-pinned tree before `apm install`, recording a remote-style resolved_commit
-    # lock with zero network. A short ref forces a network fetch.
+    # unslop's repo root is itself the skill (SKILL.md plus load-bearing scripts/
+    # and references/ siblings, no plugin.json or apm.yml), so apm types it a
+    # claude_skill. The commit is pinned here only; Nix downloads it in apm-deps
+    # (pkgs/by-name/apm-skills-compose/deps.nix).
     - theclaymethod/unslop#d81f5196167ded24f46fced04958c0c12d681798

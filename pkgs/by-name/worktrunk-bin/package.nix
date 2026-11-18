@@ -56,7 +56,12 @@ stdenv.mkDerivation (finalAttrs: {
   versionCheckProgram = "${placeholder "out"}/bin/wt";
   doInstallCheck = true;
 
-  passthru.updateScript = ./update.sh;
+  passthru = {
+    updateScript = ./update.sh;
+    # Commit the release tag points at; structure-release-alignment-worktrunk
+    # requires the worktrunk skills' apm.yml ref to equal it.
+    sourceRev = "e42f0f6fef2fdbd98fc92e5cd6c3cbea55b65b38";
+  };
 
   meta = {
     description = "Git worktree manager for parallel branches and coding agents (prebuilt release binary)";

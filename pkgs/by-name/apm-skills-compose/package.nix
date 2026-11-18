@@ -1,12 +1,9 @@
 {
-  inputs,
   lib,
-  stdenv,
+  callPackage,
   runCommandLocal,
-  ripgrep,
   jq,
   writeText,
-  gitMinimal,
 
   apm,
 
@@ -23,72 +20,21 @@
       )
     ),
 
-  # Upstream additive co-ship deps. Empty now that superpowers is a regular remote
-  # apm dep declared in planning-and-development/apm.yml and resolved offline via
-  # the git-cache pre-warm below (design.md D11).
+  # Upstream source trees composed as additional local packages. Empty: remote
+  # apm dependencies are declared in the plugin apm.yml files and come from
+  # apmDeps.
   upstreamDeps ? [ ],
 
-  # Flake-pinned superpowers tree feeding apm's git checkout cache so the remote
-  # dep resolves with zero network. superpowersRev is the single SHA source of
-  # truth (the fetchFromGitHub rev), reconciled against the apm.yml pin by the
-  # drift guard in the build script.
-  superpowersSrc ? inputs.self.packages.${stdenv.hostPlatform.system}.agent-plugins-superpowers,
-  superpowersRev ? superpowersSrc.rev,
+  # NAR hash of the apm-deps download. After a remote ref or apm version change
+  # the download is renamed and fails with a hash mismatch printing the new
+  # value to put here.
+  apmDepsHash ? "sha256-8+DPJA+j13sVvLd1hqh3muY3K0yr8Bn3JwHWNux5ju8=",
 
-  # Flake-pinned agency tree feeding apm's git checkout cache so the skills-subset
-  # remote dep resolves with zero network. agencyRev is the single SHA source of
-  # truth (the fetchFromGitHub rev), reconciled against the apm.yml pin by the
-  # drift guard in the build script.
-  agencySrc ? inputs.self.packages.${stdenv.hostPlatform.system}.agent-plugins-agency,
-  agencyRev ? agencySrc.rev,
-
-  # Flake-pinned worktrunk tree feeding apm's git checkout cache so the skills-subset
-  # remote dep resolves with zero network. worktrunkRev is the single SHA source of
-  # truth (the fetchFromGitHub rev), reconciled against the apm.yml pin by the drift
-  # guard in the build script.
-  worktrunkSrc ? inputs.self.packages.${stdenv.hostPlatform.system}.agent-plugins-worktrunk,
-  worktrunkRev ? worktrunkSrc.rev,
-
-  # Flake-pinned mattpocock/skills tree feeding apm's git checkout cache so the
-  # whole-plugin remote dep resolves with zero network. mattpocockRev is the single
-  # SHA source of truth (the fetchFromGitHub rev), reconciled against the apm.yml pin
-  # by the drift guard in the build script.
-  mattpocockSrc ? inputs.self.packages.${stdenv.hostPlatform.system}.agent-plugins-mattpocock-skills,
-  mattpocockRev ? mattpocockSrc.rev,
-
-  # Flake-pinned theclaymethod/unslop tree feeding apm's git checkout cache so the
-  # bare-skill remote dep resolves with zero network. unslopRev is the single SHA
-  # source of truth (the fetchFromGitHub rev), reconciled against the apm.yml pin by
-  # the drift guard in the build script.
-  unslopSrc ? inputs.self.packages.${stdenv.hostPlatform.system}.agent-plugins-unslop,
-  unslopRev ? unslopSrc.rev,
-
-  # Flake-pinned github/gh-stack tree feeding apm's git checkout cache so the
-  # skill-bundle remote dep resolves with zero network. ghStackRev is the single SHA
-  # source of truth (the fetchFromGitHub rev), reconciled against the apm.yml pin by
-  # the drift guard in the build script.
-  ghStackSrc ? inputs.self.packages.${stdenv.hostPlatform.system}.agent-plugins-gh-stack,
-  ghStackRev ? ghStackSrc.rev,
-
-  mergifyCliSrc ? inputs.self.packages.${stdenv.hostPlatform.system}.agent-plugins-mergify-cli,
-  mergifyCliRev ? mergifyCliSrc.rev,
-
-  # Flake-pinned GreptimeTeam/dashboard tree feeding apm's git checkout cache so the
-  # skill-bundle remote dep resolves with zero network. greptimedbDashboardRev is
-  # the single SHA source of truth (the fetchFromGitHub rev), reconciled against the
-  # apm.yml pin by the drift guard in the build script.
-  greptimedbDashboardSrc ?
-    inputs.self.packages.${stdenv.hostPlatform.system}.agent-plugins-greptimedb-dashboard,
-  greptimedbDashboardRev ? greptimedbDashboardSrc.rev,
-
-  # Flake-pinned schpet/linear-cli source tree feeding apm's git checkout cache so
-  # the skill-bundle remote dep resolves with zero network. linearCliRev (the v tag
-  # commit pinned by pkgs.linear-cli.skillSrc) is the single SHA source of truth,
-  # reconciled against the apm.yml pin by the drift guard in the build script.
-  linearCliSrc ? inputs.self.packages.${stdenv.hostPlatform.system}.linear-cli.skillSrc,
-  linearCliRev ? linearCliSrc.rev,
-
-  playwrightCli ? inputs.self.packages.${stdenv.hostPlatform.system}.playwright-cli,
+  # Every remote apm dependency, downloaded once (deps.nix, design D1).
+  apmDeps ? callPackage ./deps.nix {
+    inherit apm apmDepsHash;
+    pluginsDir = ../../../modules/home/ai/plugins;
+  },
 
   targets ? [
     "agent-skills"
@@ -145,14 +91,15 @@ runCommandLocal "apm-skills-compose"
   {
     nativeBuildInputs = [
       apm
-      ripgrep
       jq
-      gitMinimal
     ];
     meta = {
-      description = "Consumer apm compose over all auto-discovered first-party plugin packages, emitting flat .claude/skills and .agents/skills trees for the vanixiets marketplace; superpowers resolves as a regular remote apm dep offline via a pre-warmed git checkout cache.";
+      description = "Consumer apm compose over all auto-discovered first-party plugin packages, emitting flat .claude/skills and .agents/skills trees for the vanixiets marketplace; offline consumer of the apm-deps download.";
     };
-    passthru = { inherit skillNames; };
+    passthru = {
+      inherit skillNames;
+      deps = apmDeps;
+    };
   }
   ''
     set -euo pipefail
@@ -161,6 +108,13 @@ runCommandLocal "apm-skills-compose"
     export APM_E2E_TESTS=1
     mkdir -p "$HOME" "$APM_CACHE_DIR" "$out"
 
+    # Without git, apm cannot fetch, so a dependency missing from the
+    # download fails the build instead of reaching the network.
+    if command -v git >/dev/null; then
+      echo "apm-skills-compose: git is on PATH; the compose must not be able to fetch" >&2
+      exit 1
+    fi
+
     # Store paths are read-only but apm writes into each dependency tree during
     # install, so copy with cp -RL (dereferencing symlinks) then restore write
     # permission before composing.
@@ -168,199 +122,10 @@ runCommandLocal "apm-skills-compose"
 
     ${copyUpstreamDeps}
 
-    # Pre-seed apm's git checkout cache from the flake-pinned superpowers tree so
-    # the regular remote dep in planning-and-development/apm.yml resolves with zero
-    # network (design.md D11). Shard = first 16 hex of sha256 of the repo URL; the
-    # stub .git/HEAD pins the full 40-hex SHA apm matches against the declared ref.
-    SP_SHA=${superpowersRev}
-    SHARD=$(printf '%s' 'https://github.com/obra/superpowers' | sha256sum | cut -c1-16)
-    CK="$APM_CACHE_DIR/git/checkouts_v1/$SHARD/$SP_SHA/full"
-    mkdir -p "$CK"
-    cp -RL ${superpowersSrc}/. "$CK"/
-    chmod -R u+w "$CK"
-    # apm 0.36 refuses superpowers' hooks.json + hooks-cursor.json pair (filename
-    # target routing removed); consumers read only .claude/skills, so drop them.
-    rm -rf "$CK/hooks"
-    mkdir -p "$CK/.git"
-    printf '%s\n' "$SP_SHA" > "$CK/.git/HEAD"
-
-    # A drifted apm.yml pin would silently fall back to a network fetch of the
-    # declared SHA, breaking the hermetic offline compose; fail loudly instead.
-    if ! grep -q "$SP_SHA" ./planning-and-development/apm.yml; then
-      echo "apm-skills-compose: superpowers SHA drift — planning-and-development/apm.yml does not pin $SP_SHA" >&2
-      exit 1
-    fi
-
-    # Same offline pre-seed for the agency skills-subset remote dep.
-    AG_SHA=${agencyRev}
-    SHARD_AG=$(printf '%s' 'https://github.com/srid/agency' | sha256sum | cut -c1-16)
-    CK_AG="$APM_CACHE_DIR/git/checkouts_v1/$SHARD_AG/$AG_SHA/full"
-    mkdir -p "$CK_AG"
-    cp -RL ${agencySrc}/. "$CK_AG"/
-    chmod -R u+w "$CK_AG"
-    mkdir -p "$CK_AG/.git"
-    printf '%s\n' "$AG_SHA" > "$CK_AG/.git/HEAD"
-
-    if ! grep -q "$AG_SHA" ./planning-and-development/apm.yml; then
-      echo "apm-skills-compose: agency SHA drift — planning-and-development/apm.yml does not pin $AG_SHA" >&2
-      exit 1
-    fi
-
-    # Same offline pre-seed for the worktrunk skills-subset remote dep declared in
-    # version-control-and-forge/apm.yml.
-    WT_SHA=${worktrunkRev}
-    SHARD_WT=$(printf '%s' 'https://github.com/max-sixty/worktrunk' | sha256sum | cut -c1-16)
-    CK_WT="$APM_CACHE_DIR/git/checkouts_v1/$SHARD_WT/$WT_SHA/full"
-    mkdir -p "$CK_WT"
-    cp -RL ${worktrunkSrc}/. "$CK_WT"/
-    chmod -R u+w "$CK_WT"
-    mkdir -p "$CK_WT/.git"
-    printf '%s\n' "$WT_SHA" > "$CK_WT/.git/HEAD"
-
-    if ! grep -q "$WT_SHA" ./version-control-and-forge/apm.yml; then
-      echo "apm-skills-compose: worktrunk SHA drift — version-control-and-forge/apm.yml does not pin $WT_SHA" >&2
-      exit 1
-    fi
-
-    # Same offline pre-seed for the mattpocock/skills whole-plugin remote dep declared
-    # in planning-and-development/apm.yml. apm types it MARKETPLACE_PLUGIN (plugin.json,
-    # no apm.yml) and normalizes its plugin.json-declared skills into .apm/skills/ at
-    # install time.
-    MP_SHA=${mattpocockRev}
-    SHARD_MP=$(printf '%s' 'https://github.com/mattpocock/skills' | sha256sum | cut -c1-16)
-    CK_MP="$APM_CACHE_DIR/git/checkouts_v1/$SHARD_MP/$MP_SHA/full"
-    mkdir -p "$CK_MP"
-    cp -RL ${mattpocockSrc}/. "$CK_MP"/
-    chmod -R u+w "$CK_MP"
-    mkdir -p "$CK_MP/.git"
-    printf '%s\n' "$MP_SHA" > "$CK_MP/.git/HEAD"
-
-    if ! grep -q "$MP_SHA" ./planning-and-development/apm.yml; then
-      echo "apm-skills-compose: mattpocock SHA drift — planning-and-development/apm.yml does not pin $MP_SHA" >&2
-      exit 1
-    fi
-
-    # Same offline pre-seed for the unslop remote dep declared in
-    # preferences-code-and-collaboration-conventions/apm.yml. apm types it
-    # CLAUDE_SKILL (SKILL.md at the repo root, no plugin.json or apm.yml) and installs
-    # the root tree as a single skill, carrying its scripts/ and references/ siblings.
-    US_SHA=${unslopRev}
-    SHARD_US=$(printf '%s' 'https://github.com/theclaymethod/unslop' | sha256sum | cut -c1-16)
-    CK_US="$APM_CACHE_DIR/git/checkouts_v1/$SHARD_US/$US_SHA/full"
-    mkdir -p "$CK_US"
-    cp -RL ${unslopSrc}/. "$CK_US"/
-    chmod -R u+w "$CK_US"
-    mkdir -p "$CK_US/.git"
-    printf '%s\n' "$US_SHA" > "$CK_US/.git/HEAD"
-
-    if ! grep -q "$US_SHA" ./preferences-code-and-collaboration-conventions/apm.yml; then
-      echo "apm-skills-compose: unslop SHA drift — preferences-code-and-collaboration-conventions/apm.yml does not pin $US_SHA" >&2
-      exit 1
-    fi
-
-    # Same offline pre-seed for the gh-stack remote dep declared in
-    # version-control-and-forge/apm.yml. apm types it SKILL_BUNDLE (nested
-    # skills/<name>/SKILL.md, no plugin manifest and no apm.yml) and installs the
-    # skills/gh-stack/ directory with its references/ siblings.
-    GH_SHA=${ghStackRev}
-    SHARD_GH=$(printf '%s' 'https://github.com/github/gh-stack' | sha256sum | cut -c1-16)
-    CK_GH="$APM_CACHE_DIR/git/checkouts_v1/$SHARD_GH/$GH_SHA/full"
-    mkdir -p "$CK_GH"
-    cp -RL ${ghStackSrc}/. "$CK_GH"/
-    chmod -R u+w "$CK_GH"
-    mkdir -p "$CK_GH/.git"
-    printf '%s\n' "$GH_SHA" > "$CK_GH/.git/HEAD"
-
-    if ! grep -q "$GH_SHA" ./version-control-and-forge/apm.yml; then
-      echo "apm-skills-compose: gh-stack SHA drift — version-control-and-forge/apm.yml does not pin $GH_SHA" >&2
-      exit 1
-    fi
-
-    MF_SHA=${mergifyCliRev}
-    SHARD_MF=$(printf '%s' 'https://github.com/mergifyio/mergify-cli' | sha256sum | cut -c1-16)
-    CK_MF="$APM_CACHE_DIR/git/checkouts_v1/$SHARD_MF/$MF_SHA/full"
-    mkdir -p "$CK_MF"
-    cp -RL ${mergifyCliSrc}/. "$CK_MF"/
-    chmod -R u+w "$CK_MF"
-    mkdir -p "$CK_MF/.git"
-    printf '%s\n' "$MF_SHA" > "$CK_MF/.git/HEAD"
-
-    if ! rg -q "ref: $MF_SHA" ./version-control-and-forge/apm.yml; then
-      echo "apm-skills-compose: mergify-cli SHA drift — version-control-and-forge/apm.yml does not pin $MF_SHA" >&2
-      exit 1
-    fi
-
-    # Same offline pre-seed for the GreptimeTeam/dashboard remote dep declared in
-    # preferences-operations-and-reliability/apm.yml. apm types it SKILL_BUNDLE and
-    # installs the skills/greptimedb-perses-dashboard/ directory with its
-    # reference.md, catalog.md and scripts/ siblings.
-    GD_SHA=${greptimedbDashboardRev}
-    SHARD_GD=$(printf '%s' 'https://github.com/greptimeteam/dashboard' | sha256sum | cut -c1-16)
-    CK_GD="$APM_CACHE_DIR/git/checkouts_v1/$SHARD_GD/$GD_SHA/full"
-    mkdir -p "$CK_GD"
-    cp -RL ${greptimedbDashboardSrc}/. "$CK_GD"/
-    chmod -R u+w "$CK_GD"
-    mkdir -p "$CK_GD/.git"
-    printf '%s\n' "$GD_SHA" > "$CK_GD/.git/HEAD"
-
-    if ! rg -q "ref: $GD_SHA" ./preferences-operations-and-reliability/apm.yml; then
-      echo "apm-skills-compose: greptimedb-dashboard SHA drift — preferences-operations-and-reliability/apm.yml does not pin $GD_SHA" >&2
-      exit 1
-    fi
-
-    # Same offline pre-seed for the linear-cli skills-subset remote dep declared in
-    # planning-and-development/apm.yml; apm installs only skills/linear-cli/.
-    LC_SHA=${linearCliRev}
-    SHARD_LC=$(printf '%s' 'https://github.com/schpet/linear-cli' | sha256sum | cut -c1-16)
-    CK_LC="$APM_CACHE_DIR/git/checkouts_v1/$SHARD_LC/$LC_SHA/full"
-    mkdir -p "$CK_LC"
-    cp -RL ${linearCliSrc}/. "$CK_LC"/
-    chmod -R u+w "$CK_LC"
-    mkdir -p "$CK_LC/.git"
-    printf '%s\n' "$LC_SHA" > "$CK_LC/.git/HEAD"
-
-    if ! rg -q "ref: $LC_SHA" ./planning-and-development/apm.yml; then
-      echo "apm-skills-compose: linear-cli SHA drift — planning-and-development/apm.yml does not pin $LC_SHA" >&2
-      exit 1
-    fi
-
-    # Reuse the CLI's release source, including the skill's references directory.
-    PW_SHA=${playwrightCli.src.rev}
-    if ! awk -v sha="$PW_SHA" '
-      $1 == "-" && $2 == "git:" { selected = ($3 == "microsoft/playwright-cli") }
-      selected && $1 == "ref:" && $2 == sha { found = 1 }
-      END { exit !found }
-    ' ./planning-and-development/apm.yml; then
-      echo "apm-skills-compose: playwright-cli manifest/source SHA drift" >&2
-      exit 1
-    fi
-    if [ "$(jq -r .version ${playwrightCli.src}/package.json)" != ${lib.escapeShellArg playwrightCli.version} ]; then
-      echo "apm-skills-compose: playwright-cli package/source version drift" >&2
-      exit 1
-    fi
-    SHARD_PW=$(printf '%s' 'https://github.com/microsoft/playwright-cli' | sha256sum | cut -c1-16)
-    CK_PW="$APM_CACHE_DIR/git/checkouts_v1/$SHARD_PW/$PW_SHA/full"
-    mkdir -p "$CK_PW"
-    cp -RL ${playwrightCli.src}/. "$CK_PW"/
-    chmod -R u+w "$CK_PW"
-    mkdir -p "$CK_PW/.git"
-    printf '%s\n' "$PW_SHA" > "$CK_PW/.git/HEAD"
-
-    # APM 0.36 rebuilds (via network clone) any seed whose .git/config lacks its
-    # byte-determinism pins, and on a hit runs `git ls-tree HEAD` to vet tracked
-    # links. Each seed is therefore a real repo over the dereferenced tree, with
-    # a replace ref letting the pinned upstream SHA resolve to that local commit.
-    for checkout in "$CK" "$CK_AG" "$CK_WT" "$CK_MP" "$CK_US" "$CK_GH" "$CK_MF" "$CK_GD" "$CK_LC" "$CK_PW"; do
-      sha=$(<"$checkout/.git/HEAD")
-      rm -rf "$checkout/.git"
-      git -C "$checkout" init -q
-      git -C "$checkout" add -A
-      git -C "$checkout" -c user.name=apm-skills-compose -c user.email=nobody@localhost \
-        commit -q --no-gpg-sign -m seed
-      git -C "$checkout" update-ref "refs/replace/$sha" HEAD
-      printf '%s\n' "$sha" > "$checkout/.git/HEAD"
-      printf '[core]\n\tautocrlf = false\n\teol = lf\n\tsymlinks = false\n[apm]\n\tlinkMaterialization = git-objects-checkout\n' >> "$checkout/.git/config"
-    done
+    # apm reads apm_modules/ and apm.lock.yaml under the install root.
+    cp -R ${apmDeps}/apm_modules "$out/apm_modules"
+    cp ${apmDeps}/apm.lock.yaml "$out/apm.lock.yaml"
+    chmod -R u+w "$out/apm_modules" "$out/apm.lock.yaml"
 
     cp ${rootConsumerManifest} ./apm.yml
     # agent-skills,claude only: the codex/hermes/opencode/droid harnesses are
@@ -404,11 +169,6 @@ runCommandLocal "apm-skills-compose"
         echo "apm-skills-compose assertion failed: missing $expected" >&2
         exit 1
       fi
-    done
-
-    # apm 0.36 carries the repository LICENSE into each installed skill.
-    for target in .claude .agents; do
-      diff -r -x LICENSE ${playwrightCli.src}/skills/playwright-cli "$out/$target/skills/playwright-cli"
     done
 
     ${skillIndexGuard}

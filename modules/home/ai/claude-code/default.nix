@@ -143,7 +143,7 @@ in
                 "posthog@claude-plugins-official" = false;
                 "sentry@claude-plugins-official" = false;
                 "skill-creator@claude-plugins-official" = true;
-                # superpowers skills ship via the apm package dependency (the flat composed copy in modules/home/ai/skills), so the duplicate Claude-plugin delivery is disabled; pkgs.agent-plugins-superpowers is retained as the apm cache-warm feed.
+                # superpowers ships per skill through the apm compose (the flat composed copy in modules/home/ai/skills), so the duplicate Claude-plugin delivery is disabled.
                 "superpowers@claude-plugins-official" = false;
                 # cognee
                 "cognee-memory@cognee" = false;

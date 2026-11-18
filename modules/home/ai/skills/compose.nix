@@ -35,43 +35,7 @@ let
             }
           );
           default = [ ];
-          description = "Upstream apm dependencies additively co-shipped alongside first-party skills. Empty now that superpowers is a regular remote apm dep resolved offline via the compose's git-cache pre-warm (design D11); retained for a future additive co-ship. Same-name collisions resolve by apm precedence (design D6).";
-        };
-
-        superpowersSrc = lib.mkOption {
-          type = lib.types.package;
-          default = pkgs.agent-plugins-superpowers;
-          description = "Flake-pinned superpowers tree feeding apm's git checkout cache so the regular remote superpowers dep resolves offline (design D11).";
-        };
-
-        superpowersRev = lib.mkOption {
-          type = lib.types.str;
-          default = pkgs.agent-plugins-superpowers.rev;
-          description = "Full 40-char superpowers commit SHA; the single source of truth reconciled against the planning-and-development/apm.yml pin by the compose drift guard (design D11).";
-        };
-
-        agencySrc = lib.mkOption {
-          type = lib.types.package;
-          default = pkgs.agent-plugins-agency;
-          description = "Flake-pinned agency tree feeding apm's git checkout cache so the skills-subset remote agency dep resolves offline.";
-        };
-
-        agencyRev = lib.mkOption {
-          type = lib.types.str;
-          default = pkgs.agent-plugins-agency.rev;
-          description = "Full 40-char agency commit SHA; the source of truth reconciled against the planning-and-development/apm.yml pin by the compose drift guard.";
-        };
-
-        worktrunkSrc = lib.mkOption {
-          type = lib.types.package;
-          default = pkgs.agent-plugins-worktrunk;
-          description = "Flake-pinned worktrunk tree feeding apm's git checkout cache so the skills-subset remote worktrunk dep resolves offline.";
-        };
-
-        worktrunkRev = lib.mkOption {
-          type = lib.types.str;
-          default = pkgs.agent-plugins-worktrunk.rev;
-          description = "Full 40-char worktrunk commit SHA; the source of truth reconciled against the version-control-and-forge/apm.yml pin by the compose drift guard.";
+          description = "Upstream source trees composed as additional local packages alongside first-party skills. Empty: remote apm dependencies are declared in the plugin apm.yml files and downloaded by apm-deps; retained for a future additive co-ship. Same-name collisions resolve by apm precedence (design D6).";
         };
 
         apmTargets = lib.mkOption {
@@ -86,19 +50,13 @@ let
         composed = lib.mkOption {
           type = lib.types.package;
           internal = true;
-          description = "Wired apm-skills-compose derivation; skills/default.nix points into its .claude/skills/ subtree using the committed name index in passthru.skillNames. Never reference its .claude/settings.json or hooks/ (superpowers side-effect).";
+          description = "Wired apm-skills-compose derivation; skills/default.nix points into its .claude/skills/ subtree using the committed name index in passthru.skillNames. Never reference its .claude/settings.json or hooks/ (upstream hook side effects).";
         };
       };
 
       config.aiSkills.composed = pkgs.apm-skills-compose.override {
         firstPartyPackages = config.aiSkills.packages;
         upstreamDeps = config.aiSkills.upstreamDeps;
-        superpowersSrc = config.aiSkills.superpowersSrc;
-        superpowersRev = config.aiSkills.superpowersRev;
-        agencySrc = config.aiSkills.agencySrc;
-        agencyRev = config.aiSkills.agencyRev;
-        worktrunkSrc = config.aiSkills.worktrunkSrc;
-        worktrunkRev = config.aiSkills.worktrunkRev;
         targets = config.aiSkills.apmTargets;
       };
     };

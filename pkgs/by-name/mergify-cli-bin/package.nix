@@ -74,7 +74,12 @@ stdenv.mkDerivation (finalAttrs: {
   versionCheckProgram = "${placeholder "out"}/bin/mergify";
   doInstallCheck = true;
 
-  passthru.updateScript = ./update.sh;
+  passthru = {
+    updateScript = ./update.sh;
+    # Commit the release tag points at; structure-release-alignment-mergify-cli
+    # requires the mergify-stack skill's apm.yml ref to equal it.
+    sourceRev = "e7c1ebbc281361f0b2b7827cf583f57339c97ebc";
+  };
 
   meta = {
     description = "Mergify CLI for stacked pull requests and CI insights (prebuilt release binary)";
