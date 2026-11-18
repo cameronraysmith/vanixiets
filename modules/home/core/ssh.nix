@@ -8,7 +8,7 @@ let
   inherit (config.flake.lib) hosts;
 
   # Login per member reachable over ssh: every NixOS and darwin host, plus
-  # pixel7's Termux sshd. pixel11 runs no sshd.
+  # each phone's Termux sshd (port 8022; Termux accepts any username).
   logins = {
     cinnabar.User = "cameron";
     electrum.User = "cameron";
@@ -21,8 +21,12 @@ let
     magnetite.User = "cameron";
     pyrite.User = "cameron";
     pixel7 = {
-      Port = 8022; # Termux sshd default
-      User = "termux"; # Termux accepts any username
+      Port = 8022;
+      User = "termux";
+    };
+    pixel11 = {
+      Port = 8022;
+      User = "termux";
     };
   };
 
