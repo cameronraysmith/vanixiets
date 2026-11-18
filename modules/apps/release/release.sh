@@ -18,7 +18,7 @@
 # Optional (CI-mode signalling; required by env-ci on the effect path):
 #   CI                   "true" tells semantic-release / env-ci that the
 #                        run is non-interactive CI. Required in the
-#                        buildbot-effects bwrap sandbox (not a recognised
+#                        nixbot effects bwrap sandbox (not a recognised
 #                        CI provider; semantic-release would otherwise
 #                        abort `running on a CI environment is required`).
 # Optional (repo-root resolution; env-first with errexit-tolerant fallback):
@@ -147,7 +147,7 @@ if [ -z "$package_path" ]; then
 fi
 
 # Repo-root resolution: env-first, then error-tolerant git fallback, then
-# pwd. Required because the buildbot-effects bwrap sandbox does not bind-
+# pwd. Required because the nixbot effects bwrap sandbox does not bind-
 # mount the working tree's .git, so `git rev-parse --show-toplevel` would
 # fail with `fatal: not a git repository` (exit 128) and abort the script.
 # release-packages sets RELEASE_REPO_ROOT="$PWD" so this branch resolves
@@ -163,7 +163,7 @@ if [ ! -d "$package_path" ]; then
 fi
 
 # Git identity: exported via GIT_AUTHOR_* / GIT_COMMITTER_* env vars rather
-# than written to .git/config. Required because the buildbot-effects bwrap
+# than written to .git/config. Required because the nixbot effects bwrap
 # sandbox renders .git read-only (mounts /nix/store ro-bind only) and
 # `git config user.email "…"` would fail with `error: could not lock config
 # file .git/config`. git honours these env vars natively without any config

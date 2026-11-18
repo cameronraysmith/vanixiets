@@ -34,29 +34,6 @@
         "type": "github"
       }
     },
-    "buildbot-nix": {
-      "inputs": {
-        "nixpkgs": [
-          "nixpkgs"
-        ],
-        "treefmt-nix": [
-          "treefmt-nix"
-        ]
-      },
-      "locked": {
-        "lastModified": 1792833139,
-        "narHash": "sha256-iPbJV5QbtR1bZaxgMCu7IZARQ+HGmzEC8foeJF1r/2Q=",
-        "owner": "nix-community",
-        "repo": "buildbot-nix",
-        "rev": "12bdcf45ae7d0366dda54bf3eed6378edf8d919a",
-        "type": "github"
-      },
-      "original": {
-        "owner": "nix-community",
-        "repo": "buildbot-nix",
-        "type": "github"
-      }
-    },
     "bun2nix": {
       "inputs": {
         "flake-parts": [
@@ -1768,7 +1745,6 @@
       "inputs": {
         "argocd-helm-src": "argocd-helm-src",
         "argocd-src": "argocd-src",
-        "buildbot-nix": "buildbot-nix",
         "bun2nix": "bun2nix",
         "catppuccin": "catppuccin",
         "catppuccin-bottom": "catppuccin-bottom",

@@ -28,7 +28,7 @@
 # on the retired clan-vars secrets.
 #
 # clan-vars generators are declared inline within this module per the
-# gitea.nix/buildbot.nix four-part dendritic pattern. The coturn
+# gitea.nix four-part dendritic pattern. The coturn
 # generator binds owner to the static service user; the LiveKit
 # keyfile generator omits owner because both LiveKit and lk-jwt-service
 # run with DynamicUser=true and the upstream modules materialize the
@@ -357,7 +357,7 @@
       ############################################################
 
       # Auto-merges with the existing shared services.postgresql instance
-      # configured by other modules (Gitea, Buildbot). Adds a database
+      # configured by other modules (Gitea, nixbot). Adds a database
       # owned by the static matrix-synapse user. allow_unsafe_locale
       # above accepts the system-locale database that ensureDBOwnership
       # creates.

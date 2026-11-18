@@ -5,6 +5,7 @@ Every path under this directory contains `/_`, so nothing here is imported by `f
 
 The files below are complete, working modules, not broken drafts.
 They were moved here, not deleted, because beads and dolt no longer own issue tracking in this workspace: Linear and OpenSpec do, as of 2026-08-26.
+The beads-ui kanban board (its darwin agent, clan service and inventory, workspace registry and packages) was deleted outright on 2026-11-18, when Linear replaced it for good; recover it from version control if ever needed.
 
 ## Contents and restoration
 
@@ -16,32 +17,11 @@ Restoring a module re-registers its options but does not turn the corresponding 
   Restore: `mv modules/_disabled/system-dolt-sql-server.nix modules/system/dolt-sql-server.nix`.
   Then set `services.dolt-sql-server.enable = true;` on the machine that should run the dolt SQL server.
 
-- `darwin-beads-ui.nix` — originally `modules/darwin/beads-ui.nix`.
-  Defines `services.beads-ui` as a darwin launchd user agent.
-  Restore: `mv modules/_disabled/darwin-beads-ui.nix modules/darwin/beads-ui.nix`.
-  Then set `services.beads-ui.enable = true;` on the darwin machine that should run it.
-
-- `clan-service-beads-ui/` — originally `modules/clan/services/beads-ui/` (directory, including its `README.md`).
-  Defines the `flake.clan.modules.beads-ui` clan service (systemd role) with its own `enable` option under the role's settings.
-  Restore: `mv modules/_disabled/clan-service-beads-ui modules/clan/services/beads-ui`.
-  Then set `enable = true;` in the instance's role settings (see the sibling inventory file below).
-
-- `clan-inventory-beads-ui.nix` — originally `modules/clan/inventory/services/beads-ui.nix`.
-  Wires the `beads-ui` clan service instance onto machine `cinnabar` with `enable = false`.
-  Restore: `mv modules/_disabled/clan-inventory-beads-ui.nix modules/clan/inventory/services/beads-ui.nix`.
-  Requires `clan-service-beads-ui/` restored first, since it references the `beads-ui` clan module.
-  Then flip `enable = true;` in this file's `roles.default.machines."cinnabar".settings`.
-
 - `machines-nixos-cinnabar-dolt.nix` — originally `modules/machines/nixos/cinnabar/dolt.nix`.
   Sets `services.dolt-sql-server.user`/`.group` on machine `cinnabar`, with `enable = false`.
   Restore: `mv modules/_disabled/machines-nixos-cinnabar-dolt.nix modules/machines/nixos/cinnabar/dolt.nix`.
   Requires `system-dolt-sql-server.nix` restored first.
   Then flip `enable = true;` in this file.
-
-- `home-tools-beads-registry.nix` — originally `modules/home/tools/beads-registry.nix`.
-  Declaratively manages `~/.beads/registry.json` for the beads-ui server's workspace discovery.
-  Restore: `mv modules/_disabled/home-tools-beads-registry.nix modules/home/tools/beads-registry.nix`.
-  No `enable` toggle; it applies unconditionally once imported.
 
 - `home-tools-dolt-config.nix` — originally `modules/home/tools/dolt-config.nix`.
   Declaratively manages `~/.dolt/config_global.json` and defines `services.beads.doltServerPort`.
@@ -54,14 +34,10 @@ To bring the whole family back at once:
 
 ```sh
 mv modules/_disabled/system-dolt-sql-server.nix modules/system/dolt-sql-server.nix
-mv modules/_disabled/darwin-beads-ui.nix modules/darwin/beads-ui.nix
-mv modules/_disabled/clan-service-beads-ui modules/clan/services/beads-ui
-mv modules/_disabled/clan-inventory-beads-ui.nix modules/clan/inventory/services/beads-ui.nix
 mv modules/_disabled/machines-nixos-cinnabar-dolt.nix modules/machines/nixos/cinnabar/dolt.nix
-mv modules/_disabled/home-tools-beads-registry.nix modules/home/tools/beads-registry.nix
 mv modules/_disabled/home-tools-dolt-config.nix modules/home/tools/dolt-config.nix
 ```
 
-Then set `services.dolt-sql-server.enable`, `services.beads-ui.enable`, and the clan `beads-ui` instance's `enable` setting to `true` wherever the service should actually run.
+Then set `services.dolt-sql-server.enable` to `true` wherever the service should actually run.
 
-The `beads`, `beads-ui`, and `dolt` packages moved alongside these modules, into `pkgs/disabled/` (see `modules/nixpkgs/per-system.nix` for how `pkgs/by-name/` membership defines the package set); restore each with `mv pkgs/disabled/<name> pkgs/by-name/<name>`.
+The `beads` and `dolt` packages moved alongside these modules, into `pkgs/disabled/` (see `modules/nixpkgs/per-system.nix` for how `pkgs/by-name/` membership defines the package set); restore each with `mv pkgs/disabled/<name> pkgs/by-name/<name>`.

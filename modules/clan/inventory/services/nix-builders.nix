@@ -6,7 +6,6 @@
 # best-effort: every darwin check carries ignoreFailure
 # (modules/checks/nixbot-best-effort-darwin.nix), so a darwin builder that is
 # asleep or unreachable leaves a notice on the build instead of failing it.
-# buildbot builds x86_64-linux only.
 { config, ... }:
 let
   inherit (config.flake.lib) hosts;

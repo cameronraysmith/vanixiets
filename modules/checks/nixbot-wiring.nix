@@ -9,16 +9,14 @@
 # the name off the evaluated unit, so it exercises nixbot's own module code
 # rather than a transcription of it. It also pins the facts that span modules
 # or upstream behaviour: the unit's memory/OOM knob set, the binary-cache
-# uploader set, that nixbot and buildbot share one secrets file and serve
-# disjoint repositories, that every declared effect secret is used, and that
-# darwin checks are best-effort without changing their derivations. Values
-# set as literals in modules/nixos/nixbot.nix and buildbot.nix are not
-# restated here.
+# uploader set, that nixbot serves both GitHub repositories, that every
+# declared effect secret is used, and that darwin checks are best-effort
+# without changing their derivations. Values set as literals in
+# modules/nixos/nixbot.nix are not restated here.
 #
 # The repository-root config file is nixbot.toml. nixbot prefers that name over
 # the legacy buildbot-nix.toml it also still reads
-# (nixbot/nixbot/repo_config.py:17), and buildbot no longer serves either
-# GitHub repository, so nothing reads the legacy name here.
+# (nixbot/nixbot/repo_config.py:17), and nothing reads the legacy name here.
 {
   config,
   self,
@@ -34,7 +32,6 @@
 
       magnetite = self.nixosConfigurations.magnetite.config;
       nixbot = magnetite.services.nixbot;
-      buildbot = magnetite.services.buildbot-nix.master;
 
       # LoadCredential entries are "<name>:<source path>". The name never
       # contains a colon, because the transform that builds it replaces every
@@ -60,31 +57,13 @@
         builtins.filter (n: lib.hasInfix "Memory" n || lib.hasInfix "OOM" n) (builtins.attrNames nixbotUnit)
       );
 
-      # Each service's own repository filter, transcribed with its citation so
-      # the two selections can be asserted rather than described. Both take
-      # the topic first and then the allowlists; only the allowlist stage is
-      # modelled here, because a forge topic is not visible to evaluation.
+      # nixbot's own repository filter, transcribed with its citation so the
+      # selection can be asserted rather than described. It takes the topic
+      # first and then the allowlists; only the allowlist stage is modelled
+      # here, because a forge topic is not visible to evaluation.
       owner = fullName: builtins.head (lib.splitString "/" fullName);
 
-      # buildbot_nix/buildbot_nix/common.py:138-148, with full_name as the
-      # repo accessor (github_projects.py:225). The two allowlists are OR'd.
-      # A disabled master (vanixiets.buildbot.enable) serves nothing; its
-      # allowlists then fall back to the upstream null defaults, which would
-      # read as admitting everything.
-      buildbotAdmits =
-        fullName:
-        let
-          f = buildbot.github;
-        in
-        buildbot.enable
-        && f.enable
-        && (
-          (f.userAllowlist == null && f.repoAllowlist == null)
-          || (f.userAllowlist != null && builtins.elem (owner fullName) f.userAllowlist)
-          || (f.repoAllowlist != null && builtins.elem fullName f.repoAllowlist)
-        );
-
-      # nixbot/nixbot/forge/base.py:128-141, the same shape.
+      # nixbot/nixbot/forge/base.py:128-141. The two allowlists are OR'd.
       nixbotAdmits =
         fullName:
         let
@@ -102,17 +81,6 @@
             effectsCredentialNames = effectsCredentialNames;
             memoryAndOomKnobs = memoryAndOomKnobs;
 
-            # Booleans rather than the paths themselves: the assertion is that
-            # each repository buildbot still holds secrets for reads the same
-            # file as nixbot, and the paths are activation-time state that
-            # would churn the oracle without adding evidence. Keyed by
-            # repository so a failure names which one diverged. buildbot admits
-            # neither repository, so its copies are inert; asserting them keeps
-            # a later re-admission from silently reading a different file.
-            oneSecretsFileForBothServices = lib.genAttrs (sortedNames buildbot.effects.perRepoSecretFiles) (
-              key: nixbot.effects.perRepoSecretFiles.${key} == buildbot.effects.perRepoSecretFiles.${key}
-            );
-
             # Every declared effect secret is read by some trigger of some
             # effect and every secret a trigger reads is declared, so the
             # composed file holds nothing no effect uses.
@@ -127,10 +95,7 @@
               )
             );
 
-            # The cut itself. nixbot serves both repositories and buildbot
-            # serves neither on GitHub, so the two selections are disjoint.
-            buildbotAdmitsVanixiets = buildbotAdmits "cameronraysmith/vanixiets";
-            buildbotAdmitsIronstar = buildbotAdmits "sciexp/ironstar";
+            # nixbot serves both repositories.
             nixbotAdmitsVanixiets = nixbotAdmits "cameronraysmith/vanixiets";
             nixbotAdmitsIronstar = nixbotAdmits "sciexp/ironstar";
 
@@ -176,12 +141,7 @@
               "effects-secret__github_colon_sciexp_slash_ironstar"
             ];
             memoryAndOomKnobs = [ "MemoryHigh" ];
-            oneSecretsFileForBothServices = {
-              "github:sciexp/ironstar" = true;
-            };
             effectSecretsUsed = sortedNames self.lib.vanixietsEffectSecrets;
-            buildbotAdmitsVanixiets = false;
-            buildbotAdmitsIronstar = false;
             nixbotAdmitsVanixiets = true;
             nixbotAdmitsIronstar = true;
             uploadsSomewhere = true;

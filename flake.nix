@@ -88,10 +88,6 @@
 
     cognee-nix.url = "github:cameronraysmith/cognee-nix/cognee-v112";
 
-    buildbot-nix.url = "github:nix-community/buildbot-nix";
-    buildbot-nix.inputs.nixpkgs.follows = "nixpkgs";
-    buildbot-nix.inputs.treefmt-nix.follows = "treefmt-nix";
-
     nixbot.url = "github:Mic92/nixbot";
     nixbot.inputs.nixpkgs.follows = "nixpkgs";
     nixbot.inputs.treefmt-nix.follows = "treefmt-nix";

@@ -1,5 +1,9 @@
 # cognee knowledge-graph and memory service for magnetite.
 #
+# Parked: magnetite imports this module with `vanixiets.cognee.enable = false`
+# and kb. (flake.lib.cognee.publicFqdn) has no public DNS record; see
+# modules/machines/nixos/magnetite/default.nix for what reviving it takes.
+#
 # Credential generator catalog (slots; values populated as marked):
 #   - cognee-jwt-secret: auto-generated (FastAPI Users JWT signing secret)
 #   - cognee-default-user-password: auto-generated (bootstrap superuser password)

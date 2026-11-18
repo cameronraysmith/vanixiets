@@ -1,6 +1,10 @@
 # Reusable shared kanidm-OIDC SSO gateway for magnetite web UIs.
 #
-# One bespoke `oauth2-proxy-kanidm` systemd unit (NOT buildbot's nixpkgs
+# Parked: magnetite imports this module with `sso.enable = false` and no
+# public `auth.` record; see modules/machines/nixos/magnetite/default.nix for
+# what reviving it takes.
+#
+# One bespoke `oauth2-proxy-kanidm` systemd unit (NOT the nixpkgs
 # `services.oauth2-proxy` singleton, NOT a NixOS container) gates many nginx
 # vhosts behind a single central auth surface at `auth.scientistexperience.net`,
 # giving cross-subdomain single-login SSO. A consumer registers in three lines:
@@ -24,7 +28,7 @@
 #
 # Realizes openspec/changes/sso-gateway/{design.md,specs/sso-gateway/spec.md}:
 #   D1 bespoke unit; D2 central auth subdomain + static client; D3 domain-wide
-#   cookie; D4 distinct cookie name `_sso_gateway` (buildbot non-interference);
+#   cookie; D4 distinct cookie name `_sso_gateway` (oauth2-proxy non-interference);
 #   D5 per-group scopeMaps + claimMaps.groups (new vs synapse); D6 reusable
 #   registration auto-deriving the kanidm config; D7 per-vhost group auth via
 #   query-param allowed_groups with browser-vs-API 401 split; D8 clan-vars
@@ -216,9 +220,9 @@
           default = "_sso_gateway";
           description = ''
             The gateway cookie name. Deliberately distinct from oauth2-proxy's
-            default `_oauth2_proxy`, which buildbot uses as a host-only cookie; a
-            domain-wide cookie under the default name would shadow buildbot's
-            cookie and break buildbot auth (hard constraint, D4).
+            default `_oauth2_proxy`, so a host-only cookie of any other
+            oauth2-proxy on these subdomains is never shadowed by the
+            domain-wide gateway cookie (D4, decided while buildbot ran one).
           '';
         };
 
@@ -410,10 +414,10 @@
           '';
         };
 
-        # The bespoke second oauth2-proxy instance (D1). buildbot owns the host's
-        # one nixpkgs services.oauth2-proxy singleton (GitHub provider) and
-        # oauth2-proxy cannot run two providers in one process (upstream #926), so
-        # the kanidm gateway is a hand-rolled unit. Hand-rolling also lets us pass
+        # The bespoke oauth2-proxy instance (D1). It was hand-rolled because
+        # buildbot then held the host's one nixpkgs services.oauth2-proxy
+        # singleton (GitHub provider) and oauth2-proxy cannot run two providers
+        # in one process (upstream #926); hand-rolling also passes
         # --whitelist-domain, which the nixpkgs module does not expose (D3).
         systemd.services.oauth2-proxy-kanidm = {
           description = "kanidm-OIDC SSO gateway (oauth2-proxy)";

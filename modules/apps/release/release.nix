@@ -50,7 +50,7 @@
               pkgs.coreutils
               # Explicitly declare every host-PATH binary that release.sh OR
               # any transitive semantic-release plugin / node_modules helper
-              # might shell out to. The buildbot-effects bwrap sandbox
+              # might shell out to. The nixbot effects bwrap sandbox
               # provides only /nix/store ro-bind + writeShellApplication
               # runtimeInputs PATH (no host PATH binaries); a missing input
               # surfaces only at runtime as `command not found`.

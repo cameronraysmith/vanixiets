@@ -5,7 +5,7 @@
 # evaluation overlapping a remote `just check-fast` evaluation, and the kernel
 # chose nix-daemon connection workers (oom_score_adj 250) as victims rather
 # than either evaluator. With this capability every nix-eval-jobs on the host
-# (nixbot's, buildbot's, and the one `nix-fast-build --remote` finds on an ssh
+# (nixbot's, and the one `nix-fast-build --remote` finds on an ssh
 # user's PATH) queues on one lock, and the running one sits at
 # oom_score_adj 900, where a kill costs a worker that nix-eval-jobs >= 2.35.3
 # requeues and retries alone. Mechanism and its constraints:
@@ -22,13 +22,12 @@
 # is all flock(2) needs, and no user can truncate or replace them.
 #
 # Consumers install the wrapper through services.nixEvalLock.wrap, which keeps
-# each service's own evaluator build underneath (nixbot and buildbot-nix ship
-# different ones).
+# each service's own evaluator build underneath (a service may ship its own).
 #
 # The failure the assertions guard is silent: a service or user resolving the
 # bare `nix-eval-jobs` to an unwrapped binary evaluates outside the lock, which
 # is exactly the overlap that OOM-killed magnetite, and nothing about the run
-# looks different. nixbot and buildbot-nix run the bare name from their unit
+# looks different. nixbot runs the bare name from its unit
 # PATH, and `nix-fast-build --remote` runs it from the ssh user's PATH, where a
 # Home Manager or per-user package precedes the system profile.
 { config, ... }:

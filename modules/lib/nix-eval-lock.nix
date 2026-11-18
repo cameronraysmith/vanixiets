@@ -6,7 +6,7 @@
 #
 # `evaluator` is the path of the real binary and `lockFile` the lock.
 # wrapNixEvalJobsWithLock wraps a package and keeps what its consumers read
-# off it: the version (buildbot-nix asserts a minimum) and the `nix` passthru
+# off it: the version and the `nix` passthru
 # (nixbot puts the patched nix CLI matching its evaluator on the service PATH
 # and links its own package against it).
 { lib, ... }:

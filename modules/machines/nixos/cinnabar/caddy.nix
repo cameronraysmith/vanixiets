@@ -19,10 +19,6 @@ in
       # Each site's caddy configuration, given its own name and the address
       # magnetite is reached on over the same transport.
       sites = {
-        kanban = _: ''
-          tls internal
-          reverse_proxy localhost:3008
-        '';
         matrix = _: ''
           tls internal
           reverse_proxy [::1]:8008

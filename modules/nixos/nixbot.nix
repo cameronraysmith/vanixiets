@@ -1,6 +1,5 @@
 # nixbot CI service for magnetite, serving the fleet's GitHub repositories.
-# The buildbot-nix server is still resident on magnetite but no longer serves
-# either of them; it keeps only its Gitea repositories.
+# It replaced buildbot-nix, which no longer runs anywhere in the fleet.
 #
 # Credential generator catalog (slots; values populated as marked):
 #   - nixbot-github-app-secret-key: manual `clan vars set` (GitHub App PEM key)
@@ -10,20 +9,16 @@
 # credentials at start, so a rotation without a restart leaves the running
 # service holding the superseded value.
 #
-# Coexistence constraints (buildbot still runs, serving Gitea repositories):
-#   - statusContextPrefix is left at its default "nixbot"; buildbot's contexts
-#     are "buildbot/...", so the two verdict namespaces stay distinct.
-#   - github.topic is null; its default "build-with-buildbot" is the topic
-#     buildbot's repositories carry, and it one-shot-imports on an empty DB.
+# Settings carried over from the period nixbot ran beside buildbot-nix:
+#   - github.topic is null; its default "build-with-buildbot" one-shot-imports
+#     every repository carrying that topic on an empty DB.
 #   - nginx.enable stays true, so the service listens only on
-#     /run/nixbot/web.sock and binds no TCP port (its TCP fallback default
-#     8010 is also the nixpkgs buildbot default).
-#   - A dedicated GitHub App, not buildbot's (id 3305657, buildbot.nix:129):
-#     nixbot needs Checks write and the check_run/check_suite events, which
-#     buildbot-nix does not, so sharing would edit a running service's
-#     registration. It also needs Pull requests: Read and write, because the
-#     browser-evidence effect comments through /api/v1/pr-comment and GitHub
-#     answers 403 to that comment with read-only access (nixbot docs/GITHUB.md).
+#     /run/nixbot/web.sock and binds no TCP port.
+#   - A dedicated GitHub App: nixbot needs Checks write and the
+#     check_run/check_suite events. It also needs Pull requests: Read and
+#     write, because the browser-evidence effect comments through
+#     /api/v1/pr-comment and GitHub answers 403 to that comment with
+#     read-only access (nixbot docs/GITHUB.md).
 #
 # The webhook secret has two sources and they must agree. The application was
 # registered through GitHub's App manifest flow, which generated a webhook
@@ -189,15 +184,13 @@ in
             config.clan.core.vars.generators.nixbot-github-webhook-secret.files."secret".path;
           oauthSecretFile = config.clan.core.vars.generators.nixbot-github-oauth-secret.files."secret".path;
 
-          # Default is "build-with-buildbot", the topic the incumbent's
-          # repositories carry, and it one-shot-imports against an empty DB.
+          # Default is "build-with-buildbot", which one-shot-imports every
+          # repository carrying that topic against an empty DB.
           topic = null;
 
-          # nixbot serves only the repositories named here, and it serves both
-          # of the fleet's GitHub repositories: buildbot's own GitHub
-          # repoAllowlist is empty (buildbot.nix:149). Entries are forge-local
-          # names, without the "github:" prefix that perRepoSecretFiles keys
-          # carry.
+          # nixbot serves only the repositories named here. Entries are
+          # forge-local names, without the "github:" prefix that
+          # perRepoSecretFiles keys carry.
           repoAllowlist = [
             "cameronraysmith/vanixiets"
             "sciexp/ironstar"
@@ -223,16 +216,15 @@ in
         };
 
         # The module creates the vhost proxying to /run/nixbot/web.sock and this
-        # flag makes it forceSSL + enableACME. The incumbent aspect writes that
-        # vhost override by hand only because buildbot-nix has no such option.
+        # flag makes it forceSSL + enableACME.
         nginx.enableACME = true;
 
         database.createLocally = true;
 
-        # Push successful builds to the fleet's binary cache, mirroring
-        # buildbot.nix:158-163. Without it the service builds correctly and
-        # uploads nothing: the uploader set defaults to the empty list, so no
-        # upload is attempted and no signal is emitted anywhere. The public URL
+        # Push successful builds to the fleet's binary cache. Without it the
+        # service builds correctly and uploads nothing: the uploader set
+        # defaults to the empty list, so no upload is attempted and no signal
+        # is emitted anywhere. The public URL
         # rather than a local socket keeps the endpoint reachable from future
         # remote builders.
         #
@@ -283,7 +275,7 @@ in
       systemd.services.nixbot.serviceConfig.MemoryHigh = "20G";
 
       # nixbot forwards NIX_* into its evaluator sandbox and has no option for
-      # extra evaluation arguments; scoped here so buildbot-nix is unaffected.
+      # extra evaluation arguments, so the setting is scoped to its unit.
       systemd.services.nixbot.environment.NIX_CONFIG = "allow-import-from-derivation = false";
 
       # Names the evaluator in each `evaluation finished` record

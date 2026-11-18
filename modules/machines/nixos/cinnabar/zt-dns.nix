@@ -1,7 +1,7 @@
 # DNS server for .zt zone on cinnabar's zerotier interface
 #
 # dnsmasq serves authoritative A and AAAA records for .zt hostnames,
-# resolving service names (kanban, etc.) to cinnabar and machine
+# resolving service names (matrix, etc.) to cinnabar and machine
 # hostnames (stibnite, blackphos, etc.) to their zerotier addresses.
 # Non-.zt queries are forwarded to quad9 for clients that use
 # zerotier-pushed DNS globally.

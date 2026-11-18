@@ -13,7 +13,6 @@ let
       endpoints = [ "cinnabar.scientistexperience.net" ];
       deployUser = "root";
       services = [
-        "kanban"
         "matrix"
         "hermes"
         "ntfy"

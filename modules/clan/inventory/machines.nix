@@ -70,7 +70,7 @@
         "peer"
       ];
       machineClass = "nixos";
-      description = "Build infrastructure server (niks3, buildbot, Gitea)";
+      description = "Build infrastructure server (niks3, nixbot, Gitea)";
       deploy.targetHost = "root@magnetite.zt";
     };
 

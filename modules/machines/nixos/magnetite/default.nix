@@ -46,8 +46,6 @@ in
         inputs.srvos.nixosModules.mixins-nginx
         inputs.home-manager.nixosModules.home-manager
         inputs.niks3.nixosModules.niks3
-        inputs.buildbot-nix.nixosModules.buildbot-master
-        inputs.buildbot-nix.nixosModules.buildbot-worker
         inputs.nixbot.nixosModules.nixbot
         inputs.gitea-mq.nixosModules.default
         inputs.cognee-nix.nixosModules.cognee
@@ -63,7 +61,6 @@ in
         ssh-known-hosts
         stibnite-session
         zt-dns
-        buildbot
         nixbot
         gitea-mq
         renovate
@@ -138,8 +135,7 @@ in
       # best-effort: the darwin builders are laptops without guaranteed
       # availability, so each darwin check carries ignoreFailure and a
       # sleeping machine leaves a notice rather than gating CI
-      # (modules/checks/nixbot-best-effort-darwin.nix). buildbot still builds
-      # x86_64-linux only.
+      # (modules/checks/nixbot-best-effort-darwin.nix).
 
       # The build and session keys are separately authorized for independent
       # revocation and rotation. Only the build key is confined to the Nix
@@ -157,31 +153,20 @@ in
         defaults.email = "cameron@scientistexperience.net";
       };
 
-      # Shared kanidm-OIDC SSO gateway. cognee registers as consumer #1 (D10):
-      # the gateway emits the kb.scientistexperience.net forceSSL+ACME vhost,
-      # proxies `/` to the loopback frontend and `/api/` to the ZeroTier REST
-      # API, gates on cognee_access membership, and applies the browser-vs-API
-      # 401 split. The gateway owns the oauth2-proxy-kanidm unit, the sso-gateway
-      # kanidm client, and the auth.scientistexperience.net subdomain.
+      # Parked, not removed: the shared kanidm-OIDC SSO gateway
+      # (modules/nixos/sso-gateway.nix) and the cognee server
+      # (modules/nixos/cognee.nix) stay imported and off, and their generated
+      # vars (sso-cookie-secret, kanidm-oauth2-sso, cognee-*) and the
+      # root/cognee dataset are kept. Neither has a public DNS record any more
+      # (modules/terranix/cloudflare.nix). To revive one, set its enable below,
+      # restore its CNAME (auth. for the gateway, flake.lib.cognee.publicFqdn
+      # for cognee) and declare it in modules/lib/topology-facts.nix. The
+      # gateway's auth-root redirect to the kanidm portal and its apps-portal
+      # icon were dropped with "chore: expunge buildbot and kanban, park
+      # sso-gateway and cognee"; recover them from that commit's parent.
+      # cognee registers behind the gateway (below) only when it is enabled.
       sso.enable = false;
 
-      # Redirect the auth subdomain root (`auth.scientistexperience.net/`) to the
-      # kanidm apps portal instead of the stock nginx welcome page. The shared
-      # "SSO" apps-portal card launches the auth-root landing, so without this it
-      # lands on a dead nginx page; pointing `/` at the kanidm portal turns that
-      # tile into a useful entry point. `/oauth2/*` is unaffected.
-      sso.rootRedirectUrl = "https://accounts.scientistexperience.net/";
-
-      # Shared-client apps-portal card image (generic SSO/OIDC tile). The shared
-      # client reverts to the default "SSO" label and auth-root landing; this
-      # gives it a branded icon. The oauth2-proxy project icon (MIT, in-repo,
-      # commit-pinned) brands the tile to the gateway implementation we run.
-      sso.clientImageFile = pkgs.fetchurl {
-        url = "https://raw.githubusercontent.com/oauth2-proxy/oauth2-proxy/899c743afc71e695964165deb11f50b9a0703c97/docs/static/img/logos/OAuth2_Proxy_icon.svg";
-        hash = "sha256-7d14/2OgFEcZxC0DKJdvwgmfynv5BTj8wOBhYwpcAWU=";
-      };
-
-      # The cognee server is off; its vars and root/cognee dataset are kept.
       vanixiets.cognee.enable = false;
 
       sso.services.cognee = lib.mkIf config.vanixiets.cognee.enable {
@@ -335,7 +320,7 @@ in
 
       # Raise nix daemon free-space thresholds for a build host. clan-core and
       # srvos both set 512 MiB / 3 GiB via mkDefault, which is undersized for
-      # buildbot-nix workers materializing large closures on a CX53 with niks3
+      # build workers materializing large closures on a CX53 with niks3
       # GC pressure. Trigger GC at 30 GiB free, free until 80 GiB available.
       #
       # http-connections and max-substitution-jobs raise the daemon's ceiling on
@@ -407,7 +392,7 @@ in
       # A 7d window let a nix-daemon ENOSPC crash-loop orphan 201 sandboxes
       # (232 GiB) on 2026-06-10. This entry renders into 00-nixos.conf, which
       # sorts before nix-daemon.conf, so per tmpfiles.d(5) precedence the 1d
-      # age wins for this path. Active sandboxes (<= 3h buildbot hard
+      # age wins for this path. Active sandboxes (<= 3h nixbot build
       # timeout) never enter the 1d window.
       systemd.tmpfiles.rules = [
         "d /nix/var/nix/builds 0755 root root 1d -"
@@ -860,7 +845,7 @@ in
       # Memory-pressure governance. nixbot's evaluation overlapping a remote
       # `just check-fast` evaluation OOM-killed this host twice (2026-09-27,
       # 2026-10-01). The evaluation lock serialises every nix-eval-jobs here
-      # (nixbot, buildbot, ssh users) and makes the running evaluator the OOM
+      # (nixbot, ssh users) and makes the running evaluator the OOM
       # killer's first choice; MGLRU thrash protection turns a working-set
       # collapse into an OOM kill. Rationale: modules/nixos/nix-eval-lock.nix,
       # modules/nixos/memory-pressure-guards.nix.

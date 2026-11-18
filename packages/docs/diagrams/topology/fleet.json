@@ -21,7 +21,7 @@
   "machine/cinnabar": {"class":"nixos","description":"Primary VPS, zerotier controller","tags":["all","cloud","controller","hetzner","nixos"]},
   "machine/electrum": {"class":"nixos","description":"Secondary test VM, zerotier peer","tags":["all","cloud","hetzner","nixos","peer"]},
   "machine/galena": {"class":"nixos","description":"GCP CPU node (e2-standard-8), zerotier peer","tags":["all","cloud","gcp","nixos","peer"]},
-  "machine/magnetite": {"class":"nixos","description":"Build infrastructure server (niks3, buildbot, Gitea)","tags":["all","cloud","hetzner","nixos","peer"]},
+  "machine/magnetite": {"class":"nixos","description":"Build infrastructure server (niks3, nixbot, Gitea)","tags":["all","cloud","hetzner","nixos","peer"]},
   "machine/pyrite": {"class":"nixos","description":"Apple MacBookPro14,1 bare-metal NixOS laptop, zerotier peer","tags":["all","laptop","nixos","peer"]},
   "machine/rosegold": {"class":"darwin","description":"janettesmith's laptop (primary user), cameron admin","tags":["all","darwin","fleet","laptop","workstation"]},
   "machine/scheelite": {"class":"nixos","description":"GCP GPU node (n1-standard-8, T4), zerotier peer","tags":["all","cloud","gcp","gpu","nixos","peer"]},

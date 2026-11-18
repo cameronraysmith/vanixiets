@@ -24,5 +24,5 @@ Conceptual documentation to help you understand the architecture and design patt
 
 ## Build and CI
 
-- [Build service topology](/concepts/build-service-topology/) - Two CI build services coexisting on magnetite, and the boundaries that keep them apart
+- [Build service topology](/concepts/build-service-topology/) - nixbot, the one CI build service on magnetite, and the boundaries that scope what it builds
 - [Darwin build access](/concepts/darwin-build-access/) - How the fleet reaches stibnite's aarch64-darwin store, and why the remote builder and the remote store are two mechanisms

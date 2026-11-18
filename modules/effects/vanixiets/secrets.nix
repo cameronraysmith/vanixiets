@@ -179,9 +179,6 @@ in
         '';
       };
 
-      # nixbot is the only consumer: buildbot serves only Gitea repositories
-      # and never this one, so it is given no copy of these secrets.
-      #
       # The key is forge-prefixed, unlike the allowlist entry in
       # modules/nixos/nixbot.nix. nixbot substitutes ":" and "/" to derive the
       # systemd credential name it looks the file up under, so a mismatch here

@@ -56,9 +56,9 @@ Subcommands:
   queue                   Global build queue across all repositories
 
 BUILD is a build number or the literal 'latest' (the default when omitted).
-Unlike buildbot, nixbot addresses a build by repository plus one build
-number; there is no builder id and no per-step decomposition. Attributes
-and effects take the place of buildbot steps. Effects are not attributes:
+nixbot addresses a build by repository plus one build number; there is
+no builder id and no per-step decomposition, only attributes and
+effects. Effects are not attributes:
 each effect run has its own id and log, and NAME is matched against the
 effect names 'show' lists. When several runs of one effect share a build,
 the latest run is used.

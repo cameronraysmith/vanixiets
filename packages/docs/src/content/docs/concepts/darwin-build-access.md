@@ -113,7 +113,6 @@ The builder setting `authorizeSshAccessGroup = false` turns that step off for a 
 nixbot on magnetite builds `checks.aarch64-darwin` alongside `checks.x86_64-linux`, as best-effort.
 `nixbot.toml` sets `attribute = "checks"`, and `modules/nixos/nixbot.nix` sets both `buildSystems` and `evalSystems` to `[ "x86_64-linux" "aarch64-darwin" ]`.
 `evalSystems` is what scopes the attribute, so aarch64-linux, which no builder here serves, is never evaluated.
-`modules/nixos/buildbot.nix` still sets `buildSystems = [ "x86_64-linux" ]`.
 
 Every darwin builder is a laptop without guaranteed availability, so a darwin build must not gate CI on whether a Mac is awake.
 `modules/checks/nixbot-best-effort-darwin.nix` gives every darwin check, the `darwin-<host>` machine checks included, hercules-ci's `ignoreFailure` modifier.
@@ -127,6 +126,6 @@ The `nixbot-wiring` check pins CI's system scope and the best-effort marking.
 
 ## Related
 
-- [Build service topology](/concepts/build-service-topology/) — the two CI services kept separate from these development builders
+- [Build service topology](/concepts/build-service-topology/) — the CI service kept separate from these development builders
 - [Clan Integration](/concepts/clan-integration/) — how `clan machines update` deploys these ends
 - [Secrets management](/guides/secrets-management/) — how `clan.core.vars` credentials reach a service

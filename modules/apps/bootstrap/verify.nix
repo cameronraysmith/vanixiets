@@ -4,7 +4,7 @@
 # The Makefile version is callable from a nix-free shell (it's plain
 # make + shell). This flake-app version assumes nix is already installed
 # (since `nix run` requires nix); it exists so scripted contexts (CI,
-# post-bootstrap sanity checks, buildbot effects) can invoke the audit
+# post-bootstrap sanity checks, nixbot effects) can invoke the audit
 # without depending on GNU make being on PATH.
 #
 # Read-only.

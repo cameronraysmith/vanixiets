@@ -12,7 +12,7 @@ This runbook covers operational procedures executed by an admin via the kanidm C
 
 Kanidm is the chosen IdP for magnetite, selected over several alternatives.
 
-- Authelia was rejected: its declarative provisioning surface is less expressive, and its OIDC scope and claim model lacks the per-client granularity (separate scope maps, claim maps, supplementary scope maps) needed as more clients such as buildbot and Gitea are added.
+- Authelia was rejected: its declarative provisioning surface is less expressive, and its OIDC scope and claim model lacks the per-client granularity (separate scope maps, claim maps, supplementary scope maps) needed as more clients such as Gitea are added.
 - Gitea-as-IdP was rejected: its OIDC provider is a side-feature of a forge rather than a purpose-built IdP, with rudimentary scope mapping, and coupling identity to the forge would expand the IdP outage radius.
 - Matrix-authentication-service (MAS) was considered as the synapse-native option and is the eventual upstream-canonical path, but adoption is deferred until a MAS-only mode is stable upstream and in nixpkgs.
 

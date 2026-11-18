@@ -10,7 +10,7 @@
 # Checked against the hosts on 2026-11-18 (`ss -ltn`/`ss -lun`, the active
 # units, magnetite's nginx virtual hosts and cinnabar's Caddyfile, and an
 # HTTPS probe of each name). A module that is imported but disabled, such
-# as buildbot, sso-gateway or cognee on magnetite, is not declared, and a
+# as the parked sso-gateway or cognee on magnetite, is not declared, and a
 # name answered by Cloudflare, such as niks3's cache., is not declared on a
 # host.
 #
@@ -76,8 +76,8 @@
       ];
 
       # The mesh sites cinnabar's caddy serves for services that run on
-      # cinnabar (modules/lib/hosts.nix labels; kanban has no backend and
-      # omnigraph's is magnetite's).
+      # cinnabar (modules/lib/hosts.nix labels; omnigraph's backend is
+      # magnetite's).
       cinnabar.services = map meshOnly [
         "hermes"
         "matrix"

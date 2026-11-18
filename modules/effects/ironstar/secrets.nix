@@ -9,30 +9,23 @@
     {
       config,
       pkgs,
-      lib,
       ...
     }:
-    let
-      buildbot = config.vanixiets.buildbot.enable or false;
-    in
     {
       clan.core.vars.generators.ironstar-effects-secrets = {
         files.secrets = {
           secret = true;
 
-          # buildbot-master runs as this user and opens the path directly.
-          # nixbot's unit runs as "nixbot" and never opens it: systemd loads
-          # the file as a credential, which PID 1 reads as root before
-          # re-exposing a copy to the service user, so root suffices without
-          # buildbot.
-          owner = if buildbot then "buildbot" else "root";
+          # nixbot's unit runs as "nixbot" and never opens the file itself:
+          # systemd loads it as a credential, which PID 1 reads as root before
+          # re-exposing a copy to the service user, so the default root owner
+          # suffices.
 
           # clan-vars plumbs restartUnits through to sops-nix's restartUnits,
           # which keys the unit's restartTriggers on the encrypted blob hash
-          # so the next deploy refreshes the credential snapshot. Each service
-          # snapshots the file at unit start, so a rotation that restarts only
-          # one of them leaves the other serving the superseded value.
-          restartUnits = [ "nixbot.service" ] ++ lib.optional buildbot "buildbot-master.service";
+          # so the next deploy refreshes the credential snapshot the service
+          # took at unit start.
+          restartUnits = [ "nixbot.service" ];
         };
 
         prompts.cloudflare-api-token = {
@@ -91,7 +84,7 @@
         };
 
         # component secrets kept in repo for rotation management, but only the
-        # composed secrets file deploys to the buildbot-nix host.
+        # composed secrets file deploys to the nixbot host.
         files.cloudflare-api-token.deploy = false;
         files.cloudflare-account-id.deploy = false;
         files.github-token.deploy = false;
@@ -111,19 +104,11 @@
         '';
       };
 
-      # One composed file, two consumers. Both services accept the same
-      # hercules-ci secrets.json shape at a path they load as a systemd
-      # credential, so the generator above remains the single source of truth
-      # and the two services' copies cannot drift apart.
-      #
       # The key is forge-prefixed, unlike the allowlist entry in
       # modules/nixos/nixbot.nix. nixbot substitutes ":" and "/" to derive the
       # systemd credential name it looks the file up under, so a mismatch here
       # delivers no secrets at all and every effect stops at its own
       # missing-secret guard — indistinguishable from not wiring it.
-      services.buildbot-nix.master.effects.perRepoSecretFiles."github:sciexp/ironstar" =
-        config.clan.core.vars.generators.ironstar-effects-secrets.files.secrets.path;
-
       services.nixbot.effects.perRepoSecretFiles."github:sciexp/ironstar" =
         config.clan.core.vars.generators.ironstar-effects-secrets.files.secrets.path;
     };

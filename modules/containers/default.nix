@@ -241,7 +241,7 @@ in
     in
     {
       # Linux hosts expose container variants under packages.<system>.* so that
-      # `nix flake check`, nix-fast-build, and buildbot-nix discover and (where
+      # `nix flake check`, nix-fast-build, and nixbot discover and (where
       # appropriate) realize them. These packages target *-linux derivations and
       # build natively on a matching Linux host.
       #

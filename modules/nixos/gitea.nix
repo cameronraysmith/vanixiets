@@ -6,7 +6,6 @@
 # Generators define the credential slots; values are populated via:
 #   - gitea-github-oauth: manual `clan vars set` (OAuth client credentials from GitHub)
 #   - gitea-admin-password: auto-generated (initial admin account password)
-# buildbot's Gitea webhook secret and token are declared in buildbot.nix.
 {
   config,
   inputs,

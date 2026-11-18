@@ -1,7 +1,9 @@
 # Derived cognee endpoint record, the single source of truth read by the cognee
-# server bind, the plugin env, the cognee-cli wrapper, the public-UI FQDN, and
-# the terranix DNS record. Consolidated into this single file because flake.lib
-# is lazyAttrsOf raw. Carries no MCP URL because the cognee MCP is dropped.
+# server bind, the plugin env, the cognee-cli wrapper and the public-UI FQDN.
+# publicFqdn has no DNS record while the server is parked (see
+# modules/machines/nixos/magnetite/default.nix). Consolidated into this single
+# file because flake.lib is lazyAttrsOf raw. Carries no MCP URL because the
+# cognee MCP is dropped.
 { config, ... }:
 let
   inherit (config.flake.lib.hosts) magnetite;

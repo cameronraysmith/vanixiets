@@ -1,4 +1,4 @@
-# gitea-mq GitHub merge queue for magnetite, beside nixbot and buildbot-nix.
+# gitea-mq GitHub merge queue for magnetite, beside nixbot.
 #
 # Credential generator catalog (slots; values populated as marked):
 #   - gitea-mq-github-app-secret-key/key.pem: manual `clan vars set` (GitHub App PEM key)
