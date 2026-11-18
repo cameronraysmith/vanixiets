@@ -110,7 +110,7 @@ Rollback: each step is one revertible commit; a host returns to the previous gen
 
 1. What held rosegold's 229 GB, given daily collection of everything older than 10 days: rooted paths (system or user generations, `gcroots/auto`, home-manager) or non-Nix data on the shared APFS container?
 2. Did rosegold's daily 03:15 run complete, fail or hang on the lock? Its output was discarded; `launchctl print system/org.nixos.harmonia-gc` on rosegold is the remaining evidence.
-3. Who held `gc.lock`: the 119 nix-daemon children or rosegold's `nix-grpc-daemon` builder pool? No `lsof /nix/var/nix/gc.lock` was captured; capture one at the next occurrence.
+3. **Answered (observed 2026-11-18 15:55; `logs/rosegold-gc-deploy-20261118-152227.log`).** Who held `gc.lock`? nix-daemon worker processes serving a `darwin-rebuild switch` that `clan machines update` started at 15:11. Killing the local clan and ssh client did not end that rebuild on rosegold, which kept waiting on auto-GC while 111 workers held the lock. `launchctl kickstart -k system/org.nixos.nix-daemon` restarts only the parent daemon, and the workers survive it. Any collection behind them, harmonia-gc or `nix-collect-garbage`, therefore waits indefinitely, which is the case D1's 2-hour bound covers.
 4. Does the weekly `gcroots/auto` reaper (30 days, regardless of target) unroot a person's current `nix profile` generation, and should user profile roots be treated differently?
 5. Disk sizes for blackphos, stibnite and pyrite are not recorded in the repo.
 6. What is a collection's normal duration per host, so D7's 60-minute threshold can be set from evidence?
@@ -119,6 +119,7 @@ Rollback: each step is one revertible commit; a host returns to the previous gen
 
 This table is the pre-apply spec-and-feature alignment record.
 The repository has no BDD runner and no `.feature` file, so no row routes to a Gherkin scenario; each requirement is witnessed by a build gate (`nix eval`, `nix build`, the fleet obligation on the machine checks, the fixture check, the fleet-alert rule check) or a smoke observation on a deployed host recorded in `verify.md`.
+The operator approved this table, and with it the pre-apply alignment sub-gate, on 2026-11-18.
 
 | Requirement | Capability | Stratum | Modality | Witness |
 |---|---|---|---|---|

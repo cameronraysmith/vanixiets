@@ -65,5 +65,27 @@
         notifiedUnits = [ "otel-envelope" ];
         smartDevices = [ "disk0" ];
       };
+      # The laptops that build for the fleet and fill their store disks
+      # (bound-fleet-garbage-collection D6). Each joins with collect false and
+      # is turned on by its own watched deploy.
+      rosegold = agent [ ] // {
+        collect = false;
+        platform = "darwin";
+        notifiedUnits = [ "otel-envelope" ];
+        smartDevices = [ "disk0" ];
+      };
+      argentum = agent [ ] // {
+        collect = false;
+        platform = "darwin";
+        notifiedUnits = [ "otel-envelope" ];
+        smartDevices = [ "disk0" ];
+      };
+      # A reserved name with no machine (modules/clan/inventory/services/tincr.nix):
+      # it stays off until a machine takes the name, and nothing can be watched.
+      blackphos = agent [ ] // {
+        collect = false;
+        platform = "darwin";
+        notifiedUnits = [ "otel-envelope" ];
+      };
     };
 }

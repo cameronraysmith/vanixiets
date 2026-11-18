@@ -26,7 +26,9 @@
 # writes; the file-system rules, LocalExporterDown and WeeklyPipelineTest
 # expect every collecting host; the NVMe rules expect the hosts with SMART
 # devices; the four launchd and probe rules expect the darwin hosts (S5
-# design D9). LaunchdJobNotRunning expects running the kept-alive labels of
+# design D9); GarbageCollectionOverrun expects its launchd arm's selector
+# on the darwin hosts and its systemd arm's on the NixOS hosts
+# (bound-fleet-garbage-collection D7). LaunchdJobNotRunning expects running the kept-alive labels of
 # flake.lib.otelCollectorSchema.launchdKeptAlive and reports any other
 # allow-listed label unloaded; its two arms select disjoint labels, because
 # the probe writes all four states for every label, so a kept-alive label
@@ -216,6 +218,21 @@
           severity = "warning";
           annotations.summary = "A launchd job relaunched more than five times in 15 minutes";
           presence = [ (presence darwinHosts "launchd_job_runs_total") ];
+        }
+        # bound-fleet-garbage-collection D7: harmonia-gc still running an
+        # hour after it started, which a wait on gc.lock causes; its 2 h
+        # bound then ends it and LaunchdJobFailed or SystemdUnitFailed reports
+        # that. A oneshot unit is `activating` while it runs.
+        {
+          alert = "GarbageCollectionOverrun";
+          expr = ''launchd_job_state{launchd_label="org.nixos.harmonia-gc", launchd_state="running"} == 1 or systemd_unit_state{systemd_unit_name="harmonia-gc.service", systemd_unit_active_state="activating"} == 1'';
+          for = "60m";
+          severity = "warning";
+          annotations.summary = "harmonia-gc has been running for over an hour, likely waiting for the store lock; its 2 h bound will end it";
+          presence = [
+            (presence darwinHosts "launchd_job_state")
+            (presence nixosHosts "systemd_unit_state")
+          ];
         }
         {
           alert = "HostProbeStale";

@@ -33,6 +33,7 @@
       commitSigningObligations = self.lib.commitSigningObligations;
       resolverReloadObligations = self.lib.resolverReloadObligations;
       meshHostsObligations = self.lib.meshHostsObligations;
+      harmoniaGcObligations = self.lib.harmoniaGcObligations;
 
       withFleetObligations =
         name: machineConfig: toplevel:
@@ -45,6 +46,7 @@
             resolverReloadObligations.failures name machineConfig
           );
           unmetMeshHosts = meshHostsObligations.failures name machineConfig;
+          unmetHarmoniaGc = harmoniaGcObligations.failures name machineConfig;
           hostFailures = map (a: a.message) (lib.filter (a: !a.assertion) machineConfig.assertions);
         in
         assert lib.assertMsg
@@ -54,9 +56,10 @@
             && unmetSigning == [ ]
             && unmetResolverReload == [ ]
             && unmetMeshHosts == [ ]
+            && unmetHarmoniaGc == [ ]
           )
           (
-            "Fleet obligations unmet on ${name}: omnigentFleetObligations [${lib.concatStringsSep ", " unmet}]; deployRecordObligations [${lib.concatStringsSep ", " unmetDeployRecord}]; commitSigningObligations [${lib.concatStringsSep ", " unmetSigning}]; resolverReloadObligations [${lib.concatStringsSep ", " unmetResolverReload}]; meshHostsObligations [${lib.concatStringsSep ", " unmetMeshHosts}]"
+            "Fleet obligations unmet on ${name}: omnigentFleetObligations [${lib.concatStringsSep ", " unmet}]; deployRecordObligations [${lib.concatStringsSep ", " unmetDeployRecord}]; commitSigningObligations [${lib.concatStringsSep ", " unmetSigning}]; resolverReloadObligations [${lib.concatStringsSep ", " unmetResolverReload}]; meshHostsObligations [${lib.concatStringsSep ", " unmetMeshHosts}]; harmoniaGcObligations [${lib.concatStringsSep ", " unmetHarmoniaGc}]"
             + lib.optionalString (hostFailures != [ ]) (
               "\n${name} assertion failures: ${lib.concatStringsSep "\n" hostFailures}"
             )

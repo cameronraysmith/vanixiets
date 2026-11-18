@@ -3,15 +3,16 @@ linear_story_id: CAM-113
 linear_story_identifier: CAM-113
 linear_story_title: "Bound the fleet's Nix garbage collection"
 linear_story_url: https://linear.app/cameronraysmith/issue/CAM-113/bound-the-fleets-nix-garbage-collection
-linear_story_state: Todo
+linear_story_state: In Progress
 linear_team: CAM
 linear_project: fleet-observability
-last_synced_state: Todo
-last_synced_at: "2026-11-18T20:39:57Z"
+last_synced_state: In Progress
+last_synced_at: "2026-11-18T21:19:14Z"
 review_round: 0
 max_review_rounds: 3
 attempt_log:
   - { at: "2026-11-18T20:39:57Z", transition: "Backlog->Todo", outcome: "posted", note: "Issue CAM-113 created in Todo in project aeed302bea3b (Fleet observability) with description seeded from proposal.md; state and project confirmed by read-only view" }
+  - { at: "2026-11-18T21:19:14Z", transition: "Todo->In Progress", outcome: "posted", note: "Operator approved the Gate 1 table (pre-apply alignment sub-gate) and implementation on 2026-11-18; state set to In Progress at the first checked task and confirmed by read-only view" }
 ---
 
 ## Why

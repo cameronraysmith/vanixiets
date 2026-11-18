@@ -391,6 +391,17 @@ in
         always-allow-substitutes = true;
       };
 
+      # A warm store (bound-fleet-garbage-collection D8): harmonia-gc stops
+      # once 40 % of the store's filesystem is free instead of deleting every
+      # unrooted output daily, so yesterday's builds stay cached. `40%` is of
+      # the size statfs reports for the quota-bounded /nix dataset (A152).
+      # noVacuum, as upstream recommends for busy builders: concurrent daemon
+      # readers stop the post-GC VACUUM's WAL from being cleaned up.
+      services.harmonia-dev.gc = {
+        ensureFree = "40%";
+        noVacuum = true;
+      };
+
       # Nix >= 2.30 keeps build sandboxes in /nix/var/nix/builds; the only
       # reaper is the Nix package's tmpfiles rule (nix-daemon.conf, age 7d).
       # A 7d window let a nix-daemon ENOSPC crash-loop orphan 201 sandboxes

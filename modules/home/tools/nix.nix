@@ -49,5 +49,17 @@
         #   - ./modules/nixos/shared/nix.nix in your nix configuration.
         #
       '';
+
+      # harmonia-gc runs as root and never expires a person's own generations
+      # under ~/.local/state/nix/profiles (harmonia-store-gc/src/profiles.rs:304-330
+      # at 8d717e07). Expire them here after 14 days and leave collecting to
+      # harmonia-gc, so no second process contends for gc.lock
+      # (bound-fleet-garbage-collection D5).
+      services.home-manager.autoExpire = {
+        enable = true;
+        timestamp = "-14 days";
+        frequency = "daily";
+        store.cleanup = false;
+      };
     };
 }

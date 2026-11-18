@@ -57,7 +57,9 @@
             max-jobs = "auto";
 
             # Backstop only: harmonia-gc (modules/system/harmonia-gc.nix) is the
-            # primary reclaimer and runs daily to 15% free. These values exist so a
+            # primary reclaimer; it runs daily, bounded to 2 h, and deletes all
+            # unrooted garbage outside its 7-day generation window, with no
+            # free-space target. These values exist so a
             # single large build cannot wedge the machine between daily runs. On
             # 2026-10-07 argentum (8 GiB RAM, 250 GB disk) reached 235 MB free under
             # clan-core's 512 MiB / ~3 GiB defaults, macOS had no room for swap, and

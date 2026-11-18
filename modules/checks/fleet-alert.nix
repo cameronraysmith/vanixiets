@@ -1659,7 +1659,7 @@
         ];
 
       darwinSignalMissing = {
-        name = "darwinSignalMissing: stibnite reporting host memory with no launchd_job_state for 30 min, the other launchd selectors present, raises one RuleSignalMissing for LaunchdJobNotRunning";
+        name = "darwinSignalMissing: stibnite reporting host memory with no launchd_job_state for 30 min, the other launchd selectors present, raises one RuleSignalMissing each for LaunchdJobNotRunning and GarbageCollectionOverrun";
         steps = map (
           n:
           onStibnite {
@@ -1667,9 +1667,13 @@
             missing = [ fixtures.selectors.LaunchdJobNotRunning ];
           }
         ) (lib.range 0 7);
-        expect = [ "6 [FIRING] RuleSignalMissing default" ];
+        expect = [
+          "6 [FIRING] RuleSignalMissing default"
+          "6 [FIRING] RuleSignalMissing default"
+        ];
         messages = [
           "rule=LaunchdJobNotRunning"
+          "rule=GarbageCollectionOverrun"
           "selector=${fixtures.selectors.LaunchdJobNotRunning}"
         ];
       };
@@ -1821,6 +1825,46 @@
         name = "notKeptAliveHeld: harmonia-gc, not kept alive, launched at minute 0 and exiting 1, fires one LaunchdJobFailed stibnite at 5 and stays firing through minute 40";
         expect = [ "5 [FIRING] LaunchdJobFailed stibnite default" ];
       };
+      # bound-fleet-garbage-collection D7: a harmonia-gc run still going after
+      # 60 min, on darwin running in the probe's launchd state and on NixOS
+      # activating, its oneshot unit's state while it runs. The fixture
+      # replays the expression's answer every 5 min, so step 12 is minute 60.
+      overrunSeries = {
+        darwin = {
+          host_name = "stibnite";
+          launchd_label = "org.nixos.harmonia-gc";
+          launchd_state = "running";
+        };
+        nixos = {
+          host_name = "magnetite";
+          systemd_unit_name = "harmonia-gc.service";
+          systemd_unit_active_state = "activating";
+        };
+      };
+      overrunHeld = platform: last: {
+        steps = map (
+          n:
+          onStibnite {
+            at = minute (5 * n);
+            series.GarbageCollectionOverrun = [ overrunSeries.${platform} ];
+          }
+        ) (lib.range 0 (last / 5));
+      };
+      overrunDarwinHeld = overrunHeld "darwin" 70 // {
+        name = "overrunDarwinHeld: harmonia-gc running on stibnite for 70 min fires one GarbageCollectionOverrun stibnite at 60";
+        expect = [ "12 [FIRING] GarbageCollectionOverrun stibnite default" ];
+      };
+      overrunNixosHeld = overrunHeld "nixos" 70 // {
+        name = "overrunNixosHeld: harmonia-gc.service activating on magnetite for 70 min fires one GarbageCollectionOverrun magnetite at 60";
+        expect = [ "12 [FIRING] GarbageCollectionOverrun magnetite default" ];
+      };
+      overrunShort = {
+        name = "overrunShort: harmonia-gc running on stibnite until minute 50 and gone at 55 fires no GarbageCollectionOverrun";
+        steps = (overrunHeld "darwin" 50).steps ++ [
+          (onStibnite { at = minute 55; })
+        ];
+        expect = [ ];
+      };
       # nix-grpc-daemon relaunched once a minute from minute -3, so its
       # 15 min increase exceeds 5 on minutes 3 to 7, after which it stays up.
       restartLoop = {
@@ -1899,6 +1943,9 @@
         (keptAliveRestarted evaluatorRules)
         keptAliveCrashed
         notKeptAliveHeld
+        overrunDarwinHeld
+        overrunNixosHeld
+        overrunShort
         restartLoop
         probeStaleLeg
         nvmeExpectsStibnite
