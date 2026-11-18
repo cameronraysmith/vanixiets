@@ -280,12 +280,12 @@ See the [deployment plan](../../../../docs/notes/development/omnigent/deployment
 ## Selected static credentials
 
 `workers.<name>.credentials` is a typed interface on both plain host modules and the serializable Clan role.
-`signingKey` and `claudeSetupToken` have independent default-off `enable` flags and explicit `generator`/`file` names.
+`signingKey`, `deployRequestKey` and `claudeSetupToken` have independent default-off `enable` flags and explicit `generator`/`file` names.
 `githubTokens` is keyed by lowercase resource-owner login; each default-off entry selects `<worker-user>-github-token-<owner>`, fixed file `token`, and the authenticated person's `expectedLogin`.
 Every enabled GitHub entry must expect the same person; resource owners are not authenticated user identities.
 `linearApiKeys` is keyed only by the masked labels `personal` and `work`; each default-off entry names a generator `<worker-user>-linear-<label>` with fixed files `key`, `workspace`, `workspace-id` and `viewer-email`.
 All four files are secret services files: the workspace slug and verifier identities must never be Nix literals.
-Enabled sources other than the signing key declare per-person shared hidden-prompt Clan generators (`share = true`), with secret services files owned by the worker and mode `0400` on each host.
+Enabled sources other than the signing and deploy request keys declare per-person shared hidden-prompt Clan generators (`share = true`), with secret services files owned by the worker and mode `0400` on each host.
 They do not enroll values automatically.
 The adapters check the declared ciphertext source and consume `files.<name>.path`; personal bundles, age identities and `hm-sops-bridge` enrollment remain prohibited.
 All five inventory workers now declare signing-key and GitHub-token sources while execution remains disabled.
@@ -296,6 +296,9 @@ Rotating the owner's key with `clan vars generate --regenerate --generator <pers
 Cameron's workers select GitHub owners `sciexp` and `cameronraysmith`, with `defaultOwner = "cameronraysmith"`; Janette's select only `sciexp`, also her `defaultOwner`.
 Cameron's workers select `personal` and `work`; Janette's select only `personal`.
 Claude setup-token delivery remains disabled.
+A deploy request generator, named `<worker-user>-deploy-request` with file `key`, has no prompt: it runs `ssh-keygen -t ed25519` into a shared secret services `key` (worker-owned, mode `0400`) and a public `key.pub`, which the fleet deployer on cinnabar authorizes for that worker.
+When the key is selected, the worker's Home Manager declares the `fleet-deployer` SSH alias (the deployer endpoint, `IdentitiesOnly`, `ForwardAgent no`) and a `fleet-deploy` command running `ssh fleet-deployer deploy "$@"`.
+Every inventory worker declares it disabled through the single `deployRequestEnrolled` flag in `modules/clan/inventory/services/omnigent.nix`; enrollment generates `vars/shared/<worker-user>-deploy-request` and flips the flag in the same commit.
 These declarations do not enroll ciphertext: the real machine configuration must fail its credential source assertions until the operator enrolls every selected source under `vars/shared`.
 Worker `enable = false` does not bypass that prerequisite for building or deploying the machine.
 The fleet obligations read the five declarations and their generator files directly from each real machine configuration, without synthetic delivery copies.

@@ -78,7 +78,7 @@
   — verify: the package builds (flake8 in `writePython3Bin`); checks 1.2 and 4.3
   - Evidence: built on magnetite.
 - [ ] 4.2 HOST STEP: on cinnabar, as `fleet-deployer`, in a worktree of `main`, run `clan vars check` for every machine, then `clan machines update magnetite --target-host root@192.0.2.1` (unreachable, so it stops at the connection). — verify: every `vars check` exits 0 without decrypting out-of-scope files, and the update fails at the connection, not at decryption; if not, stop and revise D7
-- [ ] 4.3 Run `vmTests.x86_64-linux.fleet-deployer` on pyrite (KVM). Its cases:
+- [x] 4.3 Run `vmTests.x86_64-linux.fleet-deployer` on pyrite (KVM). The stand-ins are the forge, the cache check (`cacheCheckCommand`), the vars check and clan. Its cases:
   - a merged commit (0);
   - an unmerged commit, an unreachable-by-policy host, `stibnite` and `shell` (3, no target connection);
   - an uncached closure and a failed vars check (3);
@@ -91,6 +91,19 @@
   - the key check on a widened mode.
 
   — verify: `nix build .#vmTests.x86_64-linux.fleet-deployer` on pyrite after its GC hold test ends
+  - Evidence (2026-11-18T23:39Z, `logs/fleet-deployer-vmtest-20261118T2339Zh.log`): all nine subtests passed and the test script finished in 201 s. Outcomes:
+    - `deployed` with the record naming the closure;
+    - `refused` for the unmerged commit, `other`, `stibnite` and `shell`, with no new accepted SSH connection on the target;
+    - `refused` for the uncached closure and for the failed vars check;
+    - `busy` after 20 s;
+    - the second concurrent deploy started after the first ended;
+    - `unreachable` in 0.57 s with no host lock;
+    - `unhealthy: failed unit broken.service`, kept after the window;
+    - `rolled-back`, with the target back on `broken` and the record's `previous_closure` = `isolated`;
+    - 13 posts, high priority exactly for refused, unhealthy and rolled-back;
+    - `requests.jsonl` mode 600;
+    - the key check failing at 0440 and passing at 0400.
+  - Earlier runs on the same day found two defects, both fixed in `srnuwxtx`: `ssh-keygen` forces 0600 on the private key past `UMask=0277`, so `fleet-deployer-keys` now runs `chmod 0400` afterwards; and `fleet-deploy-notify` hit systemd's start limit during a burst of refusals, so it now sets `startLimitIntervalSec = 0`.
 - [x] 4.4 `fleet-deploy-notify` posts each request line to `fleet-deploy` with the alerter token, high priority for refused, unhealthy and rolled-back. ntfy's existing `alerter:fleet-*:rw` admits the topic (Q32). — verify: the VM test's notices case
   - Evidence: no ACL edit is needed (`modules/machines/nixos/cinnabar/ntfy.nix:61-64`); runtime proof is in 4.3.
 
@@ -100,7 +113,7 @@
   - Evidence: all nine machine-check drvPaths evaluate; `fleet-deploy-watch` is in magnetite's `systemPackages`.
 - [ ] 5.2 HOST STEP: after 2.2, deploy each target from stibnite one at a time: cinnabar, magnetite, pyrite, then rosegold and argentum when awake. — verify: on each, `ssh -i <deployer key> <deployUser>@<host> true` succeeds from cinnabar as `fleet-deployer`, and the same key is refused from any other address; every alert since each deploy started is recorded with its cause
 - [x] 5.3 Write `fleet-deploy-watch` (`pkgs/by-name/fleet-deploy-watch`). It watches `/run/current-system`, has a confirm window, rolls back by profile generation plus activation, and removes its own launchd job. — verify: the VM test's rollback case (4.3)
-  - Evidence: package built as part of the VM test driver; runtime proof is in 4.3.
+  - Evidence: the rollback case in 4.3 (NixOS). The darwin path is task 5.4.
 - [ ] 5.4 HOST STEP: on rosegold or argentum, with its user told in advance, deploy through the deployer at the deployed commit (no closure change). Then run a watcher by hand with a 60 s window on an unchanged system. — verify: the deploy exits 0 and no `org.vanixiets.fleet-deploy-watch.*` job remains; the hand-run watcher ends without switching (A159 for darwin); every alert since the test started is recorded with its cause
 
 ## 6. Integration Verification

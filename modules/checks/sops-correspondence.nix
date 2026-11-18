@@ -15,6 +15,11 @@
 #   first .sops.yaml rule whose path_regex matches it, or matches no rule;
 # - an anchor is not classified below, a classified name has no anchor, or a
 #   clan user directory is unmapped;
+# - the fleet deployer's reach differs from flake.lib.fleetDeployer: before
+#   its keys are committed, sops/users/fleet-deployer and any fleet-deployers
+#   group must not exist; after, the user's key.json must be keys.age, the
+#   group must hold only that user, every target's machine key must name the
+#   group, and no other machine key, shared var or other machine's var may;
 # - the scan finds no anchor, no rule or no file.
 # Each failure mode has a mutant case that must fail, so the check cannot pass
 # vacuously.
@@ -68,6 +73,11 @@ let
 
   tsv = attrs: lib.concatStrings (lib.mapAttrsToList (k: v: "${k}\t${v}\n") attrs);
   lines = lib.concatMapStrings (x: "${x}\n");
+
+  # The fleet deployer (modules/lib/fleet-deployer.nix): a clan user mapped to
+  # its own committed age key rather than to a person's login key.
+  inherit (config.flake.lib) fleetDeployer;
+  deployerAge = if fleetDeployer.keys == null then "" else fleetDeployer.keys.age;
 in
 {
   perSystem =
@@ -86,12 +96,15 @@ in
             hostKeyAnchors = tsv (lib.mapAttrs (_: h: config.flake.lib.darwinHostKeys.${h}) hostKeyAnchors);
             machineAnchors = lines machineAnchors;
             otherAnchors = lines (runnerAnchors ++ recoveryAnchors);
+            inherit deployerAge;
+            deployerTargets = lines fleetDeployer.targets;
             passAsFile = [
               "userAnchors"
               "clanUsers"
               "hostKeyAnchors"
               "machineAnchors"
               "otherAnchors"
+              "deployerTargets"
             ];
             tree = lib.fileset.toSource {
               root = ../..;
@@ -100,6 +113,9 @@ in
                 ../../sops/users
                 ../../sops/machines
                 ../../secrets
+                (lib.fileset.maybeMissing ../../sops/secrets)
+                (lib.fileset.maybeMissing ../../sops/groups)
+                (lib.fileset.maybeMissing ../../vars)
               ];
             };
             passthru.meta.description = "sops recipients correspond to the public keys the repository records";
@@ -135,6 +151,7 @@ in
               done < "$clanUsersPath"
               for dir in "$d"/sops/users/*/; do
                 u=$(basename "$dir")
+                [ "$u" = fleet-deployer ] && continue
                 cut -f1 "$clanUsersPath" | grep -qx -- "$u" || fail "clan user '$u' is not mapped to a flake user"
               done
               while read -r m; do
@@ -163,6 +180,34 @@ in
                 esac
                 [ "$want" = "$have" ] || fail "$rel recipients differ from rule $rule"
               done < <(find "$d/secrets" -type f ! -name '.*' -print0 | sort -z)
+
+              # The fleet deployer's reach.
+              if [ -z "$deployerAge" ]; then
+                [ ! -e "$d/sops/users/fleet-deployer" ] || fail "sops/users/fleet-deployer exists before flake.lib.fleetDeployer.keys"
+                [ ! -e "$d/sops/groups/fleet-deployers" ] || fail "sops/groups/fleet-deployers exists before flake.lib.fleetDeployer.keys"
+              else
+                [ "$(jq -r '.[0].publickey' "$d/sops/users/fleet-deployer/key.json" 2>/dev/null)" = "$deployerAge" ] \
+                  || fail "clan user 'fleet-deployer' key.json is not flake.lib.fleetDeployer.keys.age"
+                [ "$(ls "$d/sops/groups/fleet-deployers/users" 2>/dev/null)" = fleet-deployer ] \
+                  || fail "sops group fleet-deployers does not hold exactly fleet-deployer"
+                while read -r m; do
+                  [ -e "$d/sops/secrets/$m-age.key/groups/fleet-deployers" ] \
+                    || fail "$m-age.key does not name the fleet-deployers group"
+                done < "$deployerTargetsPath"
+              fi
+              while IFS= read -r -d "" g; do
+                rel=''${g#"$d"/}
+                case "$rel" in
+                  sops/secrets/*-age.key/groups/fleet-deployers)
+                    m=''${rel#sops/secrets/}; m=''${m%-age.key/groups/fleet-deployers} ;;
+                  vars/per-machine/*)
+                    m=''${rel#vars/per-machine/}; m=''${m%%/*} ;;
+                  *) m="" ;;
+                esac
+                if [ -z "$m" ] || ! grep -qx -- "$m" "$deployerTargetsPath"; then
+                  fail "$rel gives the fleet deployer a secret outside its targets' machine keys and vars"
+                fi
+              done < <(find "$d/sops/secrets" "$d/vars" \( -path '*/groups/fleet-deployers' -o -path '*/users/fleet-deployer' \) -print0 2>/dev/null | sort -z)
 
               [ "$n_anchors" -gt 0 ] || fail "no anchors in .sops.yaml"
               [ "$n_rules" -gt 0 ] || fail "no creation rules in .sops.yaml"
@@ -196,6 +241,14 @@ in
             mutant unclassified-anchor sed -i "s/^keys:$/keys:\n  - \&stranger $other/" m/.sops.yaml
             mutant dev-reintroduced sed -i "s/^keys:$/keys:\n  - \&dev age1js028xag70wpwpp47elpq50mjjv7zn7sxuwuhk8yltkjzqzdvq5qq8w8cy/" m/.sops.yaml
             mutant empty-secrets sh -c 'rm -rf m/secrets && mkdir m/secrets'
+            mutant deployer-reaches-stibnite sh -c 'mkdir -p m/sops/secrets/stibnite-age.key/groups && ln -s ../../../groups/fleet-deployers m/sops/secrets/stibnite-age.key/groups/fleet-deployers'
+            mutant deployer-reads-shared sh -c 'mkdir -p m/vars/shared/ntfy-alerter/token/users && ln -s ../../../../../sops/users/fleet-deployer m/vars/shared/ntfy-alerter/token/users/fleet-deployer'
+            if [ -z "$deployerAge" ]; then
+              mutant deployer-user-early sh -c 'mkdir -p m/sops/users/fleet-deployer && echo "[{\"publickey\":\"age1x\",\"type\":\"age\"}]" > m/sops/users/fleet-deployer/key.json'
+            else
+              mutant deployer-key-changed sh -c "sed -i 's/$deployerAge/$other/' m/sops/users/fleet-deployer/key.json"
+              mutant deployer-group-missing sh -c "rm m/sops/secrets/$(head -1 \"\$deployerTargetsPath\")-age.key/groups/fleet-deployers"
+            fi
 
             touch "$out"
           '';

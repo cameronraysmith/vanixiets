@@ -78,6 +78,7 @@ class Fixture(unittest.TestCase):
             'default = "fixture"\nfixture = "linear-key-sentinel"\n',
         )
         signing = private_file(secrets / "signing", "synthetic private key")
+        deploy_request = private_file(secrets / "deploy-request", "synthetic private key")
         self.policy = {
             "home": str(self.home),
             "serverUrl": "https://fixture.invalid",
@@ -88,6 +89,7 @@ class Fixture(unittest.TestCase):
                 "signingPublicKey": SIGNING_PUBLIC,
             },
             "signingKey": str(signing),
+            "deployRequestKey": str(deploy_request),
             "githubTokens": {
                 owner: {"path": str(paths[owner]), "expectedLogin": "fixture-human"}
                 for owner in ("first", "second")
@@ -101,6 +103,7 @@ class Fixture(unittest.TestCase):
                 str(paths["second"]),
                 str(paths["claude"]),
                 str(signing),
+                str(deploy_request),
                 *linear.values(),
                 str(self.linear_credentials),
             ],
