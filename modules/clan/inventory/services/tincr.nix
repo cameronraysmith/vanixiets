@@ -26,7 +26,10 @@ let
 
   # Phones, keyed by registry name, each with the Ed25519 public key tincapp
   # generated when it joined by invitation.
-  devices = { };
+  devices = {
+    # Joined by invitation through cinnabar on 2026-11-18 (tincapp 0.48).
+    pixel11.publicKey = "qmeYsFrBPTxrP0EbvjuIHNI9E7cqtU6Bppq1BuaVHAP";
+  };
 
   peerKey =
     name:
