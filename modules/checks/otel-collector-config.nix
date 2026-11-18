@@ -2,8 +2,9 @@
 #
 # R3.1 judges relations in magnetite's evaluated configuration that a
 # plausible edit would break silently: every listener and scrape target on
-# loopback except the ingress receiver on the address ZeroTier assigned to
-# magnetite, the alias transform in the host pipeline, queue sizes against
+# loopback except the ingress receivers, otlp/mesh on the address ZeroTier
+# assigned to magnetite and otlp/mesh-tincr on magnetite's registry mesh
+# address with otlp/mesh's TLS, the alias transform in the host pipeline, queue sizes against
 # the assumed rate, the validation override's scope, the failure-notifier
 # wiring against the failure path's policy, the limiter under the unit's
 # ceiling and the collector's order after the schema job. It does not copy
@@ -11,7 +12,7 @@
 # firewall, the unit cap and the owner aliases are agent assertions on every
 # host (design D6). Since S2 it also judges the devloop logs routes: each
 # devloop table's exporter queue, no logs pipeline exporting outside devloop
-# and none taking an OTLP receiver but otlp/mesh. R1.2 requires the exponential-histogram conversion
+# and none taking an OTLP receiver but the two ingress receivers. R1.2 requires the exponential-histogram conversion
 # while the store is below 1.3.0 (ADR-001). Each mutant edits the evaluated
 # input and must produce a non-empty failure list
 # (modules/checks/omnigent-environment.nix pattern). The configuration file
@@ -77,6 +78,7 @@
         ztAddress = lib.trim (
           builtins.readFile "${self}/vars/shared/zerotier-ip-magnetite-zerotier/ip/value"
         );
+        meshAddress = self.lib.hosts.magnetite.address;
         storeVersion = magnetite.services.greptimedb.package.version;
         notifierInterval =
           magnetite.systemd.services."observability-notify@".environment.OBSERVABILITY_NOTIFY_MIN_INTERVAL_SEC
@@ -278,19 +280,30 @@
           exphist = p."transform/exphist".metric_statements or [ ];
         in
         lib.concatLists [
-          # Loopback, with exactly one exception: otlp/mesh on the address ZeroTier
-          # assigned to magnetite (ADR-003 item 9).
+          # Loopback, with exactly two exceptions: otlp/mesh on the address
+          # ZeroTier assigned to magnetite (ADR-003 item 9), removed at
+          # ZeroTier's retirement, and otlp/mesh-tincr on magnetite's mesh
+          # address with the same TLS.
           (check
-            "R3.1: an endpoint off loopback other than otlp/mesh, or otlp/mesh not on magnetite's assigned address"
+            "R3.1: an endpoint off loopback other than the ingress receivers, or an ingress receiver not on magnetite's address or without otlp/mesh's TLS"
             (
               lib.all isLoopback (
-                collectEndpoints (builtins.removeAttrs r [ "otlp/mesh" ])
+                collectEndpoints (
+                  builtins.removeAttrs r [
+                    "otlp/mesh"
+                    "otlp/mesh-tincr"
+                  ]
+                )
                 ++ collectEndpoints e
                 ++ promTargets
                 ++ [ i.node.listenAddress ]
               )
               && (r."otlp/mesh".protocols.http.endpoint or null) == "[${i.ztAddress}]:4318"
               && !(r."otlp/mesh".protocols ? grpc)
+              && (r."otlp/mesh-tincr".protocols.http.endpoint or null) == "[${i.meshAddress}]:4318"
+              && !(r."otlp/mesh-tincr".protocols ? grpc)
+              && (r."otlp/mesh".protocols.http.tls.client_ca_file or null) != null
+              && (r."otlp/mesh-tincr".protocols.http.tls or null) == r."otlp/mesh".protocols.http.tls
             )
           )
 
@@ -309,11 +322,19 @@
             lib.all (name: !(lib.hasPrefix "traces" name)) (builtins.attrNames pipelines)
             && lib.all (name: lib.all exportsToDevloop pipelines.${name}.exporters) logsPipelineNames
           ))
-          # otlpInLogsPipeline: no OTLP receiver but the agents' otlp/mesh
-          # feeds a logs pipeline (ADR-003:81; S2 design D4; design D3).
-          (check "R3.1: a logs pipeline takes an OTLP receiver other than otlp/mesh" (
+          # otlpInLogsPipeline: no OTLP receiver but the agents' ingress
+          # receivers feeds a logs pipeline (ADR-003:81; S2 design D4; design D3).
+          (check "R3.1: a logs pipeline takes an OTLP receiver other than the ingress receivers" (
             lib.all (
-              name: !(lib.any (n: isOtlpReceiver n && n != "otlp/mesh") pipelines.${name}.receivers)
+              name:
+              !(lib.any (
+                n:
+                isOtlpReceiver n
+                && !(builtins.elem n [
+                  "otlp/mesh"
+                  "otlp/mesh-tincr"
+                ])
+              ) pipelines.${name}.receivers)
             ) logsPipelineNames
           ))
 
@@ -396,6 +417,21 @@
               i.settings.receivers."otlp/mesh".protocols.http.endpoint;
           } i;
         ztAddressOther = i: i // { ztAddress = "fddb:4344:343b:14b9:399:930f:39db:40d3"; };
+        meshAddressOther = i: i // { meshAddress = self.lib.hosts.cinnabar.address; };
+        meshTincrWildcard = onSettings {
+          receivers."otlp/mesh-tincr".protocols.http.endpoint = "[::]:4318";
+        };
+        meshTincrAbsent =
+          i:
+          i
+          // {
+            settings = i.settings // {
+              receivers = builtins.removeAttrs i.settings.receivers [ "otlp/mesh-tincr" ];
+            };
+          };
+        meshTincrWithoutClientCa = onSettings {
+          receivers."otlp/mesh-tincr".protocols.http.tls.client_ca_file = null;
+        };
         # A3:233: an exporter listenAddress of 0.0.0.0.
         exporterListenWildcard =
           i:

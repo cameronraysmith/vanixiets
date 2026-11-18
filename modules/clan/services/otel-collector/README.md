@@ -29,14 +29,14 @@ Both present the host's certificate from the credentials `otel-cert` and `otel-k
 Both trust `vanixiets.otelCollector.caFile`, `otel-ca`'s `ca.crt` written to the store with `pkgs.writeText`, so a new CA changes the rendered configuration and restarts the collector.
 `otel-cert`'s two files carry `restartUnits = [ "opentelemetry-collector.service" ]` on hosts that collect.
 `otel-ca` is shared, its `ca.key` is never deployed, and it signs each host's `otel-cert` only at generation time.
-Each `otel-cert` names its host as the CN with the extended key usage `clientAuth`; magnetite's adds `serverAuth` and the SANs `IP:<magnetite's ZeroTier address>` and `DNS:magnetite.zt`.
+Each `otel-cert` names its host as the CN with the extended key usage `clientAuth`; the ingress host's adds `serverAuth` and the SANs `IP:<its ZeroTier address>`, `DNS:<name>.zt`, `IP:<its mesh address>` and `DNS:<its fqdn>`, read from `flake.lib.hosts`; the ZeroTier pair goes with ZeroTier's retirement.
 A non-ingress agent runs with `MemoryMax = "256M"` and its `memory_limiter` at 150 MiB with a 30 MiB spike allowance.
 On every non-ingress host an assertion requires both exporters to queue in `file_storage` by bytes and retry without limit, the metrics queue to hold 24 hours at `flake.lib.otelCollectorSchema.fleetBytesPerMinute`, the two queues to sum below 512 MiB, and the limiter to stay below `MemoryMax`.
 
-The ingress's `otlp/mesh` receiver listens on `[<magnetite's ZeroTier address>]:4318`, HTTP only, with no gRPC.
+The ingress's `otlp/mesh` receiver listens on `[<magnetite's ZeroTier address>]:4318` and its `otlp/mesh-tincr` receiver, with the same TLS, on `[<magnetite's mesh address>]:4318`, both HTTP only, with no gRPC; `otlp/mesh` goes with ZeroTier's retirement.
 It presents magnetite's `otel-cert` and `otel-key`, which the clan agent role loads on magnetite too, and sets `client_ca_file` to the same CA and `min_version = "1.3"`, so a client without a certificate from `otel-ca` fails the TLS handshake.
 It feeds `metrics/ingress` beside `forward`, and `logs/ingress` where the devloop routes exist.
-The clan ingress role opens TCP 4318 on the `zt+` interfaces only (`networking.firewall.interfaces."zt+".allowedTCPPorts`).
+The clan ingress role opens TCP 4318 on the mesh interfaces only (`flake.lib.meshInterfaces`).
 magnetite sets `net.ipv6.ip_nonlocal_bind = 1`, so the receiver binds its address even before `zerotierone` holds it.
 
 ## What each agent collects
@@ -213,9 +213,9 @@ Each run prints one line per clause, `otel-envelope: <clause> <name>: ok` or `ot
 - `C1 telemetry` fails when the telemetry endpoint did not answer within 10 s on this run and the previous one.
 - `C2 targets` fails when a declared target did not answer `GET` with 200 within 10 s on this run and the previous one, and names it: every target of every scrape job is probed, named `<job>`, or `<job>@<host:port>` in a job with several targets.
 - `C3 queue` fails when telemetry answered and an exporter the collector's configuration declares has no `otelcol_exporter_queue_size` or no `otelcol_exporter_queue_capacity` series, or when an exporter's size reached 90 % of its capacity, or its capacity is absent.
-- `C4 loss` fails when, since the previous run, an `otelcol_exporter_send_failed_*` counter rose, an `otelcol_receiver_refused_*` counter rose on any receiver but the ingress's `otlp/mesh`, or, off the ingress host, an `otelcol_exporter_enqueue_failed_*` counter rose.
+- `C4 loss` fails when, since the previous run, an `otelcol_exporter_send_failed_*` counter rose, an `otelcol_receiver_refused_*` counter rose on any receiver but the ingress's `otlp/mesh` and `otlp/mesh-tincr`, or, off the ingress host, an `otelcol_exporter_enqueue_failed_*` counter rose.
 
-On magnetite, `otlp/mesh` refusals and the store exporters' enqueue failures are back-pressure, not loss.
+On magnetite, `otlp/mesh` and `otlp/mesh-tincr` refusals and the store exporters' enqueue failures are back-pressure, not loss.
 A refused agent keeps the data in its own persistent queue and resends it, so the refusal shows in that agent's `C3` once its queue fills, and a full store queue fails magnetite's `C3`.
 On an agent that is not the ingress, an enqueue failure is loss, because nothing upstream of its exporter holds the data.
 `/var/lib/otel-envelope/state` holds one `<key> <value>` line per loss counter, keyed without the labels that change at each collector start, and the `telemetry` and `down:<job>` flags of the last run.

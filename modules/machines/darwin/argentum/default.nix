@@ -24,10 +24,10 @@ in
     {
       _module.args.flake = inputs.self;
 
-      # dnscrypt-proxy and zt-services-trust are imported on every darwin host
+      # dnscrypt-proxy and fleet-services-trust are imported on every darwin host
       # so that enabling them is the per-host decision rather than importing
       # them being it. Both are inert until enabled; argentum enables
-      # dnscrypt-proxy and not zt-services-trust.
+      # dnscrypt-proxy and not fleet-services-trust.
       imports = [
         inputs.home-manager.darwinModules.home-manager
         inputs.srvos.darwinModules.server
@@ -39,7 +39,7 @@ in
         ssh-known-hosts
         dnscrypt-proxy
         zt-dns
-        zt-services-trust
+        fleet-services-trust
       ]);
 
       # Re-enable documentation for laptop use

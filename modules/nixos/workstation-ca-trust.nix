@@ -1,6 +1,6 @@
 # The two private roots a workstation reaches: caddy's root for the .zt
 # services behind cinnabar, and the local k8s development CA. Both are read
-# from the files stibnite trusts (modules/darwin/zt-services-trust.nix and
+# from the files stibnite trusts (modules/darwin/fleet-services-trust.nix and
 # stibnite's host module), so a rotation reaches every workstation together.
 { ... }:
 {

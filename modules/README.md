@@ -139,6 +139,6 @@ A build the caller or another builder can perform continues: the build hook logs
 A build no remaining machine can perform fails outright, as an x86_64-linux build requiring `kvm` does while Pyrite is offline, reporting `missing system features` with `Required features: {kvm}`, and never degrades into an unaccelerated or emulated build.
 That second case is the intended behaviour: vmTests are opt-in and outside PR gating, so an offline laptop costs a manual re-run rather than a red pull request.
 Every builder URI sets `connect-timeout=5`, so a sleeping or off-network laptop is declared unreachable in seconds instead of after the plugin's default 30; once a builder has answered, the plugin rides out a dropped connection for its default `restart-grace` of 120 seconds before failing the build.
-`checks.<system>.nix-builders-wiring` pins the entries, store URIs, daemon TLS and access rules, the ZeroTier-only port, and the absence of the retired ssh build accounts across machines, which no single machine's evaluation can see.
+`checks.<system>.nix-builders-wiring` pins the entries, store URIs, daemon TLS and access rules, the port opened only on the mesh interfaces, and the absence of the retired ssh build accounts across machines, which no single machine's evaluation can see.
 A change takes effect only after both the dispatcher and the builder are activated.
 New VM test modules belong in `vm-tests/` and assign `perSystem.vmTests`, using the same automatically discovered flake-parts composition as the other module directories.

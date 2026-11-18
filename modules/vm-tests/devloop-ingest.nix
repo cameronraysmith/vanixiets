@@ -1132,13 +1132,15 @@
                   "otel-key:${pki}/ingress.key"
                 ];
 
-                # The ingress's otlp/mesh on loopback with throwaway
+                # The ingress receivers on loopback with throwaway
                 # certificates, never the real vars, and the agent's
                 # notified-unit assertion satisfied; the envelope is
                 # fleet-ingress's subject, so its timer stays off here.
                 vanixiets.otelCollector.caFile = "${pki}/ca.crt";
                 services.opentelemetry-collector.settings.receivers."otlp/mesh".protocols.http.endpoint =
                   lib.mkForce "127.0.0.1:4318";
+                services.opentelemetry-collector.settings.receivers."otlp/mesh-tincr".protocols.http.endpoint =
+                  lib.mkForce "127.0.0.1:4320";
                 services.observability-notify.units = [
                   "opentelemetry-collector"
                   "otel-envelope"

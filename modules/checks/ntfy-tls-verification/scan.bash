@@ -1,5 +1,6 @@
 # scan.bash TREE CLIENTS NONCLIENTS EXEMPT CLAUSE...
-# Judges the source tree TREE for ntfy.zt clients. CLIENTS, NONCLIENTS and
+# Judges the source tree TREE for clients of ntfy under any name in NTFY_NAMES
+# (space-separated, from the environment). CLIENTS, NONCLIENTS and
 # EXEMPT are files listing tree-relative paths, one per line (NONCLIENTS as
 # "<path>\t<reason>"). CLAUSE is any of A, B, C. Prints "FAIL <clause>: …" for
 # each finding and exits 1 if any clause failed.
@@ -8,7 +9,9 @@ tree=$1 clients=$2 nonclients=$3 exempt=$4
 shift 4
 cd "$tree"
 fail=0
-named=$(grep -rlF --include='*.sh' --include='*.bash' --include='*.nix' --include='*.py' --include='*.ts' --include='*.js' 'ntfy.zt' modules pkgs | LC_ALL=C sort)
+names=()
+for n in ${NTFY_NAMES:?}; do names+=(-e "$n"); done
+named=$(grep -rlF --include='*.sh' --include='*.bash' --include='*.nix' --include='*.py' --include='*.ts' --include='*.js' "${names[@]}" modules pkgs | LC_ALL=C sort)
 # The left boundary admits `_` and `-`, so "${NTFY_CURL_BIN:-curl}" counts as invoking curl.
 invokes='(^|[^A-Za-z0-9])(curl|wget|CURL_BIN)([^A-Za-z0-9_]|$)'
 insecure='(^|[[:space:]"'"'"'])(-[A-Za-z]*k[A-Za-z]*|--insecure)([[:space:]"'"'"']|$)'
@@ -35,7 +38,7 @@ for clause in "$@"; do
     C)
       for f in $named; do
         grep -qE "$invokes" "$f" || continue
-        listed "$clients" "$f" || listed "$nonclients" "$f" || listed "$exempt" "$f" || { echo "FAIL C: $f names ntfy.zt and invokes curl or wget but is not declared"; fail=1; }
+        listed "$clients" "$f" || listed "$nonclients" "$f" || listed "$exempt" "$f" || { echo "FAIL C: $f names ntfy and invokes curl or wget but is not declared"; fail=1; }
       done ;;
   esac
 done

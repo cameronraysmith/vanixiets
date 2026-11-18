@@ -6,7 +6,7 @@
 # Linux hosts opt in (pyrite unlocks through polkit and pam_u2f, system-side).
 # The ssh binary is chosen in modules/home/security/tools.nix; commit signing
 # never uses an agent (flake.lib.agentFreeSshKeygen).
-{ inputs, ... }:
+{ inputs, config, ... }:
 {
   flake.modules.homeManager.core =
     {
@@ -123,7 +123,11 @@
       enable = true;
       pinnedKeys = {
         login = {
-          hosts = [ "*.zt" ];
+          # "*.zt" goes with ZeroTier's retirement.
+          hosts = [
+            "*.zt"
+            "*.${config.flake.lib.fleet.domain}"
+          ];
           publicKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINdO9rInDa9HvdtZZxmkgeEdAlTupCy3BgA/sqSGyUH+";
         };
         # GitHub authenticates cameronraysmith with this RSA key; the login key

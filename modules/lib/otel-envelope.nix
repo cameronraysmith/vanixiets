@@ -20,10 +20,10 @@
 #   exporter's size reached 90 % of its capacity, or the capacity is absent.
 # - C4 loss: since the previous run, otelcol_exporter_send_failed_* rose on
 #   any exporter, otelcol_receiver_refused_* on any receiver but the
-#   ingress's otlp/mesh, or, off the ingress host, any
-#   otelcol_exporter_enqueue_failed_*. On the ingress host otlp/mesh
-#   refusals and the store exporters' enqueue failures are back-pressure
-#   that the agents' queues absorb; a full store queue fails C3.
+#   ingress's otlp/mesh and otlp/mesh-tincr, or, off the ingress host, any
+#   otelcol_exporter_enqueue_failed_*. On the ingress host those two
+#   receivers' refusals and the store exporters' enqueue failures are
+#   back-pressure that the agents' queues absorb; a full store queue fails C3.
 # - C5 memory (darwin, with `darwinMemory` = { launchctl; top; limits; }):
 #   launchd bounds no memory, so each label of `limits` whose job prints a
 #   pid in `launchctl print system/<label>` has its physical footprint read
@@ -458,6 +458,8 @@ in
           { grep -E "$loss_re" "$tmp/now" || true; } | while read -r series value; do
             # mutant: meshRefusalIsLoss
             if [ "$ingress" = 1 ] && [[ $series == otelcol_receiver_refused_*'receiver="otlp/mesh"'* ]]; then continue; fi
+            # mutant: meshTincrRefusalIsLoss
+            if [ "$ingress" = 1 ] && [[ $series == otelcol_receiver_refused_*'receiver="otlp/mesh-tincr"'* ]]; then continue; fi
             key=$(printf '%s' "$series" | normalise)
             was=$(prev "$key")
             echo "$key $value" >> "$next"

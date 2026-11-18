@@ -1,16 +1,17 @@
-# checks.x86_64-linux.ntfy-tls-verification (CAM-87): no ntfy.zt client in the
-# repository skips certificate verification.
+# checks.x86_64-linux.ntfy-tls-verification (CAM-87): no ntfy client in the
+# repository skips certificate verification. ntfy is named ntfy.zt until
+# ZeroTier's retirement and ntfy.<fleet domain>; a file naming either is judged.
 #
 # The tree is every .sh, .bash, .nix, .py, .ts and .js file under modules/ and
 # pkgs/. Clause A fails on a curl or wget command line, continuations joined,
 # carrying -k, --insecure or a short-option cluster containing k, in a file
-# naming ntfy.zt; its value sources are the file's text and curl's option
+# naming ntfy; its value sources are the file's text and curl's option
 # grammar (curl-8_22_0 docs/cmdline-opts/insecure.md). Clause B fails when a
 # declared client is missing or passes no --cacert; its sources are the
-# declared list and the file. Clause C fails when a file naming ntfy.zt and
+# declared list and the file. Clause C fails when a file naming ntfy and
 # invoking curl or wget is in no list; its sources are the lists and the tree.
 # Clause C counts a mention of curl or wget anywhere in a file, comments
-# included, so a file that only mentions one beside ntfy.zt is declared a
+# included, so a file that only mentions one beside an ntfy name is declared a
 # non-client with its reason.
 # Each mutant changes one copy of the tree and runs only its clause.
 # The same check judges flake.lib.caddyRootCheck, which cinnabar runs weekly,
@@ -20,6 +21,12 @@
   perSystem =
     { pkgs, system, ... }:
     let
+      fleetNtfy = "ntfy.${config.flake.lib.fleet.domain}";
+      # "ntfy.zt" goes with ZeroTier's retirement.
+      ntfyNames = [
+        "ntfy.zt"
+        fleetNtfy
+      ];
       tree = lib.fileset.toSource {
         root = ../..;
         # fileFilter takes a path, so each directory is filtered and the results joined.
@@ -73,6 +80,8 @@
             }
             ''
               set -uo pipefail
+              # The names ntfy is served under, read by the scanner.
+              export NTFY_NAMES=${lib.escapeShellArg (lib.concatStringsSep " " ntfyNames)}
               # scanTree TREE CLAUSE…: the scanner's order is TREE CLIENTS NONCLIENTS EXEMPT CLAUSE….
               scanTree() { local t=$1; shift; ${pkgs.bash}/bin/bash ${scan} "$t" ${clients} ${nonclients} ${exempt} "$@"; }
               scanTree ${tree} A B C || { echo "FAIL: the repository's tree"; exit 1; }
@@ -100,6 +109,8 @@
               mutant insecureContinued A modules/x/post.sh "mkdir -p modules/x && printf 'curl \\\\\n  -k \\\\\n  https://ntfy.zt/x\n' > modules/x/post.sh"
               mutant clientMissing B "is missing" "rm $ns"
               mutant cacertDropped B "passes no --cacert" "sed -i 's/ --cacert \"\$NTFY_CACERT\"//' $ns"
+              mutant insecureFleetDomain A modules/x/post.sh "mkdir -p modules/x && printf 'curl -k https://${fleetNtfy}/x\n' > modules/x/post.sh"
+              mutant undeclaredClientFleetDomain C modules/x/post.sh "mkdir -p modules/x && printf 'curl --cacert ca https://${fleetNtfy}/x\n' > modules/x/post.sh"
               mutant undeclaredClient C modules/x/post.sh "mkdir -p modules/x && printf 'curl --cacert ca https://ntfy.zt/x\n' > modules/x/post.sh"
 
               # Root-check legs (design D6): a root, an intermediate under it and a leaf

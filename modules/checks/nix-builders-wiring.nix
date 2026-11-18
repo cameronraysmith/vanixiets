@@ -6,7 +6,7 @@
 # presenting its own certificate; the builder trusts that CA and grants the
 # `trusted` role by certificate CN to every other dispatcher. A builder that
 # names the wrong CA, a CN rule for the wrong machine, or a port opened beyond
-# ZeroTier builds and activates and is wrong in the one way that matters.
+# the mesh interfaces builds and activates and is wrong in the one way that matters.
 #
 # It also pins what each dispatcher actually schedules (the entries and the
 # store URI each one names), that the grpc:// plugin is loaded where it
@@ -51,14 +51,8 @@
         "stibnite"
       ];
 
-      # ZeroTier IPv6 addresses, as in modules/system/ssh-known-hosts.nix.
-      address = {
-        magnetite = "fddb:4344:343b:14b9:399:930f:39db:40d2";
-        pyrite = "fddb:4344:343b:14b9:399:937e:8067:8028";
-        stibnite = "fddb:4344:343b:14b9:399:9324:19d9:3451";
-        rosegold = "fddb:4344:343b:14b9:399:9315:3431:ee8";
-        argentum = "fddb:4344:343b:14b9:399:93f7:54d5:ad7e";
-      };
+      # The builders' ZeroTier IPv6 addresses, from the registry.
+      address = lib.genAttrs builders (machine: self.lib.hosts.${machine}.zerotier.address);
 
       vars = machine: (configOf machine).clan.core.vars.generators;
       caPath = machine: plain (vars machine).nix-grpc-ca.files."ca.crt".path;
@@ -198,12 +192,12 @@
           trusted = builtins.elem "nix-grpc-daemon" (config.nix.settings.extra-trusted-users or [ ]);
           # nix-darwin has no per-interface firewall; darwin binds the
           # ZeroTier address instead, pinned by `listen`.
-          zeroTierPort =
+          meshPort =
             if isDarwin machine then
               null
             else
-              builtins.elem 50051 (
-                config.networking.firewall.interfaces.${self.lib.zerotierInterfaces config}.allowedTCPPorts or [ ]
+              lib.genAttrs (self.lib.meshInterfaces config) (
+                key: builtins.elem 50051 (config.networking.firewall.interfaces.${key}.allowedTCPPorts or [ ])
               );
           globalPort =
             if isDarwin machine then null else builtins.elem 50051 config.networking.firewall.allowedTCPPorts;
@@ -231,7 +225,11 @@
           role = "trusted";
         }) (builtins.filter (dispatcher: dispatcher != machine) dispatchers);
         trusted = true;
-        zeroTierPort = if isDarwin machine then null else true;
+        meshPort =
+          if isDarwin machine then
+            null
+          else
+            lib.genAttrs (self.lib.meshInterfaces (configOf machine)) (_: true);
         globalPort = if isDarwin machine then null else false;
         sshBuildAccounts = [ ];
       };

@@ -173,6 +173,11 @@
           from = ''if [ "$ingress" = 1 ] && [[ $series == otelcol_receiver_refused_*'receiver="otlp/mesh"'* ]]; then continue; fi'';
           to = ":";
         };
+        meshTincrRefusalIsLoss = {
+          case = "ingressMeshTincrRefused";
+          from = ''if [ "$ingress" = 1 ] && [[ $series == otelcol_receiver_refused_*'receiver="otlp/mesh-tincr"'* ]]; then continue; fi'';
+          to = ":";
+        };
         missingCounterFails = {
           case = "missingSendFailed";
           from = ''{ grep -E "$loss_re" "$tmp/now" || true; } | while read -r series value; do'';
@@ -374,6 +379,11 @@
           local s
           s=$(mktemp -d)
           run ingress "$s" ingress-mesh-refused-1 down 0 && run ingress "$s" ingress-mesh-refused-2 down 0
+        }
+        case_ingressMeshTincrRefused() {
+          local s
+          s=$(mktemp -d)
+          run ingress "$s" ingress-mesh-tincr-refused-1 down 0 && run ingress "$s" ingress-mesh-tincr-refused-2 down 0
         }
         case_ingressOwnRefused() {
           local s
@@ -603,6 +613,7 @@
         "agentEnqueueFailed"
         "ingressEnqueueFailed"
         "ingressMeshRefused"
+        "ingressMeshTincrRefused"
         "ingressOwnRefused"
         "resetAfterRecorded"
         "resetThenFailure"

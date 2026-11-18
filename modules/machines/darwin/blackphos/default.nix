@@ -35,7 +35,7 @@ in
         ssh-known-hosts
         dnscrypt-proxy
         zt-dns
-        zt-services-trust
+        fleet-services-trust
       ]);
 
       # Re-enable documentation for laptop use
@@ -126,7 +126,7 @@ in
         userHome = "/private/var/lib/dnscrypt-proxy";
       };
 
-      services.zt-services-trust.enable = true;
+      services.fleet-services-trust.enable = true;
 
       # crs58: admin (UID 502), raquel: primary (UID 506) - matches existing system
       users.users.crs58 = {

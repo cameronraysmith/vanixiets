@@ -7,7 +7,8 @@
 #   - the store with magnetite's databases, its schema job and the devloop
 #     tables and pipelines;
 #   - opentelemetry-collector.service from the agent and ingress fragments,
-#     the ingress host, with otlp/mesh on 127.0.0.1:4318 and throwaway
+#     the ingress host, with otlp/mesh on 127.0.0.1:4318, otlp/mesh-tincr on
+#     127.0.0.1:4320, and throwaway
 #     certificates from flake.lib.otelTestPki;
 #   - agent-collector.service, electrum's evaluated non-ingress collector
 #     configuration exporting over mTLS to that receiver, with its queue,
@@ -169,10 +170,15 @@
               print("=== case refusal", flush=True)
               fresh_start()
               PKI = config()["pki"]
-              # The agent stays stopped, so otlp/mesh accepts nothing else.
+              # The agent stays stopped, so the ingress receivers accept nothing else.
               store.succeed(f"systemctl stop {AGENT}.service")
               time.sleep(5)
-              accepted_before = mesh_accepted()
+              # Both receivers, otlp/mesh (ZeroTier) and otlp/mesh-tincr, by
+              # their loopback ports here.
+              receivers = [("otlp/mesh", 4318), ("otlp/mesh-tincr", 4320)]
+              def receivers_accepted():
+                  return {name: metric(INGRESS_PORT, "otelcol_receiver_accepted_metric_points", {"receiver": name}) for name, _ in receivers}
+              accepted_before = receivers_accepted()
               cursor = store.succeed(
                   f"journalctl -u {INGRESS} -n 0 --show-cursor -o cat | sed -n 's/^-- cursor: //p'"
               ).strip()
@@ -184,18 +190,20 @@
                   ("a rogue CA's certificate", f"--cert {PKI}/rogue.crt --key {PKI}/rogue.key", (55, 56), "tlsv1 alert unknown ca"),
                   ("TLS 1.2 at most", f"--cert {PKI}/agent.crt --key {PKI}/agent.key --tls-max 1.2", (35,), "tlsv1 alert protocol version"),
               ]
-              for what, args, want, error in attempts:
-                  code, out = store.execute(
-                      f"curl -sS --cacert {PKI}/ca.crt {args} -H 'Content-Type: application/json' "
-                      "--data '{}' https://127.0.0.1:4318/v1/metrics 2>&1"
-                  )
-                  print(f"  {what}: exit {code}: {out.strip()}", flush=True)
-                  assert code in want and error in out, (what, code, out)
+              for receiver, port in receivers:
+                  for what, args, want, error in attempts:
+                      code, out = store.execute(
+                          f"curl -sS --cacert {PKI}/ca.crt {args} -H 'Content-Type: application/json' "
+                          f"--data '{{}}' https://127.0.0.1:{port}/v1/metrics 2>&1"
+                      )
+                      print(f"  {receiver}, {what}: exit {code}: {out.strip()}", flush=True)
+                      assert code in want and error in out, (receiver, what, code, out)
+              expected = len(receivers) * len(attempts)
               handshakes = f"journalctl -u {INGRESS} --after-cursor={shlex.quote(cursor)} -o cat | grep -c 'TLS handshake error'"
-              store.wait_until_succeeds(f"test $({handshakes}) -ge 3", timeout=30)
+              store.wait_until_succeeds(f"test $({handshakes}) -ge {expected}", timeout=30)
               print(store.succeed(f"journalctl -u {INGRESS} --after-cursor={shlex.quote(cursor)} -o cat | grep 'TLS handshake error'"), flush=True)
-              assert store.succeed(handshakes).strip() == "3"
-              assert mesh_accepted() == accepted_before, (accepted_before, mesh_accepted())
+              assert store.succeed(handshakes).strip() == str(expected)
+              assert receivers_accepted() == accepted_before, (accepted_before, receivers_accepted())
               store.succeed(f"systemctl start {AGENT}.service")
               wait_telemetry(AGENT_PORT)
               print("ok: refusal", flush=True)
@@ -740,10 +748,12 @@
                   inherit databases;
                 };
 
-                # The ingress receiver on loopback, trusting the test CA.
+                # The ingress receivers on loopback, trusting the test CA.
                 vanixiets.otelCollector.caFile = "${pki}/ca.crt";
                 services.opentelemetry-collector.settings.receivers."otlp/mesh".protocols.http.endpoint =
                   lib.mkForce "127.0.0.1:4318";
+                services.opentelemetry-collector.settings.receivers."otlp/mesh-tincr".protocols.http.endpoint =
+                  lib.mkForce "127.0.0.1:4320";
                 # The container has no ZFS dataset, so the agent fragment
                 # configures no filesystem scraper here (an empty strict list
                 # would match every mount: 713 in the nspawn container, which

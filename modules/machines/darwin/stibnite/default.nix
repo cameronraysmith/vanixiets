@@ -37,7 +37,7 @@ in
         colima
         dnscrypt-proxy
         zt-dns
-        zt-services-trust
+        fleet-services-trust
         stibnite-session-host
         shared-reference-tree
       ]);
@@ -233,7 +233,7 @@ in
         fi
       '';
 
-      services.zt-services-trust.enable = true;
+      services.fleet-services-trust.enable = true;
 
       home-manager = {
         useGlobalPkgs = true;

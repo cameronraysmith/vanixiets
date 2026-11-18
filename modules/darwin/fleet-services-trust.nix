@@ -1,14 +1,14 @@
 { lib, ... }:
 {
-  flake.modules.darwin.zt-services-trust =
+  flake.modules.darwin.fleet-services-trust =
     { config, lib, ... }:
     let
-      cfg = config.services.zt-services-trust;
+      cfg = config.services.fleet-services-trust;
       # caddy's root, the public file of cinnabar's clan vars generator caddy-root-ca.
       caddyCert = ../../vars/per-machine/cinnabar/caddy-root-ca/root.crt/value;
     in
     {
-      options.services.zt-services-trust.enable = lib.mkEnableOption "Caddy internal CA trust for .zt services";
+      options.services.fleet-services-trust.enable = lib.mkEnableOption "Caddy internal CA trust for the fleet's services";
 
       config = lib.mkIf cfg.enable {
         security.pki.certificateFiles = [ caddyCert ];

@@ -1,5 +1,6 @@
 # vmTests.x86_64-linux.caddy-root-from-vars (CAM-87 design D11): a caddy whose
-# storage is empty serves ntfy.zt under the root flake.modules.nixos.
+# storage is empty serves ntfy under both its names, ntfy.zt (until ZeroTier's
+# retirement) and ntfy.<fleet domain>, under the root flake.modules.nixos.
 # caddy-local-root configures, and writes no root of its own; the control
 # node "minting", the same caddy without the module, mints a root, so the
 # same client refuses it. The values related are the root made here and the
@@ -9,6 +10,11 @@
 { config, lib, ... }:
 let
   module = config.flake.modules.nixos.caddy-local-root;
+  # "ntfy.zt" goes with ZeroTier's retirement.
+  names = [
+    "ntfy.zt"
+    "ntfy.${config.flake.lib.fleet.domain}"
+  ];
 in
 {
   perSystem =
@@ -23,10 +29,12 @@ in
       '';
       site = {
         services.caddy.enable = true;
-        services.caddy.virtualHosts."ntfy.zt".extraConfig = ''
-          tls internal
-          respond "ok"
-        '';
+        services.caddy.virtualHosts = lib.genAttrs names (_: {
+          extraConfig = ''
+            tls internal
+            respond "ok"
+          '';
+        });
         networking.firewall.allowedTCPPorts = [ 443 ];
       };
     in
@@ -69,21 +77,24 @@ in
                 node.wait_for_unit("caddy.service")
                 node.wait_for_open_port(443)
             ca = "${pki}/root.crt"
+            names = ${builtins.toJSON names}
             # The driver runs a command under errexit, so curl's exit code is
             # read from execute rather than echoed after it.
-            def get(host):
-                rc, code = client.execute(f"curl -s -o /dev/null -w '%{{http_code}}' --cacert {ca} --resolve ntfy.zt:443:$(getent ahostsv4 {host} | head -n 1 | cut -d' ' -f1) https://ntfy.zt/")
+            def get(host, name):
+                rc, code = client.execute(f"curl -s -o /dev/null -w '%{{http_code}}' --cacert {ca} --resolve {name}:443:$(getent ahostsv4 {host} | head -n 1 | cut -d' ' -f1) https://{name}/")
                 got = f"{code.strip()} rc={rc}"
-                print(f"{host}: {got}")
+                print(f"{host} {name}: {got}")
                 return got
             with subtest("restored serves under the configured root"):
-                got = get("restored")
-                assert got.startswith("200"), got
-                client.succeed(f"openssl s_client -connect restored:443 -servername ntfy.zt -CAfile {ca} -verify_return_error < /dev/null")
+                for name in names:
+                    got = get("restored", name)
+                    assert got.startswith("200"), got
+                    client.succeed(f"openssl s_client -connect restored:443 -servername {name} -CAfile {ca} -verify_return_error < /dev/null")
                 restored.fail("test -e /var/lib/caddy/.local/share/caddy/pki/authorities/local/root.crt")
             with subtest("minting: without the module the same client is refused"):
-                got = get("minting")
-                assert got.endswith("rc=60"), got
+                for name in names:
+                    got = get("minting", name)
+                    assert got.endswith("rc=60"), got
           '';
         };
       };

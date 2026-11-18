@@ -8,6 +8,8 @@ let
   flakeUsers = config.flake.users;
   cogneeLib = config.flake.lib.cognee;
   inherit (config.flake.lib.hosts) magnetite;
+  inherit (config.flake.lib) fleet;
+  inherit (config.flake.lib) meshInterfaces;
   collectorSchema = config.flake.lib.otelCollectorSchema;
 in
 {
@@ -470,14 +472,21 @@ in
           region = "auto";
         };
 
-        bindAddress = magnetite.zerotier.address;
+        # omnigraph-server takes one --bind, and cinnabar's TLS fronts reach
+        # it on both magnetite's ZeroTier and tincr addresses, so it binds the
+        # wildcard; 8090 is opened only on the mesh interfaces below and is
+        # absent from the global allowedTCPPorts, so the firewall keeps it off
+        # the public interface.
+        bindAddress = "::";
         port = 8090;
         requireAllGraphs = true;
-        # Clients reach /mcp through cinnabar's omnigraph.zt TLS front, and
-        # the server refuses an MCP request whose Host it does not list.
+        # Clients reach /mcp through cinnabar's omnigraph TLS fronts, and the
+        # server refuses an MCP request whose Host it does not list.
         extraFlags = [
           "--mcp-allowed-host"
           "omnigraph.zt"
+          "--mcp-allowed-host"
+          "omnigraph.${fleet.domain}"
         ];
 
         environmentFile = config.clan.core.vars.generators.omnigraph-r2.files."env".path;
@@ -862,7 +871,7 @@ in
         dhcpV6Config.UseDNS = true;
       };
 
-      # Firewall configuration: dual-zone (public + ZeroTier)
+      # Firewall configuration: dual-zone (public + mesh)
       networking.firewall = {
         enable = true;
         allowedTCPPorts = [
@@ -870,10 +879,10 @@ in
           80
           443
         ];
-        # Admin and internal services accessible via ZeroTier only
-        interfaces."zt+" = {
+        # Admin and internal services accessible over the mesh only
+        interfaces = lib.genAttrs (meshInterfaces config) (_: {
           allowedTCPPorts = [ 8090 ]; # omnigraph; further ports added by service modules
-        };
+        });
       };
 
       # Increase MaxAuthTries to accommodate agent forwarding with many keys

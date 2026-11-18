@@ -2,7 +2,7 @@
 # asserted on the real configurations evaluated by nixos-pyrite and
 # darwin-stibnite. The expected keys are written out here rather than read from
 # flake.modules.homeManager.bitwarden-key-pins, so a changed or dropped pin fails.
-{ lib, ... }:
+{ config, lib, ... }:
 let
   loginKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINdO9rInDa9HvdtZZxmkgeEdAlTupCy3BgA/sqSGyUH+";
   # The key https://github.com/cameronraysmith.keys lists for authentication.
@@ -16,7 +16,15 @@ let
     in
     if (block.IdentitiesOnly or false) == true then lib.trim (file.text or "") else null;
 
-  pinsHold = home: pinnedKey home "*.zt" == loginKey && pinnedKey home "github.com" == githubAuthKey;
+  # Fleet hosts are reached under `.zt` until ZeroTier's retirement and under
+  # the fleet domain; both patterns pin the login key.
+  pinsHold =
+    home:
+    lib.all (pattern: pinnedKey home pattern == loginKey) [
+      "*.zt"
+      "*.${config.flake.lib.fleet.domain}"
+    ]
+    && pinnedKey home "github.com" == githubAuthKey;
 in
 {
   flake.modules.nixos."machines/nixos/pyrite" =

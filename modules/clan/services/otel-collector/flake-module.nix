@@ -779,11 +779,22 @@ in
               ];
             };
 
-            # The agents' mTLS exports, on magnetite's ZeroTier address only;
-            # a client without an otel-ca certificate fails the handshake
+            # The agents' mTLS exports, one receiver per overlay on magnetite's
+            # address there: otlp/mesh on ZeroTier, removed at ZeroTier's
+            # retirement, and otlp/mesh-tincr on the tincr mesh, with the same
+            # TLS. A client without an otel-ca certificate fails the handshake
             # (design D3). HTTP only, no gRPC.
             receivers."otlp/mesh".protocols.http = {
               endpoint = "[${flakeLib.hosts.magnetite.zerotier.address}]:4318";
+              tls = {
+                cert_file = "${credentialsDir}/otel-cert";
+                key_file = "${credentialsDir}/otel-key";
+                client_ca_file = config.vanixiets.otelCollector.caFile;
+                min_version = "1.3";
+              };
+            };
+            receivers."otlp/mesh-tincr".protocols.http = {
+              endpoint = "[${flakeLib.hosts.magnetite.address}]:4318";
               tls = {
                 cert_file = "${credentialsDir}/otel-cert";
                 key_file = "${credentialsDir}/otel-key";
@@ -818,6 +829,7 @@ in
                   receivers = [
                     "forward"
                     "otlp/mesh"
+                    "otlp/mesh-tincr"
                   ];
                   processors = [
                     "memory_limiter"
@@ -874,6 +886,7 @@ in
                 receivers = [
                   "forward"
                   "otlp/mesh"
+                  "otlp/mesh-tincr"
                 ];
                 processors = [ "memory_limiter" ];
                 exporters = [ "routing/logs" ];
@@ -944,7 +957,16 @@ in
               { lib, pkgs }:
               let
                 isIngress = roles.ingress.machines ? ${machine.name};
-                sans = lib.optionalString isIngress "IP:${flakeLib.hosts.magnetite.zerotier.address},DNS:magnetite.zt";
+                host = flakeLib.hosts.${machine.name};
+                # The ingress is named on both transports while ZeroTier runs.
+                sans = lib.optionalString isIngress (
+                  lib.concatStringsSep "," [
+                    "IP:${host.zerotier.address}"
+                    "DNS:${machine.name}.zt"
+                    "IP:${host.address}"
+                    "DNS:${host.fqdn}"
+                  ]
+                );
                 usage = if isIngress then "serverAuth,clientAuth" else "clientAuth";
               in
               {
@@ -1122,10 +1144,12 @@ in
                     "regulator-password:${config.clan.core.vars.generators.greptimedb-users.files.regulator-password.path}"
                   ];
                 };
-                # otlp/mesh, on ZeroTier only. magnetite's
+                # otlp/mesh, on the mesh interfaces only. magnetite's
                 # net.ipv6.ip_nonlocal_bind = 1 lets the receiver bind its
-                # address before zerotierone holds it.
-                networking.firewall.interfaces."zt+".allowedTCPPorts = [ 4318 ];
+                # address before the mesh daemon holds it.
+                networking.firewall.interfaces = lib.genAttrs (flakeLib.meshInterfaces config) (_: {
+                  allowedTCPPorts = [ 4318 ];
+                });
               };
           };
       };

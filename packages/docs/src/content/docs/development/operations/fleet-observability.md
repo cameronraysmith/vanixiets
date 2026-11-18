@@ -159,7 +159,7 @@ ssh cinnabar.zt 'sudo cat /var/lib/caddy/.local/share/caddy/pki/authorities/loca
 
 The two fingerprints must match.
 
-On macOS, a darwin host that enables `services.zt-services-trust` installs the certificate into the System keychain at activation.
+On macOS, a darwin host that enables `services.fleet-services-trust` installs the certificate into the System keychain at activation.
 On a Mac without it, install it by hand:
 
 ```sh
@@ -199,7 +199,7 @@ ntfy keeps each topic's messages on disk for a week, so they survive ntfy restar
 caddy's local authority on cinnabar signs `ntfy.zt`'s certificate under a root that is cinnabar's clan vars `caddy-root-ca`.
 Its `root.crt` is public, committed at `vars/per-machine/cinnabar/caddy-root-ca/root.crt/value`, and its `root.key` is secret, deployed to `/run/secrets/vars/per-machine/cinnabar/caddy-root-ca/root.key` with owner `caddy` and mode `0400`.
 caddy loads both through its `pki` global option, set by `modules/nixos/caddy-local-root.nix`, and cinnabar's build-time check `caddy-root-from-vars` fails if caddy's adapted configuration names other files or if the root's fingerprint differs from the one recorded in `modules/machines/nixos/cinnabar/caddy-root-ca.nix`.
-Every client reads the same file: `ntfy-send` carries it in its closure as a store path, and `services.zt-services-trust` installs it into a darwin host's System keychain.
+Every client reads the same file: `ntfy-send` carries it in its closure as a store path, and `services.fleet-services-trust` installs it into a darwin host's System keychain.
 
 ### The import
 
@@ -316,7 +316,7 @@ Every step is the operator's, and each merge lands through a pull request; run e
    Stored leaves are not moved.
    After this deploy, remove `/root/caddy-root-rotation` and `/root/caddy-intermediate-old` on cinnabar.
 
-`services.zt-services-trust` imports the root into a darwin host's System keychain by its common name; whether it imports both certificates of the overlap is checked at the first rotation, and it affects only browsers on darwin, not any `ntfy.zt` client.
+`services.fleet-services-trust` imports the root into a darwin host's System keychain by its common name; whether it imports both certificates of the overlap is checked at the first rotation, and it affects only browsers on darwin, not any `ntfy.zt` client.
 
 ## Reading alerts
 
@@ -680,7 +680,8 @@ After magnetite's deploy, check on each agent that `curl -s http://127.0.0.1:888
 
 ## The ingress and its refusal
 
-magnetite's collector receives the other agents' exports on its receiver `otlp/mesh` at `https://[fddb:4344:343b:14b9:399:930f:39db:40d2]:4318`, its ZeroTier address only, with TCP 4318 open on the `zt+` interfaces only.
+magnetite's collector receives the other agents' exports on two receivers with the same TLS: `otlp/mesh` at `https://[fddb:4344:343b:14b9:399:930f:39db:40d2]:4318`, its ZeroTier address, which the agents use until the mesh flip, and `otlp/mesh-tincr` at `https://[fd09:836d:82f8:3d7d:9f1b:28b8:f589:3944]:4318`, its tincr address, named `magnetite.vanixiets.internal`.
+TCP 4318 is open on the mesh interfaces only, `zt+` and `tinc-vanixiets`.
 It speaks HTTP over TLS 1.3 only and requires a client certificate signed by `otel-ca`.
 Confirm the listener on magnetite:
 
@@ -688,7 +689,7 @@ Confirm the listener on magnetite:
 sudo ss -tlnH | grep ':4318'
 ```
 
-The only line is `[fddb:4344:343b:14b9:399:930f:39db:40d2]:4318`, owned by `otelcol-contrib`.
+The two lines are `[fddb:4344:343b:14b9:399:930f:39db:40d2]:4318` and `[fd09:836d:82f8:3d7d:9f1b:28b8:f589:3944]:4318`, both owned by `otelcol-contrib`.
 A client without a certificate is refused at the TLS handshake.
 Reproduce the refusal from any mesh host, such as stibnite:
 

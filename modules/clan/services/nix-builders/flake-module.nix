@@ -7,7 +7,7 @@
 # an untrusted user cannot receive unsigned paths the caller evaluated itself.
 # `exclude` decides where a dispatcher sends work, not who is authorized.
 #
-# The port is reachable only over ZeroTier. NixOS opens it on the ZeroTier interfaces and binds the
+# The port is reachable only over the mesh. NixOS opens it on the mesh interfaces and binds the
 # wildcard through socket activation. nix-darwin has no per-interface firewall,
 # so darwin builders bind their ZeroTier address and KeepAlive retries until that
 # address exists after boot; launchd has no socket activation, so idleTimeout is
@@ -18,8 +18,10 @@
 # Identities are clan vars: one shared CA whose private key is never deployed,
 # and one certificate per machine with the machine name as CN and both serverAuth
 # and clientAuth, so a builder presents it as server and a dispatcher as client.
-# Builder certificates carry the ZeroTier address as an IP SAN, because
-# dispatchers connect to that literal address rather than through DNS.
+# Builder certificates carry the builder's ZeroTier address and its mesh
+# address from the registry as IP SANs, because dispatchers connect to a
+# literal address rather than through DNS, and name the machine under both
+# `.zt` and the fleet domain.
 #
 # Nix names a per-builder lock file after the whole store URI, which overflows
 # NAME_MAX once the URI spells out store paths, so the URI carries only
@@ -34,7 +36,7 @@
 # work only that builder could take fails with `missing system features`.
 { inputs, config, ... }:
 let
-  inherit (config.flake.lib) zerotierInterfaces;
+  inherit (config.flake.lib) hosts meshInterfaces;
 in
 {
   flake.clan.modules.nix-builders =
@@ -96,10 +98,14 @@ in
               ) instance.roles.builder.machines.${machine.name}.settings.address
             ) (lib.attrValues instances)
           );
+          host = hosts.${machine.name};
           subjectAltNames = [
             "DNS:${machine.name}.zt"
+            "DNS:${host.fqdn}"
           ]
-          ++ map (address: "IP:${address}") builderAddresses;
+          ++ map (address: "IP:${address}") (
+            builderAddresses ++ lib.optional (builderAddresses != [ ]) host.address
+          );
         in
         {
           clan.core.vars.generators = {
@@ -207,7 +213,7 @@ in
           address = lib.mkOption {
             type = lib.types.str;
             description = ''
-              Deterministic ZeroTier IPv6, matching modules/system/ssh-known-hosts.nix.
+              The builder's ZeroTier IPv6, read from the registry (flake.lib.hosts).
               Dispatchers connect to it directly and the builder's certificate names it.
             '';
           };
@@ -356,10 +362,12 @@ in
                   inputs.nix-grpc-store.nixosModules.server
                   (mkBuilderModule { inherit roles machine; })
                 ];
-                # Socket activation binds the wildcard at boot, before ZeroTier
+                # Socket activation binds the wildcard at boot, before the mesh
                 # is up; the firewall keeps the port off every other interface.
                 services.nix-grpc-daemon.listen = "[::]:${toString port}";
-                networking.firewall.interfaces.${zerotierInterfaces config}.allowedTCPPorts = [ port ];
+                networking.firewall.interfaces = lib.genAttrs (meshInterfaces config) (_: {
+                  allowedTCPPorts = [ port ];
+                });
               };
 
             darwinModule =

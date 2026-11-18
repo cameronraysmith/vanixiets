@@ -1,13 +1,16 @@
-# Who builds for whom. Addresses are the deterministic ZeroTier IPv6s pinned
-# in modules/system/ssh-known-hosts.nix; dispatchers connect to them directly
-# over grpc:// and each builder's certificate names its own.
+# Who builds for whom. Addresses are the builders' ZeroTier IPv6s, read from
+# the registry (flake.lib.hosts); dispatchers connect to them directly over
+# grpc:// and each builder's certificate names its own.
 #
 # nixbot on magnetite evaluates and builds checks.aarch64-darwin as
 # best-effort: every darwin check carries ignoreFailure
 # (modules/checks/nixbot-best-effort-darwin.nix), so a darwin builder that is
 # asleep or unreachable leaves a notice on the build instead of failing it.
 # buildbot builds x86_64-linux only.
+{ config, ... }:
 let
+  inherit (config.flake.lib) hosts;
+
   # Laptops in interactive use: a minority share of the machine, run at
   # Background QoS so the owner's foreground work keeps the CPU and I/O.
   # Their nix-grpc-daemon account takes the upstream darwin default uid and
@@ -41,7 +44,7 @@ in
           "uid-range"
           "recursive-nix"
         ];
-        address = "fddb:4344:343b:14b9:399:930f:39db:40d2";
+        address = hosts.magnetite.zerotier.address;
       };
 
       # MacBookPro14,1: two cores, four threads, in interactive use, so one job
@@ -56,7 +59,7 @@ in
           "kvm"
           "nixos-test"
         ];
-        address = "fddb:4344:343b:14b9:399:937e:8067:8028";
+        address = hosts.pyrite.zerotier.address;
       };
 
       # 18 logical cores, 64 GiB. Most dispatched darwin work is tiny
@@ -72,7 +75,7 @@ in
           "apple-virt"
           "big-parallel"
         ];
-        address = "fddb:4344:343b:14b9:399:9324:19d9:3451";
+        address = hosts.stibnite.zerotier.address;
       };
 
       # No hardware notes in their machine files, so the default share of 2
@@ -80,12 +83,12 @@ in
       rosegold.settings = darwinLaptop // {
         maxJobs = 2;
         supportedFeatures = [ "big-parallel" ];
-        address = "fddb:4344:343b:14b9:399:9315:3431:ee8";
+        address = hosts.rosegold.zerotier.address;
       };
       argentum.settings = darwinLaptop // {
         maxJobs = 2;
         supportedFeatures = [ "big-parallel" ];
-        address = "fddb:4344:343b:14b9:399:93f7:54d5:ad7e";
+        address = hosts.argentum.zerotier.address;
       };
     };
 
