@@ -81,6 +81,7 @@ nix build .#vmTests.x86_64-linux.fleet-ingress                # Magnetite, uid-r
 nix build .#vmTests.x86_64-linux.perses-greptimedb            # Magnetite, uid-range
 nix build .#vmTests.x86_64-linux.caddy-root-from-vars         # Magnetite, uid-range
 nix build .#vmTests.x86_64-linux.greptimedb-oom-order         # Pyrite, kvm
+nix build .#vmTests.x86_64-linux.tincr-mesh                   # Pyrite, kvm
 ```
 
 `omnigent-worker-isolation` establishes the runtime wiring of the Omnigent worker guards that no evaluation-time check can reach: that the private-home precondition is `ExecStartPre` on the real `omnigent-host-<owner>.service` and that violating the home's privacy at runtime prevents `ExecStart`, that the Nix daemon resolves a worker as untrusted, that two workers have separate accounts and mutually unreadable private homes, and that the unit's `User`, `UMask`, `NoNewPrivileges` and SSH-agent unsetting hold in the spawned process.

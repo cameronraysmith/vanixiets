@@ -1,43 +1,25 @@
 # vmTests.x86_64-linux.tincr-mesh: the clan service `tincr` on QEMU nodes named
 # after fleet members, so their addresses and names are the registry's.
-# cinnabar is public (vlan 1) and answers the zone; pyrite and electrum sit
-# behind separate MASQUERADE gateways (vlans 2 and 3) on the pattern of tincr's
-# nix/nixos-test-nat.nix, knowing only cinnabar's endpoint. mallory, on vlan 1,
-# runs tincr with a key no host file declares and claims pyrite's address;
-# electrum's own host file additionally claims magnetite's address, a subnet
-# no peer's copy of electrum's host file grants.
+# cinnabar is public (vlan 1) and answers the zone through the fleet's own
+# resolver module, flake.modules.nixos."mesh-dns/cinnabar"; pyrite and electrum
+# sit behind separate MASQUERADE gateways (vlans 2 and 3) on the pattern of
+# tincr's nix/nixos-test-nat.nix, knowing only cinnabar's endpoint. mallory, on
+# vlan 1, runs tincr with a key no host file declares and claims pyrite's
+# address; electrum's own host file additionally claims magnetite's address, a
+# subnet no peer's copy of electrum's host file grants.
 #
 # The clan test harness generates every machine's tincr-vanixiets var with the
 # service's generator, so the connections prove tincr loads the keys that
 # generator writes.
 #
-# Non-gating, like every vmTest. magnetite has no /dev/kvm, so kvm is not
-# required and QEMU falls back to TCG there.
+# Non-gating, like every vmTest; it requires kvm, so it builds on pyrite.
 { inputs, config, ... }:
 let
-  inherit (config.flake.lib) mesh hosts meshRecords;
+  inherit (config.flake.lib) mesh hosts;
   net = mesh.instance;
-  meshInterface = mesh.interface.nixos;
   nixosLib = import (inputs.nixpkgs + "/nixos/lib") { };
   snakeoil = import (inputs.tincr + "/nix/snakeoil-keys.nix");
   forgedSubnet = hosts.magnetite.address;
-
-  # The zone rendered from flake.lib.meshRecords on cinnabar's mesh address.
-  # The registry consumers' resolver module replaces this block when the
-  # stack is assembled.
-  resolver = {
-    services.dnsmasq = {
-      enable = true;
-      resolveLocalQueries = false;
-      settings = {
-        bind-dynamic = true;
-        listen-address = [ hosts.cinnabar.address ];
-        no-resolv = true;
-        address = map (record: "/${record.name}/${record.address}") meshRecords;
-      };
-    };
-    networking.firewall.interfaces.${meshInterface}.allowedUDPPorts = [ 53 ];
-  };
 
   gateway = lanVlan: {
     virtualisation.vlans = [
@@ -90,7 +72,11 @@ in
           hostPkgs = pkgs;
           defaults._module.args.clan-core = inputs.clan-core;
           name = "tincr-mesh";
-          requiredFeatures.kvm = false;
+          requiredFeatures = {
+            kvm = true;
+            nixos-test = true;
+          };
+          qemu.forceAccel = true;
           # The harness adds clan-core's nixosTestLib, built against clan-core's
           # own nixpkgs, whose Python differs from this flake's; the script
           # uses none of it.
@@ -129,7 +115,7 @@ in
 
           nodes = {
             cinnabar = {
-              imports = [ resolver ];
+              imports = [ config.flake.modules.nixos."mesh-dns/cinnabar" ];
               virtualisation.vlans = [ 1 ];
             };
             natpyrite = gateway 2;

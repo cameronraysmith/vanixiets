@@ -16,7 +16,9 @@ A first-party `tincr` clan service, written with Qubasa/infra's as reference onl
 - Repository `$REPO` is jj-colocated with a development join; `@` never moves; each task group is its own change off `main@origin` (group 1) or off group 1's change (groups 2–8), routed with `jj squash --into <change> --use-destination-message --keep-emptied <paths>`; after creating or renaming files run `jj st --no-pager >/dev/null` before any `nix` command.
 - Parallel subagents each own the files listed under "File ownership" and nothing else; a needed edit outside one's files goes to the orchestrator.
 - clan vars commands run in the join's working copy with `CLAN_NO_COMMIT=1`, which makes clan register the files it writes as intent-to-add instead of committing them; each names its generators, its files are routed into the owning change with `jj squash --into <change> --use-destination-message --keep-emptied <paths>`, and `git rev-parse HEAD` is recorded before and confirmed unchanged after.
-- Deploys are run by the orchestrator only, after `nixbot-logs queue` prints `Queue is empty`, from the merged commit on `main`: NixOS `clan machines update <machine> --flake "git+file://$PWD?rev=<main commit>" 2>&1 | tee logs/<machine>-$(date +%Y%m%d-%H%M%S).log`; darwin `just activate` on the host with the operator present.
+- Deploys never run from the development join: clan regenerates vars into the working copy it runs in whenever that tree holds newer generator inputs than the deployed vars, which happened from the join twice on 2026-11-18.
+  NixOS deploys are run by the orchestrator only, after `nixbot-logs queue` prints `Queue is empty`, from a throwaway `git clone --shared` of `main` at the merged commit: `git clone --shared "$REPO" /tmp/vanixiets-deploy-<sha> && git -C /tmp/vanixiets-deploy-<sha> checkout --detach <sha>`, then `CLAN_NO_COMMIT=1 clan machines update <machine> --flake /tmp/vanixiets-deploy-<sha> 2>&1 | tee logs/<machine>-$(date +%Y%m%d-%H%M%S).log`; the clone is deleted afterwards.
+  Darwin activations need no clone: at the Mac with the operator present, or over ssh by the orchestrator, `nix run --accept-flake-config 'github:cameronraysmith/vanixiets/<main sha>#darwin' -- <host> 'github:cameronraysmith/vanixiets/<main sha>'`, whose second argument is the flake reference; the darwin app runs no clan generators and reads vars from that pinned flake, so it also serves Macs with no checkout (argentum, rosegold, blackphos).
 - Behaviour-neutral refactors (1.2, 2.1, 2.2 for the ZeroTier key) are verified by toplevel drvPath identity: `nix eval --raw .#nixosConfigurations.<m>.config.system.build.toplevel.drvPath` (and `darwinConfigurations.<m>.system.drvPath`) before and after, equal for every machine whose behaviour must not change.
 - Every regulator is written first and seen failing; each mutant runs only the case it must fail.
 - Evaluation cost per check as `tasks.md` states; machine checks' cost recorded before and after, rises put to the operator.
@@ -92,7 +94,7 @@ R and C both touch the files holding `magnetite.zt` consumers: C changes only th
 
 ## Task 3: tincr clan service (tasks.md 3.1–3.7)
 
-- [ ] **Step 1 (3.1):** Write `modules/clan/services/tincr/README.md` first with its provenance: written first-party, Qubasa/infra `a00b9b1` `services/tincr/default.nix` read as a design reference only, none of its code copied (no licence file); the operator asks Qubasa for a grant in parallel and the README records the request and any answer. The service is written from tincr's `nix/module.nix` and `nix/darwin-module.nix` options and clan-core's `clanServices/wireguard` service shape, not from Qubasa's text.
+- [ ] **Step 1 (3.1):** Write `modules/clan/services/tincr/README.md` first with its provenance: written first-party, Qubasa/infra `a00b9b1` `services/tincr/default.nix` read as a design reference only, none of its code copied (no licence file); no licence is asked for, because the service copies nothing from that repository (operator decision 2026-11-18), and the README records that. The service is written from tincr's `nix/module.nix` and `nix/darwin-module.nix` options and clan-core's `clanServices/wireguard` service shape, not from Qubasa's text.
 - [ ] **Step 2 (3.2):** Add the input; `nix flake lock --update-input tincr`; read `nix flake metadata --json` for the rev.
 - [ ] **Step 3 (3.3):** Write `modules/vm-tests/tincr-mesh.nix` reading tincr's `nix/nixos-test-nat.nix` for the NAT topology; run `nix build .#vmTests.x86_64-linux.tincr-mesh` on magnetite; expected: evaluation failure for the missing service.
 - [ ] **Step 4 (3.4):** Write the service: `default.nix` (manifest, `exports`, `roles.peer` interface and `perInstance` with `nixosModule` and `darwinModule`, `perMachine` importing `inputs.tincr.nixosModules.tincr` / `darwinModules.tincr`), the README with the trust boundary of `fleet-mesh-interface`; build the VM test; expected: pass. Overrides `addressCollision` (two peers forced to one address) and `pqWithDevice` evaluated; expected: assertion failures naming them.
@@ -103,8 +105,8 @@ R and C both touch the files holding `magnetite.zt` consumers: C changes only th
 ## Task 4: Android (tasks.md 4.1–4.3)
 
 - [ ] **Step 1 (4.1):** Operator reads pixel11's tincapp version; record.
-- [ ] **Step 2 (4.2):** A `runCommand` package per phone writing `network.conf` and `tinc.conf` from `hosts.<phone>` and `mesh.resolvers`; `nix build` and `cat` both files.
-- [ ] **Step 3 (4.3):** At wave 3, operator runs `tinc -n vanixiets invite pixel11` on cinnabar, joins in tincapp, reads the phone's public key from `/var/lib/tincr/vanixiets/hosts/pixel11` on cinnabar into `devices`; deploy all peers (D12); check `tinc dump reachable nodes`. pixel7 (4.4) follows the same steps only if the operator has it at hand.
+- [ ] **Step 2 (4.2):** A `runCommand` package per phone writing `network.conf` and `tinc.conf` from `hosts.<phone>` and `mesh.resolvers`, and `hosts/` with every other member's host file from `flake.lib.meshHostFiles` (never the phone's own); `nix build` and `cat` the files.
+- [ ] **Step 3 (4.3):** At wave 3, operator runs `tinc -n vanixiets invite pixel11` on cinnabar, joins in tincapp, copies the package's `hosts/` into tincapp's network directory (an invitation carries only cinnabar's host file), and reads the phone's public key from `/var/lib/tincr/vanixiets/hosts/pixel11` on cinnabar into `devices`; cinnabar's `invitation-accepted` hook has written the phone's `Subnet` into that runtime copy, so cinnabar routes the phone before the deploy; deploy all peers (D12) as "Global constraints" states; check `tinc dump reachable nodes`. After any later member change, copy `hosts/` to the phone again. pixel7 (4.4) follows the same steps only if the operator has it at hand.
 
 ## Task 5: CAM-81 rewrite (tasks.md 5.1–5.2)
 
@@ -114,11 +116,11 @@ R and C both touch the files holding `magnetite.zt` consumers: C changes only th
 ## Task 6: Matrix (tasks.md 6.1–6.2)
 
 - [ ] **Step 1 (6.1):** In `matrix.nix` set the new `server_name`; add a `systemd.services.tuwunel.preStart` guard that moves `/var/lib/tuwunel` aside once when a marker file names the old server; `nix eval` the setting.
-- [ ] **Step 2 (6.2):** Operator re-registers, creates the room, invites hermes; edit `hermes-agent.nix` and `openclaw.nix`; deploy cinnabar; read the cron post.
+- [ ] **Step 2 (6.2):** Operator re-registers, creates the room, invites hermes; edit `hermes-agent.nix` and `openclaw.nix`; deploy cinnabar as "Global constraints" states; read the cron post.
 
 ## Task 7: Break-glass (tasks.md 7.1–7.3)
 
-- [ ] **Step 1 (7.1):** Endpoints already in the registry from 1.2; at wave 3 run the public-address deploy for cinnabar and magnetite.
+- [ ] **Step 1 (7.1):** Endpoints already in the registry from 1.2; at wave 3 run the public-address deploy for cinnabar and magnetite: `CLAN_NO_COMMIT=1 clan machines update <host> --target-host root@<public> --flake /tmp/vanixiets-deploy-<sha>` from the throwaway clone of "Global constraints".
 - [ ] **Step 2 (7.2):** In wave 1, add `modules/clan/inventory/services/p2p-ssh-iroh.nix` (server pyrite, client stibnite); at wave 3, with pyrite behind an address-translating router, run `systemctl stop tincr-vanixiets` on pyrite, then `clan ssh pyrite` over iroh, then start tincr again; if that fails, remove the instance and put an alternative to the operator.
 - [ ] **Step 3 (7.3):** Write the Mac recovery steps in the operations docs.
 

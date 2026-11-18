@@ -55,22 +55,15 @@ This service, the capability `fleet-mesh-interface`, guarantees less than a read
 
 ## Negative controls
 
-`vanixiets.tincr.addresses`, `vanixiets.tincr.devices` and `vanixiets.tincr.crypto` are internal options holding what the host files are rendered from, so evaluation overrides reach the assertions through the same values.
-`addressCollision` forces two peers onto one address and `pqWithDevice` sets `crypto = "pq"` with a device declared; each fails evaluation with the assertion naming them (`openspec/changes/migrate-mesh-to-tincr/tasks.md` 3.4).
-`vmTests.x86_64-linux.tincr-mesh` runs the service on QEMU nodes named after members, with two behind separate NAT gateways, and observes connections with generated keys, a direct UDP path between the NATed members, the zone, both `StrictSubnets` refusals and the invitation hook; it needs no kvm and falls back to TCG on magnetite.
+`vanixiets.tincr.addresses`, `vanixiets.tincr.publicKeys`, `vanixiets.tincr.devices` and `vanixiets.tincr.crypto` are internal options holding what the host files are rendered from, so evaluation overrides reach the assertions and the rendering through the same values.
+`addressCollision` forces two peers onto one address and `keyCollision` gives two peers one public key; each fails evaluation with the assertion naming them; `crypto = "pq"` with a device declared leaves the device's host file without `SPTPSCipher` and `SPTPSKex` (`openspec/changes/migrate-mesh-to-tincr/tasks.md` 3.4).
+`vmTests.x86_64-linux.tincr-mesh` runs the service on QEMU nodes named after members, with two behind separate NAT gateways and cinnabar answering the zone through the fleet's resolver module `flake.modules.nixos."mesh-dns/cinnabar"`, and observes connections with generated keys, a direct UDP path between the NATed members, the zone, an undeclared key refused at authentication, a declared node's undeclared subnet routed by no peer, the invitation hooks, and a device joining by invitation that cinnabar then routes; it requires kvm, so it builds on pyrite.
 
 ## Provenance
 
 This service is first-party code written for this repository from tincr's `nix/module.nix` and `nix/darwin-module.nix` at the locked revision and from the shape of clan-core's `clanServices/wireguard` at clan-core `d718bcf9`.
 Qubasa/infra `services/tincr/default.nix` at `a00b9b1` (2026-09-24) was read as a design reference only, for the ideas of hash-derived ULA addressing, a key generator, a host database from every peer's public key, `StrictSubnets` and invitation hooks; none of its code is copied, because the repository carries no licence file and is therefore all rights reserved.
+No licence was asked for (operator decision 2026-11-18): the service is first-party and copies nothing from Qubasa/infra, so it needs no licence from that repository; Qubasa/infra `services/tincr` (read at `a00b9b1`) stays credited as a design reference.
 
 tincr is pinned at `fd92f2164f8f4e2927d6c983a116bf41ac2337d5` (committed 2026-11-17, reviewed 2026-11-17); upgrades are deliberate `flake.lock` bumps.
 tincr declares GPL-2.0-or-later in `Cargo.toml` and has no root licence file.
-
-### Licence request to Qubasa
-
-The operator asks Qubasa for a licence grant in parallel; a grant would permit later reuse of that code and does not change this service.
-The request and any answer are recorded here with their dates.
-
-- Request: not yet sent (drafted 2026-11-18).
-- Answer: none.

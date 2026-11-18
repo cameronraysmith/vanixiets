@@ -11,6 +11,9 @@
 # shared settings are defaults that such a host's own definitions override.
 # bind-dynamic lets dnsmasq bind the mesh address once the tincr interface
 # carries it.
+#
+# Each resolver's module is also exported as flake.modules.nixos."mesh-dns/<name>",
+# which vmTests.x86_64-linux.tincr-mesh imports on its cinnabar node.
 { config, lib, ... }:
 let
   inherit (config.flake.lib)
@@ -48,6 +51,11 @@ let
 in
 {
   flake.modules.nixos = lib.listToAttrs (
-    map (name: lib.nameValuePair "machines/nixos/${name}" (resolverModule name)) mesh.resolvers
+    lib.concatMap (name: [
+      (lib.nameValuePair "mesh-dns/${name}" (resolverModule name))
+      (lib.nameValuePair "machines/nixos/${name}" {
+        imports = [ config.flake.modules.nixos."mesh-dns/${name}" ];
+      })
+    ]) mesh.resolvers
   );
 }

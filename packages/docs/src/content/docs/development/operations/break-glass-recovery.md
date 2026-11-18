@@ -10,8 +10,10 @@ Every host the operator administers remotely has one recovery path that does not
 |---|---|---|
 | VPS with a public address | cinnabar, magnetite (and galena, scheelite when provisioned) | SSH on the public address, the provider console, clan `emergency-access` for boot failures |
 | NixOS behind an address-translating router | pyrite | SSH over iroh from stibnite (see "pyrite over iroh") |
-| darwin laptops of other people | blackphos, argentum, rosegold | the person at the machine boots the previous nix-darwin generation (see "Macs: the person at the machine") |
+| darwin laptops of other people | argentum, rosegold | the person at the machine boots the previous nix-darwin generation (see "Macs: the person at the machine") |
 | darwin, the operator's own | stibnite | the operator at the machine, with the same steps |
+
+blackphos is a reserved name in the nix-darwin laptop class with no machine and no person behind it, so it has no recovery path until a machine takes the name.
 
 ## VPSes over their public address
 
@@ -86,11 +88,6 @@ The nix-darwin administrator account is named per Mac below; if the person's own
 
 4. Restart the Mac (Apple menu, Restart).
 5. Report to the operator: the Mac's name, the generation numbers from step 2, and whether the Mac works again (internet, and the operator can reach it).
-
-### blackphos
-
-The person at the machine is raquel; the nix-darwin administrator account is `crs58`.
-Follow the steps above to boot the previous generation of blackphos, then report.
 
 ### argentum
 

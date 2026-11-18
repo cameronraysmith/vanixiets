@@ -27,7 +27,7 @@ It ships `nixosModules.tincr` and `darwinModules.tincr` (aarch64-darwin only), r
 Qubasa/infra's `services/tincr` (local clone `a00b9b1`, 2026-09-24; the GitHub repository returns 404) is a modern `clan.service` for it with hash-derived ULA addressing, a key generator, a host database from every peer's public key, `StrictSubnets`, and invitation hooks for non-clan devices; it has no darwin module, no `exports`, and hard-coded post-quantum crypto lines.
 tincapp (`org.pacien.tincapp`, a C tinc 1.1 client) joins a tincr mesh provided every link it touches keeps tincr's default cipher and key exchange (F22); its Google Play build is installed on pixel11 (operator, 2026-11-17), which is the Android test device; pixel7 is mostly retired.
 
-Stakeholders: the operator (crs58), who administers every host; raquel and janettesmith, the primary users of blackphos and rosegold, whose laptops the operator administers remotely over the mesh; the agents that deploy and read the fleet.
+Stakeholders: the operator (crs58), who administers every host; christophersmith and janettesmith, the primary users of argentum and rosegold, whose laptops the operator administers remotely over the mesh; the agents that deploy and read the fleet.
 
 ## Goals / Non-Goals
 
@@ -144,7 +144,7 @@ Each group is one stacked pull request on top of C, except A and B, whose work i
 |---|---|---|---|
 | VPS with a public address | cinnabar, magnetite (Hetzner); galena, scheelite (GCP, when provisioned); electrum (disabled in terranix) | SSH on the public address (CAM-81's rollback already uses `root@magnetite.scientistexperience.net`), the provider console, and clan `emergency-access` for boot failures | record each host's public endpoint in `endpoints`; prove `clan machines update <host> --target-host root@<public>` once per VPS before Z |
 | NixOS behind NAT | pyrite | none today besides ZeroTier, which Z removes | pyrite needs unattended remote recovery, because it runs VM tests and remote builds (operator, 2026-11-17); `p2p-ssh-iroh` (NixOS-only, its own QUIC hole punching and relays, a separate failure domain from tincr) is the leading candidate, chosen at B from evidence that it reaches pyrite with tincr stopped, as clan instance `iroh` with pyrite its only server; the service has no client role, the `clan` CLI on stibnite is the client; because pyrite's inventory target wins over network selection and `clan ssh` has no network option (clan-core `d718bcf9`), it is used only through `clan ssh pyrite --ssh-option ProxyCommand "<dumbpipe> connect <ticket>"` and `--target-host "ssh://root@pyrite?ProxyCommand=<dumbpipe> connect <ticket>"` |
-| darwin laptops | stibnite, blackphos, argentum, rosegold | the person at the machine boots the previous nix-darwin generation with an administrator password; iroh has no darwin module | document the person-at-the-machine steps (runbook `break-glass-recovery.md`) for blackphos (raquel; admin account `crs58`), argentum (christophersmith; admin `cameron`), rosegold (janettesmith; admin `cameron`) and stibnite (the operator, `crs58`); no new transport |
+| darwin laptops | stibnite, argentum, rosegold | the person at the machine boots the previous nix-darwin generation with an administrator password; iroh has no darwin module | document the person-at-the-machine steps (runbook `break-glass-recovery.md`) for argentum (christophersmith; admin `cameron`), rosegold (janettesmith; admin `cameron`) and stibnite (the operator, `crs58`); no new transport; blackphos is a reserved name with no machine and no person, so it is not covered (operator, 2026-11-18) |
 | Android | pixel11; pixel7 best-effort | not administered over the mesh | none |
 
 - **Rationale**: two paths are worth their cost only where losing the one path leaves a host unreachable when it matters; for the VPSes a second path already exists, for the Macs the only remote-independent path is a person, and pyrite, which runs VM tests and remote builds unattended, is the one host that needs a new one.
@@ -170,8 +170,8 @@ Each group is one stacked pull request on top of C, except A and B, whose work i
   Priority 1100 places tincr above wireguard (1000) and ZeroTier (900) and below `internet` (2000) and iroh (3000) in clan's network list.
 - **Alternatives considered**: vpn-bench's `clanModules/tincr`, rejected as benchmark-shaped (a `bootstrap` role, `Slice = benchmark.slice`, upstream `services.tinc` with tincr as the package, no darwin); mulatta/dots' naru modules, rejected because their host database lives in an external flake and keys are prompted; waiting for a clan-core tincr service, rejected because there is no sign of one.
 - **Boundary**: vendored-versus-first-party: the service is first-party code and is not tracked against Qubasa's clone; tincr stays a third-party input whose upgrades are flake-lock bumps.
-  Qubasa/infra carries no licence file, so its code is all rights reserved and is not copied (operator, 2026-11-17); Qubasa is asked in parallel for a grant (task 3.1), which would only permit later reuse, not change this design.
-  Source-versus-delivered: the darwin module's launchd daemon and `/etc/resolver` file are delivered by activation, so they are verified on the host after `just activate`, not by reading source.
+  Qubasa/infra carries no licence file, so its code is all rights reserved and is not copied (operator, 2026-11-17); no licence is asked for, because the service is first-party and copies nothing from it, and it stays credited as a design reference (operator decision 2026-11-18, task 3.1).
+  Source-versus-delivered: the darwin module's launchd daemon and `/etc/resolver` file are delivered by activation, so they are verified on the host after activation, not by reading source.
 
 ### D7: Hash-derived IPv6 ULA addressing, IPv6 only
 
@@ -180,9 +180,9 @@ Each group is one stacked pull request on top of C, except A and B, whose work i
   The only IPv4 consumers of ZeroTier's `10.147.17.0/24` are cinnabar's caddy and dnsmasq listen lists (which also listen on IPv6), the disabled openclaw, one check fixture and a comment, so IPv4 brings nothing to carry over.
 - **Alternatives considered**: addresses generated as vars, rejected because every consumer would then read vars files at evaluation, as `otel-collector-config` and `otel-collector-darwin` do today with `vars/shared/zerotier-ip-magnetite-zerotier`; an IPv4 subnet beside the ULA, rejected for want of a consumer.
 
-### D8: darwin through tincr's darwin module on all four Macs
+### D8: darwin through tincr's darwin module on every Mac
 
-- **Choice**: the service's `darwinModule` configures `services.tincr.networks.vanixiets` (launchd daemon `org.tincr.vanixiets`, `utun10`, addresses through tincr's `tinc-up`) on stibnite, blackphos, argentum and rosegold, and writes `/etc/resolver/vanixiets.internal` naming both resolvers.
+- **Choice**: the service's `darwinModule` configures `services.tincr.networks.vanixiets` (launchd daemon `org.tincr.vanixiets`, `utun10`, addresses through tincr's `tinc-up`) on stibnite, argentum and rosegold (blackphos is a reserved name with no machine and joins when a machine takes it), and writes `/etc/resolver/vanixiets.internal` naming both resolvers.
 - **Rationale**: tincr's darwin module supports aarch64-darwin only; all four Macs are aarch64-darwin (`nixpkgs.hostPlatform = "aarch64-darwin"` in each machine module and in `flake.lib.machineSystems`, read 2026-11-17).
   It also removes the hand-installed cask and hand admission, so the Macs join from the inventory like the NixOS hosts.
 - **Alternatives considered**: tincr through Homebrew or by hand, rejected as a repeat of today's out-of-band ZeroTier install; wireguard for the Macs, rejected because it is hub-and-spoke and unnecessary once tincr's darwin module covers them (F22).
@@ -249,7 +249,7 @@ Each group is one stacked pull request on top of C, except A and B, whose work i
 
 - **Choice**:
   - `flake.lib.mesh` gets a nix-unit test beside it: the prefix for `vanixiets`, two known host addresses, the address of a phone computed by the invitation hook's shell formula equal to the Nix function's, and uniqueness over the registry.
-  - The tincr service gets a clan VM test (three nodes: one public, two behind separate NATs on the pattern of tincr's `nix/nixos-test-nat.nix`) asserting a direct UDP link between the two NATed nodes, resolution of a member and a service name through the generated zone, and `StrictSubnets` refusing a subnet from an undeclared key.
+  - The tincr service gets a clan VM test (one public node, two behind separate NATs on the pattern of tincr's `nix/nixos-test-nat.nix`, an undeclared node and a device) asserting a direct UDP link between the two NATed nodes, resolution of a member and a service name through the generated zone, an undeclared key refused at authentication, `StrictSubnets` ignoring a declared node's undeclared subnet (the forged-subnet case, its witness), and a device joining by invitation that cinnabar then routes.
   - Registry-to-consumer relations that are pure generation are not re-checked (a check restating the generator is vacuous); the existing machine checks (`nixos-<host>`, `darwin-stibnite`) evaluate the consumers.
   - Retired at Z: `zerotier-mss-clamp`, `zerotier-mss-clamp-runtime` and its `-nftables` variant, `zerotierone-controller`.
   - Renamed or re-pointed: `ssh-identity`, `ntfy-tls-verification`, `obs-query`, `otel-collector-config`, `otel-collector-darwin`, `nix-builders-wiring`, `fleet-ingress`, `caddy-root-from-vars`, `devloop-ingest`.
@@ -272,11 +272,11 @@ Each group is one stacked pull request on top of C, except A and B, whose work i
 - [Risk] TCP simultaneous-open punching fails behind port-translating NAT ("known v1 limitation") → Mitigation: UDP hole punching through observed addresses and relay through a peer remain; V observes what pyrite and a Mac behind real NAT actually get (`tinc -n vanixiets info <node>` reporting direct UDP versus "indirectly via").
 - [Risk] Relay through a peer puts a third host on the path for members that cannot punch → Mitigation: the VPSes are the dialable peers; relayed traffic stays end-to-end encrypted by SPTPS between the two endpoints.
 - [Risk] Unsigned gossip lets an admitted node reroute traffic → Mitigation: `StrictSubnets` on every node (D12); membership is the operator's inventory.
-- [Risk] Qubasa/infra has no licence file → Mitigation: the service is written first-party with Qubasa's as reference only; Qubasa is asked for a grant in parallel.
+- [Risk] Qubasa/infra has no licence file → Mitigation: the service is written first-party with Qubasa's as reference only, so it needs no licence from that repository.
 - [Risk] tincapp is a C tinc client pinned to the defaults, and a phone outside the inventory → Mitigation: D9 keeps the defaults; the device's key is declared in `devices`, so `StrictSubnets` accepts nothing else under its name.
 - [Risk] Two resolvers double the zone's moving parts → Mitigation: both render from the same `flake.lib.meshRecords`, so they cannot disagree on content.
 - [Risk] Every peer must redeploy to admit a new member (D12) → accepted; the fleet is twelve members.
-- [Risk] Darwin hosts of other people (blackphos, rosegold) lose remote administration if tincr fails there after Z → Mitigation: V requires a deploy over tincr to at least one of them before X; their recovery path is the person at the machine (D4).
+- [Risk] Darwin hosts of other people (argentum, rosegold) lose remote administration if tincr fails there after Z → Mitigation: V requires a deploy over tincr to at least one of them before X; their recovery path is the person at the machine (D4).
 - [Trade-off] Two certificate reissues (mirror and retirement) → accepted for a clean end state without ZeroTier SANs.
 - [Trade-off] Running two meshes until Z costs ports, daemons and one more interface on every host → accepted as the price of a reversible path.
 - [Trade-off] CAM-81 changes shape mid-flight (D5) → accepted to avoid building seven fields this change must undo.
@@ -285,7 +285,7 @@ Each group is one stacked pull request on top of C, except A and B, whose work i
 
 Deployment waves (each host's behaviour changes only when it deploys; shared registry edits take effect host by host):
 
-1. **Mirror (after C, R, T, S, A, M, B land)**: deploy cinnabar and magnetite first (dialable endpoints and resolvers), then pyrite, then the four Macs with `just activate` or `clan machines update` under the operator, then enrol the test phone.
+1. **Mirror (after C, R, T, S, A, M, B land)**: deploy cinnabar and magnetite first (dialable endpoints and resolvers), then pyrite, then activate the four Macs under the operator, each from the merged commit on `main` and never from the development join (`plan.md` "Global constraints"), then enrol the test phone.
    ZeroTier keeps carrying every default: `.zt` names, deploy targets and agent endpoints are unchanged.
    Rollback: remove the `tincr` instance and redeploy; nothing depends on it yet.
 2. **Mirror acceptance (V)**: the matrix in tasks.md group 9, from each host class over tincr with the ZeroTier interface excluded from the route, recorded in `cutover.md`.
@@ -351,7 +351,7 @@ No row carries an `est-property`, `est-contract`, or `est-symbolic` modality, so
 
 Resolved by the operator on 2026-11-17:
 
-1. **Qubasa/infra's licence.** No licence file means all rights reserved: the service is written first-party with Qubasa's as reference only, and Qubasa is asked for a grant in parallel (task 3.1).
+1. **Qubasa/infra's licence.** No licence file means all rights reserved: the service is written first-party with Qubasa's as reference only and needs no licence from that repository, so none is asked for (operator decision 2026-11-18, task 3.1).
 2. **CAM-81 sequencing.** CAM-81 holds its Task 2 until C lands; K then rewrites it (its tasks 1.1–1.3 are done, 2.x not started).
 3. **pyrite's recovery path.** pyrite needs unattended recovery, because it runs VM tests and remote builds; B leans to `p2p-ssh-iroh` for pyrite and decides from evidence.
 4. **Which phone has tincapp.** pixel11, the test device and the only phone in the cutover verification; pixel7 enrols best-effort and gates nothing.
