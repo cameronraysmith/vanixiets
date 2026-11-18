@@ -7,7 +7,7 @@
   "spec": {
     "display": {
       "name": "Dev loop",
-      "description": "Queue wait, batch formation to landing, attribute outcomes and deploys from the devloop database."
+      "description": "Queue wait, batch formation to landing, attribute outcomes, deploys and nixbot evaluations from the devloop database, beside the evaluation host's memory budget."
     },
     "duration": "7d",
     "variables": [],
@@ -201,6 +201,221 @@
             }
           ]
         }
+      },
+      "evaluation-memory": {
+        "kind": "Panel",
+        "spec": {
+          "display": {
+            "name": "nixbot evaluation memory",
+            "description": "Each evaluation's memory peak by evaluator, against its memory ceiling and nixbot's 20 GiB throttle level (devloop.eval_run)."
+          },
+          "plugin": {
+            "kind": "TimeSeriesChart",
+            "spec": {
+              "yAxis": {
+                "format": {
+                  "unit": "bytes"
+                }
+              },
+              "legend": {
+                "position": "bottom",
+                "mode": "list"
+              }
+            }
+          },
+          "queries": [
+            {
+              "kind": "TimeSeriesQuery",
+              "spec": {
+                "plugin": {
+                  "kind": "GreptimeDBTimeSeriesQuery",
+                  "spec": {
+                    "datasource": {
+                      "kind": "GreptimeDBDatasource",
+                      "name": "greptimedb-sql"
+                    },
+                    "query": "SELECT \"ts\" AS \"ts\",\n       \"memory_peak_bytes\" AS \"memory_peak_bytes\",\n       \"evaluator\" AS \"evaluator\"\nFROM \"devloop\".\"eval_run\"\nWHERE \"memory_peak_bytes\" IS NOT NULL\n  AND \"ts\" BETWEEN to_timestamp_millis($__from) AND to_timestamp_millis($__to)\nORDER BY 1"
+                  }
+                }
+              }
+            },
+            {
+              "kind": "TimeSeriesQuery",
+              "spec": {
+                "plugin": {
+                  "kind": "GreptimeDBTimeSeriesQuery",
+                  "spec": {
+                    "datasource": {
+                      "kind": "GreptimeDBDatasource",
+                      "name": "greptimedb-sql"
+                    },
+                    "query": "SELECT \"ts\" AS \"ts\",\n       \"memory_max_bytes\" AS \"memory_ceiling_bytes\"\nFROM \"devloop\".\"eval_run\"\nWHERE \"memory_max_bytes\" IS NOT NULL\n  AND \"ts\" BETWEEN to_timestamp_millis($__from) AND to_timestamp_millis($__to)\nORDER BY 1"
+                  }
+                }
+              }
+            },
+            {
+              "kind": "TimeSeriesQuery",
+              "spec": {
+                "plugin": {
+                  "kind": "GreptimeDBTimeSeriesQuery",
+                  "spec": {
+                    "datasource": {
+                      "kind": "GreptimeDBDatasource",
+                      "name": "greptimedb-sql"
+                    },
+                    "query": "SELECT \"ts\" AS \"ts\",\n       21474836480 AS \"throttle_20GiB\"\nFROM \"devloop\".\"eval_run\"\nWHERE \"ts\" BETWEEN to_timestamp_millis($__from) AND to_timestamp_millis($__to)\nORDER BY 1"
+                  }
+                }
+              }
+            }
+          ]
+        }
+      },
+      "evaluation-wall-time": {
+        "kind": "Panel",
+        "spec": {
+          "display": {
+            "name": "nixbot evaluation wall time",
+            "description": "Each evaluation's wall time by evaluator (devloop.eval_run)."
+          },
+          "plugin": {
+            "kind": "TimeSeriesChart",
+            "spec": {
+              "yAxis": {
+                "format": {
+                  "unit": "seconds"
+                }
+              },
+              "legend": {
+                "position": "bottom",
+                "mode": "list"
+              }
+            }
+          },
+          "queries": [
+            {
+              "kind": "TimeSeriesQuery",
+              "spec": {
+                "plugin": {
+                  "kind": "GreptimeDBTimeSeriesQuery",
+                  "spec": {
+                    "datasource": {
+                      "kind": "GreptimeDBDatasource",
+                      "name": "greptimedb-sql"
+                    },
+                    "query": "SELECT \"ts\" AS \"ts\",\n       CAST(\"wall_ms\" AS DOUBLE) / 1000.0 AS \"wall_s\",\n       \"evaluator\" AS \"evaluator\"\nFROM \"devloop\".\"eval_run\"\nWHERE \"wall_ms\" IS NOT NULL\n  AND \"ts\" BETWEEN to_timestamp_millis($__from) AND to_timestamp_millis($__to)\nORDER BY 1"
+                  }
+                }
+              }
+            }
+          ]
+        }
+      },
+      "memory-budget": {
+        "kind": "Panel",
+        "spec": {
+          "display": {
+            "name": "Evaluation host memory budget",
+            "description": "On the host nixbot evaluates on: each listed unit's memory, the system and user slices' totals, ZFS ARC and its limit, the RAM zram uses, and available memory."
+          },
+          "plugin": {
+            "kind": "TimeSeriesChart",
+            "spec": {
+              "yAxis": {
+                "format": {
+                  "unit": "bytes"
+                }
+              },
+              "legend": {
+                "position": "bottom",
+                "mode": "list"
+              }
+            }
+          },
+          "queries": [
+            {
+              "kind": "TimeSeriesQuery",
+              "spec": {
+                "plugin": {
+                  "kind": "PrometheusTimeSeriesQuery",
+                  "spec": {
+                    "datasource": {
+                      "kind": "PrometheusDatasource",
+                      "name": "greptimedb-promql"
+                    },
+                    "query": "sum by (host_name, unit) (vanixiets_unit_memory_current_bytes)",
+                    "seriesNameFormat": "{{host_name}} {{unit}}"
+                  }
+                }
+              }
+            },
+            {
+              "kind": "TimeSeriesQuery",
+              "spec": {
+                "plugin": {
+                  "kind": "PrometheusTimeSeriesQuery",
+                  "spec": {
+                    "datasource": {
+                      "kind": "PrometheusDatasource",
+                      "name": "greptimedb-promql"
+                    },
+                    "query": "sum by (host_name) (node_zfs_arc_size) and on (host_name) sum by (host_name) (vanixiets_zram_mem_used_bytes)",
+                    "seriesNameFormat": "{{host_name}} ZFS ARC"
+                  }
+                }
+              }
+            },
+            {
+              "kind": "TimeSeriesQuery",
+              "spec": {
+                "plugin": {
+                  "kind": "PrometheusTimeSeriesQuery",
+                  "spec": {
+                    "datasource": {
+                      "kind": "PrometheusDatasource",
+                      "name": "greptimedb-promql"
+                    },
+                    "query": "sum by (host_name) (node_zfs_arc_c_max) and on (host_name) sum by (host_name) (vanixiets_zram_mem_used_bytes)",
+                    "seriesNameFormat": "{{host_name}} ZFS ARC limit"
+                  }
+                }
+              }
+            },
+            {
+              "kind": "TimeSeriesQuery",
+              "spec": {
+                "plugin": {
+                  "kind": "PrometheusTimeSeriesQuery",
+                  "spec": {
+                    "datasource": {
+                      "kind": "PrometheusDatasource",
+                      "name": "greptimedb-promql"
+                    },
+                    "query": "sum by (host_name) (vanixiets_zram_mem_used_bytes)",
+                    "seriesNameFormat": "{{host_name}} zram RAM"
+                  }
+                }
+              }
+            },
+            {
+              "kind": "TimeSeriesQuery",
+              "spec": {
+                "plugin": {
+                  "kind": "PrometheusTimeSeriesQuery",
+                  "spec": {
+                    "datasource": {
+                      "kind": "PrometheusDatasource",
+                      "name": "greptimedb-promql"
+                    },
+                    "query": "sum by (host_name) (system_linux_memory_available_bytes) and on (host_name) sum by (host_name) (vanixiets_zram_mem_used_bytes)",
+                    "seriesNameFormat": "{{host_name}} available"
+                  }
+                }
+              }
+            }
+          ]
+        }
       }
     },
     "layouts": [
@@ -248,6 +463,33 @@
               "height": 8,
               "content": {
                 "$ref": "#/spec/panels/deploys"
+              }
+            },
+            {
+              "x": 0,
+              "y": 16,
+              "width": 12,
+              "height": 8,
+              "content": {
+                "$ref": "#/spec/panels/evaluation-memory"
+              }
+            },
+            {
+              "x": 12,
+              "y": 16,
+              "width": 12,
+              "height": 8,
+              "content": {
+                "$ref": "#/spec/panels/evaluation-wall-time"
+              }
+            },
+            {
+              "x": 0,
+              "y": 24,
+              "width": 24,
+              "height": 8,
+              "content": {
+                "$ref": "#/spec/panels/memory-budget"
               }
             }
           ]

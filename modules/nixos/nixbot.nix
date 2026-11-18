@@ -38,8 +38,40 @@
 }:
 let
   flakeLib = config.flake.lib;
+  flakeModules = config.flake.modules.nixos;
 in
 {
+  # The patches nixbot is built with, in application order. Shared with
+  # checks.x86_64-linux.nixbot-eval-record, which runs the patched runner.
+  #
+  # A merge-queue batch reusing its PR build would otherwise never get
+  # nixbot/effects, stalling gitea-mq until its check timeout. An
+  # ignoreFailure attribute whose dependency failed would otherwise fail
+  # the build (dependency_failed) instead of being ignored. Without
+  # optional_build_grace (nixbot.toml) a build waits for every
+  # ignoreFailure attribute, up to the 3 h build timeout on a sleeping Mac.
+  # A renamed or removed effect's last failed run would otherwise stay in
+  # the web "N failing" count, since it never runs again to clear it.
+  # Nothing would record an evaluation's memory peak against its ceiling,
+  # its kills, or which evaluator ran: the evaluation-record patch logs one
+  # `evaluation finished` JSON line per evaluation, which the dev-loop
+  # collection copies into devloop.eval_run (modules/nixos/devloop-collection.nix).
+  # It is written against upstream's names so it can be offered to
+  # Mic92/nixbot.
+  #
+  # Not patched: _dispatch_build (orchestrator.py) checks ancestry, awaits,
+  # then registers, so gitea-mq's back-to-back pushes of one batch ref can
+  # cancel the newest build as "superseded"; gitea-mq then bisects and the
+  # batch reports flaky=true. Fails safe; seen once in 27 multi-PR batches
+  # (2026-09-20..10-14), against a hot upstream file to carry a patch on.
+  flake.lib.nixbotPatches = [
+    ./nixbot-gated-reuse-effects-summary.patch
+    ./nixbot-ignore-failure-dependents.patch
+    ./nixbot-abandon-optional-attributes.patch
+    ./nixbot-failing-effects-defined.patch
+    ./nixbot-evaluation-record.patch
+  ];
+
   flake.modules.nixos.nixbot =
     {
       config,
@@ -49,6 +81,11 @@ in
       ...
     }:
     {
+      # The host nixbot evaluates on also measures what competes with those
+      # evaluations for its memory (CAM-111 design D11), which is why the
+      # budget comes with this module rather than with the host.
+      imports = [ flakeModules.magnetite-memory-budget ];
+
       # GitHub App private key (populated manually via clan vars set)
       clan.core.vars.generators.nixbot-github-app-secret-key = {
         files."key.pem" = {
@@ -249,6 +286,15 @@ in
       # extra evaluation arguments; scoped here so buildbot-nix is unaffected.
       systemd.services.nixbot.environment.NIX_CONFIG = "allow-import-from-derivation = false";
 
+      # Names the evaluator in each `evaluation finished` record
+      # (nixbot-evaluation-record.patch) as "<evaluator> <version>": a wrapped
+      # evaluator's `unwrapped.evaluator`, or nix-eval-jobs for nixbot's own.
+      systemd.services.nixbot.environment.NIXBOT_EVALUATOR =
+        let
+          evaluator = config.services.nixbot.packages.nix-eval-jobs;
+        in
+        "${evaluator.unwrapped.evaluator or "nix-eval-jobs"} ${evaluator.version}";
+
       # Every evaluation queues on the host evaluation lock and runs at
       # oom_score_adj 900 (modules/nixos/nix-eval-lock.nix). The wrapper sits
       # over the evaluator nixbot would otherwise use, its own patched build,
@@ -260,29 +306,10 @@ in
         config.services.nixEvalLock.wrap options.services.nixbot.packages.nix-eval-jobs.default
       );
 
-      # A merge-queue batch reusing its PR build would otherwise never get
-      # nixbot/effects, stalling gitea-mq until its check timeout. An
-      # ignoreFailure attribute whose dependency failed would otherwise fail
-      # the build (dependency_failed) instead of being ignored. Without
-      # optional_build_grace (nixbot.toml) a build waits for every
-      # ignoreFailure attribute, up to the 3 h build timeout on a sleeping Mac.
-      # A renamed or removed effect's last failed run would otherwise stay in
-      # the web "N failing" count, since it never runs again to clear it.
-      #
-      # Not patched: _dispatch_build (orchestrator.py) checks ancestry, awaits,
-      # then registers, so gitea-mq's back-to-back pushes of one batch ref can
-      # cancel the newest build as "superseded"; gitea-mq then bisects and the
-      # batch reports flaky=true. Fails safe; seen once in 27 multi-PR batches
-      # (2026-09-20..10-14), against a hot upstream file to carry a patch on.
       services.nixbot.packages.nixbot =
         options.services.nixbot.packages.nixbot.default.overridePythonAttrs
           (old: {
-            patches = (old.patches or [ ]) ++ [
-              ./nixbot-gated-reuse-effects-summary.patch
-              ./nixbot-ignore-failure-dependents.patch
-              ./nixbot-abandon-optional-attributes.patch
-              ./nixbot-failing-effects-defined.patch
-            ];
+            patches = (old.patches or [ ]) ++ flakeLib.nixbotPatches;
           });
     };
 }

@@ -43,9 +43,10 @@ let
 
   # Persistent queue per exporter: at least 24 h of fleet and under 512 MiB
   # in total (ADR-003 envelope), asserted by
-  # checks.x86_64-linux.otel-collector-config. devloop's 48 MiB is split
-  # between its metrics and its four tables, ci_attribute holding about a
-  # day of store outage on the busiest day (S2 design D4).
+  # checks.x86_64-linux.otel-collector-config. devloop's 52 MiB is split
+  # between its metrics and its five tables, ci_attribute holding about a
+  # day of store outage on the busiest day (S2 design D4); eval_run's 4 MiB
+  # holds months of nixbot's roughly 100 evaluation lines a day.
   queueBytes = {
     fleet = mib 400;
     devloop = mib 4;
@@ -54,6 +55,7 @@ let
     devloop_ci_build = mib 4;
     devloop_batch_event = mib 4;
     devloop_deploy_record = mib 4;
+    devloop_eval_run = mib 4;
   };
 
   # Imported by both roles. `package` accepts a single definition, and the

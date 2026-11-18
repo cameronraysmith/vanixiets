@@ -1,0 +1,12 @@
+vanixiets_unit_memory_current_bytes{unit="nixbot.service"} 16471371776
+vanixiets_unit_memory_peak_bytes{unit="nixbot.service"} 19236646912
+vanixiets_unit_memory_current_bytes{unit="matrix-synapse.service"} 19128320
+vanixiets_unit_memory_peak_bytes{unit="matrix-synapse.service"} 126943232
+vanixiets_unit_memory_current_bytes{unit="omnigent-host-owner-1.service"} 67256320
+vanixiets_unit_memory_peak_bytes{unit="omnigent-host-owner-1.service"} 485052416
+vanixiets_unit_memory_peak_bytes{unit="gitea-mq.service"} 55447552
+vanixiets_unit_memory_current_bytes{unit="system.slice"} 19030876160
+vanixiets_unit_memory_peak_bytes{unit="system.slice"} 26106765312
+vanixiets_zram_orig_data_bytes 4981981184
+vanixiets_zram_compr_data_bytes 463527779
+vanixiets_zram_mem_used_bytes 552349696

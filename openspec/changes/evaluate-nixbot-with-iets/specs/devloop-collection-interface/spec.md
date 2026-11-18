@@ -18,7 +18,7 @@ magnetite's collector SHALL run `journald/nixbot-eval` with `units: [nixbot.serv
 
 ### Requirement: devloop-reconcile compares evaluation records with the journal every day
 
-Over its day, the reconcile SHALL exit non-zero when a `nixbot.service` journal line with `msg` `evaluation finished` has no `eval_run` row with its `build_id` and `ts`, or an `eval_run` row of the day has no such line; it SHALL read the journal with `--boot=all` and count before it reads keys.
+Over its day, by each record's own `ts`, the reconcile SHALL exit non-zero when a `nixbot.service` journal line with `msg` `evaluation finished` has no `eval_run` row with its `build_id` and `ts`, or an `eval_run` row of the day has no such line; it SHALL read every retained boot of the journal and count before it reads keys.
 
 **Discharged by**: `vmTests.x86_64-linux.devloop-ingest`'s evaluation case and its dropped-row mutant, resting on world assumption `A146 — nixbot evaluates in a sandbox that sees neither the journal nor the cgroup tree, in a cgroup it removes after the run`.
 
