@@ -5,8 +5,8 @@
 > corresponding artifact for correction before re-running verify.
 
 **Change**: `retire-legacy-sops-tooling` (CAM-107)
-**Verified at**: `2026-11-17 06:05 UTC`
-**Verifier**: subagent `SopsRetirementChange`, against merged `main` (`3a2e049fac57`, change `nkpzxuxp`)
+**Verified at**: `2026-11-18 03:10 UTC` (re-run after the re-queue; first run `2026-11-17 06:05 UTC`)
+**Verifier**: subagent `SopsRetirementChange`, against merged `main` (`6b0e623d05eb`)
 
 The implementation landed in three pull requests, each a stacked slice:
 
@@ -15,6 +15,16 @@ The implementation landed in three pull requests, each a stacked slice:
 | #3932 | 1: readers of operator credentials | `74f6d1685e08` (`vvzlvkln`) | 1.1–1.6 | nix-eval, nix-build, effects: success |
 | #3933 | 2: correspondence check, bridge assertion, darwin guard, provision-bridge-key | `e47332613e86` (`tnrwyovt`) | 2.1–2.5, 3.1, 3.2, 4.3, 1.7 | nix-eval, nix-build, effects: success |
 | #3936 | 3: tooling deletions, D20, docs, integration | `94cf0473742c` (`tqmttxmk`) | 3.3, 4.1, 4.2, 4.4, 4.5, 5.1–5.3, 6.1–6.9, 7.1–7.4, 7.6 | nix-eval, nix-build, effects: success |
+| #3937 | verify record (first run, PASS WITH WARNINGS) | `bf1d7e294911` (`xztsvrwv`) | 7.5 | — |
+| #3983 | 3.4 key check; verify FAIL on the darwin key guard | `7d3aa6dbc74f` (`uxxqlxnn`) | — | — |
+| #3985 | guard fix: root-only `/var/lib/sops-nix` read through `sudo` | `1e4781a0c318` (`ruxtpxmn`) | 3.4 (guard half, with its witness) | nix-eval, nix-build: success |
+
+### Re-queue history
+
+- **2026-11-17 06:05 UTC**: first verify, PASS WITH WARNINGS (#3937).
+- **2026-11-18 01:31 UTC**: task 3.4's guard dry run on argentum (`logs/cam-107-task-3.4-guard-dry-20261117-203116.log`) reported "found: missing" for a present key that matched `sops/machines/argentum/key.json` at 01:22:51Z. Cause: clan's upload had created argentum's `/var/lib/sops-nix` as `drwx------ root`, and the guard tested existence without `sudo`; stibnite's directory is `drwxr-xr-x` (pre-clan), so tasks 3.2 and 7.4 had passed. Verify set to FAIL (#3983), the In Review → In Progress re-queue.
+- **2026-11-18, #3985**: the guard moves to `modules/darwin/machine-key-guard.sh` (`flake.lib.darwinMachineKeyGuard`). When the key file is not visible to the user, it decides existence and the public key through `sudo`, using `sudo -n` under `--dry`. It fails closed with "not checked" when `sudo` cannot run. `checks.x86_64-linux.darwin-machine-key-guard` covers a root-only directory, a control showing the old unprivileged test reports it missing, the `sudo -n`/`sudo` choice, mismatch, absent, sudo-unavailable and readable cases.
+- **2026-11-18 02:52:51 UTC**: witness on argentum. The app from `main` `6b0e623d` was run with `--dry`; it printed no "Machine key check failed" and no "--dry: continuing", reached `nh darwin switch … --dry`, and exited 0 (`logs/cam-107-task-3.4-guard-witness-20261117-215251.log`). argentum's expected key is compiled into the app, so the guard ran and matched. Task 3.4 ticked; this re-run.
 
 Each head commit's message carries the per-task evidence (public keys, exit codes and log names only; logs under the gitignored `logs/`).
 No decrypted value, private key or plaintext digest was printed, logged or committed at any step.
@@ -28,7 +38,7 @@ No decrypted value, private key or plaintext digest was printed, logged or commi
 **Result**:
 
 ```text
-54 items: 52 passed, 2 failed.
+56 items: 54 passed, 2 failed.
 retire-legacy-sops-tooling: valid (also `openspec validate retire-legacy-sops-tooling --strict`: valid).
 ```
 
@@ -45,13 +55,13 @@ The two failures belong to other changes and predate this one; neither is caused
 
 - [ ] All `- [ ]` have been changed to `- [x]`
 
-38 of 40 checked.
+39 of 40 checked.
 
 **Incomplete tasks**:
 
 | Task | Reason incomplete | Blocks archive? |
 |---|---|---|
-| 3.4 **[operator]** argentum key check and guard dry run | Key half done 2026-11-18: installed key matches `sops/machines/argentum/key.json`, no upload needed. **Guard half FAILS (CRITICAL)**: `.#darwin -- argentum --dry` run on argentum reported "found: missing" for a present, matching key, because clan's upload left `/var/lib/sops-nix` root-only (`0700`) and the guard tests existence without `sudo`. Without `--dry` it would refuse a correctly keyed host, violating the interface scenario "Matching key" of "The `.#darwin` app refuses activation without the host's machine key". See tasks.md 3.4. | Yes: guard fix and a re-run of the dry run on argentum |
+| 3.4 **[operator]** argentum key check and guard dry run | Done 2026-11-18 by the orchestrator at the operator's request: key matches, no upload needed; guard witnessed passing on argentum after #3985 (see Re-queue history). | — (done) |
 | 7.7 Archive preparation: merge this change's MODIFIED designation table with rows added elsewhere (naming `stand-up-renovate-on-magnetite`) | Pending, archive-time by design. Checked now: the change's table contains every row of the current main table (0 missing) and adds 21; `stand-up-renovate-on-magnetite` has not archived, so its rows are not yet in main. | Yes, it is an archive step |
 
 ---
@@ -74,13 +84,13 @@ The two failures belong to other changes and predate this one; neither is caused
 | D2 data-key renewal | `sops rotate` after `updatekeys` on narrowed files | interface: "Narrowed files carry a renewed data key" | none |
 | D4 check | sibling check, static key set, x86_64-linux only, mutants | the five "correspondence check …" interface requirements | none; 15 anchors, 11 rules, 13 files, 7 mutants fail as expected |
 | D5 bridge assertion | per-host recipient assertion | "Each NixOS host asserts it is a recipient of the bridge files it uses" | none |
-| D6 guard | in the `.#darwin` app, table baked in at evaluation | "The `.#darwin` app refuses activation…" | design says the app compares through `sudo age-keygen -y`; the implementation uses `sudo` only when the file is unreadable (task 3.1 reworded during apply) |
+| D6 guard | in the `.#darwin` app, table baked in at evaluation | "The `.#darwin` app refuses activation…" | since #3985 the comparison is `modules/darwin/machine-key-guard.sh`, called by the app; it uses `sudo` whenever the key file is not readable (existence included), `sudo -n` under `--dry`. design.md D6 still describes the comparison inline in the app |
 | D7 provision-bridge-key | pipe into `sops encrypt --filename-override`, temp ciphertext moved onto target | "`provision-bridge-key` keeps plaintext out of the repository tree" | none |
 | D9/D10/D12 deletions | setup-user, legacy recipes, `secrets/users`, `hash-encrypt`, `verify-hash`, `npmbw` | "The retired recipes, scripts and app are absent" | none; all absent on main |
 
 **Drift warnings** (non-blocking):
 
-- D6 wording vs implementation on when `sudo` is used (above); the behavior the spec requires is unchanged.
+- D6 wording vs implementation: the guard lives in a shared script since #3985 and uses `sudo` for existence as well as reading; design.md D6 predates both. The behavior the spec requires is what is now implemented and witnessed (argentum, 2026-11-18). Update D6's text at archive or in the retrospective.
 - The design's documentation table was extended during apply with passages the retired-name sweep found (operator-approved).
 
 ---
@@ -88,11 +98,11 @@ The two failures belong to other changes and predate this one; neither is caused
 ## 5. Implementation Signal
 
 - [x] No unstaged files in the worktree (`jj st`: the working copy has no changes)
-- [x] All related commits have been pushed (merged as #3932, #3933, #3936)
+- [x] All related commits have been pushed (merged as #3932, #3933, #3936, #3937, #3983, #3985)
 
-**Commit range**: `a52e80260054` (proposal) `..` `94cf0473742c` (slice 3), merged into `main` at `3a2e049fac57`.
+**Commit range**: `a52e80260054` (proposal) `..` `1e4781a0c318` (guard fix), merged into `main` at `6b0e623d05eb`.
 
-Implementation present on merged `main`: `modules/checks/sops-correspondence.nix`, `modules/lib/darwin-host-keys.nix`, the guard in `modules/darwin/app.nix`, the assertion in `modules/nixos/hm-sops-bridge.nix`, the piped `provision-bridge-key`; absent: `scripts/sops/`, `secrets/users/`, `modules/apps/bootstrap/setup-user.nix`, the six `sops-*` recipes, `hash-encrypt`, `verify-hash`, `bootstrap-setup-user`, `npmbw`.
+Implementation present on merged `main`: `modules/checks/sops-correspondence.nix`, `modules/lib/darwin-host-keys.nix`, the guard in `modules/darwin/machine-key-guard.sh` called by `modules/darwin/app.nix`, `modules/checks/darwin-machine-key-guard.nix`, the assertion in `modules/nixos/hm-sops-bridge.nix`, the piped `provision-bridge-key`; absent: `scripts/sops/`, `secrets/users/`, `modules/apps/bootstrap/setup-user.nix`, the six `sops-*` recipes, `hash-encrypt`, `verify-hash`, `bootstrap-setup-user`, `npmbw`.
 
 ---
 
@@ -109,12 +119,13 @@ ls docs/superpowers/specs/*.md 2>/dev/null
 ## 7. Deferred Manual Dogfood vs Automated Test Equivalence
 
 plan.md has no `[~]` rows.
-The host-level checks were run, not deferred: 7.4 (stibnite activation) and 7.6 (magnetite deploy).
+The host-level checks were run, not deferred: 7.4 (stibnite activation), 7.6 (magnetite deploy) and 3.4 (argentum key check and guard dry run, see Re-queue history).
 
 | Host check | Observed | Automated coverage of the same property |
 |---|---|---|
 | 7.4 stibnite `just activate` (operator, 2026-11-17 00:33:53, generation `82282czy…-darwin-system-26.11.ff0e21a`, built from the join containing all three slices) | guard passed; `/var/lib/sops-nix/key.txt` public key equals `sops/machines/stibnite/key.json`; home sops-nix agent exit 0, 23/23 declared secrets present and non-empty; `sops -d secrets/shared.yaml` and `sops exec-env … true` succeed as the operator; no `fleet-alerts` message since, `fleet-heartbeat` only `ok` | guard logic: task 3.2's runs of all outcomes; key correspondence: `sops-correspondence` (public side) |
 | 7.6 magnetite `clan machines update` from `main` `e4733261` (slices 1–2) | rc 0; `home-manager-cameron` Result=success; `/run/secrets/crs58-age-key` 75 bytes, 0400, cameron; all 23 secrets cameron's home declares installed and non-empty; user sops-nix Result=success, no journal errors; no failed units; no `fleet-alerts` message | bridge recipients: the `hm-sops-bridge` evaluation assertion (negative control in task 2.5) |
+| 3.4 argentum key check (01:22:51Z) and `.#darwin -- argentum --dry` from `main` `6b0e623d` (02:52:51Z), by the orchestrator at the operator's request | installed key's public key equals `sops/machines/argentum/key.json`, no upload; guard silent (match) with `/var/lib/sops-nix` root-only, app exit 0, `nh … --dry` reached | `checks.x86_64-linux.darwin-machine-key-guard` (root-only directory fixture, six cases, control for the old unprivileged test) |
 
 Real gaps: none for these rows. Raquel's, janettesmith's, christophersmith's, tara's and ubuntu's home secrets are witnessed by recipient presence only (the operator holds none of their keys), as task 1.5 states.
 
@@ -159,11 +170,12 @@ Not validation: `openspec validate` checks structure only.
 ## Overall Decision
 
 - [ ] (pass) PASS — may proceed to finishing-a-development-branch and archive
-- [ ] (warn) PASS WITH WARNINGS — may proceed to subsequent steps but note: `<explanation>`
-- [x] (fail) FAIL — return to the failed artifact, correct it, then re-run verify
+- [x] (warn) PASS WITH WARNINGS — may proceed to subsequent steps but note: task 7.7 (designation-table merge) is an archive step and still open; design.md D6's wording predates the shared guard script (§4); four nouns of `secret-custody` need designation rows at archive (§8a); "The documentation describes only current procedures" is undischarged by an interface property (§8b); two other changes fail `openspec validate --all` (§1), not caused by this one
 
-FAIL on 2026-11-18 (supersedes the PASS WITH WARNINGS of 2026-11-17), decided by the orchestrator: a delivered defect breaks the interface scenario "Matching key" of "The `.#darwin` app refuses activation without the host's machine key". Evidence: `logs/cam-107-task-3.4-guard-dry-20261117-203116.log`, where the app from `de5d4eaf`, run on argentum with `--dry` at 01:31:16Z, reported "found: missing" for a key that `sudo age-keygen -y` had matched to `sops/machines/argentum/key.json` at 01:22:51Z. On argentum `/var/lib/sops-nix` is `drwx------ root wheel` (created by clan's upload 2026-11-17 20:22), so the guard's unprivileged `[ -e ]` cannot see the file; on stibnite the directory is `drwxr-xr-x root wheel` (created 2026-07-10), which is why tasks 3.2 and 7.4 passed. This is the re-queue signal (In Review → In Progress).
+PASS WITH WARNINGS on 2026-11-18 03:10 UTC, superseding the FAIL of 2026-11-18 (see Re-queue history). The FAIL's defect, a guard that could not see a key file in a root-only `/var/lib/sops-nix`, is fixed by #3985 and covered by `checks.x86_64-linux.darwin-machine-key-guard`. The interface scenario "Matching key" of "The `.#darwin` app refuses activation without the host's machine key" is now witnessed on argentum, the host whose directory exposed the defect: `logs/cam-107-task-3.4-guard-witness-20261117-215251.log`, app from `main` `6b0e623d`, `--dry`, 02:52:51Z, no check failure, `nh darwin switch … --dry` reached, exit 0. Task 3.4 is complete; 39 of 40 tasks are checked, and the remaining one is 7.7, which belongs to archive.
+
+The FAIL it supersedes, recorded on 2026-11-18 by the orchestrator: a delivered defect broke that same scenario. Evidence: `logs/cam-107-task-3.4-guard-dry-20261117-203116.log`, where the app from `de5d4eaf`, run on argentum with `--dry` at 01:31:16Z, reported "found: missing" for a key that `sudo age-keygen -y` had matched to `sops/machines/argentum/key.json` at 01:22:51Z. On argentum `/var/lib/sops-nix` is `drwx------ root wheel` (created by clan's upload 2026-11-17 20:22), so the guard's unprivileged `[ -e ]` could not see the file. On stibnite the directory is `drwxr-xr-x root wheel` (created 2026-07-10), which is why tasks 3.2 and 7.4 passed. That FAIL was the re-queue signal (In Review → In Progress).
 
 **Next step**:
 
-Fix the guard in `modules/darwin/app.nix` so it decides existence and reads the key through `sudo` when `/var/lib/sops-nix` is not traversable, with a scratch test using a root-only directory; re-run `.#darwin -- argentum --dry` on argentum; re-verify. Then roborev and documenter, the retrospective, and archive with task 7.7.
+roborev and documenter, the retrospective (including D6's wording and the §8 follow-ups), then archive with task 7.7.
