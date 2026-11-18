@@ -29,6 +29,7 @@
           "factory"
           "fork"
           "ghostty"
+          "google-gemini"
           "handy"
           "helium-browser"
           "itsycal"
