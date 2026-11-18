@@ -111,6 +111,7 @@ in
         "nix-development"
         "openspec"
         "mergify"
+        "secret-file-modes"
       ];
 
       # Prefer HM's configured wrappers inside the profile, not in the supervisor PATH.
