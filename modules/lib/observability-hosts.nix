@@ -66,16 +66,16 @@
         smartDevices = [ "disk0" ];
       };
       # The laptops that build for the fleet and fill their store disks
-      # (bound-fleet-garbage-collection D6). Each joins with collect false and
-      # is turned on by its own watched deploy.
+      # (bound-fleet-garbage-collection D6). Collecting since operator
+      # decision Q44 (2026-11-18); each is a recipient of the shared
+      # ntfy-alerter token the collector role wires, which
+      # sharedVarsObligations holds on the machine checks.
       rosegold = agent [ ] // {
-        collect = false;
         platform = "darwin";
         notifiedUnits = [ "otel-envelope" ];
         smartDevices = [ "disk0" ];
       };
       argentum = agent [ ] // {
-        collect = false;
         platform = "darwin";
         notifiedUnits = [ "otel-envelope" ];
         smartDevices = [ "disk0" ];

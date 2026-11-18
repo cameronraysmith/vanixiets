@@ -2,18 +2,18 @@
 
 | Host | Platform | Service roles | Declared services | Fleet networks |
 |---|---|---|---|---|
-| argentum | darwin | nix-builders/builder, user-cameron/default, vanixiets/peer | — | vanixiets (peer), zerotier (external) |
+| argentum | darwin | nix-builders/builder, otel-collector/agent, user-cameron/default, vanixiets/peer | — | vanixiets (peer), zerotier (external) |
 | blackphos | darwin | user-crs58/default | — | zerotier (external) |
-| cinnabar | nixos | hermes-agent/default, openclaw/default, sshd/client, sshd/server, tor/server, user-cameron/default, vanixiets/peer, zerotier/controller | hermes, matrix, ntfy, radicle | vanixiets (peer), zerotier (controller) |
-| electrum | nixos | sshd/client, sshd/server, tor/server, user-cameron/default, vanixiets/peer, zerotier/peer | — | vanixiets (peer), zerotier (peer) |
-| galena | nixos | sshd/client, sshd/server, tor/server, user-cameron/default, user-tara/default, vanixiets/peer, zerotier/peer | — | vanixiets (peer), zerotier (peer) |
-| magnetite | nixos | nix-builders/builder, nix-builders/dispatcher, omnigent/host, omnigent/server, otel-collector/ingress, sshd/client, sshd/server, tor/server, user-cameron/default, vanixiets/peer, zerotier/peer | gitea, gitea-mq, greptimedb, kanidm, matrix, coturn, livekit, niks3, nixbot, omnigent, omnigraph, perses, renovate | vanixiets (peer), zerotier (peer) |
-| pyrite | nixos | iroh/server, nix-builders/builder, nix-builders/dispatcher, omnigent/host, sshd/client, sshd/server, tor/server, user-cameron/default, vanixiets/peer, wifi/default, zerotier/peer | — | vanixiets (peer), zerotier (peer) |
-| rosegold | darwin | nix-builders/builder, user-cameron/default, vanixiets/peer | — | vanixiets (peer), zerotier (external) |
-| scheelite | nixos | sshd/client, sshd/server, tor/server, user-cameron/default, user-tara/default, vanixiets/peer, zerotier/peer | — | vanixiets (peer), zerotier (peer) |
-| stibnite | darwin | nix-builders/builder, nix-builders/dispatcher, omnigent/host, user-crs58/default, vanixiets/peer | — | vanixiets (peer), zerotier (external) |
+| cinnabar | nixos | hermes-agent/default, openclaw/default, otel-collector/agent, sshd/client, sshd/server, tor/server, user-cameron/default, vanixiets/peer, zerotier/controller | hermes, matrix, ntfy, radicle | vanixiets (peer), zerotier (controller) |
+| electrum | nixos | otel-collector/agent, sshd/client, sshd/server, tor/server, user-cameron/default, vanixiets/peer, zerotier/peer | — | vanixiets (peer), zerotier (peer) |
+| galena | nixos | otel-collector/agent, sshd/client, sshd/server, tor/server, user-cameron/default, user-tara/default, vanixiets/peer, zerotier/peer | — | vanixiets (peer), zerotier (peer) |
+| magnetite | nixos | nix-builders/builder, nix-builders/dispatcher, omnigent/host, omnigent/server, otel-collector/agent, otel-collector/ingress, sshd/client, sshd/server, tor/server, user-cameron/default, vanixiets/peer, zerotier/peer | gitea, gitea-mq, greptimedb, kanidm, matrix, coturn, livekit, niks3, nixbot, omnigent, omnigraph, perses, renovate | vanixiets (peer), zerotier (peer) |
+| pyrite | nixos | iroh/server, nix-builders/builder, nix-builders/dispatcher, omnigent/host, otel-collector/agent, sshd/client, sshd/server, tor/server, user-cameron/default, vanixiets/peer, wifi/default, zerotier/peer | — | vanixiets (peer), zerotier (peer) |
+| rosegold | darwin | nix-builders/builder, otel-collector/agent, user-cameron/default, vanixiets/peer | — | vanixiets (peer), zerotier (external) |
+| scheelite | nixos | otel-collector/agent, sshd/client, sshd/server, tor/server, user-cameron/default, user-tara/default, vanixiets/peer, zerotier/peer | — | vanixiets (peer), zerotier (peer) |
+| stibnite | darwin | nix-builders/builder, nix-builders/dispatcher, omnigent/host, otel-collector/agent, user-crs58/default, vanixiets/peer | — | vanixiets (peer), zerotier (external) |
 
-Service roles held by every host: emergency-access/default, otel-collector/agent.
+Service roles held by every host: emergency-access/default.
 
 | Fleet network | Module | Members |
 |---|---|---|
