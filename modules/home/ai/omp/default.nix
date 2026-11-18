@@ -214,10 +214,9 @@ let
               slow = lib.mkDefault "openai-codex/gpt-6-astra:high";
               advisor = lib.mkDefault "openai-codex/gpt-6-astra:high";
               # smol drives both `scout` and `sonic`, one exploratory and one
-              # strictly mechanical, so it stays cheap; scout is raised on its
-              # own through task.agentModelOverrides below.
-              # smol = lib.mkDefault "openrouter/moonshotai/kimi-k3:high";
-              smol = lib.mkDefault "zai/glm-5.3:high";
+              # strictly mechanical; scout is raised on its own through
+              # task.agentModelOverrides below.
+              smol = lib.mkDefault "anthropic/claude-sonnet-5-5:medium";
               vision = lib.mkDefault "anthropic/claude-opus-5-5:medium";
               commit = lib.mkDefault "openai-codex/gpt-5.6-luna:medium";
               # Titles, the unexpected-stop classifier, and mnemopi fact
@@ -232,15 +231,17 @@ let
               scout = lib.mkDefault "anthropic/claude-opus-5-5:medium";
             };
 
-            # State the next hop for the three roles this file pins. The session
+            # State the next hop for the four roles this file pins. The session
             # falls back across families to Astra rather than to another Opus, so
             # a provider outage does not take the fallback with it; omp's
             # priority.json chains predate Astra and still head the slow chain
-            # with Sol.
+            # with Sol. smol steps up to Opus rather than down to omp's implicit
+            # Haiku, keeping sonic and the other smol consumers on Anthropic.
             retry.fallbackChains = {
               default = lib.mkDefault [ "openai-codex/gpt-6-astra" ];
               slow = lib.mkDefault [ "openai-codex/gpt-5.6-sol" ];
               advisor = lib.mkDefault [ "openai-codex/gpt-5.6-sol" ];
+              smol = lib.mkDefault [ "anthropic/claude-opus-5-5" ];
             };
 
             # Fable requests blocked by Anthropic's safety classifier retry on
@@ -347,7 +348,7 @@ let
               }
               {
                 name = "Fable";
-                model = "anthropic/claude-fable-5-1:xhigh";
+                model = "anthropic/claude-fable-5-2:xhigh";
                 instructions = "Deep-review duty: architectural soundness, subtle correctness, cross-module invariants. Invoked deliberately; be thorough.";
                 enabled = false;
               }

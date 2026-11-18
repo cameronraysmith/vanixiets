@@ -173,7 +173,7 @@
                       workspace = workspaceDir;
                       model = {
                         primary = "zai-coding-plan/glm-5.1";
-                        fallbacks = [ "anthropic/claude-opus-4-5" ];
+                        fallbacks = [ "anthropic/claude-opus-5-5" ];
                       };
                     };
                   };

@@ -46,7 +46,7 @@ in
               effortLevel = "high";
               ultracode = false;
               modelSettings = {
-                "claude-fable-5-1".effortLevel = "medium";
+                "claude-fable-5-2".effortLevel = "medium";
                 "claude-opus-5-5".effortLevel = "medium";
               };
               fallbackModel = [ "claude-sonnet-5-5" ];
@@ -174,6 +174,7 @@ in
               env = {
                 ANTHROPIC_DEFAULT_HAIKU_MODEL = "claude-sonnet-5-5";
                 ANTHROPIC_DEFAULT_OPUS_MODEL = "claude-opus-5-5";
+                ANTHROPIC_DEFAULT_FABLE_MODEL = "claude-fable-5-2";
                 ANTHROPIC_DEFAULT_SONNET_MODEL = "claude-opus-5-5";
                 ASTRO_TELEMETRY_DISABLED = "1";
                 CLAUDE_BASH_MAINTAIN_PROJECT_WORKING_DIR = "0";

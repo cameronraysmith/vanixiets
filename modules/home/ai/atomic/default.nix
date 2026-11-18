@@ -92,7 +92,7 @@ let
             defaultModel = "gpt-6-astra";
             defaultThinkingLevel = "medium";
             modelThinkingLevels = {
-              "anthropic/claude-fable-5-1" = "medium";
+              "anthropic/claude-fable-5-2" = "medium";
               "anthropic/claude-opus-5-5" = "medium";
               "openai-codex/gpt-6-astra" = "medium";
             };
