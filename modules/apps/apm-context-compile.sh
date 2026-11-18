@@ -283,13 +283,6 @@ done
 echo "staged ${fragment_count} fragment(s) from ${#tier_pkgs[@]} tier(s) into ${TMP}/.apm/instructions/"
 echo ""
 
-echo "WARNING: ${repo_root}/AGENTS.md and ${repo_root}/CLAUDE.md may still be"
-echo "symlinks into the planning repo's vanixiets.md context. This run REPLACES"
-echo "both with regular, generated files -- the intended migration. Both paths"
-echo "are already git-ignored, and any existing symlink is unlinked before"
-echo "writing, so nothing is ever written through a link into another repository."
-echo ""
-
 # A shell redirect FOLLOWS a symlink, so writing these paths in place would
 # write into the planning repo through the link instead of replacing it. That
 # is not hypothetical: it clobbered contexts/vanixiets.md there once. apm
