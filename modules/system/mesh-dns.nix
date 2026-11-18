@@ -12,21 +12,32 @@ in
   # macOS consults /etc/resolver/<domain> for names under that domain, asking
   # the listed name servers in order.
   #
-  # `flags a aaaa` makes configd mark this resolver "Request A records,
-  # Request AAAA records" whatever the Mac's own connectivity. Without it the
-  # resolver inherits the global flags, which on a Mac without an IPv6 default
-  # route are A only, and getaddrinfo with AI_ADDRCONFIG (what flags=0
-  # defaults to on macOS, and what Chrome, Firefox and curl pass) never asks
-  # for the AAAA records that are the only records of this IPv6-only zone
-  # (finding F34). configd parses the keyword in configd-1405.100.8
-  # dnsinfo/dnsinfo_flatfile.c:74,380-394,520-522 (present since configd-596,
-  # OS X 10.10); resolver(5) does not document it.
+  # A `flags` line replaces the query flags the resolver would inherit from
+  # the Mac's own connectivity (configd-1405.100.8
+  # dnsinfo/dnsinfo_flatfile.c:74,380-394,520-522, present since configd-596,
+  # OS X 10.10; resolver(5) does not document it).
+  #
+  # `aaaa` makes configd mark this resolver "Request AAAA records". Without
+  # it the resolver inherits the global flags, which on a Mac without an IPv6
+  # default route are A only, and getaddrinfo with AI_ADDRCONFIG (what
+  # flags=0 defaults to on macOS, and what Chrome, Firefox and curl pass)
+  # never asks for the AAAA records that are the only records of this
+  # IPv6-only zone (finding F34, design D7).
+  #
+  # No `a`: the zone has no A records (D7), and asking for them costs a
+  # stall when the resolvers are unreachable. On stibnite (2026-11-18), in
+  # its steady configuration with `flags a aaaa` and both resolvers blocked,
+  # getaddrinfo(AF_UNSPEC) for names /etc/hosts lists took 30.004-30.005 s:
+  # mDNSResponder answered the AAAA question from the hosts file at once and
+  # sent the A question to the two resolvers 8 times until it timed out at
+  # 30 s (logs/cam109-15.6-steady-before-20261118-130026.log and its
+  # -mdnsresponder.log). /etc/resolver/zt keeps `a aaaa`
+  # (modules/system/zt-dns.nix).
   # checks.x86_64-linux.darwin-mesh-resolver-flags holds every Mac to it.
   flake.modules.darwin.base = {
     environment.etc."resolver/${fleet.domain}" = {
       enable = true;
-      text =
-        lib.concatMapStrings (address: "nameserver ${address}\n") resolverAddresses + "flags a aaaa\n";
+      text = lib.concatMapStrings (address: "nameserver ${address}\n") resolverAddresses + "flags aaaa\n";
     };
   };
 

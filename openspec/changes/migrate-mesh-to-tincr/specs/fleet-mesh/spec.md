@@ -3,7 +3,7 @@
 ### Requirement: Every overlay member reaches every fleet service by its canonical name
 
 Every overlay member, whether a NixOS host, a darwin host or a phone, SHALL reach every service the fleet offers to overlay members, and every other overlay member, by its canonical name over the overlay network, with that name answered on a NixOS or darwin host by the host itself from the canonical names the operator declared, and on a phone by the overlay network's name service.
-This rests on world assumptions A128 and, for phones and darwin hosts, A133, A134 and A135.
+This rests on world assumptions A128 and, for phones and darwin hosts, A133, A134, A135 and A142.
 
 #### Scenario: A NixOS host reaches a service by name
 

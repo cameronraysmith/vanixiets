@@ -126,7 +126,7 @@ This rests on world assumptions A133 and A134.
 ### Requirement: Every NixOS and darwin member answers the zone from its hosts file
 
 Every NixOS and darwin peer SHALL map each `flake.lib.meshRecords` name, and until ZeroTier's retirement each `flake.lib.ztRecords` name, to exactly the registry's addresses in its `/etc/hosts`: NixOS peers through `networking.hosts`, darwin peers through `vanixiets.hosts`, which activation writes between marker lines of the real file.
-This rests on world assumption A135 for darwin peers.
+This rests on world assumptions A135 and A142 for darwin peers.
 
 #### Scenario: A peer's entries are judged against the registry
 

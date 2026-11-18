@@ -387,3 +387,15 @@ Any requirement whose discharge depends on this fact SHALL name it explicitly, a
 
 - **WHEN** on a darwin host whose `/etc/hosts` lists a canonical name, `getaddrinfo` without a fixed address family fails for that name or returns an address the file does not give it, or a replaced file's names are not answered until a restart
 - **THEN** this assumption is void, and the `fleet-mesh` requirement `Every overlay member reaches every fleet service by its canonical name` and the `fleet-mesh-interface` requirement `Every NixOS and darwin member answers the zone from its hosts file` lose their discharge for darwin hosts
+
+### Requirement: A142 — macOS asks a domain's name servers only for the address types its resolver file's flags line names
+
+It is true of macOS on the fleet's darwin hosts, independent of what this fleet builds, that a resolver whose `/etc/resolver/<domain>` file has `flags aaaa` as its first `flags` line is asked for AAAA records only, and one with `flags a aaaa` for both.
+Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL be treated as losing its discharge once this assumption's violation condition below is observed.
+
+**Evidence**: configd source, cited in migrate-mesh-to-tincr design "Open Questions" 1; `scutil --dns` on stibnite (2026-11-18); task 15.6's run after activation.
+
+#### Scenario: A Mac's resolver ignores its flags line
+
+- **WHEN** on a darwin host whose resolver files have been re-read after activation, `scutil --dns` shows for the `vanixiets.internal` or `zt` resolver flags other than its file's `flags` line names, or mDNSResponder sends an A question for a name under `vanixiets.internal`
+- **THEN** this assumption is void, and the `fleet-mesh` requirement `Every overlay member reaches every fleet service by its canonical name` and the `fleet-mesh-interface` requirement `Every NixOS and darwin member answers the zone from its hosts file` lose their discharge for darwin hosts
