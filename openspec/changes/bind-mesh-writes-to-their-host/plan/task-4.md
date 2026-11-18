@@ -9,7 +9,7 @@ Every regulator is written and seen failing before the configuration it judges.
 - Create: `modules/checks/mesh-binding.nix`
 
 **Interfaces:**
-- Consumes: `flake.lib.hosts`, `flake.lib.zerotierMac`, `externalMembers` (Task 2); the filter conditions, counter names, caddy series and socket form Task 1 Step 5 confirmed.
+- Consumes: `flake.lib.hosts.<host>.zerotier.address` (CAM-109's registry), `flake.lib.zerotierMac` (Task 2); the filter conditions, counter names, caddy series and socket form Task 1 Step 5 confirmed.
 - Produces: everything in the plan's interface contract marked Task 4.
 
 - [ ] **Step 1: C6, failing first (tasks.md 4.1)**

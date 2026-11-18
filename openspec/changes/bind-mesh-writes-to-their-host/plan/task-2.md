@@ -4,49 +4,29 @@ Implements `tasks.md` 2.1–2.5 (design D2, D4, D7; FII `One host table declares
 It is pull request 1; it starts only after Task 1 Step 3 passed.
 
 **Files:**
-- Modify: `modules/lib/hosts.nix`, `modules/clan/inventory/services/zerotier.nix` (external members keyed by name), `modules/checks/otel-collector-config.nix`, `modules/clan/services/otel-collector/flake-module.nix` (the `otel-cert` generator and the agent role's host-name assertion)
+- Modify: `modules/checks/otel-collector-config.nix`, `modules/clan/services/otel-collector/flake-module.nix` (the `otel-cert` generator and the agent role's host-name assertion)
 - Create: `modules/lib/zerotier-mac.nix`, `modules/checks/otel-collector-config/zerotier-macs.json`
 - Regenerate (committed): `vars/per-machine/<machine>/otel-cert/` for the seven collecting hosts
+- Not modified: `modules/lib/hosts.nix` (CAM-109's registry, which already declares every member) and `modules/clan/inventory/services/zerotier.nix` (whose `allowedIps` CAM-109 rewrites to read that registry)
 
 **Interfaces:**
-- Consumes: `flake.lib.observabilityHosts`; `vars/shared/zerotier-ip-<host>-zerotier/ip/value`; `vars/shared/zerotier-network-zerotier/network-id/value`; `modules/clan/inventory/services/zerotier.nix`'s external members.
-- Produces: `flake.lib.hosts.<host>.zt`, `flake.lib.zerotierMac`, the URI SAN on every `otel-cert`.
+- Consumes: `flake.lib.observabilityHosts`; CAM-109's `flake.lib.hosts.<host>.zerotier.address` and `.zerotier.memberId`; `vars/shared/zerotier-ip-<host>-zerotier/ip/value`; `vars/shared/zerotier-network-zerotier/network-id/value`.
+- Produces: `flake.lib.zerotierMac`, the address and MAC clauses of `otel-collector-config`, the URI SAN on every `otel-cert`; no `flake.lib.hosts` field.
+- Retirement: when CAM-109 retires ZeroTier, its retirement removes `flake.lib.zerotierMac`, the address and MAC clauses with their fixture and sources, and the neighbour pinning of Task 4, and the binding reads the derived `flake.lib.hosts.<host>.address` (design D4, D7).
 
 - [ ] **Step 1: The address clause, failing first (tasks.md 2.1)**
 
-First, in `modules/clan/inventory/services/zerotier.nix`, replace the commented `allowedIps` list on cinnabar's controller with an attribute set keyed by name, keeping each member's comment as its key and its member ID beside it:
-
-```nix
-externalMembers = {
-  blackphos = "fddb:4344:343b:14b9:399:930e:e971:d9e0"; # darwin, member ID 0ee971d9e0
-  stibnite = "fddb:4344:343b:14b9:399:9324:19d9:3451"; # darwin, member ID 2419d93451
-  argentum = "fddb:4344:343b:14b9:399:93f7:54d5:ad7e"; # darwin, member ID f754d5ad7e
-  rosegold = "fddb:4344:343b:14b9:399:9315:3431:ee8"; # darwin, member ID 1534310ee8
-  pixel7 = "fddb:4344:343b:14b9:399:939f:c45d:577c"; # android, member ID 9fc45d577c
-  pixel11 = "fddb:4344:343b:14b9:399:933c:8999:9bb8"; # android, member ID 3c89999bb8
-};
-```
-
-bound in a `let` and passed as `allowedIps = lib.attrValues externalMembers`; `nix eval --json` of the controller's evaluated `allowedIps` before and after lists the same six addresses (evaluation).
-The clause's two sources: `flake.lib.hosts.<host>.zt` (first-party registry) and, for each collecting host, `vars/shared/zerotier-ip-<host>-zerotier/ip/value` if it exists, else `externalMembers.<host>` (stibnite), read from the inventory module's evaluated `externalMembers`.
+The registry already holds every collecting host's ZeroTier address and member id (`modules/lib/hosts.nix`, CAM-109), so this step adds only the clause that judges it.
+The clause's two sources: `flake.lib.hosts.<host>.zerotier.address` (first-party registry) and, for each collecting host, `vars/shared/zerotier-ip-<host>-zerotier/ip/value` if it exists, else (stibnite) the rfc4193 rendering of `fd` + the network id + `9993` + `flake.lib.hosts.<host>.zerotier.memberId`, grouped in fours and rendered canonically, which gives `fddb:4344:343b:14b9:399:9324:19d9:3451` for stibnite's `2419d93451`.
+The member id is a second source only for an external member, whose `memberId` CAM-109 copied from the controller's record and checks against cinnabar's controller (migrate-mesh-to-tincr 2.1); a clan peer's `memberId` was derived from its own address, which is why clan peers are compared with their vars file instead.
 The clause also requires each address to lie in the /88 formed from `vars/shared/zerotier-network-zerotier/network-id/value` (`fd` followed by the network id, then `9993`, which gives `fddb:4344:343b:14b9:399:93` for `db4344343b14b903`), to have eight groups, to be lower case, and to equal its own canonical RFC 5952 rendering, which with eight groups means no group with a leading zero.
 Add it to `modules/checks/otel-collector-config.nix` beside R3.1, with the mutants:
-- `addressDigitChanged`: `flake.lib.hosts.pyrite.zt` with its last digit changed;
-- `externalAddressDiffers`: `flake.lib.hosts.stibnite.zt` set to `externalMembers.blackphos`, an address the controller lists, which a membership test would accept and the by-name comparison rejects.
+- `addressDigitChanged`: `flake.lib.hosts.pyrite.zerotier.address` with its last digit changed;
+- `externalAddressDiffers`: `flake.lib.hosts.stibnite.zerotier.address` set to `flake.lib.hosts.blackphos.zerotier.address` with stibnite's `memberId` unchanged, an address the controller admits, which a membership test would accept and the by-name comparison rejects.
 
-Run `nix build .#.checks.x86_64-linux.otel-collector-config -L`.
-Expected: FAIL naming the six hosts missing from `flake.lib.hosts`.
-Then add to `modules/lib/hosts.nix`, keeping its header:
-
-```nix
-    cinnabar.zt = "fddb:4344:343b:14b9:399:93db:4344:343b";
-    electrum.zt = "fddb:4344:343b:14b9:399:93d1:7e6d:27cc";
-    galena.zt = "fddb:4344:343b:14b9:399:9315:c67a:dec9";
-    pyrite.zt = "fddb:4344:343b:14b9:399:937e:8067:8028";
-    scheelite.zt = "fddb:4344:343b:14b9:399:9380:46d5:3400";
-    stibnite.zt = "fddb:4344:343b:14b9:399:9324:19d9:3451";
-```
-
+Run each mutant alone first: `nix build .#.checks.x86_64-linux.otel-collector-config -L` with only that mutant applied.
+Expected: FAIL naming pyrite for `addressDigitChanged` and stibnite for `externalAddressDiffers`.
+Then run the unmutated check.
 Expected after: the check passes, prints `mutant addressDigitChanged rejected` and `mutant externalAddressDiffers rejected`; its cost is recorded (build).
 
 - [ ] **Step 2: The MAC clause, failing first (tasks.md 2.2)**
@@ -110,7 +90,7 @@ In the `otel-cert` generator of `modules/clan/services/otel-collector/flake-modu
 
 ```nix
                 uri = "URI:spiffe://vanixiets/host/${machine.name}";
-                sans = uri + lib.optionalString isIngress ",IP:${flakeLib.hosts.magnetite.zt},DNS:magnetite.zt";
+                sans = uri + lib.optionalString isIngress ",IP:${flakeLib.hosts.magnetite.zerotier.address},DNS:magnetite.zt";
 ```
 
 and write `echo "subjectAltName=${sans}"` unconditionally in `cert.ext`; `validation.subjectAltNames = sans` is unchanged in form; the `otel-ca` definition is not touched.

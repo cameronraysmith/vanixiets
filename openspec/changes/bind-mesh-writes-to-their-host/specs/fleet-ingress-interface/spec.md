@@ -2,7 +2,7 @@
 
 ### Requirement: One host table declares the agent hosts and what each reports
 
-`flake.lib.observabilityHosts` SHALL map each agent host to its `platform`, `collect`, `alwaysOn`, `notifiedUnits` and `smartDevices`, `flake.lib.hosts` SHALL give each agent host's overlay address as its `zt` attribute, and the collector's `agent` role machines and whether each collects, each host's notified units, the evaluator's always-on hosts, expected hosts by platform and `SystemdUnitFailed` exclusion, and the devices whose disk health is read SHALL be read from it.
+`flake.lib.observabilityHosts` SHALL map each agent host to its `platform`, `collect`, `alwaysOn`, `notifiedUnits` and `smartDevices`, `flake.lib.hosts` SHALL give each agent host's ZeroTier overlay address as its `zerotier.address` attribute while ZeroTier carries the mesh, and the collector's `agent` role machines and whether each collects, each host's notified units, the evaluator's always-on hosts, expected hosts by platform and `SystemdUnitFailed` exclusion, and the devices whose disk health is read SHALL be read from it.
 
 **Discharged by**: the agent role's per-host assertions with their `extendModules` overrides; `checks.x86_64-linux.otel-collector-config`'s address clause with its mutants `addressDigitChanged` and `externalAddressDiffers`; the `otel-collector` inventory instance's platform assertion with its scratch-edit control; `checks.x86_64-linux.fleet-alert`'s exclusion, absence and platform legs.
 
@@ -13,13 +13,13 @@
 
 #### Scenario: Each agent host's overlay address equals its second source
 
-- **WHEN** `flake.lib.hosts` and each agent host's ZeroTier vars file or `externalMembers` entry are evaluated
-- **THEN** Each agent host's `zt` address SHALL equal its second source, `vars/shared/zerotier-ip-<host>-zerotier/ip/value` for a clan ZeroTier peer and the controller's `externalMembers` entry of the same name for an external member.
+- **WHEN** `flake.lib.hosts` and each agent host's ZeroTier vars file, or for an external member its `zerotier.memberId` and `vars/shared/zerotier-network-zerotier/network-id/value`, are evaluated
+- **THEN** Each agent host's `zerotier.address` SHALL equal its second source, `vars/shared/zerotier-ip-<host>-zerotier/ip/value` for a clan ZeroTier peer and the rfc4193 address formed from the network id and its `zerotier.memberId` for an external member.
 
 #### Scenario: Each agent host's overlay address is canonical and inside the network
 
 - **WHEN** `flake.lib.hosts` and `vars/shared/zerotier-network-zerotier/network-id/value` are evaluated
-- **THEN** Each agent host's `zt` address SHALL lie in the rfc4193 /88 formed from the network id in `vars/shared/zerotier-network-zerotier/network-id/value`, and SHALL be lower case and equal to its own canonical RFC 5952 rendering.
+- **THEN** Each agent host's `zerotier.address` SHALL lie in the rfc4193 /88 formed from the network id in `vars/shared/zerotier-network-zerotier/network-id/value`, and SHALL be lower case and equal to its own canonical RFC 5952 rendering.
 
 #### Scenario: The ingress's rendered tables follow the host tables
 
@@ -48,12 +48,12 @@
 
 #### Scenario: An agent host's overlay address disagrees with its second source
 
-- **WHEN** `checks.x86_64-linux.otel-collector-config` compares each agent host's `flake.lib.hosts` address with its ZeroTier vars file or the controller's `externalMembers` entry of the same name, and a mutant changes one digit of pyrite's address or gives stibnite another external member's listed address
+- **WHEN** `checks.x86_64-linux.otel-collector-config` compares each agent host's `flake.lib.hosts` `zerotier.address` with its ZeroTier vars file or, for an external member, the rfc4193 address formed from the network id and its `zerotier.memberId`, and a mutant changes one digit of pyrite's address or gives stibnite another external member's address with its own `memberId` unchanged
 - **THEN** each mutant fails the check naming the host, and the unmutated tables pass with every address inside the network's /88
 
 ### Requirement: The collection CA issues each agent host one certificate
 
-The clan vars generator `otel-ca` SHALL be shared, with `ca.key` never deployed and `ca.crt` public, and `otel-cert` SHALL issue each agent host a P-256 certificate signed by it, valid 3650 days, with CN the machine name, the URI SAN `spiffe://vanixiets/host/<machine>` and `extendedKeyUsage=clientAuth`, or on the ingress host `serverAuth,clientAuth` with the same URI SAN followed by `IP:<flake.lib.hosts.magnetite.zt>` and `DNS:magnetite.zt`.
+The clan vars generator `otel-ca` SHALL be shared, with `ca.key` never deployed and `ca.crt` public, and `otel-cert` SHALL issue each agent host a P-256 certificate signed by it, valid 3650 days, with CN the machine name, the URI SAN `spiffe://vanixiets/host/<machine>` and `extendedKeyUsage=clientAuth`, or on the ingress host `serverAuth,clientAuth` with the same URI SAN followed by `IP:<flake.lib.hosts.magnetite.zerotier.address>` and `DNS:magnetite.zt`.
 
 **Discharged by**: the plan's `openssl` reading of each issued certificate and its hash check after every vars step; the agent role's host-name assertion on NixOS and darwin with its `extendModules` override `hostNameDiffers`; `vmTests.x86_64-linux.fleet-ingress`'s refusal and delivery cases; stibnite's evaluation of the agent role's `darwinModule`; the operator's reading of the darwin key's owner and mode after stibnite's routine activation.
 
@@ -99,7 +99,7 @@ The clan vars generator `otel-ca` SHALL be shared, with `ca.key` never deployed 
 
 ### Requirement: The ingress receiver accepts only certificate holders on magnetite's ZeroTier address
 
-On the ingress host, caddy SHALL be the only listener on `[${flake.lib.hosts.magnetite.zt}]:4318`, serving TLS 1.3 only with magnetite's `otel-cert` and requiring a client certificate that verifies against `otel-ca`, and TCP 4318 SHALL be open on `zt+` only.
+On the ingress host, caddy SHALL be the only listener on `[${flake.lib.hosts.magnetite.zerotier.address}]:4318`, serving TLS 1.3 only with magnetite's `otel-cert` and requiring a client certificate that verifies against `otel-ca`, and TCP 4318 SHALL be open on `zt+` only.
 No collector endpoint SHALL be off loopback.
 
 **Discharged by**: R3.1's endpoint clause in `checks.x86_64-linux.otel-collector-config` with its mutants; magnetite's socket-group assertion over every unit's `Group` and `SupplementaryGroups` and every account's `extraGroups`, with its `extendModules` override `extraSocketMember`; the vendored probe's socket case; `vmTests.x86_64-linux.fleet-ingress`'s refusal and socket-access cases; the operator's refused request from stibnite at deploy.

@@ -5,7 +5,7 @@ The abbreviations and upstream citations are those of `brainstorm.md`: FM is the
 
 The current state, from `brainstorm.md` "Grounding evidence":
 
-- `otlp/mesh` listens on `[${flake.lib.hosts.magnetite.zt}]:4318` with mTLS against `otel-ca` at TLS 1.3 and feeds `metrics/ingress` and `logs/ingress`, which also receive magnetite's own agent through `forward` (FM:783-791, :815-825, :871-878).
+- `otlp/mesh` listens on `[${flake.lib.hosts.magnetite.zerotier.address}]:4318` with mTLS against `otel-ca` at TLS 1.3 and feeds `metrics/ingress` and `logs/ingress`, which also receive magnetite's own agent through `forward` (FM:783-791, :815-825, :871-878).
 - The pinned collector cannot see the client certificate (`confighttp@v0.155.0:server.go:142-150`; `client@v1.61.0:client.go:91-107`), and its filter answers 2xx for a dropped write (`filterprocessor@v0.155.0:logs.go:120-121`).
 - caddy 2.11.7 can verify a client certificate, read its URI SAN, map it, refuse with 403 and overwrite a forwarded header; nginx on magnetite cannot read a SAN.
 - At ZeroTier 1.16.0 neither the network nor `ipauth` ties an rfc4193 source address or neighbour-advertisement target to its sender (`ZT:node/Membership.hpp:118`, :180-222), and Linux lets an override NA rewrite magnetite's non-permanent neighbour entry (`net/ipv6/ndisc.c:1100-1108`).
@@ -44,8 +44,7 @@ Constraints:
 | Path | Change |
 |---|---|
 | `modules/clan/services/otel-collector/flake-module.nix` | `otel-cert`'s SAN; the agent role's host-name assertion; the ingress role's caddy, socket receiver, mesh pipelines, binding filters and `09-zerotier` neighbours, all rendered from one list; `restartUnits` adds caddy on the ingress host; the pipeline-coverage, socket-group and caddy-version assertions |
-| `modules/lib/hosts.nix` | every collecting host's `zt` address |
-| `modules/clan/inventory/services/zerotier.nix` | the controller's external members keyed by name |
+| `modules/lib/hosts.nix` | none: CAM-109's registry already gives every member's `zerotier = { address; memberId; }`, read here |
 | `modules/lib/observability-hosts.nix` | `caddy` in magnetite's `notifiedUnits` |
 | `modules/lib/zerotier-mac.nix` (new) | `flake.lib.zerotierMac`, the MAC of an rfc4193 address on its network |
 | `modules/lib/otel-envelope.nix` | C6 and caddy's metrics target |
@@ -110,7 +109,7 @@ otel-envelope C6: filter drops, caddy 403s, neighbour entries
 
 - **Choice**: nixpkgs' `services.caddy` on magnetite with `enableReload = false`, and a rendered Caddyfile:
   - global: `auto_https off`, `admin off`, `metrics`;
-  - one site listening on each address of `vanixiets.otelCollector.meshListen`, by default only `https://[${flake.lib.hosts.magnetite.zt}]:4318`, with magnetite's `otel-cert` and `otel-key` loaded through `LoadCredential`, `protocols tls1.3`, `client_auth { mode require_and_verify; trust_pool file <otel-ca> }`;
+  - one site listening on each address of `vanixiets.otelCollector.meshListen`, by default only `https://[${flake.lib.hosts.magnetite.zerotier.address}]:4318`, with magnetite's `otel-cert` and `otel-key` loaded through `LoadCredential`, `protocols tls1.3`, `client_auth { mode require_and_verify; trust_pool file <otel-ca> }`;
   - `map {http.request.tls.client.san.uris.0} {mesh_host} {mesh_addr}` with one line per collecting host other than magnetite and no `default`, so an unmapped SAN yields empty values;
   - `@refused not vars {http.request.remote.host} {mesh_addr}` and `respond @refused 403`, which refuses an unmapped SAN because a peer address is never empty (`modules/caddyhttp/map/map.go:166-169`; `replacer.go:159-173`);
   - `reverse_proxy unix//run/otelcol-mesh/otlp.sock` with `header_up X-Vanixiets-Host {mesh_host}`;
@@ -144,6 +143,7 @@ otel-envelope C6: filter drops, caddy 403s, neighbour entries
   networkd may reinstall an entry it manages on the next link event `[INFERENCE]`, so the first rollback does not wait for the merge queue: magnetite is deployed from `$DEPLOY` detached at the merge-base before pull request 2, with `clan machines update magnetite --target-host root@magnetite.scientistexperience.net`, a named exception in plan Global Constraints to the deploy-from-`origin/main` rule; the revert then lands through the queue and is deployed normally, and the entries are read absent after the rollback deploy.
 - **Boundary**: vendored-versus-first-party. networkd installs the entry and the kernel enforces it (A73); whether a zerotierone restart, which recreates its link, leaves the entries installed is observed in an operator-present step after the deploy, and C6 reads the live table on every run rather than the configuration, so a lost entry fails within one period.
   No step before the deploy exercises networkd's `[Neighbor]` installation on the ZeroTier link: the container's neighbour leg installs its entries with `ip -6 neigh replace`, so only C6 and the operator-present restart (tasks.md 6.1) judge the installed path.
+- **Retirement**: this pinning exists only while ZeroTier carries the mesh. When `migrate-mesh-to-tincr` (CAM-109) retires ZeroTier, the same pull request removes `flake.lib.zerotierMac` and its MAC clause and fixture, the `09-zerotier` neighbour entries, C6's neighbour leg and FI's neighbour leg. The binding's address factor then reads `flake.lib.hosts.<host>.address` on the tincr interface instead of `.zerotier.address`. No neighbour pinning replaces it: the tincr interface carries no neighbour discovery, and tincr's StrictSubnets admits each member only at its own overlay address (CAM-109's `fleet-mesh` requirement "Only members the operator declares are admitted, each only at its own overlay address").
 
 ### D5: Drop a mismatched host, and count it (O3)
 
@@ -177,13 +177,17 @@ otel-envelope C6: filter drops, caddy 403s, neighbour entries
 
 ### D7: One source of mesh addresses
 
-- **Choice**: HS gains a `zt` address for every host in HT; an OCC clause compares each with `vars/shared/zerotier-ip-<host>-zerotier/ip/value` for the clan peers and with ZI's `externalMembers.<host>` for stibnite, and requires each address to lie in the /88 formed from `vars/shared/zerotier-network-zerotier/network-id/value`, to be lower case, and to equal its own canonical RFC 5952 rendering, which `{http.request.remote.host}` produces `[INFERENCE: Go's IP.String form]`.
-  ZI's external members become an attribute set keyed by name, `externalMembers = { stibnite = "…"; … }` with `allowedIps = attrValues externalMembers`, so the clause compares stibnite by name rather than by membership in a list whose host names are comments.
+- **Choice**: every collecting host's mesh address is read from HS, the transport-neutral registry of `migrate-mesh-to-tincr` (CAM-109), which already declares every member: `flake.lib.hosts.<host>.zerotier.address` while ZeroTier carries the mesh, and the derived `flake.lib.hosts.<host>.address` after CAM-109 retires ZeroTier. This change adds no field to HS and none named `zt`.
+  An OCC clause compares each `zerotier.address` with a second source: `vars/shared/zerotier-ip-<host>-zerotier/ip/value` for the clan peers, and for stibnite the rfc4193 rendering of `fd` + the network id from `vars/shared/zerotier-network-zerotier/network-id/value` + `9993` + `flake.lib.hosts.stibnite.zerotier.memberId`.
+  The clause also requires each address to lie in the /88 formed from that network id, to be lower case, and to equal its own canonical RFC 5952 rendering, which `{http.request.remote.host}` produces `[INFERENCE: Go's IP.String form]`.
+  ZI is not changed: CAM-109 replaces its `allowedIps` literals with reads of the registry, so a list or set kept there would be a copy of HS, not a second source.
   The caddy map, the filter's conditions and the neighbour entries are rendered from one `let`-bound list taken from `vanixiets.otelCollector.meshIdentities` (host to address), an internal option defaulting to HT's collecting hosts joined with HS and set otherwise only in the container test; no assertion compares the three renderings, because they share one expression, and `mesh-binding` (D11) and FI's binding legs judge what the rendering produces.
-- **Rationale**: HS already claims to be the canonical registry (HS:1-4) while holding one host; the clan peers' addresses live in vars and stibnite's in a comment (C5 in `brainstorm.md`).
-  Two independent sources compared at evaluation catch a mistyped address before it becomes a 403.
-- **Mutants**: pyrite's HS address off by one digit; stibnite's HS address differing from `externalMembers.stibnite` while still listed in `allowedIps`; each shown failing.
+- **Rationale**: HS is the fleet's one declaration of its members, so the binding reads it rather than keeping its own address list (C5 in `brainstorm.md`).
+  Two sources compared at evaluation catch a mistyped address before it becomes a 403.
+  The memberId rendering is a second source only for external members, whose `memberId` CAM-109 copied from the controller's record and checks against cinnabar's controller (migrate-mesh-to-tincr 2.1); a clan peer's `memberId` was derived from its own address, so for clan peers the vars file is the second source.
+- **Mutants**: `addressDigitChanged`, pyrite's `zerotier.address` off by one digit; `externalAddressDiffers`, stibnite's `zerotier.address` set to blackphos's with its `memberId` unchanged; each shown failing.
 - **Boundary**: source-versus-delivered. HT and HS are read from magnetite's own closure, so a change to either takes effect only when magnetite deploys (Migration Plan).
+- **Retirement**: when CAM-109 retires ZeroTier, its retirement removes this clause and both of its sources together with the ZeroTier pinning of D4; `meshIdentities` then defaults to `flake.lib.hosts.<host>.address`, which is derived from the host's name and judged by CAM-109's own checks, so no second source replaces the clause.
 
 ### D8: Every pipeline that accepts mesh writes is bound
 
@@ -267,7 +271,7 @@ Implementation starts only after `stand-up-darwin-collection` (CAM-72) has archi
 
 | Pull request | Contains | Deploy |
 |---|---|---|
-| 1 | the SAN and the vars step; the agent-role host-name assertion; HS's addresses; ZI's external members keyed by name; `flake.lib.zerotierMac`; OCC's address and MAC clauses | magnetite, cinnabar, pyrite, then stibnite by `just activate` **[operator]**; electrum, galena and scheelite take theirs when next provisioned |
+| 1 | the SAN and the vars step; the agent-role host-name assertion; `flake.lib.zerotierMac`; OCC's address and MAC clauses | magnetite, cinnabar, pyrite, then stibnite by `just activate` **[operator]**; electrum, galena and scheelite take theirs when next provisioned |
 | 2 | caddy, the socket receiver, the mesh pipelines and filters, the neighbour entries, C6, `mesh-binding`, caddy in magnetite's `notifiedUnits` and kill order, `flake.lib.otelTestPki`'s identities, FI's cases | magnetite, after the MAC gate |
 | 3 | the documentation, the decision-record amendments and the charter v30 entry | none |
 
