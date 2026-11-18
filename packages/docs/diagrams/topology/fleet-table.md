@@ -4,10 +4,10 @@
 |---|---|---|---|---|
 | argentum | darwin | nix-builders/builder, user-cameron/default, vanixiets/peer | — | vanixiets (peer), zerotier (external) |
 | blackphos | darwin | user-crs58/default | — | zerotier (external) |
-| cinnabar | nixos | hermes-agent/default, openclaw/default, sshd/client, sshd/server, tor/server, user-cameron/default, vanixiets/peer, zerotier/controller | hermes, kanban, matrix, ntfy, omnigraph, radicle | vanixiets (peer), zerotier (controller) |
+| cinnabar | nixos | hermes-agent/default, openclaw/default, sshd/client, sshd/server, tor/server, user-cameron/default, vanixiets/peer, zerotier/controller | hermes, matrix, ntfy, radicle | vanixiets (peer), zerotier (controller) |
 | electrum | nixos | sshd/client, sshd/server, tor/server, user-cameron/default, vanixiets/peer, zerotier/peer | — | vanixiets (peer), zerotier (peer) |
 | galena | nixos | sshd/client, sshd/server, tor/server, user-cameron/default, user-tara/default, vanixiets/peer, zerotier/peer | — | vanixiets (peer), zerotier (peer) |
-| magnetite | nixos | nix-builders/builder, nix-builders/dispatcher, omnigent/host, omnigent/server, otel-collector/ingress, sshd/client, sshd/server, tor/server, user-cameron/default, vanixiets/peer, zerotier/peer | buildbot, cognee, gitea, gitea-mq, greptimedb, kanidm, matrix, niks3, nixbot, perses, omnigent, renovate, sso-gateway | vanixiets (peer), zerotier (peer) |
+| magnetite | nixos | nix-builders/builder, nix-builders/dispatcher, omnigent/host, omnigent/server, otel-collector/ingress, sshd/client, sshd/server, tor/server, user-cameron/default, vanixiets/peer, zerotier/peer | gitea, gitea-mq, greptimedb, kanidm, matrix, coturn, livekit, niks3, nixbot, omnigent, omnigraph, perses, renovate | vanixiets (peer), zerotier (peer) |
 | pyrite | nixos | iroh/server, nix-builders/builder, nix-builders/dispatcher, omnigent/host, sshd/client, sshd/server, tor/server, user-cameron/default, vanixiets/peer, wifi/default, zerotier/peer | — | vanixiets (peer), zerotier (peer) |
 | rosegold | darwin | nix-builders/builder, user-cameron/default, vanixiets/peer | — | vanixiets (peer), zerotier (external) |
 | scheelite | nixos | sshd/client, sshd/server, tor/server, user-cameron/default, user-tara/default, vanixiets/peer, zerotier/peer | — | vanixiets (peer), zerotier (peer) |
@@ -23,12 +23,8 @@ Service roles held by every host: emergency-access/default, otel-collector/agent
 | Public hostname | Host | Service | Ports |
 |---|---|---|---|
 | accounts.scientistexperience.net | magnetite | kanidm | 443 |
-| auth.scientistexperience.net | magnetite | sso-gateway | 443 |
-| buildbot.scientistexperience.net | magnetite | buildbot | 443 |
-| cache.scientistexperience.net | magnetite | niks3 | 443 |
 | cinnabar.scientistexperience.net | cinnabar | — | — |
 | git.scientistexperience.net | magnetite | gitea | 443 |
-| kb.scientistexperience.net | magnetite | cognee | 443 |
 | magnetite.scientistexperience.net | magnetite | — | — |
 | matrix.scientistexperience.net | magnetite | matrix | 443 |
 | mq.scientistexperience.net | magnetite | gitea-mq | 443 |

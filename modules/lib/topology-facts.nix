@@ -7,6 +7,13 @@
 # Mesh-only services carry no hostnames; their mesh names come from the
 # registry's `services` labels.
 #
+# Checked against the hosts on 2026-11-18 (`ss -ltn`/`ss -lun`, the active
+# units, magnetite's nginx virtual hosts and cinnabar's Caddyfile, and an
+# HTTPS probe of each name). A module that is imported but disabled, such
+# as buildbot, sso-gateway or cognee on magnetite, is not declared, and a
+# name answered by Cloudflare, such as niks3's cache., is not declared on a
+# host.
+#
 # Editing this file changes packages/docs/diagrams/topology/; run
 # `just topology-generate` (checks.x86_64-linux.fleet-topology-fresh fails
 # otherwise).
@@ -25,10 +32,6 @@
     in
     {
       magnetite.services = [
-        # modules/nixos/buildbot.nix
-        (https "buildbot" [ "buildbot.scientistexperience.net" ])
-        # modules/nixos/cognee.nix, modules/lib/cognee.nix
-        (https "cognee" [ "kb.scientistexperience.net" ])
         # modules/nixos/gitea.nix
         (https "gitea" [ "git.scientistexperience.net" ])
         # modules/nixos/gitea-mq.nix
@@ -37,33 +40,48 @@
         (meshOnly "greptimedb")
         # modules/nixos/kanidm.nix
         (https "kanidm" [ "accounts.scientistexperience.net" ])
-        # modules/nixos/matrix.nix
+        # modules/nixos/matrix.nix: the homeserver behind nginx, and its
+        # TURN relay and LiveKit SFU, which listen on the public address.
         (https "matrix" [ "matrix.scientistexperience.net" ])
-        # modules/nixos/niks3.nix
-        (https "niks3" [
-          "cache.scientistexperience.net"
-          "niks3.scientistexperience.net"
-        ])
+        {
+          name = "coturn";
+          hostnames = [ ];
+          ports = [
+            3478
+            5349
+          ];
+        }
+        {
+          name = "livekit";
+          hostnames = [ ];
+          ports = [
+            7880
+            7881
+          ];
+        }
+        # modules/nixos/niks3.nix; cache. is served by Cloudflare, not here.
+        (https "niks3" [ "niks3.scientistexperience.net" ])
         # modules/nixos/nixbot.nix
         (https "nixbot" [ "nixbot.scientistexperience.net" ])
-        # modules/nixos/perses.nix
-        (https "perses" [ "obs.scientistexperience.net" ])
         # The omnigent server role's domain (modules/clan/inventory/services/omnigent.nix);
         # declared here because role settings are not read for public names.
         (https "omnigent" [ "omni.scientistexperience.net" ])
-        # modules/nixos/renovate.nix
+        # omnigraph-server on :8090, reached over the mesh through cinnabar's
+        # omnigraph.vanixiets.internal site.
+        (meshOnly "omnigraph")
+        # modules/nixos/perses.nix
+        (https "perses" [ "obs.scientistexperience.net" ])
+        # modules/nixos/renovate.nix, a timer-started job.
         (meshOnly "renovate")
-        # modules/nixos/sso-gateway.nix
-        (https "sso-gateway" [ "auth.scientistexperience.net" ])
       ];
 
-      # The registry's mesh service labels for cinnabar (modules/lib/hosts.nix).
+      # The mesh sites cinnabar's caddy serves for services that run on
+      # cinnabar (modules/lib/hosts.nix labels; kanban has no backend and
+      # omnigraph's is magnetite's).
       cinnabar.services = map meshOnly [
         "hermes"
-        "kanban"
         "matrix"
         "ntfy"
-        "omnigraph"
         "radicle"
       ];
     };
