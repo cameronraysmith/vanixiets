@@ -9,7 +9,7 @@ Each evaluation the build service runs on magnetite SHALL leave one dev-loop rec
 #### Scenario: An evaluation finishes under the current evaluator
 
 - **WHEN** the build service finishes an evaluation of a push to `cameronraysmith/vanixiets` with nix-eval-jobs
-- **THEN** one dev-loop record names nix-eval-jobs and its version, 6 workers of 3072 MiB, the duration, user and system time, the memory peak and the memory ceiling of 21504 MiB, zero or more kernel kills and evaluator kills, and the outcome
+- **THEN** one dev-loop record names nix-eval-jobs and its version, 6 workers of 3072 MiB, the duration, user and system time, the memory peak and the memory ceiling it ran under, at least 21504 MiB, zero or more kernel kills and evaluator kills, and the outcome
 
 #### Scenario: An evaluation fails
 
@@ -58,7 +58,7 @@ The decision SHALL take, in order of cost: tuning the evaluator, reclaiming memo
 
 #### Scenario: An evaluation peaks above 90 % of its ceiling
 
-- **WHEN** an evaluation under iets in its first week records a memory peak of 19.5 GiB against a 21 GiB ceiling
+- **WHEN** an evaluation under iets in its first week records a memory peak of 19.5 GiB against the 21 GiB ceiling it ran under
 - **THEN** the build service keeps iets, and the operator records a capacity decision citing that evaluation and magnetite's memory budget at the time, starting with whether tuning the evaluator restores headroom
 
 #### Scenario: Tuning cannot restore headroom without losing the speed

@@ -52,6 +52,8 @@ in
       configFile = pkgs.writeText "magnetite-memory-budget.json" (builtins.toJSON probeConfig);
       textfileFlag = "--collector.textfile.directory=${directory}";
       nodeFlags = config.services.prometheus.exporters.node.extraFlags;
+      nodeUser = config.services.prometheus.exporters.node.user;
+      probeService = config.systemd.services.magnetite-memory-budget.serviceConfig;
     in
     {
       assertions = [
@@ -62,6 +64,15 @@ in
             && lib.elem textfileFlag nodeFlags;
           message = "magnetite-memory-budget: node_exporter must run its textfile collector on ${directory} and nodeExporterKeep must keep ${lib.concatStringsSep ", " seriesNames}, or the budget never reaches the store (CAM-111 design D11).";
         }
+        # A DynamicUser's RuntimeDirectory lives under /run/private, which
+        # only root may traverse, so node_exporter could not read it; the
+        # first deploy (2026-11-18) showed exactly that ("open
+        # /run/magnetite-memory-budget: permission denied"). The probe runs
+        # as node_exporter's own user instead.
+        {
+          assertion = !(probeService.DynamicUser or false) && (probeService.User or null) == nodeUser;
+          message = "magnetite-memory-budget: the probe must run as node_exporter's user ${nodeUser}, not as a DynamicUser, or node_exporter cannot read ${directory} (CAM-111 design D11).";
+        }
       ];
 
       services.prometheus.exporters.node.extraFlags = [
@@ -69,15 +80,17 @@ in
         textfileFlag
       ];
 
-      # A DynamicUser reads unit properties over D-Bus and zram's mm_stat,
-      # both world-readable, and owns the directory node_exporter reads.
+      # node_exporter's own user reads unit properties over D-Bus and zram's
+      # mm_stat, both world-readable, and owns the directory node_exporter
+      # reads.
       systemd.services.magnetite-memory-budget = {
         description = "magnetite's memory budget for node_exporter's textfile collector";
         path = [ config.systemd.package ];
         serviceConfig = {
           Type = "oneshot";
           ExecStart = "${lib.getExe (probe pkgs)} ${configFile} ${directory}/memory-budget.prom";
-          DynamicUser = true;
+          User = nodeUser;
+          Group = config.services.prometheus.exporters.node.group;
           RuntimeDirectory = "magnetite-memory-budget";
           RuntimeDirectoryMode = "0755";
           RuntimeDirectoryPreserve = true;
