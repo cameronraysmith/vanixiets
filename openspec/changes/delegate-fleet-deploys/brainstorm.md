@@ -115,6 +115,23 @@ Most important first. Each has my recommendation.
 - **Q7 Authorization for janettesmith.** When her sessions arrive, which machines may they deploy? Recommendation: rosegold (her laptop) only, and nothing until she has an agent host account.
 - **Q8 (settled, kept as a lesson) Keys on shared or agent hosts.** F12 was fixed outside this change, but it shows the risk this design has to avoid. A key on a multi-user host that runs agent or untrusted code is one permission slip away from every account there. The deployer's age identity and SSH key therefore live only on the deployer (Q2 excludes the agent host and magnetite). The design should also keep them unreadable to anyone but the deployer's account, and add a check that fails if they are readable more widely.
 
+## Operator decisions (2026-11-18)
+
+The operator accepted every recommendation, relayed by the orchestrator on 2026-11-18.
+
+- Decision (Q1, operator): O4, deploys as a service. O7 (a nixbot effect on `main`) may later become a second requester to the same deployer. O6 (pull-based) may later be used for the darwin laptops.
+- Decision (Q2, operator): the deployer lives on cinnabar and moves with cinnabar's CAM-112 successor.
+- Decision (Q3, operator): each user gets one request credential. The session id a request passes is logged but not verified.
+- Decision (Q4, operator): the deployer may deploy the six NixOS hosts (cinnabar, electrum, galena, scheelite, magnetite, pyrite) plus rosegold and argentum. stibnite and blackphos are excluded.
+- Decision (Q5, operator): a host that stops answering after activation rolls itself back automatically. Every other failed check is reported, not rolled back.
+- Decision (Q6, operator): a host that is asleep or unreachable fails fast with `unreachable`. Nothing is queued.
+- Decision (Q7, operator): janettesmith may deploy rosegold only, and gets nothing until she has an agent-host account.
+- Decision (Q8, operator): magnetite's development key is mitigated (permissions fixed), not rotated. A separate hardening change covers keys on other hosts. In this change Q8 stays a lesson, applied to the deployer's own keys.
+- Decision (Q33, operator): Gate 1 approved.
+- Decision (Q30, operator, revising Q4): the targets are the enabled hosts only, derived from the configuration's enabled state (terranix `enabled` for cloud hosts) rather than listed, so a re-enabled host joins automatically. Today they are cinnabar, magnetite, pyrite, rosegold and argentum. electrum, galena and scheelite are never deployable while disabled, and a regulator fails if a disabled host is in reach. stibnite and blackphos stay excluded.
+- Decision (Q31, operator, revising Q7): reach is a role policy encoded as data. Shared servers (cinnabar, magnetite) are reachable by every operator (cameron, janettesmith). Personal machines are reachable by their primary user plus cameron as admin. The primary user is a typed `flake.lib.hosts.<name>.primaryUser`: rosegold janettesmith, argentum christophersmith, pyrite cameron. janettesmith therefore reaches rosegold, cinnabar and magnetite, and cameron reaches all five. Her request key is generated and delivered to `omnigent-janettesmith` alongside cameron's. Accepted risk: a request key in an agent-run worker home can trigger deploys of merged `main` to that requester's hosts. That is bounded by the merged-only gate, locking, health checks, rollback and the audit.
+- Decision (Q32, operator): deploy notices go to a new `fleet-deploy` ntfy topic. ntfy's existing `alerter:fleet-*:rw` already admits it.
+
 ## Status
 
-Brainstorm captured on 2026-11-18. The approaches are laid out with a recommendation; nothing is decided until the operator answers Q1–Q7. `design.md` is not written and the design is not approved.
+The operator decided Q1-Q8 and Q30-Q33 on 2026-11-18. Gate 1 is approved (Q33), and implementation of groups 1 onward is in progress.

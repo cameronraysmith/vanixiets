@@ -3,15 +3,16 @@ linear_story_id: CAM-115
 linear_story_identifier: CAM-115
 linear_story_title: "Delegate fleet deploys to agent sessions through a scoped deployer"
 linear_story_url: https://linear.app/cameronraysmith/issue/CAM-115/delegate-fleet-deploys-to-agent-sessions-through-a-scoped-deployer
-linear_story_state: Todo
+linear_story_state: In Progress
 linear_team: CAM
 linear_project: nixbot-herculesci-cicd
-last_synced_state: Todo
-last_synced_at: "2026-11-18T21:34:28Z"
+last_synced_state: In Progress
+last_synced_at: "2026-11-18T22:28:54Z"
 review_round: 0
 max_review_rounds: 3
 attempt_log:
   - { at: "2026-11-18T21:34:28Z", transition: "Backlog->Todo", outcome: "posted", note: "Created in Backlog with the seeded description, related to CAM-112 and CAM-109, moved to Todo, bind comment posted" }
+  - { at: "2026-11-18T22:28:54Z", transition: "Todo->In Progress", outcome: "posted", note: "Gate 1 approved by the operator (Q33); the issue was already In Progress, the update was re-applied and confirmed by read-only view" }
 ---
 
 ## Why
@@ -22,7 +23,7 @@ The goal is that sessions can deploy what the merge gates already admitted, unat
 
 ## What Changes
 
-The approach is pending the operator's answers to Q1–Q7 in `brainstorm.md`. Below is the recommended option, O4 (deploys as a service), as it would land if Q1 is accepted.
+The operator decided Q1–Q8 and Q30–Q33 on 2026-11-18 (`brainstorm.md`, "Operator decisions"). The change implements O4, deploys as a service. The decisions D1–D15 are in `design.md`.
 
 **A deployer that deploys on request**
 - From: a deploy is `clan machines update` or `just activate`, run by the operator on stibnite with the operator's admin key.
@@ -31,7 +32,7 @@ The approach is pending the operator's answers to Q1–Q7 in `brainstorm.md`. Be
 - Impact: non-breaking. The operator can still deploy unmerged work from a workstation.
 
 **Requesters and their credentials**
-- Each user's sessions get a deploy-request credential delivered the same way as the other omnigent worker credentials, plus a per-user allowlist of machines (default deny).
+- Each user's sessions get a deploy-request credential delivered the same way as the other omnigent worker credentials. A role policy decides which hosts each requester may deploy. Shared servers are open to every operator; a personal machine is open to its primary user and to the admin. Disabled hosts are never deployable.
 - Every request is recorded with requester, machine, commit, closure and outcome, and announced through the fleet's ntfy path. Refusals and failed verifications are included.
 
 **A scoped deployer key**
@@ -40,7 +41,7 @@ The approach is pending the operator's answers to Q1–Q7 in `brainstorm.md`. Be
 
 **Out of scope**
 - Pull-based self-activation (O6) and deploy-on-merge from a nixbot effect (O7). O7 can later be added as a second requester without changing the deployer.
-- Key-file permissions on other hosts (brainstorm F12, Q8: fixed on magnetite outside this change; rotating the key is the operator's decision). This change applies the lesson only to the deployer's own keys.
+- Key-file permissions on other hosts (brainstorm F12, Q8). The operator chose to fix permissions rather than rotate keys, and a separate hardening change covers that. This change applies the lesson only to the deployer's own keys.
 
 ## Capabilities
 
@@ -51,11 +52,20 @@ The approach is pending the operator's answers to Q1–Q7 in `brainstorm.md`. Be
 ### Modified Capabilities
 - `secret-custody` (behavioral): the deployer becomes a named automated reader of the machine keys and activation-phase vars of in-scope machines, and of nothing else. Operator credentials stay readable by the operator alone.
 - `secret-custody-interface` (interface): the correspondence check accounts for the deployer's key and the group that scopes it.
-- `world-assumptions` (world): four assumptions. With the sops backend, a machine key unlocks all of that machine's secrets. clan's update always uploads vars and offers no skip. darwin laptops and pyrite sleep or travel. CI builds darwin closures only best-effort.
+- `world-assumptions` (world): eleven new designation rows and five assumptions, A155–A159:
+  - with the sops backend, a machine key opens all of that machine's secrets;
+  - clan's update always sends the machine key and checks every machine first;
+  - laptops are often unreachable;
+  - CI builds darwin closures only best-effort;
+  - a job handed to the service manager outlives the connection that started it.
 
 ## Impact
 
-- New: a deployer service and its account, on the host Q2 chooses (recommended: cinnabar, moving with its CAM-112 successor). A `deployer` sops user and group, listed in `defaultGroups` of in-scope machines. Per-user deploy-request credentials among the omnigent worker credentials.
+- New:
+  - a `fleet-deployer` account and request command on cinnabar, moving with its CAM-112 successor;
+  - a `fleet-deployer` sops user and a `fleet-deployers` group, listed in `defaultGroups` of the deploy targets (enabled NixOS and darwin machines except stibnite and blackphos: today argentum, cinnabar, magnetite, pyrite, rosegold);
+  - per-user deploy-request credentials among the omnigent worker credentials;
+  - the ntfy topic `fleet-deploy`.
 - Changed: `authorized_keys` for root on in-scope NixOS hosts and for the primary user on in-scope darwin hosts. Recipients of in-scope `sops/secrets/<machine>-age.key` and activation-phase vars, re-encrypted with `clan vars fix`. The `secret-custody` correspondence check.
 - Interacts with: CAM-109/tincr (target names and `deployUser` come from `flake.lib.hosts`), CAM-112 (where the deployer and agent hosts live), CAM-87's verifying `ntfy-send`, and ADR-005's deploy record as the host-side witness.
 - Unchanged: nixbot, gitea-mq and the merge gates; stibnite's own `just activate`; how sops-nix decrypts on the target.
