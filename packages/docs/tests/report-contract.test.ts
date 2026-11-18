@@ -441,6 +441,41 @@ test("well-formed partial scenario inventory is rejected even when counts agree"
   assert.throws(() => validateReport(data.root), /partial\/unexpected scenario matrix/);
 });
 
+test("publish matrix admits added cases but never a dropped or renamed required case", (t) => {
+  const data = fixture(t);
+  const names = requiredCases["playwright.config.ts"];
+  const engines = ["chromium", "webkit"];
+  data.metadata.provenance.config = "playwright.config.ts";
+  data.metadata.provenance.projects = engines.join(",");
+  data.completion.projects = engines;
+  const template = data.completion.tests[0];
+  const json = data.results.suites[0].specs[0].tests[0];
+  const saveCases = (cases: readonly string[]) => {
+    data.completion.tests = engines.flatMap((project) =>
+      cases.map((name, index) => ({ ...template, project, id: `${project}-${index}`, case: name })),
+    );
+    data.results.suites[0].specs = mergedSpecs(data.completion.tests, json);
+    data.results.stats.expected = data.completion.tests.length;
+    data.save();
+  };
+  saveCases([...names, "added.spec.ts::a case the pull request adds"]);
+  assert.equal(validateReport(data.root, "superset").passed, true);
+  assert.throws(() => validateReport(data.root), /partial\/unexpected scenario matrix/);
+  saveCases([...names, "added.ts::a case outside any spec file"]);
+  assert.throws(() => validateReport(data.root, "superset"), /malformed added case/);
+  saveCases(names.slice(0, -1));
+  assert.throws(() => validateReport(data.root, "superset"), /missing required scenario/);
+  saveCases([...names.slice(0, -1), `${names.at(-1)} (renamed)`]);
+  assert.throws(() => validateReport(data.root, "superset"), /missing required scenario/);
+  // An added case must run in every engine, like a required one.
+  saveCases([...names, "added.spec.ts::a case the pull request adds"]);
+  data.completion.tests.pop();
+  data.results.suites[0].specs = mergedSpecs(data.completion.tests, json);
+  data.results.stats.expected--;
+  data.save();
+  assert.throws(() => validateReport(data.root, "superset"), /partial\/unexpected scenario matrix/);
+});
+
 for (const system of ["aarch64-darwin", "x86_64-linux"]) {
   test(`independent ${system} engine policy rejects self-consistent chromium-only producer`, (t) => {
     const data = fixture(t);

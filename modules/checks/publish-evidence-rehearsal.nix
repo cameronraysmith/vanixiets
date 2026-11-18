@@ -260,7 +260,15 @@
         // Playwright's JSON reporter merges one spec's tests across projects.
         const specs = new Map();
         for (const view of views) write(view, png);
-        const cases = requiredCases[config];
+        // `added-case` runs one case main's policy does not name; `missing-case`
+        // drops the last required case and `renamed-case` renames it.
+        const required = requiredCases[config];
+        const cases =
+          {
+            "added-case": [...required, "added.spec.ts::a case the pull request adds"],
+            "missing-case": required.slice(0, -1),
+            "renamed-case": [...required.slice(0, -1), required.at(-1) + " (renamed)"],
+          }[variant] ?? required;
         const viewCase =
           cases.find((name) => name === "fleet-topology.spec.ts::every host and network in fleet.json is text in the diagrams") ??
           cases.at(-1);
@@ -354,6 +362,9 @@
         "invalid"
         "views"
         "base-views"
+        "added-case"
+        "missing-case"
+        "renamed-case"
       ];
 
       # The report tools with the failing test renamed to unsafeTestName.
@@ -764,7 +775,7 @@
               node ${reportTools}/validate-report.ts validate "$report" > /dev/null \
                 || { echo "control: fixture $report is not valid evidence" >&2; exit 1; }
             done
-            for report in ${reports.invalid} ${reports.absolute} ${reports.sanitised}; do
+            for report in ${reports.invalid} ${reports.absolute} ${reports.sanitised} ${reports.added-case} ${reports.missing-case} ${reports.renamed-case}; do
               status=0
               node ${reportTools}/validate-report.ts validate "$report" > /dev/null 2>&1 || status=$?
               [ "$status" = 2 ] || { echo "control: validator exited $status for $report, expected 2" >&2; exit 1; }
@@ -772,6 +783,15 @@
             # The sanitised fixture is valid only under its own policy.
             node ${sanitisedTools}/validate-report.ts validate ${reports.sanitised} > /dev/null \
               || { echo "control: fixture ${reports.sanitised} is not valid evidence under its policy" >&2; exit 1; }
+            # The publisher's `publish` mode takes main's cases as a subset:
+            # the added case is valid there, a dropped or renamed one is not.
+            node ${reportTools}/validate-report.ts publish ${reports.added-case} > /dev/null \
+              || { echo "control: fixture ${reports.added-case} is not valid under publish" >&2; exit 1; }
+            for report in ${reports.missing-case} ${reports.renamed-case}; do
+              status=0
+              node ${reportTools}/validate-report.ts publish "$report" > /dev/null 2>&1 || status=$?
+              [ "$status" = 2 ] || { echo "control: publish exited $status for $report, expected 2" >&2; exit 1; }
+            done
 
             export HOME=$TMPDIR
             export NIX_REMOTE="local?root=$TMPDIR/store-root"
@@ -1163,6 +1183,20 @@
               'report provenance {"system":"x86_64-linux","config":"playwright.negative.config.ts"} does not match ${reportAttr} {"system":"x86_64-linux","config":"playwright.config.ts"}'
             reject invalid-evidence 35 ${reports.invalid} \
               "invalid report: Invalid Playwright evidence: runner infrastructure error"
+
+            # A pull request's report is judged by main's policy: a case it
+            # adds publishes, held to shape only; a required case it drops or
+            # renames is rejected, naming the first one missing.
+            last_case="$(jq -r '.tests[-1].case' ${reports.steady}/playwright-report/completion.json)"
+            build 95 succeeded ${rev} "[$(report succeeded ${reports.added-case})]"
+            event 95
+            run added-case event --out "$pub/added-case"
+            expect_published "$pub/added-case" ${reports.added-case} 95 true \
+              "{\"expected\": $((tests + 3)), \"unexpected\": 0, \"skipped\": 0, \"flaky\": 0}" "''${steady_bundle[@]}"
+            reject missing-case 96 ${reports.missing-case} \
+              "invalid report: Invalid Playwright evidence: missing required scenario: chromium::$last_case"
+            reject renamed-case 97 ${reports.renamed-case} \
+              "invalid report: Invalid Playwright evidence: missing required scenario: chromium::$last_case"
 
             # unknown-extension: an attachment of another extension is
             # ignored; the bundle and receipt hold only the selected files.
