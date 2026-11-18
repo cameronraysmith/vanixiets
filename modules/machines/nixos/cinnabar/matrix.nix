@@ -1,11 +1,14 @@
 # flake.lib.tuwunelServerNameGuard pkgs { serverName }: the one-shot database
-# reset tuwunel runs before it starts. A homeserver's server name is bound into
-# every ID its database holds and cannot be changed in place, so when the
-# marker `.server-name` in $STATE_DIRECTORY names another server, or is absent
-# while the directory holds data (a database made before the marker existed),
-# the directory's contents move to a sibling `<dir>.retired-<old>-<epoch>`.
-# The guard then writes the configured name into the marker, so it acts once.
-# checks.x86_64-linux.matrix-server-name-reset exercises it.
+# reset run before tuwunel starts, given tuwunel's real state directory as its
+# argument. A homeserver's server name is bound into every ID its database
+# holds and cannot be changed in place, so when the marker `.server-name` in
+# that directory names another server, or is absent while the directory holds
+# data (a database made before the marker existed), the directory's contents
+# move to a sibling `<dir>.retired-<old>-<epoch>`. A missing directory is
+# created, so a first start is marked before tuwunel writes to it. The guard
+# then writes the configured name into the marker, so it acts once.
+# checks.x86_64-linux.matrix-server-name-reset exercises the script and
+# vmTests.x86_64-linux.tuwunel-server-name-guard the units.
 { config, ... }:
 let
   inherit (config.flake.lib) fleet matrixServerName tuwunelServerNameGuard;
@@ -26,7 +29,10 @@ in
       ];
       text = ''
         new="${serverName}"
-        state=$(realpath "''${STATE_DIRECTORY:?}")
+        state="''${1:?usage: tuwunel-server-name-guard <state directory>}"
+        if [ ! -d "$state" ]; then
+          install -d -m 0700 "$(dirname "$state")" "$state"
+        fi
         marker="$state/.server-name"
         old=""
         if [ -f "$marker" ]; then
@@ -74,11 +80,24 @@ in
         };
       };
 
-      # "+" runs the guard outside DynamicUser's sandbox: the unprivileged user
-      # cannot create the retired directory beside its own state directory.
-      systemd.services.tuwunel.serviceConfig.ExecStartPre = [
-        "+${lib.getExe (tuwunelServerNameGuard pkgs { serverName = matrixServerName; })}"
-      ];
+      # The guard runs as root in its own unit: tuwunel's sandbox (DynamicUser,
+      # StateDirectory) mounts /var/lib/private read-only for every command of
+      # tuwunel.service, "+" ExecStartPre included, so the retired directory
+      # cannot be created from there. Moving the old data inside the state
+      # directory instead would leave it in tuwunel's database_path, which is
+      # the state directory itself. Without RemainAfterExit the guard runs
+      # again on every start of tuwunel, and finds the marker.
+      systemd.services.tuwunel-server-name-guard = {
+        description = "Retire a tuwunel database made for another server name";
+        before = [ "tuwunel.service" ];
+        requiredBy = [ "tuwunel.service" ];
+        serviceConfig = {
+          Type = "oneshot";
+          ExecStart = "${
+            lib.getExe (tuwunelServerNameGuard pkgs { serverName = matrixServerName; })
+          } /var/lib/private/${config.services.matrix-tuwunel.stateDirectory}";
+        };
+      };
 
       # DynamicUser cannot read clan-vars paths; relay via systemd credentials
       systemd.services.tuwunel.serviceConfig.LoadCredential = [
