@@ -111,7 +111,7 @@ The cross-cutting clusters where one fix lands many entries:
 - **Smart host constructor** (O01, O02, O09, O14, O19, O20) — replaces ~70% of host module body with a thin call to a `flake.lib.mkMachine{Darwin,NixOS}` constructor. ~9 hosts × ~50 lines.
 - **Smart user content constructor** (O03, O11, O22, plus tail of O09) — replaces 5 per-user `default.nix` files with thin `mkUserContent` calls and removes redundant `username` / `aggregates` literals from `meta.nix`. ~5 files × ~40 lines.
 - **Smart inventory user-instance constructor** (O04, O20) — collapses three near-clone clan inventory user services into one. 3 files × ~50 lines.
-- **`flake.machines` typed registry** (O07, O08, O18, possibly O21) — moves zerotier IPv6, darwin SSH host pubkeys, and the controller designation into a single typed registry consumed by zerotier inventory, zt-dns, ssh-known-hosts, and home/core/ssh.nix. Removes ~20 inline literals.
+- **`flake.lib.hosts` registry** (O07, O08, O18, possibly O21) — moves zerotier IPv6, darwin SSH host pubkeys, and the controller designation into the single host registry `flake.lib.hosts` consumed by zerotier inventory, zt-dns, ssh-known-hosts, and home/core/ssh.nix. Removes ~20 inline literals. O07 and O08 are resolved by the OpenSpec change `migrate-mesh-to-tincr` (CAM-109).
 
 ### O01 [P1, P3] [HIGH] Cross-host duplication of `_module.args.flake`, `flakeForHomeManager`, and home-manager wiring block in every host module
 
@@ -182,14 +182,16 @@ The cross-cutting clusters where one fix lands many entries:
 
 ### O07 [P3] [HIGH] Zerotier-controller IPv6 nameserver hardcoded in three places
 
+- Status: resolved by the OpenSpec change `migrate-mesh-to-tincr` (CAM-109); its contract adds the registry, and its registry-consumer group moves the readers onto it.
 - Locations:
   - `modules/clan/inventory/services/zerotier.nix:11` (controller machine "cinnabar")
-  - `modules/darwin/zt-dns.nix:7` (`nameserver fddb:4344:343b:14b9:399:93db:4344:343b`)
+  - `modules/system/zt-dns.nix:8` (`ztDnsServer = "fddb:4344:343b:14b9:399:93db:4344:343b"`)
   - `modules/system/ssh-known-hosts.nix:24` (cinnabar zt IPv6)
   - `modules/home/core/ssh.nix:46` (cinnabar zt IPv6 hostname)
-- Current shape: the cinnabar controller's zerotier IPv6 (and the analogous IPv6 for every other fleet machine) is restated as a literal in clan inventory `allowedIps`, the darwin DNS resolver file, the system SSH known_hosts table, and the home SSH client config.
+- Current shape: the cinnabar controller's zerotier IPv6 (and the analogous IPv6 for every other fleet machine) is restated as a literal in clan inventory `allowedIps`, the DNS resolver file, the system SSH known_hosts table, and the home SSH client config.
 - Why this matters: P3 — identity-bearing data ought to flow from one authoritative writer; the IP is currently reauthored at each consumer.
-- Approach: add `flake.users.<u>.meta.sshKeys`-style `flake.machines.<host>.meta.{zerotierAddr, zerotierMemberId}` records; let zerotier inventory, zt-dns, ssh-known-hosts, and home/core/ssh.nix all read from this single registry.
+- Approach: `flake.lib.hosts.<name>` holds one entry per mesh member, phones included, with `class`, `endpoints`, `deployUser`, `services`, the derived `fqdn` and `address`, and the transitional `zerotier = { address; memberId; }`; zerotier inventory, zt-dns, ssh-known-hosts, and home/core/ssh.nix all read from this single registry.
+  `flake.lib.mesh.resolvers` names the members that serve the fleet zone, so the nameserver is read from `flake.lib.hosts.<resolver>.address` rather than written.
 - Dependencies: forms a cluster with O08, O14, O18.
 
 ### O08 [P3] [HIGH] Zerotier IPv6 addresses for all 9 fleet hosts duplicated between `system/ssh-known-hosts.nix` and `home/core/ssh.nix`
@@ -199,7 +201,8 @@ The cross-cutting clusters where one fix lands many entries:
   - `modules/home/core/ssh.nix:45-103` (10 entries with the same IPs)
 - Current shape: each of the 9 fleet hosts plus pixel7 has its zerotier IPv6 written once in `programs.ssh.knownHosts.<host>` (system) and once in `programs.ssh.matchBlocks.<host>.hostname` (home).
 - Why this matters: P3 — identity data with multiple writers and no single registry. Drift will silently break SSH for any host whose IP rotates.
-- Approach: add `flake.machines.<host>.meta.zerotierAddr` and have both modules consume from there.
+- Status: resolved by the OpenSpec change `migrate-mesh-to-tincr` (CAM-109), as O07.
+- Approach: both modules read `flake.lib.hosts.<host>.zerotier.address` until ZeroTier is retired and `flake.lib.hosts.<host>.{fqdn,address}` after, generating one entry per registry member.
 - Dependencies: cluster with O07; same fix lifts both.
 
 ### O09 [P3] [MEDIUM] Per-host SSH `users.users.<u>.openssh.authorizedKeys.keys` re-resolves `inputs.self.users.<u>.meta.sshKeys` instead of being centralized
@@ -285,12 +288,12 @@ The cross-cutting clusters where one fix lands many entries:
 - Why this matters: P2 (very mild) — fields used only locally hint that the typed registry is doing less work than its surface area suggests. WATCH: this might be intentional if the centralization is *for future consumers* but expressed at the registry layer first.
 - Approach: WATCH only. After O03 lands (the smart user-content constructor), these fields will have one canonical reader and the local-only-use pattern resolves.
 
-### O18 [P3] [MEDIUM] Static darwin SSH host pubkeys in `system/ssh-known-hosts.nix` declared inline rather than under `flake.machines.<host>.meta`
+### O18 [P3] [MEDIUM] Static darwin SSH host pubkeys in `system/ssh-known-hosts.nix` declared inline rather than in the host registry
 
 - Location: `modules/system/ssh-known-hosts.nix:79, 89, 99, 109, 123` (5 inline `publicKey = "ssh-ed25519 ..."` literals)
 - Current shape: for darwin and pixel7 hosts, the SSH host public key is hardcoded next to the IPs. NixOS hosts derive their keys from `flake.nixosConfigurations.<host>.config.clan.core.vars.generators.openssh.files."ssh.id_ed25519.pub".value`.
-- Why this matters: P3 — these are identity-bearing data values for darwin hosts, but they live as inline literals at one site. There's no second writer today (the literals are consumed only here), but combined with O07/O08 (zerotier IPs of the same darwin hosts), the natural shape is `flake.machines.<host>.meta.{zerotierAddr, sshHostPubKey}`.
-- Approach: same as O07 fix — extend `flake.machines` to carry these.
+- Why this matters: P3 — these are identity-bearing data values for darwin hosts, but they live as inline literals at one site. There's no second writer today (the literals are consumed only here), but combined with O07/O08 (zerotier IPs of the same darwin hosts), the natural shape is a further field of `flake.lib.hosts.<host>`.
+- Approach: same as O07 fix — extend `flake.lib.hosts` to carry these.
 - Dependencies: cluster with O07/O08.
 
 ### O19 [P1] [MEDIUM] `users.users.<u> = { uid; home; shell; description; openssh.authorizedKeys.keys }` recipe repeated across darwin hosts with literals
@@ -327,8 +330,8 @@ The cross-cutting clusters where one fix lands many entries:
   - `modules/machines/nixos/scheelite/default.nix:101-103`
 - Current shape: per `reference_aliases-fold-mechanism.md` post-A2, consumers read alias-keyed (`flakeUsers.cameron.modules`) and aliases-fold synthesizes the alias entry. This is the *fixed* dispatch pattern (no leakage). The remaining tension: each host still hardcodes the literal `cameron` (or `crs58` for legacy hosts) — the alias-vs-canonical relationship is encoded via *which literal the host writes*. A future host reorg requires touching every host file.
 - Why this matters: P3 — borderline. The aliases-fold mechanism resolves the relationship symmetrically (good), but the *choice of which literal each host writes* still encodes alias-vs-canonical by external knowledge (the comments at sites all say "cameron is an alias for crs58"). The alias-target relationship is authoritative in `flake.userAliases`, but each host independently re-decides whether to write `cameron` or `crs58`.
-- Approach: WATCH. May be intentional — the comment at each site indicates this is *consciously* alias-keyed and the orchestrator (clan inventory's user service) decides the binding. Possible future refinement: `flake.machines.<host>.users` typed list that resolves through aliases-fold, removing per-host decisions.
-- Dependencies: depends on O07/O08 cluster (`flake.machines` registry).
+- Approach: WATCH. May be intentional — the comment at each site indicates this is *consciously* alias-keyed and the orchestrator (clan inventory's user service) decides the binding. Possible future refinement: a `users` field on `flake.lib.hosts.<host>` that resolves through aliases-fold, removing per-host decisions.
+- Dependencies: depends on O07/O08 cluster (`flake.lib.hosts` registry).
 
 ### O22 [P1] [LOW] Per-user `aggregates` lists are 90% identical across 5 users but each is restated as a literal
 
@@ -348,22 +351,23 @@ Calibration unit: PR #1938 was one typed-registry adoption — 1 epic, 24 childr
 The opportunities decompose at that grain into one epic plus roughly five PRs.
 Each entry below names the opportunity IDs it would close so the next /session-plan can wire dependencies.
 
-### E1. Machine typed registry epic — `flake.machines.<host>.meta`
+### E1. Machine registry epic — `flake.lib.hosts`
 
 Mirrors what nix-0pd just did for users.
-Introduce `options.flake.machines = attrsOf (submodule ({ name, config, ... }: ...))` carrying per-host identity-bearing data; lift zerotier IPv6, darwin SSH host pubkeys, controller designation, and (eventually) admin/primary user bindings into this typed registry; rewrite consumers to read from it; introduce a `flake.lib.mkMachine{Darwin,NixOS}` smart constructor that collapses the host-module recipe.
+Extend `flake.lib.hosts.<host>` with per-host identity-bearing data; lift zerotier IPv6, darwin SSH host pubkeys, controller designation, and (eventually) admin/primary user bindings into this registry; rewrite consumers to read from it; introduce a `flake.lib.mkMachine{Darwin,NixOS}` smart constructor that collapses the host-module recipe.
+Tranches 1 and 2 are planned in the OpenSpec change `migrate-mesh-to-tincr` (CAM-109), whose contract extends `flake.lib.hosts` to every mesh member and whose registry-consumer group moves the ZeroTier literals onto it.
 
 - Closes: O01, O02, O07, O08, O09, O14, O18, O19, plausibly O21
 - Approximate tranches:
-  1. Schema declaration of `flake.machines.<host>.meta`
-  2. Lift zerotier IPv6 + member-id into the registry (O07, O08)
+  1. Schema of `flake.lib.hosts.<host>` (`migrate-mesh-to-tincr`)
+  2. Lift zerotier IPv6 + member-id into the registry (O07, O08; `migrate-mesh-to-tincr`)
   3. Lift darwin SSH host pubkeys (O18)
   4. Smart host constructor `flake.lib.mkMachine{Darwin,NixOS}` (O01, O02)
   5. Per-host module collapse onto the smart constructor (O09, O19)
   6. Derive `modules/checks/machines.nix` host list (O14)
   7. Falsifiable structural assertion for the machine registry shape
 - Indicative scope: ≈9 opportunities × 9 hosts × 50 lines = on par with nix-0pd
-- Calibration uncertainty: O21 is WATCH; may be deferred or addressed via an additional `flake.machines.<host>.users` typed list
+- Calibration uncertainty: O21 is WATCH; may be deferred or addressed via an additional `users` field on `flake.lib.hosts.<host>`
 
 ### E2. User-content smart constructor PR (no epic)
 
@@ -474,7 +478,7 @@ Relabeling existing principles or splitting one principle into two with the same
 
 **Surfaced patterns that did not warrant new principles:**
 
-- *Cross-host constants of identity (`flake.machines.<host>.meta.<x>`) is the natural extension of P3.* The post-PR-#1938 fix elevated `flake.users.<u>.meta` as the registry for cross-cutting per-user identity. The same architectural shape is missing for *machines* — `cinnabar.zt`'s controller status, every host's zerotier IPv6, darwin hosts' static SSH host pubkeys all live as inline literals across multiple modules. The pattern is absorbed into E1.
+- *Cross-host constants of identity (`flake.lib.hosts.<host>.<x>`) is the natural extension of P3.* The post-PR-#1938 fix elevated `flake.users.<u>.meta` as the registry for cross-cutting per-user identity. The same architectural shape is missing for *machines* — `cinnabar.zt`'s controller status, every host's zerotier IPv6, darwin hosts' static SSH host pubkeys all live as inline literals across multiple modules. The pattern is absorbed into E1.
 - *Bridging-values isomorphism*: the `inputs.self // { inherit inputs; }` synthesis appears at 7 sites (O01 + O20). This is P1 (derive once) plus P3 (one resolution site). Absorbed into E1's host-recipe collapse via `flake.lib.flakeForHomeManager`.
 - *Locality of effect — invariants check where they fire.* The hm-sops-bridge per-user `assertions = [...]` inline at the bridge module's evaluation site versus structural checks under `modules/checks/` are two architectural choices for invariant placement. Folded into P4: an assertion's epistemic content depends on it firing in the same evaluation context as the configurations it constrains.
 

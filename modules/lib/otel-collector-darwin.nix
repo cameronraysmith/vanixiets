@@ -59,7 +59,7 @@ in
       # As the NixOS agent's exporters (modules/clan/services/otel-collector/
       # flake-module.nix ingressExporter), with the sops paths of otel-cert.
       ingressExporter = queueSize: {
-        endpoint = "https://[${flakeLib.hosts.magnetite.zt}]:4318";
+        endpoint = "https://[${flakeLib.hosts.magnetite.zerotier.address}]:4318";
         tls = {
           ca_file = caFile;
           cert_file = certFile;

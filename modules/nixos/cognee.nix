@@ -145,7 +145,7 @@ in
           # only over ZeroTier, never on the public interface. The public path
           # reaches REST exclusively through the kb nginx /api/ location behind the
           # oauth2-proxy gate.
-          listenAddress = magnetite.zt;
+          listenAddress = magnetite.zerotier.address;
           port = 9270;
 
           settings = {
@@ -248,7 +248,7 @@ in
         # (D11) and ignores this runtime value. Merges additively with the
         # environment the cognee-frontend service already sets.
         systemd.services.cognee-frontend.environment.NEXT_PUBLIC_LOCAL_API_URL =
-          "http://[${magnetite.zt}]:9270";
+          "http://[${magnetite.zerotier.address}]:9270";
 
         # Permit cognee to bind magnetite's ZeroTier-assigned IPv6 REST address
         # before zerotierone settles on cold boot (mirrors

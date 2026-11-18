@@ -187,7 +187,7 @@ in
         allowedGroups = [ "cognee_access" ];
         upstream = {
           "/" = "http://127.0.0.1:3000";
-          "/api/" = "http://[${magnetite.zt}]:9270";
+          "/api/" = "http://[${magnetite.zerotier.address}]:9270";
         };
         # Dedicated apps-portal tile launching the cognee UI, scoped (via the
         # gateway) to cognee_access — the same group in allowedGroups, so tile
@@ -470,7 +470,7 @@ in
           region = "auto";
         };
 
-        bindAddress = magnetite.zt;
+        bindAddress = magnetite.zerotier.address;
         port = 8090;
         requireAllGraphs = true;
         # Clients reach /mcp through cinnabar's omnigraph.zt TLS front, and
