@@ -10,6 +10,7 @@
   ...
 }:
 let
+  inherit (config.flake.lib) meshInterfaces;
   inherit (config.flake.lib.hosts) magnetite;
 in
 {
@@ -21,9 +22,10 @@ in
       ...
     }:
     let
-      # The /64 ZeroTier prefix of magnetite's mesh address; the no-public-bind
-      # assertion admits any address inside this prefix.
-      ztPrefix = "fddb:4344:343b:14b9:";
+      # The /64 ZeroTier prefix of magnetite's ZeroTier address; the
+      # no-public-bind assertion admits any address inside this prefix.
+      ztPrefix =
+        lib.concatStringsSep ":" (lib.take 4 (lib.splitString ":" magnetite.zerotier.address)) + ":";
       isLoopbackOrMesh = addr: addr == "127.0.0.1" || addr == "::1" || lib.hasPrefix ztPrefix addr;
       restBind = config.services.cognee.listenAddress;
       frontendBind = config.services.cognee.frontend.listenAddress;
@@ -263,8 +265,10 @@ in
           "net.ipv4.ip_nonlocal_bind" = lib.mkDefault 1;
         };
 
-        # Expose the cognee REST API on the ZeroTier mesh only.
-        networking.firewall.interfaces."zt+".allowedTCPPorts = [ 9270 ];
+        # Expose the cognee REST API on the mesh interfaces only.
+        networking.firewall.interfaces = lib.genAttrs (meshInterfaces config) (_: {
+          allowedTCPPorts = [ 9270 ];
+        });
       };
     };
 }

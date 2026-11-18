@@ -343,22 +343,23 @@ if [ -z "$REASON" ]; then
 fi
 
 # --- Remote access ---
-# ssh/scp/rsync targeting *.zt zerotier-VPN hosts auto-permit with NOTICE.
-# All -J jump hosts (comma-list) must also be .zt. Other destinations escalate.
+# ssh/scp/rsync targeting fleet hosts (*.zt on ZeroTier, *.vanixiets.internal
+# on the tincr mesh) auto-permit with NOTICE. All -J jump hosts (comma-list)
+# must also be fleet hosts. Other destinations escalate.
 if [ -z "$REASON" ]; then
   if cmd_match 'ssh\s'; then
-    # Match ssh ... [user@]host.zt (destination at end-of-token boundary)
-    if echo "$COMMAND" | grep -qE '(^|[;&|]\s*|&&\s*|\|\|?\s*|\$\(\s*)ssh([[:space:]]+(-[A-Za-z][^[:space:]]*|-[A-Za-z][[:space:]]+[^[:space:]-][^[:space:]]*))*[[:space:]]+([A-Za-z0-9._-]+@)?[A-Za-z0-9_-]+(\.[A-Za-z0-9_-]+)*\.zt([[:space:]]|$)'; then
+    # Match ssh ... [user@]host.zt or host.vanixiets.internal (destination at end-of-token boundary)
+    if echo "$COMMAND" | grep -qE '(^|[;&|]\s*|&&\s*|\|\|?\s*|\$\(\s*)ssh([[:space:]]+(-[A-Za-z][^[:space:]]*|-[A-Za-z][[:space:]]+[^[:space:]-][^[:space:]]*))*[[:space:]]+([A-Za-z0-9._-]+@)?[A-Za-z0-9_-]+(\.[A-Za-z0-9_-]+)*(\.zt|\.vanixiets\.internal)([[:space:]]|$)'; then
       jump_ok=true
       if echo "$COMMAND" | grep -qE '(^|[[:space:]])-J[[:space:]]'; then
         for h in $(echo "$COMMAND" | sed -nE 's/.*[[:space:]]-J[[:space:]]+([^[:space:]]+).*/\1/p' | tr ',' ' '); do
-          [[ "$h" =~ \.zt$ ]] || { jump_ok=false; break; }
+          [[ "$h" =~ (\.zt|\.vanixiets\.internal)$ ]] || { jump_ok=false; break; }
         done
       fi
       if $jump_ok; then
-        notify_permitted "ssh to .zt host"
+        notify_permitted "ssh to fleet host"
       else
-        REASON="ssh -J jump host not on .zt domain"
+        REASON="ssh -J jump host not a fleet host"
       fi
     else
       REASON="remote shell access"
@@ -367,9 +368,9 @@ if [ -z "$REASON" ]; then
 fi
 if [ -z "$REASON" ]; then
   if cmd_match 'scp\s'; then
-    # scp uses host:path syntax; permit when at least one .zt: destination present
-    if echo "$COMMAND" | grep -qE '(^|[[:space:]])([A-Za-z0-9._-]+@)?[A-Za-z0-9_-]+(\.[A-Za-z0-9_-]+)*\.zt:'; then
-      notify_permitted "scp to/from .zt host"
+    # scp uses host:path syntax; permit when at least one fleet host: destination present
+    if echo "$COMMAND" | grep -qE '(^|[[:space:]])([A-Za-z0-9._-]+@)?[A-Za-z0-9_-]+(\.[A-Za-z0-9_-]+)*(\.zt|\.vanixiets\.internal):'; then
+      notify_permitted "scp to/from fleet host"
     else
       REASON="remote file transfer"
     fi
@@ -377,9 +378,9 @@ if [ -z "$REASON" ]; then
 fi
 if [ -z "$REASON" ]; then
   if cmd_match 'rsync\s'; then
-    # rsync uses host:path syntax (over ssh); permit when at least one .zt: destination present
-    if echo "$COMMAND" | grep -qE '(^|[[:space:]])([A-Za-z0-9._-]+@)?[A-Za-z0-9_-]+(\.[A-Za-z0-9_-]+)*\.zt:'; then
-      notify_permitted "rsync to/from .zt host"
+    # rsync uses host:path syntax (over ssh); permit when at least one fleet host: destination present
+    if echo "$COMMAND" | grep -qE '(^|[[:space:]])([A-Za-z0-9._-]+@)?[A-Za-z0-9_-]+(\.[A-Za-z0-9_-]+)*(\.zt|\.vanixiets\.internal):'; then
+      notify_permitted "rsync to/from fleet host"
     else
       REASON="remote sync"
     fi

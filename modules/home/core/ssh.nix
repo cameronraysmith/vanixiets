@@ -3,7 +3,52 @@
 # - includes (colima, augment, orbstack, custom_config)
 # - zerotier network hosts
 # - security key handling (FIDO/U2F)
-{ ... }:
+{ config, lib, ... }:
+let
+  inherit (config.flake.lib) hosts;
+
+  # Login per member reachable over ssh: every NixOS and darwin host, plus
+  # pixel7's Termux sshd. pixel11 runs no sshd.
+  logins = {
+    cinnabar.User = "cameron";
+    electrum.User = "cameron";
+    blackphos.User = "crs58";
+    stibnite.User = "crs58";
+    argentum.User = "cameron";
+    rosegold.User = "cameron";
+    galena.User = "cameron";
+    scheelite.User = "cameron";
+    magnetite.User = "cameron";
+    pyrite.User = "cameron";
+    pixel7 = {
+      Port = 8022; # Termux sshd default
+      User = "termux"; # Termux accepts any username
+    };
+  };
+
+  # One block per login under a host name: HostName is the member's address
+  # on that network, and hosts whose keys are pinned in known_hosts
+  # (modules/system/ssh-known-hosts.nix; not the phone) look the key up under
+  # that name.
+  blocksNamed =
+    hostName: address:
+    lib.mapAttrs' (
+      name: login:
+      lib.nameValuePair (hostName name) (
+        {
+          HostName = address hosts.${name};
+        }
+        // login
+        // lib.optionalAttrs (hosts.${name}.class != "android") { HostKeyAlias = hostName name; }
+      )
+    ) logins;
+
+  # ZeroTier blocks, `<name>.zt`, until ZeroTier is retired.
+  ztBlocks = blocksNamed (name: "${name}.zt") (host: host.zerotier.address);
+
+  # Mesh blocks under each member's canonical name.
+  meshBlocks = blocksNamed (name: hosts.${name}.fqdn) (host: host.address);
+in
 {
   flake.modules.homeManager.core =
     {
@@ -46,76 +91,10 @@
             AddKeysToAgent = "no";
           };
 
-          # ====================
-          # Zerotier Network Hosts (test-clan)
-          # ====================
-
-          "cinnabar.zt" = {
-            HostName = "fddb:4344:343b:14b9:399:93db:4344:343b";
-            User = "cameron";
-            HostKeyAlias = "cinnabar.zt";
-          };
-
-          "electrum.zt" = {
-            HostName = "fddb:4344:343b:14b9:399:93d1:7e6d:27cc";
-            User = "cameron";
-            HostKeyAlias = "electrum.zt";
-          };
-
-          "blackphos.zt" = {
-            HostName = "fddb:4344:343b:14b9:399:930e:e971:d9e0";
-            User = "crs58";
-            HostKeyAlias = "blackphos.zt";
-          };
-
-          "stibnite.zt" = {
-            HostName = "fddb:4344:343b:14b9:399:9324:19d9:3451";
-            User = "crs58";
-            HostKeyAlias = "stibnite.zt";
-          };
-
-          "argentum.zt" = {
-            HostName = "fddb:4344:343b:14b9:399:93f7:54d5:ad7e";
-            User = "cameron";
-            HostKeyAlias = "argentum.zt";
-          };
-
-          "rosegold.zt" = {
-            HostName = "fddb:4344:343b:14b9:399:9315:3431:ee8";
-            User = "cameron";
-            HostKeyAlias = "rosegold.zt";
-          };
-
-          "galena.zt" = {
-            HostName = "fddb:4344:343b:14b9:399:9315:c67a:dec9";
-            User = "cameron";
-            HostKeyAlias = "galena.zt";
-          };
-
-          "scheelite.zt" = {
-            HostName = "fddb:4344:343b:14b9:399:9380:46d5:3400";
-            User = "cameron";
-            HostKeyAlias = "scheelite.zt";
-          };
-
-          "magnetite.zt" = {
-            HostName = "fddb:4344:343b:14b9:399:930f:39db:40d2";
-            User = "cameron";
-            HostKeyAlias = "magnetite.zt";
-          };
-
-          "pyrite.zt" = {
-            HostName = "fddb:4344:343b:14b9:399:937e:8067:8028";
-            User = "cameron";
-            HostKeyAlias = "pyrite.zt";
-          };
-
-          "pixel7.zt" = {
-            HostName = "fddb:4344:343b:14b9:399:939f:c45d:577c";
-            Port = 8022; # Termux sshd default
-            User = "termux"; # Termux accepts any username
-          };
-
+        }
+        // ztBlocks
+        // meshBlocks
+        // {
           # Wildcard for all zerotier hosts
           "*.zt" = {
             # Enable compression for zerotier (encrypted tunnel over encrypted tunnel)

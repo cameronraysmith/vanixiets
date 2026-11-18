@@ -8,16 +8,56 @@
 # The zerotier controller pushes this DNS server to all network members.
 # systemd-resolved routes .zt queries to dnsmasq via split DNS on the
 # zerotier interface.
-{ ... }:
+{ config, ... }:
+let
+  inherit (config.flake.lib) hosts meshInterfaces;
+
+  # cinnabar's ZeroTier listen list: its ZeroTier IPv6 and the IPv4 that
+  # pin-controller-ipv4 below pins it to.
+  ztAddress = hosts.cinnabar.zerotier.address;
+  ztIpv4 = "10.147.17.1";
+
+  # Service names resolve to cinnabar on both of its ZeroTier addresses.
+  serviceRecords = builtins.concatMap (label: [
+    "/${label}.zt/${ztAddress}"
+    "/${label}.zt/${ztIpv4}"
+  ]) hosts.cinnabar.services;
+
+  # Machine hostnames (for non-SSH service discovery via meta.domain = "zt").
+  machineRecords = [
+    "/cinnabar.zt/${ztAddress}"
+    "/cinnabar.zt/${ztIpv4}"
+  ]
+  ++ map (name: "/${name}.zt/${hosts.${name}.zerotier.address}") [
+    "electrum"
+    "galena"
+    "scheelite"
+    "stibnite"
+    "blackphos"
+    "argentum"
+    "rosegold"
+    "magnetite"
+    "pyrite"
+  ];
+in
 {
   flake.modules.nixos."machines/nixos/cinnabar" =
-    { config, pkgs, ... }:
+    {
+      config,
+      lib,
+      pkgs,
+      ...
+    }:
     {
       services.dnsmasq = {
         enable = true;
         resolveLocalQueries = false;
         settings = {
-          "listen-address" = "fddb:4344:343b:14b9:399:93db:4344:343b,10.147.17.1";
+          # A list, so modules/nixos/mesh-dns.nix can add the mesh address.
+          "listen-address" = [
+            ztAddress
+            ztIpv4
+          ];
           "bind-dynamic" = true;
           "no-resolv" = true;
           "no-hosts" = true;
@@ -25,41 +65,17 @@
             "9.9.9.9"
             "149.112.112.112"
           ];
-          address = [
-            "/kanban.zt/fddb:4344:343b:14b9:399:93db:4344:343b"
-            "/kanban.zt/10.147.17.1"
-            "/matrix.zt/fddb:4344:343b:14b9:399:93db:4344:343b"
-            "/matrix.zt/10.147.17.1"
-            "/hermes.zt/fddb:4344:343b:14b9:399:93db:4344:343b"
-            "/hermes.zt/10.147.17.1"
-            "/ntfy.zt/fddb:4344:343b:14b9:399:93db:4344:343b"
-            "/ntfy.zt/10.147.17.1"
-            "/omnigraph.zt/fddb:4344:343b:14b9:399:93db:4344:343b"
-            "/omnigraph.zt/10.147.17.1"
-            "/radicle.zt/fddb:4344:343b:14b9:399:93db:4344:343b"
-            "/radicle.zt/10.147.17.1"
-
-            # Machine hostnames (for non-SSH service discovery via meta.domain = "zt")
-            "/cinnabar.zt/fddb:4344:343b:14b9:399:93db:4344:343b"
-            "/cinnabar.zt/10.147.17.1"
-            "/electrum.zt/fddb:4344:343b:14b9:399:93d1:7e6d:27cc"
-            "/galena.zt/fddb:4344:343b:14b9:399:9315:c67a:dec9"
-            "/scheelite.zt/fddb:4344:343b:14b9:399:9380:46d5:3400"
-            "/stibnite.zt/fddb:4344:343b:14b9:399:9324:19d9:3451"
-            "/blackphos.zt/fddb:4344:343b:14b9:399:930e:e971:d9e0"
-            "/argentum.zt/fddb:4344:343b:14b9:399:93f7:54d5:ad7e"
-            "/rosegold.zt/fddb:4344:343b:14b9:399:9315:3431:ee8"
-            "/magnetite.zt/fddb:4344:343b:14b9:399:930f:39db:40d2"
-            "/pyrite.zt/fddb:4344:343b:14b9:399:937e:8067:8028"
-          ];
+          address = serviceRecords ++ machineRecords;
         };
       };
 
-      networking.firewall.interfaces."zt+".allowedTCPPorts = [
-        53
-        8776
-      ];
-      networking.firewall.interfaces."zt+".allowedUDPPorts = [ 53 ];
+      networking.firewall.interfaces = lib.genAttrs (meshInterfaces config) (_: {
+        allowedTCPPorts = [
+          53
+          8776
+        ];
+        allowedUDPPorts = [ 53 ];
+      });
 
       # Pin cinnabar's own zerotier member to 10.147.17.1 so dnsmasq and
       # Caddy bind addresses are deterministic across rebuilds.
@@ -81,7 +97,7 @@
             -d '{
               "dns": {
                 "domain": "zt",
-                "servers": ["fddb:4344:343b:14b9:399:93db:4344:343b", "10.147.17.1"]
+                "servers": ["${ztAddress}", "${ztIpv4}"]
               },
               "v4AssignMode": { "zt": true },
               "ipAssignmentPools": [
@@ -98,7 +114,7 @@
           NETWORK_ID="${config.clan.core.vars.generators."zerotier-network-zerotier".files.network-id.value}"
           MEMBER_ID=$(${pkgs.zerotierone}/bin/zerotier-cli info | ${pkgs.gawk}/bin/awk '{print $3}')
           AUTH=$(cat /var/lib/zerotier-one/authtoken.secret)
-          IPV6="fddb:4344:343b:14b9:399:93db:4344:343b"
+          IPV6="${ztAddress}"
 
           ${pkgs.curl}/bin/curl -sf \
             -X POST \
@@ -111,7 +127,7 @@
 
       # Route .zt queries to local dnsmasq via systemd-resolved split DNS
       systemd.network.networks."09-zerotier" = {
-        dns = [ "fddb:4344:343b:14b9:399:93db:4344:343b" ];
+        dns = [ ztAddress ];
         domains = [ "~zt" ];
       };
     };

@@ -1,17 +1,25 @@
 # nginx location restricting a vhost's Prometheus endpoint to loopback and the
-# ZeroTier mesh, for services whose vhost otherwise proxies `/` publicly.
+# overlay networks, for services whose vhost otherwise proxies `/` publicly.
 # The regex covers /metrics, /metrics/ and anything under /metrics/ without
 # shadowing sibling paths such as /metricsfoo.
-# The mesh range is the ZeroTier /64 that cognee's no-public-bind assertion
-# already admits (modules/nixos/cognee.nix).
-{ ... }:
+# The ranges are the tincr mesh prefix from flake.lib.mesh and, until ZeroTier
+# is retired, the /64 of the members' ZeroTier addresses in flake.lib.hosts,
+# which cognee's no-public-bind assertion also admits (modules/nixos/cognee.nix).
+{ config, lib, ... }:
+let
+  inherit (config.flake.lib) hosts mesh;
+  zerotierNetwork = lib.concatStringsSep ":" (
+    lib.take 4 (lib.splitString ":" hosts.cinnabar.zerotier.address)
+  );
+in
 {
   flake.lib.nginxMetricsLocation =
     let
       accessRules = ''
         allow 127.0.0.0/8;
         allow ::1;
-        allow fddb:4344:343b:14b9::/64;
+        allow ${mesh.prefixOf mesh.instance};
+        allow ${zerotierNetwork}::/64;
         deny all;
       '';
     in

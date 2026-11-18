@@ -3,9 +3,9 @@
 # cinnabar's dnsmasq (machines/nixos/cinnabar/zt-dns.nix) answers for .zt on
 # its ZeroTier address. Clients send only .zt names there; every other name
 # keeps its usual path (the local dnscrypt-proxy where enabled).
-{ ... }:
+{ config, ... }:
 let
-  ztDnsServer = "fddb:4344:343b:14b9:399:93db:4344:343b";
+  ztDnsServer = config.flake.lib.hosts.cinnabar.zerotier.address;
 in
 {
   # macOS consults /etc/resolver/<domain> for names under that domain

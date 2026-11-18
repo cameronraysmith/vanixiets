@@ -9,11 +9,9 @@
 #
 # services.stibnite-session — the caller side: the keypair and its ssh alias.
 # services.stibnite-session-host — the stibnite side: the authorization.
-{ lib, ... }:
+{ config, lib, ... }:
 let
-  # Deterministic ZeroTier IPv6, matching modules/system/ssh-known-hosts.nix
-  # and modules/machines/nixos/cinnabar/zt-dns.nix.
-  stibniteZt = "fddb:4344:343b:14b9:399:9324:19d9:3451";
+  stibniteZt = config.flake.lib.hosts.stibnite.zerotier.address;
 
   # clan's public var values carry the trailing newline of the file they were
   # read from, and an authorized_keys entry is one line.

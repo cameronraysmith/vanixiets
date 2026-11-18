@@ -6,6 +6,8 @@
 #   - Static keys: Darwin hosts (macOS system-managed)
 { config, lib, ... }:
 let
+  inherit (config.flake.lib) hosts;
+
   # Shared known_hosts configuration for all SSH clients
   # Any machine (NixOS or darwin) might connect to any infrastructure host
   # Single source of truth for zerotier network trust relationships
@@ -21,7 +23,8 @@ let
       "cinnabar.zt" = {
         hostNames = [
           "cinnabar.zt"
-          "fddb:4344:343b:14b9:399:93db:4344:343b" # Zerotier IPv6
+          hosts.cinnabar.zerotier.address
+          hosts.cinnabar.fqdn
         ];
         publicKey =
           flake.nixosConfigurations.cinnabar.config.clan.core.vars.generators.openssh.files."ssh.id_ed25519.pub".value;
@@ -30,7 +33,8 @@ let
       "electrum.zt" = {
         hostNames = [
           "electrum.zt"
-          "fddb:4344:343b:14b9:399:93d1:7e6d:27cc" # Zerotier IPv6
+          hosts.electrum.zerotier.address
+          hosts.electrum.fqdn
         ];
         publicKey =
           flake.nixosConfigurations.electrum.config.clan.core.vars.generators.openssh.files."ssh.id_ed25519.pub".value;
@@ -39,7 +43,8 @@ let
       "galena.zt" = {
         hostNames = [
           "galena.zt"
-          "fddb:4344:343b:14b9:399:9315:c67a:dec9" # Zerotier IPv6
+          hosts.galena.zerotier.address
+          hosts.galena.fqdn
         ];
         publicKey =
           flake.nixosConfigurations.galena.config.clan.core.vars.generators.openssh.files."ssh.id_ed25519.pub".value;
@@ -48,7 +53,8 @@ let
       "scheelite.zt" = {
         hostNames = [
           "scheelite.zt"
-          "fddb:4344:343b:14b9:399:9380:46d5:3400" # Zerotier IPv6
+          hosts.scheelite.zerotier.address
+          hosts.scheelite.fqdn
         ];
         publicKey =
           flake.nixosConfigurations.scheelite.config.clan.core.vars.generators.openssh.files."ssh.id_ed25519.pub".value;
@@ -57,7 +63,8 @@ let
       "magnetite.zt" = {
         hostNames = [
           "magnetite.zt"
-          "fddb:4344:343b:14b9:399:930f:39db:40d2" # Zerotier IPv6
+          hosts.magnetite.zerotier.address
+          hosts.magnetite.fqdn
         ];
         publicKey =
           flake.nixosConfigurations.magnetite.config.clan.core.vars.generators.openssh.files."ssh.id_ed25519.pub".value;
@@ -66,7 +73,8 @@ let
       "pyrite.zt" = {
         hostNames = [
           "pyrite.zt"
-          "fddb:4344:343b:14b9:399:937e:8067:8028" # Zerotier IPv6
+          hosts.pyrite.zerotier.address
+          hosts.pyrite.fqdn
         ];
         publicKey =
           flake.nixosConfigurations.pyrite.config.clan.core.vars.generators.openssh.files."ssh.id_ed25519.pub".value;
@@ -81,7 +89,8 @@ let
       "blackphos.zt" = {
         hostNames = [
           "blackphos.zt"
-          "fddb:4344:343b:14b9:399:930e:e971:d9e0" # Zerotier IPv6
+          hosts.blackphos.zerotier.address
+          hosts.blackphos.fqdn
         ];
         publicKey = config.flake.lib.darwinHostKeys.blackphos;
       };
@@ -89,7 +98,8 @@ let
       "stibnite.zt" = {
         hostNames = [
           "stibnite.zt"
-          "fddb:4344:343b:14b9:399:9324:19d9:3451" # Zerotier IPv6
+          hosts.stibnite.zerotier.address
+          hosts.stibnite.fqdn
         ];
         publicKey = config.flake.lib.darwinHostKeys.stibnite;
       };
@@ -97,7 +107,8 @@ let
       "argentum.zt" = {
         hostNames = [
           "argentum.zt"
-          "fddb:4344:343b:14b9:399:93f7:54d5:ad7e" # Zerotier IPv6
+          hosts.argentum.zerotier.address
+          hosts.argentum.fqdn
         ];
         publicKey = config.flake.lib.darwinHostKeys.argentum;
       };
@@ -105,7 +116,8 @@ let
       "rosegold.zt" = {
         hostNames = [
           "rosegold.zt"
-          "fddb:4344:343b:14b9:399:9315:3431:ee8" # Zerotier IPv6
+          hosts.rosegold.zerotier.address
+          hosts.rosegold.fqdn
         ];
         publicKey = config.flake.lib.darwinHostKeys.rosegold;
       };
@@ -117,7 +129,11 @@ let
       "pixel7.zt" = {
         hostNames = [
           "[pixel7.zt]:8022"
-          "[fddb:4344:343b:14b9:399:939f:c45d:577c]:8022" # Zerotier IPv6 + Termux port
+          "[${hosts.pixel7.zerotier.address}]:8022" # Termux port
+          # ssh checks the phone's key under the address its block dials
+          # (modules/home/core/ssh.nix sets no HostKeyAlias for it).
+          "[${hosts.pixel7.fqdn}]:8022"
+          "[${hosts.pixel7.address}]:8022"
         ];
         # Static key from Termux openssh
         # Verified 2025-12-29

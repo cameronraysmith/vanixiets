@@ -23,6 +23,9 @@
   inputs,
   ...
 }:
+let
+  inherit (config.flake.lib) meshInterfaces;
+in
 {
   flake.modules.nixos.buildbot =
     {
@@ -258,10 +261,10 @@
           "e /nix/var/nix/gcroots/per-user/buildbot-worker/*/* - - - 30d -"
         ];
 
-        # Allow buildbot worker connections via ZeroTier (for remote workers)
-        networking.firewall.interfaces."zt+" = {
+        # Allow buildbot worker connections over the mesh (for remote workers)
+        networking.firewall.interfaces = lib.genAttrs (meshInterfaces config) (_: {
           allowedTCPPorts = [ 9989 ];
-        };
+        });
 
         # CLI for local dispatch of hercules-ci-effects pipelines against this
         # buildbot master.

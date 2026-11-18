@@ -1,9 +1,9 @@
 # Mosh (mobile shell) server for every fleet machine.
 # mosh-server is spawned through an ordinary SSH login, so it reuses the
 # existing key and certificate trust; only the UDP return path is new.
-{ config, ... }:
+{ config, lib, ... }:
 let
-  inherit (config.flake.lib) zerotierInterfaces;
+  inherit (config.flake.lib) meshInterfaces;
 in
 {
   flake.modules = {
@@ -20,12 +20,14 @@ in
         # mosh-server binds the first free port in [PORT_RANGE_LOW,
         # PORT_RANGE_HIGH] = [60001, 60999] (src/network/network.h), one port
         # per live session.
-        networking.firewall.interfaces.${zerotierInterfaces config}.allowedUDPPortRanges = [
-          {
-            from = 60001;
-            to = 60999;
-          }
-        ];
+        networking.firewall.interfaces = lib.genAttrs (meshInterfaces config) (_: {
+          allowedUDPPortRanges = [
+            {
+              from = 60001;
+              to = 60999;
+            }
+          ];
+        });
       };
 
     darwin.base =
