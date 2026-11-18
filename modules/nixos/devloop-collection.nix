@@ -10,7 +10,7 @@
 # to the patch's production code and runs the queries and grants against
 # the nixbot input's migrations (D14, D15 as amended by plan review F11).
 # The NixOS module also creates the two readers' roles and their column
-# grants, and the collector's four source receivers, each stamping its rows
+# grants, and the collector's five source receivers, each stamping its rows
 # for the ingress role's `routing/logs` (D4, D6, D7, D9, D10);
 # vmTests.x86_64-linux.devloop-ingest runs them against a real store (D16).
 { config, lib, ... }:
@@ -286,6 +286,11 @@ let
     map (column: column.name) tables.batch_event.columns
   );
 
+  # The keys nixbot's `evaluation finished` lines keep
+  # (nixbot-evaluation-record.patch): every eval_run column, ts included,
+  # which is the record's own `ts`, nixbot's JSON formatter's timestamp.
+  evalRunKeys = map (column: column.name) tables.eval_run.columns;
+
   # The three questions devloop answers for the past week (design D8), run in
   # devloop-ingest's documentedQueries case and at acceptance. GreptimeDB
   # 1.2.1 plans SQL with DataFusion 53.1.0 (GreptimeTeam/greptimedb@v1.2.1:
@@ -367,6 +372,7 @@ let
     ci_attribute = "sqlquery/ci_attribute";
     ci_build = "sqlquery/ci_build";
     batch_event = "journald/gitea-mq";
+    eval_run = "journald/nixbot-eval";
   };
 
   # The file flake.modules.nixos.deploy-record appends to (design D9).
@@ -511,7 +517,10 @@ let
   #     current system and the store's latest row does not, the store is
   #     read again every 10 s for up to 120 s first, because that line may
   #     not be shipped yet (a deploy just before the run, or the timer's
-  #     Persistent catch-up at boot).
+  #     Persistent catch-up at boot);
+  #   C8 eval-runs: the nixbot.service journal's `evaluation finished`
+  #     lines whose own ts lies in the window, as (build_id, ts) keys,
+  #     against eval_run's, compared as multisets.
   # nixbot is read by peer as devloop-reconcile through
   # devloopCollection.reconcileQueries; the store as `regulator` through
   # greptimedbSql (modules/lib/greptimedb-envelope.nix), which reads
@@ -574,6 +583,21 @@ let
       # The deploy record's lines whose ts lies in [$from, $to).
       deployLinesJq = pkgs.writeText "devloop-reconcile-deploy-lines.jq" ''
         select(.ts >= $from and .ts < $to) | .ts
+      '';
+      # The `evaluation finished` lines of the slurped nixbot.service journal
+      # whose own ts lies in [$from, $to) microseconds, one
+      # `build_id<TAB>ts_us` line each. nixbot's JSON formatter writes ts
+      # with milliseconds and a Z (Mic92/nixbot@171a8c77:nixbot/nixbot/log.py:27-30).
+      evalRunLinesJq = pkgs.writeText "devloop-reconcile-eval-run-lines.jq" ''
+        .[]
+        | .MESSAGE
+        | strings
+        | fromjson?
+        | select(type == "object" and .msg == "evaluation finished")
+        | (.ts | capture("^(?<s>[^.Z]+)(\\.(?<f>[0-9]+))?Z$")) as $c
+        | ((($c.s + "Z") | fromdateiso8601) * 1000000 + ((($c.f // "") + "000000")[0:6] | tonumber)) as $us
+        | select($us >= $from and $us < $to)
+        | "\(.build_id // "NULL")\t\($us)"
       '';
     in
     pkgs.writeShellApplication {
@@ -778,6 +802,38 @@ let
           fail "C7 current-system" "the latest stored closure is $latest$after and the current system is $current"
         fi
 
+        # C8: nixbot's evaluation records. The journal is read a minute either
+        # side of the window, because a record's own ts, which decides its
+        # day, precedes its journal timestamp by the time journald takes.
+        ${journalctl} --quiet --no-pager --output=json --unit=nixbot.service --grep='"msg": "evaluation finished"' \
+          --since="@$((from_s - 60))" --until="@$((to_s + 60))" > "$work/nixbot.json" ||
+          unreadable "the nixbot.service journal"
+        jq -r -s --argjson from "$((from_s * 1000000))" --argjson to "$((to_s * 1000000))" -f ${evalRunLinesJq} \
+          "$work/nixbot.json" > "$work/eval-lines.raw" || unreadable "the nixbot.service journal entries"
+        n=$(storeq "SELECT count(*) FROM $(tbl eval_run) WHERE $(win ts)") || unreadable "$db.eval_run in the store"
+        if [ "$n" -gt 0 ]; then
+          storeq "SELECT \"build_id\", \"ts\" FROM $(tbl eval_run) WHERE $(win ts)" > "$work/eval-store.raw" ||
+            unreadable "$db.eval_run keys in the store"
+        else
+          : > "$work/eval-store.raw"
+        fi
+        LC_ALL=C sort "$work/eval-lines.raw" > "$work/eval-lines"
+        LC_ALL=C sort "$work/eval-store.raw" > "$work/eval-store"
+        LC_ALL=C comm -23 "$work/eval-lines" "$work/eval-store" > "$work/eval-missing"
+        LC_ALL=C comm -13 "$work/eval-lines" "$work/eval-store" > "$work/eval-extra"
+        detail=""
+        if [ -s "$work/eval-missing" ]; then
+          detail="missing from $db.eval_run: $(sample "$work/eval-missing")"
+        fi
+        if [ -s "$work/eval-extra" ]; then
+          detail="''${detail:+$detail; }not in nixbot's journal: $(sample "$work/eval-extra")"
+        fi
+        if [ -n "$detail" ]; then
+          fail "C8 eval-runs" "$detail"
+        else
+          ok "C8 eval-runs"
+        fi
+
         exit "$failed"
       '';
     };
@@ -797,6 +853,7 @@ in
     inherit
       questions
       batchEventKeys
+      evalRunKeys
       reconcileQueries
       keepAttributes
       dropBody
@@ -813,6 +870,9 @@ in
       collectorGroups = lib.toList (
         config.systemd.services.opentelemetry-collector.serviceConfig.SupplementaryGroups or [ ]
       );
+      journalctlAllBoots = pkgs.writeShellScript "journalctl-all-boots" ''
+        exec ${config.systemd.package}/bin/journalctl --boot=all "$@"
+      '';
     in
     {
       assertions = [
@@ -963,9 +1023,7 @@ in
           # retained boot, including the lines written after the cursor
           # before a reboot.
           "journald/gitea-mq" = {
-            journalctl_path = "${pkgs.writeShellScript "journalctl-all-boots" ''
-              exec ${config.systemd.package}/bin/journalctl --boot=all "$@"
-            ''}";
+            journalctl_path = "${journalctlAllBoots}";
             units = [ "gitea-mq.service" ];
             grep = ''msg="batch (formed|built|landed|bisecting|done)"'';
             start_at = "beginning";
@@ -981,6 +1039,32 @@ in
                 parse_from = "body.MESSAGE";
               }
               (keepAttributes batchEventKeys)
+              dropBody
+            ];
+          };
+          # nixbot's `evaluation finished` lines
+          # (nixbot-evaluation-record.patch), one JSON object each, as its
+          # JSON formatter writes them (Mic92/nixbot@171a8c77:
+          # nixbot/nixbot/log.py:25-43); the same journal wrapper and cursor
+          # handling as journald/gitea-mq. No other nixbot line carries that
+          # msg, so the grep alone selects the records.
+          "journald/nixbot-eval" = {
+            journalctl_path = "${journalctlAllBoots}";
+            units = [ "nixbot.service" ];
+            grep = ''"msg": "evaluation finished"'';
+            start_at = "beginning";
+            storage = "file_storage";
+            retry_on_failure = {
+              enabled = true;
+              max_elapsed_time = "0s";
+            };
+            operators = [
+              {
+                type = "json_parser";
+                id = "parse-message";
+                parse_from = "body.MESSAGE";
+              }
+              (keepAttributes evalRunKeys)
               dropBody
             ];
           };

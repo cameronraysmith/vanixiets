@@ -68,6 +68,46 @@
       "node_zfs_arc_misses"
       "node_zfs_arc_memory_throttle_count"
       "node_vmstat_oom_kill"
+      # magnetite's memory budget (CAM-111 design D11): its probe's
+      # textfile, written by flake.modules.nixos.magnetite-memory-budget.
+      # No other host writes these names.
+      "vanixiets_unit_memory_current_bytes"
+      "vanixiets_unit_memory_peak_bytes"
+      "vanixiets_zram_orig_data_bytes"
+      "vanixiets_zram_compr_data_bytes"
+      "vanixiets_zram_mem_used_bytes"
+    ];
+
+    # The units magnetite's memory budget reports (CAM-111 design D11), as
+    # systemctl patterns: those running there on 2026-11-18 that hold memory
+    # or compete with nixbot's evaluations. The collector's systemd receiver
+    # reports no unit memory at contrib 0.155.0, so a probe reads systemd's
+    # MemoryCurrent and MemoryPeak instead; system.slice and user.slice are
+    # reported beside them as totals.
+    memoryBudgetUnits = [
+      "nixbot.service"
+      "nix-daemon.service"
+      "greptimedb.service"
+      "postgresql.service"
+      "gitea.service"
+      "gitea-mq.service"
+      "gitea-runner-*.service"
+      "niks3*.service"
+      "nginx.service"
+      "matrix-synapse.service"
+      "docker.service"
+      "kanidm.service"
+      "livekit.service"
+      "coturn.service"
+      "perses.service"
+      "opentelemetry-collector.service"
+      "omnigent.service"
+      "omnigent-host-*.service"
+      "omnigraph-server.service"
+      "tor.service"
+      "tincr-*.service"
+      "zerotierone.service"
+      "systemd-journald.service"
     ];
 
     # The collector's own telemetry kept from 127.0.0.1:8888 (design D4;
@@ -301,6 +341,30 @@
             (timeIndex "ts")
           ];
           primaryKey = [ "host" ];
+          timeIndex = "ts";
+        };
+        # One row per nixbot evaluation, from its `evaluation finished`
+        # journal line (modules/nixos/nixbot-evaluation-record.patch). A
+        # build evaluated twice keeps two rows, told apart by ts.
+        eval_run = {
+          columns = [
+            (column "build_id" "int64")
+            (column "evaluator" "string")
+            (column "evaluator_version" "string")
+            (column "workers" "int64")
+            (column "max_memory_mib" "int64")
+            (column "memory_max_bytes" "int64")
+            (column "memory_peak_bytes" "int64")
+            (column "oom_kill" "int64")
+            (column "wall_ms" "int64")
+            (column "user_ms" "int64")
+            (column "system_ms" "int64")
+            (column "budget_kills" "int64")
+            (column "worker_kills" "int64")
+            (column "exit_status" "int64")
+            (timeIndex "ts")
+          ];
+          primaryKey = [ "build_id" ];
           timeIndex = "ts";
         };
       };

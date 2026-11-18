@@ -1,0 +1,216 @@
+Log one structured "evaluation finished" record per evaluation.
+
+Nothing recorded how close an evaluation came to its memory ceiling,
+whether the kernel killed part of it, or which evaluator ran. The
+runner now logs one JSON line through nixbot's logger after the
+evaluator exits and before the evaluation's cgroup is removed: the
+build id, the evaluator and its version (NIXBOT_EVALUATOR, "<name>
+<version>"), workers and per-worker memory limit, wall time, the
+cgroup's memory.max, memory.peak, memory.events oom_kill and cpu.stat
+user/system time, the number of nix-eval-jobs stderr lines reporting a
+worker killed for the memory budget or killed by something else, and
+the exit status. It is written on success, failure and timeout, and it
+carries no text from the evaluator's output. A cgroup file the kernel
+does not provide, or an evaluation without its own cgroup, leaves the
+corresponding fields out.
+
+diff --git a/nixbot/build_run.py b/nixbot/build_run.py
+index 91dce22..c1f6f28 100644
+--- a/nixbot/build_run.py
++++ b/nixbot/build_run.py
+@@ -218,6 +218,7 @@ def _eval_settings(
+         extra_ro_paths=[o.repos.clone_path(event.repo.key)],
+         eval_systems=o.config.eval_systems,
+         legacy_attr_prefix=o.config.legacy_attr_prefix,
++        build_id=build.id_,
+     )
+ 
+ 
+diff --git a/nixbot/nix_eval.py b/nixbot/nix_eval.py
+index 1598b98..b073d1b 100644
+--- a/nixbot/nix_eval.py
++++ b/nixbot/nix_eval.py
+@@ -102,6 +102,8 @@ class EvalSettings:
+     build_store_url: str | None = None
+     build_store_token_file: Path | None = None
+     build_store_credential_env: str = "NIX_GRPC_TOKEN_FILE"
++    # Identifies the evaluation in its "evaluation finished" record.
++    build_id: int | None = None
+ 
+     @property
+     def memory_limit_mib(self) -> int:
+@@ -118,6 +120,97 @@ class EvalResult:
+     duration_ms: int
+ 
+ 
++# nix-eval-jobs' own stderr reports of a worker it killed for the
++# memory budget, and of a worker killed by something else (the kernel).
++BUDGET_KILL_PREFIX = "memory budget of"
++WORKER_KILL_MARKER = "was killed (system out of memory?)"
++
++
++@dataclass
++class EvalOutcome:
++    """What one evaluator run did, for its "evaluation finished" record.
++    exit_status stays None when the evaluator never started."""
++
++    exit_status: int | None = None
++    duration_ms: int | None = None
++    budget_kills: int = 0
++    worker_kills: int = 0
++
++    def count_kill(self, line: str) -> None:
++        if line.startswith(BUDGET_KILL_PREFIX):
++            self.budget_kills += 1
++        elif WORKER_KILL_MARKER in line:
++            self.worker_kills += 1
++
++
++def _read_int(path: Path) -> int | None:
++    try:
++        text = path.read_text().strip()
++    except OSError:
++        return None
++    return int(text) if text.isdigit() else None
++
++
++def _read_keyed(path: Path) -> dict[str, int]:
++    try:
++        lines = path.read_text().splitlines()
++    except OSError:
++        return {}
++    keyed: dict[str, int] = {}
++    for line in lines:
++        key, _, value = line.partition(" ")
++        if value.strip().isdigit():
++            keyed[key] = int(value)
++    return keyed
++
++
++def eval_cgroup_usage(eval_cgroup: Path) -> dict[str, int]:
++    """The evaluation cgroup's memory ceiling and peak, kernel OOM kills
++    and CPU time. A file the kernel does not provide is left out."""
++    usage: dict[str, int] = {}
++    memory_max = _read_int(eval_cgroup / "memory.max")
++    if memory_max is not None:
++        usage["memory_max_bytes"] = memory_max
++    memory_peak = _read_int(eval_cgroup / "memory.peak")
++    if memory_peak is not None:
++        usage["memory_peak_bytes"] = memory_peak
++    events = _read_keyed(eval_cgroup / "memory.events")
++    if "oom_kill" in events:
++        usage["oom_kill"] = events["oom_kill"]
++    cpu = _read_keyed(eval_cgroup / "cpu.stat")
++    if "user_usec" in cpu:
++        usage["user_ms"] = cpu["user_usec"] // 1000
++    if "system_usec" in cpu:
++        usage["system_ms"] = cpu["system_usec"] // 1000
++    return usage
++
++
++def log_evaluation_record(
++    settings: EvalSettings, outcome: EvalOutcome, eval_cgroup: Path | None
++) -> None:
++    """One structured line per evaluation. It carries no text from the
++    evaluator's output, so it can be stored as it is."""
++    if outcome.exit_status is None:
++        return
++    evaluator, _, version = (
++        os.environ.get("NIXBOT_EVALUATOR", "").strip().partition(" ")
++    )
++    record: dict[str, object] = {
++        "build_id": settings.build_id,
++        "evaluator": evaluator or "nix-eval-jobs",
++        "evaluator_version": version or None,
++        "workers": settings.worker_count,
++        "max_memory_mib": settings.max_memory_size_mib,
++        "wall_ms": outcome.duration_ms,
++        "budget_kills": outcome.budget_kills,
++        "worker_kills": outcome.worker_kills,
++        "exit_status": outcome.exit_status,
++    }
++    if eval_cgroup is not None:
++        record.update(eval_cgroup_usage(eval_cgroup))
++    logger.info("evaluation finished", extra=record)
++
++
+ _NIX_DIR = Path(__file__).parent / "nix"
+ SELECT_FN = (_NIX_DIR / "select.nix").read_text()
+ APPLY_EXPR = (_NIX_DIR / "apply.nix").read_text()
+@@ -452,17 +545,20 @@ async def _read_stderr_tail(
+     stream: asyncio.StreamReader,
+     limit: int = STDERR_TAIL_LIMIT,
+     on_line: StderrLineCallback | None = None,
++    outcome: EvalOutcome | None = None,
+ ) -> bytes:
+     """Read stderr to EOF keeping only the last `limit` bytes, dropping
+-    known-noise lines and live-streaming warnings/errors to the
+-    optional `on_line` callback."""
++    known-noise lines, live-streaming warnings/errors to the optional
++    `on_line` callback, and counting worker kills into `outcome`."""
+     buf = bytearray()
+     pending = bytearray()
++    count_kill = (outcome or EvalOutcome()).count_kill
+ 
+     async def keep(raw_line: bytes | bytearray) -> bool:
+         text = strip_ansi(raw_line.decode(errors="replace")).strip()
+         if _is_stderr_noise(text):
+             return False
++        count_kill(text)
+         if on_line is not None and ("warning:" in text or "error:" in text):
+             await on_line(text)
+         return True
+@@ -600,6 +696,7 @@ class EvalRunner:
+             assert eval_cgroup is not None  # noqa: S101
+             (eval_cgroup / "cgroup.procs").write_text("0")
+ 
++        outcome = EvalOutcome()
+         try:
+             return await self._spawn(
+                 worktree_path,
+@@ -609,8 +706,11 @@ class EvalRunner:
+                 on_jobs=on_jobs,
+                 on_stderr_line=on_stderr_line,
+                 eval_cgroup=eval_cgroup,
++                outcome=outcome,
+             )
+         finally:
++            # Before the cleanup: the cgroup's counters go with it.
++            log_evaluation_record(settings, outcome, eval_cgroup)
+             if self.limiter is not None and eval_cgroup is not None:
+                 await self.limiter.cleanup(eval_cgroup)
+ 
+@@ -623,7 +723,10 @@ class EvalRunner:
+         on_jobs: JobBatchCallback | None = None,
+         on_stderr_line: StderrLineCallback | None = None,
+         eval_cgroup: Path | None = None,
++        outcome: EvalOutcome | None = None,
+     ) -> EvalResult:
++        if outcome is None:
++            outcome = EvalOutcome()
+         cmd = build_full_command(worktree_path, branch_config, settings)
+         logger.info(
+             "starting evaluation",
+@@ -659,15 +762,20 @@ class EvalRunner:
+             async with asyncio.timeout(settings.timeout):
+                 _, stderr_bytes = await asyncio.gather(
+                     _read_job_stream(proc.stdout, jobs, parse_errors, on_jobs),
+-                    _read_stderr_tail(proc.stderr, on_line=on_stderr_line),
++                    _read_stderr_tail(
++                        proc.stderr, on_line=on_stderr_line, outcome=outcome
++                    ),
+                 )
+                 returncode = await proc.wait()
+                 duration_ms = int((time.monotonic() - t0) * 1000)
++                outcome.exit_status = returncode
++                outcome.duration_ms = duration_ms
+         except BaseException as e:
+             # Timeout, cancellation, or a reader bug: kill the evaluator
+             # instead of leaking it (possibly blocked on a full pipe).
+             _kill_process_tree(proc)
+-            await proc.wait()
++            outcome.exit_status = await proc.wait()
++            outcome.duration_ms = int((time.monotonic() - t0) * 1000)
+             if isinstance(e, TimeoutError):
+                 msg = f"evaluation timed out after {settings.timeout:.0f} seconds"
+                 raise EvalError(msg) from None

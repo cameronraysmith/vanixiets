@@ -393,6 +393,16 @@
                       metric("up", series(lambda i: 1, {"job": "node"}) + series(lambda i: 1, {"job": "smartctl"})),
                       metric("smartctl_device_critical_warning_total", series(lambda i: 0, {"device": "nvme0"})),
                       metric("smartctl_device_percentage_used_total", series(lambda i: 3, {"device": "nvme0"})),
+                      # The evaluation host's memory budget (CAM-111 design D11).
+                      metric(
+                          "vanixiets_unit_memory_current_bytes",
+                          series(lambda i: 3e8, {"unit": "nixbot.service"})
+                          + series(lambda i: 6e8, {"unit": "system.slice"}),
+                      ),
+                      metric("vanixiets_unit_memory_peak_bytes", series(lambda i: 9e8, {"unit": "nixbot.service"})),
+                      metric("vanixiets_zram_orig_data_bytes", series(lambda i: 5e9)),
+                      metric("vanixiets_zram_compr_data_bytes", series(lambda i: 5e8)),
+                      metric("vanixiets_zram_mem_used_bytes", series(lambda i: 6e8)),
                   ]
                   payload = {
                       "resourceMetrics": [
@@ -438,6 +448,9 @@
                       f"(1, 'checks.x', 'succeeded', {at(2)}), (2, 'checks.y', 'failed', {at(1)})",
                       'INSERT INTO "deploy_record" ("host", "closure", "previous_closure", "ts") VALUES '
                       f"('{host}', 'closure-b', 'closure-a', {at(1)})",
+                      'INSERT INTO "eval_run" ("build_id", "evaluator", "evaluator_version", "memory_max_bytes", "memory_peak_bytes", "wall_ms", "exit_status", "ts") VALUES '
+                      f"(1, 'nix-eval-jobs', '2.35.4', 22548578304, 17134026752, 148700, 0, {at(2)}), "
+                      f"(2, 'iets', '0.2.0', 22548578304, 18555000000, 45520, 0, {at(1)})",
                   ]
                   for statement in statements:
                       store_sql(statement, "devloop", netrc="collector")

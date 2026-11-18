@@ -3,16 +3,17 @@ linear_story_id: 3cc8a6d7-aa5b-41df-8a34-a32575e16241
 linear_story_identifier: CAM-111
 linear_story_title: "Evaluate nixbot builds with iets"
 linear_story_url: https://linear.app/cameronraysmith/issue/CAM-111/evaluate-nixbot-builds-with-iets
-linear_story_state: Todo
+linear_story_state: In Progress
 linear_team: CAM
 linear_project: nixbot-herculesci-cicd
-last_synced_state: Todo
-last_synced_at: 2026-11-18T20:15:34Z
+last_synced_state: In Progress
+last_synced_at: 2026-11-18T21:23:12Z
 review_round: 0
 max_review_rounds: 3
 attempt_log:
   - { at: "2026-11-18T20:15:34Z", transition: "Backlog->Todo", outcome: "posted", note: "T1 bind; issue created in project nixbot-herculesci-cicd at Todo, description seeded from this proposal, one comment posted" }
   - { at: "2026-11-18T20:44:39Z", transition: "description-sync", outcome: "posted", note: "description re-synced from this proposal after the capacity-gate and memory-budget revision; Linear reported state In Progress, ahead of the local phase (no [x] in tasks.md), left unreconciled" }
+  - { at: "2026-11-18T21:23:12Z", transition: "Todo->In Progress", outcome: "skipped", note: "T2 apply; the operator had already moved CAM-111 to In Progress after approving the pre-apply alignment gate (2026-11-18); the first [x] in tasks.md now matches it, so no write was needed" }
 ---
 
 ## Why

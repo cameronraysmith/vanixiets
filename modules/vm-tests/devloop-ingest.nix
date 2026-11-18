@@ -8,16 +8,21 @@
 # with magnetite's databases, the devloop tables and pipelines and the
 # credentials of magnetite's greptimedb-users generator; the collector with
 # both roles and devloop-collection; a stub gitea-mq.service printing the
-# lines of /run/devloop-ingest/gitea-mq-lines; and the deploy-record
-# activation snippet. testScript is helpers.py followed by `cases`, in order.
+# lines of /run/devloop-ingest/gitea-mq-lines; a stand-in nixbot.service that
+# also prints one `evaluation finished` record, preceded by a `starting
+# evaluation` line, per line of /run/devloop-ingest/nixbot-eval-lines, at
+# start and at each reload, stamped with the current time; and the
+# deploy-record activation snippet. testScript is helpers.py followed by
+# `cases`, in order.
 #
 # What it establishes: each devloop exporter's first send succeeds when the
 # store, its schema job and the collector start together, and fails when the
 # schema job has not created its table (auto_create_table=false); each stored
 # table equals the allow-list; overlap re-reads leave one row per key; lines
-# outside the five batch messages are not stored; one activation appends one
-# deploy record naming both closures and reaches the store; the documented
-# queries answer on GreptimeDB 1.2.1.
+# outside the five batch messages are not stored; nixbot's evaluation
+# records reach eval_run field for field and its other lines do not; one
+# activation appends one deploy record naming both closures and reaches the
+# store; the documented queries answer on GreptimeDB 1.2.1.
 #
 # What it does not establish: the collector's keep-list (`retain`) and body
 # removal, which are defence in depth with no test here, because the
@@ -96,6 +101,21 @@
               done < /run/devloop-ingest/gitea-mq-lines
             '';
 
+            # The two lines nixbot's JSON formatter writes around an evaluation
+            # (Mic92/nixbot@171a8c77:nixbot/nixbot/log.py:25-43; the
+            # `evaluation finished` fields from nixbot-evaluation-record.patch),
+            # each stamped with the current time to the millisecond, so the
+            # reconcile's window holds them and each record has its own ts.
+            nixbotEvalStub = pkgs.writeShellScript "nixbot-eval-stub" ''
+              while IFS= read -r fields; do
+                [ -n "$fields" ] || continue
+                ts=$(${pkgs.coreutils}/bin/date -u +%Y-%m-%dT%H:%M:%S.%3NZ)
+                printf '{"ts": "%s", "level": "info", "logger": "nixbot.nix_eval", "msg": "starting evaluation", "worktree": "/var/lib/nixbot/worktrees/stub", "argv0": "bwrap"}\n' "$ts"
+                printf '{"ts": "%s", "level": "info", "logger": "nixbot.nix_eval", "msg": "evaluation finished", %s}\n' "$ts" "$fields"
+                ${pkgs.coreutils}/bin/sleep 0.05
+              done < /run/devloop-ingest/nixbot-eval-lines
+            '';
+
             # Task 4: an attribute rendered at runtime by a container path.
             currentSystemLink = "/run/devloop-ingest/current-system";
             # replaceOnce NAME FROM TO TEXT: TEXT with its one FROM replaced.
@@ -132,6 +152,23 @@
                 type = "retain";
                 id = "keep-list";
                 fields = map (key: "attributes.${key}") devloop.batchEventKeys;
+              }
+              {
+                type = "remove";
+                id = "drop-body";
+                field = "body";
+              }
+            ];
+            nixbotEvalOperators = [
+              {
+                type = "json_parser";
+                id = "parse-message";
+                parse_from = "body.MESSAGE";
+              }
+              {
+                type = "retain";
+                id = "keep-list";
+                fields = map (key: "attributes.${key}") devloop.evalRunKeys;
               }
               {
                 type = "remove";
@@ -179,6 +216,18 @@
                   {
                     services.opentelemetry-collector.settings.receivers."journald/gitea-mq".operators = lib.mkForce (
                       lib.drop 1 journaldOperators
+                    );
+                  };
+              };
+              # C8: the nixbot-eval receiver without json_parser, so no
+              # record carries build_id or ts and the pipeline stores none.
+              noJsonParser = {
+                unit = "opentelemetry-collector";
+                module =
+                  { lib, ... }:
+                  {
+                    services.opentelemetry-collector.settings.receivers."journald/nixbot-eval".operators = lib.mkForce (
+                      lib.drop 1 nixbotEvalOperators
                     );
                   };
               };
@@ -351,6 +400,29 @@
               broken = gsql("SELECT * FROM \"ci_attribute\" WHERE \"attr\" = 'checks.x86_64-linux.broken'")
               assert not any("builder for broken failed" in str(value) for value in broken[0]), broken
               print("ok: tableShape: ci_attribute equals nixbot's rows, abandoned only for the marker, no error text")
+
+              # eval_run: the stand-in's `evaluation finished` records as
+              # stored, field for field, the absent cgroup fields as nulls, and
+              # none of its `starting evaluation` lines.
+              fixture = len([l for l in store.succeed("cat /etc/devloop-ingest/nixbot-eval-lines.txt").splitlines() if l.strip()])
+              printed = int(store.succeed(
+                  "journalctl -u nixbot.service -o cat | grep -cF '\"msg\": \"evaluation finished\"'"
+              ).strip())
+              assert printed == fixture, (printed, fixture)
+              wait_rows("eval_run", fixture)
+              stored = gsql(
+                  'SELECT "build_id", "evaluator", "evaluator_version", "workers", "max_memory_mib", '
+                  '"memory_max_bytes", "memory_peak_bytes", "oom_kill", "wall_ms", "user_ms", "system_ms", '
+                  '"budget_kills", "worker_kills", "exit_status" FROM "eval_run" ORDER BY "ts"'
+              )
+              assert stored == [
+                  [9001, "nix-eval-jobs", "2.35.4", 6, 3072, 22548578304, 17134026752, 0, 148700, 430090, 118750, 0, 0, 0],
+                  [9002, "iets", "0.2.0", 6, 3072, 22548578304, 21474836480, 1, 45520, 142240, 75720, 0, 0, 1],
+                  [9002, "nix-eval-jobs", "2.35.4", 6, 3072, None, None, None, 150010, None, None, 2, 1, 0],
+              ], stored
+              argv = store.succeed("pgrep -a journalctl").splitlines()
+              assert any("--boot=all" in line.split() and "nixbot.service" in line.split() for line in argv), argv
+              print(f"ok: tableShape: eval_run holds the {fixture} evaluation records field for field, no starting line")
               print("ok: tableShape")
             '';
 
@@ -475,10 +547,12 @@
             # overlap re-reads, with an attribute restarted and with it
             # finished again after the window, and with a restarted build
             # that dropped a finished attribute (S2 review F3), and fails
-            # naming its clause for each of D11's eight mutants. Every leg
-            # starts from the day's journal emptied of earlier stub lines, the
-            # tables and cursors reset, one deploy record and the stub's
-            # lines, so the window holds only that leg's events.
+            # naming its clause for each of D11's eight mutants and for C8's
+            # two (CAM-111: a receiver without json_parser, a stored record
+            # deleted). Every leg starts from the day's journal emptied of
+            # earlier stub lines, the tables and cursors reset, one deploy
+            # record and the stubs' lines, so the window holds only that leg's
+            # events.
             reconcile = ''
               import datetime
               import re
@@ -501,17 +575,20 @@
                   "C5 batch-fields",
                   "C6 deploys",
                   "C7 current-system",
+                  "C8 eval-runs",
               ]
-              TABLES = ["ci_attribute", "ci_build", "batch_event", "deploy_record"]
+              TABLES = ["ci_attribute", "ci_build", "batch_event", "deploy_record", "eval_run"]
+              EVAL_FIXTURE = "/etc/devloop-ingest/nixbot-eval-lines.txt"
+              EVALUATION = "\"msg\": \"evaluation finished\""
               VARS = config()["vars"]
               RESTARTED = "checks.x86_64-linux.reconcile-restarted"
               DROPPED = "checks.aarch64-linux.reconcile-dropped"
 
 
               # C7's wait prints this on stderr before each 10 s retry; the
-              # verdict lines are the seven clause lines alone.
+              # verdict lines are the eight clause lines alone, C8 the last.
               WAITING = "devloop-reconcile: C7 current-system: waiting for "
-              VERDICT = re.compile(r"^devloop-reconcile: C[1-7] [a-z-]+: (ok$|FAIL )")
+              VERDICT = re.compile(r"^devloop-reconcile: C[1-8] [a-z-]+: (ok$|FAIL )")
               WAITS = {"n": 0}
 
 
@@ -534,7 +611,7 @@
                   status = int(store.succeed("systemctl show -P ExecMainStatus devloop-reconcile.service").strip())
                   journal = f"journalctl --no-pager -o cat _SYSTEMD_INVOCATION_ID={invocation}"
                   if status in (0, 1):
-                      store.wait_until_succeeds(f"{journal} | grep -q '^devloop-reconcile: C7 current-system: [oF]'", timeout=60)
+                      store.wait_until_succeeds(f"{journal} | grep -q '^devloop-reconcile: C8 eval-runs: [oF]'", timeout=60)
                   output = store.succeed(journal).splitlines()
                   lines = [l for l in output if VERDICT.match(l)]
                   WAITS["n"] = sum(1 for l in output if l.startswith(WAITING))
@@ -612,7 +689,18 @@
                       lambda _last: batch_lines("journalctl --no-pager -o cat -u gitea-mq.service") == want,
                       timeout=datetime.timedelta(minutes=1),
                   )
+                  # The stand-in nixbot prints its evaluation records on reload.
+                  store.succeed("systemctl reload nixbot.service")
+                  want_records = int(store.succeed(f"grep -c . {EVAL_FIXTURE}").strip())
+                  retry(
+                      lambda _last: eval_lines("journalctl --no-pager -o cat -u nixbot.service") == want_records,
+                      timeout=datetime.timedelta(minutes=1),
+                  )
                   collector_restart(mutant)
+
+
+              def eval_lines(command):
+                  return int(store.succeed(f"{command} | grep -cF '{EVALUATION}' || true").strip())
 
 
               def settle(touched=()):
@@ -621,6 +709,7 @@
                       "ci_build": int(psql("SELECT count(*) FROM builds WHERE finished_at IS NOT NULL").strip()),
                       "batch_event": batch_lines(f"cat {FIXTURE_LINES}"),
                       "deploy_record": 1,
+                      "eval_run": int(store.succeed(f"grep -c . {EVAL_FIXTURE}").strip()),
                   }
                   for table in TABLES:
                       if table not in touched:
@@ -793,6 +882,26 @@
                   settle()
                   rejected("snippetSwapsClosures", ["C7 current-system"], *reconcile(DAY))
                   assert WAITS["n"] == 0, WAITS
+
+                  # C8: the nixbot-eval receiver without json_parser, so no
+                  # evaluation record reaches eval_run.
+                  fresh_leg()
+                  start_sources(mutant="noJsonParser")
+                  settle(touched=["eval_run"])
+                  status, lines = reconcile(DAY)
+                  rejected("noJsonParser", ["C8 eval-runs"], status, lines)
+                  fixture_records = int(store.succeed(f"grep -c . {EVAL_FIXTURE}").strip())
+                  only_missing("C8 eval-runs", "eval_run", fixture_records, lines)
+
+                  # C8: an evaluation record lost between the journal and the store.
+                  fresh_leg()
+                  start_sources()
+                  settle()
+                  admin_sql('DELETE FROM "eval_run" WHERE "build_id" = 9001')
+                  assert gsql('SELECT count(*) FROM "eval_run" WHERE "build_id" = 9001') == [[0]]
+                  status, lines = reconcile(DAY)
+                  rejected("droppedEvalRow", ["C8 eval-runs"], status, lines)
+                  only_missing("C8 eval-runs", "eval_run", 1, lines)
 
               store.succeed(
                   f"rm -f {DAY_CONF}",
@@ -1026,8 +1135,9 @@
                         (queryElement "ci_attribute" devloop.queries.ci_attribute)
                       ]
                       && receivers."sqlquery/ci_build".queries == [ (queryElement "ci_build" devloop.queries.ci_build) ]
-                      && receivers."journald/gitea-mq".operators == journaldOperators;
-                    message = "devloop-ingest: queryElement or journaldOperators no longer rebuilds the collector's receiver lists, so a Task 4 mutant would change more than its clause";
+                      && receivers."journald/gitea-mq".operators == journaldOperators
+                      && receivers."journald/nixbot-eval".operators == nixbotEvalOperators;
+                    message = "devloop-ingest: queryElement, journaldOperators or nixbotEvalOperators no longer rebuilds the collector's receiver lists, so a Task 4 mutant would change more than its clause";
                   }
                 ];
 
@@ -1063,7 +1173,7 @@
                   ensureDatabases = [ "nixbot" ];
                 };
                 systemd.services.nixbot = {
-                  description = "Stand-in for nixbot: the input's migrations and the baseline rows";
+                  description = "Stand-in for nixbot: the input's migrations, the baseline rows and its evaluation records";
                   wantedBy = [ "multi-user.target" ];
                   after = [ "postgresql.target" ];
                   requires = [ "postgresql.target" ];
@@ -1071,11 +1181,16 @@
                     config.services.postgresql.package
                     pkgs.bash
                   ];
+                  # The records are printed after the migrations and again at
+                  # each reload, from the unit's own cgroup, so the journal
+                  # files them under nixbot.service as it does nixbot's.
                   serviceConfig = {
                     Type = "oneshot";
                     RemainAfterExit = true;
                     User = "postgres";
                     Group = "postgres";
+                    ExecStartPost = "${nixbotEvalStub}";
+                    ExecReload = "${nixbotEvalStub}";
                   };
                   script = "bash ${./devloop-ingest/nixbot-schema.sh} ${inputs.nixbot}/nixbot/nixbot/migrations ${baselineFixtures}";
                 };
@@ -1096,6 +1211,7 @@
                 systemd.tmpfiles.rules = [
                   "d /run/devloop-ingest 0755 root root -"
                   "L+ /run/devloop-ingest/gitea-mq-lines - - - - /etc/devloop-ingest/gitea-mq-lines.txt"
+                  "L+ /run/devloop-ingest/nixbot-eval-lines - - - - /etc/devloop-ingest/nixbot-eval-lines.txt"
                 ];
 
                 # Credentials from magnetite's own generator script, run at
@@ -1150,6 +1266,7 @@
                 environment.etc = {
                   "devloop-ingest/gitea-mq-lines.txt".source = ./devloop-ingest/gitea-mq-lines.txt;
                   "devloop-ingest/gitea-mq-empty.txt".text = "";
+                  "devloop-ingest/nixbot-eval-lines.txt".source = ./devloop-ingest/nixbot-eval-lines.txt;
                   # The switch case's second system: nixpkgs' nspawn module
                   # disallows `specialisation`, so the variant is this
                   # configuration extended, linked from /etc.

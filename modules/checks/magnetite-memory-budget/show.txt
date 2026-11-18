@@ -1,0 +1,34 @@
+Id=nixbot.service
+ActiveState=active
+MemoryCurrent=16471371776
+MemoryPeak=19236646912
+
+Id=matrix-synapse.service
+ActiveState=active
+MemoryCurrent=19128320
+MemoryPeak=126943232
+
+Id=omnigent-host-cameron.service
+ActiveState=active
+MemoryCurrent=67256320
+MemoryPeak=485052416
+
+Id=buildbot-master.service
+ActiveState=inactive
+MemoryCurrent=[not set]
+MemoryPeak=[not set]
+
+Id=gitea-runner-nix1.service
+ActiveState=deactivating
+MemoryCurrent=10960896
+MemoryPeak=13934592
+
+Id=gitea-mq.service
+ActiveState=active
+MemoryCurrent=[not set]
+MemoryPeak=55447552
+
+Id=system.slice
+ActiveState=active
+MemoryCurrent=19030876160
+MemoryPeak=26106765312

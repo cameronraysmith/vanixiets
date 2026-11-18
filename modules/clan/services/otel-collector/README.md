@@ -96,11 +96,12 @@ Only `fleet` receives metrics; the `devloop` and `agent` metrics routes exist so
 ## Logs path
 
 S2 adds a logs path that copies the dev-loop record into `devloop`, one table per source.
-`modules/nixos/devloop-collection.nix` (`flake.modules.nixos.devloop-collection`, imported by magnetite) defines the first three of the four receivers below and the agent fragment the fourth, each with `storage: file_storage`, so its position survives a restart:
+`modules/nixos/devloop-collection.nix` (`flake.modules.nixos.devloop-collection`, imported by magnetite) defines the first four of the five receivers below and the agent fragment the fifth, each with `storage: file_storage`, so its position survives a restart:
 
 - `sqlquery/ci_attribute` and `sqlquery/ci_build` read nixbot's PostgreSQL database every 60 s over the local socket as the peer-authenticated role `opentelemetry-collector`, with a cursor on `finished_at` that re-reads a five-minute overlap in pages of 10,000 rows.
 - `journald/gitea-mq` reads the five `msg="batch …"` lines of `gitea-mq.service` and keeps only the `batch_event` keys.
   Its `journalctl_path` is a wrapper that runs `journalctl --boot=all`, because the receiver always runs `journalctl --follow` with no boot option, and systemd 261 then reads only the current boot.
+- `journald/nixbot-eval` reads the `"msg": "evaluation finished"` lines of `nixbot.service`, one JSON object per nixbot evaluation written by `modules/nixos/nixbot-evaluation-record.patch` (CAM-111), with `json_parser` and the same wrapper, and keeps only the `eval_run` keys.
 - `file_log/deploy-record` reads `/var/log/deploy-record.jsonl` with `json_parser`.
 
 ```mermaid
@@ -109,22 +110,26 @@ flowchart LR
     sa[sqlquery/ci_attribute] --> pa[logs/devloop-ci_attribute]
     sb[sqlquery/ci_build] --> pb[logs/devloop-ci_build]
     jg[journald/gitea-mq] --> pg[logs/devloop-batch_event]
+    jn[journald/nixbot-eval] --> pn[logs/devloop-eval_run]
     fd[file_log/deploy-record] --> pd[logs/devloop-deploy_record]
   end
   pa --> fwd((forward))
   pb --> fwd
   pg --> fwd
+  pn --> fwd
   pd --> fwd
   subgraph ingress
     fwd --> li[logs/ingress<br/>memory_limiter] --> rl((routing/logs))
     rl --> oa[logs/devloop-ci_attribute-out] --> ea[otlp_http/devloop_ci_attribute]
     rl --> ob[logs/devloop-ci_build-out] --> eb[otlp_http/devloop_ci_build]
     rl --> og[logs/devloop-batch_event-out] --> eg[otlp_http/devloop_batch_event]
+    rl --> on[logs/devloop-eval_run-out] --> en[otlp_http/devloop_eval_run]
     rl --> od[logs/devloop-deploy_record-out] --> ed[otlp_http/devloop_deploy_record]
   end
   ea --> store[(127.0.0.1:4000/v1/otlp)]
   eb --> store
   eg --> store
+  en --> store
   ed --> store
 ```
 
@@ -152,7 +157,8 @@ Nothing imports `schema.nix` by path; import-tree loads it as a flake-parts modu
 - `ownerAliases`: owner name to opaque alias.
   `omnigent-host-<owner>.service` is stored as `omnigent-host-<alias>.service`, so no owner's name becomes a label value.
 - `promotedResourceAttributes`: the resource attributes the store promotes to labels.
-- `nodeExporterKeep`: the node_exporter series the `node` scrape keeps; every other series is dropped.
+- `nodeExporterKeep`: the node_exporter series the `node` scrape keeps; every other series is dropped. It includes the five `vanixiets_unit_memory_*` and `vanixiets_zram_*` series of the evaluation host's memory-budget probe (`modules/nixos/magnetite-memory-budget.nix`, CAM-111), which only that host writes, to its node_exporter's textfile collector.
+- `memoryBudgetUnits`: the systemctl patterns of the units whose `MemoryCurrent` and `MemoryPeak` the memory-budget probe reports, because the `systemd` receiver reports no unit memory at contrib 0.155.0.
 - `process.minBytes`: per platform (`linux`, 64 MiB; `darwin`, 384 MiB), the floor below which one process's `process.memory.usage` point is dropped; an executable whose processes are each below the floor is not stored, however large their total.
   The darwin floor is higher because macOS RSS counts each process's share of the dyld shared cache and frameworks.
 - `process.darwinFleetExecutables`: launchd label glob to the executable name the darwin process scraper reports; darwin's `otelcol-process` keeps these names below the floor, and the darwin fragment asserts that the globs cover the host's long-running `org.nixos.*` daemons.
@@ -186,7 +192,7 @@ The notifier reads no clan var itself; the clan agent role passes the path of th
 ## Queue
 
 Every exporter uses a persistent `file_storage` sending queue under `/var/lib/opentelemetry-collector/queue`, sized in bytes; the logs receivers keep their positions in the same directory, as `receiver_<type>_<name>` files, with `file_log` spelled `filelog`, beside the exporters' `exporter_otlp_http_<name>_<signal>` files.
-On magnetite the ingress's seven store exporters queue: `fleet` gets 400 MiB, `agent` 48 MiB, `devloop` (metrics) 4 MiB, `devloop_ci_attribute` 32 MiB, and `devloop_ci_build`, `devloop_batch_event` and `devloop_deploy_record` 4 MiB each, 496 MiB in all, so the total stays under 512 MiB and `fleet` holds at least 24 hours at the assumed rate.
+On magnetite the ingress's eight store exporters queue: `fleet` gets 400 MiB, `agent` 48 MiB, `devloop` (metrics) 4 MiB, `devloop_ci_attribute` 32 MiB, and `devloop_ci_build`, `devloop_batch_event`, `devloop_deploy_record` and `devloop_eval_run` 4 MiB each, 500 MiB in all, so the total stays under 512 MiB and `fleet` holds at least 24 hours at the assumed rate.
 On every other agent host `otlp_http/ingress` gets 400 MiB and `otlp_http/ingress-logs` 16 MiB, and these queues hold the host's exports while magnetite, its receiver or the mesh is unreachable.
 The assumed rate, `fleetBytesPerMinute` in `schema.nix`, is 256,000 bytes a minute per host.
 cinnabar's measured rate is far below it: on 2026-10-29 its metrics queue held 524,034 bytes after the 23 minutes between its deploy and the start of magnetite's receiver, about 22,800 bytes a minute, and was empty within 7 minutes of that start.

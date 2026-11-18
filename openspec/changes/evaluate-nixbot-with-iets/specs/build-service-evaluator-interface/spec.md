@@ -88,10 +88,10 @@ Before the switch, the iets package SHALL run on magnetite as `nix-eval-jobs`, t
 
 ### Requirement: magnetite reports each competing unit's memory and its compressed swap
 
-magnetite SHALL run `magnetite-memory-budget.service` every 60 s, replacing `memory-budget.prom` in node_exporter's textfile directory by write-then-rename with systemd's `MemoryCurrent` and `MemoryPeak` of each running unit of `memoryBudgetUnits`, `system.slice` and `user.slice`, and zram0's `mm_stat` sizes.
-magnetite's node_exporter SHALL enable its `textfile` collector, and the five series names SHALL join `nodeExporterKeep`.
+The host nixbot runs on SHALL run `magnetite-memory-budget.service` every 60 s, replacing `/run/magnetite-memory-budget/memory-budget.prom` by write-then-rename with systemd's `MemoryCurrent` and `MemoryPeak` of each active unit matching `memoryBudgetUnits`, `system.slice` and `user.slice`, and zram0's `mm_stat` sizes.
+Its node_exporter SHALL read that directory through its `textfile` collector, and the five series names SHALL join `nodeExporterKeep`.
 
-**Discharged by**: magnetite's evaluation-time assertion that the probe's unit list equals `memoryBudgetUnits` and that the collector's node keep-list holds the five names; a read of the stored series after deploy; resting on world assumption `A153 — The collector's systemd receiver reports no unit memory, and the kernel reports each service's memory and zram's footprint`.
+**Discharged by**: `checks.x86_64-linux.magnetite-memory-budget`, which formats systemctl output recorded on magnetite with its mutants; the evaluation-time assertion of `flake.modules.nixos.magnetite-memory-budget` that node_exporter runs its textfile collector on the probe's directory and that `nodeExporterKeep` holds the five names; a read of the stored series after deploy; resting on world assumption `A153 — The collector's systemd receiver reports no unit memory, and the kernel reports each service's memory and zram's footprint`.
 
 #### Scenario: The probe's output is read on magnetite
 
