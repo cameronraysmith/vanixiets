@@ -127,6 +127,12 @@ The research pass and the approach comparison are in `brainstorm.md`; the operat
 - **Boundary**: source-versus-delivered; the committed Markdown is rendered into the delivered page by Astro.
 - **Alternatives considered**: a TypeScript component reading `fleet.json` (adds logic that would then need vitest); inlining the SVGs (rejected by the operator).
 
+### D17: The publisher admits cases a pull request adds (operator decision B, after #4022)
+- **Choice**: `validate-report.ts` gains a `publish` mode, which the publisher calls. In it, `main`'s `policy.ts` cases must be a subset of the report's cases in every required engine. A missing or renamed required case fails with `missing required scenario`. An added case must be a `<file>.spec.ts::<title>` name, run in every required engine, and pass the per-test checks. `validate` and `verdict` stay exact.
+- **Rationale**: the publisher judges a pull request's report with `main`'s validator and policy, by design, so the exact matrix rejected every pull request that adds a browser case, #4022 among them (effect run 24573). Those pull requests need evidence most. Subset keeps removal and renaming detectable; the pull request's own exact verdict is what ties an added case to its policy entry.
+- **Boundary**: first-party; the publisher keeps judging with its own copy of the validator and never the report's.
+- **Alternatives considered**: (A) accepting the gap and verifying 6.1 on a later topology pull request (rejected: case-adding pull requests would never get evidence); judging with the pull request's own policy (the report could then define its own matrix).
+
 ## Risks / Trade-offs
 
 - [Risk] Declared facts drift from what hosts run → Mitigation: the page says they are declared; open question 1 offers an obligation on the existing machine checks at no added evaluation, if the operator wants it.

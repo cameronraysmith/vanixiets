@@ -52,6 +52,8 @@ Its independently declared engine policy requires Chromium and WebKit on Darwin,
 The Chromium negative-control suites require Chromium only; the WebKit negative-control suite requires WebKit only; unknown systems/configs fail closed.
 Narrowing both producer metadata and discovery cannot narrow the required matrix.
 Update it deliberately when adding or removing a scenario; deleting a spec alone must fail validation.
+The in-tree checks call the validator in `validate` or `verdict` mode, which require the report's cases to equal `policy.ts`'s exactly.
+The publisher calls it in `publish` mode, which judges a pull request's report with `main`'s `policy.ts`: every required case must be present in every required engine, a dropped or renamed case fails with `missing required scenario`, and cases the report adds are admitted, held only to the `<file>.spec.ts::<title>` shape, to running in every engine, and to the per-test checks.
 Zero tests, partial matrices, skips, expected failures, interrupted attempts, a terminal timed-out attempt, global errors, unknown outcomes, and missing or empty referenced files fail closed.
 Referenced attachment paths cannot escape the artifact, including through symlinks.
 Every product-failed attempt must have a trace and screenshot; every referenced video must exist, but a video is not mandatory if Playwright emitted none.

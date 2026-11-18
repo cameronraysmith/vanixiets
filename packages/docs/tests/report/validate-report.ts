@@ -272,7 +272,26 @@ export function parseEvidence(root: string): Evidence {
 
 const sorted = (values: readonly string[]) => JSON.stringify([...values].sort());
 
-export function judge(root: string, { metadata, completion, results }: Evidence): Verdict {
+/**
+ * How a report's scenarios must relate to policy.ts's required cases.
+ * `exact`: the report runs exactly the required cases in every required
+ * engine; the in-tree checks use it, judging a report with that tree's own
+ * policy. `superset`: every required case must still be present, so a
+ * removed or renamed case fails, but the report may add cases; the
+ * publisher uses it, because it judges a pull request's report with main's
+ * policy, which cannot yet name the cases that pull request adds. An added
+ * case is held to shape only: it must be a `<file>.spec.ts::<title>` name,
+ * run in every engine, and pass every per-test check below.
+ */
+export type Matrix = "exact" | "superset";
+
+const addedCaseShape = /^[A-Za-z0-9._/-]+\.spec\.ts::[^\n\r]+$/;
+
+export function judge(
+  root: string,
+  { metadata, completion, results }: Evidence,
+  matrix: Matrix = "exact",
+): Verdict {
   const { provenance } = metadata;
   // An aborted or globally timed-out run never produced a complete matrix.
   check(completion.status === "passed" || completion.status === "failed", `incomplete run: ${completion.status}`);
@@ -289,11 +308,18 @@ export function judge(root: string, { metadata, completion, results }: Evidence)
   check(sorted([...new Set(tests.map((test) => test.project))]) === sorted(projects), "missing project tests");
   const cases = requiredCases[provenance.config];
   check(cases !== undefined, "unknown suite policy");
-  check(
-    sorted(tests.map((test) => `${test.project}::${test.case}`)) ===
-      sorted(projects.flatMap((project) => cases.map((name) => `${project}::${name}`))),
-    "partial/unexpected scenario matrix",
-  );
+  const ran = (names: readonly string[]) => projects.flatMap((project) => names.map((name) => `${project}::${name}`));
+  const actual = tests.map((test) => `${test.project}::${test.case}`);
+  if (matrix === "exact") {
+    check(sorted(actual) === sorted(ran(cases)), "partial/unexpected scenario matrix");
+  } else {
+    const present = new Set(actual);
+    const missing = ran(cases).filter((name) => !present.has(name));
+    check(missing.length === 0, `missing required scenario: ${missing[0]}`);
+    const added = [...new Set(tests.map((test) => test.case))].filter((name) => !cases.includes(name));
+    for (const name of added) check(addedCaseShape.test(name), `malformed added case: ${JSON.stringify(name)}`);
+    check(sorted(actual) === sorted(ran([...cases, ...added])), "partial/unexpected scenario matrix");
+  }
   check(results.tests.length === tests.length, "test inventory disagreement");
   check(new Set(tests.map((test) => test.id)).size === tests.length, "duplicate test ID");
   const key = (test: Pick<CompletionTest, "project" | "case">) => `${test.project}::${test.case}`;
@@ -354,17 +380,18 @@ export function judge(root: string, { metadata, completion, results }: Evidence)
   return { passed, counts, infrastructureRetries };
 }
 
-export function validateReport(root: string): Verdict {
-  return judge(root, parseEvidence(root));
+export function validateReport(root: string, matrix: Matrix = "exact"): Verdict {
+  return judge(root, parseEvidence(root), matrix);
 }
 
 if (process.argv[1] && realpathSync(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const [mode, root] = process.argv.slice(2);
   try {
-    if ((mode !== "validate" && mode !== "verdict") || !root) {
-      throw new InvalidEvidence("usage: validate-report.ts validate|verdict REPORT");
+    // `publish` is `validate` with the superset matrix (see Matrix).
+    if ((mode !== "validate" && mode !== "verdict" && mode !== "publish") || !root) {
+      throw new InvalidEvidence("usage: validate-report.ts validate|verdict|publish REPORT");
     }
-    const verdict = validateReport(root);
+    const verdict = validateReport(root, mode === "publish" ? "superset" : "exact");
     console.log(JSON.stringify(verdict));
     if (mode === "verdict" && !verdict.passed) process.exitCode = 1;
   } catch (error) {

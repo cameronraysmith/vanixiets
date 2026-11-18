@@ -229,6 +229,14 @@ The effect's code comes from `main`, and a pull request contributes only an untr
 A pull request that changes the effect or the publisher is therefore not exercised by its own build.
 It is exercised by builds after it lands, and before then only the `publish-evidence-rehearsal` check covers it.
 
+The publisher also judges the report with `main`'s validator and `main`'s case policy (`tests/report/policy.ts`), not the pull request's.
+A pull request that adds a browser test case therefore runs cases `main`'s policy does not yet name.
+The publisher accepts the report as long as every case `main` requires is present, in every engine `main` requires; the cases the pull request adds may come on top.
+A required case that the pull request drops or renames is still rejected, so its evidence is not published.
+An added case is held to shape only: its name must be a `<file>.spec.ts::<title>` case, it must run in every required engine, and its attempts pass the same per-test checks as any other test, but no policy says the case should exist.
+That check against a policy happens in the pull request's own build, whose in-tree verdict (`package-vanixiets-docs-test-e2e`) still requires the report to match the pull request's `policy.ts` exactly.
+So the residual gap is narrow: a case added without its `policy.ts` entry fails the pull request's own checks, and the publisher alone cannot tell an intended addition from a stray one.
+
 The effect has three triggers, and every run takes the same `browser-evidence` lock, so runs never overlap.
 An onPush run for `main` publishes the newest build of the pushed commit to `ttl-90d` and never comments, because a fast-forward landing reuses the merge-queue build and nixbot sends no `build_finished` for it.
 A `pull_request` run handles each pull request build that settles succeeded, freshly built or reused.

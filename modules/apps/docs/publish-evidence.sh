@@ -806,9 +806,12 @@ expected_identity="$(jq -nc --arg system "$report_system" --arg config "$report_
   rejected "report provenance $report_identity does not match $report_attr $expected_identity"
 
 # This program's validator judges the report; a negative report is valid
-# evidence (exit 0, passed false), anything else is not publishable.
+# evidence (exit 0, passed false), anything else is not publishable. It is
+# main's validator and policy judging what may be a pull request's report,
+# so `publish` requires main's cases as a subset and holds the cases the
+# pull request adds to shape only; the in-tree verdict stays exact.
 validator_status=0
-verdict="$(node "$validator" validate "$report" 2>"$tmpdir/validator.err")" || validator_status=$?
+verdict="$(node "$validator" publish "$report" 2>"$tmpdir/validator.err")" || validator_status=$?
 case "$validator_status" in
   0) ;;
   2) rejected "invalid report: $(cat "$tmpdir/validator.err")" ;;
