@@ -31,6 +31,7 @@
       obligations = self.lib.omnigentFleetObligations;
       deployRecordObligations = self.lib.deployRecordObligations;
       commitSigningObligations = self.lib.commitSigningObligations;
+      resolverReloadObligations = self.lib.resolverReloadObligations;
 
       withFleetObligations =
         name: machineConfig: toplevel:
@@ -38,14 +39,20 @@
           unmet = obligations.failures name machineConfig;
           unmetDeployRecord = deployRecordObligations.failures name machineConfig;
           unmetSigning = commitSigningObligations.failures name machineConfig;
+          # Darwin only: NixOS has no /etc/resolver.
+          unmetResolverReload = lib.optionals (lib.hasSuffix "-darwin" machineSystems.${name}) (
+            resolverReloadObligations.failures name machineConfig
+          );
           hostFailures = map (a: a.message) (lib.filter (a: !a.assertion) machineConfig.assertions);
         in
-        assert lib.assertMsg (unmet == [ ] && unmetDeployRecord == [ ] && unmetSigning == [ ]) (
-          "Fleet obligations unmet on ${name}: omnigentFleetObligations [${lib.concatStringsSep ", " unmet}]; deployRecordObligations [${lib.concatStringsSep ", " unmetDeployRecord}]; commitSigningObligations [${lib.concatStringsSep ", " unmetSigning}]"
-          + lib.optionalString (hostFailures != [ ]) (
-            "\n${name} assertion failures: ${lib.concatStringsSep "\n" hostFailures}"
-          )
-        );
+        assert lib.assertMsg
+          (unmet == [ ] && unmetDeployRecord == [ ] && unmetSigning == [ ] && unmetResolverReload == [ ])
+          (
+            "Fleet obligations unmet on ${name}: omnigentFleetObligations [${lib.concatStringsSep ", " unmet}]; deployRecordObligations [${lib.concatStringsSep ", " unmetDeployRecord}]; commitSigningObligations [${lib.concatStringsSep ", " unmetSigning}]; resolverReloadObligations [${lib.concatStringsSep ", " unmetResolverReload}]"
+            + lib.optionalString (hostFailures != [ ]) (
+              "\n${name} assertion failures: ${lib.concatStringsSep "\n" hostFailures}"
+            )
+          );
         toplevel;
     in
     assert lib.assertMsg (
