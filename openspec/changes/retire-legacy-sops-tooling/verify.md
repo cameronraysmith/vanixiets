@@ -51,7 +51,7 @@ The two failures belong to other changes and predate this one; neither is caused
 
 | Task | Reason incomplete | Blocks archive? |
 |---|---|---|
-| 3.4 **[operator]** argentum: check `/var/lib/sops-nix/key.txt` against `sops/machines/argentum/key.json` when the host is next online; `clan vars upload argentum` only if missing or mismatched | Pending, operator: argentum has not been online. Whether an upload is needed is unknown. The guard already enforces the condition on argentum's next `just activate`. | No |
+| 3.4 **[operator]** argentum key check and guard dry run | Key half done 2026-11-18: installed key matches `sops/machines/argentum/key.json`, no upload needed. **Guard half FAILS (CRITICAL)**: `.#darwin -- argentum --dry` run on argentum reported "found: missing" for a present, matching key, because clan's upload left `/var/lib/sops-nix` root-only (`0700`) and the guard tests existence without `sudo`. Without `--dry` it would refuse a correctly keyed host, violating the interface scenario "Matching key" of "The `.#darwin` app refuses activation without the host's machine key". See tasks.md 3.4. | Yes: guard fix and a re-run of the dry run on argentum |
 | 7.7 Archive preparation: merge this change's MODIFIED designation table with rows added elsewhere (naming `stand-up-renovate-on-magnetite`) | Pending, archive-time by design. Checked now: the change's table contains every row of the current main table (0 missing) and adds 21; `stand-up-renovate-on-magnetite` has not archived, so its rows are not yet in main. | Yes, it is an archive step |
 
 ---
@@ -159,9 +159,11 @@ Not validation: `openspec validate` checks structure only.
 ## Overall Decision
 
 - [ ] (pass) PASS — may proceed to finishing-a-development-branch and archive
-- [x] (warn) PASS WITH WARNINGS — may proceed to subsequent steps but note: 3.4 (operator, argentum key check when online) and 7.7 (designation-table merge at archive) are pending; four designation-lint nouns and one undischarged behavioral requirement are recorded in §8 as follow-ups; `openspec validate --all` fails only on two other changes.
-- [ ] (fail) FAIL — return to the failed artifact, correct it, then re-run verify
+- [ ] (warn) PASS WITH WARNINGS — may proceed to subsequent steps but note: `<explanation>`
+- [x] (fail) FAIL — return to the failed artifact, correct it, then re-run verify
+
+FAIL on 2026-11-18 (supersedes the PASS WITH WARNINGS of 2026-11-17), decided by the orchestrator: a delivered defect breaks the interface scenario "Matching key" of "The `.#darwin` app refuses activation without the host's machine key". Evidence: `logs/cam-107-task-3.4-guard-dry-20261117-203116.log`, where the app from `de5d4eaf`, run on argentum with `--dry` at 01:31:16Z, reported "found: missing" for a key that `sudo age-keygen -y` had matched to `sops/machines/argentum/key.json` at 01:22:51Z. On argentum `/var/lib/sops-nix` is `drwx------ root wheel` (created by clan's upload 2026-11-17 20:22), so the guard's unprivileged `[ -e ]` cannot see the file; on stibnite the directory is `drwxr-xr-x root wheel` (created 2026-07-10), which is why tasks 3.2 and 7.4 passed. This is the re-queue signal (In Review → In Progress).
 
 **Next step**:
 
-In Review: roborev, then documenter. Then the retrospective, then archive, with task 7.7 run immediately before archive and 3.4 recorded whenever argentum is next online.
+Fix the guard in `modules/darwin/app.nix` so it decides existence and reads the key through `sudo` when `/var/lib/sops-nix` is not traversable, with a scratch test using a root-only directory; re-run `.#darwin -- argentum --dry` on argentum; re-verify. Then roborev and documenter, the retrospective, and archive with task 7.7.
