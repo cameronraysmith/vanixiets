@@ -1,4 +1,7 @@
-{ ... }:
+{ config, ... }:
+let
+  tincrPort = toString config.flake.lib.mesh.port;
+in
 {
   flake.modules.terranix.gcp =
     {
@@ -125,6 +128,24 @@
           {
             protocol = "udp";
             ports = [ "9993" ];
+          }
+        ];
+        source_ranges = [ "0.0.0.0/0" ];
+        target_tags = [ "terraform-managed" ];
+      };
+
+      # Firewall rule: Allow tincr (tcp and udp, flake.lib.mesh.port) for the tincr mesh
+      resource.google_compute_firewall.allow_tincr = {
+        name = "allow-tincr-terraform";
+        network = "default";
+        allow = [
+          {
+            protocol = "tcp";
+            ports = [ tincrPort ];
+          }
+          {
+            protocol = "udp";
+            ports = [ tincrPort ];
           }
         ];
         source_ranges = [ "0.0.0.0/0" ];

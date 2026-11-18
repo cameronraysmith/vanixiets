@@ -77,7 +77,7 @@ The instance SHALL put every NixOS and darwin machine in its `peer` role, genera
 
 #### Scenario: The instance is evaluated
 
-- **WHEN** `nix eval --json .#clan.inventory.instances.tincr.roles.peer` runs
+- **WHEN** `nix eval --json .#clan.inventory.instances.vanixiets.roles.peer` runs
 - **THEN** it covers all six NixOS and all four darwin machines
 
 ### Requirement: The service exports the mesh to clan's network selection
@@ -91,13 +91,13 @@ The service SHALL export `networking.priority = 1100` and each peer's `fqdn` und
 
 ### Requirement: The mesh runs tincr's default crypto while a phone is a member
 
-The service's `crypto` setting SHALL default to `"default"`, under which no `SPTPSCipher` or `SPTPSKex` line is written, and evaluation SHALL fail if `crypto = "pq"` while any `devices` entry exists.
+The mesh SHALL run tincr's default crypto mesh-wide: the service's `crypto` setting SHALL default to `"default"`, under which no `SPTPSCipher` or `SPTPSKex` line is written, and `crypto = "pq"`, if set, SHALL write those lines only into clan peers' host files and never into a device's.
 This rests on world assumption A132.
 
 #### Scenario: Post-quantum crypto with a phone declared
 
-- **WHEN** an override sets `crypto = "pq"` with `devices` non-empty
-- **THEN** evaluation fails naming the devices
+- **WHEN** an override sets `crypto = "pq"` with `devices` non-empty and `nix eval` reads a peer's host files
+- **THEN** each device's host file carries no `SPTPSCipher` or `SPTPSKex` line, and each clan peer's carries both
 
 ### Requirement: Two name services answer the zone from the registry
 

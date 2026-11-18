@@ -283,6 +283,21 @@
         "type": "github"
       }
     },
+    "crane_2": {
+      "locked": {
+        "lastModified": 1793836618,
+        "narHash": "sha256-TREenflwEjxOSq292FYwbc3kEm7TDRtXCZRNWEdjBmg=",
+        "owner": "ipetkov",
+        "repo": "crane",
+        "rev": "79fd63528501446749c09f08cad486a58c7d173e",
+        "type": "github"
+      },
+      "original": {
+        "owner": "ipetkov",
+        "repo": "crane",
+        "type": "github"
+      }
+    },
     "data-mesher": {
       "inputs": {
         "flake-parts": [
@@ -407,6 +422,28 @@
         "owner": "nixidae",
         "repo": "easykubenix",
         "rev": "3e49ac61a71aad99db0303699aac25c8b6df9c10",
+        "type": "github"
+      }
+    },
+    "fenix": {
+      "inputs": {
+        "nixpkgs": [
+          "tincr",
+          "nixpkgs"
+        ],
+        "rust-analyzer-src": "rust-analyzer-src"
+      },
+      "locked": {
+        "lastModified": 1794495277,
+        "narHash": "sha256-WKnOgZ2VYIx1H3oeAeOq5CctswSlKH2SsiQh9iugCrI=",
+        "owner": "nix-community",
+        "repo": "fenix",
+        "rev": "0738efb391fea6fe32c886f5bac8e8ab90af3c81",
+        "type": "github"
+      },
+      "original": {
+        "owner": "nix-community",
+        "repo": "fenix",
         "type": "github"
       }
     },
@@ -1783,9 +1820,27 @@
         "step-ca-src": "step-ca-src",
         "systems": "systems_12",
         "terranix": "terranix",
+        "tincr": "tincr",
         "treefmt-nix": "treefmt-nix_5",
         "uv2nix": "uv2nix_2",
         "zen-browser": "zen-browser"
+      }
+    },
+    "rust-analyzer-src": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1794309314,
+        "narHash": "sha256-dWYcc8jzHP/9Nl+zpSHqQnMXJwkkPgpYR8eE74rULao=",
+        "owner": "rust-lang",
+        "repo": "rust-analyzer",
+        "rev": "2a362a41a8eb6e090f1a12d9b712df85af6f0c33",
+        "type": "github"
+      },
+      "original": {
+        "owner": "rust-lang",
+        "ref": "nightly",
+        "repo": "rust-analyzer",
+        "type": "github"
       }
     },
     "rust-overlay": {
@@ -2110,6 +2165,31 @@
       "original": {
         "owner": "terranix",
         "repo": "terranix",
+        "type": "github"
+      }
+    },
+    "tincr": {
+      "inputs": {
+        "crane": "crane_2",
+        "fenix": "fenix",
+        "nixpkgs": [
+          "nixpkgs"
+        ],
+        "treefmt-nix": [
+          "treefmt-nix"
+        ]
+      },
+      "locked": {
+        "lastModified": 1794944414,
+        "narHash": "sha256-dT/Ny0jbVMeeW1TGp/YDPQGiDwspvhd8/k/OgULz57Y=",
+        "owner": "Mic92",
+        "repo": "tincr",
+        "rev": "fd92f2164f8f4e2927d6c983a116bf41ac2337d5",
+        "type": "github"
+      },
+      "original": {
+        "owner": "Mic92",
+        "repo": "tincr",
         "type": "github"
       }
     },

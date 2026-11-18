@@ -80,6 +80,10 @@
     nix-grpc-store.inputs.nixpkgs.follows = "nixpkgs";
     nix-grpc-store.inputs.niks3.follows = "niks3";
 
+    tincr.url = "github:Mic92/tincr";
+    tincr.inputs.nixpkgs.follows = "nixpkgs";
+    tincr.inputs.treefmt-nix.follows = "treefmt-nix";
+
     harmonia.url = "github:nix-community/harmonia";
 
     cognee-nix.url = "github:cameronraysmith/cognee-nix/cognee-v112";
