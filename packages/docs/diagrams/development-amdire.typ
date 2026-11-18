@@ -5,7 +5,7 @@
 // Build: typst compile --format svg development-amdire.typ development-amdire.svg
 // Optimize: svgo development-amdire.svg -o ../public/diagrams/development-amdire.svg
 
-#import "@preview/fletcher:0.5.8" as fletcher: diagram, node, edge
+#import "@preview/fletcher:0.6.0" as fletcher: diagram, node, edge
 
 #set page(width: auto, height: auto, margin: 1em)
 #set text(font: "Inter", size: 9pt)
