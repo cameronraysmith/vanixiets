@@ -86,6 +86,17 @@
           _vanixiets_agents_context
           unset -f _vanixiets_agents_context
 
+          # clan commits the vars and secrets files it generates, which in a jj
+          # checkout moves git HEAD off the commit jj tracks as the working
+          # copy's parent. With CLAN_NO_COMMIT set, clan only registers new
+          # files with `git add --intent-to-add`, so flakes still see them and
+          # jj snapshots them into the working-copy change. Plain-git clones
+          # keep clan's commit. The repo root comes from git so entry from a
+          # subdirectory works.
+          if [[ -d .jj || -d "$(git rev-parse --show-toplevel 2>/dev/null)/.jj" ]]; then
+            export CLAN_NO_COMMIT=1
+          fi
+
           # git-hooks.nix (via inputsFrom, whose shellHook runs first) writes
           # core.hooksPath relative to the checkout it installs from, so a value
           # written from the primary checkout resolves to nothing in a linked
