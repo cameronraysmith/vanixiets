@@ -3,15 +3,17 @@ linear_story_id: 87427573-4d17-43f0-8b6c-c56979c4c089
 linear_story_identifier: CAM-110
 linear_story_title: "Pin apm dependencies once, in apm.yml"
 linear_story_url: https://linear.app/cameronraysmith/issue/CAM-110/pin-apm-dependencies-once-in-apmyml
-linear_story_state: Todo
+linear_story_state: In Review
 linear_team: CAM
 linear_project: pi-agent-environment
-last_synced_state: Todo
-last_synced_at: 2026-11-18T17:42:09Z
+last_synced_state: In Review
+last_synced_at: 2026-11-18T19:51:09Z
 review_round: 0
 max_review_rounds: 3
 attempt_log:
   - { at: "2026-11-18T17:42:09Z", transition: "Backlog->Todo", outcome: "posted", note: "T1 bind: issue created in CAM and project Agent environment (d7d743a19249), description seeded from proposal.md, moved to Todo, one comment posted; state confirmed by read-only API" }
+  - { at: "2026-11-18T19:50:40Z", transition: "Todo->In Progress", outcome: "observed", note: "T2: Linear already read In Progress at verify; the write was made outside this ledger and posted no comment" }
+  - { at: "2026-11-18T19:51:09Z", transition: "In Progress->In Review", outcome: "posted", note: "T3 on verify.md (PASS WITH WARNINGS): state set by name, one comment posted, In Review confirmed by read-back" }
 ---
 
 ## Why

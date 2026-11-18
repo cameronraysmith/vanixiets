@@ -89,7 +89,7 @@ The build establishes that the composition resolves every remote dependency from
 
 #### Scenario: offline root-manifest composition
 
-- **WHEN** the composition generates a root consumer `apm.yml` whose `dependencies.apm` lists the first-party package directories as local relative paths, places the download beside it, and runs `apm install --root $out` with no git executable on PATH inside a network-isolated build
+- **WHEN** the composition generates a root consumer `apm.yml` whose `dependencies.apm` lists the first-party package directories as local relative paths, copies the download's `apm_modules/` and lock under the install root `$out`, and runs `apm install --root $out` with no git executable on PATH inside a network-isolated build
 - **THEN** every remote dependency resolves from the download, the install exits 0, and the composed `.claude/skills` and `.agents/skills` trees contain every first-party skill and every skill the remote entries select
 
 #### Scenario: the download is withheld

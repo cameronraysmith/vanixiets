@@ -396,10 +396,11 @@ Expected: FAIL with the `apm-deps: superpowers skills declared … differ` messa
 ```nix
     # Remote apm dependencies come only from the apm-deps fixed-output
     # download (design D1); no git on PATH, so a missing dependency fails
-    # instead of fetching.
-    cp -R ${deps}/apm_modules ./apm_modules
-    cp ${deps}/apm.lock.yaml ./apm.lock.yaml
-    chmod -R u+w ./apm_modules ./apm.lock.yaml
+    # instead of fetching. apm reads apm_modules/ and apm.lock.yaml under
+    # the install root, not beside the generated manifest.
+    cp -R ${deps}/apm_modules "$out/apm_modules"
+    cp ${deps}/apm.lock.yaml "$out/apm.lock.yaml"
+    chmod -R u+w "$out/apm_modules" "$out/apm.lock.yaml"
 ```
 
 
