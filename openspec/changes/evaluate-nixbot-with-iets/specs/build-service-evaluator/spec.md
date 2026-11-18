@@ -49,22 +49,43 @@ The canary commits SHALL cover outputs already on magnetite, outputs only a bina
 - **WHEN** the canary evaluates a commit whose outputs are in one of the fleet's binary caches but not on magnetite
 - **THEN** both evaluators report those attributes as cached rather than as not built
 
-### Requirement: Whole-evaluation failure on a killed worker is accepted only with measured headroom
+### Requirement: Insufficient evaluation headroom opens a capacity decision
 
-While the build service runs an evaluator that fails a whole evaluation when one of its workers is killed, every evaluation in the canary and in the first seven days after the switch SHALL peak at or below 90 % of its memory ceiling and below the build service's 20 GiB throttle level, with no kernel kill.
-When one does not, or the operator judges the headroom not comfortable, the build service SHALL return to the evaluator it replaced, with the operator's recorded reason.
+While the build service runs an evaluator that fails a whole evaluation when one of its workers is killed, an evaluation peaking above 90 % of its memory ceiling or at the build service's 20 GiB throttle level, or suffering a kernel kill, SHALL open a capacity decision by the operator, recorded with the evaluation records and magnetite's memory budget.
+The decision SHALL take, in order of cost: tuning the evaluator, reclaiming memory, moving other services, resizing magnetite.
 
-**Discharged by**: `build-service-evaluator-interface` requirement `nixbot logs one record per evaluation`, resting on world assumption `A144 — iets fails a whole evaluation when a worker is killed, while nix-eval-jobs retries the killed worker's attribute alone`; the operator's recorded gate over the canary's and the first week's dev-loop records discharges it.
+**Discharged by**: `build-service-evaluator-interface` requirements `nixbot logs one record per evaluation` and `magnetite reports each competing unit's memory and its compressed swap`, resting on world assumption `A144 — iets fails a whole evaluation when a worker is killed, while nix-eval-jobs retries the killed worker's attribute alone`; the operator's recorded decisions over the canary's and each week's dev-loop records discharge it.
 
 #### Scenario: An evaluation peaks above 90 % of its ceiling
 
 - **WHEN** an evaluation under iets in its first week records a memory peak of 19.5 GiB against a 21 GiB ceiling
-- **THEN** the build service returns to nix-eval-jobs and the operator's record cites that evaluation
+- **THEN** the build service keeps iets, and the operator records a capacity decision citing that evaluation and magnetite's memory budget at the time, starting with whether tuning the evaluator restores headroom
+
+#### Scenario: Tuning cannot restore headroom without losing the speed
+
+- **WHEN** fewer workers or a smaller share of memory per worker would bring the peak under the trigger only by giving back most of iets' measured speed
+- **THEN** the operator's decision moves to reclaiming memory on magnetite, such as capping the file-system cache, and only then to moving other services or resizing magnetite, which the operator decides outside this capability
 
 #### Scenario: The kernel kills a worker under iets
 
 - **WHEN** an evaluation under iets records one kernel kill and fails
-- **THEN** the build service returns to nix-eval-jobs, unless the operator records why the kill does not recur
+- **THEN** the operator records a capacity decision; the build service returns to nix-eval-jobs only if the failure blocks builds, as the safety valve of `A change of evaluator is reverted with one change`
+
+### Requirement: magnetite's memory budget is measured beside every evaluation
+
+For as long as the build service evaluates on magnetite, the memory each competing unit holds and has held at most, the file-system cache's size and its limit, and the memory compressed swap holds and the data it stands for SHALL be recorded each minute, and SHALL be viewable beside the evaluation records.
+
+**Discharged by**: `build-service-evaluator-interface` requirement `magnetite reports each competing unit's memory and its compressed swap`, the existing node_exporter keep-list's ARC series, and `fleet-dashboard` requirement `An admitted person views the fleet's signals and the dev-loop history by host`, resting on world assumption `A153 — The collector's systemd receiver reports no unit memory, and the kernel reports each service's memory and zram's footprint`; the operator's recorded baseline week discharges it.
+
+#### Scenario: The baseline week is summarised
+
+- **WHEN** the operator records the baseline week
+- **THEN** the record names each competing unit's largest memory, the file-system cache's largest size and its limit, and compressed swap's largest footprint, beside the evaluations' memory peaks
+
+#### Scenario: A competing unit grows
+
+- **WHEN** a unit on magnetite other than the build service doubles its memory over a week
+- **THEN** the dev-loop view shows it beside the evaluation peaks, and a capacity decision can cite it
 
 ### Requirement: The evaluation still runs one at a time and without building
 
@@ -79,7 +100,7 @@ Whichever evaluator the build service runs, its evaluation SHALL wait for every 
 
 ### Requirement: A change of evaluator is reverted with one change
 
-Returning the build service to the evaluator it replaced SHALL take one change to one line of magnetite's configuration and one deploy of magnetite, and SHALL leave the evaluation records and their chart in place.
+Returning the build service to the evaluator it replaced SHALL take one change to one line of magnetite's configuration and one deploy of magnetite, SHALL be available at once whenever an evaluation under the new evaluator fails or is broken, and SHALL leave the evaluation records, magnetite's memory budget and their charts in place.
 
 **Discharged by**: `build-service-evaluator-interface` requirement `nixbot's evaluator is the lock-wrapped nix-eval-jobs option`; the reversal rehearsed in a scratch copy discharges it.
 
@@ -90,7 +111,7 @@ Returning the build service to the evaluator it replaced SHALL take one change t
 
 ### Requirement: A change to the evaluation's memory settings rests on recorded measurements
 
-The number of workers and each worker's share of memory SHALL change only by a decision the operator records beside the earlier measurements, citing the evaluations' memory peaks, durations and kill counts from the dev-loop history for at least the seven days before the decision.
+The number of workers and each worker's share of memory SHALL change only by a decision the operator records beside the earlier measurements, citing the evaluations' memory peaks, durations and kill counts from the dev-loop history and magnetite's memory budget for at least the seven days before the decision; such tuning is the first response of a capacity decision.
 
 **Discharged by**: the comment table beside `evalWorkerCount` and `evalMaxMemorySize` in `modules/nixos/nixbot.nix`, with the operator's recorded decision as its evidence.
 

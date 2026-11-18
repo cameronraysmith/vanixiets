@@ -22,7 +22,7 @@ Any requirement whose discharge depends on this fact SHALL name it explicitly, a
 #### Scenario: iets retries killed workers, or nix-eval-jobs stops retrying them
 
 - **WHEN** an iets revision retries a killed worker's attribute instead of failing the run, or a nix-eval-jobs revision nixbot pins stops requeueing a killed worker's attribute
-- **THEN** this assumption is void, and the `build-service-evaluator` requirement `Whole-evaluation failure on a killed worker is accepted only with measured headroom` loses the premise that makes its headroom gate necessary, and the gate is reconsidered rather than kept by habit
+- **THEN** this assumption is void, and the `build-service-evaluator` requirement `Insufficient evaluation headroom opens a capacity decision` loses the premise that makes its trigger necessary, and the trigger is reconsidered rather than kept by habit
 
 ### Requirement: A145 — Neither evaluator reports routine worker recycling, and nix-eval-jobs reports its kills in two fixed messages
 
@@ -61,6 +61,18 @@ Any requirement whose discharge depends on this fact SHALL name it explicitly, a
 
 - **WHEN** the canary, or any later comparison of the two evaluators on one commit, finds an attribute whose derivation, outputs or system differ, or an iets bump changes its parity target
 - **THEN** this assumption is void for that revision, and the `build-service-evaluator` requirement `A change of evaluator keeps every attribute's derivation and cache status` loses its discharge until the difference is explained or the build service reverts to the evaluator it replaced
+
+### Requirement: A153 — The collector's systemd receiver reports no unit memory, and the kernel reports each service's memory and zram's footprint
+
+It is true of the OpenTelemetry collector contrib 0.155.0, independent of what this fleet builds, that its `systemd` receiver reports no memory metric; and of magnetite's kernel that each service's cgroup reports its current and peak memory and that zram reports the data it holds and the memory it uses.
+Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL be treated as losing its discharge once this assumption's violation condition below is observed.
+
+**Evidence**: `open-telemetry/opentelemetry-collector-contrib` `receiver/systemdreceiver/metadata.yaml` at tag `v0.155.0` lists only `systemd.service.cpu.time` and `systemd.service.restarts` (`systemd.unit.state` aside); a later revision (`cd37ea9151`, 2026-10-15) adds `systemd.service.memory.usage` and `systemd.service.memory.usage.max`; magnetite's collector runs `opentelemetry-collector-contrib-0.155.0` and its store held no `systemd_service_memory_*` series on 2026-11-18; magnetite (kernel 6.18.60) exposes `memory.current` and `memory.peak` under `/sys/fs/cgroup/system.slice/<unit>/` for its running services and `/sys/block/zram0/mm_stat` (on 2026-11-18: 4,981,981,184 bytes of data in 552,349,696 bytes of memory).
+
+#### Scenario: The collector gains unit memory, or the kernel's files change
+
+- **WHEN** a contrib bump brings `systemd.service.memory.usage` to magnetite's collector, or a kernel change removes or renames `memory.peak` or `mm_stat`'s fields
+- **THEN** this assumption is void, and the `build-service-evaluator` requirement `magnetite's memory budget is measured beside every evaluation` loses the discharge argument for the probe; with the receiver available, the probe's unit series are replaced by the receiver's
 
 ## MODIFIED Requirements
 
@@ -147,6 +159,9 @@ A term found to denote two distinct phenomena within this repository's vocabular
 | worker | evaluation | one of the processes among which an evaluator divides an evaluation, each limited to a share of the evaluation's memory and replaced when it outgrows that share or is killed | shared |
 | memory ceiling | evaluation | the most memory the kernel lets one evaluation's processes hold together before it kills one of them | shared |
 | memory peak | evaluation | the most memory one evaluation's processes held together at any moment of that evaluation | shared |
+| memory budget | host | the division of a host's memory at one time among its units, its file-system cache and its compressed swap, together with each unit's largest share so far | shared |
+| file-system cache | ZFS | the memory a host's ZFS holds as its adaptive read cache, up to a limit, which it gives back under memory pressure | shared |
+| capacity decision | — | the operator's recorded choice of where an evaluation's missing memory comes from: tuning the evaluator, reclaiming memory on the host, moving other services off it, or resizing it | world-only |
 | collector | — | the service on a host that gathers that host's signals and writes them to the telemetry store | shared |
 | queued interval | — | measurements a collector has gathered but the telemetry store has not yet accepted | shared |
 | gap | — | an interval within a series for which measurements were gathered, or were due to be, but none are stored | shared |

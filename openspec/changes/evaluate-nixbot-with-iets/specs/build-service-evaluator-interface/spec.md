@@ -86,12 +86,29 @@ Before the switch, the iets package SHALL run on magnetite as `nix-eval-jobs`, t
 - **WHEN** the canary is prepared
 - **THEN** its commits include one whose outputs are all on magnetite, one with outputs only a fleet binary cache holds, one with outputs no cache holds, and one whose evaluation fails, and the comparison covers `drvPath`, `outputs`, `system`, `cacheStatus` and the presence of `error`
 
+### Requirement: magnetite reports each competing unit's memory and its compressed swap
+
+magnetite SHALL run `magnetite-memory-budget.service` every 60 s, replacing `memory-budget.prom` in node_exporter's textfile directory by write-then-rename with systemd's `MemoryCurrent` and `MemoryPeak` of each running unit of `memoryBudgetUnits`, `system.slice` and `user.slice`, and zram0's `mm_stat` sizes.
+magnetite's node_exporter SHALL enable its `textfile` collector, and the five series names SHALL join `nodeExporterKeep`.
+
+**Discharged by**: magnetite's evaluation-time assertion that the probe's unit list equals `memoryBudgetUnits` and that the collector's node keep-list holds the five names; a read of the stored series after deploy; resting on world assumption `A153 — The collector's systemd receiver reports no unit memory, and the kernel reports each service's memory and zram's footprint`.
+
+#### Scenario: The probe's output is read on magnetite
+
+- **WHEN** `memory-budget.prom` is read on magnetite after deploy
+- **THEN** it holds `vanixiets_unit_memory_current_bytes` and `vanixiets_unit_memory_peak_bytes` for each running unit of the list and for `system.slice` and `user.slice`, and `vanixiets_zram_orig_data_bytes`, `vanixiets_zram_compr_data_bytes` and `vanixiets_zram_mem_used_bytes`, with `omnigent-host-<owner>.service` written under its owner alias, and no series for a unit that is not running
+
+#### Scenario: The keep-list loses a budget series
+
+- **WHEN** a mutant of `nodeExporterKeep` drops `vanixiets_unit_memory_current_bytes`
+- **THEN** magnetite's evaluation fails on the assertion
+
 ### Requirement: This capability states its own trust boundary
 
 This capability SHALL guarantee only that magnetite selects one lock-wrapped evaluator, that the iets package and the record patch are built and checked as stated, and that the canary's comparison is recorded.
-nixbot, the kernel's cgroup counters and the evaluators produce what is recorded, trusted at the pinned revisions; nothing here guarantees that iets evaluates any expression as Nix does beyond the compared commits, or that a record reaches the telemetry store.
+nixbot, the kernel's cgroup and zram counters and the evaluators produce what is recorded, trusted at the pinned revisions; nothing here guarantees that iets evaluates any expression as Nix does beyond the compared commits, or that a record reaches the telemetry store.
 
-**Discharged by**: the statements of this capability's other requirements and of world assumptions `A143` to `A147`.
+**Discharged by**: the statements of this capability's other requirements and of world assumptions `A143` to `A147` and `A153`.
 
 #### Scenario: A reader asks whether iets is proven equivalent to Nix
 

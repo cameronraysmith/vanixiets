@@ -2,7 +2,7 @@
 
 ### Requirement: An admitted person views the fleet's signals and the dev-loop history by host
 
-An admitted person SHALL be able to open the dashboard service at its hostname from a browser, and SHALL find there one view of each collecting host's memory, compressed swap, per-process memory, out-of-memory kills, file systems, storage pools, units and disk health, selectable by the name of the host, and one view of the dev-loop history's queue wait, formation-to-land, build outcomes and deploys per host, and of each evaluation's memory peak against its memory ceiling and its duration, told apart by evaluator.
+An admitted person SHALL be able to open the dashboard service at its hostname from a browser, and SHALL find there one view of each collecting host's memory, compressed swap, per-process memory, out-of-memory kills, file systems, storage pools, units and disk health, selectable by the name of the host, and one view of the dev-loop history's queue wait, formation-to-land, build outcomes and deploys per host, and of each evaluation's memory peak against its memory ceiling and its duration, told apart by evaluator, beside magnetite's memory budget.
 
 **Discharged by**: `fleet-dashboard-interface` requirements `The dashboard service runs the vendor's release with its pinned plugins`, `The dashboard service listens on loopback behind one vhost`, `The telemetry store is read only through two global datasources`, `Committed files are the only source of views and datasources` and `The view files lint clean at the shipped plugins`, resting on world assumption `A58 — Perses 0.55.1 removes its write routes in read-only mode, proxies with the stored credential and fixed headers, and refreshes a session without depending on the identity provider's answer`; the lint check, the container runtime test's query and views cases and the operator's recorded observation at first deployment discharge it.
 
@@ -25,3 +25,8 @@ An admitted person SHALL be able to open the dashboard service at its hostname f
 
 - **WHEN** the build service's evaluator changes and evaluations under both have been recorded
 - **THEN** the dev-loop view shows both evaluators' memory peaks against the memory ceiling and both durations as separate series, so the change is visible at its date
+
+#### Scenario: A capacity decision is prepared
+
+- **WHEN** the operator opens the dev-loop view to decide where an evaluation's missing memory comes from
+- **THEN** the view shows, for the same interval, the evaluations' memory peaks and magnetite's memory budget: each competing unit's memory, the file-system cache's size and limit, and compressed swap's footprint

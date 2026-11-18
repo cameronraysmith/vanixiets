@@ -15,7 +15,7 @@ where the mapping is one to one.
 
 **Tech Stack:** nix flakes with flake-parts and import-tree; nixbot at `Mic92/nixbot@171a8c77` (Python, `nixbot/nixbot/nix_eval.py`, `build_run.py`, `log.py`); nix-eval-jobs 2.35.4; iets 0.2.0 (`numtide/iets@9157ca1a`); OpenTelemetry collector journald receiver; GreptimeDB 1.2.1 pipelines; Perses; clan deployment.
 
-**Spec:** `openspec/changes/evaluate-nixbot-with-iets/` — `design.md` (D1–D10), `specs/build-service-evaluator`, `specs/build-service-evaluator-interface`, `specs/devloop-collection`, `specs/devloop-collection-interface`, `specs/fleet-dashboard`, `specs/world-assumptions` (A143–A147).
+**Spec:** `openspec/changes/evaluate-nixbot-with-iets/` — `design.md` (D1–D11), `specs/build-service-evaluator`, `specs/build-service-evaluator-interface`, `specs/devloop-collection`, `specs/devloop-collection-interface`, `specs/fleet-dashboard`, `specs/world-assumptions` (A143–A147, A153).
 
 ## Global Constraints
 
@@ -26,7 +26,8 @@ where the mapping is one to one.
 - The record's producer is the nixbot patch; `modules/lib/nix-eval-lock.sh` and `modules/lib/nix-eval-lock.nix` are not edited except the 5.2 comment (D5).
 - `eval_run` fields exactly: `build_id`, `evaluator`, `evaluator_version`, `workers`, `max_memory_mib`, `memory_max_bytes`, `memory_peak_bytes`, `oom_kill`, `wall_ms`, `user_ms`, `system_ms`, `budget_kills`, `worker_kills`, `exit_status`, `ts`; key `build_id`; time `ts`; no evaluator text (D6, D7).
 - 6 workers × 3072 MiB unchanged through the switch; tuning only by the operator's recorded decision (D8, D10, Q2).
-- D9 gate: every evaluation ≤ 90 % of `memory.max` (≤ 19353 MiB of 21504) and below 20 GiB, with `oom_kill = 0`, through the canary and the first switched week, unless the operator restates it at 5.1.
+- D9 capacity trigger, not a verdict: an evaluation above 90 % of `memory.max` (19353 MiB of 21504) or at 20 GiB, or any `oom_kill > 0`, opens an operator capacity decision taken in order of cost: (a) tune the evaluator, (b) reclaim memory on magnetite (ARC cap, zram, per-service limits), (c) move non-CI services off magnetite (fleet-topology initiative), (d) resize magnetite; (c) and (d) are the operator's, outside this change. The one-line revert is only the safety valve for a failing or broken evaluation.
+- magnetite memory budget (D11): ARC, swap use, available memory, OOM kills and large processes are already stored and are not re-added; the probe adds only `vanixiets_unit_memory_current_bytes`, `vanixiets_unit_memory_peak_bytes` (systemd `MemoryCurrent`/`MemoryPeak` for `memoryBudgetUnits`, `system.slice`, `user.slice`) and `vanixiets_zram_orig_data_bytes`, `vanixiets_zram_compr_data_bytes`, `vanixiets_zram_mem_used_bytes`.
 - buildbot's and `nix-fast-build --remote`'s evaluations are not recorded.
 - nix-managed outputs are verified by `nix eval`/`nix build` against `.#nixosConfigurations.magnetite`, `.#checks.x86_64-linux.*` and `.#vmTests.x86_64-linux.*`, or on magnetite after activation; never by reading source.
 - Long or output-heavy commands: `<command> 2>&1 | tee logs/<identifier>-$(date +%Y%m%d-%H%M%S).log`.
@@ -62,10 +63,13 @@ The vendored consumer of the evaluator is nixbot at `171a8c77`. Any pre-switch r
 - Modify: `modules/nixos/devloop-collection.nix` (`journald/nixbot-eval`, `logs/devloop-eval_run`, reconcile comparison)
 - Modify: `modules/checks/devloop-queries.nix`, `modules/checks/devloop-queries/reconcile-fixtures.sql`, `modules/vm-tests/devloop-ingest.nix`
 - Modify: `modules/nixos/perses/resources/dashboard-devloop.json`
+- Modify: `modules/clan/services/otel-collector/schema.nix` (`memoryBudgetUnits`, `nodeExporterKeep`)
+- Create: `modules/nixos/magnetite-memory-budget.nix` (probe service, timer, node_exporter `textfile` collector, assertions; imported by magnetite only)
 
 **Interfaces:**
 - Produces: the journal line `{"ts": "...Z", "level": "info", "logger": "nixbot.nix_eval", "msg": "evaluation finished", "build_id": int, "evaluator": str, "evaluator_version": str, "workers": int, "max_memory_mib": int, "memory_max_bytes"?: int, "memory_peak_bytes"?: int, "oom_kill"?: int, "wall_ms": int, "user_ms"?: int, "system_ms"?: int, "budget_kills": int, "worker_kills": int, "exit_status": int}` consumed by Steps 6–9 and Task 2; the environment value `NIXBOT_EVALUATOR="<evaluator> <version>"`, split on the first space.
 - Produces: `devloop.eval_run` with the Global Constraints columns.
+- Produces: `memory-budget.prom` lines `vanixiets_unit_memory_current_bytes{unit="<unit>"} <int>`, `vanixiets_unit_memory_peak_bytes{unit="<unit>"} <int>`, `vanixiets_zram_orig_data_bytes <int>`, `vanixiets_zram_compr_data_bytes <int>`, `vanixiets_zram_mem_used_bytes <int>`, consumed by Step 12 and Task 2.
 
 - [ ] **Step 1: Write the check first.** `checks.x86_64-linux.nixbot-eval-record` runs the patched `nixbot.nix_eval` runner with `sandbox = False` against a stub `nix-eval-jobs` script, a stand-in cgroup directory holding `memory.max`, `memory.peak`, `memory.events` and `cpu.stat` fixtures, and a captured `JsonFormatter` handler. Cases: `success` (exit 0, one line, `exit_status` 0, `memory_peak_bytes` equal to the fixture); `failure` (exit 1, one line, `exit_status` 1); `kills` (stub prints `memory budget of 18432 MiB exceeded (19000 MiB in use), killing worker 42 ('checks.x', 4000 MiB)` and `evaluation worker 43 was killed (system out of memory?)`; `budget_kills` 1, `worker_kills` 1, and no value contains `checks.x`); `timeout` (stub sleeps past a 1 s timeout; one line); `no-cgroup` (limiter absent; one line without the cgroup keys).
 - [ ] **Step 2: Build it and see it fail** against the unpatched package. Run: `nix build .#checks.x86_64-linux.nixbot-eval-record`. Expected: FAIL, no `evaluation finished` line.
@@ -76,7 +80,10 @@ The vendored consumer of the evaluator is nixbot at `171a8c77`. Any pre-switch r
 - [ ] **Step 7: Receiver and pipeline.** `journald/nixbot-eval` with `units = [ "nixbot.service" ]`, `grep = ''"msg": "evaluation finished"''`, the gitea-mq receiver's `journalctl_path`, `start_at = "beginning"`, `storage = "file_storage"`, operators `json_parser` on `body.MESSAGE`, `retain` from the allow-list, body removal; pipeline `logs/devloop-eval_run` as the other four. Run: `nix build .#checks.x86_64-linux.otel-collector-config`. Expected: PASS.
 - [ ] **Step 8: Reconcile and container test.** Add the `eval_run` comparison to `devloop-reconcile` and its fixture to `reconcile-fixtures.sql`; add the stub `nixbot.service` (two `evaluation finished` lines for one `build_id`, one without cgroup keys, one `starting evaluation` line), the evaluation case and the two mutants to `devloop-ingest`. Run: `nix build .#checks.x86_64-linux.devloop-queries` and `nix build .#vmTests.x86_64-linux.devloop-ingest` on magnetite. Expected: PASS; each mutant FAILS as the interface scenarios state.
 - [ ] **Step 9: Charts.** Two panels in `dashboard-devloop.json` over `devloop.eval_run`: `memory_peak_bytes` and `memory_max_bytes` by `ts`, series per `evaluator`, with a 21474836480 threshold line; `wall_ms` by `ts` per `evaluator`. Run: the `perses-lint` check and the Perses container runtime test. Expected: PASS.
-- [ ] **Step 10: Commit** onto this change's implementation chain: `feat(nixbot): record every evaluation in the dev-loop history`.
+- [ ] **Step 10: Budget allow-list.** Add `memoryBudgetUnits` (the D11 list) and the five names to `nodeExporterKeep` in `schema.nix`. Run: `nix eval --json .#lib.otelCollectorSchema.memoryBudgetUnits` and `.nodeExporterKeep`. Expected: the D11 units; the keep-list with the five names after the existing nine.
+- [ ] **Step 11: Budget probe, test first.** Write a fixture of recorded `systemctl show -p Id -p ActiveState -p MemoryCurrent -p MemoryPeak` output (one active unit, one inactive, one `[not set]`, one `omnigent-host-cameron.service`) and an `mm_stat` line, and a check that the probe's `format_budget(show_output, mm_stat, aliases) -> str` emits exactly the expected `.prom` text (alias applied, no line for the inactive or `[not set]` unit); see it fail; implement the probe as a `writeShellApplication` (or `writers.writePython3Bin`) with that function, the service and 60 s timer writing by write-then-rename, magnetite's node_exporter `--collector.textfile.directory`, and the two assertions of tasks.md 1.11; run the check, `otel-collector-config` and magnetite's `system.build.toplevel` evaluation, then the keep-list mutant. Expected: PASS, PASS, evaluates, mutant FAILS on the assertion.
+- [ ] **Step 12: Budget chart.** A panel in `dashboard-devloop.json` through the PromQL datasource beside Step 9's: `sum by (unit) (vanixiets_unit_memory_current_bytes{host_name="magnetite", unit!~".*\\.slice"})` stacked, `node_zfs_arc_size{host_name="magnetite"}` and `vanixiets_zram_mem_used_bytes{host_name="magnetite"}`, with `node_zfs_arc_c_max` as a line. Run: `perses-lint` and the Perses container runtime test. Expected: PASS.
+- [ ] **Step 13: Commit** onto this change's implementation chain: `feat(nixbot): record every evaluation and magnetite's memory budget`.
 
 ### Task 2: Land and baseline
 
@@ -88,7 +95,8 @@ The vendored consumer of the evaluator is nixbot at `171a8c77`. Any pre-switch r
 - [ ] **Step 2:** deploy magnetite and attribute every post since the deploy (tasks.md 2.2).
 - [ ] **Step 3:** compare journal line counts with `eval_run` rows and read one row (tasks.md 2.3); expected `memory_max_bytes = 22548578304`.
 - [ ] **Step 4:** read the first reconcile log (tasks.md 2.4).
-- [ ] **Step 5 [operator, wizard]:** after seven days, write the baseline (tasks.md 2.5) from `SELECT date_trunc('day', ts), count(*), max(memory_peak_bytes), approx_percentile_cont(memory_peak_bytes, 0.5), max(wall_ms), approx_percentile_cont(wall_ms, 0.5), sum(budget_kills), sum(worker_kills), sum(oom_kill), sum(exit_status <> 0) FROM devloop.eval_run GROUP BY 1 ORDER BY 1`.
+- [ ] **Step 5:** confirm the budget series on magnetite and in `fleet` (tasks.md 2.5).
+- [ ] **Step 6 [operator, wizard]:** after seven days, write the baseline (tasks.md 2.6) from `SELECT date_trunc('day', ts), count(*), max(memory_peak_bytes), approx_percentile_cont(memory_peak_bytes, 0.5), max(wall_ms), approx_percentile_cont(wall_ms, 0.5), sum(budget_kills), sum(worker_kills), sum(oom_kill), sum(exit_status <> 0) FROM devloop.eval_run GROUP BY 1 ORDER BY 1`, and for the budget `max_over_time(vanixiets_unit_memory_current_bytes{host_name="magnetite"}[7d])` by `unit`, `max_over_time(node_zfs_arc_size{host_name="magnetite"}[7d])` with `node_zfs_arc_c_max`, `max_over_time(vanixiets_zram_mem_used_bytes{host_name="magnetite"}[7d])` and `max_over_time(sum(system_paging_usage_bytes{host_name="magnetite",state="used"})[7d:1m])`.
 
 ### Task 3: The iets package, unused
 
@@ -125,22 +133,24 @@ The vendored consumer of the evaluator is nixbot at `171a8c77`. Any pre-switch r
 - Modify: `modules/nixos/nixbot.nix:252-261`
 - Modify: `modules/lib/nix-eval-lock.sh` (OOM paragraph comment only), `modules/machines/nixos/magnetite/default.nix` (kill-order assertion comment only)
 
-- [ ] **Step 1 [operator, wizard]:** the switch decision and D9 threshold (tasks.md 5.1).
+- [ ] **Step 1 [operator, wizard]:** the switch decision and the D9 capacity trigger, with a capacity decision first if the canary fired it (tasks.md 5.1).
 - [ ] **Step 2:** replace `options.services.nixbot.packages.nix-eval-jobs.default` inside `config.services.nixEvalLock.wrap (...)` with `(config.flake.lib.mkNixEvalJobsIets pkgs inputs.iets.packages.${pkgs.system}.default options.services.nixbot.packages.nix-eval-jobs.default)` on one line; amend the two comments. Verify per tasks.md 5.2.
 - [ ] **Step 3:** the unwrapped mutant fails magnetite's evaluation (tasks.md 5.3).
 - [ ] **Step 4:** land, deploy, attribute posts, read the unit PATH (tasks.md 5.4).
 - [ ] **Step 5:** read the first `eval_run` row naming `iets` (tasks.md 5.5).
 - [ ] **Step 6: Commit:** `feat(nixbot): evaluate with iets`.
 
-### Task 6: First week and tuning
+### Task 6: First week and capacity
 
-- [ ] **Step 1 [operator, wizard]:** the D9 gate over the canary and the week (tasks.md 6.1), with Task 2 Step 5's query restricted to `evaluator = 'iets'`.
-- [ ] **Step 2 [operator, wizard]:** the D10 decision recorded in the comment table (tasks.md 6.2).
+- [ ] **Step 1:** the safety valve stands from Task 5 Step 4 on: a failing or broken evaluation lands Task 7 Step 3's revert at once (tasks.md 6.1).
+- [ ] **Step 2 [operator, wizard]:** read the D9 trigger over the canary and the week (tasks.md 6.2), with Task 2 Step 6's queries restricted to `evaluator = 'iets'` and the switched week.
+- [ ] **Step 3 [operator, wizard]:** the capacity decision, (a) to (d) in order, recorded in the comment table (tasks.md 6.3); a change under (a) or (b) loops back to Step 2 for its next week.
 
 ### Task 7: Integration verification
 
 - [ ] **Step 1:** per-evaluator counts against the journal across the switch (tasks.md 7.1).
 - [ ] **Step 2:** restart one pre-switch build and compare `ci_attribute.drv_path` per `attr` (tasks.md 7.2).
 - [ ] **Step 3:** the rollback rehearsal in a scratch copy (tasks.md 7.3).
-- [ ] **Step 4 [operator]:** the dev-loop view across the switch (tasks.md 7.4).
-- [ ] **Step 5:** archive preparation (tasks.md 7.5).
+- [ ] **Step 4 [operator]:** the dev-loop view across the switch, budget included (tasks.md 7.4).
+- [ ] **Step 5:** the budget's accounting of MemTotal at three moments (tasks.md 7.5).
+- [ ] **Step 6:** archive preparation (tasks.md 7.6).
