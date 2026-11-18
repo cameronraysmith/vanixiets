@@ -1,3 +1,7 @@
+{ config, ... }:
+let
+  inherit (config.flake.lib) matrixServerName;
+in
 {
   flake.clan.inventory.instances.hermes-agent = {
     module = {
@@ -9,7 +13,7 @@
         serviceUser = "cameron";
         openrouterApiKeyGenerator = "hermes-openrouter-api-key";
         matrixBotPasswordGenerator = "matrix-password-hermes";
-        matrixServerName = "matrix.zt";
+        inherit matrixServerName;
         matrixUserName = "hermes";
         # Colocated tuwunel listens on 127.0.0.1 + ::1 at matrixPort (8008 as
         # configured at modules/machines/nixos/cinnabar/matrix.nix). The
@@ -21,12 +25,12 @@
         matrixHomeserverUrl = "http://localhost:8008";
         port = 18791;
         dashboardPort = 18790;
-        channelsAllowlist = [ "@cameron:matrix.zt" ];
-        # Matrix home channel — receives cron-job results and cross-platform
-        # messages. The "cron" room (!Tthf05aI9YvVVsCF2d:matrix.zt) has the
-        # hermes user as a member; the bot joined on invite per upstream's
-        # hardcoded _on_invite handler (matrix.py:1979-1988).
-        homeRoom = "!Tthf05aI9YvVVsCF2d:matrix.zt";
+        channelsAllowlist = [ "@cameron:${matrixServerName}" ];
+        # Matrix home channel: receives cron-job results and cross-platform
+        # messages. Empty until the operator creates the cron room on the
+        # fresh homeserver and invites hermes; the bot joins on invite per
+        # upstream's hardcoded _on_invite handler (matrix.py:1979-1988).
+        homeRoom = "";
         homeRoomName = "cron";
         configOverrides = {
           # Mirror openclaw's autoJoin posture so the bot accepts DM invites.

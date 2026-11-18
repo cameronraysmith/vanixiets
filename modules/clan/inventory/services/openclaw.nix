@@ -1,3 +1,7 @@
+{ config, ... }:
+let
+  inherit (config.flake.lib) hosts matrixServerName;
+in
 {
   flake.clan.inventory.instances.openclaw = {
     module = {
@@ -13,13 +17,13 @@
         enable = false;
         homeserver = "http://localhost:8008";
         botUserName = "clawd";
-        matrixServerName = "matrix.zt";
+        inherit matrixServerName;
         port = 18789;
         serviceUser = "cameron";
         gatewayMode = "local";
         matrixBotPasswordGenerator = "matrix-password-clawd";
         listenAddresses = [
-          "fddb:4344:343b:14b9:399:93db:4344:343b"
+          hosts.cinnabar.zerotier.address
           "10.147.17.1"
         ];
         configOverrides = {
@@ -30,7 +34,7 @@
           channels.matrix.dm = {
             enabled = true;
             policy = "allowlist";
-            allowFrom = [ "@cameron:matrix.zt" ];
+            allowFrom = [ "@cameron:${matrixServerName}" ];
           };
           gateway.controlUi.allowedOrigins = [ "https://openclaw.zt" ];
         };

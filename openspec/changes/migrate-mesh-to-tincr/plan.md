@@ -36,6 +36,8 @@ A first-party `tincr` clan service, written with Qubasa/infra's as reference onl
 | `flake.lib.meshInterfaces config` | 1.3 | R, S, Z |
 | clan service `tincr`, instance `vanixiets`, generator `tincr-vanixiets`, interface `tinc-vanixiets` / `utun10` | T | R (networkd match), S, V |
 | package `tincapp-network-<phone>` | A | V |
+| `flake.lib.matrixServerName` | M | M (tuwunel, hermes-agent, openclaw) |
+| `flake.lib.tuwunelServerNameGuard pkgs { serverName }` | M | M (tuwunel `ExecStartPre`, check `matrix-server-name-reset`) |
 
 ## DAG and dispatch
 
@@ -59,7 +61,7 @@ S is authored in wave 1 against the contract's names; it merges after T because 
 | T | `flake.nix`, `flake.lock`, `modules/clan/services/tincr/**`, `modules/clan/inventory/services/tincr.nix`, `modules/vm-tests/tincr-mesh.nix`, `modules/terranix/gcp.nix`, `vars/per-machine/*/tincr-vanixiets/**` |
 | A | `pkgs/by-name/tincapp-network/**` (or the repo's package location for generated configs) |
 | K | `openspec/changes/bind-mesh-writes-to-their-host/**` on CAM-81's chain |
-| M | `modules/machines/nixos/cinnabar/matrix.nix`, `modules/clan/inventory/services/hermes-agent.nix`, `modules/clan/inventory/services/openclaw.nix` |
+| M | `modules/machines/nixos/cinnabar/matrix.nix`, `modules/clan/inventory/services/hermes-agent.nix`, `modules/clan/inventory/services/openclaw.nix`, `modules/checks/matrix-server-name-reset.nix` |
 | B | the operations runbook page, `modules/clan/inventory/services/p2p-ssh-iroh.nix` if 7.2 adds it |
 | S | `modules/machines/nixos/cinnabar/caddy.nix`, `modules/darwin/zt-services-trust.nix` (renamed), `modules/clan/services/otel-collector/flake-module.nix` SAN lines, `modules/clan/services/nix-builders/flake-module.nix`, `modules/clan/inventory/services/nix-builders.nix`, `modules/clan/inventory/services/sshd.nix`, the nine checks of 8.4 |
 

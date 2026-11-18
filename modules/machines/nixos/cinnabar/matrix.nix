@@ -1,5 +1,51 @@
-{ ... }:
+# flake.lib.tuwunelServerNameGuard pkgs { serverName }: the one-shot database
+# reset tuwunel runs before it starts. A homeserver's server name is bound into
+# every ID its database holds and cannot be changed in place, so when the
+# marker `.server-name` in $STATE_DIRECTORY names another server, or is absent
+# while the directory holds data (a database made before the marker existed),
+# the directory's contents move to a sibling `<dir>.retired-<old>-<epoch>`.
+# The guard then writes the configured name into the marker, so it acts once.
+# checks.x86_64-linux.matrix-server-name-reset exercises it.
+{ config, ... }:
+let
+  inherit (config.flake.lib) fleet matrixServerName tuwunelServerNameGuard;
+in
 {
+  # The homeserver's server name, the suffix of every Matrix ID it issues;
+  # hermes-agent and openclaw read it for their user IDs and allowlists.
+  flake.lib.matrixServerName = "matrix.${fleet.domain}";
+
+  flake.lib.tuwunelServerNameGuard =
+    pkgs:
+    { serverName }:
+    pkgs.writeShellApplication {
+      name = "tuwunel-server-name-guard";
+      runtimeInputs = [
+        pkgs.coreutils
+        pkgs.findutils
+      ];
+      text = ''
+        new="${serverName}"
+        state=$(realpath "''${STATE_DIRECTORY:?}")
+        marker="$state/.server-name"
+        old=""
+        if [ -f "$marker" ]; then
+          old=$(cat "$marker")
+          if [ "$old" = "$new" ]; then exit 0; fi
+        elif [ -n "$(ls -A "$state")" ]; then
+          old=unmarked
+        fi
+        if [ -n "$old" ]; then
+          dest="$state.retired-$old-$(date +%s)"
+          mkdir -m 0700 "$dest"
+          find "$state" -mindepth 1 -maxdepth 1 -exec mv -t "$dest" {} +
+          echo "moved the database of server $old to $dest; starting empty as $new"
+        fi
+        printf '%s\n' "$new" > "$marker"
+        chown --reference="$state" "$marker"
+      '';
+    };
+
   flake.modules.nixos."machines/nixos/cinnabar" =
     {
       config,
@@ -14,7 +60,7 @@
       services.matrix-tuwunel = {
         enable = true;
         settings.global = {
-          server_name = "matrix.zt";
+          server_name = matrixServerName;
           address = [
             "::1"
             "127.0.0.1"
@@ -27,6 +73,12 @@
           trusted_servers = [ ];
         };
       };
+
+      # "+" runs the guard outside DynamicUser's sandbox: the unprivileged user
+      # cannot create the retired directory beside its own state directory.
+      systemd.services.tuwunel.serviceConfig.ExecStartPre = [
+        "+${lib.getExe (tuwunelServerNameGuard pkgs { serverName = matrixServerName; })}"
+      ];
 
       # DynamicUser cannot read clan-vars paths; relay via systemd credentials
       systemd.services.tuwunel.serviceConfig.LoadCredential = [
