@@ -15,6 +15,11 @@ A service role that every host holds SHALL be shown once, as holding on every ho
 - **WHEN** a service gives the same service role to every host of the fleet
 - **THEN** the fleet map shows it once as holding on every host and not inside each host
 
+#### Scenario: A person opens the published fleet map
+
+- **WHEN** a person opens the documentation page carrying the fleet map
+- **THEN** the page and both of the fleet map's pictures load, and the picture of the hosts names every host of the fleet as text rather than as drawn shapes
+
 ### Requirement: The fleet map shows each fleet network and the public edge
 
 The fleet map SHALL show every fleet network, every network member of it, and the service role each network member holds in it, including devices that are not hosts.
@@ -34,6 +39,11 @@ The fleet map SHALL show each public hostname of the fleet together with the hos
 
 - **WHEN** a person reads the fleet map to learn which host answers a public hostname
 - **THEN** the map names that host and the service behind the hostname
+
+#### Scenario: A person opens the picture of the fleet networks
+
+- **WHEN** a person opens the fleet map's picture of the fleet networks
+- **THEN** it names every fleet network and every network member of it as text
 
 ### Requirement: The fleet map is derived and says which of its facts are declared
 
@@ -63,3 +73,18 @@ A change that alters which host runs a service, the service role a service gives
 
 - **WHEN** a change moves a service, changes a fleet network's membership or edits a declared fact without updating the fleet map
 - **THEN** a check run on the change fails before it merges, and the failure names the command that brings the map up to date
+
+### Requirement: A person reviewing a change to the fleet map sees its pictures before and after
+
+When a change alters the fleet map, the person reviewing the change SHALL be shown, on the change itself, the fleet map's pictures as they were before the change and as they are with it, without being asked to build anything.
+No check run SHALL fail merely because the pictures differ, since an intended change to the fleet is expected to change them.
+
+#### Scenario: A service moves and the pictures change
+
+- **WHEN** a change moves a service from one host to another and is checked
+- **THEN** the person reviewing the change sees both pictures as they were before and as they are after the move, and no check run fails because they differ
+
+#### Scenario: No earlier picture is available
+
+- **WHEN** the pictures from before the change were never published or are no longer kept
+- **THEN** the person reviewing the change is told that the earlier pictures are unavailable and still sees the pictures after the change

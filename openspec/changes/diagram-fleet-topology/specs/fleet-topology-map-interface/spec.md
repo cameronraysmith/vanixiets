@@ -128,28 +128,89 @@ Its cases SHALL cover tag resolution, the `all` tag, an absent machine, devices,
 - **WHEN** `mkFleetTopology` stops resolving user tags into role members
 - **THEN** `checks.x86_64-linux.eval-fleet-topology` fails on the tag-resolution case
 
-### Requirement: Both views are rendered into the docs site
+### Requirement: Both views are rendered into the docs site through the existing svgo pass
 
-`just diagrams-build` and the `vanixiets-docs` package build SHALL each render `fleet.d2` and `network.d2` to `packages/docs/public/diagrams/topology-fleet.svg` and `topology-network.svg` with `d2 --layout elk` before the svgo pass, and the default devshell SHALL provide `d2`.
+`just diagrams-build` and the `vanixiets-docs` package build SHALL each render `fleet.d2` and `network.d2` with `d2 --layout elk` and D2's default theme to `packages/docs/public/diagrams/topology-fleet.svg` and `topology-network.svg`, after the typst loop and before the existing `svgo --quiet` loop, with no svgo configuration file; the default devshell SHALL provide `d2`.
 
 #### Scenario: The docs package is built
 
 - **WHEN** the `vanixiets-docs` package is built
-- **THEN** its output contains `topology-fleet.svg` and `topology-network.svg`
+- **THEN** its output contains `topology-fleet.svg` and `topology-network.svg`, each having passed through `svgo`
 
-### Requirement: The concepts page carries the map
+### Requirement: The rendered SVGs keep their words as text elements
 
-`packages/docs/src/content/docs/concepts/fleet-topology.md` SHALL embed both SVGs, state that `flake.lib.topologyFacts` is declared rather than observed, and name `just topology-generate`.
+After the svgo pass, every node and edge label of both views SHALL remain the content of an SVG `<text>` element in the delivered file, not glyph outlines.
+
+#### Scenario: A host name in the delivered fleet view
+
+- **WHEN** the delivered `topology-fleet.svg` is parsed as XML
+- **THEN** each `machine/<name>` key of the committed `fleet.json` names a `<text>` element whose content is `<name>`
+
+### Requirement: The concepts page embeds both views as images
+
+`packages/docs/src/content/docs/concepts/fleet-topology.md` SHALL embed `/diagrams/topology-fleet.svg` and `/diagrams/topology-network.svg` as Markdown images with non-empty alt text, state that `flake.lib.topologyFacts` is declared rather than observed, and name `just topology-generate`; `concepts/index.md`, `concepts/architecture-overview.md` and `concepts/build-service-topology.md` SHALL link it.
+No dark-theme variant of either view SHALL be rendered.
 
 #### Scenario: The docs package is built with the page
 
 - **WHEN** the `vanixiets-docs` package is built
 - **THEN** its output contains the page `concepts/fleet-topology/` with both images and the declared-facts statement
 
+### Requirement: A Playwright spec witnesses the page and both views
+
+`packages/docs/e2e/fleet-topology.spec.ts` SHALL import `test` from `e2e/fixtures.ts` and define the tests `fleet topology page loads`, `both fleet topology diagrams load` and `every host and network in fleet.json is text in the diagrams`, and `tests/report/policy.ts` SHALL list all three under `playwright.config.ts`.
+
+#### Scenario: The page and images load
+
+- **WHEN** the e2e suite runs against the built site
+- **THEN** `/concepts/fleet-topology/` answers 200 with the heading `Fleet topology` and the declared-facts statement, and each image has non-empty alt text, `naturalWidth` greater than zero, and a `src` answering 200 with a non-empty `image/svg+xml` body
+
+### Requirement: The diagram oracle is derived from the committed fleet.json
+
+The test `every host and network in fleet.json is text in the diagrams` SHALL read the committed `diagrams/topology/fleet.json`, and SHALL fail unless every `machine/<name>` key names a `<text>` element of the served `topology-fleet.svg` and every `network/<name>` key, and each member of that network, names a `<text>` element of the served `topology-network.svg`.
+It SHALL NOT compare pixels; no `toHaveScreenshot` assertion SHALL witness either view.
+
+#### Scenario: A host is added to the inventory and regenerated
+
+- **WHEN** a machine is added to the inventory, the files are regenerated and the site is rebuilt
+- **THEN** the oracle requires the new machine's name as text in `topology-fleet.svg` without any edit to the spec
+
+### Requirement: A negative control proves the oracle fails
+
+`passthru.tests.e2e-topology-negative-control` SHALL run `tests/negative-control/fleet-topology.spec.ts` under `playwright.topology-negative.config.ts` on Chromium, intercepting `topology-fleet.svg` to remove the `<text>` of the first `machine/<name>` in `fleet.json`, and `check-negative-report.ts` in mode `topology` SHALL require that its single test failed as a product failure on every attempt with that name in `results.json`; `modules/checks/package-tests.nix` SHALL expose it.
+
+#### Scenario: One host is dropped from the served SVG
+
+- **WHEN** the negative control runs
+- **THEN** the oracle fails naming the dropped host, and the check `package-vanixiets-docs-test-e2e-topology-negative-control` passes
+
+### Requirement: Both views are attached to the browser evidence on Chromium
+
+On Chromium only, the oracle test SHALL attach element screenshots of the two images as `view-fleet.png` and `view-network.png` with `testInfo.attach` and a file path, so the completion report records them on the passing attempt.
+
+#### Scenario: The report is validated
+
+- **WHEN** `validate-report.ts validate` reads a passing report
+- **THEN** the Chromium attempt of the oracle test lists `view-fleet.png` and `view-network.png`, each a nonempty PNG, and the Firefox and WebKit attempts list none
+
+### Requirement: The evidence comment shows the views before and after
+
+When the published report carries `view-*.png` attachments, the publisher's pull-request comment SHALL include a `Rendered views` section linking each head view and the same-named view from the report published for the pull request's base revision, or stating that the base view is unavailable; `concepts/browser-evidence.md` and `tests/report/README.md` SHALL describe passing-attempt view screenshots.
+
+#### Scenario: The base report has no views
+
+- **WHEN** a pull request's report carries `view-fleet.png` and its base revision's published report carries none
+- **THEN** the comment links the head `view-fleet.png` and states that the base view is unavailable
+
+#### Scenario: The report carries no views
+
+- **WHEN** a pull request changes the docs report but no test attached a `view-*.png`
+- **THEN** the comment has no `Rendered views` section
+
 ### Requirement: Trust boundary of the fleet map
 
-This interface SHALL guarantee only that the committed files equal what `self.clan.inventory`, `self.lib.hosts` and `self.lib.topologyFacts` produce, and that both views parse as D2.
-It SHALL NOT be relied on to show that a host runs what is declared, that a public hostname resolves or answers on its declared ports, that a listed device is connected, or that the layout is readable.
+This interface SHALL guarantee only that the committed files equal what the inventory, the registry and the declared facts produce, that both views parse as D2, and that the served SVGs carry every committed host and network name as `<text>`.
+It SHALL NOT be relied on to show that a host runs what is declared, that a hostname answers on its ports, that a device is connected, or that a layout or screenshot reads well; screenshots are evidence, not a gate.
 
 #### Scenario: A host runs a service nobody declared
 
