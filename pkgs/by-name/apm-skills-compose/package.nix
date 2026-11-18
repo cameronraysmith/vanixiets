@@ -6,6 +6,7 @@
   ripgrep,
   jq,
   writeText,
+  gitMinimal,
 
   apm,
 
@@ -146,6 +147,7 @@ runCommandLocal "apm-skills-compose"
       apm
       ripgrep
       jq
+      gitMinimal
     ];
     meta = {
       description = "Consumer apm compose over all auto-discovered first-party plugin packages, emitting flat .claude/skills and .agents/skills trees for the vanixiets marketplace; superpowers resolves as a regular remote apm dep offline via a pre-warmed git checkout cache.";
@@ -176,6 +178,9 @@ runCommandLocal "apm-skills-compose"
     mkdir -p "$CK"
     cp -RL ${superpowersSrc}/. "$CK"/
     chmod -R u+w "$CK"
+    # apm 0.36 refuses superpowers' hooks.json + hooks-cursor.json pair (filename
+    # target routing removed); consumers read only .claude/skills, so drop them.
+    rm -rf "$CK/hooks"
     mkdir -p "$CK/.git"
     printf '%s\n' "$SP_SHA" > "$CK/.git/HEAD"
 
@@ -341,9 +346,20 @@ runCommandLocal "apm-skills-compose"
     mkdir -p "$CK_PW/.git"
     printf '%s\n' "$PW_SHA" > "$CK_PW/.git/HEAD"
 
-    # APM 0.31 rejects HEAD-only cache seeds to rematerialize older CRLF checkouts.
+    # APM 0.36 rebuilds (via network clone) any seed whose .git/config lacks its
+    # byte-determinism pins, and on a hit runs `git ls-tree HEAD` to vet tracked
+    # links. Each seed is therefore a real repo over the dereferenced tree, with
+    # a replace ref letting the pinned upstream SHA resolve to that local commit.
     for checkout in "$CK" "$CK_AG" "$CK_WT" "$CK_MP" "$CK_US" "$CK_GH" "$CK_MF" "$CK_GD" "$CK_LC" "$CK_PW"; do
-      printf '[core]\n\tautocrlf = false\n' > "$checkout/.git/config"
+      sha=$(<"$checkout/.git/HEAD")
+      rm -rf "$checkout/.git"
+      git -C "$checkout" init -q
+      git -C "$checkout" add -A
+      git -C "$checkout" -c user.name=apm-skills-compose -c user.email=nobody@localhost \
+        commit -q --no-gpg-sign -m seed
+      git -C "$checkout" update-ref "refs/replace/$sha" HEAD
+      printf '%s\n' "$sha" > "$checkout/.git/HEAD"
+      printf '[core]\n\tautocrlf = false\n\teol = lf\n\tsymlinks = false\n[apm]\n\tlinkMaterialization = git-objects-checkout\n' >> "$checkout/.git/config"
     done
 
     cp ${rootConsumerManifest} ./apm.yml
@@ -390,8 +406,9 @@ runCommandLocal "apm-skills-compose"
       fi
     done
 
+    # apm 0.36 carries the repository LICENSE into each installed skill.
     for target in .claude .agents; do
-      diff -r ${playwrightCli.src}/skills/playwright-cli "$out/$target/skills/playwright-cli"
+      diff -r -x LICENSE ${playwrightCli.src}/skills/playwright-cli "$out/$target/skills/playwright-cli"
     done
 
     ${skillIndexGuard}
