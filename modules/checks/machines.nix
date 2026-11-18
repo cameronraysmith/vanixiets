@@ -28,6 +28,18 @@
         name: machine: machine.machineClass == "darwin" && machineSystems.${name} == system
       ) inventory;
 
+      # Every network clan may reach the machine through logs in as its login
+      # user (modules/lib/network-targets.nix).
+      withNetworkTargets =
+        name: toplevel:
+        let
+          unmet = self.lib.networkTargetObligations.failures name;
+        in
+        assert lib.assertMsg (
+          unmet == [ ]
+        ) "networkTargetObligations unmet on ${name}: ${lib.concatStringsSep "; " unmet}";
+        toplevel;
+
       obligations = self.lib.omnigentFleetObligations;
       deployRecordObligations = self.lib.deployRecordObligations;
       commitSigningObligations = self.lib.commitSigningObligations;
@@ -92,15 +104,17 @@
         (lib.mapAttrs' (
           name: _:
           lib.nameValuePair "nixos-${name}" (
-            withFleetObligations name self.nixosConfigurations.${name}.config
-              self.nixosConfigurations.${name}.config.system.build.toplevel
+            withFleetObligations name self.nixosConfigurations.${name}.config (
+              withNetworkTargets name self.nixosConfigurations.${name}.config.system.build.toplevel
+            )
           )
         ) nixosForSystem)
         // (lib.mapAttrs' (
           name: _:
           lib.nameValuePair "darwin-${name}" (
-            withFleetObligations name self.darwinConfigurations.${name}.config
-              self.darwinConfigurations.${name}.system
+            withFleetObligations name self.darwinConfigurations.${name}.config (
+              withNetworkTargets name self.darwinConfigurations.${name}.system
+            )
           )
         ) darwinForSystem);
     };

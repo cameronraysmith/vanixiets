@@ -288,8 +288,12 @@ in
             };
           in
           {
+            # clan logs in through a network as its export's user, root when
+            # unset, ahead of the machine's own targetHost; darwin logs in as
+            # its admin account (flake.lib.networkTargetObligations).
             exports = mkExports {
               peer.hosts = [ { plain = hosts.${machine.name}.fqdn; } ];
+              peer.user = hosts.${machine.name}.deployUser;
             };
 
             nixosModule =
