@@ -98,3 +98,30 @@ Chosen: out of scope.
 - Tier 2 is declared, not observed: it can drift from what a host actually runs. The page says so. An obligation on the existing machine checks could compare declared public names with configured virtual hosts at no new evaluation, but the operator scoped tier 2 to never evaluate host configuration, so that is an open question, not part of this change.
 - We maintain a small generator ourselves instead of adopting a tool. It is a few dozen lines of pure Nix and is unit-tested.
 - ELK layout of D2 is automatic; readability depends on keeping views small.
+
+## Revision after Gate 1 (2026-11-18): presentation and browser verification
+
+After the proposal merged (CAM-114, #4016) the operator stepped back at Gate 1 and asked where the diagrams are presented and how the browser verifies them. The direction came back as: same pipeline as the typst diagrams (d2 → SVG → svgo → `public/diagrams`), words kept as `<text>`, home at `concepts/fleet-topology` linked from the architecture overview and build-service-topology, themes handled as the existing diagrams handle them; a Playwright witness in the existing e2e suite with a data-derived oracle and a negative control; screenshots of both views in the browser-evidence report on each pull request so a reviewer sees before and after; no pixel-snapshot gate; vitest only if the page has TypeScript logic.
+
+What the repository says (grounding for the forks below):
+- `justfile:963-983`: typst loop, then `svgo --quiet` over every SVG, no config file; `package.nix:121-136` mirrors it.
+- Existing diagrams are `<img>` (`reading-paths.md:21`, `development/index.md:11`); `custom.css:19-28` only centres them; nothing handles dark mode.
+- typst SVGs have no `<text>` at all: `reading-paths.typ` compiled to 0 `<text>`, 239 `<use>`, 153 `<path>`.
+- svgo 4.1.0 default preset on the prototype's D2 render: 94 `<text>` before and after; 94 `<rect>` became paths; styles merged; fonts kept.
+- The e2e suite: `e2e/*.spec.ts` import `test` from `e2e/fixtures.ts`; `tests/report/policy.ts` fixes the required cases; negative controls are one config, one report override and one `check-negative-report.ts` mode each, and each asserts exactly one failing test.
+- Screenshots are kept only on failure (`playwright.config.ts:122`); WebKit's are empty in the Nix build unless repaired.
+- The reporter, validator and uploader already carry attachments of passing attempts (`completion-reporter.ts:113-115`, `validate-report.ts:320-321`, `publish-evidence.sh:580-582`), but the comment only tabulates failed attempts (`publish-evidence.sh:853-897`) and the docs say passing attempts keep none (`browser-evidence.md:28`). The publisher reads no base revision (`publish-evidence.sh:299-305`).
+
+**R1. How are the views embedded?** `<img>`, like every other diagram. Inside an `<img>` the SVG's text is not in the page DOM: not found by find-in-page, not read by a screen reader beyond the alt text. It is still text in the served file, which the oracle reads. Inlining through MDX would make it page text but would be the only diagram embedded that way; left as an open question.
+
+**R2. svgo settings?** None needed: the default preset keeps every `<text>`, and svgo has no text-to-outline plugin. The oracle is what guards it.
+
+**R3. Dark theme?** Match the existing diagrams: no variant. D2's `--dark-theme` follows the OS through the SVG's own media query, which in an `<img>` disagrees with Starlight's toggle. D2's opaque white background keeps the light view legible on the dark page.
+
+**R4. Oracle source?** The committed `fleet.json`, read by the test with Node; SVGs fetched through `page.request` and parsed with `DOMParser`. Whole-element `textContent` equality, not substring.
+
+**R5. Negative control?** Its own config and check: adding it to an existing negative config would break their exactly-one-failure assertion.
+
+**R6. Screenshots: which engine, and how do they reach the reviewer?** Chromium only, attached on the passing attempt. They already reach the uploaded bundle; only the comment needs a `Rendered views` section, with the base revision's same-named views beside them. The base revision's field in nixbot's event is unknown; open question.
+
+**R7. Pixel snapshots, vitest?** Neither: an intended topology change would fail a snapshot, the text diffs are the record, and the page has no TypeScript logic for vitest to test.
