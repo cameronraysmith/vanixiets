@@ -109,8 +109,8 @@ The vendored consumer of the evaluator is nixbot at `171a8c77`. Any pre-switch r
 
 - [ ] **Step 1:** add `inputs.iets.url = "github:numtide/iets";` and run `nix flake lock --update-input iets`. Expected: `nix flake metadata --json | jq -r '.locks.nodes.iets.locked.rev'` is `9157ca1a…` or later, and `.locks.nodes.iets.inputs.nixpkgs` names iets' own node.
 - [ ] **Step 2:** write `mkNixEvalJobsIets` as `pkgs.runCommand "nix-eval-jobs-iets-${iets.version}" { passthru = { pname = "nix-eval-jobs"; evaluator = "iets"; inherit (iets) version; inherit (stock) nix; }; meta.mainProgram = "nix-eval-jobs"; } "mkdir -p $out/bin && ln -s ${lib.getExe' iets "iets"} $out/bin/nix-eval-jobs"`. Verify per tasks.md 3.2: `ls` of `bin/`, `nix path-info -r` without a second Nix, and `nix eval` of `passthru.nix.drvPath` equal to the stock's.
-- [ ] **Step 3 [operator, wizard]:** the upstream iets issue (tasks.md 3.3).
-- [ ] **Step 4: Commit:** `feat(nixbot): package iets as nix-eval-jobs for nixbot`.
+- [ ] **Step 3:** a check that the package exposes what nixbot and the lock need (`bin/nix-eval-jobs`, `passthru.nix` equal to the stock's, `evaluator = "iets"`, `pname = "nix-eval-jobs"`) and that the lock wraps it, with a mutant per property (tasks.md 3.3). Nothing is filed upstream to iets (design D12).
+- [ ] **Step 4: Commit:** `feat(nixbot): package iets as an evaluator, not selected`.
 
 ### Task 4: Canary inside nixbot's sandbox
 

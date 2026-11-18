@@ -66,4 +66,4 @@ The swap fits the evaluator setting nixbot already exposes, but iets fails a who
 - `modules/nixos/nixbot.nix`: a fifth nixbot patch and a unit environment value naming the evaluator, then the evaluator override; `modules/lib/nix-eval-lock.sh` and magnetite's kill-order assertion change in comments only.
 - `modules/clan/services/otel-collector/schema.nix` (the `eval_run` table, `memoryBudgetUnits`, five node_exporter keep-list names), `modules/nixos/devloop-collection.nix`, `devloop-reconcile`, magnetite's memory-budget probe and node_exporter textfile collector, `modules/nixos/perses/resources/dashboard-devloop.json`, and the `devloop-ingest` and `devloop-queries` checks.
 - magnetite only, apart from the shared keep-list, whose new names no other host produces. cache.numtide.com is already a fleet substituter (`lib/caches.nix:8`).
-- Upstream: an issue asking iets to retry killed workers; the record patch offered to Mic92/nixbot as a follow-up.
+- Upstream: nothing is filed to iets (operator decision, 2026-11-18); the record patch may be offered to Mic92/nixbot as a follow-up.
