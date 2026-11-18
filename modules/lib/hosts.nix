@@ -1,10 +1,167 @@
-# Per-host ZeroTier-address registry, the canonical source of truth for mesh
-# addresses consumed across NixOS, home-manager, and terranix evals.
+# Fleet member registry, the only place a member's name or overlay address is
+# written. `fqdn` and `address` are derived from the name; `zerotier` carries
+# today's ZeroTier address and member id until ZeroTier is retired.
 # Consolidated into this single file because flake.lib is lazyAttrsOf raw,
 # which forbids multi-file writes at the same nested path.
-{ ... }:
-{
-  flake.lib.hosts = {
-    magnetite.zt = "fddb:4344:343b:14b9:399:930f:39db:40d2";
+{ config, lib, ... }:
+let
+  inherit (config.flake.lib) fleet mesh;
+
+  members = {
+    cinnabar = {
+      class = "nixos";
+      endpoints = [ "cinnabar.scientistexperience.net" ];
+      deployUser = "root";
+      services = [
+        "kanban"
+        "matrix"
+        "hermes"
+        "ntfy"
+        "omnigraph"
+        "radicle"
+      ];
+      zerotier = {
+        address = "fddb:4344:343b:14b9:399:93db:4344:343b";
+        memberId = "db4344343b";
+      };
+    };
+    electrum = {
+      class = "nixos";
+      endpoints = [ ];
+      deployUser = "root";
+      services = [ ];
+      zerotier = {
+        address = "fddb:4344:343b:14b9:399:93d1:7e6d:27cc";
+        memberId = "d17e6d27cc";
+      };
+    };
+    galena = {
+      class = "nixos";
+      endpoints = [ ];
+      deployUser = "root";
+      services = [ ];
+      zerotier = {
+        address = "fddb:4344:343b:14b9:399:9315:c67a:dec9";
+        memberId = "15c67adec9";
+      };
+    };
+    scheelite = {
+      class = "nixos";
+      endpoints = [ ];
+      deployUser = "root";
+      services = [ ];
+      zerotier = {
+        address = "fddb:4344:343b:14b9:399:9380:46d5:3400";
+        memberId = "8046d53400";
+      };
+    };
+    magnetite = {
+      class = "nixos";
+      endpoints = [ "magnetite.scientistexperience.net" ];
+      deployUser = "root";
+      services = [ ];
+      zerotier = {
+        address = "fddb:4344:343b:14b9:399:930f:39db:40d2";
+        memberId = "0f39db40d2";
+      };
+    };
+    pyrite = {
+      class = "nixos";
+      endpoints = [ ];
+      deployUser = "root";
+      services = [ ];
+      zerotier = {
+        address = "fddb:4344:343b:14b9:399:937e:8067:8028";
+        memberId = "7e80678028";
+      };
+    };
+    stibnite = {
+      class = "darwin";
+      endpoints = [ ];
+      deployUser = "crs58";
+      services = [ ];
+      zerotier = {
+        address = "fddb:4344:343b:14b9:399:9324:19d9:3451";
+        memberId = "2419d93451";
+      };
+    };
+    blackphos = {
+      class = "darwin";
+      endpoints = [ ];
+      deployUser = "crs58";
+      services = [ ];
+      zerotier = {
+        address = "fddb:4344:343b:14b9:399:930e:e971:d9e0";
+        memberId = "0ee971d9e0";
+      };
+    };
+    argentum = {
+      class = "darwin";
+      endpoints = [ ];
+      deployUser = "cameron";
+      services = [ ];
+      zerotier = {
+        address = "fddb:4344:343b:14b9:399:93f7:54d5:ad7e";
+        memberId = "f754d5ad7e";
+      };
+    };
+    rosegold = {
+      class = "darwin";
+      endpoints = [ ];
+      deployUser = "cameron";
+      services = [ ];
+      zerotier = {
+        address = "fddb:4344:343b:14b9:399:9315:3431:ee8";
+        memberId = "1534310ee8";
+      };
+    };
+    pixel7 = {
+      class = "android";
+      endpoints = [ ];
+      deployUser = null;
+      services = [ ];
+      zerotier = {
+        address = "fddb:4344:343b:14b9:399:939f:c45d:577c";
+        memberId = "9fc45d577c";
+      };
+    };
+    pixel11 = {
+      class = "android";
+      endpoints = [ ];
+      deployUser = null;
+      services = [ ];
+      zerotier = {
+        address = "fddb:4344:343b:14b9:399:933c:8999:9bb8";
+        memberId = "3c89999bb8";
+      };
+    };
   };
+
+  hosts = lib.mapAttrs (
+    name: member:
+    member
+    // {
+      fqdn = "${name}.${fleet.domain}";
+      address = mesh.addressOf mesh.instance name;
+    }
+  ) members;
+in
+{
+  flake.lib.hosts = hosts;
+
+  flake.lib.meshRecords = lib.concatLists (
+    lib.mapAttrsToList (
+      _: host:
+      [
+        {
+          name = host.fqdn;
+          inherit (host) address;
+        }
+      ]
+      ++ map (label: {
+        name = "${label}.${fleet.domain}";
+        inherit (host) address;
+      }) host.services
+    ) hosts
+  );
 }

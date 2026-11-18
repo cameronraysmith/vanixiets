@@ -172,7 +172,7 @@ in
             logs = [ "otlp_http/ingress-logs" ];
           };
       ingressExporter = queueSize: {
-        endpoint = "https://[${flakeLib.hosts.magnetite.zt}]:4318";
+        endpoint = "https://[${flakeLib.hosts.magnetite.zerotier.address}]:4318";
         tls = {
           ca_file = config.vanixiets.otelCollector.caFile;
           cert_file = "${credentialsDir}/otel-cert";
@@ -783,7 +783,7 @@ in
             # a client without an otel-ca certificate fails the handshake
             # (design D3). HTTP only, no gRPC.
             receivers."otlp/mesh".protocols.http = {
-              endpoint = "[${flakeLib.hosts.magnetite.zt}]:4318";
+              endpoint = "[${flakeLib.hosts.magnetite.zerotier.address}]:4318";
               tls = {
                 cert_file = "${credentialsDir}/otel-cert";
                 key_file = "${credentialsDir}/otel-key";
@@ -944,7 +944,7 @@ in
               { lib, pkgs }:
               let
                 isIngress = roles.ingress.machines ? ${machine.name};
-                sans = lib.optionalString isIngress "IP:${flakeLib.hosts.magnetite.zt},DNS:magnetite.zt";
+                sans = lib.optionalString isIngress "IP:${flakeLib.hosts.magnetite.zerotier.address},DNS:magnetite.zt";
                 usage = if isIngress then "serverAuth,clientAuth" else "clientAuth";
               in
               {

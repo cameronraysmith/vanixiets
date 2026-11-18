@@ -44,7 +44,7 @@ in
             # only because magnetite lists omnigraph.zt in --mcp-allowed-host.
             extraConfig = ''
               tls internal
-              reverse_proxy [${magnetite.zt}]:8090
+              reverse_proxy [${magnetite.zerotier.address}]:8090
             '';
           };
           "radicle.zt" = {
