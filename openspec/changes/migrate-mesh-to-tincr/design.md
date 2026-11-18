@@ -179,6 +179,7 @@ Each group is one stacked pull request on top of C, except A and B, whose work i
 - **Rationale**: addresses computable at evaluation time make the zone, SANs, known-hosts, firewall and deploy targets pure functions of the registry, and phones get the same function through the invitation hook.
   The only IPv4 consumers of ZeroTier's `10.147.17.0/24` are cinnabar's caddy and dnsmasq listen lists (which also listen on IPv6), the disabled openclaw, one check fixture and a comment, so IPv4 brings nothing to carry over.
 - **Alternatives considered**: addresses generated as vars, rejected because every consumer would then read vars files at evaluation, as `otel-collector-config` and `otel-collector-darwin` do today with `vars/shared/zerotier-ip-magnetite-zerotier`; an IPv4 subnet beside the ULA, rejected for want of a consumer.
+- **Open (2026-11-18, finding F34)**: the rationale above did not consider macOS name resolution: a Mac without a global IPv6 address asks its scoped resolvers for A records only, so `.vanixiets.internal` names fail on the Macs for browsers, curl and Python; see "Open Questions".
 
 ### D8: darwin through tincr's darwin module on every Mac
 
@@ -203,6 +204,7 @@ Each group is one stacked pull request on top of C, except A and B, whose work i
   The invitation carries only the inviter's host file (tincr `crates/tinc-tools/src/cmd/invite.rs`); cinnabar's `invitation-created` hook hands the phone its derived address, and its `invitation-accepted` hook writes that `Subnet` into cinnabar's runtime copy of the phone's host file, which otherwise holds only the key and hides the declared one.
   A package `tincapp-network-<phone>` renders the phone's `network.conf` (`Address = <address>/128`, `Route = <prefix>`, `DNSServer` for both resolvers, `SearchDomain = vanixiets.internal`, `AllowFamily = 2`), its `tinc.conf` (`StrictSubnets = yes`, `Broadcast = no`, `LocalDiscovery = yes`) and `hosts/` with every other member's host file from `flake.lib.meshHostFiles`, never the phone's own, which the join wrote with its key and port; the operator places them in tincapp's network directory and re-copies `hosts/` after any member is added or rekeyed.
   The phone's VPN is IPv6 for the mesh with IPv4 allowed through to the underlying network, because Android blocks every address family a VPN configures no address, route or name server for (tincapp user documentation, `network.conf` `AllowFamily`, read 2026-11-17).
+  tincapp also learns other members' keys only from `hosts/`: as a C tinc client it asks for an unknown key with `REQ_PUBKEY`, which tincr refuses, so a phone missing a member's file cannot reach that member (finding F33, task 4.3).
   pixel11 is the test device and the only phone in the cutover verification; pixel7 enrols best-effort, and nothing in V, X, F or Z depends on it, including its own ZeroTier removal (operator, 2026-11-17).
 - **Rationale**: tincapp runs no `tinc-up` and takes its interface addresses, routes and DNS servers only from `network.conf` (tincapp user documentation, read 2026-11-17), so the file is the Android equivalent of the darwin resolver file and the NixOS network unit.
 - **Alternatives considered**: tincr's own Android app, rejected while its publication is unverified (it is in the pinned source); dropping `StrictSubnets` on the phone instead of shipping `hosts/`, rejected because the phone would then accept any member's claim to any address; keeping the phones on ZeroTier, rejected because it keeps the controller alive for two devices.
@@ -277,6 +279,9 @@ Each group is one stacked pull request on top of C, except A and B, whose work i
 - [Risk] Two resolvers double the zone's moving parts → Mitigation: both render from the same `flake.lib.meshRecords`, so they cannot disagree on content.
 - [Risk] Every peer must redeploy to admit a new member (D12) → accepted; the fleet is twelve members.
 - [Risk] Darwin hosts of other people (argentum, rosegold) lose remote administration if tincr fails there after Z → Mitigation: V requires a deploy over tincr to at least one of them before X; their recovery path is the person at the machine (D4).
+- [Risk] Android runs one VPN at a time, and connecting tincapp disconnects the ZeroTier app (finding F32, task 4.3) → accepted: the phone cannot run the mirror beside ZeroTier, so its mirror test (9.4) is its cutover, and its rollback during the mirror and the soak is reconnecting the ZeroTier app.
+- [Risk] A phone whose `hosts/` misses a member cannot reach it, because tincr refuses tincapp's `REQ_PUBKEY` (finding F33, task 4.3) → Mitigation: the operator checks after each copy that `hosts/` lists every member, reconnects, and copies again after any member change (`break-glass-recovery.md`, "pixel11").
+- [Risk] On macOS, names with only an AAAA record fail for browsers, curl and Python, because the scoped resolvers request A records only on a Mac without global IPv6 (finding F34) → open: it blocks the darwin rows of V and the cutover decision until the research in "Open Questions" chooses a direction.
 - [Trade-off] Two certificate reissues (mirror and retirement) → accepted for a clean end state without ZeroTier SANs.
 - [Trade-off] Running two meshes until Z costs ports, daemons and one more interface on every host → accepted as the price of a reversible path.
 - [Trade-off] CAM-81 changes shape mid-flight (D5) → accepted to avoid building seven fields this change must undo.
@@ -358,4 +363,13 @@ Resolved by the operator on 2026-11-17:
 5. **Soak length.** Seven days.
 6. **Linear project.** No fleet, infrastructure or networking project exists in the workspace (checked 2026-11-17), so CAM-109 stays in "Migrate to nixbot and herculesCI CI/CD".
 
-None remain open at proposal time.
+None remained open at proposal time.
+
+Open since 2026-11-18:
+
+1. **Mesh names on macOS (finding F34).** macOS's `getaddrinfo` without a fixed address family, which browsers, curl and Python use, fails for names that have only an AAAA record: every `.vanixiets.internal` name and the machine `.zt` names such as `magnetite.zt`.
+   `scutil --dns` shows both scoped resolvers, `/etc/resolver/zt` and `/etc/resolver/vanixiets.internal`, flagged "Request A records" only, because the Mac has no global IPv6 address.
+   `.zt` service names work today only because they also have A records on ZeroTier's IPv4 `10.147.17.0/24` (`curl https://kanban.zt` reached `10.147.17.1`); the tincr mesh is IPv6-only (D7), so on the Macs its service names fail where the `.zt` ones work.
+   `ping6` works, and ssh works through the generated blocks, which give literal addresses.
+   This blocks the darwin part of V (9.4) and the cutover decision (10.1).
+   Candidate directions, not yet researched: IPv4 on the mesh beside the ULA (dual stack); a macOS mechanism that makes the resolver request AAAA records for the zone; others the research finds.

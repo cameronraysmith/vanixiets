@@ -1,6 +1,6 @@
 ---
 title: Break-glass recovery
-description: "Reaching or recovering each fleet host when the overlay network fails: the VPSes over their public addresses, pyrite over iroh, and the Macs by the person at the machine booting the previous nix-darwin generation."
+description: "Reaching or recovering each fleet host when the overlay network fails: the VPSes over their public addresses, pyrite over iroh, the Macs by the person at the machine booting the previous nix-darwin generation, and pixel11 by the operator at the phone."
 ---
 
 This runbook is for the moment the overlay network (the mesh) is down for a host, or a deploy has broken it there.
@@ -12,6 +12,7 @@ Every host the operator administers remotely has one recovery path that does not
 | NixOS behind an address-translating router | pyrite | SSH over iroh from stibnite (see "pyrite over iroh") |
 | darwin laptops of other people | argentum, rosegold | the person at the machine boots the previous nix-darwin generation (see "Macs: the person at the machine") |
 | darwin, the operator's own | stibnite | the operator at the machine, with the same steps |
+| Android phone | pixel11 | the operator at the phone: complete tincapp's `hosts/`, or reconnect the ZeroTier app while ZeroTier runs (see "pixel11") |
 
 blackphos is a reserved name in the nix-darwin laptop class with no machine and no person behind it, so it has no recovery path until a machine takes the name.
 
@@ -102,3 +103,21 @@ Follow the steps above to boot the previous generation of rosegold, then report.
 ### stibnite
 
 The operator is the person at the machine (account `crs58`) and follows the same steps to boot the previous generation.
+
+## pixel11
+
+pixel11 joins the mesh through tincapp, which keeps its own copy of the mesh's host files in `hosts/` of its network directory.
+tincapp is a C tinc client: it asks for an unknown member's key with `REQ_PUBKEY`, which tincr refuses (`REQ_PUBKEY/ANS_PUBKEY unsupported - provision hosts/<name> with Ed25519PublicKey` in the member's journal), so the phone reaches only the members whose files it holds.
+After the join it holds only cinnabar's file and its own.
+
+To give the phone every member:
+
+1. Build the phone's files with `nix build .#tincapp-network-pixel11`.
+2. Copy them into tincapp's network directory through tincapp's "Edit configuration", using Android's Files app; Termux cannot write there, because Android gives each app private storage.
+3. Check that `hosts/` lists a file for every member, not only cinnabar and the phone.
+4. Disconnect and reconnect the network in tincapp.
+
+Repeat the copy whenever a member is added or rekeyed.
+
+Android runs one VPN at a time, and connecting tincapp disconnects the ZeroTier app.
+While ZeroTier still runs, reconnecting the ZeroTier app restores the phone's `.zt` names and drops the mesh.
