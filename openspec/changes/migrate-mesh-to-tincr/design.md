@@ -287,6 +287,56 @@ Deployment waves (each host's behaviour changes only when it deploys; shared reg
    Irreversible in practice: the network's identity and controller state are discarded.
 7. **Close-out (E)**: rebase and extend the spec deltas (D17), regenerate the satisfaction projection at archive, archive.
 
+## Gate 1 modality verdicts
+
+This table is the pre-apply spec-and-feature alignment record.
+It carries one row per requirement in this change's five delta specs, removed and renamed requirements included, with the capability's stratum tag from the proposal and the modality that witnesses the requirement.
+
+No row routes to a Gherkin scenario, so this change lays out no `.feature` file.
+The repository has no BDD runner (no pytest-bdd, cucumber or behave dependency, and no `.feature` file in the tree), so a laid-out scenario would be an unbound surface nothing executes.
+Every observable this change asserts is either a property of the evaluated configuration, the built packages or the source tree, which `nix eval`, `nix build`, the nix-unit test, the mesh VM test and content searches witness, or an observation against a deployed host, a phone or a certificate, which the mirror acceptance, the retirement and the integration verification witness as smoke tests recorded in `cutover.md` and `verify.md`.
+Every scenario has a task that observes it except two, which are accepted unobserved and whose rows give the rationale.
+
+| Requirement | Capability | Stratum | Modality | Witness |
+|---|---|---|---|---|
+| Every overlay member reaches every fleet service by its canonical name | `fleet-mesh` | behavioral | build gate (VM test, `nix eval`, `nix build`) and smoke (reachability matrix) | tasks 2.3, 2.4, 3.3, 4.2, 9.3, 9.4, 14.1; the scenario "One name service is down" by task 14.1, which stops each name service once |
+| Members behind address-translating routers reach each other without a coordinating host | `fleet-mesh` | behavioral | build gate (VM test) and smoke (hosts behind real routers, cinnabar stopped for a bounded window) | tasks 3.3, 9.5; the scenario "cinnabar is down" by task 9.4, which stops `tincr-vanixiets` and `dnsmasq` on cinnabar for a recorded window and observes pyrite and a Mac reaching each other and resolving through magnetite |
+| Only members the operator declares are admitted, each only at its own overlay address | `fleet-mesh` | behavioral | build gate (VM test, negative control, `nix eval`) | tasks 3.3 (the undeclared node's advertisement refused), 3.4, 3.5 |
+| The fleet declares each overlay member once | `fleet-mesh` | behavioral | build gate (`nix eval`, drvPath identity), content search and review | tasks 1.2, 2.1, 2.5, 11.1, 12.1; the scenario "A record is edited by hand" by review, as it states; the scenario "A host is added" is accepted unobserved: adding the phones and every host to the registry in 1.2 and deploying them in group 9 exercises it by construction, and an evaluation check over a synthetic host is optional future work |
+| The chat service is identified by its canonical name | `fleet-mesh` | behavioral | build gate (`nix eval`) and smoke (chat service) | tasks 6.1, 6.2 |
+| Each remotely administered host has a recovery path | `fleet-mesh` | behavioral | smoke (public-address deploy, pyrite with the mesh stopped) and delivered runbook | tasks 7.1, 7.2, 7.3, 9.8; the scenario "The overlay network fails on another person's laptop" is accepted unobserved: the recovery is performed by the laptop's person on their own machine, so the written steps of 7.3 are the deliverable |
+| The overlay network is the fleet's only private network | `fleet-mesh` | behavioral | build gate (`nix eval`), content search and smoke (every host and pixel11) | tasks 11.1, 11.2, 12.1, 12.4, 12.5, 14.1 |
+| flake.lib.hosts declares every overlay member | `fleet-mesh-interface` | interface | build gate (`nix eval`) | task 1.2 |
+| A member's name and address are derived, never written | `fleet-mesh-interface` | interface | build gate (`nix eval`, nix-unit) and content search | tasks 1.1, 1.2; the scenario "A literal address reappears" by task 2.1's `fd09:836d:82f8:3d7d:` search |
+| ZeroTier addresses live only in a transitional registry field | `fleet-mesh-interface` | interface | content search and build gate (`nix eval`) | tasks 2.1, 12.1; the scenario "After retirement" by 12.1's searches and its `nix eval` of the registry |
+| The mesh prefix and addresses are pure functions of names | `fleet-mesh-interface` | interface | build gate (nix-unit, mutant) | task 1.1 |
+| Derived addresses are unique | `fleet-mesh-interface` | interface | build gate (evaluation, negative control) | task 3.4 (`addressCollision`) |
+| Every peer runs StrictSubnets without TunnelServer | `fleet-mesh-interface` | interface | build gate (VM test, `nix eval`) and smoke (delivered configuration) | tasks 3.3, 3.4, 3.5; the scenario "A peer's delivered configuration is read" by tasks 9.1 (cinnabar) and 9.3 (stibnite), which read `/etc/tinc/vanixiets/` |
+| The tincr service joins every NixOS and darwin machine from the inventory | `fleet-mesh-interface` | interface | build gate (`nix eval`) and smoke (deployment) | tasks 3.5, 3.6, 9.1, 9.2, 9.3 |
+| The service exports the mesh to clan's network selection | `fleet-mesh-interface` | interface | build gate (service evaluation) and smoke (`clan network list`) | task 3.4 (`exports.networking.priority = 1100`); the scenario "Clan lists the network" by task 9.3's `clan network list` on stibnite |
+| The mesh runs tincr's default crypto while a phone is a member | `fleet-mesh-interface` | interface | build gate (evaluation, negative control) | task 3.4 (`pqWithDevice`) |
+| Two name services answer the zone from the registry | `fleet-mesh-interface` | interface | build gate (`nix build`, VM test) and smoke (resolution, forwarding, each service stopped once) | tasks 2.3, 3.3, 3.4 (tincr's DNS stub off), 9.4, 14.1; the scenario "A name outside the zone is resolved" by task 9.4's `dig A example.org` against each name service |
+| Every member class routes the zone to both name services | `fleet-mesh-interface` | interface | build gate (`nix eval`, `nix build`) and smoke (`resolvectl`, `scutil --dns`) | tasks 2.4, 4.2, 9.2 (`resolvectl status` and `query` on pyrite), 9.3, 9.4 |
+| One helper names the mesh interfaces for every firewall opening | `fleet-mesh-interface` | interface | build gate (`nix eval`) and content search | tasks 1.3, 2.2 (its search covers `"tinc-vanixiets"` as well as the ZeroTier keys), 12.1 |
+| Deploy targets are generated from the registry | `fleet-mesh-interface` | interface | build gate (`nix eval`) | task 11.1 |
+| Certificate names are generated from the registry | `fleet-mesh-interface` | interface | delivered certificate (`openssl`) | tasks 8.2, 12.2 |
+| This capability states its own trust boundary | `fleet-mesh-interface` | interface | capability text and delivered README | specs text and the proposal; task 3.4, whose verify line reads the README's trust-boundary section against this requirement |
+| The ingress receiver accepts only certificate holders on magnetite's overlay address | `fleet-ingress-interface` | interface | build gate (collector check, mutants, VM test) and smoke (refused request at deploy) | tasks 2.2, 8.4 (`otel-collector-config`, `fleet-ingress`), 9.7 |
+| ZeroTier admission requires redeploying the controller (removed) | `bare-metal-install-path` | behavioral | content search and smoke (retirement) | tasks 12.1, 12.4 |
+| Overlay admission requires redeploying every member | `bare-metal-install-path` | behavioral | build gate (`nix eval`) and smoke (deployment order) | tasks 1.2, 3.4, 3.5, 9.1, 9.2 |
+| Grounded vocabulary for behavioral requirements | `world-assumptions` | world | designation table and its lint | the table itself |
+| A33 — The fleet's notification service on cinnabar is reachable over the overlay network and is the single delivery path | `world-assumptions` | world | violation-condition witness | its own scenarios |
+| A65 — A store-built binary on stibnite reaches the ingress over the overlay network | `world-assumptions` | world | violation-condition witness | its own scenario; task 9.7 repeats its comparison |
+| A128 — `.internal` is reserved for private use and is never delegated | `world-assumptions` | world | violation-condition witness | its own scenario |
+| A129 — A Matrix homeserver's server name cannot change once it holds data | `world-assumptions` | world | violation-condition witness | its own scenario |
+| A130 — Two tincr nodes behind address-translating routers reach each other directly by UDP when both routers keep a source port, and through another node otherwise | `world-assumptions` | world | violation-condition witness | its own scenario; tasks 3.3, 9.5 observe it |
+| A131 — tincr's subnet gossip is unsigned, and StrictSubnets accepts a subnet only from the node's own host file | `world-assumptions` | world | violation-condition witness | its own scenario; task 3.3's refusal case is its regulator |
+| A132 — A C-tinc client joins a tincr mesh only on tincr's default cipher and key exchange | `world-assumptions` | world | violation-condition witness | its own scenario |
+| A133 — tincapp configures its interface only from its network file | `world-assumptions` | world | violation-condition witness | its own scenario; task 9.4's rows from pixel11 observe it |
+| A134 — macOS sends names under a domain to the name servers its resolver file for that domain lists | `world-assumptions` | world | violation-condition witness | its own scenario; task 9.3's `scutil --dns` observes it |
+
+No row carries an `est-property`, `est-contract`, or `est-symbolic` modality, so this change carries no executable-specification-testing obligation.
+
 ## Open Questions
 
 Resolved by the operator on 2026-11-17:
