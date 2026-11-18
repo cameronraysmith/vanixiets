@@ -375,3 +375,15 @@ Any requirement whose discharge depends on this fact SHALL name it explicitly, a
 
 - **WHEN** `scutil --dns` on a darwin host lists no resolver for `vanixiets.internal`, or a canonical name fails there while both name services answer it from another member
 - **THEN** this assumption is void, and the `fleet-mesh` requirement `Every overlay member reaches every fleet service by its canonical name` loses its discharge for darwin hosts
+
+### Requirement: A135 — macOS answers a name its hosts file lists from that file, before any name server
+
+It is true of macOS on the fleet's darwin hosts, independent of what this fleet builds, that the system resolver answers a name `/etc/hosts` lists from that file before asking any name server, AAAA records included, and reads the file again when it is replaced.
+Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL be treated as losing its discharge once this assumption's violation condition below is observed.
+
+**Evidence**: Apple's mDNSResponder source, cited in migrate-mesh-to-tincr design D19; task 15.6 observes it on stibnite.
+
+#### Scenario: A listed name does not resolve from the file on a Mac
+
+- **WHEN** on a darwin host whose `/etc/hosts` lists a canonical name, `getaddrinfo` without a fixed address family fails for that name or returns an address the file does not give it, or a replaced file's names are not answered until a restart
+- **THEN** this assumption is void, and the `fleet-mesh` requirement `Every overlay member reaches every fleet service by its canonical name` and the `fleet-mesh-interface` requirement `Every NixOS and darwin member answers the zone from its hosts file` lose their discharge for darwin hosts

@@ -123,6 +123,26 @@ This rests on world assumptions A133 and A134.
 - **WHEN** `resolvectl domain tinc-vanixiets` runs on pyrite, `scutil --dns` on stibnite, and the phone's `network.conf` package is built
 - **THEN** each names both name services for `vanixiets.internal`
 
+### Requirement: Every NixOS and darwin member answers the zone from its hosts file
+
+Every NixOS and darwin peer SHALL map each `flake.lib.meshRecords` name, and until ZeroTier's retirement each `flake.lib.ztRecords` name, to exactly the registry's addresses in its `/etc/hosts`: NixOS peers through `networking.hosts`, darwin peers through `vanixiets.hosts`, which activation writes between marker lines of the real file.
+This rests on world assumption A135 for darwin peers.
+
+#### Scenario: A peer's entries are judged against the registry
+
+- **WHEN** the `nixos-<host>` and `darwin-<host>` machine checks evaluate each machine's entries against `flake.lib.meshHostsObligations`
+- **THEN** each mesh name maps to exactly the registry's addresses, except a NixOS peer's own `fqdnOrHostName`, which NixOS maps to `127.0.0.2`, and a removed name, a moved or added address or a stray name fails that machine's check
+
+#### Scenario: Both name services are unreachable
+
+- **WHEN** cinnabar and magnetite are both shut down in `vmTests.x86_64-linux.tincr-mesh-partition`
+- **THEN** pyrite and electrum resolve each other's canonical names and a service name through `getaddrinfo` and reach each other by name, and without the hosts entries they do not
+
+#### Scenario: A Mac's own hosts lines are kept
+
+- **WHEN** activation writes the block into a hosts file that has lines of its own, again with the same block, and with an empty block
+- **THEN** the other lines are unchanged, the second write leaves the file as it was, and the empty block removes the block and its markers
+
 ### Requirement: One helper names the mesh interfaces for every firewall opening
 
 `flake.lib.meshInterfaces config` SHALL return the interface keys of every overlay network a NixOS host carries (ZeroTier's key and `tinc-vanixiets` until retirement, `tinc-vanixiets` after), and every overlay-only firewall opening SHALL use it.

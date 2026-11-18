@@ -2,8 +2,8 @@
 
 ### Requirement: Every overlay member reaches every fleet service by its canonical name
 
-Every overlay member, whether a NixOS host, a darwin host or a phone, SHALL reach every service the fleet offers to overlay members, and every other overlay member, by its canonical name over the overlay network, with that name answered by the overlay network's name service.
-This rests on world assumptions A128 and, for phones and darwin hosts, A133 and A134.
+Every overlay member, whether a NixOS host, a darwin host or a phone, SHALL reach every service the fleet offers to overlay members, and every other overlay member, by its canonical name over the overlay network, with that name answered on a NixOS or darwin host by the host itself from the canonical names the operator declared, and on a phone by the overlay network's name service.
+This rests on world assumptions A128 and, for phones and darwin hosts, A133, A134 and A135.
 
 #### Scenario: A NixOS host reaches a service by name
 
@@ -24,6 +24,11 @@ This rests on world assumptions A128 and, for phones and darwin hosts, A133 and 
 
 - **WHEN** either cinnabar's or magnetite's name service stops answering
 - **THEN** every overlay member still resolves every canonical name through the other
+
+#### Scenario: Both name services are down
+
+- **WHEN** cinnabar's and magnetite's name services both stop answering
+- **THEN** two online NixOS or darwin hosts still resolve each other's canonical names and reach each other
 
 ### Requirement: Members behind address-translating routers reach each other without a coordinating host
 

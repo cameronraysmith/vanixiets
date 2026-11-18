@@ -41,6 +41,9 @@ A first-party `tincr` clan service, written with Qubasa/infra's as reference onl
 | package `tincapp-network-<phone>` | A | V |
 | `flake.lib.matrixServerName` | M | M (tuwunel, hermes-agent, openclaw) |
 | `flake.lib.tuwunelServerNameGuard pkgs { serverName }` | M | M (tuwunel `ExecStartPre`, check `matrix-server-name-reset`) |
+| `flake.lib.ztRecords` (cinnabar's `.zt` records, `{ name; address; }`, until Z) | N | cinnabar's `.zt` dnsmasq, N's hosts entries |
+| `flake.modules.{nixos,darwin}.mesh-hosts`, darwin option `vanixiets.hosts`, `flake.lib.etcHostsSplice pkgs` | N | each class's `base`, `tincr-mesh-partition` |
+| `flake.lib.meshHostsObligations.{failures,mismatches}` | N | `modules/checks/machines.nix`, check `mesh-hosts-obligations` |
 
 ## DAG and dispatch
 
@@ -67,6 +70,7 @@ S is authored in wave 1 against the contract's names; it merges after T because 
 | M | `modules/machines/nixos/cinnabar/matrix.nix`, `modules/clan/inventory/services/hermes-agent.nix`, `modules/clan/inventory/services/openclaw.nix`, `modules/checks/matrix-server-name-reset.nix` |
 | B | the operations runbook page, `modules/clan/inventory/services/p2p-ssh-iroh.nix` if 7.2 adds it |
 | S | `modules/machines/nixos/cinnabar/caddy.nix`, `modules/darwin/zt-services-trust.nix` (renamed), `modules/clan/services/otel-collector/flake-module.nix` SAN lines, `modules/clan/services/nix-builders/flake-module.nix`, `modules/clan/inventory/services/nix-builders.nix`, `modules/clan/inventory/services/sshd.nix`, the nine checks of 8.4 |
+| N | `modules/system/mesh-hosts.nix`, `modules/darwin/etc-hosts.nix`, `modules/lib/etc-hosts-splice.{nix,sh}`, `modules/checks/mesh-hosts-obligations.nix`, the mesh-hosts obligation lines of `modules/checks/machines.nix`, `modules/checks/etc-hosts-splice.nix`, `modules/vm-tests/tincr-mesh-partition.nix`, the `.zt` records of `modules/machines/nixos/cinnabar/zt-dns.nix` |
 
 R and C both touch the files holding `magnetite.zt` consumers: C changes only the attribute path on those lines, R everything else in them, and R rebases on C.
 

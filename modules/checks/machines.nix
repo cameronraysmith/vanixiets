@@ -32,6 +32,7 @@
       deployRecordObligations = self.lib.deployRecordObligations;
       commitSigningObligations = self.lib.commitSigningObligations;
       resolverReloadObligations = self.lib.resolverReloadObligations;
+      meshHostsObligations = self.lib.meshHostsObligations;
 
       withFleetObligations =
         name: machineConfig: toplevel:
@@ -43,12 +44,19 @@
           unmetResolverReload = lib.optionals (lib.hasSuffix "-darwin" machineSystems.${name}) (
             resolverReloadObligations.failures name machineConfig
           );
+          unmetMeshHosts = meshHostsObligations.failures name machineConfig;
           hostFailures = map (a: a.message) (lib.filter (a: !a.assertion) machineConfig.assertions);
         in
         assert lib.assertMsg
-          (unmet == [ ] && unmetDeployRecord == [ ] && unmetSigning == [ ] && unmetResolverReload == [ ])
           (
-            "Fleet obligations unmet on ${name}: omnigentFleetObligations [${lib.concatStringsSep ", " unmet}]; deployRecordObligations [${lib.concatStringsSep ", " unmetDeployRecord}]; commitSigningObligations [${lib.concatStringsSep ", " unmetSigning}]; resolverReloadObligations [${lib.concatStringsSep ", " unmetResolverReload}]"
+            unmet == [ ]
+            && unmetDeployRecord == [ ]
+            && unmetSigning == [ ]
+            && unmetResolverReload == [ ]
+            && unmetMeshHosts == [ ]
+          )
+          (
+            "Fleet obligations unmet on ${name}: omnigentFleetObligations [${lib.concatStringsSep ", " unmet}]; deployRecordObligations [${lib.concatStringsSep ", " unmetDeployRecord}]; commitSigningObligations [${lib.concatStringsSep ", " unmetSigning}]; resolverReloadObligations [${lib.concatStringsSep ", " unmetResolverReload}]; meshHostsObligations [${lib.concatStringsSep ", " unmetMeshHosts}]"
             + lib.optionalString (hostFailures != [ ]) (
               "\n${name} assertion failures: ${lib.concatStringsSep "\n" hostFailures}"
             )

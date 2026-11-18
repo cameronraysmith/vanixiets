@@ -8,39 +8,46 @@
 # The zerotier controller pushes this DNS server to all network members.
 # systemd-resolved routes .zt queries to dnsmasq via split DNS on the
 # zerotier interface.
-{ config, ... }:
+#
+# The records are flake.lib.ztRecords, which modules/system/mesh-hosts.nix
+# also writes into every NixOS and darwin peer's /etc/hosts; both go with
+# ZeroTier's retirement.
+{ config, lib, ... }:
 let
-  inherit (config.flake.lib) hosts meshInterfaces;
+  inherit (config.flake.lib) hosts meshInterfaces ztRecords;
 
   # cinnabar's ZeroTier listen list: its ZeroTier IPv6 and the IPv4 that
   # pin-controller-ipv4 below pins it to.
   ztAddress = hosts.cinnabar.zerotier.address;
   ztIpv4 = "10.147.17.1";
 
-  # Service names resolve to cinnabar on both of its ZeroTier addresses.
-  serviceRecords = builtins.concatMap (label: [
-    "/${label}.zt/${ztAddress}"
-    "/${label}.zt/${ztIpv4}"
-  ]) hosts.cinnabar.services;
-
-  # Machine hostnames (for non-SSH service discovery via meta.domain = "zt").
-  machineRecords = [
-    "/cinnabar.zt/${ztAddress}"
-    "/cinnabar.zt/${ztIpv4}"
-  ]
-  ++ map (name: "/${name}.zt/${hosts.${name}.zerotier.address}") [
-    "electrum"
-    "galena"
-    "scheelite"
-    "stibnite"
-    "blackphos"
-    "argentum"
-    "rosegold"
-    "magnetite"
-    "pyrite"
-  ];
+  record = name: address: { inherit name address; };
 in
 {
+  # Service names resolve to cinnabar on both of its ZeroTier addresses;
+  # machine hostnames (for non-SSH service discovery via meta.domain = "zt")
+  # to each machine's ZeroTier address.
+  flake.lib.ztRecords =
+    lib.concatMap (label: [
+      (record "${label}.zt" ztAddress)
+      (record "${label}.zt" ztIpv4)
+    ]) hosts.cinnabar.services
+    ++ [
+      (record "cinnabar.zt" ztAddress)
+      (record "cinnabar.zt" ztIpv4)
+    ]
+    ++ map (name: record "${name}.zt" hosts.${name}.zerotier.address) [
+      "electrum"
+      "galena"
+      "scheelite"
+      "stibnite"
+      "blackphos"
+      "argentum"
+      "rosegold"
+      "magnetite"
+      "pyrite"
+    ];
+
   flake.modules.nixos."machines/nixos/cinnabar" =
     {
       config,
@@ -65,7 +72,7 @@ in
             "9.9.9.9"
             "149.112.112.112"
           ];
-          address = serviceRecords ++ machineRecords;
+          address = map (r: "/${r.name}/${r.address}") ztRecords;
         };
       };
 

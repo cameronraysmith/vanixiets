@@ -61,6 +61,7 @@ It also applies the nixbot input's migrations to a sandboxed PostgreSQL, creates
 `checks.x86_64-linux.fleet-alert` also replays `PullRequestQueueWaitBurn` against `devloop` through the fixture server's `/v1/sql` and requires each rule's query to reach its own database.
 The five x86_64-linux NixOS machine checks (cinnabar, electrum, galena, magnetite, pyrite) require the deploy-record snippet in the machine's activation through `flake.lib.deployRecordObligations`; the darwin machine checks require it too, but nixbot evaluates `checks.aarch64-darwin` only best-effort, and the deferred scheelite carries the snippet with no machine check.
 The darwin machine checks also require, through `flake.lib.resolverReloadObligations`, a `touch -h` of each managed `/etc/resolver` file after the `/etc` link loop in the rendered activation script, so that configd rereads the files (`darwin/resolver-reload.nix`); `checks.x86_64-linux.darwin-resolver-reload` runs that judge over fixtures and its mutants on every pull request.
+Every NixOS and darwin machine check also requires, through `flake.lib.meshHostsObligations`, that the machine's hosts entries map every name under `vanixiets.internal` or `.zt` to exactly the registry's addresses (`system/mesh-hosts.nix`); `checks.x86_64-linux.mesh-hosts-obligations` runs that judge over fixtures and its mutants on every pull request.
 The receivers, the store's pipelines and `devloop-reconcile` against the real store are verified by `devloop-ingest` below and at deployment, not by these checks.
 The collector's envelope check is gated the same way and needs no running collector.
 `checks.x86_64-linux.otel-envelope` runs the script of `flake.lib.otelEnvelope`, which `otel-envelope.service` runs on every agent host, against recorded collector telemetry served by a loopback stub, one case per sequence of runs on a fresh state directory.
@@ -83,6 +84,7 @@ nix build .#vmTests.x86_64-linux.perses-greptimedb            # Magnetite, uid-r
 nix build .#vmTests.x86_64-linux.caddy-root-from-vars         # Magnetite, uid-range
 nix build .#vmTests.x86_64-linux.greptimedb-oom-order         # Pyrite, kvm
 nix build .#vmTests.x86_64-linux.tincr-mesh                   # Pyrite, kvm
+nix build .#vmTests.x86_64-linux.tincr-mesh-partition         # Pyrite, kvm
 ```
 
 `omnigent-worker-isolation` establishes the runtime wiring of the Omnigent worker guards that no evaluation-time check can reach: that the private-home precondition is `ExecStartPre` on the real `omnigent-host-<owner>.service` and that violating the home's privacy at runtime prevents `ExecStart`, that the Nix daemon resolves a worker as untrusted, that two workers have separate accounts and mutually unreadable private homes, and that the unit's `User`, `UMask`, `NoNewPrivileges` and SSH-agent unsetting hold in the spawned process.
