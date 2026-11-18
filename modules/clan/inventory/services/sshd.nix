@@ -11,6 +11,14 @@
         input = "clan-core";
       };
 
+      # Key and certificate login only: with UsePAM, keyboard-interactive would
+      # let PAM accept a password. srvos sets this on hosts that import its
+      # server profile; pyrite does not. Checked by
+      # checks.x86_64-linux.sshd-no-keyboard-interactive.
+      roles.server.extraModules = [
+        { services.openssh.settings.KbdInteractiveAuthentication = false; }
+      ];
+
       # Server role generates host keys and CA-signed certificates
       # Restricted to NixOS (clan sshd service has no darwinModule for server)
       roles.server.tags."nixos" = { };
