@@ -20,6 +20,10 @@ projects:
         id: "3818e4f0-8aa1-43c2-bedc-da9db0e44d57"
       "browser-relay-delivery-interface":
         id: "f765de2b-e8e5-4f1e-a1f3-60b921d4cfe6"
+      "third-party-plugin-dependency":
+        id: "eda2fac3-f526-4844-a0f1-1d7718b83880"
+      "world-assumptions":
+        id: "c3ba657c-8e38-49b8-b314-1b3f07d30957"
   "requirements-engineering":
     # slugId, not the project UUID (ceb6017b-2e49-482f-af46-c213f07e039e), for the
     # reason recorded on the sibling entries: `linear document list --project`
