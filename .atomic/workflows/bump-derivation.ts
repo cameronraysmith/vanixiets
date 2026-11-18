@@ -12,11 +12,11 @@ import { capture, changed, discoverReleaseSource, pinGate, processCheckpoint, pr
 
 // The first-party fable route rejects this client's reported version. Openrouter
 // reaches the same model without that gate and therefore leads the fallback chain.
-const RECON = { model: "anthropic/claude-fable-5-1:medium", fallbackModels: ["openrouter/anthropic/claude-fable-5.1:medium", "anthropic/claude-sonnet-4-6:medium"] };
+const RECON = { model: "anthropic/claude-fable-5-2:medium", fallbackModels: ["openrouter/anthropic/claude-fable-5.2:medium", "anthropic/claude-sonnet-4-6:medium"] };
 const IMPL = { model: "openai-codex/gpt-6-astra:high", fallbackModels: ["openai-codex/gpt-5.6-terra:high"] };
-const REVIEW = { model: "anthropic/claude-opus-5:max", fallbackModels: ["anthropic/claude-opus-4-8:max"] };
+const REVIEW = { model: "anthropic/claude-opus-5-5:max", fallbackModels: ["anthropic/claude-opus-5:max"] };
 const READ_ONLY = { tools: ["read", "search", "find", "ls"], mcp: { allow: [] } };
-const LAND = { model: "anthropic/claude-opus-5:high", fallbackModels: ["anthropic/claude-opus-4-8:high"] };
+const LAND = { model: "anthropic/claude-opus-5-5:high", fallbackModels: ["anthropic/claude-opus-5:high"] };
 const keep = (text: string) => `<keepContext>\n${text}\n</keepContext>`;
 const Probe = Type.Object({ claim: Type.Integer({ minimum: 0 }), kind: Type.Union([Type.Literal("Help"), Type.Literal("Source"), Type.Literal("Vendored")]), args: Type.Array(Type.String()) });
 const Probes = Type.Object({ probes: Type.Array(Probe) });
