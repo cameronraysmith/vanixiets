@@ -185,18 +185,22 @@ Each group is one stacked pull request on top of C, except A and B, whose work i
 
 ### D9: tincr's default crypto mesh-wide
 
-- **Choice**: `crypto = "default"`: no `SPTPSCipher` or `SPTPSKex` lines, so every link uses ChaCha20-Poly1305 and X25519; the service rejects `crypto = "pq"` by assertion while any `devices` entry exists.
-- **Rationale**: tincapp is a C tinc 1.1 client, every link involving a C node must stay on the defaults (tincr `README.md` "Compatibility", `docs/COMPAT.md`), and host files carry the setting mesh-wide [INFERENCE]; tincapp's Google Play build is already installed on one of the operator's phones (operator, 2026-11-17), so the default is what the Android path will actually exercise.
-  vpn-bench measured the defaults, so the benchmark evidence applies to this choice and not to the post-quantum one.
-- **Alternatives considered**: Qubasa's `x25519-mlkem768` with `aes-256-gcm`, rejected for now because it locks out tincapp and is unmeasured; per-link crypto, rejected because tincr's host files do not scope it per link.
-  Revisit when an Android client that can carry the post-quantum setting is published (tincr's own app, PR #94, unmerged since 2026-09-07).
+- **Choice**: the instance runs `crypto = "default"`: no `SPTPSCipher` or `SPTPSKex` lines, so every link uses ChaCha20-Poly1305 and X25519.
+  The service's `crypto = "pq"`, if set, writes those lines into clan peers' host files only and never into a device's, so post-quantum key exchange between clan peers is available but not enabled.
+- **Rationale**: tincr applies `SPTPSCipher` and `SPTPSKex` per link, only when both ends' host files ask for them, and ignores them in `tinc.conf` (tincr `docs/COMPAT.md`, `docs/OPERATING.md` "Post-quantum key exchange"); a C tinc node such as tincapp ignores them, and a link to it stays on the defaults as long as the device's host file the peers read does not ask, which the service guarantees.
+  vpn-bench measured the defaults, so the benchmark evidence applies to this choice and not to the post-quantum one; tincapp's Google Play build is installed on one of the operator's phones (operator, 2026-11-17), so the default is what the Android path exercises.
+- **Alternatives considered**: `x25519-mlkem768` with `aes-256-gcm` between clan peers now, deferred until it is measured; it needs only `crypto = "pq"` on the instance.
+  tincr's own Android app is in the pinned source (`tincr-app`, with an `android-mesh` check) but its publication was not verified (2026-11-18); revisit the phones' client when it is published.
 
 ### D10: Android through tincapp
 
-- **Choice**: each phone is a `devices` entry with its Ed25519 public key and enrols by a `tinc invite` from cinnabar, whose invitation hook hands it its derived address and every peer's host file; a package `tincapp-network-<phone>` renders the phone's `network.conf` (`Address = <address>/128`, `Route = <prefix>`, `DNSServer` for both resolvers, `SearchDomain = vanixiets.internal`) for the operator to place in tincapp's network directory.
+- **Choice**: each phone is a `devices` entry with its Ed25519 public key and enrols by a `tinc invite` from cinnabar.
+  The invitation carries only the inviter's host file (tincr `crates/tinc-tools/src/cmd/invite.rs`); cinnabar's `invitation-created` hook hands the phone its derived address, and its `invitation-accepted` hook writes that `Subnet` into cinnabar's runtime copy of the phone's host file, which otherwise holds only the key and hides the declared one.
+  A package `tincapp-network-<phone>` renders the phone's `network.conf` (`Address = <address>/128`, `Route = <prefix>`, `DNSServer` for both resolvers, `SearchDomain = vanixiets.internal`, `AllowFamily = 2`), its `tinc.conf` (`StrictSubnets = yes`, `Broadcast = no`, `LocalDiscovery = yes`) and `hosts/` with every other member's host file from `flake.lib.meshHostFiles`, never the phone's own, which the join wrote with its key and port; the operator places them in tincapp's network directory and re-copies `hosts/` after any member is added or rekeyed.
+  The phone's VPN is IPv6 for the mesh with IPv4 allowed through to the underlying network, because Android blocks every address family a VPN configures no address, route or name server for (tincapp user documentation, `network.conf` `AllowFamily`, read 2026-11-17).
   pixel11 is the test device and the only phone in the cutover verification; pixel7 enrols best-effort, and nothing in V, X, F or Z depends on it, including its own ZeroTier removal (operator, 2026-11-17).
 - **Rationale**: tincapp runs no `tinc-up` and takes its interface addresses, routes and DNS servers only from `network.conf` (tincapp user documentation, read 2026-11-17), so the file is the Android equivalent of the darwin resolver file and the NixOS network unit.
-- **Alternatives considered**: tincr's own Android app, rejected while unpublished (F-Droid 404, PR #94 open); keeping the phones on ZeroTier, rejected because it keeps the controller alive for two devices.
+- **Alternatives considered**: tincr's own Android app, rejected while its publication is unverified (it is in the pinned source); dropping `StrictSubnets` on the phone instead of shipping `hosts/`, rejected because the phone would then accept any member's claim to any address; keeping the phones on ZeroTier, rejected because it keeps the controller alive for two devices.
 
 ### D11: The zone is generated and served by dnsmasq on two resolvers
 

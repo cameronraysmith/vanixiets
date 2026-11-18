@@ -35,6 +35,7 @@ A first-party `tincr` clan service, written with Qubasa/infra's as reference onl
 | `flake.lib.meshRecords` | 1.2 | R (zone), A (phone DNS) |
 | `flake.lib.meshInterfaces config` | 1.3 | R, S, Z |
 | clan service `tincr`, instance `vanixiets`, generator `tincr-vanixiets`, interface `tinc-vanixiets` / `utun10` | T | R (networkd match), S, V |
+| `flake.lib.meshHostFiles` (every peer's and device's host file, rendered by the service's own `flake.lib.tincrHostFile`) | T | A (phone `hosts/`) |
 | package `tincapp-network-<phone>` | A | V |
 | `flake.lib.matrixServerName` | M | M (tuwunel, hermes-agent, openclaw) |
 | `flake.lib.tuwunelServerNameGuard pkgs { serverName }` | M | M (tuwunel `ExecStartPre`, check `matrix-server-name-reset`) |
