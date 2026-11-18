@@ -318,11 +318,63 @@ A term found to denote two distinct phenomena within this repository's vocabular
 | sleep | — | a laptop's suspended state, in which it runs nothing and sends nothing until it wakes | world-only |
 | dark wake | — | a brief wake of a sleeping laptop for maintenance, without its panel lit, after which it sleeps again | world-only |
 | watched launchd jobs | — | the fleet's single list of launchd job labels whose state, runs and last exit code a darwin host's probe reads, each job on it an allow-listed launchd job | shared |
+| secret | — | a value whose disclosure would let someone act as the fleet, its operator, or a person in it | world-only |
+| secret file | — | a file in the repository holding secrets, protected so that only its readers can recover them | shared |
+| reader | secret file | a key whose holder can recover a secret file's contents | shared |
+| operator credential | — | a secret that authenticates the operator to an outside service such as the forge, a DNS provider or a binary cache | world-only |
+| operator identity | — | the personal key the operator uses day to day to read secrets | shared |
+| recovery key | — | a key kept offline whose only use is to regain access to secrets when every other reader is lost | world-only |
+| personal key | — | the private key a person holds to read the secrets meant for them | shared |
+| machine key | — | the private key a host holds to read the secrets meant for it, distinct from its host key | shared |
+| host key | — | the key a host proves its identity with over SSH, which the fleet pins for its hosts | shared |
+| public key | — | the non-secret half of a key pair, from which anyone can encrypt to its holder or verify the holder's identity | shared |
+| key store | — | the password manager in which the operator keeps people's SSH key pairs | world-only |
+| workstation | — | a host a person logs into and works at, and which holds that person's personal key | world-only |
+| retired host | — | a host that no longer exists, or a host's earlier hardware after the host was moved to new hardware | world-only |
+| maintenance tool | — | a command the operator runs by hand to change the fleet's keys, readers or secrets | shared |
+| working tree | — | the files of a repository's checkout on disk, tracked or not | shared |
+| automated runner | — | an unattended run on a forge's or provider's machines that holds its own key to read the secrets it needs | shared |
+| change | repository | a set of edits proposed to a repository and pushed to its forge for checking before it is accepted | shared |
+| reader rule | — | the repository's own statement of which readers each secret file must have | shared |
+| procedure | documentation | a sequence of steps the documentation tells a person to perform | world-only |
+| documentation | — | the prose the fleet publishes describing how its hosts and secrets are arranged and how to operate them | world-only |
+| correspondence | key | the fact that a public key the repository names is the public half of the key the named person or host actually holds | world-only |
+| key | — | the secret half of a key pair, or the pair itself, held by a person or a host; qualified as personal key, machine key, host key, recovery key or public key wherever the sense matters | world-only |
+| hardware | host | the physical machine a host runs on, which a host can outlive when it is moved to new hardware | world-only |
+| item | key store | one named entry in the key store, holding a key pair or a credential and the fields that describe it | world-only |
+| command | — | an instruction a person or a maintenance tool runs, named in the documentation or the repository, to act on a host, a secret file or the key store | shared |
+| dependency updater | — | the service that looks for newer releases of a forge-hosted repository's dependencies and proposes each update to that repository as an update pull request | shared |
+| hosted updater | — | the vendor-operated instance of the dependency updater's software that served this repository before the fleet ran its own, and which runs no update tasks for it | world-only |
+| run | dependency updater | one pass of the dependency updater over the repository, started by its schedule or by the operator | shared |
+| dry run | — | a run of the dependency updater that performs every step up to writing, records what it would have committed and opened, and writes nothing to the forge | shared |
+| dependency | — | an externally sourced component a forge-hosted repository declares at a chosen version, such as a flake input or an npm package | shared |
+| release | dependency | a version of a dependency that its upstream publishes, which the dependency updater can propose moving to | world-only |
+| declaration | — | the place in a forge-hosted repository that states which version of a dependency it wants, such as a flake input's reference or a package's version range | shared |
+| lock file | — | a file in a forge-hosted repository that records the exact versions its declarations resolved to, or a projection of another lock file into the form the build consumes | shared |
+| derived pin | — | a declaration the repository requires to equal the version of another dependency rather than choosing its own | shared |
+| npm Playwright pin | — | the version the documentation package declares for the npm `playwright` and `@playwright/test` packages, a derived pin | shared |
+| Playwright flake input | — | the flake input that provides the Playwright driver and browsers the documentation tests run against, whose driver version the npm Playwright pin must equal | shared |
+| consistent commit | — | a commit in which every lock file agrees with the declarations it records and every derived pin equals its source | shared |
+| update pull request | — | a pull request the dependency updater opens to move one or more dependencies to newer releases | shared |
+| update task | — | a command the repository asks the dependency updater to run in its copy of the repository after it changes a declaration and before it commits | shared |
+| allowlist | — | the operator's list of patterns naming the commands the dependency updater may run as update tasks | shared |
+| branch | — | a named, movable reference to a commit in a forge-hosted repository, on which a pull request proposes its change | shared |
+| push | — | the act of sending commits to a branch of a forge-hosted repository, after which the build service evaluates the new tip | shared |
+| follow-up commit | — | a commit pushed to a pull request after its first push to repair what the first push left inconsistent | shared |
+| application key | — | the long-lived private key of a forge application, from which short-lived forge credentials for its installation are minted | shared |
+| merge authorization | — | a person's act on a pull request that tells the merge queue to land it once its required checks pass, such as applying the queue's label or enabling auto-merge | shared |
+| bypass | — | standing on the forge that exempts an identity from a repository's required checks and branch rules | shared |
+| dependency dashboard | — | the issue on the forge in which the dependency updater lists the updates it has pending, held or awaiting approval | shared |
+| flake input | — | a dependency a forge-hosted repository's flake declares by reference, whose exact version the flake lock file records | shared |
+| comment | — | a message a person or service posts on a pull request or an issue on the forge | shared |
+| Renovate instance | — | one running copy of the dependency updater's software, writing to the forge under one forge identity; the hosted updater and the fleet's updater are two instances | shared |
+| flake-input updater | — | the dependency updater that refreshes the locked revisions of branch-tracking flake inputs, one pull request per input, apart from Renovate | shared |
+| branch-tracking flake input | — | a flake input whose declaration names a branch, or no reference at all, so its locked revision moves whenever that branch does | shared |
 
 #### Scenario: The terms with two senses are read
 
 - **WHEN** the table is read for terms that carry two senses in this repository
-- **THEN** twenty-four terms carry more than one sense today and are disambiguated by separate rows rather than left to context: `session`, `package`, `policy`, `@`, `mutation`, `activation`, `probe`, `machine`, `host`, `interface`, `repository`, `build service`, `database`, `hostname`, `evaluator`, `person`, `writer`, `account`, `build`, `path`, `credential`, `identifier`, `browser`, and `release`, of which `probe` carries three and every other term two
+- **THEN** twenty-five terms carry more than one sense today and are disambiguated by separate rows rather than left to context: `session`, `package`, `policy`, `@`, `mutation`, `activation`, `probe`, `machine`, `host`, `interface`, `repository`, `build service`, `database`, `hostname`, `evaluator`, `person`, `writer`, `account`, `build`, `path`, `credential`, `identifier`, `browser`, `release`, and `reader`, of which `probe` and `release` carry three and every other term two
 
 #### Scenario: A term resolves to two phenomena
 
@@ -868,3 +920,69 @@ Any requirement whose discharge depends on this fact SHALL name it explicitly, a
 
 - **WHEN** the darwin process scraper reports a figure other than `pti_resident_size`, a macOS release stops counting shared-cache pages in it, or a fleet daemon's process reports a name other than its `process.darwinFleetExecutables` entry
 - **THEN** this assumption is void, and the `host-metrics-collection` requirement `Series cardinality stays bounded` loses the argument that a 384 MiB darwin floor with the fleet's executables kept holds stibnite at or below 20 names an hour, and the argument that every fleet executable stays visible below the floor, until the distribution is measured again and the floor and map follow it
+
+### Requirement: A116 — Only clan's deployment and upload commands install a host's machine key
+
+It is true of clan-core at the pinned revision, independent of what this fleet builds, that `/var/lib/sops-nix/key.txt` is written to a host only by `clan machines update`, `clan machines install` or `clan vars upload <machine>`, never by local activation.
+Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL lose its discharge once the violation condition below is observed.
+
+**Evidence**: clan-core `dbae21013aca`, `pkgs/clan-cli/clan_lib/vars/upload.py` (`upload_secret_vars` uploads phases activation, users and services); `pkgs/clan-cli/clan_lib/vars/secret_modules/sops.py:243-260` (`populate_dir` decrypts `<machine>-age.key` as the admin user and writes `key.txt` mode 0600 for the users and services phases) and `:302-315` (`upload`, over SSH as root); `pkgs/clan-cli/clan_lib/machines/update.py:612` (`clan machines update` calls `upload_secret_vars`). This fleet's darwin activation path is `nh darwin switch` (`modules/darwin/app.nix:81`), which calls none of them.
+
+#### Scenario: Activation starts installing the machine key, or upload stops
+- **WHEN** a pinned clan-core or nix-darwin starts writing the machine key during local activation, or `clan vars upload` stops writing `key.txt` for a machine whose `<machine>-age.key` exists
+- **THEN** this assumption is void, and the `secret-custody` requirement `A darwin host is not activated without its machine key` loses the argument that the remedy it names is the only one, and the `secret-custody-interface` guard's message must be re-examined
+
+### Requirement: A117 — clan-core points sops-nix at the uploaded machine key exactly when the repository holds one
+
+It is true of clan-core at the pinned revision, independent of what this fleet builds, that its sops vars backend sets `sops.age.keyFile` to `<secretUploadDirectory>/key.txt`, `/var/lib/sops-nix/key.txt` by default, whenever `sops/secrets/<machine>-age.key/secret` exists in the flake, and leaves it unset otherwise.
+Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL lose its discharge once the violation condition below is observed.
+
+**Evidence**: clan-core `dbae21013aca`, `nixosModules/clanCore/vars/secret/sops/default.nix:52-54`; `nix eval --raw .#darwinConfigurations.stibnite.config.sops.age.keyFile` printed `/var/lib/sops-nix/key.txt` on 2026-11-16.
+
+#### Scenario: The key path or its condition changes
+- **WHEN** a pinned clan-core sets `sops.age.keyFile` to another path, or sets it for a machine without `<machine>-age.key`, or stops setting it
+- **THEN** this assumption is void, and the `secret-custody-interface` requirement `The .#darwin app refuses activation without the host's machine key` checks the wrong file or the wrong hosts
+
+### Requirement: A118 — sops-nix fails to install secrets when its configured age key file cannot be read
+
+It is true of sops-nix at the pinned revision, independent of what this fleet builds, that `sops-install-secrets` returns an error, installing no secret, when the manifest names an `ageKeyFile` it cannot read.
+Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL lose its discharge once the violation condition below is observed.
+
+**Evidence**: sops-nix `fe7b4228405a`, `pkgs/sops-install-secrets/main.go:1434-1440` (`cannot read keyfile '%s'`). The diagnosis of 2026-11-16 traced the consequences on darwin: `omnigent-host.nix:474` exits activation non-zero when it has credential deliveries, and the otelcol job waits in `wait4path` (`otel-collector-agent.nix:140-142`).
+
+#### Scenario: Missing keys become non-fatal
+- **WHEN** a pinned sops-nix skips an unreadable key file and installs what it can
+- **THEN** this assumption is void, and the reason the `secret-custody` requirement `A darwin host is not activated without its machine key` stops activation, rather than letting it proceed, must be re-examined
+
+### Requirement: A119 — ssh-to-age maps one ed25519 key to one age key, deterministically
+
+It is true of ssh-to-age 1.3.0, independent of what this fleet builds, that the same ed25519 SSH key always yields the same age key pair, whose private half decrypts for its public half, and that every other key type is rejected.
+Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL lose its discharge once the violation condition below is observed.
+
+**Evidence**: ssh-to-age 1.3.0 `convert.go:22-29` (private key: SHA-512 of the seed), `:32-58` (public key: the birational Edwards-to-Montgomery map, `edwards25519.Point.BytesMontgomery`, bech32 `age`), `:19` (`only ed25519 keys are supported`); nixpkgs `6dadaf4375be` ships 1.3.0.
+
+#### Scenario: The conversion stops being deterministic or changes form
+- **WHEN** a pinned ssh-to-age yields a different age key for the same SSH key, or its private and public conversions stop corresponding
+- **THEN** this assumption is void, and the `secret-custody` requirements `Every public key the repository names corresponds to the person or machine it names` and `A workstation's personal key is derived from the person's SSH key in the key store` lose their discharge, because both compare ssh-to-age images
+
+### Requirement: A120 — sops updatekeys keeps a file's data key, and only sops rotate renews it
+
+It is true of sops 3.13.3, independent of what this fleet builds, that `sops updatekeys` re-wraps a file's existing data key for its rule's recipients without changing it, and that `sops rotate` generates a new data key and re-encrypts every value with it.
+Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL lose its discharge once the violation condition below is observed.
+
+**Evidence**: getsops.io, "Key management" (https://getsops.io/docs/usage/key-management/): "When removing keys, it is recommended to rotate the data key using -r, otherwise, owners of the removed key may have add access to the data key in the past", and the compromised-key procedure `sops updatekeys` then `sops rotate --in-place`; "Use updatekeys if you want to add a key without rotating the data key". So a former recipient that held the old data key can read values written after `updatekeys` until `rotate` runs, and earlier ciphertext in git history stays readable by its recipients of that time. sops 3.13.3 is the devshell's version.
+
+#### Scenario: updatekeys starts rotating, or rotate stops renewing
+- **WHEN** a pinned sops renews the data key during `updatekeys`, or `rotate` keeps the old data key
+- **THEN** this assumption is void, and the `secret-custody` requirement `Narrowing a secret file's readers keeps every reader still in use and renews its protection` loses the argument for, or the sufficiency of, the separate rotate step
+
+### Requirement: A121 — A Bitwarden SSH key item carries its key pair in the sshKey fields
+
+It is true of Bitwarden's SSH key item type, independent of what this fleet builds, that `bw get item <name>` for such an item returns JSON whose `.sshKey.privateKey` holds the OpenSSH private key and `.sshKey.publicKey` the public key.
+Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL lose its discharge once the violation condition below is observed.
+
+**Evidence**: `justfile` `provision-bridge-key` reads these fields and produced `secrets/bridge/crs58-age-key.enc` and `secrets/bridge/tara-age-key.enc`, whose decrypted keys the NixOS hosts use; the diagnosis of 2026-11-16 confirmed the field names on the operator's vault. This evidence is observational, not from Bitwarden's source; the client choice is being researched separately and may replace `bw`.
+
+#### Scenario: The item shape changes
+- **WHEN** the key-store client in use returns the key pair under other fields, or a key item stops carrying the private key
+- **THEN** this assumption is void, and the `secret-custody` requirement `A workstation's personal key is derived from the person's SSH key in the key store` loses its documented procedure until the procedure is updated

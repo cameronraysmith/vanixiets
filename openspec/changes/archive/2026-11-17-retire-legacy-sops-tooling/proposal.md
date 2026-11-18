@@ -7,7 +7,7 @@ linear_story_state: Done
 linear_team: CAM
 linear_project: workstation-parity
 last_synced_state: Done
-last_synced_at: 2026-11-17T05:53:21Z
+last_synced_at: 2026-11-18T03:23:36Z
 review_round: 0
 max_review_rounds: 3
 attempt_log:
@@ -15,6 +15,9 @@ attempt_log:
   - { at: "2026-11-17T00:01:18Z", transition: "Todo (description re-sync)", outcome: "posted", note: "description re-seeded after operator decisions Q28-Q32 and D25 (dev retired, hash-encrypt and npmbw removed); state unchanged" }
   - { at: "2026-11-17T04:46:09Z", transition: "Todo->In Progress", outcome: "posted", note: "T2 on the first checked tasks.md box (slice 1, group 1); one comment posted" }
   - { at: "2026-11-17T05:53:21Z", transition: "In Progress->In Review", outcome: "dropped", note: "T3 on verify.md not fired: Linear already Done since 2026-11-17T05:08:34Z, 2 s after #3932 (slice 1) merged, by the operator's account with no bot actor (likely Linear's GitHub integration closing the issue on a merged PR that names CAM-107); strictly-behind rule makes T3 a no-op; Done before archive breaks the lifecycle invariant; state left for the operator to decide" }
+  - { at: "2026-11-18", transition: "In Review->In Progress->In Review", outcome: "posted", note: "re-queue, review round 1: verify FAIL on task 3.4's argentum guard dry run (#3983), fix #3985, witness on argentum at 02:52:51Z, re-verify PASS WITH WARNINGS; the orchestrator moved the Linear state itself and this log does not carry its timestamps; the counter resets at archive" }
+  - { at: "2026-11-18T03:23:20Z", transition: "archive->mirror", outcome: "posted", note: "documents created in project workstation-parity: OpenSpec: secret-custody, secret-custody-interface, world-assumptions; ids stored in openspec/linear.yaml" }
+  - { at: "2026-11-18T03:23:36Z", transition: "In Review->Done", outcome: "posted", note: "T4 on archive; roborev and documenter waived by the operator on 2026-11-18 (\"we don't need to do them right now\"); one comment posted" }
 ---
 
 ## Why

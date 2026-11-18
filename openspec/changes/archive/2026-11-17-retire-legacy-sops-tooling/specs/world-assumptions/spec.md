@@ -318,11 +318,42 @@ A term found to denote two distinct phenomena within this repository's vocabular
 | procedure | documentation | a sequence of steps the documentation tells a person to perform | world-only |
 | documentation | — | the prose the fleet publishes describing how its hosts and secrets are arranged and how to operate them | world-only |
 | correspondence | key | the fact that a public key the repository names is the public half of the key the named person or host actually holds | world-only |
+| key | — | the secret half of a key pair, or the pair itself, held by a person or a host; qualified as personal key, machine key, host key, recovery key or public key wherever the sense matters | world-only |
+| hardware | host | the physical machine a host runs on, which a host can outlive when it is moved to new hardware | world-only |
+| item | key store | one named entry in the key store, holding a key pair or a credential and the fields that describe it | world-only |
+| command | — | an instruction a person or a maintenance tool runs, named in the documentation or the repository, to act on a host, a secret file or the key store | shared |
+| dependency updater | — | the service that looks for newer releases of a forge-hosted repository's dependencies and proposes each update to that repository as an update pull request | shared |
+| hosted updater | — | the vendor-operated instance of the dependency updater's software that served this repository before the fleet ran its own, and which runs no update tasks for it | world-only |
+| run | dependency updater | one pass of the dependency updater over the repository, started by its schedule or by the operator | shared |
+| dry run | — | a run of the dependency updater that performs every step up to writing, records what it would have committed and opened, and writes nothing to the forge | shared |
+| dependency | — | an externally sourced component a forge-hosted repository declares at a chosen version, such as a flake input or an npm package | shared |
+| release | dependency | a version of a dependency that its upstream publishes, which the dependency updater can propose moving to | world-only |
+| declaration | — | the place in a forge-hosted repository that states which version of a dependency it wants, such as a flake input's reference or a package's version range | shared |
+| lock file | — | a file in a forge-hosted repository that records the exact versions its declarations resolved to, or a projection of another lock file into the form the build consumes | shared |
+| derived pin | — | a declaration the repository requires to equal the version of another dependency rather than choosing its own | shared |
+| npm Playwright pin | — | the version the documentation package declares for the npm `playwright` and `@playwright/test` packages, a derived pin | shared |
+| Playwright flake input | — | the flake input that provides the Playwright driver and browsers the documentation tests run against, whose driver version the npm Playwright pin must equal | shared |
+| consistent commit | — | a commit in which every lock file agrees with the declarations it records and every derived pin equals its source | shared |
+| update pull request | — | a pull request the dependency updater opens to move one or more dependencies to newer releases | shared |
+| update task | — | a command the repository asks the dependency updater to run in its copy of the repository after it changes a declaration and before it commits | shared |
+| allowlist | — | the operator's list of patterns naming the commands the dependency updater may run as update tasks | shared |
+| branch | — | a named, movable reference to a commit in a forge-hosted repository, on which a pull request proposes its change | shared |
+| push | — | the act of sending commits to a branch of a forge-hosted repository, after which the build service evaluates the new tip | shared |
+| follow-up commit | — | a commit pushed to a pull request after its first push to repair what the first push left inconsistent | shared |
+| application key | — | the long-lived private key of a forge application, from which short-lived forge credentials for its installation are minted | shared |
+| merge authorization | — | a person's act on a pull request that tells the merge queue to land it once its required checks pass, such as applying the queue's label or enabling auto-merge | shared |
+| bypass | — | standing on the forge that exempts an identity from a repository's required checks and branch rules | shared |
+| dependency dashboard | — | the issue on the forge in which the dependency updater lists the updates it has pending, held or awaiting approval | shared |
+| flake input | — | a dependency a forge-hosted repository's flake declares by reference, whose exact version the flake lock file records | shared |
+| comment | — | a message a person or service posts on a pull request or an issue on the forge | shared |
+| Renovate instance | — | one running copy of the dependency updater's software, writing to the forge under one forge identity; the hosted updater and the fleet's updater are two instances | shared |
+| flake-input updater | — | the dependency updater that refreshes the locked revisions of branch-tracking flake inputs, one pull request per input, apart from Renovate | shared |
+| branch-tracking flake input | — | a flake input whose declaration names a branch, or no reference at all, so its locked revision moves whenever that branch does | shared |
 
 #### Scenario: The terms with two senses are read
 
 - **WHEN** the table is read for terms that carry two senses in this repository
-- **THEN** twenty-five terms carry more than one sense today and are disambiguated by separate rows rather than left to context: `session`, `package`, `policy`, `@`, `mutation`, `activation`, `probe`, `machine`, `host`, `interface`, `repository`, `build service`, `database`, `hostname`, `evaluator`, `person`, `writer`, `account`, `build`, `path`, `credential`, `identifier`, `browser`, `release`, and `reader`, of which `probe` carries three and every other term two
+- **THEN** twenty-five terms carry more than one sense today and are disambiguated by separate rows rather than left to context: `session`, `package`, `policy`, `@`, `mutation`, `activation`, `probe`, `machine`, `host`, `interface`, `repository`, `build service`, `database`, `hostname`, `evaluator`, `person`, `writer`, `account`, `build`, `path`, `credential`, `identifier`, `browser`, `release`, and `reader`, of which `probe` and `release` carry three and every other term two
 
 #### Scenario: A term resolves to two phenomena
 
