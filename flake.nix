@@ -92,6 +92,14 @@
     nixbot.inputs.nixpkgs.follows = "nixpkgs";
     nixbot.inputs.treefmt-nix.follows = "treefmt-nix";
 
+    # iets as a candidate evaluator for nixbot (CAM-111), packaged by
+    # modules/lib/nix-eval-jobs-iets.nix and not selected. Pinned to the rev
+    # whose parity with nix-eval-jobs was measured on magnetite (world
+    # assumption A147), so an update is a deliberate, re-measured change.
+    # No follows: the input keeps its own nixpkgs, and its build is
+    # substituted from cache.numtide.com (lib/caches.nix).
+    iets.url = "github:numtide/iets/9157ca1a2a50c085bcd7fd0004d9ba71e2b7c1e0";
+
     gitea-mq.url = "github:Mic92/gitea-mq";
     gitea-mq.inputs.nixpkgs.follows = "nixpkgs";
     gitea-mq.inputs.treefmt-nix.follows = "treefmt-nix";

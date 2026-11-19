@@ -79,7 +79,33 @@ in
       # The host nixbot evaluates on also measures what competes with those
       # evaluations for its memory (CAM-111 design D11), which is why the
       # budget comes with this module rather than with the host.
-      imports = [ flakeModules.magnetite-memory-budget ];
+      #
+      # The iets evaluator (CAM-111 design D3) is built from this host's own
+      # stock evaluator and exposed read-only, so it can be built and checked
+      # on the host without being selected: nothing on the host refers to it,
+      # and services.nixbot.packages.nix-eval-jobs below stays the stock one.
+      imports = [
+        flakeModules.magnetite-memory-budget
+        (
+          {
+            lib,
+            options,
+            pkgs,
+            ...
+          }:
+          {
+            options.vanixiets.nixbot.ietsEvaluator = lib.mkOption {
+              type = lib.types.package;
+              readOnly = true;
+              default =
+                flakeLib.mkNixEvalJobsIets pkgs inputs.iets.packages.${pkgs.stdenv.hostPlatform.system}.default
+                  options.services.nixbot.packages.nix-eval-jobs.default;
+              defaultText = lib.literalExpression "flake.lib.mkNixEvalJobsIets pkgs inputs.iets.packages.\${system}.default options.services.nixbot.packages.nix-eval-jobs.default";
+              description = "iets as a nix-eval-jobs package for nixbot, built from this host's stock evaluator; not selected.";
+            };
+          }
+        )
+      ];
 
       # GitHub App private key (populated manually via clan vars set)
       clan.core.vars.generators.nixbot-github-app-secret-key = {
