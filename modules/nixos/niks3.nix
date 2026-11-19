@@ -15,14 +15,52 @@ let
   flakeLib = config.flake.lib;
 in
 {
+  # niks3-claim-without-exception.patch, carried locally (F65), not filed
+  # upstream (operator decision 2026-11-19).
+  #
+  # Mic92/niks3 f91108b1 ("keep a publish claim only until its push
+  # commits") claims narinfos outside a transaction first: claim_narinfos
+  # RAISEs SQLSTATE NK301 whenever a key is not won outright, and
+  # claimNarinfos (server/uploads.go) catches it and retries in a
+  # transaction. Our nixbot uploader pushes overlapping closures, so a key
+  # another push committed meanwhile is routine, and PostgreSQL logged each
+  # fallback as an ERROR with its statement: about 400 an hour on magnetite,
+  # nothing lost. Still so on upstream main 38c867bd.
+  #
+  # The patch catches NK301 inside the function, in a block whose
+  # subtransaction undoes the claim insert, and returns
+  # {"needs_transaction": true}; claimNarinfos retries on that flag. The
+  # fast path is upstream's. The alternative, claiming in a transaction
+  # every time, removes the fast path f91108b1 added. The patch replaces only
+  # a function body, which niks3 re-applies on every start
+  # (server/pg/pg.go), so it needs no migration and dropping it needs none.
+  # checks.x86_64-linux.niks3-claim runs upstream's claim tests with it, plus
+  # modules/checks/niks3-claim/claim-test.patch, which fails without it.
+  #
+  # Trial from its first magnetite deploy (built 2026-11-19). Offer it
+  # upstream after four weeks if: postgresql.service's journal has no
+  # `claim needs a transaction`; niks3_http_requests_total for route
+  # "POST /api/pushes/{id}/sign" shows no 5xx; that route's
+  # niks3_http_request_duration_seconds is no worse than before; GC runs
+  # succeed; no publish_claims rows are left behind and no live narinfo's NAR
+  # is missing; and upstream main still raises NK301.
+  flake.lib.niks3Patches = [ ./niks3-claim-without-exception.patch ];
+
   flake.modules.nixos.niks3 =
     {
       config,
+      options,
       pkgs,
       lib,
       ...
     }:
     {
+      # The module builds niks3-server from its own source with this host's
+      # pkgs (serverPackage's default), so the patch goes on that package.
+      services.niks3.serverPackage = options.services.niks3.serverPackage.default.overrideAttrs (old: {
+        patches = (old.patches or [ ]) ++ flakeLib.niks3Patches;
+      });
+
       # Clan vars for niks3 R2 S3 credentials (populated manually via clan vars set)
       clan.core.vars.generators.niks3-s3 = {
         files."access-key" = {

@@ -1,0 +1,122 @@
+diff --git a/server/pg/functions/4_claim_narinfos.sql b/server/pg/functions/4_claim_narinfos.sql
+index 832d604..721e558 100644
+--- a/server/pg/functions/4_claim_narinfos.sql
++++ b/server/pg/functions/4_claim_narinfos.sql
+@@ -27,7 +27,9 @@ DROP FUNCTION IF EXISTS claim_narinfos(bigint, varchar[], varchar[], jsonb[]);
+ --
+ -- A push that wins every key outright is done after the insert. Anything
+ -- else needs in_transaction: the caller holds the claim rows until it has
+--- deleted the taken files. Without it the call fails with SQLSTATE NK301.
++-- deleted the taken files. Without it the insert is undone and the call
++-- returns {"needs_transaction": true}. It does not fail, since PostgreSQL
++-- would log the error of every push that takes this way.
+ --
+ -- Returns {"lost": {key: narinfo}, "published": {key: NAR key}, "taken": [key]}.
+ CREATE OR REPLACE FUNCTION claim_narinfos(
+@@ -49,28 +51,34 @@ BEGIN
+         RAISE EXCEPTION 'Push does not exist: id=%', push_id;
+     END IF;
+ 
+-    WITH inserted AS (
+-        INSERT INTO publish_claims (key, nar_key, narinfo)
+-        SELECT t.key, t.nar_key, t.narinfo
+-        FROM unnest(keys, nar_keys, narinfos) AS t (key, nar_key, narinfo)
+-        ORDER BY t.key COLLATE "C"
+-        ON CONFLICT (key) DO NOTHING
+-        RETURNING key
+-    )
+-    SELECT coalesce(array_agg(key), '{}') INTO won FROM inserted;
++    -- A subtransaction, so the claims of a call that needs a transaction
++    -- are undone without failing the call.
++    BEGIN
++        WITH inserted AS (
++            INSERT INTO publish_claims (key, nar_key, narinfo)
++            SELECT t.key, t.nar_key, t.narinfo
++            FROM unnest(keys, nar_keys, narinfos) AS t (key, nar_key, narinfo)
++            ORDER BY t.key COLLATE "C"
++            ON CONFLICT (key) DO NOTHING
++            RETURNING key
++        )
++        SELECT coalesce(array_agg(key), '{}') INTO won FROM inserted;
+ 
+-    -- Looked up after the insert, which waited for a commit of the same key.
+-    IF cardinality(won) = cardinality(keys) AND NOT EXISTS (
+-        SELECT 1 FROM objects AS o
+-        INNER JOIN unnest(keys, nar_keys) AS t (key, nar_key) ON t.key = o.key
+-        WHERE o.deleted_at IS NULL OR NOT (t.nar_key = any(o.refs))
+-    ) THEN
+-        RETURN '{}'::jsonb;
+-    END IF;
++        -- Looked up after the insert, which waited for a commit of the same key.
++        IF cardinality(won) = cardinality(keys) AND NOT EXISTS (
++            SELECT 1 FROM objects AS o
++            INNER JOIN unnest(keys, nar_keys) AS t (key, nar_key) ON t.key = o.key
++            WHERE o.deleted_at IS NULL OR NOT (t.nar_key = any(o.refs))
++        ) THEN
++            RETURN '{}'::jsonb;
++        END IF;
+ 
+-    IF NOT in_transaction THEN
+-        RAISE EXCEPTION 'claim needs a transaction' USING ERRCODE = 'NK301';
+-    END IF;
++        IF NOT in_transaction THEN
++            RAISE EXCEPTION 'claim needs a transaction' USING ERRCODE = 'NK301';
++        END IF;
++    EXCEPTION WHEN SQLSTATE 'NK301' THEN
++        RETURN '{"needs_transaction": true}'::jsonb;
++    END;
+ 
+     SELECT
+         coalesce(jsonb_object_agg(o.key, (SELECT r FROM unnest(o.refs) AS r WHERE r LIKE 'nar/%' LIMIT 1)), '{}'),
+diff --git a/server/uploads.go b/server/uploads.go
+index 0377049..e414c5d 100644
+--- a/server/uploads.go
++++ b/server/uploads.go
+@@ -613,13 +613,17 @@ func (s *Service) claimNarinfos(
+ 
+ 	// A push that wins every key outright needs no transaction.
+ 	answer, err := pg.New(s.Pool).ClaimNarinfos(ctx, params)
+-	if err == nil {
+-		return decodeClaim(answer)
++	if err != nil {
++		return nil, claimError(err)
+ 	}
+ 
+-	var pgError *pgconn.PgError
+-	if !errors.As(err, &pgError) || pgError.Code != claimNeedsTransaction {
+-		return nil, claimError(err)
++	claim, err := decodeClaim(answer)
++	if err != nil {
++		return nil, err
++	}
++
++	if !claim.NeedsTransaction {
++		return claim, nil
+ 	}
+ 
+ 	tx, err := s.Pool.Begin(ctx)
+@@ -636,7 +640,7 @@ func (s *Service) claimNarinfos(
+ 		return nil, claimError(err)
+ 	}
+ 
+-	claim, err := decodeClaim(answer)
++	claim, err = decodeClaim(answer)
+ 	if err != nil {
+ 		return nil, err
+ 	}
+@@ -654,13 +658,12 @@ func (s *Service) claimNarinfos(
+ 	return claim, nil
+ }
+ 
+-// claimNeedsTransaction is the SQLSTATE claim_narinfos fails with.
+-const claimNeedsTransaction = "NK301"
+-
+ type narinfoClaim struct {
+ 	Lost      map[string]NarinfoMetadata `json:"lost"`
+ 	Published map[string]string          `json:"published"`
+ 	Taken     []string                   `json:"taken"`
++	// NeedsTransaction: the claim is undone and has to be made in a transaction.
++	NeedsTransaction bool `json:"needs_transaction"`
+ }
+ 
+ func decodeClaim(answer []byte) (*narinfoClaim, error) {
