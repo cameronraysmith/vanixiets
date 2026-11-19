@@ -2,11 +2,13 @@
 # given systemctl show output recorded on magnetite on 2026-11-18, with two
 # blocks edited (gitea-mq.service's MemoryCurrent as [not set], and a
 # gitea-runner-nix1.service block marked deactivating while systemd still
-# reports its memory), and zram0's mm_stat, the probe writes exactly
-# ./magnetite-memory-budget/expected.prom: both values of each active unit
-# that has them, the owner's unit under its alias, nothing for a unit that is
-# not active or a [not set] value, and zram's three sizes. Defined for
-# x86_64-linux only: the evaluation host is x86_64-linux.
+# reports its memory), zram0's mm_stat, and user.slice's memory.events
+# recorded on 2026-11-19 with its `high` count edited from 0 to 1273, the
+# probe writes exactly ./magnetite-memory-budget/expected.prom: both values
+# of each active unit that has them, the owner's unit under its alias,
+# nothing for a unit that is not active or a [not set] value, zram's three
+# sizes, and user.slice's `high` count and no other event (design D14).
+# Defined for x86_64-linux only: the evaluation host is x86_64-linux.
 { config, ... }:
 let
   budget = config.flake.lib.magnetiteMemoryBudget;
@@ -31,7 +33,8 @@ in
             }
             ''
               ${lib.getExe (budget.probe pkgs)} --format "$configPath" \
-                ${./magnetite-memory-budget/show.txt} ${./magnetite-memory-budget/mm_stat.txt} > got.prom
+                ${./magnetite-memory-budget/show.txt} ${./magnetite-memory-budget/mm_stat.txt} \
+                ${./magnetite-memory-budget/user-slice-memory.events} > got.prom
               diff -u ${./magnetite-memory-budget/expected.prom} got.prom
               mkdir -p $out
               cp got.prom $out/

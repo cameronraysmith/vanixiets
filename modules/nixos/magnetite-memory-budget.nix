@@ -6,9 +6,10 @@
 # contrib 0.155.0, and nothing reports the RAM zram itself holds. This module
 # adds those: magnetite-memory-budget.service, every 60 s, writes systemd's
 # MemoryCurrent and MemoryPeak for flake.lib.otelCollectorSchema's
-# memoryBudgetUnits, system.slice and user.slice, and zram0's mm_stat sizes,
-# to node_exporter's textfile collector (./magnetite-memory-budget/probe.py).
-# The five series names are in nodeExporterKeep; the assertion below keeps
+# memoryBudgetUnits, system.slice and user.slice, zram0's mm_stat sizes, and
+# user.slice's memory.events `high` count (design D14), to node_exporter's
+# textfile collector (./magnetite-memory-budget/probe.py).
+# The six series names are in nodeExporterKeep; the assertion below keeps
 # the keep-list and the textfile collector from drifting apart from the
 # probe. checks.x86_64-linux.magnetite-memory-budget runs the probe's
 # formatting against recorded systemctl output.
@@ -22,6 +23,9 @@ let
     "vanixiets_zram_orig_data_bytes"
     "vanixiets_zram_compr_data_bytes"
     "vanixiets_zram_mem_used_bytes"
+    # user.slice's memory.events `high` count, how often the soft guard of
+    # design D14 throttled it (./magnetite-user-slice-guard.nix).
+    "vanixiets_unit_memory_high_events"
   ];
 
   probeConfig = {

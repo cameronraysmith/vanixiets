@@ -1,0 +1,50 @@
+# checks.x86_64-linux.user-slice-guard-obligations: the judge of
+# flake.lib.userSliceGuard (modules/nixos/magnetite-user-slice-guard.nix)
+# accepts a user.slice with MemoryHigh and no MemoryMax, and finds exactly one
+# problem in each mutant: no MemoryHigh, MemoryHigh infinity, and a MemoryMax
+# beside the MemoryHigh.
+#
+# magnetite's own slice is judged by the module's assertion, which the
+# nixos-magnetite check evaluates. No host is evaluated here; the fixtures are
+# literals, so the check runs on x86_64-linux only.
+{ self, lib, ... }:
+{
+  perSystem =
+    { pkgs, system, ... }:
+    let
+      o = self.lib.userSliceGuard;
+      ok = {
+        MemoryHigh = o.memoryHigh;
+      };
+      cases = {
+        accepted = {
+          slice = ok;
+          problems = 0;
+        };
+        noMemoryHigh = {
+          slice = { };
+          problems = 1;
+        };
+        memoryHighInfinity = {
+          slice = {
+            MemoryHigh = "infinity";
+          };
+          problems = 1;
+        };
+        memoryMaxPresent = {
+          slice = ok // {
+            MemoryMax = "12G";
+          };
+          problems = 1;
+        };
+      };
+      wrong = lib.filterAttrs (_: case: lib.length (o.problems case.slice) != case.problems) cases;
+    in
+    lib.optionalAttrs (system == "x86_64-linux") {
+      checks.user-slice-guard-obligations =
+        assert lib.assertMsg (
+          wrong == { }
+        ) "user-slice-guard-obligations: the judge misjudges ${toString (lib.attrNames wrong)}";
+        pkgs.runCommand "user-slice-guard-obligations" { } "touch $out";
+    };
+}
