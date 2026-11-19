@@ -128,3 +128,9 @@ Main and the operator settled option A: one host-side producer, a fifth nixbot p
 - No buildbot unit exists on magnetite (`systemctl list-units --all '*buildbot*'` is empty), so the operator's mention of buildbot has nothing to measure today.
 
 **Resulting design (D9 rewritten, D10 revised, D11 added).** A magnetite-only probe writes systemd's `MemoryCurrent`/`MemoryPeak` for a fixed unit list plus `system.slice` and `user.slice`, and zram's `mm_stat`, to node_exporter's textfile collector; five names join the keep-list; a budget chart sits beside the evaluation charts. Reading through `systemctl show` rather than a fixed cgroup path covers nested units such as `matrix-synapse.service`. When a contrib bump brings the receiver's memory metrics, the probe's unit series give way to them.
+
+## Decisions of 2026-11-18 (after the first deploy)
+
+**Operator decision R-c: nothing is filed upstream to iets.** No issue, pull request or comment to `numtide/iets`. The request for iets to retry killed workers (Q5 as revised, task 3.3) and the upstream-summary-line candidate for counting worker restarts are withdrawn. The whole-evaluation abort on a killed worker (C2/B2) stays mitigated only by the capacity gate, the measured headroom and the canary; no replacement action is added (design D12).
+
+**Operator decision R-d (Q40): task group 3 starts now, beside the baseline week.** The iets input and the minimal package are added and built on magnetite but not selected; nixbot keeps stock nix-eval-jobs and magnetite's system derivation must not change. A check pins what nixbot and the lock need from the package. Q41, when the canary runs, is undecided; task group 4 is not scheduled.
