@@ -8,7 +8,7 @@
 #   (D2), as uncompressed `pg_dump -C` SQL into
 #   flake.lib.postgresqlBackup.location, with no timer of its own (D3);
 #   postgresql-dump-globals.service writes the roles beside them.
-# - restic-backups-postgresql, nightly at 02:30, starts every dump in its
+# - restic-backups-postgresql, nightly at 02:30 UTC, starts every dump in its
 #   prepare step and fails if any fails (D4), then uploads exactly the dump
 #   files to its repository in R2 bucket sciexp-postgresql-backup under the
 #   host's name (D6), prunes to 7 daily, 4 weekly and 6 monthly copies and
@@ -63,7 +63,7 @@ let
   };
   # PostgreSQL hosts whose vars the operator has not yet generated; such a
   # host runs with the backup off and the obligation accepts it.
-  awaitingSecrets = [ "magnetite" ];
+  awaitingSecrets = [ ];
 
   dumpUnit = db: "postgresqlBackup-${db}";
   globalsUnit = "postgresql-dump-globals";
@@ -261,8 +261,10 @@ let
                 done
                 exit "$failed"
               '';
+              # The timer of a notified unit names its zone, as
+              # modules/nixos/observability-notify.nix asserts.
               timerConfig = {
-                OnCalendar = "*-*-* 02:30:00";
+                OnCalendar = "*-*-* 02:30:00 UTC";
                 RandomizedDelaySec = "15m";
                 Persistent = true;
               };

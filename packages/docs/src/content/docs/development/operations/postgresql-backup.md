@@ -24,7 +24,7 @@ The recovery point is up to 24 h: there is no WAL archiving.
 
 ## The nightly flow
 
-At 02:30 (with up to 15 min of random delay, and at the next boot if a night was missed) the timer starts `restic-backups-postgresql.service`:
+At 02:30 UTC (with up to 15 min of random delay, and at the next boot if a night was missed) the timer starts `restic-backups-postgresql.service`:
 
 1. Its prepare step starts, one at a time, `postgresqlBackup-<db>.service` for every database and then `postgresql-dump-globals.service`. Each writes an uncompressed `pg_dump -C` file, `<db>.sql`, or `globals.sql`, to `/var/backup/postgresql-nightly`, keeping the previous night's `<db>.sql` as `<db>.prev.sql`. If any dump fails, the job fails before uploading anything, so restic never uploads an old dump as tonight's.
 2. `restic backup` uploads exactly those files to the repository `s3:https://1ece4a9a8f092f8cbdd679d22b9ecb1f.r2.cloudflarestorage.com/sciexp-postgresql-backup/<host>`.

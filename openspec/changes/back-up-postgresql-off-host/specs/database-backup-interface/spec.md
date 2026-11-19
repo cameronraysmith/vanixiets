@@ -43,7 +43,7 @@ A oneshot `postgresql-dump-globals.service`, running as `postgres` and requiring
 
 ### Requirement: The backup job runs nightly and catches up a missed night
 
-The job's `timerConfig` SHALL hold `OnCalendar = "*-*-* 02:30:00"`, `RandomizedDelaySec = "15m"` and `Persistent = true`.
+The job's `timerConfig` SHALL hold `OnCalendar = "*-*-* 02:30:00 UTC"`, `RandomizedDelaySec = "15m"` and `Persistent = true`.
 
 #### Scenario: the timer is evaluated
 

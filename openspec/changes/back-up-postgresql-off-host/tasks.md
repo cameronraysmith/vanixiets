@@ -106,7 +106,7 @@ Sequential, after groups 1 to 6 have merged and 2.1, 4.2 and 4.3 are done. Each 
   - `systemctl list-timers` shows only the restic timer;
   - every alert since the deploy is recorded.
 - [ ] 7.2 After the first scheduled night — verify:
-  - a second snapshot was taken by the timer between 02:30 and 02:45;
+  - a second snapshot was taken by the timer between 02:30 and 02:45 UTC;
   - the units' `MemoryPeak` appears in the memory-budget series (CAM-111), with the peak and the run's duration recorded;
   - no alert fired except as recorded.
 - [ ] 7.3 After eight nights — verify:

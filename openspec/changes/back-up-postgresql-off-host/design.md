@@ -101,14 +101,14 @@ Stakeholders:
   - `extraOptions = [ "s3.bucket-lookup=path" "s3.region=auto" ]`.
   - `initialize = true`, `createWrapper = true` (the `restic-postgresql` command for the runbook).
   - `paths` = `<location>/<db>.sql` for each backed-up database, plus `<location>/globals.sql`.
-  - `timerConfig = { OnCalendar = "*-*-* 02:30:00"; RandomizedDelaySec = "15m"; Persistent = true; }`.
+  - `timerConfig = { OnCalendar = "*-*-* 02:30:00 UTC"; RandomizedDelaySec = "15m"; Persistent = true; }`. The zone is named because `observability-notify` asserts that every notified unit's timer names its zone.
 - **Rationale**:
   - R2 is already the fleet's object store and charges no egress, so the nightly read check (D7) and a restore cost nothing to read.
   - Path-style addressing and `region=auto` are what R2 requires of S3 clients.
   - One prefix per host leaves room for a second PostgreSQL host.
   - Naming files rather than the directory keeps `.prev` and any stray file out of the repository.
   - `Persistent` runs a missed night at the next boot.
-  - 02:30 is clear of harmonia-gc (04:00) and of the dataset's absent snapshots.
+  - 02:30 UTC is clear of harmonia-gc (04:00) and of the dataset's absent snapshots.
 - **Boundary**: vendored-versus-first-party; the upstream module and package, configured only through options.
 - **Alternatives considered**:
   - A Hetzner Storage Box with borg (rejected by the operator).

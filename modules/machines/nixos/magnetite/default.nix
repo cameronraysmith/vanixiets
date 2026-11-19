@@ -319,6 +319,12 @@ in
         };
       };
 
+      # Nightly PostgreSQL backups to R2 (back-up-postgresql-off-host design
+      # D16), on with this host's postgresql-backup-r2 and
+      # postgresql-backup-restic vars in the repository and the dataset
+      # zroot/root/postgresql-dumps created by hand (tasks.md 2.1).
+      vanixiets.postgresqlBackup.enable = true;
+
       # The PostgreSQL dumps' dataset (disko.nix, back-up-postgresql-off-host
       # design D5), enforced at boot because disko options apply at dataset
       # creation only; present only with the backup on, as is the dataset.
