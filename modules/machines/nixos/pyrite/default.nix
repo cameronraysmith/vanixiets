@@ -764,6 +764,7 @@ in
           flakeHomeModules.zen-browser
           flakeHomeModules.bitwarden-key-pins
           flakeHomeModules.linux-workstation
+          flakeHomeModules.night-light
         ];
         # Validate with the exact derivation installed by nixpkgs' NixOS module.
         programs.niri.package = config.programs.niri.package;
