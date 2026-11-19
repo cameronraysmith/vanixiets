@@ -39,8 +39,10 @@ Its log, `/var/log/tincr-<instance>.log`, grows without rotation: launchd holds 
 
 ## Exports
 
-Each instance exports `networking.priority = 1100`, above wireguard (1000) and ZeroTier (900), and each peer exports its `flake.lib.hosts.<name>.fqdn` under `peer.hosts`.
-Inventory `deploy.targetHost` takes precedence over network selection, so the export does not choose deploy paths while targets are set.
+Each instance exports `networking.priority = 1100`, above wireguard (1000) and ZeroTier (900), and each peer exports its `flake.lib.hosts.<name>.fqdn` under `peer.hosts` and its `flake.lib.hosts.<name>.deployUser` under `peer.user`.
+Inventory `deploy.targetHost` takes precedence over network selection, so the export does not choose deploy paths for the NixOS hosts while their targets are set.
+The Macs set `clan.core.networking.targetHost`, which clan tries only after every network, so `clan machines update <mac>` without `--target-host` reaches a Mac over tincr; clan logs in as the export's `user`, root when it is unset, which is why the export carries the Mac's admin account (`cameron` or `crs58`; finding F36).
+`flake.lib.networkTargetObligations` (`modules/lib/network-targets.nix`), asserted on every `nixos-<host>` and `darwin-<host>` check, fails a machine that any network export would log in to as another user; `checks.x86_64-linux.network-target-obligations` runs its judge over fixtures and mutants.
 
 ## Trust boundary
 
