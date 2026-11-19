@@ -82,6 +82,10 @@
       "vanixiets_zram_compr_data_bytes"
       "vanixiets_zram_mem_used_bytes"
       "vanixiets_unit_memory_high_events"
+      # The last successful PostgreSQL backup (back-up-postgresql-off-host
+      # design D11): written to the textfile collector by
+      # flake.modules.nixos.postgresql-backup where the backup is on.
+      "vanixiets_postgresql_backup_last_success_timestamp_seconds"
     ];
 
     # The units magnetite's memory budget reports (CAM-111 design D11), as
@@ -114,6 +118,11 @@
       "tincr-*.service"
       "zerotierone.service"
       "systemd-journald.service"
+      # The nightly PostgreSQL backup (back-up-postgresql-off-host design
+      # D10): the job and the dumps it starts.
+      "restic-backups-*.service"
+      "postgresqlBackup-*.service"
+      "postgresql-dump-globals.service"
     ];
 
     # The collector's own telemetry kept from 127.0.0.1:8888 (design D4;

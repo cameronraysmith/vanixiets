@@ -61,7 +61,7 @@ Stakeholders:
 - **Boundary**: first-party; one parked list for both probes, not a second convention.
 
 ### D3: nixpkgs `services.postgresqlBackup`, uncompressed, with no timer of its own
-- **Choice**: A first-party module `flake.modules.nixos.postgresql-backup` in `modules/nixos/postgresql-backup.nix`. Every NixOS base imports it, and it acts only where `services.postgresql.enable` is set. It sets:
+- **Choice**: A first-party module `flake.modules.nixos.postgresql-backup` in `modules/nixos/postgresql-backup.nix`. Every NixOS base imports it, and it acts only where `vanixiets.postgresqlBackup.enable` (D16) and `services.postgresql.enable` are both set. It sets:
   - `services.postgresqlBackup.enable = true`;
   - `databases` = the backup set (D2);
   - `compression = "none"`;
@@ -87,7 +87,7 @@ Stakeholders:
   - `restic backup --stdin-from-command` per database. This needs one restic job per database, and the jobs would contend for the repository lock with each job's prune.
 
 ### D5: Dumps on a dedicated dataset with auto-snapshot off
-- **Choice**: The dataset is `zroot/root/postgresql-dumps`, mounted at `/var/backup/postgresql-nightly`, with `com.sun:auto-snapshot=false` and `quota=16G`. It is declared in `disko.nix` and created by hand on the installed host, as `root/greptimedb` was. It is kept by `zfs-assert-root-postgresql-dumps-noautosnap` and `zfs-set-root-postgresql-dumps-quota` oneshots in magnetite's `default.nix`, which join its `notifiedUnits` like their siblings.
+- **Choice**: The dataset is `zroot/root/postgresql-dumps`, mounted at `/var/backup/postgresql-nightly`, with `com.sun:auto-snapshot=false` and `quota=16G`. It is declared in `disko.nix` and created by hand on the installed host, as `root/greptimedb` was. It is kept by `zfs-assert-root-postgresql-dumps-noautosnap` and `zfs-set-root-postgresql-dumps-quota` oneshots in magnetite's `default.nix`, which join its `notifiedUnits` like their siblings. The declaration and both oneshots exist only while `vanixiets.postgresqlBackup.enable` is set (D16), so the mount and the `zfs set` units never come before the dataset.
 - **Rationale**:
   - Each nightly rewrite of ~1.5 GB on the root dataset would be pinned by up to three daily and one weekly snapshot, about 6 GB more on the disk with no recovery value, since restic already keeps every night's copy (A165).
   - The quota bounds a runaway dump.
@@ -150,7 +150,13 @@ Stakeholders:
 - **Alternatives considered**: notifying only the restic unit. The notice would not say which database failed, and the dump unit would also raise `SystemdUnitFailed`.
 
 ### D11: `PostgresqlBackupStale` at 36 h, seeded so "never" ages too
-- **Choice**: On success, the job's `ExecStartPost` writes `vanixiets_postgresql_backup_last_success_timestamp_seconds <unix time>` to `/var/lib/postgresql-backup-metrics/backup.prom`. That directory is mode 0755 and is on node_exporter's textfile directories; the series is in `nodeExporterKeep`. A oneshot `postgresql-backup-metric-seed` (`ConditionPathExists=!`, wanted by `multi-user.target`) writes the activation time when the file is missing. The rule is:
+- **Choice** (metrics placement decided 2026-11-19 after F75):
+  - On success, the job's `ExecStartPost` writes `vanixiets_postgresql_backup_last_success_timestamp_seconds <unix time>` to its record `/var/lib/postgresql-backup-metrics/backup.prom` (directory 0755, root), then copies the record by write-then-rename to `postgresql-backup.prom` in the host's one textfile directory, `vanixiets.nodeExporter.textfileDirectory` (`/run/node-exporter-textfile` by default, `modules/nixos/node-exporter-textfile.nix`).
+  - The module names itself `postgresql-backup` in `vanixiets.nodeExporter.textfileWriters`, so node_exporter's one `--collector.textfile.directory` flag covers it. It adds no flag of its own: node_exporter refuses a repeated flag, and that module asserts at most one.
+  - `postgresql-backup-metric.service` (wanted by `multi-user.target`, and every 60 s by its timer) writes the record with the current time when none exists, and otherwise copies it into the textfile directory again.
+  - An assertion, in the collation probe's former form, requires node_exporter on, the series in `nodeExporterKeep`, and the textfile directory flag present.
+
+  The rule is:
   - `alert = "PostgresqlBackupStale"`;
   - `expr = "time() - vanixiets_postgresql_backup_last_success_timestamp_seconds > 129600"`;
   - `for = "10m"`, severity warning;
@@ -159,16 +165,19 @@ Stakeholders:
 - **Rationale**:
   - 36 h is one missed night plus a margin for the randomized delay and a slow run (pinpox's threshold).
   - `ExecStartPost` runs only after every ExecStart command succeeded: backup, prune and check.
-  - The file sits under `/var/lib` so it survives reboots. The seed means a host that never completes a backup is reported 36 h after the module is deployed, which covers a timer that never fires.
+  - The record sits under `/var/lib` so the timestamp survives reboots. The shared directory is under `/run`, so its copy is lost at each boot; the metric unit restores it within a minute of boot.
+  - Republishing every minute keeps the file's mtime fresh. `HostProbeStale` fires on any textfile older than 300 s on a host with a textfile writer (F76), so a file written only at each night's success would fire it all day.
+  - The seed means a host that never completes a backup is reported 36 h after the module is first deployed, which covers a timer that never fires.
   - The unit failure notice (D10) covers a run that fails. This rule covers a run that never happens.
 - **Alternatives considered**:
   - `absent()` (no per-host semantics in the evaluator).
   - A presence selector through a new host-table field (data duplicated from the configuration).
-  - A runtime directory under `/run`, which would lose the timestamp at reboot and re-seed it.
+  - Keeping the record only under `/run`, which would lose the timestamp at reboot and re-seed it.
+  - A third `--collector.textfile.directory` flag on `/var/lib/postgresql-backup-metrics` (the plan before F75). node_exporter refuses a repeated flag and did not start on magnetite on 2026-11-19.
 
 ### D12: Restore proven by a container test of the real module
 - **Choice**: `vmTests.x86_64-linux.postgresql-backup-restore`, `pkgs.testers.runNixOSTest` with one nspawn container, following `modules/vm-tests/devloop-ingest.nix`. The node imports `flake.modules.nixos.postgresql-backup` with magnetite's PostgreSQL package, two databases created by `ensureDatabases`, and the repository overridden to a local path `/var/lib/restic-test` with a fixed test password. No credentials are needed. The script:
-  1. Seeds rows in both databases and a role, then starts one dump unit by hand, so an older dump exists.
+  1. Seeds rows in both databases and a role, then starts every dump unit by hand, so an older copy of every file exists.
   2. Inserts a sentinel row, then starts `restic-backups-postgresql.service` only.
   3. Records row counts, drops both databases and the role.
   4. Runs `restic-postgresql restore latest --target /restore`, then `psql -f globals.sql` and `psql -f <db>.sql` for each database.
@@ -202,10 +211,16 @@ Stakeholders:
 
 ### D15: Regulators: a fleet obligation and a fixture check
 - **Choice**: `flake.lib.postgresqlBackupObligations`, in `modules/nixos/postgresql-backup.nix` beside `flake.lib.postgresqlBackup` (`location`, `seriesName`, `jobName`, `metricsDirectory`), exposes:
-  - a pure judge `problems { postgresql, postgresqlBackup, services, restic, notifiedUnits, parked }`;
-  - `failures name hostConfig`, which returns `[ ]` when PostgreSQL is off and otherwise reads the evaluated configuration and the host table entry.
+  - a pure judge `problems { postgresql, enable, awaiting, secretsGenerated, parked, postgresqlBackup, services, restic, notifiedUnits }`;
+  - `factsOf name hostConfig`, which reads those facts from the evaluated configuration, the repository's vars and the host table entry;
+  - `failures name hostConfig`, the judge over `factsOf`. It returns `[ ]` when PostgreSQL is off.
 
   The judge reports, one message each:
+  - PostgreSQL on, the backup off, and the host absent from `flake.lib.postgresqlBackup.awaitingSecrets` (D16);
+  - the backup on and the host still in `awaitingSecrets`;
+  - the backup on and either generator's deployed file (`postgresql-backup-r2/env`, `postgresql-backup-restic/password`) absent from the repository.
+
+  With the backup on, it also reports:
   - each database in `ensureDatabases` minus `parked` absent from `postgresqlBackup.databases`;
   - each `postgresqlBackup-<db>` with a non-empty `startAt`;
   - compression other than `"none"`;
@@ -213,13 +228,36 @@ Stakeholders:
   - each dump unit, or `postgresql-dump-globals`, not named in `backupPrepareCommand`;
   - each backup unit absent from `notifiedUnits`.
 
-  `modules/checks/machines.nix` asserts `failures` in `withFleetObligations`. `modules/checks/postgresql-backup-obligations.nix` defines `checks.x86_64-linux.postgresql-backup-obligations` over literal fixtures: one accepted configuration with 0 problems, and one mutant per message with exactly 1 problem each (missingDatabase, dumpTimer, compressed, pathMissing, prepareMissing, unitNotNotified), plus a parked database absent from the backup set with 0 problems.
+  `modules/checks/machines.nix` asserts `failures` in `withFleetObligations`. `modules/checks/postgresql-backup-obligations.nix` defines `checks.x86_64-linux.postgresql-backup-obligations` over literal fixtures. Four cases give 0 problems: the accepted configuration, a parked database absent from the backup set, a host awaiting its secrets with the backup off, and a host without PostgreSQL. One mutant per message gives exactly 1 problem each: missingDatabase, dumpTimer, compressed, pathMissing, prepareMissing, unitNotNotified, notEnabled, awaitingButEnabled and secretsMissing.
 - **Rationale**:
   - The facts are configuration values, and the machine checks already evaluate every configuration, so this costs no attribute and no evaluation.
   - The fixture check's key is a literal gated on `x86_64-linux`.
   - Each mutant runs only its own case.
   - Module `assertions` would pass by construction, because the same module sets the values. The obligation judges the final merged value, so a later `mkForce`, an added database or an edit to the host table fails the check.
 - **Alternatives considered**: a standalone check evaluating every host (re-pays each fixpoint).
+
+### D16: The backup is off until the host's vars are in the repository
+- **Choice**: The module declares `vanixiets.postgresqlBackup.enable`, default `false`. Everything it configures, the two vars generators included, is under that option, and so are magnetite's dataset declaration and dataset oneshots (D5). `flake.lib.postgresqlBackup.awaitingSecrets = [ "magnetite" ]` names the PostgreSQL hosts whose vars the operator has not yet generated.
+
+  One later commit, the one that adds magnetite's generated vars, makes four edits:
+  - sets `vanixiets.postgresqlBackup.enable = true` on magnetite;
+  - removes magnetite from `awaitingSecrets`;
+  - adds the backup units and the dataset oneshots to magnetite's `notifiedUnits` (D10);
+  - adds the vars files under `vars/per-machine/magnetite/postgresql-backup-{r2,restic}/`.
+- **Rationale**:
+  - `clan machines update` runs every missing generator of every machine before it deploys anything (clan-core d718bcf, `clan_cli/machines/update.py:210`). If the generators were declared before their vars existed, an unattended deploy, such as the fleet deployer's, would fail on the hidden prompts. A deploy without prompts would generate the restic password in a checkout that is not committed, and the repository would be created under a password the repository does not hold (D8).
+  - Without the option, the module's units would exist on magnetite with `EnvironmentFile` and `RESTIC_PASSWORD_FILE` at clan's `/no-such-path` placeholder, so every night's run would fail and post a notice.
+  - The obligation locks the four edits together. Each of the following fails `nixos-magnetite`:
+    - turning the backup on while magnetite is still in `awaitingSecrets`;
+    - removing magnetite from `awaitingSecrets` without turning the backup on;
+    - turning it on without the vars;
+    - turning it on without the notified units.
+
+    Any other host that enables PostgreSQL fails its check until it either backs up or is listed as awaiting.
+- **Before the later commit**: magnetite evaluates and builds with no backup unit, timer, generator, dataset mount or textfile writer of this module, and `failures "magnetite"` is `[ ]`. Deploying `main` adds nothing to magnetite. The bucket, once applied, holds nothing. The alert rule has no series to fire on.
+- **Alternatives considered**:
+  - Declaring the generators unconditionally. This breaks every unattended deploy until the operator generates the vars.
+  - An `enable` defaulting to `services.postgresql.enable`, with magnetite setting it `false` for now. That needs the same exemption in the obligation, and adds a setting on the host that exists only to be deleted.
 
 ## Risks / Trade-offs
 
@@ -237,15 +275,14 @@ Stakeholders:
 
 ## Migration Plan
 
-1. Land the obligation and fixture check red, then the module and its host-table entries, so `nixos-magnetite` proves the backup set before any deploy (group 1).
+1. Land the obligation and fixture check red, then the module, with the backup off and magnetite in `awaitingSecrets` (D16). `nixos-magnetite` proves the backup set through `extendModules` mutants before any deploy (group 1).
 2. In parallel, land the dataset declaration (group 2), the alert rule (group 3), the bucket resource (group 4), the restore test (group 5) and the runbook (group 6).
 3. Operator, by hand (tasks 2.1, 4.2, 4.3):
    - apply the bucket (`nix run .#terraform` plan and apply);
-   - mint the token and `clan vars generate magnetite --generator postgresql-backup-r2`;
-   - generate `postgresql-backup-restic`;
-   - `zfs create -o mountpoint=/var/backup/postgresql-nightly -o com.sun:auto-snapshot=false -o quota=16G zroot/root/postgresql-dumps` on magnetite.
+   - `zfs create -o mountpoint=/var/backup/postgresql-nightly -o com.sun:auto-snapshot=false -o quota=16G zroot/root/postgresql-dumps` on magnetite;
+   - in the working copy of the enable commit (D16), mint the token and run `clan vars generate magnetite --generator postgresql-backup-r2`, then generate `postgresql-backup-restic`.
 4. Run the restore container test and its mutant (tasks 5.1, 5.2).
-5. Deploy magnetite. Start `restic-backups-postgresql.service` once by hand and watch it. Confirm the snapshot, the textfile and the series in the store. Read every alert posted since the deploy started (task 7.1).
+5. Land the enable commit, deploy magnetite, start `restic-backups-postgresql.service` once by hand and watch it. Confirm the snapshot, the textfile and the series in the store. Read every alert posted since the deploy started (task 7.1).
 6. Over the next nights: scheduled snapshots, memory peaks, prune and check output, the off-host drill and the reporting paths (tasks 7.2 to 7.5).
 
 Rollback:

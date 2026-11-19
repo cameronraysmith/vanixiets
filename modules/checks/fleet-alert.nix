@@ -110,6 +110,62 @@
 
       rulesYaml = pkgs.writeText "fleet-alert-rules.yaml" rules.yaml;
 
+      # back-up-postgresql-off-host D11: PromQL's own semantics for
+      # PostgresqlBackupStale over 41 h of minute samples. magnetite's last
+      # success stops advancing at hour 2, so the value is exactly 36 h old
+      # at 38 h, not yet stale; the condition holds from 38 h 1 min, is
+      # pending at 38 h 5 min and fires at 38 h 11 min. pyrite's succeeds
+      # every 24 h and never fires. The mutant staleThreshold, ten times
+      # the threshold, must fail it.
+      backupStaleTest =
+        rulesFile:
+        let
+          series = host: ''vanixiets_postgresql_backup_last_success_timestamp_seconds{host_name="${host}"}'';
+          at = minutes: alerts: {
+            eval_time = "${toString minutes}m";
+            alertname = "PostgresqlBackupStale";
+            exp_alerts = map (host: {
+              exp_labels = {
+                host_name = host;
+                severity = "warning";
+              };
+              exp_annotations = (ruleNamed "PostgresqlBackupStale").annotations;
+            }) alerts;
+          };
+        in
+        pkgs.writeText "fleet-alert-backup-stale-test.yaml" (
+          builtins.toJSON {
+            rule_files = [ "${rulesFile}" ];
+            evaluation_interval = "1m";
+            tests = [
+              {
+                interval = "1m";
+                input_series = [
+                  {
+                    series = series "magnetite";
+                    values = "0+60x120 7200x2340";
+                  }
+                  {
+                    series = series "pyrite";
+                    values = "0x1439 86400x1021";
+                  }
+                ];
+                alert_rule_test = [
+                  (at 2280 [ ])
+                  (at 2285 [ ])
+                  (at 2291 [ "magnetite" ])
+                  (at 2460 [ "magnetite" ])
+                ];
+              }
+            ];
+          }
+        );
+      staleThresholdYaml = pkgs.writeText "fleet-alert-rules-stale-threshold.yaml" (
+        mutateText "staleThreshold" "vanixiets_postgresql_backup_last_success_timestamp_seconds > 129600"
+          "vanixiets_postgresql_backup_last_success_timestamp_seconds > 1296000"
+          rules.yaml
+      );
+
       mutateText =
         name: from: to: text:
         assert lib.assertMsg (lib.hasInfix from text)
@@ -276,6 +332,14 @@
           ''
             set -euo pipefail
             promtool check rules ${rulesYaml}
+            promtool test rules ${backupStaleTest rulesYaml}
+            if promtool test rules ${backupStaleTest staleThresholdYaml} > stale-threshold.log 2>&1; then
+              cat stale-threshold.log
+              echo "FAIL: the backup stale test accepted the staleThreshold mutant" >&2
+              exit 1
+            fi
+            cat stale-threshold.log
+            echo "mutant staleThreshold rejected"
             if promtool check rules ${malformedYaml} > malformed.log 2>&1; then
               cat malformed.log
               echo "FAIL: promtool accepted the malformed-expression mutant" >&2
@@ -1123,6 +1187,14 @@
           "collversion_recorded=2.42"
           "REFRESH COLLATION VERSION"
         ];
+      };
+
+      # back-up-postgresql-off-host D11: magnetite's stale last success, as
+      # the rule's expression answers it, posts one warning whose title names
+      # magnetite and whose message names the runbook; promtoolRehearsal's
+      # backup stale test shows when PromQL answers it.
+      backupStaleLeg = fireAndResolve "PostgresqlBackupStale" // {
+        messages = [ "development/operations/postgresql-backup.md" ];
       };
 
       # The SystemdUnitFailed exclusion a rule list renders.
@@ -2140,6 +2212,7 @@
         ]
         ++ [
           collationDriftLeg
+          backupStaleLeg
           exclusionLeg
           storeErrorLeg
           silentHostLeg

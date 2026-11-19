@@ -316,6 +316,25 @@
           severity = "warning";
           annotations.summary = "A PostgreSQL database's recorded collation version differs from the system library's, so its text indexes may be stale; on the host run, as postgres, psql -d <datname> -c 'REINDEX DATABASE \"<datname>\"' -c 'ALTER DATABASE \"<datname>\" REFRESH COLLATION VERSION' (runbook in modules/nixos/fleet-alert/rules.nix)";
         }
+        # back-up-postgresql-off-host design D11: restic-backups-postgresql
+        # (flake.modules.nixos.postgresql-backup) records the time of each run
+        # whose backup, prune and check all succeeded, and
+        # postgresql-backup-metric publishes it to the textfile collector
+        # every minute, seeding it with its first run's time when no record
+        # exists, so a host that never completes a backup ages too. 36 h is
+        # one missed night plus margin for the 15 min randomized delay and a
+        # slow run. A failed run is reported by its unit's notice; this rule
+        # reports runs that do not happen. No presence selector: the host
+        # table does not say which hosts back up PostgreSQL.
+        #
+        # Runbook: packages/docs/src/content/docs/development/operations/postgresql-backup.md.
+        {
+          alert = "PostgresqlBackupStale";
+          expr = "time() - vanixiets_postgresql_backup_last_success_timestamp_seconds > 129600";
+          for = "10m";
+          severity = "warning";
+          annotations.summary = "No PostgreSQL backup has succeeded on this host for over 36 h; check restic-backups-postgresql's journal and timer (runbook in packages/docs/src/content/docs/development/operations/postgresql-backup.md)";
+        }
         {
           alert = "WeeklyPipelineTest";
           expr = "count(count by (host_name) (system_memory_usage_bytes))";

@@ -319,6 +319,35 @@ in
         };
       };
 
+      # The PostgreSQL dumps' dataset (disko.nix, back-up-postgresql-off-host
+      # design D5), enforced at boot because disko options apply at dataset
+      # creation only; present only with the backup on, as is the dataset.
+      systemd.services.zfs-set-root-postgresql-dumps-quota =
+        lib.mkIf config.vanixiets.postgresqlBackup.enable
+          {
+            description = "Assert quota=16G on zroot/root/postgresql-dumps";
+            wantedBy = [ "multi-user.target" ];
+            after = [ "zfs-import.target" ];
+            serviceConfig = {
+              Type = "oneshot";
+              RemainAfterExit = true;
+              ExecStart = "${pkgs.zfs}/bin/zfs set quota=16G zroot/root/postgresql-dumps";
+            };
+          };
+
+      systemd.services.zfs-assert-root-postgresql-dumps-noautosnap =
+        lib.mkIf config.vanixiets.postgresqlBackup.enable
+          {
+            description = "Assert com.sun:auto-snapshot=false on zroot/root/postgresql-dumps";
+            wantedBy = [ "multi-user.target" ];
+            after = [ "zfs-import.target" ];
+            serviceConfig = {
+              Type = "oneshot";
+              RemainAfterExit = true;
+              ExecStart = "${pkgs.zfs}/bin/zfs set com.sun:auto-snapshot=false zroot/root/postgresql-dumps";
+            };
+          };
+
       # Raise nix daemon free-space thresholds for a build host. clan-core and
       # srvos both set 512 MiB / 3 GiB via mkDefault, which is undersized for
       # build workers materializing large closures on a CX53 with niks3
