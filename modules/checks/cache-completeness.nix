@@ -1,0 +1,87 @@
+# checks.x86_64-linux.cache-completeness (F81): the probe of
+# modules/nixos/cache-completeness.nix, built with magnetite's PostgreSQL,
+# against nixbot's own schema (the pinned input's migrations) holding
+# ./cache-completeness/fixture.sql, and a fixture cache served on loopback.
+# Its first run only records since and passes. With since 10 hours back it
+# must fail naming exactly missing-1, the one output of the default-branch
+# builds in its window that the fixture cache answers 404 for: not those of
+# the build still settling, the one from before since, the pull request, the
+# push to another branch or the build still running, nor the failed
+# attribute or the one without an output; and served-1 once although two
+# builds recorded it. Once the fixture serves missing-1 too, it must pass.
+{ self, inputs, ... }:
+{
+  perSystem =
+    { lib, pkgs, ... }:
+    let
+      magnetite = self.nixosConfigurations.magnetite;
+      postgresql = magnetite.config.services.postgresql.package;
+      probe = lib.getExe (
+        self.lib.cacheCompleteness.probe {
+          inherit pkgs postgresql;
+        }
+      );
+      migrations = "${inputs.nixbot}/nixbot/nixbot/migrations";
+    in
+    {
+      checks = lib.optionalAttrs (pkgs.stdenv.hostPlatform.system == "x86_64-linux") {
+        cache-completeness = pkgs.stdenvNoCC.mkDerivation {
+          name = "cache-completeness";
+          dontUnpack = true;
+          dontConfigure = true;
+          dontBuild = true;
+          dontInstall = true;
+          doCheck = true;
+          nativeCheckInputs = [
+            postgresql
+            pkgs.postgresqlTestHook
+            pkgs.python3
+            pkgs.curl
+          ];
+          meta.description = "behavioural check: the cache completeness probe against nixbot's schema and a fixture cache with a missing narinfo";
+          checkPhase = ''
+            runHook preCheck
+            for m in ${migrations}/*.sql; do
+              psql -X -q -1 -v ON_ERROR_STOP=1 -f "$m"
+            done
+            psql -X -q -v ON_ERROR_STOP=1 -f ${./cache-completeness/fixture.sql}
+
+            mkdir cache
+            touch cache/00000000000000000000000000000001.narinfo
+            python3 -m http.server --bind 127.0.0.1 --directory cache 8081 2>http.log &
+            for _ in $(seq 50); do
+              curl -sf -o /dev/null -I http://127.0.0.1:8081/00000000000000000000000000000001.narinfo && break
+              sleep 0.2
+            done
+            url=http://127.0.0.1:8081
+
+            ${probe} since $url > first.txt
+            test -s since
+            grep -q '^first run' first.txt
+            echo "ok: the first run records since and passes"
+
+            date -u -d '10 hours ago' +%Y-%m-%dT%H:%M:%SZ > since
+            if ${probe} since $url > got.txt; then
+              cat got.txt
+              echo "FAIL: the probe passed with missing-1 not served" >&2
+              exit 1
+            fi
+            cat got.txt
+            test "$(grep '^missing' got.txt)" = "missing 404 /nix/store/00000000000000000000000000000002-missing-1"
+            grep -q '^checked 2 outputs' got.txt
+            echo "ok: the probe fails on exactly the missing output"
+
+            touch cache/00000000000000000000000000000002.narinfo
+            ${probe} since $url > after.txt
+            cat after.txt
+            grep -q '^checked 2 outputs .*, 0 not served' after.txt
+            echo "ok: the probe passes once it is served"
+
+            mkdir -p "$out"
+            cp got.txt after.txt "$out/"
+            runHook postCheck
+          '';
+        };
+      };
+    };
+}

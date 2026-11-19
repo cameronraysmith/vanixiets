@@ -1,0 +1,88 @@
+Upload the outputs of attributes found already in the store.
+
+An attribute whose outputs are valid in the store when it is evaluated
+is skipped (skipped_local) and never uploaded. The skip comes from
+buildbot-nix's BuildTrigger (build_trigger.py, before the rename in
+dc23225c) and assumes a closed world: an output in the local store was
+either built and uploaded by an earlier CI build, or substituted from
+the cache. upload.py's docstring states the assumption only
+implicitly, as "each attribute's final outputs land in upload_queue".
+A host that also builds outside CI (a remote builder, a developer's
+build on the host) breaks it, and those outputs never reach the cache.
+
+In a build of a push to the default branch, the skipped attributes'
+outputs, all of them, now go to every uploader once the build's
+attributes are scheduled, in one batch. That is the build whose
+skipped outputs already get gcroots (post_process_skipped), and every
+change reaching the default branch gets one, so pull request builds
+and pushes to other branches stay as they were. A
+buildDependenciesOnly attribute still publishes nothing. In one batch,
+the uploader resolves them with one `nix path-info` call, and niks3
+answers closures it already has with one request per 50 paths and
+walks the closure only of the paths it lacks; that request also renews
+those closures against niks3's age-based GC.
+
+This version is unconditional, for the one host that carries it. The
+version offered upstream will put it behind a host option, off by
+default, with its NixOS module field, since only a host that builds
+outside CI needs it.
+
+diff --git a/nixbot/build_run.py b/nixbot/build_run.py
+index c1f6f28..0a2c38f 100644
+--- a/nixbot/build_run.py
++++ b/nixbot/build_run.py
+@@ -53,6 +53,7 @@ if TYPE_CHECKING:
+     from .gitrepo import FetchCredentials
+     from .models import NixEvalJob
+     from .orchestrator import Orchestrator
++    from .upload import Uploader
+ 
+ logger = logging.getLogger(__name__)
+ 
+@@ -533,6 +534,38 @@ async def _try_reuse_eval(
+     return True
+ 
+ 
++def enqueue_local_outputs(
++    uploaders: Sequence[Uploader],
++    event: ChangeEvent,
++    results: Sequence[AttributeResult],
++) -> None:
++    """Queue the outputs of the attributes found already in the store.
++
++    Skipping them assumed that an output in the local store was built
++    and uploaded by an earlier build, or substituted from the cache.
++    An output that reached the store another way (a remote build or a
++    developer's build on this host) was then never uploaded. Only for
++    pushes to the default branch, whose skipped outputs also get gcroots
++    (post_process_skipped): every change reaching it gets such a build.
++    Queued in one batch per build, so the uploader resolves them in one
++    call; an uploader that asks the cache which closures it has (niks3)
++    walks the closure only of the paths it lacks."""
++    if event.pr_number is not None or event.branch != event.repo.default_branch:
++        return
++    paths = [
++        path
++        for result in results
++        if result.status == AttributeStatus.skipped_local
++        and isinstance(result.job, NixEvalJobSuccess)
++        and not result.job.build_dependencies_only
++        for path in result.job.outputs.values()
++        if path
++    ]
++    for uploader in uploaders:
++        for path in paths:
++            uploader.enqueue_nowait(path)
++
++
+ async def build_attributes(  # noqa: PLR0913
+     o: Orchestrator,
+     event: ChangeEvent,
+@@ -584,6 +617,7 @@ async def build_attributes(  # noqa: PLR0913
+     # (failed_eval, dependency_failed, cached_failure, skips).
+     for result in schedule_result.results:
+         await db.complete_attribute(o.pool, build.id_, result, if_unfinished=True)
++    enqueue_local_outputs(o.uploaders, event, schedule_result.results)
+ 
+     # Skipped-as-local attributes still get gcroots/outputs
+     # updates. A filesystem error here must not skip the final

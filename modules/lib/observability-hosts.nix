@@ -24,6 +24,7 @@
     {
       magnetite =
         agent [
+          "cache-completeness"
           "devloop-pg-grants"
           "devloop-reconcile"
           "fleet-alert"

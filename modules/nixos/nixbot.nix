@@ -37,7 +37,8 @@ let
 in
 {
   # The patches nixbot is built with, in application order. Shared with
-  # checks.x86_64-linux.nixbot-eval-record, which runs the patched runner.
+  # checks.x86_64-linux.nixbot-eval-record, which runs the patched runner,
+  # and checks.x86_64-linux.nixbot-upload-local.
   #
   # A merge-queue batch reusing its PR build would otherwise never get
   # nixbot/effects, stalling gitea-mq until its check timeout. An
@@ -52,7 +53,16 @@ in
   # `evaluation finished` JSON line per evaluation, which the dev-loop
   # collection copies into devloop.eval_run (modules/nixos/devloop-collection.nix).
   # It is written against upstream's names so it can be offered to
-  # Mic92/nixbot.
+  # Mic92/nixbot. nixbot skips an attribute whose outputs are already in
+  # the store (skipped_local), assuming, since buildbot-nix, that CI built
+  # and uploaded them earlier or they came from the cache; magnetite also
+  # builds outside nixbot (remote builds for stibnite and pyrite, agents'
+  # builds), so those outputs never reached the cache (F81, 383
+  # x86_64-linux check outputs in the week to 2026-11-19). The
+  # upload-local-outputs patch relaxes that assumption for builds of pushes
+  # to the default branch, which deploys use: it queues their skipped
+  # outputs too, in one batch per build. cache-completeness.service
+  # (modules/nixos/cache-completeness.nix) watches for misses at run time.
   #
   # Not patched: _dispatch_build (orchestrator.py) checks ancestry, awaits,
   # then registers, so gitea-mq's back-to-back pushes of one batch ref can
@@ -65,6 +75,7 @@ in
     ./nixbot-abandon-optional-attributes.patch
     ./nixbot-failing-effects-defined.patch
     ./nixbot-evaluation-record.patch
+    ./nixbot-upload-local-outputs.patch
   ];
 
   flake.modules.nixos.nixbot =
