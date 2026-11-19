@@ -719,6 +719,45 @@ in
             ];
           };
         })
+
+        # PostgreSQL collation drift (F61, Q68a): the sqlquery receiver of
+        # flake.lib.postgresqlCollation reads pg_database every 60 s as the
+        # collector's own role, peer-authenticated on the local socket, into
+        # metrics/host, which stamps host.name and the fleet database.
+        (lib.mkIf config.services.postgresql.enable {
+          services.postgresql.ensureUsers = [ { name = "opentelemetry-collector"; } ];
+          services.opentelemetry-collector.settings = {
+            receivers."sqlquery/postgresql-collation" = flakeLib.postgresqlCollation.receiver {
+              datasource = "host=/run/postgresql dbname=postgres user=opentelemetry-collector sslmode=disable";
+              parked = config.vanixiets.postgresqlCollation.parkedDatabases;
+            };
+            service.pipelines."metrics/host".receivers = [ "sqlquery/postgresql-collation" ];
+          };
+        })
+
+        # F78: on 2026-11-19 at 03:09:10Z a deploy stopped the collector and
+        # PostgreSQL in one transaction with no ordering between them;
+        # PostgreSQL's fast shutdown closed the sqlquery receivers'
+        # connections at 03:09:11.10, and their shutdown then wrote to the
+        # closed sockets, so the collector exited 1 ("failed to shutdown
+        # pipelines: write unix @->/run/postgresql/.s.PGSQL.5432: write:
+        # broken pipe", twice) and posted a FAILED notice. After= makes
+        # systemd stop the collector before PostgreSQL, and start it after.
+        {
+          assertions = [
+            {
+              assertion =
+                !lib.any (r: lib.hasInfix "host=/run/postgresql" (r.datasource or "")) (
+                  lib.attrValues (config.services.opentelemetry-collector.settings.receivers or { })
+                )
+                || lib.elem "postgresql.service" config.systemd.services.opentelemetry-collector.after;
+              message = "otel-collector agent on ${hostName}: a receiver reads the local PostgreSQL, so opentelemetry-collector.service must be After=postgresql.service, or a deploy restarting both stops PostgreSQL first and the collector exits 1 on its broken connections (F78).";
+            }
+          ];
+          systemd.services.opentelemetry-collector.after = lib.mkIf config.services.postgresql.enable [
+            "postgresql.service"
+          ];
+        }
       ];
     };
 

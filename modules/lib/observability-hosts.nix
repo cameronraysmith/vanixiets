@@ -5,6 +5,11 @@
 # the agent role on; a host joining the fleet enters with its `collect`
 # false until its watched first deploy. A host joins alwaysOn only by an
 # edit here when it becomes permanently provisioned (ADR-009 item 16).
+# A NixOS host's `textfile` says it registers a node_exporter textfile
+# writer (vanixiets.nodeExporter.textfileWriters), so HostProbeStale expects
+# its textfile series; modules/nixos/node-exporter-textfile.nix asserts it
+# against the host's own configuration, which its machine check evaluates
+# anyway (F76). Every collecting darwin host's probe writes a textfile.
 { ... }:
 {
   flake.lib.observabilityHosts =
@@ -14,6 +19,7 @@
         platform = "nixos";
         alwaysOn = false;
         smartDevices = [ ];
+        textfile = false;
         notifiedUnits = [
           "opentelemetry-collector"
           "otel-envelope"
@@ -32,7 +38,6 @@
           "greptimedb-envelope"
           "greptimedb-schema"
           "perses"
-          "postgresql-collation"
           "zfs-assert-root-docker-noautosnap"
           "zfs-assert-root-greptimedb-noautosnap"
           "zfs-assert-root-nix-noautosnap"
@@ -45,6 +50,7 @@
         ]
         // {
           alwaysOn = true;
+          textfile = true;
         };
       cinnabar =
         agent [

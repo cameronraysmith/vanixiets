@@ -1,10 +1,13 @@
 # checks.x86_64-linux.node-exporter-textfile (F75): magnetite's node_exporter
 # carries `--collector.textfile.directory` exactly once, on the host's one
 # textfile directory, which systemd-tmpfiles creates for node_exporter's
-# user, and both textfile probes write their own file there. The mutant
-# twoDirectories, magnetite with a second directory flag, must fail the
-# assertion of modules/nixos/node-exporter-textfile.nix, as magnetite's
-# node_exporter failed to start on 2026-11-19.
+# user, and the memory budget writes its own file there. The collation
+# probe that also wrote one is gone (Q68a): no postgresql-collation unit,
+# timer or writer remains, and the collector's sqlquery/postgresql-collation
+# receiver feeds metrics/host. The mutant twoDirectories, magnetite with a
+# second directory flag, must fail the assertion of
+# modules/nixos/node-exporter-textfile.nix, as magnetite's node_exporter
+# failed to start on 2026-11-19.
 { self, lib, ... }:
 let
   inherit (self.lib.nodeExporterTextfile) flag;
@@ -47,10 +50,19 @@ let
         rule.user == node.user && rule.group == node.group && rule.mode == "0755";
     }
     {
-      label = "the memory budget and the collation probe write their own files into ${directory}";
+      label = "the memory budget writes its own file into ${directory}";
+      holds = writesInto "magnetite-memory-budget" "magnetite-memory-budget.prom";
+    }
+    # Q68a: collation drift moved to the collector's sqlquery receiver.
+    {
+      label = "the postgresql-collation probe is gone: no unit, timer or textfile writer, and sqlquery/postgresql-collation feeds metrics/host";
       holds =
-        writesInto "magnetite-memory-budget" "magnetite-memory-budget.prom"
-        && writesInto "postgresql-collation" "postgresql-collation.prom";
+        !(cfg.systemd.services ? postgresql-collation)
+        && !(cfg.systemd.timers ? postgresql-collation)
+        && !(lib.elem "postgresql-collation" cfg.vanixiets.nodeExporter.textfileWriters)
+        &&
+          lib.elem "sqlquery/postgresql-collation"
+            cfg.services.opentelemetry-collector.settings.service.pipelines."metrics/host".receivers;
     }
     {
       label = "mutant twoDirectories (a second ${flag}) fails the assertion";

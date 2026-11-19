@@ -7,7 +7,10 @@
 #   modules/nixos/fleet-alert/rules.nix, and a malformed-expression mutant
 #   that promtool must reject; `promtool test rules` over a drifted and a
 #   matching database for PostgresqlCollationDrift (F61), which must fire
-#   on the drifted one only, and must fail on the mutant driftAnyValue.
+#   on the drifted one only, and must fail on the mutant driftAnyValue; and
+#   over 2026-11-18's node_exporter loop for SystemdUnitRestartLoop (F77),
+#   which must hold while the unit stays failed, and must fail on the
+#   mutant windowOnly.
 # - fixtureRehearsal: the evaluator, flake.lib.fleetAlertEvaluator built with
 #   a recording ntfy-send, runs in the build sandbox against
 #   fleet-alert/fixture_server.py, which replays canned answers to the
@@ -120,7 +123,7 @@
       );
 
       # F61: PromQL's own semantics for PostgresqlCollationDrift, which the
-      # fixture server cannot evaluate: over 20 min of the probe's series on
+      # fixture server cannot evaluate: over 20 min of the receiver's series on
       # magnetite, nixbot drifted (1) and gitea matching (0), the rule is
       # pending at 5 min and at 15 min fires one alert, nixbot's. The mutant
       # driftAnyValue, firing on every value, must fail the test.
@@ -189,11 +192,86 @@
           rules.yaml
       );
 
+      # F77: the 2026-11-18 sequence on magnetite, minute 0 being 22:00:
+      # prometheus-node-exporter.service restarts twice a minute from 22:05
+      # to 22:15, is failed from 22:15 to 22:37, and is started by hand at
+      # 22:38, which resets its restart counter. SystemdUnitRestartLoop
+      # fires at 22:10 and 22:20, still fires at 22:30 and 22:37, when the
+      # 15 min increase is 0 but the unit is failed, under the same labels,
+      # and is gone at 22:40. The mutant windowOnly, the rule before F77,
+      # must fail it at 22:30, where it resolved while the unit was failed.
+      restartLoopTest =
+        rulesFile:
+        let
+          unit = {
+            host_name = "magnetite";
+            systemd_unit_name = "prometheus-node-exporter.service";
+          };
+          series =
+            name: labels:
+            "${name}{${lib.concatStringsSep "," (lib.mapAttrsToList (k: v: ''${k}="${v}"'') labels)}}";
+          firing = minute: {
+            eval_time = "${toString minute}m";
+            alertname = "SystemdUnitRestartLoop";
+            exp_alerts = [
+              {
+                exp_labels = unit // {
+                  severity = "warning";
+                };
+                exp_annotations = (ruleNamed "SystemdUnitRestartLoop").annotations;
+              }
+            ];
+          };
+        in
+        pkgs.writeText "fleet-alert-restart-loop-test.yaml" (
+          builtins.toJSON {
+            rule_files = [ "${rulesFile}" ];
+            evaluation_interval = "1m";
+            tests = [
+              {
+                interval = "1m";
+                input_series = [
+                  {
+                    series = series "systemd_service_restarts_total" unit;
+                    values = "0x4 2+2x10 22x21 0x10";
+                  }
+                  {
+                    series = series "systemd_unit_state" (unit // { systemd_unit_active_state = "failed"; });
+                    values = "0x14 1x22 0x10";
+                  }
+                  {
+                    series = series "systemd_unit_state" (unit // { systemd_unit_active_state = "active"; });
+                    values = "1x14 0x22 1x10";
+                  }
+                ];
+                alert_rule_test =
+                  map firing [
+                    10
+                    20
+                    30
+                    37
+                  ]
+                  ++ [
+                    {
+                      eval_time = "40m";
+                      alertname = "SystemdUnitRestartLoop";
+                      exp_alerts = [ ];
+                    }
+                  ];
+              }
+            ];
+          }
+        );
+      windowOnlyYaml = pkgs.writeText "fleet-alert-rules-window-only.yaml" (
+        mutateText "windowOnly" (builtins.toJSON (ruleNamed "SystemdUnitRestartLoop")
+          .expr) (builtins.toJSON "increase(systemd_service_restarts_total[15m]) > 5") rules.yaml
+      );
+
       promtoolRehearsal =
         pkgs.runCommand "fleet-alert-promtool"
           {
             nativeBuildInputs = [ pkgs.prometheus.cli ];
-            meta.description = "R9.2: every rendered rule parses as PromQL, and a malformed expression is rejected; F61: PostgresqlCollationDrift fires on a drifted database only";
+            meta.description = "R9.2: every rendered rule parses as PromQL, and a malformed expression is rejected; F61: PostgresqlCollationDrift fires on a drifted database only; F77: SystemdUnitRestartLoop holds while a looped unit stays failed";
           }
           ''
             set -euo pipefail
@@ -213,6 +291,14 @@
             fi
             cat drift-any-value.log
             echo "mutant driftAnyValue rejected"
+            promtool test rules ${restartLoopTest rulesYaml}
+            if promtool test rules ${restartLoopTest windowOnlyYaml} > window-only.log 2>&1; then
+              cat window-only.log
+              echo "FAIL: the restart loop test accepted the windowOnly mutant" >&2
+              exit 1
+            fi
+            cat window-only.log
+            echo "mutant windowOnly rejected"
             touch "$out"
           '';
 
@@ -1082,6 +1168,7 @@
                 alwaysOn = true;
                 notifiedUnits = [ "unit-a" ];
                 smartDevices = [ ];
+                textfile = false;
               };
               b = {
                 collect = true;
@@ -1089,6 +1176,7 @@
                 alwaysOn = false;
                 notifiedUnits = [ "unit-b" ];
                 smartDevices = [ ];
+                textfile = false;
               };
             };
           }).json;

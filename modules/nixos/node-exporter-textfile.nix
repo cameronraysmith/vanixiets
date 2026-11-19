@@ -15,6 +15,7 @@
 { config, lib, ... }:
 let
   inherit (config.flake) modules;
+  hosts = config.flake.lib.observabilityHosts;
 
   flag = "--collector.textfile.directory";
 
@@ -28,6 +29,7 @@ let
         config.systemd.services.prometheus-node-exporter.serviceConfig.ExecStart or ""
       );
       flagCount = lib.length (lib.splitString flag execStart) - 1;
+      row = hosts.${config.networking.hostName} or null;
     in
     {
       options.vanixiets.nodeExporter = {
@@ -48,6 +50,16 @@ let
           {
             assertion = flagCount <= 1;
             message = "node-exporter-textfile: node_exporter's ExecStart carries ${flag} ${toString flagCount} times; node_exporter refuses a repeated flag (F75), so every textfile probe writes into vanixiets.nodeExporter.textfileDirectory instead.";
+          }
+          # F76: HostProbeStale expects textfile series from the hosts whose
+          # row says `textfile`, so the row follows this configuration.
+          {
+            assertion = row == null || !row.collect || row.textfile == enabled;
+            message = "node-exporter-textfile: ${config.networking.hostName}'s row in flake.lib.observabilityHosts has textfile = ${
+              lib.boolToString (row.textfile or false)
+            }, but its textfile collector is ${
+              if enabled then "on, for ${builtins.toJSON cfg.textfileWriters}" else "off"
+            }; set the row's textfile to match, so HostProbeStale expects exactly the hosts that write a textfile (F76).";
           }
         ];
 

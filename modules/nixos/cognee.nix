@@ -37,7 +37,7 @@ in
     in
     {
       # While parked, its database is unreadable without pgvector (F63) and
-      # so cannot be reindexed; the collation drift probe
+      # so cannot be reindexed; the collector's collation drift receiver
       # (./postgresql-collation.nix) leaves it out, and turning cognee on
       # brings it back under PostgresqlCollationDrift.
       imports = [

@@ -25,8 +25,10 @@
 # SystemdUnitFailed expect the NixOS hosts, whose selectors darwin never
 # writes; the file-system rules, LocalExporterDown and WeeklyPipelineTest
 # expect every collecting host; the NVMe rules expect the hosts with SMART
-# devices; the four launchd and probe rules expect the darwin hosts (S5
-# design D9); GarbageCollectionOverrun expects its launchd arm's selector
+# devices; the three launchd rules expect the darwin hosts (S5 design D9),
+# and HostProbeStale the hosts with a textfile writer, every collecting
+# darwin host and each NixOS host whose row's `textfile` is set (F76);
+# GarbageCollectionOverrun expects its launchd arm's selector
 # on the darwin hosts and its systemd arm's on the NixOS hosts
 # (bound-fleet-garbage-collection D7). LaunchdJobNotRunning expects running the kept-alive labels of
 # flake.lib.otelCollectorSchema.launchdKeptAlive and reports any other
@@ -71,6 +73,13 @@
       nixosHosts = onPlatform "nixos";
       darwinHosts = onPlatform "darwin";
       smartHosts = builtins.attrNames (lib.filterAttrs (_: h: h.smartDevices != [ ]) collecting);
+      # Every collecting darwin host's probe writes a textfile; a NixOS host
+      # does where its row's `textfile` says so, which
+      # modules/nixos/node-exporter-textfile.nix asserts against the host's
+      # registered textfile writers (F76).
+      textfileHosts = builtins.attrNames (
+        lib.filterAttrs (_: h: h.platform == "darwin" || h.textfile) collecting
+      );
       presence = expectedHosts: selector: { inherit selector expectedHosts; };
       fsRatio = ''sum by (host_name, mountpoint) (system_filesystem_usage_bytes{state="used"}) / sum by (host_name, mountpoint) (system_filesystem_usage_bytes)'';
       # Each dot written [.], as notifiedRegex below.
@@ -234,20 +243,30 @@
             (presence nixosHosts "systemd_unit_state")
           ];
         }
+        # F76: every host with a textfile writer, the darwin probe's and the
+        # NixOS probes' named in vanixiets.nodeExporter.textfileWriters.
         {
           alert = "HostProbeStale";
           expr = "time() - node_textfile_mtime_seconds > 300 or node_textfile_scrape_error == 1";
           for = "10m";
           severity = "warning";
-          annotations.summary = "A darwin host's probe has stopped writing its textfile";
-          presence = [ (presence darwinHosts "node_textfile_mtime_seconds") ];
+          annotations.summary = "A host's textfile probe has stopped writing its textfile, or node_exporter cannot read it";
+          presence = [ (presence textfileHosts "node_textfile_mtime_seconds") ];
         }
+        # F77: systemd's restart counter (NRestarts) holds its value while
+        # the unit stays failed and resets when it is next started by hand,
+        # so the second arm keeps a looping unit that systemd gave up on
+        # firing until it is started again. On 2026-11-18 node_exporter
+        # restarted from 22:05 to 22:15 and stayed failed until 22:38, and
+        # the first arm alone sent RESOLVED at 22:28, when its 15 min window
+        # emptied. Both arms keep only host_name and systemd_unit_name, so
+        # the instance is the same while either holds.
         {
           alert = "SystemdUnitRestartLoop";
-          expr = "increase(systemd_service_restarts_total[15m]) > 5";
+          expr = ''max by (host_name, systemd_unit_name) (increase(systemd_service_restarts_total[15m])) > 5 or on (host_name, systemd_unit_name) max by (host_name, systemd_unit_name) (systemd_unit_state{systemd_unit_active_state="failed"} == 1 and on (host_name, systemd_unit_name) systemd_service_restarts_total > 5)'';
           for = "0s";
           severity = "warning";
-          annotations.summary = "A unit restarted more than 5 times in 15 min";
+          annotations.summary = "A unit restarted more than 5 times in 15 min, or did so and is still failed";
           presence = [ (presence nixosHosts "systemd_service_restarts_total") ];
         }
         {
@@ -268,26 +287,27 @@
         }
         # F61: on 2026-11-19 every database on magnetite recorded glibc
         # collation version 2.42 under glibc 2.44, its text indexes stale, and
-        # nothing noticed until pg_dump warned. flake.modules.nixos.postgresql-collation
-        # writes 1 for a database whose recorded datcollversion is not null
+        # nothing noticed until pg_dump warned. The collector's
+        # sqlquery/postgresql-collation receiver (flake.lib.postgresqlCollation,
+        # Q68a) emits 1 for a database whose recorded datcollversion is not null
         # and IS DISTINCT FROM pg_database_collation_actual_version(oid),
         # PostgreSQL's own connection-time check, which skips a database
         # with no recorded version, since a null is never comparable
         # (template0 has none); a deploy that bumps glibc restarts
         # PostgreSQL on the new library, so the drift shows from the deploy
         # that causes it. A parked service's database is left out by the
-        # probe (vanixiets.postgresqlCollation.parkedDatabases). One
+        # receiver (vanixiets.postgresqlCollation.parkedDatabases). One
         # instance per database; the message names it as datname, with
         # both versions. No presence selector: the host table does not say
-        # which hosts run PostgreSQL, and a failing probe is a notified
-        # unit, postgresql-collation, on magnetite.
+        # which hosts run PostgreSQL; a receiver that cannot query logs its
+        # error in the collector's journal and writes no series.
         #
         # Runbook: on the host, for each named database <db>, as postgres:
         #   sudo -u postgres psql -d <db> -c 'REINDEX DATABASE "<db>"' \
         #     -c 'ALTER DATABASE "<db>" REFRESH COLLATION VERSION'
         # The refresh alone hides the drift without repairing the indexes,
-        # so reindex first. The instance resolves 5 min after the probe
-        # writes 0. Reviving cognee needs pgvector in PostgreSQL's
+        # so reindex first. The instance resolves 5 min after the receiver
+        # reports 0. Reviving cognee needs pgvector in PostgreSQL's
         # extensions first (F63), then this reindex.
         {
           alert = "PostgresqlCollationDrift";
