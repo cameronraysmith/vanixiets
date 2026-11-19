@@ -66,7 +66,7 @@
   - Deploy cinnabar (new authorized keys), then magnetite and pyrite from stibnite, then stibnite by `just activate`.
 
   — verify:
-  - each delivered key is owned by its worker, `0400` in a `0700` directory;
+  - each delivered key file is `0400` and owned by its worker, and its parent directories are root-owned `751`, as sops-nix creates them (traversable, not listable);
   - `fleet-deploy shell` from each worker exits 3 with a refusal;
   - every alert since each deploy started is recorded with its cause.
   - Repository half, done (2026-11-19, in a clone of `main@origin` `4de4d1cb` with `CLAN_NO_COMMIT=1`):
@@ -76,7 +76,15 @@
     - janettesmith's is readable by the operator key, magnetite and pyrite;
     - `fleet-deployers` (`age107c7…mpaw`) reads neither;
     - cinnabar's evaluated `fleet-deployer` authorized keys now hold the two forced-command lines.
-  - The deploys are pending the operator's approval of this PR.
+  - Host half (2026-11-19, `logs/pr-cam-115-request-keys-merge-20261118-213423.log`): #4043 merged on the operator's approval (Q65).
+    - cinnabar and pyrite were deployed with rc=0, and stibnite was activated with rc=0; cinnabar's `fleet-deployer` holds the two request lines, and no unit failed.
+    - Refusals: `cameron` asking for `stibnite` got "refused: 'stibnite' is not a deploy target", exit 3; `janettesmith` asking for `pyrite` got "refused: janettesmith may not deploy pyrite", exit 3.
+  - Delivered keys (2026-11-19, read-only `stat -c '%U %a %n'`, over SSH on magnetite, pyrite and cinnabar, locally on stibnite):
+    - On magnetite and pyrite, `/run/secrets/vars/shared/omnigent-cameron-deploy-request/key` is owned by `omnigent-cameron` with mode 400, and `/run/secrets/vars/shared/omnigent-janettesmith-deploy-request/key` by `omnigent-janettesmith` with mode 400.
+    - On stibnite, cameron's key is owned by `omnigent-cameron` with mode 400; janettesmith's is absent there, as her recipients are magnetite and pyrite only. cinnabar holds neither.
+    - Every parent directory, from the key's own up to the sops-nix generation directory (`/run/secrets.d/<n>`, which the `/run/secrets` symlink points to), is owned by `root` with mode 751 on magnetite, pyrite and stibnite.
+  - Operator decision (2026-11-19): the clause names root-owned `751` parents, not a `0700` directory, because a root-owned `0700` directory would stop the worker from reaching its own key.
+  - Still open: `fleet-deploy shell` from each worker, and the alerts since each deploy.
 
 ## 4. The request path (D6, D7, D9, D11, D12)
 
@@ -93,6 +101,7 @@
 
   — verify: the package builds (flake8 in `writePython3Bin`); checks 1.2 and 4.3
   - Evidence: built on magnetite.
+  - Q66 (2026-11-19): #4046 makes the health check compare the target's running system with the deployed closure (design, Risks, F72). cinnabar was redeployed at 03:07Z with rc=0, and its `fleet-deploy-request` contains the running-system check (`logs/deploy-round-q66-collation-20261118-220709.log`).
 - [x] 4.2 HOST STEP: on cinnabar, as `fleet-deployer`, in a worktree of `main`, run `clan vars check` for every machine, then `clan machines update magnetite --target-host root@192.0.2.1` (unreachable, so it stops at the connection). — verify: every `vars check` exits 0 without decrypting out-of-scope files, and the update fails at the connection, not at decryption; if not, stop and revise D7
   - Evidence (2026-11-18, `logs/cam115-steps0-3-*.log`):
     - as `fleet-deployer`, rosegold's machine key and pyrite's `initrd-ssh/id_ed25519` decrypt; stibnite's machine key and `ntfy-alerter` exit 128, with no value printed;
@@ -143,6 +152,7 @@
   - exit 0, and the log shows fetch, cache hit, update and health;
   - one `requests.jsonl` line, one `fleet-deploy` post, and magnetite's deploy record names the closure;
   - every alert since the request started is recorded with its cause.
+  - Not run (2026-11-19): 6.1–6.5 wait on magnetite's metrics being restored (F75).
 - [ ] 6.2 From an `omnigent-janettesmith` session, deploy a real configuration change to cinnabar (D13), then ask for pyrite. — verify: cinnabar exits 0 across its own activation; pyrite exits 3 (outside her reach) with a high-priority post; every alert since each request started is recorded with its cause
 - [ ] 6.3 Ask for `rosegold` while it is asleep, then while it is awake at a commit that changes its closure. — verify:
   - the first exits 5 within one minute, with no change on rosegold;
