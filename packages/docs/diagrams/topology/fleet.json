@@ -7,7 +7,7 @@
   "instance/nix-builders": {"module":"nix-builders","roles":{"builder":["argentum","magnetite","pyrite","rosegold","stibnite"],"dispatcher":["magnetite","pyrite","stibnite"]}},
   "instance/omnigent": {"module":"omnigent","roles":{"host":["magnetite","pyrite","stibnite"],"server":["magnetite"]}},
   "instance/openclaw": {"module":"openclaw","roles":{"default":["cinnabar"]}},
-  "instance/otel-collector": {"module":"otel-collector","roles":{"agent":["argentum","blackphos","cinnabar","electrum","galena","magnetite","pyrite","rosegold","scheelite","stibnite"],"ingress":["magnetite"]}},
+  "instance/otel-collector": {"module":"otel-collector","roles":{"agent":["argentum","cinnabar","electrum","galena","magnetite","pyrite","rosegold","scheelite","stibnite"],"ingress":["magnetite"]}},
   "instance/sshd": {"module":"sshd","roles":{"client":["cinnabar","electrum","galena","magnetite","pyrite","scheelite"],"server":["cinnabar","electrum","galena","magnetite","pyrite","scheelite"]}},
   "instance/tor": {"module":"tor","roles":{"server":["cinnabar","electrum","galena","magnetite","pyrite","scheelite"]}},
   "instance/user-cameron": {"module":"users","roles":{"default":["argentum","cinnabar","electrum","galena","magnetite","pyrite","rosegold","scheelite"]}},

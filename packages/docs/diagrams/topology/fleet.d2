@@ -10,6 +10,7 @@ darwin: "darwin hosts" {
   argentum: "argentum" {
     grid-columns: 2
     r_nix_builders_builder: "nix-builders/builder"
+    r_otel_collector_agent: "otel-collector/agent"
     r_user_cameron_default: "user-cameron/default"
     r_vanixiets_peer: "vanixiets/peer"
   }
@@ -20,6 +21,7 @@ darwin: "darwin hosts" {
   rosegold: "rosegold" {
     grid-columns: 2
     r_nix_builders_builder: "nix-builders/builder"
+    r_otel_collector_agent: "otel-collector/agent"
     r_user_cameron_default: "user-cameron/default"
     r_vanixiets_peer: "vanixiets/peer"
   }
@@ -28,6 +30,7 @@ darwin: "darwin hosts" {
     r_nix_builders_builder: "nix-builders/builder"
     r_nix_builders_dispatcher: "nix-builders/dispatcher"
     r_omnigent_host: "omnigent/host"
+    r_otel_collector_agent: "otel-collector/agent"
     r_user_crs58_default: "user-crs58/default"
     r_vanixiets_peer: "vanixiets/peer"
   }
@@ -38,6 +41,7 @@ nixos: "NixOS hosts" {
     grid-columns: 2
     r_hermes_agent_default: "hermes-agent/default"
     r_openclaw_default: "openclaw/default"
+    r_otel_collector_agent: "otel-collector/agent"
     r_sshd_client: "sshd/client"
     r_sshd_server: "sshd/server"
     r_tor_server: "tor/server"
@@ -59,6 +63,7 @@ nixos: "NixOS hosts" {
   }
   electrum: "electrum" {
     grid-columns: 2
+    r_otel_collector_agent: "otel-collector/agent"
     r_sshd_client: "sshd/client"
     r_sshd_server: "sshd/server"
     r_tor_server: "tor/server"
@@ -68,6 +73,7 @@ nixos: "NixOS hosts" {
   }
   galena: "galena" {
     grid-columns: 2
+    r_otel_collector_agent: "otel-collector/agent"
     r_sshd_client: "sshd/client"
     r_sshd_server: "sshd/server"
     r_tor_server: "tor/server"
@@ -82,6 +88,7 @@ nixos: "NixOS hosts" {
     r_nix_builders_dispatcher: "nix-builders/dispatcher"
     r_omnigent_host: "omnigent/host"
     r_omnigent_server: "omnigent/server"
+    r_otel_collector_agent: "otel-collector/agent"
     r_otel_collector_ingress: "otel-collector/ingress"
     r_sshd_client: "sshd/client"
     r_sshd_server: "sshd/server"
@@ -135,6 +142,7 @@ nixos: "NixOS hosts" {
     r_nix_builders_builder: "nix-builders/builder"
     r_nix_builders_dispatcher: "nix-builders/dispatcher"
     r_omnigent_host: "omnigent/host"
+    r_otel_collector_agent: "otel-collector/agent"
     r_sshd_client: "sshd/client"
     r_sshd_server: "sshd/server"
     r_tor_server: "tor/server"
@@ -145,6 +153,7 @@ nixos: "NixOS hosts" {
   }
   scheelite: "scheelite" {
     grid-columns: 2
+    r_otel_collector_agent: "otel-collector/agent"
     r_sshd_client: "sshd/client"
     r_sshd_server: "sshd/server"
     r_tor_server: "tor/server"
@@ -156,7 +165,6 @@ nixos: "NixOS hosts" {
 }
 every_host: "on every host" {
   r_emergency_access_default: "emergency-access/default"
-  r_otel_collector_agent: "otel-collector/agent"
 }
 key: "Key" {
   host: "host: a box holding its service roles and declared services"
