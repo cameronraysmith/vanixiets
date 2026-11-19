@@ -112,6 +112,16 @@ in
         vanixiets.otelCollector.darwin = {
           agentSettings = rendered.agent;
           processSettings = rendered.process;
+          # C5's limits. otelcol-process's 128 MiB came from one footprint of
+          # 102 MiB at its first start (2026-11-06, commit 585128280). On
+          # stibnite on 2026-11-19, after 5.3 days up, `footprint` read
+          # otelcol-process at 111 MB: 41 MB dirty __DATA_CONST (the contrib
+          # binary's load-time cost, the same in otelcol), about 60 MB of Go
+          # runtime memory (untagged VM_ALLOCATE, 56 MB of it compressed but
+          # still counted) and 10 MB else, with a peak of 133.4 MiB (vmmap)
+          # and one C5 failure at 131 MiB (2026-11-19T00:50Z). otelcol read
+          # 133.5 MiB, peak 137.3 MiB, under its 256 MiB. The check takes
+          # 44 MiB as the fixed floor that GOMEMLIMIT cannot reduce.
           envelopeMemoryLimits = {
             "org.nixos.otelcol" = 268435456;
             "org.nixos.otelcol-process" = 134217728;
@@ -163,6 +173,11 @@ in
             script = "exec ${lib.getExe' pkgs.opentelemetry-collector-contrib "otelcol-contrib"} --config ${
               (pkgs.formats.yaml { }).generate "otelcol-process.yaml" cfg.processSettings
             }";
+            # The memory_limiter checks only the heap; the Go runtime keeps
+            # up to its GC goal beyond it, which the footprint counts. 64 MiB,
+            # the limiter's own limit_mib, keeps C5's 128 MiB above the
+            # 44 MiB floor plus this bound (memorylimiterprocessor README:74-77).
+            environment.GOMEMLIMIT = "64MiB";
             serviceConfig = {
               KeepAlive = true;
               RunAtLoad = true;
