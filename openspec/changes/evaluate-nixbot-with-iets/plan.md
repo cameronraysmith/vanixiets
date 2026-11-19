@@ -96,7 +96,7 @@ The vendored consumer of the evaluator is nixbot at `171a8c77`. Any pre-switch r
 - [ ] **Step 3:** compare journal line counts with `eval_run` rows and read one row (tasks.md 2.3); expected `memory_max_bytes` at least 22548578304 (the 21504 MiB worker budget), higher when the host could spare more when the evaluation started.
 - [ ] **Step 4:** read the first reconcile log (tasks.md 2.4).
 - [ ] **Step 5:** confirm the budget series on magnetite and in `fleet` (tasks.md 2.5).
-- [ ] **Step 6 [operator, wizard]:** after seven days, write the baseline (tasks.md 2.6) from `SELECT date_trunc('day', ts), count(*), max(memory_peak_bytes), approx_percentile_cont(memory_peak_bytes, 0.5), max(wall_ms), approx_percentile_cont(wall_ms, 0.5), sum(budget_kills), sum(worker_kills), sum(oom_kill), sum(exit_status <> 0) FROM devloop.eval_run GROUP BY 1 ORDER BY 1`, and for the budget `max_over_time(vanixiets_unit_memory_current_bytes{host_name="magnetite"}[7d])` by `unit`, `max_over_time(node_zfs_arc_size{host_name="magnetite"}[7d])` with `node_zfs_arc_c_max`, `max_over_time(vanixiets_zram_mem_used_bytes{host_name="magnetite"}[7d])` and `max_over_time(sum(system_paging_usage_bytes{host_name="magnetite",state="used"})[7d:1m])`.
+- [ ] **Step 6 [operator, wizard]:** after at least 48 hours that include Friday 2026-11-20's 22:00 UTC flake-update evaluation (design D13), write the baseline (tasks.md 2.6) from `SELECT date_trunc('day', ts), count(*), max(memory_peak_bytes), approx_percentile_cont(memory_peak_bytes, 0.5), max(wall_ms), approx_percentile_cont(wall_ms, 0.5), sum(budget_kills), sum(worker_kills), sum(oom_kill), sum(exit_status <> 0) FROM devloop.eval_run GROUP BY 1 ORDER BY 1`, the flake-update evaluation's `memory_peak_bytes` against its `memory_max_bytes`, and for the budget `max_over_time(vanixiets_unit_memory_current_bytes{host_name="magnetite"}[<window>])` by `unit`, `max_over_time(node_zfs_arc_size{host_name="magnetite"}[<window>])` with `node_zfs_arc_c_max`, `max_over_time(vanixiets_zram_mem_used_bytes{host_name="magnetite"}[<window>])` and `max_over_time(sum(system_paging_usage_bytes{host_name="magnetite",state="used"})[<window>:1m])`, leaving out the replay runs' windows (Task 4 Step 3).
 
 ### Task 3: The iets package, unused
 
@@ -112,29 +112,32 @@ The vendored consumer of the evaluator is nixbot at `171a8c77`. Any pre-switch r
 - [ ] **Step 3:** a check that the package exposes what nixbot and the lock need (`bin/nix-eval-jobs`, `passthru.nix` equal to the stock's, `evaluator = "iets"`, `pname = "nix-eval-jobs"`) and that the lock wraps it, with a mutant per property (tasks.md 3.3). Nothing is filed upstream to iets (design D12).
 - [ ] **Step 4: Commit:** `feat(nixbot): package iets as an evaluator, not selected`.
 
-### Task 4: Canary inside nixbot's sandbox
+### Task 4: Canary: the paired replay inside nixbot's sandbox
 
 **Files:**
 - Create: `scripts/nixbot-eval-canary.py` (run on magnetite only; reads nixbot's own argv builders)
 
 **Interfaces:**
-- Consumes: `flake.lib.mkNixEvalJobsIets`; the lock wrapper `config.services.nixEvalLock.wrap`.
-- Produces: `logs/cam-111-canary-<ts>/{<commit>-{stock,iets}.jsonl,.stderr,.scope}` and `comparison.log`, consumed by Task 5 Step 1.
+- Consumes: `config.vanixiets.nixbot.ietsEvaluator` (built by `flake.lib.mkNixEvalJobsIets`); the lock wrapper `config.services.nixEvalLock.wrap`.
+- Produces: `logs/cam-111-canary-<ts>/{<commit>-{stock,iets}.jsonl,.stderr,.scope}`, each run's start and end, and `comparison.log`, consumed by Task 2 Step 6 (excluded windows) and Task 5 Step 1.
 
-- [ ] **Step 1:** choose the four commits and record why each qualifies (tasks.md 4.1). For the cached commit, confirm with `nix path-info --store https://cache.scientistexperience.net <out>` succeeding and `nix path-info <out>` failing on magnetite before the run.
-- [ ] **Step 2:** write `nixbot-eval-canary.py <commit> <evaluator-bin-dir>`: as the `nixbot` user, create a detached worktree of the clone, build `EvalSettings` from `/run/nixbot` configuration values (6, 3072, `systemd_scope=False`, `sandbox=True`), call `build_full_command`, write the argv to the log header, and run it with `PATH=<evaluator-bin-dir>:<unit PATH>` under `systemd-run --scope -p MemoryAccounting=yes --expand-environment=no`, capturing stdout, stderr, `memory.peak` and `cpu.stat`.
-- [ ] **Step 3:** run the four commits with the stock wrapper and then the iets wrapper, never concurrently, each behind `/etc/nix/eval.lock` (tasks.md 4.3).
-- [ ] **Step 4:** compare per attribute (tasks.md 4.4) with `jq -S` on `{attr, drvPath, outputs, system, cacheStatus, error: (has("error"))}` sorted by `attr`. Expected: zero differences; `local`, `cached`, `notBuilt` each present.
-- [ ] **Step 5:** record memory, time and warnings in verify.md (tasks.md 4.5).
+- [ ] **Step 1:** choose the replay set of design D13 and record why each commit qualifies (tasks.md 4.1): the five largest `memory_peak_bytes` and the five largest `wall_ms` from `devloop.eval_run`, each build's commit from `devloop.ci_attribute`'s `commit_sha` on the same `build_id`, the latest flake-update commit, the four cache-state and failure commits, the rest at random from recent days. For the cached commit, confirm with `nix path-info --store https://cache.scientistexperience.net <out>` succeeding and `nix path-info <out>` failing on magnetite before the run.
+- [ ] **Step 2:** write `nixbot-eval-canary.py <commit> <evaluator-bin-dir>`: as the `nixbot` user, create a detached worktree of the clone, build `EvalSettings` from `/run/nixbot` configuration values (6, 3072, `systemd_scope=False`, `sandbox=True`), call `build_full_command`, write the argv to the log header, and run it with `PATH=<evaluator-bin-dir>:<unit PATH>` under `systemd-run --scope --unit=nixbot-replay-<commit>-<evaluator> -p MemoryAccounting=yes --expand-environment=no`, capturing stdout, stderr, start and end, the lock's `memory.max`, `memory.peak`, `memory.events` and `cpu.stat`.
+- [ ] **Step 3:** in a quiet window, run each commit under both wrappers back to back, the stock one first on odd commits and the iets one first on even ones, never concurrently, each behind `/etc/nix/eval.lock` (tasks.md 4.3).
+- [ ] **Step 4:** P1 and P4: compare per attribute (tasks.md 4.4) with `jq -S` on `{attr, drvPath, outputs, system, cacheStatus, error: (has("error"))}` sorted by `attr`. Expected: the same attribute sets, zero differences, `local`, `cached`, `notBuilt` each present, and the failing commit failing on the same attributes.
+- [ ] **Step 5:** P2, P3 and P5: record per commit and evaluator the peak against `memory.max`, kills, times and the iets-to-stock wall ratio, with the overall speed-up and the warnings, in verify.md (tasks.md 4.5). A tripped criterion is written up for the operator's discussion (design D13), not treated as a rejection.
 
 ### Task 5: Switch
 
 **Files:**
+- Create: `modules/nixos/magnetite-user-slice-guard.nix`, `modules/checks/user-slice-guard-obligations.nix` (Step 0)
+- Modify: `modules/nixos/magnetite-memory-budget/probe.py`, `modules/nixos/magnetite-memory-budget.nix`, `modules/checks/magnetite-memory-budget.nix` and its fixtures, `modules/clan/services/otel-collector/schema.nix` (Step 0)
 - Modify: `modules/nixos/nixbot.nix:252-261`
-- Modify: `modules/lib/nix-eval-lock.sh` (OOM paragraph comment only), `modules/machines/nixos/magnetite/default.nix` (kill-order assertion comment only)
+- Modify: `modules/lib/nix-eval-lock.sh` (OOM paragraph comment only), `modules/machines/nixos/magnetite/default.nix` (the guard's import, Step 0; kill-order assertion comment only)
 
-- [ ] **Step 1 [operator, wizard]:** the switch decision and the D9 capacity trigger, with a capacity decision first if the canary fired it (tasks.md 5.1).
-- [ ] **Step 2:** replace `options.services.nixbot.packages.nix-eval-jobs.default` inside `config.services.nixEvalLock.wrap (...)` with `(config.flake.lib.mkNixEvalJobsIets pkgs inputs.iets.packages.${pkgs.system}.default options.services.nixbot.packages.nix-eval-jobs.default)` on one line; amend the two comments. Verify per tasks.md 5.2.
+- [ ] **Step 0:** the soft guard of design D14 (tasks.md 5.0): the guard module with its assertion, seen failing on `nixos-magnetite` before the slice is set; the probe's `high` count with its check's fixture; land and deploy before Step 1. Commit: `feat(nixbot): soft memory guard for user sessions on magnetite`.
+- [ ] **Step 1 [operator, wizard]:** no earlier than Saturday 2026-11-21, the switch decision on the baseline and P1–P5, with the D9 capacity trigger, after any discussion a tripped criterion or the flake-update peak opened (tasks.md 5.1, design D13).
+- [ ] **Step 2:** replace `options.services.nixbot.packages.nix-eval-jobs.default` inside `config.services.nixEvalLock.wrap (...)` with `config.vanixiets.nixbot.ietsEvaluator` on one line; amend the two comments. Verify per tasks.md 5.2.
 - [ ] **Step 3:** the unwrapped mutant fails magnetite's evaluation (tasks.md 5.3).
 - [ ] **Step 4:** land, deploy, attribute posts, read the unit PATH (tasks.md 5.4).
 - [ ] **Step 5:** read the first `eval_run` row naming `iets` (tasks.md 5.5).

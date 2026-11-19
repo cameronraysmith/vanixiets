@@ -21,21 +21,37 @@ Each evaluation the build service runs on magnetite SHALL leave one dev-loop rec
 - **WHEN** a worker exceeds its share of memory, leaves after its attribute and is replaced
 - **THEN** the dev-loop record does not count it, because neither evaluator reports it, and the record's memory peak still bounds what the evaluation held
 
-### Requirement: The build service changes evaluator only after a week of measured evaluations under the evaluator it replaces
+### Requirement: The build service changes evaluator only after a paired replay against a measured baseline
 
-The build service SHALL NOT change its evaluator until the dev-loop history holds the records of at least seven consecutive days of evaluations under the evaluator it replaces, at the memory settings the new evaluator will start with, and the operator has recorded that week's memory peaks, durations and kill counts as the baseline.
+The build service SHALL NOT change its evaluator until the dev-loop history holds at least 48 hours of evaluations under the evaluator it replaces, including a flake-update evaluation, and about twenty commits it has already evaluated have run under both evaluators back to back in its own isolation, with the operator's record of both.
+A replay criterion that is not met SHALL open the operator's discussion of mitigations rather than reject the evaluator.
 
-**Discharged by**: the ordering of the change's deployment, with the operator's recorded baseline as its evidence; `build-service-evaluator-interface` requirement `nixbot's evaluator is the lock-wrapped nix-eval-jobs option` keeps the stock evaluator in place until the switch.
+**Discharged by**: the ordering of the change's deployment, with the operator's recorded baseline and replay as its evidence; `build-service-evaluator-interface` requirement `The canary compares the evaluators inside nixbot's sandbox` runs the replay, and `nixbot's evaluator is the lock-wrapped nix-eval-jobs option` keeps the stock evaluator in place until the switch.
 
-#### Scenario: The switch is proposed before a week has passed
+#### Scenario: The switch is proposed before the baseline holds a flake update
 
-- **WHEN** fewer than seven days of evaluation records exist under nix-eval-jobs at 6 × 3072 MiB
+- **WHEN** fewer than 48 hours of evaluation records exist under nix-eval-jobs at 6 × 3072 MiB, or none of them is a flake-update evaluation
 - **THEN** the switch is not deployed
+
+#### Scenario: The replay is read
+
+- **WHEN** the operator reads the replay before the switch
+- **THEN** each commit kept its attribute set and each attribute's derivation, each iets peak stayed at most 90 % of its memory ceiling and at most 20 GiB with no kernel or worker kill, cache states behaved alike, and no commit was more than 10 % slower, or the criterion that was not met is under discussion
+
+#### Scenario: The replay finds an iets peak above 90 % of its ceiling
+
+- **WHEN** one replayed commit peaks under iets above 90 % of the memory ceiling it ran under
+- **THEN** the operator opens a discussion of mitigations, starting with tuning the evaluator, and iets is not rejected for it
+
+#### Scenario: The replay finds a commit slower under iets
+
+- **WHEN** one replayed commit takes more than 10 % longer under iets than under nix-eval-jobs
+- **THEN** the slowdown is diagnosed before the switch, and the replay's overall speed-up is reported
 
 ### Requirement: A change of evaluator keeps every attribute's derivation and cache status
 
-Before the build service changes its evaluator, the new evaluator SHALL run inside the build service's own isolation on magnetite, under the name the build service invokes, and SHALL give every attribute of the canary commits the same derivation, outputs, system and cache status as the evaluator it replaces, failing where that evaluator fails.
-The canary commits SHALL cover outputs already on magnetite, outputs only a binary cache holds, outputs nowhere held, and an evaluation that fails.
+Before the build service changes its evaluator, the new evaluator SHALL run inside the build service's own isolation on magnetite, under the name the build service invokes, and SHALL give every attribute of the replayed commits the same derivation, outputs, system and cache status as the evaluator it replaces, failing where that evaluator fails.
+The replayed commits SHALL cover outputs already on magnetite, outputs only a binary cache holds, outputs nowhere held, and an evaluation that fails.
 
 **Discharged by**: `build-service-evaluator-interface` requirement `The canary compares the evaluators inside nixbot's sandbox`, resting on world assumptions `A143 — iets evaluates without building, never reads a flake's nixConfig, and asks the daemon for cache status` and `A147 — iets computes the same derivations as nix-eval-jobs for this repository's checks`; the canary's recorded comparison discharges it.
 
@@ -75,11 +91,11 @@ The decision SHALL take, in order of cost: tuning the evaluator, reclaiming memo
 
 For as long as the build service evaluates on magnetite, the memory each competing unit holds and has held at most, the file-system cache's size and its limit, and the memory compressed swap holds and the data it stands for SHALL be recorded each minute, and SHALL be viewable beside the evaluation records.
 
-**Discharged by**: `build-service-evaluator-interface` requirement `magnetite reports each competing unit's memory and its compressed swap`, the existing node_exporter keep-list's ARC series, and `fleet-dashboard` requirement `An admitted person views the fleet's signals and the dev-loop history by host`, resting on world assumption `A153 — The collector's systemd receiver reports no unit memory, and the kernel reports each service's memory and zram's footprint`; the operator's recorded baseline week discharges it.
+**Discharged by**: `build-service-evaluator-interface` requirement `magnetite reports each competing unit's memory and its compressed swap`, the existing node_exporter keep-list's ARC series, and `fleet-dashboard` requirement `An admitted person views the fleet's signals and the dev-loop history by host`, resting on world assumption `A153 — The collector's systemd receiver reports no unit memory, and the kernel reports each service's memory and zram's footprint`; the operator's recorded baseline discharges it.
 
-#### Scenario: The baseline week is summarised
+#### Scenario: The baseline is summarised
 
-- **WHEN** the operator records the baseline week
+- **WHEN** the operator records the baseline
 - **THEN** the record names each competing unit's largest memory, the file-system cache's largest size and its limit, and compressed swap's largest footprint, beside the evaluations' memory peaks
 
 #### Scenario: A competing unit grows
