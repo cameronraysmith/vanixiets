@@ -51,8 +51,8 @@ in
         nightModeEndHour = 6;
         nightModeEndMinute = 30;
         nightModeTransitionMinutes = 30;
-        # The lowest temperature both the settings slider and the gamma backend accept.
-        nightModeTemperature = 1000;
+        # The operator's choice; 1000 K, the lowest DMS accepts, proved too red.
+        nightModeTemperature = 2500;
         nightModeHighTemperature = 6500;
         nightModeUseIPLocation = false;
       };
