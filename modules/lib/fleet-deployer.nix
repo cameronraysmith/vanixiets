@@ -130,9 +130,19 @@ let
     ++ map (r: r.address) (lib.filter (r: r.name == "${deployerHost}.zt") ztRecords)
   );
 
-  # The single authorized_keys line a target's deploy account carries.
+  # The single authorized_keys line a target's deploy account carries. On the
+  # deployer host itself the deployer reaches `<host>.zt` over loopback (the
+  # host maps its own name to 127.0.0.2), so that line also admits loopback
+  # (F82); every other target admits only the deployer's addresses.
+  loopbackAddresses = [
+    "127.0.0.1"
+    "::1"
+  ];
   targetKeyLine =
-    sshPublicKey: ''from="${lib.concatStringsSep "," deployerAddresses}",restrict ${sshPublicKey}'';
+    onDeployer: sshPublicKey:
+    ''from="${
+      lib.concatStringsSep "," (deployerAddresses ++ lib.optionals onDeployer loopbackAddresses)
+    }",restrict ${sshPublicKey}'';
   # The line the deployer account carries for one requester.
   requestKeyLine =
     name: sshPublicKey:
@@ -208,7 +218,7 @@ let
       holders = lib.attrNames (
         lib.filterAttrs (_: lines: lib.any (carries sshPublicKey) lines) facts.users
       );
-      expectedLine = targetKeyLine sshPublicKey;
+      expectedLine = targetKeyLine isDeployer sshPublicKey;
       deployLines = facts.users.${deployUser} or [ ];
       deployerLines = facts.users.${account} or [ ];
     in

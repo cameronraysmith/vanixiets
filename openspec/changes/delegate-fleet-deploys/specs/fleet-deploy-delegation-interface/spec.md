@@ -95,7 +95,7 @@ For a target of class `nixos`, it SHALL refuse with status 3 when `nix path-info
 
 ### Requirement: Only deploy targets accept the deployer's key
 
-When `flake.lib.fleetDeployer.keys` is set, every target SHALL carry `flake.lib.fleetDeployer.targetKeyLine keys.ssh` exactly once, on its deploy account and on no other account. That line is `from="<cinnabar's tincr, ZeroTier IPv6 and IPv4 addresses>",restrict <key>`. The deploy account is root on NixOS and `flake.lib.hosts.<name>.deployUser` on darwin. No other machine SHALL carry the key on any account.
+When `flake.lib.fleetDeployer.keys` is set, every target SHALL carry `flake.lib.fleetDeployer.targetKeyLine (name == deployerHost) keys.ssh` exactly once, on its deploy account and on no other account. That line is `from="<cinnabar's tincr, ZeroTier IPv6 and IPv4 addresses>",restrict <key>`. On the deployer host itself, the `from=` list also admits loopback (`127.0.0.1,::1`), because the host resolves its own name to a loopback address (F82). The deploy account is root on NixOS and `flake.lib.hosts.<name>.deployUser` on darwin. No other machine SHALL carry the key on any account.
 
 #### Scenario: an excluded host gains the key
 - **WHEN** the host judge is given stibnite, which is not a target, with the deployer's key on any account

@@ -18,7 +18,9 @@
 # (4), a stopped sshd (5, within 15 s, no host lock taken), two concurrent
 # requests serialised, a failed unit (7, kept), a deploy that cuts SSH
 # rolled back by the target itself (8), one notice per request, high
-# priority for 3, 7 and 8, and the key check failing on a widened key file.
+# priority for 3, 7 and 8, the key check failing on a widened key file, and a
+# deploy of the deployer itself, reached over loopback (F82), whose switch
+# restarts sshd and replaces the request command while the request runs.
 #
 # It establishes nothing about clan, the forge, niks3, ntfy or darwin, which
 # the change's verification observes on the fleet.
@@ -83,6 +85,7 @@
           base = nodes.target.system.build.toplevel;
           # The resolved store path, which activation records as $systemConfig.
           spec = name: "${nodes.target.specialisation.${name}.configuration.system.build.toplevel}";
+          switched = "${nodes.deployer.specialisation.switched.configuration.system.build.toplevel}";
         in
         {
           name = "fleet-deployer";
@@ -95,9 +98,19 @@
           nodes.deployer =
             { nodes, ... }:
             {
-              imports = [ self.modules.nixos.fleet-deployer ];
+              imports = [
+                self.modules.nixos.fleet-deployer
+                self.modules.nixos.deploy-record
+              ];
               config = {
                 services.openssh.enable = true;
+                # Deploying the deployer itself (F82): a generation whose request
+                # command (its config) and sshd differ, switched to while the
+                # request that deploys it runs.
+                specialisation.switched.configuration = {
+                  services.fleet-deployer.requestConfig.generation = "switched";
+                  services.openssh.settings.LoginGraceTime = 119;
+                };
                 services.fleet-deployer = {
                   ntfySend = recordingNtfySend;
                   notifyTokenFile = "/dev/null";
@@ -116,9 +129,19 @@
                         class = "nixos";
                         deployUser = "root";
                       };
+                      deployer = {
+                        class = "nixos";
+                        deployUser = "root";
+                      };
                     };
-                    machines = [ "target" ];
-                    requesters.op = [ "target" ];
+                    machines = [
+                      "target"
+                      "deployer"
+                    ];
+                    requesters.op = [
+                      "target"
+                      "deployer"
+                    ];
                     cacheStore = "file:///var/lib/test-cache";
                     forge = "/srv/forge.git";
                     stateDir = "/var/lib/fleet-deployer";
@@ -134,7 +157,9 @@
                     # and reads the commit's files from the worktree it names.
                     resolveCommand = stub "resolve" ''
                       ${worktreeOf}
-                      jq -n --arg c "$(cat "$tree/closure")" '{closure: $c, targetHost: "root@target"}'
+                      host=root@target
+                      if [ -e "$tree/host" ]; then host=$(cat "$tree/host"); fi
+                      jq -n --arg c "$(cat "$tree/closure")" --arg h "$host" '{closure: $c, targetHost: $h}'
                     '';
                     varsCheckCommand = stub "vars-check" ''
                       ${worktreeOf}
@@ -168,6 +193,7 @@
                 environment.systemPackages = [
                   pkgs.git
                   pkgs.nix
+                  nodePkgs.fleet-deploy-watch
                 ];
                 virtualisation.additionalPaths = [ nodes.target.system.build.toplevel ];
                 nix.settings.experimental-features = [ "nix-command" ];
@@ -223,7 +249,7 @@
 
             # The forge: main carries `next`; a branch carries `broken` unmerged.
             def commit(name, files, branch="main"):
-                script = f"cd /srv/work && git checkout -q -B {branch} && rm -f closure vars-broken no-switch"
+                script = f"cd /srv/work && git checkout -q -B {branch} && rm -f closure host vars-broken no-switch"
                 for path, text in files.items():
                     script += f" && printf %s {shlex.quote(text)} > {path}"
                 script += f" && git add -A && git commit -q -m {name} && git push -q -f origin {branch}"
@@ -236,7 +262,7 @@
                 " && git remote add origin /srv/forge.git"
             )
             # The stand-in cache holds a marker per built closure.
-            for closure in ("${spec "next"}", "${spec "broken"}", "${spec "isolated"}"):
+            for closure in ("${spec "next"}", "${spec "broken"}", "${spec "isolated"}", "${switched}"):
                 deployer.succeed(f"touch /var/lib/test-cache/$(basename {closure})")
 
             def request(command, expect):
@@ -367,6 +393,22 @@
                 deployer.fail("systemctl start fleet-deployer-keycheck.service")
                 deployer.succeed("chmod 0400 /var/lib/fleet-deployer/keys/age.key")
                 deployer.succeed("systemctl start fleet-deployer-keycheck.service")
+
+            with subtest("a request that switches the deployer's own system survives the switch"):
+                # The deployer reaches its own host by name over loopback (F82).
+                own = 'from="127.0.0.1,::1,%s",restrict %s' % (deployer_ip, pub)
+                deployer.succeed(f"mkdir -p /root/.ssh && chmod 700 /root/.ssh && echo {shlex.quote(own)} >> /root/.ssh/authorized_keys")
+                sshd_before = deployer.succeed("systemctl show -p MainPID --value sshd.service").strip()
+                request_before = deployer.succeed("readlink -f /run/current-system/sw/bin/fleet-deploy-request").strip()
+                commit("switched", {"closure": "${switched}", "host": "root@deployer"})
+                out = request("deploy deployer", 0)
+                assert "deployed: deployer runs ${switched}" in out, out
+                assert deployer.succeed("readlink -f /run/current-system").strip() == "${switched}"
+                assert deployer.succeed("systemctl show -p MainPID --value sshd.service").strip() != sshd_before, "sshd was not restarted"
+                assert deployer.succeed("readlink -f /run/current-system/sw/bin/fleet-deploy-request").strip() != request_before, "the request command did not change"
+                last = json.loads(deployer.succeed("tail -n1 /var/log/deploy-record.jsonl"))
+                assert last["closure"] == "${switched}", last
+                assert records()[-1]["outcome"] == "deployed" and records()[-1]["machine"] == "deployer", records()[-1]
           '';
         }
       );

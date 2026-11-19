@@ -7,7 +7,7 @@
 # - Once the deployer's keys are committed (flake.lib.fleetDeployer.keys is
 #   not null), adds its SSH key to the deploy account's authorized keys
 #   (root on NixOS, flake.lib.hosts.<name>.deployUser on darwin), restricted
-#   to the deployer's addresses.
+#   to the deployer's addresses, and on the deployer host also to loopback.
 #
 # The deployer reads a target's secrets through the sops group
 # fleet-deployers, which is a reader of exactly what `clan machines update`
@@ -37,7 +37,7 @@ let
       environment.systemPackages = [ pkgs.fleet-deploy-watch ];
       users.users = lib.mkIf provisioned {
         ${deployUser}.openssh.authorizedKeys.keys = [
-          (fleetDeployer.targetKeyLine fleetDeployer.keys.ssh)
+          (fleetDeployer.targetKeyLine (name == fleetDeployer.deployerHost) fleetDeployer.keys.ssh)
         ];
       };
     };

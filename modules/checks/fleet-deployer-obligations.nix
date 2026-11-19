@@ -8,7 +8,8 @@
 #   machine: its primary user and the admin).
 # - hostProblems fails a missing primary-user account, a non-target or a
 #   second account carrying the deployer's key, a target without exactly the
-#   restricted key line, a deployer account whose keys are not the
+#   restricted key line (on the deployer host, the line that also admits
+#   loopback, F82; elsewhere, the line that does not), a deployer account whose keys are not the
 #   requesters' forced-command lines, and a deployer host whose key
 #   directory or key generation is declared wider.
 #
@@ -24,7 +25,8 @@
       key = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFixtureDeployerKeyFixtureDeployerKeyFix deployer";
       other = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOtherOtherOtherOtherOtherOtherOtherOthe other";
       reqKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIRequesterRequesterRequesterRequesterReq req";
-      line = d.targetKeyLine key;
+      line = d.targetKeyLine false key;
+      deployerLine = d.targetKeyLine true key;
       requesterLines = [ (d.requestKeyLine "cameron" reqKey) ];
       deployerUnit = {
         keysUMask = d.keyUMask;
@@ -154,6 +156,7 @@
         isTarget = true;
         facts = host.facts // {
           users = host.facts.users // {
+            root = [ deployerLine ];
             ${d.account} = requesterLines;
           };
           inherit deployerUnit;
@@ -250,6 +253,26 @@
             facts = host.facts // {
               users = host.facts.users // {
                 root = [ ];
+              };
+            };
+          };
+          problems = 1;
+        };
+        deployerLineWithoutLoopback = {
+          args = deployer // {
+            facts = deployer.facts // {
+              users = deployer.facts.users // {
+                root = [ line ];
+              };
+            };
+          };
+          problems = 1;
+        };
+        targetLineWithLoopback = {
+          args = host // {
+            facts = host.facts // {
+              users = host.facts.users // {
+                root = [ deployerLine ];
               };
             };
           };
