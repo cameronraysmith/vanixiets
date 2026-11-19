@@ -41,7 +41,7 @@ The properties in this capability SHALL be read as guarantees only about what th
 
 ### Requirement: The deployer answers only its forced command
 
-Every key in `fleet-deployer`'s `authorized_keys` on cinnabar SHALL equal `flake.lib.fleetDeployer.requestKeyLine <requester> <key>`, which is `restrict,from="<tincr /64>,<ZeroTier /64>,<ZeroTier IPv4 /24>",command="/run/current-system/sw/bin/fleet-deploy-request <requester>" <key>`. `fleet-deploy-request` SHALL accept only `deploy <machine> [<commit>] [--session <id>]`, separated by single spaces, where:
+Every key in `fleet-deployer`'s `authorized_keys` on cinnabar SHALL equal `flake.lib.fleetDeployer.requestKeyLine <requester> <key>`, which is `restrict,from="<tincr /64>,<ZeroTier /64>,<ZeroTier IPv4 /24>",command="/run/current-system/sw/bin/fleet-deploy-request <requester>" <key>`. `fleet-deploy-request` SHALL accept only `deploy <machine> [<commit>] [--session <id>]`, at most 200 printable ASCII characters separated by single spaces, where:
 - `<machine>` is a target;
 - `<commit>` is 7-40 lowercase hexadecimal digits;
 - `<id>` is 1-64 characters from `[A-Za-z0-9._-]`.
@@ -149,7 +149,7 @@ Before the deploy command runs, `fleet-deploy-request` SHALL stop stale watchers
 
 ### Requirement: Every request is written to the request log and posted to ntfy
 
-`fleet-deploy-request` SHALL append one JSON line to `/var/lib/fleet-deployer/requests.jsonl` (mode `0600`) for every request, refusals included. The line holds `ts`, `id`, `requester`, `command`, `session`, `machine`, `commit`, `closure`, `outcome`, `reason` and `finished`. `fleet-deploy-notify`, a root oneshot started by a path unit on that file, SHALL post each new line once through `ntfy-send` to the topic `fleet-deploy`, with `Priority: high` for `refused`, `unhealthy` and `rolled-back`, reading the token from the alerter token file.
+`fleet-deploy-request` SHALL append one JSON line to `/var/lib/fleet-deployer/requests.jsonl` (mode `0600`) for every request, refusals included. The line holds `ts`, `id`, `requester`, `command`, `session`, `machine`, `target`, `commit`, `closure`, `outcome`, `reason` and `finished`. `target` is the requested target as received, every word between `deploy` and the commit or `--session`, and is null when the command was refused before it. `fleet-deploy-notify`, a root oneshot started by a path unit on that file, SHALL post each new line once through `ntfy-send` to the topic `fleet-deploy`, with `Priority: high` for `refused`, `unhealthy` and `rolled-back`, reading the token from the alerter token file.
 
 #### Scenario: notices in the VM test
 - **WHEN** the VM test has sent all its requests

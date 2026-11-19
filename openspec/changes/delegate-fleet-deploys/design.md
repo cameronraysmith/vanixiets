@@ -136,7 +136,7 @@ The operator decided Q1-Q8 and, after Gate 1 was approved (Q33), Q30-Q32 on 2026
   Exit statuses: 0 deployed, 3 refused, 4 busy, 5 unreachable, 6 failed, 7 unhealthy, 8 rolled back.
 
 ### D12: Every request is recorded and announced, with the token kept root-only
-- **Choice**: `fleet-deploy-request` appends `{ts, id, requester, command, session, machine, commit, closure, outcome, reason, finished}` to `/var/lib/fleet-deployer/requests.jsonl` (`0600`) for every request. The path unit `fleet-deploy-notify` (root, the alerter token through `NTFY_TOKEN_FILE`) posts each new line to the topic `fleet-deploy` (Q32), with `Priority: high` for refused, unhealthy and rolled-back. ntfy's existing `alerter:fleet-*:rw` admits the topic, so no ACL edit is needed.
+- **Choice**: `fleet-deploy-request` appends `{ts, id, requester, command, session, machine, target, commit, closure, outcome, reason, finished}` to `/var/lib/fleet-deployer/requests.jsonl` (`0600`) for every request. The path unit `fleet-deploy-notify` (root, the alerter token through `NTFY_TOKEN_FILE`) posts each new line to the topic `fleet-deploy` (Q32), with `Priority: high` for refused, unhealthy and rolled-back. ntfy's existing `alerter:fleet-*:rw` admits the topic, so no ACL edit is needed.
 - **Rationale**: the request process never holds the alerter token.
 
 ### D13: The deployer itself is deployed like any other target

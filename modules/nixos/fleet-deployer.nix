@@ -112,7 +112,7 @@ in
             tail -c +"$((offset + 1))" "$log" | head -c "$((size - offset))" |
               while IFS= read -r line; do
                 outcome=$(jq -r .outcome <<<"$line")
-                message=$(jq -r '"\(.outcome): \(.requester) asked to deploy \(.machine // "?") at \(.commit // "main") (session \(.session // "none")): \(.reason)"' <<<"$line")
+                message=$(jq -r -f ${pkgs.fleet-deploy-request}/share/fleet-deploy-request/notice.jq <<<"$line")
                 case "$outcome" in
                   refused | unhealthy | rolled-back) ntfy-send "$message" fleet-deploy -H "Priority: high" ;;
                   *) ntfy-send "$message" fleet-deploy ;;

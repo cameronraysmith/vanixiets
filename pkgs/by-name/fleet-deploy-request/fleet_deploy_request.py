@@ -54,32 +54,52 @@ class Outcome(Exception):
         self.reason = reason
 
 
-def parse(command: str, requester: str, config: dict) -> dict:
-    """Parse and authorize one request; raise Outcome('refused') otherwise."""
+def parse(command: str, requester: str, config: dict, record: dict | None = None) -> dict:
+    """Parse and authorize one request; raise Outcome('refused') otherwise.
+
+    Each of session, target, machine and commit is written to record once it
+    is known (machine and commit once valid), so a refusal still records the
+    fields established before it. ssh joins the client's arguments with
+    spaces, so every word between `deploy` and the commit or --session is the
+    target as received, and a refusal names it whole, quoted as JSON. A
+    command is printable ASCII, so this quoting is the same as jq's tojson,
+    which fleet-deploy-notify's notice.jq uses.
+    """
+    record = {} if record is None else record
     words = command.split(" ") if command else []
-    if any(w == "" for w in words) or len(command) > 200:
+    printable = command.isascii() and command.isprintable()
+    if any(w == "" for w in words) or len(command) > 200 or not printable:
         raise Outcome("refused", "malformed command")
     if not words or words[0] != "deploy":
         raise Outcome("refused", "the only command is: deploy <machine> [<commit>] [--session <id>]")
     rest = words[1:]
-    session = None
     if "--session" in rest:
         i = rest.index("--session")
         if i + 2 != len(rest) or not SESSION.fullmatch(rest[i + 1]):
             raise Outcome("refused", "--session takes one id of at most 64 [A-Za-z0-9._-]")
-        session = rest[i + 1]
+        record["session"] = rest[i + 1]
         rest = rest[:i]
-    if not 1 <= len(rest) <= 2:
+    if not rest:
         raise Outcome("refused", "expected: deploy <machine> [<commit>]")
-    machine = rest[0]
-    commit = rest[1] if len(rest) == 2 else None
-    if not NAME.fullmatch(machine) or machine not in config["targets"]:
-        raise Outcome("refused", f"{machine!r} is not a deploy target")
-    if commit is not None and not COMMIT.fullmatch(commit):
-        raise Outcome("refused", "a commit is 7-40 lowercase hexadecimal digits")
+
+    def target(name: str) -> bool:
+        return bool(NAME.fullmatch(name)) and name in config["targets"]
+
+    if len(rest) == 2 and target(rest[0]):
+        machine, commit = rest
+    else:
+        machine, commit = " ".join(rest), None
+    record["target"] = machine
+    if not target(machine):
+        raise Outcome("refused", f"{json.dumps(machine)} is not a deploy target")
+    record["machine"] = machine
+    if commit is not None:
+        if not COMMIT.fullmatch(commit):
+            raise Outcome("refused", "a commit is 7-40 lowercase hexadecimal digits")
+        record["commit"] = commit
     if machine not in config["requesters"].get(requester, []):
         raise Outcome("refused", f"{requester} may not deploy {machine}")
-    return {"machine": machine, "commit": commit, "session": session}
+    return {"machine": machine, "commit": commit, "session": record.get("session")}
 
 
 def say(message: str) -> None:
@@ -274,11 +294,11 @@ class Deployer:
         return problems
 
     # -- the request ---------------------------------------------------------
-    def handle(self, request: dict) -> tuple[str, str, dict]:
+    def handle(self, request: dict, entry: dict) -> tuple[str, str]:
+        """Run one parsed request; each field is written to entry once resolved."""
         machine = request["machine"]
-        extra: dict = {}
         commit = self.gate(request["commit"])
-        extra["commit"] = commit
+        entry["commit"] = commit
         say(f"{machine} at {commit}")
 
         tree = tempfile.mkdtemp(prefix="deploy-", dir=self.state / "trees")
@@ -294,7 +314,7 @@ class Deployer:
                 raise Outcome("busy", "every deploy slot stayed taken")
             resolved = self.resolve(ref, machine)
             closure, target = resolved["closure"], resolved["targetHost"]
-            extra["closure"] = closure
+            entry["closure"] = closure
             say(f"closure {closure}, target {target}")
             if self.config["targets"][machine]["class"] == "nixos" and not self.cached(closure):
                 raise Outcome("refused", f"{closure} is not in {self.config['cacheStore']}: CI has not built it")
@@ -322,7 +342,7 @@ class Deployer:
             problems = self.health(machine, target, closure)
             if problems:
                 raise Outcome("unhealthy", "; ".join(problems))
-            return "deployed", f"{machine} runs {closure}", extra
+            return "deployed", f"{machine} runs {closure}"
         finally:
             run(["git", "-C", str(self.mirror), "worktree", "remove", "--force", tree],
                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
@@ -336,14 +356,13 @@ class Deployer:
             "command": command[:200],
             "session": None,
             "machine": None,
+            "target": None,
             "commit": None,
             "closure": None,
         }
         try:
-            request = parse(command, self.requester, self.config)
-            entry.update(machine=request["machine"], session=request["session"], commit=request["commit"])
-            outcome, reason, extra = self.handle(request)
-            entry.update(extra)
+            request = parse(command, self.requester, self.config, entry)
+            outcome, reason = self.handle(request, entry)
         except Outcome as o:
             outcome, reason = o.outcome, o.reason
         except Exception as e:  # noqa: BLE001 - every request ends in one recorded status

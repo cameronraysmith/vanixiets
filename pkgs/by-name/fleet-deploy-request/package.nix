@@ -23,6 +23,7 @@ symlinkJoin {
   paths = [ unwrapped ];
   nativeBuildInputs = [ makeWrapper ];
   postBuild = ''
+    install -Dm444 ${./notice.jq} $out/share/fleet-deploy-request/notice.jq
     wrapProgram $out/bin/fleet-deploy-request \
       --prefix PATH : ${
         lib.makeBinPath [
