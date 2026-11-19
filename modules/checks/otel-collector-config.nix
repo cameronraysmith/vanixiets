@@ -314,6 +314,22 @@
           (check "R3.1: the alias transform is not in the host pipeline" (
             builtins.elem "transform/omnigent-alias" pipelines."metrics/host".processors
           ))
+          # F64: a process that rewrites its title named by its command line.
+          (check
+            "R3.1: the process-name transform does not cut the name at its first space before resource/agent"
+            (
+              let
+                processors = pipelines."metrics/process".processors;
+                at = name: lib.lists.findFirstIndex (n: n == name) null processors;
+              in
+              (p."transform/process-name".metric_statements or [ ]) == [
+                ''replace_pattern(resource.attributes["process.executable.name"], "^([^ ]{15,}) .*$", "$$1")''
+              ]
+              && at "transform/process-name" != null
+              && at "resource/agent" != null
+              && at "transform/process-name" < at "resource/agent"
+            )
+          )
 
           # Content: no traces pipeline, and the logs pipelines write only
           # into devloop (S2 design D4; S7 adds journald logs behind ADR-008's
@@ -467,6 +483,26 @@
               lib.remove "transform/omnigent-alias"
                 i.settings.service.pipelines."metrics/host".processors;
           } i;
+        processNameAfterAgent =
+          i:
+          onSettings {
+            service.pipelines."metrics/process".processors =
+              lib.remove "transform/process-name" i.settings.service.pipelines."metrics/process".processors
+              ++ [ "transform/process-name" ];
+          } i;
+        processNameUnwired =
+          i:
+          onSettings {
+            service.pipelines."metrics/process".processors =
+              lib.remove "transform/process-name"
+                i.settings.service.pipelines."metrics/process".processors;
+          } i;
+        # `$1` unescaped: the collector expands it as a variable, not a group.
+        processNameUnescaped = onSettings {
+          processors."transform/process-name".metric_statements = [
+            ''replace_pattern(resource.attributes["process.executable.name"], "^([^ ]{15,}) .*$", "$1")''
+          ];
+        };
         queueInMemory =
           i:
           i

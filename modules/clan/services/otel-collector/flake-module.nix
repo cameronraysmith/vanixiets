@@ -310,6 +310,15 @@ in
                     action = "upsert";
                   }
                 ];
+                # A process whose comm fills the kernel's 15 bytes is named by
+                # the base of its argv[0] (gopsutil@v4.26.5:process/process_linux.go:847-860),
+                # which a process that rewrites its title, as Chromium does,
+                # fills with its whole command line. Cut the name at its first
+                # space, so that no command line reaches the store (ADR-004's
+                # label bans) or mints a series per launch.
+                "transform/process-name".metric_statements = [
+                  ''replace_pattern(resource.attributes["process.executable.name"], "^([^ ]{15,}) .*$", "$$1")''
+                ];
                 # Compaction (empty keys) and aggregate_labels are meant to sum
                 # same-named processes, but aggregate_labels keys points by the
                 # full nanosecond timestamp, which the scraper stamps per
@@ -463,6 +472,7 @@ in
                   receivers = [ "host_metrics/process" ];
                   processors = [
                     "memory_limiter"
+                    "transform/process-name"
                     "groupbyattrs/compact"
                     "metrics_transform/process"
                     "filter/process-min"
