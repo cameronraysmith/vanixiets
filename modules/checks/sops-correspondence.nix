@@ -247,7 +247,8 @@ in
               mutant deployer-user-early sh -c 'mkdir -p m/sops/users/fleet-deployer && echo "[{\"publickey\":\"age1x\",\"type\":\"age\"}]" > m/sops/users/fleet-deployer/key.json'
             else
               mutant deployer-key-changed sh -c "sed -i 's/$deployerAge/$other/' m/sops/users/fleet-deployer/key.json"
-              mutant deployer-group-missing sh -c "rm m/sops/secrets/$(head -1 \"\$deployerTargetsPath\")-age.key/groups/fleet-deployers"
+              first=$(head -1 "$deployerTargetsPath")
+              mutant deployer-group-missing rm "m/sops/secrets/$first-age.key/groups/fleet-deployers"
             fi
 
             touch "$out"

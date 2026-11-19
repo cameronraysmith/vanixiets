@@ -58,7 +58,7 @@ The machine checks fail when a disabled or excluded machine would be in reach, o
 
 - **A requester:** remove them from `requesterNames` and deploy cinnabar. Their key no longer opens the account.
 - **A target's trust:** a machine that stops being a target loses the deployer's key at its next deploy. To withdraw all trust at once, set `flake.lib.fleetDeployer.keys = null` and deploy the targets from stibnite.
-- **Read access:** remove the target from the targets, then run `clan vars fix` for it on stibnite, so its machine key is no longer encrypted to `fleet-deployers`.
+- **Read access:** remove the target from the targets, then run `clan secrets groups remove-secret fleet-deployers <host>-age.key` and delete the `groups/fleet-deployers` links of its activation vars, followed by `clan vars fix <host>`, on stibnite.
 
 ## Moving the deployer
 
@@ -67,7 +67,10 @@ To move it, for example to cinnabar's successor:
 
 1. Import `flake.modules.nixos.fleet-deployer` on the new host, set `deployerHost` in `modules/lib/fleet-deployer.nix`, and deploy the new host from stibnite.
 2. Read the new public halves there with `age-keygen -y` and `ssh-keygen -y`, as `fleet-deployer`. Commit them to `flake.lib.fleetDeployer.keys` and `sops/users/fleet-deployer/key.json`.
-3. Run `clan vars fix` for the targets on stibnite, then deploy each target from stibnite so it trusts the new address and key.
+3. Replace `sops/users/fleet-deployer/key.json` with the new age key (`clan secrets users add -f`), which re-encrypts every file the `fleet-deployers` group reads. Then deploy each target from stibnite so it trusts the new address and key.
 
 The move rotates both keys.
+
+The group reads exactly what `clan machines update` decrypts on the deployer: each target's machine key and its activation-phase vars.
+When a target gains an activation-phase var, its machine check fails until the var has a `groups/fleet-deployers` link and `clan vars fix <host>` has re-encrypted it.
 `fleet-deployer-keycheck` fails daily, and at start, while the keys' modes, owner or public halves differ from the flake.

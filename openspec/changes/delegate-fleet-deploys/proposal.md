@@ -63,9 +63,9 @@ The operator decided Q1–Q8 and Q30–Q33 on 2026-11-18 (`brainstorm.md`, "Oper
 
 - New:
   - a `fleet-deployer` account and request command on cinnabar, moving with its CAM-112 successor;
-  - a `fleet-deployer` sops user and a `fleet-deployers` group, listed in `defaultGroups` of the deploy targets (enabled NixOS and darwin machines except stibnite and blackphos: today argentum, cinnabar, magnetite, pyrite, rosegold);
+  - a `fleet-deployer` sops user and a `fleet-deployers` group, a reader of each deploy target's machine key and activation-phase vars (deploy targets: enabled NixOS and darwin machines except stibnite and blackphos; today argentum, cinnabar, magnetite, pyrite, rosegold);
   - per-user deploy-request credentials among the omnigent worker credentials;
   - the ntfy topic `fleet-deploy`.
-- Changed: `authorized_keys` for root on in-scope NixOS hosts and for the primary user on in-scope darwin hosts. Recipients of in-scope `sops/secrets/<machine>-age.key` and activation-phase vars, re-encrypted with `clan vars fix`. The `secret-custody` correspondence check.
+- Changed: `authorized_keys` for root on in-scope NixOS hosts and for the primary user on in-scope darwin hosts. Recipients of the targets' `sops/secrets/<machine>-age.key` and activation-phase vars, re-encrypted with clan's `secrets groups add-secret` and `vars fix`. The `secret-custody` correspondence check.
 - Interacts with: CAM-109/tincr (target names and `deployUser` come from `flake.lib.hosts`), CAM-112 (where the deployer and agent hosts live), CAM-87's verifying `ntfy-send`, and ADR-005's deploy record as the host-side witness.
 - Unchanged: nixbot, gitea-mq and the merge gates; stibnite's own `just activate`; how sops-nix decrypts on the target.

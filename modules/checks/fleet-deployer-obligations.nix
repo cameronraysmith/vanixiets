@@ -138,6 +138,16 @@
             alice = [ other ];
           };
           deployerUnit = null;
+          localSecrets = [
+            {
+              path = "sops/secrets/h-age.key";
+              readable = true;
+            }
+            {
+              path = "vars/per-machine/h/initrd-ssh/id_ed25519";
+              readable = true;
+            }
+          ];
         };
       };
       deployer = host // {
@@ -151,6 +161,32 @@
         isDeployer = true;
       };
       hostCases = {
+        activationVarWithoutGroup = {
+          args = host // {
+            facts = host.facts // {
+              localSecrets = host.facts.localSecrets ++ [
+                {
+                  path = "vars/per-machine/h/new-activation/key";
+                  readable = false;
+                }
+              ];
+            };
+          };
+          problems = 1;
+        };
+        machineKeyWithoutGroup = {
+          args = host // {
+            facts = host.facts // {
+              localSecrets = [
+                {
+                  path = "sops/secrets/h-age.key";
+                  readable = false;
+                }
+              ];
+            };
+          };
+          problems = 1;
+        };
         acceptedTarget = {
           args = host;
           problems = 0;

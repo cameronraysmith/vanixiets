@@ -62,10 +62,15 @@ The operator decided Q1-Q8 and, after Gate 1 was approved (Q33), Q30-Q32 on 2026
 - **Choice**:
   - `flake.lib.fleetDeployer.targets` is every NixOS or darwin inventory machine that is enabled, minus stibnite and blackphos (Q30). A machine is enabled when its `flake.lib.cloudMachines` entry says `enabled = true`, or when it has no cloud entry. The terranix sets moved into `modules/lib/cloud-machines.nix` unchanged; the terraform JSON is byte-identical (sha256 `3cea80f0…98ec` before and after).
   - Today the targets are argentum, cinnabar, magnetite, pyrite and rosegold. electrum, galena and scheelite are disabled. Re-enabling one in terranix makes it a target with no other edit.
-  - Once `keys` is set, `fleet-deploy-target` lists the sops group `fleet-deployers` (only `fleet-deployer`) in `clan.core.sops.defaultGroups` on targets. The operator runs `clan vars fix` for them, so the group reads exactly their machine keys and activation-phase vars.
+  - The sops group `fleet-deployers` (only `fleet-deployer`) reads exactly what `clan machines update` decrypts on the deployer for each target. That is the machine key, plus every secret var with `neededFor = "activation"`; clan's sops `populate_dir` decrypts these for the update phases activation, users and services (clan-core `d718bcf`, `clan_lib/vars/secret_modules/sops.py:243-290`, `clan_lib/vars/upload.py:21`). Partitioning vars are decrypted only by `clan machines install`; users and services vars travel encrypted.
+  - The group is added per file with clan's own commands: `clan secrets groups add-secret fleet-deployers <m>-age.key`, and a `groups/fleet-deployers` link on each activation var followed by `clan vars fix <m> -g <generator>`. Today that is the five machine keys plus `initrd-ssh/id_ed25519` on cinnabar, magnetite and pyrite; the darwin targets have no activation var.
+  - `flake.lib.fleetDeployer.failures` derives the same set from each target's evaluated `clan.core.vars.generators`. Any such file without the group link fails that target's machine check, so a future activation var fails CI rather than a deploy.
 - **Rationale**: per machine is the narrowest scope the sops backend offers (A155). Deriving targets from the enabled state means a disabled machine can never be in reach, which the policy judge and every machine check enforce.
-- **Boundary**: vendored-versus-first-party. Recipient computation is clan's; we declare `defaultGroups` and the group, and run clan's `vars fix`.
-- **Alternatives considered**: a typed list of targets (rejected by Q30: it can drift from what exists); clan's experimental age backend with per-host recipients (a fleet-wide backend migration).
+- **Boundary**: vendored-versus-first-party. Recipient computation and re-encryption are clan's; we declare the group and its links.
+- **Alternatives considered**:
+  - a typed list of targets (rejected by Q30: it can drift from what exists);
+  - clan's experimental age backend with per-host recipients (a fleet-wide backend migration);
+  - (b) `clan.core.sops.defaultGroups = [ "fleet-deployers" ]` on targets followed by `clan vars fix`. This was rejected for diff size, not reach. By A155 the machine key already opens every var of the machine, so (b) grants nothing more. But it re-encrypts every per-machine var of every target in one change, which buries the few files that matter under dozens of unrelated rewrites in the operator's review. Until that `vars fix` lands, clan's recipient check also flags every existing var, which would make the deployer's `clan vars check` refuse every request.
 
 ### D4: Reach is a role policy over each machine's primary user
 - **Choice**: `flake.lib.hosts.<name>.primaryUser` is a typed field: null, or one of the names under `flake.users` (aliases included). It is checked with `types.nullOr (types.enum …)`. The values are pyrite cameron, rosegold janettesmith, argentum christophersmith, stibnite crs58 and blackphos raquel; servers and phones are null. The policy (Q31), as data in `flake.lib.fleetDeployer`:
@@ -166,13 +171,13 @@ The operator decided Q1-Q8 and, after Gate 1 was approved (Q33), Q30-Q32 on 2026
 ## Migration Plan
 
 1. Land the regulators red, then the deployer on cinnabar, the target module, the request credential kind (enrollment off) and the VM test. No host trusts a deployer key while `keys` is null (done in this change's code commit).
-2. Deploy cinnabar from stibnite; `fleet-deployer-keys` generates the keys. Commit their public halves to `flake.lib.fleetDeployer.keys` and `sops/users/fleet-deployer`. Create the group and run `clan vars fix` for the targets on stibnite. Verify that only the targets' machine keys and activation vars changed (tasks 2.1-2.4).
+2. Deploy cinnabar from stibnite; `fleet-deployer-keys` generates the keys. Commit their public halves to `flake.lib.fleetDeployer.keys` and `sops/users/fleet-deployer`. Create the group and add it to the targets' machine keys and activation vars (D3). Verify that only those files changed (tasks 2.1-2.4).
 3. On cinnabar, as the deployer, run the vars check and a target-unreachable dry pass (task 4.2).
 4. Generate the request keys (`clan vars generate`) and flip `deployRequestEnrolled`; deploy magnetite, pyrite and stibnite (task 3.3).
 5. Deploy each target from stibnite so it trusts the deployer, laptops when awake (task 5.2).
 6. Run the integration verification (group 6).
 
-Rollback: setting `keys = null` and redeploying withdraws every target's trust; removing the group from `defaultGroups` and running `clan vars fix` withdraws read access. Each is one revertible commit.
+Rollback: setting `keys = null` and redeploying withdraws every target's trust; `clan secrets groups remove-secret fleet-deployers <m>-age.key` and removing the activation vars' group links followed by `clan vars fix` withdraw read access. Each is one revertible commit.
 
 ## Open Questions
 

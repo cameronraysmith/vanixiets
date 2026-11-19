@@ -51,9 +51,13 @@ let
     "janettesmith"
   ];
 
-  # The public halves of the deployer's keys, written after cinnabar
-  # generates them (tasks 2.1-2.2). null: not yet provisioned.
-  keys = null;
+  # The public halves of the deployer's keys, generated on cinnabar by
+  # fleet-deployer-keys on 2026-11-18 (task 2.2). Setting this to null
+  # withdraws every target's trust in the deployer.
+  keys = {
+    age = "age107c7zd4v6wm6t3f8kfe87ly4y2f4zh2yeg34n0n9addc6fzfcf9sl9mpaw";
+    ssh = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAnu4jxBMb1qSCgURz/E7mqrQvakcuuand4ZWFby+eGR fleet-deployer@cinnabar";
+  };
 
   cloud = cloudMachines.hetzner // cloudMachines.gcp;
   enabledOf = name: if cloud ? ${name} then cloud.${name}.enabled else true;
@@ -186,6 +190,9 @@ let
   # Per-host judge. `facts` is what the machine's configuration declares:
   #   users        name -> list of authorized_keys lines
   #   deployerUnit { keysUMask; tmpfiles } on the deployer host, else null
+  #   localSecrets the secrets `clan machines update` decrypts on the
+  #                deployer for this machine, each { path; readable; }, where
+  #                readable says the sops group fleet-deployers is a reader
   hostProblems =
     {
       name,
@@ -208,6 +215,11 @@ let
     lib.optional (
       primaryUser != null && !(facts.users ? ${primaryUser})
     ) "${name}'s primary user ${primaryUser} has no account on it"
+    ++ lib.optionals (sshPublicKey != null && isTarget) (
+      map (
+        secret: "${name}: ${secret.path} is decrypted by the deployer but fleet-deployers is not a reader"
+      ) (lib.filter (secret: !secret.readable) facts.localSecrets)
+    )
     ++ lib.optionals (sshPublicKey != null) (
       if isTarget then
         lib.optional (holders != [ deployUser ] && holders != [ ])
@@ -240,7 +252,37 @@ let
         ) "${name} is not the deployer host but declares the ${account} account or service"
     );
 
-  factsOf = hostConfig: {
+  # What `clan machines update` decrypts on the deployer (clan-core d718bcf,
+  # clan_lib/vars/secret_modules/sops.py populate_dir, called with the phases
+  # activation, users and services by clan_lib/vars/upload.py:21): the
+  # machine key, and every secret var whose neededFor is "activation".
+  # Partitioning vars are decrypted only by `clan machines install`; users
+  # and services vars travel encrypted and are decrypted on the target.
+  localSecretsOf =
+    name: hostConfig:
+    let
+      generators = hostConfig.clan.core.vars.generators or { };
+      varPath =
+        generator: file:
+        if generators.${generator}.share then
+          "vars/shared/${generator}/${file}"
+        else
+          "vars/per-machine/${name}/${generator}/${file}";
+      activation = lib.concatLists (
+        lib.mapAttrsToList (
+          generator: spec:
+          map (file: varPath generator file) (
+            lib.attrNames (lib.filterAttrs (_: file: file.secret && file.neededFor == "activation") spec.files)
+          )
+        ) generators
+      );
+    in
+    map (path: {
+      inherit path;
+      readable = builtins.pathExists (../.. + "/${path}/groups/fleet-deployers");
+    }) ([ "sops/secrets/${name}-age.key" ] ++ activation);
+
+  factsOf = name: hostConfig: {
     users = lib.mapAttrs (_: user: user.openssh.authorizedKeys.keys or [ ]) (
       lib.filterAttrs (_: user: user ? openssh) hostConfig.users.users
     );
@@ -252,6 +294,7 @@ let
         }
       else
         null;
+    localSecrets = if lib.elem name targets then localSecretsOf name hostConfig else [ ];
   };
 
   sshPublicKey = if keys == null then null else keys.ssh;
@@ -265,7 +308,7 @@ let
     name: hostConfig:
     hostProblems {
       inherit name sshPublicKey requesterLines;
-      facts = factsOf hostConfig;
+      facts = factsOf name hostConfig;
       isTarget = lib.elem name targets;
       inherit (hosts.${name}) deployUser primaryUser;
       isDeployer = name == deployerHost;

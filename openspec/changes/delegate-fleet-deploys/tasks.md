@@ -26,17 +26,24 @@
 
   — verify: `nixos-cinnabar` evaluates green; the VM test covers runtime (4.3)
   - Evidence: `nixos-cinnabar` drvPath evaluates with the obligation met; `users.users.fleet-deployer.openssh.authorizedKeys.keys` is `[ ]` until request keys exist.
-- [ ] 2.2 HOST STEP (returns to the orchestrator first):
+- [x] 2.2 HOST STEP:
   - Deploy cinnabar from stibnite so `fleet-deployer-keys` generates the keys.
-  - Read their public halves on cinnabar: `sudo -u fleet-deployer age-keygen -y …/age.key` and `ssh-keygen -y`.
-  - Commit them to `flake.lib.fleetDeployer.keys` and `sops/users/fleet-deployer/key.json`.
-  - Create the group `fleet-deployers` with only that user, and run `clan vars fix` for the five targets on stibnite.
+  - Read their public halves on cinnabar and commit them to `flake.lib.fleetDeployer.keys` and `sops/users/fleet-deployer/key.json`.
+  - Create the group `fleet-deployers` with only that user, and add it to the targets' machine keys and activation vars (D3). Use a throwaway clone with `CLAN_NO_COMMIT=1` and copy back only the resulting files.
 
   — verify:
-  - `jj diff --stat` touches only `sops/users/fleet-deployer`, `sops/groups/fleet-deployers` and the five targets' `sops/secrets/<m>-age.key` and per-machine vars;
+  - only `sops/users/fleet-deployer`, `sops/groups/fleet-deployers`, the five targets' machine keys and the three activation vars changed;
+  - nothing else gained or lost a recipient, and no secret value changed;
   - `sops-correspondence` passes with its provisioned mutants;
-  - `SOPS_AGE_KEY_FILE=…/age.key sops -d sops/secrets/stibnite-age.key/secret` fails on cinnabar as `fleet-deployer`, and the same for rosegold succeeds;
-  - every alert since the deploy started is recorded with its cause.
+  - every machine check is green with `keys` set, and an added activation var without the group fails.
+  - Evidence (2026-11-18): #4029 deployed cinnabar, and `fleet-deployer-keys` generated the keys (age `age107c7…mpaw`, SSH `…FbyeGR fleet-deployer@cinnabar`; `logs/cam115-step1-cinnabar-*.log`). In a clone of `main@origin` `057a8c5f`, with `CLAN_NO_COMMIT=1`, I ran:
+    - `clan secrets users add fleet-deployer --age-key …`;
+    - `clan secrets groups add-user fleet-deployers fleet-deployer`;
+    - `clan secrets groups add-secret fleet-deployers <m>-age.key` for argentum, cinnabar, magnetite, pyrite and rosegold;
+    - group links plus `clan vars fix <m> -g initrd-ssh` for cinnabar, magnetite and pyrite.
+  - Of the 190 secret files under `sops/secrets` and `vars`, exactly those 8 gained the one recipient `age107c7…mpaw`, and the other 182 have the same recipients as before. stibnite, blackphos, electrum, galena and scheelite are untouched. The sha256 of each of the 8 decrypted values is unchanged.
+  - `sops-correspondence` built with `deployer-key-changed` and `deployer-group-missing` failing as expected. The nine machine-check drvPaths evaluate. On cinnabar, an `extendModules` activation var gives `cinnabar: vars/per-machine/cinnabar/fd-mutant/key is decrypted by the deployer but fleet-deployers is not a reader`; the fixture mutants `activationVarWithoutGroup` and `machineKeyWithoutGroup` each yield one problem.
+  - The decrypt-on-cinnabar test (the deployer reads rosegold's machine key but not stibnite's) moves to task 4.2, the first step run as the deployer.
 - [ ] 2.3 HOST STEP: on cinnabar, make `keys/age.key` mode `0440` and start `fleet-deployer-keycheck`; it fails. Restore the mode; it passes. Record whether `SystemdUnitFailed cinnabar` is posted (open question 3). — verify: unit results and the ntfy post
 - [x] 2.4 The obligation's key-mode clause judges the declared tmpfiles mode and `UMask`. — verify: mutants `deployerWideKeyDir` and `deployerWideUMask` in 1.4
   - Evidence: covered by 1.4's build.
@@ -109,7 +116,7 @@
 
 ## 5. Targets and rollback (D8, D10, D13)
 
-- [x] 5.1 Add `modules/system/fleet-deploy-target.nix` (NixOS and darwin, imported by every base). On targets it installs `fleet-deploy-watch` and, once `keys` is set, adds the restricted key line to the deploy account and `fleet-deployers` to `defaultGroups`. — verify: every machine check is green; the host-judge mutants in 1.4
+- [x] 5.1 Add `modules/system/fleet-deploy-target.nix` (NixOS and darwin, imported by every base). On targets it installs `fleet-deploy-watch` and, once `keys` is set, adds the restricted key line to the deploy account. The group's read access is per file (D3), not through `defaultGroups`. — verify: every machine check is green; the host-judge mutants in 1.4
   - Evidence: all nine machine-check drvPaths evaluate; `fleet-deploy-watch` is in magnetite's `systemPackages`.
 - [ ] 5.2 HOST STEP: after 2.2, deploy each target from stibnite one at a time: cinnabar, magnetite, pyrite, then rosegold and argentum when awake. — verify: on each, `ssh -i <deployer key> <deployUser>@<host> true` succeeds from cinnabar as `fleet-deployer`, and the same key is refused from any other address; every alert since each deploy started is recorded with its cause
 - [x] 5.3 Write `fleet-deploy-watch` (`pkgs/by-name/fleet-deploy-watch`). It watches `/run/current-system`, has a confirm window, rolls back by profile generation plus activation, and removes its own launchd job. — verify: the VM test's rollback case (4.3)

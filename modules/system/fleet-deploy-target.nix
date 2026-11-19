@@ -7,9 +7,15 @@
 # - Once the deployer's keys are committed (flake.lib.fleetDeployer.keys is
 #   not null), adds its SSH key to the deploy account's authorized keys
 #   (root on NixOS, flake.lib.hosts.<name>.deployUser on darwin), restricted
-#   to the deployer's addresses, and lists the sops group fleet-deployers in
-#   clan's default groups, so `clan vars fix` makes the deployer a reader of
-#   this machine's key and activation-phase vars and of nothing else.
+#   to the deployer's addresses.
+#
+# The deployer reads a target's secrets through the sops group
+# fleet-deployers, which is a reader of exactly what `clan machines update`
+# decrypts on the deployer: the machine key and the activation-phase vars
+# (design D3, option a). The group is added per file with clan's own
+# `clan secrets groups add-secret` and group links, not through
+# clan.core.sops.defaultGroups, which would make it a reader of every var of
+# the machine and flag every existing var for `clan vars fix`.
 #
 # flake.lib.fleetDeployer.failures, asserted by modules/checks/machines.nix,
 # fails a target whose deploy account lacks exactly that line and any other
@@ -34,7 +40,6 @@ let
           (fleetDeployer.targetKeyLine fleetDeployer.keys.ssh)
         ];
       };
-      clan.core.sops.defaultGroups = lib.mkIf provisioned [ "fleet-deployers" ];
     };
 in
 {
