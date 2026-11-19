@@ -115,6 +115,14 @@ Rollback: each step is one revertible commit; a host returns to the previous gen
 5. Disk sizes for blackphos, stibnite and pyrite are not recorded in the repo.
 6. What is a collection's normal duration per host, so D7's 60-minute threshold can be set from evidence?
 
+## Findings during apply
+
+- **F47:** temporary roots blocked collection on rosegold (observed during the 2026-11-18 incident).
+- **F49:** `--delete-older-than` keeps the generation at the cutoff, so a host's rollback window (D4) can hold one generation older than the window.
+- **F53:** never delete the generation a profile points at without first checking `/etc/static`. This applies to any manual cleanup, such as the one done on rosegold during the incident.
+- **F58:** a `collect = false` host was in the collector role and received the shared `ntfy-alerter` token without being one of its recipients, so rosegold half-activated. Fixed by keeping `collect = false` hosts out of the role and its secrets, and by a module assertion (`flake.lib.sharedVarsObligations`) that fails any host deploying a shared secret it is not a recipient of.
+- **F66:** a held GC lock blocks every build and realisation on the host, not just collection. On pyrite during the hold test, a new trivial `nix build` hung until it was interrupted at 180 s and `nix-store --realise` of an existing path timed out at 60 s, while `nix path-info` answered at once (`logs/cam113-hold-test-v3-20261118-184927.log`). This is the mechanism behind rosegold's stuck deploys. It raises the stakes of D1: until a stuck run is ended, the host can neither build nor deploy, so the 2-hour bound is the most a stuck run can cost a host, and the 60-minute overrun alert (D7) is how a person learns of it.
+
 ## Gate 1 modality verdicts
 
 This table is the pre-apply spec-and-feature alignment record.
