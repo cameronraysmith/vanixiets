@@ -94,6 +94,7 @@ Stakeholders: the operator (deploys, approves rollback depth), the laptops' user
 - [Trade-off] darwin rollback depth drops from 10 to 7 days → accepted by the operator.
 - [Trade-off] magnetite holds up to 60% of its store quota between runs → accepted for cache hits; min-free/max-free remain the backstop.
 - [Trade-off] the 60-minute alert threshold is a guess → accepted until D2's log gives run times.
+- [Known limit] F69: every new daemon user on a Mac forces a graphical-session activation. nix-darwin cannot create a user over SSH without Full Disk Access, so a remote deploy that adds one aborts at activation, and the operator has to run the generation's `activate` at the machine's keyboard. `_otelcol` did this earlier (F56), and `_prometheus-node-exporter` did it on rosegold on 2026-11-19 → accepted: plan each Mac's first deploy that adds a daemon user as a session at the machine.
 
 ## Migration Plan
 

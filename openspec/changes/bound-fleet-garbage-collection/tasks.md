@@ -45,9 +45,34 @@
 - [ ] 5.6 On rosegold, before its deploy, capture the evidence for open questions 1–3: `launchctl print system/org.nixos.harmonia-gc`, `sudo lsof /nix/var/nix/gc.lock`, `du -sh` over `/nix/var/nix/profiles`, each user's `~/.local/state/nix/profiles` and `/nix/var/nix/gcroots/auto` targets, and `diskutil apfs list` — verify: outputs saved to `logs/rosegold-gc-evidence-<timestamp>.log` and summarised in `verify.md`
 - [ ] 5.7 Deploy rosegold, then argentum, with `collect = false` — verify: as 5.5 for each, plus `home-manager generations` count per user before and after the first expiry run; every alert posted since each deploy recorded
 - [ ] 5.8 Turn `collect = true` for rosegold, carrying the vars the collector role then wires: rosegold's own `otel-cert` (`clan vars generate -g otel-cert rosegold`) and rosegold as a recipient of the shared `ntfy-alerter` token (a `collect = false` host is in no collector role and gets none of its secrets, and `sharedVarsObligations` fails `darwin-rosegold` until it is a recipient; CAM-113 F58); deploy magnetite and rosegold, watch — verify: `darwin-rosegold` evaluates; `vars/shared/ntfy-alerter/token/machines/rosegold` exists; rosegold's file-system and launchd series appear in the `fleet` database under its name within one interval; every alert posted since the deploy recorded with its cause
-  - Operator decision Q44 (2026-11-18): collection is turned on for rosegold and argentum together, in the F58 fix commit (`fix(otel): keep collect=false hosts out of the collector role and its secrets`), not in separate commits. That commit carries the config and vars parts. The watched deploy and its evidence are still to come, after merge.
-  - Operator note: janettesmith is told that rosegold reports to the fleet dashboards.
+  - Operator decision Q44 (2026-11-18): collection is turned on for rosegold and argentum together, in the F58 fix commit (`fix(otel): keep collect=false hosts out of the collector role and its secrets`, #4032), not in separate commits. #4032 merged 2026-11-19T00:52:07Z with the config and vars parts.
+  - Evidence (`logs/clan-update-rosegold-20261118-195213.log`, `logs/pr-f58-collect-recipients-20261118-192030.log`):
+    - Store collection before the deploy (2026-11-18, about 23:15Z, `logs/rosegold-q34-20261118-181515.log`): system generations 16, 18 and 19 were deleted, keeping 17, and the collection freed 31.0 GiB (16519 store paths). `/nix` went from 98 % to 52 % full.
+    - The remote deploy at 00:52Z failed at activation (Return Code 1): "users cannot be create over SSH without Full Disk Access", for the new daemon user `_prometheus-node-exporter` (F69).
+    - The operator then ran `sudo /nix/var/nix/profiles/system-20-link/activate` at rosegold's keyboard. Checked afterwards: generation 20 is running; `/etc` and the system profile agree; `sshd -t` passes; `sops-install-secrets` exited 0, so the shared `ntfy-alerter` token decrypts; both daemon users exist; the collector agents and tincr are running.
+    - Mesh: address `fd09:…:debe`, and `rosegold.vanixiets.internal` answers ping and SSH over tincr from stibnite.
+    - Disk and swap: `/nix` is 56 % full (36 GiB free); swap is 2356 of 3072 MB used.
+    - The tincr launchd entry shows last exit 1 with a live PID. This looks stale and is to be rechecked.
+  - Operator note (2026-11-19): janettesmith has been told that rosegold reports to the fleet dashboards.
+  - Still open:
+    - rosegold's file-system and launchd series have not been read from the `fleet` database.
+    - No alerts posted since the deploy have been read and recorded.
 - [ ] 5.9 The same for argentum (its `otel-cert` and its recipient entry on the `ntfy-alerter` token, in the same Q44 commit), recording its available memory before and after the watched deploy — verify: as 5.8, plus the memory readings
+  - Evidence (`logs/clan-update-argentum-20261118-195520.log`, `logs/pr-f58-collect-recipients-20261118-192030.log`):
+    - The remote deploy at 00:55Z exited rc 0.
+    - These are running: the collector (`org.nixos.otelcol`), the process collector (`org.nixos.otelcol-process`), the host probe, the envelope, `sops-install-secrets` and tincr.
+    - Mesh: address `fd09:…:704e`; ping and SSH over tincr from stibnite succeed.
+    - Free plus inactive memory went from 1.46 to 1.57 GB around the deploy.
+    - Swap used went from 4002 to 4434 MB of 5120 MB. That is not the collector: `otelcol-contrib` peaked at 161.8 MiB in `fleet.process_memory_usage_bytes` over the last 10 min.
+    - `fleet.system_memory_usage_bytes` holds 15 rows for argentum, up to 01:05:27Z.
+  - Store collection and redeploy (2026-11-19, `logs/argentum-space-20261118-201626.log`, `logs/argentum-cleanup-v3-20261118-205932.log`, `logs/clan-update-argentum-20261118-210146.log`):
+    - Before: `/nix` was 95 % full, with 4.1 GiB free.
+    - System generations 22–26 were deleted, keeping 27 and 28. The collection finished at 02:01:44Z and freed 35.6 GiB (18416 store paths); `/nix` is 49 % full.
+    - `[RESOLVED] FilesystemFull argentum` was posted at 02:05:02Z, and `[RESOLVED] FilesystemFillingWarn argentum` at 02:06:02Z.
+    - The redeploy from `main` without `--target-host` failed in home-manager activation with `Bootstrap failed: 5` (F72). The operator then activated generation 29 at the machine: a Mac activation that adds a daemon user needs a local console session (F69, F72).
+  - Still open:
+    - No alerts posted since the deploy have been read and recorded (the log's `greptimedb-sql` readout failed with "command not found").
+    - Operator note, open: christophersmith is to be told that argentum reports to the fleet dashboards.
 
 ## 6. Integration Verification
 
@@ -59,6 +84,7 @@
     - At about 00:50Z `[FIRING] GarbageCollectionOverrun pyrite` reached the operator through ntfy ("harmonia-gc has been running for over an hour, likely waiting for the store lock; its 2 h bound will end it").
     - Concurrency probe at t+5 min (F66): a new trivial `nix build` hung until it was interrupted at 180 s; the log shows "error: interrupted by the user", and the wrapper recorded rc 0. `nix-store --realise` of an existing path timed out at 60 s (rc 124). `nix path-info` answered at once.
   - The test was ended early on purpose at 00:56:31Z (operator decision on cost and benefit) by releasing the lock, after harmonia-gc had waited 1 h 07 min. harmonia-gc then completed with `Result=success`: 13 store paths deleted, 3.11 MiB freed, 153.1M memory peak, 1 h 7 min 3.8 s wall clock. A build after the release succeeded in 9 s.
+  - `[RESOLVED] GarbageCollectionOverrun pyrite` reached the operator at 01:02:03Z (ntfy time), after the release (`logs/cam113-hold-test-v3-20261118-184927.log`).
   - Not proven on the host: the 2-hour stop and the `SystemdUnitFailed pyrite` alert that follows it. The 2-hour stop is proven in the VM (task 2.3, timeout shortened to 20 s) and `TimeoutStartUSec=2h` is confirmed configured on pyrite. The alert that follows it was not observed. This step stays open for that part only.
 - [x] 6.2 Verify the store is consistent after a stopped run: `nix-store --verify` reports no missing or damaged path, and no process holds `gc.lock` (A150)
   - Evidence: in the VM (task 2.3), after the unit was stopped at its timeout and the `timeout`-wrapped run was killed, `nix-store --verify --check-contents` passed, a non-blocking `flock -n -x` on `gc.lock` succeeded, and the next run completed. On pyrite, after the 1 h 07 min held run, `nix-store --verify` returned rc 0, the unit was `inactive` with `Result=success ExecMainStatus=0`, and no unit had failed. That run was released, not stopped by its bound. The stibnite step this task first named was replaced by the VM, so no real darwin host's lock was held (Main, 2026-11-18).
