@@ -71,6 +71,23 @@
       "allowedVersions": "<10"
     },
     {
+      "description": "semantic-release 26 requires Node >=26.13, while the release app runs nixpkgs' default Node 24, and 26.0.1 depends on beta plugins (@semantic-release/core, commit-analyzer, npm and release-notes-generator prereleases). Hold on 25.x; revisit when its plugins are stable.",
+      "matchPackageNames": ["semantic-release"],
+      "allowedVersions": "<26"
+    },
+    {
+      "description": "bun is derived, not tracked: the packageManager field must equal the nixpkgs bun that renovate's bun post-upgrade task runs, or a different bun can rewrite bun.lock. The renovate aspect (modules/nixos/renovate.nix) asserts the pairing, so a flake.lock bump that moves nixpkgs bun must carry the packageManager edit. Renovate never proposes it on its own.",
+      "matchManagers": ["bun"],
+      "matchDepTypes": ["packageManager"],
+      "matchPackageNames": ["bun"],
+      "enabled": false
+    },
+    {
+      "description": "Typst @preview package versions follow nixpkgs typstPackages: the docs build compiles diagrams offline with typst.withPackages (modules/nixpkgs/overlays/typst.nix), so an import of a version nixpkgs does not ship fails in the sandbox. Bump the imports alongside a flake.lock update that brings the package. Renovate never proposes them on its own.",
+      "matchManagers": ["typst"],
+      "enabled": false
+    },
+    {
       "description": "Regex-manager flake.nix ref bumps never touch flake.lock; re-lock in the same commit so nixbot evaluates a complete tree.",
       "matchManagers": ["custom.regex"],
       "postUpgradeTasks": {
