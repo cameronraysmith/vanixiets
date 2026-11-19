@@ -120,11 +120,15 @@ Reference a new secret from the user's home module; `defaultSopsFile` already po
 ```nix
 # modules/home/users/<user>/default.nix
 sops = {
-  defaultSopsFile = flake.inputs.self + "/secrets/home-manager/users/<user>/secrets.yaml";
+  defaultSopsFile = ../../../../secrets/home-manager/users/<user>/secrets.yaml;
   secrets.my-new-secret = { };
 };
 # elsewhere: config.sops.secrets.my-new-secret.path
 ```
+
+Name the file with a path literal, never `inputs.self + "/secrets/..."`.
+A path literal copies only that file into the store, while `inputs.self` makes the secrets manifest depend on the whole repository, so every commit would change every host that carries it.
+An assertion on every host and home (`flake.lib.sourceContextObligations`) fails evaluation, naming the option, when a sops file or a home-manager file source references the repository source that way.
 
 Deploy with `just activate` (darwin, or a standalone home) or `clan machines update <machine>` (NixOS).
 

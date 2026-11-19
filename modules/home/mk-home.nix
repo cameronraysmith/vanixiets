@@ -27,6 +27,8 @@
         # name cannot be resolved, so the formal's own default never applies.
         osConfig = null;
       };
-      modules = config.flake.users.${user}.modules;
+      modules = config.flake.users.${user}.modules ++ [
+        config.flake.lib.sourceContextObligations.homeModule
+      ];
     };
 }

@@ -53,7 +53,7 @@ let
       sopsInstallWithoutSystemd.enable = true;
 
       sops = {
-        defaultSopsFile = flake.inputs.self + "/secrets/home-manager/users/ubuntu/secrets.yaml";
+        defaultSopsFile = ../../../../secrets/home-manager/users/ubuntu/secrets.yaml;
 
         age.keyFile = lib.mkForce "${sopsDir}/age/keys.txt";
 

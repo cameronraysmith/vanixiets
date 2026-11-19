@@ -164,7 +164,7 @@ In your user module (`modules/home/users/yourname/default.nix`) point sops-nix a
 
 ```nix
 sops = {
-  defaultSopsFile = flake.inputs.self + "/secrets/home-manager/users/yourname/secrets.yaml";
+  defaultSopsFile = ../../../../secrets/home-manager/users/yourname/secrets.yaml;
   secrets = {
     github-token = { };
     some-api-key = { };

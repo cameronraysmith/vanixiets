@@ -281,7 +281,7 @@ Each user has a module directory in `modules/home/users/<username>/default.nix`:
 
       # sops-nix user secrets
       sops = {
-        defaultSopsFile = flake.inputs.self + "/secrets/home-manager/users/crs58/secrets.yaml";
+        defaultSopsFile = ../../../../secrets/home-manager/users/crs58/secrets.yaml;
         secrets = {
           github-token = { };
           ssh-signing-key = { mode = "0400"; };

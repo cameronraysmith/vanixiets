@@ -151,7 +151,7 @@ Each user's home-manager module points sops-nix at that user's file:
 ```nix
 # modules/home/users/crs58/default.nix
 sops = {
-  defaultSopsFile = flake.inputs.self + "/secrets/home-manager/users/crs58/secrets.yaml";
+  defaultSopsFile = ../../../../secrets/home-manager/users/crs58/secrets.yaml;
   secrets.github-token = { };
 };
 ```

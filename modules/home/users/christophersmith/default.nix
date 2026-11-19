@@ -5,7 +5,6 @@ let
   content =
     {
       pkgs,
-      flake,
       ...
     }:
     {
@@ -20,7 +19,7 @@ let
       ];
 
       sops = {
-        defaultSopsFile = flake.inputs.self + "/secrets/home-manager/users/christophersmith/secrets.yaml";
+        defaultSopsFile = ../../../../secrets/home-manager/users/christophersmith/secrets.yaml;
         secrets = {
           github-token = { };
           ssh-signing-key = {

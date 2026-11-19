@@ -38,7 +38,7 @@
 #
 # This module has no OpenSpec change and no ADR: its introducing commit 5be53d720 carries
 # a subject line and no body, so this header is the entire design record.
-flakeArgs@{ inputs, ... }:
+flakeArgs@{ ... }:
 {
   flake.modules.nixos.hm-sops-bridge =
     {
@@ -86,8 +86,8 @@ flakeArgs@{ inputs, ... }:
             username: userCfg:
             let
               host = config.clan.core.settings.machine.name;
-              bridgeFile = inputs.self + "/secrets/bridge/${userCfg.sopsIdentity}-age-key.enc";
-              machineKeyFile = inputs.self + "/sops/machines/${host}/key.json";
+              bridgeFile = ../../secrets/bridge/${userCfg.sopsIdentity}-age-key.enc;
+              machineKeyFile = ../../sops/machines/${host}/key.json;
               bridgeExists = builtins.pathExists bridgeFile;
               # The binary sops store is JSON on disk; recipients are public metadata.
               recipients = map (r: r.recipient) (builtins.fromJSON (builtins.readFile bridgeFile)).sops.age;
@@ -123,7 +123,7 @@ flakeArgs@{ inputs, ... }:
         sops.secrets = lib.mapAttrs' (
           username: userCfg:
           lib.nameValuePair "${userCfg.sopsIdentity}-age-key" {
-            sopsFile = inputs.self + "/secrets/bridge/${userCfg.sopsIdentity}-age-key.enc";
+            sopsFile = ../../secrets/bridge/${userCfg.sopsIdentity}-age-key.enc;
             format = "binary";
             owner = username;
             mode = "0400";

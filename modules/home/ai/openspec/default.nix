@@ -1,4 +1,4 @@
-{ config, inputs, ... }:
+{ config, ... }:
 {
   flake.modules.homeManager.ai.imports = [ config.flake.modules.homeManager.openspec ];
   flake.modules.homeManager.openspec =
@@ -14,7 +14,7 @@
     }:
     let
       cfg = config.programs.openspec;
-      assetsDir = inputs.self + "/modules/home/ai/openspec/assets";
+      assetsDir = ./assets;
       jsonFormat = pkgs.formats.json { };
     in
     {
@@ -83,7 +83,7 @@
           );
           defaultText = lib.literalExpression ''
             lib.genAttrs [ "superpowers-bridge" "superpowers-bridge-wrspm" ] (
-              name: inputs.self + "/modules/home/ai/openspec/assets/schemas/''${name}"
+              name: ./assets/schemas/''${name}
             )
           '';
           description = ''

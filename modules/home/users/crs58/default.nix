@@ -149,7 +149,7 @@ let
       # sops-nix configuration for crs58/cameron user
       # 22 secrets: development + ai + shell aggregates
       sops = {
-        defaultSopsFile = flake.inputs.self + "/secrets/home-manager/users/crs58/secrets.yaml";
+        defaultSopsFile = ../../../../secrets/home-manager/users/crs58/secrets.yaml;
         secrets = {
           github-token = { };
           ssh-signing-key = {

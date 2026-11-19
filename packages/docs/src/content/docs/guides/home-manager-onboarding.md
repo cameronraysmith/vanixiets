@@ -158,7 +158,7 @@ Use sops in the user module, leaving the age key file location to `base-sops`, w
 {
   flake.modules.homeManager."users/raquel" = { pkgs, lib, ... }: {
     sops = {
-      defaultSopsFile = "${inputs.self}/secrets/home-manager/users/raquel/secrets.yaml";
+      defaultSopsFile = ../../../../secrets/home-manager/users/raquel/secrets.yaml;
       secrets = {
         "github-token" = { };
         "ssh-signing-key" = {
