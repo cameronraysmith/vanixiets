@@ -72,36 +72,52 @@ magnetite's configuration SHALL set `systemd.services.nixbot.environment.NIXBOT_
 
 ### Requirement: The canary compares the evaluators inside nixbot's sandbox
 
-Before the switch, the iets package SHALL run on magnetite as `nix-eval-jobs`, through nixbot's own sandbox command and argv and behind the host lock, for a worktree of each canary commit, and its output SHALL be compared per attribute with the stock evaluator's for the same commit and argv.
+Before the switch, the iets package SHALL run on magnetite as `nix-eval-jobs`, through nixbot's own sandbox command and argv and behind the host lock, back to back with the stock evaluator on a worktree of each replayed commit, alternating which runs first, while no nixbot evaluation runs; outputs SHALL be compared per attribute, and each run's peak, ceiling, kills and wall time recorded and kept out of the baseline.
 
 **Discharged by**: the canary's logs and comparison under `logs/`, recorded in the change's verification, resting on world assumptions `A143 — iets evaluates without building, never reads a flake's nixConfig, and asks the daemon for cache status` and `A147 — iets computes the same derivations as nix-eval-jobs for this repository's checks`.
 
 #### Scenario: The canary's comparison is read
 
-- **WHEN** the comparison of the four canary commits is read
-- **THEN** every attribute matches on the compared fields, each of `local`, `cached` and `notBuilt` occurs at least once, and the failing commit fails under both evaluators on the same attributes
+- **WHEN** the comparison of the replayed commits is read
+- **THEN** every attribute matches on the compared fields, each of `local`, `cached` and `notBuilt` occurs at least once, the failing commit fails under both evaluators on the same attributes, and each run's peak against its ceiling, kills and wall time stand beside it
 
 #### Scenario: The canary's commits and fields are chosen
 
 - **WHEN** the canary is prepared
-- **THEN** its commits include one whose outputs are all on magnetite, one with outputs only a fleet binary cache holds, one with outputs no cache holds, and one whose evaluation fails, and the comparison covers `drvPath`, `outputs`, `system`, `cacheStatus` and the presence of `error`
+- **THEN** its about twenty commits, all already evaluated by nixbot, include the five heaviest by stock memory peak, the five slowest by wall time, the latest flake update, one whose outputs are all on magnetite, one with outputs only a fleet binary cache holds, one with outputs no cache holds, and one whose evaluation fails, the rest drawn at random from recent days; the comparison covers `drvPath`, `outputs`, `system`, `cacheStatus` and the presence of `error`
 
 ### Requirement: magnetite reports each competing unit's memory and its compressed swap
 
-The host nixbot runs on SHALL run `magnetite-memory-budget.service` every 60 s, replacing `/run/magnetite-memory-budget/memory-budget.prom` by write-then-rename with systemd's `MemoryCurrent` and `MemoryPeak` of each active unit matching `memoryBudgetUnits`, `system.slice` and `user.slice`, and zram0's `mm_stat` sizes.
-Its node_exporter SHALL read that directory through its `textfile` collector, and the five series names SHALL join `nodeExporterKeep`.
+The host nixbot runs on SHALL run `magnetite-memory-budget.service` every 60 s, replacing `/run/magnetite-memory-budget/memory-budget.prom` by write-then-rename with the `MemoryCurrent` and `MemoryPeak` of each active unit matching `memoryBudgetUnits` and of both slices, zram0's `mm_stat` sizes, and `user.slice`'s `memory.events` `high` count.
+node_exporter SHALL read it through its `textfile` collector, and the six series names SHALL join `nodeExporterKeep`.
 
-**Discharged by**: `checks.x86_64-linux.magnetite-memory-budget`, which formats systemctl output recorded on magnetite with its mutants; the evaluation-time assertion of `flake.modules.nixos.magnetite-memory-budget` that node_exporter runs its textfile collector on the probe's directory and that `nodeExporterKeep` holds the five names; a read of the stored series after deploy; resting on world assumption `A153 — The collector's systemd receiver reports no unit memory, and the kernel reports each service's memory and zram's footprint`.
+**Discharged by**: `checks.x86_64-linux.magnetite-memory-budget`, which formats systemctl output recorded on magnetite and a recorded `memory.events` with its mutants; the evaluation-time assertion of `flake.modules.nixos.magnetite-memory-budget` that node_exporter runs its textfile collector on the probe's directory and that `nodeExporterKeep` holds the six names; a read of the stored series after deploy; resting on world assumption `A153 — The collector's systemd receiver reports no unit memory, and the kernel reports each service's memory and zram's footprint`.
 
 #### Scenario: The probe's output is read on magnetite
 
 - **WHEN** `memory-budget.prom` is read on magnetite after deploy
-- **THEN** it holds `vanixiets_unit_memory_current_bytes` and `vanixiets_unit_memory_peak_bytes` for each running unit of the list and for `system.slice` and `user.slice`, and `vanixiets_zram_orig_data_bytes`, `vanixiets_zram_compr_data_bytes` and `vanixiets_zram_mem_used_bytes`, with `omnigent-host-<owner>.service` written under its owner alias, and no series for a unit that is not running
+- **THEN** it holds `vanixiets_unit_memory_current_bytes` and `vanixiets_unit_memory_peak_bytes` for each running unit of the list and for `system.slice` and `user.slice`, `vanixiets_zram_orig_data_bytes`, `vanixiets_zram_compr_data_bytes` and `vanixiets_zram_mem_used_bytes`, and `vanixiets_unit_memory_high_events{unit="user.slice"}`, with `omnigent-host-<owner>.service` written under its owner alias, and no series for a unit that is not running
 
 #### Scenario: The keep-list loses a budget series
 
 - **WHEN** a mutant of `nodeExporterKeep` drops `vanixiets_unit_memory_current_bytes`
 - **THEN** magnetite's evaluation fails on the assertion
+
+### Requirement: magnetite's user sessions carry a soft memory guard
+
+magnetite's `user.slice` SHALL carry `MemoryHigh` 10G and no `MemoryMax`, so user sessions are throttled and reclaimed first above it and nothing is killed; `nix-daemon.service`, `nixbot.service` and `system.slice` SHALL carry no memory limit from this guard.
+
+**Discharged by**: `flake.modules.nixos.magnetite-user-slice-guard`'s evaluation-time assertion, which the `nixos-magnetite` check evaluates, and `checks.x86_64-linux.user-slice-guard-obligations`, which runs its judge over fixtures; the `high` count of the budget probe shows how often it throttles.
+
+#### Scenario: The guard loses its MemoryHigh
+
+- **WHEN** a mutant of magnetite's configuration forces `user.slice`'s `MemoryHigh` to null
+- **THEN** magnetite's evaluation fails on the guard's assertion
+
+#### Scenario: The guard gains a MemoryMax
+
+- **WHEN** a mutant of magnetite's configuration gives `user.slice` a `MemoryMax`
+- **THEN** magnetite's evaluation fails on the guard's assertion, because the guard kills nothing
 
 ### Requirement: This capability states its own trust boundary
 

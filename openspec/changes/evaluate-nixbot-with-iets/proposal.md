@@ -27,7 +27,7 @@ The swap fits the evaluator setting nixbot already exposes, but iets fails a who
 **A record of every nixbot evaluation**
 - From: nixbot keeps an evaluation's duration and per-attribute counters, and nothing records how close an evaluation came to its memory ceiling, whether the kernel killed part of it, or which evaluator ran.
 - To: a fifth patch on nixbot logs one structured record per evaluation (evaluator and version, workers, per-worker memory limit, wall, user and system time, the evaluation's memory peak against its ceiling, kernel kills, the evaluator's own kill messages, exit status), which the collector copies into a new dev-loop table, the daily reconcile checks, and the dev-loop view charts.
-- Reason: the decisions to switch, to keep iets, and to give it room all rest on these numbers, and the first week of them is the baseline under the current evaluator.
+- Reason: the decisions to switch, to keep iets, and to give it room all rest on these numbers, and their first 48 hours or more, holding a flake-update evaluation, are the baseline under the current evaluator.
 - Impact: non-breaking; one more dev-loop table and chart. buildbot's and `nix-fast-build --remote`'s evaluations are not recorded.
 
 **A memory budget for magnetite**
@@ -38,7 +38,7 @@ The swap fits the evaluator setting nixbot already exposes, but iets fails a who
 
 **nixbot's evaluator**
 - From: nixbot evaluates with its own patched nix-eval-jobs behind the host evaluation lock.
-- To: after a week of baseline and a canary inside nixbot's real sandbox, nixbot evaluates with iets behind the same lock, through a minimal package exposing iets as `nix-eval-jobs` with nixbot's own Nix grafted on; nothing else on any host changes.
+- To: after a baseline of at least 48 hours and a paired replay of about twenty already-evaluated commits under both evaluators inside nixbot's real sandbox (design D13), nixbot evaluates with iets behind the same lock, through a minimal package exposing iets as `nix-eval-jobs` with nixbot's own Nix grafted on; nothing else on any host changes.
 - Reason: about 3x less evaluation CPU at identical results, without the shared writable cache of Mic92/nixbot#255 or a fleet-wide shim.
 - Impact: non-breaking for results; one more flake input. A worker killed for memory fails the whole evaluation instead of being retried. Reverting one line to the stock package stays as the immediate safety valve for a failing or broken evaluation.
 
