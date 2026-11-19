@@ -403,17 +403,17 @@
     "easykubenix": {
       "flake": false,
       "locked": {
-        "lastModified": 1794946515,
-        "narHash": "sha256-lHn+ZHFbu51rimTqDbq0GRh/8zpZfFCaDE6KmDCnStU=",
+        "lastModified": 1795091624,
+        "narHash": "sha256-1boDn54LvN5KF8zh8ogMdSoZJjSiC+OQBFTqDimQDt0=",
         "owner": "nixidae",
         "repo": "easykubenix",
-        "rev": "3e49ac61a71aad99db0303699aac25c8b6df9c10",
+        "rev": "245b16d037a1c5a9e62595bfa256ef7c6d239984",
         "type": "github"
       },
       "original": {
         "owner": "nixidae",
         "repo": "easykubenix",
-        "rev": "3e49ac61a71aad99db0303699aac25c8b6df9c10",
+        "rev": "245b16d037a1c5a9e62595bfa256ef7c6d239984",
         "type": "github"
       }
     },
