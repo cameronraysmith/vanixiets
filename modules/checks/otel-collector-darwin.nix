@@ -98,6 +98,10 @@
             processSettings
             envelopeMemoryLimits
             ;
+          # nix-darwin leaves EnvironmentVariables null without `environment`.
+          processEnvironment =
+            lib.defaultTo { }
+              self.darwinConfigurations.stibnite.config.launchd.daemons.otelcol-process.serviceConfig.EnvironmentVariables;
         };
       };
 
@@ -256,6 +260,18 @@
             "org.nixos.otelcol" = 256 * 1024 * 1024;
             "org.nixos.otelcol-process" = 128 * 1024 * 1024;
           };
+        # F67: otelcol-process's Go runtime bounded below C5's limit less
+        # the footprint GOMEMLIMIT cannot reduce, 44 MiB typed here from
+        # stibnite's `footprint` on 2026-11-19 (41 MB dirty __DATA_CONST,
+        # 2.3 MB __DATA, 0.9 MB page table; the fragment's comment).
+        processGoMemLimit =
+          let
+            m = builtins.match "([0-9]+)MiB" (i.fragment.processEnvironment.GOMEMLIMIT or "");
+          in
+          m != null
+          &&
+            lib.toInt (builtins.head m) * 1024 * 1024
+            <= i.fragment.envelopeMemoryLimits."org.nixos.otelcol-process" - 44 * 1024 * 1024;
         otlpFeedsHostOnly =
           let
             p = i.fragment.agentSettings.service.pipelines;
@@ -355,6 +371,21 @@
             lib.recursiveUpdate i {
               fragment.envelopeMemoryLimits."org.nixos.otelcol" = 268435457;
             };
+        };
+        goMemLimitDropped = {
+          clause = "processGoMemLimit";
+          apply =
+            i:
+            i
+            // {
+              fragment = i.fragment // {
+                processEnvironment = builtins.removeAttrs i.fragment.processEnvironment [ "GOMEMLIMIT" ];
+              };
+            };
+        };
+        goMemLimitAtC5 = {
+          clause = "processGoMemLimit";
+          apply = i: lib.recursiveUpdate i { fragment.processEnvironment.GOMEMLIMIT = "128MiB"; };
         };
         otlpFeedsLogs = {
           clause = "otlpFeedsHostOnly";
