@@ -5,13 +5,17 @@ Writes, by write-then-rename, one file of:
   vanixiets_unit_memory_peak_bytes{unit="<unit>"} from systemd's
   MemoryCurrent and MemoryPeak, for each active unit matching the
   configured patterns and for system.slice and user.slice, and
-  vanixiets_zram_{orig_data,compr_data,mem_used}_bytes from zram0's mm_stat.
+  vanixiets_zram_{orig_data,compr_data,mem_used}_bytes from zram0's mm_stat,
+  and vanixiets_unit_memory_high_events{unit="user.slice"}, the `high`
+  count of user.slice's memory.events: how often the slice's MemoryHigh
+  guard (CAM-111 D14) has throttled it since boot.
 systemd reads each unit's own cgroup wherever it is nested, so a unit
 under a sub-slice is covered. An inactive unit, or a value systemd reports
-as [not set], writes no series.
+as [not set], writes no series; neither does a missing events file.
 
 Usage: probe.py CONFIG OUTPUT_FILE
-       probe.py --format CONFIG SHOW_OUTPUT MM_STAT   (prints the file)
+       probe.py --format CONFIG SHOW_OUTPUT MM_STAT USER_SLICE_EVENTS
+       (prints the file)
 CONFIG is JSON: {"units": [patterns], "aliases": {owner: alias}}.
 """
 
@@ -25,6 +29,8 @@ from pathlib import Path
 SLICES = ["system.slice", "user.slice"]
 ZRAM = Path("/sys/block/zram0/mm_stat")
 ZRAM_FIELDS = ["orig_data", "compr_data", "mem_used"]
+EVENTS_SLICE = "user.slice"
+EVENTS = Path("/sys/fs/cgroup/user.slice/memory.events")
 OWNER_UNIT = re.compile(r"^omnigent-host-(?P<owner>.+)\.service$")
 
 
@@ -50,7 +56,7 @@ def label(unit, aliases):
     return unit
 
 
-def format_budget(show_text, mm_stat_text, aliases):
+def format_budget(show_text, mm_stat_text, aliases, events_text):
     lines = []
     for props in parse_show(show_text):
         unit = props.get("Id", "")
@@ -72,6 +78,12 @@ def format_budget(show_text, mm_stat_text, aliases):
     ):
         for name, value in zip(ZRAM_FIELDS, fields):
             lines.append(f"vanixiets_zram_{name}_bytes {value}")
+    for line in events_text.splitlines():
+        key, _, value = line.partition(" ")
+        if key == "high" and value.isdigit():
+            lines.append(
+                f'vanixiets_unit_memory_high_events{{unit="{EVENTS_SLICE}"}} {value}'
+            )
     return "".join(f"{line}\n" for line in lines)
 
 
@@ -99,7 +111,8 @@ def collect(config):
         *SLICES,
     )
     mm_stat = ZRAM.read_text() if ZRAM.exists() else ""
-    return format_budget(show, mm_stat, config["aliases"])
+    events = EVENTS.read_text() if EVENTS.exists() else ""
+    return format_budget(show, mm_stat, config["aliases"], events)
 
 
 def main(argv):
@@ -110,6 +123,7 @@ def main(argv):
                 Path(argv[3]).read_text(),
                 Path(argv[4]).read_text(),
                 config["aliases"],
+                Path(argv[5]).read_text(),
             )
         )
         return

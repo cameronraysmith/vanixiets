@@ -55,6 +55,7 @@ in
         deploy-record
         hm-sops-bridge
         kvm-declaration
+        magnetite-user-slice-guard
         memory-pressure-guards
         niks3
         nix-eval-lock

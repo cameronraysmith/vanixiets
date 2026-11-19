@@ -76,6 +76,7 @@
       "vanixiets_zram_orig_data_bytes"
       "vanixiets_zram_compr_data_bytes"
       "vanixiets_zram_mem_used_bytes"
+      "vanixiets_unit_memory_high_events"
     ];
 
     # The units magnetite's memory budget reports (CAM-111 design D11), as

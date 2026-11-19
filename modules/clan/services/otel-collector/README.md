@@ -157,7 +157,7 @@ Nothing imports `schema.nix` by path; import-tree loads it as a flake-parts modu
 - `ownerAliases`: owner name to opaque alias.
   `omnigent-host-<owner>.service` is stored as `omnigent-host-<alias>.service`, so no owner's name becomes a label value.
 - `promotedResourceAttributes`: the resource attributes the store promotes to labels.
-- `nodeExporterKeep`: the node_exporter series the `node` scrape keeps; every other series is dropped. It includes the five `vanixiets_unit_memory_*` and `vanixiets_zram_*` series of the evaluation host's memory-budget probe (`modules/nixos/magnetite-memory-budget.nix`, CAM-111), which only that host writes, to its node_exporter's textfile collector.
+- `nodeExporterKeep`: the node_exporter series the `node` scrape keeps; every other series is dropped. It includes the six `vanixiets_unit_memory_*` and `vanixiets_zram_*` series of the evaluation host's memory-budget probe (`modules/nixos/magnetite-memory-budget.nix`, CAM-111), which only that host writes, to its node_exporter's textfile collector; `vanixiets_unit_memory_high_events` counts how often user.slice's soft memory guard throttled it.
 - `memoryBudgetUnits`: the systemctl patterns of the units whose `MemoryCurrent` and `MemoryPeak` the memory-budget probe reports, because the `systemd` receiver reports no unit memory at contrib 0.155.0.
 - `process.minBytes`: per platform (`linux`, 64 MiB; `darwin`, 384 MiB), the floor below which one process's `process.memory.usage` point is dropped; an executable whose processes are each below the floor is not stored, however large their total.
   The darwin floor is higher because macOS RSS counts each process's share of the dyld shared cache and frameworks.

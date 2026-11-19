@@ -10,3 +10,4 @@ vanixiets_unit_memory_peak_bytes{unit="system.slice"} 26106765312
 vanixiets_zram_orig_data_bytes 4981981184
 vanixiets_zram_compr_data_bytes 463527779
 vanixiets_zram_mem_used_bytes 552349696
+vanixiets_unit_memory_high_events{unit="user.slice"} 1273
