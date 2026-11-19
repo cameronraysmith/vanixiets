@@ -432,6 +432,40 @@
               print("ok: longRun", flush=True)
             '';
 
+            # F64: a process whose comm fills the kernel's 15 bytes and whose
+            # argv[0] carries its command line, as Chromium's retitled
+            # processes do, is stored under its executable's name alone.
+            processName = ''
+              print("=== case processName", flush=True)
+              fresh_start()
+              EXE = "abcdefghijklmnop-x"
+              TITLE = f"/tmp/{EXE} --field-trial-handle=3,i,7729614572803203038"
+              store.succeed(
+                  f"ln -sf ${pkgs.python3}/bin/python3 /tmp/{EXE}",
+                  "systemd-run --unit=f64-title --property=Type=exec bash -c "
+                  + shlex.quote(f"exec -a {shlex.quote(TITLE)} /tmp/{EXE} -c 'import time; b = b\"x\" * (96 << 20); time.sleep(3600)'"),
+              )
+              pid = store.succeed("systemctl show -p MainPID --value f64-title.service").strip()
+              store.wait_until_succeeds(f"test \"$(cat /proc/{pid}/comm)\" = {EXE[:15]}", timeout=30)
+              assert store.succeed(f"tr '\\0' '\\n' < /proc/{pid}/cmdline | head -n 1").strip() == TITLE
+              SQL = (
+                  "SELECT host_name, process_executable_name FROM process_memory_usage_bytes "
+                  f"WHERE process_executable_name LIKE '{EXE[:15]}%' GROUP BY host_name, process_executable_name ORDER BY host_name"
+              )
+
+
+              def names():
+                  rows = gsql(SQL)
+                  print(f"  {rows}", flush=True)
+                  return rows
+
+
+              wait_for(lambda: {row[0] for row in names()} == {"electrum", "store"}, "both collectors' scrapes of the process", 240)
+              assert names() == [["electrum", EXE], ["store", EXE]], names()
+              store.succeed("systemctl stop f64-title.service", f"rm /tmp/{EXE}")
+              print("ok: processName", flush=True)
+            '';
+
             absentClientCa = ''
               print("=== case absentClientCa", flush=True)
               fresh_start()
@@ -634,6 +668,7 @@
             '';
 
             cases = [
+              processName
               refusal
               delivery
               backPressure
