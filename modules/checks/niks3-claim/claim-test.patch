@@ -1,0 +1,68 @@
+diff --git a/server/claim_test.go b/server/claim_test.go
+index 07e7922..ed678a0 100644
+--- a/server/claim_test.go
++++ b/server/claim_test.go
+@@ -5,6 +5,7 @@ import (
+ 	"encoding/json"
+ 	"fmt"
+ 	"maps"
++	"strconv"
+ 	"strings"
+ 	"sync"
+ 	"testing"
+@@ -390,3 +391,55 @@ func TestClaim_CollectedWithItsObjects(t *testing.T) {
+ 		t.Fatalf("%d claims left after their objects were collected", n)
+ 	}
+ }
++
++// A push that signs a key another push committed meanwhile needs the claim
++// in a transaction. The call without one says so and keeps nothing; it does
++// not fail, which PostgreSQL would log as an error on every such push.
++func TestClaim_NeedingATransactionRaisesNothing(t *testing.T) {
++	t.Parallel()
++
++	service := claimService(t)
++	defer service.Close()
++
++	first, second := newBuild(1, 1, 2), newBuild(1, 2, 2)
++	firstID, secondID := first.push(t, service), second.push(t, service)
++
++	first.sign(t, service, firstID)
++	completePush(t, service, firstID)
++
++	pushID, err := strconv.ParseInt(secondID, 10, 64)
++	ok(t, err)
++
++	narinfos := make([][]byte, len(second.outputs))
++	for out := range narinfos {
++		narinfos[out] = []byte("{}")
++	}
++
++	answer, err := pg.New(service.Pool).ClaimNarinfos(t.Context(), pg.ClaimNarinfosParams{
++		PushID: pushID, Keys: second.keys(), NarKeys: second.nars, Narinfos: narinfos,
++	})
++	if err != nil {
++		t.Fatalf("claim without a transaction failed: %v", err)
++	}
++
++	var claim struct {
++		NeedsTransaction bool `json:"needs_transaction"`
++	}
++
++	ok(t, json.Unmarshal(answer, &claim))
++
++	if !claim.NeedsTransaction {
++		t.Fatalf("claim without a transaction answered %s, want needs_transaction", answer)
++	}
++
++	if n := countRows(t, service, `SELECT count(*) FROM publish_claims`); n != 0 {
++		t.Fatalf("claim without a transaction kept %d claims", n)
++	}
++
++	told := second.sign(t, service, secondID)
++	for out, key := range first.keys() {
++		if told[key] != first.nars[out] {
++			t.Fatalf("second build was told %v is published, want the first build's %v", told, first.nars)
++		}
++	}
++}
