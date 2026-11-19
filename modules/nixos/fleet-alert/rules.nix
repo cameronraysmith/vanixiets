@@ -266,6 +266,36 @@
           annotations.summary = "A loopback exporter the collector scrapes is down";
           presence = [ (presence agentHosts ''up{job="node"}'') ];
         }
+        # F61: on 2026-11-19 every database on magnetite recorded glibc
+        # collation version 2.42 under glibc 2.44, its text indexes stale, and
+        # nothing noticed until pg_dump warned. flake.modules.nixos.postgresql-collation
+        # writes 1 for a database whose recorded datcollversion is not null
+        # and IS DISTINCT FROM pg_database_collation_actual_version(oid),
+        # PostgreSQL's own connection-time check, which skips a database
+        # with no recorded version, since a null is never comparable
+        # (template0 has none); a deploy that bumps glibc restarts
+        # PostgreSQL on the new library, so the drift shows from the deploy
+        # that causes it. A parked service's database is left out by the
+        # probe (vanixiets.postgresqlCollation.parkedDatabases). One
+        # instance per database; the message names it as datname, with
+        # both versions. No presence selector: the host table does not say
+        # which hosts run PostgreSQL, and a failing probe is a notified
+        # unit, postgresql-collation, on magnetite.
+        #
+        # Runbook: on the host, for each named database <db>, as postgres:
+        #   sudo -u postgres psql -d <db> -c 'REINDEX DATABASE "<db>"' \
+        #     -c 'ALTER DATABASE "<db>" REFRESH COLLATION VERSION'
+        # The refresh alone hides the drift without repairing the indexes,
+        # so reindex first. The instance resolves 5 min after the probe
+        # writes 0. Reviving cognee needs pgvector in PostgreSQL's
+        # extensions first (F63), then this reindex.
+        {
+          alert = "PostgresqlCollationDrift";
+          expr = "vanixiets_postgresql_collation_drift == 1";
+          for = "10m";
+          severity = "warning";
+          annotations.summary = "A PostgreSQL database's recorded collation version differs from the system library's, so its text indexes may be stale; on the host run, as postgres, psql -d <datname> -c 'REINDEX DATABASE \"<datname>\"' -c 'ALTER DATABASE \"<datname>\" REFRESH COLLATION VERSION' (runbook in modules/nixos/fleet-alert/rules.nix)";
+        }
         {
           alert = "WeeklyPipelineTest";
           expr = "count(count by (host_name) (system_memory_usage_bytes))";

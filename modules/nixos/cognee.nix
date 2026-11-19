@@ -36,6 +36,18 @@ in
       postgresBind = config.services.postgresql.settings.listen_addresses;
     in
     {
+      # While parked, its database is unreadable without pgvector (F63) and
+      # so cannot be reindexed; the collation drift probe
+      # (./postgresql-collation.nix) leaves it out, and turning cognee on
+      # brings it back under PostgresqlCollationDrift.
+      imports = [
+        {
+          vanixiets.postgresqlCollation.parkedDatabases = lib.mkIf (!config.vanixiets.cognee.enable) [
+            config.services.cognee.database.name
+          ];
+        }
+      ];
+
       # Off by default: the server's Python closure (fastapi-users and the rest)
       # stays out of the system until it is wanted again. The generated vars
       # under vars/per-machine/magnetite/cognee-* and the root/cognee dataset are

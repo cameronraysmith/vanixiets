@@ -71,6 +71,16 @@
       "job": "node",
       "service_instance_id": "127.0.0.1:9100",
       "service_name": "node"
+    },
+    "PostgresqlCollationDrift": {
+      "collversion_actual": "2.44",
+      "collversion_recorded": "2.42",
+      "datname": "nixbot",
+      "host_name": "magnetite",
+      "instance": "127.0.0.1:9100",
+      "job": "node",
+      "service_instance_id": "127.0.0.1:9100",
+      "service_name": "node"
     }
   },
   "selectors": {

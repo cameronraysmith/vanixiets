@@ -1,0 +1,10 @@
+# HELP vanixiets_postgresql_collation_drift 1 when the database's recorded collation version differs from the system's.
+# TYPE vanixiets_postgresql_collation_drift gauge
+vanixiets_postgresql_collation_drift{datname="drifted",collversion_recorded="1.0",collversion_actual="@glibc@"} 1
+vanixiets_postgresql_collation_drift{datname="matching",collversion_recorded="@glibc@",collversion_actual="@glibc@"} 0
+vanixiets_postgresql_collation_drift{datname="odd\"name\\x",collversion_recorded="1.0",collversion_actual="@glibc@"} 1
+vanixiets_postgresql_collation_drift{datname="postgres",collversion_recorded="",collversion_actual=""} 0
+vanixiets_postgresql_collation_drift{datname="template0",collversion_recorded="",collversion_actual=""} 0
+vanixiets_postgresql_collation_drift{datname="template1",collversion_recorded="",collversion_actual=""} 0
+vanixiets_postgresql_collation_drift{datname="test_db",collversion_recorded="",collversion_actual=""} 0
+vanixiets_postgresql_collation_drift{datname="unrecorded",collversion_recorded="",collversion_actual="@glibc@"} 0

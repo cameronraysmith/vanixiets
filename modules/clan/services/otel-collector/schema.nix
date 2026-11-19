@@ -68,6 +68,10 @@
       "node_zfs_arc_misses"
       "node_zfs_arc_memory_throttle_count"
       "node_vmstat_oom_kill"
+      # PostgreSQL collation version drift (F61): written to the textfile
+      # collector by flake.modules.nixos.postgresql-collation on every host
+      # running PostgreSQL.
+      "vanixiets_postgresql_collation_drift"
       # magnetite's memory budget (CAM-111 design D11): its probe's
       # textfile, written by flake.modules.nixos.magnetite-memory-budget.
       # No other host writes these names.

@@ -31,6 +31,7 @@
           "greptimedb-envelope"
           "greptimedb-schema"
           "perses"
+          "postgresql-collation"
           "zfs-assert-root-docker-noautosnap"
           "zfs-assert-root-greptimedb-noautosnap"
           "zfs-assert-root-nix-noautosnap"

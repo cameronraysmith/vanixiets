@@ -5,7 +5,9 @@
 # Five parts, each a derivation in passthru so it can be built alone:
 # - promtoolRehearsal: `promtool check rules` over the YAML rendered from
 #   modules/nixos/fleet-alert/rules.nix, and a malformed-expression mutant
-#   that promtool must reject.
+#   that promtool must reject; `promtool test rules` over a drifted and a
+#   matching database for PostgresqlCollationDrift (F61), which must fire
+#   on the drifted one only, and must fail on the mutant driftAnyValue.
 # - fixtureRehearsal: the evaluator, flake.lib.fleetAlertEvaluator built with
 #   a recording ntfy-send, runs in the build sandbox against
 #   fleet-alert/fixture_server.py, which replays canned answers to the
@@ -117,11 +119,81 @@
           rules.yaml
       );
 
+      # F61: PromQL's own semantics for PostgresqlCollationDrift, which the
+      # fixture server cannot evaluate: over 20 min of the probe's series on
+      # magnetite, nixbot drifted (1) and gitea matching (0), the rule is
+      # pending at 5 min and at 15 min fires one alert, nixbot's. The mutant
+      # driftAnyValue, firing on every value, must fail the test.
+      collationDriftTest =
+        rulesFile:
+        let
+          series =
+            labels:
+            "vanixiets_postgresql_collation_drift{${
+              lib.concatStringsSep "," (lib.mapAttrsToList (k: v: ''${k}="${v}"'') labels)
+            }}";
+          drifted = {
+            host_name = "magnetite";
+            datname = "nixbot";
+            collversion_recorded = "2.42";
+            collversion_actual = "2.44";
+          };
+          matching = drifted // {
+            datname = "gitea";
+            collversion_recorded = "2.44";
+          };
+        in
+        pkgs.writeText "fleet-alert-collation-test.yaml" (
+          builtins.toJSON {
+            rule_files = [ "${rulesFile}" ];
+            evaluation_interval = "1m";
+            tests = [
+              {
+                interval = "1m";
+                input_series = [
+                  {
+                    series = series drifted;
+                    values = "1x20";
+                  }
+                  {
+                    series = series matching;
+                    values = "0x20";
+                  }
+                ];
+                alert_rule_test = [
+                  {
+                    eval_time = "5m";
+                    alertname = "PostgresqlCollationDrift";
+                    exp_alerts = [ ];
+                  }
+                  {
+                    eval_time = "15m";
+                    alertname = "PostgresqlCollationDrift";
+                    exp_alerts = [
+                      {
+                        exp_labels = drifted // {
+                          severity = "warning";
+                        };
+                        exp_annotations = (ruleNamed "PostgresqlCollationDrift").annotations;
+                      }
+                    ];
+                  }
+                ];
+              }
+            ];
+          }
+        );
+      driftAnyValueYaml = pkgs.writeText "fleet-alert-rules-drift-any-value.yaml" (
+        mutateText "driftAnyValue" "vanixiets_postgresql_collation_drift == 1"
+          "vanixiets_postgresql_collation_drift >= 0"
+          rules.yaml
+      );
+
       promtoolRehearsal =
         pkgs.runCommand "fleet-alert-promtool"
           {
             nativeBuildInputs = [ pkgs.prometheus.cli ];
-            meta.description = "R9.2: every rendered rule parses as PromQL, and a malformed expression is rejected";
+            meta.description = "R9.2: every rendered rule parses as PromQL, and a malformed expression is rejected; F61: PostgresqlCollationDrift fires on a drifted database only";
           }
           ''
             set -euo pipefail
@@ -133,6 +205,14 @@
             fi
             cat malformed.log
             echo "mutant malformedExpression rejected"
+            promtool test rules ${collationDriftTest rulesYaml}
+            if promtool test rules ${collationDriftTest driftAnyValueYaml} > drift-any-value.log 2>&1; then
+              cat drift-any-value.log
+              echo "FAIL: the collation drift test accepted the driftAnyValue mutant" >&2
+              exit 1
+            fi
+            cat drift-any-value.log
+            echo "mutant driftAnyValue rejected"
             touch "$out"
           '';
 
@@ -945,6 +1025,19 @@
             "omits swapped-out pages"
           ];
         };
+
+      # F61: the probe's series for a drifted nixbot on magnetite, as the
+      # rule's expression answers it, posts one warning whose title names
+      # magnetite and whose message names the database and the reindex;
+      # a matching database's 0 is not answered, as promtoolRehearsal's
+      # collation test shows of PromQL itself.
+      collationDriftLeg = fireAndResolve "PostgresqlCollationDrift" // {
+        messages = [
+          "datname=nixbot"
+          "collversion_recorded=2.42"
+          "REFRESH COLLATION VERSION"
+        ];
+      };
 
       # The SystemdUnitFailed exclusion a rule list renders.
       exclusionRegexOf =
@@ -1958,6 +2051,7 @@
           "HostOOMKill"
         ]
         ++ [
+          collationDriftLeg
           exclusionLeg
           storeErrorLeg
           silentHostLeg
