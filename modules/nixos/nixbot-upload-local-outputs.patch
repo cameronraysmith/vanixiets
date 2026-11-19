@@ -10,17 +10,19 @@ implicitly, as "each attribute's final outputs land in upload_queue".
 A host that also builds outside CI (a remote builder, a developer's
 build on the host) breaks it, and those outputs never reach the cache.
 
-In a build of a push to the default branch, the skipped attributes'
-outputs, all of them, now go to every uploader once the build's
-attributes are scheduled, in one batch. That is the build whose
-skipped outputs already get gcroots (post_process_skipped), and every
-change reaching the default branch gets one, so pull request builds
-and pushes to other branches stay as they were. A
-buildDependenciesOnly attribute still publishes nothing. In one batch,
-the uploader resolves them with one `nix path-info` call, and niks3
-answers closures it already has with one request per 50 paths and
-walks the closure only of the paths it lacks; that request also renews
-those closures against niks3's age-based GC.
+Every build, pull requests and pushes to any branch included, now
+queues the skipped attributes' outputs, all of them, to every uploader
+once its attributes are scheduled, in one batch. An earlier version
+did this only for pushes to the default branch and never fired: a
+change usually lands by fast-forward, and the default branch's push
+then reuses the pull request's build by tree hash and runs nothing, so
+the build that ran is the only chance to queue them. A reused build's
+outputs were queued when it ran. A buildDependenciesOnly attribute
+still publishes nothing. In one batch, the uploader resolves them with
+one `nix path-info` call, and niks3 answers closures it already has
+with one request per 50 paths and walks the closure only of the paths
+it lacks; that request also renews those closures against niks3's
+age-based GC.
 
 This version is unconditional, for the one host that carries it. The
 version offered upstream will put it behind a host option, off by
@@ -28,7 +30,7 @@ default, with its NixOS module field, since only a host that builds
 outside CI needs it.
 
 diff --git a/nixbot/build_run.py b/nixbot/build_run.py
-index c1f6f28..0a2c38f 100644
+index c1f6f28..8a42af9 100644
 --- a/nixbot/build_run.py
 +++ b/nixbot/build_run.py
 @@ -53,6 +53,7 @@ if TYPE_CHECKING:
@@ -39,28 +41,24 @@ index c1f6f28..0a2c38f 100644
  
  logger = logging.getLogger(__name__)
  
-@@ -533,6 +534,38 @@ async def _try_reuse_eval(
+@@ -533,6 +534,34 @@ async def _try_reuse_eval(
      return True
  
  
 +def enqueue_local_outputs(
-+    uploaders: Sequence[Uploader],
-+    event: ChangeEvent,
-+    results: Sequence[AttributeResult],
++    uploaders: Sequence[Uploader], results: Sequence[AttributeResult]
 +) -> None:
 +    """Queue the outputs of the attributes found already in the store.
 +
 +    Skipping them assumed that an output in the local store was built
 +    and uploaded by an earlier build, or substituted from the cache.
 +    An output that reached the store another way (a remote build or a
-+    developer's build on this host) was then never uploaded. Only for
-+    pushes to the default branch, whose skipped outputs also get gcroots
-+    (post_process_skipped): every change reaching it gets such a build.
-+    Queued in one batch per build, so the uploader resolves them in one
-+    call; an uploader that asks the cache which closures it has (niks3)
-+    walks the closure only of the paths it lacks."""
-+    if event.pr_number is not None or event.branch != event.repo.default_branch:
-+        return
++    developer's build on this host) was then never uploaded. Every
++    build queues them, pull requests included: a push reusing a
++    finished build runs nothing, so the build that ran is the only
++    chance. Queued in one batch per build, so the uploader resolves
++    them in one call; an uploader that asks the cache which closures it
++    has (niks3) walks the closure only of the paths it lacks."""
 +    paths = [
 +        path
 +        for result in results
@@ -78,11 +76,11 @@ index c1f6f28..0a2c38f 100644
  async def build_attributes(  # noqa: PLR0913
      o: Orchestrator,
      event: ChangeEvent,
-@@ -584,6 +617,7 @@ async def build_attributes(  # noqa: PLR0913
+@@ -584,6 +613,7 @@ async def build_attributes(  # noqa: PLR0913
      # (failed_eval, dependency_failed, cached_failure, skips).
      for result in schedule_result.results:
          await db.complete_attribute(o.pool, build.id_, result, if_unfinished=True)
-+    enqueue_local_outputs(o.uploaders, event, schedule_result.results)
++    enqueue_local_outputs(o.uploaders, schedule_result.results)
  
      # Skipped-as-local attributes still get gcroots/outputs
      # updates. A filesystem error here must not skip the final

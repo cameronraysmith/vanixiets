@@ -1,0 +1,23 @@
+Mutant of nixbot-upload-local-outputs.patch: queue each skipped attribute's outputs as its result is recorded, not in one batch per build.
+
+diff --git a/nixbot/build_run.py b/nixbot/build_run.py
+index 8a42af9..8f572ac 100644
+--- a/nixbot/build_run.py
++++ b/nixbot/build_run.py
+@@ -582,6 +582,7 @@ async def build_attributes(  # noqa: PLR0913
+         """Persist skips and dependency failures as they happen;
+         otherwise they stay pending until the whole build ends."""
+         await db.complete_attribute(o.pool, build.id_, result, if_unfinished=True)
++        enqueue_local_outputs(o.uploaders, [result])
+ 
+     failed_build_cache: FailedBuildCache | None = (
+         o.failed_build_cache(build.project_id)
+@@ -613,7 +614,7 @@ async def build_attributes(  # noqa: PLR0913
+     # (failed_eval, dependency_failed, cached_failure, skips).
+     for result in schedule_result.results:
+         await db.complete_attribute(o.pool, build.id_, result, if_unfinished=True)
+-    enqueue_local_outputs(o.uploaders, schedule_result.results)
++    pass
+ 
+     # Skipped-as-local attributes still get gcroots/outputs
+     # updates. A filesystem error here must not skip the final

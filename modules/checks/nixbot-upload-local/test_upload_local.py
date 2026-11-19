@@ -2,14 +2,14 @@
 # skips an attribute whose outputs are already in the store
 # (skipped_local), assuming an earlier build built and uploaded them or they
 # came from the cache; outputs built on the host another way then never
-# reached the cache. In a build of a push to the default branch, the skipped
+# reached the cache. In every build, pull requests, pushes to the default
+# branch and to other branches (gitea-mq's batches) alike, the skipped
 # attributes' outputs, all of them, now go to every uploader in one batch; a
 # buildDependenciesOnly attribute publishes nothing, and built attributes
-# keep their own upload. Pull request builds and pushes to other branches
-# (gitea-mq's batches) queue nothing more than before. Drives
-# build_attributes with a fake orchestrator and uploader; the database, which
-# yields like real I/O, and the forge are stubbed. Run by
-# checks.x86_64-linux.nixbot-upload-local against the patched nixbot package.
+# keep their own upload. Drives build_attributes with a fake orchestrator
+# and uploader; the database, which yields like real I/O, and the forge are
+# stubbed. Run by checks.x86_64-linux.nixbot-upload-local against the
+# patched nixbot package.
 from __future__ import annotations
 
 import asyncio
@@ -138,24 +138,18 @@ async def run(
     return uploader.batches
 
 
-def test_main_queues_local_outputs_in_one_batch(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    batches = asyncio.run(run(tmp_path, monkeypatch, "main", None))
-    assert [sorted(b) for b in batches] == [
-        ["/nix/store/local-dev", "/nix/store/local-out", "/nix/store/local2-out"]
-    ]
-
-
 @pytest.mark.parametrize(
     ("branch", "pr_number"),
-    [("feature", 7), ("main", 8), ("gitea-mq/batch/1", None)],
-    ids=["pull-request", "pull-request-from-main", "other-branch"],
+    [("main", None), ("feature", 7), ("main", 8), ("gitea-mq/batch/1", None)],
+    ids=["main", "pull-request", "pull-request-from-main", "other-branch"],
 )
-def test_other_builds_queue_nothing(
+def test_local_outputs_are_queued_in_one_batch(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     branch: str,
     pr_number: int | None,
 ) -> None:
-    assert asyncio.run(run(tmp_path, monkeypatch, branch, pr_number)) == []
+    batches = asyncio.run(run(tmp_path, monkeypatch, branch, pr_number))
+    assert [sorted(b) for b in batches] == [
+        ["/nix/store/local-dev", "/nix/store/local-out", "/nix/store/local2-out"]
+    ]

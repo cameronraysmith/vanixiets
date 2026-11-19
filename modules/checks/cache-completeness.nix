@@ -3,12 +3,14 @@
 # against nixbot's own schema (the pinned input's migrations) holding
 # ./cache-completeness/fixture.sql, and a fixture cache served on loopback.
 # Its first run only records since and passes. With since 10 hours back it
-# must fail naming exactly missing-1, the one output of the default-branch
-# builds in its window that the fixture cache answers 404 for: not those of
-# the build still settling, the one from before since, the pull request, the
-# push to another branch or the build still running, nor the failed
-# attribute or the one without an output; and served-1 once although two
-# builds recorded it. Once the fixture serves missing-1 too, it must pass.
+# must fail naming exactly missing-1, the one output in its window that the
+# fixture cache answers 404 for, from a pull request's build reused for the
+# default branch: not those of the build still settling, the one from before
+# since, the pull request that has not landed, the push to another branch or
+# the build still running, nor the failed attribute or the one without an
+# output; and served-1 once although two builds recorded it. Capped at one
+# output it must say so and check the newest. Once the fixture serves
+# missing-1 too, it must pass.
 { self, inputs, ... }:
 {
   perSystem =
@@ -16,11 +18,17 @@
     let
       magnetite = self.nixosConfigurations.magnetite;
       postgresql = magnetite.config.services.postgresql.package;
-      probe = lib.getExe (
-        self.lib.cacheCompleteness.probe {
-          inherit pkgs postgresql;
-        }
-      );
+      probeWith =
+        args:
+        lib.getExe (
+          self.lib.cacheCompleteness.probe (
+            {
+              inherit pkgs postgresql;
+            }
+            // args
+          )
+        );
+      probe = probeWith { };
       migrations = "${inputs.nixbot}/nixbot/nixbot/migrations";
     in
     {
@@ -70,6 +78,13 @@
             test "$(grep '^missing' got.txt)" = "missing 404 /nix/store/00000000000000000000000000000002-missing-1"
             grep -q '^checked 2 outputs' got.txt
             echo "ok: the probe fails on exactly the missing output"
+
+            # Capped at one output, the newest: build 7's served-1.
+            ${probeWith { limit = 1; }} since $url > capped.txt
+            cat capped.txt
+            grep -q '^the window holds more than 1 outputs' capped.txt
+            grep -q '^checked 1 outputs .*, 0 not served' capped.txt
+            echo "ok: a capped run says so and checks the newest"
 
             touch cache/00000000000000000000000000000002.narinfo
             ${probe} since $url > after.txt

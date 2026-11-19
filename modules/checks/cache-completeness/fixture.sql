@@ -1,23 +1,26 @@
 -- Builds for checks.x86_64-linux.cache-completeness, on nixbot's own schema.
 -- The probe's since is 10 hours ago and it settles for an hour: only build 1
--- and build 7, pushes to the default branch finished in that window, count,
--- and of their outputs only missing-1 is not served.
+-- and build 7, builds that reached the default branch and finished in that
+-- window, count, and of their outputs only missing-1 is not served.
 INSERT INTO projects (forge, forge_repo_id, owner, name, url, default_branch)
 VALUES ('gitea', '1', 'owner', 'repo', 'https://forge/owner/repo', 'main');
 
-INSERT INTO builds (project_id, number, commit_sha, branch, pr_number, finished_at) VALUES
-(1, 1, 'aaaa', 'main', NULL, now() - interval '2 hours'),
+INSERT INTO builds (project_id, number, commit_sha, branch, pr_number, merged_pr_number, finished_at) VALUES
+-- a pull request's build that the default branch's push reused after a
+-- fast-forward: nixbot moved its row to the branch and cleared pr_number,
+-- as build 2820 (#2726) reads
+(1, 1, 'aaaa', 'main', NULL, 4057, now() - interval '2 hours'),
 -- still settling
-(1, 2, 'bbbb', 'main', NULL, now() - interval '20 minutes'),
+(1, 2, 'bbbb', 'main', NULL, NULL, now() - interval '20 minutes'),
 -- before since
-(1, 3, 'cccc', 'main', NULL, now() - interval '12 hours'),
--- a pull request
-(1, 4, 'dddd', 'feature', 7, now() - interval '2 hours'),
--- a push to another branch: a gitea-mq batch
-(1, 5, 'eeee', 'gitea-mq/batch/1', NULL, now() - interval '2 hours'),
+(1, 3, 'cccc', 'main', NULL, NULL, now() - interval '12 hours'),
+-- a pull request that has not landed
+(1, 4, 'dddd', 'feature', 7, NULL, now() - interval '2 hours'),
+-- a push to another branch: a gitea-mq batch not reused for the branch
+(1, 5, 'eeee', 'gitea-mq/batch/1', NULL, NULL, now() - interval '2 hours'),
 -- still running
-(1, 6, 'ffff', 'main', NULL, NULL),
-(1, 7, 'gggg', 'main', NULL, now() - interval '90 minutes');
+(1, 6, 'ffff', 'main', NULL, NULL, NULL),
+(1, 7, 'gggg', 'main', NULL, NULL, now() - interval '90 minutes');
 
 INSERT INTO build_attributes (build_id, attr, system, status, outputs) VALUES
 (1, 'served-1', 'x86_64-linux', 'succeeded',

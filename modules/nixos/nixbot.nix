@@ -59,9 +59,10 @@ in
   # builds outside nixbot (remote builds for stibnite and pyrite, agents'
   # builds), so those outputs never reached the cache (F81, 383
   # x86_64-linux check outputs in the week to 2026-11-19). The
-  # upload-local-outputs patch relaxes that assumption for builds of pushes
-  # to the default branch, which deploys use: it queues their skipped
-  # outputs too, in one batch per build. cache-completeness.service
+  # upload-local-outputs patch relaxes that assumption in every build: it
+  # queues the skipped outputs too, in one batch per build. Pull request
+  # builds included, since a fast-forward landing reuses the pull request's
+  # build for the default branch and runs nothing. cache-completeness.service
   # (modules/nixos/cache-completeness.nix) watches for misses at run time.
   #
   # Not patched: _dispatch_build (orchestrator.py) checks ancestry, awaits,
