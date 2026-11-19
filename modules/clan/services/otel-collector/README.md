@@ -242,6 +242,7 @@ A run there whose UTC minute is `00` (`OTEL_ENVELOPE_MINUTE`, default the minute
 - `B2 label-values` fails when a tag column of `fleet`'s physical table, other than `__tsid`, `__table_id` and the three that `B3` bounds per host, has over `budget.labelValues` (200) values within one metric in the last hour.
 - `B3 per-host` fails when a host has over `budget.processNames` (30) `process_executable_name` values, over `OTEL_ENVELOPE_MAX_UNITS` (default `budget.units`, 40) `systemd_unit_name` values other than notifier instances, or over `budget.launchdLabels` (30) `launchd_label` values in the last hour; while no table carries `launchd_label` it prints `otel-envelope: B3 per-host: launchd_label table absent` and skips that count.
 - `B4 notifier-instances` fails when an `observability-notify@<unit>.service.service` instance is stored for a host whose `notifiedUnits` lacks `<unit>`.
+  Removing a unit from `notifiedUnits` gives one B4 failure episode, up to about 2 h, because the budget run reads the last hour and the other runs carry its failure; a forced budget run (`OTEL_ENVELOPE_FORCE_HOURLY=1`) once the unit's last stored row is over an hour old ends it early (magnetite, `postgresql-collation`, 2026-11-19).
 - `B5 devloop-rows` fails above `budget.devloopRows` (100,000) `devloop` rows in the last 24 hours.
 - `B6 ttl` fails when a database of `schema.databases` has a `ttl` other than the declared one, compared as durations.
 
