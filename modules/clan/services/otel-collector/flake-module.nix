@@ -725,6 +725,7 @@ in
         # collector's own role, peer-authenticated on the local socket, into
         # metrics/host, which stamps host.name and the fleet database.
         (lib.mkIf config.services.postgresql.enable {
+          # Duplicates devloop-collection's entry on magnetite; remove it only with the next intentional ensureUsers change, as any setup change restarts PostgreSQL (see README).
           services.postgresql.ensureUsers = [ { name = "opentelemetry-collector"; } ];
           services.opentelemetry-collector.settings = {
             receivers."sqlquery/postgresql-collation" = flakeLib.postgresqlCollation.receiver {

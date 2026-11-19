@@ -897,6 +897,8 @@ in
 
       # Login roles without a password, admitted by the local peer rule
       # because each is named after its reader's DynamicUser (design D10).
+      # Changing this list restarts PostgreSQL and its dependents on deploy
+      # (modules/clan/services/otel-collector/README.md); batch such changes.
       services.postgresql.ensureUsers = map (name: { inherit name; }) (lib.attrNames grants);
 
       # nixbot.service is not a notify unit, so its migrations may still be
