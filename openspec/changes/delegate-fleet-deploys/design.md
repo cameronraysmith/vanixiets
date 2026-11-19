@@ -169,8 +169,8 @@ The operator decided Q1-Q8 and, after Gate 1 was approved (Q33), Q30-Q32 on 2026
 - [Trade-off] Two provisioning conditionals (`keys = null`, `deployRequestEnrolled = false`) live until the host steps → removed by task 7.1.
 - [Known limit, F72] A darwin deploy can fail inside a person's home-manager activation: argentum, 2026-11-18, `Activating sops-nix` → `Bootstrap failed: 5: Input/output error`, because launchd cannot load a per-user agent without that person's console session. It leaves `/etc` and the system profile on the new generation and the running system on the old one.
   - **What the code does today:** `fleet-deploy-request` treats any non-zero exit of `clan machines update` as `failed` (status 6, "the deploy command failed"). It stops the rollback watcher, records the request and posts it at normal priority. This case is therefore never reported as success, provided clan exits non-zero, which it did here.
-  - **Gap:** if clan exited 0 in such a half-switched state, the health check would not notice. It reads the deploy record, which activation writes before the switch, and does not compare `/run/current-system` with the deployed closure. Adding that comparison is the smallest fix. It is not made here.
-  - **Mitigation until then:** a darwin target needs its primary user's console session, or someone present, for a deploy that changes their agents. Status 6 sends the operator to the machine.
+  - **Gap, closed (Q66, 2026-11-19):** the health check now begins by comparing `readlink -f /run/current-system` on the target with the deployed closure, on both NixOS and darwin. A mismatch ends the request as `unhealthy` (7), with a reason naming both paths, so an activation that exits 0 without switching is never reported as deployed. The deploy record alone is not evidence, because activation writes it before the switch.
+  - **Remaining limit:** a darwin target needs its primary user's console session, or someone present, for a deploy that changes their agents. Statuses 6 and 7 send the operator to the machine.
 
 ## Migration Plan
 
