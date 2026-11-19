@@ -17,7 +17,7 @@ What the fleet already has:
 - terranix declaring R2 buckets with `cloudflare_r2_bucket` (`modules/terranix/cloudflare.nix`; provider 5.27.0; state encrypted and committed).
 - Failure notices for units listed in a host's `notifiedUnits` (`modules/lib/observability-hosts.nix`).
 - fleet-alert rules with promtool and fixture cases (`modules/nixos/fleet-alert/rules.nix`, `modules/checks/fleet-alert.nix`).
-- A textfile-collector probe pattern, `modules/nixos/postgresql-collation.nix` on chain `zqpxwylx`. node_exporter takes repeated `--collector.textfile.directory` flags, and each series must be in `nodeExporterKeep`.
+- A textfile-collector probe pattern, `modules/nixos/postgresql-collation.nix` on chain `zqpxwylx`. node_exporter refuses a repeated `--collector.textfile.directory` flag (F75), so every textfile writer names itself in `vanixiets.nodeExporter.textfileWriters` and writes its own file into the host's one `vanixiets.nodeExporter.textfileDirectory` (`modules/nixos/node-exporter-textfile.nix`); each series must be in `nodeExporterKeep`.
 - Fleet obligations asserted on every machine check (`modules/checks/machines.nix`, `withFleetObligations`).
 
 The nixpkgs modules at the pinned revision behave as follows:

@@ -16,6 +16,7 @@
 { config, lib, ... }:
 let
   schema = config.flake.lib.otelCollectorSchema;
+  inherit (config.flake.lib.nodeExporterTextfile) flag;
 
   seriesNames = [
     "vanixiets_unit_memory_current_bytes"
@@ -38,8 +39,6 @@ let
     pkgs.writers.writePython3Bin "magnetite-memory-budget" {
       flakeIgnore = [ "E501" ];
     } (builtins.readFile ./magnetite-memory-budget/probe.py);
-
-  directory = "/run/magnetite-memory-budget";
 in
 {
   flake.lib.magnetiteMemoryBudget = {
@@ -54,9 +53,9 @@ in
     }:
     let
       configFile = pkgs.writeText "magnetite-memory-budget.json" (builtins.toJSON probeConfig);
-      textfileFlag = "--collector.textfile.directory=${directory}";
-      nodeFlags = config.services.prometheus.exporters.node.extraFlags;
-      nodeUser = config.services.prometheus.exporters.node.user;
+      directory = config.vanixiets.nodeExporter.textfileDirectory;
+      node = config.services.prometheus.exporters.node;
+      nodeUser = node.user;
       probeService = config.systemd.services.magnetite-memory-budget.serviceConfig;
     in
     {
@@ -64,8 +63,8 @@ in
         {
           assertion =
             lib.all (name: lib.elem name schema.nodeExporterKeep) seriesNames
-            && lib.elem "--collector.textfile" nodeFlags
-            && lib.elem textfileFlag nodeFlags;
+            && node.enable
+            && lib.elem "${flag}=${directory}" node.extraFlags;
           message = "magnetite-memory-budget: node_exporter must run its textfile collector on ${directory} and nodeExporterKeep must keep ${lib.concatStringsSep ", " seriesNames}, or the budget never reaches the store (CAM-111 design D11).";
         }
         # A DynamicUser's RuntimeDirectory lives under /run/private, which
@@ -79,25 +78,21 @@ in
         }
       ];
 
-      services.prometheus.exporters.node.extraFlags = [
-        "--collector.textfile"
-        textfileFlag
-      ];
+      # The host's one textfile directory (./node-exporter-textfile.nix, F75).
+      vanixiets.nodeExporter.textfileWriters = [ "magnetite-memory-budget" ];
 
       # node_exporter's own user reads unit properties over D-Bus and zram's
-      # mm_stat, both world-readable, and owns the directory node_exporter
-      # reads.
+      # mm_stat, both world-readable, and writes into the directory
+      # node_exporter reads, which systemd-tmpfiles creates for that user.
       systemd.services.magnetite-memory-budget = {
         description = "magnetite's memory budget for node_exporter's textfile collector";
         path = [ config.systemd.package ];
         serviceConfig = {
           Type = "oneshot";
-          ExecStart = "${lib.getExe (probe pkgs)} ${configFile} ${directory}/memory-budget.prom";
+          ExecStart = "${lib.getExe (probe pkgs)} ${configFile} ${directory}/magnetite-memory-budget.prom";
           User = nodeUser;
-          Group = config.services.prometheus.exporters.node.group;
-          RuntimeDirectory = "magnetite-memory-budget";
-          RuntimeDirectoryMode = "0755";
-          RuntimeDirectoryPreserve = true;
+          Group = node.group;
+          ReadWritePaths = [ directory ];
           UMask = "0022";
           MemoryMax = "64M";
           NoNewPrivileges = true;

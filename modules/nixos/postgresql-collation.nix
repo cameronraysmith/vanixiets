@@ -23,7 +23,7 @@ let
   schema = config.flake.lib.otelCollectorSchema;
 
   seriesName = "vanixiets_postgresql_collation_drift";
-  directory = "/run/postgresql-collation";
+  inherit (config.flake.lib.nodeExporterTextfile) flag;
 
   # The probe, with the query as an argument so the check can build its
   # mutants from the same script. PARKED_FILE holds a JSON array of
@@ -68,7 +68,7 @@ let
     let
       cfg = config.vanixiets.postgresqlCollation;
       node = config.services.prometheus.exporters.node;
-      textfileFlag = "--collector.textfile.directory=${directory}";
+      directory = config.vanixiets.nodeExporter.textfileDirectory;
       parkedFile = pkgs.writeText "postgresql-collation-parked.json" (
         builtins.toJSON (lib.naturalSort cfg.parkedDatabases)
       );
@@ -87,8 +87,7 @@ let
             assertion =
               node.enable
               && lib.elem seriesName schema.nodeExporterKeep
-              && lib.elem "--collector.textfile" node.extraFlags
-              && lib.elem textfileFlag node.extraFlags;
+              && lib.elem "${flag}=${directory}" node.extraFlags;
             message = "postgresql-collation: node_exporter must run its textfile collector on ${directory} and nodeExporterKeep must keep ${seriesName}, or collation drift never reaches the store (F61).";
           }
           # F54: a DynamicUser's RuntimeDirectory is under /run/private,
@@ -99,12 +98,9 @@ let
           }
         ];
 
-        # node_exporter 1.12.1 takes the textfile directory flag repeated,
-        # and the textfile flag itself repeated, beside the memory budget's.
-        services.prometheus.exporters.node.extraFlags = [
-          "--collector.textfile"
-          textfileFlag
-        ];
+        # The host's one textfile directory (./node-exporter-textfile.nix):
+        # node_exporter refuses its directory flag repeated (F75).
+        vanixiets.nodeExporter.textfileWriters = [ "postgresql-collation" ];
 
         services.postgresql.ensureUsers = [ { name = node.user; } ];
 
@@ -122,12 +118,10 @@ let
                 inherit pkgs;
                 postgresql = config.services.postgresql.package;
               })
-            } ${parkedFile} ${directory}/collation.prom";
+            } ${parkedFile} ${directory}/postgresql-collation.prom";
             User = node.user;
             Group = node.group;
-            RuntimeDirectory = "postgresql-collation";
-            RuntimeDirectoryMode = "0755";
-            RuntimeDirectoryPreserve = true;
+            ReadWritePaths = [ directory ];
             UMask = "0022";
             MemoryMax = "64M";
             NoNewPrivileges = true;
