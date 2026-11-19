@@ -15,7 +15,7 @@ The configuration (FLEET_DEPLOY_CONFIG, JSON) is rendered from
 flake.lib.fleetDeployer.requestConfig. Four steps can be replaced by commands
 named in it, which the VM test uses in place of the forge's flake, the binary
 cache and clan: resolveCommand, cacheCheckCommand, varsCheckCommand and
-deployCommand.
+deployCommand. Each receives the same flake reference the real step uses.
 """
 
 from __future__ import annotations
@@ -185,32 +185,21 @@ class Deployer:
             time.sleep(1)
 
     # -- resolution, vars check, deploy ------------------------------------
-    def resolve(self, tree: str, machine: str) -> dict:
+    def resolve(self, ref: str, machine: str) -> dict:
         custom = self.config.get("resolveCommand")
         if custom:
-            return json.loads(output([custom, tree, machine]))
-        cls = self.config["targets"][machine]["class"]
-        flake = f"path:{tree}"
-        if cls == "nixos":
-            closure = output(["nix", "eval", "--raw",
-                              f"{flake}#nixosConfigurations.{machine}.config.system.build.toplevel.outPath"])
-            target = output(["nix", "eval", "--raw",
-                             f"{flake}#clan.inventory.machines.{machine}.deploy.targetHost"])
-        else:
-            closure = output(["nix", "eval", "--raw", f"{flake}#darwinConfigurations.{machine}.system.outPath"])
-            target = output(["nix", "eval", "--raw",
-                             f"{flake}#darwinConfigurations.{machine}.config.clan.core.networking.targetHost"])
-        return {"closure": closure, "targetHost": target}
+            return json.loads(output([custom, ref, machine]))
+        return resolve_closure(ref, self.config["targets"][machine]["class"], machine)
 
     def cached(self, closure: str) -> bool:
         custom = self.config.get("cacheCheckCommand")
         argv = [custom, closure] if custom else ["nix", "path-info", "--store", self.config["cacheStore"], closure]
         return run(argv, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode == 0
 
-    def vars_check(self, tree: str) -> None:
+    def vars_check(self, ref: str) -> None:
         custom = self.config.get("varsCheckCommand")
         for machine in self.config["machines"]:
-            argv = [custom, tree, machine] if custom else ["clan", "vars", "check", "--flake", tree, machine]
+            argv = [custom, ref, machine] if custom else ["clan", "vars", "check", "--flake", ref, machine]
             if run(argv, env=self.env()).returncode != 0:
                 raise Outcome("refused", f"clan vars check failed for {machine}; nothing is generated here")
 
@@ -221,10 +210,10 @@ class Deployer:
         env["CLAN_NO_COMMIT"] = "1"
         return env
 
-    def deploy(self, tree: str, machine: str, target: str, closure: str) -> bool:
+    def deploy(self, ref: str, machine: str, target: str, closure: str) -> bool:
         custom = self.config.get("deployCommand")
-        argv = ([custom, tree, machine, target, closure] if custom else
-                ["clan", "machines", "update", "--flake", tree, machine, "--target-host", target])
+        argv = ([custom, ref, machine, target, closure] if custom else
+                ["clan", "machines", "update", "--flake", ref, machine, "--target-host", target])
         return run(argv, env=self.env()).returncode == 0
 
     # -- rollback watcher (D10) --------------------------------------------
@@ -294,19 +283,22 @@ class Deployer:
 
         tree = tempfile.mkdtemp(prefix="deploy-", dir=self.state / "trees")
         run(["git", "-C", str(self.mirror), "worktree", "add", "--quiet", "--detach", tree, commit], check=True)
+        # One reference for every step, so the resolve, the cache check, clan's
+        # vars check and deploy, and the running-system check see one closure.
+        ref = flake_ref(tree, commit)
         try:
             # Evaluation and the deploy each hold one of the slots, which bound
             # cinnabar's memory; the target is probed before its lock is taken.
             slot = self.slot(self.config["lockWait"])
             if slot is None:
                 raise Outcome("busy", "every deploy slot stayed taken")
-            resolved = self.resolve(tree, machine)
+            resolved = self.resolve(ref, machine)
             closure, target = resolved["closure"], resolved["targetHost"]
             extra["closure"] = closure
             say(f"closure {closure}, target {target}")
             if self.config["targets"][machine]["class"] == "nixos" and not self.cached(closure):
                 raise Outcome("refused", f"{closure} is not in {self.config['cacheStore']}: CI has not built it")
-            self.vars_check(tree)
+            self.vars_check(ref)
             slot.close()
             if not self.reachable(target):
                 raise Outcome("unreachable", f"{target} did not answer within {self.config['probeTimeout']} s")
@@ -317,7 +309,7 @@ class Deployer:
             if slot is None:
                 raise Outcome("busy", "every deploy slot stayed taken")
             self.arm(machine, target)
-            if not self.deploy(tree, machine, target, closure):
+            if not self.deploy(ref, machine, target, closure):
                 self.disarm(machine, target)
                 raise Outcome("failed", "the deploy command failed")
             slot.close()
@@ -388,7 +380,38 @@ def private_environment(state: Path) -> None:
     )
 
 
+def flake_ref(tree: str, commit: str) -> str:
+    """The flake reference of a deploy: the worktree's git tree at the commit.
+
+    A git reference takes only tracked files, so it yields the source, and the
+    closures, that nixbot builds and clan deploys. A path: reference would also
+    copy the worktree's .git file, giving every NixOS closure a hash that CI
+    never built (F80). clan reads its secrets from the worktree it names
+    (clan_lib/flake/flake.py takes the path from the reference's file:// URL).
+    """
+    return f"git+file://{tree}?rev={commit}"
+
+
+def resolve_closure(ref: str, cls: str, machine: str) -> dict:
+    """Evaluate a machine's toplevel and declared deploy target at ref."""
+    if cls == "nixos":
+        closure = output(["nix", "eval", "--raw",
+                          f"{ref}#nixosConfigurations.{machine}.config.system.build.toplevel.outPath"])
+        target = output(["nix", "eval", "--raw", f"{ref}#clan.inventory.machines.{machine}.deploy.targetHost"])
+    else:
+        closure = output(["nix", "eval", "--raw", f"{ref}#darwinConfigurations.{machine}.system.outPath"])
+        target = output(["nix", "eval", "--raw",
+                         f"{ref}#darwinConfigurations.{machine}.config.clan.core.networking.targetHost"])
+    return {"closure": closure, "targetHost": target}
+
+
 def main() -> int:
+    if len(sys.argv) == 5 and sys.argv[1] == "--resolve":
+        # The fixture check: resolve <class> <machine> in the worktree <tree> at its HEAD.
+        tree, cls, machine = sys.argv[2:]
+        commit = output(["git", "-C", tree, "rev-parse", "HEAD"])
+        print(json.dumps(resolve_closure(flake_ref(tree, commit), cls, machine)))
+        return 0
     config = json.loads(Path(os.environ["FLEET_DEPLOY_CONFIG"]).read_text())
     command = os.environ.get("SSH_ORIGINAL_COMMAND", "")
     if len(sys.argv) == 3 and sys.argv[1] == "--parse":

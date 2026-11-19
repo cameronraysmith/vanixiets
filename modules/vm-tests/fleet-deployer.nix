@@ -66,6 +66,15 @@
           printf '%s\t%s\t%s\n' "$1" "''${2:-}" "''${*:3}" >>/var/lib/fleet-deploy-notify/posts
         '';
       };
+      # $1 must be `git+file://<worktree>?rev=<commit>`; sets $tree.
+      worktreeOf = ''
+        case "$1" in
+          git+file://*\?rev=*) ;;
+          *) echo "not a git flake reference pinned to a commit: $1" >&2; exit 93 ;;
+        esac
+        tree=''${1#git+file://}
+        tree=''${tree%%\?*}
+      '';
     in
     lib.optionalAttrs (system == "x86_64-linux") {
       vmTests.fleet-deployer = pkgs.testers.runNixOSTest (
@@ -120,15 +129,23 @@
                     settle = 3;
                     confirmWindow = 20;
                     activationWait = 120;
+                    # The stand-ins receive the flake reference the real steps use;
+                    # each refuses anything but a git reference pinned to a commit
+                    # and reads the commit's files from the worktree it names.
                     resolveCommand = stub "resolve" ''
-                      jq -n --arg c "$(cat "$1/closure")" '{closure: $c, targetHost: "root@target"}'
+                      ${worktreeOf}
+                      jq -n --arg c "$(cat "$tree/closure")" '{closure: $c, targetHost: "root@target"}'
                     '';
-                    varsCheckCommand = stub "vars-check" ''test ! -e "$1/vars-broken"'';
+                    varsCheckCommand = stub "vars-check" ''
+                      ${worktreeOf}
+                      test ! -e "$tree/vars-broken"
+                    '';
                     cacheCheckCommand = stub "cache-check" ''test -e "/var/lib/test-cache/$(basename "$1")"'';
                     deployCommand = stub "deploy" ''
+                      ${worktreeOf}
                       log=/var/lib/fleet-deployer/deploy.log
                       echo "start $(date +%s.%N) $4" >>"$log"
-                      if [ -e "$1/no-switch" ]; then
+                      if [ -e "$tree/no-switch" ]; then
                         # An activation that writes its deploy record and exits 0
                         # without relinking /run/current-system (F72's half switch).
                         # shellcheck disable=SC2029
