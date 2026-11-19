@@ -93,6 +93,7 @@ nix build .#vmTests.x86_64-linux.fleet-deployer               # Pyrite, kvm
 - **What it imports:** the deployer imports `flake.modules.nixos.fleet-deployer`. Its forge is a local bare repository, its cache is a `file://` store, its ntfy is a recording `ntfy-send`, and stubs replace the commit's evaluation, `clan vars check` and `clan machines update`, which switch the target to the closure a test commit names. The target has the deploy record and `fleet-deploy-watch`, plus three specialisations: `next`, `broken` (a failing unit) and `isolated` (a firewall dropping the deployer's SSH).
 - **What it establishes:** requests through sshd's forced command:
   - a merged deploy confirmed;
+  - a request run with a hostile inherited environment (another user's `XDG_RUNTIME_DIR`, no `HOME`, an unwritable `TMPDIR`), which still deploys, because the request command replaces its environment with the account's own (`HOME`, `XDG_RUNTIME_DIR`, `XDG_CACHE_HOME` and `TMPDIR` under `/var/lib/fleet-deployer`, the directories 0700). Every stub refuses to run without a usable `HOME`, `XDG_RUNTIME_DIR` and `TMPDIR`, as clan and nix need;
   - refusals that never touch the target;
   - busy, unreachable within 15 s, concurrent requests serialised;
   - an unhealthy deploy kept;

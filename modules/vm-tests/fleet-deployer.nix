@@ -37,16 +37,27 @@
         overlays = [ self.overlays.default ];
       };
       keys = import (pkgs.path + "/nixos/tests/ssh-keys.nix") pkgs;
+      # Every stand-in needs what clan and nix need from their environment: a
+      # writable HOME and XDG_RUNTIME_DIR (clan's cache) and TMPDIR, and
+      # records what it got, so the test sees the environment the request
+      # command gives them.
       stub =
         name: text:
         lib.getExe (
           pkgs.writeShellApplication {
-            inherit name text;
+            inherit name;
             runtimeInputs = [
               pkgs.coreutils
               pkgs.openssh
               pkgs.jq
             ];
+            text = ''
+              [ -n "''${HOME:-}" ] && [ -w "$HOME" ] || { echo "${name}: HOME unusable" >&2; exit 90; }
+              mkdir -p "''${XDG_RUNTIME_DIR:?}/clan-cache" || { echo "${name}: XDG_RUNTIME_DIR unusable" >&2; exit 91; }
+              [ -w "''${TMPDIR:-/tmp}" ] || { echo "${name}: TMPDIR unusable" >&2; exit 92; }
+              printf 'HOME=%s\nXDG_RUNTIME_DIR=%s\nTMPDIR=%s\n' "$HOME" "$XDG_RUNTIME_DIR" "''${TMPDIR:-}" >/var/lib/fleet-deployer/stub-env
+              ${text}
+            '';
           }
         );
       recordingNtfySend = pkgs.writeShellApplication {
@@ -81,6 +92,8 @@
                 services.fleet-deployer = {
                   ntfySend = recordingNtfySend;
                   notifyTokenFile = "/dev/null";
+                  # The VM generates its own keys, which are not the committed ones.
+                  keys = null;
                   requesterLines = [
                     ''restrict,command="/run/current-system/sw/bin/fleet-deploy-request op" ${keys.snakeOilPublicKey}''
                   ];
@@ -219,6 +232,22 @@
                 last = json.loads(target.succeed("tail -n1 /var/log/deploy-record.jsonl"))
                 assert last["closure"] == "${spec "next"}", last
                 assert records()[-1]["outcome"] == "deployed" and records()[-1]["commit"] == c1
+
+            with subtest("a request in a hostile inherited environment still deploys"):
+                # sshd or runuser may hand the account root's runtime directory, no HOME
+                # and an unwritable TMPDIR; the request command must not use them.
+                deployer.succeed("mkdir -p /run/user/0 /root/tmp && chmod 0700 /run/user/0 /root/tmp")
+                status, out = deployer.execute(
+                    "SSH_ORIGINAL_COMMAND='deploy target' XDG_RUNTIME_DIR=/run/user/0 TMPDIR=/root/tmp"
+                    " runuser -m -u fleet-deployer -- env -u HOME /run/current-system/sw/bin/fleet-deploy-request op"
+                )
+                print(out)
+                assert status == 0, (status, out)
+                got = dict(entry.split("=", 1) for entry in deployer.succeed("cat /var/lib/fleet-deployer/stub-env").splitlines())
+                assert got["HOME"] == "/var/lib/fleet-deployer", got
+                assert got["XDG_RUNTIME_DIR"].startswith("/var/lib/fleet-deployer/"), got
+                assert got["TMPDIR"].startswith("/var/lib/fleet-deployer/"), got
+                deployer.succeed("test $(stat -c %a \"$(sed -n 's/^XDG_RUNTIME_DIR=//p' /var/lib/fleet-deployer/stub-env)\") = 700")
 
             with subtest("an unmerged commit and an unreachable host are refused without contacting the target"):
                 before = accepted()

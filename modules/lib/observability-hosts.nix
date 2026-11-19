@@ -48,6 +48,7 @@
         agent [
           "fleet-deadman"
           "caddy-root-check"
+          "fleet-deployer-keycheck"
         ]
         // {
           alwaysOn = true;

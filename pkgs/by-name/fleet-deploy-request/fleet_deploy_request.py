@@ -215,7 +215,8 @@ class Deployer:
                 raise Outcome("refused", f"clan vars check failed for {machine}; nothing is generated here")
 
     def env(self) -> dict:
-        env = {k: v for k, v in os.environ.items() if k not in ("SSH_AUTH_SOCK", "SSH_AGENT_PID")}
+        # os.environ is already private_environment's; clan also gets the key.
+        env = dict(os.environ)
         env["SOPS_AGE_KEY_FILE"] = str(self.age_key)
         env["CLAN_NO_COMMIT"] = "1"
         return env
@@ -354,12 +355,39 @@ class Deployer:
         return STATUS[outcome]
 
 
+def private_environment(state: Path) -> None:
+    """Replace the inherited environment with the account's own.
+
+    sshd, runuser or su can hand this account another user's runtime
+    directory, no HOME or an unwritable TMPDIR, and clan and nix write their
+    caches there (clan's under XDG_RUNTIME_DIR). Every subprocess inherits
+    os.environ, so it is rebuilt once, before any of them runs: only PATH and
+    FLEET_DEPLOY_CONFIG (both set by the wrapper) survive, and HOME,
+    XDG_RUNTIME_DIR, XDG_CACHE_HOME and TMPDIR point into the state
+    directory, the two directories created 0700.
+    """
+    keep = {k: os.environ[k] for k in ("PATH", "FLEET_DEPLOY_CONFIG") if k in os.environ}
+    runtime, tmp = state / "runtime", state / "tmp"
+    for directory in (runtime, tmp):
+        directory.mkdir(mode=0o700, exist_ok=True)
+        directory.chmod(0o700)
+    os.environ.clear()
+    os.environ.update(keep)
+    os.environ.update(
+        HOME=str(state),
+        XDG_RUNTIME_DIR=str(runtime),
+        XDG_CACHE_HOME=str(state / ".cache"),
+        TMPDIR=str(tmp),
+    )
+
+
 def main() -> int:
     config = json.loads(Path(os.environ["FLEET_DEPLOY_CONFIG"]).read_text())
+    command = os.environ.get("SSH_ORIGINAL_COMMAND", "")
     if len(sys.argv) == 3 and sys.argv[1] == "--parse":
         # The fixture check: parse SSH_ORIGINAL_COMMAND for one requester.
         try:
-            print(json.dumps(parse(os.environ.get("SSH_ORIGINAL_COMMAND", ""), sys.argv[2], config)))
+            print(json.dumps(parse(command, sys.argv[2], config)))
             return 0
         except Outcome as o:
             print(o.reason)
@@ -367,7 +395,8 @@ def main() -> int:
     if len(sys.argv) != 2 or not NAME.fullmatch(sys.argv[1]):
         print("usage: fleet-deploy-request <requester>", file=sys.stderr)
         return STATUS["refused"]
-    return Deployer(config, sys.argv[1]).main(os.environ.get("SSH_ORIGINAL_COMMAND", ""))
+    private_environment(Path(config["stateDir"]))
+    return Deployer(config, sys.argv[1]).main(command)
 
 
 if __name__ == "__main__":

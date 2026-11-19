@@ -54,7 +54,7 @@ in
           ForwardAgent no
           BatchMode yes
       '';
-      declared = lib.optionalAttrs (d.keys != null) d.keys;
+      declared = lib.optionalAttrs (cfg.keys != null) cfg.keys;
       keycheck = pkgs.writeShellApplication {
         name = "fleet-deployer-keycheck";
         runtimeInputs = [
@@ -151,6 +151,12 @@ in
           defaultText = lib.literalExpression "the ntfy-alerter token's path";
           description = "The alerter token fleet-deploy-notify posts with; root-only.";
         };
+        keys = lib.mkOption {
+          type = lib.types.nullOr (lib.types.attrsOf lib.types.str);
+          default = d.keys;
+          defaultText = lib.literalExpression "flake.lib.fleetDeployer.keys";
+          description = "The public halves fleet-deployer-keycheck compares the generated keys with; null checks modes only.";
+        };
       };
 
       config = {
@@ -211,8 +217,9 @@ in
         systemd.timers.fleet-deployer-keycheck = {
           wantedBy = [ "timers.target" ];
           timerConfig = {
-            OnCalendar = "daily";
             Persistent = true;
+            # observability-notify requires a named zone on notified units' timers.
+            OnCalendar = "*-*-* 04:00:00 UTC";
           };
         };
 
