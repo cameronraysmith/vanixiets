@@ -136,14 +136,41 @@ let
     };
   };
 
-  hosts = lib.mapAttrs (
-    name: member:
-    member
-    // {
-      fqdn = "${name}.${fleet.domain}";
-      address = mesh.addressOf mesh.instance name;
-    }
-  ) members;
+  # The person a machine belongs to, if it is anyone's: a name under
+  # flake.users (modules/home/users, aliases included) or null for a shared
+  # server or a phone. flake.lib.fleetDeployer derives who may deploy a
+  # machine from it, and its obligation requires the user to have an account
+  # on that machine.
+  primaryUsers = {
+    pyrite = "cameron";
+    stibnite = "crs58";
+    blackphos = "raquel";
+    argentum = "christophersmith";
+    rosegold = "janettesmith";
+  };
+  primaryUserType = lib.types.nullOr (lib.types.enum (lib.attrNames config.flake.users));
+  primaryUserOf =
+    name:
+    let
+      user = primaryUsers.${name} or null;
+    in
+    assert lib.assertMsg (primaryUserType.check user)
+      "flake.lib.hosts.${name}.primaryUser: ${builtins.toJSON user} is not null or a name under flake.users";
+    user;
+
+  hosts =
+    assert lib.assertMsg (lib.all (name: members ? ${name}) (
+      lib.attrNames primaryUsers
+    )) "flake.lib.hosts: primaryUsers names a machine that is not a member";
+    lib.mapAttrs (
+      name: member:
+      member
+      // {
+        fqdn = "${name}.${fleet.domain}";
+        address = mesh.addressOf mesh.instance name;
+        primaryUser = primaryUserOf name;
+      }
+    ) members;
 in
 {
   flake.lib.hosts = hosts;

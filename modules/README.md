@@ -85,7 +85,27 @@ nix build .#vmTests.x86_64-linux.caddy-root-from-vars         # Magnetite, uid-r
 nix build .#vmTests.x86_64-linux.greptimedb-oom-order         # Pyrite, kvm
 nix build .#vmTests.x86_64-linux.tincr-mesh                   # Pyrite, kvm
 nix build .#vmTests.x86_64-linux.tincr-mesh-partition         # Pyrite, kvm
+nix build .#vmTests.x86_64-linux.fleet-deployer               # Pyrite, kvm
 ```
+
+`fleet-deployer` runs the fleet deployer's request path end to end, in two QEMU VMs.
+- **What it imports:** the deployer imports `flake.modules.nixos.fleet-deployer`. Its forge is a local bare repository, its cache is a `file://` store, its ntfy is a recording `ntfy-send`, and stubs replace the commit's evaluation, `clan vars check` and `clan machines update`, which switch the target to the closure a test commit names. The target has the deploy record and `fleet-deploy-watch`, plus three specialisations: `next`, `broken` (a failing unit) and `isolated` (a firewall dropping the deployer's SSH).
+- **What it establishes:** requests through sshd's forced command:
+  - a merged deploy confirmed;
+  - refusals that never touch the target;
+  - busy, unreachable within 15 s, concurrent requests serialised;
+  - an unhealthy deploy kept;
+  - a deploy that cuts SSH rolled back by the target itself;
+  - one notice per request;
+  - the key check failing on a widened key file.
+- **What it does not establish:** anything about clan, the forge, niks3, ntfy or darwin.
+
+The fleet deployer's evaluation-time regulators are in the PR lane:
+- every NixOS and darwin machine check asserts `flake.lib.fleetDeployer.failures`: a primary user's account, the deployer's key only on targets' deploy accounts, and the deployer account and key modes only on cinnabar;
+- the machine checks module asserts `flake.lib.fleetDeployer.problems` (no disabled or excluded target, no reach outside the role policy);
+- `checks.x86_64-linux.fleet-deployer-obligations` runs both judges over fixtures and mutants;
+- `checks.x86_64-linux.fleet-deploy-request` runs the forced command's parser;
+- `checks.x86_64-linux.sops-correspondence` bounds the deployer's sops reach to its targets.
 
 `omnigent-worker-isolation` establishes the runtime wiring of the Omnigent worker guards that no evaluation-time check can reach: that the private-home precondition is `ExecStartPre` on the real `omnigent-host-<owner>.service` and that violating the home's privacy at runtime prevents `ExecStart`, that the Nix daemon resolves a worker as untrusted, that two workers have separate accounts and mutually unreadable private homes, and that the unit's `User`, `UMask`, `NoNewPrivileges` and SSH-agent unsetting hold in the spawned process.
 It is not a sandbox and establishes nothing about confining hostile code inside a worker account, it stubs `ExecStart` so it is no evidence about the Omnigent client, it declares no credentials so the Clan-vars-to-sops delivery path is out of scope, and it says nothing about Stibnite or any Darwin host because there is no Darwin NixOS test node type.

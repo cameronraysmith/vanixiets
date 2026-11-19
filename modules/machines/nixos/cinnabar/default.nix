@@ -27,6 +27,7 @@ in
         base
         deploy-record
         fleet-alert
+        fleet-deployer
         hm-sops-bridge
         kvm-declaration
         ntfy-alerter

@@ -190,6 +190,8 @@ let
           generator = "${worker.user}-signing-key";
           file = "key";
         }
+        && credentials.deployRequestKey.generator == "${worker.user}-deploy-request"
+        && credentials.deployRequestKey.file == "key"
         &&
           credentials.githubTokens
           == lib.genAttrs ([ "sciexp" ] ++ lib.optional (worker.owner == "cameron") "cameronraysmith")
@@ -226,6 +228,8 @@ let
           (
             if name == "signingKey" then
               generator.prompts == { } && generator.dependencies == [ personGenerator ]
+            else if name == "deployRequestKey" then
+              generator.prompts == { } && !generator.files."key.pub".secret
             else
               generator.prompts.${source.file}.type == "hidden"
           )

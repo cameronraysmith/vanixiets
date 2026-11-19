@@ -28,6 +28,11 @@ let
       default = { };
       description = "Explicitly delegated passwordless SSH private key for Git and Jujutsu signing.";
     };
+    deployRequestKey = lib.mkOption {
+      type = credentialSource;
+      default = { };
+      description = "Per-worker SSH private key authorizing deploy requests to the fleet deployer; its shared generator creates the key pair without prompts.";
+    };
     githubTokens = lib.mkOption {
       type = lib.types.attrsOf (
         lib.types.submodule {

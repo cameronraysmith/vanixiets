@@ -1,34 +1,14 @@
-{ ... }:
+{ config, ... }:
+let
+  hetznerMachines = config.flake.lib.cloudMachines.hetzner;
+in
 {
   flake.modules.terranix.hetzner =
     { config, lib, ... }:
     let
-      # Machine deployment definitions
-      # Set enabled = true to deploy, false to destroy
-      # Run: nix run .#terraform (regenerates config and applies)
-      machines = {
-        cinnabar = {
-          enabled = true; # Primary VPS, zerotier controller (CX43: BIOS + GRUB)
-          serverType = "cx43";
-          location = "fsn1";
-          image = "debian-12";
-          comment = "8 vCPU, 16GB RAM, 160GB SSD, legacy BIOS";
-        };
-        electrum = {
-          enabled = false; # Secondary test VM, zerotier peer (CCX23: UEFI + systemd-boot)
-          serverType = "ccx23";
-          location = "fsn1";
-          image = "debian-12";
-          comment = "4 vCPU, 16GB RAM, 160GB SSD, native UEFI";
-        };
-        magnetite = {
-          enabled = true; # Build infrastructure server (CX53: BIOS + GRUB)
-          serverType = "cx53";
-          location = "fsn1";
-          image = "debian-12";
-          comment = "16 vCPU, 32GB RAM, 320GB SSD, legacy BIOS";
-        };
-      };
+      # Machine deployment definitions: flake.lib.cloudMachines.hetzner
+      # (modules/lib/cloud-machines.nix).
+      machines = hetznerMachines;
 
       # Filter to only enabled machines
       enabledMachines = lib.filterAttrs (_name: cfg: cfg.enabled) machines;

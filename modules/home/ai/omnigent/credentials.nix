@@ -1,5 +1,6 @@
 { config, lib, ... }:
 let
+  inherit (config.flake.lib) fleetDeployer;
   linearFiles = [
     "key"
     "workspace"
@@ -10,7 +11,7 @@ let
     credentials:
     lib.filterAttrs (_: source: source.enable) (
       {
-        inherit (credentials) signingKey claudeSetupToken;
+        inherit (credentials) signingKey deployRequestKey claudeSetupToken;
       }
       // lib.mapAttrs' (
         owner: source: lib.nameValuePair "github-${owner}" source
@@ -49,6 +50,7 @@ let
         inherit home serverUrl;
         inherit (credentials) expected defaultOwner;
         signingKey = enabledPath credentials.signingKey;
+        deployRequestKey = enabledPath credentials.deployRequestKey;
         githubTokens = lib.mapAttrs (_: source: {
           path = path source;
           inherit (source) expectedLogin;
@@ -140,6 +142,13 @@ let
       personSigningGenerator = config.flake.lib.commitSigningGenerator (
         config.flake.lib.signingPerson worker.owner
       );
+      # The deploy request key pair is generated, not prompted: the private key stays
+      # with the worker and the fleet deployer authorizes the public `key.pub`.
+      deployRequestGenerator =
+        if worker.credentials.deployRequestKey.enable then
+          worker.credentials.deployRequestKey.generator
+        else
+          null;
     in
     {
       enabled = selected != { };
@@ -218,6 +227,15 @@ let
           );
           message = "Omnigent worker ${worker.user}: Linear generators must use the worker user and masked label.";
         }
+        {
+          assertion =
+            !worker.credentials.deployRequestKey.enable
+            || (
+              worker.credentials.deployRequestKey.generator == "${worker.user}-deploy-request"
+              && worker.credentials.deployRequestKey.file == "key"
+            );
+          message = "Omnigent worker ${worker.user}: the deploy request key must use generator ${worker.user}-deploy-request and file key.";
+        }
       ];
       generators = lib.mapAttrs (
         generator: sources:
@@ -242,6 +260,26 @@ let
               script = lib.concatMapStringsSep "\n" (file: ''
                 cp "$in/${personSigningGenerator}/key" "$out/${file}"
               '') files;
+            }
+          else if generator == deployRequestGenerator then
+            {
+              files = {
+                key = {
+                  secret = true;
+                  neededFor = "services";
+                  owner = worker.user;
+                  inherit group;
+                  mode = "0400";
+                };
+                "key.pub".secret = false;
+              };
+              runtimeInputs = [
+                pkgs.openssh
+                pkgs.coreutils
+              ];
+              script = ''
+                ssh-keygen -t ed25519 -N "" -C "${worker.user}-deploy-request" -f "$out/key"
+              '';
             }
           else
             {
@@ -273,6 +311,7 @@ in
     { config, pkgs, ... }:
     let
       policy = config.programs.omnigent.workerCredentials;
+      deployer = fleetDeployer.endpoint;
       policyFile = pkgs.writeText "omnigent-worker-credential-policy.json" (builtins.toJSON policy);
       wrapper =
         name: mode:
@@ -295,7 +334,29 @@ in
         home.packages = [
           (wrapper "omnigent-worker-verify" "verify")
         ]
-        ++ lib.optional (policy.linearApiKeys != { }) (lib.hiPrio (wrapper "linear" "linear"));
+        ++ lib.optional (policy.linearApiKeys != { }) (lib.hiPrio (wrapper "linear" "linear"))
+        ++ lib.optional (policy.deployRequestKey != null) (
+          pkgs.writeShellApplication {
+            name = "fleet-deploy";
+            runtimeInputs = [ pkgs.openssh ];
+            text = ''
+              exec ssh fleet-deployer deploy "$@"
+            '';
+          }
+        );
+        # The request key only authenticates deploy requests to the deployer's
+        # forced command; it never reaches an agent or a forwarded socket.
+        programs.ssh = lib.mkIf (policy.deployRequestKey != null) {
+          enable = true;
+          enableDefaultConfig = false;
+          settings.fleet-deployer = {
+            HostName = deployer.hostName;
+            User = deployer.user;
+            IdentityFile = policy.deployRequestKey;
+            IdentitiesOnly = true;
+            ForwardAgent = false;
+          };
+        };
         xdg.configFile."linear/credentials.toml" = lib.mkIf (policy.linearApiKeys != { }) {
           source = config.lib.file.mkOutOfStoreSymlink policy.linearRendered;
         };

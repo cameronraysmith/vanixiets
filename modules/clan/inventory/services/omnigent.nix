@@ -1,5 +1,9 @@
 { config, ... }:
 let
+  # Enrollment flips this in the same commit that adds the generated
+  # vars/shared/<worker-user>-deploy-request ciphertext; until then every machine's
+  # credential-source assertions would reject the selected but absent key.
+  deployRequestEnrolled = false;
   workerCredentials =
     owner: user: labels:
     let
@@ -9,6 +13,11 @@ let
       signingKey = {
         enable = true;
         generator = "${user}-signing-key";
+        file = "key";
+      };
+      deployRequestKey = {
+        enable = deployRequestEnrolled;
+        generator = "${user}-deploy-request";
         file = "key";
       };
       githubTokens = builtins.listToAttrs (

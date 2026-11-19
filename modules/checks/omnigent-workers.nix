@@ -49,11 +49,12 @@
           ++ extra;
         };
       # An unsigned author, a documentation mention of a foreign path and a synthetic
-      # credential policy must all stay accepted by the guards.
+      # credential policy, including a deploy request key, must all stay accepted by the guards.
       home = mkHome [
         {
           _module.args.omnigentCredentialPolicy = {
             signingKey = null;
+            deployRequestKey = "/synthetic-deploy-request-key";
             githubTokens.fixture = {
               path = "/synthetic-github-token";
               expectedLogin = "fixture";
@@ -185,6 +186,23 @@
         linear = lib.elem pkgs.linear-cli cfg.home.packages;
         skills = cfg.home.file."${cfg.home.homeDirectory}/.claude/skills/linear-cli".enable;
         githubHelper = cfg.programs.gh.gitCredentialHelper.enable;
+        # The deploy request key reaches the deployer only through its own SSH alias,
+        # which the no-agent guard (held by `composition`) accepts.
+        deployRequest =
+          let
+            block = cfg.programs.ssh.settings.fleet-deployer.data;
+          in
+          cfg.programs.ssh.enable
+          &&
+            block == {
+              header = "Host fleet-deployer";
+              HostName = config.flake.lib.fleetDeployer.endpoint.hostName;
+              User = config.flake.lib.fleetDeployer.endpoint.user;
+              IdentityFile = "/synthetic-deploy-request-key";
+              IdentitiesOnly = true;
+              ForwardAgent = false;
+            }
+          && lib.any (package: package.name == "fleet-deploy") cfg.home.packages;
       };
 
       # Linux: one container NixOS fixture. Cameron is enabled and violates the private
@@ -703,7 +721,10 @@
             "workspace-id"
             "viewer-email"
           ] (credentialVar generator)
-        );
+        )
+        // {
+          omnigent-cameron-deploy-request.key = credentialVar "omnigent-cameron-deploy-request" "key";
+        };
       credentialPolicy =
         definition: linearRendered:
         config.flake.lib.omnigentCredentialPolicy {
@@ -722,8 +743,14 @@
         enable = true;
         generator = "omnigent-cameron-linear-${label}";
       };
+      credentialDeployRequest = {
+        enable = true;
+        generator = "omnigent-cameron-deploy-request";
+        file = "key";
+      };
       workerCredentials = {
         signingKey = credentialSource "signing";
+        deployRequestKey = credentialDeployRequest;
         githubTokens = lib.genAttrs credentialGithubOwners (owner: {
           enable = true;
           generator = "omnigent-cameron-github-token-${owner}";
@@ -766,6 +793,9 @@
                   signingKey = credentialSource "signing" // {
                     enable = false;
                   };
+                  deployRequestKey = credentialDeployRequest // {
+                    enable = false;
+                  };
                   githubTokens = workerCredentials.githubTokens // {
                     second = workerCredentials.githubTokens.second // {
                       enable = false;
@@ -785,16 +815,80 @@
             disabled = [
               credentialVars.fixture-signing.credential.path
               credentialVars.fixture-claude.credential.path
+              credentialVars.omnigent-cameron-deploy-request.key.path
               credentialVars.omnigent-cameron-github-token-second.token.path
             ]
             ++ map (file: file.path) (lib.attrValues credentialVars.omnigent-cameron-linear-work);
           in
           policy.signingKey == null
+          && policy.deployRequestKey == null
           && policy.claudeSetupToken == null
           && lib.attrNames policy.githubTokens == [ "first" ]
           && lib.attrNames policy.linearApiKeys == [ "personal" ]
           && !lib.any (path: lib.elem path policy.requiredFiles) disabled
           && lib.elem credentialVars.omnigent-cameron-github-token-first.token.path policy.requiredFiles;
+        # The deploy request key is selected, required and exposed like any other source.
+        deployRequestKeySelected =
+          let
+            policy = credentialDelivery.policy;
+            path = credentialVars.omnigent-cameron-deploy-request.key.path;
+          in
+          policy.deployRequestKey == path
+          && lib.elem path policy.requiredFiles
+          &&
+            policy.sources.deployRequestKey == {
+              generator = "omnigent-cameron-deploy-request";
+              file = "key";
+              inherit path;
+            };
+        # The deploy request generator creates its key pair without prompts; only the
+        # private key is secret, and its name is bound to the worker user. Only the fields
+        # read here are forced, so no host configuration is needed.
+        deployRequestGenerator =
+          let
+            delivery =
+              generator:
+              config.flake.lib.mkOmnigentWorkerCredentials {
+                inherit pkgs;
+                osConfig = throw "deploy request generator read the host configuration";
+                worker = {
+                  user = "omnigent-cameron";
+                  owner = "cameron";
+                  credentials = credentialsOf {
+                    deployRequestKey = credentialDeployRequest // {
+                      inherit generator;
+                    };
+                  };
+                };
+                home = credentialHomePath;
+                group = "omnigent-cameron";
+                serverUrl = "https://fixture.invalid";
+              };
+            named =
+              generator:
+              (lib.findFirst (
+                a: lib.hasInfix "deploy request key" a.message
+              ) (throw "no deploy request naming assertion") (delivery generator).assertions).assertion;
+            spec = (delivery "omnigent-cameron-deploy-request").generators.omnigent-cameron-deploy-request;
+          in
+          spec.share
+          && !(spec ? prompts)
+          && !(spec ? dependencies)
+          &&
+            spec.files == {
+              key = {
+                secret = true;
+                neededFor = "services";
+                owner = "omnigent-cameron";
+                group = "omnigent-cameron";
+                mode = "0400";
+              };
+              "key.pub".secret = false;
+            }
+          && lib.elem pkgs.openssh spec.runtimeInputs
+          && lib.hasInfix ''ssh-keygen -t ed25519 -N "" -C "omnigent-cameron-deploy-request" -f "$out/key"'' spec.script
+          && named "omnigent-cameron-deploy-request"
+          && !named "omnigent-cameron-other";
         # Readiness waits for the rendered template; the Home Manager link to it is created later.
         linearRequiresRendered =
           let

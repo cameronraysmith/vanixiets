@@ -1,6 +1,7 @@
 { config, ... }:
 let
   tincrPort = toString config.flake.lib.mesh.port;
+  gcpMachines = config.flake.lib.cloudMachines.gcp;
 in
 {
   flake.modules.terranix.gcp =
@@ -17,48 +18,9 @@ in
       defaultRegion = "us-central1";
       defaultZone = "us-central1-b";
 
-      # Machine deployment definitions
-      # Set enabled = true to deploy, false to destroy
-      # Run: nix run .#terraform (regenerates config and applies)
-      #
-      # COST REFERENCE TABLE:
-      # =========================================
-      # | Machine     | Type          | GPU       | Hourly  | Monthly (730h) |
-      # |-------------|---------------|-----------|---------|----------------|
-      # | galena      | e2-standard-8 | None      | ~$0.27  | ~$197          |
-      # | scheelite   | n1-standard-8 | 1x T4     | ~$0.54  | ~$394          |
-      # | scheelite-l4| g2-standard-4 | 1x L4     | ~$0.37  | ~$270          |
-      # | (new)       | a2-highgpu-1g | 1x A100   | ~$3.14  | ~$2,292        |
-      # =========================================
-      machines = {
-        galena = {
-          enabled = false;
-          machineType = "e2-standard-8"; # 8 vCPU, 32GB RAM
-          zone = "us-central1-b";
-          image = "debian-12";
-          comment = "CPU-only GCP node (~$0.27/hr) - named for lead ore mineral";
-        };
-
-        scheelite = {
-          enabled = false;
-          machineType = "n1-standard-8"; # 8 vCPU, 30GB RAM
-          zone = "us-central1-f"; # Try: a -> b -> c -> f if RESOURCE_EXHAUSTED
-          image = "debian-12";
-          gpuType = "nvidia-tesla-t4"; # Turing architecture, 16GB VRAM
-          gpuCount = 1;
-          comment = "T4 GPU node for ML training/inference (~$0.35/hr GPU + ~$0.19/hr base)";
-        };
-
-        # scheelite-l4 = {
-        #   enabled = false;
-        #   machineType = "g2-standard-4"; # 4 vCPU, 16GB RAM, optimized for L4
-        #   zone = "us-central1-a";
-        #   image = "debian-12";
-        #   gpuType = "nvidia-l4"; # Ada Lovelace, 24GB VRAM, ~30% faster than T4
-        #   gpuCount = 1;
-        #   comment = "L4 GPU node (~$0.24/hr GPU + ~$0.13/hr base)";
-        # };
-      };
+      # Machine deployment definitions: flake.lib.cloudMachines.gcp
+      # (modules/lib/cloud-machines.nix), with the cost reference table.
+      machines = gcpMachines;
 
       # Filter to enabled machines
       enabledMachines = lib.filterAttrs (_name: cfg: cfg.enabled) machines;

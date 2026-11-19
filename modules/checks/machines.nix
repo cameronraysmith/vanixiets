@@ -34,6 +34,7 @@
       resolverReloadObligations = self.lib.resolverReloadObligations;
       meshHostsObligations = self.lib.meshHostsObligations;
       harmoniaGcObligations = self.lib.harmoniaGcObligations;
+      fleetDeployer = self.lib.fleetDeployer;
 
       withFleetObligations =
         name: machineConfig: toplevel:
@@ -47,6 +48,7 @@
           );
           unmetMeshHosts = meshHostsObligations.failures name machineConfig;
           unmetHarmoniaGc = harmoniaGcObligations.failures name machineConfig;
+          unmetFleetDeployer = fleetDeployer.failures name machineConfig;
           hostFailures = map (a: a.message) (lib.filter (a: !a.assertion) machineConfig.assertions);
         in
         assert lib.assertMsg
@@ -57,9 +59,10 @@
             && unmetResolverReload == [ ]
             && unmetMeshHosts == [ ]
             && unmetHarmoniaGc == [ ]
+            && unmetFleetDeployer == [ ]
           )
           (
-            "Fleet obligations unmet on ${name}: omnigentFleetObligations [${lib.concatStringsSep ", " unmet}]; deployRecordObligations [${lib.concatStringsSep ", " unmetDeployRecord}]; commitSigningObligations [${lib.concatStringsSep ", " unmetSigning}]; resolverReloadObligations [${lib.concatStringsSep ", " unmetResolverReload}]; meshHostsObligations [${lib.concatStringsSep ", " unmetMeshHosts}]; harmoniaGcObligations [${lib.concatStringsSep ", " unmetHarmoniaGc}]"
+            "Fleet obligations unmet on ${name}: omnigentFleetObligations [${lib.concatStringsSep ", " unmet}]; deployRecordObligations [${lib.concatStringsSep ", " unmetDeployRecord}]; commitSigningObligations [${lib.concatStringsSep ", " unmetSigning}]; resolverReloadObligations [${lib.concatStringsSep ", " unmetResolverReload}]; meshHostsObligations [${lib.concatStringsSep ", " unmetMeshHosts}]; harmoniaGcObligations [${lib.concatStringsSep ", " unmetHarmoniaGc}]; fleetDeployer [${lib.concatStringsSep ", " unmetFleetDeployer}]"
             + lib.optionalString (hostFailures != [ ]) (
               "\n${name} assertion failures: ${lib.concatStringsSep "\n" hostFailures}"
             )
@@ -87,6 +90,9 @@
     assert lib.assertMsg (lib.all (name: inventory ? ${name} && !(builtins.elem name deferred)) (
       lib.attrNames obligations.expectedOwners
     )) "every machine carrying Omnigent fleet obligations must have a machine check to assert them";
+    assert lib.assertMsg (
+      fleetDeployer.problems == [ ]
+    ) "flake.lib.fleetDeployer: ${lib.concatStringsSep "; " fleetDeployer.problems}";
     {
       checks =
         (lib.mapAttrs' (
