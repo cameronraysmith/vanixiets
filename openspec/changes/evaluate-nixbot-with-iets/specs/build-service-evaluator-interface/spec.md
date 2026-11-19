@@ -4,7 +4,7 @@
 
 magnetite's configuration SHALL set `services.nixbot.packages.nix-eval-jobs` to `config.services.nixEvalLock.wrap` applied to exactly one package: `options.services.nixbot.packages.nix-eval-jobs.default` until the switch, and the package of `The iets package exposes nix-eval-jobs with nixbot's nix grafted on` after it, chosen on one line of `modules/nixos/nixbot.nix`; the unit's `NIX_CONFIG` SHALL keep `allow-import-from-derivation = false`.
 
-**Discharged by**: `flake.modules.nixos.nix-eval-lock`'s assertions that no service PATH carries an unwrapped `nix-eval-jobs` and that a wrapper's `nix` equals its evaluator's (`modules/nixos/nix-eval-lock.nix`), `checks.x86_64-linux.nix-eval-lock-rehearsal`, and magnetite's kill-order assertion, resting on world assumption `A143 — iets evaluates without building, never reads a flake's nixConfig, and asks the daemon for cache status`; an evaluation of magnetite's `systemd.services.nixbot.path` and a read of the deployed unit's PATH discharge it.
+**Discharged by**: `flake.modules.nixos.nix-eval-lock`'s assertions that no service PATH carries an unwrapped `nix-eval-jobs` and that a wrapper's `nix` equals its evaluator's (`modules/nixos/nix-eval-lock.nix`), `checks.x86_64-linux.nix-eval-lock-rehearsal`, `checks.x86_64-linux.nixbot-iets-evaluator` (the selection and its unwrapped mutant), and magnetite's kill-order assertion, resting on world assumption `A143 — iets evaluates without building, never reads a flake's nixConfig, and asks the daemon for cache status`; an evaluation of magnetite's `systemd.services.nixbot.path` and a read of the deployed unit's PATH discharge it.
 
 #### Scenario: The unit PATH is read after the switch
 
@@ -88,7 +88,7 @@ Before the switch, the iets package SHALL run on magnetite as `nix-eval-jobs`, t
 
 ### Requirement: magnetite reports each competing unit's memory and its compressed swap
 
-The host nixbot runs on SHALL run `magnetite-memory-budget.service` every 60 s, replacing `magnetite-memory-budget.prom` in the host's one textfile directory, `vanixiets.nodeExporter.textfileDirectory` (`/run/node-exporter-textfile`), by write-then-rename with the `MemoryCurrent` and `MemoryPeak` of each active unit matching `memoryBudgetUnits` and of both slices, zram0's `mm_stat` sizes, and `user.slice`'s `memory.events` `high` count.
+The host nixbot runs on SHALL run `magnetite-memory-budget.service` every 60 s, replacing `magnetite-memory-budget.prom` in `vanixiets.nodeExporter.textfileDirectory` by write-then-rename with the `MemoryCurrent` and `MemoryPeak` of each active unit matching `memoryBudgetUnits` and of both slices, zram0's `mm_stat` sizes, and `user.slice`'s `memory.events` `high` count.
 node_exporter SHALL read it through its `textfile` collector, and the six series names SHALL join `nodeExporterKeep`.
 
 **Discharged by**: `checks.x86_64-linux.magnetite-memory-budget`, which formats systemctl output recorded on magnetite and a recorded `memory.events` with its mutants; the evaluation-time assertion of `flake.modules.nixos.magnetite-memory-budget` that node_exporter runs its textfile collector on the probe's directory and that `nodeExporterKeep` holds the six names; a read of the stored series after deploy; resting on world assumption `A153 — The collector's systemd receiver reports no unit memory, and the kernel reports each service's memory and zram's footprint`.

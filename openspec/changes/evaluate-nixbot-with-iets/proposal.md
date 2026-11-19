@@ -27,7 +27,7 @@ The swap fits the evaluator setting nixbot already exposes, but iets fails a who
 **A record of every nixbot evaluation**
 - From: nixbot keeps an evaluation's duration and per-attribute counters, and nothing records how close an evaluation came to its memory ceiling, whether the kernel killed part of it, or which evaluator ran.
 - To: a fifth patch on nixbot logs one structured record per evaluation (evaluator and version, workers, per-worker memory limit, wall, user and system time, the evaluation's memory peak against its ceiling, kernel kills, the evaluator's own kill messages, exit status), which the collector copies into a new dev-loop table, the daily reconcile checks, and the dev-loop view charts.
-- Reason: the decisions to switch, to keep iets, and to give it room all rest on these numbers, and their first 48 hours or more, holding a flake-update evaluation, are the baseline under the current evaluator.
+- Reason: the decisions to switch, to keep iets, and to give it room all rest on these numbers; the stock records collected until the switch are the reference for the switched week.
 - Impact: non-breaking; one more dev-loop table and chart. buildbot's and `nix-fast-build --remote`'s evaluations are not recorded.
 
 **A memory budget for magnetite**
@@ -38,7 +38,7 @@ The swap fits the evaluator setting nixbot already exposes, but iets fails a who
 
 **nixbot's evaluator**
 - From: nixbot evaluates with its own patched nix-eval-jobs behind the host evaluation lock.
-- To: after a baseline of at least 48 hours and a paired replay of about twenty already-evaluated commits under both evaluators inside nixbot's real sandbox (design D13), nixbot evaluates with iets behind the same lock, through a minimal package exposing iets as `nix-eval-jobs` with nixbot's own Nix grafted on; nothing else on any host changes.
+- To: after a paired replay of about twenty already-evaluated commits under both evaluators inside nixbot's real sandbox (design D13; the operator's Q69 of 2026-11-19 made it the only gate), nixbot evaluates with iets behind the same lock, through a minimal package exposing iets as `nix-eval-jobs` with nixbot's own Nix grafted on; nothing else on any host changes.
 - Reason: about 3x less evaluation CPU at identical results, without the shared writable cache of Mic92/nixbot#255 or a fleet-wide shim.
 - Impact: non-breaking for results; one more flake input. A worker killed for memory fails the whole evaluation instead of being retried. Reverting one line to the stock package stays as the immediate safety valve for a failing or broken evaluation.
 
@@ -46,7 +46,7 @@ The swap fits the evaluator setting nixbot already exposes, but iets fails a who
 - From: 6 workers × 3072 MiB, chosen from 2026-09 measurements under nix-eval-jobs, and no rule for what happens when an evaluation outgrows its room.
 - To: magnetite's first job is to be the best nixbot server. An evaluation above 90 % of its memory ceiling or at 20 GiB, or a kernel kill, triggers an operator decision taken in order of cost: tune the evaluator, reclaim memory on magnetite (ZFS cache cap, zram, per-service limits), move other services off magnetite, or resize it. The last two are the operator's, outside this change.
 - Reason: a 3x faster evaluator is worth giving room to, within what the operator will pay for and maintain; reverting it for lack of memory that can be found more cheaply would optimise the wrong thing.
-- Impact: none until the trigger fires; settings stay at 6 × 3072 through the switch.
+- Impact: none until the trigger fires. The replay fired it once, so the switch lands at 5 × 3072, D9's first rung (design D10).
 
 ## Capabilities
 

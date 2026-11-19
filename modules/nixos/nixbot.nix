@@ -92,9 +92,8 @@ in
       # budget comes with this module rather than with the host.
       #
       # The iets evaluator (CAM-111 design D3) is built from this host's own
-      # stock evaluator and exposed read-only, so it can be built and checked
-      # on the host without being selected: nothing on the host refers to it,
-      # and services.nixbot.packages.nix-eval-jobs below stays the stock one.
+      # stock evaluator, whose patched `nix` it carries, and is what nixbot
+      # evaluates with (services.nixbot.packages.nix-eval-jobs below).
       imports = [
         flakeModules.magnetite-memory-budget
         (
@@ -112,7 +111,7 @@ in
                 flakeLib.mkNixEvalJobsIets pkgs inputs.iets.packages.${pkgs.stdenv.hostPlatform.system}.default
                   options.services.nixbot.packages.nix-eval-jobs.default;
               defaultText = lib.literalExpression "flake.lib.mkNixEvalJobsIets pkgs inputs.iets.packages.\${system}.default options.services.nixbot.packages.nix-eval-jobs.default";
-              description = "iets as a nix-eval-jobs package for nixbot, built from this host's stock evaluator; not selected.";
+              description = "iets as a nix-eval-jobs package for nixbot, built from this host's stock evaluator.";
             };
           }
         )
@@ -183,29 +182,21 @@ in
         # (8388608 / 65536 = 128).
         buildConcurrency = 128;
 
-        # 6 x 3072 MiB, measured on the two-system scope (311 attributes, 75 GiB
-        # of evaluator allocation in total; nix-eval-jobs runs Boehm with
-        # GC_DONT_GC=1, so a worker's heap only grows until it is recycled):
-        #
-        #   6 x 3072   341 s   peak 18.7 GB   24 restarts   no swap   fastest
-        #   5 x 4096   419 s   peak 21.6 GB   20 restarts   no swap
-        #   4 x 4096   476 s   peak 16.0 GB   16 restarts   no swap
-        #   8 x 2048   505 s   peak 16.3 GB   42 restarts   no swap
-        #   8 x 1536   727 s   peak 12.9 GB   64 restarts   (MemoryHigh 12G)
-        #   8 x 4096   aborted at 186/311 after 163 s: 0 restarts, 42 GB in
-        #              zram (9.2 GB real), 2.7 GB left on the host
-        #
-        # The x86-only optimum (8 x 4096 under MemoryHigh 12G, 131.5 s for 144
-        # attributes) never recycled because resident memory was held below the
-        # limit and the heaps spilled ~31 GiB into zram. With aarch64-darwin the
-        # heaps need ~75-85 GiB, which no zram size can back in 30.6 GiB of RAM,
-        # and that regime crawled to nixbot's 60-minute timeout (build 1115).
-        # Here workers recycle instead, and nix-eval-jobs' own budget (workers x
-        # max-memory-size, plus the attribute in flight) is the bound, so
-        # MemoryHigh below sits above the measured peak and does not bind. At
-        # peak about 8 GB stays free for concurrent local builds.
+        # iets at 5 x 3072 (CAM-111 design D9 (a), the first capacity rung).
+        # The paired replay of 2026-11-19 (20 commits, both evaluators in this
+        # sandbox, logs/cam-111-replay/) gave identical derivations and cache
+        # states, iets a median 3.2x faster than nix-eval-jobs (2.35.4), and
+        # iets peaks of 16.6-20.0 GiB at 6 x 3072 against 15.0-17.8 GiB for
+        # nix-eval-jobs. One cold first evaluation (e527ef7b) reached the 20G
+        # MemoryHigh below, 90.2 % of its ceiling, and ran throttled. Five
+        # workers lowered iets' peaks by 2.4-2.8 GiB, to 68-72 % of the
+        # ceiling (77.6 % for a cold first evaluation), at no measurable cost
+        # in wall time; 6 x 2560 saved as much but recycled workers more.
+        # Workers recycle at max-memory-size, so workers x max-memory-size plus
+        # the attribute in flight bounds the evaluation. The two-system
+        # measurements behind the earlier 6 x 3072 are in
         # logs/magnetite-two-system-eval-experiment.md.
-        evalWorkerCount = 6;
+        evalWorkerCount = 5;
         evalMaxMemorySize = 3072;
 
         github = {
@@ -297,10 +288,11 @@ in
         locations."/metrics".proxyPass = "http://unix:/run/nixbot/web.sock";
       };
 
-      # The service-wide backstop on the evaluation, set above its measured
-      # 18.7 GB peak at 6 x 3072 so that nix-eval-jobs' own budget binds first
-      # (the evaluator flags above). Throttling evaluator heaps at this limit is
-      # what crawled with two systems, so it must not bind in normal operation.
+      # The service-wide backstop on the evaluation, set above iets' measured
+      # peaks at 5 x 3072 (logs/cam-111-replay/) so that the evaluator's own
+      # budget (the flags above) binds first. Throttling evaluator heaps at
+      # this limit is what crawled with two systems, so it must not bind in
+      # normal operation.
       # MemoryMax is deliberately absent: nixbot runs each eval in a delegated
       # cgroup leaf, and when a parent limit binds, the kernel declares OOM at
       # the service and picks the largest process in the whole subtree, the
@@ -325,14 +317,17 @@ in
         "${evaluator.unwrapped.evaluator or "nix-eval-jobs"} ${evaluator.version}";
 
       # Every evaluation queues on the host evaluation lock and runs at
-      # oom_score_adj 900 (modules/nixos/nix-eval-lock.nix). The wrapper sits
-      # over the evaluator nixbot would otherwise use, its own patched build,
-      # and forwards that build's `nix` passthru, so the patched nix CLI on the
-      # service PATH and the nixbot package itself are unchanged. nixbot runs
-      # the bare name from the service PATH inside its bwrap sandbox, which is
-      # why the lock lives under /etc/nix.
+      # oom_score_adj 900 (modules/nixos/nix-eval-lock.nix). The evaluator is
+      # iets (CAM-111): the wrapper sits over the iets package, which keeps
+      # the name nix-eval-jobs and forwards the stock build's `nix` passthru,
+      # so the patched nix CLI on the service PATH and the nixbot package
+      # itself are unchanged. nixbot runs the bare name from the service PATH
+      # inside its bwrap sandbox, which is why the lock lives under /etc/nix.
+      # Reverting to the stock evaluator, the safety valve of CAM-111 design
+      # D9, replaces config.vanixiets.nixbot.ietsEvaluator on the one line
+      # below with options.services.nixbot.packages.nix-eval-jobs.default.
       services.nixbot.packages.nix-eval-jobs = lib.mkIf config.services.nixEvalLock.enable (
-        config.services.nixEvalLock.wrap options.services.nixbot.packages.nix-eval-jobs.default
+        config.services.nixEvalLock.wrap config.vanixiets.nixbot.ietsEvaluator
       );
 
       services.nixbot.packages.nixbot =

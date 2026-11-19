@@ -77,7 +77,7 @@ Stakeholders: the operator, who maintains magnetite and reads the dev-loop view;
 - **Alternatives considered**: a metrics series through Prometheus scrape (no per-evaluation identity, and nixbot's `/metrics` has no such gauge); a separate database (another TTL and exporter for one table).
 
 ### D8: Order of operations, and what each gate needs
-- **Choice**: (1) the record under stock `nix-eval-jobs`, then a baseline at 6 × 3072 of at least 48 hours holding Friday's flake-update evaluation (D13); (2) the canary, a paired replay of the D3 package against the stock evaluator inside nixbot's real sandbox and argv on magnetite, comparing every attribute's derivation for the same commit (D13); (3) the switch at 6 × 3072, no earlier than Saturday 2026-11-21; (4) a tuning decision from the switched week's records. Each gate is the operator's, recorded with the numbers it rests on.
+- **Choice**: (1) the record under stock `nix-eval-jobs`; (2) the canary, a paired replay of the D3 package against the stock evaluator inside nixbot's real sandbox and argv on magnetite, comparing every attribute's derivation for the same commit (D13); (3) the switch as soon as the replay passes P1–P5, at the settings D9's ladder leaves (5 × 3072 after the replay, D10); (4) a tuning decision from the switched week's records. Each gate is the operator's, recorded with the numbers it rests on. (Steps (1) and (3) as revised by the operator on 2026-11-19, Q69: the 48-hour baseline holding Friday's flake update and the Saturday earliest switch are gone, D13.)
 - **Rationale**: the operator's order; the switch must be judged against a baseline measured by the same producer.
 - **Alternatives considered**: switching straight after the benchmark (the benchmark skipped the sandbox, the classic name and the uncovered cache states).
 
@@ -96,6 +96,11 @@ Stakeholders: the operator, who maintains magnetite and reads the dev-loop view;
 ### D10: Evaluator tuning is the first capacity response and a recorded decision
 - **Choice**: after the first switched week, and whenever D9's trigger fires, the operator decides whether to change `evalMaxMemorySize` or `evalWorkerCount`, recording the decision in `modules/nixos/nixbot.nix`'s comment table beside the 2026-09 measurements, citing the week's peaks, wall times and kill counts from `devloop.eval_run` and the D11 budget. If tuning cannot restore headroom without giving back the speed that justified iets, the decision moves to D9's (b)–(d).
 - **Rationale**: Q2 as revised; tuning is the cheapest response and touches only nixbot; the existing table at `nixbot.nix:117-138` is where readers look for why the numbers are what they are.
+- **Taken, 2026-11-19, before the switch.** The replay's P2 tripped once: e527ef7b's cold first iets run at 6 × 3072 reached nixbot.service's 20 GiB `MemoryHigh` (`memory.events` high 94), 90.2 % of its 22707 MiB ceiling, and ran only 1.53× faster than nix-eval-jobs because it was throttled. D9's first rung was taken, 5 workers × 3072 MiB:
+  - Same sandbox, two runs each: B peaked 2.4–2.8 GiB below 6 × 3072 (15584 against 18428 MiB on e527ef7b, 16163 against 18624 MiB on a67385bc), at 67.8–72.0 % of its ceilings, with no measurable loss in wall time.
+  - A cold first evaluation under B (395ec68b, 2026-10-07, nixpkgs ac1faec4) peaked at 17081 MiB, 77.6 % of a 22008 MiB ceiling, with no high events; at that peak 16148 MiB was anonymous memory and 74 MiB file pages.
+  - 6 × 2560 saved as much but recycled workers more. Raising `MemoryHigh` to 22G lowered no peak.
+  - The table in `modules/nixos/nixbot.nix` records the choice and the evidence is in verify.md.
 
 ### D11: magnetite's memory budget is measured beside every evaluation
 - **Choice**: the record's scope grows from the evaluation to the host. What the fleet already stores is kept as is; a magnetite-only probe adds what is missing, and a budget chart sits beside the evaluation charts in the `devloop` view.
@@ -117,10 +122,9 @@ Stakeholders: the operator, who maintains magnetite and reads the dev-loop view;
   - **Replay set.** About twenty commits of `cameronraysmith/vanixiets` that nixbot has already evaluated: the five heaviest by stock `memory_peak_bytes`, the five slowest by `wall_ms`, the latest flake-update commit, one each whose outputs were all local, partly cached, partly not built, and whose evaluation failed, and the rest drawn at random from recent days.
   - **Runs.** Each commit under both evaluators back to back, alternating which runs first, inside nixbot's real sandbox and argv (6 workers, `--max-memory-size 3072`, through the evaluation lock, so each run gets its own `memory.max`), in a quiet window with no nixbot evaluation running. Every run is tagged, and its window is excluded from the baseline figures.
   - **Criteria.** P1: the same attribute set and the same `drvPath` per attribute, and for the failing commit the same failing attributes. P2: every iets peak at most 90 % of its own `memory.max` and at most 20 GiB. P3: no OOM kill and no worker kill under iets. P4: `cached` and `notBuilt` states behave the same in the job output. P5: no commit more than 10 % slower under iets; a sanity check only, with the speed-up reported, not gated.
-  - **Baseline condition.** At least 48 hours of stock records including Friday 2026-11-20's 22:00 UTC flake-update evaluation, whose stock peak must itself be under 90 % of its `memory.max`; if it is not, D9's capacity decision comes before the switch.
-  - **A tripped criterion opens a discussion of mitigations, not a rejection.** P2 or P3 leads to D9's ladder: tune the evaluator, reclaim memory, move services (CAM-112), resize. P4 or P5 leads to diagnosis first. P1 is firm until explained as an iets bug, non-determinism of this repository, or the replay's setup. The only automatic action is D9's one-line revert when a production evaluation fails after the switch, followed by the same discussion.
-  - **Earliest switch**: Saturday 2026-11-21.
-- **Rationale**: a week of stock records measures the evaluator being replaced, not the new one; the same commits, heaviest and slowest included, under both evaluators in the same sandbox measure what the switch changes. The 48 hours with the flake-update evaluation give the stock reference the replay is read against.
+  - **Baseline condition.** Removed by the operator on 2026-11-19 (Q69), both parts: (a) at least 48 hours of stock records and (b) those records holding Friday 2026-11-20's 22:00 UTC flake-update evaluation. The paired replay measures what that unpaired baseline stood for, and better, and its set holds three nixpkgs bumps. The stock records collected until the switch (from 2026-11-18T23:18Z, excluding the replay's window 03:48–05:42Z and the cold run's 05:46–05:58Z on 2026-11-19) are still summarised as the stock reference for the switched week (task 2.6, 6.2), with no gate.
+  - **Earliest switch**: as soon as the replay passes P1–P5 (Q69, 2026-11-19; it replaced Saturday 2026-11-21). The 6.1 safety valve stays.
+- **Rationale**: a week of stock records measures the evaluator being replaced, not the new one; the same commits, heaviest and slowest included, under both evaluators in the same sandbox measure what the switch changes. Each pair is its own stock reference, which is why Q69 could drop the unpaired baseline as a gate.
 - **Alternatives considered**: a week of baseline before the switch (D8's first version, superseded); the four-commit canary alone (too few commits to bound memory and time); gating the switch on speed (P5 checks only for a regression).
 
 ### D14: A soft memory guard on magnetite's user sessions before the switch
@@ -149,9 +153,9 @@ Stakeholders: the operator, who maintains magnetite and reads the dev-loop view;
 ## Migration Plan
 
 1. Land the instrumentation (record patch, `NIXBOT_EVALUATOR`, `eval_run` table, receiver, reconcile comparison, the magnetite budget probe, charts) and deploy magnetite. This changes only magnetite's configuration and the shared `schema.nix` keep-list, which other hosts read but whose new names no other host produces.
-2. Collect at least 48 hours of baseline under `nix-eval-jobs` 2.35.4 at 6 × 3072, including Friday 2026-11-20's 22:00 UTC flake-update evaluation (D13); the operator records the window's summary (peak, median and maximum wall, kill counts) and magnetite's budget (each unit's maximum, ARC size and `c_max`, zram use).
+2. Collect stock records under `nix-eval-jobs` 2.35.4 until the switch; the operator summarises them (peak, median and maximum wall, kill counts) with magnetite's budget (each unit's maximum, ARC size and `c_max`, zram use) as the stock reference for the switched week, with no gate (D13 as revised by Q69, 2026-11-19).
 3. Land the `iets` input and the D3 package as a separate, unused output; run the canary, the paired replay of D13, on magnetite inside nixbot's sandbox (task group 4) and record P1–P5.
-4. Operator gate: switch, no earlier than Saturday 2026-11-21. Land the one-line override and deploy magnetite. A tripped criterion, or a flake-update peak above 90 % in the baseline, is discussed first (D13).
+4. Operator gate: switch as soon as the replay passes P1–P5 (Q69, 2026-11-19). Land the one-line override and the D9 rung the replay called for (5 × 3072, D10) and deploy magnetite. A tripped criterion is discussed first (D13).
 5. Collect the switched week; the operator reads D9's trigger and, if it fired, makes the capacity decision (a)–(d); then D10 (tune or keep).
 
 Rollback (the safety valve of D9): revert the override line in `modules/nixos/nixbot.nix` (the stock package is `options.services.nixbot.packages.nix-eval-jobs.default`, still wrapped by the lock) and deploy magnetite. The record, the budget probe, their table and their charts stay.
@@ -170,7 +174,7 @@ The repository has no BDD runner and no `.feature` file (`features/` is empty), 
 | Requirement | Capability | Stratum | Modality | Witness |
 |---|---|---|---|---|
 | Every evaluation of the build service is measured whichever evaluator runs | `build-service-evaluator` | behavioral | build gate (`nixbot-eval-record` check and mutants, `devloop-ingest`) and smoke | tasks 1.1-1.8, 2.3, 2.4, 5.5, 7.1 |
-| The build service changes evaluator only after a paired replay against a measured baseline | `build-service-evaluator` | behavioral | operator decision | tasks 2.6, 4.4, 4.5, 5.1 |
+| The build service changes evaluator only after a paired replay | `build-service-evaluator` | behavioral | operator decision | tasks 4.4, 4.5, 5.1 |
 | A change of evaluator keeps every attribute's derivation and cache status | `build-service-evaluator` | behavioral | smoke (the canary) and smoke on live builds | tasks 4.1-4.5, 7.2 |
 | Insufficient evaluation headroom opens a capacity decision | `build-service-evaluator` | behavioral | operator decision on recorded measurements | tasks 5.1, 6.2, 6.3 |
 | magnetite's memory budget is measured beside every evaluation | `build-service-evaluator` | behavioral | build gate (`magnetite-memory-budget` check and mutants, magnetite's assertion) and smoke | tasks 1.10-1.12, 2.5, 2.6, 7.5 |

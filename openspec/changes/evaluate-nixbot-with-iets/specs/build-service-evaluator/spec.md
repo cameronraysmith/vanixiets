@@ -21,16 +21,16 @@ Each evaluation the build service runs on magnetite SHALL leave one dev-loop rec
 - **WHEN** a worker exceeds its share of memory, leaves after its attribute and is replaced
 - **THEN** the dev-loop record does not count it, because neither evaluator reports it, and the record's memory peak still bounds what the evaluation held
 
-### Requirement: The build service changes evaluator only after a paired replay against a measured baseline
+### Requirement: The build service changes evaluator only after a paired replay
 
-The build service SHALL NOT change its evaluator until the dev-loop history holds at least 48 hours of evaluations under the evaluator it replaces, including a flake-update evaluation, and about twenty commits it has already evaluated have run under both evaluators back to back in its own isolation, with the operator's record of both.
+The build service SHALL NOT change its evaluator until about twenty commits it has already evaluated, including broad lock-file updates and an evaluation that fails, have run under both evaluators back to back in its own isolation, and the operator has recorded the replay.
 A replay criterion that is not met SHALL open the operator's discussion of mitigations rather than reject the evaluator.
 
-**Discharged by**: the ordering of the change's deployment, with the operator's recorded baseline and replay as its evidence; `build-service-evaluator-interface` requirement `The canary compares the evaluators inside nixbot's sandbox` runs the replay, and `nixbot's evaluator is the lock-wrapped nix-eval-jobs option` keeps the stock evaluator in place until the switch.
+**Discharged by**: the ordering of the change's deployment, with the operator's recorded replay as its evidence; `build-service-evaluator-interface` requirement `The canary compares the evaluators inside nixbot's sandbox` runs the replay, and `nixbot's evaluator is the lock-wrapped nix-eval-jobs option` keeps the stock evaluator in place until the switch.
 
-#### Scenario: The switch is proposed before the baseline holds a flake update
+#### Scenario: The switch is proposed before the replay
 
-- **WHEN** fewer than 48 hours of evaluation records exist under nix-eval-jobs at 6 × 3072 MiB, or none of them is a flake-update evaluation
+- **WHEN** the replay has not run, or a commit's attribute derivations differ between the evaluators without an explanation recorded
 - **THEN** the switch is not deployed
 
 #### Scenario: The replay is read

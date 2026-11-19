@@ -765,7 +765,11 @@ in
             # OOM the kernel kills the evaluator, then the dashboard service,
             # then the store, then the collector, so the collector outlives
             # the store and queues; the alert evaluator, which reports OOM
-            # kills, is taken after all of them.
+            # kills, is taken after all of them. nixbot's evaluator is iets
+            # (CAM-111), which fails the whole evaluation when one of its
+            # workers is killed, so being first does not make it cheap: its
+            # headroom is kept by CAM-111 design D9's capacity decisions, and
+            # nixbot's one-line revert to nix-eval-jobs is the safety valve.
             {
               assertion =
                 config.services.nixEvalLock.enable

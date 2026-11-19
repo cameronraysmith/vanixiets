@@ -90,11 +90,14 @@ while [ "$status" -ne 0 ]; do
   flock -w "$report_interval" -E "$conflict" "$lock_fd" || status=$?
 done
 
-# The evaluator is the cheapest victim when the host runs out of memory:
-# nix-eval-jobs >= 2.35.3 requeues an OOM-killed worker and retries it alone,
-# while the alternatives the kernel otherwise picks (nix-daemon connection
-# workers, the CI daemon, the desktop) are not retried. Raising the value
-# needs no privilege. Hosts without the interface (darwin) skip it.
+# The evaluator is the kernel's first victim when the host runs out of memory:
+# the alternatives it otherwise picks (nix-daemon connection workers, the CI
+# daemon, the desktop) are worse to lose. nix-eval-jobs >= 2.35.3 requeues an
+# OOM-killed worker and retries it alone; iets, magnetite's evaluator for
+# nixbot (CAM-111), fails the whole evaluation instead, so there headroom is
+# kept by CAM-111 design D9's capacity decisions, and reverting nixbot to the
+# stock evaluator is the safety valve. Raising the value needs no privilege.
+# Hosts without the interface (darwin) skip it.
 if [ -e /proc/self/oom_score_adj ]; then
   echo 900 >/proc/self/oom_score_adj
 fi
