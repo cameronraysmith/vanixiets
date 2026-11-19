@@ -97,6 +97,7 @@ nix build .#vmTests.x86_64-linux.fleet-deployer               # Pyrite, kvm
   - refusals that never touch the target;
   - busy, unreachable within 15 s, concurrent requests serialised;
   - an unhealthy deploy kept;
+  - an activation that writes its deploy record and exits 0 without switching, ended as unhealthy because the running system is not the deployed closure;
   - a deploy that cuts SSH rolled back by the target itself;
   - one notice per request;
   - the key check failing on a widened key file.

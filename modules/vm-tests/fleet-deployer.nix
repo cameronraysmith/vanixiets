@@ -128,8 +128,15 @@
                     deployCommand = stub "deploy" ''
                       log=/var/lib/fleet-deployer/deploy.log
                       echo "start $(date +%s.%N) $4" >>"$log"
-                      unit="test-switch-$RANDOM"
-                      ssh "$3" systemd-run --collect "--unit=$unit" "$4/bin/switch-to-configuration" switch
+                      if [ -e "$1/no-switch" ]; then
+                        # An activation that writes its deploy record and exits 0
+                        # without relinking /run/current-system (F72's half switch).
+                        # shellcheck disable=SC2029
+                        ssh "$3" half-activate "$4"
+                      else
+                        unit="test-switch-$RANDOM"
+                        ssh "$3" systemd-run --collect "--unit=$unit" "$4/bin/switch-to-configuration" switch
+                      fi
                       sleep 4
                       echo "end $(date +%s.%N) $4" >>"$log"
                     '';
@@ -155,7 +162,15 @@
             {
               imports = [ self.modules.nixos.deploy-record ];
               services.openssh.enable = true;
-              environment.systemPackages = [ pkgs.fleet-deploy-watch ];
+              environment.systemPackages = [
+                pkgs.fleet-deploy-watch
+                # Writes the deploy record an activation would and leaves
+                # /run/current-system where it is.
+                (pkgs.writeShellScriptBin "half-activate" ''
+                  printf '{"host":"target","closure":"%s","previous_closure":"%s","ts":"x"}\n' \
+                    "$1" "$(readlink -f /run/current-system)" >>/var/log/deploy-record.jsonl
+                '')
+              ];
               nix.settings.experimental-features = [ "nix-command" ];
               specialisation = {
                 next.configuration.environment.etc."deployed".text = "next";
@@ -191,7 +206,7 @@
 
             # The forge: main carries `next`; a branch carries `broken` unmerged.
             def commit(name, files, branch="main"):
-                script = f"cd /srv/work && git checkout -q -B {branch} && rm -f closure vars-broken"
+                script = f"cd /srv/work && git checkout -q -B {branch} && rm -f closure vars-broken no-switch"
                 for path, text in files.items():
                     script += f" && printf %s {shlex.quote(text)} > {path}"
                 script += f" && git add -A && git commit -q -m {name} && git push -q -f origin {branch}"
@@ -294,6 +309,16 @@
                 deployer.fail("test -e /run/fleet-deployer/lock/target")
                 target.succeed("systemctl start sshd.service")
                 target.wait_for_unit("sshd.service")
+
+            with subtest("an activation that leaves the running system unchanged is unhealthy"):
+                running = current()
+                commit("half-switch", {"closure": "${spec "broken"}", "no-switch": "x"})
+                out = request("deploy target", 7)
+                assert f"the running system is {running}, not the deployed ${spec "broken"}" in out, out
+                last = json.loads(target.succeed("tail -n1 /var/log/deploy-record.jsonl"))
+                assert last["closure"] == "${spec "broken"}", last
+                assert current() == running
+                assert records()[-1]["outcome"] == "unhealthy", records()[-1]
 
             with subtest("a failed unit is reported and kept"):
                 commit("broken", {"closure": "${spec "broken"}"})

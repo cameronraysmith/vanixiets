@@ -259,6 +259,13 @@ class Deployer:
     def health(self, machine: str, target: str, closure: str) -> list[str]:
         problems = []
         cls = self.config["targets"][machine]["class"]
+        # The running system first: an activation can write its deploy record
+        # and exit 0 without relinking /run/current-system (F72), so the record
+        # alone does not show that the host runs what was deployed.
+        current = self.ssh(target, "readlink -f /run/current-system", capture_output=True, text=True)
+        running = current.stdout.strip() if current.returncode == 0 else ""
+        if running != closure:
+            problems.append(f"the running system is {running or '(unreadable)'}, not the deployed {closure}")
         last = self.ssh(target, "tail -n 1 /var/log/deploy-record.jsonl", capture_output=True, text=True)
         try:
             if json.loads(last.stdout)["closure"] != closure:
