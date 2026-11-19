@@ -172,6 +172,7 @@ The operator decided Q1-Q8 and, after Gate 1 was approved (Q33), Q30-Q32 on 2026
   - **What the code does today:** `fleet-deploy-request` treats any non-zero exit of `clan machines update` as `failed` (status 6, "the deploy command failed"). It stops the rollback watcher, records the request and posts it at normal priority. This case is therefore never reported as success, provided clan exits non-zero, which it did here.
   - **Gap, closed (Q66, 2026-11-19):** the health check now begins by comparing `readlink -f /run/current-system` on the target with the deployed closure, on both NixOS and darwin. A mismatch ends the request as `unhealthy` (7), with a reason naming both paths, so an activation that exits 0 without switching is never reported as deployed. The deploy record alone is not evidence, because activation writes it before the switch.
   - **Remaining limit:** a darwin target needs its users logged in with a console session for a deploy that changes their agents. Physical presence is not needed: the operator's `clan machines update argentum` at 04:23Z on 2026-11-19 completed remotely (generation 30), with both users holding console sessions. Statuses 6 and 7 send the operator to the machine.
+- [Known limit, F83] A request to a sleeping host ends `unreachable` (5) only after the resolve, the cache check and the vars check, because the target is probed after evaluation. argentum, 2026-11-19 18:36Z, took 133 s against task 6.3's one minute. The probe could run before the resolve; not changed yet.
 
 ## Migration Plan
 
