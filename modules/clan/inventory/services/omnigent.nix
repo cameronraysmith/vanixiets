@@ -1,9 +1,9 @@
 { config, ... }:
 let
-  # Enrollment flips this in the same commit that adds the generated
-  # vars/shared/<worker-user>-deploy-request ciphertext; until then every machine's
-  # credential-source assertions would reject the selected but absent key.
-  deployRequestEnrolled = false;
+  # Enrolled 2026-11-19 with vars/shared/<worker-user>-deploy-request (CAM-115
+  # task 3.3); false again would make every machine's credential-source
+  # assertions drop the key.
+  deployRequestEnrolled = true;
   workerCredentials =
     owner: user: labels:
     let

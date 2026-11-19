@@ -44,7 +44,8 @@
   - Of the 190 secret files under `sops/secrets` and `vars`, exactly those 8 gained the one recipient `age107c7…mpaw`, and the other 182 have the same recipients as before. stibnite, blackphos, electrum, galena and scheelite are untouched. The sha256 of each of the 8 decrypted values is unchanged.
   - `sops-correspondence` built with `deployer-key-changed` and `deployer-group-missing` failing as expected. The nine machine-check drvPaths evaluate. On cinnabar, an `extendModules` activation var gives `cinnabar: vars/per-machine/cinnabar/fd-mutant/key is decrypted by the deployer but fleet-deployers is not a reader`; the fixture mutants `activationVarWithoutGroup` and `machineKeyWithoutGroup` each yield one problem.
   - The decrypt-on-cinnabar test (the deployer reads rosegold's machine key but not stibnite's) moves to task 4.2, the first step run as the deployer.
-- [ ] 2.3 HOST STEP: on cinnabar, make `keys/age.key` mode `0440` and start `fleet-deployer-keycheck`; it fails. Restore the mode; it passes. Record whether `SystemdUnitFailed cinnabar` is posted (open question 3). — verify: unit results and the ntfy post
+- [x] 2.3 HOST STEP: on cinnabar, make `keys/age.key` mode `0440` and start `fleet-deployer-keycheck`; it fails. Restore the mode; it passes. Record whether `SystemdUnitFailed cinnabar` is posted (open question 3). — verify: unit results and the ntfy post
+  - Evidence (2026-11-18, `logs/cam115-steps0-3-*.log`): with mode 0440 the key check failed, and it passed again at 0400. No `SystemdUnitFailed` alert was posted, which answers open question 3: no. #4042 adds `fleet-deployer-keycheck` to cinnabar's `notifiedUnits`, with its timer at `*-*-* 04:00:00 UTC` as observability-notify requires. Since cinnabar was redeployed, the key check passes against the committed keys.
 - [x] 2.4 The obligation's key-mode clause judges the declared tmpfiles mode and `UMask`. — verify: mutants `deployerWideKeyDir` and `deployerWideUMask` in 1.4
   - Evidence: covered by 1.4's build.
 
@@ -61,13 +62,21 @@
   — verify: the five omnigent checks build; with the flag forced on, only the two missing-ciphertext assertions fail
   - Evidence: `omnigent-worker-capabilities`, `omnigent-credential-policy`, `omnigent-credentials-unit` (33 tests), `omnigent-worker-inventory` and `omnigent-worker-linux` built. With the flag forced on through `extendModules` (magnetite, pyrite, stibnite), the generators are shared, prompt-free, `key` secret and `key.pub` public, and the alias and command are present. The only failed assertions are "credentials require private shared services files…" and "only the declared Clan vars ciphertext…".
 - [ ] 3.3 HOST STEP (returns to the orchestrator first):
-  - Run `clan vars generate` for `omnigent-cameron-deploy-request` and `omnigent-janettesmith-deploy-request` on stibnite, and flip `deployRequestEnrolled = true` in the same commit.
+  - Run `clan vars generate` for `omnigent-cameron-deploy-request` and `omnigent-janettesmith-deploy-request`, and flip `deployRequestEnrolled = true` in the same commit.
   - Deploy cinnabar (new authorized keys), then magnetite and pyrite from stibnite, then stibnite by `just activate`.
 
   — verify:
   - each delivered key is owned by its worker, `0400` in a `0700` directory;
   - `fleet-deploy shell` from each worker exits 3 with a refusal;
   - every alert since each deploy started is recorded with its cause.
+  - Repository half, done (2026-11-19, in a clone of `main@origin` `4de4d1cb` with `CLAN_NO_COMMIT=1`):
+    - `clan vars generate magnetite pyrite stibnite -g omnigent-cameron-deploy-request` and `clan vars generate magnetite pyrite -g omnigent-janettesmith-deploy-request`;
+    - only the two new `vars/shared/omnigent-<user>-deploy-request/` trees were added, and no other file changed;
+    - cameron's `key/secret` is readable by the operator key (`age1vn8f…tmv8`), magnetite, pyrite and stibnite;
+    - janettesmith's is readable by the operator key, magnetite and pyrite;
+    - `fleet-deployers` (`age107c7…mpaw`) reads neither;
+    - cinnabar's evaluated `fleet-deployer` authorized keys now hold the two forced-command lines.
+  - The deploys are pending the operator's approval of this PR.
 
 ## 4. The request path (D6, D7, D9, D11, D12)
 
@@ -84,7 +93,11 @@
 
   — verify: the package builds (flake8 in `writePython3Bin`); checks 1.2 and 4.3
   - Evidence: built on magnetite.
-- [ ] 4.2 HOST STEP: on cinnabar, as `fleet-deployer`, in a worktree of `main`, run `clan vars check` for every machine, then `clan machines update magnetite --target-host root@192.0.2.1` (unreachable, so it stops at the connection). — verify: every `vars check` exits 0 without decrypting out-of-scope files, and the update fails at the connection, not at decryption; if not, stop and revise D7
+- [x] 4.2 HOST STEP: on cinnabar, as `fleet-deployer`, in a worktree of `main`, run `clan vars check` for every machine, then `clan machines update magnetite --target-host root@192.0.2.1` (unreachable, so it stops at the connection). — verify: every `vars check` exits 0 without decrypting out-of-scope files, and the update fails at the connection, not at decryption; if not, stop and revise D7
+  - Evidence (2026-11-18, `logs/cam115-steps0-3-*.log`):
+    - as `fleet-deployer`, rosegold's machine key and pyrite's `initrd-ssh/id_ed25519` decrypt; stibnite's machine key and `ntfy-alerter` exit 128, with no value printed;
+    - `clan vars check` passes ("All vars are present and valid") for all ten machines.
+  - Run through `runuser` from root, `clan vars check` first crashed with `PermissionError: /run/user/0/clan-cache` (root's `XDG_RUNTIME_DIR`, inherited). #4042 makes `fleet-deploy-request` replace its environment (`HOME`, `XDG_RUNTIME_DIR`, `XDG_CACHE_HOME` and `TMPDIR` under `/var/lib/fleet-deployer`, 0700). The VM test's hostile-environment case fails without that and passes with it.
 - [x] 4.3 Run `vmTests.x86_64-linux.fleet-deployer` on pyrite (KVM). The stand-ins are the forge, the cache check (`cacheCheckCommand`), the vars check and clan. Its cases:
   - a merged commit (0);
   - an unmerged commit, an unreachable-by-policy host, `stibnite` and `shell` (3, no target connection);
@@ -119,6 +132,7 @@
 - [x] 5.1 Add `modules/system/fleet-deploy-target.nix` (NixOS and darwin, imported by every base). On targets it installs `fleet-deploy-watch` and, once `keys` is set, adds the restricted key line to the deploy account. The group's read access is per file (D3), not through `defaultGroups`. — verify: every machine check is green; the host-judge mutants in 1.4
   - Evidence: all nine machine-check drvPaths evaluate; `fleet-deploy-watch` is in magnetite's `systemPackages`.
 - [ ] 5.2 HOST STEP: after 2.2, deploy each target from stibnite one at a time: cinnabar, magnetite, pyrite, then rosegold and argentum when awake. — verify: on each, `ssh -i <deployer key> <deployUser>@<host> true` succeeds from cinnabar as `fleet-deployer`, and the same key is refused from any other address; every alert since each deploy started is recorded with its cause
+  - Evidence (2026-11-18/19): trust deploys of cinnabar, pyrite, rosegold and argentum are done, and `fleet-deployer` reaches `root@pyrite` and `cameron@{rosegold,argentum}`, with sudo on the Macs. rosegold and argentum were deployed without `--target-host`, and clan used `cameron@<host>.vanixiets.internal` (the F36 fix; CAM-109 task 9.11). The argentum deploy hit F72 (design, Risks). magnetite's trust comes with its pending deploy.
 - [x] 5.3 Write `fleet-deploy-watch` (`pkgs/by-name/fleet-deploy-watch`). It watches `/run/current-system`, has a confirm window, rolls back by profile generation plus activation, and removes its own launchd job. — verify: the VM test's rollback case (4.3)
   - Evidence: the rollback case in 4.3 (NixOS). The darwin path is task 5.4.
 - [ ] 5.4 HOST STEP: on rosegold or argentum, with its user told in advance, deploy through the deployer at the deployed commit (no closure change). Then run a watcher by hand with a 60 s window on an unchanged system. — verify: the deploy exits 0 and no `org.vanixiets.fleet-deploy-watch.*` job remains; the hand-run watcher ends without switching (A159 for darwin); every alert since the test started is recorded with its cause

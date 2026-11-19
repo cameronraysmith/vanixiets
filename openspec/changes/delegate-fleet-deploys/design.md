@@ -167,6 +167,10 @@ The operator decided Q1-Q8 and, after Gate 1 was approved (Q33), Q30-Q32 on 2026
 - [Trade-off] darwin targets are gated on `main` only → accepted (A158).
 - [Trade-off] session ids are not verified → accepted (Q3).
 - [Trade-off] Two provisioning conditionals (`keys = null`, `deployRequestEnrolled = false`) live until the host steps → removed by task 7.1.
+- [Known limit, F72] A darwin deploy can fail inside a person's home-manager activation: argentum, 2026-11-18, `Activating sops-nix` → `Bootstrap failed: 5: Input/output error`, because launchd cannot load a per-user agent without that person's console session. It leaves `/etc` and the system profile on the new generation and the running system on the old one.
+  - **What the code does today:** `fleet-deploy-request` treats any non-zero exit of `clan machines update` as `failed` (status 6, "the deploy command failed"). It stops the rollback watcher, records the request and posts it at normal priority. This case is therefore never reported as success, provided clan exits non-zero, which it did here.
+  - **Gap:** if clan exited 0 in such a half-switched state, the health check would not notice. It reads the deploy record, which activation writes before the switch, and does not compare `/run/current-system` with the deployed closure. Adding that comparison is the smallest fix. It is not made here.
+  - **Mitigation until then:** a darwin target needs its primary user's console session, or someone present, for a deploy that changes their agents. Status 6 sends the operator to the machine.
 
 ## Migration Plan
 
@@ -183,7 +187,7 @@ Rollback: setting `keys = null` and redeploying withdraws every target's trust; 
 
 1. World-assumption numbers A155-A159 follow A154 (`diagram-fleet-topology`). A concurrent change claiming the same numbers is reconciled at archive.
 2. The `world-assumptions` MODIFIED delta copies the designation table at `main@origin` `82010ba4`; other in-flight changes modify the same table, and their rows are merged at archive.
-3. Is a `SystemdUnitFailed` alert raised for `fleet-deployer-keycheck` on cinnabar, or must the unit join cinnabar's notified units? Observed at task 2.3.
+3. Answered on 2026-11-18: a failing `fleet-deployer-keycheck` raised no alert. #4042 adds it to cinnabar's `notifiedUnits`.
 
 ## Gate 1 modality verdicts
 
