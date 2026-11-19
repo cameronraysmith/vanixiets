@@ -9,13 +9,19 @@ Every request ends in exactly one exit status, recorded in requests.jsonl and
 posted to the fleet-deploy topic by fleet-deploy-notify on the deployer host:
 
     0 deployed   3 refused   4 busy   5 unreachable
-    6 failed     7 unhealthy 8 rolled-back
+    6 failed     7 unhealthy 8 rolled-back 9 unconfirmed
+
+rolled-back is reported only after the target is read running the closure it
+ran before the deploy; a target the deployer cannot confirm that is not read
+back on it is unconfirmed (F84).
 
 The configuration (FLEET_DEPLOY_CONFIG, JSON) is rendered from
-flake.lib.fleetDeployer.requestConfig. Four steps can be replaced by commands
-named in it, which the VM test uses in place of the forge's flake, the binary
-cache and clan: resolveCommand, cacheCheckCommand, varsCheckCommand and
-deployCommand. Each receives the same flake reference the real step uses.
+flake.lib.fleetDeployer.requestConfig. Five steps can be replaced by commands
+named in it, which the VM test and the fixture check use in place of the
+forge's flake, the binary cache, clan and the targets: resolveCommand,
+cacheCheckCommand, varsCheckCommand and deployCommand each receive the same
+flake reference the real step uses; sshCommand receives the target and the
+command it would run there.
 """
 
 from __future__ import annotations
@@ -24,7 +30,6 @@ import fcntl
 import json
 import os
 import re
-import shlex
 import subprocess
 import sys
 import tempfile
@@ -40,6 +45,7 @@ STATUS = {
     "failed": 6,
     "unhealthy": 7,
     "rolled-back": 8,
+    "unconfirmed": 9,
 }
 
 COMMIT = re.compile(r"[0-9a-f]{7,40}")
@@ -135,7 +141,8 @@ class Deployer:
 
     # -- ssh to a target ---------------------------------------------------
     def ssh(self, target: str, command: str, timeout: int | None = None, **kwargs):
-        argv = [
+        custom = self.config.get("sshCommand")
+        argv = [custom, target, command] if custom else [
             "ssh",
             "-i", str(self.ssh_key),
             "-o", "IdentitiesOnly=yes",
@@ -239,23 +246,27 @@ class Deployer:
     # -- rollback watcher (D10) --------------------------------------------
     def arm(self, machine: str, target: str) -> None:
         c = self.config
-        cls = c["targets"][machine]["class"]
         watch = "/run/current-system/sw/bin/fleet-deploy-watch"
         args = f"{self.id} {c['activationWait']} {c['confirmWindow']}"
-        if cls == "nixos":
+        if c["targets"][machine]["class"] == "nixos":
             command = (f"systemctl stop 'fleet-deploy-watch-*' ; "
                        f"systemd-run --quiet --collect --unit fleet-deploy-watch-{self.id} {watch} {args}")
         else:
-            command = (f"{watch} --stop-stale ; "
-                       f"launchctl submit -l org.vanixiets.fleet-deploy-watch.{self.id} -- {watch} {args}")
-            command = f"sudo sh -c {shlex.quote(command)}"
+            # The target's own job, declared in its configuration, bootstrapped
+            # into launchd's system domain as root (F84). A Mac still on a
+            # system without that job is deployed once by hand first; its old
+            # watcher does not know --arm.
+            if self.ssh(target, "test -r /etc/fleet-deploy-watch/job.plist").returncode != 0:
+                raise Outcome("failed", f"{target} declares no rollback watcher job (/etc/fleet-deploy-watch); "
+                                        "deploy it once by hand")
+            command = f"sudo {watch} --arm {args}"
         if self.ssh(target, command).returncode != 0:
             raise Outcome("failed", "could not arm the rollback watcher on the target")
 
     def disarm(self, machine: str, target: str) -> None:
-        cls = self.config["targets"][machine]["class"]
-        command = (f"systemctl stop fleet-deploy-watch-{self.id}" if cls == "nixos"
-                   else f"launchctl remove org.vanixiets.fleet-deploy-watch.{self.id}")
+        command = (f"systemctl stop fleet-deploy-watch-{self.id}"
+                   if self.config["targets"][machine]["class"] == "nixos"
+                   else "/run/current-system/sw/bin/fleet-deploy-watch --disarm")
         self.ssh(target, self.root(machine, command), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
     def confirm(self, machine: str, target: str) -> bool:
@@ -264,6 +275,37 @@ class Deployer:
         command = self.root(machine, f"touch {directory}/{self.id}.confirmed")
         return self.ssh(target, command).returncode == 0
 
+    def running(self, target: str) -> str | None:
+        """The target's /run/current-system, or None when it cannot be read."""
+        try:
+            current = self.ssh(target, "readlink -f /run/current-system", capture_output=True, text=True,
+                               timeout=self.config["probeTimeout"] + 5)
+        except subprocess.TimeoutExpired:
+            return None
+        if current.returncode != 0:
+            return None
+        return current.stdout.strip() or None
+
+    def await_rollback(self, target: str, previous: str, closure: str) -> Outcome:
+        """Read the target until it runs `previous` again or the watcher's
+        window and rollbackGrace have passed; only the first is rolled-back."""
+        c = self.config
+        deadline = time.monotonic() + c["confirmWindow"] + c["rollbackGrace"]
+        while True:
+            running = self.running(target)
+            if previous != closure and running == previous:
+                return Outcome("rolled-back", f"{target} was not confirmed and returned to {previous}")
+            if time.monotonic() >= deadline:
+                break
+            time.sleep(5)
+        if running == closure:
+            state = f"still runs the deployed {closure}"
+        elif running is None:
+            state = "could not be read"
+        else:
+            state = f"runs {running}"
+        return Outcome("unconfirmed", f"{target} was not confirmed and {state}, not the previous {previous}")
+
     # -- health (D11) --------------------------------------------------------
     def health(self, machine: str, target: str, closure: str) -> list[str]:
         problems = []
@@ -271,8 +313,7 @@ class Deployer:
         # The running system first: an activation can write its deploy record
         # and exit 0 without relinking /run/current-system (F72), so the record
         # alone does not show that the host runs what was deployed.
-        current = self.ssh(target, "readlink -f /run/current-system", capture_output=True, text=True)
-        running = current.stdout.strip() if current.returncode == 0 else ""
+        running = self.running(target)
         if running != closure:
             problems.append(f"the running system is {running or '(unreadable)'}, not the deployed {closure}")
         last = self.ssh(target, "tail -n 1 /var/log/deploy-record.jsonl", capture_output=True, text=True)
@@ -328,6 +369,10 @@ class Deployer:
             slot = self.slot(self.config["lockWait"])
             if slot is None:
                 raise Outcome("busy", "every deploy slot stayed taken")
+            previous = self.running(target)
+            if previous is None:
+                raise Outcome("failed", f"could not read the running system of {target}")
+            entry["previous"] = previous
             self.arm(machine, target)
             if not self.deploy(ref, machine, target, closure):
                 self.disarm(machine, target)
@@ -336,9 +381,8 @@ class Deployer:
             say(f"activated; settling {self.config['settle']} s")
             time.sleep(self.config["settle"])
             if not (self.reachable(target) and self.confirm(machine, target)):
-                say("the target does not answer; its watcher rolls it back")
-                time.sleep(self.config["confirmWindow"] + 30)
-                raise Outcome("rolled-back", f"{target} stopped answering after activation")
+                say("the target is not confirmed; reading whether its watcher returns it")
+                raise self.await_rollback(target, previous, closure)
             problems = self.health(machine, target, closure)
             if problems:
                 raise Outcome("unhealthy", "; ".join(problems))
@@ -359,6 +403,7 @@ class Deployer:
             "target": None,
             "commit": None,
             "closure": None,
+            "previous": None,
         }
         try:
             request = parse(command, self.requester, self.config, entry)

@@ -357,11 +357,11 @@ Any requirement relying on this SHALL name it and SHALL lose its discharge once 
 
 ### Requirement: A159 — A job handed to the host's service manager outlives the connection that started it
 
-It is true of systemd and of macOS's launchd, independent of what this fleet builds, that a job started through `systemd-run` or `launchctl submit` keeps running under the service manager after the connection that started it closes and while the host switches configuration.
+It is true of systemd and of macOS's launchd, independent of what this fleet builds, that a job started through `systemd-run` or bootstrapped with `launchctl bootstrap system` keeps running under the service manager after the connection that started it closes and while the host switches configuration.
 Any requirement relying on this SHALL name it and SHALL lose its discharge once the condition below is observed.
 
-**Evidence**: systemd-run(1) transient units belong to the system manager, not the session; launchctl(1) `submit` places the job in the system domain. To be observed on the fleet in the change's verification.
+**Evidence**: systemd-run(1) transient units belong to the system manager, not the session; launchctl(1) `bootstrap` takes its domain as an argument, and `system` is the root domain that no user session owns. The earlier evidence, that `launchctl submit` places the job in the system domain, was false for a submit run with sudo from an SSH session: argentum ran it in `gui/502` as the deploy user (F84, `logs/cam115-e2e3-20261119T1852Z-6.3-rolledback-diag.log`). To be observed on the fleet in the change's verification (task 5.4).
 
 #### Scenario: the job dies with its connection
-- **WHEN** a watcher started through `systemd-run` or `launchctl submit` is found stopped after the starting connection closed or after an activation, without having reached its own end
+- **WHEN** a watcher started through `systemd-run` or bootstrapped into launchd's system domain is found stopped after the starting connection closed or after an activation, without having reached its own end
 - **THEN** this assumption is void, and `fleet-deploy-delegation` requirement `A host that stops answering after a deploy returns to its previous configuration` loses its discharge

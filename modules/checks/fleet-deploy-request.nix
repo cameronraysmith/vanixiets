@@ -5,6 +5,12 @@
 # status 3. Then the forced command itself runs refused requests against a
 # fixture forge, with the resolve and cache steps stubbed, and each
 # requests.jsonl record must keep every field known when it was refused (F79).
+# Last, it deploys to a darwin fixture target played by sshCommand, which
+# fails the confirmation in two of three runs (F84): a target still running
+# the deployed closure is `unconfirmed` (9), never `rolled-back`; one back on
+# the closure it ran before is `rolled-back` (8); a confirmed one is
+# `deployed` (0). Every run arms the watcher through the target's own
+# `fleet-deploy-watch --arm`, never a launchctl command built here.
 # The deploy path itself is exercised by vmTests.x86_64-linux.fleet-deployer.
 { lib, ... }:
 {
@@ -107,6 +113,103 @@
           ''.outcome == "refused" and .reason == "malformed command" and .target == null''
         ]
       ];
+      # A darwin target played from $HOME/target: HOME is the state directory
+      # in every step (private_environment). The confirmation's result is the
+      # run's scenario; `rolls-back` also returns the target to its previous
+      # closure, as its watcher would.
+      previousClosure = "/nix/store/11111111111111111111111111111111-previous";
+      deployedClosure = "/nix/store/22222222222222222222222222222222-deployed";
+      targetStub = pkgs.writeShellScript "fixture-target" ''
+        t=$HOME/target
+        printf '%s\n' "$2" >>"$t/commands"
+        case "$2" in
+          true) exit 0 ;;
+          "readlink -f /run/current-system") cat "$t/current" ;;
+          *"touch /var/run/fleet-deploy/"*".confirmed")
+            case $(cat "$t/scenario") in
+              confirmed) exit 0 ;;
+              rolls-back)
+                cp "$t/previous" "$t/current"
+                exit 1
+                ;;
+              *) exit 1 ;;
+            esac
+            ;;
+          "tail -n 1 /var/log/deploy-record.jsonl") printf '{"closure": "%s"}\n' "$(cat "$t/current")" ;;
+          "sudo launchctl list") echo "PID Status Label" ;;
+          *) exit 0 ;;
+        esac
+      '';
+      deployConfig = pkgs.writeText "fleet-deploy-deploy-fixture.json" (
+        builtins.toJSON {
+          targets.beta = {
+            class = "darwin";
+            deployUser = "op";
+          };
+          requesters = {
+            op = [ "beta" ];
+            pat = [ ];
+          };
+          machines = [ "beta" ];
+          slots = 1;
+          lockWait = 0;
+          probeTimeout = 1;
+          settle = 0;
+          confirmWindow = 0;
+          rollbackGrace = 0;
+          activationWait = 60;
+          cacheStore = "fixture-cache";
+          resolveCommand = pkgs.writeShellScript "resolve" ''
+            echo '{"closure": "${deployedClosure}", "targetHost": "op@beta"}'
+          '';
+          varsCheckCommand = pkgs.writeShellScript "vars-check" "exit 0";
+          deployCommand = pkgs.writeShellScript "deploy" ''echo "$4" >"$HOME/target/current"'';
+          sshCommand = targetStub;
+        }
+      );
+      deploys = [
+        # description, the target's scenario, expected status, jq condition
+        # on the record
+        [
+          "a confirmed deploy is deployed"
+          "confirmed"
+          0
+          ''.outcome == "deployed"''
+        ]
+        [
+          "a failed confirmation on the deployed closure is not rolled back"
+          "stays"
+          9
+          ''.outcome == "unconfirmed" and (.reason | contains("${deployedClosure}"))''
+        ]
+        [
+          "a failed confirmation back on the previous closure is rolled back"
+          "rolls-back"
+          8
+          ''.outcome == "rolled-back" and (.reason | contains("${previousClosure}"))''
+        ]
+      ];
+      deployRun = case: ''
+        t=$TMPDIR/deploy-state/target
+        rm -rf "$t"
+        mkdir -p "$t"
+        echo ${previousClosure} >"$t/previous"
+        cp "$t/previous" "$t/current"
+        echo ${lib.elemAt case 1} >"$t/scenario"
+        set +e
+        SSH_ORIGINAL_COMMAND="deploy beta" fleet-deploy-request op >/dev/null
+        status=$?
+        line=$(tail -n 1 "$TMPDIR/deploy-state/requests.jsonl")
+        jq -e ${lib.escapeShellArg (lib.elemAt case 3)} <<<"$line" >/dev/null
+        holds=$?
+        grep -qx 'sudo /run/current-system/sw/bin/fleet-deploy-watch --arm [0-9a-f]\{12\} 60 0' "$t/commands"
+        armed=$?
+        set -e
+        if [ "$status" != ${toString (lib.elemAt case 2)} ] || [ "$holds" != 0 ] || [ "$armed" != 0 ]; then
+          echo "deploy "${lib.escapeShellArg (lib.elemAt case 0)}": status $status, record $line, target commands: $(tr '\n' ';' <"$t/commands")"
+          failed=1
+        fi
+      '';
       notice = "${self'.packages.fleet-deploy-request}/share/fleet-deploy-request/notice.jq";
       record = case: ''
         set +e
@@ -264,6 +367,13 @@
               ${recordConfig} >"$TMPDIR/record-config.json"
             export FLEET_DEPLOY_CONFIG=$TMPDIR/record-config.json
             ${lib.concatMapStrings record records}
+
+            mkdir "$TMPDIR/deploy-state"
+            jq --arg tmp "$TMPDIR" \
+              '.stateDir = $tmp + "/deploy-state" | .runDir = $tmp + "/deploy-run" | .forge = $tmp + "/forge"' \
+              ${deployConfig} >"$TMPDIR/deploy-config.json"
+            export FLEET_DEPLOY_CONFIG=$TMPDIR/deploy-config.json
+            ${lib.concatMapStrings deployRun deploys}
             [ "$failed" = 0 ]
             touch $out
           '';

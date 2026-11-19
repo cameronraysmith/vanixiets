@@ -98,16 +98,16 @@ nix build .#vmTests.x86_64-linux.fleet-deployer               # Pyrite, kvm
   - busy, unreachable within 15 s, concurrent requests serialised;
   - an unhealthy deploy kept;
   - an activation that writes its deploy record and exits 0 without switching, ended as unhealthy because the running system is not the deployed closure;
-  - a deploy that cuts SSH rolled back by the target itself;
+  - a deploy that cuts SSH rolled back by the target itself, reported rolled back once the deployer reads the target on its previous closure;
   - one notice per request;
   - the key check failing on a widened key file.
 - **What it does not establish:** anything about clan, the forge, niks3, ntfy or darwin.
 
 The fleet deployer's evaluation-time regulators are in the PR lane:
-- every NixOS and darwin machine check asserts `flake.lib.fleetDeployer.failures`: a primary user's account, the deployer's key only on targets' deploy accounts, and the deployer account and key modes only on cinnabar;
+- every NixOS and darwin machine check asserts `flake.lib.fleetDeployer.failures`: a primary user's account, the deployer's key only on targets' deploy accounts, the deployer account and key modes only on cinnabar, and on darwin targets a rollback watcher job declared in launchd's system domain, run as root and not kept alive (F84);
 - the machine checks module asserts `flake.lib.fleetDeployer.problems` (no disabled or excluded target, no reach outside the role policy);
 - `checks.x86_64-linux.fleet-deployer-obligations` runs both judges over fixtures and mutants;
-- `checks.x86_64-linux.fleet-deploy-request` runs the forced command's parser;
+- `checks.x86_64-linux.fleet-deploy-request` runs the forced command's parser, and deploys to a darwin fixture target whose failed confirmation is `unconfirmed` (9) while it keeps the deployed closure and `rolled-back` (8) only once it runs its previous closure;
 - `checks.x86_64-linux.sops-correspondence` bounds the deployer's sops reach to its targets.
 
 `omnigent-worker-isolation` establishes the runtime wiring of the Omnigent worker guards that no evaluation-time check can reach: that the private-home precondition is `ExecStartPre` on the real `omnigent-host-<owner>.service` and that violating the home's privacy at runtime prevents `ExecStart`, that the Nix daemon resolves a worker as untrusted, that two workers have separate accounts and mutually unreadable private homes, and that the unit's `User`, `UMask`, `NoNewPrivileges` and SSH-agent unsetting hold in the spawned process.

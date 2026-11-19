@@ -120,12 +120,13 @@ The operator decided Q1-Q8 and, after Gate 1 was approved (Q33), Q30-Q32 on 2026
   - The deploy takes a slot again.
 
 ### D10: The target arms its own rollback before activation and the deployer confirms after verification
-- **Choice**: `fleet-deploy-watch <id> 7200 300`, started by `systemd-run` on NixOS or `launchctl submit` on darwin after stale watchers are stopped:
+- **Choice**: `fleet-deploy-watch <id> 7200 300`, started by `systemd-run` on NixOS. On darwin, `sudo fleet-deploy-watch --arm <id> 7200 300` bootstraps the job the target's configuration declares (`vanixiets.fleetDeployWatch`, rendered to `/etc/fleet-deploy-watch`) into launchd's system domain. There is one job label per host, and a second arm while it is loaded fails. The watcher:
   - records `/run/current-system` and waits up to 2 h for it to change, then 300 s for `<run>/fleet-deploy/<id>.confirmed`;
   - unless confirmed, sets a new system profile generation to the recorded system and activates it (`switch-to-configuration switch` or `activate`), which writes a deploy record.
 
-  The deployer confirms as soon as SSH answers after the settle period, whatever the health result. It stops its watcher when the deploy command fails.
+  The deployer confirms as soon as SSH answers after the settle period, whatever the health result. It stops its watcher when the deploy command fails. When the confirm fails, it reads the target's `/run/current-system` until `confirmWindow + rollbackGrace` has passed, and reports rolled back only once the target runs the closure it ran before the deploy; otherwise the request is unconfirmed.
 - **Rationale**: only a host that stops answering rolls back (Q5). Watching `/run/current-system`, not the profile, covers every activation, specialisations included.
+- **F84 (2026-11-19)**: the darwin watcher was first started with `sudo sh -c 'launchctl submit …'` over SSH. `submit` is a legacy subcommand that acts on the caller's bootstrap namespace, which sudo does not change, so the job ran as the deploy user in `gui/502` (`logs/cam115-e2e3-20261119T1852Z-6.3-rolledback-diag.log`). It could not create `/var/run/fleet-deploy`, so the confirm failed, and it could not roll back. The deployer then reported rolled back after sleeping without reading the host, and every Mac deploy exited 8. `launchctl bootstrap system <plist>` names its domain and requires root. `asuser 0` is documented only as running as close as possible to the user's context. A nix-darwin daemon was rejected, because activation reloads a daemon whose plist changed, which would end the watcher in the middle of the deploy it watches. The obligation in `flake.lib.fleetDeployer.failures` requires every darwin target's job to be in the system domain, run as root, not kept alive and run `fleet-deploy-watch --run`.
 
 ### D11: Feedback is the streamed log, a settle period and a health verdict
 - **Choice**: after the update, 60 s of settling, then:
@@ -133,10 +134,10 @@ The operator decided Q1-Q8 and, after Gate 1 was approved (Q33), Q30-Q32 on 2026
   - the newest deploy record names the deployed closure;
   - `systemctl --failed` is empty (NixOS), or every `org.nixos.*` job's last exit is 0 (darwin).
 
-  Exit statuses: 0 deployed, 3 refused, 4 busy, 5 unreachable, 6 failed, 7 unhealthy, 8 rolled back.
+  Exit statuses: 0 deployed, 3 refused, 4 busy, 5 unreachable, 6 failed, 7 unhealthy, 8 rolled back, 9 unconfirmed (not confirmed and not read back on its previous closure, F84).
 
 ### D12: Every request is recorded and announced, with the token kept root-only
-- **Choice**: `fleet-deploy-request` appends `{ts, id, requester, command, session, machine, target, commit, closure, outcome, reason, finished}` to `/var/lib/fleet-deployer/requests.jsonl` (`0600`) for every request. The path unit `fleet-deploy-notify` (root, the alerter token through `NTFY_TOKEN_FILE`) posts each new line to the topic `fleet-deploy` (Q32), with `Priority: high` for refused, unhealthy and rolled-back. ntfy's existing `alerter:fleet-*:rw` admits the topic, so no ACL edit is needed.
+- **Choice**: `fleet-deploy-request` appends `{ts, id, requester, command, session, machine, target, commit, closure, previous, outcome, reason, finished}` to `/var/lib/fleet-deployer/requests.jsonl` (`0600`) for every request. `previous` is the target's running system read before the deploy. The path unit `fleet-deploy-notify` (root, the alerter token through `NTFY_TOKEN_FILE`) posts each new line to the topic `fleet-deploy` (Q32), with `Priority: high` for refused, unhealthy, rolled-back and unconfirmed. ntfy's existing `alerter:fleet-*:rw` admits the topic, so no ACL edit is needed.
 - **Rationale**: the request process never holds the alerter token.
 
 ### D13: The deployer itself is deployed like any other target

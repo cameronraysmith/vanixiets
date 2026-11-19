@@ -119,7 +119,7 @@ When `flake.lib.fleetDeployer.keys` is set, every target SHALL carry `flake.lib.
 
 ### Requirement: Each request ends in one exit status
 
-`fleet-deploy-request` SHALL probe the target with `ssh -o ConnectTimeout=<probeTimeout>` before taking the host's lock. It SHALL end every request with exactly one of: 0 deployed, 3 refused, 4 busy, 5 unreachable, 6 failed, 7 unhealthy, 8 rolled back. The health check SHALL run `settle` seconds after the deploy command returns and requires:
+`fleet-deploy-request` SHALL probe the target with `ssh -o ConnectTimeout=<probeTimeout>` before taking the host's lock. It SHALL end every request with exactly one of: 0 deployed, 3 refused, 4 busy, 5 unreachable, 6 failed, 7 unhealthy, 8 rolled back, 9 unconfirmed. The health check SHALL run `settle` seconds after the deploy command returns and requires:
 - SSH answers;
 - the target's newest `/var/log/deploy-record.jsonl` line has `closure` equal to the deployed toplevel;
 - on NixOS, `systemctl --failed` lists no unit;
@@ -135,25 +135,35 @@ When `flake.lib.fleetDeployer.keys` is set, every target SHALL carry `flake.lib.
 
 ### Requirement: The target arms its own rollback before the deploy
 
-Before the deploy command runs, `fleet-deploy-request` SHALL stop stale watchers on the target and start `fleet-deploy-watch <id> <activationWait> <confirmWindow>`, through `systemd-run --unit fleet-deploy-watch-<id>` on NixOS or `launchctl submit -l org.vanixiets.fleet-deploy-watch.<id>` on darwin. The watcher SHALL:
+Before the deploy command runs, `fleet-deploy-request` SHALL read the target's `/run/current-system` as the previous closure and arm the watcher. On NixOS it stops stale watchers and starts `fleet-deploy-watch <id> <activationWait> <confirmWindow>` through `systemd-run --unit fleet-deploy-watch-<id>`. On darwin it runs `sudo fleet-deploy-watch --arm <id> <activationWait> <confirmWindow>`, which bootstraps the job declared by the target's configuration into launchd's system domain, so the watcher runs as root, and fails while that job is already loaded. The watcher SHALL:
 - record `/run/current-system`;
 - wait up to `activationWait` seconds for it to change, and then up to `confirmWindow` seconds for `/run/fleet-deploy/<id>.confirmed` (`/var/run/fleet-deploy/` on darwin);
 - when that file is absent, set a new system profile generation to the recorded system and activate it;
-- remove its own launchd job on every path.
+- unload its own launchd job on every path.
 
-`fleet-deploy-request` SHALL create the file as soon as SSH answers after the settle period, SHALL stop the watcher when the deploy command fails, and SHALL end with status 8 when SSH does not answer.
+Every darwin target's configuration SHALL declare that job in launchd's `system` domain, with no user other than root, not kept alive, running `fleet-deploy-watch --run`.
+
+`fleet-deploy-request` SHALL create the file as soon as SSH answers after the settle period, and SHALL stop the watcher when the deploy command fails. When the file cannot be created, it SHALL read the target's `/run/current-system` until `confirmWindow + rollbackGrace` seconds have passed. It SHALL end with status 8 only once the target runs the previous closure, and with status 9 otherwise.
 
 #### Scenario: the confirm never arrives in the VM test
 - **WHEN** the VM test deploys a closure whose firewall drops the deployer's SSH
 - **THEN** the request exits 8. The target's current system is the previous closure again within 60 s after it, and its newest deploy record names the previous closure with the dropped closure as `previous_closure`.
 
+#### Scenario: the confirm fails while the target keeps the deployed closure
+- **WHEN** `checks.x86_64-linux.fleet-deploy-request` deploys to a fixture darwin target whose confirmation fails and whose running system stays the deployed closure
+- **THEN** the request exits 9, `unconfirmed`, and is not reported rolled back; the same target read back on its previous closure exits 8
+
+#### Scenario: a darwin watcher outside the system domain
+- **WHEN** a darwin target's watcher job is declared in another domain, for another user, kept alive or running another program
+- **THEN** its `darwin-<host>` machine check fails evaluation naming the problem
+
 ### Requirement: Every request is written to the request log and posted to ntfy
 
-`fleet-deploy-request` SHALL append one JSON line to `/var/lib/fleet-deployer/requests.jsonl` (mode `0600`) for every request, refusals included. The line holds `ts`, `id`, `requester`, `command`, `session`, `machine`, `target`, `commit`, `closure`, `outcome`, `reason` and `finished`. `target` is the requested target as received, every word between `deploy` and the commit or `--session`, and is null when the command was refused before it. `fleet-deploy-notify`, a root oneshot started by a path unit on that file, SHALL post each new line once through `ntfy-send` to the topic `fleet-deploy`, with `Priority: high` for `refused`, `unhealthy` and `rolled-back`, reading the token from the alerter token file.
+`fleet-deploy-request` SHALL append one JSON line to `/var/lib/fleet-deployer/requests.jsonl` (mode `0600`) for every request, refusals included. The line holds `ts`, `id`, `requester`, `command`, `session`, `machine`, `target`, `commit`, `closure`, `previous`, `outcome`, `reason` and `finished`. `target` is the requested target as received, every word between `deploy` and the commit or `--session`, and is null when the command was refused before it. `previous` is the target's running system read before the deploy. `fleet-deploy-notify`, a root oneshot started by a path unit on that file, SHALL post each new line once through `ntfy-send` to the topic `fleet-deploy`, with `Priority: high` for `refused`, `unhealthy`, `rolled-back` and `unconfirmed`, reading the token from the alerter token file.
 
 #### Scenario: notices in the VM test
 - **WHEN** the VM test has sent all its requests
-- **THEN** the recording `ntfy-send` holds one post per request line on topic `fleet-deploy`, each starting with its outcome, high priority exactly for the three outcomes, and the request log has mode `0600`
+- **THEN** the recording `ntfy-send` holds one post per request line on topic `fleet-deploy`, each starting with its outcome, high priority exactly for the four outcomes, and the request log has mode `0600`
 
 ### Requirement: The deployer's keys are readable by its account only
 

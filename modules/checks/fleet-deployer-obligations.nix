@@ -10,8 +10,10 @@
 #   second account carrying the deployer's key, a target without exactly the
 #   restricted key line (on the deployer host, the line that also admits
 #   loopback, F82; elsewhere, the line that does not), a deployer account whose keys are not the
-#   requesters' forced-command lines, and a deployer host whose key
-#   directory or key generation is declared wider.
+#   requesters' forced-command lines, a deployer host whose key
+#   directory or key generation is declared wider, and a darwin target whose
+#   rollback watcher job is undeclared, bootstrapped outside launchd's system
+#   domain, run as another user, kept alive or running another program (F84).
 #
 # Per-host facts are asserted by modules/checks/machines.nix on every
 # nixos-<host> and darwin-<host> check, which already evaluates the
@@ -129,6 +131,7 @@
       host = {
         name = "h";
         isTarget = true;
+        isDarwin = false;
         deployUser = "root";
         primaryUser = null;
         sshPublicKey = key;
@@ -150,6 +153,7 @@
               readable = true;
             }
           ];
+          watcher = null;
         };
       };
       deployer = host // {
@@ -163,6 +167,37 @@
         };
         isDeployer = true;
       };
+      macJob = {
+        Label = "org.vanixiets.fleet-deploy-watch";
+        ProgramArguments = [
+          "/nix/store/00000000000000000000000000000000-fleet-deploy-watch/bin/fleet-deploy-watch"
+          "--run"
+        ];
+        RunAtLoad = true;
+        KeepAlive = false;
+      };
+      mac = host // {
+        isDarwin = true;
+        deployUser = "op";
+        facts = host.facts // {
+          users = {
+            op = [ line ];
+            alice = [ other ];
+          };
+          watcher = {
+            domain = "system";
+            job = macJob;
+          };
+        };
+      };
+      macWith =
+        watcher:
+        mac
+        // {
+          facts = mac.facts // {
+            inherit watcher;
+          };
+        };
       hostCases = {
         activationVarWithoutGroup = {
           args = host // {
@@ -312,6 +347,52 @@
           args = host // {
             facts = host.facts // {
               inherit deployerUnit;
+            };
+          };
+          problems = 1;
+        };
+        macAccepted = {
+          args = mac;
+          problems = 0;
+        };
+        macWatcherUndeclared = {
+          args = macWith null;
+          problems = 1;
+        };
+        macWatcherInUserDomain = {
+          args = macWith {
+            domain = "gui/502";
+            job = macJob;
+          };
+          problems = 1;
+        };
+        macWatcherAsDeployUser = {
+          args = macWith {
+            domain = "system";
+            job = macJob // {
+              UserName = "op";
+            };
+          };
+          problems = 1;
+        };
+        macWatcherKeptAlive = {
+          args = macWith {
+            domain = "system";
+            job = macJob // {
+              KeepAlive = true;
+            };
+          };
+          problems = 1;
+        };
+        macWatcherOtherProgram = {
+          args = macWith {
+            domain = "system";
+            job = macJob // {
+              ProgramArguments = [
+                "/bin/sh"
+                "-c"
+                "true"
+              ];
             };
           };
           problems = 1;

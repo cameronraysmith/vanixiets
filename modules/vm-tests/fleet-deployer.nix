@@ -17,7 +17,8 @@
 # uncached closure and a failed vars check refused (3), a held host lock
 # (4), a stopped sshd (5, within 15 s, no host lock taken), two concurrent
 # requests serialised, a failed unit (7, kept), a deploy that cuts SSH
-# rolled back by the target itself (8), one notice per request, high
+# rolled back by the target itself and read back on its previous closure
+# (8), one notice per request, high
 # priority for 3, 7 and 8, the key check failing on a widened key file, and a
 # deploy of the deployer itself, reached over loopback (F82), whose switch
 # restarts sshd and replaces the request command while the request runs.
@@ -152,6 +153,7 @@
                     settle = 3;
                     confirmWindow = 20;
                     activationWait = 120;
+                    rollbackGrace = 60;
                     # The stand-ins receive the flake reference the real steps use;
                     # each refuses anything but a git reference pinned to a commit
                     # and reads the commit's files from the worktree it names.
@@ -222,9 +224,12 @@
                   serviceConfig.Type = "oneshot";
                   script = "exit 1";
                 };
+                # In nixos-fw, which every firewall reload flushes, so the
+                # rollback to `broken` restores SSH and the deployer can read
+                # the target back on its previous closure (F84).
                 isolated.configuration.networking.firewall.extraCommands = ''
-                  iptables -I INPUT -s ${nodes.deployer.networking.primaryIPAddress} -p tcp --dport 22 -j DROP
-                  ip6tables -I INPUT -s ${nodes.deployer.networking.primaryIPv6Address} -p tcp --dport 22 -j DROP
+                  iptables -I nixos-fw -s ${nodes.deployer.networking.primaryIPAddress} -p tcp --dport 22 -j DROP
+                  ip6tables -I nixos-fw -s ${nodes.deployer.networking.primaryIPv6Address} -p tcp --dport 22 -j DROP
                 '';
               };
             };
@@ -372,7 +377,8 @@
 
             with subtest("a deploy that cuts SSH is rolled back by the target"):
                 commit("isolated", {"closure": "${spec "isolated"}"})
-                request("deploy target", 8)
+                out = request("deploy target", 8)
+                assert "returned to ${spec "broken"}" in out, out
                 target.wait_until_succeeds("test \"$(readlink -f /run/current-system)\" = ${spec "broken"}", timeout=60)
                 last = json.loads(target.succeed("tail -n1 /var/log/deploy-record.jsonl"))
                 assert last["closure"] == "${spec "broken"}" and last["previous_closure"] == "${spec "isolated"}", last
@@ -385,7 +391,7 @@
                     message, topic, extra = post.split("\t")
                     assert topic == "fleet-deploy", post
                     assert message.startswith(record["outcome"] + ":"), (record, post)
-                    assert ("Priority: high" in extra) == (record["outcome"] in ("refused", "unhealthy", "rolled-back")), (record, post)
+                    assert ("Priority: high" in extra) == (record["outcome"] in ("refused", "unhealthy", "rolled-back", "unconfirmed")), (record, post)
                 deployer.succeed("test $(stat -c %a /var/lib/fleet-deployer/requests.jsonl) = 600")
 
             with subtest("the key check fails on a widened key file"):

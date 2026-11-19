@@ -203,11 +203,14 @@ let
   #   localSecrets the secrets `clan machines update` decrypts on the
   #                deployer for this machine, each { path; readable; }, where
   #                readable says the sops group fleet-deployers is a reader
+  #   watcher      on darwin, the rollback watcher's launchd job
+  #                (vanixiets.fleetDeployWatch: { domain; job; }), else null
   hostProblems =
     {
       name,
       facts,
       isTarget,
+      isDarwin,
       deployUser,
       primaryUser,
       sshPublicKey,
@@ -229,6 +232,33 @@ let
       map (
         secret: "${name}: ${secret.path} is decrypted by the deployer but fleet-deployers is not a reader"
       ) (lib.filter (secret: !secret.readable) facts.localSecrets)
+    )
+    # The darwin watcher must be a root job in launchd's system domain that
+    # runs once: in a user's domain it can neither roll back nor create the
+    # directory the deployer confirms in (F84).
+    ++ lib.optionals (isTarget && isDarwin) (
+      let
+        job = if facts.watcher == null then { } else facts.watcher.job;
+        args = job.ProgramArguments or [ ];
+      in
+      if job == { } then
+        [ "${name}: the darwin rollback watcher's launchd job is not declared" ]
+      else
+        lib.optional (facts.watcher.domain != "system")
+          "${name}: the rollback watcher is bootstrapped into ${facts.watcher.domain}, not launchd's system domain"
+        ++ lib.optional (
+          (job.UserName or "root") != "root"
+        ) "${name}: the rollback watcher's job runs as ${job.UserName}, not root"
+        ++ lib.optional (
+          (job.KeepAlive or false) != false
+        ) "${name}: launchd restarts the rollback watcher's job (KeepAlive)"
+        ++ lib.optional (
+          !(
+            lib.length args == 2
+            && lib.hasSuffix "/bin/fleet-deploy-watch" (lib.head args)
+            && lib.last args == "--run"
+          )
+        ) "${name}: the rollback watcher's job does not run fleet-deploy-watch --run"
     )
     ++ lib.optionals (sshPublicKey != null) (
       if isTarget then
@@ -305,6 +335,7 @@ let
       else
         null;
     localSecrets = if lib.elem name targets then localSecretsOf name hostConfig else [ ];
+    watcher = hostConfig.vanixiets.fleetDeployWatch or null;
   };
 
   sshPublicKey = if keys == null then null else keys.ssh;
@@ -320,6 +351,7 @@ let
       inherit name sshPublicKey requesterLines;
       facts = factsOf name hostConfig;
       isTarget = lib.elem name targets;
+      isDarwin = classOf name == "darwin";
       inherit (hosts.${name}) deployUser primaryUser;
       isDeployer = name == deployerHost;
     };
@@ -387,6 +419,9 @@ in
       settle = 60;
       confirmWindow = 300;
       activationWait = 7200;
+      # After a failed confirmation the deployer reads the target until
+      # confirmWindow + rollbackGrace for the watcher's return (F84).
+      rollbackGrace = 60;
     };
   };
 }

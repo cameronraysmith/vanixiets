@@ -114,7 +114,7 @@ in
                 outcome=$(jq -r .outcome <<<"$line")
                 message=$(jq -r -f ${pkgs.fleet-deploy-request}/share/fleet-deploy-request/notice.jq <<<"$line")
                 case "$outcome" in
-                  refused | unhealthy | rolled-back) ntfy-send "$message" fleet-deploy -H "Priority: high" ;;
+                  refused | unhealthy | rolled-back | unconfirmed) ntfy-send "$message" fleet-deploy -H "Priority: high" ;;
                   *) ntfy-send "$message" fleet-deploy ;;
                 esac
               done
