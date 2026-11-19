@@ -1936,16 +1936,16 @@
     "sops-secrets-operator-src": {
       "flake": false,
       "locked": {
-        "lastModified": 1794376164,
-        "narHash": "sha256-JOzd5D1HGg9dQHmkiuNQ/FIpYXr/OiSg7wok6gXKnnk=",
+        "lastModified": 1794949867,
+        "narHash": "sha256-vSqKCC19pnaHS0CR3/Rw2dAazLEqyiujAmV4YJ6Mhaw=",
         "owner": "isindir",
         "repo": "sops-secrets-operator",
-        "rev": "6da77c4bafe0721f2f5e014df83a41ab25a838f2",
+        "rev": "15ac5fd35c2520852a47ed746ad99445855a30de",
         "type": "github"
       },
       "original": {
         "owner": "isindir",
-        "ref": "0.22.3",
+        "ref": "0.22.4",
         "repo": "sops-secrets-operator",
         "type": "github"
       }
