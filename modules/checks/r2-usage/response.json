@@ -1,0 +1,264 @@
+{
+  "data": {
+    "viewer": {
+      "accounts": [
+        {
+          "storage": [
+            {
+              "max": {
+                "payloadSize": 88412736512,
+                "metadataSize": 4718592,
+                "objectCount": 151203,
+                "uploadCount": 0
+              },
+              "dimensions": {
+                "bucketName": "sciexp",
+                "datetime": "2026-11-20T14:00:00Z"
+              }
+            },
+            {
+              "max": {
+                "payloadSize": 163208273920,
+                "metadataSize": 61865984,
+                "objectCount": 402117,
+                "uploadCount": 2
+              },
+              "dimensions": {
+                "bucketName": "sciexp-nix-cache",
+                "datetime": "2026-11-20T14:00:00Z"
+              }
+            },
+            {
+              "max": {
+                "payloadSize": 1610612736,
+                "metadataSize": 98304,
+                "objectCount": 214,
+                "uploadCount": 0
+              },
+              "dimensions": {
+                "bucketName": "sciexp-postgresql-backup",
+                "datetime": "2026-11-20T14:00:00Z"
+              }
+            },
+            {
+              "max": {
+                "payloadSize": 0,
+                "metadataSize": 0,
+                "objectCount": 0,
+                "uploadCount": 0
+              },
+              "dimensions": {
+                "bucketName": "idle-archive",
+                "datetime": "2026-11-20T13:00:00Z"
+              }
+            },
+            {
+              "max": {
+                "payloadSize": 88400000000,
+                "metadataSize": 4718000,
+                "objectCount": 151190,
+                "uploadCount": 0
+              },
+              "dimensions": {
+                "bucketName": "sciexp",
+                "datetime": "2026-11-20T13:00:00Z"
+              }
+            },
+            {
+              "max": {
+                "payloadSize": 163100000000,
+                "metadataSize": 61800000,
+                "objectCount": 401990,
+                "uploadCount": 3
+              },
+              "dimensions": {
+                "bucketName": "sciexp-nix-cache",
+                "datetime": "2026-11-20T13:00:00Z"
+              }
+            },
+            {
+              "max": {
+                "payloadSize": 1610612736,
+                "metadataSize": 98304,
+                "objectCount": 214,
+                "uploadCount": 0
+              },
+              "dimensions": {
+                "bucketName": "sciexp-postgresql-backup",
+                "datetime": "2026-11-20T13:00:00Z"
+              }
+            },
+            {
+              "max": {
+                "payloadSize": 0,
+                "metadataSize": 0,
+                "objectCount": 0,
+                "uploadCount": 0
+              },
+              "dimensions": {
+                "bucketName": "idle-archive",
+                "datetime": "2026-11-19T13:00:00Z"
+              }
+            }
+          ],
+          "operations": [
+            {
+              "sum": {
+                "requests": 402310
+              },
+              "dimensions": {
+                "bucketName": "sciexp-nix-cache",
+                "actionType": "PutObject"
+              }
+            },
+            {
+              "sum": {
+                "requests": 1203554
+              },
+              "dimensions": {
+                "bucketName": "sciexp-nix-cache",
+                "actionType": "GetObject"
+              }
+            },
+            {
+              "sum": {
+                "requests": 188420
+              },
+              "dimensions": {
+                "bucketName": "sciexp-nix-cache",
+                "actionType": "HeadObject"
+              }
+            },
+            {
+              "sum": {
+                "requests": 1210
+              },
+              "dimensions": {
+                "bucketName": "sciexp-nix-cache",
+                "actionType": "CreateMultipartUpload"
+              }
+            },
+            {
+              "sum": {
+                "requests": 9876
+              },
+              "dimensions": {
+                "bucketName": "sciexp-nix-cache",
+                "actionType": "UploadPart"
+              }
+            },
+            {
+              "sum": {
+                "requests": 1198
+              },
+              "dimensions": {
+                "bucketName": "sciexp-nix-cache",
+                "actionType": "CompleteMultipartUpload"
+              }
+            },
+            {
+              "sum": {
+                "requests": 9
+              },
+              "dimensions": {
+                "bucketName": "sciexp-nix-cache",
+                "actionType": "AbortMultipartUpload"
+              }
+            },
+            {
+              "sum": {
+                "requests": 611802
+              },
+              "dimensions": {
+                "bucketName": "sciexp",
+                "actionType": "PutObject"
+              }
+            },
+            {
+              "sum": {
+                "requests": 187340
+              },
+              "dimensions": {
+                "bucketName": "sciexp",
+                "actionType": "ListObjects"
+              }
+            },
+            {
+              "sum": {
+                "requests": 172003
+              },
+              "dimensions": {
+                "bucketName": "sciexp",
+                "actionType": "GetObject"
+              }
+            },
+            {
+              "sum": {
+                "requests": 9120
+              },
+              "dimensions": {
+                "bucketName": "sciexp",
+                "actionType": "HeadObject"
+              }
+            },
+            {
+              "sum": {
+                "requests": 40411
+              },
+              "dimensions": {
+                "bucketName": "sciexp",
+                "actionType": "DeleteObject"
+              }
+            },
+            {
+              "sum": {
+                "requests": 3
+              },
+              "dimensions": {
+                "bucketName": "sciexp",
+                "actionType": "GetBucketVersioning"
+              }
+            },
+            {
+              "sum": {
+                "requests": 318
+              },
+              "dimensions": {
+                "bucketName": "sciexp-postgresql-backup",
+                "actionType": "PutObject"
+              }
+            },
+            {
+              "sum": {
+                "requests": 41
+              },
+              "dimensions": {
+                "bucketName": "sciexp-postgresql-backup",
+                "actionType": "ListObjects"
+              }
+            },
+            {
+              "sum": {
+                "requests": 57
+              },
+              "dimensions": {
+                "bucketName": "sciexp-postgresql-backup",
+                "actionType": "GetObject"
+              }
+            },
+            {
+              "sum": {
+                "requests": 12
+              },
+              "dimensions": {
+                "bucketName": "",
+                "actionType": "ListBuckets"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "errors": null
+}

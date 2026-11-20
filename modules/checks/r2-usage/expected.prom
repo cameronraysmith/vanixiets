@@ -1,0 +1,48 @@
+# HELP vanixiets_r2_bucket_payload_bytes Bytes of the objects in the bucket, at the latest storage sample.
+# TYPE vanixiets_r2_bucket_payload_bytes gauge
+vanixiets_r2_bucket_payload_bytes{bucket="idle-archive"} 0
+vanixiets_r2_bucket_payload_bytes{bucket="sciexp"} 88412736512
+vanixiets_r2_bucket_payload_bytes{bucket="sciexp-nix-cache"} 163208273920
+vanixiets_r2_bucket_payload_bytes{bucket="sciexp-postgresql-backup"} 1610612736
+# HELP vanixiets_r2_bucket_metadata_bytes Bytes of the objects' metadata in the bucket, at the latest storage sample.
+# TYPE vanixiets_r2_bucket_metadata_bytes gauge
+vanixiets_r2_bucket_metadata_bytes{bucket="idle-archive"} 0
+vanixiets_r2_bucket_metadata_bytes{bucket="sciexp"} 4718592
+vanixiets_r2_bucket_metadata_bytes{bucket="sciexp-nix-cache"} 61865984
+vanixiets_r2_bucket_metadata_bytes{bucket="sciexp-postgresql-backup"} 98304
+# HELP vanixiets_r2_bucket_objects Objects in the bucket, at the latest storage sample.
+# TYPE vanixiets_r2_bucket_objects gauge
+vanixiets_r2_bucket_objects{bucket="idle-archive"} 0
+vanixiets_r2_bucket_objects{bucket="sciexp"} 151203
+vanixiets_r2_bucket_objects{bucket="sciexp-nix-cache"} 402117
+vanixiets_r2_bucket_objects{bucket="sciexp-postgresql-backup"} 214
+# HELP vanixiets_r2_bucket_pending_uploads Pending multipart uploads in the bucket, at the latest storage sample.
+# TYPE vanixiets_r2_bucket_pending_uploads gauge
+vanixiets_r2_bucket_pending_uploads{bucket="idle-archive"} 0
+vanixiets_r2_bucket_pending_uploads{bucket="sciexp"} 0
+vanixiets_r2_bucket_pending_uploads{bucket="sciexp-nix-cache"} 2
+vanixiets_r2_bucket_pending_uploads{bucket="sciexp-postgresql-backup"} 0
+# HELP vanixiets_r2_operations Operations on the bucket since the billing period began, by pricing class.
+# TYPE vanixiets_r2_operations gauge
+vanixiets_r2_operations{bucket="(account)",class="A"} 12
+vanixiets_r2_operations{bucket="(account)",class="B"} 0
+vanixiets_r2_operations{bucket="idle-archive",class="A"} 0
+vanixiets_r2_operations{bucket="idle-archive",class="B"} 0
+vanixiets_r2_operations{bucket="sciexp",class="A"} 799142
+vanixiets_r2_operations{bucket="sciexp",class="B"} 181123
+vanixiets_r2_operations{bucket="sciexp",class="free"} 40411
+vanixiets_r2_operations{bucket="sciexp",class="unclassified"} 3
+vanixiets_r2_operations{bucket="sciexp-nix-cache",class="A"} 414594
+vanixiets_r2_operations{bucket="sciexp-nix-cache",class="B"} 1391974
+vanixiets_r2_operations{bucket="sciexp-nix-cache",class="free"} 9
+vanixiets_r2_operations{bucket="sciexp-postgresql-backup",class="A"} 359
+vanixiets_r2_operations{bucket="sciexp-postgresql-backup",class="B"} 57
+# HELP vanixiets_r2_billing_period_start_timestamp_seconds Unix time the billing period began.
+# TYPE vanixiets_r2_billing_period_start_timestamp_seconds gauge
+vanixiets_r2_billing_period_start_timestamp_seconds 1792713600
+# HELP vanixiets_r2_billing_period_end_timestamp_seconds Unix time the billing period ends.
+# TYPE vanixiets_r2_billing_period_end_timestamp_seconds gauge
+vanixiets_r2_billing_period_end_timestamp_seconds 1795392000
+# HELP vanixiets_r2_last_success_timestamp_seconds Unix time of the last poll whose response gave both datasets.
+# TYPE vanixiets_r2_last_success_timestamp_seconds gauge
+vanixiets_r2_last_success_timestamp_seconds 1795186800

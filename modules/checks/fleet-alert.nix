@@ -2,7 +2,7 @@
 # D11, D13-D16, D19; tasks.md 4.5, 4.6; stand-up-devloop-collection design
 # D17, tasks.md 5.1, 5.3-5.5).
 #
-# Five parts, each a derivation in passthru so it can be built alone:
+# Six parts, each a derivation in passthru so it can be built alone:
 # - promtoolRehearsal: `promtool check rules` over the YAML rendered from
 #   modules/nixos/fleet-alert/rules.nix, and a malformed-expression mutant
 #   that promtool must reject; `promtool test rules` over a drifted and a
@@ -11,6 +11,11 @@
 #   over 2026-11-18's node_exporter loop for SystemdUnitRestartLoop (F77),
 #   which must hold while the unit stays failed, and must fail on the
 #   mutant windowOnly.
+# - r2PromtoolRehearsal (track-r2-usage): `promtool test rules` cases for
+#   R2MultipartUploadPending, R2CostProjected, R2BucketGrowthAnomalous,
+#   R2BucketUndeclared (rendered with a fixture external bucket) and
+#   R2UsageStale, each failing on its mutants: moreThanOne, noProjection,
+#   noClamp, noBaseline, noExclusion, externalIgnored and r2StaleThreshold.
 # - fixtureRehearsal: the evaluator, flake.lib.fleetAlertEvaluator built with
 #   a recording ntfy-send, runs in the build sandbox against
 #   fleet-alert/fixture_server.py, which replays canned answers to the
@@ -322,6 +327,324 @@
         mutateText "windowOnly" (builtins.toJSON (ruleNamed "SystemdUnitRestartLoop")
           .expr) (builtins.toJSON "increase(systemd_service_restarts_total[15m]) > 5") rules.yaml
       );
+
+      # --- R2 usage (track-r2-usage design D7, D8) ------------------------------
+
+      r2Series =
+        name: labels:
+        "${name}{${
+          lib.concatStringsSep "," (
+            lib.mapAttrsToList (k: v: ''${k}="${v}"'') ({ host_name = "magnetite"; } // labels)
+          )
+        }}";
+      r2Alerts = alert: minutes: labelSets: {
+        eval_time = "${toString minutes}m";
+        alertname = alert;
+        exp_alerts = map (labels: {
+          exp_labels = labels // {
+            severity = (ruleNamed alert).severity;
+          };
+          exp_annotations = (ruleNamed alert).annotations;
+        }) labelSets;
+      };
+      r2Test =
+        name: interval: input_series: alert_rule_test: rulesFile:
+        pkgs.writeText "fleet-alert-${name}-test.yaml" (
+          builtins.toJSON {
+            rule_files = [ "${rulesFile}" ];
+            evaluation_interval = interval;
+            tests = [ { inherit interval input_series alert_rule_test; } ];
+          }
+        );
+      # A mutant that replaces one rule's whole expression.
+      r2Mutant =
+        name: alert: expr: text:
+        pkgs.writeText "fleet-alert-rules-${name}.yaml" (
+          mutateText name (builtins.toJSON (ruleNamed alert).expr) (builtins.toJSON expr) text
+        );
+
+      # F74: one upload pending in sciexp-nix-cache from minute 0, none in
+      # sciexp; R2MultipartUploadPending is pending at 23 h 50 min and fires
+      # sciexp-nix-cache's at 24 h 10 min. The mutant moreThanOne, reading
+      # "pending uploads" as more than one, must fail it.
+      r2PendingTest =
+        r2Test "r2-pending" "10m"
+          [
+            {
+              series = r2Series "vanixiets_r2_bucket_pending_uploads" { bucket = "sciexp-nix-cache"; };
+              values = "1x160";
+            }
+            {
+              series = r2Series "vanixiets_r2_bucket_pending_uploads" { bucket = "sciexp"; };
+              values = "0x160";
+            }
+          ]
+          [
+            (r2Alerts "R2MultipartUploadPending" 1430 [ ])
+            (r2Alerts "R2MultipartUploadPending" 1450 [
+              {
+                host_name = "magnetite";
+                bucket = "sciexp-nix-cache";
+              }
+            ])
+          ];
+      moreThanOneYaml =
+        r2Mutant "moreThanOne" "R2MultipartUploadPending" "vanixiets_r2_bucket_pending_uploads > 1"
+          rules.yaml;
+
+      # D4: a 30-day billing period from time 0; class A grows 1,700 an hour
+      # over two buckets (1.22M projected), class B 12,000 an hour (8.64M
+      # projected), and 310 GB stored. At 12 h only storage fires: the elapsed
+      # time is held at a day, so 20,400 class A operations project to
+      # 612,000. At 10 d 2 h class A fires too, at 411,400 so far. The
+      # mutant noProjection compares the operations so far and must miss
+      # class A at 10 d 2 h; noClamp divides by the bare elapsed time and
+      # must fire class A at 12 h.
+      r2CostTest =
+        r2Test "r2-cost" "1h"
+          [
+            {
+              series = r2Series "vanixiets_r2_billing_period_start_timestamp_seconds" { };
+              values = "0x300";
+            }
+            {
+              series = r2Series "vanixiets_r2_billing_period_end_timestamp_seconds" { };
+              values = "2592000x300";
+            }
+            {
+              series = r2Series "vanixiets_r2_operations" {
+                bucket = "sciexp";
+                class = "A";
+              };
+              values = "0+1000x300";
+            }
+            {
+              series = r2Series "vanixiets_r2_operations" {
+                bucket = "sciexp-nix-cache";
+                class = "A";
+              };
+              values = "0+700x300";
+            }
+            {
+              series = r2Series "vanixiets_r2_operations" {
+                bucket = "sciexp-nix-cache";
+                class = "B";
+              };
+              values = "0+12000x300";
+            }
+            {
+              series = r2Series "vanixiets_r2_bucket_payload_bytes" { bucket = "sciexp-nix-cache"; };
+              values = "309000000000x300";
+            }
+            {
+              series = r2Series "vanixiets_r2_bucket_metadata_bytes" { bucket = "sciexp-nix-cache"; };
+              values = "1000000000x300";
+            }
+          ]
+          [
+            (r2Alerts "R2CostProjected" 720 [ { class = "storage"; } ])
+            (r2Alerts "R2CostProjected" 14520 [
+              { class = "A"; }
+              { class = "storage"; }
+            ])
+          ];
+      r2CostExpr = (ruleNamed "R2CostProjected").expr;
+      noProjectionYaml = r2Mutant "noProjection" "R2CostProjected" (builtins.replaceStrings
+        [
+          " * scalar(max(vanixiets_r2_billing_period_end_timestamp_seconds) - max(vanixiets_r2_billing_period_start_timestamp_seconds)) / scalar(clamp_min(time() - max(vanixiets_r2_billing_period_start_timestamp_seconds), 86400))"
+        ]
+        [ "" ]
+        r2CostExpr
+      ) rules.yaml;
+      noClampYaml = r2Mutant "noClamp" "R2CostProjected" (builtins.replaceStrings
+        [ "scalar(clamp_min(time() - max(vanixiets_r2_billing_period_start_timestamp_seconds), 86400))" ]
+        [ "scalar(time() - max(vanixiets_r2_billing_period_start_timestamp_seconds))" ]
+        r2CostExpr
+      ) rules.yaml;
+
+      # D7: 35 days of hourly sizes. spiky grows 1 GB a day for 28 days,
+      # then 20 GB a day; steady grows 2 GB a day throughout; young appears
+      # 3 days before the end and grows 5 GB a day. At 700 h nothing fires;
+      # at 839 h only spiky does (its 7-day fit 140 GB a week against a
+      # 30-day fit of 25), steady's windows agree, and young's hold the same
+      # samples. The mutant noBaseline, the 1 GB a week floor alone, must
+      # fire steady and young too.
+      r2GrowthTest =
+        r2Test "r2-growth" "1h"
+          [
+            {
+              series = r2Series "vanixiets_r2_bucket_payload_bytes" { bucket = "spiky"; };
+              values = "0+41666667x672 28833333557+833333333x166";
+            }
+            {
+              series = r2Series "vanixiets_r2_bucket_payload_bytes" { bucket = "steady"; };
+              values = "0+83333333x839";
+            }
+            {
+              series = r2Series "vanixiets_r2_bucket_payload_bytes" { bucket = "young"; };
+              values = "_x767 0+208333333x71";
+            }
+          ]
+          [
+            (r2Alerts "R2BucketGrowthAnomalous" (700 * 60) [ ])
+            (r2Alerts "R2BucketGrowthAnomalous" (839 * 60) [
+              {
+                host_name = "magnetite";
+                bucket = "spiky";
+              }
+            ])
+          ];
+      noBaselineYaml =
+        r2Mutant "noBaseline" "R2BucketGrowthAnomalous"
+          "deriv(vanixiets_r2_bucket_payload_bytes[7d]) * 604800 > 1000000000"
+          rules.yaml;
+
+      # F87, rendered with the fixture bucket fixture-external listed in
+      # externalBuckets: sciexp, declared, never fires; scratch, in neither
+      # list, fires at 70 min; fixture-external is empty until 100 min,
+      # then holds 3 objects and fires at 170 min. The mutant noExclusion
+      # loses the declared list and must fire sciexp; externalIgnored drops
+      # the non-empty arm and must miss fixture-external.
+      r2ExternalRules = self.lib.fleetAlertRules {
+        inherit lib hosts;
+        r2ExternalBuckets.fixture-external = "a fixture: empty, owned elsewhere";
+      };
+      r2ExternalRulesYaml = pkgs.writeText "fleet-alert-rules-r2-external.yaml" r2ExternalRules.yaml;
+      r2UndeclaredExpr =
+        (lib.findFirst (
+          r: r.alert == "R2BucketUndeclared"
+        ) (throw "no R2BucketUndeclared") r2ExternalRules.rules).expr;
+      r2UndeclaredMutant =
+        name: expr:
+        pkgs.writeText "fleet-alert-rules-${name}.yaml" (
+          mutateText name (builtins.toJSON r2UndeclaredExpr) (builtins.toJSON expr) r2ExternalRules.yaml
+        );
+      r2UndeclaredTest =
+        r2Test "r2-undeclared" "10m"
+          [
+            {
+              series = r2Series "vanixiets_r2_bucket_payload_bytes" { bucket = "sciexp"; };
+              values = "1x24";
+            }
+            {
+              series = r2Series "vanixiets_r2_bucket_payload_bytes" { bucket = "scratch"; };
+              values = "5x24";
+            }
+            {
+              series = r2Series "vanixiets_r2_bucket_payload_bytes" { bucket = "fixture-external"; };
+              values = "0x24";
+            }
+            {
+              series = r2Series "vanixiets_r2_bucket_objects" { bucket = "fixture-external"; };
+              values = "0x9 3x15";
+            }
+          ]
+          [
+            (r2Alerts "R2BucketUndeclared" 70 [ { bucket = "scratch"; } ])
+            (r2Alerts "R2BucketUndeclared" 170 [
+              { bucket = "fixture-external"; }
+              { bucket = "scratch"; }
+            ])
+          ];
+      noExclusionYaml = r2UndeclaredMutant "noExclusion" (
+        mutateText "noExclusion" ''bucket!~"${lib.concatStringsSep "|" self.lib.r2Usage.declaredBuckets}|''
+          ''bucket!~"''
+          r2UndeclaredExpr
+      );
+      externalIgnoredYaml = r2UndeclaredMutant "externalIgnored" (
+        lib.head (
+          lib.splitString " or count by (bucket) (vanixiets_r2_bucket_payload_bytes{bucket=~" r2UndeclaredExpr
+        )
+      );
+
+      # D7: the poll's last success advances every 10 min to 2 h, then stops;
+      # it is exactly 2 h old at 4 h, R2UsageStale is pending at 4 h 10 min
+      # and fires at 4 h 20 min. The mutant r2StaleThreshold, ten times the
+      # threshold, must fail it.
+      r2StaleTest =
+        r2Test "r2-stale" "10m"
+          [
+            {
+              series = r2Series "vanixiets_r2_last_success_timestamp_seconds" { };
+              values = "0+600x12 7200x30";
+            }
+          ]
+          [
+            (r2Alerts "R2UsageStale" 250 [ ])
+            (r2Alerts "R2UsageStale" 260 [ { host_name = "magnetite"; } ])
+          ];
+      r2StaleThresholdYaml =
+        r2Mutant "r2StaleThreshold" "R2UsageStale"
+          "time() - vanixiets_r2_last_success_timestamp_seconds > 72000"
+          rules.yaml;
+
+      # Each regulator passes on the rendered rules, and fails on each of its
+      # mutants.
+      r2Cases = [
+        {
+          test = r2PendingTest;
+          rulesFile = rulesYaml;
+          mutants.moreThanOne = moreThanOneYaml;
+        }
+        {
+          test = r2CostTest;
+          rulesFile = rulesYaml;
+          mutants = {
+            noProjection = noProjectionYaml;
+            noClamp = noClampYaml;
+          };
+        }
+        {
+          test = r2GrowthTest;
+          rulesFile = rulesYaml;
+          mutants.noBaseline = noBaselineYaml;
+        }
+        {
+          test = r2UndeclaredTest;
+          rulesFile = r2ExternalRulesYaml;
+          mutants = {
+            noExclusion = noExclusionYaml;
+            externalIgnored = externalIgnoredYaml;
+          };
+        }
+        {
+          test = r2StaleTest;
+          rulesFile = rulesYaml;
+          mutants.r2StaleThreshold = r2StaleThresholdYaml;
+        }
+      ];
+      r2PromtoolRehearsal =
+        pkgs.runCommand "fleet-alert-r2-promtool"
+          {
+            nativeBuildInputs = [ pkgs.prometheus.cli ];
+            meta.description = "track-r2-usage D4, D7, D8, F74, F87: the five R2 rules fire as their cases say, and each mutant fails its case";
+          }
+          (
+            ''
+              set -euo pipefail
+              promtool check rules ${r2ExternalRulesYaml}
+            ''
+            + lib.concatMapStrings (
+              c:
+              ''
+                promtool test rules ${c.test c.rulesFile}
+              ''
+              + lib.concatStrings (
+                lib.mapAttrsToList (name: mutant: ''
+                  if promtool test rules ${c.test mutant} > ${name}.log 2>&1; then
+                    cat ${name}.log
+                    echo "FAIL: the R2 test accepted the ${name} mutant" >&2
+                    exit 1
+                  fi
+                  cat ${name}.log
+                  echo "mutant ${name} rejected"
+                '') c.mutants
+              )
+            ) r2Cases
+            + ''
+              touch "$out"
+            ''
+          );
 
       promtoolRehearsal =
         pkgs.runCommand "fleet-alert-promtool"
@@ -2708,6 +3031,7 @@
                 inherit
                   rules
                   promtoolRehearsal
+                  r2PromtoolRehearsal
                   fixtureRehearsal
                   propertyRehearsal
                   deadmanRehearsal
@@ -2720,6 +3044,7 @@
             ''
               # R9.2: rules parse; the evaluator against fixtures; the model.
               test -e ${promtoolRehearsal}
+              test -e ${r2PromtoolRehearsal}
               test -e ${fixtureRehearsal}
               test -e ${propertyRehearsal}
               test -e ${deadmanRehearsal}

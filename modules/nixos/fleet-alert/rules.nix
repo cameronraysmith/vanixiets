@@ -62,6 +62,9 @@
     {
       lib,
       hosts ? config.flake.lib.observabilityHosts,
+      # A parameter so checks.x86_64-linux.fleet-alert can render the rule
+      # with a fixture bucket listed (track-r2-usage design D8).
+      r2ExternalBuckets ? config.flake.lib.r2Usage.externalBuckets,
     }:
     let
       # A host is expected, or always-on, only once it collects (S4 design
@@ -97,6 +100,15 @@
           )
         )
       );
+      r2 = config.flake.lib.r2Usage;
+      # Billing-period projection (track-r2-usage design D4): the operations
+      # so far times the period's length over the time elapsed, the elapsed
+      # time at least a day, so the first hours of a period do not multiply
+      # a handful of operations into a warning.
+      r2Projection = "scalar(max(vanixiets_r2_billing_period_end_timestamp_seconds) - max(vanixiets_r2_billing_period_start_timestamp_seconds)) / scalar(clamp_min(time() - max(vanixiets_r2_billing_period_start_timestamp_seconds), 86400))";
+      r2ClassProjected =
+        class: limit:
+        ''sum by (class) (vanixiets_r2_operations{class="${class}"}) * ${r2Projection} > ${toString limit}'';
 
       # Appended to HostMemoryPressure and HostOOMKill messages (ADR-009 item
       # 5); the evaluator substitutes the firing host for <host>.
@@ -334,6 +346,79 @@
           for = "10m";
           severity = "warning";
           annotations.summary = "No PostgreSQL backup has succeeded on this host for over 36 h; check restic-backups-postgresql's journal and timer (runbook in packages/docs/src/content/docs/development/operations/postgresql-backup.md)";
+        }
+        # track-r2-usage (F74, design D7): R2 keeps a multipart upload that is
+        # never completed or aborted, and bills its parts as storage, until
+        # a lifecycle rule aborts it; sciexp's aborts at 7 days. A day of
+        # pending uploads in any bucket is a client that died mid-upload.
+        # The poller writes the latest storage sample's uploadCount hourly.
+        {
+          alert = "R2MultipartUploadPending";
+          expr = "vanixiets_r2_bucket_pending_uploads > 0";
+          for = "24h";
+          severity = "warning";
+          annotations.summary = "An R2 bucket has held a pending multipart upload for over 24 h; list them with `aws s3api list-multipart-uploads` against the R2 endpoint and abort the stale ones, or add an abort rule to the bucket's lifecycle";
+        }
+        # track-r2-usage design D4: Class A and Class B projected past their
+        # free tier by the end of the billing period, each a whole-million
+        # step in the bill ($4.50 and $0.36) because Cloudflare rounds up,
+        # and storage past flake.lib.r2Usage.storageBudgetGBMonth, holding
+        # today's level for the period. One instance per class.
+        {
+          alert = "R2CostProjected";
+          expr = "${r2ClassProjected "A" r2.freeTier.classA} or ${r2ClassProjected "B" r2.freeTier.classB} or label_replace(sum(vanixiets_r2_bucket_payload_bytes + vanixiets_r2_bucket_metadata_bytes), \"class\", \"storage\", \"\", \"\") > ${
+            toString (r2.storageBudgetGBMonth * 1000000000)
+          }";
+          for = "1h";
+          severity = "info";
+          annotations.summary = "R2 usage is projected past a cost edge this billing period: class A or B operations past the free tier (${toString r2.freeTier.classA} and ${toString r2.freeTier.classB}; each further million costs \$${builtins.toJSON r2.pricing.classAPerMillion} or \$${builtins.toJSON r2.pricing.classBPerMillion}), or storage past the ${toString r2.storageBudgetGBMonth} GB-month budget; see the R2 usage dashboard";
+        }
+        # track-r2-usage design D7: a bucket's least-squares growth over the
+        # last 7 days, as bytes a week, above 1 GB and above three times its
+        # least-squares growth over the last 30 days. deriv() fits whatever
+        # samples each window holds, so the rule is defined from the second
+        # sample on and one odd sample moves it little; with under 7 days of
+        # history both windows hold the same samples and compare equal, so
+        # it stays silent rather than guessing, and it discriminates fully
+        # from 30 days on. Payload only: metadata is under 0.1 % of it.
+        {
+          alert = "R2BucketGrowthAnomalous";
+          expr = "deriv(vanixiets_r2_bucket_payload_bytes[7d]) * 604800 > 1000000000 and deriv(vanixiets_r2_bucket_payload_bytes[7d]) > 3 * deriv(vanixiets_r2_bucket_payload_bytes[30d])";
+          for = "2h";
+          severity = "warning";
+          annotations.summary = "An R2 bucket grew by more than 1 GB in the last week, over three times its 30-day rate; see the bucket's panels on the R2 usage dashboard";
+        }
+        # F87: a bucket in the account that terranix does not declare
+        # (flake.lib.r2Usage.declaredBuckets, read from
+        # modules/terranix/cloudflare.nix) and that is not listed as managed
+        # elsewhere (flake.lib.r2Usage.externalBuckets), or a listed external
+        # bucket that holds an object or a byte, whose entry says it is empty.
+        {
+          alert = "R2BucketUndeclared";
+          expr =
+            let
+              names = r2.declaredBuckets ++ lib.attrNames r2ExternalBuckets;
+              known =
+                assert lib.assertMsg (lib.all (n: builtins.match "[a-z0-9][a-z0-9-]*" n != null) names)
+                  "fleetAlertRules: R2 bucket names must match [a-z0-9][a-z0-9-]*, so the exclusion needs no escape; got ${builtins.toJSON names}";
+                lib.concatStringsSep "|" names;
+              external = lib.concatStringsSep "|" (lib.attrNames r2ExternalBuckets);
+            in
+            ''count by (bucket) (vanixiets_r2_bucket_payload_bytes{bucket!~"${known}"}) > 0 or count by (bucket) (vanixiets_r2_bucket_payload_bytes{bucket=~"${external}"} > 0 or vanixiets_r2_bucket_objects{bucket=~"${external}"} > 0) > 0'';
+          for = "1h";
+          severity = "warning";
+          annotations.summary = "The R2 account holds a bucket that modules/terranix/cloudflare.nix does not declare, or a bucket listed in flake.lib.r2Usage.externalBuckets as empty now holds data; declare it in terranix (an import block, prevent_destroy), or record or correct its entry in externalBuckets";
+        }
+        # track-r2-usage design D7: r2-usage-publish republishes the record
+        # every minute, so HostProbeStale sees the file fresh; this rule
+        # reads the poll's own time, which ages from the publisher's first
+        # run when no poll has succeeded. Two hourly polls missed.
+        {
+          alert = "R2UsageStale";
+          expr = "time() - vanixiets_r2_last_success_timestamp_seconds > 7200";
+          for = "10m";
+          severity = "warning";
+          annotations.summary = "No R2 usage poll has succeeded for over 2 h; check r2-usage.service's journal on the host, and that its cloudflare-analytics token still has Account Analytics Read";
         }
         {
           alert = "WeeklyPipelineTest";

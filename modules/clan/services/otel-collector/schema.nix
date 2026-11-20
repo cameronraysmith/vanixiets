@@ -86,6 +86,17 @@
       # design D11): written to the textfile collector by
       # flake.modules.nixos.postgresql-backup where the backup is on.
       "vanixiets_postgresql_backup_last_success_timestamp_seconds"
+      # The account's R2 usage (track-r2-usage design D2): written to the
+      # textfile collector by flake.modules.nixos.r2-usage on the one host
+      # where the poller is on (flake.lib.r2Usage.seriesNames).
+      "vanixiets_r2_bucket_payload_bytes"
+      "vanixiets_r2_bucket_metadata_bytes"
+      "vanixiets_r2_bucket_objects"
+      "vanixiets_r2_bucket_pending_uploads"
+      "vanixiets_r2_operations"
+      "vanixiets_r2_billing_period_start_timestamp_seconds"
+      "vanixiets_r2_billing_period_end_timestamp_seconds"
+      "vanixiets_r2_last_success_timestamp_seconds"
     ];
 
     # The units magnetite's memory budget reports (CAM-111 design D11), as

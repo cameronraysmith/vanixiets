@@ -1,0 +1,403 @@
+{
+  "kind": "Dashboard",
+  "metadata": {
+    "name": "r2-usage",
+    "project": "fleet"
+  },
+  "spec": {
+    "display": {
+      "name": "R2 usage",
+      "description": "The account's R2 buckets from Cloudflare's GraphQL Analytics API, polled hourly on magnetite: estimated cost this billing period, and each bucket's size, objects and operations by pricing class."
+    },
+    "duration": "7d",
+    "refreshInterval": "5m",
+    "variables": [
+      {
+        "kind": "ListVariable",
+        "spec": {
+          "name": "bucket",
+          "display": {
+            "name": "Bucket"
+          },
+          "allowMultiple": true,
+          "allowAllValue": true,
+          "defaultValue": "$__all",
+          "plugin": {
+            "kind": "PrometheusLabelValuesVariable",
+            "spec": {
+              "datasource": {
+                "kind": "PrometheusDatasource",
+                "name": "greptimedb-promql"
+              },
+              "labelName": "bucket",
+              "matchers": [
+                "vanixiets_r2_bucket_payload_bytes"
+              ]
+            }
+          }
+        }
+      }
+    ],
+    "panels": {
+      "cost": {
+        "kind": "Panel",
+        "spec": {
+          "display": {
+            "name": "Estimated cost this billing period",
+            "description": "At R2's Standard prices (flake.lib.r2Usage.pricing): operations since the period began beyond the free tier, rounded up to whole millions as Cloudflare bills them, and storage beyond the free tier held at today's level for the whole period."
+          },
+          "plugin": {
+            "kind": "TimeSeriesChart",
+            "spec": {
+              "yAxis": {
+                "format": {
+                  "unit": "usd"
+                }
+              },
+              "legend": {
+                "position": "bottom",
+                "mode": "list"
+              }
+            }
+          },
+          "queries": [
+            {
+              "kind": "TimeSeriesQuery",
+              "spec": {
+                "plugin": {
+                  "kind": "PrometheusTimeSeriesQuery",
+                  "spec": {
+                    "datasource": {
+                      "kind": "PrometheusDatasource",
+                      "name": "greptimedb-promql"
+                    },
+                    "query": "4.5 * ceil(clamp_min(sum(vanixiets_r2_operations{class=\"A\"}) - 1000000, 0) / 1000000)",
+                    "seriesNameFormat": "class A"
+                  }
+                }
+              }
+            },
+            {
+              "kind": "TimeSeriesQuery",
+              "spec": {
+                "plugin": {
+                  "kind": "PrometheusTimeSeriesQuery",
+                  "spec": {
+                    "datasource": {
+                      "kind": "PrometheusDatasource",
+                      "name": "greptimedb-promql"
+                    },
+                    "query": "0.36 * ceil(clamp_min(sum(vanixiets_r2_operations{class=\"B\"}) - 10000000, 0) / 1000000)",
+                    "seriesNameFormat": "class B"
+                  }
+                }
+              }
+            },
+            {
+              "kind": "TimeSeriesQuery",
+              "spec": {
+                "plugin": {
+                  "kind": "PrometheusTimeSeriesQuery",
+                  "spec": {
+                    "datasource": {
+                      "kind": "PrometheusDatasource",
+                      "name": "greptimedb-promql"
+                    },
+                    "query": "0.015 * ceil(clamp_min(sum(vanixiets_r2_bucket_payload_bytes + vanixiets_r2_bucket_metadata_bytes) / 1000000000 - 10, 0))",
+                    "seriesNameFormat": "storage"
+                  }
+                }
+              }
+            },
+            {
+              "kind": "TimeSeriesQuery",
+              "spec": {
+                "plugin": {
+                  "kind": "PrometheusTimeSeriesQuery",
+                  "spec": {
+                    "datasource": {
+                      "kind": "PrometheusDatasource",
+                      "name": "greptimedb-promql"
+                    },
+                    "query": "(4.5 * ceil(clamp_min(sum(vanixiets_r2_operations{class=\"A\"}) - 1000000, 0) / 1000000)) + (0.36 * ceil(clamp_min(sum(vanixiets_r2_operations{class=\"B\"}) - 10000000, 0) / 1000000)) + (0.015 * ceil(clamp_min(sum(vanixiets_r2_bucket_payload_bytes + vanixiets_r2_bucket_metadata_bytes) / 1000000000 - 10, 0)))",
+                    "seriesNameFormat": "total"
+                  }
+                }
+              }
+            }
+          ]
+        }
+      },
+      "operations-by-class": {
+        "kind": "Panel",
+        "spec": {
+          "display": {
+            "name": "Operations this billing period, by class",
+            "description": "Every bucket's operations since the billing period began, summed by pricing class; the free tier is 1,000,000 class A and 10,000,000 class B."
+          },
+          "plugin": {
+            "kind": "TimeSeriesChart",
+            "spec": {
+              "yAxis": {
+                "format": {
+                  "unit": "decimal"
+                }
+              },
+              "legend": {
+                "position": "bottom",
+                "mode": "list"
+              }
+            }
+          },
+          "queries": [
+            {
+              "kind": "TimeSeriesQuery",
+              "spec": {
+                "plugin": {
+                  "kind": "PrometheusTimeSeriesQuery",
+                  "spec": {
+                    "datasource": {
+                      "kind": "PrometheusDatasource",
+                      "name": "greptimedb-promql"
+                    },
+                    "query": "sum by (class) (vanixiets_r2_operations)",
+                    "seriesNameFormat": "{{class}}"
+                  }
+                }
+              }
+            }
+          ]
+        }
+      },
+      "bucket-size": {
+        "kind": "Panel",
+        "spec": {
+          "display": {
+            "name": "Size: $bucket",
+            "description": "Bytes of the bucket's objects and of their metadata at the latest storage sample."
+          },
+          "plugin": {
+            "kind": "TimeSeriesChart",
+            "spec": {
+              "yAxis": {
+                "format": {
+                  "unit": "bytes"
+                }
+              },
+              "legend": {
+                "position": "bottom",
+                "mode": "list"
+              }
+            }
+          },
+          "queries": [
+            {
+              "kind": "TimeSeriesQuery",
+              "spec": {
+                "plugin": {
+                  "kind": "PrometheusTimeSeriesQuery",
+                  "spec": {
+                    "datasource": {
+                      "kind": "PrometheusDatasource",
+                      "name": "greptimedb-promql"
+                    },
+                    "query": "sum by (bucket) (vanixiets_r2_bucket_payload_bytes{bucket=~\"$bucket\"})",
+                    "seriesNameFormat": "{{bucket}} payload"
+                  }
+                }
+              }
+            },
+            {
+              "kind": "TimeSeriesQuery",
+              "spec": {
+                "plugin": {
+                  "kind": "PrometheusTimeSeriesQuery",
+                  "spec": {
+                    "datasource": {
+                      "kind": "PrometheusDatasource",
+                      "name": "greptimedb-promql"
+                    },
+                    "query": "sum by (bucket) (vanixiets_r2_bucket_metadata_bytes{bucket=~\"$bucket\"})",
+                    "seriesNameFormat": "{{bucket}} metadata"
+                  }
+                }
+              }
+            }
+          ]
+        }
+      },
+      "bucket-objects": {
+        "kind": "Panel",
+        "spec": {
+          "display": {
+            "name": "Objects: $bucket",
+            "description": "Objects in the bucket and its pending multipart uploads, which R2MultipartUploadPending reports after 24 h."
+          },
+          "plugin": {
+            "kind": "TimeSeriesChart",
+            "spec": {
+              "yAxis": {
+                "format": {
+                  "unit": "decimal"
+                }
+              },
+              "legend": {
+                "position": "bottom",
+                "mode": "list"
+              }
+            }
+          },
+          "queries": [
+            {
+              "kind": "TimeSeriesQuery",
+              "spec": {
+                "plugin": {
+                  "kind": "PrometheusTimeSeriesQuery",
+                  "spec": {
+                    "datasource": {
+                      "kind": "PrometheusDatasource",
+                      "name": "greptimedb-promql"
+                    },
+                    "query": "sum by (bucket) (vanixiets_r2_bucket_objects{bucket=~\"$bucket\"})",
+                    "seriesNameFormat": "{{bucket}} objects"
+                  }
+                }
+              }
+            },
+            {
+              "kind": "TimeSeriesQuery",
+              "spec": {
+                "plugin": {
+                  "kind": "PrometheusTimeSeriesQuery",
+                  "spec": {
+                    "datasource": {
+                      "kind": "PrometheusDatasource",
+                      "name": "greptimedb-promql"
+                    },
+                    "query": "sum by (bucket) (vanixiets_r2_bucket_pending_uploads{bucket=~\"$bucket\"})",
+                    "seriesNameFormat": "{{bucket}} pending uploads"
+                  }
+                }
+              }
+            }
+          ]
+        }
+      },
+      "bucket-operations": {
+        "kind": "Panel",
+        "spec": {
+          "display": {
+            "name": "Operations this billing period: $bucket",
+            "description": "The bucket's operations since the billing period began, by pricing class."
+          },
+          "plugin": {
+            "kind": "TimeSeriesChart",
+            "spec": {
+              "yAxis": {
+                "format": {
+                  "unit": "decimal"
+                }
+              },
+              "legend": {
+                "position": "bottom",
+                "mode": "list"
+              }
+            }
+          },
+          "queries": [
+            {
+              "kind": "TimeSeriesQuery",
+              "spec": {
+                "plugin": {
+                  "kind": "PrometheusTimeSeriesQuery",
+                  "spec": {
+                    "datasource": {
+                      "kind": "PrometheusDatasource",
+                      "name": "greptimedb-promql"
+                    },
+                    "query": "sum by (bucket, class) (vanixiets_r2_operations{bucket=~\"$bucket\"})",
+                    "seriesNameFormat": "{{bucket}} {{class}}"
+                  }
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "layouts": [
+      {
+        "kind": "Grid",
+        "spec": {
+          "display": {
+            "title": "Account",
+            "collapse": {
+              "open": true
+            }
+          },
+          "items": [
+            {
+              "x": 0,
+              "y": 0,
+              "width": 12,
+              "height": 8,
+              "content": {
+                "$ref": "#/spec/panels/cost"
+              }
+            },
+            {
+              "x": 12,
+              "y": 0,
+              "width": 12,
+              "height": 8,
+              "content": {
+                "$ref": "#/spec/panels/operations-by-class"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "kind": "Grid",
+        "spec": {
+          "display": {
+            "title": "Bucket $bucket",
+            "collapse": {
+              "open": true
+            }
+          },
+          "repeatVariable": "bucket",
+          "items": [
+            {
+              "x": 0,
+              "y": 0,
+              "width": 8,
+              "height": 8,
+              "content": {
+                "$ref": "#/spec/panels/bucket-size"
+              }
+            },
+            {
+              "x": 8,
+              "y": 0,
+              "width": 8,
+              "height": 8,
+              "content": {
+                "$ref": "#/spec/panels/bucket-objects"
+              }
+            },
+            {
+              "x": 16,
+              "y": 0,
+              "width": 8,
+              "height": 8,
+              "content": {
+                "$ref": "#/spec/panels/bucket-operations"
+              }
+            }
+          ]
+        }
+      }
+    ]
+  }
+}
