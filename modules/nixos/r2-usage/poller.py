@@ -7,7 +7,10 @@ bucket in the account (no bucket list is configured):
     vanixiets_r2_bucket_payload_bytes{bucket}, _metadata_bytes{bucket},
     vanixiets_r2_bucket_objects{bucket} and
     vanixiets_r2_bucket_pending_uploads{bucket} (uploadCount, the pending
-    multipart uploads);
+    multipart uploads). A bucket whose latest sample is older than the
+    configured storageFreshSeconds writes no storage series: Cloudflare was
+    seen sampling every existing bucket, empty ones too, at least hourly,
+    so such a bucket has been deleted;
   r2OperationsAdaptiveGroups from the start of the billing period to now,
     by bucketName and actionType, summed into
     vanixiets_r2_operations{bucket,class}: class A, B or free per
@@ -15,7 +18,8 @@ bucket in the account (no bucket list is configured):
     page does not name, so a new one is counted rather than lost. An
     operation on no bucket (ListBuckets) is counted under bucket
     "(account)". Every bucket gets an A and a B series, zero when it saw no
-    such operation.
+    such operation. The operations of a bucket with no fresh storage sample
+    were real and billed, so they stay, labelled gone="true".
 The billing period runs from 00:00 UTC on the configured anchor day of the
 month (clamped to the month's last day) to the same time a month later;
 vanixiets_r2_billing_period_{start,end}_timestamp_seconds carry it, and
@@ -28,6 +32,7 @@ Usage: poller.py CONFIG TOKEN_FILE OUTPUT_FILE
        poller.py --format CONFIG RESPONSE_FILE NOW_EPOCH_SECONDS
        (prints the file the response gives at that time)
 CONFIG is JSON: {"accountTag": str, "endpoint": str, "billingAnchorDay": int,
+"storageFreshSeconds": int,
 "classes": {"A": [actionType], "B": [actionType], "free": [actionType]}}.
 """
 
@@ -117,12 +122,17 @@ def format_usage(response, now, config):
     account = account_of(response)
     start, end = billing_period(now, config["billingAnchorDay"])
 
+    fresh = timedelta(seconds=config["storageFreshSeconds"])
     latest = {}
     for row in account["storage"]:
         bucket = row["dimensions"]["bucketName"]
         moment = row["dimensions"]["datetime"]
         if bucket not in latest or moment > latest[bucket][0]:
             latest[bucket] = (moment, row["max"])
+    latest = {
+        bucket: sample for bucket, sample in latest.items()
+        if now - datetime.fromisoformat(sample[0].replace("Z", "+00:00")) <= fresh
+    }
 
     operations = {}
     for row in account["operations"]:
@@ -147,7 +157,8 @@ def format_usage(response, now, config):
         f"# TYPE {name} gauge",
     ]
     for (bucket, cls), value in sorted(operations.items()):
-        lines.append(f'{name}{{bucket="{bucket}",class="{cls}"}} {value}')
+        gone = ',gone="true"' if bucket != "(account)" and bucket not in latest else ""
+        lines.append(f'{name}{{bucket="{bucket}",class="{cls}"{gone}}} {value}')
     for name, moment, help_text in [
         ("vanixiets_r2_billing_period_start_timestamp_seconds", start,
          "Unix time the billing period began."),

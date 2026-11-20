@@ -107,6 +107,15 @@ let
       "DeleteBucket"
       "AbortMultipartUpload"
     ];
+    # Seen in the live operations of 2026-10-23 to 2026-11-20 and named
+    # nowhere in pricing.mdx (nor elsewhere in the R2 docs), so counted as
+    # `unclassified`:
+    # - DeleteObjects (multi-object delete): 55,752 on sciexp, 611 on
+    #   sciexp-nix-cache. The dashboard's 1.22M Class A and 1.58M Class B
+    #   for the period match our A and B without them, so Cloudflare does
+    #   not appear to bill them, but no page says so.
+    # - GetBucketNotificationConfiguration: 2 on sciexp-nix-cache.
+    # - GetBucketSippyConfiguration: 3 on sciexp-nix-cache.
   };
 
   # The storage the account may hold before R2CostProjected warns, in
@@ -125,8 +134,20 @@ let
 
   accountTag = "1ece4a9a8f092f8cbdd679d22b9ecb1f";
 
+  # A bucket whose latest storage sample is older than this is gone. On
+  # 2026-11-18 to 2026-11-20 Cloudflare sampled every bucket every 10 to 60
+  # minutes, the empty omicsberg hourly, the busiest every 10; two hours is
+  # twice the longest gap seen. R2BucketUndeclared's `for` exceeds this
+  # plus the hourly poll, so a deleted bucket never fires it.
+  storageFreshSeconds = 7200;
+
   pollerConfig = {
-    inherit accountTag billingAnchorDay classes;
+    inherit
+      accountTag
+      billingAnchorDay
+      classes
+      storageFreshSeconds
+      ;
     endpoint = "https://api.cloudflare.com/client/v4/graphql";
   };
 
@@ -393,6 +414,7 @@ in
       classes
       storageBudgetGBMonth
       billingAnchorDay
+      storageFreshSeconds
       pollerConfig
       declaredBuckets
       externalBuckets

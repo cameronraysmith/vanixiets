@@ -99,6 +99,18 @@
                 "bucketName": "idle-archive",
                 "datetime": "2026-11-19T13:00:00Z"
               }
+            },
+            {
+              "max": {
+                "payloadSize": 524288,
+                "metadataSize": 64,
+                "objectCount": 2,
+                "uploadCount": 0
+              },
+              "dimensions": {
+                "bucketName": "deleted-scratch",
+                "datetime": "2026-11-20T12:50:00Z"
+              }
             }
           ],
           "operations": [
@@ -212,15 +224,6 @@
             },
             {
               "sum": {
-                "requests": 3
-              },
-              "dimensions": {
-                "bucketName": "sciexp",
-                "actionType": "GetBucketVersioning"
-              }
-            },
-            {
-              "sum": {
                 "requests": 318
               },
               "dimensions": {
@@ -253,6 +256,114 @@
               "dimensions": {
                 "bucketName": "",
                 "actionType": "ListBuckets"
+              }
+            },
+            {
+              "sum": {
+                "requests": 55752
+              },
+              "dimensions": {
+                "bucketName": "sciexp",
+                "actionType": "DeleteObjects"
+              }
+            },
+            {
+              "sum": {
+                "requests": 611
+              },
+              "dimensions": {
+                "bucketName": "sciexp-nix-cache",
+                "actionType": "DeleteObjects"
+              }
+            },
+            {
+              "sum": {
+                "requests": 2
+              },
+              "dimensions": {
+                "bucketName": "sciexp-nix-cache",
+                "actionType": "GetBucketNotificationConfiguration"
+              }
+            },
+            {
+              "sum": {
+                "requests": 3
+              },
+              "dimensions": {
+                "bucketName": "sciexp-nix-cache",
+                "actionType": "GetBucketSippyConfiguration"
+              }
+            },
+            {
+              "sum": {
+                "requests": 1
+              },
+              "dimensions": {
+                "bucketName": "sciexp-nix-cache",
+                "actionType": "GetBucketCors"
+              }
+            },
+            {
+              "sum": {
+                "requests": 4
+              },
+              "dimensions": {
+                "bucketName": "sciexp",
+                "actionType": "GetBucketLifecycleConfiguration"
+              }
+            },
+            {
+              "sum": {
+                "requests": 45
+              },
+              "dimensions": {
+                "bucketName": "sciexp",
+                "actionType": "HeadBucket"
+              }
+            },
+            {
+              "sum": {
+                "requests": 25
+              },
+              "dimensions": {
+                "bucketName": "sciexp",
+                "actionType": "ListMultipartUploads"
+              }
+            },
+            {
+              "sum": {
+                "requests": 1
+              },
+              "dimensions": {
+                "bucketName": "sciexp-postgresql-backup",
+                "actionType": "PutBucket"
+              }
+            },
+            {
+              "sum": {
+                "requests": 6
+              },
+              "dimensions": {
+                "bucketName": "deleted-scratch",
+                "actionType": "PutObject"
+              }
+            },
+            {
+              "sum": {
+                "requests": 6
+              },
+              "dimensions": {
+                "bucketName": "deleted-scratch",
+                "actionType": "HeadBucket"
+              }
+            },
+            {
+              "sum": {
+                "requests": 1
+              },
+              "dimensions": {
+                "bucketName": "deleted-scratch",
+                "actionType": "DeleteBucket"
               }
             }
           ]

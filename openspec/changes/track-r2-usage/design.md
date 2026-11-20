@@ -85,16 +85,20 @@ Cloudflare's analytics are per bucket, and the bill is per account and per billi
   `externalBuckets` maps a name to an owner note for buckets that terranix deliberately does not manage. It is empty. The account held only the three declared buckets on 2026-11-20, after the operator deleted the empty `omicsberg`.
 
   `R2BucketUndeclared` has two arms. It fires on a bucket in neither list, and on an external bucket with any object or byte, because its entry claims it is empty. `fleetAlertRules` takes `r2ExternalBuckets` as a parameter, so the check can render the rule with a fixture bucket listed.
+
+  A deleted bucket keeps its last storage sample inside the query's one-day window: the first live poll at 16:28Z on 2026-11-20 still reported `omicsberg`, deleted at about 15:55Z. So the poller drops a bucket whose latest sample is older than `storageFreshSeconds` (2 h). The docs give no sampling cadence. The live response for 2026-11-18 to 2026-11-20 showed samples every 10 to 60 minutes for every bucket, the empty `omicsberg` hourly, so 2 h is twice the longest gap seen. The bucket's operations in the period were real and billed, so they stay, labelled `gone="true"`; the rule reads storage series only. The rule's `for` is `storageFreshSeconds` plus 2 h (4 h), which exceeds the bound plus one hourly poll. A bucket first polled after its deletion therefore drops out before the rule fires.
 - **Boundary**: vendored-versus-first-party. Only our own module's literals are read, not the provider's state.
 
 ### D9: Regulators
-- **Poller**: `checks.x86_64-linux.r2-usage` formats `response.json` (written to the documented schema) at 2026-11-20T15:00:00Z and compares the result with `expected.prom`. Three mutants must each change a named line:
+- **Poller**: `checks.x86_64-linux.r2-usage` formats `response.json` (written to the documented schema) at 2026-11-20T15:00:00Z and compares the result with `expected.prom`. The fixture holds every action type of the live period. Five mutants must each change a named line:
   - `unitConfusion`: sizes read as KiB;
   - `classMapping`: `ListObjects` priced as class B;
-  - `bucketDropped`: only rows at the newest time kept.
+  - `bucketDropped`: only rows at the newest time kept;
+  - `noFreshness`: the bound widened to the query's whole day;
+  - `deleteObjectsFree`: `DeleteObjects` counted as free.
 
   The same check runs the judge over literal fixtures and asserts the dashboard's cost queries.
-- **Rules**: `fleet-alert.passthru.r2PromtoolRehearsal` runs one promtool case per rule. The mutants are `moreThanOne`, `noProjection`, `noClamp`, `noBaseline`, `noExclusion`, `externalIgnored` and `r2StaleThreshold`.
+- **Rules**: `fleet-alert.passthru.r2PromtoolRehearsal` runs one promtool case per rule. The mutants are `moreThanOne`, `noProjection`, `noClamp`, `noBaseline`, `noExclusion`, `externalIgnored`, `forOneHour` and `r2StaleThreshold`.
 - **Store**: every expression was run against GreptimeDB 1.2.1 on magnetite on 2026-11-20. GreptimeDB accepted each one: `scalar`, `clamp_min`, `label_replace`, `deriv` over 30 d, and set operators with `count by`.
 
 ## Per-service attribution within `sciexp`
@@ -107,5 +111,5 @@ Neither is implemented here.
 
 ## Risks
 
-- R2's action type names may differ from the pricing page's. An unnamed type is counted as `unclassified` and shown on the dashboard, not dropped.
+- R2's action type names may differ from the pricing page's. An unnamed type is counted as `unclassified` and shown on the dashboard, not dropped. The live period had three: `DeleteObjects`, `GetBucketNotificationConfiguration` and `GetBucketSippyConfiguration`. No R2 page names their class. The dashboard's 1.22M Class A and 1.58M Class B match our A and B without the 56,363 `DeleteObjects`, which suggests they are not billed.
 - The analytics datasets are sampled. The GraphQL API is not a billing measure.

@@ -500,11 +500,15 @@
           rules.yaml;
 
       # F87, rendered with the fixture bucket fixture-external listed in
-      # externalBuckets: sciexp, declared, never fires; scratch, in neither
-      # list, fires at 70 min; fixture-external is empty until 100 min,
-      # then holds 3 objects and fires at 170 min. The mutant noExclusion
-      # loses the declared list and must fire sciexp; externalIgnored drops
-      # the non-empty arm and must miss fixture-external.
+      # externalBuckets, `for` being 4 h: sciexp, declared, never fires;
+      # scratch, in neither list, fires at 4 h; fixture-external is empty
+      # until 100 min, then holds 3 objects and fires at 5 h 40 min;
+      # gone-bucket, in neither list, is reported for 2 h 40 min and then
+      # dropped by the poller, as omicsberg was polled after its deletion,
+      # and never fires. The mutant noExclusion loses the declared list and
+      # must fire sciexp; externalIgnored drops the non-empty arm and must
+      # miss fixture-external; forOneHour, the rule before its `for` covered
+      # the poller's freshness bound, must fire gone-bucket at 150 min.
       r2ExternalRules = self.lib.fleetAlertRules {
         inherit lib hosts;
         r2ExternalBuckets.fixture-external = "a fixture: empty, owned elsewhere";
@@ -524,28 +528,38 @@
           [
             {
               series = r2Series "vanixiets_r2_bucket_payload_bytes" { bucket = "sciexp"; };
-              values = "1x24";
+              values = "1x40";
             }
             {
               series = r2Series "vanixiets_r2_bucket_payload_bytes" { bucket = "scratch"; };
-              values = "5x24";
+              values = "5x40";
             }
             {
               series = r2Series "vanixiets_r2_bucket_payload_bytes" { bucket = "fixture-external"; };
-              values = "0x24";
+              values = "0x40";
             }
             {
               series = r2Series "vanixiets_r2_bucket_objects" { bucket = "fixture-external"; };
-              values = "0x9 3x15";
+              values = "0x9 3x31";
+            }
+            {
+              series = r2Series "vanixiets_r2_bucket_payload_bytes" { bucket = "gone-bucket"; };
+              values = "0x15 _x25";
             }
           ]
           [
-            (r2Alerts "R2BucketUndeclared" 70 [ { bucket = "scratch"; } ])
-            (r2Alerts "R2BucketUndeclared" 170 [
+            (r2Alerts "R2BucketUndeclared" 150 [ ])
+            (r2Alerts "R2BucketUndeclared" 250 [ { bucket = "scratch"; } ])
+            (r2Alerts "R2BucketUndeclared" 350 [
               { bucket = "fixture-external"; }
               { bucket = "scratch"; }
             ])
           ];
+      forOneHourYaml = pkgs.writeText "fleet-alert-rules-for-one-hour.yaml" (
+        mutateText "forOneHour" ''${builtins.toJSON r2UndeclaredExpr},"for":"4h"''
+          ''${builtins.toJSON r2UndeclaredExpr},"for":"1h"''
+          r2ExternalRules.yaml
+      );
       noExclusionYaml = r2UndeclaredMutant "noExclusion" (
         mutateText "noExclusion" ''bucket!~"${lib.concatStringsSep "|" self.lib.r2Usage.declaredBuckets}|''
           ''bucket!~"''
@@ -605,6 +619,7 @@
           mutants = {
             noExclusion = noExclusionYaml;
             externalIgnored = externalIgnoredYaml;
+            forOneHour = forOneHourYaml;
           };
         }
         {

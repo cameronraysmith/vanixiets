@@ -14,6 +14,15 @@ Where `vanixiets.r2Usage.enable` is set, `r2-usage.service` SHALL run hourly and
 - **WHEN** one bucket's latest storage sample is an hour older than the others'
 - **THEN** its series are still written
 
+### Requirement: A deleted bucket's storage is dropped and its operations kept
+
+The poller SHALL write no storage series for a bucket whose latest storage sample is older than `flake.lib.r2Usage.storageFreshSeconds`, and SHALL keep that bucket's operations in the period, labelled `gone="true"`.
+
+#### Scenario: a bucket last sampled 2 h 10 min ago
+
+- **WHEN** the recorded response's `deleted-scratch` was last sampled 2 h 10 min before the poll
+- **THEN** no `vanixiets_r2_bucket_*` series names it, and its operations carry `gone="true"`
+
 ### Requirement: Operations are classed by R2's pricing page
 
 Each action type SHALL count toward class `A`, `B` or `free` as `r2/pricing.mdx` lists it, and toward `unclassified` when the page does not name it; an operation on no bucket SHALL count under bucket `(account)`.
@@ -22,6 +31,11 @@ Each action type SHALL count toward class `A`, `B` or `free` as `r2/pricing.mdx`
 
 - **WHEN** a response holds 187,340 `ListObjects` on `sciexp`
 - **THEN** they count toward `vanixiets_r2_operations{bucket="sciexp",class="A"}`
+
+#### Scenario: an action type the page does not name
+
+- **WHEN** a response holds 55,752 `DeleteObjects` on `sciexp`
+- **THEN** they count toward `vanixiets_r2_operations{bucket="sciexp",class="unclassified"}`
 
 ### Requirement: The poller is off until its token is in the repository
 
@@ -70,7 +84,7 @@ The `cloudflare-analytics` generator's deployed `token` SHALL be owned by root a
 
 #### Scenario: an external bucket gains objects
 
-- **WHEN** a listed external bucket reports 3 objects for an hour
+- **WHEN** a listed external bucket reports 3 objects for 4 h
 - **THEN** the rule fires for that bucket
 
 ### Requirement: Pending uploads and anomalous growth are reported

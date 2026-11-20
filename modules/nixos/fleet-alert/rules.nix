@@ -393,6 +393,13 @@
         # modules/terranix/cloudflare.nix) and that is not listed as managed
         # elsewhere (flake.lib.r2Usage.externalBuckets), or a listed external
         # bucket that holds an object or a byte, whose entry says it is empty.
+        # Storage series only: a deleted bucket's operations stay, labelled
+        # gone, and are not read. A deleted bucket's storage series vanish
+        # within storageFreshSeconds of its last sample plus one hourly poll,
+        # so `for` is that plus an hour: a bucket first seen after its
+        # deletion never fires (omicsberg, deleted 15:55Z 2026-11-20, last
+        # sampled 16:00Z, first polled 16:28Z), and one deleted while firing
+        # resolves within that time.
         {
           alert = "R2BucketUndeclared";
           expr =
@@ -405,7 +412,7 @@
               external = lib.concatStringsSep "|" (lib.attrNames r2ExternalBuckets);
             in
             ''count by (bucket) (vanixiets_r2_bucket_payload_bytes{bucket!~"${known}"}) > 0 or count by (bucket) (vanixiets_r2_bucket_payload_bytes{bucket=~"${external}"} > 0 or vanixiets_r2_bucket_objects{bucket=~"${external}"} > 0) > 0'';
-          for = "1h";
+          for = "${toString ((r2.storageFreshSeconds + 7200) / 3600)}h";
           severity = "warning";
           annotations.summary = "The R2 account holds a bucket that modules/terranix/cloudflare.nix does not declare, or a bucket listed in flake.lib.r2Usage.externalBuckets as empty now holds data; declare it in terranix (an import block, prevent_destroy), or record or correct its entry in externalBuckets";
         }

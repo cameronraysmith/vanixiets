@@ -7,14 +7,20 @@
 #   query's shape validated against the live schema on 2026-11-20, at
 #   2026-11-20T15:00:00Z into exactly ./r2-usage/expected.prom: each
 #   bucket's latest storage sample and not an older one, idle-archive's
-#   sampled an hour before the others, operations summed by pricing class
-#   from flake.lib.r2Usage.classes with ListBuckets under (account), a
-#   DeleteObject as free and an action type the pricing page does not name
-#   as unclassified, and the billing period Oct 23 - Nov 23.
-# - Three mutants must each change a named line of that file:
+#   sampled two hours before, exactly storageFreshSeconds, and kept;
+#   deleted-scratch's last sample 2 h 10 min old, so no storage series,
+#   and its operations kept with gone="true"; operations summed by pricing
+#   class from flake.lib.r2Usage.classes, every action type of the live
+#   period of 2026-11-20 among them, with ListBuckets under (account),
+#   DeleteObject and DeleteBucket as free, and DeleteObjects,
+#   GetBucketNotificationConfiguration and GetBucketSippyConfiguration,
+#   which the pricing page does not name, as unclassified; and the billing
+#   period Oct 23 - Nov 23.
+# - Five mutants must each change a named line of that file:
 #   unitConfusion reads the sizes as KiB, classMapping prices ListObjects
-#   as class B, and bucketDropped keeps only the rows at the newest
-#   sample's time, which drops idle-archive.
+#   as class B, bucketDropped keeps only the rows at the newest sample's
+#   time, which drops idle-archive, noFreshness widens the bound to the
+#   query's whole day, and deleteObjectsFree counts DeleteObjects as free.
 # - The judge of flake.lib.r2UsageObligations accepts the polling host, the
 #   host awaiting its token, and another host with the poller off; it finds
 #   exactly one problem in each mutant: notEnabled, awaitingButEnabled,
@@ -157,12 +163,26 @@ in
               B = r2.pollerConfig.classes.B ++ [ "ListObjects" ];
             };
           }
-        )) ''vanixiets_r2_operations{bucket="sciexp",class="A"} 799142'';
+        )) ''vanixiets_r2_operations{bucket="sciexp",class="A"} 799167'';
         bucketDropped = format "bucketDropped" (pollerOf "bucket-dropped" (
           mutateText "bucketDropped" "if bucket not in latest or moment > latest[bucket][0]:"
             ''if moment == account["storage"][0]["dimensions"]["datetime"]:''
             source
         )) config' ''vanixiets_r2_bucket_payload_bytes{bucket="idle-archive"} 0'';
+        noFreshness = format "noFreshness" (pollerOf "no-freshness" (
+          mutateText "noFreshness" "<= fresh" "<= fresh * 12" source
+        )) config' ''vanixiets_r2_operations{bucket="deleted-scratch",class="A",gone="true"} 6'';
+        deleteObjectsFree = format "deleteObjectsFree" (pollerOf "accepted" source) (configOf
+          "delete-objects-free"
+          (
+            r2.pollerConfig
+            // {
+              classes = r2.pollerConfig.classes // {
+                free = r2.pollerConfig.classes.free ++ [ "DeleteObjects" ];
+              };
+            }
+          )
+        ) ''vanixiets_r2_operations{bucket="sciexp",class="unclassified"} 55752'';
       };
     in
     {

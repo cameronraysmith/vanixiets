@@ -26,16 +26,20 @@ vanixiets_r2_bucket_pending_uploads{bucket="sciexp-postgresql-backup"} 0
 # TYPE vanixiets_r2_operations gauge
 vanixiets_r2_operations{bucket="(account)",class="A"} 12
 vanixiets_r2_operations{bucket="(account)",class="B"} 0
+vanixiets_r2_operations{bucket="deleted-scratch",class="A",gone="true"} 6
+vanixiets_r2_operations{bucket="deleted-scratch",class="B",gone="true"} 6
+vanixiets_r2_operations{bucket="deleted-scratch",class="free",gone="true"} 1
 vanixiets_r2_operations{bucket="idle-archive",class="A"} 0
 vanixiets_r2_operations{bucket="idle-archive",class="B"} 0
-vanixiets_r2_operations{bucket="sciexp",class="A"} 799142
-vanixiets_r2_operations{bucket="sciexp",class="B"} 181123
+vanixiets_r2_operations{bucket="sciexp",class="A"} 799167
+vanixiets_r2_operations{bucket="sciexp",class="B"} 181172
 vanixiets_r2_operations{bucket="sciexp",class="free"} 40411
-vanixiets_r2_operations{bucket="sciexp",class="unclassified"} 3
+vanixiets_r2_operations{bucket="sciexp",class="unclassified"} 55752
 vanixiets_r2_operations{bucket="sciexp-nix-cache",class="A"} 414594
-vanixiets_r2_operations{bucket="sciexp-nix-cache",class="B"} 1391974
+vanixiets_r2_operations{bucket="sciexp-nix-cache",class="B"} 1391975
 vanixiets_r2_operations{bucket="sciexp-nix-cache",class="free"} 9
-vanixiets_r2_operations{bucket="sciexp-postgresql-backup",class="A"} 359
+vanixiets_r2_operations{bucket="sciexp-nix-cache",class="unclassified"} 616
+vanixiets_r2_operations{bucket="sciexp-postgresql-backup",class="A"} 360
 vanixiets_r2_operations{bucket="sciexp-postgresql-backup",class="B"} 57
 # HELP vanixiets_r2_billing_period_start_timestamp_seconds Unix time the billing period began.
 # TYPE vanixiets_r2_billing_period_start_timestamp_seconds gauge
