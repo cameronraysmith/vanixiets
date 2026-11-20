@@ -47,7 +47,7 @@ let
   stateDirectory = "r2-usage";
   # Hosts whose cloudflare-analytics token the operator has not yet entered;
   # such a host runs with the poller off and the obligation accepts it.
-  awaitingSecrets = [ host ];
+  awaitingSecrets = [ ];
 
   seriesNames = [
     "vanixiets_r2_bucket_payload_bytes"

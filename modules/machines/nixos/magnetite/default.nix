@@ -325,6 +325,11 @@ in
       # zroot/root/postgresql-dumps created by hand (tasks.md 2.1).
       vanixiets.postgresqlBackup.enable = true;
 
+      # The account's R2 usage, polled hourly (openspec change
+      # track-r2-usage, design D6), on with this host's cloudflare-analytics
+      # vars in the repository.
+      vanixiets.r2Usage.enable = true;
+
       # The PostgreSQL dumps' dataset (disko.nix, back-up-postgresql-off-host
       # design D5), enforced at boot because disko options apply at dataset
       # creation only; present only with the backup on, as is the dataset.

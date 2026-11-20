@@ -45,6 +45,7 @@
           "postgresqlBackup-niks3"
           "postgresqlBackup-nixbot"
           "postgresqlBackup-omnigent"
+          "r2-usage"
           "restic-backups-postgresql"
           "zfs-assert-root-docker-noautosnap"
           "zfs-assert-root-greptimedb-noautosnap"
