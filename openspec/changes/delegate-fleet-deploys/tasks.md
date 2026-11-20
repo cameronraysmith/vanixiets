@@ -179,13 +179,20 @@
 
 ## 6. Integration Verification
 
-- [ ] 6.1 From an `omnigent-cameron` session on magnetite, while stibnite is asleep, run `fleet-deploy magnetite`. — verify:
+- [x] 6.1 From an `omnigent-cameron` session on magnetite, while stibnite is asleep, run `fleet-deploy magnetite`. — verify:
   - exit 0, and the log shows fetch, cache hit, update and health;
   - one `requests.jsonl` line, one `fleet-deploy` post, and magnetite's deploy record names the closure;
   - every alert since the request started is recorded with its cause.
   - F80 (2026-11-19, fixed by #4053): the first attempt at c3672d28 was refused at the cache check. The deployer resolved through a `path:` reference, which copies `.git`, so the closure it resolved never matched CI's. It now uses `git+file://<worktree>?rev=<commit>` for every step, and `checks.x86_64-linux.fleet-deploy-resolve` and its `path:` mutant regulate it (`logs/cam115-e2e-20261119T0339Z-f78-diag.log`).
-  - Evidence (2026-11-19, main 1c544d53, `omnigent-cameron` on magnetite): exit 0 with closure `sanh2m2m…` (nixbot #2722), activated, settled 60 s, deployed. Request `9bc06211b083` wrote one `requests.jsonl` line and one p3 post, and magnetite's deploy record names the closure. No fleet-alerts in the window (`logs/cam115-e2e2-20261119T0435Z-6.1.log`, `logs/cam115-e2e2-20261119T0640Z-6.1-verify.log`).
-  - Rerun with stibnite asleep: stibnite was awake, because it ran the test. The requester's log has no explicit fetch or cache-hit line, so the rerun's evidence must show the cache hit through the deployer's record or journal, or state that it is implied by the absence of a cache refusal.
+  - First run (2026-11-19, main 1c544d53): exit 0 with `sanh2m2m…`, request `9bc06211b083`. It did not count, because stibnite was awake and ran it (`logs/cam115-e2e2-20261119T0435Z-6.1.log`, `logs/cam115-e2e2-20261119T0640Z-6.1-verify.log`).
+  - Evidence (2026-11-20, main aa88addf): the request was scheduled in advance as a one-shot `systemd-run` timer on magnetite (unit `cam115-e2e-6-1`, User/Group `omnigent-cameron`, 21:30:00Z) running `fleet-deploy magnetite --session cam115-e2e-6.1` (`logs/cam115-6.1-schedule-20261120-161840.log`).
+    - stibnite was asleep: from 21:21 to 21:39Z pmset shows only DarkWake maintenance entries (Deep Idle, no user session), and its next FullWake was at 22:07Z (HID). cinnabar's sshd accepted the request from magnetite's address, not stibnite's.
+    - Request `4787da1fe27e`, 21:30:01–21:34:03Z: deployed, exit 0, commit aa88addf, closure `byvvvi6q…`, with `previous`, `target` and `session` recorded. `previous` equals the closure because magnetite had been on main since 19:24Z, so this was a same-closure deploy.
+    - Fetch: the deployer's nix-daemon connections on cinnabar start at 21:30:03Z.
+    - Cache hit: no explicit line. It is implied by the absence of a cache refusal, and `byvvvi6q…`'s narinfo was 200 when checked independently.
+    - Update: magnetite's activation ran 21:32:59–21:33:02Z.
+    - Health: "activated; settling 60 s", then "deployed: magnetite runs byvvvi6q…" at 21:34:03Z. Afterwards magnetite was running with no failed units.
+    - One p3 `fleet-deploy` post at 21:34:03Z. magnetite's deploy record at 21:32:58Z names `byvvvi6q…`. No fleet-alerts from 21:30Z to 21:40Z (`logs/cam115-6.1-evidence-20261120-170833.log`, `logs/cam115-6.1-post-alerts-20261120T2209Z.log`).
 - [x] 6.2 From an `omnigent-janettesmith` session, deploy a real configuration change to cinnabar (D13), then ask for pyrite. — verify: cinnabar exits 0 across its own activation; pyrite exits 3 (outside her reach) with a high-priority post; every alert since each request started is recorded with its cause
   - pyrite (2026-11-19, main 1c544d53, from magnetite): refused with exit 3, `janettesmith may not deploy pyrite`, a p4 post and no deployer login on pyrite. No fleet-alerts in the window (`logs/cam115-e2e2-20261119T0438Z-6.2.log`).
   - Earlier cinnabar attempts:
