@@ -65,6 +65,13 @@ Each is stated in full, with its evidence and violation condition, in `specs/wor
 | A178 | The platform owns `launcher-settings.json` (edit denied), its hook scripts, `skills/session-start-hook` and `skills/synced` (rewritten at boot); setup-written files beside them survive. | V6, C18; A2's `synced` at 19:23:38 against its skill at 19:22:52. |
 | A179 | A controller session can `create_session`, swap the setup script with `update_environment` (one approval card each) and read pushed reports; sessions push new branches of any name. | Session 2 controller; session 1 pushed `claude/sandbox-reports` and `sandbox-reports-plain`. |
 | A180 | Packages home-manager activates as root are installed into the image's default profile, whose `bin` the harness puts on the agent's shell `PATH`, and that profile keeps the image's Nix. | Session 3's C1 and C2: 18 tools resolve from `/nix/var/nix/profiles/default/bin`; `setup.log`'s `nix=2.34.6` was read after activation. |
+| A181 | The setup step runs when a container is claimed for a session, not when it boots: the platform keeps pre-warmed containers, and a container booted under one setup script runs the script current at its claim. | Session 4: E1, E3 and E4 report `uptime -s` before their `create_session` (E1 booted 22:06:32, created 22:08:28); E4 booted at 22:10:30 while the real script was installed, yet its only `setup.log` line is the broken script's run at 22:12:28Z, after its 22:12:22 create. |
+| A182 | A snapshot-started session's snapshot can come from a sibling container that ran setup at the same time as the cold session, not from the cold session's own container (consistent with A171's checkpoint builder). | Session 4: E2's one `setup.log` line (22:09:04Z, `activate=0/3s`) differs from E1's (22:09:03Z, `activate=0/2s`); session 3's C2 (21:19:26Z, `0/16s`, `0/4s`) against C1 (21:19:25Z, `0/17s`, `0/3s`). |
+
+Measured cold and snapshot numbers (2026-11-21, session 4, revision `8c41bceba1e75f12c9fb9906eda0d3fa0346dc55`, `P` = `i6f12svdd7j8xcj85vdk6avimkfzwy0b-home-manager-generation`, closure 5,226,590,784 bytes):
+the cold start E1 realised 822 paths (1.1 GiB fetched) in 29 s and activated in 2 s (`realise=0/29s activate=0/2s`), about 31 s of the 360 s A169 allows;
+the snapshot start E2 ran no setup (its only `setup.log` line predates its boot at 22:10:38), and only the two SessionStart hooks ran, at 22:10:53–54Z, 4 s for the repository context.
+Session 3 measured 17 s and 3 s for the 4,923,527,456-byte closure of revision `63bcb45e`.
 
 The proxy re-terminates TLS and its CA is in the system bundle Nix uses (V15, C3); this is relied on by every fetch but is not separately listed.
 
@@ -96,15 +103,17 @@ The proxy re-terminates TLS and its CA is in the system bundle Nix uses (V15, C3
 | S4 | Dropped 2026-11-21 by Q91: it concerned the bootstrap sub-flake's committed pointer file, which D2 no longer has. | — | — |
 | S5 | The profile's closure, substituted and activated, fits the 360 s and 64 GB measured bounds. | The first bootstrap run exceeds 360 s or the disk fills. | R4 |
 | S6 | `/root/.nix-profile/bin` (or the profile home-manager activates) is on the agent's shell PATH (PA1 found it was not, in 2026-09). | Probe P4 shows it missing. | R12 |
-| S7 | A SessionStart hook declared in a setup-written `~/.claude/settings.json` runs in cloud sessions, and `CLAUDE_ENV_FILE` is set inside it (PA1, C13). | Probe P4 shows the hook did not run. | R8, R14 |
-| S8 | The environment's variables, including `SOPS_AGE_KEY`, are present in the processes of a cloud session, hooks included (C7: "Variables … apply the next time the session starts"). | The first D5 session's hook finds `SOPS_AGE_KEY` unset. | R14 |
+| S7 | A SessionStart hook declared in a setup-written `~/.claude/settings.json` runs in cloud sessions (PA1, C13). HOLDS (session 4, 2026-11-21). | Probe P4 shows the hook did not run. | R8, R14 |
+| S8 | The environment's variables, including `SOPS_AGE_KEY`, are present in the processes of a cloud session, hooks included (C7: "Variables … apply the next time the session starts"). HOLDS (session 4, 2026-11-21). | The first D5 session's hook finds `SOPS_AGE_KEY` unset. | R14 |
 | S9 | `api.linear.app` is reachable from a cloud session; the operator's allowed hosts hold `*.linear.app`, which covers it (session 3, task 6.3), though V31 found it absent earlier. | `linear auth whoami` fails with a proxy denial. | R14 |
 | S10 | The platform's proxy forwards the Linear CLI's own `Authorization` header to `api.linear.app` (PA4 concerns GitHub only). | `linear auth whoami` returns an authentication error with a correct key. | R14 |
 
 S6 was measured in session 3 (2026-11-21) and holds; it is now A180 above, whose trigger is in `specs/world-assumptions`.
-S7 and S8 were not measured in session 3, and remain assumptions until the next cloud session (task 3.4's open part, probe commands under task 4.1).
+S7 and S8 were not measured in session 3; session 4 (2026-11-21) settled both, as recorded under Probe P4 below.
+S7's original wording also asked that `CLAUDE_ENV_FILE` be set inside the hook; that was never printed, and it no longer matters, because no part of the design writes `CLAUDE_ENV_FILE` (hooks run by store path, D4; tools reach `PATH` through the default profile, A180).
+S9 and S10 were exercised by the same session: E1's `linear auth whoami` reported workspace `cameronraysmith` through the proxy with the rendered credentials, so both hold as of 2026-11-21.
 
-### Probe P4 (part measured in session 3, 2026-11-21)
+### Probe P4 (measured in sessions 3 and 4, 2026-11-21)
 
 P4 measures, in one cloud session started on the first bootstrap revision:
 the agent's shell `PATH` and whether each required tool runs by bare name;
@@ -120,6 +129,13 @@ R12's nix, playwright-cli, typst, d2 and mmdc were not called by name in session
 `CLAUDE_ENV_FILE` and `USER` are unset in the agent's shell (A173); whether SessionStart ran, with what `PATH` and `CLAUDE_ENV_FILE`, and whether `SOPS_AGE_KEY` is visible to a hook and to the shell were not measured, so S7 and S8 stay open.
 `settings.json` held 6 events and 13 store-path hook commands, and no tool result showed a hook error.
 The children listed 176 skill directories against the report's 174; the two extra are taken to be the harness's `session-start-hook` and `synced` (A178), which session 3 did not list by name.
+
+Session 4 (controller on `claude/sandbox-reports-s4`, children E1–E4, setup script for `8c41bceb`) measured the rest, 2026-11-21.
+S7 holds: E2 started from the snapshot, so no setup ran in its container (`uptime -s` 22:10:38; its only `setup.log` line 22:09:04Z), yet `run.log` gained `22:10:53Z repo-context repo=/home/user/vanixiets rc=0 tier=default secs=4` and `22:10:54Z session-secrets status=ok` after its boot; only SessionStart, where `settings.json` registers `claude-sandbox-session-secrets` and `claude-sandbox-repo-context` by store path, could have run them.
+E1's cold start alone could not show this, as E1 itself noted: its hook lines (22:09:05Z, 22:09:08Z) follow setup, and `run.log` does not record which invoked them.
+S8 holds: E1's agent's shell printed `SOPS_AGE_KEY=set` (presence only), and the `session-secrets` hook, which decrypts with that key, logged `status=ok` in E1 and E2.
+Not measured, and not needed: the hook's own `PATH` and `CLAUDE_ENV_FILE`; E1's agent's shell showed `CLAUDE_ENV_FILE=unset`.
+E1 also called by bare name the five tools session 3 had not: `nix (Nix) 2.34.6`, `playwright-cli 0.1.21`, `typst 0.15.1`, `d2 v0.9.0` and `mmdc 12.0.0`, all from `/nix/var/nix/profiles/default/bin`, so Nix survived activation directly, not only on the marker line's evidence.
 
 ## Goals / Non-Goals
 
@@ -240,21 +256,21 @@ S is the specification the machine meets: D1's profile, D2's check, generated se
 | R13 One source | D1 imports the same modules other hosts import | — (a property of the repository, checked by evaluation) |
 | R14 Linear skills in cloud sessions | D5 | A172; S7, S8, S9, S10 |
 
-R8 and R14 are not discharged until P4 settles S7 and S8.
+R8 and R14 were not discharged until P4 settled S7 and S8; session 4 settled both on 2026-11-21, and E1 exercised R8 and R14 end to end (tasks 8.1, 4.1, 4.2).
 R12 rests on A180, a fact about the base image's Nix layout, which drifts (PA3).
 
 ## Migration Plan
 
 1. Land D1 and D4; `ubuntu`'s behaviour is unchanged, checked by comparing its rendered files before and after.
 2. Land D2's checks, report step and setup-script app; wait for nixbot to build and publish the activation package.
-3. Run the first bootstrap test from a controller session on `nix-sandbox-test`, including P4 (session 3, 2026-11-21: all but S7 and S8).
-4. Land D3; its first cloud session also measures S7 and S8.
+3. Run the first bootstrap test from a controller session on `nix-sandbox-test`, including P4 (session 3, 2026-11-21: all but S7 and S8; session 4, the same day: S7 and S8, and the integration round).
+4. Land D3; its first cloud session also measures S7 and S8 (session 4, 2026-11-21).
 5. The D5 key, recipient and `SOPS_AGE_KEY` exist (2026-11-21); add `api.linear.app` to the allowed hosts; on stibnite, add the recipient to `.sops.yaml` and create the scoped file; land the profile's secret declarations.
 6. Switch the operator's default cloud environment to the generated setup script, and regenerate it at least monthly (D2's liveness rule).
 Rollback: replace the setup step with the previous script (one approval card); the environment snapshot is rebuilt from it.
 
 ## Open Questions
 
-- P4's S7 and S8, measured in the next cloud session.
+- P4's S7 and S8: resolved 2026-11-21 by session 4 (both hold).
 - The setup step's real time ceiling above 360 s.
 - Q90, resolved 2026-11-21: chromium, the playwright chromium builds and mermaid-cli stay in the closure, because session 3 realised the whole 4,923,527,456-byte closure in a cloud session in 17 s (16 s in the checkpoint builder), well inside the 360 s.

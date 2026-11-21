@@ -17,9 +17,9 @@ Providing them SHALL take no work in that cloud session beyond reading files alr
 
 ### Requirement: One closure defines the environment
 
-The operator's cloud environment's setup step SHALL name one closure, the activation package this repository builds for cloud sessions, by its store path, and SHALL record the pinned revision that produced it as provenance.
-Everything a cloud session receives from this repository SHALL be determined by that closure alone, and the setup step SHALL NOT evaluate any flake.
-The setup step SHALL be renewed at least every 30 days, so that the fleet's binary cache, which drops a closure 30 days after its last reference, still holds the closure it names.
+The cloud environment's setup step SHALL name one closure, the cloud-session activation package, by store path, with its source revision as provenance.
+Everything a session receives from this repository SHALL come from that closure, and the setup step SHALL NOT evaluate a flake.
+The setup step SHALL be renewed at least every 30 days, while the binary cache still holds the closure.
 
 #### Scenario: Two sessions on one closure
 

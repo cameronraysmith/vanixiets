@@ -210,6 +210,36 @@ Any requirement whose discharge depends on this fact SHALL name it explicitly, a
 - **WHEN** a fresh container's Nix installer, default profile or harness `PATH` differ from the above (PA3: they changed between 2026-03 and 2026-09), a required tool no longer resolves under `/nix/var/nix/profiles/default/bin`, or `command -v nix` fails after activation
 - **THEN** this assumption is void, and the `claude-sandbox-bootstrap` requirement `Required tools present` loses its discharge and needs a `PATH` route of its own (a `CLAUDE_ENV_FILE` line from a SessionStart hook, or links into `/usr/local/bin`)
 
+### Requirement: A181 — The setup step runs when a container is claimed for a session, not when it boots
+
+It is true of a cloud environment, independent of what this fleet builds, that the platform keeps pre-warmed containers and runs the setup step when one is claimed for a session, using the setup script current at that moment.
+Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL lose its discharge once the violation below is observed.
+
+#### Scenario: Measured on 2026-11-21
+
+- **WHEN** session 4's controller created children E1, E3 and E4 and swapped the setup script between E2's and E4's creation
+- **THEN** E1, E3 and E4 each reported an `uptime -s` earlier than their `create_session` (E1 booted 22:06:32, created 22:08:28); E4 booted at 22:10:30 while the real script was installed, yet its only `setup.log` line is the broken script's run at 22:12:28Z, after its creation at 22:12:22
+
+#### Scenario: Setup runs at boot
+
+- **WHEN** a container's `setup.log` holds a run of a setup script that was replaced before the container was claimed
+- **THEN** this assumption is void, and the `claude-sandbox-bootstrap` requirement `One closure defines the environment` loses its discharge, because a session could start on a superseded closure
+
+### Requirement: A182 — A snapshot can come from a sibling container, not the cold session's own
+
+It is true of a cloud environment, independent of what this fleet builds, that the environment snapshot later sessions start from can be taken from a sibling container that ran the setup step alongside the cold session, rather than from the cold session's own container.
+Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL lose its discharge once the violation below is observed.
+
+#### Scenario: Measured on 2026-11-21
+
+- **WHEN** a snapshot-started session reads its `setup.log` and compares it with the cold session's
+- **THEN** session 4's E2 holds one line stamped 22:09:04Z with `activate=0/3s`, while E1's is 22:09:03Z with `activate=0/2s`; session 3's C2 holds 21:19:26Z, `realise=0/16s activate=0/4s`, while C1's is 21:19:25Z, `0/17s`, `0/3s`
+
+#### Scenario: The snapshot depends on the cold session's own run
+
+- **WHEN** a snapshot-started session holds only the cold session's own setup run, or a failure in a sibling's run leaves a snapshot the cold session never had
+- **THEN** this assumption is void, and the `claude-sandbox-bootstrap` requirement `Idempotent setup without external side effects` must be re-argued, since it relies on every run of the same script ending in the same state
+
 ## MODIFIED Requirements
 
 ### Requirement: Grounded vocabulary for behavioral requirements
