@@ -9,7 +9,7 @@ cognee's database exists on disk, but cognee is parked (`vanixiets.cognee.enable
 
 What protects the data today:
 - ZFS auto-snapshots of `zroot/root/nixos`, which holds `/var/lib/postgresql` (`magnetite/default.nix:200-206`, `disko.nix:43-50`).
-- One pre-deploy omnigent dump (`.atomic/workflows/omnigent/deployment.ts:143-145`).
+- One pre-deploy omnigent dump, taken by the `deploy-omnigent` Atomic workflow before each deploy. That workflow was removed with the atomic 0.10.3 bump (atomic 0.10.0 dropped workflows), so no deploy takes this dump any more.
 - Tonight's manual dumps in `/var/backup/postgresql/pre-reindex-20261119T0031Z/`.
 
 What the fleet already has:

@@ -16,7 +16,7 @@
 #
 # Pinning: the registry tarball by its sha256 (cross-checkable against the
 # registry's published integrity) and the dependency closure by npmDepsHash
-# over the shipped npm-shrinkwrap.json (lockfileVersion 3, 343 packages).
+# over the shipped npm-shrinkwrap.json (lockfileVersion 3, 345 packages).
 #
 # Two upstream-shrinkwrap repairs live in npm-dist-repairs.patch:
 #  - the prepublishOnly generator emits the workspace-internal @bastani/*
@@ -62,12 +62,12 @@ buildNpmPackage (finalAttrs: {
 
   src = fetchurl {
     url = "https://registry.npmjs.org/@bastani/atomic/-/atomic-${finalAttrs.version}.tgz";
-    hash = "sha256-i8cOLX3PkS24Bd8YZrpVw7nNrOolTtgGCIuIVBRnqCc=";
+    hash = "sha256-Nb97/Kwx8K9pYO2EWvzGNirWbBngLdjR4Z/hSypiLcw=";
   };
   sourceRoot = "package";
 
   nodejs = nodejs_22;
-  npmDepsHash = "sha256-hLMDZ/E6m8+miyAfWNEOwtMaQigk9iVG3BrC81dWgSM=";
+  npmDepsHash = "sha256-zv9j4t6H/9kAUJFnSI//DznC47O8Id/rGDbI82wYpQk=";
 
   postPatch = ''
     patch -p1 < ${./npm-dist-repairs.patch}

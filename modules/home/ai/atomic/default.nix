@@ -82,10 +82,9 @@ let
             ++ config.aiAgentSettings.extensionsForAtomic;
 
             # Three model roles. The session default covers chat, planning, and
-            # every workflow stage that pins no model. Implementation runs on
-            # Astra because the builtin goal and ralph orchestrators pin it and
-            # `worker` is the implementation writer those orchestrators hand off
-            # to; the read-only codebase-* agents take Opus for quick research.
+            # every subagent that pins no model. Implementation runs on Astra
+            # through `worker`, the implementation writer subagent; the read-only
+            # codebase-* agents take Opus for quick research.
             # atomic rewrites the default* keys on /model and /thinking, so an
             # interactive switch survives only until the next activation.
             defaultProvider = "openai-codex";

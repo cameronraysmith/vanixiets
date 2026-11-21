@@ -29,7 +29,7 @@ The 0.12.0 literals in 2.1–2.2 record what S1 verified at the time.
 
 Depends on accepted S1.
 Only `modules/nixos/omnigent.nix`, `modules/nixos/kanidm.nix`, and `modules/terranix/cloudflare.nix` are writable in this slice.
-The S2 gates evaluate magnetite through an `extendModules` fixture (the `fixture` export in `.atomic/workflows/omnigent/slices.ts`) that imports `modules.nixos.omnigent` with the S2 server settings, because the clan binding does not exist yet.
+The S2 gates evaluate magnetite through an `extendModules` fixture (the `fixture` export of the `deploy-omnigent` Atomic workflow's slice definitions, removed with the atomic 0.10.3 bump and kept only in git history) that imports `modules.nixos.omnigent` with the S2 server settings, because the clan binding does not exist yet.
 
 - [ ] 3.1 Add the plain server module, static omnigent account, shared PostgreSQL socket/peer connection, database ownership, memory limits, and ordering after and requiring `postgresql.target` — verify: fixture evaluations retain `omnigent`, `matrix-synapse`, and `buildbot` databases, PostgreSQL version starts with `16.`, and the ordering assertion in `slice-2.json` passes.
 - [ ] 3.2 Configure confidential client `omnigent`, exact issuer `https://accounts.scientistexperience.net/oauth2/openid/omnigent`, group `omnigent_users`, callback and landing URLs, and scope map `[ "openid" "profile" "email" ]` — verify: the Kanidm group and exact scope-map fixture gates pass, while review confirms PKCE and email verification remain enabled and membership stays operational.
@@ -53,7 +53,7 @@ Only `modules/nixos/omnigent-host.nix`, `modules/clan/services/omnigent/`, and `
 
 Depends on accepted S0–S3, reviewed content, controller-owned delivery changes, and the explicit deployment confirmations.
 There is no supplied `slice-4.json`.
-These tasks follow the `input.deploy` branch in `.atomic/workflows/deploy-omnigent.ts`, `.atomic/workflows/omnigent/deployment.ts`, and the wizard/probes in `.atomic/workflows/omnigent/tools.ts`.
+These tasks follow the `input.deploy` branch of the `deploy-omnigent` Atomic workflow, its deployment helpers, and its wizard and probes (removed with the atomic 0.10.3 bump; kept only in git history).
 They record future controller and human work, not permission for this writer to perform it.
 
 - [ ] 5.1 Obtain operator confirmation, generate only `kanidm-oauth2-omnigent` and `omnigent-cookie-secret-omnigent`, and route only their generated files into the S3 delivery change — verify: `generate-vars` evidence confirms permitted paths and unchanged foreign content, followed by successful topology verification.

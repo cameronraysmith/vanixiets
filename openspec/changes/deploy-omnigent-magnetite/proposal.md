@@ -65,7 +65,7 @@ This run reuses the existing CAM-57 binding recorded above; its timestamp record
 Those acceptance lists and deterministic gates remain unchanged; `tasks.md` is the HIL task ledger, not a replacement gate implementation.
 The current S1–S3 gates use `__OMNIGENT_SOURCE__` instead of the previous run's working-copy source; the controller supplies that source, and this writer neither substitutes a guessed revision nor edits those gates.
 S4 has no slice JSON in the supplied evidence.
-Its sequence is recorded from the `input.deploy` branch in `.atomic/workflows/deploy-omnigent.ts`, the deployment helpers, and the `checklist` in `.atomic/workflows/omnigent/types.ts`.
+Its sequence is recorded from the `input.deploy` branch of the `deploy-omnigent` Atomic workflow, its deployment helpers, and its `checklist`; the workflow was removed with the atomic 0.10.3 bump (atomic 0.10.0 dropped workflows) and survives only in git history.
 
 The plan at commit `46be61b3e`, dated 2026-09-06, predates the supplied S0 corrections: its fork citations, unresolved admission values, and old inventory filename must not override the explicit slice contract.
 The later research also examines development revisions rather than only the packaged release; release compatibility remains an implementation obligation, not a claim established by these tracking files.

@@ -1,128 +1,128 @@
 --- a/npm-shrinkwrap.json
 +++ b/npm-shrinkwrap.json
-@@ -431,6 +431,7 @@
+@@ -433,6 +433,7 @@
  		"node_modules/@bastani/atomic-agent-core": {
- 			"version": "0.9.88",
- 			"resolved": "https://registry.npmjs.org/@bastani/atomic-agent-core/-/atomic-agent-core-0.9.88.tgz",
-+			"integrity": "sha512-3ry4ZFjepAksNf8mR7LKRTpq2iLVgTYCqprqg/MuhOtna2Y+EkYOMhdoku1dXwwAqbMN+yl2+c/elqSpD4AhOA==",
+ 			"version": "0.10.3",
+ 			"resolved": "https://registry.npmjs.org/@bastani/atomic-agent-core/-/atomic-agent-core-0.10.3.tgz",
++			"integrity": "sha512-pK69FKLSj5zLRAV0PPgew1XICSyOG8i6jNsyLpakEj2WJ5H5ZwFFVdXtIWDiK04X/6uYcig+wSNYFLZigUhEtg==",
  			"license": "MIT",
  			"dependencies": {
- 				"@bastani/atomic-ai": "0.9.88",
-@@ -443,6 +444,7 @@
+ 				"@bastani/atomic-ai": "0.10.3",
+@@ -445,6 +446,7 @@
  		"node_modules/@bastani/atomic-ai": {
- 			"version": "0.9.88",
- 			"resolved": "https://registry.npmjs.org/@bastani/atomic-ai/-/atomic-ai-0.9.88.tgz",
-+			"integrity": "sha512-wWQ0fl0duSbHQ9czygPjEfOT9fGsZRdPEXGYYtHIUp4jXDFh2bJ0jPal0dqEs8FYRTII7WOqw/rZktY+SkdnsA==",
+ 			"version": "0.10.3",
+ 			"resolved": "https://registry.npmjs.org/@bastani/atomic-ai/-/atomic-ai-0.10.3.tgz",
++			"integrity": "sha512-fQ6agFoWyy2UGITRtdvOFBnYOWcOH36XUrP/tP9AjRB7ee3hfsL6L4p+vc94v6AY3q3oe4kpTyMRUJKQDlhbMQ==",
  			"license": "MIT",
  			"dependencies": {
  				"@anthropic-ai/sdk": "0.129.0",
-@@ -528,6 +530,7 @@
+@@ -530,6 +532,7 @@
  		"node_modules/@bastani/atomic-codemode": {
- 			"version": "0.9.88",
- 			"resolved": "https://registry.npmjs.org/@bastani/atomic-codemode/-/atomic-codemode-0.9.88.tgz",
-+			"integrity": "sha512-GaiwcbgkBewyDvSm1fnsHsu3mvOr326RYJrm1y6U0huiaGdkFUp2cUumA6vZvdTOM+J2mHusohES2Rx2CCUbmw==",
+ 			"version": "0.10.3",
+ 			"resolved": "https://registry.npmjs.org/@bastani/atomic-codemode/-/atomic-codemode-0.10.3.tgz",
++			"integrity": "sha512-uFnJnn4toOSeC+kwNG+lpLcyzWN0/bCUXhcwB+nXuMGGzqPBmxp8SPYr3hmt4mZgmEGaosFTXPrWuBPT4iGy5g==",
  			"license": "MIT",
  			"dependencies": {
  				"quickjs-wasi": "3.6.3"
-@@ -539,6 +542,7 @@
+@@ -541,6 +544,7 @@
  		"node_modules/@bastani/atomic-natives": {
- 			"version": "0.9.88",
- 			"resolved": "https://registry.npmjs.org/@bastani/atomic-natives/-/atomic-natives-0.9.88.tgz",
-+			"integrity": "sha512-ovBSyrtrQb7QIAz1othA6llBNsZZBBaLRfwkLdf4WC1XK7843ez8pOkrgDUlVgQV3FZGY9vV3PnimOLq/KSzQw==",
+ 			"version": "0.10.3",
+ 			"resolved": "https://registry.npmjs.org/@bastani/atomic-natives/-/atomic-natives-0.10.3.tgz",
++			"integrity": "sha512-BezHMVO6RN/jCiQWlpcqsDc8jVQcKGs7EhvfgMFBdHMhGa1RZFiSa/UKx70l8Zj+1kDT/rFDZIm4Kk6Me1bEFA==",
  			"license": "MIT",
  			"optionalDependencies": {
- 				"@bastani/atomic-natives-darwin-arm64": "0.9.88",
-@@ -558,6 +562,7 @@
+ 				"@bastani/atomic-natives-darwin-arm64": "0.10.3",
+@@ -560,6 +564,7 @@
  		"node_modules/@bastani/atomic-natives-darwin-arm64": {
- 			"version": "0.9.88",
- 			"resolved": "https://registry.npmjs.org/@bastani/atomic-natives-darwin-arm64/-/atomic-natives-darwin-arm64-0.9.88.tgz",
-+			"integrity": "sha512-LXvWWKojoxrI9Qq0LMomBcV7EdaaL4B3CuCPj2Vl9gIYpzjo5AzQe+8EkyG5kL2g3YO6UKhK7cKqFmlm77vpRg==",
+ 			"version": "0.10.3",
+ 			"resolved": "https://registry.npmjs.org/@bastani/atomic-natives-darwin-arm64/-/atomic-natives-darwin-arm64-0.10.3.tgz",
++			"integrity": "sha512-iNGbOwDMPSe4qdIBkz45KFapLhcTCJJmem8EROTgP2bgZIxJZoCYFx8hHkcEAwWh7VUrVqXd3qppRnfj+XI43w==",
  			"license": "MIT",
  			"os": [
  				"darwin"
-@@ -570,6 +575,7 @@
+@@ -572,6 +577,7 @@
  		"node_modules/@bastani/atomic-natives-darwin-x64": {
- 			"version": "0.9.88",
- 			"resolved": "https://registry.npmjs.org/@bastani/atomic-natives-darwin-x64/-/atomic-natives-darwin-x64-0.9.88.tgz",
-+			"integrity": "sha512-HXmzOggcu30tXY6ke02jdzGFueXI2gf5FxMikXDD1MD68/rvPDkf+DvDZgYKGwUWdVeBnZWuYffL+8Y69DrTuw==",
+ 			"version": "0.10.3",
+ 			"resolved": "https://registry.npmjs.org/@bastani/atomic-natives-darwin-x64/-/atomic-natives-darwin-x64-0.10.3.tgz",
++			"integrity": "sha512-7QmNybBsKsF9AlaOICIA/n6ZB+LuTOwi3VbSyePd75gvAwWSwGdapO1HGJrnEDLaGX/EYy4Qu2VAbBgotUVJpQ==",
  			"license": "MIT",
  			"os": [
  				"darwin"
-@@ -582,6 +588,7 @@
+@@ -584,6 +590,7 @@
  		"node_modules/@bastani/atomic-natives-linux-arm64-gnu": {
- 			"version": "0.9.88",
- 			"resolved": "https://registry.npmjs.org/@bastani/atomic-natives-linux-arm64-gnu/-/atomic-natives-linux-arm64-gnu-0.9.88.tgz",
-+			"integrity": "sha512-J4VfIbkKZNKU+lQevKRhITPc9+OpadGbIRaSivnZ3nno4hV2nURJAySq6lpTYrFk3f209EQbaw7hqrnnQ4LJVA==",
+ 			"version": "0.10.3",
+ 			"resolved": "https://registry.npmjs.org/@bastani/atomic-natives-linux-arm64-gnu/-/atomic-natives-linux-arm64-gnu-0.10.3.tgz",
++			"integrity": "sha512-RwO7QqD2mlM5loqvCDnP51tb02SehTtWoIn89qi1q9NXVH5g4BqRbFwdN3UtTS2B1Coc0Z6O1vNrSY+TKeklrg==",
  			"license": "MIT",
  			"os": [
  				"linux"
-@@ -597,6 +604,7 @@
+@@ -599,6 +606,7 @@
  		"node_modules/@bastani/atomic-natives-linux-arm64-musl": {
- 			"version": "0.9.88",
- 			"resolved": "https://registry.npmjs.org/@bastani/atomic-natives-linux-arm64-musl/-/atomic-natives-linux-arm64-musl-0.9.88.tgz",
-+			"integrity": "sha512-5nF+BjRs8V7FHtEh3eTAWr7isrFxRNiPn6JOu++KpUx0e2AtTJX1UOVXVAsS/XjC8bVUoXuXNcByef4fCYcYSQ==",
+ 			"version": "0.10.3",
+ 			"resolved": "https://registry.npmjs.org/@bastani/atomic-natives-linux-arm64-musl/-/atomic-natives-linux-arm64-musl-0.10.3.tgz",
++			"integrity": "sha512-gqkX/+Nk34wVkOOHpxB98fU37G9zCVZxDEDK9EKn4eJrCZ2RbarGxR3EB3J28WDG8dnYXFUSLfO1YrTcGpVhMA==",
  			"license": "MIT",
  			"os": [
  				"linux"
-@@ -612,6 +620,7 @@
+@@ -614,6 +622,7 @@
  		"node_modules/@bastani/atomic-natives-linux-x64-gnu": {
- 			"version": "0.9.88",
- 			"resolved": "https://registry.npmjs.org/@bastani/atomic-natives-linux-x64-gnu/-/atomic-natives-linux-x64-gnu-0.9.88.tgz",
-+			"integrity": "sha512-tp6jlqeX663NR/db8DgyW+7+65md0Jchgshg3L3zsUNmCai0B4wSIaLimYH7eUJHeTspL1Y4AedrvWFaWw4HeQ==",
+ 			"version": "0.10.3",
+ 			"resolved": "https://registry.npmjs.org/@bastani/atomic-natives-linux-x64-gnu/-/atomic-natives-linux-x64-gnu-0.10.3.tgz",
++			"integrity": "sha512-dLWt9dajDdk8EHVPMyz0bedXIjJ5hpaSvQ524tmTJ1mGVY9Fo4qsjZBRuteZ1NWolcbSDAA8dZ8/T+/zkmvUjw==",
  			"license": "MIT",
  			"os": [
  				"linux"
-@@ -627,6 +636,7 @@
+@@ -629,6 +638,7 @@
  		"node_modules/@bastani/atomic-natives-linux-x64-musl": {
- 			"version": "0.9.88",
- 			"resolved": "https://registry.npmjs.org/@bastani/atomic-natives-linux-x64-musl/-/atomic-natives-linux-x64-musl-0.9.88.tgz",
-+			"integrity": "sha512-LfpgW4EV+PqEbJEljp3GkoZwirevYAE9SvgtJlai8HaAjV86ydIyeVmDaSZ5RGs7A0DEQpRQdWYzlLG+9JeBmA==",
+ 			"version": "0.10.3",
+ 			"resolved": "https://registry.npmjs.org/@bastani/atomic-natives-linux-x64-musl/-/atomic-natives-linux-x64-musl-0.10.3.tgz",
++			"integrity": "sha512-wHIUA0JCpY8Q694JpJkqqpdIONvoZWmB1wc2oiheUN0MeAQlPfGzmn4VzfZXi9Rv2maH4XSYzzkzytAa18gMIQ==",
  			"license": "MIT",
  			"os": [
  				"linux"
-@@ -642,6 +652,7 @@
+@@ -644,6 +654,7 @@
  		"node_modules/@bastani/atomic-natives-win32-arm64-msvc": {
- 			"version": "0.9.88",
- 			"resolved": "https://registry.npmjs.org/@bastani/atomic-natives-win32-arm64-msvc/-/atomic-natives-win32-arm64-msvc-0.9.88.tgz",
-+			"integrity": "sha512-0G03cSB+mrMKCbdcLmVhaQK61Q3tl3UrUyT1stsHksJVhsGjR4Upq+ns/FbHvm128nkF/S6R50iHiaFYnmqmGA==",
+ 			"version": "0.10.3",
+ 			"resolved": "https://registry.npmjs.org/@bastani/atomic-natives-win32-arm64-msvc/-/atomic-natives-win32-arm64-msvc-0.10.3.tgz",
++			"integrity": "sha512-6iQnRyRNzIGbSWLQUuQllgI0CjTXqc9vS67HHOg+5TqDznF7neWT3YilgHkinhi4ySPzFCrjMVtekNHLfksxFw==",
  			"license": "MIT",
  			"os": [
  				"win32"
-@@ -654,6 +665,7 @@
+@@ -656,6 +667,7 @@
  		"node_modules/@bastani/atomic-natives-win32-x64-msvc": {
- 			"version": "0.9.88",
- 			"resolved": "https://registry.npmjs.org/@bastani/atomic-natives-win32-x64-msvc/-/atomic-natives-win32-x64-msvc-0.9.88.tgz",
-+			"integrity": "sha512-JK2yjPdV3BoQuLFTKvp/tDc+TDcabCWhHoLVlX6e9nxoAkuGhHpe2uBDeGdEZef079sPG5lTxayZNg2HdzKEmw==",
+ 			"version": "0.10.3",
+ 			"resolved": "https://registry.npmjs.org/@bastani/atomic-natives-win32-x64-msvc/-/atomic-natives-win32-x64-msvc-0.10.3.tgz",
++			"integrity": "sha512-PGOvMbiEPD86ZHkOFCx5dOg2KXVa5cOyDr5sgisJTc7x8fUhhjXT4TMQIHiclZno9j4Eu7E0Y5iyJBBDSCnkAw==",
  			"license": "MIT",
  			"os": [
  				"win32"
-@@ -666,6 +678,7 @@
+@@ -668,6 +680,7 @@
  		"node_modules/@bastani/atomic-schema": {
- 			"version": "0.9.88",
- 			"resolved": "https://registry.npmjs.org/@bastani/atomic-schema/-/atomic-schema-0.9.88.tgz",
-+			"integrity": "sha512-yTjcl9N3b1VC6CxVGfNjHSNWQel/pkpvoEywABWq9OumhSKImfErtZcdYCUVa7Vxl10l+jh/EVzRajRNyhB0vA==",
+ 			"version": "0.10.3",
+ 			"resolved": "https://registry.npmjs.org/@bastani/atomic-schema/-/atomic-schema-0.10.3.tgz",
++			"integrity": "sha512-PL/K5Ej2Cajc4tv3AQ/TyxUZHhpJy2h0jYR/IK7sme/vcSbAiQpCF4L7sKM+zw7ieC69vKrsKJTVDynQWU008Q==",
  			"license": "MIT",
  			"engines": {
  				"node": ">=22.19.0"
-@@ -674,6 +687,7 @@
+@@ -676,6 +689,7 @@
  		"node_modules/@bastani/atomic-telemetry": {
- 			"version": "0.9.88",
- 			"resolved": "https://registry.npmjs.org/@bastani/atomic-telemetry/-/atomic-telemetry-0.9.88.tgz",
-+			"integrity": "sha512-o0FohkjN3jc+RyoB4Xjg0IjiEqclKd3HpYKpV/IrPlfjs+5jKULBMr7WJ/Y3ipne+vGz8wkUNmPkW3rWA+mr9A==",
+ 			"version": "0.10.3",
+ 			"resolved": "https://registry.npmjs.org/@bastani/atomic-telemetry/-/atomic-telemetry-0.10.3.tgz",
++			"integrity": "sha512-s48rZiGs24YtdkDJdap+cM7DbTV8ayGHwxJ/D4K3hIBE2aVLqIYzIAGFQM2O8WLhU7DOUw7pIbPqqyZGlkXOrQ==",
  			"license": "MIT",
  			"engines": {
  				"node": ">=22.19.0"
-@@ -682,6 +696,7 @@
+@@ -684,6 +698,7 @@
  		"node_modules/@bastani/atomic-tui": {
- 			"version": "0.9.88",
- 			"resolved": "https://registry.npmjs.org/@bastani/atomic-tui/-/atomic-tui-0.9.88.tgz",
-+			"integrity": "sha512-6uI56E4fT1qbZnlsG+7ISggfHTli/5OTsaHzq7nGM2wnGTcIofeFMH1RU8eHifaf4HwD1qB/GUr+w0d9i/oSbQ==",
+ 			"version": "0.10.3",
+ 			"resolved": "https://registry.npmjs.org/@bastani/atomic-tui/-/atomic-tui-0.10.3.tgz",
++			"integrity": "sha512-gHGMT4wTKe7RbEj6vD+MCeTp1HvPMvD+oLB5yf8DZ3sFc9YvswqtWx+W8dCe5VaZRQDxNXtksvsS1TWbAQLUcg==",
  			"license": "MIT",
  			"dependencies": {
  				"get-east-asian-width": "1.7.0",
 --- a/package.json
 +++ b/package.json
-@@ -139,16 +139,7 @@
+@@ -121,16 +121,7 @@
    "optionalDependencies": {
      "@mariozechner/clipboard": "0.3.9"
    },

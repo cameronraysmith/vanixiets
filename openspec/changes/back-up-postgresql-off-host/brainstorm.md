@@ -13,7 +13,7 @@ cognee's database also exists on disk but cognee is parked, its module is off an
 Nothing backs these databases up.
 The only copies are:
 - ZFS auto-snapshots of the root dataset that holds `/var/lib/postgresql` (`magnetite/default.nix:200-206`: hourly 4, daily 3, weekly 1), on the same pool and disk (`disko.nix:43-50`). They are crash-consistent [INFERENCE: PGDATA and pg_wal share one dataset] and are lost with the disk.
-- One `pg_dump` of omnigent that its deploy workflow takes before each deploy (`.atomic/workflows/omnigent/deployment.ts:143-145`).
+- One `pg_dump` of omnigent that its deploy workflow takes before each deploy (the `deploy-omnigent` Atomic workflow, since removed with the atomic 0.10.3 bump).
 - The manual dumps the orchestrator took tonight before reindexing every database for the glibc collation change, in `/var/backup/postgresql/pre-reindex-20261119T0031Z/`.
 
 Losing magnetite's disk today loses every service's state.
