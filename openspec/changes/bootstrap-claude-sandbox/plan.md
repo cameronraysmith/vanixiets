@@ -5,7 +5,7 @@
 **Goal:** A cloud session started on the operator's cloud environment gets the user context, the skill corpus, the required tools, each attached repository's context and the Linear credentials, from one pinned setup line.
 
 **Architecture:** A `claude-sandbox@x86_64-linux` home configuration (D1) is built by one CI check and published to `cache.scientistexperience.net` (D2).
-A channels-only sub-flake at `bootstrap/claude-sandbox` carries a generated pointer to that activation package; the setup step runs it by pinned revision, it substitutes and activates without evaluating the main flake, reports, and always exits 0.
+The setup script, generated for each commit by `nix run .#claude-sandbox-setup-script`, names that activation package by store path; it substitutes and activates it without evaluating any flake, records a marker line, and always exits 0, while the activation itself writes the bootstrap report (D2, revised by Q91 on 2026-11-21).
 Session-time work (repository context, D3; Linear secrets, D5) runs from hooks whose commands are store paths (D4).
 
 **Tech Stack:** Nix flakes (flake-parts, import-tree), home-manager, sops-nix, `apm-context-compile`, nixbot and niks3, Claude Code cloud environments.
@@ -15,21 +15,21 @@ Session-time work (repository context, D3; Linear secrets, D5) runs from hooks w
 ## Global Constraints
 
 - Platform: `x86_64-linux` only; username `root`; home `/root`.
-- The setup step is one line: `nix run "git+https://github.com/cameronraysmith/vanixiets?rev=<40-hex sha>&shallow=1&dir=bootstrap/claude-sandbox"; exit 0`, within 100 lines of 200 bytes.
-- `bootstrap/claude-sandbox/flake.nix` has no `github:` input; its only input is `https://channels.nixos.org/nixos-unstable/nixexprs.tar.xz`.
+- The setup step is the script `nix run .#claude-sandbox-setup-script` prints for the pinned revision, within 100 lines of 200 bytes, ending in `exit 0`; it evaluates no flake.
+- The setup step is renewed at least every 30 days, because niks3 drops a closure 30 days after its last reference.
 - Every bootstrap and hook path exits 0.
 - Setup finishes within 360 seconds on a cache hit.
 - No secret in the setup step, in any file under `/root`, `/var/log/claude-sandbox-bootstrap` or `/nix`, or in any report; secrets are decrypted only into `/dev/shm`.
 - Never write `launcher-settings.json`, `session-start-setup-script-failure.sh`, `stop-hook-git-check.sh`, `environment-manager/`, `skills/session-start-hook` or `skills/synced` under `/root/.claude`.
-- Binary cache: `https://cache.scientistexperience.net`, key `cache.scientistexperience.net-1:N9ZeWasooJLXEwaN+rd4MMyBuGpAtcUAXrEUPBT5cXI=` (from `flake.nix` `nixConfig`).
+- Binary caches: `https://cache.scientistexperience.net` and `https://cache.nixos.org`, with their keys taken from `lib/caches.nix`.
 - Reports go to `/var/log/claude-sandbox-bootstrap/`.
 - x86_64-linux builds run on magnetite; darwin configurations are evaluated only.
 - Prose in READMEs: one sentence per line.
 
 ## Review Focus
 
-1. A stale pointer: the pointer names a store path that the revision's activation package no longer has → the pointer check fails CI (Task 4, mutant test).
-2. A realise that fails halfway → nothing is activated, the report names the failed path, exit 0 (Task 5, cache-miss test).
+1. A stale closure: the setup script names a store path other than the one CI builds → the `claude-sandbox-setup-script` check fails evaluation (Task 4, mutant test).
+2. A realise that fails halfway → nothing is activated, the marker line records the failed realise, exit 0 (Task 5, cache-miss test).
 3. SessionStart fires on resume as well as start → the repository-context hook and the secret hook are no-ops the second time (Tasks 7 and 8, run-twice test).
 4. `SOPS_AGE_KEY` unset (environment not yet configured) → the secret hook does nothing and says so in the report, and the Linear skills fail closed (Task 8, unset-key test).
 5. An attached repository without `apm.yml`, or a session with no attached repository → the repository-context hook skips it (Task 7, no-`apm.yml` test).
@@ -82,35 +82,30 @@ Session-time work (repository context, D3; Linear secrets, D5) runs from hooks w
 - [ ] **Step 4: Build and inspect** — on magnetite, `nix build .#homeConfigurations."claude-sandbox@x86_64-linux".activationPackage -o /tmp/cs`; then `cmp /tmp/cs/home-files/.claude/CLAUDE.md <crs58's>`, `ls /tmp/cs/home-files/.claude/skills | wc -l` against `skills.json` minus the excluded skills, `ls /tmp/cs/home-path/bin` contains every tool above, and `ls -a /tmp/cs/home-files/.claude` contains none of the harness-owned names. Record `nix path-info -S /tmp/cs` in the pull request.
 - [ ] **Step 5: Commit** — `feat(home): add the claude-sandbox configuration`.
 
-### Task 4: CI check and pointer (tasks.md 3.1, 3.3)
+### Task 4: CI check and the generated setup script (tasks.md 3.1, 3.3)
 
 **Files:**
-- Create: `modules/checks/claude-sandbox.nix`, `bootstrap/claude-sandbox/activation.json`, `modules/apps/claude-sandbox-pointer.sh` (registered as `apps.claude-sandbox-pointer`)
+- Modify: `modules/checks/home.nix` (add `claude-sandbox` to the x86_64-linux homes)
+- Create: `modules/apps/claude-sandbox-setup-script.nix`, `modules/checks/claude-sandbox-setup-script.nix`
 
 **Interfaces:**
-- Produces: `checks.x86_64-linux.claude-sandbox-activation` (the activation package itself) and `checks.x86_64-linux.claude-sandbox-pointer` (fails unless `activation.json`'s `.activationPackage` equals the evaluated store path); `nix run .#claude-sandbox-pointer` rewrites `activation.json` as `{"activationPackage": "<store path>", "system": "x86_64-linux"}`.
+- Produces: `checks.x86_64-linux.home-manager-claude-sandbox` (the activation package itself), `flake.lib.claudeSandboxSetupScript.text`, `apps.claude-sandbox-setup-script` (prints the text), and `checks.x86_64-linux.claude-sandbox-setup-script` (evaluation-time asserts: at most 100 lines of at most 200 bytes, `exit 0` last, `P=` the path `home-manager-claude-sandbox` builds).
 
-- [ ] **Step 1: Write the pointer check and a mutant test** — the check reads `bootstrap/claude-sandbox/activation.json` with `builtins.fromJSON (builtins.readFile ...)`; a mutant with a changed hash must fail.
-- [ ] **Step 2: Run** `nix build .#checks.x86_64-linux.claude-sandbox-pointer` with no pointer file. Expected: FAIL.
-- [ ] **Step 3: Implement the app and generate the pointer.**
-- [ ] **Step 4: Run both checks.** Expected: PASS; then change only `activation.json`'s whitespace and confirm `nix eval .#homeConfigurations."claude-sandbox@x86_64-linux".activationPackage.outPath` is unchanged (S4).
-- [ ] **Step 5: Commit** — `feat(checks): build and point at the claude-sandbox activation package`; after merge, confirm `nix path-info --store https://cache.scientistexperience.net <path>` answers.
+- [ ] **Step 1: Show the setup-script check absent and failing** — on the parent revision it does not exist; with the app in place, mutants (no `exit 0`, a 215-byte line, 101 lines, `P` set to `ubuntu`'s activation package) each fail evaluation.
+- [ ] **Step 2: Implement the app and run the check.** Expected: PASS.
+- [ ] **Step 3: Commit** — `feat(claude-sandbox): build the profile in CI and generate its setup script`; after merge, confirm `nix path-info --store https://cache.scientistexperience.net <path>` answers.
 
-### Task 5: The bootstrap sub-flake (tasks.md 3.2, 5.1)
+### Task 5: The bootstrap report and the container test (tasks.md 3.2, 5.1)
 
 **Files:**
-- Create: `bootstrap/claude-sandbox/flake.nix`, `bootstrap/claude-sandbox/bootstrap.sh`, `bootstrap/claude-sandbox/README.md`
+- Modify: `modules/home/sandbox/default.nix` (option `vanixiets.sandbox.bootstrapReport`), `modules/home/users/claude-sandbox/default.nix` (enable it)
 
 **Interfaces:**
-- Consumes: `activation.json` (Task 4).
-- Produces: `apps.x86_64-linux.default`, a `writeShellApplication` `claude-sandbox-bootstrap` that: records start time, `nix --version` and the pointer to `/var/log/claude-sandbox-bootstrap/report.md`; runs `nix-store --realise <path> --option extra-substituters https://cache.scientistexperience.net --option extra-trusted-public-keys <key>` under `timeout`; on success, `USER=root <path>/activate`; records each step's exit code and duration; exits 0 on every path.
-  A second run with the same store path already activated records "already active" and does nothing else.
+- Produces: a home-manager activation step that writes `/var/log/claude-sandbox-bootstrap/report.json` (time, generation, closure size, `home-files` entries two levels deep, skill count, `home-path/bin` names) and appends `run.log`, never failing the activation; off unless enabled, so `ubuntu`'s activation package is unchanged.
 
-- [ ] **Step 1: Write the container test** `bootstrap/claude-sandbox/test.sh`: in an Ubuntu 24.04 container with Nix 2.34.6 installed single-user, (a) a cache miss (pointer to a nonexistent hash) must exit 0 and leave `report.md` naming the path and `activate` not run; (b) a hit must exit 0 with `/root/.claude/CLAUDE.md` present; (c) a second run must change no file but the report.
-- [ ] **Step 2: Run it.** Expected: FAIL (no app).
-- [ ] **Step 3: Implement the flake and script.**
-- [ ] **Step 4: Run the test** and `nix flake metadata ./bootstrap/claude-sandbox --json | jq '[.locks.nodes[] | .locked.type?] | unique'`. Expected: PASS; no `github`.
-- [ ] **Step 5: Commit** — `feat(bootstrap): substitute and activate the claude-sandbox profile`.
+- [ ] **Step 1: Container test** on magnetite: an Ubuntu 24.04 image with Nix 2.34.6 installed single-user, no daemon; (a) run the generated script twice: the second run changes nothing but files under `/var/log/claude-sandbox-bootstrap`; (b) with `cache.scientistexperience.net` mapped to 127.0.0.1 in `/etc/hosts`, the script exits 0 and its marker line records the failed realise.
+- [ ] **Step 2: Compare `ubuntu`'s activation package derivation** before and after. Expected: identical.
+- [ ] **Step 3: Commit** with Task 4.
 
 ### Task 6: First bootstrap test and probe P4 (tasks.md 3.4–3.6)
 
@@ -118,7 +113,7 @@ Session-time work (repository context, D3; Linear secrets, D5) runs from hooks w
 - Create: `logs/claude-sandbox/prompt-bootstrap1.md`
 - Modify: `openspec/changes/bootstrap-claude-sandbox/design.md` (assumption table)
 
-- [ ] **Step 1: Write the controller prompt** modelled on `prompt-session2.md`: swap `nix-sandbox-test`'s setup step to the one pinned line at the merged revision, create child E, then child E2 with no change, and restore; each child reports its first-context check (user context marker heading, a named composed skill listed and loaded), `report.md`, `echo $PATH`, `<tool> --version` for each R12 tool, whether `~/.claude/settings.json`'s SessionStart hook ran (a hook that appends `date`, `$PATH` and `${CLAUDE_ENV_FILE:+set}` to `/var/log/claude-sandbox-bootstrap/hook.log`), and the names of environment variables visible to the hook and the shell.
+- [ ] **Step 1: Write the controller prompt** modelled on `prompt-session2.md`: swap `nix-sandbox-test`'s setup step to the script `nix run .#claude-sandbox-setup-script` prints at the merged revision, create child E, then child E2 with no change, and restore; each child reports its first-context check (user context marker heading, a named composed skill listed and loaded), `report.json` and `setup.log`, `echo $PATH`, `<tool> --version` for each R12 tool, whether `~/.claude/settings.json`'s SessionStart hook ran (a hook that appends `date`, `$PATH` and `${CLAUDE_ENV_FILE:+set}` to `/var/log/claude-sandbox-bootstrap/hook.log`), and the names of environment variables visible to the hook and the shell.
 - [ ] **Step 2: The operator starts the controller session** with that prompt and accepts its approval cards.
 - [ ] **Step 3: Record** E's setup duration against 360 s, E2's start without setup, and S6, S7 and S8's outcomes in design.md.
 - [ ] **Step 4: If S6 failed**, add to the bootstrap the PATH route the observation supports (links into `/usr/local/bin`, or a `CLAUDE_ENV_FILE` line from the hook), repeat Steps 2–3.
@@ -131,9 +126,9 @@ Session-time work (repository context, D3; Linear secrets, D5) runs from hooks w
 
 **Interfaces:**
 - Consumes: `apm-context-compile` (store path), P4's outcome.
-- Produces: a SessionStart hook `claude-sandbox-repo-context` that, for each `/home/user/*/apm.yml`, runs `apm-context-compile --auto --if-stale` in that repository, appends one line per repository to `report.md`, and exits 0.
+- Produces: a SessionStart hook `claude-sandbox-repo-context` that, for each `/home/user/*/apm.yml`, runs `apm-context-compile --auto --if-stale` in that repository, appends one line per repository to `/var/log/claude-sandbox-bootstrap/run.log`, and exits 0.
 
-- [ ] **Step 1: Write the test** in `bootstrap/claude-sandbox/test.sh`: with `~/.claude/CLAUDE.md` present, a repository with `apm.yml` gets `AGENTS.md` and `.agents/.context-compile-key` naming the `default` tier; a repository without `apm.yml` is skipped; a second run changes nothing.
+- [ ] **Step 1: Write the test** in the magnetite container of Task 5: with `~/.claude/CLAUDE.md` present, a repository with `apm.yml` gets `AGENTS.md` and `.agents/.context-compile-key` naming the `default` tier; a repository without `apm.yml` is skipped; a second run changes nothing.
 - [ ] **Step 2: Run it.** Expected: FAIL.
 - [ ] **Step 3: Implement the hook.**
 - [ ] **Step 4: Run it**, then repeat Task 6's loop with vanixiets attached and check no `~/.claude/CLAUDE.md` heading appears in its `AGENTS.md`. Expected: PASS.
@@ -159,8 +154,8 @@ Session-time work (repository context, D3; Linear secrets, D5) runs from hooks w
 
 ### Task 9: Default environment, cleanup and integration (tasks.md 7, 8)
 
-- [ ] **Step 1: README** for `bootstrap/claude-sandbox` and the profile: the pinned-line format, the controller loop, the approval-card cost, the operator steps.
-- [ ] **Step 2: Integration round** from a controller session: 8.1 (all of R1, R7, R8, R12, R14), 8.2 (pointer to a missing path: session starts, report names it), 8.3 (harness-owned names and sizes match a session with no setup step), 8.4 (operator actions counted).
-- [ ] **Step 3: Switch the default environment** to the pinned line (one approval card).
+- [ ] **Step 1: README** for the profile: `nix run .#claude-sandbox-setup-script`, the 30-day renewal, the controller loop, the approval-card cost, the operator steps.
+- [ ] **Step 2: Integration round** from a controller session: 8.1 (all of R1, R7, R8, R12, R14), 8.2 (a setup script whose `P` the cache lacks: session starts, its marker line names it), 8.3 (harness-owned names and sizes match a session with no setup step), 8.4 (operator actions counted).
+- [ ] **Step 3: Switch the default environment** to the generated setup script (one approval card), and renew it at least every 30 days.
 - [ ] **Step 4: Delete the scratch report branches** listed in tasks.md 7.3.
 - [ ] **Step 5: Commit** — `docs(claude-sandbox): document the cloud environment bootstrap`.

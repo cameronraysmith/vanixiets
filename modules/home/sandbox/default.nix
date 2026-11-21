@@ -38,7 +38,70 @@
         '';
       };
 
+      options.vanixiets.sandbox.bootstrapReport = {
+        enable = lib.mkEnableOption ''
+          a bootstrap report written at the end of every activation: the
+          generation, the time, its closure size and what it delivered, as
+          `report.json` (replaced) and one line of `run.log` (appended) under
+          `directory`. For a sandbox whose setup step activates as root and
+          whose controller reads the report back; the directory must be
+          writable by the activating user
+        '';
+        directory = lib.mkOption {
+          type = lib.types.str;
+          default = "/var/log/claude-sandbox-bootstrap";
+          description = "Directory holding `report.json` and `run.log`.";
+        };
+      };
+
       config = {
+        # Whitelisted fields only: store paths, names, counts and the time; no
+        # environment, no file content. Never fails the activation, and only
+        # ever touches its own two files, so a second activation of the same
+        # generation changes nothing else (R11).
+        home.activation.vanixietsBootstrapReport =
+          lib.mkIf config.vanixiets.sandbox.bootstrapReport.enable
+            (
+              lib.hm.dag.entryAfter
+                [
+                  "writeBoundary"
+                  "linkGeneration"
+                  "installPackages"
+                  "sopsInstallWithoutSystemd"
+                ]
+                ''
+                  vanixietsBootstrapReport() {
+                    local dir=${lib.escapeShellArg config.vanixiets.sandbox.bootstrapReport.directory}
+                    local files="$newGenPath/home-files" closure=null
+                    mkdir -p "$dir" || return 1
+                    if command -v nix-store >/dev/null; then
+                      closure=$(nix-store --query --requisites "$newGenPath" \
+                        | ${pkgs.findutils}/bin/xargs nix-store --query --size \
+                        | ${pkgs.gawk}/bin/awk '{ s += $1 } END { print s + 0 }') || closure=null
+                    fi
+                    ${lib.getExe pkgs.jq} -n \
+                      --arg time "$(date -u +%FT%TZ)" \
+                      --arg generation "$newGenPath" \
+                      --argjson closure_bytes "$closure" \
+                      --argjson home_files "$(${pkgs.findutils}/bin/find "$files/" -mindepth 1 -maxdepth 2 -printf '%P\n' | sort | ${lib.getExe pkgs.jq} -R . | ${lib.getExe pkgs.jq} -s -c .)" \
+                      --argjson skills "$(${pkgs.findutils}/bin/find "$files/.claude/skills" -mindepth 1 -maxdepth 1 2>/dev/null | wc -l)" \
+                      --argjson bin "$(${pkgs.findutils}/bin/find "$newGenPath/home-path/bin" -mindepth 1 -maxdepth 1 -printf '%f\n' | sort | ${lib.getExe pkgs.jq} -R . | ${lib.getExe pkgs.jq} -s -c .)" \
+                      '{time: $time, generation: $generation, closure_bytes: $closure_bytes,
+                        activated: {home_files: $home_files, skills: $skills, bin: $bin}}' \
+                      >"$dir/report.json.tmp" || return 1
+                    mv "$dir/report.json.tmp" "$dir/report.json" || return 1
+                    printf '%s activated generation=%s closure_bytes=%s\n' \
+                      "$(date -u +%FT%TZ)" "$newGenPath" "$closure" >>"$dir/run.log"
+                  }
+                  if [[ -v DRY_RUN ]]; then
+                    verboseEcho "Would write the bootstrap report"
+                  else
+                    vanixietsBootstrapReport || warnEcho "Could not write the bootstrap report"
+                  fi
+                  unset -f vanixietsBootstrapReport
+                ''
+            );
+
         # The host owns ~/.bashrc and ~/.bash_profile and may rewrite them at
         # session start, and agent shells are non-interactive, so home-manager's
         # bash configuration is unreachable here and only collides with them.

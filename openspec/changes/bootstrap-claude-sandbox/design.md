@@ -27,7 +27,7 @@ The terms are defined in `specs/world-assumptions`, requirement `Grounded vocabu
 | cloud session | shared | not the `session` rows (autonomous episode, Pi's stored record) |
 | cloud environment | shared | the platform's named definition, not a nix `environment` attribute |
 | container | shared | the platform VM, not an OCI container or `modules/checks/containers.nix` |
-| setup step | shared | the platform's script slot; the one pinned line lives there |
+| setup step | shared | the platform's script slot; the generated setup script (D2) lives there |
 | environment snapshot | shared | the platform's disk copy, not `automatic snapshot` (ZFS) |
 | first prompt | shared | |
 | user context | shared | world sense; the machine artifact is `~/.claude/CLAUDE.md` from `programs.agents-md` |
@@ -92,7 +92,7 @@ The proxy re-terminates TLS and its CA is in the system bundle Nix uses (V15, C3
 | S1 | The snapshot is rebuilt when the setup script or allowed hosts change and expires after about seven days (C12, documented). | A session after a script change starts from the old snapshot, or a snapshot outlives the documented expiry with stale content the operator did not expect. | R2 |
 | S2 | Home-manager activation as root, with `USER` exported and no systemd, completes (PA2). | The first bootstrap run's activation exits non-zero or its report shows a skipped required step. | R1, R12 |
 | S3 | Root, as a trusted user, can name `cache.scientistexperience.net` and its key with `--option` and substitute from it (A177, V21). | The first bootstrap run's substitution refuses the substituter or the signature. | R1, R4 |
-| S4 | The activation package's store path does not depend on the bootstrap sub-flake's pointer file or on the commit, so a revision can carry its own pointer. | The pointer check fails on a commit that changes only the pointer. | R2 |
+| S4 | Dropped 2026-11-21 by Q91: it concerned the bootstrap sub-flake's committed pointer file, which D2 no longer has. | — | — |
 | S5 | The profile's closure, substituted and activated, fits the 360 s and 64 GB measured bounds. | The first bootstrap run exceeds 360 s or the disk fills. | R4 |
 | S6 | `/root/.nix-profile/bin` (or the profile home-manager activates) is on the agent's shell PATH (PA1 found it was not, in 2026-09). | Probe P4 shows it missing. | R12 |
 | S7 | A SessionStart hook declared in a setup-written `~/.claude/settings.json` runs in cloud sessions, and `CLAUDE_ENV_FILE` is set inside it (PA1, C13). | Probe P4 shows the hook did not run. | R8, R14 |
@@ -138,18 +138,21 @@ All five decisions were authorized by the operator on 2026-11-21 as recommended.
   Vendored-versus-first-party: the skill corpus keeps its vendored skills exactly as composed for other hosts; no vendored skill is edited.
   `ubuntu`'s activation package should be unchanged by the refactor except for store-path churn; that is checked, not assumed.
 
-### D2: CI-built activation package, substituted by a pinned bootstrap sub-flake — DECIDED 2026-11-21
+### D2: CI-built activation package, named by store path in a generated setup script — DECIDED 2026-11-21, REVISED by Q91 2026-11-21
 
-- **Choice**: one `checks.x86_64-linux` attribute builds `claude-sandbox@x86_64-linux`'s activation package, so nixbot builds it and its binary-cache uploader publishes it to `cache.scientistexperience.net`.
-  `bootstrap/claude-sandbox` (channels-only input, as in the probe flake) carries a generated pointer file holding that store path; a check fails when the pointer differs from the evaluated store path.
-  The bootstrap app realises the store path with `cache.scientistexperience.net` and its key passed as options, exports `USER=root`, runs the activation, writes the bootstrap report under `/var/log/claude-sandbox-bootstrap/`, and exits 0 on every path.
-  The setup step is one line: `nix run "git+https://github.com/cameronraysmith/vanixiets?rev=<sha>&shallow=1&dir=bootstrap/claude-sandbox"; exit 0`.
-  No evaluation of the main flake and no secret in the sandbox.
-  On a cache miss or any failure, it degrades: it activates nothing partial, writes a report naming the failure, and exits 0.
-- **Rationale**: A175 rules out `github:` inputs; A176 shows the outer half works in 23 s; prefetching 94 inputs and evaluating cost 75 s plus 37 s and three inputs mismatched (V18–V20), and M3 would still need github for the skill corpus.
+- **Choice**: one `checks.x86_64-linux` attribute, `home-manager-claude-sandbox` (`modules/checks/home.nix`), builds `claude-sandbox@x86_64-linux`'s activation package, so nixbot builds it and its binary-cache uploader publishes it to `cache.scientistexperience.net`.
+  The setup script is generated, not committed: `nix run .#claude-sandbox-setup-script` prints it for the current commit, with the commit and its date as a provenance comment and the activation package's store path as `P`.
+  The script realises `P` with `nix-store --realise`, naming `cache.scientistexperience.net` and `cache.nixos.org` and their keys (taken from `lib/caches.nix`) as options, runs `USER=root HOME=/root timeout 240 "$P/activate"` unless `P` is already the current home-manager generation, appends one marker line with the realise and activate exit codes and durations to `/var/log/claude-sandbox-bootstrap/setup.log`, and ends in `exit 0`.
+  The bootstrap report is configuration: `vanixiets.sandbox.bootstrapReport`, a home-manager activation step of the `sandbox` aggregate, enabled for `claude-sandbox` only, writes `report.json` and appends `run.log` in the same directory.
+  The `claude-sandbox-setup-script` check holds the generated script to A175's limits (100 lines of 200 bytes), to `exit 0` as its last line, and to the store path `home-manager-claude-sandbox` builds.
+  No evaluation of any flake and no secret in the sandbox.
+  On a cache miss or any failure, it degrades: nothing is activated after a failed realise, the marker line records the failure, and the script exits 0.
+  Liveness: niks3 drops a closure 30 days after its last reference, so the setup step is regenerated and swapped at least monthly, even when nothing else changed.
+- **Rationale**: A175 rules out `github:` inputs; prefetching 94 inputs and evaluating cost 75 s plus 37 s and three inputs mismatched (V18–V20), and M3 would still need github for the skill corpus.
   A170 makes exit 0 mandatory.
-- **Alternatives considered**: prefetch and evaluate in the sandbox (slow, GitHub-dependent, mismatches); a branch ref instead of a revision (never invalidates the snapshot, S1); an environment variable as the revision switch (setup cannot read variables, A172).
-- **Boundaries**: source-versus-delivered: the pointer file is a generated, committed artifact derived from the profile; it is never edited by hand, and the check is its regulator.
+  Q91 (operator, 2026-11-21): the environment consumes a closure, and CI is already the function from a commit to that closure, so the setup step names the closure and records the commit as its provenance; the bootstrap sub-flake first chosen here (with a committed pointer file, its check and assumption S4) was a redundant second evaluator of the same function, and is dropped.
+- **Alternatives considered**: prefetch and evaluate in the sandbox (slow, GitHub-dependent, mismatches); a channels-only bootstrap sub-flake carrying a pointer file (superseded by Q91, above); a branch ref instead of a revision (never invalidates the snapshot, S1); an environment variable as the revision switch (setup cannot read variables, A172).
+- **Boundaries**: source-versus-delivered: the profile is source; the activation package is the delivered artifact; the setup script is generated from the commit and is never committed, and the `claude-sandbox-setup-script` check is its regulator.
 
 ### D3: repository context from a SessionStart hook — DECIDED 2026-11-21 (wiring gated on P4)
 
@@ -187,25 +190,26 @@ All five decisions were authorized by the operator on 2026-11-21 as recommended.
 
 Obstacles, each the negation of a goal:
 - [Risk] The platform rewrites or claims files under `~/.claude` that the profile writes (negates R1, R5). → Mitigation: the profile writes only `CLAUDE.md`, per-skill directories and `settings.json`, none of which the platform was seen to own (A178); the bootstrap report lists harness-owned paths before and after, and a session-start line checks the user context is still present.
-- [Risk] The activation package misses the cache (negates R1, R4). → Mitigation: D2's check makes it a CI output on every revision; the pointer check stops a stale pointer from merging; the bootstrap degrades and reports.
-- [Risk] The setup step exits non-zero (negates R3). → Mitigation: the line ends in `exit 0`, the app wraps every step, and a deliberately broken revision is part of the integration tests.
+- [Risk] The activation package misses the cache (negates R1, R4). → Mitigation: D2's check makes it a CI output on every revision; the setup-script check ties the script's store path to that check's output; the script degrades and records the miss.
+- [Risk] niks3 drops the named closure 30 days after its last reference (negates R1, R2). → Mitigation: the liveness rule in D2: regenerate and swap the setup step at least monthly.
+- [Risk] The setup step exits non-zero (negates R3). → Mitigation: the script sets no `set -e` and ends in `exit 0`, the setup-script check holds that last line, and a deliberately broken revision is part of the integration tests.
 - [Risk] Hook commands are not on PATH (negates R8, R14). → Mitigation: D4; P4 measures it before D3's wiring is relied on.
-- [Risk] The snapshot holds a stale pointer (negates R2). → Mitigation: the pointer is in the pinned revision, a revision change is a setup script change, and a setup script change rebuilds the snapshot (S1); the bootstrap report records the revision it ran.
+- [Risk] The snapshot holds a stale closure (negates R2). → Mitigation: the store path is in the setup script itself, so a new closure is a setup script change, and a setup script change rebuilds the snapshot (S1); the marker line records the revision it ran.
 - [Risk] The closure exceeds the measured 360 s (negates R4). → Mitigation: measure in the first bootstrap test; trim the tool set before raising the bound.
-- [Risk] The base image's Nix changes (A177, PA3). → Mitigation: the report records `nix --version` and the configuration it saw.
+- [Risk] The base image's Nix changes (A177, PA3). → Mitigation: the setup script's marker line records the Nix version it ran with.
 - [Trade-off] The age key is readable by anything in the session (D5) → accepted because the file it opens is scoped to keys the operator can rotate.
 - [Trade-off] Each environment update costs one approval card → accepted; it is what makes the update reviewed.
 
 ## Satisfaction argument (W ∧ S ⇒ R)
 
-S is the specification the machine meets: D1's profile, D2's sub-flake, check, pointer and shim, D3's hook, D4's paths and D5's secret path.
+S is the specification the machine meets: D1's profile, D2's check, generated setup script and report step, D3's hook, D4's paths and D5's secret path.
 
 | R | Discharged by S | Resting on W (A) and assumptions (S) |
 |---|---|---|
 | R1 Context and skills from the first prompt | D1 writes `~/.claude/CLAUDE.md` and `~/.claude/skills/<n>` at activation; D2 activates in setup | A167, A168, A172, A174, A178; S2, S3 |
-| R2 One pinned line defines the environment | D2's one-line shim and in-revision pointer | A175, A176, A177; S1, S4 |
+| R2 One closure defines the environment | D2's generated setup script naming the closure by store path, with its revision as provenance | A175, A177; S1 |
 | R3 Setup never prevents a session from starting | D2's `exit 0` and degrade-on-failure | A170 (why it is needed) |
-| R4 Setup finishes within the snapshot window | D2 substitutes instead of evaluating | A169, A176, A174; S3, S5 |
+| R4 Setup finishes within the snapshot window | D2 substitutes instead of evaluating | A169, A174; S3, S5 |
 | R5 Additive to harness-owned state | D1 writes only its own paths | A178 |
 | R6 No secret at rest | D2 carries no secret; D5 decrypts into `/dev/shm` at session start | A172; S8 |
 | R7 Every bootstrap run reports | D2's report; D3 appends to it | A179 (the controller reads it) |
@@ -222,15 +226,15 @@ R8 and R14 are not discharged until P4 settles S7 and S8.
 ## Migration Plan
 
 1. Land D1 and D4; `ubuntu`'s behaviour is unchanged, checked by comparing its rendered files before and after.
-2. Land D2's check and sub-flake; wait for nixbot to build and publish the activation package.
+2. Land D2's checks, report step and setup-script app; wait for nixbot to build and publish the activation package.
 3. Run the first bootstrap test from a controller session on `nix-sandbox-test`, including P4.
 4. Land D3, wired as P4 allows.
 5. The D5 key, recipient and `SOPS_AGE_KEY` exist (2026-11-21); add `api.linear.app` to the allowed hosts; on stibnite, add the recipient to `.sops.yaml` and create the scoped file; land the profile's secret declarations.
-6. Switch the operator's default cloud environment to the pinned line.
-Rollback: replace the setup step with the previous line (one approval card); the environment snapshot is rebuilt from it.
+6. Switch the operator's default cloud environment to the generated setup script, and regenerate it at least monthly (D2's liveness rule).
+Rollback: replace the setup step with the previous script (one approval card); the environment snapshot is rebuilt from it.
 
 ## Open Questions
 
 - P4 (S6, S7, S8), run within the first bootstrap test.
 - The setup step's real time ceiling above 360 s.
-- The activation package's closure size and substitution time.
+- The activation package's substitution time in a cloud session; in a container on magnetite (task 5.1, 2026-11-21) the closure was 4,923,527,456 bytes, and fetching it took 11.3 s for 1,505,989,543 bytes received, of which chromium, the two playwright chromium builds and mermaid-cli were about 534 MB compressed (Q90).

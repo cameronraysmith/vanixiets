@@ -133,7 +133,7 @@ Any requirement whose discharge depends on this fact SHALL name it explicitly, a
 #### Scenario: The gate or the allowlist changes
 
 - **WHEN** anonymous git reads of public repositories are refused, the channels or an allowlisted cache stop answering, or the gate stops refusing archives
-- **THEN** this assumption is void, and the `claude-sandbox-bootstrap` requirements `One pinned line defines the environment` and `Attached repositories get their repository context` lose their discharge, or in the last case gain simpler designs
+- **THEN** this assumption is void, and the `claude-sandbox-bootstrap` requirements `One closure defines the environment` and `Attached repositories get their repository context` lose their discharge, or in the last case gain simpler designs
 
 ### Requirement: A176 — A pinned remote `git+https` sub-flake runs from the setup step in about 23 seconds
 
@@ -148,7 +148,7 @@ Any requirement whose discharge depends on this fact SHALL name it explicitly, a
 #### Scenario: The pinned remote run fails or slows
 
 - **WHEN** a pinned `git+https` run of a channels-only sub-flake fails from the setup step, or takes long enough that the bootstrap exceeds the measured setup bound
-- **THEN** this assumption is void, and the `claude-sandbox-bootstrap` requirements `One pinned line defines the environment` and `Setup finishes within the snapshot window` lose their discharge
+- **THEN** this assumption is void; since Q91 (2026-11-21) the setup step names a closure instead of running a sub-flake, so no `claude-sandbox-bootstrap` requirement rests on it
 
 ### Requirement: A177 — Nix is preinstalled single-user, with root trusted and only cache.nixos.org configured
 
@@ -163,7 +163,7 @@ Any requirement whose discharge depends on this fact SHALL name it explicitly, a
 #### Scenario: The base image's Nix changes
 
 - **WHEN** a fresh container's Nix version, installer, store, trusted users or configured caches differ from the above
-- **THEN** this assumption is void, and the `claude-sandbox-bootstrap` requirements `One pinned line defines the environment` and `Setup finishes within the snapshot window` must be re-checked against the new base image
+- **THEN** this assumption is void, and the `claude-sandbox-bootstrap` requirements `One closure defines the environment` and `Setup finishes within the snapshot window` must be re-checked against the new base image
 
 ### Requirement: A178 — The platform owns part of `/root/.claude` and leaves setup-written files beside it
 

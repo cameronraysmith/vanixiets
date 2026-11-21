@@ -19,7 +19,7 @@ attempt_log:
 
 Claude Code cloud sessions (claude.ai/code, on Anthropic-hosted environments) start without the operator's context, skills or tools, so every cloud session works below the standard of a local one.
 Probes on 2026-11-21 showed the platform honours context and skills that the environment's setup step installs, caches that setup for later sessions, and lets a cloud session drive fresh sessions and read their results.
-The repository already generates the context, composes the skills and packages the tools for its other hosts, so one pinned line can bring the same agent environment to cloud sessions without a second copy of any of it.
+The repository already generates the context, composes the skills and packages the tools for its other hosts, and CI already builds them into a closure, so one setup script naming that closure can bring the same agent environment to cloud sessions without a second copy of any of it.
 
 ## What Changes
 
@@ -29,9 +29,9 @@ The repository already generates the context, composes the skills and packages t
 - Reason: cloud sessions should follow the same instructions and have the same skills as local sessions.
 - Impact: non-breaking; affects only cloud environments whose setup step names this repository.
 
-**Environment defined by one pinned line**
+**Environment defined by one closure**
 - From: the environment's setup script is hand-written shell edited in the claude.ai settings.
-- To: the setup script is one line naming one revision of this repository; everything else is defined here and updated by changing that revision.
+- To: the setup script is generated from a revision of this repository and names that revision's closure by store path; everything else is defined here and updated by regenerating the script, at least monthly so the cache still holds the closure.
 - Reason: the environment is reviewed, versioned and reproducible like the rest of the fleet.
 - Impact: non-breaking; each update costs the operator one approval.
 
@@ -61,7 +61,7 @@ The interface's shared phenomena (where the required tools appear to the agent's
 ## Impact
 
 - New home configuration and a shared sandbox aggregate factored from the `ubuntu` profile (D1), under `modules/home/`.
-- A bootstrap sub-flake under `bootstrap/claude-sandbox/` and one CI check that builds and caches the profile's activation package (D2).
+- One CI check that builds and caches the profile's activation package, an app that prints the setup script naming it, a check holding that script to the platform's limits, and a bootstrap report written by the profile's activation (D2, revised by Q91 on 2026-11-21).
 - A SessionStart hook for the repository tier (D3), a change to `modules/home/ai/claude-code/hooks.nix` (D4), and a scoped sops file, age recipient and `.sops.yaml` rule (D5).
-- The operator's cloud environment `nix-sandbox-test`, and later the default environment, whose setup script becomes the one pinned line, whose variables gain `SOPS_AGE_KEY`, and whose allowed hosts gain `api.linear.app`.
+- The operator's cloud environment `nix-sandbox-test`, and later the default environment, whose setup script becomes the generated one, whose variables gain `SOPS_AGE_KEY`, and whose allowed hosts gain `api.linear.app`.
 - Existing hosts: `ubuntu@x86_64-linux` imports the factored aggregate with unchanged behaviour; D4 changes every Claude Code host's hook commands from bare names to store paths.

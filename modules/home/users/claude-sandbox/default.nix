@@ -16,6 +16,10 @@ let
 
       vanixiets.sandbox.sopsDir = "/dev/shm/claude-sandbox-sops";
 
+      # The cloud environment's setup script (`nix run .#claude-sandbox-setup-script`)
+      # activates as root, and a controller session reads this report back.
+      vanixiets.sandbox.bootstrapReport.enable = true;
+
       # vcs-author's default looks up flake.users.<home.username>, and root is no
       # flake user.
       vcs.author = flake.lib.vcsAuthor flake.users.claude-sandbox.meta;

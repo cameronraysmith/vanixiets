@@ -29,6 +29,11 @@
 # janettesmith (rosegold) and cameron (alias). Revisit this list when host
 # user assignments or `flake.users` change.
 #
+# claude-sandbox is embedded in no host; its check is also what makes nixbot
+# build the activation package and niks3 publish it to
+# cache.scientistexperience.net, where Claude Code cloud sessions substitute
+# it by store path (`nix run .#claude-sandbox-setup-script`).
+#
 # The key set is a literal per system so computing `checks.<system>` names
 # never forces `flake.users` aggregates, machine configurations, or `pkgs`.
 #
@@ -49,6 +54,7 @@ let
     x86_64-linux = [
       "crs58"
       "christophersmith"
+      "claude-sandbox"
       "janettesmith"
       "raquel"
       "ubuntu"

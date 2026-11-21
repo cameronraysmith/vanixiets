@@ -15,20 +15,26 @@ Providing them SHALL take no work in that cloud session beyond reading files alr
 - **WHEN** a cloud session starts in a container whose setup step has just run
 - **THEN** its first prompt shows the user context and lists the skill corpus
 
-### Requirement: One pinned line defines the environment
+### Requirement: One closure defines the environment
 
-The operator's cloud environment's setup step SHALL be one line naming one pinned revision of this repository.
-Everything a cloud session receives from this repository SHALL be determined by that pinned revision alone.
+The operator's cloud environment's setup step SHALL name one closure, the activation package this repository builds for cloud sessions, by its store path, and SHALL record the pinned revision that produced it as provenance.
+Everything a cloud session receives from this repository SHALL be determined by that closure alone, and the setup step SHALL NOT evaluate any flake.
+The setup step SHALL be renewed at least every 30 days, so that the fleet's binary cache, which drops a closure 30 days after its last reference, still holds the closure it names.
 
-#### Scenario: Two sessions on one pinned revision
+#### Scenario: Two sessions on one closure
 
-- **WHEN** two cloud sessions start on cloud environments whose setup steps name the same pinned revision
+- **WHEN** two cloud sessions start on cloud environments whose setup steps name the same store path
 - **THEN** they receive the same user context, skill corpus and required tools
 
 #### Scenario: Updating the environment
 
 - **WHEN** the operator updates what cloud sessions receive
-- **THEN** the only change to the cloud environment is the pinned revision its setup step names
+- **THEN** the only change to the cloud environment is its setup step, replaced by the one generated for a new pinned revision, which names that revision's closure
+
+#### Scenario: A month without changes
+
+- **WHEN** 30 days pass since the setup step was last renewed
+- **THEN** the setup step has been regenerated and swapped, so its closure is still in the fleet's binary cache
 
 ### Requirement: Setup never prevents a session from starting
 
