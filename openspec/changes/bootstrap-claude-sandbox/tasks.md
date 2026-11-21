@@ -94,7 +94,8 @@ D2 was revised by Q91 on 2026-11-21 (design.md D2): the bootstrap sub-flake and 
 - [x] 7.1 Document the cloud environment, the generated setup script, the controller loop, the operator steps and the monthly renewal in the profile's README — verify: the README exists and names `nix run .#claude-sandbox-setup-script`, the approval-card cost and the 30-day renewal.
   Done 2026-11-21: `modules/home/users/claude-sandbox/README.md`.
 - [ ] 7.2 Switch the operator's default cloud environment's setup step to the generated setup script, and renew it at least every 30 days (D2's liveness rule: niks3 drops a closure 30 days after its last reference) — verify: `get_environment` on it shows the script; a new session on it passes 8.1.
-- [ ] 7.3 Delete the scratch probe report branches once this change has landed: `claude/sandbox-reports`, `sandbox-reports-plain`, `claude/sandbox-reports-s2`, `-s2A`, `-s2A2`, `-s2B`, `-s2B2`, `-s3`, `-s3C1`, `-s3C2`, `-s4`, `-s4E1`, `-s4E2`, `-s4E3`, `-s4E4` — verify: `git ls-remote --heads origin 'claude/sandbox-reports*' sandbox-reports-plain` prints nothing.
+- [x] 7.3 Delete the scratch probe report branches once this change has landed: `claude/sandbox-reports`, `sandbox-reports-plain`, `claude/sandbox-reports-s2`, `-s2A`, `-s2A2`, `-s2B`, `-s2B2`, `-s3`, `-s3C1`, `-s3C2`, `-s4`, `-s4E1`, `-s4E2`, `-s4E3`, `-s4E4` — verify: `git ls-remote --heads origin 'claude/sandbox-reports*' sandbox-reports-plain` prints nothing.
+  Done 2026-11-21 after #4121 landed: all 15 branches deleted with `git push origin --delete`, and the verify command printed nothing. `claude-sandbox-dev` (the probe flake, 7fffbd2c) is kept because design.md links it.
 
 ## 8. Integration Verification
 

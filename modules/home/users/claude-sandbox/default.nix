@@ -175,6 +175,10 @@ let
         ];
       };
 
+      # Cloud sessions clone attached repositories under /home/user, so ghq
+      # puts acquired ones beside them rather than in /root/ghq.
+      programs.git.settings.ghq.root = "/home/user/ghq";
+
       programs.openspec.enable = true;
       programs.uv.enable = true;
 
