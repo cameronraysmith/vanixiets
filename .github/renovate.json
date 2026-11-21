@@ -34,11 +34,11 @@
       "versioning": "regex:^argo-cd-(?<major>\\d+)\\.(?<minor>\\d+)\\.(?<patch>\\d+)$"
     },
     {
-      "description": "One non-major PR for the bun workspace. Every update of a dependency declared in package.json or packages/*/package.json regenerates the shared bun.lock (and, through the bun post-upgrade task below, bun.nix), so separate PRs conflict pairwise and land one per CI cycle. Matching the lock file rather than package names tracks the unit of conflict as dependencies come and go: the bun manager attaches the root bun.lock to every workspace member (lib/modules/manager/bun/extract.ts), and matchFileNames tests lock files as well as package files (lib/util/package-rules/files.ts). The coupled groups below override this one because later packageRules win, so a cloudflare-workers-tooling or astro update that breaks does not hold back routine ones; majors stay separate. npm playwright is not updated by the bun manager at all (see the playwright rules at the end).",
+      "description": "One non-major PR for the JavaScript dependencies of the bun-managed workspace; bun itself is excluded, because its packageManager entry is disabled and follows nixpkgs (see the packageManager rule below). Every update of a dependency declared in package.json or packages/*/package.json regenerates the shared bun.lock (and, through the bun post-upgrade task below, bun.nix), so separate PRs conflict pairwise and land one per CI cycle. Matching the lock file rather than package names tracks the unit of conflict as dependencies come and go: the bun manager attaches the root bun.lock to every workspace member (lib/modules/manager/bun/extract.ts), and matchFileNames tests lock files as well as package files (lib/util/package-rules/files.ts). The coupled groups below override this one because later packageRules win, so a cloudflare-workers-tooling or astro update that breaks does not hold back routine ones; majors stay separate. npm playwright is not updated by the bun manager at all (see the playwright rules at the end).",
       "matchFileNames": ["bun.lock"],
       "matchUpdateTypes": ["minor", "patch"],
-      "groupName": "bun workspace non-major",
-      "groupSlug": "bun-workspace-non-major"
+      "groupName": "javascript workspace non-major",
+      "groupSlug": "javascript-workspace-non-major"
     },
     {
       "description": "The rust nightly channel is a derived constraint (aeneas -> charon pin -> required nightly), not a free-floating dependency; surface drift on the dependency dashboard but never open a PR automatically",
