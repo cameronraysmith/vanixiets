@@ -53,9 +53,9 @@
 # instance per failing database (review F7). RuleSignalMissing's `database`
 # is the one the evaluator reads system_memory_usage_bytes from, the
 # selector `reporting` comes from. PullRequestQueueWaitBurn (design D1)
-# reads devloop's ci_build in SQL, which promtool cannot parse;
-# vmTests.x86_64-linux.devloop-ingest's burnRule case runs it on GreptimeDB
-# 1.2.1.
+# and IetsEvaluationUnhealthy read devloop's ci_build and eval_run in SQL,
+# which promtool cannot parse; vmTests.x86_64-linux.devloop-ingest's
+# burnRule and ietsHealthRule cases run them on GreptimeDB 1.2.1.
 { config, ... }:
 {
   flake.lib.fleetAlertRules =
@@ -449,6 +449,67 @@
           for = "1h";
           severity = "warning";
           annotations.summary = "More than one in ten of the at least 10 pull-request builds whose first attempt finished in the last 24 h waited over an hour to start; the value is that share";
+        }
+        # CAM-111 6.1: the safety valve's detector. Each production nixbot
+        # evaluation writes one `evaluation finished` record
+        # (nixbot-evaluation-record.patch), which the collector's
+        # journald/nixbot-eval receiver copies into devloop.eval_run
+        # (modules/nixos/devloop-collection.nix), so the rule is SQL. One
+        # instance per iets record of the last 12 h with a kill or a
+        # non-zero exit_status, the asyncio returncode of the process nixbot
+        # spawns, bwrap (Mic92/nixbot@171a8c77 nixbot/nixbot/nix_eval.py:
+        # 94-101, 659-670, with the patch's `outcome.exit_status`):
+        # - 0: a clean run, attribute errors included; nix-eval-jobs and iets
+        #   report those per attribute and exit 0 unless one is fatal, which
+        #   only a stack overflow is (numtide/iets@bd3dea00
+        #   src/cli/jobs.rs:371, src/jobs/mod.rs:224). The record carries no
+        #   attribute-error count, so such a run is a healthy record.
+        # - 1: the evaluator failed: a worker iets lost (killed, crashed or
+        #   exited), which aborts the whole run (src/jobs/collector.rs:
+        #   215-239, 408-435; worker_kills stays 0, since iets does not print
+        #   the message the patch counts), or an error iets reports, which
+        #   the classic name always exits 1 for (src/log.rs:751-761); a
+        #   flake whose root does not evaluate also exits 1.
+        # - 128+n: the evaluator died of signal n inside bwrap, which exits
+        #   bash-style (bubblewrap 0.13.1 bubblewrap.c:426-438): 137 for
+        #   SIGKILL, the kernel's OOM kill included (nixbot's
+        #   OOM_RETURN_CODES, nix_eval.py:46), and 134 for an iets panic,
+        #   since its release profile aborts (Cargo.toml:73).
+        # - -9: nixbot SIGKILLed bwrap's process group itself (nix_eval.py:
+        #   551-558, 665-673): the evaluation's wall-clock timeout, also
+        #   when the host evaluation lock's wrapper was still waiting, since
+        #   the wrapper waits without a limit (modules/lib/nix-eval-lock.sh),
+        #   or a cancellation.
+        # Every non-zero status is therefore unhealthy. A record falls out
+        # of the window 12 h after its evaluation, which resolves its
+        # instance whether or not the cause is fixed; a critical instance
+        # is re-posted only after 24 h, so it posts once.
+        #
+        # Runbook, an escalation ladder (tasks.md 6.1; operator Q88,
+        # 2026-11-21), from the build named by build_id:
+        # 1. Rebuild the build in nixbot. If it passes, record it in
+        #    verify.md as transient and stop.
+        # 2. If the same commit fails again, classify it from the labels.
+        #    Memory (worker_kills, oom_kill or budget_kills above 0) is a
+        #    capacity problem: take design D9's ladder, tuning
+        #    evalWorkerCount or evalMaxMemorySize first, not a revert.
+        #    Evaluator (a crash exit, a derivation difference, or errors
+        #    stock nix-eval-jobs does not produce on that commit, compared
+        #    with the paired-replay driver, as root on magnetite `replay.py
+        #    run COMMITS_TSV OUTDIR` with one row for the build, verify.md
+        #    4.2-4.3): fix forward, most cheaply by pinning the iets input
+        #    in flake.nix to its last good revision.
+        # 3. Revert to stock nix-eval-jobs (task 7.3's change) only if the
+        #    failure blocks merges and no fix or pin is quick, as a
+        #    deliberate decision recorded in verify.md.
+        {
+          alert = "IetsEvaluationUnhealthy";
+          database = "devloop";
+          language = "sql";
+          expr = "SELECT build_id, ts, evaluator_version, worker_kills, oom_kill, budget_kills, exit_status AS value FROM eval_run WHERE evaluator = 'iets' AND ts >= now() - INTERVAL '12 hours' AND (worker_kills > 0 OR oom_kill > 0 OR budget_kills > 0 OR exit_status <> 0)";
+          for = "0s";
+          severity = "critical";
+          annotations.summary = "A production nixbot evaluation by iets lost a worker, was killed or crashed; the value is its exit status. 1. Rebuild build_id in nixbot; if it passes, record it in verify.md as transient. 2. If it fails again: kills above 0 are capacity, so tune evalWorkerCount or evalMaxMemorySize (D9); a crash or a stock-only success (paired replay, verify.md 4.2-4.3) is fixed forward, e.g. by pinning iets to its last good revision. 3. Revert to stock (task 7.3) only if merges are blocked and no quick fix exists, recorded in verify.md (runbook in modules/nixos/fleet-alert/rules.nix). Resolves 12 h after the evaluation, not when fixed";
         }
         {
           alert = "StoreQueryFailing";

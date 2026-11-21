@@ -1047,6 +1047,92 @@
               print("ok: burnRule", flush=True)
             '';
 
+            # CAM-111 6.1's detector as fleet-alert's evaluator sends it,
+            # over eval_run rows written as admin, the fields as
+            # nixbot-evaluation-record.patch writes them. Each row's build_id
+            # names its case; the exit statuses are the rule comment's.
+            ietsAlertRule =
+              lib.findFirst (r: r.alert == "IetsEvaluationUnhealthy")
+                (throw "devloop-ingest: no IetsEvaluationUnhealthy rule")
+                (self.lib.fleetAlertRules { inherit lib; }).rules;
+            ietsHealthRule = ''
+              print("=== case ietsHealthRule", flush=True)
+              import datetime
+
+              IETS_EXPR = json.loads(${builtins.toJSON (builtins.toJSON ietsAlertRule.expr)})
+              IETS_DB = ${builtins.toJSON ietsAlertRule.database}
+              assert ${builtins.toJSON ietsAlertRule.language} == "sql", "IetsEvaluationUnhealthy is not an SQL rule"
+              assert IETS_DB == "devloop", IETS_DB
+
+              # eval_run holds exactly the rows written below.
+              reset_devloop()
+              IETS_NOW = int(store.succeed("date -u +%s").strip())
+
+
+              def iets_row(build_id, exit_status, worker_kills=0, oom_kill=0, budget_kills=0, evaluator="iets", hours_ago=1):
+                  ts = datetime.datetime.fromtimestamp(IETS_NOW - hours_ago * 3600, datetime.timezone.utc)
+                  oom = "NULL" if oom_kill is None else str(oom_kill)
+                  return (
+                      f"({build_id}, '{ts.strftime('%Y-%m-%dT%H:%M:%SZ')}', '{evaluator}', '0.2.0', 5, 3072, "
+                      f"23068672000, 17179869184, {oom}, 40000, {budget_kills}, {worker_kills}, {exit_status})"
+                  )
+
+
+              ROWS = [
+                  iets_row(1, 0),  # healthy
+                  iets_row(2, 0),  # attribute errors: reported per attribute, exit 0
+                  iets_row(3, 0, oom_kill=None),  # healthy, no evaluation cgroup
+                  iets_row(4, 0, worker_kills=1),
+                  iets_row(5, 0, oom_kill=1),
+                  iets_row(6, 0, budget_kills=1),
+                  iets_row(7, 1),  # crash: a lost worker or a reported error
+                  iets_row(8, 137),  # SIGKILL inside bwrap
+                  iets_row(9, -9),  # nixbot's timeout, lock wait included
+                  iets_row(10, 1, evaluator="nix-eval-jobs"),  # the stock evaluator
+                  iets_row(11, 1, hours_ago=13),  # outside the window
+              ]
+              FIRING = [4, 5, 6, 7, 8, 9]
+              admin_sql(
+                  'INSERT INTO "eval_run" ("build_id", "ts", "evaluator", "evaluator_version", "workers", '
+                  '"max_memory_mib", "memory_max_bytes", "memory_peak_bytes", "oom_kill", "wall_ms", '
+                  '"budget_kills", "worker_kills", "exit_status") VALUES ' + ", ".join(ROWS),
+                  db=IETS_DB,
+              )
+              stored = gsql('SELECT count(*) FROM "eval_run"', db=IETS_DB)
+              assert stored == [[len(ROWS)]], (stored, len(ROWS))
+
+
+              def iets_fired(expr):
+                  return sorted(row[0] for row in gsql(expr, db=IETS_DB))
+
+
+              def iets_mutant(name, old, new):
+                  assert old in IETS_EXPR, f"mutant {name} found nothing to replace"
+                  return IETS_EXPR.replace(old, new)
+
+
+              # One row per unhealthy evaluation, its value column the exit
+              # status, which the evaluator requires.
+              fired = iets_fired(IETS_EXPR)
+              print(f"IetsEvaluationUnhealthy fires for builds {fired}", flush=True)
+              assert fired == FIRING, (fired, FIRING)
+              values = gsql(f'SELECT "build_id", "value" FROM ({IETS_EXPR}) AS unhealthy ORDER BY "build_id"', db=IETS_DB)
+              assert values == [[4, 0], [5, 0], [6, 0], [7, 1], [8, 137], [9, -9]], values
+
+              IETS_MUTANTS = {
+                  "attributeErrorsFire": iets_mutant("attributeErrorsFire", "exit_status <> 0", "exit_status >= 0"),
+                  "ignoresWorkerKills": iets_mutant("ignoresWorkerKills", "worker_kills > 0 OR ", ""),
+              }
+              for name, expr in IETS_MUTANTS.items():
+                  got = iets_fired(expr)
+                  assert got != FIRING, f"mutant {name} accepted: {got}"
+                  print(f"mutant {name} rejected: fires for builds {got}", flush=True)
+
+              reset_devloop()
+              collector_restart()
+              print("ok: ietsHealthRule", flush=True)
+            '';
+
             cases = [
               firstStart
               noAutoCreate
@@ -1056,6 +1142,7 @@
               documentedQueries
               reconcile
               burnRule
+              ietsHealthRule
             ];
           in
           pkgs.testers.runNixOSTest {
@@ -1110,6 +1197,9 @@
                   self.modules.nixos.otel-collector-ingress
                   self.modules.nixos.devloop-collection
                   self.modules.nixos.deploy-record
+                  # Declares the option the agent's collation receiver reads
+                  # on a host running PostgreSQL; hosts get it from `base`.
+                  self.modules.nixos.postgresql-collation
                   # Marks the switch case's second system, so it does not
                   # build a variant of itself.
                   {

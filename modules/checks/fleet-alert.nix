@@ -81,8 +81,9 @@
 # two arms select them (design D9; tasks.md 8.3a), and LaunchdJobFailed's
 # legs replay one job's last exit and the minute its launch count last
 # rose as that expression's two arms select it (CAM-92 design D3).
-# Nor can it run SQL: vmTests.x86_64-linux.devloop-ingest's burnRule case
-# runs PullRequestQueueWaitBurn's query on GreptimeDB 1.2.1 (design D1, D16).
+# Nor can it run SQL: vmTests.x86_64-linux.devloop-ingest's burnRule and
+# ietsHealthRule cases run PullRequestQueueWaitBurn's and
+# IetsEvaluationUnhealthy's queries on GreptimeDB 1.2.1 (design D1, D16).
 { self, lib, ... }:
 {
   perSystem =

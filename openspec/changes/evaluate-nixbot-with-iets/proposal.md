@@ -40,7 +40,7 @@ The swap fits the evaluator setting nixbot already exposes, but iets fails a who
 - From: nixbot evaluates with its own patched nix-eval-jobs behind the host evaluation lock.
 - To: after a paired replay of about twenty already-evaluated commits under both evaluators inside nixbot's real sandbox (design D13; the operator's Q69 of 2026-11-19 made it the only gate), nixbot evaluates with iets behind the same lock, through a minimal package exposing iets as `nix-eval-jobs` with nixbot's own Nix grafted on; nothing else on any host changes.
 - Reason: about 3x less evaluation CPU at identical results, without the shared writable cache of Mic92/nixbot#255 or a fleet-wide shim.
-- Impact: non-breaking for results; one more flake input. A worker killed for memory fails the whole evaluation instead of being retried. Reverting one line to the stock package stays as the immediate safety valve for a failing or broken evaluation.
+- Impact: non-breaking for results; one more flake input. A worker killed for memory fails the whole evaluation instead of being retried. A failing evaluation is rebuilt, then answered as capacity or fixed forward (an iets pin); reverting one line to the stock package is the last rung, taken only when merges are blocked (operator Q88, 2026-11-21).
 
 **Capacity decisions instead of a keep-or-revert threshold**
 - From: 6 workers × 3072 MiB, chosen from 2026-09 measurements under nix-eval-jobs, and no rule for what happens when an evaluation outgrows its room.
@@ -51,7 +51,7 @@ The swap fits the evaluator setting nixbot already exposes, but iets fails a who
 ## Capabilities
 
 ### New Capabilities
-- `build-service-evaluator` (stratum: `behavioral`): which evaluator the build service runs, that a change of evaluator keeps every attribute's derivation, that it is made only on measured evidence, that insufficient headroom opens a capacity decision, that magnetite's memory budget is measured beside every evaluation, that a change of evaluator can be reverted with one change as a safety valve, and that the evaluation still runs one at a time and without building during evaluation.
+- `build-service-evaluator` (stratum: `behavioral`): which evaluator the build service runs, that a change of evaluator keeps every attribute's derivation, that it is made only on measured evidence, that insufficient headroom opens a capacity decision, that magnetite's memory budget is measured beside every evaluation, that a change of evaluator can be reverted with one change as the last rung of an escalation ladder, and that the evaluation still runs one at a time and without building during evaluation.
 - `build-service-evaluator-interface` (stratum: `interface`): the iets flake input, the minimal `nix-eval-jobs` package and its grafted `nix` passthru, the lock-wrapped override of `services.nixbot.packages.nix-eval-jobs`, the evaluation-record patch and the record's fields, magnetite's memory-budget probe and its node_exporter keep-list entries, and the checks that pin them. Trust boundary: nixbot, the kernel's cgroup and zram counters and the evaluators produce what is recorded, and this machine only declares and reads them; nothing here guarantees iets evaluates any expression as Nix does, only that the configured parity comparisons, the canary and the recorded measurements behave as stated.
 
 ### Modified Capabilities

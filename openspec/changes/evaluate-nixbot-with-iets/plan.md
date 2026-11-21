@@ -145,7 +145,7 @@ The vendored consumer of the evaluator is nixbot at `171a8c77`. Any pre-switch r
 
 ### Task 6: First week and capacity
 
-- [ ] **Step 1:** the safety valve stands from Task 5 Step 4 on: a failing or broken evaluation lands Task 7 Step 3's revert at once (tasks.md 6.1).
+- [ ] **Step 1:** the escalation ladder stands from Task 5 Step 4 on (tasks.md 6.1, operator Q88, 2026-11-21): rebuild; a repeat is capacity (D9, tuning first) or fixed forward (an iets pin); Task 7 Step 3's revert only when merges are blocked and no fix is quick. `IetsEvaluationUnhealthy` detects the failures.
 - [ ] **Step 2 [operator, wizard]:** read the D9 trigger over the canary and the week (tasks.md 6.2), with Task 2 Step 6's queries restricted to `evaluator = 'iets'` and the switched week.
 - [ ] **Step 3 [operator, wizard]:** the capacity decision, (a) to (d) in order, recorded in the comment table (tasks.md 6.3); a change under (a) or (b) loops back to Step 2 for its next week.
 

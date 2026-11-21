@@ -85,7 +85,7 @@ The decision SHALL take, in order of cost: tuning the evaluator, reclaiming memo
 #### Scenario: The kernel kills a worker under iets
 
 - **WHEN** an evaluation under iets records one kernel kill and fails
-- **THEN** the operator records a capacity decision; the build service returns to nix-eval-jobs only if the failure blocks builds, as the safety valve of `A change of evaluator is reverted with one change`
+- **THEN** the build is rebuilt; if the same commit fails again, the operator records a capacity decision, starting with tuning the evaluator, and the kill alone does not return the build service to nix-eval-jobs
 
 ### Requirement: magnetite's memory budget is measured beside every evaluation
 
@@ -116,7 +116,7 @@ Whichever evaluator the build service runs, its evaluation SHALL wait for every 
 
 ### Requirement: A change of evaluator is reverted with one change
 
-Returning the build service to the evaluator it replaced SHALL take one change to one line of magnetite's configuration and one deploy of magnetite, SHALL be available at once whenever an evaluation under the new evaluator fails or is broken, and SHALL leave the evaluation records, magnetite's memory budget and their charts in place.
+Returning the build service to the evaluator it replaced SHALL take one change to one line of magnetite's configuration and one deploy of magnetite, SHALL leave the evaluation records, magnetite's memory budget and their charts in place, and SHALL be taken only when a failing evaluation blocks merges and no fix or pin of the new evaluator is quick, as a decision the operator records (Q88, 2026-11-21).
 
 **Discharged by**: `build-service-evaluator-interface` requirement `nixbot's evaluator is the lock-wrapped nix-eval-jobs option`; the reversal rehearsed in a scratch copy discharges it.
 
@@ -124,6 +124,11 @@ Returning the build service to the evaluator it replaced SHALL take one change t
 
 - **WHEN** the line selecting the iets package is reverted
 - **THEN** magnetite's configuration evaluates with nixbot's stock evaluator behind the lock, and the evaluation records keep arriving with the evaluator named nix-eval-jobs
+
+#### Scenario: An evaluator failure repeats on a commit
+
+- **WHEN** an evaluation under iets crashes, rebuilt it crashes again on the same commit, and nix-eval-jobs evaluates that commit cleanly
+- **THEN** the failure is fixed forward, first by pinning iets to its last good revision, and the switch is reverted only if merges stay blocked and no fix or pin is quick
 
 ### Requirement: A change to the evaluation's memory settings rests on recorded measurements
 
