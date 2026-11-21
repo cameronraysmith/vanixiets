@@ -38,6 +38,20 @@
         '';
       };
 
+      options.vanixiets.sandbox.workspaceDirectory = lib.mkOption {
+        type = lib.types.nullOr lib.types.str;
+        default = null;
+        example = "/home/user";
+        description = ''
+          Directory the sandbox platform clones a session's repositories into,
+          when that differs from $HOME. Claude Code cloud sessions run as root
+          with HOME=/root, start their setup step in /home/user and clone each
+          attached repository to /home/user/<repo> (measured 2026-11-21, CAM-118
+          sessions 1 and 4); /home/user is not the home of the account the
+          session runs as. Null where the platform has no separate workspace.
+        '';
+      };
+
       options.vanixiets.sandbox.bootstrapReport = {
         enable = lib.mkEnableOption ''
           a bootstrap report written at the end of every activation: the

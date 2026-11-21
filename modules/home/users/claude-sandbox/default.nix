@@ -12,6 +12,7 @@ let
       # The package the devshell's shellHook runs, so a cloud session compiles
       # with the same compiler and records the same compile key.
       apmContextCompile = flake.packages.${pkgs.stdenv.hostPlatform.system}.apm-context-compile;
+      workspace = config.vanixiets.sandbox.workspaceDirectory;
 
       # Compiles each attached repository's context (D3). Claude Code adds a
       # SessionStart hook's stdout to the model's context, so this prints
@@ -34,7 +35,7 @@ let
           }
 
           found=0
-          for manifest in /home/user/*/apm.yml; do
+          for manifest in ${lib.escapeShellArg workspace}/*/apm.yml; do
             [[ -f $manifest ]] || continue
             found=1
             repo=''${manifest%/apm.yml}
@@ -125,6 +126,7 @@ let
       home.homeDirectory = lib.mkForce "/root";
 
       vanixiets.sandbox.sopsDir = "/dev/shm/claude-sandbox-sops";
+      vanixiets.sandbox.workspaceDirectory = "/home/user";
 
       sops = {
         defaultSopsFile = ../../../../secrets/home-manager/users/claude-sandbox/secrets.yaml;
@@ -175,9 +177,9 @@ let
         ];
       };
 
-      # Cloud sessions clone attached repositories under /home/user, so ghq
-      # puts acquired ones beside them rather than in /root/ghq.
-      programs.git.settings.ghq.root = "/home/user/ghq";
+      # ghq puts acquired repositories beside the attached ones rather than in
+      # /root/ghq.
+      programs.git.settings.ghq.root = "${workspace}/ghq";
 
       programs.openspec.enable = true;
       programs.uv.enable = true;
