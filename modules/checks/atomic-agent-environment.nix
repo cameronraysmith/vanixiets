@@ -26,7 +26,7 @@
 # silent no-op. The edit/write policy reached atomic through this gap for three
 # days. The policy itself now reaches atomic on purpose, by store path in
 # atomic's own `extensions`, so that it also loads where the pi root is never
-# scanned (PI_CODING_AGENT_DIR set, as in every Omnigent session).
+# scanned (PI_CODING_AGENT_DIR set, as in every Omnigent Atomic session).
 #
 # Skill sink. ~/.agents/skills is canonical; a ~/.pi/agent/skills sink would
 # shadow it.

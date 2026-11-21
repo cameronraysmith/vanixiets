@@ -321,16 +321,17 @@
                   assert env["XDG_RUNTIME_DIR"] == runtime_dir, env
                   assert env["DOCKER_HOST"] == socket, env
                   assert env["CONTAINER_HOST"] == socket, env
-                  assert env["OMNIGENT_RUNNER_ENV_PASSTHROUGH"] == (
-                      "PI_ACP_PI_COMMAND,PI_CODING_AGENT_DIR,DOCKER_HOST,CONTAINER_HOST"
-                  ), env
+                  assert env["OMNIGENT_RUNNER_ENV_PASSTHROUGH"] == "DOCKER_HOST,CONTAINER_HOST", env
                   assert "/run/wrappers/bin" in env["PATH"].split(":"), env
                   env = recorded_env(control)
                   for name in ("XDG_RUNTIME_DIR", "DOCKER_HOST", "CONTAINER_HOST"):
                       assert name not in env, (name, env)
-                  assert env["OMNIGENT_RUNNER_ENV_PASSTHROUGH"] == (
-                      "PI_ACP_PI_COMMAND,PI_CODING_AGENT_DIR"
-                  ), env
+                  assert "OMNIGENT_RUNNER_ENV_PASSTHROUGH" not in env, env
+                  # Atomic's state selectors belong to its ACP command, not the unit.
+                  for worker in (rootless, control):
+                      env = recorded_env(worker)
+                      for name in ("PI_ACP_PI_COMMAND", "PI_CODING_AGENT_DIR"):
+                          assert name not in env, (worker, name, env)
 
               with subtest("the lingering user manager holds podman socket-activated and cold"):
                   machine.wait_for_unit(f"user@{rootless_uid}.service")

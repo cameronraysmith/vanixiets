@@ -30,7 +30,7 @@
 # force-excludes. atomic resolves an absolute `extensions` entry itself
 # (core/package-manager-resolver.ts resolveConfiguredLocalEntries), so the
 # policy loads from whichever agent directory holds this settings.json,
-# including the PI_CODING_AGENT_DIR=~/.atomic/agent of every Omnigent session,
+# including the PI_CODING_AGENT_DIR=~/.atomic/agent of every Omnigent Atomic session,
 # where the ~/.pi/agent copy is never scanned. The force-exclude of that copy
 # keeps an interactive session from loading the policy twice.
 { config, ... }:

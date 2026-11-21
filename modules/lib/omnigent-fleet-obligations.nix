@@ -245,34 +245,35 @@ let
         lib.optional (serverDomains ? ${machine}) serverDomains.${machine}
       );
 
-      # The supervisor runs each worker as itself, privately, with its own identity and
-      # harness selectors; on Linux it restarts with, and requires, the worker's Home
-      # Manager activation, and on Darwin it is a system daemon whose session is created
-      # only for a Keychain worker.
+      # The supervisor runs each worker as itself, privately, with its own identity; on
+      # Linux it restarts with, and requires, the worker's Home Manager activation, and
+      # on Darwin it is a system daemon whose session is created only for a Keychain
+      # worker. Atomic's state selectors stay out of the host environment and its
+      # runner passthrough, which every generic ACP child inherits since omnigent
+      # 0.23.0; the Atomic ACP command sets them (checks.omnigent-acp-spawn-env).
       supervision = lib.all (
         owner:
         let
           worker = workers.${owner};
           user = worker.user;
           home = toString hostConfig.users.users.${user}.home;
+          passthrough = lib.optionals (worker.containers.engine == "rootless-podman") [
+            "DOCKER_HOST"
+            "CONTAINER_HOST"
+          ];
           identity =
             env:
             env.HOME == home
             && env.USER == user
             && env.LOGNAME == user
-            && env.PI_ACP_PI_COMMAND == "atomic"
-            && env.PI_CODING_AGENT_DIR == "${home}/.atomic/agent"
-            &&
-              env.OMNIGENT_RUNNER_ENV_PASSTHROUGH == lib.concatStringsSep "," (
-                [
-                  "PI_ACP_PI_COMMAND"
-                  "PI_CODING_AGENT_DIR"
-                ]
-                ++ lib.optionals (worker.containers.engine == "rootless-podman") [
-                  "DOCKER_HOST"
-                  "CONTAINER_HOST"
-                ]
-              );
+            && !(env ? PI_ACP_PI_COMMAND)
+            && !(env ? PI_CODING_AGENT_DIR)
+            && (
+              if passthrough == [ ] then
+                !(env ? OMNIGENT_RUNNER_ENV_PASSTHROUGH)
+              else
+                env.OMNIGENT_RUNNER_ENV_PASSTHROUGH == lib.concatStringsSep "," passthrough
+            );
         in
         if isDarwin then
           let
@@ -446,11 +447,13 @@ let
         }
       ) (lib.attrValues workers);
 
-      # ACP children receive only omnigent's base allowlist plus each agent's declared
-      # passthrough, so on a host with rootless container access every agent must
-      # declare the socket locators, or its sessions fall back to the rootful socket
-      # and to a local podman that NoNewPrivileges cannot start. Oh My Pi must still
-      # never receive PI_CODING_AGENT_DIR, which points at Atomic's state.
+      # ACP children receive omnigent's base allowlist, each agent's declared
+      # passthrough and the host's runner passthrough, so on a host with rootless
+      # container access every agent must declare the socket locators, or its sessions
+      # fall back to the rootful socket and to a local podman that NoNewPrivileges
+      # cannot start. Oh My Pi must still never receive PI_CODING_AGENT_DIR, which
+      # points at Atomic's state; supervision keeps it out of the runner passthrough and
+      # checks.omnigent-acp-spawn-env observes what each agent receives.
       acpContainerLocators =
         !lib.any (worker: worker.containers.engine == "rootless-podman") (lib.attrValues workers)
         || lib.all (

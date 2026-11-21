@@ -58,10 +58,6 @@ in
     roles.host = {
       machines.magnetite.settings = {
         legacyEnable = false;
-        environment = {
-          PI_ACP_PI_COMMAND = "atomic";
-          OMNIGENT_RUNNER_ENV_PASSTHROUGH = "PI_ACP_PI_COMMAND,PI_CODING_AGENT_DIR";
-        };
         workers = {
           cameron = {
             enable = true;
@@ -86,10 +82,6 @@ in
       };
       machines.pyrite.settings = {
         legacyEnable = false;
-        environment = {
-          PI_ACP_PI_COMMAND = "atomic";
-          OMNIGENT_RUNNER_ENV_PASSTHROUGH = "PI_ACP_PI_COMMAND,PI_CODING_AGENT_DIR";
-        };
         workers = {
           cameron = {
             enable = true;
@@ -120,10 +112,6 @@ in
       };
       machines.stibnite.settings = {
         legacyEnable = false;
-        environment = {
-          PI_ACP_PI_COMMAND = "atomic";
-          OMNIGENT_RUNNER_ENV_PASSTHROUGH = "PI_ACP_PI_COMMAND,PI_CODING_AGENT_DIR";
-        };
         workers.cameron = {
           enable = true;
           owner = "cameron";
@@ -134,16 +122,6 @@ in
           ];
         };
       };
-      extraModules = [
-        (
-          { config, ... }:
-          {
-            services.omnigent-host.environment.PI_CODING_AGENT_DIR = "${
-              config.users.users.${config.services.omnigent-host.user}.home
-            }/.atomic/agent";
-          }
-        )
-      ];
     };
   };
 }

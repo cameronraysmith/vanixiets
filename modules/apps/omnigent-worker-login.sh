@@ -40,6 +40,9 @@ command=(sudo -n -H -u "$user" env -i
   "XDG_STATE_HOME=$home/.local/state" "XDG_DATA_HOME=$home/.local/share"
   "PATH=$profile/bin:/run/current-system/sw/bin:/usr/bin:/bin:/usr/sbin:/sbin"
   "TERM=${TERM:-xterm-256color}")
+# Atomic's credentials must land where the Atomic ACP command points its sessions
+# (atomic-acp in modules/home/ai/omnigent/acp.nix). The worker's host unit does not
+# carry PI_CODING_AGENT_DIR, so it is set here.
 if [[ "$tool" == atomic ]]; then
   command+=("PI_CODING_AGENT_DIR=$home/.atomic/agent")
 fi

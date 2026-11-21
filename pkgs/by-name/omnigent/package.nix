@@ -6,8 +6,8 @@
   runCommand,
 }:
 let
-  version = "0.22.0";
-  # omnigent 0.22.0 caps mcp<2 and imports
+  version = "0.23.0";
+  # omnigent 0.23.0 still caps mcp<2 and imports
   # mcp.client.streamable_http.streamablehttp_client and
   # mcp.shared.exceptions.McpError, both absent from nixpkgs' mcp 2.2.0. Pin
   # mcp 1.29.0, nixpkgs' previous release, in omnigent's package set only, so
@@ -67,7 +67,7 @@ let
       python = "py3";
       dist = "py3";
       platform = "any";
-      hash = "sha256-/W68O3sDvfNoUm52PkbDbZWJsUoDy3yOYOWPG9jXGEA=";
+      hash = "sha256-+iZoaujmMzneEpuiuCGembJYCbGLG+KbDhLHYGrXKN0=";
     };
 
     # openai<2.45 is upstream's transitive cap on openai-agents, not on omnigent's

@@ -111,20 +111,6 @@ in
           XDG_CACHE_HOME = "${homeFor worker}/.cache";
           XDG_DATA_HOME = "${homeFor worker}/.local/share";
           XDG_STATE_HOME = "${homeFor worker}/.local/state";
-          PI_ACP_PI_COMMAND = "atomic";
-          PI_CODING_AGENT_DIR = "${homeFor worker}/.atomic/agent";
-          OMNIGENT_RUNNER_ENV_PASSTHROUGH = lib.concatStringsSep "," (
-            [
-              "PI_ACP_PI_COMMAND"
-              "PI_CODING_AGENT_DIR"
-            ]
-            # omnigent's runner allowlist already carries XDG_RUNTIME_DIR but not
-            # DOCKER_HOST or CONTAINER_HOST.
-            ++ lib.optionals (rootlessPodman worker) [
-              "DOCKER_HOST"
-              "CONTAINER_HOST"
-            ]
-          );
           PATH = lib.mkForce (
             # NixOS's setuid wrappers (newuidmap/newgidmap among them) precede
             # everything as in NixOS's own PATH; under the unit's NoNewPrivileges
@@ -150,6 +136,12 @@ in
             XDG_RUNTIME_DIR = runtimeDirFor worker;
             DOCKER_HOST = socket;
             CONTAINER_HOST = socket;
+            # omnigent's runner allowlist already carries XDG_RUNTIME_DIR but not
+            # DOCKER_HOST or CONTAINER_HOST. Since omnigent 0.23.0 every generic ACP
+            # child also inherits these names, so the list carries only stateless
+            # locators; Atomic's state selectors are set by its own ACP command
+            # (modules/home/ai/omnigent/acp.nix), never here.
+            OMNIGENT_RUNNER_ENV_PASSTHROUGH = "DOCKER_HOST,CONTAINER_HOST";
           }
         );
     in

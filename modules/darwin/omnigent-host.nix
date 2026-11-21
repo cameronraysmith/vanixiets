@@ -165,9 +165,6 @@ in
           XDG_CACHE_HOME = "${homeFor worker}/.cache";
           XDG_DATA_HOME = "${homeFor worker}/.local/share";
           XDG_STATE_HOME = "${homeFor worker}/.local/state";
-          PI_ACP_PI_COMMAND = "atomic";
-          PI_CODING_AGENT_DIR = "${homeFor worker}/.atomic/agent";
-          OMNIGENT_RUNNER_ENV_PASSTHROUGH = "PI_ACP_PI_COMMAND,PI_CODING_AGENT_DIR";
           PATH =
             (inputs.self.lib.omnigentWorkerPath {
               inherit pkgs;

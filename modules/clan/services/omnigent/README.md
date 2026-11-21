@@ -15,10 +15,9 @@ Names keep the clan role interface JSON-serializable; the plain `services.omnige
 Set `roles.host.machines.<machine>.settings.user` to select an existing account on that machine; the default `null` leaves account selection to the platform.
 NixOS selects the unique normal `wheel` user with a Home Manager configuration and requires an explicit user when there are zero or multiple candidates.
 Darwin retains `system.primaryUser` as its default.
-Pinned Clan treats each machine's inventory `settings` as one non-mergeable value: add `user` inside its existing settings block, or replace the complete block while preserving its environment values.
+Pinned Clan treats each machine's inventory `settings` as one non-mergeable value: add `user` inside its existing settings block, or replace the complete block.
 An independent module cannot add only `settings.user` beside an existing machine settings definition.
-The shared inventory `extraModules` entry runs on both NixOS and Darwin and derives `PI_CODING_AGENT_DIR` from the selected account's actual home.
-Role settings carry only the home-independent environment pair.
+The inventory declares no host environment: Atomic's state selectors belong to its ACP command (below), not to the host.
 
 The NixOS host supplies the same environment through both `systemd.services.omnigent-host.environment` and `serviceConfig.Environment`.
 The S3 contract inspects the latter, but pinned nixpkgs renders the former directly into unit text rather than populating that key (`nixos/lib/systemd-lib.nix:779-793`).
@@ -27,16 +26,19 @@ Both carriers derive from one attribute set and use nixpkgs' JSON quoting, so th
 ## Runner state
 
 The NixOS runner reads the selected existing account's credentials; both magnetite and pyrite currently select `cameron`, while stibnite selects `crs58`.
-Both platforms derive HOME and working directory from `config.users.users.${cfg.user}.home`; the shared inventory uses that home for Atomic state, and Darwin also uses it for logs.
+Both platforms derive HOME and working directory from `config.users.users.${cfg.user}.home`; the Atomic ACP command resolves Atomic state from that HOME, and Darwin also uses it for logs.
 The aliases map reuses `crs58`'s Home Manager content under `cameron`; it does not rename Unix accounts.
 Home Manager enables `programs.omnigent` with the same package and renders `host.name`, the shared ACP definitions and `tui.theme: dark` into writable `~/.omnigent/config.yaml` through `managedConfigs`.
 Each activation rewrites the file from the declaration, keeping only `host.host_id` and `server` from the existing file; it must not become a Nix-store symlink, because omnigent rewrites the file in place through a temporary file and rename.
 The theme is declared because activation drops undeclared keys: a theme chosen through omnigent's picker or `/theme` would not survive the next deploy, and a file without `tui.theme` makes every session terminal block on the theme picker.
-All three hosts use the exact shared `Atomic` / `<pi-acp store path>/bin/pi-acp` (`pkgs/by-name/pi-acp`, so no session start fetches from npm) and `Oh My Pi` / `omp acp` rows from `modules/home/ai/omnigent/acp.nix`.
-Both rows disable `omnigent_mcp` and `inject_system_prompt`; Atomic allows `PI_ACP_PI_COMMAND` and `PI_CODING_AGENT_DIR`, while omp never receives `PI_CODING_AGENT_DIR`, so Atomic state does not reach omp.
-Both rows also allow `DOCKER_HOST` and `CONTAINER_HOST`, which carry no state; see "Container access".
+All three hosts use the exact shared `Atomic` / `<atomic-acp store path>/bin/atomic-acp` and `Oh My Pi` / `omp acp` rows from `modules/home/ai/omnigent/acp.nix`.
+`atomic-acp` exports `PI_ACP_PI_COMMAND=atomic` and `PI_CODING_AGENT_DIR=$HOME/.atomic/agent` and executes `pi-acp` (`pkgs/by-name/pi-acp`, so no session start fetches from npm).
+Both rows disable `omnigent_mcp` and `inject_system_prompt`.
+Both rows allow only `DOCKER_HOST` and `CONTAINER_HOST`, which carry no state; see "Container access".
 
-The host environment carries `PI_ACP_PI_COMMAND=atomic`, `PI_CODING_AGENT_DIR=<selected-home>/.atomic/agent`, and `OMNIGENT_RUNNER_ENV_PASSTHROUGH=PI_ACP_PI_COMMAND,PI_CODING_AGENT_DIR`.
+Neither the host environment nor `OMNIGENT_RUNNER_ENV_PASSTHROUGH` carries `PI_ACP_PI_COMMAND` or `PI_CODING_AGENT_DIR`.
+Since omnigent 0.23.0 every generic ACP child inherits each name in `OMNIGENT_RUNNER_ENV_PASSTHROUGH`, so a selector placed there would reach omp and point it at Atomic's state.
+The `supervision` fleet obligation keeps both out of each worker unit, and `checks.omnigent-acp-spawn-env` runs the packaged omnigent's runner and ACP spawn environment on each NixOS worker's rendered unit environment and settings, then traces the execve of each agent program: Atomic's `pi-acp` receives both selectors, while omp and an undeclared generic ACP agent receive neither.
 Do not set a conflicting `ATOMIC_CODING_AGENT_DIR`.
 Credentials, sessions and host IDs remain local to each runner; never copy state between hosts or publish tokens.
 
@@ -216,9 +218,10 @@ Pyrite's workers select `rootless-podman` and `restricted`, magnetite's select `
 Sessions are not logins: the runner zygote has no PAM or logind session, so nothing else creates `/run/user/<uid>` or a user manager.
 `rootless-podman` therefore lingers the account, and `omnigent-host-<key>.service` wants and orders after `user@<uid>.service`.
 The user manager socket-activates the account's own `podman.socket`; nothing runs until a client connects.
-The unit sets `XDG_RUNTIME_DIR=/run/user/<uid>`, and both `DOCKER_HOST` and `CONTAINER_HOST` to `unix:///run/user/<uid>/podman/podman.sock`, appending both names to `OMNIGENT_RUNNER_ENV_PASSTHROUGH`, since omnigent's runner allowlist carries `XDG_RUNTIME_DIR` but neither of them.
+The unit sets `XDG_RUNTIME_DIR=/run/user/<uid>`, both `DOCKER_HOST` and `CONTAINER_HOST` to `unix:///run/user/<uid>/podman/podman.sock`, and `OMNIGENT_RUNNER_ENV_PASSTHROUGH=DOCKER_HOST,CONTAINER_HOST`, since omnigent's runner allowlist carries `XDG_RUNTIME_DIR` but neither of them; a worker without container access has no `OMNIGENT_RUNNER_ENV_PASSTHROUGH`.
 Sessions inherit the unit's `NoNewPrivileges`, under which the setuid `newuidmap`/`newgidmap` cannot raise privileges, so a local `podman` CLI cannot create the rootless user namespace; `CONTAINER_HOST` makes it a remote client of the socket-activated service, which runs under the user manager instead.
-Those variables reach native sessions such as Claude Code directly, but ACP harnesses receive only omnigent's base allowlist plus their row's `env_passthrough`, so both shared ACP rows declare `DOCKER_HOST` and `CONTAINER_HOST`.
+Those variables reach native sessions such as Claude Code directly.
+ACP harnesses receive omnigent's base allowlist, their row's `env_passthrough` and, since omnigent 0.23.0, the names in `OMNIGENT_RUNNER_ENV_PASSTHROUGH`; both shared ACP rows still declare `DOCKER_HOST` and `CONTAINER_HOST`, so they keep the locators under omnigent 0.22.0.
 The rows do not declare `XDG_RUNTIME_DIR`, which omnigent handles as a desktop-session variable (`omnigent/inner/agent_env.py`); with `CONTAINER_HOST` podman runs remote and the Docker CLI follows `DOCKER_HOST`, so neither client needs it.
 On any Linux host with a `rootless-podman` worker, the `acpContainerLocators` fleet obligation requires every ACP row in each worker's rendered settings to declare both names, and Oh My Pi never to declare `PI_CODING_AGENT_DIR`.
 Remote mode rejects local-only operations such as `podman unshare`, `podman mount`, `podman system migrate`, `podman system reset` and `run --env-host`; bind mounts of the worker's own paths and `--userns=keep-id` still work, because the service runs as the same user on the same host.

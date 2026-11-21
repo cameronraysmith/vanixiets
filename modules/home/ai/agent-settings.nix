@@ -203,7 +203,7 @@ let
             store path modules/home/ai/atomic/default.nix declares in `extensions`,
             because the pi root this file sits in is not scanned when
             ATOMIC_CODING_AGENT_DIR or PI_CODING_AGENT_DIR is set, as it is for
-            every Omnigent session. Excluding pi's copy keeps an interactive atomic
+            every Omnigent Atomic session. Excluding pi's copy keeps an interactive atomic
             session from registering the same handler twice.
           '';
         };
