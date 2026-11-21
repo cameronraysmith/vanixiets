@@ -240,6 +240,21 @@ Any requirement whose discharge depends on this fact SHALL name it explicitly, a
 - **WHEN** a snapshot-started session holds only the cold session's own setup run, or a failure in a sibling's run leaves a snapshot the cold session never had
 - **THEN** this assumption is void, and the `claude-sandbox-bootstrap` requirement `Idempotent setup without external side effects` must be re-argued, since it relies on every run of the same script ending in the same state
 
+### Requirement: A183 — The workspace directory is not the session account's home
+
+It is true of a cloud session, independent of what this fleet builds, that `/home/user`, where the setup step starts and attached repositories are cloned, belongs to no account: no passwd entry `user` exists, `/home/user` is `root:root` 755, and the session runs as root with home `/root`.
+Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL lose its discharge once the violation below is observed.
+
+#### Scenario: Measured on 2026-11-21
+
+- **WHEN** task 7.2's child session on the Default cloud environment runs `getent passwd user`, `stat /home/user` and `id`
+- **THEN** they print "no passwd entry named user", `root:root 755 /home/user` and `uid=0(root) gid=0(root) groups=0(root)`
+
+#### Scenario: The workspace gains its own account or moves
+
+- **WHEN** a cloud session runs as an account whose home is `/home/user`, or attached repositories are cloned elsewhere
+- **THEN** this assumption is void, and the `claude-sandbox-bootstrap` requirement `Attached repositories get their repository context` loses its discharge until the workspace directory the profile names is re-measured
+
 ## MODIFIED Requirements
 
 ### Requirement: Grounded vocabulary for behavioral requirements

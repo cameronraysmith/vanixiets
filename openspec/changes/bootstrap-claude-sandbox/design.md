@@ -67,6 +67,7 @@ Each is stated in full, with its evidence and violation condition, in `specs/wor
 | A180 | Packages home-manager activates as root are installed into the image's default profile, whose `bin` the harness puts on the agent's shell `PATH`, and that profile keeps the image's Nix. | Session 3's C1 and C2: 18 tools resolve from `/nix/var/nix/profiles/default/bin`; `setup.log`'s `nix=2.34.6` was read after activation. |
 | A181 | The setup step runs when a container is claimed for a session, not when it boots: the platform keeps pre-warmed containers, and a container booted under one setup script runs the script current at its claim. | Session 4: E1, E3 and E4 report `uptime -s` before their `create_session` (E1 booted 22:06:32, created 22:08:28); E4 booted at 22:10:30 while the real script was installed, yet its only `setup.log` line is the broken script's run at 22:12:28Z, after its 22:12:22 create. |
 | A182 | A snapshot-started session's snapshot can come from a sibling container that ran setup at the same time as the cold session, not from the cold session's own container (consistent with A171's checkpoint builder). | Session 4: E2's one `setup.log` line (22:09:04Z, `activate=0/3s`) differs from E1's (22:09:03Z, `activate=0/2s`); session 3's C2 (21:19:26Z, `0/16s`, `0/4s`) against C1 (21:19:25Z, `0/17s`, `0/3s`). |
+| A183 | `/home/user`, where the platform starts the setup step and clones attached repositories, is not any account's home: no passwd entry named `user` exists, and `/home/user` is owned `root:root` with mode 755; the session runs as root with home `/root`. This is why `vanixiets.sandbox.workspaceDirectory` is a separate option from the home directory. | Task 7.2's child on Default (2026-11-21): `getent passwd user` printed "no passwd entry named user", `stat /home/user` printed `root:root 755 /home/user`, `id` printed `uid=0(root) gid=0(root) groups=0(root)`. |
 
 Measured cold and snapshot numbers (2026-11-21, session 4, revision `8c41bceba1e75f12c9fb9906eda0d3fa0346dc55`, `P` = `i6f12svdd7j8xcj85vdk6avimkfzwy0b-home-manager-generation`, closure 5,226,590,784 bytes):
 the cold start E1 realised 822 paths (1.1 GiB fetched) in 29 s and activated in 2 s (`realise=0/29s activate=0/2s`), about 31 s of the 360 s A169 allows;
@@ -266,11 +267,33 @@ R12 rests on A180, a fact about the base image's Nix layout, which drifts (PA3).
 3. Run the first bootstrap test from a controller session on `nix-sandbox-test`, including P4 (session 3, 2026-11-21: all but S7 and S8; session 4, the same day: S7 and S8, and the integration round).
 4. Land D3; its first cloud session also measures S7 and S8 (session 4, 2026-11-21).
 5. The D5 key, recipient and `SOPS_AGE_KEY` exist (2026-11-21); add `api.linear.app` to the allowed hosts; on stibnite, add the recipient to `.sops.yaml` and create the scoped file; land the profile's secret declarations.
-6. Switch the operator's default cloud environment to the generated setup script, and regenerate it at least monthly (D2's liveness rule).
+6. Switch the operator's default cloud environment to the generated setup script, and regenerate it at least monthly (D2's liveness rule); done 2026-11-21 for revision `7c2a300b` (task 7.2).
+
 Rollback: replace the setup step with the previous script (one approval card); the environment snapshot is rebuilt from it.
+Default's setup script before 2026-11-21T22:47:08Z, read verbatim by `get_environment` at 22:47:03Z (task 7.2's controller report), is:
+
+```bash
+#!/bin/bash
+GHQ_VERSION=v1.12.0
+if ! command -v ghq >/dev/null; then
+  curl -fsSL "https://github.com/x-motemen/ghq/releases/download/${GHQ_VERSION}/ghq_linux_amd64.zip" -o /tmp/g.zip \
+    && unzip -o /tmp/g.zip -d /tmp >/dev/null \
+    && install -m0755 /tmp/ghq_linux_amd64/ghq /usr/local/bin/ghq \
+    || echo "ghq install failed; continuing"
+fi
+git config --global ghq.root /home/user/ghq
+exit 0
+```
+
+Default's allowed hosts and variables were not changed by the switch: the same host list (including `*.linear.app`, `*.nixos.org` and `*.scientistexperience.net`) and the single variable `SOPS_AGE_KEY`, before and after.
 
 ## Open Questions
 
 - P4's S7 and S8: resolved 2026-11-21 by session 4 (both hold).
 - The setup step's real time ceiling above 360 s.
 - Q90, resolved 2026-11-21: chromium, the playwright chromium builds and mermaid-cli stay in the closure, because session 3 realised the whole 4,923,527,456-byte closure in a cloud session in 17 s (16 s in the checkpoint builder), well inside the 360 s.
+- Open observation (2026-11-21), the ghq root: in task 7.2's child on Default, `git config --global --get ghq.root` was unset (exit 1), yet `ghq get --shallow https://github.com/x-motemen/ghq` cloned to `/home/user/ghq/github.com/x-motemen/ghq`.
+  The profile sets `programs.git.settings.ghq.root = "/home/user/ghq"` (`modules/home/users/claude-sandbox/default.nix`), written to `/root/.config/git/config`; in a harness-free container that file supplies `ghq.root` to both git and ghq.
+  [INFERENCE] The likely cause in the cloud is the harness's own `/root/.gitconfig` together with a `GIT_CONFIG_GLOBAL` or `GHQ_ROOT` override, which would make `git config --global` read a different file than ghq consults.
+  Next probe, at the next 30-day renewal: `env | grep -E '^(GIT_CONFIG|GHQ_ROOT|XDG_CONFIG)'` and `git config --show-origin --get-all ghq.root` in a child session.
+  It matters beyond ghq: any git setting the profile writes to `/root/.config/git/config`, the commit author identity (`vcs.author`) included, may be shadowed in the same way.

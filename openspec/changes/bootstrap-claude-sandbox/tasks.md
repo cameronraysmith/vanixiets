@@ -1,6 +1,6 @@
 D1–D5 were decided by the operator on 2026-11-21 (design.md §Decisions).
 Group 4's hook is wired and was measured in cloud session 4 (2026-11-21), which also settled S7 and S8; group 6 is done.
-Still open: 2.1's stibnite activation, 7.2 (switching the Default environment) and 7.3 (deleting the scratch report branches).
+Every task is done as of 2026-11-21; 7.2's 30-day renewal is a standing obligation, not a one-off task.
 `plan.md` decomposes groups 1–8 into steps.
 
 ## 0. Probes (completed 2026-11-21)
@@ -24,9 +24,12 @@ Still open: 2.1's stibnite activation, 7.2 (switching the Default environment) a
 
 ## 2. D4: hook commands by store path
 
-- [ ] 2.1 Change `modules/home/ai/claude-code/hooks.nix` to refer to every hook command by its store path — verify: `nix eval` of crs58's and `claude-sandbox`'s Claude Code `settings.json` hooks shows only `/nix/store/...` commands; after activation on stibnite, a Bash and an Edit tool call in a local Claude Code session run their hooks with no "command not found".
+- [x] 2.1 Change `modules/home/ai/claude-code/hooks.nix` to refer to every hook command by its store path — verify: `nix eval` of crs58's and `claude-sandbox`'s Claude Code `settings.json` hooks shows only `/nix/store/...` commands; after activation on stibnite, a Bash and an Edit tool call in a local Claude Code session run their hooks with no "command not found".
   Evaluation part done 2026-11-21: crs58's (x86_64-linux and aarch64-darwin) and `claude-sandbox`'s hooks are 13 commands each, all `/nix/store/...`, identical to the previous bare names once the store prefix is stripped; a module assertion in `claude-code-hooks` fails evaluation on any bare command (seen failing on the bare names and on a one-hook mutant).
-  The stibnite activation part is open.
+  stibnite part done 2026-11-21, after the operator deployed stibnite at `8c41bceb`: every hook command in `~/.claude/settings.json` is an existing store path, the 13 of `claude-code-hooks` plus 10 `moshi-hook` entries from `modules/home/ai/moshi`.
+  A local `claude -p` run (transcript under `~/.claude/projects/-private-tmp-hookcheck-2kpP/`) made one Bash call (`true`) and one Write call, and its debug log holds no "command not found" and no hook failure.
+  The clause names an Edit call; the run made a Write call instead, which the same `Edit|Write|MultiEdit` matcher sends to the same hook (`enforce-branch-before-edit`).
+  Each of the 13 hooks, invoked through its `settings.json` store path with representative input, exited 0.
 
 ## 3. D2: CI-built activation package and the generated setup script
 
@@ -93,7 +96,11 @@ D2 was revised by Q91 on 2026-11-21 (design.md D2): the bootstrap sub-flake and 
 
 - [x] 7.1 Document the cloud environment, the generated setup script, the controller loop, the operator steps and the monthly renewal in the profile's README — verify: the README exists and names `nix run .#claude-sandbox-setup-script`, the approval-card cost and the 30-day renewal.
   Done 2026-11-21: `modules/home/users/claude-sandbox/README.md`.
-- [ ] 7.2 Switch the operator's default cloud environment's setup step to the generated setup script, and renew it at least every 30 days (D2's liveness rule: niks3 drops a closure 30 days after its last reference) — verify: `get_environment` on it shows the script; a new session on it passes 8.1.
+- [x] 7.2 Switch the operator's default cloud environment's setup step to the generated setup script, and renew it at least every 30 days (D2's liveness rule: niks3 drops a closure 30 days after its last reference) — verify: `get_environment` on it shows the script; a new session on it passes 8.1.
+  Switched 2026-11-21 by a controller session on Default (`env_011CULN8FWHtshNCrzLVdbp4`, report on `claude/sandbox-reports-72c`): `update_environment` was called at 22:47:08Z and answered `"updated":true,"setup_script_replaced":true` by 22:47:22Z, after one approval card, with the script for `7c2a300ba97299b7f5c1d4453b3f0225ddaf0e72` (`P=/nix/store/d96f192x7b6r0gwahpdy877nsv2a6ad9-home-manager-generation`); `get_environment` afterwards shows the first comment line `# claude-sandbox setup: vanixiets 7c2a300ba97299b7f5c1d4453b3f0225ddaf0e72 (2026-11-21)`, with `*.linear.app` and `*.scientistexperience.net` among the allowed hosts and `SOPS_AGE_KEY` the only variable.
+  A child on Default (report on `claude/sandbox-reports-72`) passed 8.1's checks: `setup.log` `2026-11-21T22:47:57Z rev=7c2a300b… realise=0/18s activate=0/3s nix=2.34.6`; before any command it reported `/root/.claude/CLAUDE.md` starting "## How this context is composed", `preferences-nix-development` listed, and vanixiets' `AGENTS.md` in context; `CLAUDE.md` sha256 `2b37fb62…e6c5` MATCH; 176 skill entries; nix 2.34.6 and openspec, linear, jj, git, gh, ghq, jq, rg, fd, just, uv and sops under `/nix/var/nix/profiles/default/bin`; `run.log` `repo-context repo=/home/user/vanixiets rc=0 tier=default secs=3` and the key naming the `default` tier; `SOPS_AGE_KEY=set`; `linear auth whoami --workspace cameronraysmith` reported the workspace; `credentials.toml` resolves to `/dev/shm/claude-sandbox-sops/secrets.d/1/rendered/linear-credentials.toml`.
+  This child probed 12 of R12's tools by name, not all; session 4's E1 called every one (8.1).
+  Default's previous setup script is preserved verbatim in the controller report and copied into design.md's rollback section.
 - [x] 7.3 Delete the scratch probe report branches once this change has landed: `claude/sandbox-reports`, `sandbox-reports-plain`, `claude/sandbox-reports-s2`, `-s2A`, `-s2A2`, `-s2B`, `-s2B2`, `-s3`, `-s3C1`, `-s3C2`, `-s4`, `-s4E1`, `-s4E2`, `-s4E3`, `-s4E4` — verify: `git ls-remote --heads origin 'claude/sandbox-reports*' sandbox-reports-plain` prints nothing.
   Done 2026-11-21 after #4121 landed: all 15 branches deleted with `git push origin --delete`, and the verify command printed nothing. `claude-sandbox-dev` (the probe flake, 7fffbd2c) is kept because design.md links it.
 
