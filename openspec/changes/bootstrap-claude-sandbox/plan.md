@@ -89,7 +89,7 @@ Session-time work (repository context, D3; Linear secrets, D5) runs from hooks w
 - Create: `modules/apps/claude-sandbox-setup-script.nix`, `modules/checks/claude-sandbox-setup-script.nix`
 
 **Interfaces:**
-- Produces: `checks.x86_64-linux.home-manager-claude-sandbox` (the activation package itself), `flake.lib.claudeSandboxSetupScript.text`, `apps.claude-sandbox-setup-script` (prints the text), and `checks.x86_64-linux.claude-sandbox-setup-script` (evaluation-time asserts: at most 100 lines of at most 200 bytes, `exit 0` last, `P=` the path `home-manager-claude-sandbox` builds).
+- Produces: `checks.x86_64-linux.home-manager-claude-sandbox` (the activation package itself), `flake.lib.claudeSandboxSetupScript.template` (no commit-dependent value; `@REV@` and `@DATE@` placeholders), `apps.claude-sandbox-setup-script` (prints the template with the revision and date filled in at run time), and `checks.x86_64-linux.claude-sandbox-setup-script` (evaluation-time asserts: at most 100 lines of at most 200 bytes, `exit 0` last, `P=` the path `home-manager-claude-sandbox` builds, no revision in the template).
 
 - [ ] **Step 1: Show the setup-script check absent and failing** — on the parent revision it does not exist; with the app in place, mutants (no `exit 0`, a 215-byte line, 101 lines, `P` set to `ubuntu`'s activation package) each fail evaluation.
 - [ ] **Step 2: Implement the app and run the check.** Expected: PASS.
