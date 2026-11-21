@@ -25,8 +25,8 @@ Fonts belong beside the terminal emulators that render them, and a wrapper's fla
 Nothing goes into a shared package list on the grounds that several aggregates might want it.
 
 Per-user exceptions are overrides, not omissions.
-A user who cannot run one module of an aggregate imports the aggregate and disables that module with `lib.mkForce` in `users/<name>/default.nix`, keeping the rest of the capability.
-`users/ubuntu` does this for `programs.bash.enable` and `services.ssh-agent.enable`.
+A user who cannot run one module of an aggregate imports the aggregate and disables that module with `lib.mkForce` in `users/<name>/default.nix`, keeping the rest of the capability; an exception shared by several users is its own aggregate.
+The `sandbox` aggregate does this for `programs.bash.enable` and `services.ssh-agent.enable` in `users/ubuntu` and `users/claude-sandbox`, the profiles that run in a hosted agent sandbox.
 
 Reusable options and shared data are named deferred modules or `flake.lib` values, never `_name.nix` files pulled in through `imports`; `core/catppuccin.nix` shows the pattern.
 Neither Den (drupol's aspect framework over dendritic flake-parts) nor `flake-file` (generating `flake.nix` from modules) is adopted here; both are evaluated in `github:drupol/infra`.
@@ -56,6 +56,7 @@ The Git feature owns `git-xet` when Git LFS uses the configured xet transfer, ra
 `omnigent-worker` selects these editor and Git dependencies alongside repository acquisition, engineering tools, Nix development, OpenSpec and Mergify.
 Workers explicitly enable OpenSpec's existing configuration and both schema bundles.
 Mergify installation is not authenticated workflow readiness: credential-adapter review and publication authorization remain separate.
+`pandoc`, `typst` and `worktrunk` are likewise exported from `tools` and `ai` with stable identities; `users/claude-sandbox` selects them with the Git, Jujutsu, GitHub, Linear, ghq, jq, ripgrep and fd modules rather than importing `development`, whose radicle module needs a sops secret and a systemd user unit.
 
 ## Hazards
 
@@ -69,7 +70,7 @@ Instead, `just home-package-names` prints the sorted package names of every conf
 
 The `<aggregate>/tools.nix` files hold raw packages that no home-manager module owns yet; they are split into per-program files as modules are adopted.
 
-`users/ubuntu` is the profile activated inside a Devin sandbox VM, which has no AI secrets, and whose exec shells reach no systemd user manager while its snapshot builds do.
+`users/ubuntu` is the profile activated inside a Devin sandbox VM, which has no AI secrets, and whose exec shells reach no systemd user manager while its snapshot builds do; `users/claude-sandbox` is activated as root inside a Claude Code cloud session's container, which has no systemd user manager.
 Modules that start user services or read sops secrets fail there and must be overridable as described above; an activation must also succeed under a user manager with no key present, which is what `base/sops-install-without-systemd.nix` provides.
 
 ## Verification

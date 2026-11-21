@@ -1,11 +1,43 @@
-# Claude Code hooks configuration
-# Hook scripts are packaged in modules/home/tools/hooks/ and available on PATH.
-{ ... }:
+# Claude Code hooks configuration, shared by the `ai` aggregate and the
+# `claude-sandbox` profile. Each command is the store path of a hook packaged by
+# `flake.lib.claudeCodeHooks` (modules/home/tools/hooks), so a hook runs in a
+# profile that does not put the hooks on PATH, such as a cloud session's.
+{ config, ... }:
+let
+  hookPackages = config.flake.lib.claudeCodeHooks;
+in
 {
   flake.modules = {
-    homeManager.ai =
-      { ... }:
+    homeManager.ai.imports = [ config.flake.modules.homeManager.claude-code-hooks ];
+
+    homeManager.claude-code-hooks =
       {
+        config,
+        lib,
+        pkgs,
+        ...
+      }:
+      let
+        hooks = hookPackages pkgs;
+        command = name: lib.getExe hooks.${name};
+
+        # A command Claude Code resolves through PATH fails with "command not
+        # found" wherever the hook is not on PATH, and nothing else notices.
+        commands = lib.concatMap (lib.concatMap (group: map (hook: hook.command) group.hooks)) (
+          lib.attrValues config.programs.claude-code.settings.hooks
+        );
+        bareCommands = lib.filter (c: !lib.hasPrefix "${builtins.storeDir}/" c) commands;
+      in
+      {
+        key = "vanixiets/claude-code-hooks-home-module";
+
+        assertions = [
+          {
+            assertion = bareCommands == [ ];
+            message = "programs.claude-code.settings.hooks must call every hook by store path; bare commands: ${lib.concatStringsSep ", " bareCommands}";
+          }
+        ];
+
         programs.claude-code.settings.hooks = {
           PreToolUse = [
             {
@@ -13,28 +45,19 @@
               hooks = [
                 {
                   type = "command";
-                  command = "redirect-rm-to-rip";
+                  command = command "redirect-rm-to-rip";
                 }
                 {
                   type = "command";
-                  command = "gate-mutating-http";
+                  command = command "gate-mutating-http";
                 }
                 {
                   type = "command";
-                  command = "gate-dangerous-commands";
+                  command = command "gate-dangerous-commands";
                 }
                 {
                   type = "command";
-                  command = "gate-git-worktree";
-                }
-              ];
-            }
-            {
-              matcher = "Edit|Write|MultiEdit";
-              hooks = [
-                {
-                  type = "command";
-                  command = "enforce-branch-before-edit";
+                  command = command "gate-git-worktree";
                 }
               ];
             }
@@ -43,7 +66,16 @@
               hooks = [
                 {
                   type = "command";
-                  command = "verify-diamond-before-edit";
+                  command = command "enforce-branch-before-edit";
+                }
+              ];
+            }
+            {
+              matcher = "Edit|Write|MultiEdit";
+              hooks = [
+                {
+                  type = "command";
+                  command = command "verify-diamond-before-edit";
                 }
               ];
             }
@@ -56,7 +88,7 @@
               hooks = [
                 {
                   type = "command";
-                  command = "gate-worktree-surfaces";
+                  command = command "gate-worktree-surfaces";
                 }
               ];
             }
@@ -65,7 +97,7 @@
               hooks = [
                 {
                   type = "command";
-                  command = "gate-worktree-surfaces";
+                  command = command "gate-worktree-surfaces";
                 }
               ];
             }
@@ -76,7 +108,7 @@
               hooks = [
                 {
                   type = "command";
-                  command = "jj-worktree-create";
+                  command = command "jj-worktree-create";
                 }
               ];
             }
@@ -87,7 +119,7 @@
               hooks = [
                 {
                   type = "command";
-                  command = "jj-worktree-remove";
+                  command = command "jj-worktree-remove";
                 }
               ];
             }
@@ -98,7 +130,7 @@
               hooks = [
                 {
                   type = "command";
-                  command = "session-start";
+                  command = command "session-start";
                 }
               ];
             }
@@ -109,7 +141,7 @@
               hooks = [
                 {
                   type = "command";
-                  command = "clarify-vague-request";
+                  command = command "clarify-vague-request";
                 }
               ];
             }
@@ -121,7 +153,7 @@
               hooks = [
                 {
                   type = "command";
-                  command = "notify-permission-prompt";
+                  command = command "notify-permission-prompt";
                   async = true;
                 }
               ];

@@ -5,14 +5,14 @@ created: 2026-08-26
 
 ## Claude Code hook scripts
 
-A hook only takes effect through two files, and the two must be kept in sync by hand because nothing checks that they agree.
-`default.nix` in this directory packages each script as a `pkgs.writeShellApplication` derivation inside `flake.modules.homeManager.tools`, gives it a `name`, declares its `runtimeInputs`, and appends it to `home.packages` so the built executable lands on the global PATH.
-Because that script is on PATH by its bare `name` after home-manager activation, a hook can be exercised by hand without triggering its event, by piping the same JSON shape the harness would send: `echo '{}' | redirect-rm-to-rip`.
-`../ai/claude-code/hooks.nix` wires events inside `flake.modules.homeManager.ai`, setting `programs.claude-code.settings.hooks.<Event>` to a list of `{ matcher; hooks = [ { type = "command"; command = "<bare-name>"; } ]; }` entries, where `<bare-name>` is a plain string.
-The two files connect only by that string matching the derivation's `name`; there is no nix-level reference between them.
+A hook takes effect through two files.
+`default.nix` in this directory packages each script as a `pkgs.writeShellApplication` derivation, gives it a `name` and declares its `runtimeInputs`, all inside the function `flake.lib.claudeCodeHooks`, which takes `pkgs` and returns the derivations keyed by name.
+`../../ai/claude-code/hooks.nix` defines `flake.modules.homeManager.claude-code-hooks`, imported by the `ai` aggregate and the `claude-sandbox` profile, which sets `programs.claude-code.settings.hooks.<Event>` to a list of `{ matcher; hooks = [ { type = "command"; command = <store path>; } ]; }` entries, each command being `lib.getExe` of the derivation of that name.
+A hook therefore runs whether or not it is on PATH, as in a cloud session's profile, and naming a hook that `flake.lib.claudeCodeHooks` does not package fails evaluation.
+The same module asserts that every command under `programs.claude-code.settings.hooks`, whichever module set it, starts with the store directory, so a bare command name added anywhere fails evaluation of every configuration that imports it.
+`flake.modules.homeManager.tools` also appends the same derivations to `home.packages`, so after activation a hook can be exercised by hand without triggering its event, by piping the same JSON shape the harness would send: `echo '{}' | redirect-rm-to-rip`.
 A derivation added to `default.nix` without a corresponding `command` entry in `hooks.nix` sits on PATH and never fires.
-A `command` entry added to `hooks.nix` without a matching derivation (and `home.packages` entry) in `default.nix` resolves to nothing at runtime and the hook invocation fails.
-Not every derivation in `default.nix` is wired to an event this way: `notify-permission-wait` is built and added to `home.packages` but appears in `hooks.nix` nowhere, because `gate-mutating-http` and `gate-dangerous-commands` consume it only as a `runtimeInputs` entry, calling it internally rather than being invoked directly by an event.
+Not every derivation in `default.nix` is wired to an event this way: `notify-permission-wait` appears in `hooks.nix` nowhere, because `gate-mutating-http` and `gate-dangerous-commands` consume it only as a `runtimeInputs` entry, calling it internally rather than being invoked directly by an event.
 
 The event names currently wired in `hooks.nix`, i.e. the top-level keys under `programs.claude-code.settings.hooks`, are `PreToolUse`, `WorktreeCreate`, `WorktreeRemove`, `PostToolUse`, `SessionStart`, `UserPromptSubmit`, and `Notification`.
 

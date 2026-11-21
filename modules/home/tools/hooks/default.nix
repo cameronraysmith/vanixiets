@@ -1,14 +1,11 @@
-# Hook scripts packaged as writeShellApplication derivations.
-# These end up on PATH so that programs.claude-code.settings.hooks
-# can reference them by bare command name.
-{ ... }:
+# Hook scripts packaged as writeShellApplication derivations, keyed by name.
+# `claude-code-hooks` (../../ai/claude-code/hooks.nix) calls each by its store
+# path, so a hook runs whether or not it is on PATH; `tools` also puts them on
+# PATH.
+{ config, ... }:
 {
-  flake.modules.homeManager.tools =
-    {
-      pkgs,
-      flake,
-      ...
-    }:
+  flake.lib.claudeCodeHooks =
+    pkgs:
     let
       # Hosts where mutating HTTP requests (POST, PUT, etc.) are auto-approved
       # by gate-mutating-http without prompting. Matched as hostnames in URLs
@@ -178,7 +175,7 @@
       };
     in
     {
-      home.packages = [
+      inherit
         enforce-branch-before-edit
         session-start
         clarify-vague-request
@@ -192,6 +189,31 @@
         verify-diamond-before-edit
         gate-dangerous-commands
         notify-permission-prompt
+        ;
+    };
+
+  # On PATH for interactive use: a hook can be exercised by hand by piping it
+  # the JSON the harness would send.
+  flake.modules.homeManager.tools =
+    { pkgs, ... }:
+    let
+      hooks = config.flake.lib.claudeCodeHooks pkgs;
+    in
+    {
+      home.packages = map (name: hooks.${name}) [
+        "enforce-branch-before-edit"
+        "session-start"
+        "clarify-vague-request"
+        "redirect-rm-to-rip"
+        "notify-permission-wait"
+        "gate-mutating-http"
+        "gate-worktree-surfaces"
+        "jj-worktree-create"
+        "jj-worktree-remove"
+        "gate-git-worktree"
+        "verify-diamond-before-edit"
+        "gate-dangerous-commands"
+        "notify-permission-prompt"
       ];
     };
 }

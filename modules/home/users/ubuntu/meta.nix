@@ -31,6 +31,7 @@
       core
       development
       herdr
+      sandbox
       shell
       terminal
     ];

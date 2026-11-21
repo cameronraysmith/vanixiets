@@ -46,6 +46,7 @@
             "christophersmith@aarch64-darwin"
             "christophersmith@aarch64-linux"
             "christophersmith@x86_64-linux"
+            "claude-sandbox@x86_64-linux"
             "crs58@aarch64-darwin"
             "crs58@aarch64-linux"
             "crs58@x86_64-linux"
