@@ -61,7 +61,7 @@
     "starlight-katex": "^0.0.4",
     "starlight-links-validator": "0.27.0",
     "vitest": "^5.1.1",
-    "wrangler": "4.165.0"
+    "wrangler": "4.166.0"
   },
   "release": {
     "extends": "semantic-release-monorepo",
