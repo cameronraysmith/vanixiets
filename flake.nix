@@ -92,13 +92,18 @@
     nixbot.inputs.nixpkgs.follows = "nixpkgs";
     nixbot.inputs.treefmt-nix.follows = "treefmt-nix";
 
-    # iets as a candidate evaluator for nixbot (CAM-111), packaged by
-    # modules/lib/nix-eval-jobs-iets.nix and not selected. Pinned to the rev
-    # whose parity with nix-eval-jobs was measured on magnetite (world
-    # assumption A147), so an update is a deliberate, re-measured change.
-    # No follows: the input keeps its own nixpkgs, and its build is
-    # substituted from cache.numtide.com (lib/caches.nix).
-    iets.url = "github:numtide/iets/9157ca1a2a50c085bcd7fd0004d9ba71e2b7c1e0";
+    # iets is nixbot's evaluator (CAM-111 task 5.2): modules/nixos/nixbot.nix
+    # selects the package modules/lib/nix-eval-jobs-iets.nix builds from it.
+    # Tracks upstream; updates come from the flake-update effect. Bumps aren't
+    # re-measured for nix-eval-jobs parity or performance (world assumption
+    # A147 was measured at 9157ca1a only), by choice: a uniform update process
+    # is preferred, and problems a bump causes are fixed as they arise. An
+    # 'Update iets' pull request is evaluated by the deployed iets; the new
+    # one is exercised by checks.x86_64-linux.nix-eval-jobs-iets (package
+    # shape only) and evaluates from magnetite's next deploy. No follows: the
+    # input keeps its own nixpkgs, and its build is substituted from
+    # cache.numtide.com (lib/caches.nix).
+    iets.url = "github:numtide/iets";
 
     gitea-mq.url = "github:Mic92/gitea-mq";
     gitea-mq.inputs.nixpkgs.follows = "nixpkgs";

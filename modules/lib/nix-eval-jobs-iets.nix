@@ -18,10 +18,12 @@
 #   (NIXBOT_EVALUATOR, modules/nixos/nixbot.nix).
 #
 # `stock` is the evaluator nixbot would otherwise use, normally
-# options.services.nixbot.packages.nix-eval-jobs.default. Nothing selects
-# this package yet: checks.x86_64-linux.nix-eval-jobs-iets pins its shape,
-# and the nixbot module exposes magnetite's instance, unused, as
-# vanixiets.nixbot.ietsEvaluator.
+# options.services.nixbot.packages.nix-eval-jobs.default. Magnetite's
+# instance is vanixiets.nixbot.ietsEvaluator, which modules/nixos/nixbot.nix
+# selects, lock-wrapped, as nixbot's evaluator (CAM-111 task 5.2);
+# checks.x86_64-linux.nix-eval-jobs-iets pins its shape. Parity with the
+# stock evaluator (world assumption A147) was measured at iets 9157ca1a and
+# is not re-measured per bump (operator decision, 2026-11-20).
 { lib, ... }:
 {
   flake.lib.mkNixEvalJobsIets =

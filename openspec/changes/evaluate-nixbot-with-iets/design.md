@@ -52,7 +52,7 @@ Stakeholders: the operator, who maintains magnetite and reads the dev-loop view;
 - **Alternatives considered**: iets' `classic` package grafted with `.nix` (rejected by the operator: it bundles a second Nix closure and shims four other command names, and it is Linux-only); the plain `iets` package (fails at run time: no `bin/nix-eval-jobs`).
 
 ### D4: The `iets` flake input carries no `follows`
-- **Choice**: `inputs.iets.url = "github:numtide/iets"`, locked at `9157ca1a` or later, with no `inputs.nixpkgs.follows`.
+- **Choice**: `inputs.iets.url = "github:numtide/iets"`, locked at `9157ca1a` or later, with no `inputs.nixpkgs.follows`. The input tracks upstream and the flake-update effect proposes its updates like any other branch-tracking input; a bump is not re-measured against A147 (operator decision, 2026-11-20).
 - **Rationale**: the repository's rule against redirecting an upstream input's nixpkgs; the unredirected build is substituted from cache.numtide.com (the benchmark's `/nix/store/jk7bh7cc…-iets-0.2.0`), which is already a fleet substituter (`lib/caches.nix:8`, key at `:21`).
 - **Alternatives considered**: `follows = "nixpkgs"` (a local Rust build and an untested toolchain combination).
 
@@ -149,6 +149,7 @@ Stakeholders: the operator, who maintains magnetite and reads the dev-loop view;
 - [Risk] The patch adds a fifth carried patch on a fast-moving upstream file → Mitigation: it touches only the runner's tail and the stderr reader; a nixbot input bump that breaks it fails the nixbot package build; it is offered upstream.
 - [Trade-off] Routine worker recycling is not counted (open question 1) → accepted; the memory peak and kill counts bound what matters for D9's trigger.
 - [Trade-off] buildbot's and `nix-fast-build --remote`'s evaluations go unrecorded → accepted; they are out of scope and keep stock `nix-eval-jobs`.
+- [Trade-off] A147 is measured at `9157ca1a` only and is not re-measured per iets bump (operator decision, 2026-11-20): a uniform update process is preferred, and a difference a bump introduces is fixed as it arises, through 6.1's revert when it blocks builds → accepted; `checks.x86_64-linux.nix-eval-jobs-iets` checks each bump's package shape, not parity.
 
 ## Migration Plan
 
@@ -185,4 +186,4 @@ The repository has no BDD runner and no `.feature` file (`features/` is empty), 
 | An admitted person views the fleet's signals and the dev-loop history by host (evaluation and budget charts added) | `fleet-dashboard` | behavioral | build gate (`perses-lint`, `perses-greptimedb`) and smoke | tasks 1.9, 1.12, 7.4 |
 | Each `build-service-evaluator-interface` requirement | `build-service-evaluator-interface` | interface | build gate | tasks 1.1-1.4, 1.10, 1.11, 3.1, 3.2, 4.3, 5.2, 5.3 |
 | Each `devloop-collection-interface` requirement this change adds or modifies | `devloop-collection-interface` | interface | build gate (`devloop-ingest`, `otel-collector-config`) | tasks 1.5-1.8 |
-| A143-A147, A153 | `world-assumptions` | world | monitoring (violation scenarios) | A143 and A147 by the canary (4.4) and each iets bump; A144 and A145 by each evaluator bump; A146 by `nixbot-eval-record` and `devloop-ingest` at each nixbot bump; A153 at each collector bump |
+| A143-A147, A153 | `world-assumptions` | world | monitoring (violation scenarios) | A143 and A147 by the canary (4.4), not re-measured per iets bump (operator decision, 2026-11-20); A144 and A145 by each evaluator bump; A146 by `nixbot-eval-record` and `devloop-ingest` at each nixbot bump; A153 at each collector bump |
