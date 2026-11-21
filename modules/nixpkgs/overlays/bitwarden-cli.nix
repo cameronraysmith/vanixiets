@@ -4,11 +4,9 @@
 # TODO: Remove when upstream resolves punycode dependency
 # Date added: 2026-03-31
 #
-# Skipped on aarch64-darwin because stable-fallbacks.nix routes
-# pkgs.bitwarden-cli to the cached stable derivation on that platform
-# to avoid local rebuild from channel lag. overrideAttrs would force
-# a full rebuild even though the underlying stable output is cached;
-# accept the punycode warning there as a tradeoff for cache hit.
+# Skipped on aarch64-darwin so that platform keeps substituting the
+# cache.nixos.org build: overrideAttrs forces a full local rebuild, so the
+# punycode warning is accepted there as the price of the cache hit.
 { ... }:
 {
   nixpkgsOverlays = [

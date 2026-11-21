@@ -201,10 +201,10 @@
         proxied = false;
       };
 
-      # Parked services have no record: the sso-gateway's auth. and cognee's
-      # kb. (flake.lib.cognee.publicFqdn) were removed while both are off on
-      # magnetite. Restore the CNAME (unproxied, so ACME issuance works) when
-      # reviving either (modules/machines/nixos/magnetite/default.nix).
+      # A parked service has no record: the sso-gateway's auth. was removed
+      # while it is off on magnetite, as was kb. with the cognee server.
+      # Restore the CNAME (unproxied, so ACME issuance works) when reviving
+      # the gateway (modules/machines/nixos/magnetite/default.nix).
 
       # R2 custom domain for public cache access (Cloudflare auto-manages DNS CNAME)
       resource.cloudflare_r2_custom_domain.nix-cache = {

@@ -10,7 +10,7 @@
 # Checked against the hosts on 2026-11-18 (`ss -ltn`/`ss -lun`, the active
 # units, magnetite's nginx virtual hosts and cinnabar's Caddyfile, and an
 # HTTPS probe of each name). A module that is imported but disabled, such
-# as the parked sso-gateway or cognee on magnetite, is not declared, and a
+# as the parked sso-gateway on magnetite, is not declared, and a
 # name answered by Cloudflare, such as niks3's cache., is not declared on a
 # host.
 #

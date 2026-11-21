@@ -60,9 +60,9 @@
         };
         parkedLeftOut = accepted // {
           postgresql = accepted.postgresql // {
-            ensureDatabases = databases ++ [ "cognee" ];
+            ensureDatabases = databases ++ [ "parked" ];
           };
-          parked = [ "cognee" ];
+          parked = [ "parked" ];
           problems = 0;
         };
         awaitingSecrets = accepted // {

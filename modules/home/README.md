@@ -93,7 +93,7 @@ The fifth builds the sandbox profile that the Devin snapshot activates.
 
 - `agents/` — agent CLIs (apm, cursor-agent, droid, gemini-cli, claudebox, claude-monitor, golem, hindsight, ouroboros); secret-free like `herdr/`, because the harness supplies credentials at run time, whereas `ai/` reads sops secrets.
   Distinct from the `agents-md` module under `modules/`, which generates the per-harness context files (`AGENTS.md`, `CLAUDE.md`, and others).
-- `ai/` — agent tooling that needs sops secrets (cognee, opencode, moshi, devin); indexed by its own README.
+- `ai/` — agent tooling that needs sops secrets (opencode, moshi, devin); indexed by its own README.
 - `base/` — sops-nix wiring, including activation without systemd.
 - `bioinformatics/` — sequence alignment and SRA retrieval (minimap2, STAR, xsra).
 - `compute/` — cloud, container, and Kubernetes command-line tools (gcloud, kubectl, helm, argo, crane, lima, and others).

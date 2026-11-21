@@ -8,11 +8,10 @@
 #   - inputs: Raw flake inputs reference
 #   - nixpkgs: Main nixpkgs (unstable) - for reference
 #   - patched: nixpkgs with patches applied (empty in test-clan)
-#   - stable: OS-specific stable nixpkgs (darwin-stable or linux-stable)
+#   - stable: OS-specific stable nixpkgs (parked: commented out below)
 #   - unstable: Explicit unstable nixpkgs (same as nixpkgs, for clarity)
 #
 # Usage in other overlays or configurations:
-#   pkgs.stable.packageName       # Get package from stable channel
 #   pkgs.unstable.packageName     # Explicit unstable reference
 #
 { inputs, ... }:
@@ -45,13 +44,13 @@
           patches = [ ]; # Empty in test-clan
         }) nixpkgsConfig;
 
+        # ~keep Restore with nixpkgs-{darwin,linux}-stable in flake.nix inputs.
         # Stable channel (OS-specific: darwin-stable or linux-stable)
-        # Direct conditional based on system (test-clan doesn't have lib'.systemInput)
-        stable =
-          if prev.stdenv.hostPlatform.isDarwin then
-            import inputs.nixpkgs-darwin-stable nixpkgsConfig
-          else
-            import inputs.nixpkgs-linux-stable nixpkgsConfig;
+        # stable =
+        #   if prev.stdenv.hostPlatform.isDarwin then
+        #     import inputs.nixpkgs-darwin-stable nixpkgsConfig
+        #   else
+        #     import inputs.nixpkgs-linux-stable nixpkgsConfig;
 
         # Explicit unstable (for clarity when pulling from unstable)
         unstable = import inputs.nixpkgs nixpkgsConfig;

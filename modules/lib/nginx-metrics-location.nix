@@ -3,8 +3,7 @@
 # The regex covers /metrics, /metrics/ and anything under /metrics/ without
 # shadowing sibling paths such as /metricsfoo.
 # The ranges are the tincr mesh prefix from flake.lib.mesh and, until ZeroTier
-# is retired, the /64 of the members' ZeroTier addresses in flake.lib.hosts,
-# which cognee's no-public-bind assertion also admits (modules/nixos/cognee.nix).
+# is retired, the /64 of the members' ZeroTier addresses in flake.lib.hosts.
 { config, lib, ... }:
 let
   inherit (config.flake.lib) hosts mesh;

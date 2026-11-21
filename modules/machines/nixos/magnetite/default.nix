@@ -6,7 +6,6 @@
 let
   flakeModules = config.flake.modules.nixos;
   flakeUsers = config.flake.users;
-  cogneeLib = config.flake.lib.cognee;
   inherit (config.flake.lib.hosts) magnetite;
   inherit (config.flake.lib) fleet;
   inherit (config.flake.lib) meshInterfaces;
@@ -48,7 +47,6 @@ in
         inputs.niks3.nixosModules.niks3
         inputs.nixbot.nixosModules.nixbot
         inputs.gitea-mq.nixosModules.default
-        inputs.cognee-nix.nixosModules.cognee
       ]
       ++ (with flakeModules; [
         base
@@ -66,7 +64,6 @@ in
         gitea-mq
         renovate
         gitea
-        cognee
         sso-gateway
         perses
         gitea-actions-runner
@@ -155,40 +152,21 @@ in
       };
 
       # Parked, not removed: the shared kanidm-OIDC SSO gateway
-      # (modules/nixos/sso-gateway.nix) and the cognee server
-      # (modules/nixos/cognee.nix) stay imported and off, and their generated
-      # vars (sso-cookie-secret, kanidm-oauth2-sso, cognee-*) and the
-      # root/cognee dataset are kept. Neither has a public DNS record any more
-      # (modules/terranix/cloudflare.nix). To revive one, set its enable below,
-      # restore its CNAME (auth. for the gateway, flake.lib.cognee.publicFqdn
-      # for cognee) and declare it in modules/lib/topology-facts.nix. The
-      # gateway's auth-root redirect to the kanidm portal and its apps-portal
-      # icon were dropped with "chore: expunge buildbot and kanban, park
-      # sso-gateway and cognee"; recover them from that commit's parent.
-      # cognee registers behind the gateway (below) only when it is enabled.
+      # (modules/nixos/sso-gateway.nix) stays imported and off, and its
+      # generated vars (sso-cookie-secret, kanidm-oauth2-sso) are kept. It has
+      # no public DNS record any more (modules/terranix/cloudflare.nix). To
+      # revive it, set its enable below, restore its auth. CNAME and declare it
+      # in modules/lib/topology-facts.nix. Its auth-root redirect to the kanidm
+      # portal and its apps-portal icon were dropped with "chore: expunge
+      # buildbot and kanban, park sso-gateway and cognee"; recover them from
+      # that commit's parent.
       sso.enable = false;
 
-      vanixiets.cognee.enable = false;
-
-      sso.services.cognee = lib.mkIf config.vanixiets.cognee.enable {
-        domain = cogneeLib.publicFqdn;
-        allowedGroups = [ "cognee_access" ];
-        upstream = {
-          "/" = "http://127.0.0.1:3000";
-          "/api/" = "http://[${magnetite.zerotier.address}]:9270";
-        };
-        # Dedicated apps-portal tile launching the cognee UI, scoped (via the
-        # gateway) to cognee_access — the same group in allowedGroups, so tile
-        # visibility matches gateway admission.
-        portalCard = {
-          displayName = "Cognee";
-          landingUrl = "https://${cogneeLib.publicFqdn}";
-          imageFile = pkgs.fetchurl {
-            url = "https://raw.githubusercontent.com/topoteretes/cognee/b7fcc7faa51acffc28386392f0250521c1536679/cognee-frontend/src/app/icon.svg";
-            hash = "sha256-5o5gLrjcuFhKxjEtTNfalPcs2VrBhdRRonedH6CmmnA=";
-          };
-        };
-      };
+      # The removed cognee server's database and root/cognee dataset are kept.
+      # The database is unreadable without pgvector (F63), so the collector's
+      # collation drift receiver and the backup set leave it out. Drop this
+      # together with that database.
+      vanixiets.postgresqlCollation.parkedDatabases = [ "cognee" ];
 
       # Tune ZFS auto-snapshot retention for a single-disk cloud VPS without
       # off-site snapshot replication. The nixpkgs defaults (frequent=4,

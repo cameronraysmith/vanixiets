@@ -9,8 +9,9 @@
     nixpkgs.url = "https://channels.nixos.org/nixos-unstable-small/nixexprs.tar.xz";
     systems.url = "github:nix-systems/default";
 
-    nixpkgs-darwin-stable.url = "https://channels.nixos.org/nixpkgs-26.05-darwin/nixexprs.tar.xz";
-    nixpkgs-linux-stable.url = "https://channels.nixos.org/nixos-26.05/nixexprs.tar.xz";
+    # ~keep Restore with `stable` in modules/nixpkgs/overlays/channels.nix; advance to 26.11 when released.
+    # nixpkgs-darwin-stable.url = "https://channels.nixos.org/nixpkgs-26.05-darwin/nixexprs.tar.xz";
+    # nixpkgs-linux-stable.url = "https://channels.nixos.org/nixos-26.05/nixexprs.tar.xz";
 
     flake-parts.url = "github:hercules-ci/flake-parts";
     flake-parts.inputs.nixpkgs-lib.follows = "nixpkgs";
@@ -19,9 +20,6 @@
 
     nix-darwin.url = "github:nix-darwin/nix-darwin";
     nix-darwin.inputs.nixpkgs.follows = "nixpkgs";
-
-    mac-app-util.url = "github:hraban/mac-app-util";
-    mac-app-util.inputs.nixpkgs.follows = "nixpkgs";
 
     home-manager.url = "github:nix-community/home-manager";
     home-manager.inputs.nixpkgs.follows = "nixpkgs";
@@ -59,10 +57,6 @@
     git-hooks.inputs.nixpkgs.follows = "nixpkgs";
     git-hooks.inputs.flake-compat.follows = "";
 
-    nix-unit.url = "github:nix-community/nix-unit/v2.35.1";
-    nix-unit.inputs.nixpkgs.follows = "nixpkgs";
-    nix-unit.inputs.treefmt-nix.follows = "treefmt-nix";
-
     lazyvim-nix.url = "github:pfassina/lazyvim-nix/v16.0.1";
     lazyvim-nix.inputs.nixpkgs.follows = "nixpkgs";
 
@@ -85,8 +79,6 @@
     tincr.inputs.treefmt-nix.follows = "treefmt-nix";
 
     harmonia.url = "github:nix-community/harmonia";
-
-    cognee-nix.url = "github:cameronraysmith/cognee-nix/cognee-v112";
 
     nixbot.url = "github:Mic92/nixbot";
     nixbot.inputs.nixpkgs.follows = "nixpkgs";
