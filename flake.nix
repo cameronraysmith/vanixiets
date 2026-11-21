@@ -98,7 +98,7 @@
     # assumption A147), so an update is a deliberate, re-measured change.
     # No follows: the input keeps its own nixpkgs, and its build is
     # substituted from cache.numtide.com (lib/caches.nix).
-    iets.url = "github:numtide/iets/9157ca1a2a50c085bcd7fd0004d9ba71e2b7c1e0";
+    iets.url = "github:numtide/iets/1daf93d4982c33a2f2103232f7d2170851ff9188";
 
     gitea-mq.url = "github:Mic92/gitea-mq";
     gitea-mq.inputs.nixpkgs.follows = "nixpkgs";
