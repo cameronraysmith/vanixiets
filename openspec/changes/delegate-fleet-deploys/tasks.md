@@ -217,7 +217,16 @@
   - the first exits 5 within one minute, with no change on rosegold;
   - the second exits 0, the log shows target `cameron@…`, and the darwin machine-key guard passes;
   - every alert since each request started is recorded with its cause.
-  - rosegold: not reached. It needs a window with janettesmith logged in at the console; physical presence is not needed (F72, design Risks).
+  - rosegold, awake (2026-11-21, janettesmith and cameron at the console, held awake with `caffeinate`):
+    - 15:19Z: a manual `CLAN_NO_COMMIT=1 clan machines update rosegold` from a throwaway clone of 6ffb8fac installed the F84 job, giving generation 22 `6yzgrfwy…`. Its record names previous `pi3pl8da…`, so F86 holds on a second Mac (`logs/cam115-6.3-rosegold-20261121T1519Z-1-manual-update.log`).
+    - 15:27Z: a same-closure request (`8da9881f6a10`) exited 0, but its watcher stayed loaded, waiting for a change that never came (F90, fixed by #4107). It was disarmed by hand (`logs/cam115-6.3-rosegold-20261121T1527Z-2-request.log`, `logs/cam115-6.3-rosegold-20261121T1532Z-f90-disarm.log`).
+    - 16:00Z, main 15ae4039: `omnigent-janettesmith` on magnetite sent `fleet-deploy rosegold --session cam115-e2e-6.3-rosegold-change`.
+      - It resolved `k1r0jdz5…`, a change from `6yzgrfwy…`, with narinfo 200, and exited 0 with target `cameron@rosegold.zt`. Request `9ea5e932d22f`, one p3 post, no fleet-alerts.
+      - The watcher ran as root in `system`; it was the pre-F90 one, armed from generation 22. It logged "activated k1r0jdz5…" and "confirmed", then unloaded, leaving `/var/run/fleet-deploy` empty.
+      - Generation 23 `k1r0jdz5…` is the running system, and the installed `fleet-deploy-watch` is now the F90 version (`k583jxyl…`).
+      - The record names previous `6yzgrfwy…`. otelcol and the sops-nix agent are up, and both console sessions remain. tincr shows last exit 1, as before the deploy.
+      - The machine-key guard was not checked separately (`logs/cam115-6.3-rosegold-20261121T1600Z-change.log`).
+  - rosegold, asleep: not run yet; it waits for rosegold to sleep.
   - argentum (2026-11-19, `omnigent-cameron` on magnetite), in place of rosegold, so this does not meet the clause:
     - Asleep (18:36Z, 71ec4d13): exit 5, `cameron@argentum.zt did not answer within 10 s`, no change on argentum, request `40e4fcaf7806`. It took 133 s, not ≤ 60 s, because the resolve runs before the reachability probe (F83, design Risks; `logs/cam115-e2e3-20261119T1836Z-6.3.log`).
     - Awake (18:43Z): argentum reached `jcnmknlh…`, but the request reported `rolled-back` (8). That was F84 (5.3) and nothing was rolled back (`logs/cam115-e2e3-20261119T1843Z-6.3-awake.log`).
