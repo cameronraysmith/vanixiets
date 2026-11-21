@@ -116,7 +116,7 @@ console.log("PASS definition import and shape (no registry reload, models, VCS o
 const sliceModule = await import(moduleUrl(`${root}/slice.ts`));
 const sliceDefinition = sliceModule.default;
 const compact = (await import(moduleUrl(".atomic/workflows/bump/tools.ts"))).assertCompactCheckpoint;
-await (await import("./controller-checks.mjs")).controllerChecks({ definition, sliceDefinition, sliceModule, migrationDefinition: migration.default, Operations: operations.Operations, operations, contracts, source, compact, models, modelResult, realArtifacts: process.argv.includes("--provenance-artifacts") });
+await (await import("./controller-checks.mjs")).controllerChecks({ definition, sliceDefinition, sliceModule, migrationDefinition: migration.default, Operations: operations.Operations, operations, contracts, source, compact, models, modelResult });
 for (const expression of [gates.baselineExpr(source.source), gates.stateExpr(source.source, ["magnetite"]), gates.workersExpr(source.source, "stibnite")]) {
   execFileSync("nix-instantiate", ["--parse", "--expr", expression], { stdio: ["ignore", "pipe", "pipe"] });
 }

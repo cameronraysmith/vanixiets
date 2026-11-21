@@ -133,7 +133,7 @@ No provider identity, model grant, SSH key or signing credential is inherited or
 
 Janette's canonical profile and worker owner are `janettesmith`; her Linux account is `omnigent-janettesmith`, with host names `magnetite-janettesmith` and `pyrite-janettesmith`.
 Her primary/SSO mail is `janette.a.smith@gmail.com`, her GitHub username is `janetteasmith`, and her Git/jj author mail is `125711642+janetteasmith@users.noreply.github.com`.
-The existing `github-email` helper verified that author address during read-only B1 research, recorded in `.atomic/workflows/runs/fan-out-and-synthesize-47eef966-2b3f-4a5b-8a3e-57860db40b96/branch-01-b1-janette-identity-and-sso-mapping.md`.
+The existing `github-email` helper verified that author address during read-only B1 research on 2026-09-12.
 Evaluation and activation use the recorded constant, never a GitHub lookup.
 `meta.gitEmail` defaults to `meta.email` for other profiles; Janette's human author mail and `allowed_signers` principal use her explicit Git address without changing signing authority.
 Her Git configuration also derives `[github] user = "janetteasmith"` from `meta.githubUser`, following the existing human-profile convention.

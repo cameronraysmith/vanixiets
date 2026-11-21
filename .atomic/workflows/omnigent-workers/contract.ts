@@ -5,7 +5,6 @@ export const repository = "/Users/crs58/projects/vanixiets";
 export const chain = "omnigent-magnetite";
 export const model = "openai-codex/gpt-6-astra";
 export const modelOptions = { model: `${model}:high`, thinkingLevel: "high", fallbackModels: [] } as const;
-export const research = ".atomic/workflows/runs/fan-out-and-synthesize-cdf84325-0d11-4b73-8451-009787d3a765/synthesis.md";
 export const hosts = ["magnetite", "pyrite", "stibnite"] as const;
 export type Host = typeof hosts[number];
 export const phases = ["capabilities", "linux", "darwin", "inventory", "identity", "credentials", ...hosts, "closure"] as const;

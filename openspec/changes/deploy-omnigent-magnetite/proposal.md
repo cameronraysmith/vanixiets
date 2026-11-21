@@ -59,7 +59,8 @@ No new flake input, additional runner rollout, dedicated-user migration, backup 
 
 ## Contract and readiness
 
-The current S0–S3 contracts are `slice-0.json` through `slice-3.json` under `.atomic/workflows/runs/deploy-omnigent/omnigent-magnetite/d0064db1-3756-4e49-ae30-e03f23ca0bd7/`.
+The current S0–S3 contracts are `slice-0.json` through `slice-3.json` of the untracked deploy-omnigent run `d0064db1-3756-4e49-ae30-e03f23ca0bd7` (2026-09-07).
+They cover the plan amendment and Linear binding (S0), the PyPI 0.12.0 wheel package (S1), the server module (S2), and the host module with two-role clan composition (S3).
 This run reuses the existing CAM-57 binding recorded above; its timestamp records the earlier binding operation, not a fresh remote readback.
 Those acceptance lists and deterministic gates remain unchanged; `tasks.md` is the HIL task ledger, not a replacement gate implementation.
 The current S1–S3 gates use `__OMNIGENT_SOURCE__` instead of the previous run's working-copy source; the controller supplies that source, and this writer neither substitutes a guessed revision nor edits those gates.

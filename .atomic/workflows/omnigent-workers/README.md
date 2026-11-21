@@ -178,13 +178,9 @@ They cover integrated-only failure despite chain equality, fixed baselines throu
 Supplemental fixtures pin the pre-identity expression digest and unchanged historical payload, accept the real HM four-field identity change, reject a fifth Janette package/settings/service/key/mode change, and reject four-field drift in credentials and later phases.
 Controller fixtures also require the same-role supplemental baseline files in writer reads before edits, retain them through repairs, and reject standalone Darwin generation drift.
 Phase fixtures cover all six implementation children, implementation/closure resume indices, credentials-receipt readiness, per-host preparation gates, and join-scoped routing child selection with off-join peers and an unfinished-splice negative control.
-For this repair's separately recorded immutable real-source probes, `--provenance-artifacts` reuses the private ignored C0/J0 and complete archive-movement outputs rather than evaluating the mutable fleet.
-That optional lane retains real projection contents but uses explicitly synthetic routed commit labels; it does not create Git objects or route real changes.
-The separate probe logs, immutable source URLs and projection hashes establish the real Nix semantics, not the controller mocks.
 
 ```sh
 node .atomic/workflows/omnigent-workers/check.mjs --model-only
-node .atomic/workflows/omnigent-workers/check.mjs --provenance-artifacts
 ```
 
 Use a 5400-second deadline and `set -o pipefail` with `tee` into ignored `logs/` for each validation command.

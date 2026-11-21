@@ -5,7 +5,7 @@ import { randomUUID } from "node:crypto";
 import { join } from "node:path";
 import implementation from "./omnigent-workers/slice.js";
 import migration from "./omnigent-workers/migration.js";
-import { inputs, repository, phases, hosts, Receipt, Stop, rethrowControl, research, type Receipt as SliceReceipt } from "./omnigent-workers/contract.js";
+import { inputs, repository, phases, hosts, Receipt, Stop, rethrowControl, type Receipt as SliceReceipt } from "./omnigent-workers/contract.js";
 import { Operations, currentModel } from "./omnigent-workers/operations.js";
 
 export default workflow({
@@ -32,7 +32,7 @@ export default workflow({
     const ops = new Operations(ctx, root, timeout);
     const receipts: SliceReceipt[] = [];
     const migrated: { host: string; sha: string; system: string; evidence: string; acceptance: "human_attested" }[] = [];
-    const reads = [research];
+    const reads: string[] = [];
     try {
       await ops.observeSource("preflight");
       if (ctx.inputs.start_at > 0 && (ctx.inputs.start_at < phases.indexOf(hosts[0]) || phases[ctx.inputs.start_at] === "closure")) {

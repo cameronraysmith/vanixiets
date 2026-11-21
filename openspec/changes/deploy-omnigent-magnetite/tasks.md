@@ -1,7 +1,6 @@
 ## 1. S0 amend-plan
 
-This ledger follows the S0–S3 contracts in `.atomic/workflows/runs/deploy-omnigent/omnigent-magnetite/d0064db1-3756-4e49-ae30-e03f23ca0bd7/`.
-The `slice-N.json` references below resolve under that evidence root.
+This ledger follows the S0–S3 contracts, `slice-0.json` through `slice-3.json` of the untracked deploy-omnigent run `d0064db1-3756-4e49-ae30-e03f23ca0bd7` (2026-09-07); the `slice-N.json` references below name those files.
 All checkboxes are pending controller acceptance, including the tracking work performed during binding.
 Remote operations, including the Linear readback gate, builds on remote machines, version-control changes, and deployment belong to the controller, never to a scoped writer.
 The `.#` examples below identify attributes, not substitutes for the current contracts' `__OMNIGENT_SOURCE__` input; the controller resolves that input before executing the literal S1–S3 gates.
@@ -30,7 +29,7 @@ The 0.12.0 literals in 2.1–2.2 record what S1 verified at the time.
 
 Depends on accepted S1.
 Only `modules/nixos/omnigent.nix`, `modules/nixos/kanidm.nix`, and `modules/terranix/cloudflare.nix` are writable in this slice.
-Use the `extendModules` fixture from `slice-2.json`; the clan binding does not exist yet.
+The S2 gates evaluate magnetite through an `extendModules` fixture (the `fixture` export in `.atomic/workflows/omnigent/slices.ts`) that imports `modules.nixos.omnigent` with the S2 server settings, because the clan binding does not exist yet.
 
 - [ ] 3.1 Add the plain server module, static omnigent account, shared PostgreSQL socket/peer connection, database ownership, memory limits, and ordering after and requiring `postgresql.target` — verify: fixture evaluations retain `omnigent`, `matrix-synapse`, and `buildbot` databases, PostgreSQL version starts with `16.`, and the ordering assertion in `slice-2.json` passes.
 - [ ] 3.2 Configure confidential client `omnigent`, exact issuer `https://accounts.scientistexperience.net/oauth2/openid/omnigent`, group `omnigent_users`, callback and landing URLs, and scope map `[ "openid" "profile" "email" ]` — verify: the Kanidm group and exact scope-map fixture gates pass, while review confirms PKCE and email verification remain enabled and membership stays operational.

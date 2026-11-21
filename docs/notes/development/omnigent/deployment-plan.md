@@ -524,7 +524,8 @@ The `.#` examples below name attributes for local exploration; the current S1–
 - The separate `pyrite-never-sleep` change owns machine sleep policy; S8 neither depends on it nor changes that policy, and the runner must work whether or not pyrite sleeps.
   A genuine conflict requires replanning, not a silent sleep-policy change.
 
-S8's current immutable contract is `.atomic/workflows/runs/deploy-omnigent/omnigent-magnetite/4af2fa57-541b-42f8-a307-24e76f99a40d/slice-8.json`.
+S8's current immutable contract was `slice-8.json` of the untracked deploy-omnigent run `4af2fa57-541b-42f8-a307-24e76f99a40d` (2026-09-09), which attached pyrite as the third host.
+That run ended `completed-with-caveat`: S0–S8 verified and magnetite deployment probes observed, with operator acceptance incomplete.
 Its account-selection and isolated per-machine override fixtures, foreground unit/environment/PATH and intermittent lifecycle predicates, exact shared ACP settings, and magnetite/stibnite regression predicates must all pass.
 The earlier run `dff899f2-8c1e-476b-85d9-134ca4df3863` was blocked by its G5 partial override fixture, not by machine sleep policy.
 That 2026-09-09 evaluation failed because G5 added a second `machines.pyrite.settings` definition beside the required inventory environment binding; pinned Clan declares that option as non-mergeable `types.raw` (`/nix/store/mf3mvkbkb54prnwj46x83whirp041d7i-source/lib/inventory/distributed-service/service-module.nix:209-217`).
@@ -535,7 +536,8 @@ The independent artifact gate inspects the selected user's actual HM activation 
 The controller builds `checks.x86_64-linux.nixos-pyrite` once via `NixBuildRemote` on magnetite, never pyrite; no second machine build is needed for artifact inspection.
 The D7 human checklist alone establishes pyrite UI online state, a completed turn and automatic suspend/resume return.
 
-S10's current immutable contract is `.atomic/workflows/runs/deploy-omnigent/omnigent-magnetite/8af34f82-2163-47d0-9a7a-ff10610dd0a8/slice-10.json`.
+S10's current immutable contract was `slice-10.json` of the untracked deploy-omnigent run `8af34f82-2163-47d0-9a7a-ff10610dd0a8` (2026-09-09), which implemented the approved direnv mechanism on both runner modules.
+That run recorded S0–S10 verified but ended `blocked` on the development-join S7 gate (index 9), with deployment not attempted.
 It supersedes run `c047a554-2b00-4819-a626-87a74fdbc852` by binding the executable checks directly to each host's configured Bash output on its empty-extras PATH; the acceptance list and runtime implementation remain unchanged.
 Evaluate all three effective runner PATHs with empty extras and compare each rendered HM `direnv.toml` whitelist against the configured home plus `/projects`, including changed-home fixtures.
 The shared-source check must retain exactly the reviewed common packages, Linux-only bubblewrap and the Darwin system suffix; all S7/S8 account, foreground, PI carrier, ACP and lifecycle regressions remain required.
@@ -564,7 +566,8 @@ printf '%s' "$TOK" | python3 -c 'import sys,json,base64; t=json.load(sys.stdin);
 
 ### S7 Darwin regression checks after S10
 
-The immutable run contract is `.atomic/workflows/runs/deploy-omnigent/omnigent-magnetite/80f36dda-338d-469b-ae83-dd94df58e7bc/slice-7.json`.
+The immutable run contract was `slice-7.json` of the untracked deploy-omnigent run `80f36dda-338d-469b-ae83-dd94df58e7bc` (2026-09-09), which attached stibnite as the second host.
+That run ended `completed-with-caveat`: S0–S7 verified and deployment probes observed, with operator acceptance incomplete.
 Its literal acceptance list and deterministic gates remain the historical S7 contract; the inspection commands below retain its regressions with S8's three-host roster and S10's expanded required PATH.
 The current S10 contract above owns those amended expectations; no historical gate artifact is edited.
 Set `OMNIGENT_SOURCE` to the controller's pinned implementation source, not an unchanged branch tip or an untracked working-tree approximation.
@@ -845,7 +848,7 @@ The old Raquel activation candidate is superseded and must not be activated or r
 
 Janette's canonical profile/owner is `janettesmith`, her Unix worker account is `omnigent-janettesmith`, and the host names are `magnetite-janettesmith` and `pyrite-janettesmith`.
 Her primary/SSO address is `janette.a.smith@gmail.com`; her GitHub username is `janetteasmith`.
-The existing `github-email` helper returned `125711642+janetteasmith@users.noreply.github.com` during read-only research, as recorded in `.atomic/workflows/runs/fan-out-and-synthesize-47eef966-2b3f-4a5b-8a3e-57860db40b96/branch-01-b1-janette-identity-and-sso-mapping.md`.
+The existing `github-email` helper returned `125711642+janetteasmith@users.noreply.github.com` during read-only research on 2026-09-12.
 The implementation records that constant in typed `meta.gitEmail`, whose default remains `meta.email` for every other profile.
 No GitHub lookup runs during evaluation, checks or activation.
 
@@ -858,7 +861,7 @@ This identity correction grants no signing key, personal age identity, SSH agent
 The role-agnostic `omnigent-worker-inventory` check asserts canonical metadata and human author/principal; account bindings and the narrow worker-HM binding moved to `flake.lib.omnigentFleetObligations`, asserted on each real machine's own toplevel check.
 Its negative fixtures reject wrong Git/jj mail, host name and unrelated binding content alongside the existing authority exclusions.
 The controller separately compares C1 against fixed chain C0 `e235c5ae9bb32b54b0631fff97087c1a163a8230` and J1 against fixed integrated J0 `b7962a09eb9ec81467db8b1d4d05c552284e3a82`.
-The original supplemental baselines in `.atomic/workflows/runs/omnigent-workers/7b0fc94a-ba03-4078-b113-6cfc4435121c/identity/` retain Janette's complete human projection.
+The original supplemental baselines evaluated Janette's complete human projection at the fixed C0 and J0 revisions above.
 The controller-approved identity allowance covers exactly Git author mail, jj mail, the signer principal and `programs.git.settings.github.user`, plus generated artifacts whose differences follow only from those fields.
 The GitHub field is required by canonical `meta.githubUser`; its absence from the original three-field allowance was a controller-contract gap, not a reason to suppress normal profile behavior.
 Janette's home is not excluded from comparison.
@@ -1072,7 +1075,7 @@ It applies to an enabled NixOS iptables firewall, with IPv6 hooks following `net
 The September 15 source/live reconciliation found six copies of each rule on cinnabar and an interrupted magnetite activation, not a builder Unix-account defect.
 The switch failed while reading a disappearing logind user object's GID, before firewall and other pending service work.
 An advanced system profile is not successful activation; preserve the pending firewall, Home Manager and sysinit work.
-Source and live evidence are indexed in `.atomic/workflows/runs/fan-out-and-synthesize-eb58d561-2895-4d2e-a3f2-8a0be9caa1de/synthesis.md`.
+That reconciliation was a read-only research run on 2026-09-15; it performed no recovery, restart, deployment or source change.
 
 Before activation approval, require both platform `zerotier-mss-clamp` structural checks, the isolated Linux `zerotier-mss-clamp-runtime` check, `nix develop -c prek run --all-files`, independent review, one signed delivery child and a build of the exact routed integrated join's magnetite closure.
 The VM must exercise actual NixOS firewall unit scripts and real iptables/ip6tables through install, legacy-duplicate convergence, repeated reload/restart, stop and re-enable, with unrelated-rule preservation and material-error checks.

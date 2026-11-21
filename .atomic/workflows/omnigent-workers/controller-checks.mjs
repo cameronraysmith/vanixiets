@@ -1,13 +1,12 @@
 import assert from "node:assert/strict";
 import { mkdir, writeFile, readFile } from "node:fs/promises";
 
-export async function controllerChecks({ definition, sliceDefinition, sliceModule, migrationDefinition, Operations, operations, contracts, source, compact, models, modelResult, realArtifacts }) {
+export async function controllerChecks({ definition, sliceDefinition, sliceModule, migrationDefinition, Operations, operations, contracts, source, compact, models, modelResult }) {
   const root = `.atomic/workflows/runs/omnigent-workers-tests/${Date.now()}`;
   await mkdir(root, { recursive: true });
   const tree = `${root}/tree.json`;
   await writeFile(tree, "{}");
-  const load = async (name) => JSON.parse(await readFile(`.atomic/workflows/runs/omnigent-workers-real-provenance-${name}.json`, "utf8"));
-  const values = realArtifacts ? { c0: await load("snapshot-c0"), c1: await load("snapshot-c1"), j0: await load("j0"), j1: await load("snapshot-j1"), negative: await load("snapshot-j-negative") } : { c0: { humans: { generation: "chain" }, server: "server" }, c1: { humans: { generation: "chain" }, server: "server" }, j0: { humans: { generation: "integrated-with-niri" }, server: "server" }, j1: { humans: { generation: "integrated-with-niri" }, server: "server" }, negative: { humans: { generation: "integrated-niri-changed" }, server: "server" } };
+  const values = { c0: { humans: { generation: "chain" }, server: "server" }, c1: { humans: { generation: "chain" }, server: "server" }, j0: { humans: { generation: "integrated-with-niri" }, server: "server" }, j1: { humans: { generation: "integrated-with-niri" }, server: "server" }, negative: { humans: { generation: "integrated-niri-changed" }, server: "server" } };
   assert.deepEqual(values.c0, values.c1);
   assert.deepEqual(values.j0, values.j1);
   assert.notDeepEqual(values.c0, values.j0);
@@ -56,7 +55,7 @@ export async function controllerChecks({ definition, sliceDefinition, sliceModul
         if (name.startsWith("review")) {
           review++;
           structured = config.contractFault ? { kind: "contract_defect", reason: "gate cannot check required property" } : { kind: "approved", evidence: [tree] };
-          const evidence = JSON.parse(await readFile(opts.reads[1], "utf8"));
+          const evidence = JSON.parse(await readFile(opts.reads[0], "utf8"));
           ctx.reviewEvidence = evidence;
           assert.equal(evidence.protectedResult.baseline.source.sha, source.sha);
           assert.equal(evidence.integratedResult.baseline.source.sha, source.join.sha);
@@ -157,7 +156,7 @@ export async function controllerChecks({ definition, sliceDefinition, sliceModul
   const accepted = JSON.parse(await readFile(metadata.receipt.evidence, "utf8"));
   assert.equal(accepted.verifiedIntegrated.sha, routed.join.sha);
   assert.equal(accepted.acceptanceContext.current.join.sha, "d".repeat(40), "an advanced join must not relabel the old integrated receipt");
-  console.log(`PASS paired controller preservation${realArtifacts ? " backed by real immutable projection artifacts" : " (offline differentiated fixtures)"}: matching roles, attributed chain route, integrated-only negative, tool failure, foreign drift, metadata-only movement and labelled later join`);
+  console.log("PASS paired controller preservation (offline differentiated fixtures): matching roles, attributed chain route, integrated-only negative, tool failure, foreign drift, metadata-only movement and labelled later join");
   const childInput = { phase: "linux", root, timeout: 1000, max_repairs: 2, verify_only: false, reads: [] };
   ctx = context(childInput, { gateFailure: true });
   const repaired = await sliceDefinition.run(ctx);
