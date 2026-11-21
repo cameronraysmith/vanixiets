@@ -428,7 +428,8 @@ A term found to denote two distinct phenomena within this repository's vocabular
 | batch event | — | one of the five transitions the merge queue announces for a batch: formed, built, landed, bisecting and done | shared |
 | deploy | — | one activation, in the machine sense, of a configuration on a host, including the one each NixOS boot performs | shared |
 | deploy record | — | the entry a host writes at each deploy naming the host, the closure it activated, the closure it replaced and the time | shared |
-| closure | — | the complete built system a configuration produces for one host, identified by its store path | shared |
+| closure | host | the complete built system a configuration produces for one host, identified by its store path | shared |
+| closure | home | the complete set of built files and programs one account's home configuration produces, which a cloud session's setup step fetches from the binary cache and activates without producing it | shared |
 | collected host | — | a host whose deploy records a collector ships to the telemetry store: magnetite, cinnabar, pyrite and stibnite | shared |
 | error text | — | the free-form message the build service keeps when an attribute or a build fails, which can carry compiler output and repository content | shared |
 | message body | — | the free text of a log record, as distinct from the named fields parsed out of it | shared |
@@ -440,6 +441,7 @@ A term found to denote two distinct phenomena within this repository's vocabular
 | event | dev-loop | one occurrence in the dev loop, such as an attribute finishing, a build finishing, a batch transition or a deploy, that one dev-loop record describes | shared |
 | field | — | one named value a dev-loop record or a source's entry carries | shared |
 | credential | service database | a password or other secret that authenticates a reader to a service's own relational database | shared |
+| credential | Linear | a key that lets an agent act in one of the operator's Linear workspaces, kept in a secret file that only the readers named for it can open | shared |
 | agent host | — | a host of the fleet that runs a collector of its own, which gathers that host's signals and sends them on to the telemetry store | shared |
 | provisioned host | — | a host of the fleet that currently exists and runs, as opposed to one that is only configured and is created on demand | world-only |
 | ingress | — | the part of magnetite's collector that alone accepts other hosts' signals and writes them to the telemetry store | shared |
@@ -560,11 +562,14 @@ A term found to denote two distinct phenomena within this repository's vocabular
 | approval card | — | the prompt the platform shows the operator before it applies a change to a cloud environment that a cloud session proposes | shared |
 | operator action | — | an act the operator performs by hand, such as starting a cloud session with a prompt, as distinct from accepting an approval card | world-only |
 | Linear workspace | — | a named organisation on Linear in which the operator's issues, projects and documents live, reached with a key that workspace issues | world-only |
+| disk | — | the persistent storage of a cloud session's container, which survives into the environment snapshot, as distinct from memory-backed storage that does not | shared |
+| interactive terminal | — | a terminal screen a person watches and types into while a program runs, as distinct from a shell that only runs commands and returns their output | world-only |
+| clipboard | — | the copy-and-paste buffer of a person's desktop session | world-only |
 
 #### Scenario: The terms with two senses are read
 
 - **WHEN** the table is read for terms that carry two senses in this repository
-- **THEN** twenty-five terms carry more than one sense today and are disambiguated by separate rows rather than left to context: `session`, `package`, `policy`, `@`, `mutation`, `activation`, `probe`, `machine`, `host`, `interface`, `repository`, `build service`, `database`, `hostname`, `evaluator`, `person`, `writer`, `account`, `build`, `path`, `credential`, `identifier`, `browser`, `release`, and `reader`, of which `probe` and `release` carry three and every other term two
+- **THEN** twenty-six terms carry more than one sense today and are disambiguated by separate rows rather than left to context: `session`, `package`, `policy`, `@`, `mutation`, `activation`, `probe`, `machine`, `host`, `interface`, `repository`, `build service`, `database`, `hostname`, `evaluator`, `person`, `writer`, `account`, `build`, `path`, `credential`, `identifier`, `browser`, `release`, `reader`, and `closure`, of which `probe`, `release` and `credential` carry three and every other term two
 
 #### Scenario: A term resolves to two phenomena
 

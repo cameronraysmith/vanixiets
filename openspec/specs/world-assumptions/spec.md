@@ -260,7 +260,8 @@ A term found to denote two distinct phenomena within this repository's vocabular
 | batch event | — | one of the five transitions the merge queue announces for a batch: formed, built, landed, bisecting and done | shared |
 | deploy | — | one activation, in the machine sense, of a configuration on a host, including the one each NixOS boot performs | shared |
 | deploy record | — | the entry a host writes at each deploy naming the host, the closure it activated, the closure it replaced and the time | shared |
-| closure | — | the complete built system a configuration produces for one host, identified by its store path | shared |
+| closure | host | the complete built system a configuration produces for one host, identified by its store path | shared |
+| closure | home | the complete set of built files and programs one account's home configuration produces, which a cloud session's setup step fetches from the binary cache and activates without producing it | shared |
 | collected host | — | a host whose deploy records a collector ships to the telemetry store: magnetite, cinnabar, pyrite and stibnite | shared |
 | error text | — | the free-form message the build service keeps when an attribute or a build fails, which can carry compiler output and repository content | shared |
 | message body | — | the free text of a log record, as distinct from the named fields parsed out of it | shared |
@@ -272,6 +273,7 @@ A term found to denote two distinct phenomena within this repository's vocabular
 | event | dev-loop | one occurrence in the dev loop, such as an attribute finishing, a build finishing, a batch transition or a deploy, that one dev-loop record describes | shared |
 | field | — | one named value a dev-loop record or a source's entry carries | shared |
 | credential | service database | a password or other secret that authenticates a reader to a service's own relational database | shared |
+| credential | Linear | a key that lets an agent act in one of the operator's Linear workspaces, kept in a secret file that only the readers named for it can open | shared |
 | agent host | — | a host of the fleet that runs a collector of its own, which gathers that host's signals and sends them on to the telemetry store | shared |
 | provisioned host | — | a host of the fleet that currently exists and runs, as opposed to one that is only configured and is created on demand | world-only |
 | ingress | — | the part of magnetite's collector that alone accepts other hosts' signals and writes them to the telemetry store | shared |
@@ -370,11 +372,36 @@ A term found to denote two distinct phenomena within this repository's vocabular
 | Renovate instance | — | one running copy of the dependency updater's software, writing to the forge under one forge identity; the hosted updater and the fleet's updater are two instances | shared |
 | flake-input updater | — | the dependency updater that refreshes the locked revisions of branch-tracking flake inputs, one pull request per input, apart from Renovate | shared |
 | branch-tracking flake input | — | a flake input whose declaration names a branch, or no reference at all, so its locked revision moves whenever that branch does | shared |
+| cloud session | — | a Claude Code conversation that runs in a container Anthropic hosts, started from claude.ai/code, the command line or another cloud session | shared |
+| cloud environment | — | a named definition the operator owns on Anthropic's platform (allowed hosts, variables, setup step) from which cloud sessions start | shared |
+| container | — | the virtual machine one cloud session runs in, either freshly built or started from an environment snapshot | shared |
+| setup step | — | the shell script a cloud environment defines, which the platform runs as root in a freshly built container after cloning the attached repositories and before the model starts | shared |
+| environment snapshot | — | the platform's saved copy of a container's disk after a successful setup step, from which later cloud sessions on the same cloud environment start without running it | shared |
+| first prompt | — | the first turn of a cloud session, whose context the model reads before any of its tools runs | shared |
+| user context | — | the instructions this repository generates for the operator's agents to follow in every repository they work in | shared |
+| skill corpus | — | the named agent skills this repository composes for the operator's agents, first-party and vendored | shared |
+| skill | — | one named set of instructions in the skill corpus, which an agent lists in its context and reads in full when it uses it | shared |
+| required tool | — | a command-line program a skill tells the agent to run and cannot do its work without | shared |
+| agent's shell | — | the shell in which a cloud session's agent runs commands | shared |
+| attached repository | — | a repository selected when a cloud session starts, which the platform clones into its container and serves through the GitHub gate | shared |
+| repository context | — | the instructions a repository carries for agents working in it, as distinct from the user context | shared |
+| harness-owned state | — | the files and programs the platform places in a container and manages itself, such as its launcher settings, its hooks, its synced skills and the Claude Code program | shared |
+| GitHub gate | — | the platform's filter on a cloud session's GitHub traffic, which refuses archive, codeload and API requests for repositories not attached to the session and serves anonymous git reads | world-only |
+| pinned revision | — | one commit of this repository named by its full hash | shared |
+| bootstrap run | — | one execution, inside a container, of the work this repository defines to install the user context, the skill corpus, the required tools and the repository context | shared |
+| bootstrap report | — | a record a bootstrap run leaves in the container, stating what it installed, what it could not install and why, readable by the operator from the cloud session | shared |
+| controller session | — | a cloud session the operator starts to create other cloud sessions on its cloud environment, change that environment's setup step and read what the other sessions report | shared |
+| approval card | — | the prompt the platform shows the operator before it applies a change to a cloud environment that a cloud session proposes | shared |
+| operator action | — | an act the operator performs by hand, such as starting a cloud session with a prompt, as distinct from accepting an approval card | world-only |
+| Linear workspace | — | a named organisation on Linear in which the operator's issues, projects and documents live, reached with a key that workspace issues | world-only |
+| disk | — | the persistent storage of a cloud session's container, which survives into the environment snapshot, as distinct from memory-backed storage that does not | shared |
+| interactive terminal | — | a terminal screen a person watches and types into while a program runs, as distinct from a shell that only runs commands and returns their output | world-only |
+| clipboard | — | the copy-and-paste buffer of a person's desktop session | world-only |
 
 #### Scenario: The terms with two senses are read
 
 - **WHEN** the table is read for terms that carry two senses in this repository
-- **THEN** twenty-five terms carry more than one sense today and are disambiguated by separate rows rather than left to context: `session`, `package`, `policy`, `@`, `mutation`, `activation`, `probe`, `machine`, `host`, `interface`, `repository`, `build service`, `database`, `hostname`, `evaluator`, `person`, `writer`, `account`, `build`, `path`, `credential`, `identifier`, `browser`, `release`, and `reader`, of which `probe` and `release` carry three and every other term two
+- **THEN** twenty-six terms carry more than one sense today and are disambiguated by separate rows rather than left to context: `session`, `package`, `policy`, `@`, `mutation`, `activation`, `probe`, `machine`, `host`, `interface`, `repository`, `build service`, `database`, `hostname`, `evaluator`, `person`, `writer`, `account`, `build`, `path`, `credential`, `identifier`, `browser`, `release`, `reader`, and `closure`, of which `probe`, `release` and `credential` carry three and every other term two
 
 #### Scenario: A term resolves to two phenomena
 
@@ -1058,3 +1085,258 @@ Any requirement relying on this SHALL name it and SHALL lose its discharge once 
 
 - **WHEN** the download's superpowers-list step fails to fetch the declared commit while GitHub is reachable
 - **THEN** this assumption is void, and `third-party-plugin-dependency` requirement `superpowers and agency are consumed per skill directory` loses the discharge of its upstream-list scenario
+
+### Requirement: A167 — Context and skills written by the setup step reach a cloud session's first prompt
+
+It is true of a cloud session, independent of what this fleet builds, that a user context file the setup step writes at `/root/.claude/CLAUDE.md` and a skill it writes under `/root/.claude/skills/` are shown and listed in the first prompt.
+Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL lose its discharge once the violation below is observed.
+
+#### Scenario: Measured on 2026-11-21
+
+- **WHEN** a setup step writes a marker into the user context file and a marker skill, and a cloud session starts
+- **THEN** the session reports both markers in its first context; observed in probe session 1 (file written 19:12:47.145, session state created 19:12:47.8) and in probe session 2's children A, A2, B and B2, each of which also loaded the skill on use
+
+#### Scenario: Setup-written context or skills stop reaching the first prompt
+
+- **WHEN** a cloud session started after such a setup step does not show that context or list that skill in its first prompt
+- **THEN** this assumption is void, and the `claude-sandbox-bootstrap` requirement `Context and skills from the first prompt` loses its discharge
+
+### Requirement: A168 — A later cloud session starts from the environment snapshot without running the setup step
+
+It is true of a cloud environment, independent of what this fleet builds, that once its setup step has succeeded, a later cloud session on it starts from the environment snapshot, with that run's files, without running the setup step again.
+Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL lose its discharge once the violation below is observed.
+
+#### Scenario: Measured on 2026-11-21
+
+- **WHEN** a second cloud session is created on an unchanged cloud environment after a successful setup step
+- **THEN** it runs within about 10 seconds with no new setup run; observed for child A2 (booted 19:23:32, one setup run 19:22:17–19:22:52) and child B2 (booted 19:32:44, one run 19:25:26–19:31:27)
+
+#### Scenario: A later session re-runs the setup step
+
+- **WHEN** a cloud session started on an unchanged cloud environment whose setup step already succeeded runs it again, or lacks the files it wrote
+- **THEN** this assumption is void, and the `claude-sandbox-bootstrap` requirements `Context and skills from the first prompt` and `Setup finishes within the snapshot window` lose their discharge
+
+### Requirement: A169 — A 360-second setup step completes and is snapshotted
+
+It is true of a cloud environment, independent of what this fleet builds, that a 360-second setup step is neither cut off nor left uncached, contrary to the documented five-minute bound; the actual ceiling is unknown.
+Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL lose its discharge once the violation below is observed.
+
+#### Scenario: Measured on 2026-11-21
+
+- **WHEN** a setup step sleeps until it has run for 360 seconds
+- **THEN** the session waits for it and later sessions start from its snapshot; observed for child B (`nix_run_rc=0 secs=360`, 19:25:26–19:31:26, agent at 19:31:35) and child B2
+
+#### Scenario: A setup step of 360 seconds or less is cut off or not cached
+
+- **WHEN** a setup step of at most 360 seconds is terminated before it finishes, or the next session on the unchanged cloud environment runs it again
+- **THEN** this assumption is void, and the `claude-sandbox-bootstrap` requirement `Setup finishes within the snapshot window` loses its discharge
+
+### Requirement: A170 — A setup step that exits non-zero prevents the cloud session from starting
+
+It is true of a cloud environment, independent of what this fleet builds, that a setup step exiting non-zero leaves the cloud session unable to start or recover, whatever `CCR_SETUP_SCRIPT_FAILURE_CONTINUES` holds.
+Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL lose its discharge once the violation below is observed.
+
+#### Scenario: Measured on 2026-11-21
+
+- **WHEN** a setup step exits 3 on purpose
+- **THEN** the session never starts its model; observed for child D: exit 3 at 19:34:36, `last_init_error` "Setup script failed" with `recoverable=false`, still pending at 19:35:42, `num_turns=0`, with `CCR_SETUP_SCRIPT_FAILURE_CONTINUES` present in the setup step's environment
+
+#### Scenario: A failed setup step no longer blocks the session
+
+- **WHEN** a cloud session whose setup step exited non-zero starts its model anyway
+- **THEN** this assumption is void, and the `claude-sandbox-bootstrap` requirement `Setup never prevents a session from starting` loses the reason it rests on, though not its discharge
+
+### Requirement: A171 — The setup step runs twice on a cloud environment's first use
+
+It is true of a cloud environment, independent of what this fleet builds, that the first session after a setup script change runs the setup step twice: in the session's container and in one that builds the environment snapshot.
+Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL lose its discharge once the violation below is observed.
+
+#### Scenario: Measured on 2026-11-21
+
+- **WHEN** a cloud session is created right after a setup script change
+- **THEN** two runs occur; observed for child A, whose run ended 19:22:40 while the run in A2's snapshot started the same second and ended 19:22:52, and the platform logged "Saving setup for next time" with `setup_source=building_checkpoint` for A and for D
+
+#### Scenario: The setup step runs a different number of times
+
+- **WHEN** a setup script change is followed by more than two runs before a later session starts from a snapshot, or the two runs share a container
+- **THEN** this assumption is void, and the `claude-sandbox-bootstrap` requirement `Idempotent setup without external side effects` must be re-argued against the observed runs
+
+### Requirement: A172 — The setup step runs as root after attached repositories are cloned, without the environment's variables or secrets
+
+It is true of a cloud environment, independent of what this fleet builds, that the setup step runs as root in `/home/user` after the attached repositories are cloned there, and cannot read the environment's variables or secrets.
+Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL lose its discharge once the violation below is observed.
+
+#### Scenario: Measured on 2026-11-21
+
+- **WHEN** a setup step logs its identity, directory and the repositories present
+- **THEN** probe session 1 recorded `id=root pwd=/home/user repos=/home/user/vanixiets/` and no session identifier among the variable names; the platform's `update_environment` description states "The script cannot read the environment's saved variables or secrets"
+
+#### Scenario: The setup step's identity, order or inputs change
+
+- **WHEN** the setup step runs as another account, before the attached repositories are cloned, or with the environment's variables or secrets readable
+- **THEN** this assumption is void, and the `claude-sandbox-bootstrap` requirements `Context and skills from the first prompt`, `No secret at rest` and `Attached repositories get their repository context` lose their discharge
+
+### Requirement: A173 — The agent's shell inherits neither login profiles nor setup-step exports
+
+It is true of a cloud session, independent of what this fleet builds, that the agent's shell is a non-login bash from a saved shell snapshot that `/etc/profile.d` and `.bashrc` do not reach, with `CLAUDE_ENV_FILE` unset outside hooks.
+Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL lose its discharge once the violation below is observed.
+
+#### Scenario: Measured on 2026-11-21
+
+- **WHEN** a setup step writes exports to `/etc/profile.d` and `/root/.bashrc` and the agent's shell prints its environment
+- **THEN** probe session 1 (P4) found both exports unset, `login_shell` off, `CLAUDE_ENV_FILE` unset, `NIX_PROFILES`, `NIX_SSL_CERT_FILE`, `HOME` and `PATH` set, and `USER` unset
+
+#### Scenario: The agent's shell environment changes
+
+- **WHEN** the agent's shell starts as a login shell, picks up profile or bashrc exports, or loses `NIX_PROFILES`
+- **THEN** this assumption is void, and the `claude-sandbox-bootstrap` requirement `Required tools present` must be re-argued against how tools then reach the shell
+
+### Requirement: A174 — A cloud session's container has one filesystem with about 64 GB free
+
+It is true of a cloud session's container, independent of what this fleet builds, that `/`, `/nix`, `/home` and `/tmp` share one filesystem with about 64 GB free, more than the documented 30 GB.
+Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL lose its discharge once the violation below is observed.
+
+#### Scenario: Measured on 2026-11-21
+
+- **WHEN** the agent's shell measures free space and writes a large file
+- **THEN** probe session 1 (P9) measured 64,375,160,832 bytes available on `/dev/vda` and `fallocate -l 35G` succeeded; no quota mechanism was observed
+
+#### Scenario: Available disk shrinks
+
+- **WHEN** a fresh container has less free space than the bootstrap's closure needs, or a write within the measured size fails
+- **THEN** this assumption is void, and the `claude-sandbox-bootstrap` requirements `Context and skills from the first prompt` and `Required tools present` lose their discharge for closures larger than the space available
+
+### Requirement: A175 — The GitHub gate refuses unattached repositories' archives while channels, allowlisted caches and anonymous git reads are served
+
+It is true of the operator's limited-network cloud environments, independent of what this fleet builds, that the GitHub gate refuses `github:` flake inputs, while anonymous git reads, `channels.nixos.org` and the allowlisted binary caches are served.
+Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL lose its discharge once the violation below is observed.
+
+#### Scenario: Measured on 2026-11-21
+
+- **WHEN** a cloud session fetches an unattached repository's archive, the same repository over git, the registry's `nixpkgs`, and the binary caches
+- **THEN** the archive got 403 "GitHub access to this repository is not enabled for this session", `nix flake prefetch git+https://github.com/vic/import-tree` succeeded, `nix path-info --store` answered from `cache.nixos.org` and `cache.scientistexperience.net` (V11, V12, V22), and `nixpkgs` resolved to `https://channels.nixos.org/nixpkgs-unstable/nixexprs.tar.zst` with no 403 (probe session 1, P8)
+
+#### Scenario: The gate or the allowlist changes
+
+- **WHEN** anonymous git reads of public repositories are refused, the channels or an allowlisted cache stop answering, or the gate stops refusing archives
+- **THEN** this assumption is void, and the `claude-sandbox-bootstrap` requirements `One closure defines the environment` and `Attached repositories get their repository context` lose their discharge, or in the last case gain simpler designs
+
+### Requirement: A176 — A pinned remote `git+https` sub-flake runs from the setup step in about 23 seconds
+
+It is true of a cloud environment, independent of what this fleet builds, that its setup step can `nix run` a pinned `git+https` sub-flake of this repository whose only input is a `channels.nixos.org` tarball, in about 23 seconds.
+Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL lose its discharge once the violation below is observed.
+
+#### Scenario: Measured on 2026-11-21
+
+- **WHEN** the setup step runs `nix run "git+https://github.com/cameronraysmith/vanixiets?rev=7fffbd2c2464f7663348fde7882541b430507714&shallow=1&dir=bootstrap/claude-sandbox"` (branch `claude-sandbox-dev`)
+- **THEN** child A's setup log records the fetch, 50 paths (30.6 MiB) from `cache.nixos.org`, the build of `claude-sandbox-probe`, and `nix_run_rc=0 secs=23`
+
+#### Scenario: The pinned remote run fails or slows
+
+- **WHEN** a pinned `git+https` run of a channels-only sub-flake fails from the setup step, or takes long enough that the bootstrap exceeds the measured setup bound
+- **THEN** this assumption is void; since Q91 (2026-11-21) the setup step names a closure instead of running a sub-flake, so no `claude-sandbox-bootstrap` requirement rests on it
+
+### Requirement: A177 — Nix is preinstalled single-user, with root trusted and only cache.nixos.org configured
+
+It is true of a cloud session's base image, independent of what this fleet builds, that Nix 2.34.6 is preinstalled without a daemon, on a local store, trusting root, with only `cache.nixos.org` configured and flakes enabled.
+Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL lose its discharge once the violation below is observed.
+
+#### Scenario: Measured on 2026-11-21
+
+- **WHEN** a cloud session reads Nix's version, configuration and install receipt
+- **THEN** it finds the NixOS nix-installer's receipt, no `nix-daemon`, `Store URL: local`, `trusted-users = root`, `substituters` and `trusted-public-keys` naming only `cache.nixos.org`, and `accept-flake-config = false` (V8, V13, V14), and probe session 1 recorded `nix (Nix) 2.34.6`; reports from 2026-03 to 2026-09 describe other installers, so the image has changed before
+
+#### Scenario: The base image's Nix changes
+
+- **WHEN** a fresh container's Nix version, installer, store, trusted users or configured caches differ from the above
+- **THEN** this assumption is void, and the `claude-sandbox-bootstrap` requirements `One closure defines the environment` and `Setup finishes within the snapshot window` must be re-checked against the new base image
+
+### Requirement: A178 — The platform owns part of `/root/.claude` and leaves setup-written files beside it
+
+It is true of a cloud session, independent of what this fleet builds, that the platform writes and manages its own files under `/root/.claude`, and that files the setup step writes beside them survive into the session.
+Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL lose its discharge once the violation below is observed.
+
+#### Scenario: Measured on 2026-11-21
+
+- **WHEN** a cloud session lists `/root/.claude` and edits the platform's files
+- **THEN** it finds `launcher-settings.json` (an edit "was blocked by a deny rule"), `session-start-setup-script-failure.sh`, `stop-hook-git-check.sh`, `environment-manager/` and `skills/{session-start-hook,synced}` (V6, C18); in A2, `skills/synced` was rewritten at 19:23:38, after the snapshot, while the setup-written skill kept its 19:22:52 time
+
+#### Scenario: The platform rewrites setup-written files
+
+- **WHEN** a file the setup step wrote under `/root/.claude` is missing or replaced when the session starts, or the platform claims a path the bootstrap writes
+- **THEN** this assumption is void, and the `claude-sandbox-bootstrap` requirements `Context and skills from the first prompt` and `Additive to harness-owned state` lose their discharge
+
+### Requirement: A179 — A controller session can start cloud sessions, change the setup step, and read what they push
+
+It is true of a cloud session, independent of what this fleet builds, that it can create cloud sessions on its cloud environment, replace that environment's setup script behind one approval card per change, and read new branches of any name they push.
+Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL lose its discharge once the violation below is observed.
+
+#### Scenario: Measured on 2026-11-21
+
+- **WHEN** a controller session runs `create_session`, `update_environment`, `get_session` and `git fetch`
+- **THEN** probe session 2's controller created children A, A2, B, B2 and D, made four `update_environment` calls each answered `"setup_script_replaced":true` after one approval card, and read reports from `claude/sandbox-reports-s2A`, `-s2A2`, `-s2B` and `-s2B2`; probe session 1 pushed the new branches `claude/sandbox-reports` and `sandbox-reports-plain`
+
+#### Scenario: Session control or pushing is withdrawn
+
+- **WHEN** a cloud session can no longer create sessions, change its environment's setup script, or push a new branch, or each change needs more than one approval card
+- **THEN** this assumption is void, and the `claude-sandbox-bootstrap` requirements `One operator action per development iteration` and `Every bootstrap run reports` lose their discharge
+
+### Requirement: A180 — Packages activated as root reach the agent's shell through the image's default Nix profile
+
+It is true of a cloud session's base image, independent of what this fleet builds, that home-manager activated as root installs its packages into `/nix/var/nix/profiles/default`, whose `bin` is on the agent's shell `PATH`, and that the image's Nix, in the same profile, still runs afterwards.
+Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL lose its discharge once the violation below is observed.
+
+#### Scenario: Measured on 2026-11-21
+
+- **WHEN** session 3's children C1 and C2 start on a setup step that activated `claude-sandbox`'s activation package, and their agent's shell prints `PATH` and runs `command -v` on 18 tools
+- **THEN** `PATH` is the platform's `rm-guard` directory, then `/nix/var/nix/profiles/default/bin`, then system directories; all 18 tools (openspec, linear, jj, git, gh, ghq, mergify, jq, jaq, rg, fd, duckdb, just, uv, pandoc, sops, age, wt) resolve under `/nix/var/nix/profiles/default/bin`; `/root/.nix-profile` points at `per-user/root/profile` and `/root/.local/state/nix/profiles` does not exist; and the setup step read `nix=2.34.6` after activating, which is indirect evidence that Nix survived
+
+#### Scenario: The base image's Nix layout changes
+
+- **WHEN** a fresh container's Nix installer, default profile or harness `PATH` differ from the above (PA3: they changed between 2026-03 and 2026-09), a required tool no longer resolves under `/nix/var/nix/profiles/default/bin`, or `command -v nix` fails after activation
+- **THEN** this assumption is void, and the `claude-sandbox-bootstrap` requirement `Required tools present` loses its discharge and needs a `PATH` route of its own (a `CLAUDE_ENV_FILE` line from a SessionStart hook, or links into `/usr/local/bin`)
+
+### Requirement: A181 — The setup step runs when a container is claimed for a session, not when it boots
+
+It is true of a cloud environment, independent of what this fleet builds, that the platform keeps pre-warmed containers and runs the setup step when one is claimed for a session, using the setup script current at that moment.
+Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL lose its discharge once the violation below is observed.
+
+#### Scenario: Measured on 2026-11-21
+
+- **WHEN** session 4's controller created children E1, E3 and E4 and swapped the setup script between E2's and E4's creation
+- **THEN** E1, E3 and E4 each reported an `uptime -s` earlier than their `create_session` (E1 booted 22:06:32, created 22:08:28); E4 booted at 22:10:30 while the real script was installed, yet its only `setup.log` line is the broken script's run at 22:12:28Z, after its creation at 22:12:22
+
+#### Scenario: Setup runs at boot
+
+- **WHEN** a container's `setup.log` holds a run of a setup script that was replaced before the container was claimed
+- **THEN** this assumption is void, and the `claude-sandbox-bootstrap` requirement `One closure defines the environment` loses its discharge, because a session could start on a superseded closure
+
+### Requirement: A182 — A snapshot can come from a sibling container, not the cold session's own
+
+It is true of a cloud environment, independent of what this fleet builds, that the environment snapshot later sessions start from can be taken from a sibling container that ran the setup step alongside the cold session, rather than from the cold session's own container.
+Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL lose its discharge once the violation below is observed.
+
+#### Scenario: Measured on 2026-11-21
+
+- **WHEN** a snapshot-started session reads its `setup.log` and compares it with the cold session's
+- **THEN** session 4's E2 holds one line stamped 22:09:04Z with `activate=0/3s`, while E1's is 22:09:03Z with `activate=0/2s`; session 3's C2 holds 21:19:26Z, `realise=0/16s activate=0/4s`, while C1's is 21:19:25Z, `0/17s`, `0/3s`
+
+#### Scenario: The snapshot depends on the cold session's own run
+
+- **WHEN** a snapshot-started session holds only the cold session's own setup run, or a failure in a sibling's run leaves a snapshot the cold session never had
+- **THEN** this assumption is void, and the `claude-sandbox-bootstrap` requirement `Idempotent setup without external side effects` must be re-argued, since it relies on every run of the same script ending in the same state
+
+### Requirement: A183 — The workspace directory is not the session account's home
+
+It is true of a cloud session, independent of what this fleet builds, that `/home/user`, where the setup step starts and attached repositories are cloned, belongs to no account: no passwd entry `user` exists, `/home/user` is `root:root` 755, and the session runs as root with home `/root`.
+Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL lose its discharge once the violation below is observed.
+
+#### Scenario: Measured on 2026-11-21
+
+- **WHEN** task 7.2's child session on the Default cloud environment runs `getent passwd user`, `stat /home/user` and `id`
+- **THEN** they print "no passwd entry named user", `root:root 755 /home/user` and `uid=0(root) gid=0(root) groups=0(root)`
+
+#### Scenario: The workspace gains its own account or moves
+
+- **WHEN** a cloud session runs as an account whose home is `/home/user`, or attached repositories are cloned elsewhere
+- **THEN** this assumption is void, and the `claude-sandbox-bootstrap` requirement `Attached repositories get their repository context` loses its discharge until the workspace directory the profile names is re-measured

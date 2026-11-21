@@ -3,16 +3,19 @@ linear_story_id: CAM-118
 linear_story_identifier: CAM-118
 linear_story_title: "Bootstrap Claude Code cloud sessions from vanixiets"
 linear_story_url: https://linear.app/cameronraysmith/issue/CAM-118/bootstrap-claude-code-cloud-sessions-from-vanixiets
-linear_story_state: Todo
+linear_story_state: Done
 linear_team: CAM
 linear_project: pi-agent-environment
-last_synced_state: Todo
-last_synced_at: "2026-11-21T19:54:50Z"
+last_synced_state: Done
+last_synced_at: "2026-11-21T23:45:51Z"
 review_round: 0
 max_review_rounds: 3
 attempt_log:
   - { at: "2026-11-21T19:54:50Z", transition: "Backlog->Todo", outcome: "posted", note: "Issue CAM-118 created in Todo in project d7d743a19249 (Agent environment), team CAM, description seeded from proposal.md, no labels; binding comment posted; state and project confirmed by read-only view" }
   - { at: "2026-11-21T20:05:02Z", transition: "Todo (description sync)", outcome: "posted", note: "Description refreshed after the operator decided D1–D5; Linear deliverable no longer pending" }
+  - { at: "2026-11-21T23:45:51Z", transition: "Todo->In Progress->In Review", outcome: "dropped", note: "Not written by this ledger: the issue was already In Review when read before archive, moved outside this change's ledger; no catch-up transition was needed" }
+  - { at: "2026-11-21T23:45:51Z", transition: "archive->mirror", outcome: "posted", note: "Documents for project d7d743a19249: world-assumptions updated (c3ba657c), claude-sandbox-bootstrap (a218ded0) and claude-sandbox-interface (f041378c) created; ids written to openspec/linear.yaml" }
+  - { at: "2026-11-21T23:45:51Z", transition: "In Review->Done", outcome: "posted", note: "After the archive and mirror; completion comment posted; state Done confirmed by read-only view" }
 ---
 
 ## Why
@@ -51,12 +54,13 @@ The repository already generates the context, composes the skills and packages t
 
 ### New Capabilities
 - `claude-sandbox-bootstrap` (behavioral): what a cloud session started on the operator's cloud environment has from its first prompt, how the environment is defined and updated, and the bounds on the setup step (never blocking, idempotent, additive, secret-free, reporting).
+- `claude-sandbox-interface` (interface): the setup step names the `claude-sandbox` activation package by Nix store path, fetches it only from the two binary caches under their keys, and stays within the platform's script limits; the named path is the CI check's output.
+  Trust boundary: it guarantees what the setup step fetches and runs, not that the caches still hold the path, that the platform runs the setup step, or that activation succeeds.
 
 ### Modified Capabilities
 - `world-assumptions` (world): adds the cloud-platform facts measured by the 2026-11-21 probes as indicative assumptions with their evidence and violation conditions, and adds the designation rows for the cloud-session vocabulary the new capability uses.
 
-No interface capability is added yet.
-The interface's shared phenomena (where the required tools appear to the agent's shell, whether a setup-installed session hook runs) are what probe P4 measures, so the interface capability is added once P4 has run.
+The interface capability was added on 2026-11-22 (operator decision Q96), when the verification's designation lint found machine terms (activation package, store path, flake) in the behavioral requirement `One closure defines the environment`; they moved here, and that requirement kept its meaning in world terms.
 
 ## Impact
 

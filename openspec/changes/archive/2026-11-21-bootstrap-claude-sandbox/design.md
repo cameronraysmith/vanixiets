@@ -243,7 +243,7 @@ S is the specification the machine meets: D1's profile, D2's check, generated se
 | R | Discharged by S | Resting on W (A) and assumptions (S) |
 |---|---|---|
 | R1 Context and skills from the first prompt | D1 writes `~/.claude/CLAUDE.md` and `~/.claude/skills/<n>` at activation; D2 activates in setup | A167, A168, A172, A174, A178; S2, S3 |
-| R2 One closure defines the environment | D2's generated setup script naming the closure by store path, with its revision as provenance | A175, A177; S1 |
+| R2 One closure defines the environment | D2's generated setup script naming the closure by store path, with its revision as provenance; stated at the machine boundary by `claude-sandbox-interface` (added 2026-11-22, Q96) | A175, A177, A181; S1 |
 | R3 Setup never prevents a session from starting | D2's `exit 0` and degrade-on-failure | A170 (why it is needed) |
 | R4 Setup finishes within the snapshot window | D2 substitutes instead of evaluating | A169, A174; S3, S5 |
 | R5 Additive to harness-owned state | D1 writes only its own paths | A178 |
@@ -297,3 +297,6 @@ Default's allowed hosts and variables were not changed by the switch: the same h
   [INFERENCE] The likely cause in the cloud is the harness's own `/root/.gitconfig` together with a `GIT_CONFIG_GLOBAL` or `GHQ_ROOT` override, which would make `git config --global` read a different file than ghq consults.
   Next probe, at the next 30-day renewal: `env | grep -E '^(GIT_CONFIG|GHQ_ROOT|XDG_CONFIG)'` and `git config --show-origin --get-all ghq.root` in a child session.
   It matters beyond ghq: any git setting the profile writes to `/root/.config/git/config`, the commit author identity (`vcs.author`) included, may be shadowed in the same way.
+- Follow-up, not in this change's scope (Q97, accepted by the operator 2026-11-22): let a cloud environment track `main` by evaluating it in the sandbox, with the flake input sources served from the fleet's binary cache so the GitHub gate is never asked for them (PA5, V21).
+  It needs its own change and a probe first: whether every input's source substitutes by narHash from `cache.scientistexperience.net`, and how long evaluation takes against the 360 s bound.
+  This change archives as delivered, with the environment pinned to one closure (Q98, 2026-11-22).

@@ -1,4 +1,10 @@
-## ADDED Requirements
+# claude-sandbox-bootstrap Specification
+
+## Purpose
+
+What a Claude Code cloud session started on the operator's cloud environment has from its first prompt (user context, skill corpus, required tools, repository context, Linear credentials), how that environment is defined and renewed from one closure of this repository, and the bounds on its setup step: it never blocks a session, finishes inside the snapshot window, is idempotent and additive, keeps no secret at rest, and always reports.
+
+## Requirements
 
 ### Requirement: Context and skills from the first prompt
 
@@ -17,13 +23,13 @@ Providing them SHALL take no work in that cloud session beyond reading files alr
 
 ### Requirement: One closure defines the environment
 
-The cloud environment's setup step SHALL name one closure, the cloud-session activation package, by store path, with its source revision as provenance.
-Everything a session receives from this repository SHALL come from that closure, and the setup step SHALL NOT evaluate a flake.
+The cloud environment's setup step SHALL name one closure built from one pinned revision of this repository, and SHALL record that revision.
+Everything a cloud session receives from this repository SHALL come from that closure; the setup step SHALL only fetch and activate it, never produce it.
 The setup step SHALL be renewed at least every 30 days, while the binary cache still holds the closure.
 
 #### Scenario: Two sessions on one closure
 
-- **WHEN** two cloud sessions start on cloud environments whose setup steps name the same store path
+- **WHEN** two cloud sessions start on cloud environments whose setup steps name the same closure
 - **THEN** they receive the same user context, skill corpus and required tools
 
 #### Scenario: Updating the environment
@@ -142,7 +148,7 @@ Tools that need an interactive terminal, a clipboard or the fleet's overlay netw
 
 ### Requirement: One source for agent context and skills
 
-The user context, skill corpus and repository context a cloud session receives SHALL be produced by the same definitions in this repository that produce them for the operator's other agents, so that a change to one reaches both.
+The user context, skill corpus and repository context a cloud session receives SHALL be the same ones this repository generates for the operator's other agents, so that a change to one reaches both.
 
 #### Scenario: A context fragment changes
 
