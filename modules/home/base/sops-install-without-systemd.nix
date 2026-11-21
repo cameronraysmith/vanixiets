@@ -96,26 +96,41 @@
         rather than relying on entry order.
       '';
 
+      options.sopsInstallWithoutSystemd.atActivation = lib.mkOption {
+        type = lib.types.bool;
+        default = true;
+        description = ''
+          Whether activation installs the secrets. When false, activation
+          carries no install step at all, and sops-nix's own entry stays
+          replaced, so activating never decrypts whatever key is present; the
+          install is then owed by a session-start hook, such as the `sandbox`
+          aggregate's `session-env.sh`. For a profile activated by a step that
+          must hold no secret, whose result may be snapshotted.
+        '';
+      };
+
       config = lib.mkIf (cfg.enable && pkgs.stdenv.hostPlatform.isLinux && config.sops.secrets != { }) {
         home.activation.sops-nix = lib.mkForce "";
 
         # warnEcho on the skip: a profile whose secrets are not installed is
         # worth seeing on every activation, not only a verbose one.
-        home.activation.sopsInstallWithoutSystemd = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
-          systemdStatus=$(${systemctl} --user is-system-running 2>&1 || true)
+        home.activation.sopsInstallWithoutSystemd = lib.mkIf cfg.atActivation (
+          lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+            systemdStatus=$(${systemctl} --user is-system-running 2>&1 || true)
 
-          if ${ageKeyAbsent}; then
-            warnEcho "sops-nix: no age key at ${toString ageKeyFile}; skipping secret installation until an activation runs with the key present"
-          elif [[ $systemdStatus == 'running' || $systemdStatus == 'degraded' ]]; then
-            verboseEcho "sops-nix: user systemd manager is $systemdStatus; restarting the sops-nix unit"
-            run ${systemctl} restart --user sops-nix
-          else
-            verboseEcho "sops-nix: no user systemd manager; installing secrets directly"
-            ${ensureRuntimeDir}run env ${environment} ${installScript}
-          fi
+            if ${ageKeyAbsent}; then
+              warnEcho "sops-nix: no age key at ${toString ageKeyFile}; skipping secret installation until an activation runs with the key present"
+            elif [[ $systemdStatus == 'running' || $systemdStatus == 'degraded' ]]; then
+              verboseEcho "sops-nix: user systemd manager is $systemdStatus; restarting the sops-nix unit"
+              run ${systemctl} restart --user sops-nix
+            else
+              verboseEcho "sops-nix: no user systemd manager; installing secrets directly"
+              ${ensureRuntimeDir}run env ${environment} ${installScript}
+            fi
 
-          unset systemdStatus
-        '';
+            unset systemdStatus
+          ''
+        );
       };
     };
 }

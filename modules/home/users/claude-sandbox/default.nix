@@ -64,6 +64,58 @@ let
           exit 0
         '';
       };
+
+      # Installs D5's secrets at session start, the first point at which
+      # SOPS_AGE_KEY exists (A172); activation never decrypts (see
+      # sopsInstallWithoutSystemd.atActivation below). The install itself is the
+      # sandbox aggregate's session-env.sh, sourced by store path: it seeds the
+      # key into the tmpfs sopsDir and runs sops-nix's install, and its stamp
+      # makes a resumed session, which runs SessionStart again, a no-op. Claude
+      # Code adds a SessionStart hook's stdout to the model's context, so this
+      # prints nothing, records one line in the bootstrap report's run.log naming
+      # the paths it found installed (never a value), and always exits 0.
+      sopsDir = config.vanixiets.sandbox.sopsDir;
+      installedPaths =
+        map (template: template.path) (lib.attrValues config.sops.templates)
+        ++ map (secret: secret.path) (lib.attrValues config.sops.secrets);
+      sessionSecretsHook = pkgs.writeShellApplication {
+        name = "claude-sandbox-session-secrets";
+        runtimeInputs = [ pkgs.coreutils ];
+        text = ''
+          log_dir=${lib.escapeShellArg config.vanixiets.sandbox.bootstrapReport.directory}
+
+          record() {
+            mkdir -p "$log_dir" 2>/dev/null &&
+              printf '%s session-secrets %s\n' "$(date -u +%FT%TZ)" "$*" >>"$log_dir/run.log" 2>/dev/null
+          }
+
+          if [[ -z ''${SOPS_AGE_KEY:-} ]]; then
+            record "skipped=no SOPS_AGE_KEY" || true
+            exit 0
+          fi
+
+          (
+            set +euo pipefail
+            # shellcheck disable=SC1091
+            . ${config.xdg.configFile."vanixiets/session-env.sh".source}
+          ) </dev/null >/dev/null 2>&1 || true
+
+          status=none
+          if [[ -r ${sopsDir}/session-install.stamp ]]; then
+            read -r status <${sopsDir}/session-install.stamp || status=unreadable
+          fi
+          if [[ $status == ok ]]; then
+            installed=()
+            for path in ${lib.escapeShellArgs installedPaths}; do
+              [[ -e $path ]] && installed+=("$path")
+            done
+            record "status=ok rendered=$(IFS=,; printf '%s' "''${installed[*]}")" || true
+          else
+            record "status=$status log=${sopsDir}/session-install.log" || true
+          fi
+          exit 0
+        '';
+      };
     in
     {
       home.stateVersion = "23.11";
@@ -73,6 +125,22 @@ let
       home.homeDirectory = lib.mkForce "/root";
 
       vanixiets.sandbox.sopsDir = "/dev/shm/claude-sandbox-sops";
+
+      sops = {
+        defaultSopsFile = ../../../../secrets/home-manager/users/claude-sandbox/secrets.yaml;
+        secrets = {
+          linear-api-key-personal = { };
+          linear-api-key-work = { };
+          linear-workspace-personal = { };
+          linear-workspace-work = { };
+        };
+        templates."linear-credentials.toml" = flake.lib.mkLinearCredentialsTemplate config;
+      };
+
+      # The setup step activates before the session exists, cannot read
+      # SOPS_AGE_KEY (A172), and its result is snapshotted (R6), so activation
+      # carries no install step; sessionSecretsHook installs at session start.
+      sopsInstallWithoutSystemd.atActivation = false;
 
       # The cloud environment's setup script (`nix run .#claude-sandbox-setup-script`)
       # activates as root, and a controller session reads this report back.
@@ -94,6 +162,10 @@ let
         settings.hooks.SessionStart = [
           {
             hooks = [
+              {
+                type = "command";
+                command = lib.getExe sessionSecretsHook;
+              }
               {
                 type = "command";
                 command = lib.getExe repoContextHook;
