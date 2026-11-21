@@ -13,6 +13,7 @@ keys:
   - &christophersmith-user age1xz7gmqx7m0pn8u2nq8x05efq6dj52ym6c9gat5xj4am6x9sauq6sfzd2fn  # derived from SSH key via ssh-to-age
   - &tara-user age1krkf4ht5r2uufp0qkj6eu7pj9j04n7lz0tjlazmqzc3lhnjqt99sam42yp  # from sops-tara-user-ssh in Bitwarden
   - &ubuntu-user age1mg67ytvlmsyj6a7hk7v0p905jydx4vd483yqqsejf0n0vncmhy4sgu43kj  # from devin-ubuntu-ssh in Bitwarden via ssh-to-age
+  - &claude-sandbox-user age1sfddwr9waenu8du9mpxj7l4cfz7w3pkng4tc6xk4k4z09wj9tu8smr9xcf  # from sops-claude-sandbox in Bitwarden via ssh-to-age (2026-11-21)
 
   # Darwin host keys: ssh-to-age of the host key pinned in modules/system/ssh-known-hosts.nix
   - &blackphos age1ez8lkukzdjn8vqj8ly4k5y9eql5gz00mwyz3h2qhkh5m5tdzmc3swxkmdq   # from sops-blackphos-ssh
@@ -53,6 +54,14 @@ creation_rules:
         - *admin
         - *admin-user
         - *ubuntu-user
+
+  # Revocation: modules/home/users/claude-sandbox/README.md
+  - path_regex: secrets/home-manager/users/claude-sandbox/.*\.yaml$
+    key_groups:
+      - age:
+        - *admin
+        - *admin-user
+        - *claude-sandbox-user
 
   - path_regex: secrets/home-manager/users/christophersmith/.*\.yaml$
     key_groups:

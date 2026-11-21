@@ -16,7 +16,7 @@ The measurements this design relies on are quoted in `specs/world-assumptions` (
 ### Stakeholders
 
 The operator, who uses cloud sessions and approves every environment change.
-The `ubuntu` profile's users (Devin sandboxes), whose profile D1 refactors.
+The `ubuntu` profile's users: the repository's generic profile for non-NixOS Linux hosts (`home-bootstrap`'s default user; first used by Devin sandboxes), which D1 refactors.
 
 ### Designation index
 
@@ -146,7 +146,7 @@ All five decisions were authorized by the operator on 2026-11-21 as recommended.
   The identity defaults (`/home/<user>`) are overridden for root; `flake-shape.nix` gains `claude-sandbox@x86_64-linux`.
 - **Rationale**: M5 and M6: `ubuntu` lacks the agent modules and lives at `/home/ubuntu`; `ai` does not evaluate without crs58's secrets.
   Factoring keeps one copy of the sandbox handling (R13).
-- **Alternatives considered**: extend `ubuntu` (changes Devin's profile and keeps the wrong home and secret declarations); import `ai` with stub secrets (macOS paths and MCP servers would still be wrong).
+- **Alternatives considered**: extend `ubuntu` (changes the generic non-NixOS profile and keeps its `/home/ubuntu` home and its secret declarations); import `ai` with stub secrets (macOS paths and MCP servers would still be wrong).
 - **Boundaries**: source-versus-delivered: the profile is source; the activation package is what cloud sessions receive.
   Vendored-versus-first-party: the skill corpus keeps its vendored skills exactly as composed for other hosts; no vendored skill is edited.
   `ubuntu`'s activation package should be unchanged by the refactor except for store-path churn; that is checked, not assumed.
@@ -197,9 +197,13 @@ All five decisions were authorized by the operator on 2026-11-21 as recommended.
   - revocation removes the recipient from `.sops.yaml` and re-encrypts that one file, then clears the variable.
 - **Exposure**: the private key is readable by the model and by every process in every cloud session on that environment, and it decrypts every value in the scoped file.
   The file therefore holds nothing but the Linear workspace keys, so a disclosure exposes those keys and nothing else; the keys can be rotated in Linear.
+- **Source of the keys (Q93, decided 2026-11-21)**: the two API keys are the ubuntu profile's agent Linear keys, copied from `secrets/home-manager/users/ubuntu/secrets.yaml`, not the operator's; the workspace names are the same in both files.
+  Because they are not the operator's keys, rotating them never breaks the operator's workstations.
+  They are shared with the ubuntu profile, so a leak means rotating them for any active ubuntu host too; both `ubuntu-user` and `claude-sandbox-user` can decrypt them.
+  Dedicated sandbox keys remain a later two-command swap.
 - **Rationale**: M9: the Linear skills need a local credentials file and refuse `LINEAR_API_KEY`, so platform network secrets (header injection) cannot serve them.
   The setup step cannot read secrets (A172), so decryption happens at session start, and R6 forbids writing them to disk.
-- **Alternatives considered**: no secrets in the first version (leaves the Linear-bound workflow unusable); network secrets (rejected by M9); reusing `ubuntu-user` (would expose Devin's secrets, which include signing keys).
+- **Alternatives considered**: no secrets in the first version (leaves the Linear-bound workflow unusable); network secrets (rejected by M9); reusing the `ubuntu-user` recipient (it decrypts the whole `ubuntu` secrets file, which includes signing keys, so a leak would expose far more than the Linear keys).
 
 ## Risks / Trade-offs
 

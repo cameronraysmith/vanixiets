@@ -64,10 +64,13 @@ let
   };
   # Keys with no person, machine or host-key counterpart in the repository:
   # ci is the CI runner's SOPS_AGE_KEY; ubuntu-user is the Devin profile's key,
-  # which has no meta.sshKeys. dev is deliberately in no class.
+  # which has no meta.sshKeys; claude-sandbox-user is the Claude Code cloud
+  # environment's SOPS_AGE_KEY, whose profile has no meta.sshKeys either.
+  # dev is deliberately in no class.
   runnerAnchors = [
     "ci"
     "ubuntu-user"
+    "claude-sandbox-user"
   ];
   recoveryAnchors = [ "admin" ];
 
