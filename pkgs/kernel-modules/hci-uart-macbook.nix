@@ -10,15 +10,17 @@ let
   release = kernel.modDirVersion;
   kernelBuild = "${kernel.dev}/lib/modules/${release}/build";
 in
-# Linux 6.18.60 -> 6.18.63 revalidation: the patch target drivers/bluetooth/hci_bcm.c
-# is byte-identical. The only change compiled into this hci_uart.ko is two bounds
-# checks in hci_bcsp.c, a protocol the BCM serdev path never uses; it alone moves
-# the srcversion. Every other change under drivers/bluetooth and drivers/tty (btusb,
-# bfusb, btnxpuart, btrsi, hci_nokia, hci_vhci, serial_core, 8250 and other serial
-# drivers) is in-kernel only and not part of this module. The prepared .config and
-# autoconf.h differ only in the release and rustc version strings.
-assert lib.assertMsg (kernel.version == "6.18.63" && release == "6.18.63")
-  "hci-uart-macbook: only Linux 6.18.63 has been checked; revalidate source, prepared configuration, ABI and effective module selection before updating";
+# Linux 6.18.63 -> 6.18.64 revalidation (kernel.org patch-6.18.63-64 and the two nixpkgs
+# source tarballs): the patch target hci_bcm.c and the other hci_uart sources (hci_ldisc,
+# hci_serdev, hci_h4, hci_bcsp, hci_ll, hci_qca, hci_uart.h, btbcm.h, btqca.h and the
+# Makefile) are byte-identical, so the srcversion is unchanged. The only other changes
+# under drivers/bluetooth and drivers/tty are btqca.c (a WCN3950 baud-rate fix in the
+# separate btqca module, no export change) and the sc16is7xx serial driver. The prepared
+# .config and autoconf.h differ in the release string, the dropped SATA_INIC162X and the
+# LENOVO_WMI_DATA01 -> LENOVO_WMI_CAPDATA rename; Module.symvers only gains three exports
+# and moves two Lenovo WMI ones, none of which this module imports.
+assert lib.assertMsg (kernel.version == "6.18.64" && release == "6.18.64")
+  "hci-uart-macbook: only Linux 6.18.64 has been checked; revalidate source, prepared configuration, ABI and effective module selection before updating";
 kernel.stdenv.mkDerivation {
   pname = "hci-uart-macbook";
   version = "0-unstable-2026-09-14-${release}";
@@ -86,9 +88,9 @@ kernel.stdenv.mkDerivation {
     chmod -R u+w prepared
     test "$(cat prepared/include/config/kernel.release)" = '${release}'
     sha256sum -c <<'HASHES'
-    e436cfb17359ea48eae27d98e998b2e84c78dafa8351652da7cb34f8f8863d5d  prepared/.config
-    e8369fae7c20eeb179ea6c453cf105ba4396770de60b87aa64e38587255c1409  prepared/Module.symvers
-    ddf428e4209c2ce363817e3aed9cdb6778b5d7b556431a9c2a2dd74b598514d3  prepared/include/generated/autoconf.h
+    f3b02781525efd5fb71e11d367f88252c2fd7127ecab98faaeb62ef71db8ea5c  prepared/.config
+    d5f0a23a18f44adfed663d55b18bc257bd0e44cd5310301ec4faacea6a2b79c7  prepared/Module.symvers
+    16db6f667e784ca2d6c2a53937b08afe97204c87616e37271dc62b1d918993bd  prepared/include/generated/autoconf.h
     HASHES
     flagsArray=()
     concatTo flagsArray makeFlags makeFlagsArray
