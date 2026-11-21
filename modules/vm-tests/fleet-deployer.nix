@@ -296,6 +296,18 @@
                 assert last["closure"] == "${spec "next"}", last
                 assert records()[-1]["outcome"] == "deployed" and records()[-1]["commit"] == c1
 
+            with subtest("a deploy of the running closure ends its watcher once confirmed"):
+                # F90: the link never changes, so only the confirmation ends the
+                # watcher; it must not wait out activationWait.
+                commit("again", {"closure": "${spec "next"}", "again": "1"})
+                request("deploy target", 0)
+                target.wait_until_succeeds(
+                    "! systemctl list-units --no-legend --state=active,activating 'fleet-deploy-watch-*' | grep -q .",
+                    timeout=10,
+                )
+                target.succeed("journalctl --no-pager -t fleet-deploy-watch | grep -q 'confirmed; the system did not change'")
+                assert current() == "${spec "next"}"
+
             with subtest("a request in a hostile inherited environment still deploys"):
                 # sshd or runuser may hand the account root's runtime directory, no HOME
                 # and an unwritable TMPDIR; the request command must not use them.

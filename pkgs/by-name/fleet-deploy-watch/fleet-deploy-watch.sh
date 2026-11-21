@@ -17,21 +17,29 @@
 # reaches the host again. Without it, the host returns to the recorded
 # system: a new profile generation pointing at it, then its activation, which
 # also writes a deploy record. A system that never changes ends the watcher
-# without action.
+# without action. The confirmation ends it whenever it arrives, during the
+# activation wait too, so a deploy of the running closure does not leave
+# the watcher loaded for <activation-wait> seconds (F90).
 #
 # No `set -e`: the watcher unloads its own job on every path (finish) and
 # never exits early on error.
+#
+# FLEET_DEPLOY_WATCH_ROOT (prefixed to every path the watcher reads or
+# writes) and FLEET_DEPLOY_WATCH_OS (in place of `uname -s`) exist for
+# checks.x86_64-linux.fleet-deploy-watch only. sudo, launchd and systemd-run
+# start the watcher with neither set.
 set -u
 
-job=/etc/fleet-deploy-watch
+root=${FLEET_DEPLOY_WATCH_ROOT:-}
+job=$root/etc/fleet-deploy-watch
 domain='' label=''
 
-if [ "$(uname -s)" = Darwin ]; then
-  dir=/var/run/fleet-deploy
+if [ "${FLEET_DEPLOY_WATCH_OS:-$(uname -s)}" = Darwin ]; then
+  dir=$root/var/run/fleet-deploy
   domain=$(cat "$job/domain")
   label=$(cat "$job/label")
 else
-  dir=/run/fleet-deploy
+  dir=$root/run/fleet-deploy
 fi
 
 case "${1:-}" in
@@ -81,12 +89,18 @@ finish() {
   exit 0
 }
 
-current() { readlink -f /run/current-system; }
+current() { readlink -f "$root/run/current-system"; }
 
 before=$(current)
 echo "fleet-deploy-watch $id: watching $before as $(id -un)"
 waited=0
 while [ "$(current)" = "$before" ]; do
+  # A deploy of the running closure never changes the link; its confirmation
+  # ends the watcher as soon as it arrives (F90).
+  if [ -e "$dir/$id.confirmed" ]; then
+    echo "fleet-deploy-watch $id: confirmed; the system did not change"
+    finish
+  fi
   if [ "$waited" -ge "$wait" ]; then
     echo "fleet-deploy-watch $id: the system did not change within ${wait}s"
     finish
@@ -100,7 +114,7 @@ waited=0
 while [ ! -e "$dir/$id.confirmed" ]; do
   if [ "$waited" -ge "$window" ]; then
     echo "fleet-deploy-watch $id: no confirmation; returning to $before"
-    nix-env -p /nix/var/nix/profiles/system --set "$before"
+    nix-env -p "$root/nix/var/nix/profiles/system" --set "$before"
     if [ -n "$domain" ]; then
       "$before/activate"
     else

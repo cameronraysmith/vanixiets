@@ -121,7 +121,7 @@ The operator decided Q1-Q8 and, after Gate 1 was approved (Q33), Q30-Q32 on 2026
 
 ### D10: The target arms its own rollback before activation and the deployer confirms after verification
 - **Choice**: `fleet-deploy-watch <id> 7200 300`, started by `systemd-run` on NixOS. On darwin, `sudo fleet-deploy-watch --arm <id> 7200 300` bootstraps the job the target's configuration declares (`vanixiets.fleetDeployWatch`, rendered to `/etc/fleet-deploy-watch`) into launchd's system domain. There is one job label per host, and a second arm while it is loaded fails. The watcher:
-  - records `/run/current-system` and waits up to 2 h for it to change, then 300 s for `<run>/fleet-deploy/<id>.confirmed`;
+  - records `/run/current-system` and waits up to 2 h for it to change, then 300 s for `<run>/fleet-deploy/<id>.confirmed`; the confirmation ends it whenever it arrives, during the first wait too, so a deploy of the running closure does not keep it for 2 h (F90);
   - unless confirmed, sets a new system profile generation to the recorded system and activates it (`switch-to-configuration switch` or `activate`), which writes a deploy record.
 
   The deployer confirms as soon as SSH answers after the settle period, whatever the health result. It stops its watcher when the deploy command fails. When the confirm fails, it reads the target's `/run/current-system` until `confirmWindow + rollbackGrace` has passed, and reports rolled back only once the target runs the closure it ran before the deploy; otherwise the request is unconfirmed.

@@ -109,6 +109,7 @@ The fleet deployer's evaluation-time regulators are in the PR lane:
 - the machine checks module asserts `flake.lib.fleetDeployer.problems` (no disabled or excluded target, no reach outside the role policy);
 - `checks.x86_64-linux.fleet-deployer-obligations` runs both judges over fixtures and mutants;
 - `checks.x86_64-linux.fleet-deploy-request` runs the forced command's parser, and deploys to a darwin fixture target whose failed confirmation is `unconfirmed` (9) while it keeps the deployed closure and `rolled-back` (8) only once it runs its previous closure;
+- `checks.x86_64-linux.fleet-deploy-watch` runs the rollback watcher against a fixture root, as on NixOS and as the darwin job: a confirmed deploy of the running closure ends it promptly without a rollback (F90), as does a confirmed change; an unconfirmed change rolls back; an unchanged, unconfirmed system ends after the activation wait;
 - `checks.x86_64-linux.sops-correspondence` bounds the deployer's sops reach to its targets.
 
 `omnigent-worker-isolation` establishes the runtime wiring of the Omnigent worker guards that no evaluation-time check can reach: that the private-home precondition is `ExecStartPre` on the real `omnigent-host-<owner>.service` and that violating the home's privacy at runtime prevents `ExecStart`, that the Nix daemon resolves a worker as untrusted, that two workers have separate accounts and mutually unreadable private homes, and that the unit's `User`, `UMask`, `NoNewPrivileges` and SSH-agent unsetting hold in the spawned process.

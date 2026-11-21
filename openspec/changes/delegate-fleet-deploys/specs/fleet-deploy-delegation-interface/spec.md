@@ -138,6 +138,7 @@ When `flake.lib.fleetDeployer.keys` is set, every target SHALL carry `flake.lib.
 Before the deploy command runs, `fleet-deploy-request` SHALL read the target's `/run/current-system` as the previous closure and arm the watcher. On NixOS it stops stale watchers and starts `fleet-deploy-watch <id> <activationWait> <confirmWindow>` through `systemd-run --unit fleet-deploy-watch-<id>`. On darwin it runs `sudo fleet-deploy-watch --arm <id> <activationWait> <confirmWindow>`, which bootstraps the job declared by the target's configuration into launchd's system domain, so the watcher runs as root, and fails while that job is already loaded. The watcher SHALL:
 - record `/run/current-system`;
 - wait up to `activationWait` seconds for it to change, and then up to `confirmWindow` seconds for `/run/fleet-deploy/<id>.confirmed` (`/var/run/fleet-deploy/` on darwin);
+- end without rolling back as soon as that file exists, during either wait, so a deploy of the running closure ends it at its confirmation;
 - when that file is absent, set a new system profile generation to the recorded system and activate it;
 - unload its own launchd job on every path.
 
