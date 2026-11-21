@@ -12,6 +12,7 @@ const require = createRequire(import.meta.url);
 const playwright = require.resolve("@playwright/test");
 const cli = require.resolve("@playwright/test/cli");
 const reporter = fileURLToPath(new URL("./completion-reporter.ts", import.meta.url));
+const fixtures = fileURLToPath(new URL("../../e2e/fixtures.ts", import.meta.url));
 
 export type ControlMode =
   | "action"
@@ -23,13 +24,19 @@ export type ControlMode =
   | "closed-page"
   | "launch"
   | "global"
-  | "empty";
+  | "empty"
+  // A WebKit product failure, through e2e/fixtures.ts, whose on-failure
+  // `page.screenshot()` fails, so Playwright attaches no screenshot at all.
+  | "webkit-missing-screenshot";
 
 export type ControlRun = { root: string; results: unknown; completion: Completion };
 
 export function runControl(t: TestContext, mode: ControlMode): ControlRun {
   const root = mkdtempSync(join(tmpdir(), "docs-runner-control-"));
   t.after(() => rmSync(root, { recursive: true, force: true }));
+  const webkit = mode === "webkit-missing-screenshot";
+  const engine = webkit ? "webkit" : "chromium";
+  const configName = webkit ? "playwright.webkit-negative.config.ts" : "playwright.negative.config.ts";
   const config = {
     testDir: ".",
     testMatch: mode === "empty" ? "missing.spec.ts" : "reader-journey.spec.ts",
@@ -50,33 +57,43 @@ export function runControl(t: TestContext, mode: ControlMode): ControlRun {
     ],
     projects: [
       {
-        name: "chromium",
+        name: engine,
         use: {
-          browserName: "chromium",
+          browserName: engine,
           ...(mode === "launch" ? { launchOptions: { executablePath: "/nonexistent-docs-control-browser" } } : {}),
+          // As in playwright.config.ts, where the video shares the screencast.
+          ...(webkit ? { video: "retain-on-failure" } : {}),
         },
       },
     ],
     ...(mode === "global" ? { globalSetup: "./broken-setup.ts" } : {}),
   };
-  writeFileSync(join(root, "playwright.negative.config.ts"), `export default ${JSON.stringify(config)};`);
+  writeFileSync(join(root, configName), `export default ${JSON.stringify(config)};`);
   writeFileSync(
     join(root, "broken-setup.ts"),
     'export default () => { throw new Error("controlled setup failure"); };',
   );
   writeFileSync(
     join(root, "reader-journey.spec.ts"),
-    `import { test, expect } from ${JSON.stringify(playwright)};
+    `import { test, expect } from ${JSON.stringify(webkit ? fixtures : playwright)};
      ${mode === "hook" ? 'test.beforeEach(async ({ page }) => { await page.getByRole("link").click(); });' : ""}
      ${mode === "hook-assertion" ? "test.beforeEach(async () => { expect(1).toBe(2); });" : ""}
      test("damaged guide is rejected by the real reader journey", async ({ page }) => {
        ${mode === "deadline" ? "test.setTimeout(100); page.setDefaultTimeout(0);" : ""}
        ${mode === "worker" ? "process.exit(1);" : ""}
        ${mode === "closed-page" ? "await page.close();" : ""}
-       ${mode === "assertion" ? "await expect(page.getByRole('link')).toBeVisible({ timeout: 250 });" : "await page.getByRole('link', { name: 'Getting started' }).click();"}
+       ${webkit ? 'page.screenshot = () => Promise.reject(new Error("controlled screenshot failure"));' : ""}
+       ${
+         // The fixture takes the first screencast frame for a pre-paint
+         // placeholder, so paint several times, as a navigated reader page does.
+         webkit
+           ? 'await page.setContent("<h1>Damaged guide</h1>"); for (let i = 0; i < 5; i++) { await page.evaluate((n) => document.body.append(String(n)), i); await page.waitForTimeout(200); }'
+           : ""
+       }
+       ${mode === "assertion" || webkit ? "await expect(page.getByRole('link')).toBeVisible({ timeout: 250 });" : "await page.getByRole('link', { name: 'Getting started' }).click();"}
      });`,
   );
-  const child = spawnSync(process.execPath, [cli, "test", "--config", "playwright.negative.config.ts"], {
+  const child = spawnSync(process.execPath, [cli, "test", "--config", configName], {
     cwd: root,
     env: { ...process.env, CI: "true", PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1" },
     encoding: "utf8",
@@ -107,8 +124,8 @@ export function runControl(t: TestContext, mode: ControlMode): ControlRun {
         browsers: "/nix/store/control-browsers",
         node: "/nix/store/control-node",
         system: "aarch64-darwin",
-        config: "playwright.negative.config.ts",
-        projects: "chromium",
+        config: configName,
+        projects: engine,
         trace: "retain-on-failure",
         evidenceEpoch: "0",
       },

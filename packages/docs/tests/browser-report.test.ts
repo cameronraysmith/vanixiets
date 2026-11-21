@@ -1,4 +1,6 @@
 import assert from "node:assert/strict";
+import { statSync } from "node:fs";
+import { join } from "node:path";
 import { test } from "node:test";
 import { runControl } from "./report/runner-control.ts";
 import { validateReport } from "./report/validate-report.ts";
@@ -33,3 +35,13 @@ for (const [mode, message] of Object.entries(infrastructureControls) as [
     assert.throws(() => validateReport(root), /infrastructure failure/);
   });
 }
+
+test("WebKit product failure without Playwright's screenshot keeps a non-empty PNG", (t) => {
+  const { root, completion } = runControl(t, "webkit-missing-screenshot");
+  const [attempt] = completion.tests[0].attempts;
+  assert.equal(attempt.failureKind, "product");
+  const screenshots = attempt.attachments.filter((name) => name.endsWith(".png"));
+  assert.equal(screenshots.length, 1, JSON.stringify(attempt.attachments));
+  assert.ok(statSync(join(root, screenshots[0])).size > 0);
+  assert.equal(validateReport(root).passed, false);
+});

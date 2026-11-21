@@ -20,17 +20,20 @@ const settleDeadlineMs = 5000;
  * build users (`_nixbld*`) have no LaunchServices database, so ImageIO gets an
  * empty type identifier, WebKit answers `Page.snapshotRect` with `data:,`, and
  * Playwright 1.63 writes the empty buffer as a 0-byte `test-failed-1.png`
- * without raising. The screencast is encoded outside that path and still
- * shows the page, so for WebKit this fixture keeps the latest screencast frame
- * and, only when Playwright's own failure screenshot is empty, writes that
- * frame into the same attachment as PNG. When Playwright produces a real
- * screenshot, it is left untouched. If no painted frame exists, the teardown
- * throws: the attempt then fails closed as infrastructure instead of carrying
- * an empty or blank image.
+ * without raising. Playwright also swallows an on-failure `page.screenshot()`
+ * that throws, such as one that outlives its fixed 5 s timeout on a loaded
+ * builder, and then attaches no screenshot at all (nixbot build 2878, x86_64-linux).
+ * The screencast is encoded outside that path and still shows the page, so for
+ * WebKit this fixture keeps the latest screencast frame and, only when a failed
+ * attempt's screenshot is empty or missing, writes that frame as PNG into the
+ * attachment Playwright wrote or would have written. When Playwright produces a
+ * real screenshot, it is left untouched. If no painted frame exists, the
+ * teardown throws: the attempt then fails closed as infrastructure instead of
+ * carrying no, an empty, or a blank image.
  */
 export const test = base.extend<{ webkitFailureScreenshot: undefined }>({
   webkitFailureScreenshot: [
-    async ({ page, browserName }, use, testInfo) => {
+    async ({ page, browserName, screenshot }, use, testInfo) => {
       if (browserName !== "webkit") {
         await use(undefined);
         return;
@@ -46,23 +49,33 @@ export const test = base.extend<{ webkitFailureScreenshot: undefined }>({
         },
       });
       await use(undefined);
-      const empty = testInfo.attachments.flatMap(({ name, path }) =>
-        name === "screenshot" && path && statSync(path).size === 0 ? [path] : [],
-      );
-      if (empty.length > 0) {
+      const screenshots = testInfo.attachments.filter(({ name }) => name === "screenshot");
+      const empty = screenshots.flatMap(({ path }) => (path && statSync(path).size === 0 ? [path] : []));
+      // Playwright's own on-failure capture, which runs before fixture teardown.
+      const mode = typeof screenshot === "string" ? screenshot : screenshot.mode;
+      const failed = testInfo.status !== "skipped" && testInfo.status !== testInfo.expectedStatus;
+      const expected =
+        failed && (mode === "on" || mode === "only-on-failure" || (mode === "on-first-failure" && testInfo.retry === 0));
+      // Playwright's name for the first failure screenshot of an attempt.
+      const missing = expected && screenshots.length === 0 ? testInfo.outputPath("test-failed-1.png") : undefined;
+      const repair = missing ? [...empty, missing] : empty;
+      if (repair.length > 0) {
         const deadline = Date.now() + settleDeadlineMs;
         while (Date.now() < deadline && Date.now() - (latest?.at ?? 0) < quietMs) await sleep(50);
       }
       if (!page.isClosed()) await page.screencast.stop();
-      if (empty.length === 0) return;
+      if (repair.length === 0) return;
       if (frames < 2 || !latest) {
-        throw new Error(`WebKit wrote an empty failure screenshot and no painted screencast frame exists: ${empty}`);
+        throw new Error(
+          `WebKit wrote an empty or no failure screenshot and no painted screencast frame exists (${frames} frames): ${repair}`,
+        );
       }
       // Loaded only on this repair path: sharp is a native addon, and the
       // engines whose own screenshots work never need to load it.
       const { default: sharp } = await import("sharp");
       const png = await sharp(latest.data).png().toBuffer();
-      for (const path of empty) writeFileSync(path, png);
+      for (const path of repair) writeFileSync(path, png);
+      if (missing) testInfo.attachments.push({ name: "screenshot", path: missing, contentType: "image/png" });
     },
     { auto: true },
   ],
