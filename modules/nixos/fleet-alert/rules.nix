@@ -494,11 +494,22 @@
         #    capacity problem: take design D9's ladder, tuning
         #    evalWorkerCount or evalMaxMemorySize first, not a revert.
         #    Evaluator (a crash exit, a derivation difference, or errors
-        #    stock nix-eval-jobs does not produce on that commit, compared
-        #    with the paired-replay driver, as root on magnetite `replay.py
-        #    run COMMITS_TSV OUTDIR` with one row for the build, verify.md
-        #    4.2-4.3): fix forward, most cheaply by pinning the iets input
-        #    in flake.nix to its last good revision.
+        #    stock nix-eval-jobs does not produce on that commit): fix
+        #    forward, most cheaply by pinning the iets input in flake.nix to
+        #    its last good revision. To ask whether stock succeeds, on
+        #    magnetite with the build's commit SHA, using that commit's own
+        #    nixpkgs (so it stays right across bumps; 2 workers to keep the
+        #    load low):
+        #      for s in x86_64-linux aarch64-darwin; do
+        #        sudo -u nixbot nix run --inputs-from \
+        #          github:cameronraysmith/vanixiets/SHA nixpkgs#nix-eval-jobs -- \
+        #          --flake github:cameronraysmith/vanixiets/SHA#checks.$s \
+        #          --force-recurse --workers 2 --max-memory-size 3072 \
+        #          > /tmp/stock-SHA-$s.jsonl; echo "$s exit $?"
+        #        jq -r 'select(.error) | .attr' /tmp/stock-SHA-$s.jsonl
+        #      done
+        #    Stock exiting 0 with no errors that iets reported means the
+        #    fault is iets'.
         # 3. Revert to stock nix-eval-jobs (task 7.3's change) only if the
         #    failure blocks merges and no fix or pin is quick, as a
         #    deliberate decision recorded in verify.md.
@@ -509,7 +520,7 @@
           expr = "SELECT build_id, ts, evaluator_version, worker_kills, oom_kill, budget_kills, exit_status AS value FROM eval_run WHERE evaluator = 'iets' AND ts >= now() - INTERVAL '12 hours' AND (worker_kills > 0 OR oom_kill > 0 OR budget_kills > 0 OR exit_status <> 0)";
           for = "0s";
           severity = "critical";
-          annotations.summary = "A production nixbot evaluation by iets lost a worker, was killed or crashed; the value is its exit status. 1. Rebuild build_id in nixbot; if it passes, record it in verify.md as transient. 2. If it fails again: kills above 0 are capacity, so tune evalWorkerCount or evalMaxMemorySize (D9); a crash or a stock-only success (paired replay, verify.md 4.2-4.3) is fixed forward, e.g. by pinning iets to its last good revision. 3. Revert to stock (task 7.3) only if merges are blocked and no quick fix exists, recorded in verify.md (runbook in modules/nixos/fleet-alert/rules.nix). Resolves 12 h after the evaluation, not when fixed";
+          annotations.summary = "A production nixbot evaluation by iets lost a worker, was killed or crashed; the value is its exit status. 1. Rebuild build_id in nixbot; if it passes, record it in verify.md as transient. 2. If it fails again: kills above 0 are capacity, so tune evalWorkerCount or evalMaxMemorySize (D9); a crash, or errors stock nix-eval-jobs does not produce (the stock check command in the runbook), is fixed forward, e.g. by pinning iets to its last good revision. 3. Revert to stock (task 7.3) only if merges are blocked and no quick fix exists, recorded in verify.md (runbook in modules/nixos/fleet-alert/rules.nix). Resolves 12 h after the evaluation, not when fixed";
         }
         {
           alert = "StoreQueryFailing";
