@@ -29,11 +29,12 @@
       ) inventory;
 
       # Every network clan may reach the machine through logs in as its login
-      # user (modules/lib/network-targets.nix).
+      # user, and its deploy address is flake.lib.hosts.<name>.targetHost
+      # (modules/lib/network-targets.nix).
       withNetworkTargets =
-        name: toplevel:
+        name: machineConfig: toplevel:
         let
-          unmet = self.lib.networkTargetObligations.failures name;
+          unmet = self.lib.networkTargetObligations.failures name machineConfig;
         in
         assert lib.assertMsg (
           unmet == [ ]
@@ -117,7 +118,8 @@
           name: _:
           lib.nameValuePair "nixos-${name}" (
             withFleetObligations name self.nixosConfigurations.${name}.config (
-              withNetworkTargets name self.nixosConfigurations.${name}.config.system.build.toplevel
+              withNetworkTargets name self.nixosConfigurations.${name}.config
+                self.nixosConfigurations.${name}.config.system.build.toplevel
             )
           )
         ) nixosForSystem)
@@ -125,7 +127,8 @@
           name: _:
           lib.nameValuePair "darwin-${name}" (
             withFleetObligations name self.darwinConfigurations.${name}.config (
-              withNetworkTargets name self.darwinConfigurations.${name}.system
+              withNetworkTargets name self.darwinConfigurations.${name}.config
+                self.darwinConfigurations.${name}.system
             )
           )
         ) darwinForSystem);

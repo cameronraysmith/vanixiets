@@ -8,6 +8,7 @@
 let
   flakeModules = config.flake.modules.darwin;
   flakeUsers = config.flake.users;
+  inherit (config.flake.lib) hosts;
   # sops-nix requires flake in extraSpecialArgs
   flakeForHomeManager = config.flake // {
     inherit inputs;
@@ -51,8 +52,9 @@ in
       networking.hostName = "blackphos";
       networking.computerName = "blackphos";
 
-      # Remote deployment target (enables `clan machines update` from stibnite)
-      clan.core.networking.targetHost = "crs58@blackphos.zt";
+      # Remote deployment target, clan's fallback after the network peers
+      # (flake.lib.hosts.<name>.targetHost, the single source).
+      clan.core.networking.targetHost = hosts.blackphos.targetHost;
 
       nixpkgs.hostPlatform = "aarch64-darwin";
 

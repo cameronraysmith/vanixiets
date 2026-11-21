@@ -1,3 +1,11 @@
+# A NixOS machine's deploy.targetHost is flake.lib.hosts.<name>.targetHost.
+# Darwin machines carry none: with it set, `clan machines update` would skip
+# the network peers (tincr) for the darwin login user (F36,
+# flake.lib.networkTargetObligations).
+{ config, ... }:
+let
+  inherit (config.flake.lib) hosts;
+in
 {
   flake.lib.machineSystems = {
     argentum = "aarch64-darwin";
@@ -22,7 +30,7 @@
       ];
       machineClass = "nixos";
       description = "Primary VPS, zerotier controller";
-      deploy.targetHost = "root@cinnabar.zt";
+      deploy.targetHost = hosts.cinnabar.targetHost;
     };
 
     electrum = {
@@ -34,7 +42,7 @@
       ];
       machineClass = "nixos";
       description = "Secondary test VM, zerotier peer";
-      deploy.targetHost = "root@electrum.zt";
+      deploy.targetHost = hosts.electrum.targetHost;
     };
 
     galena = {
@@ -46,7 +54,7 @@
       ];
       machineClass = "nixos";
       description = "GCP CPU node (e2-standard-8), zerotier peer";
-      deploy.targetHost = "root@galena.zt";
+      deploy.targetHost = hosts.galena.targetHost;
     };
 
     scheelite = {
@@ -59,7 +67,7 @@
       ];
       machineClass = "nixos";
       description = "GCP GPU node (n1-standard-8, T4), zerotier peer";
-      deploy.targetHost = "root@scheelite.zt";
+      deploy.targetHost = hosts.scheelite.targetHost;
     };
 
     magnetite = {
@@ -71,7 +79,7 @@
       ];
       machineClass = "nixos";
       description = "Build infrastructure server (niks3, nixbot, Gitea)";
-      deploy.targetHost = "root@magnetite.zt";
+      deploy.targetHost = hosts.magnetite.targetHost;
     };
 
     pyrite = {
@@ -82,7 +90,7 @@
       ];
       machineClass = "nixos";
       description = "Apple MacBookPro14,1 bare-metal NixOS laptop, zerotier peer";
-      deploy.targetHost = "root@pyrite.zt";
+      deploy.targetHost = hosts.pyrite.targetHost;
     };
 
     blackphos = {

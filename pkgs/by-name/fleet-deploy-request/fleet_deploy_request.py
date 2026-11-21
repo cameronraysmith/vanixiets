@@ -341,6 +341,11 @@ class Deployer:
         commit = self.gate(request["commit"])
         entry["commit"] = commit
         say(f"{machine} at {commit}")
+        # A host that is asleep or off the network fails here, before the
+        # commit is evaluated (F83), at the address flake.lib.hosts declares.
+        declared = self.config["targets"][machine]["targetHost"]
+        if not self.reachable(declared):
+            raise Outcome("unreachable", f"{declared} did not answer within {self.config['probeTimeout']} s")
 
         tree = tempfile.mkdtemp(prefix="deploy-", dir=self.state / "trees")
         run(["git", "-C", str(self.mirror), "worktree", "add", "--quiet", "--detach", tree, commit], check=True)
@@ -361,6 +366,8 @@ class Deployer:
                 raise Outcome("refused", f"{closure} is not in {self.config['cacheStore']}: CI has not built it")
             self.vars_check(ref)
             slot.close()
+            # The host can drop off during evaluation, and the commit names
+            # the address the deploy uses, so the resolved target is probed again.
             if not self.reachable(target):
                 raise Outcome("unreachable", f"{target} did not answer within {self.config['probeTimeout']} s")
             host_lock = self.lock(self.run_dir / "lock" / machine, self.config["lockWait"])

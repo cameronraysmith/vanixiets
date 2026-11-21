@@ -125,14 +125,17 @@
                       target = {
                         class = "nixos";
                         deployUser = "root";
+                        targetHost = "root@target";
                       };
                       other = {
                         class = "nixos";
                         deployUser = "root";
+                        targetHost = "root@other";
                       };
                       deployer = {
                         class = "nixos";
                         deployUser = "root";
+                        targetHost = "root@deployer";
                       };
                     };
                     machines = [

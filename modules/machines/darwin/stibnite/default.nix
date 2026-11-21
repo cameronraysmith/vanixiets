@@ -8,6 +8,7 @@
 let
   flakeModules = config.flake.modules.darwin;
   flakeUsers = config.flake.users;
+  inherit (config.flake.lib) hosts;
   # sops-nix requires flake in extraSpecialArgs
   flakeForHomeManager = config.flake // {
     inherit inputs;
@@ -67,8 +68,9 @@ in
       networking.computerName = "stibnite";
       services.omnigent-host.workers.cameron.keychainEnable = true;
 
-      # Remote deployment target (enables `clan machines update` from other machines)
-      clan.core.networking.targetHost = "crs58@stibnite.zt";
+      # Remote deployment target, clan's fallback after the network peers
+      # (flake.lib.hosts.<name>.targetHost, the single source).
+      clan.core.networking.targetHost = hosts.stibnite.targetHost;
 
       nixpkgs.hostPlatform = "aarch64-darwin";
 

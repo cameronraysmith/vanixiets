@@ -91,9 +91,10 @@
 - [x] 4.1 Write `fleet-deploy-request` (`pkgs/by-name/fleet-deploy-request`, Python) to D1-D12. Its order:
   - parse and authorize;
   - fetch `main` and run the ancestor check;
+  - probe the target at `flake.lib.hosts.<name>.targetHost` (F83, added 2026-11-21);
   - create a worktree;
   - with a slot: resolve the commit's closure and target, check the cache (NixOS), run `clan vars check` for every machine;
-  - probe the target;
+  - probe the target again at the resolved address;
   - take the host lock, then a slot;
   - arm the watcher and deploy;
   - settle, confirm, run the health check;
@@ -215,7 +216,7 @@
     - The one fleet-alert in the window, FAILED `otel-envelope.service` on magnetite, is unrelated (`logs/cam115-e2e3-20261119T1854Z-6.2-pre2.log`, `logs/cam115-e2e3-20261119T1855Z-6.2.log`).
 - [ ] 6.3 Ask for `rosegold` while it is asleep, then while it is awake at a commit that changes its closure. — verify:
   - the first exits 5 within one minute, with no change on rosegold;
-  - the second exits 0, the log shows target `cameron@…`, and the darwin machine-key guard passes;
+  - the second exits 0, the log shows target `cameron@…`, the host's machine key matches `sops/machines/<host>/key.json`, and sops-nix installed its secrets;
   - every alert since each request started is recorded with its cause.
   - rosegold, awake (2026-11-21, janettesmith and cameron at the console, held awake with `caffeinate`):
     - 15:19Z: a manual `CLAN_NO_COMMIT=1 clan machines update rosegold` from a throwaway clone of 6ffb8fac installed the F84 job, giving generation 22 `6yzgrfwy…`. Its record names previous `pi3pl8da…`, so F86 holds on a second Mac (`logs/cam115-6.3-rosegold-20261121T1519Z-1-manual-update.log`).
@@ -225,8 +226,10 @@
       - The watcher ran as root in `system`; it was the pre-F90 one, armed from generation 22. It logged "activated k1r0jdz5…" and "confirmed", then unloaded, leaving `/var/run/fleet-deploy` empty.
       - Generation 23 `k1r0jdz5…` is the running system, and the installed `fleet-deploy-watch` is now the F90 version (`k583jxyl…`).
       - The record names previous `6yzgrfwy…`. otelcol and the sops-nix agent are up, and both console sessions remain. tincr shows last exit 1, as before the deploy.
-      - The machine-key guard was not checked separately (`logs/cam115-6.3-rosegold-20261121T1600Z-change.log`).
+      - The machine key matches. At 16:40Z, `modules/darwin/machine-key-guard.sh rosegold <key.json's public key> --dry`, run read-only on rosegold, exited 0, and the installed `/var/lib/sops-nix/key.txt`'s public key equals `sops/machines/rosegold/key.json`'s (`age1a5wl…3fcg`).
+      - sops-nix installed its secrets: `/run/secrets` → `/run/secrets.d/11` (6 system secrets), 28 home-manager secrets for cameron, the sops-nix agent last exited 0, and the past 2 h of logs have no `sops-install-secrets` errors (`logs/cam115-6.3-rosegold-20261121T1600Z-change.log`, `logs/cam115-6.3-rosegold-20261121T1640Z-machine-key.log`).
   - rosegold, asleep: not run yet; it waits for rosegold to sleep.
+  - Clause reworded on 2026-11-21: it asked that "the darwin machine-key guard passes", but that guard (`flake.lib.darwinMachineKeyGuard`) runs only in the `.#darwin` app's local activation. The deployer path uses `clan machines update`, which installs `key.txt` itself, so the clause now names what applies to that path: the key match and the installed secrets.
   - argentum (2026-11-19, `omnigent-cameron` on magnetite), in place of rosegold, so this does not meet the clause:
     - Asleep (18:36Z, 71ec4d13): exit 5, `cameron@argentum.zt did not answer within 10 s`, no change on argentum, request `40e4fcaf7806`. It took 133 s, not ≤ 60 s, because the resolve runs before the reachability probe (F83, design Risks; `logs/cam115-e2e3-20261119T1836Z-6.3.log`).
     - Awake (18:43Z): argentum reached `jcnmknlh…`, but the request reported `rolled-back` (8). That was F84 (5.3) and nothing was rolled back (`logs/cam115-e2e3-20261119T1843Z-6.3-awake.log`).

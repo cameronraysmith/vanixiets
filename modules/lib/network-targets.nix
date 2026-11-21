@@ -41,6 +41,24 @@ let
       ) peers
     );
 
+  # One message per way the machine's deploy address leaves its single
+  # source, flake.lib.hosts.<name>.targetHost (F83): clan's targetHost set to
+  # anything else, and a darwin machine given an inventory deploy.targetHost,
+  # which clan would take before the network peers above.
+  targetProblems =
+    {
+      name,
+      class,
+      targetHost,
+      configTargetHost,
+      inventoryTargetHost,
+    }:
+    lib.optional (configTargetHost != targetHost)
+      "${name}'s clan.core.networking.targetHost is ${toString configTargetHost}, not flake.lib.hosts.${name}.targetHost ${toString targetHost}"
+    ++
+      lib.optional (class == "darwin" && inventoryTargetHost != null)
+        "${name} is darwin but sets inventory deploy.targetHost ${inventoryTargetHost}, so clan would skip its network peers";
+
   # The machine's peer export in every network, keyed by
   # `<service>:<instance>` as clan scopes them.
   peersOf =
@@ -62,13 +80,19 @@ let
 in
 {
   flake.lib.networkTargetObligations = {
-    inherit problems;
+    inherit problems targetProblems;
     failures =
-      name:
+      name: machineConfig:
       problems {
         inherit name;
         inherit (hosts.${name}) deployUser;
         peers = peersOf name;
+      }
+      ++ targetProblems {
+        inherit name;
+        inherit (hosts.${name}) class targetHost;
+        configTargetHost = machineConfig.clan.core.networking.targetHost;
+        inventoryTargetHost = inputs.self.clan.inventory.machines.${name}.deploy.targetHost or null;
       };
   };
 }

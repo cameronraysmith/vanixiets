@@ -107,7 +107,7 @@ When `flake.lib.fleetDeployer.keys` is set, every target SHALL carry `flake.lib.
 
 ### Requirement: Deploys hold a per-host lock and one of two slots
 
-`fleet-deploy-request` SHALL hold one of two slot locks under `/run/fleet-deployer/slot/` while it evaluates, release it, probe the target, then hold `/run/fleet-deployer/lock/<machine>` (waiting at most 600 s) until the health check ends, and hold a slot again while the deploy command runs. A lock not obtained in time SHALL end the request with status 4.
+`fleet-deploy-request` SHALL probe the target at `flake.lib.hosts.<name>.targetHost` before it evaluates the commit, ending the request with status 5 if it does not answer (F83). It SHALL then hold one of two slot locks under `/run/fleet-deployer/slot/` while it evaluates, release it, and probe the target again at the address resolved from the commit. It SHALL then hold `/run/fleet-deployer/lock/<machine>` (waiting at most 600 s) until the health check ends, and hold a slot again while the deploy command runs. A lock not obtained in time SHALL end the request with status 4.
 
 #### Scenario: concurrent requests in the VM test
 - **WHEN** the VM test sends two requests for the same target one second apart

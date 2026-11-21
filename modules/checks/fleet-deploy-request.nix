@@ -11,6 +11,8 @@
 # the closure it ran before is `rolled-back` (8); a confirmed one is
 # `deployed` (0). Every run arms the watcher through the target's own
 # `fleet-deploy-watch --arm`, never a launchctl command built here.
+# A target that answers no SSH ends unreachable (5) before the commit is
+# evaluated: none of the resolve, cache and vars stand-ins may run (F83).
 # The deploy path itself is exercised by vmTests.x86_64-linux.fleet-deployer.
 { lib, ... }:
 {
@@ -51,6 +53,7 @@
           targets.alpha = {
             class = "nixos";
             deployUser = "root";
+            targetHost = "root@alpha";
           };
           requesters = {
             op = [ "alpha" ];
@@ -65,6 +68,8 @@
             echo '{"closure": "${closure}", "targetHost": "root@alpha"}'
           '';
           cacheCheckCommand = pkgs.writeShellScript "cache-check" "exit 1";
+          # alpha answers the probe that precedes evaluation (F83).
+          sshCommand = pkgs.writeShellScript "fixture-ssh" "exit 0";
         }
       );
       records = [
@@ -145,6 +150,7 @@
           targets.beta = {
             class = "darwin";
             deployUser = "op";
+            targetHost = "op@beta";
           };
           requesters = {
             op = [ "beta" ];
@@ -165,6 +171,34 @@
           varsCheckCommand = pkgs.writeShellScript "vars-check" "exit 0";
           deployCommand = pkgs.writeShellScript "deploy" ''echo "$4" >"$HOME/target/current"'';
           sshCommand = targetStub;
+        }
+      );
+      # An asleep target (F83): every SSH attempt fails, and each evaluating
+      # step records that it ran. The request must end unreachable (5) with
+      # none of them run, i.e. before the commit is evaluated.
+      unreachableConfig = pkgs.writeText "fleet-deploy-unreachable-fixture.json" (
+        builtins.toJSON {
+          targets.alpha = {
+            class = "nixos";
+            deployUser = "root";
+            targetHost = "root@alpha";
+          };
+          requesters = {
+            op = [ "alpha" ];
+            pat = [ ];
+          };
+          machines = [ "alpha" ];
+          slots = 1;
+          lockWait = 0;
+          probeTimeout = 1;
+          cacheStore = "fixture-cache";
+          resolveCommand = pkgs.writeShellScript "resolve" ''
+            echo resolve >>"$HOME/evaluated"
+            echo '{"closure": "${closure}", "targetHost": "root@alpha"}'
+          '';
+          cacheCheckCommand = pkgs.writeShellScript "cache-check" ''echo cache-check >>"$HOME/evaluated"'';
+          varsCheckCommand = pkgs.writeShellScript "vars-check" ''echo vars-check >>"$HOME/evaluated"'';
+          sshCommand = pkgs.writeShellScript "fixture-ssh-asleep" "exit 255";
         }
       );
       deploys = [
@@ -374,6 +408,21 @@
               ${deployConfig} >"$TMPDIR/deploy-config.json"
             export FLEET_DEPLOY_CONFIG=$TMPDIR/deploy-config.json
             ${lib.concatMapStrings deployRun deploys}
+
+            mkdir "$TMPDIR/asleep-state"
+            jq --arg tmp "$TMPDIR" \
+              '.stateDir = $tmp + "/asleep-state" | .runDir = $tmp + "/asleep-run" | .forge = $tmp + "/forge"' \
+              ${unreachableConfig} >"$TMPDIR/asleep-config.json"
+            set +e
+            FLEET_DEPLOY_CONFIG=$TMPDIR/asleep-config.json SSH_ORIGINAL_COMMAND="deploy alpha" \
+              fleet-deploy-request op >/dev/null
+            status=$?
+            set -e
+            outcome=$(tail -n 1 "$TMPDIR/asleep-state/requests.jsonl" | jq -r .outcome)
+            if [ "$status" != 5 ] || [ "$outcome" != unreachable ] || [ -e "$TMPDIR/asleep-state/evaluated" ]; then
+              echo "asleep target: status $status, outcome $outcome, evaluated before the probe: $(tr '\n' ' ' <"$TMPDIR/asleep-state/evaluated" 2>/dev/null)"
+              failed=1
+            fi
             [ "$failed" = 0 ]
             touch $out
           '';

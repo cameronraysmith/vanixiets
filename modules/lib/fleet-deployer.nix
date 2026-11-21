@@ -403,9 +403,11 @@ in
     };
     # What the deployer's request command reads (pkgs/by-name/fleet-deploy-request).
     requestConfig = {
+      # targetHost is the address probed before the commit is evaluated (F83);
+      # the address resolved from the commit is re-probed before the lock.
       targets = lib.genAttrs targets (name: {
         class = classOf name;
-        inherit (hosts.${name}) deployUser;
+        inherit (hosts.${name}) deployUser targetHost;
       });
       machines = lib.attrNames inventory;
       requesters = lib.mapAttrs (_: r: r.machines) requesters;

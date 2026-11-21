@@ -4,7 +4,10 @@
 # leaves the user unset for root, and finds exactly one problem in each
 # mutant: a darwin peer exported without a user (F36: clan logs in as root), a
 # peer exported with another user, and a NixOS peer exported with a non-root
-# user.
+# user. Its targetProblems accepts a machine whose clan targetHost is
+# flake.lib.hosts.<name>.targetHost and finds one problem each for a darwin
+# machine with another targetHost or with an inventory deploy.targetHost
+# (F83).
 #
 # Per-host facts are asserted by modules/checks/machines.nix on every
 # nixos-<host> and darwin-<host> check against the flake's real exports. No
@@ -64,12 +67,44 @@
           }
         ) != case.problems
       ) cases;
+      # targetProblems: the deploy address has one source (F83).
+      target = {
+        name = "m";
+        class = "darwin";
+        targetHost = "cameron@m.zt";
+        configTargetHost = "cameron@m.zt";
+        inventoryTargetHost = null;
+      };
+      targetCases = {
+        darwinFromHosts = target // {
+          problems = 0;
+        };
+        nixosInventoryFromHosts = target // {
+          class = "nixos";
+          targetHost = "root@m.zt";
+          configTargetHost = "root@m.zt";
+          inventoryTargetHost = "root@m.zt";
+          problems = 0;
+        };
+        darwinLiteralElsewhere = target // {
+          configTargetHost = "cameron@m.vanixiets.internal";
+          problems = 1;
+        };
+        darwinInventoryTarget = target // {
+          inventoryTargetHost = "cameron@m.zt";
+          problems = 1;
+        };
+      };
+      wrongTarget = lib.filterAttrs (
+        _: case: lib.length (o.targetProblems (removeAttrs case [ "problems" ])) != case.problems
+      ) targetCases;
     in
     lib.optionalAttrs (system == "x86_64-linux") {
       checks.network-target-obligations =
-        assert lib.assertMsg (
-          wrong == { }
-        ) "network-target-obligations: the judge misjudges ${toString (lib.attrNames wrong)}";
+        assert lib.assertMsg (wrong == { } && wrongTarget == { })
+          "network-target-obligations: the judge misjudges ${
+            toString (lib.attrNames wrong ++ lib.attrNames wrongTarget)
+          }";
         pkgs.runCommand "network-target-obligations" { } "touch $out";
     };
 }

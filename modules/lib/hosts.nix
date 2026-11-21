@@ -169,6 +169,12 @@ let
         fqdn = "${name}.${fleet.domain}";
         address = mesh.addressOf mesh.instance name;
         primaryUser = primaryUserOf name;
+        # The one address every deploy path names for this machine: clan's
+        # own targetHost (darwin machine modules), the inventory's
+        # deploy.targetHost where a NixOS machine sets one, and the fleet
+        # deployer's reachability probe. The ZeroTier name until the tincr
+        # cutover (CAM-109) changes it here.
+        targetHost = if member.deployUser == null then null else "${member.deployUser}@${name}.zt";
       }
     ) members;
 in
