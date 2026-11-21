@@ -2,11 +2,69 @@
 let
   content =
     {
+      config,
       lib,
       pkgs,
       flake,
       ...
     }:
+    let
+      # The package the devshell's shellHook runs, so a cloud session compiles
+      # with the same compiler and records the same compile key.
+      apmContextCompile = flake.packages.${pkgs.stdenv.hostPlatform.system}.apm-context-compile;
+
+      # Compiles each attached repository's context (D3). Claude Code adds a
+      # SessionStart hook's stdout to the model's context, so this prints
+      # nothing and records one line per repository in the bootstrap report's
+      # run.log instead. It always exits 0, and it bounds each compile so the
+      # hook ends well inside Claude Code's hook timeout. `--if-stale` makes a
+      # resumed session, which runs SessionStart again, a no-op. `--auto` picks
+      # the repository's own tier because ~/.claude/CLAUDE.md is present.
+      repoContextHook = pkgs.writeShellApplication {
+        name = "claude-sandbox-repo-context";
+        runtimeInputs = [ pkgs.coreutils ];
+        text = ''
+          log_dir=${lib.escapeShellArg config.vanixiets.sandbox.bootstrapReport.directory}
+          compile=${lib.getExe apmContextCompile}
+          deadline=$((SECONDS + 40))
+
+          record() {
+            mkdir -p "$log_dir" 2>/dev/null &&
+              printf '%s repo-context %s\n' "$(date -u +%FT%TZ)" "$*" >>"$log_dir/run.log" 2>/dev/null
+          }
+
+          found=0
+          for manifest in /home/user/*/apm.yml; do
+            [[ -f $manifest ]] || continue
+            found=1
+            repo=''${manifest%/apm.yml}
+            left=$((deadline - SECONDS))
+            if ((left < 5)); then
+              record "repo=$repo skipped=deadline" || true
+              continue
+            fi
+            start=$SECONDS
+            if out=$(cd "$repo" && timeout "$((left < 20 ? left : 20))" "$compile" --auto --if-stale 2>&1 </dev/null); then
+              rc=0
+            else
+              rc=$?
+            fi
+            tier=none key=
+            if [[ -r $repo/.agents/.context-compile-key ]] && read -r key <"$repo/.agents/.context-compile-key"; then
+              tier=''${key##* }
+            fi
+            if ((rc == 0)); then
+              record "repo=$repo rc=0 tier=$tier secs=$((SECONDS - start))" || true
+            else
+              last=''${out##*$'\n'}
+              record "repo=$repo rc=$rc tier=$tier secs=$((SECONDS - start)) error=''${last:0:200}" || true
+            fi
+          done
+          ((found)) || record "repos=0 under /home/user with apm.yml" || true
+          exit 0
+        '';
+      };
+    in
     {
       home.stateVersion = "23.11";
 
@@ -33,6 +91,16 @@ let
         enable = true;
         package = null;
         mutableSettings = true;
+        settings.hooks.SessionStart = [
+          {
+            hooks = [
+              {
+                type = "command";
+                command = lib.getExe repoContextHook;
+              }
+            ];
+          }
+        ];
       };
 
       programs.openspec.enable = true;

@@ -10,7 +10,7 @@ Session-time work (repository context, D3; Linear secrets, D5) runs from hooks w
 
 **Tech Stack:** Nix flakes (flake-parts, import-tree), home-manager, sops-nix, `apm-context-compile`, nixbot and niks3, Claude Code cloud environments.
 
-**Spec:** `openspec/changes/bootstrap-claude-sandbox/` — `specs/claude-sandbox-bootstrap/spec.md` (requirements), `specs/world-assumptions/spec.md` (A167–A179), `design.md` (D1–D5, assumptions S1–S10, probe P4), `tasks.md` (task groups 1–8, which this plan's tasks map to).
+**Spec:** `openspec/changes/bootstrap-claude-sandbox/` — `specs/claude-sandbox-bootstrap/spec.md` (requirements), `specs/world-assumptions/spec.md` (A167–A180), `design.md` (D1–D5, assumptions S1–S10, probe P4), `tasks.md` (task groups 1–8, which this plan's tasks map to).
 
 ## Global Constraints
 

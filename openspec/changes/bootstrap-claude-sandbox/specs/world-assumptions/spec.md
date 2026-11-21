@@ -195,6 +195,21 @@ Any requirement whose discharge depends on this fact SHALL name it explicitly, a
 - **WHEN** a cloud session can no longer create sessions, change its environment's setup script, or push a new branch, or each change needs more than one approval card
 - **THEN** this assumption is void, and the `claude-sandbox-bootstrap` requirements `One operator action per development iteration` and `Every bootstrap run reports` lose their discharge
 
+### Requirement: A180 — Packages activated as root reach the agent's shell through the image's default Nix profile
+
+It is true of a cloud session's base image, independent of what this fleet builds, that home-manager activated as root installs its packages into `/nix/var/nix/profiles/default`, whose `bin` is on the agent's shell `PATH`, and that the image's Nix, in the same profile, still runs afterwards.
+Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL lose its discharge once the violation below is observed.
+
+#### Scenario: Measured on 2026-11-21
+
+- **WHEN** session 3's children C1 and C2 start on a setup step that activated `claude-sandbox`'s activation package, and their agent's shell prints `PATH` and runs `command -v` on 18 tools
+- **THEN** `PATH` is the platform's `rm-guard` directory, then `/nix/var/nix/profiles/default/bin`, then system directories; all 18 tools (openspec, linear, jj, git, gh, ghq, mergify, jq, jaq, rg, fd, duckdb, just, uv, pandoc, sops, age, wt) resolve under `/nix/var/nix/profiles/default/bin`; `/root/.nix-profile` points at `per-user/root/profile` and `/root/.local/state/nix/profiles` does not exist; and the setup step read `nix=2.34.6` after activating, which is indirect evidence that Nix survived
+
+#### Scenario: The base image's Nix layout changes
+
+- **WHEN** a fresh container's Nix installer, default profile or harness `PATH` differ from the above (PA3: they changed between 2026-03 and 2026-09), a required tool no longer resolves under `/nix/var/nix/profiles/default/bin`, or `command -v nix` fails after activation
+- **THEN** this assumption is void, and the `claude-sandbox-bootstrap` requirement `Required tools present` loses its discharge and needs a `PATH` route of its own (a `CLAUDE_ENV_FILE` line from a SessionStart hook, or links into `/usr/local/bin`)
+
 ## MODIFIED Requirements
 
 ### Requirement: Grounded vocabulary for behavioral requirements

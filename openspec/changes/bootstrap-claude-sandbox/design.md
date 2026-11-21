@@ -11,7 +11,7 @@ Sources:
 - a prior-art survey (PA1–PA6 below);
 - a read-only map of this repository's machinery (M1–M8 below).
 
-The measurements this design relies on are quoted in `specs/world-assumptions` (A167–A179) rather than linked, because the probe report branches are scratch branches that will be deleted.
+The measurements this design relies on are quoted in `specs/world-assumptions` (A167–A180) rather than linked, because the probe report branches are scratch branches that will be deleted.
 
 ### Stakeholders
 
@@ -64,6 +64,7 @@ Each is stated in full, with its evidence and violation condition, in `specs/wor
 | A177 | Nix 2.34.6, nix-installer, no daemon, local store, `trusted-users = root`, only cache.nixos.org configured. | V8, V13, V14; session 1 P6. |
 | A178 | The platform owns `launcher-settings.json` (edit denied), its hook scripts, `skills/session-start-hook` and `skills/synced` (rewritten at boot); setup-written files beside them survive. | V6, C18; A2's `synced` at 19:23:38 against its skill at 19:22:52. |
 | A179 | A controller session can `create_session`, swap the setup script with `update_environment` (one approval card each) and read pushed reports; sessions push new branches of any name. | Session 2 controller; session 1 pushed `claude/sandbox-reports` and `sandbox-reports-plain`. |
+| A180 | Packages home-manager activates as root are installed into the image's default profile, whose `bin` the harness puts on the agent's shell `PATH`, and that profile keeps the image's Nix. | Session 3's C1 and C2: 18 tools resolve from `/nix/var/nix/profiles/default/bin`; `setup.log`'s `nix=2.34.6` was read after activation. |
 
 The proxy re-terminates TLS and its CA is in the system bundle Nix uses (V15, C3); this is relied on by every fetch but is not separately listed.
 
@@ -97,16 +98,28 @@ The proxy re-terminates TLS and its CA is in the system bundle Nix uses (V15, C3
 | S6 | `/root/.nix-profile/bin` (or the profile home-manager activates) is on the agent's shell PATH (PA1 found it was not, in 2026-09). | Probe P4 shows it missing. | R12 |
 | S7 | A SessionStart hook declared in a setup-written `~/.claude/settings.json` runs in cloud sessions, and `CLAUDE_ENV_FILE` is set inside it (PA1, C13). | Probe P4 shows the hook did not run. | R8, R14 |
 | S8 | The environment's variables, including `SOPS_AGE_KEY`, are present in the processes of a cloud session, hooks included (C7: "Variables … apply the next time the session starts"). | The first D5 session's hook finds `SOPS_AGE_KEY` unset. | R14 |
-| S9 | `api.linear.app` is reachable once added to the cloud environment's allowed hosts; it is absent from the current list (V31). | `linear auth whoami` fails with a proxy denial after the host is added. | R14 |
+| S9 | `api.linear.app` is reachable from a cloud session; the operator's allowed hosts hold `*.linear.app`, which covers it (session 3, task 6.3), though V31 found it absent earlier. | `linear auth whoami` fails with a proxy denial. | R14 |
 | S10 | The platform's proxy forwards the Linear CLI's own `Authorization` header to `api.linear.app` (PA4 concerns GitHub only). | `linear auth whoami` returns an authentication error with a correct key. | R14 |
 
-### Probe P4 (open; runs within the first bootstrap test)
+S6 was measured in session 3 (2026-11-21) and holds; it is now A180 above, whose trigger is in `specs/world-assumptions`.
+S7 and S8 were not measured in session 3, and remain assumptions until the next cloud session (task 3.4's open part, probe commands under task 4.1).
+
+### Probe P4 (part measured in session 3, 2026-11-21)
 
 P4 measures, in one cloud session started on the first bootstrap revision:
 the agent's shell `PATH` and whether each required tool runs by bare name;
 whether a SessionStart hook declared in the setup-written `~/.claude/settings.json` runs, with its `PATH` and whether `CLAUDE_ENV_FILE` is set inside it;
 whether a variable set on the cloud environment is visible to the hook and to the agent's shell (names only).
-P4 gates D3's hook wiring and settles S6, S7 and S8.
+P4 settles S6, S7 and S8.
+
+Session 3 (controller on `claude/sandbox-reports-s3`, children C1 and C2, setup script for `63bcb45e`) measured the first part.
+The agent's shell `PATH` is the harness's `rm-guard` directory, then `/nix/var/nix/profiles/default/bin`, then `/root/.local/bin` and system directories; `~/.nix-profile` points at `per-user/root/profile`, and `~/.local/state/nix/profiles` does not exist.
+All 18 tools probed with `command -v` (openspec, linear, jj, git, gh, ghq, mergify, jq, jaq, rg, fd, duckdb, just, uv, pandoc, sops, age, wt) resolve from `/nix/var/nix/profiles/default/bin`, so home-manager's `installPackages` installed `home.packages` into the image's default profile, which the harness's `PATH` already includes, and R12 needs no `CLAUDE_ENV_FILE` route (A180).
+That profile also holds the image's Nix, and Nix survived activation only on indirect evidence: the setup script reads `nix=2.34.6` for its marker line after activating; task 8.1 checks `command -v nix` directly.
+R12's nix, playwright-cli, typst, d2 and mmdc were not called by name in session 3; the last four are in the same `home-path/bin` (task 1.4).
+`CLAUDE_ENV_FILE` and `USER` are unset in the agent's shell (A173); whether SessionStart ran, with what `PATH` and `CLAUDE_ENV_FILE`, and whether `SOPS_AGE_KEY` is visible to a hook and to the shell were not measured, so S7 and S8 stay open.
+`settings.json` held 6 events and 13 store-path hook commands, and no tool result showed a hook error.
+The children listed 176 skill directories against the report's 174; the two extra are taken to be the harness's `session-start-hook` and `synced` (A178), which session 3 did not list by name.
 
 ## Goals / Non-Goals
 
@@ -155,11 +168,12 @@ All five decisions were authorized by the operator on 2026-11-21 as recommended.
 - **Alternatives considered**: prefetch and evaluate in the sandbox (slow, GitHub-dependent, mismatches); a channels-only bootstrap sub-flake carrying a pointer file (superseded by Q91, above); a branch ref instead of a revision (never invalidates the snapshot, S1); an environment variable as the revision switch (setup cannot read variables, A172).
 - **Boundaries**: source-versus-delivered: the profile is source; the activation package is the delivered artifact; the setup script is generated from the commit and is never committed, and the `claude-sandbox-setup-script` check is its regulator.
 
-### D3: repository context from a SessionStart hook — DECIDED 2026-11-21 (wiring gated on P4)
+### D3: repository context from a SessionStart hook — DECIDED 2026-11-21 (wired 2026-11-21; relies on S7)
 
-- **Choice**: the profile declares a SessionStart hook that, for each attached repository under `/home/user` with an `apm.yml`, runs `apm-context-compile --auto` from the activated closure.
+- **Choice**: the profile declares a SessionStart hook, `claude-sandbox-repo-context`, that, for each attached repository under `/home/user` with an `apm.yml`, runs the devshell's own `apm-context-compile --auto --if-stale` by store path from the activated closure.
   With the user context present it compiles only the repository's own tier (M4, R9).
-  The hook always exits 0 and appends its outcome to the session's bootstrap report.
+  The hook prints nothing, because Claude Code adds a SessionStart hook's stdout to the context; it appends one line per repository to the bootstrap report's `run.log`, bounds each compile to 20 s and the hook to 40 s, and always exits 0.
+  `--if-stale` makes the second SessionStart of a resumed session a no-op.
 - **Rationale**: attached repositories differ per session, so this cannot be in the snapshot; the devshell cannot be entered without evaluating the repository's flake.
 - **Alternatives considered**: compile in the setup step (attached repositories are cloned before setup, A172, but the snapshot would carry one session's repositories to the next); commit generated context to every repository (duplicates the user tier for repositories without it).
 - **Boundaries**: source-versus-delivered: the compiled `AGENTS.md`/`CLAUDE.md` are generated in the attached repository's working tree and are not committed by the hook.
@@ -194,7 +208,7 @@ Obstacles, each the negation of a goal:
 - [Risk] The activation package misses the cache (negates R1, R4). → Mitigation: D2's check makes it a CI output on every revision; the setup-script check ties the script's store path to that check's output; the script degrades and records the miss.
 - [Risk] niks3 drops the named closure 30 days after its last reference (negates R1, R2). → Mitigation: the liveness rule in D2: regenerate and swap the setup step at least monthly.
 - [Risk] The setup step exits non-zero (negates R3). → Mitigation: the script sets no `set -e` and ends in `exit 0`, the setup-script check holds that last line, and a deliberately broken revision is part of the integration tests.
-- [Risk] Hook commands are not on PATH (negates R8, R14). → Mitigation: D4; P4 measures it before D3's wiring is relied on.
+- [Risk] Hook commands are not on PATH (negates R8, R14). → Mitigation: D4; P4 measures whether SessionStart runs (S7) before R8 is claimed.
 - [Risk] The snapshot holds a stale closure (negates R2). → Mitigation: the store path is in the setup script itself, so a new closure is a setup script change, and a setup script change rebuilds the snapshot (S1); the marker line records the revision it ran.
 - [Risk] The closure exceeds the measured 360 s (negates R4). → Mitigation: measure in the first bootstrap test; trim the tool set before raising the bound.
 - [Risk] The base image's Nix changes (A177, PA3). → Mitigation: the setup script's marker line records the Nix version it ran with.
@@ -218,24 +232,25 @@ S is the specification the machine meets: D1's profile, D2's check, generated se
 | R9 User context is not repeated | D3 runs `--auto` with the user context present (M4) | A167 |
 | R10 One operator action per iteration | the controller-session loop | A179 |
 | R11 Idempotent, no external side effects | D2 realises and activates only; no push or upload | A171 |
-| R12 Required tools present | D1's tool set; D4 | A173; S6 |
+| R12 Required tools present | D1's tool set; D4 | A173, A180 |
 | R13 One source | D1 imports the same modules other hosts import | — (a property of the repository, checked by evaluation) |
 | R14 Linear skills in cloud sessions | D5 | A172; S7, S8, S9, S10 |
 
 R8 and R14 are not discharged until P4 settles S7 and S8.
+R12 rests on A180, a fact about the base image's Nix layout, which drifts (PA3).
 
 ## Migration Plan
 
 1. Land D1 and D4; `ubuntu`'s behaviour is unchanged, checked by comparing its rendered files before and after.
 2. Land D2's checks, report step and setup-script app; wait for nixbot to build and publish the activation package.
-3. Run the first bootstrap test from a controller session on `nix-sandbox-test`, including P4.
-4. Land D3, wired as P4 allows.
+3. Run the first bootstrap test from a controller session on `nix-sandbox-test`, including P4 (session 3, 2026-11-21: all but S7 and S8).
+4. Land D3; its first cloud session also measures S7 and S8.
 5. The D5 key, recipient and `SOPS_AGE_KEY` exist (2026-11-21); add `api.linear.app` to the allowed hosts; on stibnite, add the recipient to `.sops.yaml` and create the scoped file; land the profile's secret declarations.
 6. Switch the operator's default cloud environment to the generated setup script, and regenerate it at least monthly (D2's liveness rule).
 Rollback: replace the setup step with the previous script (one approval card); the environment snapshot is rebuilt from it.
 
 ## Open Questions
 
-- P4 (S6, S7, S8), run within the first bootstrap test.
+- P4's S7 and S8, measured in the next cloud session.
 - The setup step's real time ceiling above 360 s.
-- The activation package's substitution time in a cloud session; in a container on magnetite (task 5.1, 2026-11-21) the closure was 4,923,527,456 bytes, and fetching it took 11.3 s for 1,505,989,543 bytes received, of which chromium, the two playwright chromium builds and mermaid-cli were about 534 MB compressed (Q90).
+- Q90, resolved 2026-11-21: chromium, the playwright chromium builds and mermaid-cli stay in the closure, because session 3 realised the whole 4,923,527,456-byte closure in a cloud session in 17 s (16 s in the checkpoint builder), well inside the 360 s.
