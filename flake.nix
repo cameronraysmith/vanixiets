@@ -198,9 +198,11 @@
     nixhelm.url = "github:farcaller/nixhelm";
     nixhelm.inputs.nixpkgs.follows = "nixpkgs";
 
-    # Pinned by revision: upstream changes its module API often and the k3d
-    # integration run is not a merge gate, so bump by hand with that run green.
-    easykubenix.url = "github:nixidae/easykubenix/245b16d037a1c5a9e62595bfa256ef7c6d239984";
+    # Tracks upstream; updates come from the flake-update effect. Bumps aren't
+    # validated against the k3d integration run (test-cluster.yaml), by
+    # choice: a uniform update process is preferred, and problems a bump
+    # causes in the module API are fixed as they arise.
+    easykubenix.url = "github:nixidae/easykubenix";
     easykubenix.flake = false;
 
     cilium-src.url = "github:cilium/cilium/v1.20.5";
