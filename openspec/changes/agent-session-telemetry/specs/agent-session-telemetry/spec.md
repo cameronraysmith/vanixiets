@@ -41,7 +41,7 @@ The fleet SHALL keep session content where every reader of the telemetry store m
 
 No part of an agent session SHALL leave its host unless it is on the fleet's allow-list: listed harnesses, listed session events and their listed fields; prompts, responses and tool details are listed, tool output and raw API bodies are not, and anything unlisted SHALL be dropped on the host.
 
-**Discharged by**: `agent-session-telemetry-interface` requirements `The agent-session stages admit only allow-listed events and keys`, `The span path keeps only the newest prompt and listed span keys`, `One allow-list decides what the collector keeps and the store stores` and `The VM test proves the allow-list with a canary`; resting on world assumptions `A190 — Claude Code emits its telemetry as documented for its packaged version`, `A191 — omp reads its own environment file and puts content only on spans`, `A193 — The telemetry store's pipelines filter, close and index as documented` and `A198 — The telemetry store writes traces into pre-created v1 tables and refuses unknown columns`.
+**Discharged by**: `agent-session-telemetry-interface` requirements `The agent-session stages admit only allow-listed events and keys`, `The span path keeps only the last user message and listed span keys`, `Only a top-level run's first request gets a last user message`, `One allow-list decides what the collector keeps and the store stores` and `The VM test proves the allow-list with a canary`; resting on world assumptions `A190 — Claude Code emits its telemetry as documented for its packaged version`, `A191 — omp reads its own environment file and puts content only on spans`, `A193 — The telemetry store's pipelines filter, close and index as documented`, `A198 — The telemetry store writes traces into pre-created v1 tables and refuses unknown columns` and `A201 — omp marks the spans whose newest user message can be other than a person's`.
 
 #### Scenario: A harness is reconfigured to send tool output
 
@@ -56,7 +56,7 @@ No part of an agent session SHALL leave its host unless it is on the fleet's all
 #### Scenario: An omp session sends its whole history
 
 - **WHEN** an omp session sends, with each model call, the whole conversation so far, earlier tool output included
-- **THEN** only the newest prompt of each turn, the response and the tool details reach the telemetry store; the earlier conversation and the tool output are dropped on the host
+- **THEN** only the newest user message of each run's first request, the response and the tool details reach the telemetry store; the earlier conversation and the tool output are dropped on the host
 
 ### Requirement: No account identifier leaves a host
 
@@ -111,17 +111,33 @@ Only Claude Code and omp sessions on agent-telemetry hosts SHALL send agent sess
 
 Each agent-telemetry host SHALL keep at least 24 hours of its agent series, 8 hours of its session events and 3 hours of omp's session content through an outage of the ingress, and the ingress SHALL keep at least 2 hours of every agent-telemetry host's series and session events and 40 minutes of its omp content through an outage of the telemetry store, at the assumed rates, without shortening the fleet's own 24 hours.
 
-**Discharged by**: `agent-session-telemetry-interface` requirement `Agent queues are sized to their holds`; `fleet-ingress-interface` requirement `Each agent exports by its role`; `telemetry-store-interface` requirement `The collector's queue persists across a telemetry store restart`; the measured rates after deploy.
+**Discharged by**: `agent-session-telemetry-interface` requirement `Agent queues are sized to their holds`; `fleet-ingress-interface` requirements `Each agent exports by its role` and `The agent-session collector exports each signal through its own exporter`; `telemetry-store-interface` requirement `The collector's queue persists across a telemetry store restart`; the measured rates after deploy.
 
 #### Scenario: A queue is shrunk below its hold
 
-- **WHEN** a configuration sizes an agent-telemetry host's event queue below 8 hours, or its metrics queue below 24 hours of fleet and agent series together
+- **WHEN** a configuration sizes an agent-telemetry host's event queue below 8 hours, its agent series queue below 24 hours, or its own series queue below 24 hours
 - **THEN** that host's evaluation fails
 
 #### Scenario: The assumed rate is exceeded
 
 - **WHEN** the rates measured after deploy give a hold below its target
 - **THEN** the measurement is recorded as a finding and the queues are resized by a change
+
+### Requirement: Agent sessions cannot cost a host's own series
+
+However many agent sessions run on an agent-telemetry host and however large their content, the collector SHALL keep recording every series of that host's own signals; an overload SHALL cost only agent series, session events and omp's session content, and a lost one SHALL reach a person through a failure notice.
+
+**Discharged by**: `agent-session-telemetry-interface` requirements `The agent-session pipelines run in a collector unit of their own`, `The loopback receiver feeds only the agent-session pipelines` and `Regulators cover the agent-session path`; the split load harness on pyrite's and magnetite's evaluated collectors (design D14); resting on world assumptions `A199 — omp's chat spans carry the whole conversation at the measured sizes` and `A200 — The collector holds ten to fourteen times a span request while decoding it`.
+
+#### Scenario: Eight sessions post their largest contexts at once
+
+- **WHEN** eight agent sessions on pyrite or magnetite each send a 13.8 MiB conversation every 5 seconds, or 64 spans at once
+- **THEN** no series of the host's own signals is lost and the host's collector does not restart
+
+#### Scenario: The agent sessions' part of the collector is killed
+
+- **WHEN** the agent-session part of an agent-telemetry host's collector is killed for lack of memory
+- **THEN** it restarts within seconds, the host's own series continue without a gap, and a failure notice names it
 
 ### Requirement: Agent series stay under their cap
 

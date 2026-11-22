@@ -606,11 +606,13 @@
 
         # omp spans (design D13): the services, span keys and resource keys
         # traces/agent-session keeps, each span key with the store type of
-        # its agent.agent_span column. `prompt` is not sent by omp: the
-        # host copies it from the newest user message of
-        # `gen_ai.input.messages` (promptSource), which it then drops with
-        # every other unlisted key, since that attribute holds the whole
-        # history, earlier tool results included. Span events are dropped.
+        # its agent.agent_span column. `last_user_message` is not sent by
+        # omp: on a step-0 chat span of a top-level, non-oneshot run with
+        # native tools (design D15), the host copies it from the newest user
+        # message of `gen_ai.input.messages` (promptSource), which it then
+        # drops with every other unlisted key, since that attribute holds the
+        # whole history, earlier tool results included. Span events are
+        # dropped.
         spans = {
           services = [
             "claude-code"
@@ -638,10 +640,10 @@
             "gen_ai.usage.cache_creation.input_tokens" = "int64";
             "error.type" = "string";
             "gen_ai.output.messages" = "string";
-            prompt = "string";
+            last_user_message = "string";
           };
           fulltext = [
-            "prompt"
+            "last_user_message"
             "gen_ai.output.messages"
           ];
           table = "agent_span";

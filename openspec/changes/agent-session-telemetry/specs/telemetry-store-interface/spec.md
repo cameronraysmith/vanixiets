@@ -2,7 +2,7 @@
 
 ### Requirement: Ingest is OTLP over HTTP with a database header
 
-The ingress SHALL write metrics to the telemetry store only through OTLP over HTTP at `http://127.0.0.1:4000/v1/otlp` as `collector`, one `otlp_http` exporter per database behind a `routing` connector, taking them from magnetite's agent through `forward` and from other agent hosts through `otlp/mesh`.
+The ingress SHALL write metrics to the telemetry store only through OTLP over HTTP at `http://127.0.0.1:4000/v1/otlp` as `collector`, one `otlp_http` exporter per database behind a `routing` connector, taking them through `forward` and `otlp/loopback` from magnetite's two collectors and through `otlp/mesh` from other agent hosts.
 Logs SHALL enter it only in `devloop`'s tables and `agent.session_event`, and traces only in `agent.agent_span`, each within its allow-list.
 
 **Discharged by**: the evaluation-time collector check (R3.1) with its mutants, nixpkgs' build-time `otelcol-contrib validate`, and the container tests `greptimedb-pipeline`, `devloop-ingest` and `fleet-ingress`.

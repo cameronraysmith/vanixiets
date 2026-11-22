@@ -20,10 +20,14 @@
 #   exporter's size reached 90 % of its capacity, or the capacity is absent.
 # - C4 loss: since the previous run, otelcol_exporter_send_failed_* rose on
 #   any exporter, otelcol_receiver_refused_* on any receiver but the
-#   ingress's otlp/mesh and otlp/mesh-tincr, or, off the ingress host, any
-#   otelcol_exporter_enqueue_failed_*. On the ingress host those two
+#   ingress's otlp/mesh and otlp/mesh-tincr, and on the ingress host
+#   otlp/loopback, or, off the ingress host, any
+#   otelcol_exporter_enqueue_failed_*. On the ingress host those
 #   receivers' refusals and the store exporters' enqueue failures are
-#   back-pressure that the agents' queues absorb; a full store queue fails C3.
+#   back-pressure that the agents' queues absorb, the agent-session
+#   collector's included (agent-session-telemetry design D14); a full store
+#   queue fails C3. The otlp/loopback line is rendered only into the
+#   ingress's script, so no other host's script changes.
 # - C5 memory (darwin, with `darwinMemory` = { launchctl; top; limits; }):
 #   launchd bounds no memory, so each label of `limits` whose job prints a
 #   pid in `launchctl print system/<label>` has its physical footprint read
@@ -489,7 +493,14 @@ in
             # mutant: meshRefusalIsLoss
             if [ "$ingress" = 1 ] && [[ $series == otelcol_receiver_refused_*'receiver="otlp/mesh"'* ]]; then continue; fi
             # mutant: meshTincrRefusalIsLoss
-            if [ "$ingress" = 1 ] && [[ $series == otelcol_receiver_refused_*'receiver="otlp/mesh-tincr"'* ]]; then continue; fi
+            if [ "$ingress" = 1 ] && [[ $series == otelcol_receiver_refused_*'receiver="otlp/mesh-tincr"'* ]]; then continue; fi${
+              lib.optionalString ingress (
+                "\n"
+                + ''
+                  # mutant: loopbackRefusalIsLoss
+                  if [[ $series == otelcol_receiver_refused_*'receiver="otlp/loopback"'* ]]; then continue; fi''
+              )
+            }
             key=$(printf '%s' "$series" | normalise)
             was=$(prev "$key")
             echo "$key $value" >> "$next"

@@ -14,10 +14,12 @@
 #     configuration exporting over mTLS to that receiver, with its queue,
 #     telemetry (127.0.0.1:8889) and deploy-record file moved into its own
 #     state directory and the zerotierone job removed;
-#   - agent-session-collector.service, pyrite's evaluated agent-session
-#     pipelines with their receiver otlp/local, the one listener here on the
-#     harnesses' 127.0.0.1:4318, and their exporters, pointed at otlp/mesh,
-#     with telemetry on 127.0.0.1:8890 (agent-session-telemetry design D12);
+#   - otel-agent-session.service, pyrite's agent-session collector: its
+#     evaluated configuration and unit (ceiling, GOMEMLIMIT, hardening),
+#     with otlp/local the one listener here on the harnesses'
+#     127.0.0.1:4318, its exporters pointed at otlp/mesh under the test CA
+#     and its telemetry on 127.0.0.1:8890 (agent-session-telemetry design
+#     D12, D14);
 #   - the store's agent.session_event table and pipeline as magnetite
 #     declares them, and a file exporter on the ingress's logs/ingress that
 #     records every log record crossing the mesh, for the canary;
@@ -129,22 +131,19 @@
                 };
               };
 
-            # pyrite's agent-session path as the agent role renders it on a
-            # host whose agentTelemetry is true (agent-session-telemetry design
-            # D12): the receivers, processors and exporters its agent-session
-            # pipelines name, taken from the evaluated configuration so the
-            # test follows the module, with the exporters pointed at this
-            # container's otlp/mesh and the queue and telemetry moved aside.
-            pyrite = self.nixosConfigurations.pyrite.config.services.opentelemetry-collector.settings;
-            agentSessionState = "/var/lib/agent-session-collector";
+            # pyrite's agent-session collector as the agent role renders it on
+            # a host whose agentTelemetry is true (agent-session-telemetry
+            # design D12, D14): its evaluated configuration whole, with only
+            # its exporters pointed at this container's otlp/mesh under the
+            # test CA, and a tap beside each pipeline's exporter; its queue
+            # and telemetry stay where the module puts them.
+            pyriteConfig = self.nixosConfigurations.pyrite.config;
+            pyriteSession = pyriteConfig.vanixiets.otelCollector.agentSessionSettings;
+            pyriteSessionUnit = pyriteConfig.systemd.services.otel-agent-session.serviceConfig;
+            agentSessionState = "/var/lib/otel-agent-session";
             agentSessionSettings =
               let
-                # Every pyrite pipeline that consumes otlp/local, whatever its
-                # name, so a third consumer fails here rather than going untested.
-                pipelines = lib.filterAttrs (
-                  _: pipeline: builtins.elem "otlp/local" (pipeline.receivers or [ ])
-                ) pyrite.service.pipelines;
-                used = kind: lib.unique (lib.concatMap (pipeline: pipeline.${kind}) (lib.attrValues pipelines));
+                pipelines = pyriteSession.service.pipelines;
               in
               assert lib.assertMsg
                 (
@@ -153,26 +152,24 @@
                     "metrics/agent-session"
                     "traces/agent-session"
                   ]
-                  && used "receivers" == [ "otlp/local" ]
-                  && pyrite.receivers."otlp/local" == { protocols.http.endpoint = "127.0.0.1:4318"; }
+                  && lib.all (pipeline: pipeline.receivers == [ "otlp/local" ]) (lib.attrValues pipelines)
+                  && pyriteSession.receivers == { "otlp/local".protocols.http.endpoint = "127.0.0.1:4318"; }
+                  && pyriteSession.extensions.file_storage.directory == "${agentSessionState}/queue"
                 )
-                "fleet-ingress: pyrite's otlp/local is not exactly 127.0.0.1:4318 feeding the three agent-session pipelines";
-              {
-                receivers = lib.genAttrs (used "receivers") (name: pyrite.receivers.${name});
-                processors = lib.genAttrs (used "processors") (name: pyrite.processors.${name});
+                "fleet-ingress: pyrite's agent-session collector is not otlp/local alone on 127.0.0.1:4318 feeding its three pipelines, with its queue under ${agentSessionState}";
+              pyriteSession
+              // {
                 exporters =
-                  lib.genAttrs (used "exporters") (
-                    name:
-                    pyrite.exporters.${name}
+                  lib.mapAttrs (
+                    _: exporter:
+                    exporter
                     // {
                       endpoint = "https://127.0.0.1:4319";
-                      tls = pyrite.exporters.${name}.tls // {
+                      tls = exporter.tls // {
                         ca_file = "${pki}/ca.crt";
-                        cert_file = "${pki}/agent.crt";
-                        key_file = "${pki}/agent.key";
                       };
                     }
-                  )
+                  ) pyriteSession.exporters
                   # What leaves the host, beside each pipeline's own exporter,
                   # one JSON export per line, so the canary reads it before the
                   # store's pipeline closes the columns again.
@@ -182,11 +179,7 @@
                       path = "${agentSessionState}/tap-${lib.removeSuffix "/agent-session" name}.jsonl";
                     }
                   ) pipelines;
-                extensions.file_storage = pyrite.extensions.file_storage // {
-                  directory = "${agentSessionState}/queue";
-                };
-                service = {
-                  extensions = [ "file_storage" ];
+                service = pyriteSession.service // {
                   pipelines = lib.mapAttrs (
                     name: pipeline:
                     pipeline
@@ -194,14 +187,6 @@
                       exporters = pipeline.exporters ++ [ "file/tap-${lib.removeSuffix "/agent-session" name}" ];
                     }
                   ) pipelines;
-                  telemetry.metrics.readers = [
-                    {
-                      pull.exporter.prometheus = {
-                        host = "127.0.0.1";
-                        port = 8890;
-                      };
-                    }
-                  ];
                 };
               };
             agentExecStart =
@@ -910,7 +895,7 @@
               assert points == [["pyrite", "cameron", "claude-opus-5-5", "input"]], points
 
               # What left the host.
-              taps = {kind: store.succeed(f"cat /var/lib/agent-session-collector/tap-{kind}.jsonl") for kind in ("logs", "metrics")}
+              taps = {kind: store.succeed(f"cat /var/lib/otel-agent-session/tap-{kind}.jsonl") for kind in ("logs", "metrics")}
               for kind, text in taps.items():
                   print(f"  tap-{kind}: {len(text)} bytes, nonce {text.count(NONCE)} time(s)", flush=True)
                   for key in ("user.email", "organization.id", "user.account_uuid", "tool_output", "prompt_text", "\"cost_usd\"",
@@ -940,7 +925,10 @@
             # (an older prompt, a tool result, the newest prompt), one after a
             # tool, one tool span, and one from another service, through
             # pyrite's otlp/local, otlp/mesh and the ingress into
-            # agent.agent_span, which the schema job created.
+            # agent.agent_span, which the schema job created. Only the step-0
+            # chat span of a top-level, non-oneshot run with native tools gets
+            # `last_user_message` (design D15); four spans whose history also
+            # ends in user text, each failing one condition, get none.
             agentSpans = ''
               print("=== case agentSpans", flush=True)
               fresh_start()
@@ -962,12 +950,35 @@
                   "scope": f"canary-scope-{NONCE}",
                   "email": f"canary-email-{NONCE}",
                   "other service": f"canary-other-{NONCE}",
+                  # A span with a link is dropped whole, its link's
+                  # attributes and its own (design D14).
+                  "link": f"canary-link-{NONCE}",
+                  "linked span": f"canary-linkedspan-{NONCE}",
+                  # An emitter's own `last_user_message` on a span whose
+                  # history ends in no user text.
+                  "forged prompt": f"canary-forgedprompt-{NONCE}",
+                  # Newest user messages the copy's gate must not take: a
+                  # step after a tool (a tool result under an in-band
+                  # dialect), an advisor's, a oneshot's, and a request
+                  # listing no tools.
+                  "step 1": f"canary-step1-{NONCE}",
+                  "advisor": f"canary-advisor-{NONCE}",
+                  "oneshot": f"canary-oneshot-{NONCE}",
+                  "no tools": f"canary-notools-{NONCE}",
               }
               admitted = ("prompt", "response", "arguments")
 
 
               def s(key, value):
                   return {"key": key, "value": {"stringValue": value}}
+
+
+              def iv(key, value):
+                  return {"key": key, "value": {"intValue": str(value)}}
+
+
+              tools = {"key": "omp.gen_ai.request.available_tools",
+                       "value": {"arrayValue": {"values": [{"stringValue": "bash"}, {"stringValue": "read"}]}}}
 
 
               now = time.time_ns()
@@ -983,10 +994,12 @@
                   "attributes": [
                       s("gen_ai.operation.name", "chat"), s("gen_ai.request.model", "claude-opus"),
                       s("gen_ai.conversation.id", f"session-{NONCE}"),
+                      iv("omp.gen_ai.agent.step.number", 0), tools,
                       {"key": "gen_ai.usage.input_tokens", "value": {"intValue": "42"}},
                       s("gen_ai.system_instructions", json.dumps([{"type": "text", "content": canary["system"]}])),
                       s("gen_ai.input.messages", json.dumps(history + [{"role": "user", "parts": [{"type": "text", "content": canary["prompt"]}]}])),
-                      s("gen_ai.output.messages", json.dumps([{"role": "assistant", "parts": [{"type": "text", "content": canary["response"]}]}])),
+                      # Past the 64 KiB every kept value is cut to.
+                      s("gen_ai.output.messages", json.dumps([{"role": "assistant", "parts": [{"type": "text", "content": canary["response"] + " " + "x" * 70000}]}])),
                       s("canary.unlisted", canary["unlisted"]),
                   ],
                   "events": [{"name": "exception", "timeUnixNano": str(now - 1500000000),
@@ -994,7 +1007,29 @@
                   "status": {"code": 2, "message": canary["status"]},
               }
               after_tool = dict(chat, spanId="eee19b7ec3c1b177", events=[], status={},
-                                attributes=[s("gen_ai.operation.name", "chat"), s("gen_ai.input.messages", json.dumps(history))])
+                                attributes=[s("gen_ai.operation.name", "chat"), s("gen_ai.input.messages", json.dumps(history)),
+                                            iv("omp.gen_ai.agent.step.number", 0), tools,
+                                            s("last_user_message", canary["forged prompt"])])
+              linked = dict(chat, spanId="eee19b7ec3c1b178", events=[], status={},
+                            attributes=[s("gen_ai.operation.name", "chat"), s("gen_ai.conversation.id", canary["linked span"])],
+                            links=[{"traceId": TRACE, "spanId": "eee19b7ec3c1b179", "attributes": [s("canary.link", canary["link"])]}])
+
+
+              def gated(span_id, marker, *attributes):
+                  messages = history + [{"role": "user", "parts": [{"type": "text", "content": canary[marker]}]}]
+                  return dict(chat, spanId=span_id, events=[], status={},
+                              attributes=[s("gen_ai.operation.name", "chat"), s("gen_ai.input.messages", json.dumps(messages)),
+                                          *attributes])
+
+
+              excluded = [
+                  gated("eee19b7ec3c1b17a", "step 1", iv("omp.gen_ai.agent.step.number", 1), tools),
+                  gated("eee19b7ec3c1b17b", "advisor", iv("omp.gen_ai.agent.step.number", 0), tools,
+                        s("gen_ai.agent.id", "session-advisor")),
+                  gated("eee19b7ec3c1b17c", "oneshot", iv("omp.gen_ai.agent.step.number", 0), tools,
+                        s("omp.gen_ai.oneshot.kind", "compaction_summary")),
+                  gated("eee19b7ec3c1b17d", "no tools", iv("omp.gen_ai.agent.step.number", 0)),
+              ]
               tool = {
                   "traceId": TRACE, "spanId": "eee19b7ec3c1b175", "parentSpanId": "eee19b7ec3c1b173",
                   "name": "execute_tool bash", "kind": 1,
@@ -1011,7 +1046,7 @@
                                                s("user.email", canary["email"]), s("host.name", f"canary-host-{NONCE}"),
                                                s("vanixiets.database", "fleet")]},
                    "scopeSpans": [{"scope": {"name": "omp", "attributes": [s("canary.scope", canary["scope"])]},
-                                   "spans": [chat, after_tool, tool]}]},
+                                   "spans": [chat, after_tool, tool, linked] + excluded}]},
                   {"resource": {"attributes": [s("service.name", "canary-other"), s("user.name", "cameron")]},
                    "scopeSpans": [{"spans": [dict(tool, spanId="eee19b7ec3c1b176",
                                                   attributes=[s("gen_ai.input.messages", canary["other service"])])]}]},
@@ -1024,31 +1059,40 @@
               print(f"  POST otlp/local /v1/traces: {status} {store.succeed('cat /tmp/agent-spans-answer')}", flush=True)
               assert status == "200", status
 
+              # What left the host, before the store is asked: no span with a
+              # link. The file exporter flushes once a second.
+              store.wait_until_succeeds(f"grep -q {NONCE} /var/lib/otel-agent-session/tap-traces.jsonl", timeout=60)
+              tap = store.succeed("cat /var/lib/otel-agent-session/tap-traces.jsonl")
+              assert canary["link"] not in tap and canary["linked span"] not in tap, "a linked span left the host"
+
 
               def stored_spans():
                   status, body = _request("/v1/sql", "agent", [("sql", "SELECT count(*) FROM agent_span WHERE \"resource_attributes.host.name\" = 'pyrite'")])
                   rows = json.loads(body)["output"][0]["records"]["rows"] if status == 200 else None
                   print(f"  agent_span rows from pyrite: {status} {rows}", flush=True)
-                  return rows == [[3]]
+                  return rows == [[7]]
 
 
-              wait_for(stored_spans, "pyrite's three spans in agent.agent_span", 240)
+              wait_for(stored_spans, "pyrite's seven spans in agent.agent_span", 240)
               rows = gsql(
-                  'SELECT span_name, "span_attributes.prompt", "span_attributes.gen_ai.output.messages", '
+                  'SELECT span_name, "span_attributes.last_user_message", "span_attributes.gen_ai.output.messages", '
                   '"span_attributes.gen_ai.tool.call.arguments", "span_attributes.gen_ai.usage.input_tokens", '
                   '"resource_attributes.user.name", "resource_attributes.host.name", service_name, span_status_message '
                   "FROM agent_span ORDER BY span_id", "agent")
               for row in rows:
                   print(f"  span: {row}", flush=True)
-              assert [r[0] for r in rows] == ["chat claude-opus", "execute_tool bash", "chat claude-opus"], rows
+              assert [r[0] for r in rows] == ["chat claude-opus", "execute_tool bash"] + ["chat claude-opus"] * 5, rows
               assert all(r[5:9] == ["cameron", "pyrite", "oh-my-pi", ""] for r in rows), rows
               assert rows[0][1] == canary["prompt"] and canary["response"] in rows[0][2] and rows[0][4] == 42, rows
-              assert rows[2][1] is None and canary["arguments"] in rows[1][3], rows
-              found = gsql(f"SELECT span_name FROM agent_span WHERE matches_term(\"span_attributes.prompt\", '{NONCE}')", "agent")
-              print(f"  matches_term(prompt, nonce): {found}", flush=True)
+              assert len(rows[0][2].encode()) <= 65536, len(rows[0][2].encode())
+              # Absent on the span after a tool and on each of the four the
+              # gate excludes.
+              assert all(r[1] is None for r in rows[2:]) and canary["arguments"] in rows[1][3], rows
+              found = gsql(f"SELECT span_name FROM agent_span WHERE matches_term(\"span_attributes.last_user_message\", '{NONCE}')", "agent")
+              print(f"  matches_term(last_user_message, nonce): {found}", flush=True)
               assert found == [["chat claude-opus"]], found
               create = gsql("SHOW CREATE TABLE agent_span", "agent")[0][1]
-              for column in ("span_attributes.prompt", "span_attributes.gen_ai.output.messages"):
+              for column in ("span_attributes.last_user_message", "span_attributes.gen_ai.output.messages"):
                   assert f"\"{column}\" STRING NULL FULLTEXT INDEX WITH(analyzer = 'English', backend = 'bloom', case_sensitive = 'false'" in create, column
               options = gsql("SELECT create_options FROM information_schema.tables WHERE table_schema = 'agent' AND table_name = 'agent_span'", "agent")[0][0]
               print(f"  agent_span create_options: {options}", flush=True)
@@ -1056,10 +1100,8 @@
               # The Jaeger lookup tables the store fills beside the spans.
               print(f"  agent_span_operations: {gsql('SELECT service_name, span_name, span_kind FROM agent_span_operations ORDER BY span_name', 'agent')}", flush=True)
 
-              # What left the host.
-              # The file exporter flushes once a second.
-              store.wait_until_succeeds(f"grep -q {NONCE} /var/lib/agent-session-collector/tap-traces.jsonl", timeout=60)
-              tap = store.succeed("cat /var/lib/agent-session-collector/tap-traces.jsonl")
+              # Everything that left the host.
+              tap = store.succeed("cat /var/lib/otel-agent-session/tap-traces.jsonl")
               print(f"  tap-traces: {len(tap)} bytes, nonce {tap.count(NONCE)} time(s)", flush=True)
               for what, value in canary.items():
                   assert (value in tap) == (what in admitted), (what, value in tap)
@@ -1069,7 +1111,7 @@
 
               # Every string and JSON column of every database, as regulator.
               assert nonce_hits(NONCE) == {
-                  "agent.agent_span.span_attributes.prompt": 1,
+                  "agent.agent_span.span_attributes.last_user_message": 1,
                   "agent.agent_span.span_attributes.gen_ai.conversation.id": 2,
                   "agent.agent_span.span_attributes.gen_ai.output.messages": 1,
                   "agent.agent_span.span_attributes.gen_ai.tool.call.arguments": 1,
@@ -1247,18 +1289,25 @@
                   };
                 };
 
-                systemd.services.agent-session-collector = {
-                  description = "pyrite's agent-session pipelines, exporting over mTLS to otlp/mesh";
+                # pyrite's unit itself, its ceiling, GOMEMLIMIT and hardening,
+                # with the configuration above and the test certificate.
+                systemd.services.otel-agent-session = {
+                  description = "pyrite's agent-session collector, exporting over mTLS to otlp/mesh";
                   wantedBy = [ "multi-user.target" ];
                   after = [ "opentelemetry-collector.service" ];
                   startLimitIntervalSec = 0;
-                  serviceConfig = {
-                    DynamicUser = true;
-                    StateDirectory = "agent-session-collector";
-                    ExecStart = agentExecStart collector agentSessionSettings;
-                    Restart = "always";
-                    RestartSec = "5s";
-                  };
+                  serviceConfig =
+                    builtins.removeAttrs pyriteSessionUnit [
+                      "ExecStartPost"
+                      "ExecStopPost"
+                    ]
+                    // {
+                      ExecStart = agentExecStart collector agentSessionSettings;
+                      LoadCredential = [
+                        "otel-cert:${pki}/agent.crt"
+                        "otel-key:${pki}/agent.key"
+                      ];
+                    };
                 };
 
                 systemd.services.agent-envelope = {

@@ -763,6 +763,7 @@ in
               );
             order = {
               nix-eval-jobs = evaluatorAdj;
+              otel-agent-session = unitAdj "otel-agent-session";
               perses = unitAdj "perses";
               greptimedb = unitAdj "greptimedb";
               opentelemetry-collector = unitAdj "opentelemetry-collector";
@@ -781,10 +782,12 @@ in
               }.";
             }
             # R7.1 (A7:100,127), S3 design D12 and CAM-73 design D8: under host
-            # OOM the kernel kills the evaluator, then the dashboard service,
-            # then the store, then the collector, so the collector outlives
-            # the store and queues; the alert evaluator, which reports OOM
-            # kills, is taken after all of them. nixbot's evaluator is iets
+            # OOM the kernel kills the evaluator, then the agent-session
+            # collector (agent-session-telemetry design D14), whose loss costs
+            # only agent telemetry, then the dashboard service, then the
+            # store, then the collector, so the collector outlives the store
+            # and queues; the alert evaluator, which reports OOM kills, is
+            # taken after all of them. nixbot's evaluator is iets
             # (CAM-111), which fails the whole evaluation when one of its
             # workers is killed, so being first does not make it cheap: its
             # headroom is kept by CAM-111 design D9's capacity decisions, and
@@ -793,11 +796,12 @@ in
               assertion =
                 config.services.nixEvalLock.enable
                 && evaluatorAdj != null
-                && evaluatorAdj > order.perses
+                && evaluatorAdj > order.otel-agent-session
+                && order.otel-agent-session > order.perses
                 && order.perses > order.greptimedb
                 && order.greptimedb > order.opentelemetry-collector
                 && order.opentelemetry-collector > order.fleet-alert;
-              message = "magnetite: R7.1, S3 design D12 and CAM-73 design D8 require the evaluation lock and oom_score_adj nix-eval-jobs > perses > greptimedb > opentelemetry-collector > fleet-alert; the lock is ${
+              message = "magnetite: R7.1, S3 design D12, CAM-73 design D8 and agent-session-telemetry design D14 require the evaluation lock and oom_score_adj nix-eval-jobs > otel-agent-session > perses > greptimedb > opentelemetry-collector > fleet-alert; the lock is ${
                 if config.services.nixEvalLock.enable then "enabled" else "disabled"
               } and the values are ${builtins.toJSON order}.";
             }

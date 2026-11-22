@@ -43,19 +43,23 @@ On the ingress host the agent's pipelines SHALL end in `forward`, and on every o
 
 ## ADDED Requirements
 
-### Requirement: Agent-telemetry hosts export agent events through a third exporter
+### Requirement: The agent-session collector exports each signal through its own exporter
 
-On a host other than the ingress whose host-table row sets `agentTelemetry`, `otlp_http/ingress` SHALL queue 408 MiB, and `logs/agent-session` SHALL end in `otlp_http/ingress-agent`, a logs-only exporter with `otlp_http/ingress`'s endpoint, TLS and unlimited retry and a 64 MiB `file_storage` queue sized in bytes.
+On an agent-telemetry host, `otel-agent-session.service` SHALL export metrics, events and spans through `otlp_http/ingress-metrics` (52 MiB), `otlp_http/ingress-agent` (64 MiB) and `otlp_http/ingress-traces` (20 MiB), each serving one pipeline over mTLS with the host's `otel-cert`, unlimited retry and a `file_storage` queue sized in bytes: to `otlp/mesh` on other hosts, to the ingress's `otlp/loopback` on magnetite; the host's own exporters keep their sizes.
 
-**Discharged by**: the agent role's queue assertion with `extendModules` overrides of pyrite; `checks.x86_64-linux.otel-collector-config`'s clause that `otlp_http/ingress-agent` is in no metrics pipeline; `vmTests.x86_64-linux.fleet-ingress`'s agent-telemetry container.
+**Discharged by**: the agent role's assertion over the unit with `extendModules` overrides of pyrite; `checks.x86_64-linux.otel-collector-config`'s hand-off clause with mutants `handoffAroundIngress`, `handoffNameUnverified`, `handoffWithoutClientCa` and `handoffWildcard`; `vmTests.x86_64-linux.fleet-ingress` running pyrite's evaluated unit; pyrite's host collector compared with main before #4145 (design D14).
 
 #### Scenario: pyrite's exporters are evaluated
 
 - **WHEN** pyrite's configuration is evaluated
-- **THEN** `otlp_http/ingress` queues 408 MiB, `otlp_http/ingress-logs` 16 MiB and `otlp_http/ingress-agent` 64 MiB, 488 MiB in all, and `otlp_http/ingress-agent` appears in no metrics pipeline
+- **THEN** the host's collector queues `otlp_http/ingress` 400 MiB and `otlp_http/ingress-logs` 16 MiB, its evaluated settings and unit equal those of main before #4145, and the agent-session collector queues 52, 64 and 20 MiB, 136 MiB in all
 
 #### Scenario: Agent events cross the ingress in the VM test
 
-- **WHEN** the VM test's agent-telemetry container posts an admitted session event to its `otlp/local`
+- **WHEN** the VM test's agent-session collector posts an admitted session event to its `otlp/local`
 - **THEN** the event passes through `otlp_http/ingress-agent`, `otlp/mesh` and `routing/logs` into `agent.session_event`, and the exporter's failed-send count stays zero
 
+#### Scenario: magnetite's hand-off loses its client certificate check
+
+- **WHEN** a mutant removes `client_ca_file` from magnetite's `otlp/loopback`, or points an agent-session exporter past it at the store
+- **THEN** `otel-collector-config` fails its hand-off clause

@@ -10,10 +10,12 @@
 # its textfile series; modules/nixos/node-exporter-textfile.nix asserts it
 # against the host's own configuration, which its machine check evaluates
 # anyway (F76). Every collecting darwin host's probe writes a textfile.
-# A NixOS host's `agentTelemetry` turns on the loopback receiver for its
-# agent sessions and, through the agent-telemetry home module, the
-# emitters of every person and Omnigent worker on it
-# (agent-session-telemetry design D8); it is a NixOS option only, so a
+# A NixOS host's `agentTelemetry` turns on the agent-session collector,
+# otel-agent-session.service with its loopback receiver, for its agent
+# sessions and, through the agent-telemetry home module, the emitters of
+# every person and Omnigent worker on it (agent-session-telemetry design D8,
+# D14); its row also lists that unit and its envelope among the notified
+# units, which the agent role asserts. It is a NixOS option only, so a
 # darwin row keeps it false.
 { ... }:
 {
@@ -43,6 +45,8 @@
           "greptimedb"
           "greptimedb-envelope"
           "greptimedb-schema"
+          "otel-agent-session"
+          "otel-agent-session-envelope"
           "perses"
           "postgresql-dump-globals"
           "postgresqlBackup-gitea"
@@ -79,10 +83,15 @@
         // {
           alwaysOn = true;
         };
-      pyrite = agent [ ] // {
-        smartDevices = [ "/dev/nvme0" ];
-        agentTelemetry = true;
-      };
+      pyrite =
+        agent [
+          "otel-agent-session"
+          "otel-agent-session-envelope"
+        ]
+        // {
+          smartDevices = [ "/dev/nvme0" ];
+          agentTelemetry = true;
+        };
       electrum = agent [ ];
       galena = agent [ ];
       scheelite = agent [ ];

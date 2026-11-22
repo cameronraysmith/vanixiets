@@ -55,14 +55,30 @@ Where agent telemetry is on, `~/.omp/agent/.env` SHALL set the metrics endpoint 
 
 ### Requirement: The loopback receiver feeds only the agent-session pipelines
 
-On an agent-telemetry host, `otlp/local` SHALL be an OTLP/HTTP receiver on `127.0.0.1:4318` feeding exactly `metrics/agent-session`, `logs/agent-session` and `traces/agent-session`; no other pipeline SHALL take it, and the only other traces pipeline SHALL be the ingress's `traces/ingress`.
+On an agent-telemetry host, `otlp/local` SHALL be an OTLP/HTTP receiver on `127.0.0.1:4318`, the only receiver of the agent-session collector, feeding exactly `metrics/agent-session`, `logs/agent-session` and `traces/agent-session`; the host's collector SHALL have no `otlp/local`, no receiver on its address and no agent-session pipeline, and its only traces pipeline SHALL be the ingress's `traces/ingress`.
 
-**Discharged by**: `checks.x86_64-linux.otel-collector-config`'s clauses over magnetite's evaluated configuration with mutants `localFeedsDevloop`, `localFeedsFleet` and `spansToFleet`; the `fleet-ingress` test's evaluation-time assertion over pyrite's receiver and the pipelines that take it; nixpkgs' build-time `otelcol-contrib validate`.
+**Discharged by**: `checks.x86_64-linux.otel-collector-config`'s local, isolation, logs-receiver and traces clauses over magnetite's two collectors with mutants `localFeedsDevloop`, `localFeedsFleet`, `metricsBackInShared`, `spansBackInShared`, `localWildcard`, `localSecondReceiver` and `spansToFleet`; the `fleet-ingress` test's evaluation-time assertion over pyrite's agent-session collector; build-time `otelcol-contrib validate` of both configurations.
 
 #### Scenario: A mutant wires the receiver elsewhere
 
-- **WHEN** a mutant adds `otlp/local` to `metrics/host` or to a `logs/devloop-*` pipeline, sends `traces/ingress` to `otlp_http/fleet`, adds a third consumer of pyrite's `otlp/local`, or binds pyrite's `otlp/local` to `0.0.0.0:4318`
-- **THEN** the check or the test's evaluation fails on its clause
+- **WHEN** a mutant adds `otlp/local` or an agent-session pipeline back to the host's collector, adds a second receiver to the agent-session collector, sends `traces/ingress` to `otlp_http/fleet`, or binds `otlp/local` to `0.0.0.0:4318`
+- **THEN** the check fails on its clause
+
+### Requirement: The agent-session pipelines run in a collector unit of their own
+
+On an agent-telemetry host, the agent-session pipelines SHALL run only in `otel-agent-session.service`, with `MemoryMax` 512M, a 384 MiB limiter first in every pipeline, `GOMEMLIMIT` 409 MiB between them, its own queue directory and telemetry port, the host collector's hardening and `OOMScoreAdjust` 700 on magnetite; the host's collector SHALL set no `GOMEMLIMIT` and no agent limiter.
+
+**Discharged by**: the agent role's assertion over the unit and the notified units; magnetite's kill-order assertion; `checks.x86_64-linux.otel-collector-config`'s stages and agent limiter clauses with mutants `traceLimiterDropped`, `agentLimiterOverGoMemLimit`, `goMemLimitUnset` and `sharedGoMemLimit`; `vmTests.x86_64-linux.fleet-ingress` running pyrite's unit; the split load harness (design D14), resting on world assumptions `A199 — omp's chat spans carry the whole conversation at the measured sizes` and `A200 — The collector holds ten to fourteen times a span request while decoding it`.
+
+#### Scenario: Eight sessions post maximum-size chat spans at once
+
+- **WHEN** the split load harness posts eight 13.8 MiB chat spans every 5 s, or eight 64-span bursts, to `otlp/local` on pyrite's and magnetite's evaluated collectors
+- **THEN** the host's collector refuses no fleet point and does not restart, and whatever the agent-session collector refuses or loses is agent telemetry
+
+#### Scenario: magnetite's kill order omits the unit
+
+- **WHEN** an override sets the unit's `OOMScoreAdjust` below perses's 600, or the unit is absent
+- **THEN** magnetite's evaluation fails on its kill-order assertion
 
 ### Requirement: The agent-session stages admit only allow-listed events and keys
 
@@ -80,21 +96,53 @@ On an agent-telemetry host, `otlp/local` SHALL be an OTLP/HTTP receiver on `127.
 - **WHEN** the VM test sends a `claude_code.token.usage` point carrying `session.id`, `prompt.id`, `user.email` and `organization.id`
 - **THEN** the stored series carries none of those labels and carries `user_name` and `host_name`
 
-### Requirement: The span path keeps only the newest prompt and listed span keys
+### Requirement: Every kept span and event value is at most 64 KiB
 
-`traces/agent-session` SHALL admit `claude-code` and `oh-my-pi`, copy the newest user message's text into `prompt`, drop every span event, keep only `agentSession.spans` keys and resource keys, blank the status message and clear scope attributes before stamping; `traces/ingress` SHALL write only `agent`-stamped spans to the schema job's `agent.agent_span` through `greptime_trace_v1` with `auto_create_table=false`.
+After the allow-lists, the agent-session collector SHALL cut every span attribute and every event attribute to 65,536 bytes, so a stored prompt, last user message, response, tool argument or output message holds at most 64 KiB; it SHALL delete an emitter's own `last_user_message` before any copy, and drop every span that carries a link.
+
+**Discharged by**: `checks.x86_64-linux.otel-collector-config`'s keys and stages clauses with mutants `spanTruncationRemoved`, `eventTruncationRemoved`, `promptNotCleared` and `spanLinksKept`; `vmTests.x86_64-linux.fleet-ingress`'s `agentSpans` case (a 70 KiB response, a forged `last_user_message`, a linked span seen absent on the host's tap); the split load harness's 14 MiB `gen_ai.output.messages` scenario (design D14).
+
+#### Scenario: A response larger than 64 KiB is sent
+
+- **WHEN** a chat span's `gen_ai.output.messages` holds 70 KiB, or 14 MiB under load
+- **THEN** the stored value holds at most 65,536 bytes, its beginning intact
+
+#### Scenario: A span carries a link or its own last user message
+
+- **WHEN** an emitter sends a span with a link, or a span with a `last_user_message` attribute whose history ends in no user text
+- **THEN** the linked span and its link's attributes are not stored, and the other span is stored without `last_user_message`
+
+### Requirement: The span path keeps only the last user message and listed span keys
+
+`traces/agent-session` SHALL admit `claude-code` and `oh-my-pi`, copy the newest user message's text into `last_user_message` where the next requirement allows, drop every span event, keep only `agentSession.spans` keys and resource keys, blank the status message and clear scope attributes before stamping; `traces/ingress` SHALL write only `agent`-stamped spans to the schema job's `agent.agent_span` through `greptime_trace_v1` with `auto_create_table=false`.
 
 **Discharged by**: `checks.x86_64-linux.otel-collector-config`'s stage, statement and traces clauses with mutants `spanInputMessagesKept`, `spanEventsKept`, `promptAfterAllowList`, `spansToFleet` and `spanTableAutoCreated`; `vmTests.x86_64-linux.fleet-ingress`'s `agentSpans` case; resting on world assumption `A198 — The telemetry store writes traces into pre-created v1 tables and refuses unknown columns`.
 
 #### Scenario: A chat span carries the whole history
 
-- **WHEN** the VM test posts an omp chat span whose `gen_ai.input.messages` holds an older prompt, a tool result and the newest prompt, plus a system prompt, an unlisted key, an exception event, a status message and a scope attribute
-- **THEN** `agent.agent_span` holds the newest prompt in `span_attributes.prompt`, the response and the tool arguments, and no column or value holds any of the rest
+- **WHEN** the VM test posts an omp step-0 chat span with tools whose `gen_ai.input.messages` holds an older prompt, a tool result and the newest prompt, plus a system prompt, an unlisted key, an exception event, a status message and a scope attribute
+- **THEN** `agent.agent_span` holds the newest prompt in `span_attributes.last_user_message`, the response and the tool arguments, and no column or value holds any of the rest
 
 #### Scenario: The span table is read back
 
 - **WHEN** the VM test reads `SHOW CREATE TABLE agent.agent_span` and its `create_options` as `regulator`
-- **THEN** `span_attributes.prompt` and `span_attributes.gen_ai.output.messages` carry the full-text index, `table_data_model` is `greptime_trace_v1`, and the table has no `ttl` of its own
+- **THEN** `span_attributes.last_user_message` and `span_attributes.gen_ai.output.messages` carry the full-text index, `table_data_model` is `greptime_trace_v1`, and the table has no `ttl` of its own
+
+### Requirement: Only a top-level run's first request gets a last user message
+
+The agent-session collector SHALL copy into `last_user_message` only on a span named `chat …` whose `omp.gen_ai.agent.step.number` is 0, which carries `omp.gen_ai.request.available_tools` and carries neither `gen_ai.agent.id` nor `omp.gen_ai.oneshot.kind`, so that no tool result, advisor update, subagent message or oneshot prompt is copied.
+
+**Discharged by**: `checks.x86_64-linux.otel-collector-config`'s keys clause with mutants `promptGateNoChat`, `promptGateNoStep`, `promptGateNoAgentId`, `promptGateNoOneshot` and `promptGateNoTools`; `vmTests.x86_64-linux.fleet-ingress`'s `agentSpans` case, seen failing with the gate removed; resting on world assumption `A201 — omp marks the spans whose newest user message can be other than a person's`.
+
+#### Scenario: Spans the gate excludes
+
+- **WHEN** the VM test posts chat spans whose history ends in user text at step 1, with `gen_ai.agent.id`, with `omp.gen_ai.oneshot.kind`, and without `omp.gen_ai.request.available_tools`
+- **THEN** each is stored without `last_user_message`, and its user text is neither in what left the host nor in any column
+
+#### Scenario: Injected user text at step 0 is stored (accepted)
+
+- **WHEN** the newest user message of a top-level run's first request is `!cmd` output, a steering interjection, an IRC message, a skill body or an image-mention wrapper
+- **THEN** it is stored as `last_user_message`, as the operator accepted on 2026-11-22 (design D15)
 
 ### Requirement: One allow-list decides what the collector keeps and the store stores
 
@@ -136,25 +184,30 @@ The ingress SHALL route logs with `vanixiets.database=agent` and `vanixiets.tabl
 
 ### Requirement: Agent queues are sized to their holds
 
-Non-ingress agent-telemetry hosts SHALL queue `otlp_http/ingress` 408 MiB (24 h of fleet and agent metrics), logs-only `otlp_http/ingress-agent` 64 MiB (8 h of events) and traces-only `otlp_http/ingress-traces` 20 MiB (3 h of spans); magnetite SHALL queue `otlp_http/agent` 16 MiB, `otlp_http/agent_session_event` 32 MiB (2 h) and `otlp_http/agent_span` 8 MiB (40 min) of every agent-telemetry host's rates; all sums below 512 MiB.
+The agent-session collector SHALL queue `otlp_http/ingress-metrics` 52 MiB (24 h of agent metrics), `otlp_http/ingress-agent` 64 MiB (8 h of events) and `otlp_http/ingress-traces` 20 MiB (3 h of spans), below 512 MiB; magnetite SHALL queue `otlp_http/agent` 16 MiB, `otlp_http/agent_session_event` 32 MiB (2 h) and `otlp_http/agent_span` 8 MiB (40 min) of every agent-telemetry host's rates, its sum below 512 MiB.
 
-**Discharged by**: the agent role's queue assertion with an `extendModules` override of pyrite's `otlp_http/ingress-agent` to 32 MiB; `checks.x86_64-linux.otel-collector-config`'s queue clauses with their mutants; the rates measured after deploy.
+**Discharged by**: the agent role's assertion over the agent-session collector with an `extendModules` override of pyrite's `otlp_http/ingress-agent` to 32 MiB; `checks.x86_64-linux.otel-collector-config`'s queue clauses with their mutants; the rates measured after deploy.
 
 #### Scenario: pyrite's event queue is shrunk
 
-- **WHEN** an override sizes pyrite's `otlp_http/ingress-agent` at 32 MiB
-- **THEN** pyrite's evaluation fails on the agent role's queue assertion
+- **WHEN** an override sizes pyrite's agent-session `otlp_http/ingress-agent` at 32 MiB
+- **THEN** pyrite's evaluation fails on the agent role's assertion over the unit
 
 ### Requirement: Regulators cover the agent-session path
 
-`otel-envelope` on the ingress host SHALL fail its hourly budget run when `agent` holds more than 2,000 active series or a label more than 200 values, and `otel-collector-config` SHALL fail on a traces pipeline other than `traces/agent-session` and `traces/ingress`, on `otlp/local` feeding any other pipeline, on a transform statement list other than the one `agentSession` renders, and on logs leaving for a database other than `devloop` or `agent`.
+`otel-envelope` on the ingress host SHALL fail its hourly budget run when `agent` holds more than 2,000 active series or a label more than 200 values; `otel-agent-session-envelope` SHALL judge the agent-session collector's own telemetry, a span refused at `otlp/local` being loss; `otel-collector-config` SHALL fail on any agent-session pipeline in the host's collector, any transform statement list other than `agentSession` renders, and logs leaving for a database other than `devloop` or `agent`.
 
-**Discharged by**: `checks.x86_64-linux.otel-envelope`'s case set with an `agent` fixture of 2,001 series; `checks.x86_64-linux.otel-collector-config` with its mutants.
+**Discharged by**: `checks.x86_64-linux.otel-envelope`'s case set with an `agent` fixture of 2,001 series, the cases `agentSessionHealthy`, `agentSessionLocalRefused` and `ingressLoopbackRefused` with mutant `loopbackRefusalIsLoss`; `checks.x86_64-linux.otel-collector-config` with its mutants.
 
 #### Scenario: The agent series budget is exceeded in the fixture
 
 - **WHEN** the envelope check runs its budget clause over a fixture where `agent` holds 2,001 active series
 - **THEN** the clause fails, and passes at 2,000
+
+#### Scenario: The agent-session collector refuses spans
+
+- **WHEN** the agent-session collector's envelope reads 40 more spans refused at `otlp/local` than on its previous run
+- **THEN** it fails `C4 loss`, while magnetite's envelope does not count refusals at `otlp/loopback` as loss
 
 ### Requirement: The VM test proves the allow-list with a canary
 
@@ -169,8 +222,8 @@ Non-ingress agent-telemetry hosts SHALL queue `otlp_http/ingress` 408 MiB (24 h 
 
 #### Scenario: The span canary runs
 
-- **WHEN** the `agentSpans` case posts omp spans carrying an older prompt, a tool result in the history and as an attribute, a system prompt, an unlisted key, an exception event, a status message, a scope attribute, `user.email` and a `canary-other` service, each marked with a nonce
-- **THEN** what left the host and every string and JSON column in every database hold the nonce only in the newest prompt, the response and the tool arguments
+- **WHEN** the `agentSpans` case posts omp spans carrying an older prompt, a tool result in the history and as an attribute, a system prompt, an unlisted key, an exception event, a status message, a scope attribute, `user.email`, a `canary-other` service, a linked span, a forged `last_user_message` and four spans the copy's gate excludes, each marked with a nonce
+- **THEN** what left the host and every string and JSON column in every database hold the nonce only in the newest prompt of the step-0 chat span, the response and the tool arguments
 
 ### Requirement: This capability states its own trust boundary
 

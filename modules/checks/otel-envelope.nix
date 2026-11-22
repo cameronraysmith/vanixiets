@@ -124,6 +124,17 @@
           ingress = true;
           exporters = [ "otlp_http/fleet" ];
         };
+        # The agent-session collector's envelope (agent-session-telemetry
+        # design D14): its three exporters, on its own telemetry endpoint,
+        # off the ingress, so a refusal at otlp/local is loss.
+        agentSession = envelope {
+          hostName = "pyrite";
+          exporters = [
+            "otlp_http/ingress-agent"
+            "otlp_http/ingress-metrics"
+            "otlp_http/ingress-traces"
+          ];
+        };
         budget = envelope {
           budget = {
             storeUrl = "http://127.0.0.1:${toString closedStorePort}";
@@ -188,6 +199,15 @@
         meshTincrRefusalIsLoss = {
           case = "ingressMeshTincrRefused";
           from = ''if [ "$ingress" = 1 ] && [[ $series == otelcol_receiver_refused_*'receiver="otlp/mesh-tincr"'* ]]; then continue; fi'';
+          to = ":";
+        };
+        # The agent-session collector's hand-off on the ingress host is
+        # back-pressure, as the mesh receivers' are; the line is rendered
+        # only into the ingress's script (design D14).
+        loopbackRefusalIsLoss = {
+          case = "ingressLoopbackRefused";
+          variants = [ "ingress" ];
+          from = ''if [[ $series == otelcol_receiver_refused_*'receiver="otlp/loopback"'* ]]; then continue; fi'';
           to = ":";
         };
         missingCounterFails = {
@@ -409,6 +429,28 @@
           s=$(mktemp -d)
           run ingress "$s" ingress-memory-refused-1 down 0 && run ingress "$s" ingress-memory-refused-2 down 1 \
             && grep -q '^otel-envelope: C4 loss: FAIL .*host_metrics/memory' "$work/out"
+        }
+        # The ingress host's own agent-session collector hands off to
+        # otlp/loopback; its refusals are that collector's back-pressure
+        # (agent-session-telemetry design D14).
+        case_ingressLoopbackRefused() {
+          local s
+          s=$(mktemp -d)
+          run ingress "$s" ingress-loopback-refused-1 down 0 && run ingress "$s" ingress-loopback-refused-2 down 0
+        }
+        # The agent-session collector's envelope: its three exporters' queue
+        # series pass C3, and spans refused at otlp/local are loss.
+        case_agentSessionHealthy() {
+          local s
+          s=$(mktemp -d)
+          run agentSession "$s" agent-session-healthy down 0 && run agentSession "$s" agent-session-healthy down 0 \
+            && ! grep -q ': FAIL' "$work/out"
+        }
+        case_agentSessionLocalRefused() {
+          local s
+          s=$(mktemp -d)
+          run agentSession "$s" agent-session-healthy down 0 && run agentSession "$s" agent-session-local-refused down 1 \
+            && grep -q '^otel-envelope: C4 loss: FAIL .*receiver="otlp/local".* +40' "$work/out"
         }
         case_resetAfterRecorded() {
           local s
@@ -654,6 +696,9 @@
         "ingressMeshRefused"
         "ingressMeshTincrRefused"
         "ingressOwnRefused"
+        "ingressLoopbackRefused"
+        "agentSessionHealthy"
+        "agentSessionLocalRefused"
         "resetAfterRecorded"
         "resetThenFailure"
         "targetDownOnce"

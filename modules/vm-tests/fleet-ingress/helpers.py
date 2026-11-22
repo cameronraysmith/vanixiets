@@ -13,7 +13,7 @@ INGRESS = "opentelemetry-collector"
 AGENT = "agent-collector"
 INGRESS_PORT = 8888
 AGENT_PORT = 8889
-SESSION = "agent-session-collector"
+SESSION = "otel-agent-session"
 SESSION_PORT = 8890
 CONFIG = None
 

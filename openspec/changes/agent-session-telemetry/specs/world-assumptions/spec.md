@@ -185,7 +185,58 @@ Any requirement whose discharge depends on this fact SHALL name it explicitly, a
 #### Scenario: The store adds columns despite the hint, or drops v1
 
 - **WHEN** a store release the fleet deploys adds a column under `auto_create_table=false`, or no longer accepts `greptime_trace_v1`
-- **THEN** this assumption is void, and the `agent-session-telemetry-interface` requirement `The span path keeps only the newest prompt and listed span keys` loses its store-side closure
+- **THEN** this assumption is void, and the `agent-session-telemetry-interface` requirement `The span path keeps only the last user message and listed span keys` loses its store-side closure
+
+### Requirement: A199 — omp's chat spans carry the whole conversation at the measured sizes
+
+It is true of omp 19.1.0 sessions on this fleet's hosts, independent of what this fleet builds, that a chat span's `gen_ai.input.messages` is 660 KiB at the median, 8.35 MiB at p99 and 13.8 MiB at most, that a session finishes at most 4 chat spans in 5 s, and that one host's concurrent sessions post at most 54.5 MiB of span bodies in 5 s.
+Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL lose its discharge once the violation below is observed.
+
+**Evidence**: measured on 2026-11-22 over this machine's 1,725 omp session files (122,651 chat spans, 890 active session-hours), each request history rebuilt along the session's parent chain and serialised as `can1357/oh-my-pi@v19.1.0` `packages/agent/src/telemetry.ts:913-959` does, compaction included and no cap, cross-checked at a median of 3.95 bytes per reported input token (`local://telemetry-traces-load.md` §1, §2).
+
+#### Scenario: Measured on 2026-11-22
+
+- **WHEN** the session files above were measured on 2026-11-22
+- **THEN** the sizes above held, and no chat span reached 16 MiB
+
+#### Scenario: Sessions grow past the measured sizes
+
+- **WHEN** a later measurement, or an omp release, gives chat spans above 13.8 MiB, more than 4 chat spans per session in 5 s, or host windows above 54.5 MiB
+- **THEN** this assumption is void, and design D14's load proof is rerun at the new sizes before the agent-session collector's ceiling is relied on
+
+### Requirement: A200 — The collector holds ten to fourteen times a span request while decoding it
+
+It is true of otelcol-contrib 0.155.0, independent of what this fleet builds, that its OTLP/HTTP receiver reads a request whole and unmarshals it with a copy of every string, refusing bodies over 20 MiB at the door, so a traces pipeline's heap holds ten to fourteen times the request bodies it is decoding at their peak.
+Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL lose its discharge once the violation below is observed.
+
+**Evidence**: `open-telemetry/opentelemetry-collector@v0.155.0` `config/confighttp/server.go:35,191-193` (the 20 MiB default); measured on 2026-11-22 in VMs on pyrite running each host's evaluated collector: one 8.4 MiB body in flight added 101 MiB of heap, one 13.9 MiB body 135 MiB, and eight 0.69 MiB bodies 78 MiB (`local://telemetry-traces-load.md` §2, `logs/traces-load-pyrite-v2-20261122-073624.log`).
+
+#### Scenario: Measured on 2026-11-22
+
+- **WHEN** the requests above were posted to each host's evaluated collector
+- **THEN** the heap grew by ten to fourteen times the bodies in flight
+
+#### Scenario: A release decodes differently
+
+- **WHEN** the packaged collector differs from 0.155.0 and decodes a request in more than fourteen times its size, or raises its default body limit
+- **THEN** this assumption is void, and design D14's load proof is rerun before the agent-session collector's ceiling is relied on
+
+### Requirement: A201 — omp marks the spans whose newest user message can be other than a person's
+
+It is true of omp 19.1.0, independent of what this fleet builds, that tool results are user messages only under an in-band dialect, which omits `omp.gen_ai.request.available_tools`; that advisors and subagents carry `gen_ai.agent.id` and oneshots `omp.gen_ai.oneshot.kind`; and that each run restarts the integer `omp.gen_ai.agent.step.number` at 0.
+Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL lose its discharge once the violation below is observed.
+
+**Evidence**: `can1357/oh-my-pi@v19.1.0` (the packaged source, read 2026-11-22): `packages/agent/src/telemetry.ts:79,129,133,153` (the four keys), `:728,1621` (span name `chat <model>`), `:769` (step number, a number), `:789-791` (available tools only when the request lists tools), `:581` (agent id when the session has an identity), `:1864` (oneshot kind), `:936-958` (a message keeps only its role and parts, so injected user text cannot be told from typed text); `packages/agent/src/agent-loop.ts:1148-1150` (step counter per run), `:2085,2186` (an in-band dialect sends no tools); `packages/coding-agent/src/session/messages.ts:1143-1153` (`!cmd` output as a user message), advisor and subagent identities per agent://OmpUserMessageShape (`session-advisors.ts:1410-1428`, `task/executor.ts:5121-5141`).
+
+#### Scenario: What the gate leaves admitted (accepted by the operator, 2026-11-22)
+
+- **WHEN** a top-level run's first request is sent
+- **THEN** its newest user message can still be other than what the person typed: `!cmd` output when a run continues without a new prompt [unverified], a steering interjection, an IRC message, a skill body or an image-mention wrapper, and its first text part can be the date and working-directory reminder; the operator accepted storing these under D15
+
+#### Scenario: A release marks spans differently
+
+- **WHEN** the packaged omp differs from 19.1.0 and renames or retypes one of the four keys, or sends tool results or injected context as user messages on a span the gate admits
+- **THEN** this assumption is void, and the `agent-session-telemetry-interface` requirement `Only a top-level run's first request gets a last user message` is re-read against the new source before the copy is relied on
 
 ## MODIFIED Requirements
 
