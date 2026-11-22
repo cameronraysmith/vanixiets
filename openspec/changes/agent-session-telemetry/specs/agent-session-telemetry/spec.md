@@ -39,13 +39,13 @@ The fleet SHALL keep session content where every reader of the telemetry store m
 
 ### Requirement: Only allow-listed session content leaves a host
 
-No part of an agent session SHALL leave its host unless it is on the fleet's allow-list: listed harnesses, listed session events and their listed fields; prompts, responses and tool details are listed, tool output and raw API bodies are not, and anything unlisted SHALL be dropped on the host.
+No part of an agent session SHALL leave its host unless it is on the fleet's allow-list: listed harnesses, listed session events and their listed fields. Prompts, responses, tool details and tool output are listed, each value at most 64 KiB; raw API bodies and a harness's whole conversation history are not. Anything unlisted SHALL be dropped on the host.
 
-**Discharged by**: `agent-session-telemetry-interface` requirements `The agent-session stages admit only allow-listed events and keys`, `The span path keeps only the last user message and listed span keys`, `Only a top-level run's first request gets a last user message`, `One allow-list decides what the collector keeps and the store stores` and `The VM test proves the allow-list with a canary`; resting on world assumptions `A190 — Claude Code emits its telemetry as documented for its packaged version`, `A191 — omp reads its own environment file and puts content only on spans`, `A193 — The telemetry store's pipelines filter, close and index as documented`, `A198 — The telemetry store writes traces into pre-created v1 tables and refuses unknown columns` and `A201 — omp marks the spans whose newest user message can be other than a person's`.
+**Discharged by**: `agent-session-telemetry-interface` requirements `The agent-session stages admit only allow-listed events and keys`, `Every kept span and event value is at most 64 KiB`, `The span path keeps only the last user message and listed span keys`, `Only a top-level run's first request gets a last user message`, `One allow-list decides what the collector keeps and the store stores` and `The VM test proves the allow-list with a canary`; resting on world assumptions `A190 — Claude Code emits its telemetry as documented for its packaged version`, `A191 — omp reads its own environment file and puts content only on spans`, `A193 — The telemetry store's pipelines filter, close and index as documented`, `A198 — The telemetry store writes traces into pre-created v1 tables and refuses unknown columns`, `A201 — omp marks the spans whose newest user message can be other than a person's` and `A202 — Claude Code's traces carry its tool output in an event and read the span buffer bound from the environment`.
 
-#### Scenario: A harness is reconfigured to send tool output
+#### Scenario: A harness is reconfigured to send raw API bodies
 
-- **WHEN** a person edits their Claude Code settings to send tool output, or a session sends raw API bodies, an unlisted event or an unlisted field
+- **WHEN** a person edits their Claude Code settings to send raw API bodies, or a session sends an unlisted event or an unlisted field
 - **THEN** none of it reaches the telemetry store, which the VM test's canary shows for each kind
 
 #### Scenario: A harness release adds a field
@@ -56,7 +56,18 @@ No part of an agent session SHALL leave its host unless it is on the fleet's all
 #### Scenario: An omp session sends its whole history
 
 - **WHEN** an omp session sends, with each model call, the whole conversation so far, earlier tool output included
-- **THEN** only the newest user message of each run's first request, the response and the tool details reach the telemetry store; the earlier conversation and the tool output are dropped on the host
+- **THEN** only the newest user message of each run's first request, the response, the tool details and each tool's own output reach the telemetry store; the earlier conversation is dropped on the host
+
+### Requirement: Token-shaped secrets in stored content are masked
+
+Secrets of a listed token shape (private-key blocks and the tokens of the issuers the collector lists) in a session's prompts, responses, tool details, tool output or error text SHALL be replaced before they leave the host. This SHALL NOT be relied on for any other secret, and SHALL NOT replace the allow-list.
+
+**Discharged by**: `agent-session-telemetry-interface` requirement `Credential shapes are masked in what the agent-session collector keeps`.
+
+#### Scenario: A tool prints a token
+
+- **WHEN** a session's command prints a GitHub token, or a file it reads holds a private key
+- **THEN** the stored tool output holds `****` in its place and the rest of the output as printed
 
 ### Requirement: No account identifier leaves a host
 
@@ -169,5 +180,5 @@ No change to what agent sessions send, or to the collection path that carries it
 
 #### Scenario: The canary is run
 
-- **WHEN** the VM test sends raw API bodies, an unlisted field, an unlisted event, account identifiers, a message body, a foreign harness and an unlisted metric, each marked with a unique word
-- **THEN** no marked word or forbidden field appears anywhere in the telemetry store, and the admitted prompt is found by its word
+- **WHEN** the VM test sends raw API bodies, an unlisted field, an unlisted event, account identifiers, a message body, a foreign harness, an unlisted metric, a whole conversation history and planted token-shaped secrets, each marked with a unique word, beside admitted prompts and tool output
+- **THEN** no marked word or forbidden field appears anywhere in the telemetry store, the secrets appear only as `****`, and the admitted prompt and tool output are found by their word

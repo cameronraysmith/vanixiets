@@ -305,17 +305,44 @@
             ''set(span.cache["g"], true) where IsMatch(span.name, "^chat ") and span.attributes["omp.gen_ai.agent.step.number"] == 0 and span.attributes["gen_ai.agent.id"] == nil and span.attributes["omp.gen_ai.oneshot.kind"] == nil and span.attributes["omp.gen_ai.request.available_tools"] != nil''
             ''set(span.cache["t"], ${source}) where span.cache["g"] == true and ${source} != nil and Len(${source}) <= 65536''
             ''set(span.cache["t"], Substring(${source}, Len(${source}) - 65536, 65536)) where span.cache["g"] == true and ${source} != nil and Len(${source}) > 65536''
-            ''set(span.cache["x"], ExtractPatterns(span.cache["t"], "\\{\\s*\"role\"\\s*:\\s*\"user\"\\s*,\\s*\"parts\"\\s*:\\s*\\[\\s*\\{\\s*\"type\"\\s*:\\s*\"text\"\\s*,\\s*\"content\"\\s*:\\s*\"(?P<c>(?:[^\"\\\\]|\\\\.)*)\"\\s*\\}(?:\\s*,\\s*\\{[^\\[\\]]*\\})*\\s*\\]\\s*\\}\\s*\\]\\s*$")) where span.cache["t"] != nil''
+            # The last text part of the newest user message, the reminder
+            # stripped from a single text part's head (design D15, A201).
+            ''set(span.cache["x"], ExtractPatterns(span.cache["t"], "\\{\\s*\"role\"\\s*:\\s*\"user\"\\s*,\\s*\"parts\"\\s*:\\s*\\[\\s*(?:\\{\\s*\"type\"\\s*:\\s*\"text\"\\s*,\\s*\"content\"\\s*:\\s*\"(?:[^\"\\\\]|\\\\.)*\"\\s*\\}\\s*,\\s*)*\\{\\s*\"type\"\\s*:\\s*\"text\"\\s*,\\s*\"content\"\\s*:\\s*\"(?P<c>(?:[^\"\\\\]|\\\\.)*)\"\\s*\\}(?:\\s*,\\s*\\{[^\\[\\]]*\\})*\\s*\\]\\s*\\}\\s*\\]\\s*$")) where span.cache["t"] != nil''
             ''set(span.cache["p"], ParseJSON(Concat(["[\"", span.cache["x"]["c"], "\"]"], ""))) where span.cache["x"]["c"] != nil''
             ''set(span.attributes["last_user_message"], span.cache["p"][0]) where span.cache["p"] != nil''
+            ''replace_pattern(span.attributes["last_user_message"], "^<system-reminder>[\\s\\S]*?</system-reminder>\\s*", "")''
           ];
           expectedSpanStatements = [
             "keep_keys(span.attributes, ${keyList (builtins.attrNames session.spans.keys)})"
             "truncate_all(span.attributes, 65536)"
-            ''set(span.status.message, "")''
+            ''set(span.cache["status"], span.status.message)''
+            "truncate_all(span.cache, 65536)"
+            ''set(span.status.message, span.cache["status"])''
             "keep_keys(resource.attributes, ${keyList session.spans.resourceKeys})"
             "keep_keys(scope.attributes, [])"
           ];
+          # Claude's tool output, copied from its `tool.output` event onto
+          # the span before every event is dropped (design D15).
+          expectedToolOutputStatements = map (
+            attribute:
+            ''set(span.attributes["${session.spans.toolOutput.key}"], spanevent.attributes["${attribute}"]) where spanevent.name == "${session.spans.toolOutput.event}" and spanevent.attributes["${attribute}"] != nil''
+          ) session.spans.toolOutput.attributes;
+          # Every one of schema.nix's credential shapes, in every kept
+          # string of events and spans and in the status message.
+          credentials = ''"${
+            lib.escape [ "\\" "\"" ] (
+              lib.concatMapStringsSep "|" (pattern: "(?:${pattern})") (
+                builtins.attrValues session.credentialPatterns
+              )
+            )
+          }"'';
+          expectedMask = {
+            log_statements = [ ''replace_all_patterns(log.attributes, "value", ${credentials}, "****")'' ];
+            trace_statements = [
+              ''replace_all_patterns(span.attributes, "value", ${credentials}, "****")''
+              ''replace_pattern(span.status.message, ${credentials}, "****")''
+            ];
+          };
           # agent.agent_span's CREATE TABLE as the schema job runs it, and
           # the attribute keys its columns are named after.
           spanTable =
@@ -331,6 +358,24 @@
           spanTableColumns = {
             span = columnKeys "span_attributes";
             resource = columnKeys "resource_attributes";
+          };
+          # The schema job's statements that bring an existing agent_span
+          # to the same columns and indexes (design D15), after its CREATE.
+          spanTableIndex = lib.lists.findFirstIndex (s: s == spanTable) null (i.storeTables.agent or [ ]);
+          spanAlterKeys =
+            pattern:
+            lib.concatMap
+              (
+                statement:
+                let
+                  matched = builtins.match ''ALTER TABLE "${session.spans.table}" ${pattern}'' statement;
+                in
+                if matched == null then [ ] else matched
+              )
+              (lib.drop (if spanTableIndex == null then 0 else spanTableIndex + 1) (i.storeTables.agent or [ ]));
+          spanAlters = {
+            added = spanAlterKeys ''ADD COLUMN IF NOT EXISTS "span_attributes[.]([^"]+)" [A-Z]+ NULL'';
+            indexed = spanAlterKeys ''MODIFY COLUMN "span_attributes[.]([^"]+)" SET FULLTEXT INDEX WITH[(].*[)]'';
           };
           # The values a filter's conditions compare with.
           conditionValues =
@@ -517,7 +562,7 @@
           # attribute columns are exactly agentSession.spans' keys, so what
           # the host keeps and what the store accepts agree.
           (check
-            "R3.1: a traces pipeline other than the agent-session collector's traces/agent-session into otlp_http/ingress-traces and the ingress's traces/ingress, or a span route not into agent.agent_span's declared columns through greptime_trace_v1 with auto_create_table=false"
+            "R3.1: a traces pipeline other than the agent-session collector's traces/agent-session into otlp_http/ingress-traces and the ingress's traces/ingress, or a span route not into agent.agent_span's declared columns through greptime_trace_v1 with auto_create_table=false, or a span column or index the schema job does not also add to an existing table"
             (
               tracesPipelineNames == [ "traces/ingress" ]
               && agentTracesPipelineNames == [ "traces/agent-session" ]
@@ -549,6 +594,8 @@
                 }
               && spanTable != null
               && sorted spanTableColumns.span == sorted (builtins.attrNames session.spans.keys)
+              && sorted spanAlters.added == sorted (builtins.attrNames session.spans.keys)
+              && sorted spanAlters.indexed == sorted session.spans.fulltext
               &&
                 sorted spanTableColumns.resource
                 == sorted (lib.remove "service.name" session.spans.resourceKeys ++ [ "host.name" ])
@@ -619,7 +666,7 @@
           # and no dependency that would stop or start the host's collector
           # with it, either way.
           (check
-            "R3.1: the agent-session collector shares the host collector's queue directory, serves telemetry off loopback, does not always restart, or is bound to the host's collector"
+            "R3.1: the agent-session collector shares the host collector's queue directory, serves telemetry off loopback, does not always restart, is bound to the host's collector, or may start before the store's schema job"
             (
               let
                 own = a.extensions.file_storage.directory or "";
@@ -642,6 +689,9 @@
               && (i.agentService.Restart or null) == "always"
               && !(builtins.elem "opentelemetry-collector.service" (deps (i.services.otel-agent-session or { })))
               && !(builtins.elem "otel-agent-session.service" (deps i.services.opentelemetry-collector))
+              # On the store's host the columns for new span keys exist
+              # before the unit sends them (design D15).
+              && builtins.elem "greptimedb-schema.service" (i.services.otel-agent-session.after or [ ])
             )
           )
           (check
@@ -660,16 +710,20 @@
                   "filter/agent-session-service"
                   "filter/agent-session-events"
                   "transform/agent-session-events"
+                  "transform/agent-session-mask"
                   "resource/agent-session-events"
                 ]
               &&
                 (agentPipelines."traces/agent-session".processors or null) == [
                   "memory_limiter"
                   "filter/agent-session-service"
+                  "transform/agent-session-span-links"
                   "filter/agent-session-span-links"
                   "transform/agent-session-prompt"
+                  "transform/agent-session-tool-output"
                   "filter/agent-session-span-events"
                   "transform/agent-session-spans"
+                  "transform/agent-session-mask"
                   "resource/agent-session"
                 ]
               && lib.all (n: (ap.${n}.error_mode or null) == "propagate") [
@@ -680,7 +734,10 @@
                 "filter/agent-session-span-links"
                 "transform/agent-session-metrics"
                 "transform/agent-session-events"
+                "transform/agent-session-span-links"
+                "transform/agent-session-tool-output"
                 "transform/agent-session-spans"
+                "transform/agent-session-mask"
               ]
               # The prompt copy alone ignores its errors: what it could not
               # read, transform/agent-session-spans drops next.
@@ -688,7 +745,7 @@
             )
           )
           (check
-            "R3.1: an agent-session filter or transform keeps a service, metric, event or key off schema.nix's agentSession, or the body"
+            "R3.1: an agent-session filter or transform keeps a service, metric, event or key off schema.nix's agentSession, or the body, or does not cut, copy or mask as schema.nix's agentSession says"
             (
               sameSet (conditionValues (
                 ap."filter/agent-session-service".metric_conditions or [ ]
@@ -716,6 +773,12 @@
               && metricStatements == expectedMetricStatements
               && (ap."transform/agent-session-spans".trace_statements or null) == expectedSpanStatements
               && (ap."transform/agent-session-prompt".trace_statements or null) == expectedPromptStatements
+              &&
+                (ap."transform/agent-session-tool-output".trace_statements or null) == expectedToolOutputStatements
+              &&
+                (ap."transform/agent-session-span-links".trace_statements or null)
+                == [ "set(span.links, span.links)" ]
+              && builtins.removeAttrs (ap."transform/agent-session-mask" or { }) [ "error_mode" ] == expectedMask
               &&
                 (ap."filter/agent-session-span-events".trace_conditions or null) == [
                   ''spanevent.name != "" or spanevent.name == ""''
@@ -770,9 +833,11 @@
             (e."otlp_http/fleet".sending_queue.queue_size or 0) >= 24 * 60 * i.schema.fleetBytesPerMinute
           ))
           # While the store is down the ingress holds 2 h of every
-          # agent-telemetry host's agent metrics and events, and about 42
-          # min of their spans, the hold design D13 accepts within the sum
-          # (agent-session-telemetry design D10, D13).
+          # agent-telemetry host's agent metrics and events, and 15 min of
+          # their spans (agent-session-telemetry design D10, D13, D15). Its
+          # span queue must refuse when full rather than block, so a full
+          # queue is a retryable refusal and each host's agent-session
+          # collector keeps the spans in its own 3 h queue.
           (check "R3.1: an agent queue below its hold of the agent-telemetry hosts' assumed rates" (
             agentTelemetryHosts > 0
             &&
@@ -783,7 +848,8 @@
               >= 2 * 60 * agentTelemetryHosts * i.schema.agentEventBytesPerMinute
             &&
               (e."otlp_http/agent_span".sending_queue.queue_size or 0)
-              >= 40 * agentTelemetryHosts * i.schema.agentSpanBytesPerMinute
+              >= 15 * agentTelemetryHosts * i.schema.agentSpanBytesPerMinute
+            && !(e."otlp_http/agent_span".sending_queue.block_on_overflow or false)
           ))
           (check "R3.1: queues at or above 512 MiB" (lib.foldl' builtins.add 0 queueSizes < mib 512))
 
@@ -1063,15 +1129,15 @@
         local = "R3.1: otlp/local is not the agent-session collector's only receiver, HTTP-only on 127.0.0.1:4318, feeding exactly its three agent-session pipelines";
         isolation = "R3.1: the host's collector has an otlp/local receiver, a receiver on its address, or an agent-session pipeline";
         logsReceiver = "R3.1: a logs pipeline takes an OTLP receiver other than the ingress receivers, or the agent-session collector's other than logs/agent-session's otlp/local";
-        traces = "R3.1: a traces pipeline other than the agent-session collector's traces/agent-session into otlp_http/ingress-traces and the ingress's traces/ingress, or a span route not into agent.agent_span's declared columns through greptime_trace_v1 with auto_create_table=false";
+        traces = "R3.1: a traces pipeline other than the agent-session collector's traces/agent-session into otlp_http/ingress-traces and the ingress's traces/ingress, or a span route not into agent.agent_span's declared columns through greptime_trace_v1 with auto_create_table=false, or a span column or index the schema job does not also add to an existing table";
         stages = "R3.1: an agent-session pipeline's stages are not the filters and transforms before the stamping";
-        keys = "R3.1: an agent-session filter or transform keeps a service, metric, event or key off schema.nix's agentSession, or the body";
+        keys = "R3.1: an agent-session filter or transform keeps a service, metric, event or key off schema.nix's agentSession, or the body, or does not cut, copy or mask as schema.nix's agentSession says";
         route = "R3.1: agent events are not routed through routing/logs to otlp_http/agent_session_event with its four headers";
         promote = "R3.1: a database exporter's promote header is not the shared one, or agent's not it plus agentSession's";
         agentQueue = "R3.1: an agent queue below its hold of the agent-telemetry hosts' assumed rates";
         agentLimiter = "R3.1: the agent-session collector's limiter is not below its GOMEMLIMIT and that below its MemoryMax, or the host's collector sets GOMEMLIMIT";
         notified = "R3.1: a greptimedb*, zfs-set-*, zfs-assert-*, devloop-*, collector, otel-envelope or agent-session unit is not notified";
-        unit = "R3.1: the agent-session collector shares the host collector's queue directory, serves telemetry off loopback, does not always restart, or is bound to the host's collector";
+        unit = "R3.1: the agent-session collector shares the host collector's queue directory, serves telemetry off loopback, does not always restart, is bound to the host's collector, or may start before the store's schema job";
       };
       onAgent = update: i: i // { agentSettings = lib.recursiveUpdate i.agentSettings update; };
       withReceiver =
@@ -1193,8 +1259,8 @@
             exporters."otlp_http/ingress-traces".tls.server_name_override = "localhost";
           };
         };
-        # The span path (design D13). omp's whole history, tool results
-        # included, kept on the span.
+        # The span path (design D13). omp's whole history, the system prompt
+        # included, kept on the span; it stays dropped for size (design D15).
         spanInputMessagesKept = {
           clauses = [ clause.keys ];
           mutate =
@@ -1207,6 +1273,102 @@
         spanEventsKept = {
           clauses = [ clause.stages ];
           mutate = agentStages "traces/agent-session" (lib.remove "filter/agent-session-span-events");
+        };
+        # Tool output (design D15): Claude's never reaches its span, because
+        # the copy is gone or runs after every event is dropped.
+        toolOutputCopyRemoved = {
+          clauses = [ clause.stages ];
+          mutate = agentStages "traces/agent-session" (lib.remove "transform/agent-session-tool-output");
+        };
+        toolOutputCopyAfterEventsDropped = {
+          clauses = [ clause.stages ];
+          mutate = agentStages "traces/agent-session" (
+            processors:
+            lib.concatMap (
+              n:
+              if n == "transform/agent-session-tool-output" then
+                [ ]
+              else if n == "filter/agent-session-span-events" then
+                [
+                  n
+                  "transform/agent-session-tool-output"
+                ]
+              else
+                [ n ]
+            ) processors
+          );
+        };
+        # Claude's Read output, one of the three attributes, not copied.
+        toolOutputAttributeDropped = {
+          clauses = [ clause.keys ];
+          mutate =
+            i:
+            onAgent {
+              processors."transform/agent-session-tool-output".trace_statements = lib.filter (
+                s: !lib.hasInfix ''spanevent.attributes["content"]'' s
+              ) i.agentSettings.processors."transform/agent-session-tool-output".trace_statements;
+            } i;
+        };
+        # The status message, a failed tool's output, no longer cut.
+        statusMessageUncut = {
+          clauses = [ clause.keys ];
+          mutate =
+            i:
+            onAgent {
+              processors."transform/agent-session-spans".trace_statements =
+                lib.remove "truncate_all(span.cache, 65536)"
+                  i.agentSettings.processors."transform/agent-session-spans".trace_statements;
+            } i;
+        };
+        # Masking (design D15): gone from either pipeline, run before the
+        # cut that bounds its scan, one shape dropped, or the status message
+        # left unmasked.
+        maskRemovedFromSpans = {
+          clauses = [ clause.stages ];
+          mutate = agentStages "traces/agent-session" (lib.remove "transform/agent-session-mask");
+        };
+        maskRemovedFromEvents = {
+          clauses = [ clause.stages ];
+          mutate = agentStages "logs/agent-session" (lib.remove "transform/agent-session-mask");
+        };
+        maskBeforeCut = {
+          clauses = [ clause.stages ];
+          mutate = agentStages "traces/agent-session" (
+            processors:
+            lib.concatMap (
+              n:
+              if n == "transform/agent-session-mask" then
+                [ ]
+              else if n == "transform/agent-session-spans" then
+                [
+                  "transform/agent-session-mask"
+                  n
+                ]
+              else
+                [ n ]
+            ) processors
+          );
+        };
+        maskShapeDropped = {
+          clauses = [ clause.keys ];
+          mutate =
+            i:
+            onAgent {
+              processors."transform/agent-session-mask".trace_statements = map (lib.replaceStrings
+                [ "(?:${session.credentialPatterns.github})|" ]
+                [ "" ]
+              ) i.agentSettings.processors."transform/agent-session-mask".trace_statements;
+            } i;
+        };
+        statusMessageUnmasked = {
+          clauses = [ clause.keys ];
+          mutate =
+            i:
+            onAgent {
+              processors."transform/agent-session-mask".trace_statements = lib.filter (
+                s: !lib.hasPrefix "replace_pattern(span.status.message" s
+              ) i.agentSettings.processors."transform/agent-session-mask".trace_statements;
+            } i;
         };
         # The copy after the allow-list reads an attribute already dropped,
         # so no prompt is stored.
@@ -1247,7 +1409,26 @@
         promptGateNoAgentId = promptGateWithout ''and span.attributes["gen_ai.agent.id"] == nil'';
         promptGateNoOneshot = promptGateWithout ''and span.attributes["omp.gen_ai.oneshot.kind"] == nil'';
         promptGateNoTools = promptGateWithout ''and span.attributes["omp.gen_ai.request.available_tools"] != nil'';
-        # Span links, whose attributes the store writes, pass.
+        # The first-text-part rule the deploy showed wrong: omp's reminder
+        # part, not the person's prompt, becomes `last_user_message`.
+        promptFirstTextPart = promptGateWithout ''(?:\\{\\s*\"type\"\\s*:\\s*\"text\"\\s*,\\s*\"content\"\\s*:\\s*\"(?:[^\"\\\\]|\\\\.)*\"\\s*\\}\\s*,\\s*)*'';
+        # A string-content message's reminder kept at the prompt's head.
+        promptReminderKept = {
+          clauses = [ clause.keys ];
+          mutate =
+            i:
+            onAgent {
+              processors."transform/agent-session-prompt".trace_statements = lib.filter (
+                s: !lib.hasPrefix "replace_pattern(" s
+              ) i.agentSettings.processors."transform/agent-session-prompt".trace_statements;
+            } i;
+        };
+        # Span links, whose attributes the store writes: not cleared, and
+        # the fail-closed filter behind the clearing gone.
+        spanLinksNotCleared = {
+          clauses = [ clause.stages ];
+          mutate = agentStages "traces/agent-session" (lib.remove "transform/agent-session-span-links");
+        };
         spanLinksKept = {
           clauses = [ clause.stages ];
           mutate = agentStages "traces/agent-session" (lib.remove "filter/agent-session-span-links");
@@ -1321,6 +1502,21 @@
               };
             };
         };
+        # A switch that adds span keys may start the unit before the schema
+        # job has added their columns (design D15).
+        agentBeforeSchema = {
+          clauses = [ clause.unit ];
+          mutate =
+            i:
+            i
+            // {
+              services = i.services // {
+                otel-agent-session = i.services.otel-agent-session // {
+                  after = lib.remove "greptimedb-schema.service" i.services.otel-agent-session.after;
+                };
+              };
+            };
+        };
         agentLimiterOverGoMemLimit = {
           clauses = [ clause.agentLimiter ];
           mutate = onAgent { processors.memory_limiter.limit_mib = 420; };
@@ -1351,6 +1547,30 @@
             exporters."otlp_http/agent_span".headers."x-greptime-hints" = "auto_create_table=true";
           };
         };
+        # An existing agent_span is no longer brought to the declared
+        # columns, or to the content columns' indexes (design D15).
+        spanColumnsNotAltered = {
+          clauses = [ clause.traces ];
+          mutate =
+            i:
+            i
+            // {
+              storeTables = i.storeTables // {
+                agent = lib.filter (s: !lib.hasInfix "ADD COLUMN IF NOT EXISTS" s) i.storeTables.agent;
+              };
+            };
+        };
+        spanIndexesNotAltered = {
+          clauses = [ clause.traces ];
+          mutate =
+            i:
+            i
+            // {
+              storeTables = i.storeTables // {
+                agent = lib.filter (s: !lib.hasInfix "SET FULLTEXT INDEX" s) i.storeTables.agent;
+              };
+            };
+        };
         eventFilterDropped = {
           clauses = [ clause.stages ];
           mutate = agentStages "logs/agent-session" (lib.remove "filter/agent-session-events");
@@ -1372,7 +1592,8 @@
               "keep_keys(datapoint.attributes, ${quotedList session.metrics.pointKeys})"
               "keep_keys(datapoint.attributes, ${quotedList (session.metrics.pointKeys ++ [ "session.id" ])})";
         };
-        toolOutputKept = {
+        # A key off an event's list (here a made-up tool_result key) kept.
+        eventUnlistedKeyKept = {
           clauses = [ clause.keys ];
           mutate =
             let
@@ -1424,6 +1645,16 @@
         agentQueueShort = {
           clauses = [ clause.agentQueue ];
           mutate = onSettings { exporters."otlp_http/agent_session_event".sending_queue.queue_size = mib 8; };
+        };
+        # The ingress's span queue below 15 min of both hosts' spans, or
+        # blocking when full instead of refusing the hand-off (design D15).
+        agentSpanQueueShort = {
+          clauses = [ clause.agentQueue ];
+          mutate = onSettings { exporters."otlp_http/agent_span".sending_queue.queue_size = mib 6; };
+        };
+        agentSpanQueueBlocks = {
+          clauses = [ clause.agentQueue ];
+          mutate = onSettings { exporters."otlp_http/agent_span".sending_queue.block_on_overflow = true; };
         };
         agentUnitNotNotified = {
           clauses = [ clause.notified ];

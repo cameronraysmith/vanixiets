@@ -3,6 +3,7 @@
 # modules/vm-tests/fleet-ingress.nix, in order. Every case prints
 # `=== case <name>` first and `ok: <name>` last, and leaves every unit
 # running with no mutant drop-in.
+import base64
 import datetime as dt
 import json
 import re

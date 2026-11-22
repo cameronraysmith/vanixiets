@@ -65,9 +65,10 @@ let
     devloop = mib 4;
     agent = mib 16;
     agent_session_event = mib 32;
-    # omp spans (design D13): 8,388,608 B holds about 42 min of two
+    # Agent spans (design D13, D15): 8,388,608 B holds about 17 min of two
     # agent-telemetry hosts at agentSpanBytesPerMinute while the store is
-    # down, the hold the design accepts within the 512 MiB sum.
+    # down; a full queue refuses the hand-off as retryable, so each host's
+    # agent-session collector then holds the rest in its own 44 MiB.
     agent_span = mib 8;
     devloop_ci_attribute = mib 32;
     devloop_ci_build = mib 4;
@@ -698,16 +699,18 @@ in
         })
 
         # Agent sessions' telemetry, where the host table sets agentTelemetry
-        # (agent-session-telemetry design D3, D8, D14), in a collector unit
-        # of its own, otel-agent-session.service, so that agent traffic can
-        # cost only agent telemetry: `otlp/local` on loopback feeds exactly
-        # the three agent-session pipelines, each of which drops every
-        # service, metric, event, span key and key off schema.nix's
-        # agentSession allow-list before it stamps the host and the routing
-        # attributes. Every filter and transform but the prompt copy
-        # propagates its errors, so a statement that cannot run refuses the
-        # batch rather than passing it on; the prompt copy ignores its own,
-        # since the span allow-list after it drops what it would have read.
+        # (agent-session-telemetry design D3, D8, D14, D15), in a collector
+        # unit of its own, otel-agent-session.service, so that agent traffic
+        # can cost only agent telemetry: `otlp/local` on loopback feeds
+        # exactly the three agent-session pipelines, each of which drops
+        # every service, metric, event, span key and key off schema.nix's
+        # agentSession allow-list (events and spans then cut every kept value
+        # to 64 KiB and mask credential shapes in it) before it stamps the
+        # host and the routing attributes. Every filter and transform but the
+        # prompt copy propagates its errors, so a statement that cannot run
+        # refuses the batch rather than passing it on; the prompt copy
+        # ignores its own, since the span allow-list after it drops what it
+        # would have read.
         # The unit exports over mTLS with the host's otel-cert: elsewhere to
         # otlp/mesh like the host's collector, on the ingress host to its
         # loopback receiver otlp/loopback.
@@ -717,6 +720,15 @@ in
             eventNames = builtins.attrNames session.events.keys;
             list = keys: "[${lib.concatMapStringsSep ", " (key: ''"${key}"'') keys}]";
             oneOf = path: values: lib.concatMapStringsSep " or " (value: ''${path} == "${value}"'') values;
+            # schema.nix's credential shapes as one RE2 alternation, quoted
+            # as an OTTL string.
+            credentials = ''"${
+              lib.escape [ "\\" "\"" ] (
+                lib.concatMapStringsSep "|" (pattern: "(?:${pattern})") (
+                  builtins.attrValues session.credentialPatterns
+                )
+              )
+            }"'';
             serviceName = ''resource.attributes["service.name"]'';
             eventName = ''log.attributes["event.name"]'';
             stamp =
@@ -747,11 +759,11 @@ in
             # One exporter per signal, each with its own persistent queue:
             # 24 h of agent metrics, 8 h of agent events and 3 h of spans at
             # schema.nix's rates while the ingress is unreachable (design
-            # D10, D14); the assertion below judges them.
+            # D10, D14, D15); the assertion below judges them.
             sessionQueueBytes = {
               "otlp_http/ingress-metrics" = mib 52;
               "otlp_http/ingress-agent" = mib 64;
-              "otlp_http/ingress-traces" = mib 20;
+              "otlp_http/ingress-traces" = mib 44;
             };
             sessionExporter = mtlsExporter (
               if ingress then
@@ -830,11 +842,16 @@ in
             # The hardening of nixpkgs' collector unit, without the journal
             # group it does not need. After the host's collector: at the
             # cutover that collector releases 127.0.0.1:4318, and on the
-            # ingress host it runs otlp/loopback.
+            # ingress host it runs otlp/loopback. Where the store runs, also
+            # after its schema job, so a switch that adds span keys adds their
+            # columns before this unit sends them (design D15).
             systemd.services.${agentSessionUnit} = {
               description = "OpenTelemetry collector for agent sessions' telemetry";
               wantedBy = [ "multi-user.target" ];
-              after = [ "opentelemetry-collector.service" ];
+              after = [
+                "opentelemetry-collector.service"
+              ]
+              ++ lib.optional (config.services.greptimedb.enable or false) "greptimedb-schema.service";
               startLimitIntervalSec = 0;
               serviceConfig = {
                 ExecStart = "${lib.getExe package} --config=file:${configFile}";
@@ -974,19 +991,47 @@ in
                       ''set(span.cache["g"], true) where IsMatch(span.name, "^chat ") and span.attributes["omp.gen_ai.agent.step.number"] == 0 and span.attributes["gen_ai.agent.id"] == nil and span.attributes["omp.gen_ai.oneshot.kind"] == nil and span.attributes["omp.gen_ai.request.available_tools"] != nil''
                       ''set(span.cache["t"], ${source}) where span.cache["g"] == true and ${source} != nil and Len(${source}) <= 65536''
                       ''set(span.cache["t"], Substring(${source}, Len(${source}) - 65536, 65536)) where span.cache["g"] == true and ${source} != nil and Len(${source}) > 65536''
-                      ''set(span.cache["x"], ExtractPatterns(span.cache["t"], "\\{\\s*\"role\"\\s*:\\s*\"user\"\\s*,\\s*\"parts\"\\s*:\\s*\\[\\s*\\{\\s*\"type\"\\s*:\\s*\"text\"\\s*,\\s*\"content\"\\s*:\\s*\"(?P<c>(?:[^\"\\\\]|\\\\.)*)\"\\s*\\}(?:\\s*,\\s*\\{[^\\[\\]]*\\})*\\s*\\]\\s*\\}\\s*\\]\\s*$")) where span.cache["t"] != nil''
+                      # The newest user message's LAST text part: omp 19.1.0
+                      # prepends its date and working-directory reminder as
+                      # a text part of its own before the person's (design
+                      # D15, A201); attachments follow as non-text parts.
+                      ''set(span.cache["x"], ExtractPatterns(span.cache["t"], "\\{\\s*\"role\"\\s*:\\s*\"user\"\\s*,\\s*\"parts\"\\s*:\\s*\\[\\s*(?:\\{\\s*\"type\"\\s*:\\s*\"text\"\\s*,\\s*\"content\"\\s*:\\s*\"(?:[^\"\\\\]|\\\\.)*\"\\s*\\}\\s*,\\s*)*\\{\\s*\"type\"\\s*:\\s*\"text\"\\s*,\\s*\"content\"\\s*:\\s*\"(?P<c>(?:[^\"\\\\]|\\\\.)*)\"\\s*\\}(?:\\s*,\\s*\\{[^\\[\\]]*\\})*\\s*\\]\\s*\\}\\s*\\]\\s*$")) where span.cache["t"] != nil''
                       ''set(span.cache["p"], ParseJSON(Concat(["[\"", span.cache["x"]["c"], "\"]"], ""))) where span.cache["x"]["c"] != nil''
                       ''set(span.attributes["last_user_message"], span.cache["p"][0]) where span.cache["p"] != nil''
+                      # A string-content message carries the reminder at the
+                      # head of its one text part.
+                      ''replace_pattern(span.attributes["last_user_message"], "^<system-reminder>[\\s\\S]*?</system-reminder>\\s*", "")''
                     ];
                   };
+                # Claude Code's tool output exists only as its `tool.output`
+                # span event (design D15): each listed attribute is copied
+                # onto the event's span as schema.nix's toolOutput key, before
+                # the filter below drops every event.
+                "transform/agent-session-tool-output" = {
+                  error_mode = "propagate";
+                  trace_statements = map (
+                    attribute:
+                    ''set(span.attributes["${session.spans.toolOutput.key}"], spanevent.attributes["${attribute}"]) where spanevent.name == "${session.spans.toolOutput.event}" and spanevent.attributes["${attribute}"] != nil''
+                  ) session.spans.toolOutput.attributes;
+                };
                 # Every span event, exceptions included, whatever its name.
                 "filter/agent-session-span-events" = {
                   error_mode = "propagate";
                   trace_conditions = [ ''spanevent.name != "" or spanevent.name == ""'' ];
                 };
-                # A span carrying links is dropped whole: OTTL cannot clear
-                # them at 0.155.0, and the store would write their
-                # attributes (design D14).
+                # Links are never stored (design D14, D15), but the span is:
+                # Claude's `llm_request` carries one on a direct Anthropic
+                # connection. OTTL 0.155.0 has no value to clear them with;
+                # assigning the links to themselves does, because its setter
+                # empties the span's slice, which is the value it then copies
+                # (pkg/ottl contexts/internal/ctxspan/span.go:524-540; pdata
+                # 1.61.0 SpanLinkSlice.CopyTo returns on the same slice).
+                "transform/agent-session-span-links" = {
+                  error_mode = "propagate";
+                  trace_statements = [ "set(span.links, span.links)" ];
+                };
+                # Fail-closed behind it: a span still carrying links is
+                # dropped whole, since the store would write their attributes.
                 "filter/agent-session-span-links" = {
                   error_mode = "propagate";
                   trace_conditions = [ "Len(span.links) > 0" ];
@@ -995,11 +1040,29 @@ in
                   error_mode = "propagate";
                   trace_statements = [
                     "keep_keys(span.attributes, ${list (builtins.attrNames session.spans.keys)})"
-                    # Every kept value at most 64 KiB (design D14).
+                    # Every kept value at most 64 KiB (design D14), the
+                    # status message too (design D15): it holds a failed
+                    # tool's output or error text. truncate_all cuts at a
+                    # UTF-8 boundary, so the message goes through the cache.
                     "truncate_all(span.attributes, 65536)"
-                    ''set(span.status.message, "")''
+                    ''set(span.cache["status"], span.status.message)''
+                    "truncate_all(span.cache, 65536)"
+                    ''set(span.status.message, span.cache["status"])''
                     "keep_keys(resource.attributes, ${list session.spans.resourceKeys})"
                     "keep_keys(scope.attributes, [])"
+                  ];
+                };
+                # Credential shapes in every kept string, after the cut that
+                # bounds the scan (design D15). In addition to the key
+                # allow-lists, never instead: it masks token-shaped strings,
+                # not every secret. OTTL rather than the redaction processor,
+                # which does not reach the status message.
+                "transform/agent-session-mask" = {
+                  error_mode = "propagate";
+                  log_statements = [ ''replace_all_patterns(log.attributes, "value", ${credentials}, "****")'' ];
+                  trace_statements = [
+                    ''replace_all_patterns(span.attributes, "value", ${credentials}, "****")''
+                    ''replace_pattern(span.status.message, ${credentials}, "****")''
                   ];
                 };
               };
@@ -1036,6 +1099,7 @@ in
                       "filter/agent-session-service"
                       "filter/agent-session-events"
                       "transform/agent-session-events"
+                      "transform/agent-session-mask"
                       "resource/agent-session-events"
                     ];
                     exporters = [ "otlp_http/ingress-agent" ];
@@ -1045,10 +1109,13 @@ in
                     processors = [
                       "memory_limiter"
                       "filter/agent-session-service"
+                      "transform/agent-session-span-links"
                       "filter/agent-session-span-links"
                       "transform/agent-session-prompt"
+                      "transform/agent-session-tool-output"
                       "filter/agent-session-span-events"
                       "transform/agent-session-spans"
+                      "transform/agent-session-mask"
                       "resource/agent-session"
                     ];
                     exporters = [ "otlp_http/ingress-traces" ];

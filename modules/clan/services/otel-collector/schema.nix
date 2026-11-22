@@ -263,11 +263,14 @@
     # checks.x86_64-linux.otel-collector-config read them.
     agentMetricsBytesPerMinute = 35840;
     agentEventBytesPerMinute = 133000;
-    # omp spans after the host's span allow-list (design D13): 8 sessions x
-    # about 0.75 MB per session-hour (about 230 spans x 0.6 KB of fixed
-    # columns, the newest prompt, the assistant output and tool arguments,
-    # measured from 1,185 session-hours of omp transcripts) / 60 = 100,000.
-    agentSpanBytesPerMinute = 100000;
+    # Agent spans after the host's span allow-list (design D13, D15): 8
+    # sessions x about 1.8 MB per session-hour of omp (about 230 spans x 0.6
+    # KB of fixed columns, the newest prompt, the assistant output and tool
+    # arguments, 0.75 MB, plus about 1.05 MB of tool results, each cut to 64
+    # KiB, measured from 1,185 session-hours of omp transcripts) / 60 =
+    # 240,000. Claude Code's spans come to about 0.45 MB per session-hour
+    # (about 415 spans), so omp bounds the rate.
+    agentSpanBytesPerMinute = 240000;
 
     # observability-notify@ instances pass the unit allow-list, so that
     # SystemdUnitFailed reports a failed post, but are bounded by the host's
@@ -481,8 +484,9 @@
               "query_source"
             ];
             # tool_parameters and tool_input are the call's input (commands,
-            # paths, arguments, about 4 K characters at most); the output
-            # exists only as a trace span's tool.output, which is not wired.
+            # paths, arguments, about 4 K characters at most); Claude puts no
+            # tool output on this event (its `tool_result_size_bytes` only):
+            # the output is the trace span's tool.output (spans below).
             tool_result = [
               "tool_name"
               "tool_use_id"
@@ -604,15 +608,19 @@
           ];
         };
 
-        # omp spans (design D13): the services, span keys and resource keys
-        # traces/agent-session keeps, each span key with the store type of
-        # its agent.agent_span column. `last_user_message` is not sent by
-        # omp: on a step-0 chat span of a top-level, non-oneshot run with
-        # native tools (design D15), the host copies it from the newest user
-        # message of `gen_ai.input.messages` (promptSource), which it then
-        # drops with every other unlisted key, since that attribute holds the
-        # whole history, earlier tool results included. Span events are
-        # dropped.
+        # Claude Code's and omp's spans (design D13, D15): the services, span
+        # keys and resource keys traces/agent-session keeps, each span key
+        # with the store type of its agent.agent_span column.
+        # `last_user_message` is not sent by omp: on a step-0 chat span of a
+        # top-level, non-oneshot run with native tools, the host copies it
+        # from the newest user message of `gen_ai.input.messages`
+        # (promptSource), which it then drops with every other unlisted key,
+        # since that attribute holds the whole history on every request.
+        # Tool output is kept (design D15): omp's `gen_ai.tool.call.result`
+        # as sent, and Claude's, which exists only as the `tool.output` span
+        # event (toolOutput), copied onto its span under the same key before
+        # every span event is dropped. Claude's span keys follow
+        # monitoring-usage.md's span tables; `success` is a boolean there.
         spans = {
           services = [
             "claude-code"
@@ -624,6 +632,17 @@
             "user.name"
           ];
           promptSource = "gen_ai.input.messages";
+          toolOutput = {
+            event = "tool.output";
+            # Read and Write's `content`, Edit's `diff`, Bash, MCP and web
+            # tools' `output`: one per event; a later one wins.
+            attributes = [
+              "diff"
+              "content"
+              "output"
+            ];
+            key = "gen_ai.tool.call.result";
+          };
           keys = {
             "gen_ai.operation.name" = "string";
             "gen_ai.provider.name" = "string";
@@ -634,19 +653,65 @@
             "gen_ai.tool.name" = "string";
             "gen_ai.tool.call.id" = "string";
             "gen_ai.tool.call.arguments" = "string";
+            "gen_ai.tool.call.result" = "string";
             "gen_ai.usage.input_tokens" = "int64";
             "gen_ai.usage.output_tokens" = "int64";
             "gen_ai.usage.cache_read.input_tokens" = "int64";
             "gen_ai.usage.cache_creation.input_tokens" = "int64";
+            "omp.gen_ai.tool.status" = "string";
             "error.type" = "string";
             "gen_ai.output.messages" = "string";
             last_user_message = "string";
+            # Claude Code's spans.
+            "session.id" = "string";
+            user_prompt = "string";
+            tool_name = "string";
+            tool_use_id = "string";
+            full_command = "string";
+            file_path = "string";
+            duration_ms = "int64";
+            success = "boolean";
+            error = "string";
+            input_tokens = "int64";
+            output_tokens = "int64";
+            cache_read_tokens = "int64";
+            cache_creation_tokens = "int64";
           };
           fulltext = [
             "last_user_message"
             "gen_ai.output.messages"
+            "gen_ai.tool.call.result"
+            "user_prompt"
           ];
           table = "agent_span";
+        };
+
+        # Credential shapes masked to `****` in every kept string of spans
+        # (their status message too) and events, after the allow-lists and
+        # the 64 KiB cut (design D15): RE2, one alternative each, from
+        # gitleaks 8.30.1's rules for these issuers, loosened to the token's
+        # prefix and alphabet. They catch token-shaped strings only, never
+        # every secret: a password, an AWS secret access key or any
+        # credential without a fixed prefix passes. A private key cut at 64
+        # KiB before its END line is masked to the end of the value.
+        credentialPatterns = {
+          private-key = "-----BEGIN[ A-Z0-9_-]{0,100}PRIVATE KEY(?: BLOCK)?-----(?:[\\s\\S]*?-----END[ A-Z0-9_-]{0,100}PRIVATE KEY(?: BLOCK)?-----|[\\s\\S]*)";
+          age-secret-key = "AGE-SECRET-KEY-1[QPZRY9X8GF2TVDW0S3JN54KHCE6MUA7L]{58}";
+          anthropic = "sk-ant-[A-Za-z0-9_-]{20,}";
+          openai = "sk-(?:proj|svcacct|admin)-[A-Za-z0-9_-]{20,}|sk-[A-Za-z0-9]{20}T3BlbkFJ[A-Za-z0-9]{20}";
+          langfuse = "sk-lf-[A-Za-z0-9-]{8,}";
+          github = "(?:ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9]{36,}|github_pat_[A-Za-z0-9_]{22,}";
+          gitlab = "glpat-[A-Za-z0-9_-]{20,}";
+          npm = "npm_[A-Za-z0-9]{36}";
+          pypi = "pypi-AgEIcHlwaS5vcmc[A-Za-z0-9_-]{50,}";
+          linear = "lin_api_[A-Za-z0-9]{40}";
+          aws-access-key-id = "(?:A3T[A-Z0-9]|AKIA|ASIA|ABIA|ACCA)[A-Z2-7]{16}";
+          gcp-api-key = "AIza[A-Za-z0-9_-]{35}";
+          digitalocean = "do[opr]_v1_[a-f0-9]{64}";
+          slack = "xox[abeoprs]-[A-Za-z0-9-]{10,}|xapp-[0-9]-[A-Za-z0-9-]{10,}|hooks\\.slack\\.com/(?:services|workflows|triggers)/[A-Za-z0-9/_+-]{20,}";
+          stripe = "(?:sk|rk)_(?:test|live|prod)_[A-Za-z0-9]{10,}";
+          jwt = "eyJ[A-Za-z0-9_-]{8,}\\.eyJ[A-Za-z0-9_-]{8,}\\.[A-Za-z0-9_-]*";
+          bearer = "(?i:bearer)\\s+[A-Za-z0-9._~+/=-]{16,}";
         };
 
         # agent.session_event: one row per admitted event, the time index the

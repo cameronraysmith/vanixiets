@@ -231,12 +231,58 @@ Any requirement whose discharge depends on this fact SHALL name it explicitly, a
 #### Scenario: What the gate leaves admitted (accepted by the operator, 2026-11-22)
 
 - **WHEN** a top-level run's first request is sent
-- **THEN** its newest user message can still be other than what the person typed: `!cmd` output when a run continues without a new prompt [unverified], a steering interjection, an IRC message, a skill body or an image-mention wrapper, and its first text part can be the date and working-directory reminder; the operator accepted storing these under D15
+- **THEN** its newest user message can still be other than what the person typed: `!cmd` output when a run continues without a new prompt [unverified], a steering interjection, an IRC message, a skill body or an image-mention wrapper; the operator accepted storing these under D15
+
+#### Scenario: omp adds its date and directory reminder to the turn (deploy finding, 2026-11-22)
+
+- **WHEN** omp 19.1.0 sends a request, it adds a `<system-reminder>` date and working-directory text to the first user turn: a text part of its own before the turn's parts, or the head of a string turn's one text (`packages/coding-agent/src/session/date-cwd-reminder.ts:136-145`)
+- **THEN** the person's text is the last text part, images after it as `blob` parts; the copy takes that part and strips a leading reminder, as magnetite's first real spans showed the first-part rule storing only the reminder
 
 #### Scenario: A release marks spans differently
 
 - **WHEN** the packaged omp differs from 19.1.0 and renames or retypes one of the four keys, or sends tool results or injected context as user messages on a span the gate admits
 - **THEN** this assumption is void, and the `agent-session-telemetry-interface` requirement `Only a top-level run's first request gets a last user message` is re-read against the new source before the copy is relied on
+
+### Requirement: A202 — Claude Code's traces carry its tool output in an event and read the span buffer bound from the environment
+
+It is true of Claude Code 2.1.330, independent of what this fleet builds, that with traces and tool content on its tool output is the `tool.output` event of the `claude_code.tool` span, its span keys are as documented with `success` a boolean, and its span buffer reads `OTEL_BSP_MAX_QUEUE_SIZE`.
+Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL lose its discharge once the violation below is observed.
+
+**Evidence**: `thevibeworks/claude-code-docs@273997f` `monitoring-usage.md:127,130,203-251,259-338,356-365` (gates, content limit, span tables, the `tool.output` event and its attributes, the `traceresponse` link at `:217`), read 2026-11-22; the packaged 2.1.330 bundle (`claude-code-2.1.330/bin/.claude-wrapped`) sets `success` from a boolean on `tool.execution` and builds its tracer's batch span processor without `maxQueueSize`, which then reads `getNumberFromEnv("OTEL_BSP_MAX_QUEUE_SIZE") ?? 2048`; the docs do not mention that variable.
+
+#### Scenario: Read on 2026-11-22
+
+- **WHEN** the documentation and the bundle above were read on 2026-11-22
+- **THEN** each clause held for 2.1.330; the VM test sends spans of that shape, not a live session's
+
+#### Scenario: A release moves tool output or the buffer setting
+
+- **WHEN** the packaged Claude Code differs from 2.1.330 and puts tool output elsewhere, renames a span key, retypes `success`, or passes its own span queue size
+- **THEN** this assumption is void, and the `agent-session-telemetry-interface` requirements `Claude Code's settings carry the emitter gates` and `The span path keeps only the last user message and listed span keys` are re-checked against it
+
+### Requirement: A203 — The collector's OTTL and queues behave as read at 0.155.0
+
+It is true of otelcol-contrib 0.155.0, independent of what this fleet builds, that OTTL's span-event context can set span attributes, `set(span.links, span.links)` empties a span's links, and a full sending queue without `block_on_overflow` refuses with a retryable error.
+Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL lose its discharge once the violation below is observed.
+
+**Evidence**: the module sources of 0.155.0 in its Go module cache: `pkg/ottl` `contexts/ottlspanevent/span_events.go:229-246` (span paths in the span-event context), `contexts/internal/ctxspan/span.go:524-540` (the links setter removes every link, then copies the value it was given, here the emptied slice); pdata 1.61.0 `ptrace/generated_spanlinkslice.go:125-155`; `exporterhelper@v0.155.0` `internal/queue/persistent_queue.go:271-280` (`ErrQueueIsFull` unless `blockOnOverflow`); `otlpreceiver@v0.155.0` `internal/errors/errors.go:15-45` (an unclassified error becomes `Unavailable`, HTTP 503). `fleet-ingress`'s `agentSpans` case shows the first three; its `backPressure` case shows the refusal and retry for metrics on the same exporter and receiver code.
+
+#### Scenario: A release changes one of them
+
+- **WHEN** the packaged collector differs from 0.155.0 and the span-event context loses span paths, the links setter copies before it clears, the regex engine changes, or a full queue blocks or drops
+- **THEN** this assumption is void; a span still carrying links is dropped whole by the filter behind the clearing, and the `agentSpans` case is rerun before the collector is relied on
+
+### Requirement: A204 — The telemetry store alters a table idempotently as read at 1.2.1
+
+It is true of GreptimeDB 1.2.1, independent of what this fleet builds, that `ADD COLUMN IF NOT EXISTS` and a repeated `SET FULLTEXT INDEX` with the same options are idempotent and keep existing rows, and that a `BOOLEAN` span column takes an OTLP boolean.
+Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL lose its discharge once the violation below is observed.
+
+**Evidence**: `GreptimeTeam/greptimedb@v1.2.1` `src/sql/src/parsers/alter_parser.rs:697-724` (`ADD COLUMN IF NOT EXISTS`, a plain column definition, so no index inside it) and `:570-600` (`SET FULLTEXT INDEX`); `fleet-ingress`'s `agentSpans` case on the packaged 1.2.1 (2026-11-22): the table as main created it, holding a row, brought by the schema job to a fresh store's definition up to column order, a second run changing nothing, and spans with a boolean `success` stored.
+
+#### Scenario: A release changes ALTER
+
+- **WHEN** the packaged store differs from 1.2.1 and rejects a repeated `SET FULLTEXT INDEX`, or `ADD COLUMN IF NOT EXISTS`
+- **THEN** this assumption is void, the schema job fails on the store's host, and its failure notice reports it before the collector sends new keys
 
 ## MODIFIED Requirements
 
@@ -564,7 +610,7 @@ A term found to denote two distinct phenomena within this repository's vocabular
 | tool detail | — | the name, arguments and error text of a tool an agent session runs, without what the tool returned | shared |
 | tool output | — | what a tool returns to an agent session, such as a file's contents or a command's output | shared |
 | raw API body | — | the full request or response a harness exchanges with the model provider, which holds the whole conversation | shared |
-| session content | — | the prompts, responses and tool details of an agent session | shared |
+| session content | — | the prompts, responses, tool details and tool output of an agent session | shared |
 | account identifier | — | an identifier a model provider assigns a person's account or organisation, such as its email address, account id or organisation id | shared |
 | user name | — | the name of the person an agent session runs for, such as `cameron` or `janettesmith` | shared |
 | group | — | the people who run agent sessions on the fleet's hosts and read the telemetry store, whom the operator treats as one organisation | world-only |

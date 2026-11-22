@@ -2,14 +2,14 @@
 
 ### Requirement: Claude Code's settings carry the emitter gates
 
-Where agent telemetry is on, the user settings' `env` SHALL set `CLAUDE_CODE_ENABLE_TELEMETRY=1`, `OTEL_METRICS_EXPORTER=otlp`, `OTEL_LOGS_EXPORTER=otlp`, `OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf`, `OTEL_EXPORTER_OTLP_ENDPOINT=http://127.0.0.1:4318`, `OTEL_LOG_USER_PROMPTS=1`, `OTEL_LOG_ASSISTANT_RESPONSES=1`, `OTEL_LOG_TOOL_DETAILS=1`, `OTEL_METRICS_INCLUDE_ACCOUNT_UUID=false` and `OTEL_RESOURCE_ATTRIBUTES=user.name=<person>`, and no other `OTEL_*` or tracing key.
+Where agent telemetry is on, the user settings' `env` SHALL set telemetry, metrics, logs and traces on over `http/protobuf` to `http://127.0.0.1:4318`, prompts, responses, tool details and tool content on, a 64-span buffer (`OTEL_BSP_MAX_QUEUE_SIZE=64`), account UUIDs off and `OTEL_RESOURCE_ATTRIBUTES=user.name=<person>`, and no other `OTEL_*` or tracing key: never raw API bodies or detailed tracing.
 
-**Discharged by**: evaluation of `checks.x86_64-linux.nixos-magnetite` and `nixos-pyrite` with an assertion of the agent-telemetry home module over the rendered `env`; the activated `~/.claude/settings.json` read after each deploy; resting on world assumption `A190 — Claude Code emits its telemetry as documented for its packaged version`.
+**Discharged by**: evaluation of `checks.x86_64-linux.nixos-magnetite` and `nixos-pyrite` with an assertion of the agent-telemetry home module over the rendered `env`; `checks.x86_64-linux.agent-telemetry-emitters`, which writes the fourteen keys out itself and was seen failing on mutants adding `OTEL_LOG_RAW_API_BODIES` or `ENABLE_BETA_TRACING_DETAILED` and dropping `OTEL_LOG_TOOL_CONTENT`, `OTEL_TRACES_EXPORTER` or `OTEL_BSP_MAX_QUEUE_SIZE`; the activated `~/.claude/settings.json` read after each deploy; resting on world assumptions `A190 — Claude Code emits its telemetry as documented for its packaged version` and `A202 — Claude Code's traces carry its tool output in an event and read the span buffer bound from the environment`.
 
 #### Scenario: The rendered settings are evaluated
 
 - **WHEN** cameron's home and each worker's home on magnetite and pyrite are evaluated
-- **THEN** `programs.claude-code.settings.env` holds exactly the keys above, `<person>` is `cameron` for cameron's home and for `omnigent-cameron`, and `janettesmith` for `omnigent-janettesmith`, and none of `OTEL_LOG_TOOL_CONTENT`, `OTEL_LOG_RAW_API_BODIES`, `OTEL_TRACES_EXPORTER`, `CLAUDE_CODE_ENHANCED_TELEMETRY_BETA`, `ENABLE_BETA_TRACING_DETAILED`, `BETA_TRACING_ENDPOINT` or `OTEL_RESOURCE_INCLUDE_HOST` is present
+- **THEN** `programs.claude-code.settings.env` holds exactly the keys above, `<person>` is `cameron` for cameron's home and for `omnigent-cameron`, and `janettesmith` for `omnigent-janettesmith`, and none of `OTEL_LOG_RAW_API_BODIES`, `ENABLE_BETA_TRACING_DETAILED`, `BETA_TRACING_ENDPOINT` or `OTEL_RESOURCE_INCLUDE_HOST` is present
 
 #### Scenario: A worker's settings stay writable
 
@@ -98,35 +98,67 @@ On an agent-telemetry host, the agent-session pipelines SHALL run only in `otel-
 
 ### Requirement: Every kept span and event value is at most 64 KiB
 
-After the allow-lists, the agent-session collector SHALL cut every span attribute and every event attribute to 65,536 bytes, so a stored prompt, last user message, response, tool argument or output message holds at most 64 KiB; it SHALL delete an emitter's own `last_user_message` before any copy, and drop every span that carries a link.
+After the allow-lists, the agent-session collector SHALL cut every span attribute, event attribute and span status message to 65,536 bytes; it SHALL delete an emitter's own `last_user_message` before any copy, and clear every span's links, dropping whole a span that still carries one.
 
-**Discharged by**: `checks.x86_64-linux.otel-collector-config`'s keys and stages clauses with mutants `spanTruncationRemoved`, `eventTruncationRemoved`, `promptNotCleared` and `spanLinksKept`; `vmTests.x86_64-linux.fleet-ingress`'s `agentSpans` case (a 70 KiB response, a forged `last_user_message`, a linked span seen absent on the host's tap); the split load harness's 14 MiB `gen_ai.output.messages` scenario (design D14).
+**Discharged by**: `checks.x86_64-linux.otel-collector-config`'s keys and stages clauses with mutants `spanTruncationRemoved`, `eventTruncationRemoved`, `statusMessageUncut`, `promptNotCleared`, `spanLinksNotCleared` and `spanLinksKept`; `vmTests.x86_64-linux.fleet-ingress`'s `agentSpans` case (a 70 KiB response, tool result and status message, a forged `last_user_message`, linked omp and Claude spans stored without their links), its uncommitted mutant `spanLinksNotCleared`; the split load harness's 14 MiB `gen_ai.output.messages` scenario (design D14); resting on world assumption `A203 — The collector's OTTL and queues behave as read at 0.155.0`.
 
 #### Scenario: A response larger than 64 KiB is sent
 
-- **WHEN** a chat span's `gen_ai.output.messages` holds 70 KiB, or 14 MiB under load
+- **WHEN** a chat span's `gen_ai.output.messages` holds 70 KiB, or 14 MiB under load, or a tool result or a status message holds 70 KiB
 - **THEN** the stored value holds at most 65,536 bytes, its beginning intact
 
 #### Scenario: A span carries a link or its own last user message
 
 - **WHEN** an emitter sends a span with a link, or a span with a `last_user_message` attribute whose history ends in no user text
-- **THEN** the linked span and its link's attributes are not stored, and the other span is stored without `last_user_message`
+- **THEN** the linked span is stored without its link, whose attributes are nowhere, and the other span is stored without `last_user_message`
 
 ### Requirement: The span path keeps only the last user message and listed span keys
 
-`traces/agent-session` SHALL admit `claude-code` and `oh-my-pi`, copy the newest user message's text into `last_user_message` where the next requirement allows, drop every span event, keep only `agentSession.spans` keys and resource keys, blank the status message and clear scope attributes before stamping; `traces/ingress` SHALL write only `agent`-stamped spans to the schema job's `agent.agent_span` through `greptime_trace_v1` with `auto_create_table=false`.
+`traces/agent-session` SHALL admit `claude-code` and `oh-my-pi`, copy the newest user message where the gate below allows and Claude Code's `tool.output` onto its span as `gen_ai.tool.call.result`, then drop every span event and keep only `agentSession.spans` keys and resource keys, clearing scope attributes, before stamping; `traces/ingress` SHALL write only `agent`-stamped spans to `agent.agent_span` through `greptime_trace_v1` with `auto_create_table=false`.
 
-**Discharged by**: `checks.x86_64-linux.otel-collector-config`'s stage, statement and traces clauses with mutants `spanInputMessagesKept`, `spanEventsKept`, `promptAfterAllowList`, `spansToFleet` and `spanTableAutoCreated`; `vmTests.x86_64-linux.fleet-ingress`'s `agentSpans` case; resting on world assumption `A198 — The telemetry store writes traces into pre-created v1 tables and refuses unknown columns`.
+**Discharged by**: `checks.x86_64-linux.otel-collector-config`'s stage, statement and traces clauses with mutants `spanInputMessagesKept`, `spanEventsKept`, `toolOutputCopyRemoved`, `toolOutputCopyAfterEventsDropped`, `toolOutputAttributeDropped`, `promptAfterAllowList`, `spansToFleet` and `spanTableAutoCreated`; `vmTests.x86_64-linux.fleet-ingress`'s `agentSpans` case and its uncommitted mutant `toolOutputCopyRemoved`; resting on world assumptions `A198 — The telemetry store writes traces into pre-created v1 tables and refuses unknown columns`, `A202 — Claude Code's traces carry its tool output in an event and read the span buffer bound from the environment` and `A203 — The collector's OTTL and queues behave as read at 0.155.0`.
 
 #### Scenario: A chat span carries the whole history
 
-- **WHEN** the VM test posts an omp step-0 chat span with tools whose `gen_ai.input.messages` holds an older prompt, a tool result and the newest prompt, plus a system prompt, an unlisted key, an exception event, a status message and a scope attribute
-- **THEN** `agent.agent_span` holds the newest prompt in `span_attributes.last_user_message`, the response and the tool arguments, and no column or value holds any of the rest
+- **WHEN** the VM test posts an omp step-0 chat span with tools whose `gen_ai.input.messages` holds an older prompt, a tool result and the newest prompt, plus a system prompt, an unlisted key, an exception event, a status message and a scope attribute, and a tool span with its result
+- **THEN** `agent.agent_span` holds the newest prompt in `span_attributes.last_user_message`, the response, the tool arguments, the tool result and the status message, and no column or value holds any of the rest
+
+#### Scenario: Claude Code's spans are posted
+
+- **WHEN** the VM test posts Claude Code's interaction, model-request, tool and tool-execution spans with its standard attributes, a `tool.output` event on each tool span, retry events and a link
+- **THEN** the store holds the session id, the user prompt, tool name and id, the command or file path, duration, success, error, model and token counts, and each tool's output as `gen_ai.tool.call.result`, and no account identifier, event or link
 
 #### Scenario: The span table is read back
 
 - **WHEN** the VM test reads `SHOW CREATE TABLE agent.agent_span` and its `create_options` as `regulator`
-- **THEN** `span_attributes.last_user_message` and `span_attributes.gen_ai.output.messages` carry the full-text index, `table_data_model` is `greptime_trace_v1`, and the table has no `ttl` of its own
+- **THEN** `span_attributes.last_user_message`, `span_attributes.gen_ai.output.messages`, `span_attributes.gen_ai.tool.call.result` and `span_attributes.user_prompt` carry the full-text index, `span_attributes.success` is `BOOLEAN`, `table_data_model` is `greptime_trace_v1`, and the table has no `ttl` of its own
+
+### Requirement: Credential shapes are masked in what the agent-session collector keeps
+
+After the allow-lists and the 64 KiB cut, the agent-session collector SHALL replace every match of `agentSession.credentialPatterns` with `****` in every kept string attribute of events and spans and in the span status message. The masking is in addition to the key allow-lists, never instead of them, and catches token-shaped strings only, not every secret.
+
+**Discharged by**: `checks.x86_64-linux.otel-collector-config`'s stages and keys clauses with mutants `maskRemovedFromSpans`, `maskRemovedFromEvents`, `maskBeforeCut`, `maskShapeDropped` and `statusMessageUnmasked`; `vmTests.x86_64-linux.fleet-ingress`'s `agentSession` and `agentSpans` cases, with credentials assembled at run time from pieces so that `checks.x86_64-linux.gitleaks` stays clean, and the case's uncommitted mutant `maskRemoved`; resting on world assumption `A203 — The collector's OTTL and queues behave as read at 0.155.0`.
+
+#### Scenario: Credentials are planted in tool output and errors
+
+- **WHEN** the VM test sends a GitHub token and a private-key block in an omp tool result, an Anthropic key in a status message, a bearer token and a JWT in a Claude Bash output, a private-key block in a Claude Read output, a GitHub token in a Claude tool-execution status, and a bearer token in an event's tool parameters
+- **THEN** each is stored as `****` around its unmasked context, and no part of any credential is in what left the host or in any column; with the masking stage removed the case fails
+
+#### Scenario: A credential without a known shape is sent
+
+- **WHEN** a session's tool output holds a password or an AWS secret access key
+- **THEN** it is stored as sent; the allow-list and the shapes do not claim to catch it
+
+### Requirement: The schema job brings an existing span table to the declared columns
+
+On every run the schema job SHALL add each `agentSession.spans` key's column and each full-text index to an existing `agent.agent_span`, so a table an older generation created ends identical, up to column order, to a fresh one, and a second run changes nothing; on the store's host the agent-session collector SHALL start after the schema job.
+
+**Discharged by**: `checks.x86_64-linux.otel-collector-config`'s traces and unit clauses with mutants `spanColumnsNotAltered`, `spanIndexesNotAltered` and `agentBeforeSchema`; `vmTests.x86_64-linux.fleet-ingress`'s `agentSpans` case, which recreates the table as main created it before design D15 and runs the job twice, and its uncommitted mutant `spanAltersRemoved`; resting on world assumption `A204 — The telemetry store alters a table idempotently as read at 1.2.1`.
+
+#### Scenario: The table predates the new keys
+
+- **WHEN** `agent.agent_span` holds rows and lacks the columns and indexes design D15 adds, and the schema job runs
+- **THEN** the job succeeds, the rows remain, and the table's definition equals a fresh store's up to column order; a second run leaves it unchanged
 
 ### Requirement: Only a top-level run's first request gets a last user message
 
@@ -184,9 +216,9 @@ The ingress SHALL route logs with `vanixiets.database=agent` and `vanixiets.tabl
 
 ### Requirement: Agent queues are sized to their holds
 
-The agent-session collector SHALL queue `otlp_http/ingress-metrics` 52 MiB (24 h of agent metrics), `otlp_http/ingress-agent` 64 MiB (8 h of events) and `otlp_http/ingress-traces` 20 MiB (3 h of spans), below 512 MiB; magnetite SHALL queue `otlp_http/agent` 16 MiB, `otlp_http/agent_session_event` 32 MiB (2 h) and `otlp_http/agent_span` 8 MiB (40 min) of every agent-telemetry host's rates, its sum below 512 MiB.
+The agent-session collector SHALL queue `otlp_http/ingress-metrics` 52 MiB (24 h of agent metrics), `otlp_http/ingress-agent` 64 MiB (8 h of events) and `otlp_http/ingress-traces` 44 MiB (3 h of spans), below 512 MiB; magnetite SHALL queue `otlp_http/agent` 16 MiB, `otlp_http/agent_session_event` 32 MiB (2 h) and `otlp_http/agent_span` 8 MiB (15 min, refusing when full) of every agent-telemetry host's rates, its sum below 512 MiB.
 
-**Discharged by**: the agent role's assertion over the agent-session collector with an `extendModules` override of pyrite's `otlp_http/ingress-agent` to 32 MiB; `checks.x86_64-linux.otel-collector-config`'s queue clauses with their mutants; the rates measured after deploy.
+**Discharged by**: the agent role's assertion over the agent-session collector with an `extendModules` override of pyrite's `otlp_http/ingress-agent` to 32 MiB; `checks.x86_64-linux.otel-collector-config`'s queue clauses with their mutants, `agentSpanQueueShort` and `agentSpanQueueBlocks` among them; the rates measured after deploy; resting on world assumption `A203 — The collector's OTTL and queues behave as read at 0.155.0` for the refusal.
 
 #### Scenario: pyrite's event queue is shrunk
 
@@ -222,8 +254,8 @@ The agent-session collector SHALL queue `otlp_http/ingress-metrics` 52 MiB (24 h
 
 #### Scenario: The span canary runs
 
-- **WHEN** the `agentSpans` case posts omp spans carrying an older prompt, a tool result in the history and as an attribute, a system prompt, an unlisted key, an exception event, a status message, a scope attribute, `user.email`, a `canary-other` service, a linked span, a forged `last_user_message` and four spans the copy's gate excludes, each marked with a nonce
-- **THEN** what left the host and every string and JSON column in every database hold the nonce only in the newest prompt of the step-0 chat span, the response and the tool arguments
+- **WHEN** the `agentSpans` case posts omp spans carrying an older prompt, a tool result in the history, a system prompt, an unlisted key, an exception event, a scope attribute, `user.email`, a `canary-other` service, a link, a forged `last_user_message` and four spans the copy's gate excludes, and Claude Code spans carrying account identifiers, retry events, a detailed-tracing attribute and a link, each marked with a nonce
+- **THEN** what left the host and every string and JSON column in every database hold the nonce only in the admitted values: the step-0 chat span's newest prompt, the response, the tool arguments and results, the status messages, the linked span's own key, and Claude's session id, prompt, command, path and tool output
 
 ### Requirement: This capability states its own trust boundary
 
@@ -243,8 +275,8 @@ This capability SHALL state what its properties guarantee and what they do not, 
 
 #### Scenario: A guarantee about what is inside an admitted field is sought
 
-- **WHEN** someone asks whether a stored prompt, response or tool detail is free of secrets
-- **THEN** the answer is no: the allow-list chooses fields, not their contents, and a person or an agent can paste a secret into a prompt or a command
+- **WHEN** someone asks whether a stored prompt, response, tool detail or tool output is free of secrets
+- **THEN** the answer is no: the allow-list chooses fields, not their contents, and a person or an agent can paste a secret into a prompt or a command; the masking replaces only token-shaped credentials of the listed issuers
 
 #### Scenario: A guarantee about readers is sought
 

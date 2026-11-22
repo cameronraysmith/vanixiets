@@ -14,9 +14,10 @@
 #   starts with OTEL_.
 #
 # The expectations are written out here rather than read from the module, so
-# a key added to or dropped from the module (OTEL_LOG_TOOL_CONTENT, say) fails
-# this check. Evaluation-time obligations: the asserts fire when this
-# attribute is evaluated; the value is the rendered pyrite files as a file.
+# a key added to or dropped from the module (OTEL_LOG_RAW_API_BODIES added, or
+# OTEL_LOG_TOOL_CONTENT dropped, say) fails this check. Evaluation-time
+# obligations: the asserts fire when this attribute is evaluated; the value
+# is the rendered pyrite files as a file.
 { self, lib, ... }:
 {
   perSystem =
@@ -25,15 +26,20 @@
       checks = lib.optionalAttrs (system == "x86_64-linux") {
         agent-telemetry-emitters =
           let
+            # design D2's gates and D15's traces with tool content.
             claudeExpected = person: {
               CLAUDE_CODE_ENABLE_TELEMETRY = "1";
+              CLAUDE_CODE_ENHANCED_TELEMETRY_BETA = "1";
               OTEL_METRICS_EXPORTER = "otlp";
               OTEL_LOGS_EXPORTER = "otlp";
+              OTEL_TRACES_EXPORTER = "otlp";
               OTEL_EXPORTER_OTLP_PROTOCOL = "http/protobuf";
               OTEL_EXPORTER_OTLP_ENDPOINT = "http://127.0.0.1:4318";
               OTEL_LOG_USER_PROMPTS = "1";
               OTEL_LOG_ASSISTANT_RESPONSES = "1";
               OTEL_LOG_TOOL_DETAILS = "1";
+              OTEL_LOG_TOOL_CONTENT = "1";
+              OTEL_BSP_MAX_QUEUE_SIZE = "64";
               OTEL_METRICS_INCLUDE_ACCOUNT_UUID = "false";
               OTEL_RESOURCE_ATTRIBUTES = "user.name=${person}";
             };
@@ -105,7 +111,7 @@
             show = attrs: lib.concatStringsSep ", " (lib.attrNames attrs);
           in
           assert lib.assertMsg (claudeWrong == { })
-            "agent-telemetry: pyrite Claude settings env must carry exactly the D2 gates; wrong for ${show claudeWrong}: ${
+            "agent-telemetry: pyrite Claude settings env must carry exactly the D2 and D15 gates; wrong for ${show claudeWrong}: ${
               builtins.toJSON (
                 lib.mapAttrs (
                   user: _: telemetryOf (pyrite.${user}.managedConfigs.claude-code-settings.settings.env or { })

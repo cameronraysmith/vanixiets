@@ -140,6 +140,40 @@
             pyriteConfig = self.nixosConfigurations.pyrite.config;
             pyriteSession = pyriteConfig.vanixiets.otelCollector.agentSessionSettings;
             pyriteSessionUnit = pyriteConfig.systemd.services.otel-agent-session.serviceConfig;
+            # agent.agent_span as main created it before design D15 (72f782b8,
+            # the table magnetite holds): the span keys D15 adds removed and
+            # the two content indexes of then, its CREATE pinned by hash.
+            oldSpanTable =
+              let
+                table = self.lib.agentSessionStore.spanTableFor {
+                  keys = builtins.removeAttrs self.lib.otelCollectorSchema.agentSession.spans.keys [
+                    "gen_ai.tool.call.result"
+                    "omp.gen_ai.tool.status"
+                    "session.id"
+                    "user_prompt"
+                    "tool_name"
+                    "tool_use_id"
+                    "full_command"
+                    "file_path"
+                    "duration_ms"
+                    "success"
+                    "error"
+                    "input_tokens"
+                    "output_tokens"
+                    "cache_read_tokens"
+                    "cache_creation_tokens"
+                  ];
+                  fulltext = [
+                    "last_user_message"
+                    "gen_ai.output.messages"
+                  ];
+                };
+              in
+              assert lib.assertMsg (
+                builtins.hashString "sha256" table
+                == "babb610506252a20f240d2d3d8c8b424b22481eab5bfdc9e96242fe3e9497b1e"
+              ) "fleet-ingress: the pre-D15 agent_span is not main's (72f782b8) CREATE";
+              table;
             agentSessionState = "/var/lib/otel-agent-session";
             agentSessionSettings =
               let
@@ -739,13 +773,15 @@
             # metrics posted to pyrite's otlp/local, through its agent-session
             # pipelines, otlp_http/ingress-agent and otlp/mesh into `agent`,
             # read back as `regulator`. One nonce marks the admitted prompt and
-            # every canary: tool output, a raw API body, an unlisted event, a
-            # record body, account identifiers, a foreign service, an unlisted
-            # metric, session labels on a metric, a forged host and route. What
-            # left the host (the unit's file taps) and every string column of
-            # every table of every database may hold the nonce only in that
-            # prompt. Posted as OTLP/JSON: the receiver decodes it to the same
-            # records as protobuf, and the exporters send protobuf onward.
+            # every canary: an unlisted key, a raw API body, an unlisted event,
+            # a record body, account identifiers, a foreign service, an
+            # unlisted metric, session labels on a metric, a forged host and
+            # route. What left the host (the unit's file taps) and every string
+            # column of every table of every database may hold the nonce only
+            # in that prompt. A bearer token in the tool parameters is stored
+            # masked (design D15). Posted as OTLP/JSON: the receiver decodes it
+            # to the same records as protobuf, and the exporters send protobuf
+            # onward.
             agentSession = ''
               print("=== case agentSession", flush=True)
               fresh_start()
@@ -754,6 +790,9 @@
               NONCE = f"n{time.time_ns()}"
               ADMITTED = f"canary admitted prompt {NONCE}"
               now = time.time_ns()
+              # Assembled here from pieces, so no credential-shaped string
+              # exists in the repository (checks.gitleaks).
+              BEARER = "Authorization: " + "Bear" + "er " + "c4n4ryB34r3r" + "T0k3nAbCdEf9"
 
 
               def s(key, value):
@@ -799,7 +838,7 @@
                                                 {"key": "cost_usd", "value": {"doubleValue": 0.001234}}, n("duration_ms", 900),
                                                 s("speed", "normal"), s("effort", "medium")]),
                       record(4, "tool_result", [s("tool_name", "Bash"), s("success", "true"), s("duration_ms", "12"),
-                                                s("tool_parameters", json.dumps({"bash_command": "ls"})),
+                                                s("tool_parameters", json.dumps({"bash_command": f"curl -H '{BEARER}' x"})),
                                                 s("tool_input", json.dumps({"command": "ls"})),
                                                 s("tool_output", f"canary-output-{NONCE}")]),
                       record(5, "api_request_body", [s("body", f"canary-raw-{NONCE}")]),
@@ -862,6 +901,7 @@
               assert rows[0][4] == ADMITTED and rows[1][5] == "admitted response zebrafish", rows
               assert rows[2][6:9] == [100, 50, 1234] and rows[2][13] == "normal", rows
               assert rows[3][9] == 12 and rows[3][10] is True and rows[3][11] == "Bash", rows
+              assert "****" in rows[3][12] and "T0k3nAbCdEf9" not in rows[3][12], rows[3][12]
               found = gsql(f"SELECT event_name, host_name FROM session_event WHERE matches_term(prompt, '{NONCE}')", "agent")
               print(f"  matches_term(prompt, nonce): {found}", flush=True)
               assert found == [["user_prompt", "pyrite"]], found
@@ -899,12 +939,13 @@
               for kind, text in taps.items():
                   print(f"  tap-{kind}: {len(text)} bytes, nonce {text.count(NONCE)} time(s)", flush=True)
                   for key in ("user.email", "organization.id", "user.account_uuid", "tool_output", "prompt_text", "\"cost_usd\"",
-                              "hook_name", "terminal.type", "marker", "canary.scope", "canary-", "deploy_record"):
+                              "hook_name", "terminal.type", "marker", "canary.scope", "canary-", "deploy_record", "T0k3nAbCdEf9"):
                       assert key not in text, (kind, key)
               assert taps["logs"].count(NONCE) == taps["logs"].count(ADMITTED) == 1, taps["logs"]
               assert NONCE not in taps["metrics"], taps["metrics"]
 
               assert nonce_hits(NONCE) == {"agent.session_event.prompt": 1}
+              assert nonce_hits("T0k3nAbCdEf9") == {}
               forbidden = gsql(
                   "SELECT table_schema, table_name, column_name FROM information_schema.columns WHERE column_name IN "
                   "('user_email', 'organization_id', 'user_account_uuid', 'user_account_id', 'tool_output', 'prompt_text', "
@@ -921,26 +962,95 @@
               print("ok: agentSession", flush=True)
             '';
 
-            # omp's spans (design D13): one chat span carrying the history
-            # (an older prompt, a tool result, the newest prompt), one after a
-            # tool, one tool span, and one from another service, through
+            # omp's and Claude Code's spans (design D13, D15), through
             # pyrite's otlp/local, otlp/mesh and the ingress into
-            # agent.agent_span, which the schema job created. Only the step-0
-            # chat span of a top-level, non-oneshot run with native tools gets
-            # `last_user_message` (design D15); four spans whose history also
-            # ends in user text, each failing one condition, get none.
+            # agent.agent_span. First the schema job's upgrade path on 1.2.1:
+            # agent_span as main created it (before D15) is brought by the job
+            # to the table a fresh store has, and a second run changes nothing.
+            # Then omp: a chat span carrying the history (an older prompt, a
+            # tool result, the newest prompt), one after a tool, a tool span
+            # whose result is stored, cut to 64 KiB and masked, a span with a
+            # link (kept, the link not), four spans the prompt copy's gate
+            # excludes (design D15's narrowing), and one from another service.
+            # Then Claude Code: an interaction, an llm_request with a link,
+            # retry events and a detailed-tracing attribute, Bash and Read
+            # tool spans whose `tool.output` events become
+            # gen_ai.tool.call.result, and a failed tool.execution whose
+            # status message is stored, cut and masked; account identifiers
+            # on every span are not.
             agentSpans = ''
               print("=== case agentSpans", flush=True)
               fresh_start()
+
+
+              def admin(sql):
+                  status = store.succeed(
+                      f"curl -sS -o /tmp/agent-admin -w '%{{http_code}}' --netrc-file {config()['vars']}/admin.netrc "
+                      f"--data-urlencode {shlex.quote('sql=' + sql)} 'http://127.0.0.1:4000/v1/sql?db=agent'"
+                  ).strip()
+                  assert status == "200", (sql, status, store.succeed("cat /tmp/agent-admin"))
+
+
+              def table_lines():
+                  create = gsql("SHOW CREATE TABLE agent_span", "agent")[0][1]
+                  return sorted(line.strip().rstrip(",") for line in create.splitlines())
+
+
+              def schema_job():
+                  store.succeed("systemctl restart greptimedb-schema.service")
+                  print("  " + store.succeed("systemctl show -p Result -p ExecMainStatus greptimedb-schema.service").replace("\n", " "), flush=True)
+
+
+              # The upgrade (design D15), the column order aside: ADD COLUMN
+              # appends, so the comparison is of the table's lines, sorted.
+              fresh = table_lines()
+              schema_job()
+              assert table_lines() == fresh, "a second schema run on a fresh store changed agent_span"
+              admin("DROP TABLE agent_span")
+              admin(config()["oldSpanTable"])
+              admin("INSERT INTO agent_span (\"timestamp\", service_name, span_name) VALUES (now(), 'pre-d15', 'pre-d15 row')")
+              old = table_lines()
+              missing = sorted(set(fresh) - set(old))
+              print(f"  pre-D15 agent_span lacks {len(missing)} lines: {missing}", flush=True)
+              assert missing and all("span_attributes" in line for line in missing), missing
+              schema_job()
+              upgraded = table_lines()
+              assert upgraded == fresh, ("the upgraded agent_span differs from a fresh one", sorted(set(upgraded) ^ set(fresh)))
+              schema_job()
+              assert table_lines() == fresh, "a second schema run on the upgraded agent_span changed it"
+              assert gsql("SELECT count(*) FROM agent_span WHERE span_name = 'pre-d15 row'", "agent") == [[1]]
+              print("  agent_span: pre-D15 table upgraded to the fresh one; the second run changed nothing", flush=True)
+
               store.succeed(f"systemctl restart {SESSION}.service")
               wait_telemetry(SESSION_PORT)
               NONCE = f"n{time.time_ns()}"
               TRACE = "5b8efff798038103d269b633813fc60c"
+              CLAUDE_TRACE = "6c9f00a8a91492143e37c744924ad71d"
+              # Assembled here from pieces, so no credential-shaped string
+              # exists in the repository (checks.gitleaks); each one's tail
+              # is what the store and the tap must never hold.
+              planted = {
+                  "github": "gh" + "p_" + "Zq7Xw3Rt9Lk2Mn5Bv8Cx1Jh4" + "Gf6Ds0Pa3Yu7E",
+                  "anthropic": "sk-" + "ant-" + "api03-" + "Xy9Qw8Er7Ty6Ui5Op4As3Df2" + "Gh1Jk0Lz",
+                  "pem": "-----BEGIN " + "OPENSSH PRIVATE KEY-----\n" + "b3BlbnNzaC1yZGF0YQ" * 4
+                                 + "\n-----END " + "OPENSSH PRIVATE KEY-----",
+                  "bearer": "Authorization: " + "Bear" + "er " + "c4n4ryB34r3r" + "T0k3nGhIjKl8",
+                  "jwt": "ey" + "JhbGciOiJIUzI1NiJ9." + "ey" + "JzdWIiOiJjYW5hcnkifQ." + "c4n4ryS1gn4tur3QrStUv",
+              }
+              tails = {
+                  "github": "Gf6Ds0Pa3Yu7E",
+                  "anthropic": "Gh1Jk0Lz",
+                  "pem": "b3BlbnNzaC1yZGF0YQ",
+                  "bearer": "T0k3nGhIjKl8",
+                  "jwt": "c4n4ryS1gn4tur3",
+              }
               canary = {
                   "prompt": f"canary prompt {NONCE}",
                   "response": f"canary response {NONCE}",
                   "arguments": f"canary arguments {NONCE}",
                   "older prompt": f"canary-oldprompt-{NONCE}",
+                  # Tool output is stored (design D15): omp's result as sent,
+                  # Claude's from its tool.output event.
                   "tool result": f"canary-result-{NONCE}",
                   "history result": f"canary-histresult-{NONCE}",
                   "system": f"canary-system-{NONCE}",
@@ -950,8 +1060,8 @@
                   "scope": f"canary-scope-{NONCE}",
                   "email": f"canary-email-{NONCE}",
                   "other service": f"canary-other-{NONCE}",
-                  # A span with a link is dropped whole, its link's
-                  # attributes and its own (design D14).
+                  # A span with a link is kept; the link's attributes are not
+                  # (design D15).
                   "link": f"canary-link-{NONCE}",
                   "linked span": f"canary-linkedspan-{NONCE}",
                   # An emitter's own `last_user_message` on a span whose
@@ -965,8 +1075,24 @@
                   "advisor": f"canary-advisor-{NONCE}",
                   "oneshot": f"canary-oneshot-{NONCE}",
                   "no tools": f"canary-notools-{NONCE}",
+                  # omp 19.1.0 prepends its date and directory reminder as a
+                  # text part of its own before the person's (design D15).
+                  "reminder": f"<system-reminder>\nToday: 2026-11-22; current working directory: '/tmp/canary-reminder-{NONCE}'.\n</system-reminder>",
+                  # Claude Code's spans.
+                  "claude session": f"canary-claudesession-{NONCE}",
+                  "user prompt": f"canary user prompt {NONCE}",
+                  "bash output": f"canary-bashoutput-{NONCE}",
+                  "read content": f"canary-readcontent-{NONCE}",
+                  "command": f"canary-command-{NONCE}",
+                  "path": f"/tmp/canary-path-{NONCE}.txt",
+                  "claude status": f"canary-claudestatus-{NONCE}",
+                  "claude link": f"canary-claudelink-{NONCE}",
+                  "new context": f"canary-newcontext-{NONCE}",
+                  "attempt": f"canary-attempt-{NONCE}",
+                  "account": f"canary-account-{NONCE}",
               }
-              admitted = ("prompt", "response", "arguments")
+              admitted = ("prompt", "response", "arguments", "tool result", "status", "linked span", "claude session",
+                          "user prompt", "bash output", "read content", "command", "path", "claude status")
 
 
               def s(key, value):
@@ -975,6 +1101,10 @@
 
               def iv(key, value):
                   return {"key": key, "value": {"intValue": str(value)}}
+
+
+              def bv(key, value):
+                  return {"key": key, "value": {"boolValue": value}}
 
 
               tools = {"key": "omp.gen_ai.request.available_tools",
@@ -997,14 +1127,16 @@
                       iv("omp.gen_ai.agent.step.number", 0), tools,
                       {"key": "gen_ai.usage.input_tokens", "value": {"intValue": "42"}},
                       s("gen_ai.system_instructions", json.dumps([{"type": "text", "content": canary["system"]}])),
-                      s("gen_ai.input.messages", json.dumps(history + [{"role": "user", "parts": [{"type": "text", "content": canary["prompt"]}]}])),
+                      s("gen_ai.input.messages", json.dumps(history + [{"role": "user", "parts": [
+                          {"type": "text", "content": canary["reminder"]}, {"type": "text", "content": canary["prompt"]}]}])),
                       # Past the 64 KiB every kept value is cut to.
                       s("gen_ai.output.messages", json.dumps([{"role": "assistant", "parts": [{"type": "text", "content": canary["response"] + " " + "x" * 70000}]}])),
                       s("canary.unlisted", canary["unlisted"]),
                   ],
                   "events": [{"name": "exception", "timeUnixNano": str(now - 1500000000),
                               "attributes": [s("exception.message", canary["event"])]}],
-                  "status": {"code": 2, "message": canary["status"]},
+                  # A failed request's status message is kept and masked.
+                  "status": {"code": 2, "message": f"{canary['status']} {planted['anthropic']}"},
               }
               after_tool = dict(chat, spanId="eee19b7ec3c1b177", events=[], status={},
                                 attributes=[s("gen_ai.operation.name", "chat"), s("gen_ai.input.messages", json.dumps(history)),
@@ -1038,20 +1170,77 @@
                       s("gen_ai.operation.name", "execute_tool"), s("gen_ai.tool.name", "bash"),
                       s("gen_ai.conversation.id", f"session-{NONCE}"),
                       s("gen_ai.tool.call.arguments", json.dumps({"command": canary["arguments"]})),
-                      s("gen_ai.tool.call.result", canary["tool result"]),
+                      # Past the 64 KiB cut, two credentials inside it.
+                      s("gen_ai.tool.call.result", json.dumps({"content": [{"type": "text", "text": "\n".join(
+                          [canary["tool result"], planted["github"], planted["pem"], "y" * 70000])}], "isError": False})),
+                      s("omp.gen_ai.tool.status", "ok"),
                   ],
               }
+
+
+              def claude_span(span_id, parent, name, attributes, **extra):
+                  span = {
+                      "traceId": CLAUDE_TRACE, "spanId": span_id, "name": name, "kind": 1,
+                      "startTimeUnixNano": str(now - 700000000), "endTimeUnixNano": str(now - 600000000),
+                      # Claude Code's standard attributes, on every span.
+                      "attributes": [s("span.type", name.removeprefix("claude_code.")), s("session.id", canary["claude session"]),
+                                     s("user.email", f"{canary['account']}@example.com"), s("organization.id", canary["account"]),
+                                     s("user.account_uuid", canary["account"]), s("user.account_id", canary["account"]),
+                                     s("user.id", canary["account"]), s("terminal.type", "tmux")] + attributes,
+                  }
+                  if parent:
+                      span["parentSpanId"] = parent
+                  span.update(extra)
+                  return span
+
+
+              claude_spans = [
+                  claude_span("aaa19b7ec3c1b101", None, "claude_code.interaction", [
+                      s("user_prompt", canary["user prompt"]), iv("user_prompt_length", 24), iv("interaction.sequence", 1)]),
+                  claude_span("aaa19b7ec3c1b102", "aaa19b7ec3c1b101", "claude_code.llm_request", [
+                      s("model", "claude-opus-5-5"), s("gen_ai.request.model", "claude-opus-5-5"), iv("input_tokens", 100),
+                      iv("output_tokens", 50), iv("cache_read_tokens", 7), iv("cache_creation_tokens", 3), iv("duration_ms", 900),
+                      bv("success", True), s("request_id", "req_claude_1"), s("new_context", canary["new context"])],
+                      events=[{"name": "gen_ai.request.attempt", "timeUnixNano": str(now - 650000000),
+                               "attributes": [iv("attempt", 1), s("client_request_id", canary["attempt"])]}],
+                      links=[{"traceId": "7d0e11b9ba25a3254f48d855a35be82e", "spanId": "fff19b7ec3c1b101",
+                              "attributes": [s("canary.link", canary["claude link"])]}]),
+                  claude_span("aaa19b7ec3c1b103", "aaa19b7ec3c1b101", "claude_code.tool", [
+                      s("tool_name", "Bash"), s("tool_use_id", "toolu_claude_1"), s("gen_ai.tool.call.id", "toolu_claude_1"),
+                      s("full_command", f"echo {canary['command']}"), iv("duration_ms", 12)],
+                      events=[{"name": "tool.output", "timeUnixNano": str(now - 650000000),
+                               "attributes": [s("output", "\n".join([canary["bash output"], planted["bearer"], planted["jwt"]])),
+                                              s("bash_command", f"echo {canary['command']}")]}]),
+                  claude_span("aaa19b7ec3c1b104", "aaa19b7ec3c1b101", "claude_code.tool", [
+                      s("tool_name", "Read"), s("tool_use_id", "toolu_claude_2"), s("file_path", canary["path"])],
+                      events=[{"name": "tool.output", "timeUnixNano": str(now - 650000000),
+                               "attributes": [s("content", "\n".join([canary["read content"], planted["pem"]])),
+                                              s("file_path", canary["path"])]}]),
+                  claude_span("aaa19b7ec3c1b105", "aaa19b7ec3c1b103", "claude_code.tool.execution", [
+                      s("tool_use_id", "toolu_claude_1"), bv("success", False), s("error", "ShellError"),
+                      s("error.type", "tool_error")],
+                      # Past the 64 KiB cut, a credential inside it.
+                      status={"code": 2, "message": " ".join([canary["claude status"], planted["github"], "z" * 70000])}),
+              ]
               body = {"resourceSpans": [
                   {"resource": {"attributes": [s("service.name", "oh-my-pi"), s("service.version", "19.1.0"), s("user.name", "cameron"),
                                                s("user.email", canary["email"]), s("host.name", f"canary-host-{NONCE}"),
                                                s("vanixiets.database", "fleet")]},
                    "scopeSpans": [{"scope": {"name": "omp", "attributes": [s("canary.scope", canary["scope"])]},
                                    "spans": [chat, after_tool, tool, linked] + excluded}]},
+                  {"resource": {"attributes": [s("service.name", "claude-code"), s("service.version", "2.1.330"), s("user.name", "cameron"),
+                                               s("os.type", "linux"), s("host.arch", "amd64")]},
+                   "scopeSpans": [{"scope": {"name": "com.anthropic.claude_code.tracing"}, "spans": claude_spans}]},
                   {"resource": {"attributes": [s("service.name", "canary-other"), s("user.name", "cameron")]},
                    "scopeSpans": [{"spans": [dict(tool, spanId="eee19b7ec3c1b176",
                                                   attributes=[s("gen_ai.input.messages", canary["other service"])])]}]},
               ]}
-              store.succeed(f"cat > /tmp/agent-spans.json <<'EOF'\n{json.dumps(body)}\nEOF")
+              # Past one argument's 128 KiB limit, so in base64 chunks.
+              encoded = base64.b64encode(json.dumps(body).encode()).decode()
+              store.succeed("rm -f /tmp/agent-spans.b64")
+              for i in range(0, len(encoded), 65536):
+                  store.succeed(f"printf %s {encoded[i:i + 65536]} >> /tmp/agent-spans.b64")
+              store.succeed("base64 -d /tmp/agent-spans.b64 > /tmp/agent-spans.json")
               status = store.succeed(
                   "curl -sS -o /tmp/agent-spans-answer -w '%{http_code}' -H 'Content-Type: application/json' "
                   "--data @/tmp/agent-spans.json http://127.0.0.1:4318/v1/traces"
@@ -1059,41 +1248,93 @@
               print(f"  POST otlp/local /v1/traces: {status} {store.succeed('cat /tmp/agent-spans-answer')}", flush=True)
               assert status == "200", status
 
-              # What left the host, before the store is asked: no span with a
-              # link. The file exporter flushes once a second.
+              # What left the host, before the store is asked: both linked
+              # spans, neither link. The file exporter flushes once a second.
               store.wait_until_succeeds(f"grep -q {NONCE} /var/lib/otel-agent-session/tap-traces.jsonl", timeout=60)
               tap = store.succeed("cat /var/lib/otel-agent-session/tap-traces.jsonl")
-              assert canary["link"] not in tap and canary["linked span"] not in tap, "a linked span left the host"
+              assert canary["link"] not in tap and canary["claude link"] not in tap, "a link left the host"
+              assert '"links"' not in tap, "a span left the host with links"
+              for what, tail in tails.items():
+                  assert tail not in tap, f"{what} left the host unmasked"
 
 
               def stored_spans():
                   status, body = _request("/v1/sql", "agent", [("sql", "SELECT count(*) FROM agent_span WHERE \"resource_attributes.host.name\" = 'pyrite'")])
                   rows = json.loads(body)["output"][0]["records"]["rows"] if status == 200 else None
                   print(f"  agent_span rows from pyrite: {status} {rows}", flush=True)
-                  return rows == [[7]]
+                  return rows == [[13]]
 
 
-              wait_for(stored_spans, "pyrite's seven spans in agent.agent_span", 240)
-              rows = gsql(
-                  'SELECT span_name, "span_attributes.last_user_message", "span_attributes.gen_ai.output.messages", '
-                  '"span_attributes.gen_ai.tool.call.arguments", "span_attributes.gen_ai.usage.input_tokens", '
-                  '"resource_attributes.user.name", "resource_attributes.host.name", service_name, span_status_message '
-                  "FROM agent_span ORDER BY span_id", "agent")
-              for row in rows:
-                  print(f"  span: {row}", flush=True)
-              assert [r[0] for r in rows] == ["chat claude-opus", "execute_tool bash"] + ["chat claude-opus"] * 5, rows
-              assert all(r[5:9] == ["cameron", "pyrite", "oh-my-pi", ""] for r in rows), rows
-              assert rows[0][1] == canary["prompt"] and canary["response"] in rows[0][2] and rows[0][4] == 42, rows
-              assert len(rows[0][2].encode()) <= 65536, len(rows[0][2].encode())
+              wait_for(stored_spans, "pyrite's thirteen spans in agent.agent_span", 240)
+              columns = ["span_id", "span_name", "span_attributes.last_user_message", "span_attributes.gen_ai.output.messages",
+                         "span_attributes.gen_ai.tool.call.arguments", "span_attributes.gen_ai.usage.input_tokens",
+                         "resource_attributes.user.name", "resource_attributes.host.name", "service_name", "span_status_message",
+                         "span_attributes.gen_ai.tool.call.result", "span_attributes.omp.gen_ai.tool.status",
+                         "span_attributes.session.id", "span_attributes.user_prompt", "span_attributes.tool_name",
+                         "span_attributes.tool_use_id", "span_attributes.full_command", "span_attributes.file_path",
+                         "span_attributes.duration_ms", "span_attributes.success", "span_attributes.error",
+                         "span_attributes.input_tokens", "span_attributes.output_tokens", "span_attributes.cache_read_tokens",
+                         "span_attributes.cache_creation_tokens", "span_attributes.gen_ai.request.model", "span_attributes.error.type"]
+              found_rows = gsql("SELECT " + ", ".join(f'"{c}"' for c in columns)
+                                + " FROM agent_span WHERE \"resource_attributes.host.name\" = 'pyrite' ORDER BY span_id", "agent")
+              spans = {row[0]: dict(zip(columns, row)) for row in found_rows}
+              for row in spans.values():
+                  shown = {k: (v[:120] + "…" if isinstance(v, str) and len(v) > 120 else v) for k, v in row.items() if v not in (None, "")}
+                  print(f"  span: {json.dumps(shown)}", flush=True)
+              omp = [spans[i] for i in ("eee19b7ec3c1b174", "eee19b7ec3c1b175", "eee19b7ec3c1b177", "eee19b7ec3c1b178",
+                                        "eee19b7ec3c1b17a", "eee19b7ec3c1b17b", "eee19b7ec3c1b17c", "eee19b7ec3c1b17d")]
+              assert [r["service_name"] for r in spans.values()].count("claude-code") == 5, spans.keys()
+              assert all(r["resource_attributes.user.name"] == "cameron" and r["resource_attributes.host.name"] == "pyrite"
+                         for r in spans.values()), spans
+              chat_row, tool_row = omp[0], omp[1]
+              assert chat_row["span_attributes.last_user_message"] == canary["prompt"], chat_row
+              assert canary["response"] in chat_row["span_attributes.gen_ai.output.messages"], chat_row
+              assert chat_row["span_attributes.gen_ai.usage.input_tokens"] == 42, chat_row
+              assert len(chat_row["span_attributes.gen_ai.output.messages"].encode()) <= 65536
               # Absent on the span after a tool and on each of the four the
               # gate excludes.
-              assert all(r[1] is None for r in rows[2:]) and canary["arguments"] in rows[1][3], rows
+              assert all(r["span_attributes.last_user_message"] is None for r in omp[2:]), omp
+              assert canary["arguments"] in tool_row["span_attributes.gen_ai.tool.call.arguments"], tool_row
+              # The tool result stored, cut and masked (design D15).
+              result = tool_row["span_attributes.gen_ai.tool.call.result"]
+              print(f"  omp tool result: {len(result.encode())} bytes, masked {result.count('****')} time(s)", flush=True)
+              assert canary["tool result"] in result and 65000 < len(result.encode()) <= 65536, len(result.encode())
+              assert result.count("****") == 2 and tool_row["span_attributes.omp.gen_ai.tool.status"] == "ok", result[:400]
+              # The status message kept and masked; elsewhere empty.
+              assert chat_row["span_status_message"] == f"{canary['status']} ****", chat_row
+              assert all(r["span_status_message"] == "" for r in omp[1:]), omp
+              # The linked span kept.
+              assert omp[3]["span_name"] == "chat claude-opus", omp[3]
+
+              # Claude Code's spans (design D15).
+              interaction, llm, bash, read, execution = (spans[f"aaa19b7ec3c1b10{n}"] for n in range(1, 6))
+              assert all(r["span_attributes.session.id"] == canary["claude session"]
+                         for r in (interaction, llm, bash, read, execution)), spans
+              assert interaction["span_attributes.user_prompt"] == canary["user prompt"], interaction
+              assert [llm[c] for c in ("span_attributes.input_tokens", "span_attributes.output_tokens",
+                                       "span_attributes.cache_read_tokens", "span_attributes.cache_creation_tokens",
+                                       "span_attributes.duration_ms", "span_attributes.success",
+                                       "span_attributes.gen_ai.request.model")] == [100, 50, 7, 3, 900, True, "claude-opus-5-5"], llm
+              assert bash["span_attributes.tool_name"] == "Bash" and bash["span_attributes.tool_use_id"] == "toolu_claude_1", bash
+              assert bash["span_attributes.full_command"] == f"echo {canary['command']}", bash
+              assert bash["span_attributes.gen_ai.tool.call.result"] == f"{canary['bash output']}\nAuthorization: ****\n****", bash
+              assert read["span_attributes.file_path"] == canary["path"], read
+              assert read["span_attributes.gen_ai.tool.call.result"] == f"{canary['read content']}\n****", read
+              assert execution["span_attributes.success"] is False and execution["span_attributes.error"] == "ShellError", execution
+              assert execution["span_attributes.error.type"] == "tool_error", execution
+              message = execution["span_status_message"]
+              assert message.startswith(f"{canary['claude status']} **** z") and 65000 < len(message.encode()) <= 65536, message[:200]
+
               found = gsql(f"SELECT span_name FROM agent_span WHERE matches_term(\"span_attributes.last_user_message\", '{NONCE}')", "agent")
               print(f"  matches_term(last_user_message, nonce): {found}", flush=True)
               assert found == [["chat claude-opus"]], found
+              found = gsql(f"SELECT span_id FROM agent_span WHERE matches_term(\"span_attributes.gen_ai.tool.call.result\", '{NONCE}') ORDER BY span_id", "agent")
+              print(f"  matches_term(gen_ai.tool.call.result, nonce): {found}", flush=True)
+              assert found == [["aaa19b7ec3c1b103"], ["aaa19b7ec3c1b104"], ["eee19b7ec3c1b175"]], found
               create = gsql("SHOW CREATE TABLE agent_span", "agent")[0][1]
-              for column in ("span_attributes.last_user_message", "span_attributes.gen_ai.output.messages"):
-                  assert f"\"{column}\" STRING NULL FULLTEXT INDEX WITH(analyzer = 'English', backend = 'bloom', case_sensitive = 'false'" in create, column
+              for column in ("last_user_message", "gen_ai.output.messages", "gen_ai.tool.call.result", "user_prompt"):
+                  assert f"\"span_attributes.{column}\" STRING NULL FULLTEXT INDEX WITH(analyzer = 'English', backend = 'bloom', case_sensitive = 'false'" in create, column
+              assert "\"span_attributes.success\" BOOLEAN NULL" in create, create
               options = gsql("SELECT create_options FROM information_schema.tables WHERE table_schema = 'agent' AND table_name = 'agent_span'", "agent")[0][0]
               print(f"  agent_span create_options: {options}", flush=True)
               assert "table_data_model=greptime_trace_v1" in options and "ttl" not in options, options
@@ -1105,17 +1346,27 @@
               print(f"  tap-traces: {len(tap)} bytes, nonce {tap.count(NONCE)} time(s)", flush=True)
               for what, value in canary.items():
                   assert (value in tap) == (what in admitted), (what, value in tap)
-              for key in ("gen_ai.input.messages", "gen_ai.system_instructions", "gen_ai.tool.call.result", "canary.unlisted",
-                          "canary.scope", "user.email", "exception", "vanixiets.database\",\"value\":{\"stringValue\":\"fleet"):
+              for key in ("gen_ai.input.messages", "gen_ai.system_instructions", "canary.unlisted", "canary.scope", "user.email",
+                          "organization.id", "user.account_uuid", "user.account_id", "\"user.id\"", "terminal.type", "new_context",
+                          "exception", "gen_ai.request.attempt", "tool.output", "os.type",
+                          "vanixiets.database\",\"value\":{\"stringValue\":\"fleet"):
                   assert key not in tap, key
 
               # Every string and JSON column of every database, as regulator.
               assert nonce_hits(NONCE) == {
                   "agent.agent_span.span_attributes.last_user_message": 1,
-                  "agent.agent_span.span_attributes.gen_ai.conversation.id": 2,
+                  "agent.agent_span.span_attributes.gen_ai.conversation.id": 3,
                   "agent.agent_span.span_attributes.gen_ai.output.messages": 1,
                   "agent.agent_span.span_attributes.gen_ai.tool.call.arguments": 1,
+                  "agent.agent_span.span_attributes.gen_ai.tool.call.result": 3,
+                  "agent.agent_span.span_status_message": 2,
+                  "agent.agent_span.span_attributes.session.id": 5,
+                  "agent.agent_span.span_attributes.user_prompt": 1,
+                  "agent.agent_span.span_attributes.full_command": 1,
+                  "agent.agent_span.span_attributes.file_path": 1,
               }
+              for what, tail in tails.items():
+                  assert nonce_hits(tail) == {}, f"{what} stored unmasked"
               failed = {port: metric(port, r"otelcol_exporter_send_failed_[a-z_]+") for port in (INGRESS_PORT, SESSION_PORT)}
               print(f"  send_failed {failed}", flush=True)
               assert failed == {INGRESS_PORT: 0, SESSION_PORT: 0}, failed
@@ -1334,7 +1585,12 @@
 
                 environment.etc = {
                   "fleet-ingress/config.json".text = builtins.toJSON {
-                    inherit vars pki agentDeployRecord;
+                    inherit
+                      vars
+                      pki
+                      agentDeployRecord
+                      oldSpanTable
+                      ;
                     deployRecord = self.lib.deployRecordScript {
                       inherit pkgs;
                       hostName = "electrum";

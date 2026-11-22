@@ -33,18 +33,27 @@
       resourceAttributes = "user.name=${cfg.person}";
 
       # Prompts, responses and tool details on (operator's content decision);
-      # OTEL_LOG_TOOL_CONTENT, OTEL_LOG_RAW_API_BODIES, traces and
-      # OTEL_RESOURCE_INCLUDE_HOST stay unset. Metric temporality stays
-      # Claude's default delta (design D2).
+      # tool output on (design D15): Claude's beta traces with tool content,
+      # since its tool output exists only as the `tool.output` span event.
+      # Its span buffer holds at most 64 spans, as omp's does: tool spans
+      # carry up to 60 KB each, and 2.1.330's batch span processor reads
+      # OTEL_BSP_MAX_QUEUE_SIZE (default 2048) from the environment.
+      # OTEL_LOG_RAW_API_BODIES (the whole conversation on every request),
+      # detailed beta tracing and OTEL_RESOURCE_INCLUDE_HOST stay unset.
+      # Metric temporality stays Claude's default delta (design D2).
       claudeCodeEnv = {
         CLAUDE_CODE_ENABLE_TELEMETRY = "1";
+        CLAUDE_CODE_ENHANCED_TELEMETRY_BETA = "1";
         OTEL_METRICS_EXPORTER = "otlp";
         OTEL_LOGS_EXPORTER = "otlp";
+        OTEL_TRACES_EXPORTER = "otlp";
         OTEL_EXPORTER_OTLP_PROTOCOL = "http/protobuf";
         OTEL_EXPORTER_OTLP_ENDPOINT = receiver;
         OTEL_LOG_USER_PROMPTS = "1";
         OTEL_LOG_ASSISTANT_RESPONSES = "1";
         OTEL_LOG_TOOL_DETAILS = "1";
+        OTEL_LOG_TOOL_CONTENT = "1";
+        OTEL_BSP_MAX_QUEUE_SIZE = "64";
         OTEL_METRICS_INCLUDE_ACCOUNT_UUID = "false";
         OTEL_RESOURCE_ATTRIBUTES = resourceAttributes;
       };
@@ -57,13 +66,13 @@
         OTEL_LOGS_EXPORTER = "none";
         OTEL_RESOURCE_ATTRIBUTES = resourceAttributes;
       };
-      # omp's traces (design D13): spans to the receiver with message content
-      # at `full`, since omp puts content only on spans; the host's
-      # traces/agent-session keeps the newest prompt and the output and
-      # drops the history, tool results included. omp's span buffer holds
-      # at most 64 spans (OTel's default 2048 of about 600 KB chat spans
-      # would be about 1.2 GB while the collector is down), and an export
-      # gives up after 5 s, its retries included (A196).
+      # omp's traces (design D13, D15): spans to the receiver with message
+      # content at `full`, since omp puts content only on spans; the host's
+      # traces/agent-session keeps the newest prompt, the output and the
+      # tool results and drops the history. omp's span buffer holds at most
+      # 64 spans (OTel's default 2048 of about 600 KB chat spans would be
+      # about 1.2 GB while the collector is down), and an export gives up
+      # after 5 s, its retries included (A196).
       ompTracesEnv = {
         OTEL_EXPORTER_OTLP_TRACES_ENDPOINT = "${receiver}/v1/traces";
         OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT = "full";
@@ -128,7 +137,7 @@
             {
               assertion = renderedClaude == lib.optionalAttrs enabled claudeCodeEnv;
               message = "agent-telemetry: Claude Code settings env must carry exactly the emitter gates ${
-                if enabled then "of design D2" else "none (this host has no agentTelemetry)"
+                if enabled then "of design D2 and D15" else "none (this host has no agentTelemetry)"
               }; telemetry keys found: ${builtins.toJSON renderedClaude}";
             }
             {

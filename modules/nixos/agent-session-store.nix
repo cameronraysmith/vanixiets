@@ -52,21 +52,13 @@ let
   # PARTITION ON (one region, standalone) and no ttl (agent's 30 d applies).
   spans = agentSession.spans;
   skipping = "SKIPPING INDEX WITH(false_positive_rate = '0.01', granularity = '10240', type = 'BLOOM')";
-  fulltext = "FULLTEXT INDEX WITH(analyzer = 'English', case_sensitive = 'false', backend = 'bloom')";
+  fulltextIndex = "FULLTEXT INDEX WITH(analyzer = 'English', case_sensitive = 'false', backend = 'bloom')";
   storeType = {
     string = "STRING";
     int64 = "BIGINT";
+    boolean = "BOOLEAN";
   };
-  spanColumn =
-    key:
-    lib.concatStringsSep " " (
-      [
-        ''"span_attributes.${key}"''
-        storeType.${spans.keys.${key}}
-        "NULL"
-      ]
-      ++ lib.optional (lib.elem key spans.fulltext) fulltext
-    );
+  spanColumn = keys: key: ''"span_attributes.${key}" ${storeType.${keys.${key}}} NULL'';
   # service.name becomes service_name; host.name is stamped by the collector.
   resourceColumns = map (key: ''"resource_attributes.${key}" STRING NULL'') (
     lib.remove "service.name" spans.resourceKeys ++ [ "host.name" ]
@@ -75,8 +67,11 @@ let
     CREATE TABLE IF NOT EXISTS "${name}" (
       ${lib.concatStringsSep ",\n  " columns}
     ) ENGINE=mito WITH(${lib.concatStringsSep ", " options})'';
-  spanDdl = [
-    (createTable spans.table
+  # The span table's CREATE for a key set; the VM test renders the table as
+  # it was before design D15 from it.
+  spanTableFor =
+    { keys, fulltext }:
+    createTable spans.table
       (
         [
           ''"timestamp" TIMESTAMP(9) NOT NULL''
@@ -94,7 +89,9 @@ let
           ''"scope_version" STRING NULL''
           ''"service_name" STRING NULL ${skipping}''
         ]
-        ++ map spanColumn (lib.attrNames spans.keys)
+        ++ map (key: spanColumn keys key + lib.optionalString (lib.elem key fulltext) " ${fulltextIndex}") (
+          lib.attrNames keys
+        )
         ++ resourceColumns
         ++ [
           ''"span_events" JSON NULL''
@@ -110,8 +107,27 @@ let
         "'greptime.semantic.source' = 'opentelemetry'"
         "'greptime.semantic.trace.conventions' = 'unknown'"
         "table_data_model = 'greptime_trace_v1'"
-      ]
+      ];
+  # CREATE TABLE IF NOT EXISTS changes nothing once the table exists, so
+  # each span key's column is also added to an existing table, and each
+  # content column's index set, every run (design D15): ADD COLUMN IF NOT
+  # EXISTS does nothing to a column that is there, and SET FULLTEXT INDEX
+  # rewrites the same options. 1.2.1 takes no index inside ADD COLUMN
+  # (src/sql/src/parsers/alter_parser.rs:697-724 parses a plain column
+  # definition), hence the second statement. A table created by an older
+  # generation thus ends with the columns and indexes a new one has.
+  spanAlters =
+    map (key: ''ALTER TABLE "${spans.table}" ADD COLUMN IF NOT EXISTS ${spanColumn spans.keys key}'') (
+      lib.attrNames spans.keys
     )
+    ++ map (
+      key: ''ALTER TABLE "${spans.table}" MODIFY COLUMN "span_attributes.${key}" SET ${fulltextIndex}''
+    ) spans.fulltext;
+  spanDdl = [
+    (spanTableFor { inherit (spans) keys fulltext; })
+  ]
+  ++ spanAlters
+  ++ [
     (createTable "${spans.table}_services"
       [
         ''"timestamp" TIMESTAMP(9) NOT NULL''
@@ -136,7 +152,7 @@ let
 in
 {
   flake.lib.agentSessionStore = {
-    inherit spanDdl;
+    inherit spanDdl spanTableFor;
     inherit (rendered) ddl pipeline;
     pipelineName = "agent_session_event";
   };
