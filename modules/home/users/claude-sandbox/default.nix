@@ -117,6 +117,60 @@ let
           exit 0
         '';
       };
+
+      # Says how far behind main the snapshot's closure is (D5), and changes
+      # nothing: it reads the last marker line the setup script appended to
+      # setup.log, asks `git ls-remote` for main's tip, and appends one line to
+      # run.log with the commit used, its distance from the tip when the
+      # snapshot was made, and whether main has moved since that tip. It fetches
+      # no history and never evaluates, realises or activates. Claude Code adds a
+      # SessionStart hook's stdout to the model's context, so it prints nothing,
+      # and it always exits 0; an absent marker or network gives `unknown`.
+      stalenessHook = pkgs.writeShellApplication {
+        name = "claude-sandbox-staleness";
+        runtimeInputs = [
+          pkgs.coreutils
+          pkgs.git
+        ];
+        text = ''
+          log_dir=${lib.escapeShellArg config.vanixiets.sandbox.bootstrapReport.directory}
+          repository=${lib.escapeShellArg flake.lib.claudeSandboxSetupScript.repository}
+
+          marker=
+          if [[ -r $log_dir/setup.log ]]; then
+            marker=$(tail -n 1 "$log_dir/setup.log" 2>/dev/null) || marker=
+          fi
+          rev=unknown dist=unknown snapshot_tip=unknown
+          read -ra words <<<"$marker" || true
+          for word in "''${words[@]}"; do
+            case $word in
+              rev=*) [[ ''${word#rev=} =~ ^[0-9a-f]{40}$ ]] && rev=''${word#rev=} ;;
+              dist=*) [[ ''${word#dist=} =~ ^[0-9]+$ ]] && dist=main~''${word#dist=} ;;
+              tip=*) [[ ''${word#tip=} =~ ^[0-9a-f]{40}$ ]] && snapshot_tip=''${word#tip=} ;;
+            esac
+          done
+          # A pinned script's marker has no tip=; its own rev stands in.
+          if [[ $snapshot_tip == unknown ]]; then
+            snapshot_tip=$rev
+          fi
+
+          tip=unknown moved=unknown
+          if out=$(GIT_TERMINAL_PROMPT=0 timeout 10 git ls-remote "$repository" refs/heads/main 2>/dev/null </dev/null) &&
+            [[ $out =~ ^([0-9a-f]{40}) ]]; then
+            tip=''${BASH_REMATCH[1]}
+            if [[ $snapshot_tip == "$tip" ]]; then
+              moved=no
+            elif [[ $snapshot_tip != unknown ]]; then
+              moved=yes
+            fi
+          fi
+
+          mkdir -p "$log_dir" 2>/dev/null &&
+            printf '%s staleness rev=%s dist=%s main=%s moved=%s\n' \
+              "$(date -u +%FT%TZ)" "$rev" "$dist" "$tip" "$moved" >>"$log_dir/run.log" 2>/dev/null || true
+          exit 0
+        '';
+      };
     in
     {
       home.stateVersion = "23.11";
@@ -171,6 +225,10 @@ let
               {
                 type = "command";
                 command = lib.getExe repoContextHook;
+              }
+              {
+                type = "command";
+                command = lib.getExe stalenessHook;
               }
             ];
           }

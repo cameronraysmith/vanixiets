@@ -41,20 +41,20 @@ A read-only SessionStart hook compares the marker's commit with `main`'s tip.
 **Interfaces:**
 - Produces: `flake.lib.claudeSandboxSetupScript.trackTemplate` (string); the app prints it with `--track` and keeps the pinned output by default.
 
-- [ ] **Step 1:** Add the track-mode asserts to the check (lines, bytes, `exit 0`, no revision, no store path, `--max-jobs 0`, array form); build it against an empty template. Expected: FAIL.
-- [ ] **Step 2:** Write `trackTemplate` and the `--track` branch of the app.
-- [ ] **Step 3:** Build the check; print the script at two revisions and `cmp` them. Expected: PASS, identical.
-- [ ] **Step 4:** Run the container cases of tasks.md 1.3. Expected: each marker as listed there.
-- [ ] **Step 5:** Commit `feat(claude-sandbox): add a track mode that follows main`.
+- [x] **Step 1:** Add the track-mode asserts to the check (lines, bytes, `exit 0`, no revision, no store path, `--max-jobs 0`, array form); build it against an empty template. Expected: FAIL.
+- [x] **Step 2:** Write `trackTemplate` and the `--track` branch of the app.
+- [x] **Step 3:** Build the check; print the script at two revisions and `cmp` them. Expected: PASS, identical.
+- [x] **Step 4:** Run the container cases of tasks.md 1.3. Expected: each marker as listed there.
+- [x] **Step 5:** Commit `feat(claude-sandbox): add a track mode that follows main`.
 
 ### Task 2: Staleness hook (tasks.md 2.1)
 
 **Files:**
 - Modify: `modules/home/users/claude-sandbox/default.nix`
 
-- [ ] **Step 1:** Add `claude-sandbox-staleness` (a `writeShellApplication`) and register it under SessionStart by store path.
-- [ ] **Step 2:** `nix eval` the profile's hooks; run the container cases of tasks.md 2.1. Expected: as listed.
-- [ ] **Step 3:** Commit `feat(claude-sandbox): log a session's staleness against main`.
+- [x] **Step 1:** Add `claude-sandbox-staleness` (a `writeShellApplication`) and register it under SessionStart by store path.
+- [x] **Step 2:** `nix eval` the profile's hooks; run the container cases of tasks.md 2.1. Expected: as listed.
+- [x] **Step 3:** Commit `feat(claude-sandbox): log a session's staleness against main`.
 
 ### Task 3: Rollout (tasks.md 3.1, 3.2)
 

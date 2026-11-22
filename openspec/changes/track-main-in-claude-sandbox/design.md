@@ -56,8 +56,15 @@ This change adds `main branch` and `input source` (both shared); every other con
 |---|---|---|---|
 | T1 | Evaluating each further commit in the walk costs much less than the first, because most input sources are already in the store. | A walk of 5 commits exceeds 300 s with every source cached. | R2 |
 | T2 | `git+https://…?rev=<sha>&shallow=1` fetches a commit by SHA through the GitHub gate's anonymous lane (A141 shows GitHub serves it; the gate's lane is A175). | The walk's evaluation of a non-tip commit fails with a fetch error. | R2 |
-| T3 | `curl` with the proxy's CA reaches `cache.scientistexperience.net` narinfos from the setup step. | The walk records every commit as `narinfo` misses while the closures are published. | R2 |
+| T3 | ~~`curl` with the proxy's CA reaches `cache.scientistexperience.net` narinfos from the setup step.~~ Retired 2026-11-22: the walk no longer uses curl (D3). | — | — |
 | T4 | A snapshot made between a push and nixbot's publish is rare enough that walking back 5 commits covers it. | A snapshot's marker shows all 5 commits missed while the build service was healthy. | R2 |
+
+T2, partly resolved on 2026-11-22 (tasks.md 1.3, container on magnetite, no gate).
+The commits are listed by a treeless shallow bare clone, `git clone --bare --depth 5 --filter=tree:0 --single-branch -b main`, then `git rev-list --first-parent -n 5 main`: 5 commit objects, 17 KiB in under 1 s, against 9.89 MiB for the probe's full shallow clone.
+A per-commit `?rev=<sha>&shallow=1` fetch cannot name the parents, and `ls-remote` names only the tip.
+If that clone fails, the script runs the plain shallow clone (`--depth 5` without the filter), the form the probe saw the gate serve; if the gate only withholds the filter capability, git ignores the filter itself.
+Shown against GitHub directly: `?rev=<sha>&shallow=1` evaluates non-tip commits (tip 72 s, then 15 s and 14 s, which also supports T1).
+Not yet shown: whether the GitHub gate serves the filter and by-SHA fetches, which group 3's cold start closes; and the 300 s budget path, since no container run reached it (the run with the cache host blocked missed all 5 commits in 176 s).
 
 ## Goals / Non-Goals
 
@@ -93,9 +100,11 @@ All decided by the operator on 2026-11-22.
 ### D3: substitute only, and walk back `main`'s first-parent history — DECIDED 2026-11-22
 
 - **Choice**: realisation uses `--max-jobs 0` and `--option builders ''`, so nothing is built in the session.
-  From `main`'s tip, the step fetches first-parent history to depth 5 (a temporary shallow clone), evaluates each commit's activation package path through `git+https://…?rev=<sha>&shallow=1`, and accepts the first whose narinfo `cache.scientistexperience.net` answers with 200; a failed evaluation counts as a miss (a lock change whose sources are not uploaded yet).
+  From `main`'s tip, the step fetches first-parent history to depth 5 (a temporary treeless shallow clone, T2), evaluates each commit's activation package path through `git+https://…?rev=<sha>&shallow=1`, and accepts the first whose narinfo `cache.scientistexperience.net` answers with 200; a failed evaluation counts as a miss (a lock change whose sources are not uploaded yet).
+  The narinfo is asked for by `nix path-info --store "$C"` with `narinfo-cache-negative-ttl 0`, not by `curl`: Nix's own HTTP client is the one the probe saw reach the cache through the proxy (A184), so the step needs no assumption about curl and the proxy's CA (T3 retired), and turning the negative cache off keeps an earlier 404 from hiding a closure published since.
   The walk stops after 5 commits or about 300 s, then the step degrades and activates nothing.
-  The marker records the commit used, its distance from the tip and each skipped commit with its reason (`eval` or `narinfo`).
+  The marker records `main`'s tip when the walk ran (`tip=`), the commit used, its distance from the tip and each skipped commit with its reason (`eval` with its exit code, `narinfo`, or `budget`).
+  `tip=` is what lets D5 tell whether `main` has moved since the snapshot: when the commit used is `main~2`, it differs from the tip even if `main` has not moved.
   `PIN=` bypasses the walk.
 - **Rationale**: local builds would meet the GitHub gate on fixed-output sources such as the composed skills' dependencies (A175) and could run long; and a snapshot lives about seven days (A185), so losing the push-to-publish race would cost a week of sessions without the profile, not one.
 - **Accepted risk**: all 5 commits missing; the marker is its detector.
@@ -108,7 +117,7 @@ All decided by the operator on 2026-11-22.
 
 ### D5: a read-only staleness notice — DECIDED 2026-11-22
 
-- **Choice**: a SessionStart hook in the profile compares the commit the snapshot's marker records with `main`'s tip (`git ls-remote`), and appends one `staleness` line to `run.log` with that commit, the distance the marker recorded (for example `main~2`) and whether the tip has moved; it prints nothing, fetches no history and never activates.
+- **Choice**: a SessionStart hook in the profile reads the snapshot's marker and compares the tip it records (`tip=`, or the commit used when a pinned marker has none) with `main`'s tip (`git ls-remote`), and appends one `staleness` line to `run.log` with the commit used, the distance the marker recorded (for example `main~2`) and whether the tip has moved; it prints nothing, fetches no history and never activates.
 - **Alternative rejected**: a catch-up hook that activates `main` at session start: sessions would run with mixed versions, and the catch-up would repeat in every session.
 
 ### D6: the 30-day renewal applies only while pinned — DECIDED 2026-11-22
