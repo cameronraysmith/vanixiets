@@ -172,7 +172,7 @@ It is in addition to the key allow-lists, never instead of them. It is OTTL `rep
 The three exporters carry one signal each, over mTLS with the host's certificate and a persistent queue: `otlp_http/ingress-metrics` 52 MiB (24 h at `agentMetricsBytesPerMinute`), `otlp_http/ingress-agent` 64 MiB (8 h at `agentEventBytesPerMinute`) and `otlp_http/ingress-traces` 44 MiB (3 h at `agentSpanBytesPerMinute`).
 On pyrite they post to `otlp/mesh` like the host's collector.
 On magnetite they post to the ingress's `otlp/loopback` on `127.0.0.1:4321`, with `server_name_override` set to magnetite's registry name, which its certificate carries; `otlp/loopback` has `otlp/mesh`'s TLS, so it requires an `otel-ca` client certificate and no local account can write into the store past `otlp/local`'s allow-lists, and it feeds `metrics/ingress`, `logs/ingress` and `traces/ingress`.
-An agent assertion requires each of the unit's exporters to serve one pipeline and queue in `file_storage` by bytes with unlimited retry, those holds, the queues to sum below 512 MiB, and the limiter below `GOMEMLIMIT` and that below `MemoryMax`.
+An agent assertion requires each of the unit's exporters to serve one pipeline and queue in `file_storage` by bytes, with unlimited retry except `otlp_http/langfuse`'s, those holds, the queues to sum below 512 MiB, and the limiter below `GOMEMLIMIT` and that below `MemoryMax`.
 `otel-agent-session-envelope.service` runs `otel-envelope` over the unit's own telemetry every 5 minutes; both units are in the host's notified units, which an agent assertion requires where `agentTelemetry` is set.
 The unit's own series are judged by that envelope and not stored: scraping them into `fleet` would change the host collector's configuration.
 
@@ -182,6 +182,30 @@ At the ingress, `routing/logs` routes `vanixiets.database = agent` and `vanixiet
 The store's pipeline keeps the column set closed a second time: it returns null for an unlisted event and maps only the listed keys.
 At the ingress, `traces/ingress` takes both mesh receivers and, on magnetite, `otlp/loopback`, drops a resource whose `vanixiets.database` is not `agent` (`filter/agent-spans-only`), strips the routing attributes and exports to `otlp_http/agent_span`, which sends `x-greptime-db-name: agent`, `x-greptime-trace-table-name: agent_span`, `x-greptime-pipeline-name: greptime_trace_v1` and `x-greptime-hints: auto_create_table=false`.
 The schema job creates `agent_span`, `agent_span_services` and `agent_span_operations` from GreptimeDB 1.2.1's own v1 trace schema with one column per listed span key and full-text indexes on `span_attributes.last_user_message`, `span_attributes.gen_ai.output.messages`, `span_attributes.gen_ai.tool.call.result` and `span_attributes.user_prompt`, so a span carrying a key off the list is refused with HTTP 400 rather than adding a column. Because `CREATE TABLE IF NOT EXISTS` does nothing to a table that exists, the job then runs, every time, `ALTER TABLE "agent_span" ADD COLUMN IF NOT EXISTS` for every span key's column and `MODIFY COLUMN … SET FULLTEXT INDEX` for every full-text column (1.2.1 takes no index inside `ADD COLUMN`), so a table an older generation created ends with the columns and indexes a fresh one has, and a second run changes nothing; `fleet-ingress` shows both on 1.2.1. The Jaeger query API stays off (`modules/nixos/greptimedb.nix`).
+
+### Langfuse Cloud (design D16)
+
+Where a host's row sets `langfuse` (magnetite and pyrite), `traces/agent-session` also exports to the connector `forward/langfuse`. `traces/langfuse` therefore starts after every allow-list, cut, mask and stamp, and gets exactly the spans the store gets.
+
+`filter/langfuse` drops `claude_code.tool.blocked_on_user`. `transform/langfuse` then:
+
+- sets `langfuse.observation.input` and `.output`: from omp's `last_user_message` and `gen_ai.output.messages`, from Claude Code's `user_prompt`, and from a Claude tool's `full_command` or `file_path` and its `gen_ai.tool.call.result`;
+- moves Claude's token counts to `gen_ai.usage.*`;
+- deletes `vanixiets.*`.
+
+The fan-out clones the batch for this branch, so none of these changes reaches the store.
+
+`otlp_http/langfuse` posts protobuf to `https://cloud.langfuse.com/api/public/otel` with the header `x-langfuse-ingestion-version: 4`. It authenticates through `basicauth/langfuse` with the shared clan var `langfuse`, which the unit loads as its `langfuse-public-key` and `langfuse-secret-key` credentials.
+
+The branch must never refuse. A refusal there would travel back through the fan-out to `otlp/local`, and the emitters would resend what the store already took. So the branch:
+
+- has no limiter;
+- runs processors that ignore their errors;
+- has a 32 MiB queue that drains at 10 consumers × 3 MiB batches per 5-minute retry window while Langfuse is down. That is at least ten times `agentSpanBytesPerMinute`, which an agent assertion and `otel-collector-config` require.
+
+The exporter drops a batch after 5 minutes of retrying, or at once on 401, 403 or 413.
+
+Its failed sends do not fail C4 of `otel-agent-session-envelope` (`sendFailedExempt`). Its enqueue failures, its queue at 90 % and refusals at `otlp/local` still do. A broken Langfuse path shows as `otelcol_exporter_send_failed_spans{exporter="otlp_http/langfuse"}` rising on `127.0.0.1:8890`.
 
 ## The schema is the single source
 
@@ -242,7 +266,7 @@ Every exporter uses a persistent `file_storage` sending queue under `/var/lib/op
 On magnetite the ingress's ten store exporters queue: `fleet` gets 400 MiB, `agent` (metrics) 16 MiB, `agent_session_event` 32 MiB, `agent_span` 8 MiB, `devloop` (metrics) 4 MiB, `devloop_ci_attribute` 32 MiB, and `devloop_ci_build`, `devloop_batch_event`, `devloop_deploy_record` and `devloop_eval_run` 4 MiB each, 508 MiB in all, so the total stays under 512 MiB, `fleet` holds at least 24 hours at the assumed rate, the two `agent` queues hold about 3.9 h and 2.1 h of both agent-telemetry hosts' assumed agent output while the store is down, and `agent_span` about 17 min of their spans (the check requires 15).
 That is not the whole span hold: a full `agent_span` queue refuses the hand-off with a retryable error (`sending queue is full` becomes HTTP 503 at the receiver, because `otlp_http/agent_span` does not set `block_on_overflow`, which `otel-collector-config` requires), so each host's agent-session collector keeps its spans in its own `otlp_http/ingress-traces` queue, 3.2 h, and the end-to-end hold while the store is down is about 17 min plus 3.2 h.
 On every other agent host `otlp_http/ingress` gets 400 MiB and `otlp_http/ingress-logs` 16 MiB, and these queues hold the host's exports while magnetite, its receiver or the mesh is unreachable.
-An agent-telemetry host's agent-session collector queues under `/var/lib/otel-agent-session/queue`, 160 MiB in all: 52 MiB for `otlp_http/ingress-metrics`, 25.4 h of agent metrics, 64 MiB for `otlp_http/ingress-agent`, 8.4 h of agent events, and 44 MiB for `otlp_http/ingress-traces`, 3.2 h of spans (`agent-session-telemetry` design D10, D14, D15).
+An agent-telemetry host's agent-session collector queues under `/var/lib/otel-agent-session/queue`, 160 MiB in all for the store: 52 MiB for `otlp_http/ingress-metrics`, 25.4 h of agent metrics, 64 MiB for `otlp_http/ingress-agent`, 8.4 h of agent events, and 44 MiB for `otlp_http/ingress-traces`, 3.2 h of spans (`agent-session-telemetry` design D10, D14, D15). Where `langfuse` is set, `otlp_http/langfuse` adds 32 MiB, for 192 MiB in all (design D16).
 The assumed rate, `fleetBytesPerMinute` in `schema.nix`, is 256,000 bytes a minute per host.
 cinnabar's measured rate is far below it: on 2026-10-29 its metrics queue held 524,034 bytes after the 23 minutes between its deploy and the start of magnetite's receiver, about 22,800 bytes a minute, and was empty within 7 minutes of that start.
 Retries never stop (`max_elapsed_time = "0s"`), because a persistent queue drops an item whose retries run out.

@@ -131,6 +131,20 @@ let
                 home module configures the emitters only where it is true.
               '';
             };
+            langfuse = lib.mkOption {
+              type = lib.types.bool;
+              default = false;
+              description = ''
+                Whether the agent-session collector also sends its agent
+                spans to Langfuse Cloud (agent-session-telemetry design D16):
+                the connector forward/langfuse fans traces/agent-session's
+                output, after every allow-list, cut and mask, out to
+                traces/langfuse, which exports to Langfuse over OTLP/HTTP with
+                a short finite retry. Set by the clan agent role from the
+                host's flake.lib.observabilityHosts row; requires
+                agentTelemetry.
+              '';
+            };
             agentSessionSettings = lib.mkOption {
               type = (pkgs.formats.yaml { }).type;
               default = { };
@@ -782,6 +796,54 @@ in
                   credentials = agentSessionCredentials;
                 }
             );
+            # Langfuse Cloud (design D16): the spans traces/agent-session
+            # exports also go, through forward/langfuse, to traces/langfuse.
+            # That branch must never refuse: a refusal there reaches
+            # otlp/local through the fan-out, the emitters retry, and the
+            # store gets the batch twice. So it has no limiter, its
+            # processors ignore their errors, and its queue drains faster
+            # than spans arrive even while Langfuse is down (schema.nix's
+            # agentSession.langfuse; the assertion below).
+            langfuse = config.vanixiets.otelCollector.langfuse;
+            lf = session.langfuse;
+            langfuseExporter = "otlp_http/langfuse";
+            langfuseCredential = name: "${agentSessionCredentials}/langfuse-${name}";
+            attr = key: ''span.attributes["${key}"]'';
+            # Langfuse stops looking for an output once an input is set, and
+            # the reverse, so each source that sets one sets both where it
+            # has both (Langfuse OtelIngestionProcessor.ts:2025-2037).
+            setFrom =
+              target: source: condition:
+              "set(${attr "langfuse.observation.${target}"}, ${attr source}) where ${
+                lib.optionalString (condition != "") "${condition} and "
+              }${attr source} != nil";
+            claudeTool = ''span.name == "claude_code.tool"'';
+            langfuseStatements = [
+              # omp's step-0 chat span: the person's message and the reply.
+              (setFrom "input" "last_user_message" "")
+              (setFrom "output" "gen_ai.output.messages" "${attr "last_user_message"} != nil")
+              # Claude Code's turn: the prompt.
+              (setFrom "input" "user_prompt" ''span.name == "claude_code.interaction"'')
+              # Claude Code's tool: the command or the path, and its output.
+              (setFrom "input" "full_command" claudeTool)
+              (setFrom "input" "file_path" "${claudeTool} and ${attr "langfuse.observation.input"} == nil")
+              (setFrom "output" "gen_ai.tool.call.result" claudeTool)
+              # Each copied value once.
+              ''delete_key(span.attributes, "last_user_message")''
+              ''delete_key(span.attributes, "user_prompt")''
+              ''delete_key(span.attributes, "gen_ai.output.messages") where ${attr "langfuse.observation.output"} != nil''
+              ''delete_key(span.attributes, "gen_ai.tool.call.result") where ${attr "langfuse.observation.output"} != nil''
+            ]
+            ++ lib.concatLists (
+              lib.mapAttrsToList (from: to: [
+                "set(${attr to}, ${attr from}) where ${attr from} != nil"
+                ''delete_key(span.attributes, "${from}")''
+              ]) lf.usageKeys
+            )
+            ++ [
+              # The fleet's routing attributes are not Langfuse's.
+              ''delete_matching_keys(resource.attributes, "^vanixiets\\.")''
+            ];
             configFile =
               pkgs.runCommandLocal "${agentSessionUnit}.yaml"
                 { generated = (pkgs.formats.yaml { }).generate "${agentSessionUnit}.yaml" settings; }
@@ -821,7 +883,9 @@ in
                       n:
                       (q n).storage or null == "file_storage"
                       && (q n).sizer or null == "bytes"
-                      && (e.${n}.retry_on_failure.max_elapsed_time or null) == "0s"
+                      # Every store exporter retries forever; only Langfuse's
+                      # gives up, judged below (design D16).
+                      && (n == langfuseExporter || (e.${n}.retry_on_failure.max_elapsed_time or null) == "0s")
                       && builtins.length (pipelinesWith n) == 1
                     ) exporterNames
                     && size "otlp_http/ingress-metrics" >= 24 * 60 * schema.agentMetricsBytesPerMinute
@@ -832,9 +896,44 @@ in
                     && goMemLimit != null
                     && limit < lib.toInt (builtins.head goMemLimit)
                     && lib.toInt (builtins.head goMemLimit) < lib.toInt (builtins.head memMax);
-                  message = "otel-collector agent on ${hostName}: every exporter of ${agentSessionUnit} must serve one pipeline and queue in file_storage by bytes with unlimited retry, otlp_http/ingress-metrics must hold 24 h at agentMetricsBytesPerMinute, otlp_http/ingress-agent 8 h at agentEventBytesPerMinute and otlp_http/ingress-traces 3 h at agentSpanBytesPerMinute, the queues must sum below 512 MiB, and its limiter must be below GOMEMLIMIT and GOMEMLIMIT below MemoryMax (ADR-003 envelope; agent-session-telemetry design D10, D14); queues ${builtins.toJSON (lib.genAttrs exporterNames size)}, limiter ${toString limit}, ${
+                  message = "otel-collector agent on ${hostName}: every exporter of ${agentSessionUnit} must serve one pipeline and queue in file_storage by bytes, every one but ${langfuseExporter} with unlimited retry, otlp_http/ingress-metrics must hold 24 h at agentMetricsBytesPerMinute, otlp_http/ingress-agent 8 h at agentEventBytesPerMinute and otlp_http/ingress-traces 3 h at agentSpanBytesPerMinute, the queues must sum below 512 MiB, and its limiter must be below GOMEMLIMIT and GOMEMLIMIT below MemoryMax (ADR-003 envelope; agent-session-telemetry design D10, D14, D16); queues ${builtins.toJSON (lib.genAttrs exporterNames size)}, limiter ${toString limit}, ${
                     builtins.toJSON (unit.Environment or null)
                   }, MemoryMax ${builtins.toJSON (unit.MemoryMax or null)}.";
+                }
+              )
+              # Langfuse's exporter gives up after retryMinutes and, while
+              # Langfuse is down, drains drainMultiple times faster than spans
+              # arrive, into a queue holding twice one retry window's arrivals,
+              # in requests under Langfuse's limit; so its queue does not fill
+              # and the fan-out never refuses (design D16). Nothing else
+              # exports there, and nothing in its pipeline can refuse.
+              (
+                let
+                  x = settings.exporters.${langfuseExporter} or { };
+                  queue = x.sending_queue or { };
+                  batch = queue.batch or { };
+                  arrivals = lf.retryMinutes * schema.agentSpanBytesPerMinute;
+                  pipeline = settings.service.pipelines."traces/langfuse" or { };
+                  processors = pipeline.processors or [ ];
+                in
+                {
+                  assertion =
+                    !langfuse
+                    || (
+                      (x.retry_on_failure.enabled or false)
+                      && lf.retryMinutes > 0
+                      && (x.retry_on_failure.max_elapsed_time or null) == "${toString lf.retryMinutes}m"
+                      && (queue.queue_size or 0) >= 2 * arrivals
+                      && (queue.num_consumers or 0) * (batch.max_size or 0) >= lf.drainMultiple * arrivals
+                      && (batch.sizer or null) == "bytes"
+                      && (batch.min_size or null) == (batch.max_size or 0)
+                      && (batch.max_size or 0) < lf.requestLimitBytes
+                      && (pipeline.receivers or null) == [ "forward/langfuse" ]
+                      && (pipeline.exporters or null) == [ langfuseExporter ]
+                      && !(builtins.elem "memory_limiter" processors)
+                      && lib.all (n: (settings.processors.${n}.error_mode or null) == "ignore") processors
+                    );
+                  message = "otel-collector agent on ${hostName}: ${langfuseExporter} must retry for schema.nix's agentSession.langfuse.retryMinutes and no longer, queue at least twice a retry window's agentSpanBytesPerMinute, drain consumers x batch max_size per retry window at least drainMultiple times that, batch by bytes with min_size equal to max_size under requestLimitBytes, and be fed by traces/langfuse alone, from forward/langfuse, through processors that ignore their errors and no limiter (agent-session-telemetry design D16); exporter ${builtins.toJSON x}, pipeline ${builtins.toJSON pipeline}.";
                 }
               )
             ];
@@ -894,6 +993,11 @@ in
                     telemetryUrl = "http://127.0.0.1:${toString agentSessionTelemetryPort}/metrics";
                     targets = flakeLib.otelEnvelopeTargets settings.receivers;
                     exporters = builtins.attrNames settings.exporters;
+                    # Langfuse's failed sends are expected whenever it is
+                    # down or its quota blocks ingestion, and page no one; its
+                    # enqueue failures and otlp/local's refusals, which would
+                    # mean the fan-out refused, are still loss (design D16).
+                    sendFailedExempt = lib.optional langfuse langfuseExporter;
                   }
                 );
               };
@@ -904,9 +1008,19 @@ in
             };
 
             vanixiets.otelCollector.agentSessionSettings = {
-              extensions.file_storage = {
-                directory = "${agentSessionStateDir}/queue";
-                create_directory = true;
+              extensions = {
+                file_storage = {
+                  directory = "${agentSessionStateDir}/queue";
+                  create_directory = true;
+                };
+              }
+              // lib.optionalAttrs langfuse {
+                # The project's keys, loaded by the unit as credentials; the
+                # extension reads each file and trims it.
+                "basicauth/langfuse".client_auth = {
+                  username_file = langfuseCredential "public-key";
+                  password_file = langfuseCredential "secret-key";
+                };
               };
 
               receivers."otlp/local".protocols.http.endpoint = "127.0.0.1:4318";
@@ -1065,12 +1179,52 @@ in
                     ''replace_pattern(span.status.message, ${credentials}, "****")''
                   ];
                 };
+              }
+              // lib.optionalAttrs langfuse {
+                # Claude Code's spans that carry nothing after the allow-list.
+                "filter/langfuse" = {
+                  error_mode = "ignore";
+                  trace_conditions = [ (oneOf "span.name" lf.droppedSpans) ];
+                };
+                # Langfuse's names for what the store keeps under ours.
+                "transform/langfuse" = {
+                  error_mode = "ignore";
+                  trace_statements = langfuseStatements;
+                };
               };
 
-              exporters = lib.mapAttrs (_: sessionExporter) sessionQueueBytes;
+              exporters =
+                lib.mapAttrs (_: sessionExporter) sessionQueueBytes
+                // lib.optionalAttrs langfuse {
+                  ${langfuseExporter} = {
+                    inherit (lf) endpoint;
+                    auth.authenticator = "basicauth/langfuse";
+                    headers."x-langfuse-ingestion-version" = lf.ingestionVersion;
+                    sending_queue = {
+                      storage = "file_storage";
+                      sizer = "bytes";
+                      queue_size = lf.queueBytes;
+                      num_consumers = lf.consumers;
+                      # A batch leaves at its size or after the timeout; while
+                      # every consumer waits on Langfuse, batches fill to
+                      # max_size, which is what bounds the queue.
+                      batch = {
+                        sizer = "bytes";
+                        min_size = lf.batchBytes;
+                        max_size = lf.batchBytes;
+                        flush_timeout = "10s";
+                      };
+                    };
+                    retry_on_failure = {
+                      enabled = true;
+                      max_interval = "60s";
+                      max_elapsed_time = "${toString lf.retryMinutes}m";
+                    };
+                  };
+                };
 
               service = {
-                extensions = [ "file_storage" ];
+                extensions = [ "file_storage" ] ++ lib.optional langfuse "basicauth/langfuse";
                 # Its own port, beside the host's collector on 8888.
                 telemetry.metrics.readers = [
                   {
@@ -1118,10 +1272,25 @@ in
                       "transform/agent-session-mask"
                       "resource/agent-session"
                     ];
-                    exporters = [ "otlp_http/ingress-traces" ];
+                    exporters = [ "otlp_http/ingress-traces" ] ++ lib.optional langfuse "forward/langfuse";
+                  };
+                }
+                // lib.optionalAttrs langfuse {
+                  # After every stage above, so Langfuse gets exactly what
+                  # the store gets; its renames never reach the store.
+                  "traces/langfuse" = {
+                    receivers = [ "forward/langfuse" ];
+                    processors = [
+                      "filter/langfuse"
+                      "transform/langfuse"
+                    ];
+                    exporters = [ langfuseExporter ];
                   };
                 };
               };
+            }
+            // lib.optionalAttrs langfuse {
+              connectors."forward/langfuse" = { };
             };
           }
         ))
@@ -1661,6 +1830,7 @@ in
                 # Static data, so it can select imports without evaluating the host (design D6).
                 collect = flakeLib.observabilityHosts.${machine.name}.collect;
                 agentTelemetry = collect && flakeLib.observabilityHosts.${machine.name}.agentTelemetry;
+                langfuse = agentTelemetry && flakeLib.observabilityHosts.${machine.name}.langfuse;
                 credentials = [
                   "otel-cert:${gens.otel-cert.files."cert.pem".path}"
                   "otel-key:${gens.otel-cert.files."key.pem".path}"
@@ -1690,6 +1860,14 @@ in
                       }
                     ];
                   }
+                  {
+                    assertions = [
+                      {
+                        assertion = !flakeLib.observabilityHosts.${machine.name}.langfuse || agentTelemetry;
+                        message = "otel-collector agent on ${machine.name}: flake.lib.observabilityHosts sets langfuse without collect and agentTelemetry; Langfuse is fed by the agent-session collector (agent-session-telemetry design D16).";
+                      }
+                    ];
+                  }
                   # ca.crt reaches the collector as a store path, so a new CA changes
                   # the configuration and restarts it (design D1). The credentials
                   # load on the ingress host too, where otlp/mesh presents them.
@@ -1699,6 +1877,7 @@ in
                     vanixiets.otelCollector.caFile = pkgs.writeText "otel-ca.crt" gens.otel-ca.files."ca.crt".value;
                     vanixiets.otelCollector.smartDevices = flakeLib.observabilityHosts.${machine.name}.smartDevices;
                     vanixiets.otelCollector.agentTelemetry = flakeLib.observabilityHosts.${machine.name}.agentTelemetry;
+                    vanixiets.otelCollector.langfuse = langfuse;
                     services.observability-notify = {
                       units = flakeLib.observabilityHosts.${machine.name}.notifiedUnits;
                       tokenFile = gens.ntfy-alerter.files.token.path;
@@ -1709,6 +1888,50 @@ in
                   # (agent-session-telemetry design D14).
                   (lib.optionalAttrs agentTelemetry {
                     systemd.services.${agentSessionUnit}.serviceConfig.LoadCredential = credentials;
+                  })
+                  # Langfuse Cloud's project keys (agent-session-telemetry
+                  # design D16): one shared var, entered once at hidden
+                  # prompts and kept, so every flagged host sends with the same
+                  # project's keys and each must be its recipient
+                  # (flake.lib.sharedVarsObligations). The script only checks
+                  # their shape; clan writes each prompt to its file.
+                  (lib.optionalAttrs langfuse {
+                    clan.core.vars.generators.langfuse = {
+                      share = true;
+                      prompts.public-key = {
+                        description = ''
+                          Public key (pk-lf-…) of the Langfuse Cloud project
+                          (EU, https://cloud.langfuse.com) that receives the
+                          fleet's agent spans; used by no other service.
+                        '';
+                        type = "hidden";
+                        persist = true;
+                        display = {
+                          group = "langfuse";
+                          label = "LANGFUSE_PUBLIC_KEY";
+                        };
+                      };
+                      prompts.secret-key = {
+                        description = "Secret key (sk-lf-…) paired with the public key above.";
+                        type = "hidden";
+                        persist = true;
+                        display = {
+                          group = "langfuse";
+                          label = "LANGFUSE_SECRET_KEY";
+                        };
+                      };
+                      files.public-key.restartUnits = [ "${agentSessionUnit}.service" ];
+                      files.secret-key.restartUnits = [ "${agentSessionUnit}.service" ];
+                      runtimeInputs = [ pkgs.gnugrep ];
+                      script = ''
+                        grep -Eqx 'pk-lf-[A-Za-z0-9-]+' "$out/public-key" || { echo "langfuse: public-key is not pk-lf-…" >&2; exit 1; }
+                        grep -Eqx 'sk-lf-[A-Za-z0-9-]+' "$out/secret-key" || { echo "langfuse: secret-key is not sk-lf-…" >&2; exit 1; }
+                      '';
+                    };
+                    systemd.services.${agentSessionUnit}.serviceConfig.LoadCredential = [
+                      "langfuse-public-key:${gens.langfuse.files.public-key.path}"
+                      "langfuse-secret-key:${gens.langfuse.files.secret-key.path}"
+                    ];
                   })
                 ];
               };

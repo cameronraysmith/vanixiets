@@ -15,7 +15,7 @@ Any requirement whose discharge depends on this fact SHALL name it explicitly, a
 #### Scenario: The store gains per-database authorization
 
 - **WHEN** a release the fleet deploys authorizes reads per database or per table in the open build, which the telemetry store's release being fixed at evaluation surfaces at the change that moves it
-- **THEN** this assumption is void, and the `agent-session-telemetry` requirement `Session content is readable by every store reader and only by them` must be re-decided, since a narrower reader set becomes possible
+- **THEN** this assumption is void, and the `agent-session-telemetry` requirement `Session content is readable by every store reader and, where flagged, by the Langfuse project` must be re-decided, since a narrower reader set becomes possible
 
 ### Requirement: A189 — The group has consented to its agent sessions being recorded and read by the group
 
@@ -283,6 +283,42 @@ Any requirement whose discharge depends on this fact SHALL name it explicitly, a
 
 - **WHEN** the packaged store differs from 1.2.1 and rejects a repeated `SET FULLTEXT INDEX`, or `ADD COLUMN IF NOT EXISTS`
 - **THEN** this assumption is void, the schema job fails on the store's host, and its failure notice reports it before the collector sends new keys
+
+### Requirement: A205 — Langfuse Cloud ingests OTLP traces as read on 2026-11-22
+
+It is true of Langfuse Cloud (EU), independent of what this fleet builds, that `POST /api/public/otel/v1/traces` takes OTLP/HTTP protobuf with Basic auth (public key, secret key), answers 403 when ingestion is suspended, 413 above 5 MB and 429 over its rate limit, and that `langfuse.observation.input` or `.output` stops it reading GenAI keys.
+Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL lose its discharge once the violation below is observed.
+
+**Evidence**: langfuse/langfuse a3997264 (web 4.83.0): `web/src/pages/api/public/otel/v1/traces/index.ts:38-43,113-116`, `packages/shared/src/server/otel/OtelIngestionProcessor.ts:2025-2037,2461-2493` (input and output; tool spans' arguments and result), `:2744-2810` (user and session), `otelRequestBody.ts:28-56` (413); langfuse-docs 2238dea3 `faq/all/api-limits.mdx:17-49` (5 MB, Hobby 1,000 requests a minute), `docs/administration/billable-units.mdx:8-10`, the pricing table (Hobby 50,000 units a month, 30 days); `worker/src/ee/usageThresholds/constants.ts:9-26` (warning at 50,000, block at 250,000, Cloud's enforcement [unverified]). The contract check of 2026-11-22 from the operator's Mac: a synthetic two-span trace `vanixiets-contract-check` posted with the project's keys and `x-langfuse-ingestion-version: 4` answered 200, and `GET /api/public/v2/observations?traceId=…` (200) returned both spans, the root with the set input and output as a `SPAN`, the child as a `TOOL` with its arguments and result read natively; `GET /api/public/traces` answered 410, a v3 API Cloud has removed (`logs/d16-contract-check-*.log`).
+
+#### Scenario: Langfuse changes its contract
+
+- **WHEN** Langfuse refuses the protobuf body, the header or the auth, changes the status of a suspended or oversized request, or reads input and output differently
+- **THEN** this assumption is void; spans stop appearing in the project or appear without input and output, the exporter's failed sends rise without paging, and the contract check is rerun before the flag stays on
+
+### Requirement: A206 — The group consents to its agent sessions going to Langfuse Cloud
+
+It is true of the group that recorded its consent under A189 that the operator extended that consent on 2026-11-22 to Langfuse Cloud as a third-party processor of the same agent session content, readable by the Langfuse project's members and the vendor, for the experiment of design D16.
+Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL lose its discharge once the violation below is observed.
+
+**Evidence**: the operator's D16 answers of 2026-11-22 (all users' sessions, the EU region, the free tier), recorded in design D16 and the decision record.
+
+#### Scenario: A person withdraws consent for Langfuse
+
+- **WHEN** a person withdraws consent to their sessions reaching Langfuse Cloud
+- **THEN** this assumption is void for that person until a change stops their spans reaching Langfuse, or turns the flag off
+
+### Requirement: A207 — The collector's fan-out returns every branch's error as read at 0.155.0
+
+It is true of otelcol-contrib 0.155.0, independent of what this fleet builds, that a pipeline exporting to several consumers clones the data for a mutating one and returns all their errors together, that a queue consumer holds its batch for the whole retry, and that a batch grows to `max_size` while every consumer is busy.
+Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL lose its discharge once the violation below is observed.
+
+**Evidence**: the module sources of 0.155.0 in its Go module cache: `internal/fanoutconsumer@v0.155.0` `traces.go:47-74`; `exporterhelper@v0.155.0` `internal/queuebatch/partition_batcher.go:79-206,289-320` (merging under `min_size`, flush blocking on the worker pool) and `internal/queue/persistent_queue.go:271-280,394-420` (in-flight bytes count until done); `otlphttpexporter@v0.155.0` `otlp.go:229-273` (401, 403 and 413 permanent; 429, 502, 503, 504 retried). `fleet-ingress`'s `langfuse` case shows the drops and that nothing is refused at `otlp/local`.
+
+#### Scenario: A release isolates or couples fan-out differently
+
+- **WHEN** the packaged collector differs from 0.155.0 and the fan-out, the batcher or the retry classification changes
+- **THEN** this assumption is void, the Langfuse branch's drain bound is recomputed, and the `langfuse` case is rerun before the flag stays on
 
 ## MODIFIED Requirements
 

@@ -2,8 +2,9 @@
 # endpoint every five minutes (ADR-003 R3.2; S4 design D7).
 #
 # flake.lib.otelEnvelope pkgs { hostName; telemetryUrl; targets; exporters;
-# ingress; budget; darwinMemory; } is otel-envelope.service's ExecStart, and
-# on darwin the program of the otel-envelope launchd job. `targets` is a
+# ingress; budget; darwinMemory; sendFailedExempt; } is otel-envelope.service's
+# ExecStart, and on darwin the program of the otel-envelope launchd job.
+# `targets` is a
 # list of { job; url; credential ? null; }, the collector's own scrape
 # targets; a target with a credential is probed with `Authorization: Bearer`
 # read from $CREDENTIALS_DIRECTORY/<credential> and passed to curl on stdin.
@@ -27,7 +28,14 @@
 #   back-pressure that the agents' queues absorb, the agent-session
 #   collector's included (agent-session-telemetry design D14); a full store
 #   queue fails C3. The otlp/loopback line is rendered only into the
-#   ingress's script, so no other host's script changes.
+#   ingress's script, so no other host's script changes. With
+#   `sendFailedExempt`, a list of exporter names, those exporters'
+#   otelcol_exporter_send_failed_* are not loss, and nothing else of theirs
+#   is exempt: the agent-session collector's Langfuse exporter, whose sends
+#   fail whenever Langfuse is down or its quota blocks ingestion
+#   (agent-session-telemetry design D16). Its enqueue failures still are:
+#   they mean the fan-out refused spans at otlp/local. The lines are
+#   rendered only where the list is non-empty.
 # - C5 memory (darwin, with `darwinMemory` = { launchctl; top; limits; }):
 #   launchd bounds no memory, so each label of `limits` whose job prints a
 #   pid in `launchctl print system/<label>` has its physical footprint read
@@ -350,6 +358,7 @@ in
       ingress ? false,
       budget ? null,
       darwinMemory ? null,
+      sendFailedExempt ? [ ],
     }:
     pkgs.writeShellApplication {
       name = "otel-envelope";
@@ -500,6 +509,16 @@ in
                   # mutant: loopbackRefusalIsLoss
                   if [[ $series == otelcol_receiver_refused_*'receiver="otlp/loopback"'* ]]; then continue; fi''
               )
+            }${
+              lib.concatMapStrings (
+                exporter:
+                "\n"
+                + ''
+                  # mutant: sendFailedExemptAnyExporter
+                  if [[ $series == *'exporter="${exporter}"'* ]] &&
+                    # mutant: sendFailedExemptAnySignal
+                    [[ $series == otelcol_exporter_send_failed_* ]]; then continue; fi''
+              ) sendFailedExempt
             }
             key=$(printf '%s' "$series" | normalise)
             was=$(prev "$key")

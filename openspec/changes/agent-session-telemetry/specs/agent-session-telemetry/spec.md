@@ -21,11 +21,11 @@ Every agent session a person runs on an agent-telemetry host, and every agent se
 - **WHEN** a person's consent is withdrawn
 - **THEN** that person's sessions are no longer discharged by this requirement until a change removes them from collection
 
-### Requirement: Session content is readable by every store reader and only by them
+### Requirement: Session content is readable by every store reader and, where flagged, by the Langfuse project
 
-The fleet SHALL keep session content where every reader of the telemetry store may read it and no one else may, and no Omnigent worker SHALL hold a store credential.
+The fleet SHALL keep session content where every reader of the telemetry store may read it, and SHALL send it nowhere else except, from hosts whose row sets `langfuse`, the same spans to the Langfuse Cloud project whose keys the fleet holds; no Omnigent worker SHALL hold a store or Langfuse credential.
 
-**Discharged by**: `telemetry-store` requirement `Only the collector writes and only named readers read`; `agent-session-telemetry-interface` requirement `The emitters exist only where the collector listens for them` (workers receive an endpoint, never a credential); resting on world assumptions `A188 — The telemetry store authorizes reads by a global mode, not by database` and `A189 — The group has consented to its agent sessions being recorded and read by the group`.
+**Discharged by**: `telemetry-store` requirement `Only the collector writes and only named readers read`; `agent-session-telemetry-interface` requirements `The emitters exist only where the collector listens for them` (workers receive an endpoint, never a credential), `Langfuse gets the store's spans after every stage, under its own names` and `Langfuse's keys are a shared clan var loaded as credentials`; resting on world assumptions `A188 — The telemetry store authorizes reads by a global mode, not by database`, `A189 — The group has consented to its agent sessions being recorded and read by the group` and `A206 — The group consents to its agent sessions going to Langfuse Cloud`.
 
 #### Scenario: A dashboard reader queries session events
 
@@ -36,6 +36,11 @@ The fleet SHALL keep session content where every reader of the telemetry store m
 
 - **WHEN** an Omnigent worker's home configuration is evaluated on an agent-telemetry host
 - **THEN** it holds the loopback endpoint and no store credential
+
+#### Scenario: A Langfuse project member opens a session
+
+- **WHEN** a member of the Langfuse project opens a trace sent from magnetite or pyrite
+- **THEN** they see the same prompts, outputs and tool output the store holds, masked and cut alike, grouped by session and person; hosts without the flag send nothing there
 
 ### Requirement: Only allow-listed session content leaves a host
 

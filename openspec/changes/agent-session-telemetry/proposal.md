@@ -42,11 +42,12 @@ Nobody can see what the fleet's agent sessions do. Claude Code and omp run in he
 magnetite and pyrite; every human user's sessions and every omnigent worker there, Janette's included; Claude Code metrics and events; omp's two admitted metrics.
 
 ### Non-goals
-Claude Code's traces (its events carry its content); stibnite (its loopback receiver needs the operator's console deploy); Claude's cloud sessions and claude-sandbox; Langfuse; a public ingest endpoint; tool output and raw API bodies; omp's log records; omp's earlier conversation history on each span, of which only the newest prompt is kept (design D6, which includes omp's spans through GreptimeDB 1.2.1's `greptime_trace_v1`).
+Claude Code's traces (its events carry its content); stibnite (its loopback receiver needs the operator's console deploy); Claude's cloud sessions and claude-sandbox; a self-hosted Langfuse (design D16 sends the agent spans to Langfuse Cloud as an experiment, per host flag); a public ingest endpoint; tool output and raw API bodies; omp's log records; omp's earlier conversation history on each span, of which only the newest prompt is kept (design D6, which includes omp's spans through GreptimeDB 1.2.1's `greptime_trace_v1`).
 
 ### Operator decisions recorded, and what still needs ratification
 - Content (decided 2026-11-22): option C, shared content under an organisational model; options B and D are recorded in brainstorm.md.
 - Consent (stated 2026-11-22): everyone in the group was notified and consented; recorded as world assumption A189.
+- Langfuse Cloud (decided 2026-11-22, design D16): all users' agent spans also go to Langfuse Cloud (EU, Hobby) from magnetite and pyrite, after the same filters, cut and masking; the group's consent extended by the operator to this third-party processor (A206).
 - ADR-008's content exclusion and its Q3 consent clause: amended by the operator's decision.
 - The remaining ADR amendments (ADR-003 items 3 and the buffering envelope; ADR-004's emitters, resource keys, never-stored list, label bans and the `agent` budget row; ADR-008's loopback stage and worker posture) are written in design.md as exact edits pending ratification; a task applies them after it.
 

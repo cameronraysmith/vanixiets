@@ -686,6 +686,41 @@
           table = "agent_span";
         };
 
+        # Langfuse Cloud, the second destination of the agent spans
+        # (agent-session-telemetry design D16), fed after every allow-list,
+        # cut and mask above. Its OTLP contract: traces only, HTTP only, at
+        # <endpoint>/v1/traces, with HTTP Basic auth (public key, secret key)
+        # and the ingestion-version header, each request under 5 MB (Langfuse
+        # docs faq/all/api-limits.mdx:17-19; integrations/native/
+        # opentelemetry/index.mdx:28-58). Its exporter retries for
+        # retryMinutes and then drops: a consumer holds its batch for the
+        # whole retry, so while Langfuse is down the queue drains at
+        # consumers x batchBytes per retryMinutes, which the agent role
+        # asserts is at least drainMultiple x agentSpanBytesPerMinute, and
+        # holds at least twice the arrivals of one retry window. A full
+        # queue would refuse at otlp/local and so duplicate the store's
+        # spans when the emitters retry.
+        langfuse = {
+          endpoint = "https://cloud.langfuse.com/api/public/otel";
+          ingestionVersion = "4";
+          requestLimitBytes = 5000000;
+          retryMinutes = 5;
+          consumers = 10;
+          batchBytes = 3 * 1024 * 1024;
+          queueBytes = 32 * 1024 * 1024;
+          drainMultiple = 10;
+          # Claude Code's span that, after the allow-list, carries only a
+          # duration: one billable unit per tool call and nothing to read.
+          droppedSpans = [ "claude_code.tool.blocked_on_user" ];
+          # Claude Code's bare token counts, under the names Langfuse reads.
+          usageKeys = {
+            input_tokens = "gen_ai.usage.input_tokens";
+            output_tokens = "gen_ai.usage.output_tokens";
+            cache_read_tokens = "gen_ai.usage.cache_read.input_tokens";
+            cache_creation_tokens = "gen_ai.usage.cache_creation.input_tokens";
+          };
+        };
+
         # Credential shapes masked to `****` in every kept string of spans
         # (their status message too) and events, after the allow-lists and
         # the 64 KiB cut (design D15): RE2, one alternative each, from

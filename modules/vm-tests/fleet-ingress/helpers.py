@@ -6,6 +6,7 @@
 import base64
 import datetime as dt
 import json
+import os
 import re
 import shlex
 import time
@@ -163,7 +164,7 @@ def collector_with(unit, mutant, wait=True):
     store.succeed("systemctl daemon-reload")
     if wait:
         store.succeed(f"systemctl restart {unit}.service")
-        wait_telemetry(INGRESS_PORT if unit == INGRESS else AGENT_PORT)
+        wait_telemetry({INGRESS: INGRESS_PORT, AGENT: AGENT_PORT, SESSION: SESSION_PORT}[unit])
     else:
         store.execute(f"systemctl restart {unit}.service")
 
@@ -211,6 +212,41 @@ def wait_for(predicate, what, timeout):
     while not predicate():
         assert time.monotonic() < deadline, f"timed out after {timeout} s waiting for {what}"
         time.sleep(5)
+
+
+# Langfuse Cloud's stand-in (agent-session-telemetry design D16).
+def sink_mode(mode):
+    """Set the sink's answer: ok, 403, 429 or 413."""
+    store.succeed(f"printf %s {mode} > {config()['sinkDir']}/mode")
+
+
+def sink_records(marker=None):
+    """The sink's recorded requests, those whose text holds marker if given."""
+    code, text = store.execute(f"cat {config()['sinkDir']}/requests.jsonl")
+    if code != 0:
+        return []
+    return [json.loads(line) for line in text.splitlines() if line.strip() and (marker is None or marker in line)]
+
+
+def sink_spans(records):
+    """{span id (hex): (resource attributes, span attributes, span)} over
+    the records' decoded requests; AnyValues as MessageToDict renders them."""
+    spans = {}
+    for record in records:
+        for rs in record["request"].get("resourceSpans", []):
+            resource = {a["key"]: a.get("value", {}) for a in rs.get("resource", {}).get("attributes", [])}
+            for ss in rs.get("scopeSpans", []):
+                for span in ss.get("spans", []):
+                    attributes = {a["key"]: a.get("value", {}) for a in span.get("attributes", [])}
+                    spans[base64.b64decode(span["spanId"]).hex()] = (resource, attributes, span)
+    return spans
+
+
+def langfuse_basic():
+    """The Basic credential of the test's Langfuse key pair."""
+    public = store.succeed(f"cat {config()['vars']}/langfuse-public-key")
+    secret = store.succeed(f"cat {config()['vars']}/langfuse-secret-key")
+    return "Basic " + base64.b64encode(f"{public}:{secret}".encode()).decode()
 
 
 start_all()

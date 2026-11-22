@@ -287,3 +287,52 @@ This capability SHALL state what its properties guarantee and what they do not, 
 
 - **WHEN** someone asks whether omp's content level, traces endpoint or buffer bound are enforced
 - **THEN** the answer is no: a project `.env` in a session's working directory overrides `~/.omp/agent/.env` (world assumption `A197 — A project's environment file overrides omp's own`); the collector's allow-lists still bound what leaves the host
+
+### Requirement: Langfuse gets the store's spans after every stage, under its own names
+
+Where a host's `flake.lib.observabilityHosts` row sets `langfuse`, and only there, the agent-session collector SHALL send to Langfuse Cloud the spans `traces/agent-session` exports, after its last stage, with input, output and token counts under Langfuse's keys, without `vanixiets.*` resource attributes or `claude_code.tool.blocked_on_user` spans; none of those renames SHALL reach the store.
+
+**Discharged by**: `checks.x86_64-linux.otel-collector-config`'s Langfuse path clause with mutants `langfuseBeforeMask`, `langfuseFromLocal`, `langfuseRoutingKept` and `langfuseWithoutFlag`; `vmTests.x86_64-linux.fleet-ingress`'s `agentSpans` case, whose stand-in sink receives the store's thirteen spans and its `langfuse` case, and the uncommitted mutant `langfuseBeforeMask`; resting on world assumptions `A205 — Langfuse Cloud ingests OTLP traces as read on 2026-11-22` and `A207 — The collector's fan-out returns every branch's error as read at 0.155.0`.
+
+#### Scenario: The canary spans are sent
+
+- **WHEN** the VM test posts omp and Claude Code spans carrying planted credentials, over-long values and a link
+- **THEN** the sink receives exactly the spans the store stores, masked and cut alike, with the test key pair's Basic credential and `x-langfuse-ingestion-version: 4`, prompts, outputs and token counts under Langfuse's keys, and the store's tap holds no `langfuse.` key
+
+#### Scenario: The fan-out is moved before the mask
+
+- **WHEN** Langfuse's branch is fed before `transform/agent-session-mask`
+- **THEN** the configuration check rejects it, and the VM test fails with a planted credential reaching the sink
+
+### Requirement: Langfuse's branch cannot cost the store's spans
+
+A slow, failing, rate-limited, blocked, oversized-refused or unreachable Langfuse SHALL NOT refuse, delay or duplicate a span on the store's path or return an error to an emitter: the branch SHALL have no limiter and no error-propagating stage, retry for 5 minutes and then drop, and drain at least ten times faster than the assumed span rate into a queue of twice a retry window.
+
+**Discharged by**: the agent role's assertion on `otlp_http/langfuse`; `checks.x86_64-linux.otel-collector-config`'s Langfuse exporter clause with mutants `langfuseRetryForever`, `storeSpansRetryFinite`, `langfuseQueueShort`, `langfuseDrainSlow`, `langfuseBatchOverLimit`, `langfuseWithLimiter`, `langfuseTransformPropagates` and `agentQueuesOver512`; `vmTests.x86_64-linux.fleet-ingress`'s `langfuse` case; resting on world assumptions `A205 — Langfuse Cloud ingests OTLP traces as read on 2026-11-22` and `A207 — The collector's fan-out returns every branch's error as read at 0.155.0`.
+
+#### Scenario: Langfuse is down, blocks, throttles or refuses the size
+
+- **WHEN** the VM test's sink is stopped, then answers 403, 429 and 413, and a batch is posted in each state
+- **THEN** each POST answers 200, the store holds each batch exactly once, `otlp/local` refuses nothing, Langfuse's queue never refuses and empties, and the exporter drops the batch at once for 403 and 413 and at the retry limit, after retrying, for the others
+
+### Requirement: Langfuse's failed sends do not page, a refusing fan-out does
+
+`otel-agent-session-envelope` SHALL leave only `otlp_http/langfuse`'s failed sends out of its loss clause; that exporter's enqueue failures, its queue at 90 % and `otlp/local`'s refusals SHALL still fail it.
+
+**Discharged by**: `checks.x86_64-linux.otel-envelope`'s cases `langfuseSendFailed`, `langfuseEnqueueFailed` and `langfuseStoreSendFailed` with mutants `sendFailedExemptAnyExporter` and `sendFailedExemptAnySignal`.
+
+#### Scenario: Langfuse's quota blocks ingestion
+
+- **WHEN** Langfuse answers 403 to every request for a day
+- **THEN** no envelope run fails and nothing is posted; the agent unit's `otelcol_exporter_send_failed_spans{exporter="otlp_http/langfuse"}` shows it
+
+### Requirement: Langfuse's keys are a shared clan var loaded as credentials
+
+The Langfuse project's public and secret keys SHALL be the shared clan var `langfuse`, entered at hidden persisted prompts, deployed only to hosts whose row sets `langfuse`, each of them a recipient, and read by `otel-agent-session.service` from its credentials directory; no key SHALL appear in the configuration, a command line or the repository in clear.
+
+**Discharged by**: the agent role's generator and `LoadCredential`; `flake.lib.sharedVarsObligations` on the machine checks; `checks.x86_64-linux.otel-collector-config`'s Langfuse exporter clause with mutant `langfuseKeyInline`; `checks.x86_64-linux.gitleaks`.
+
+#### Scenario: A host without the flag is evaluated
+
+- **WHEN** cinnabar or electrum is evaluated
+- **THEN** it declares no `langfuse` generator and loads no Langfuse credential

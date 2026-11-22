@@ -17,6 +17,10 @@
 # D14); its row also lists that unit and its envelope among the notified
 # units, which the agent role asserts. It is a NixOS option only, so a
 # darwin row keeps it false.
+# A NixOS host's `langfuse`, which requires its `agentTelemetry`, also fans
+# that collector's filtered, capped and masked agent spans out to Langfuse
+# Cloud (agent-session-telemetry design D16); the agent role asserts the
+# requirement.
 { ... }:
 {
   flake.lib.observabilityHosts =
@@ -28,6 +32,7 @@
         smartDevices = [ ];
         textfile = false;
         agentTelemetry = false;
+        langfuse = false;
         notifiedUnits = [
           "opentelemetry-collector"
           "otel-envelope"
@@ -73,6 +78,7 @@
           alwaysOn = true;
           textfile = true;
           agentTelemetry = true;
+          langfuse = true;
         };
       cinnabar =
         agent [
@@ -91,6 +97,7 @@
         // {
           smartDevices = [ "/dev/nvme0" ];
           agentTelemetry = true;
+          langfuse = true;
         };
       electrum = agent [ ];
       galena = agent [ ];

@@ -135,6 +135,19 @@
             "otlp_http/ingress-traces"
           ];
         };
+        # With Langfuse (agent-session-telemetry design D16): its exporter's
+        # failed sends are not loss; its enqueue failures, and every other
+        # exporter's failed sends, still are.
+        agentSessionLangfuse = envelope {
+          hostName = "pyrite";
+          exporters = [
+            "otlp_http/ingress-agent"
+            "otlp_http/ingress-metrics"
+            "otlp_http/ingress-traces"
+            "otlp_http/langfuse"
+          ];
+          sendFailedExempt = [ "otlp_http/langfuse" ];
+        };
         budget = envelope {
           budget = {
             storeUrl = "http://127.0.0.1:${toString closedStorePort}";
@@ -277,6 +290,20 @@
           variants = [ "budgetAgent" ];
           from = ''if [ "$series" -gt ${toString self.lib.otelCollectorSchema.budget.agentActiveSeries} ]; then'';
           to = "if false; then";
+        };
+        # The exemption is for Langfuse's exporter alone, and for its failed
+        # sends alone (design D16).
+        sendFailedExemptAnyExporter = {
+          case = "langfuseStoreSendFailed";
+          variants = [ "agentSessionLangfuse" ];
+          from = ''if [[ $series == *'exporter="otlp_http/langfuse"'* ]] &&'';
+          to = "if true &&";
+        };
+        sendFailedExemptAnySignal = {
+          case = "langfuseEnqueueFailed";
+          variants = [ "agentSessionLangfuse" ];
+          from = "[[ $series == otelcol_exporter_send_failed_* ]]; then continue; fi";
+          to = "true; then continue; fi";
         };
       };
       mutate = name: m: if m.source or false then mutateSource name m else mutateScript name m;
@@ -451,6 +478,30 @@
           s=$(mktemp -d)
           run agentSession "$s" agent-session-healthy down 0 && run agentSession "$s" agent-session-local-refused down 1 \
             && grep -q '^otel-envelope: C4 loss: FAIL .*receiver="otlp/local".* +40' "$work/out"
+        }
+        # Langfuse down or its quota reached: its failed sends page no one.
+        case_langfuseSendFailed() {
+          local s
+          s=$(mktemp -d)
+          run agentSessionLangfuse "$s" agent-session-langfuse-healthy down 0 \
+            && run agentSessionLangfuse "$s" agent-session-langfuse-send-failed down 0 \
+            && ! grep -q ': FAIL' "$work/out"
+        }
+        # Its queue refusing would mean the fan-out refused: loss.
+        case_langfuseEnqueueFailed() {
+          local s
+          s=$(mktemp -d)
+          run agentSessionLangfuse "$s" agent-session-langfuse-healthy down 0 \
+            && run agentSessionLangfuse "$s" agent-session-langfuse-enqueue-failed down 1 \
+            && grep -q '^otel-envelope: C4 loss: FAIL .*enqueue_failed_spans{exporter="otlp_http/langfuse"}.* +5' "$work/out"
+        }
+        # The store's failed sends stay loss beside the exemption.
+        case_langfuseStoreSendFailed() {
+          local s
+          s=$(mktemp -d)
+          run agentSessionLangfuse "$s" agent-session-langfuse-healthy down 0 \
+            && run agentSessionLangfuse "$s" agent-session-langfuse-store-send-failed down 1 \
+            && grep -q '^otel-envelope: C4 loss: FAIL .*send_failed_spans{exporter="otlp_http/ingress-traces"}.* +3' "$work/out"
         }
         case_resetAfterRecorded() {
           local s
@@ -699,6 +750,9 @@
         "ingressLoopbackRefused"
         "agentSessionHealthy"
         "agentSessionLocalRefused"
+        "langfuseSendFailed"
+        "langfuseEnqueueFailed"
+        "langfuseStoreSendFailed"
         "resetAfterRecorded"
         "resetThenFailure"
         "targetDownOnce"

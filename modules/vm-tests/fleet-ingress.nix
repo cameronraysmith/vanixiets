@@ -20,6 +20,11 @@
 #     127.0.0.1:4318, its exporters pointed at otlp/mesh under the test CA
 #     and its telemetry on 127.0.0.1:8890 (agent-session-telemetry design
 #     D12, D14);
+#   - langfuse-sink.service, fleet-ingress/langfuse_sink.py, standing in for
+#     Langfuse Cloud on 127.0.0.1:4330: pyrite's Langfuse exporter points
+#     there with a test key pair and a 20 s retry limit, so the agentSpans
+#     and langfuse cases see what Langfuse would receive and the branch's
+#     failures (agent-session-telemetry design D16);
 #   - the store's agent.session_event table and pipeline as magnetite
 #     declares them, and a file exporter on the ingress's logs/ingress that
 #     records every log record crossing the mesh, for the canary;
@@ -70,6 +75,7 @@
               "greptimedb.service"
               "greptimedb-schema.service"
               "opentelemetry-collector.service"
+              "otel-agent-session.service"
             ];
 
             # electrum's collector configuration as the agent role renders it
@@ -175,9 +181,21 @@
               ) "fleet-ingress: the pre-D15 agent_span is not main's (72f782b8) CREATE";
               table;
             agentSessionState = "/var/lib/otel-agent-session";
+            # Langfuse Cloud's stand-in (agent-session-telemetry design D16):
+            # fleet-ingress/langfuse_sink.py on loopback, answering as the
+            # case sets its mode, and recording what it received.
+            sinkPort = 4330;
+            sinkDir = "/run/langfuse-sink";
+            # The test shortens Langfuse's retry limit so that the drop at the
+            # limit is observed within the case; everything else of the
+            # exporter is pyrite's.
+            langfuseTestRetry = "20s";
             agentSessionSettings =
               let
                 pipelines = pyriteSession.service.pipelines;
+                storePipelines = builtins.removeAttrs pipelines [ "traces/langfuse" ];
+                storeExporters = builtins.removeAttrs pyriteSession.exporters [ "otlp_http/langfuse" ];
+                langfuse = pyriteSession.exporters."otlp_http/langfuse";
               in
               assert lib.assertMsg
                 (
@@ -185,12 +203,14 @@
                     "logs/agent-session"
                     "metrics/agent-session"
                     "traces/agent-session"
+                    "traces/langfuse"
                   ]
-                  && lib.all (pipeline: pipeline.receivers == [ "otlp/local" ]) (lib.attrValues pipelines)
+                  && lib.all (pipeline: pipeline.receivers == [ "otlp/local" ]) (lib.attrValues storePipelines)
+                  && pipelines."traces/langfuse".receivers == [ "forward/langfuse" ]
                   && pyriteSession.receivers == { "otlp/local".protocols.http.endpoint = "127.0.0.1:4318"; }
                   && pyriteSession.extensions.file_storage.directory == "${agentSessionState}/queue"
                 )
-                "fleet-ingress: pyrite's agent-session collector is not otlp/local alone on 127.0.0.1:4318 feeding its three pipelines, with its queue under ${agentSessionState}";
+                "fleet-ingress: pyrite's agent-session collector is not otlp/local alone on 127.0.0.1:4318 feeding its three pipelines and forward/langfuse traces/langfuse, with its queue under ${agentSessionState}";
               pyriteSession
               // {
                 exporters =
@@ -203,24 +223,39 @@
                         ca_file = "${pki}/ca.crt";
                       };
                     }
-                  ) pyriteSession.exporters
-                  # What leaves the host, beside each pipeline's own exporter,
-                  # one JSON export per line, so the canary reads it before the
-                  # store's pipeline closes the columns again.
+                  ) storeExporters
+                  // {
+                    "otlp_http/langfuse" = langfuse // {
+                      endpoint = "http://127.0.0.1:${toString sinkPort}/api/public/otel";
+                      retry_on_failure = langfuse.retry_on_failure // {
+                        max_elapsed_time = langfuseTestRetry;
+                        # The collector refuses a limit below the interval.
+                        max_interval = "5s";
+                      };
+                    };
+                  }
+                  # What leaves the host for the store, beside each store
+                  # pipeline's own exporter, one JSON export per line, so the
+                  # canary reads it before the store's pipeline closes the
+                  # columns again.
                   // lib.mapAttrs' (
                     name: _:
                     lib.nameValuePair "file/tap-${lib.removeSuffix "/agent-session" name}" {
                       path = "${agentSessionState}/tap-${lib.removeSuffix "/agent-session" name}.jsonl";
                     }
-                  ) pipelines;
+                  ) storePipelines;
                 service = pyriteSession.service // {
-                  pipelines = lib.mapAttrs (
-                    name: pipeline:
-                    pipeline
+                  pipelines =
+                    lib.mapAttrs (
+                      name: pipeline:
+                      pipeline
+                      // {
+                        exporters = pipeline.exporters ++ [ "file/tap-${lib.removeSuffix "/agent-session" name}" ];
+                      }
+                    ) storePipelines
                     // {
-                      exporters = pipeline.exporters ++ [ "file/tap-${lib.removeSuffix "/agent-session" name}" ];
-                    }
-                  ) pipelines;
+                      inherit (pipelines) "traces/langfuse";
+                    };
                 };
               };
             agentExecStart =
@@ -1370,7 +1405,189 @@
               failed = {port: metric(port, r"otelcol_exporter_send_failed_[a-z_]+") for port in (INGRESS_PORT, SESSION_PORT)}
               print(f"  send_failed {failed}", flush=True)
               assert failed == {INGRESS_PORT: 0, SESSION_PORT: 0}, failed
+
+              # Langfuse (design D16): the same thirteen spans, after the same
+              # stages, with the test key pair and the ingestion version, and
+              # Langfuse's names; none of them reaches the store.
+              assert "langfuse." not in tap, "a Langfuse attribute reached the store's exporter"
+              wait_for(lambda: set(sink_spans(sink_records(NONCE))) >= set(spans), "the thirteen spans at the Langfuse sink", 120)
+              records = sink_records(NONCE)
+              basic = langfuse_basic()
+              for r in records:
+                  assert (r["path"], r["authorization"] == basic, r["ingestion_version"], r["content_type"]) == (
+                      "/api/public/otel/v1/traces", True, "4", "application/x-protobuf"), (r["path"], r["ingestion_version"], r["content_type"])
+              lf = sink_spans(records)
+              print(f"  Langfuse sink: {len(records)} request(s), {len(lf)} spans, {sum(r['bytes'] for r in records)} bytes", flush=True)
+              assert set(lf) == set(spans), sorted(set(lf) ^ set(spans))
+              blob = json.dumps(records)
+              for what, tail in tails.items():
+                  assert tail not in blob, f"{what} reached Langfuse unmasked"
+              for what, value in canary.items():
+                  assert (value in blob) == (what in admitted), (what, value in blob)
+              for key in ("vanixiets.", "last_user_message", "user_prompt", "\"input_tokens\"", "\"cache_read_tokens\"", "links", "canary.link"):
+                  assert key not in blob, key
+
+
+              def text(attributes, key):
+                  return attributes.get(key, {}).get("stringValue")
+
+
+              for span_id, (resource, attributes, span) in lf.items():
+                  assert text(resource, "user.name") == "cameron" and text(resource, "host.name") == "pyrite", (span_id, resource)
+                  for key, value in attributes.items():
+                      assert len((value.get("stringValue") or "").encode()) <= 65536, (span_id, key)
+              chat_lf, tool_lf = lf["eee19b7ec3c1b174"][1], lf["eee19b7ec3c1b175"][1]
+              assert text(chat_lf, "langfuse.observation.input") == canary["prompt"], chat_lf.keys()
+              assert canary["response"] in text(chat_lf, "langfuse.observation.output") and "gen_ai.output.messages" not in chat_lf
+              assert chat_lf["gen_ai.usage.input_tokens"] == {"intValue": "42"} and text(chat_lf, "gen_ai.conversation.id") == f"session-{NONCE}"
+              # omp's tool span: Langfuse reads its arguments and result.
+              assert not any(k.startswith("langfuse.") for k in tool_lf), tool_lf.keys()
+              assert text(tool_lf, "gen_ai.tool.call.result").count("****") == 2 and canary["arguments"] in text(tool_lf, "gen_ai.tool.call.arguments")
+              interaction_lf, llm_lf, bash_lf, read_lf = (lf[f"aaa19b7ec3c1b10{n}"][1] for n in range(1, 5))
+              assert text(interaction_lf, "langfuse.observation.input") == canary["user prompt"], interaction_lf.keys()
+              assert text(interaction_lf, "session.id") == canary["claude session"]
+              assert [llm_lf.get(k) for k in ("gen_ai.usage.input_tokens", "gen_ai.usage.output_tokens", "gen_ai.usage.cache_read.input_tokens",
+                                              "gen_ai.usage.cache_creation.input_tokens")] == [{"intValue": v} for v in ("100", "50", "7", "3")], llm_lf
+              assert text(bash_lf, "langfuse.observation.input") == f"echo {canary['command']}", bash_lf.keys()
+              assert text(bash_lf, "langfuse.observation.output") == f"{canary['bash output']}\nAuthorization: ****\n****", bash_lf.keys()
+              assert "gen_ai.tool.call.result" not in bash_lf
+              assert text(read_lf, "langfuse.observation.input") == canary["path"] and text(read_lf, "langfuse.observation.output") == f"{canary['read content']}\n****"
+              print("  Langfuse: the store's spans, masked and cut, under Langfuse's names; none reached the store", flush=True)
               print("ok: agentSpans", flush=True)
+            '';
+
+            # Langfuse's branch cannot cost the store anything (design D16).
+            # With the sink down, then answering 403, 429 and 413: the
+            # emitter's POST succeeds, otlp/local refuses nothing, the store
+            # holds each batch exactly once, Langfuse's queue never refuses,
+            # and the exporter drops the batch: at once for a permanent answer,
+            # at the test's retry limit for a retryable one, after retrying
+            # within it. Claude's blocked_on_user span reaches the store, not
+            # Langfuse.
+            langfuse = ''
+              print("=== case langfuse", flush=True)
+              fresh_start()
+              store.succeed("systemctl start langfuse-sink.service")
+              sink_mode("ok")
+              store.succeed(f"systemctl restart {SESSION}.service")
+              wait_telemetry(SESSION_PORT)
+              RETRY = int(config()["langfuseTestRetry"].removesuffix("s"))
+              CAPACITY = 32 * 1024 * 1024
+
+
+              def lf_metric(name):
+                  return metric(SESSION_PORT, name, {"exporter": "otlp_http/langfuse"})
+
+
+              def counters():
+                  return {
+                      "refused": metric(SESSION_PORT, r"otelcol_receiver_refused_[a-z_]+", {"receiver": "otlp/local"}),
+                      "enqueue_failed": metric(SESSION_PORT, r"otelcol_exporter_enqueue_failed_[a-z_]+"),
+                      "store_send_failed": metric(SESSION_PORT, r"otelcol_exporter_send_failed_[a-z_]+", {"exporter": "otlp_http/ingress-traces"}),
+                      "langfuse_send_failed": lf_metric("otelcol_exporter_send_failed_spans"),
+                      "langfuse_sent": lf_metric("otelcol_exporter_sent_spans"),
+                  }
+
+
+              def a(key, value):
+                  return {"key": key, "value": {"stringValue": value}}
+
+
+              def lf_post(nonce, spans, service="oh-my-pi"):
+                  body = {"resourceSpans": [{"resource": {"attributes": [a("service.name", service), a("user.name", "cameron")]},
+                                             "scopeSpans": [{"spans": spans}]}]}
+                  store.succeed(f"cat > /tmp/langfuse-{nonce}.json <<'EOF'\n{json.dumps(body)}\nEOF")
+                  return store.succeed(
+                      "curl -sS -o /dev/null -w '%{http_code}' -H 'Content-Type: application/json' "
+                      f"--data @/tmp/langfuse-{nonce}.json http://127.0.0.1:4318/v1/traces"
+                  ).strip()
+
+
+              def omp_tools(nonce, n):
+                  now = time.time_ns()
+                  trace = os.urandom(16).hex()
+                  return [{"traceId": trace, "spanId": os.urandom(8).hex(), "name": "execute_tool bash", "kind": 1,
+                           "startTimeUnixNano": str(now - 1000000), "endTimeUnixNano": str(now),
+                           "attributes": [a("gen_ai.operation.name", "execute_tool"), a("gen_ai.conversation.id", nonce),
+                                          a("gen_ai.tool.call.arguments", json.dumps({"command": f"echo {nonce} {i}"})),
+                                          a("gen_ai.tool.call.result", f"{nonce} result {i}")]} for i in range(n)]
+
+
+              def lf_stored(nonce, column="gen_ai.conversation.id"):
+                  return gsql(f"SELECT count(*) FROM agent_span WHERE \"span_attributes.{column}\" = '{nonce}'", "agent")[0][0]
+
+
+              # ok: a Claude tool and its blocked_on_user child; the child
+              # reaches the store but not Langfuse.
+              nonce = f"lfok{time.time_ns()}"
+              now = time.time_ns()
+              trace = os.urandom(16).hex()
+              claude = [
+                  {"traceId": trace, "spanId": "bbb19b7ec3c1b101", "name": "claude_code.tool", "kind": 1,
+                   "startTimeUnixNano": str(now - 3000000), "endTimeUnixNano": str(now),
+                   "attributes": [a("session.id", nonce), a("tool_name", "Bash"), a("full_command", f"echo {nonce}")]},
+                  {"traceId": trace, "spanId": "bbb19b7ec3c1b102", "parentSpanId": "bbb19b7ec3c1b101",
+                   "name": "claude_code.tool.blocked_on_user", "kind": 1,
+                   "startTimeUnixNano": str(now - 3000000), "endTimeUnixNano": str(now - 2000000),
+                   "attributes": [a("session.id", nonce), a("decision", "accept")]},
+              ]
+              assert lf_post(nonce, claude, "claude-code") == "200"
+              wait_for(lambda: lf_stored(nonce, "session.id") == 2, "both Claude spans in the store", 120)
+              wait_for(lambda: "bbb19b7ec3c1b101" in sink_spans(sink_records(nonce)), "the Claude tool span at the sink", 120)
+              time.sleep(12)
+              assert set(sink_spans(sink_records(nonce))) == {"bbb19b7ec3c1b101"}, sink_spans(sink_records(nonce)).keys()
+              print("  ok: blocked_on_user stored, not sent to Langfuse", flush=True)
+
+              results = {}
+              for mode in ("down", "403", "429", "413"):
+                  if mode == "down":
+                      store.succeed("systemctl stop langfuse-sink.service")
+                  else:
+                      sink_mode(mode)
+                      store.succeed("systemctl start langfuse-sink.service")
+                      store.wait_until_succeeds(f"bash -c 'echo > /dev/tcp/127.0.0.1/{config()['sinkPort']}'", timeout=30)
+                  before = counters()
+                  nonce = f"lf{mode}{time.time_ns()}"
+                  status = lf_post(nonce, omp_tools(nonce, 5))
+                  posted = time.monotonic()
+                  assert status == "200", (mode, status)
+                  wait_for(lambda: lf_stored(nonce) == 5, f"the {mode} batch in the store", 120)
+                  peak = 0
+                  while True:
+                      current = counters()
+                      peak = max(peak, lf_metric("otelcol_exporter_queue_size"))
+                      if current["langfuse_send_failed"] - before["langfuse_send_failed"] >= 5:
+                          break
+                      assert time.monotonic() - posted < 180, (mode, current, before)
+                      time.sleep(1)
+                  dropped_after = time.monotonic() - posted
+                  wait_for(lambda: lf_metric("otelcol_exporter_queue_size") == 0, f"Langfuse's queue empty after {mode}", 60)
+                  time.sleep(10)
+                  after = counters()
+                  attempts = len(sink_records(nonce))
+                  r = {"status": status, "stored": lf_stored(nonce), "dropped_after_s": round(dropped_after, 1),
+                       "attempts": attempts, "queue_peak_bytes": peak, **{k: after[k] - before[k] for k in after}}
+                  results[mode] = r
+                  print(f"  {mode}: {json.dumps(r)}", flush=True)
+                  # The store's path untouched: once each, nothing refused.
+                  assert r["stored"] == 5 and r["refused"] == 0 and r["enqueue_failed"] == 0 and r["store_send_failed"] == 0, (mode, r)
+                  assert r["langfuse_send_failed"] == 5 and r["langfuse_sent"] == 0 and 0 <= peak < CAPACITY, (mode, r)
+                  if mode in ("403", "413"):
+                      # Permanent: one attempt, dropped at once (the batch
+                      # leaves within its 10 s flush timeout).
+                      assert attempts == 1 and dropped_after < RETRY, (mode, r)
+                  else:
+                      # Retryable: retried, then dropped at the limit.
+                      assert dropped_after >= RETRY and (mode == "down" or attempts >= 2), (mode, r)
+
+              sink_mode("ok")
+              store.succeed("systemctl start langfuse-sink.service")
+              nonce = f"lfback{time.time_ns()}"
+              assert lf_post(nonce, omp_tools(nonce, 2)) == "200"
+              wait_for(lambda: len(sink_spans(sink_records(nonce))) == 2, "Langfuse again after the failures", 120)
+              wait_for(lambda: lf_stored(nonce) == 2, "the store again", 120)
+              print(f"  langfuse isolation: {json.dumps(results)}", flush=True)
+              print("ok: langfuse", flush=True)
             '';
 
             cases = [
@@ -1379,6 +1596,7 @@
               delivery
               agentSession
               agentSpans
+              langfuse
               backPressure
               lossControls
               crashLoop
@@ -1469,6 +1687,11 @@
                     done
                     # The notifier's token; the recording ntfy-send ignores it.
                     printf tk_fleetingress000000000000000000 > ${vars}/alerter-token
+                    # A Langfuse key pair of the right shape for this test
+                    # only, generated at boot: the sink checks the collector's
+                    # Basic credential against it, never against the real one.
+                    printf 'pk-lf-test-%s' "$(head -c 12 /dev/urandom | od -An -tx1 | tr -d ' \n')" > ${vars}/langfuse-public-key
+                    printf 'sk-lf-test-%s' "$(head -c 24 /dev/urandom | od -An -tx1 | tr -d ' \n')" > ${vars}/langfuse-secret-key
                   '';
                 };
                 systemd.services.greptimedb.serviceConfig.LoadCredential = [ "users:${vars}/users" ];
@@ -1557,8 +1780,33 @@
                       LoadCredential = [
                         "otel-cert:${pki}/agent.crt"
                         "otel-key:${pki}/agent.key"
+                        "langfuse-public-key:${vars}/langfuse-public-key"
+                        "langfuse-secret-key:${vars}/langfuse-secret-key"
                       ];
                     };
+                };
+
+                # Langfuse Cloud's stand-in (design D16), up from boot so that
+                # every case's spans reach it; the langfuse case stops it and
+                # sets its mode.
+                systemd.services.langfuse-sink = {
+                  description = "Stand-in for Langfuse Cloud's OTLP endpoint";
+                  wantedBy = [ "multi-user.target" ];
+                  before = [ "otel-agent-session.service" ];
+                  environment = {
+                    SINK_DIR = sinkDir;
+                    SINK_PORT = toString sinkPort;
+                  };
+                  serviceConfig = {
+                    ExecStartPre = "${pkgs.coreutils}/bin/mkdir -p ${sinkDir}";
+                    ExecStart = "${
+                      pkgs.python3.withPackages (p: [
+                        p.opentelemetry-proto
+                        p.protobuf
+                      ])
+                    }/bin/python3 ${./fleet-ingress/langfuse_sink.py}";
+                    Restart = "on-failure";
+                  };
                 };
 
                 systemd.services.agent-envelope = {
@@ -1590,6 +1838,9 @@
                       pki
                       agentDeployRecord
                       oldSpanTable
+                      sinkDir
+                      sinkPort
+                      langfuseTestRetry
                       ;
                     deployRecord = self.lib.deployRecordScript {
                       inherit pkgs;

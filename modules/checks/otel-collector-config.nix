@@ -228,6 +228,16 @@
           ap = a.processors or { };
           ae = a.exporters or { };
           agentPipelines = a.service.pipelines or { };
+          # Langfuse Cloud (design D16): its exporter is the one endpoint of
+          # the agent-session collector off loopback and outside the
+          # hand-off, and traces/langfuse the one pipeline not on otlp/local;
+          # the Langfuse clause below judges both.
+          lfName = "otlp_http/langfuse";
+          lf = i.schema.agentSession.langfuse;
+          lfOn = i.hosts.magnetite.langfuse or false;
+          lfx = ae.${lfName} or { };
+          storeExporters = builtins.removeAttrs ae [ lfName ];
+          storePipelines = builtins.removeAttrs agentPipelines [ "traces/langfuse" ];
           handoff = r."otlp/loopback".protocols.http or { };
           check = name: ok: lib.optional (!ok) name;
           dbs = lib.attrNames i.schema.databases;
@@ -478,7 +488,7 @@
                 )
                 ++ collectEndpoints e
                 ++ collectEndpoints ar
-                ++ collectEndpoints ae
+                ++ collectEndpoints storeExporters
                 ++ promTargets
                 ++ [ i.node.listenAddress ]
               )
@@ -513,14 +523,14 @@
                   "metrics/ingress"
                   "traces/ingress"
                 ]
-              && ae != { }
+              && storeExporters != { }
               && lib.all (
                 x:
                 (x.endpoint or null) == "https://${handoff.endpoint}"
                 && (x.tls.ca_file or null) == handoff.tls.client_ca_file
                 && (x.tls.server_name_override or null) == i.fqdn
                 && (x.sending_queue.num_consumers or null) == 1
-              ) (builtins.attrValues ae)
+              ) (builtins.attrValues storeExporters)
             )
           )
 
@@ -565,8 +575,12 @@
             "R3.1: a traces pipeline other than the agent-session collector's traces/agent-session into otlp_http/ingress-traces and the ingress's traces/ingress, or a span route not into agent.agent_span's declared columns through greptime_trace_v1 with auto_create_table=false, or a span column or index the schema job does not also add to an existing table"
             (
               tracesPipelineNames == [ "traces/ingress" ]
-              && agentTracesPipelineNames == [ "traces/agent-session" ]
-              && (agentPipelines."traces/agent-session".exporters or null) == [ "otlp_http/ingress-traces" ]
+              &&
+                sorted agentTracesPipelineNames
+                == sorted ([ "traces/agent-session" ] ++ lib.optional lfOn "traces/langfuse")
+              &&
+                (agentPipelines."traces/agent-session".exporters or null)
+                == [ "otlp_http/ingress-traces" ] ++ lib.optional lfOn "forward/langfuse"
               &&
                 sorted (pipelines."traces/ingress".receivers or [ ]) == [
                   "otlp/loopback"
@@ -645,7 +659,7 @@
                   "metrics/agent-session"
                   "traces/agent-session"
                 ]
-              && sorted (builtins.attrNames agentPipelines) == sorted localPipelines
+              && sorted (builtins.attrNames storePipelines) == sorted localPipelines
             )
           )
           # Isolation (design D14): the host's collector runs none of it, so
@@ -742,6 +756,90 @@
               # The prompt copy alone ignores its errors: what it could not
               # read, transform/agent-session-spans drops next.
               && (ap."transform/agent-session-prompt".error_mode or null) == "ignore"
+            )
+          )
+          # Langfuse Cloud (design D16): where observabilityHosts sets
+          # langfuse, and only there, traces/agent-session's spans, after its
+          # last stage, fan out through forward/langfuse to traces/langfuse
+          # alone, whose stages ignore their errors and include no limiter,
+          # so the branch cannot refuse what the store path took.
+          (check
+            "R3.1: traces/langfuse exists where observabilityHosts does not set langfuse or is missing where it does, or is not fed by forward/langfuse from traces/agent-session alone, after all its stages, through stages that cannot refuse"
+            (
+              (agentPipelines ? "traces/langfuse") == lfOn
+              && (ae ? ${lfName}) == lfOn
+              && (
+                !lfOn
+                || (
+                  let
+                    lp = agentPipelines."traces/langfuse";
+                    feeding = builtins.filter (
+                      n: builtins.elem "forward/langfuse" (agentPipelines.${n}.exporters or [ ])
+                    ) (builtins.attrNames agentPipelines);
+                    fed = builtins.filter (n: builtins.elem "forward/langfuse" (agentPipelines.${n}.receivers or [ ])) (
+                      builtins.attrNames agentPipelines
+                    );
+                  in
+                  feeding == [ "traces/agent-session" ]
+                  && fed == [ "traces/langfuse" ]
+                  && (lp.receivers or null) == [ "forward/langfuse" ]
+                  && (lp.exporters or null) == [ lfName ]
+                  && (a.connectors."forward/langfuse" or null) == { }
+                  && !(builtins.elem "memory_limiter" (lp.processors or [ ]))
+                  && lib.all (
+                    n:
+                    (ap.${n}.error_mode or null) == "ignore"
+                    && !(lib.hasPrefix "filter/agent-session" n || lib.hasPrefix "transform/agent-session" n)
+                  ) (lp.processors or [ ])
+                  &&
+                    (ap."filter/langfuse".trace_conditions or null) == map (n: ''span.name == "${n}"'') lf.droppedSpans
+                  && builtins.elem ''delete_matching_keys(resource.attributes, "^vanixiets\\.")'' (
+                    ap."transform/langfuse".trace_statements or [ ]
+                  )
+                )
+              )
+            )
+          )
+          (check
+            "R3.1: Langfuse's exporter does not send to schema.nix's endpoint with the unit's Langfuse credentials and ingestion version, retry for retryMinutes and no longer, drain faster than spans arrive into a queue of twice a retry window, in batches under the request limit, or a store exporter of the agent-session collector does not retry forever, or its queues reach 512 MiB"
+            (
+              let
+                queue = lfx.sending_queue or { };
+                batch = queue.batch or { };
+                arrivals = lf.retryMinutes * i.schema.agentSpanBytesPerMinute;
+                auth = a.extensions."basicauth/langfuse".client_auth or { };
+                credentials = lib.toList (i.agentService.LoadCredential or [ ]);
+                loads = name: lib.any (lib.hasPrefix "langfuse-${name}:") credentials;
+              in
+              lib.all (x: (x.retry_on_failure.max_elapsed_time or null) == "0s") (
+                builtins.attrValues storeExporters
+              )
+              && lib.foldl' (s: x: s + (x.sending_queue.queue_size or 0)) 0 (builtins.attrValues ae) < mib 512
+              && (
+                !lfOn
+                || (
+                  (lfx.endpoint or null) == lf.endpoint
+                  && (lfx.headers or null) == { "x-langfuse-ingestion-version" = lf.ingestionVersion; }
+                  && (lfx.auth.authenticator or null) == "basicauth/langfuse"
+                  && builtins.elem "basicauth/langfuse" (a.service.extensions or [ ])
+                  && (auth.username_file or null) == "/run/credentials/otel-agent-session.service/langfuse-public-key"
+                  && (auth.password_file or null) == "/run/credentials/otel-agent-session.service/langfuse-secret-key"
+                  && !(auth ? password)
+                  && loads "public-key"
+                  && loads "secret-key"
+                  && (lfx.retry_on_failure.enabled or false)
+                  && lf.retryMinutes > 0
+                  && (lfx.retry_on_failure.max_elapsed_time or null) == "${toString lf.retryMinutes}m"
+                  && (queue.storage or null) == "file_storage"
+                  && (queue.sizer or null) == "bytes"
+                  && !(queue.block_on_overflow or false)
+                  && (queue.queue_size or 0) >= 2 * arrivals
+                  && (queue.num_consumers or 0) * (batch.max_size or 0) >= lf.drainMultiple * arrivals
+                  && (batch.sizer or null) == "bytes"
+                  && (batch.min_size or null) == (batch.max_size or 0)
+                  && (batch.max_size or lf.requestLimitBytes) < lf.requestLimitBytes
+                )
+              )
             )
           )
           (check
@@ -1138,6 +1236,8 @@
         agentLimiter = "R3.1: the agent-session collector's limiter is not below its GOMEMLIMIT and that below its MemoryMax, or the host's collector sets GOMEMLIMIT";
         notified = "R3.1: a greptimedb*, zfs-set-*, zfs-assert-*, devloop-*, collector, otel-envelope or agent-session unit is not notified";
         unit = "R3.1: the agent-session collector shares the host collector's queue directory, serves telemetry off loopback, does not always restart, is bound to the host's collector, or may start before the store's schema job";
+        langfusePath = "R3.1: traces/langfuse exists where observabilityHosts does not set langfuse or is missing where it does, or is not fed by forward/langfuse from traces/agent-session alone, after all its stages, through stages that cannot refuse";
+        langfuseExporter = "R3.1: Langfuse's exporter does not send to schema.nix's endpoint with the unit's Langfuse credentials and ingestion version, retry for retryMinutes and no longer, drain faster than spans arrive into a queue of twice a retry window, in batches under the request limit, or a store exporter of the agent-session collector does not retry forever, or its queues reach 512 MiB";
       };
       onAgent = update: i: i // { agentSettings = lib.recursiveUpdate i.agentSettings update; };
       withReceiver =
@@ -1663,6 +1763,106 @@
         agentEnvelopeNotNotified = {
           clauses = [ clause.notified ];
           mutate = i: i // { notifyUnits = lib.remove "otel-agent-session-envelope" i.notifyUnits; };
+        };
+        # Langfuse Cloud (design D16). The fan-out moved before the mask: a
+        # pipeline of its own on otlp/local, without the mask and the
+        # stamping, feeds Langfuse, and traces/agent-session only the store.
+        langfuseBeforeMask = {
+          clauses = [
+            clause.langfusePath
+            clause.local
+          ];
+          mutate =
+            i:
+            let
+              spans = i.agentSettings.service.pipelines."traces/agent-session";
+            in
+            onAgent {
+              service.pipelines = {
+                "traces/agent-session".exporters = [ "otlp_http/ingress-traces" ];
+                "traces/agent-session-unmasked" = spans // {
+                  processors = lib.remove "resource/agent-session" (
+                    lib.remove "transform/agent-session-mask" spans.processors
+                  );
+                  exporters = [ "forward/langfuse" ];
+                };
+              };
+            } i;
+        };
+        langfuseFromLocal = {
+          clauses = [ clause.langfusePath ];
+          mutate = onAgent { service.pipelines."traces/langfuse".receivers = [ "otlp/local" ]; };
+        };
+        langfuseWithLimiter = {
+          clauses = [ clause.langfusePath ];
+          mutate =
+            i:
+            onAgent {
+              service.pipelines."traces/langfuse".processors = [
+                "memory_limiter"
+              ]
+              ++ i.agentSettings.service.pipelines."traces/langfuse".processors;
+            } i;
+        };
+        langfuseTransformPropagates = {
+          clauses = [ clause.langfusePath ];
+          mutate = onAgent { processors."transform/langfuse".error_mode = "propagate"; };
+        };
+        langfuseRoutingKept = {
+          clauses = [ clause.langfusePath ];
+          mutate =
+            i:
+            onAgent {
+              processors."transform/langfuse".trace_statements = builtins.filter (
+                s: !lib.hasPrefix "delete_matching_keys(resource.attributes" s
+              ) i.agentSettings.processors."transform/langfuse".trace_statements;
+            } i;
+        };
+        langfuseWithoutFlag = {
+          clauses = [ clause.langfusePath ];
+          mutate =
+            i:
+            i
+            // {
+              hosts = i.hosts // {
+                magnetite = i.hosts.magnetite // {
+                  langfuse = false;
+                };
+              };
+            };
+        };
+        langfuseRetryForever = {
+          clauses = [ clause.langfuseExporter ];
+          mutate = onAgent { exporters."otlp_http/langfuse".retry_on_failure.max_elapsed_time = "0s"; };
+        };
+        storeSpansRetryFinite = {
+          clauses = [ clause.langfuseExporter ];
+          mutate = onAgent { exporters."otlp_http/ingress-traces".retry_on_failure.max_elapsed_time = "5m"; };
+        };
+        langfuseQueueShort = {
+          clauses = [ clause.langfuseExporter ];
+          mutate = onAgent { exporters."otlp_http/langfuse".sending_queue.queue_size = mib 1; };
+        };
+        langfuseDrainSlow = {
+          clauses = [ clause.langfuseExporter ];
+          mutate = onAgent { exporters."otlp_http/langfuse".sending_queue.num_consumers = 1; };
+        };
+        langfuseBatchOverLimit = {
+          clauses = [ clause.langfuseExporter ];
+          mutate = onAgent {
+            exporters."otlp_http/langfuse".sending_queue.batch = {
+              min_size = mib 6;
+              max_size = mib 6;
+            };
+          };
+        };
+        langfuseKeyInline = {
+          clauses = [ clause.langfuseExporter ];
+          mutate = onAgent { extensions."basicauth/langfuse".client_auth.password = "inline"; };
+        };
+        agentQueuesOver512 = {
+          clauses = [ clause.langfuseExporter ];
+          mutate = onAgent { exporters."otlp_http/ingress-agent".sending_queue.queue_size = mib 400; };
         };
       };
       agentRejections = lib.mapAttrs (_: m: failures (m.mutate input)) agentMutants;
