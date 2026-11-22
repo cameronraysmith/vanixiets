@@ -4,11 +4,12 @@
 usage() {
   cat <<'EOF'
 Usage:
-  claude-cloud-session create <name> <prompt-file> [--env <env_id>]
+  claude-cloud-session create <name> <prompt-file> [--environment-id <env_id>]
   claude-cloud-session send <session|name> <message | ->
   claude-cloud-session wait <session|name> [--timeout <seconds>]
   claude-cloud-session fetch <session|name> [<out>]
   claude-cloud-session prune --older-than <days> [--yes]
+  claude-cloud-session refresh-line
 
 Drives Claude Code cloud sessions from the command line and reads their
 transcripts from the branches the claude-sandbox profile's Stop hook pushes,
@@ -16,11 +17,16 @@ claude/transcripts/<session>.
 
   create  Starts a cloud session whose first message is the prompt file's
           text, named <name>-<sha7> after the commit it should start from,
-          and prints its id (session_01…). --env picks the cloud environment
-          for this session; otherwise remote.defaultEnvironmentId does. Run it
-          from a checkout of the repository that Claude Code trusts: the
-          session starts from the newest pushed commit beneath its HEAD; when
-          the CLI reports another, create warns and index.tsv records that one.
+          and prints its id (session_01…). Run it from a checkout of the
+          repository that Claude Code trusts: the session starts from the
+          newest pushed commit beneath its HEAD; when the CLI reports another,
+          create warns and index.tsv records that one.
+          --environment-id env_… picks the cloud environment for this session,
+          passed as --settings '{"remote":{"defaultEnvironmentId":"env_…"}}'.
+          Without it, ~/.claude/settings.json must set
+          remote.defaultEnvironmentId, or create refuses: the CLI would take the
+          newest environment. (Claude Code's own --environment takes only
+          self-hosted ccpool_… ids.)
   send    Sends a follow-up message ("-" reads it from stdin); exits 1 when
           the cloud does not accept it.
   wait    Polls the session's transcript branch until its newest turn has
@@ -30,6 +36,14 @@ claude/transcripts/<session>.
           logs/claude-sandbox/sessions/<session>.jsonl, or <out>.
   prune   Lists transcript branches whose last commit is older than <days>;
           --yes deletes them.
+  refresh-line
+          Prints only the line to add, or replace, before `exit 0` in a cloud
+          environment's setup script so its snapshot is rebuilt now:
+          # refresh trigger <YYYY-MM-DD UTC> (main=<sha8> builds <hash>)
+          for GitHub's main (git ls-remote, not the local HEAD), <hash> being
+          the store hash of the claude-sandbox activation package that commit
+          evaluates to, by a pure evaluation of github:…/<sha> with the
+          caller's nix. Run it as: nix run .#claude-cloud-session -- refresh-line
 
 A session can be named by its id or by the name create gave it, which
 logs/claude-sandbox/sessions/index.tsv records. All git work happens in a
@@ -144,12 +158,16 @@ cmd_create() {
   shift 2
   while [ $# -gt 0 ]; do
     case $1 in
-      --env) env=${2:?--env needs an id}; shift 2 ;;
+      --environment-id) env=${2:?--environment-id needs an env_… id}; shift 2 ;;
       *) die "unknown option $1" 2 ;;
     esac
   done
   [ -r "$file" ] || die "cannot read $file" 2
-  [ -n "$env" ] && settings=(--settings "{\"remote\":{\"defaultEnvironmentId\":\"$env\"}}")
+  if [ -n "$env" ]; then
+    settings=(--settings "{\"remote\":{\"defaultEnvironmentId\":\"$env\"}}")
+  elif ! jq -e '.remote.defaultEnvironmentId | strings | length > 0' "$HOME/.claude/settings.json" >/dev/null 2>&1; then
+    die "no --environment-id and no remote.defaultEnvironmentId in ~/.claude/settings.json: the CLI would start the session on the newest environment" 2
+  fi
   # The newest pushed commit beneath HEAD, which the CLI says it starts from.
   if n=$(git -C "$toplevel" rev-list --first-parent --count HEAD --not --remotes 2>/dev/null) &&
     predicted=$(git -C "$toplevel" rev-parse "HEAD~$n" 2>/dev/null); then :
@@ -259,12 +277,30 @@ cmd_prune() {
   fi
 }
 
+# The refresh-trigger line for origin's main: its commit and the store hash of
+# the claude-sandbox activation package it evaluates to.
+cmd_refresh_line() {
+  [ $# -eq 0 ] || die "refresh-line takes no arguments" 2
+  local repo=cameronraysmith/vanixiets rev path base
+  rev=$(git ls-remote "https://github.com/$repo" refs/heads/main | awk '{ print $1 }')
+  [[ $rev =~ ^[0-9a-f]{40}$ ]] || die "cannot read main from https://github.com/$repo"
+  printf 'claude-cloud-session: evaluating the claude-sandbox activation package at main=%s\n' "${rev:0:8}" >&2
+  path=$(nix eval --raw "github:$repo/$rev#homeConfigurations.\"claude-sandbox@x86_64-linux\".activationPackage.outPath") ||
+    die "cannot evaluate the claude-sandbox activation package at $rev"
+  base=${path##*/}
+  printf '# refresh trigger %s (main=%s builds %s)\n' "$(date -u +%F)" "${rev:0:8}" "${base:0:32}"
+}
+
 case ${1:-} in
   create | send | wait | fetch | prune)
     c=$1
     shift
     context
     "cmd_$c" "$@"
+    ;;
+  refresh-line)
+    shift
+    cmd_refresh_line "$@"
     ;;
   -h | --help) usage ;;
   *) usage >&2; exit 2 ;;

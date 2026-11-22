@@ -44,7 +44,26 @@ The bootstrap's `exit 0` holds even when `nix run` fails: a setup step that exit
 The `claude-sandbox-setup-script` check holds this bootstrap, here and in the app module's comment, to the lines it generates from `lib/caches.nix`, and the app to the same caches and keys and to its substitute-only realise.
 Where `github:` flake references work, `nix run github:cameronraysmith/vanixiets#claude-sandbox-setup` runs the same app.
 
-A change to the app reaches an environment the next time its snapshot is rebuilt, like a change to the profile; a revert on `main` is the normal rollback.
+A change to the app or the profile reaches an environment only at its next snapshot rebuild; a revert on `main` is the normal rollback.
+
+## Rolling a change out now: the refresh trigger
+
+To have an environment pick up `main` now, add, or replace, one refresh-trigger line before `exit 0` in its stored setup script, the one sanctioned edit to the bootstrap above; the edit costs one approval card and rebuilds the snapshot.
+Print the line from the Mac checkout with:
+
+```bash
+nix run .#claude-cloud-session -- refresh-line
+```
+
+It reads `main` from GitHub (`git ls-remote`, not the local HEAD) and evaluates the claude-sandbox activation package at that commit, so the stored script then ends like this:
+
+```bash
+  'git+https://github.com/cameronraysmith/vanixiets?ref=main&shallow=1#claude-sandbox-setup'
+# refresh trigger 2026-11-22 (main=c0e8ddda builds jv4m6yd1…)
+exit 0
+```
+
+On 2026-11-22 Default ran closure `w6c3n94q…` with no transcript hook, and its staleness line said `moved=yes`; after a refresh it ran `rev=c0e8ddda`, `P=jv4m6yd1…`, with the hook present and `moved=no`.
 
 ## Renewing while pinned
 
@@ -56,18 +75,19 @@ A pinned environment does: replace its pin at least every 30 days, even when not
 
 1. Push the commit and wait for nixbot to build `home-manager-claude-sandbox`.
 2. Start one cloud session on the environment as the controller, with a prompt (see `logs/claude-sandbox/` for past ones) that creates child sessions with `create_session` and reads the reports they push to new `claude/sandbox-reports-*` branches.
-3. A child picks up the new commit once the environment's snapshot is rebuilt; an edit to the setup box, such as adding a dated comment, forces that, at one approval card.
+3. A child picks up the new commit once the environment's snapshot is rebuilt; a refresh-trigger line (above) forces that, at one approval card.
 
 The first child after a rebuild runs the setup step (about 80 s on 2026-11-22: 46–48 s evaluating, 21–29 s fetching, 3 s activating); later children start from the snapshot and run only the session hooks.
 
-From the command line, `claude --cloud "<prompt>" -n <name>` starts a cloud session on Default, because the crs58 and cameron profiles set `remote.defaultEnvironmentId` to it (`modules/home/ai/claude-code`); without that key the CLI takes the account's first environment.
-To target another environment for one session, add `--settings '{"remote":{"defaultEnvironmentId":"env_…"}}'`.
+From the command line, `claude --cloud "<prompt>" -n <name>` starts a cloud session on Default, because the crs58 and cameron profiles set `remote.defaultEnvironmentId` to it (`modules/home/ai/claude-code`) once their home configuration is switched; without that key the CLI takes the newest environment in the account's list.
+To target another environment for one session, add `--settings '{"remote":{"defaultEnvironmentId":"env_…"}}'` (the app's `--environment-id`); Claude Code's own `--environment` takes only self-hosted `ccpool_…` ids.
 
 ## Observing a session
 
 After each turn, the Stop hook `claude-sandbox-transcripts` publishes the session's transcript to its own branch, `claude/transcripts/<session>`: an orphan branch on the first turn, then one fast-forward commit per turn.
 Each commit holds `<session>.jsonl`, the transcript, and `session.json`: the cloud session id and the cloud-local uuid, the first prompt's first line, the start time, the checkout's commit, and the setup marker's `mode`, `tip`, `rev`, `dist` and `P`.
-The hook runs `gitleaks` on the transcript first (its default rules: the repository's `.gitleaks.toml` only allowlists paths, and a config with no rules of its own disables all of them); a finding pushes nothing and leaves `reason=gitleaks` in `/var/log/claude-sandbox-bootstrap/transcripts.log`, which logs one line per turn.
+The hook runs `gitleaks` on the transcript first, with its own configuration, `transcript-gitleaks.toml`: the default rules, minus three kinds of harness metadata that the default `generic-api-key` rule misread in every cloud transcript on 2026-11-22 (the `access is scoped to: \`owner/repo\`` notice, the `anthropic-beta` list of api-request records, and `turnAttributionKey`), each allowlisted only as a whole, anchored finding; the `claude-sandbox-transcripts` check holds it to finding a planted canary beside each.
+A finding pushes nothing and leaves `reason=gitleaks` in `/var/log/claude-sandbox-bootstrap/transcripts.log`, which logs one line per turn, written only after the turn ends.
 It works in a scratch repository under `/tmp`, never in the session's checkout, and prints nothing.
 
 - The branch is keyed by the cloud session id, `session_01…`, which the hook reads from the transcript's `remote_session_change` record. A probe session on 2026-11-22 found the id there (5 occurrences in its own transcript) and in no environment variable: `CLAUDE_CODE_REMOTE_SESSION_ID` and `CLAUDE_CODE_SESSION_ID` exist, but no variable's value contains `session_01`. A transcript without that record falls back to the cloud-local uuid, and `session.json` then identifies the session by its first prompt.

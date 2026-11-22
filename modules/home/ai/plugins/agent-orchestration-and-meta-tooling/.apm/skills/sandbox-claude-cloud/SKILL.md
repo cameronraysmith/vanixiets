@@ -18,7 +18,7 @@ Read `modules/apps/claude-cloud-session.sh` for the exact mechanics, and `module
 
 | Step | Raw CLI | vanixiets app |
 |---|---|---|
-| create | `claude --cloud "<first message>" -n <name>` under a terminal | `create <name> <prompt-file> [--env <env_id>]` (the first message comes from a file) |
+| create | `claude --cloud "<first message>" -n <name>` under a terminal | `create <name> <prompt-file> [--environment-id <env_id>]` (the first message comes from a file) |
 | wait | (no CLI command) | `wait <session> [--timeout S]` |
 | fetch | (no CLI command) | `fetch <session> [<out>]` |
 | query | `jq`, `duckdb` on the JSONL | same |
@@ -46,14 +46,20 @@ git --git-dir="$g" show FETCH_HEAD:session.json | jq .
 
 ## Choosing the environment
 
-- The CLI uses `remote.defaultEnvironmentId` from the settings, else the newest environment in the account's list; vanixiets sets it to Default for crs58 and cameron.
-- For one session, pass `--settings '{"remote":{"defaultEnvironmentId":"env_…"}}'` (the app's `--env`); `/remote-env` writes the same key.
+- The CLI uses `remote.defaultEnvironmentId` from the settings, else the newest environment in the account's list; vanixiets sets it to Default for crs58 and cameron, once their home configuration is switched.
+- For one session, pass `--settings '{"remote":{"defaultEnvironmentId":"env_…"}}'` (the app's `--environment-id`); `/remote-env` writes the same key. Claude Code's own `--environment` takes only self-hosted `ccpool_…` ids.
 - Pick an environment whose setup activates the claude-sandbox profile when you need the transcript branch: elsewhere there is no Stop hook, so `wait` and `fetch` find nothing.
+
+## Rolling out a profile change
+
+A change on `main` reaches cloud sessions only at the environment's next snapshot rebuild.
+To roll it out now, add, or replace, the refresh-trigger line before `exit 0` in the environment's setup script, the one sanctioned edit to its stored bootstrap (one approval card).
+In vanixiets, print the line with `nix run .#claude-cloud-session -- refresh-line`; the README's refresh-trigger section shows where it goes.
 
 ## The transcript branch
 
 After each turn, the profile's Stop hook pushes the session's transcript to `claude/transcripts/<session_01…>`: an orphan branch on the first turn, then one fast-forward commit per turn, holding `<session>.jsonl` and `session.json`.
-A gitleaks finding pushes nothing for that turn. A turn has finished when the last user or assistant record is the assistant's, with no `tool_use` waiting for a result.
+A gitleaks finding pushes nothing for that turn; vanixiets' hook scans with its own config that allowlists the harness's metadata. A turn has finished when the last user or assistant record is the assistant's, with no `tool_use` waiting for a result.
 If the transcript lacks the cloud id, the branch is keyed by the cloud-local uuid and found through `session.json`'s first prompt.
 
 ## Three commits, three questions
@@ -78,4 +84,6 @@ A null marker means the environment ran no claude-sandbox setup, or a snapshot r
 | Attaching | `claude --cloud <id>` without `-p` is "not enabled for your account" | steer with `-p --cloud <id> --output-format json`, which returns `{ok, session_id, url}` |
 | `--teleport` | makes a local copy with a new session id and a derived-from record, checks out the session's branch, writes the JSONL only after one local turn, and can catch a turn mid-way ("Tool call result not in this copy") | read the transcript branch instead; never teleport into a jj working copy |
 | `/rename` | sent with `-p --cloud`, it renames the session internally and shows in its chat, but doesn't change the claude.ai title set by `-n` | choose the name at create time |
-| Default environment | without the settings key, the CLI takes the newest environment, not necessarily the one you mean | set `remote.defaultEnvironmentId` or pass `--settings` |
+| Default environment | without the settings key (a Mac whose home configuration isn't switched yet, say), create without a pin lands on the newest environment in the list, not necessarily the one you mean | set `remote.defaultEnvironmentId` or pass `--settings`; the app's create refuses to run without one of them |
+| Hook logs | a Stop hook's log line, and its transcript push, appear only after the turn ends; a turn still running shows nothing | wait for the turn, then read `transcripts.log` or the branch |
+| Stale snapshot | the session runs the snapshot's closure, which can predate `main` by days | check `session.json`'s marker and the staleness line; refresh the environment to roll out now |

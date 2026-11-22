@@ -1,13 +1,15 @@
 # Stop hook of the claude-sandbox profile: publishes the session's transcript
 # after each turn as `<key>.jsonl` plus `session.json` on the branch
 # `claude/transcripts/<key>`, a new orphan on the first turn and a fast-forward
-# after that. default.nix defines log_dir above this text.
+# after that. default.nix defines log_dir and gitleaks_config above this text.
 #
 # It works in a scratch bare repository under /tmp, never in the session's own
 # checkout, and pushes to that checkout's push URL for origin, so the push uses
 # the same credentials as the session's own pushes (the harness's
-# credential.https://github.com.helper). A gitleaks finding pushes nothing. It
-# prints nothing, bounds each network step, and always exits 0.
+# credential.https://github.com.helper). A gitleaks finding under
+# transcript-gitleaks.toml (the default rules, minus three kinds of harness
+# metadata) pushes nothing. It prints nothing, bounds each network step, and
+# always exits 0.
 
 record() {
   mkdir -p "$log_dir" 2>/dev/null &&
@@ -57,7 +59,7 @@ fi
 key=$(session_key "$transcript" "$uuid")
 branch=refs/heads/claude/transcripts/$key
 
-gitleaks dir "$transcript" --no-banner --redact --log-level error --exit-code 3 >/dev/null 2>&1
+gitleaks dir "$transcript" --config "$gitleaks_config" --no-banner --redact --log-level error --exit-code 3 >/dev/null 2>&1
 leaks=$?
 if [ "$leaks" = 3 ]; then
   record "key=$key pushed=no reason=gitleaks"
