@@ -4,8 +4,10 @@
 # when this attribute is evaluated, over the package's script text; its build
 # depends on the package, whose writeShellApplication build shellchecks it.
 #
+# - the bootstrap is at most 200 columns per line, a tab counting 8, since the
+#   platform refuses a wider setup-script line (A187);
 # - the bootstrap that the app module's header comment and the profile's README
-#   document equals the 3 lines generated here from lib/caches.nix;
+#   document equals the lines generated here from lib/caches.nix;
 # - the script realises with `--max-jobs 0 --option builders ''`, so the
 #   profile's closure is never built;
 # - its C, S and K are the two caches' entries in lib/caches.nix, S and K as
@@ -33,17 +35,19 @@ let
   publicKeys = pick (h: "${h}-") caches.publicKeys;
   fleetCache = lib.head (lib.filter (lib.hasPrefix "https://${lib.head hosts}") substituters);
 
+  # One `nix run` command split with `\` continuations: the platform refuses a
+  # setup-script line wider than 200 columns, a tab counting 8 (A187).
   bootstrap = [
     "#!/bin/bash"
-    (lib.concatStringsSep " " [
-      "nix run"
-      "--option substituters ${lib.escapeShellArg (lib.concatStringsSep " " substituters)}"
-      "--option trusted-public-keys ${lib.escapeShellArg (lib.concatStringsSep " " publicKeys)}"
-      "--option accept-flake-config false"
-      (lib.escapeShellArg "git+https://github.com/cameronraysmith/vanixiets?ref=main&shallow=1#claude-sandbox-setup")
-    ])
+    "nix run \\"
+    "  --option substituters ${lib.escapeShellArg (lib.concatStringsSep " " substituters)} \\"
+    "  --option trusted-public-keys ${lib.escapeShellArg (lib.concatStringsSep " " publicKeys)} \\"
+    "  --option accept-flake-config false \\"
+    "  ${lib.escapeShellArg "git+https://github.com/cameronraysmith/vanixiets?ref=main&shallow=1#claude-sandbox-setup"}"
     "exit 0"
   ];
+  columns = line: lib.stringLength line + 7 * (lib.length (lib.splitString "\t" line) - 1);
+  wide = lib.filter (line: columns line > 200) bootstrap;
   documents = {
     "modules/apps/claude-sandbox-setup.nix" = lib.concatMapStrings (l: "#   ${l}\n") bootstrap;
     "modules/home/users/claude-sandbox/README.md" = lib.concatLines bootstrap;
@@ -85,6 +89,8 @@ in
     {
       checks = lib.optionalAttrs (system == "x86_64-linux") {
         claude-sandbox-setup-script =
+          assert lib.assertMsg (wide == [ ])
+            "the setup box's bootstrap has lines over 200 columns (a tab counts 8), which the platform refuses (A187): ${lib.concatStringsSep " | " wide}";
           assert lib.assertMsg (undocumented == [ ])
             "the setup box's bootstrap, generated from lib/caches.nix, is not documented verbatim in: ${lib.concatStringsSep ", " undocumented}; expected:\n${lib.concatLines bootstrap}";
           assert lib.assertMsg (lib.hasInfix "--max-jobs 0 --option builders ''" text)

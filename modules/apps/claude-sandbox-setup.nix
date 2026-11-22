@@ -4,10 +4,16 @@
 # check holds this comment and the profile's README to it):
 #
 #   #!/bin/bash
-#   nix run --option substituters 'https://cache.nixos.org https://cache.scientistexperience.net?priority=45' --option trusted-public-keys 'cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY= cache.scientistexperience.net-1:N9ZeWasooJLXEwaN+rd4MMyBuGpAtcUAXrEUPBT5cXI=' --option accept-flake-config false 'git+https://github.com/cameronraysmith/vanixiets?ref=main&shallow=1#claude-sandbox-setup'
+#   nix run \
+#     --option substituters 'https://cache.nixos.org https://cache.scientistexperience.net?priority=45' \
+#     --option trusted-public-keys 'cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY= cache.scientistexperience.net-1:N9ZeWasooJLXEwaN+rd4MMyBuGpAtcUAXrEUPBT5cXI=' \
+#     --option accept-flake-config false \
+#     'git+https://github.com/cameronraysmith/vanixiets?ref=main&shallow=1#claude-sandbox-setup'
 #   exit 0
 #
-# To pin one closure, end the nix run line with `-- /nix/store/…-home-manager-generation`.
+# It is one command split by `\` continuations, since the platform refuses a
+# setup-script line wider than 200 columns, a tab counting 8 (A187). To pin one
+# closure, end its last line with `-- /nix/store/…-home-manager-generation`.
 # Only bash and the image's nix are trusted; every command the app calls comes
 # from runtimeInputs, our nix included, and the preamble passes the caches and
 # keys from lib/caches.nix to it explicitly, whatever the image's nix.conf says.

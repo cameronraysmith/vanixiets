@@ -8,18 +8,18 @@ Relies on: A172, A177; S: the app's argument handling.
 
 #### Scenario: A pinned bootstrap runs
 
-- **WHEN** the setup box's `nix run` line ends with `-- /nix/store/…-home-manager-generation`
+- **WHEN** the setup box's flake reference is followed by `-- /nix/store/…-home-manager-generation`
 - **THEN** the app realises and activates that path with no `git clone` or walk evaluation, and its marker records `mode=pinned`
 
-### Requirement: The setup box is three fixed lines
+### Requirement: The setup box holds a fixed bootstrap
 
-(R3) The setup box SHALL hold three fixed lines generated from `lib/caches.nix`: `#!/bin/bash`; `nix run` with the two caches as substituters, their keys and `accept-flake-config false` on `git+https://github.com/cameronraysmith/vanixiets?ref=main&shallow=1#claude-sandbox-setup`; and `exit 0`.
-Relies on: A170, A175, A184, T5; S: the `claude-sandbox-setup-script` check.
+(R3) The setup box SHALL hold a fixed bootstrap generated from `lib/caches.nix`: `#!/bin/bash`; one `nix run` command, split by `\` continuations into lines of at most 200 columns, with the two caches, their keys and `accept-flake-config false`, on `git+https://github.com/cameronraysmith/vanixiets?ref=main&shallow=1#claude-sandbox-setup`; and `exit 0`.
+Relies on: A170, A175, A184, A187, T5; S: the `claude-sandbox-setup-script` check.
 
 #### Scenario: The documented bootstrap drifts
 
-- **WHEN** `lib/caches.nix` changes, or the bootstrap in the app module's comment or the profile's README differs from the lines the check generates
-- **THEN** the `claude-sandbox-setup-script` check fails evaluation, naming the file
+- **WHEN** `lib/caches.nix` changes, a bootstrap line exceeds 200 columns with a tab counting 8, or the bootstrap in the app module's comment or the profile's README differs from the lines the check generates
+- **THEN** the `claude-sandbox-setup-script` check fails evaluation, naming the wide line or the file
 
 #### Scenario: A commit changes the setup app
 
@@ -135,6 +135,6 @@ It SHALL NOT fetch history, evaluate, realise or activate anything.
 
 ### Requirement: The setup script stays within the platform's limits
 
-**Reason**: the generated setup scripts are removed; the setup box holds three fixed lines (R3), well within the platform's 100 lines of 200 bytes, and its `exit 0` is held by the `claude-sandbox-setup-script` check.
+**Reason**: the generated setup scripts are removed; the setup box holds a fixed bootstrap (R3), whose lines the `claude-sandbox-setup-script` check holds to the platform's 200 columns (A187) and which ends in `exit 0`.
 
-**Migration**: paste the bootstrap from the profile's README into the setup box, as `The setup box is three fixed lines` states.
+**Migration**: paste the bootstrap from the profile's README into the setup box, as `The setup box holds a fixed bootstrap` states.

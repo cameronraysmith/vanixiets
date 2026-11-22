@@ -45,6 +45,21 @@ Any requirement whose discharge depends on this fact SHALL name it explicitly, a
 - **WHEN** a key the profile sets in `/root/.config/git/config` is shadowed by the harness's file or its environment overrides
 - **THEN** this assumption is void for that key, and the `claude-sandbox-bootstrap` requirement `One source for agent context and skills` must be re-checked for any instruction that depends on it
 
+### Requirement: A187 — The platform refuses a setup-script line wider than 200 columns
+
+It is true of a cloud environment, independent of what this fleet builds, that the platform refuses a setup script holding any line wider than 200 columns, a tab counting 8, before an approval card is shown, so the script never changes.
+Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL lose its discharge once the violation below is observed.
+
+#### Scenario: Measured on 2026-11-22
+
+- **WHEN** task 5.3's controller sent Default a setup script whose line 2 was 402 columns
+- **THEN** `update_environment` answered `setup_script line 2 is 402 columns wide (a tab counts 8); keep each line to at most 200 (split long commands with "\" continuations) so the person approving can read all of it`, and nothing was changed
+
+#### Scenario: The platform's limit changes
+
+- **WHEN** the platform accepts a wider line, or refuses one of 200 columns or fewer
+- **THEN** this assumption is void, and the `claude-sandbox-interface` requirement `The setup box holds a fixed bootstrap` and the `claude-sandbox-setup-script` check's 200-column limit must be revised to the observed limit
+
 ## MODIFIED Requirements
 
 ### Requirement: Grounded vocabulary for behavioral requirements

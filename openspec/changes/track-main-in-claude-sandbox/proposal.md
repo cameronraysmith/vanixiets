@@ -24,7 +24,7 @@ A probe on 2026-11-22 showed a cloud session can evaluate `main` itself in 46 s 
 
 **Follow `main` by default**
 - From: the setup step names one closure; profile changes reach cloud sessions only after the operator regenerates and swaps the setup step.
-- To: the setup box holds three fixed lines that run the flake app `claude-sandbox-setup` from `main`, which follows the newest commit on `main` whose closure the fleet's cache already holds, walking back at most 5 commits; a store path argument pins one closure.
+- To: the setup box holds a fixed bootstrap that runs the flake app `claude-sandbox-setup` from `main`, which follows the newest commit on `main` whose closure the fleet's cache already holds, walking back at most 5 commits; a store path argument pins one closure.
 - Reason: profile changes reach cloud sessions without a per-change approval card, and the monthly renewal is no longer needed while following `main`.
 - Impact: non-breaking; one approval card per environment to switch, and a pin stays available.
 
@@ -48,9 +48,9 @@ None.
 
 ### Modified Capabilities
 - `claude-sandbox-bootstrap` (behavioral): `One closure defines the environment` now follows `main`'s newest published closure by default and can be pinned; adds a staleness notice and the requirement that every input source stays in the cache.
-- `claude-sandbox-interface` (interface): the pinned-path and script-limit requirements are replaced by R1–R7 (the closure follows `main`, a pin as an argument, a fixed three-line box, the logic as a flake app whose every command comes from the flake, setup never failing the session, the profile's closure substituted, never built); adds the bounded walk over `main`'s first-parent history, its marker line, the read-only staleness hook, and the input-sources check.
+- `claude-sandbox-interface` (interface): the pinned-path and script-limit requirements are replaced by R1–R7 (the closure follows `main`, a pin as an argument, a fixed bootstrap within the platform's 200 columns per line, the logic as a flake app whose every command comes from the flake, setup never failing the session, the profile's closure substituted, never built); adds the bounded walk over `main`'s first-parent history, its marker line, the read-only staleness hook, and the input-sources check.
   Trust boundary: these properties guarantee what the setup step evaluates, fetches and runs, and what the hook reads; they do not guarantee that any of the 5 newest commits is published, that the platform rebuilds the snapshot when documented, or that activation succeeds.
-- `world-assumptions` (world): adds the probe's measurement of evaluating `main` from the cache, the platform's documented snapshot expiry (not yet measured), and how the harness applies its own git configuration.
+- `world-assumptions` (world): adds the probe's measurement of evaluating `main` from the cache, the platform's documented snapshot expiry (not yet measured), how the harness applies its own git configuration, and the platform's 200-column limit on setup-script lines (A187).
 
 ## Impact
 

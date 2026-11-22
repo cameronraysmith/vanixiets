@@ -17,9 +17,15 @@ The environment's setup box holds a fixed bootstrap, the same for every commit, 
 
 ```bash
 #!/bin/bash
-nix run --option substituters 'https://cache.nixos.org https://cache.scientistexperience.net?priority=45' --option trusted-public-keys 'cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY= cache.scientistexperience.net-1:N9ZeWasooJLXEwaN+rd4MMyBuGpAtcUAXrEUPBT5cXI=' --option accept-flake-config false 'git+https://github.com/cameronraysmith/vanixiets?ref=main&shallow=1#claude-sandbox-setup'
+nix run \
+  --option substituters 'https://cache.nixos.org https://cache.scientistexperience.net?priority=45' \
+  --option trusted-public-keys 'cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY= cache.scientistexperience.net-1:N9ZeWasooJLXEwaN+rd4MMyBuGpAtcUAXrEUPBT5cXI=' \
+  --option accept-flake-config false \
+  'git+https://github.com/cameronraysmith/vanixiets?ref=main&shallow=1#claude-sandbox-setup'
 exit 0
 ```
+
+Its one `nix run` command is split with `\` continuations because the platform refuses a setup-script line wider than 200 columns, a tab counting 8.
 
 Only bash and the image's preinstalled Nix are trusted: every command the app calls, Nix included, comes from its `runtimeInputs`.
 Its only local build is its own wrapper, a printf and a shellcheck whose inputs come from `cache.nixos.org`.
@@ -31,7 +37,7 @@ The app (`modules/apps/claude-sandbox-setup.{nix,sh}`) follows `main`:
 - it runs `"$P/activate"` as `USER=root HOME=/root` under `timeout 240`, unless the realise failed or the path is already the current generation;
 - it appends one marker line to `/var/log/claude-sandbox-bootstrap/setup.log`, and exits 0.
 
-To pin one closure, end the `nix run` line with `-- /nix/store/…-home-manager-generation`.
+To pin one closure, end the command's last line, the flake reference, with `-- /nix/store/…-home-manager-generation`.
 A pin is an argument because the setup step cannot read the environment's variables.
 
 The bootstrap's `exit 0` holds even when `nix run` fails: a setup step that exits non-zero stops the session from ever starting.
