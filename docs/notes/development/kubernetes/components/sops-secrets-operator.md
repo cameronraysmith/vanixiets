@@ -114,7 +114,7 @@ The age private key file format:
 
 ```text
 # created: 2024-01-15T10:00:00Z
-# public key: age1js028xag70wpwpp47elpq50mjjv7zn7sxuwuhk8yltkjzqzdvq5qq8w8cy
+# public key: age1js028xag70wpwpp47elpq50mjjv7zn7sxuwuhk8yltkjzqzdvq5qq8w8cy # gitleaks:allow age public key
 AGE-SECRET-KEY-1QQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQ
 ```
 
@@ -563,7 +563,7 @@ spec:
   secretTemplates:
     - name: app-credentials
       stringData:
-        api-key: sk-1234567890abcdef
+        api-key: sk-1234567890abcdef # gitleaks:allow
         api-secret: secret-value-here
 ```
 

@@ -40,7 +40,7 @@ SQL_PATH = "/v1/sql"
 FIXTURE_USER = "regulator"
 # The same value checks.x86_64-linux.fleet-alert writes to the fixture
 # credentials' regulator-password.
-FIXTURE_PASSWORD = "00112233445566778899aabbccddeeff"
+FIXTURE_PASSWORD = "00112233445566778899aabbccddeeff"  # gitleaks:allow
 
 
 def main():

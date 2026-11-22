@@ -707,7 +707,7 @@
 
       # --- fixture legs -------------------------------------------------------
 
-      fixturePassword = "00112233445566778899aabbccddeeff";
+      fixturePassword = "00112233445566778899aabbccddeeff"; # gitleaks:allow
       fixtureCredentials = pkgs.runCommand "fleet-alert-fixture-credentials" { } ''
         mkdir "$out"
         printf '%s' ${fixturePassword} > "$out/regulator-password"

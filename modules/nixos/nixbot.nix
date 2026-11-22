@@ -205,7 +205,7 @@ in
 
           # Public identifiers of the dedicated application github.com/apps/sciexp-nixbot.
           appId = 4743700;
-          oauthId = "Iv23lie8GaDpY0cPXGg4";
+          oauthId = "Iv23lie8GaDpY0cPXGg4"; # gitleaks:allow
 
           appSecretKeyFile =
             config.clan.core.vars.generators.nixbot-github-app-secret-key.files."key.pem".path;

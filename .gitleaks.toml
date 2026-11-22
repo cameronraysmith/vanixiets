@@ -1,6 +1,10 @@
 # Gitleaks configuration
 # https://github.com/gitleaks/gitleaks
 
+# Without this, a config holding only an allowlist loads no rules at all.
+[extend]
+useDefault = true
+
 [allowlist]
   description = "Global allowlist for false positives"
 
@@ -11,4 +15,6 @@
   paths = [
     '''terraform/terraform\.tfstate''',
     '''terraform/terraform\.tfstate\.backup''',
+    # Frozen copies of plans whose sources carry inline gitleaks:allow comments.
+    '''openspec/changes/archive/''',
   ]

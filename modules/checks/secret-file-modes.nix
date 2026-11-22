@@ -61,7 +61,7 @@
 
               store=$TMPDIR/store
               mkdir -p "$store/sops/age"
-              printf -- '-----BEGIN OPENSSH PRIVATE KEY-----\nAAAA\n-----END OPENSSH PRIVATE KEY-----\n' > "$store/linked-key"
+              printf -- '-----BEGIN OPENSSH PRIVATE KEY-----\nAAAA\n-----END OPENSSH PRIVATE KEY-----\n' > "$store/linked-key" # gitleaks:allow
               printf 'Host *\n' > "$store/ssh-config"
               printf 'AGE-SECRET-KEY-1STORE\n' > "$store/sops/age/keys.txt"
               chmod 644 "$store/linked-key" "$store/ssh-config" "$store/sops/age/keys.txt"

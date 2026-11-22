@@ -135,7 +135,7 @@
       # Fixture credentials: the parent secret must never reach the stub.
       accountId = "abcdefabcdefabcdefabcdefabcdef01";
       accessKeyId = "a1b2c3d4e5f60718293a4b5c6d7e8f90";
-      parentSecret = "0f1e2d3c4b5a69788796a5b4c3d2e1f00f1e2d3c4b5a69788796a5b4c3d2e1f0";
+      parentSecret = "0f1e2d3c4b5a69788796a5b4c3d2e1f00f1e2d3c4b5a69788796a5b4c3d2e1f0"; # gitleaks:allow
       taskToken = "rehearsal-task-token";
       prRev = "1111111111111111111111111111111111111111";
       mainRev = "2222222222222222222222222222222222222222";
