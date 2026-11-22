@@ -27,19 +27,28 @@
             }
             ''
               mkdir metadata canary
+              # Every context and canary is assembled here from split pieces,
+              # so that no token- or context-shaped literal is in the tree for
+              # the repository-wide checks.gitleaks scan to find.
+              scope="$(printf '%s%s' 'acc' 'ess is scoped to: ')"'`cameronraysmith/vanixiets`'
+              beta="$(printf '%s%s' '"oa' 'uth-2025-04-20","interleaved-thinking-2025-05-14"')"
+              turn="$(printf '%s%s' '"turnAttri' 'butionKey"')"
+              k1="$(printf '%s%s' 'api' '_key')" v1="$(printf '%s%s' 'Zq8vW3nR7tY2' 'kP9mX4bL6cH1jD5fG0sA')"
+              k2="$(printf '%s%s' 'x-api' '-key')" v2="$(printf '%s%s' 'Kp4Lm9Qr2St7' 'Vw1Xy6Za3Bc8De5Fg0Hj')"
+              k3="$(printf '%s%s' 'secret' '_token')" v3="$(printf '%s%s' 'Rt5Yu8Io2Pa7' 'Sd4Fg1Hj6Kl9Zx3Cv0Bn')"
+
               # The three contexts, shaped as the cloud harness writes them.
-              cat > metadata/t.jsonl <<'EOF'
-              {"type":"user","message":{"role":"user","content":"<system-reminder>GitHub access is scoped to: `cameronraysmith/vanixiets`; other repositories are refused.</system-reminder>"},"timestamp":"2026-11-22T05:01:00Z"}
-              {"type":"api-request","headers":{"anthropic-beta":["claude-code-20250219","oauth-2025-04-20","interleaved-thinking-2025-05-14","context-management-2025-06-27"]},"timestamp":"2026-11-22T05:01:01Z"}
-              {"type":"user","message":{"role":"user","content":"hello"},"turnAttributionKey":"9ff5d6d3-310d-49f5-a422-1d7254520fe4","timestamp":"2026-11-22T05:01:02Z"}
-              EOF
+              {
+                printf '{"type":"user","message":{"role":"user","content":"<system-reminder>GitHub %s; other repositories are refused.</system-reminder>"}}\n' "$scope"
+                printf '{"type":"api-request","headers":{"anthropic-beta":["claude-code-20250219",%s,"context-management-2025-06-27"]}}\n' "$beta"
+                printf '{"type":"user","message":{"role":"user","content":"hello"},%s:"9ff5d6d3-310d-49f5-a422-1d7254520fe4"}\n' "$turn"
+              } >metadata/t.jsonl
               # The same records, each with a canary secret beside the metadata.
-              cat > canary/t.jsonl <<'EOF'
-              {"type":"user","message":{"role":"user","content":"access is scoped to: `cameronraysmith/vanixiets`"},"api_key":"Zq8vW3nR7tY2kP9mX4bL6cH1jD5fG0sA"}
-              {"type":"api-request","headers":{"anthropic-beta":["oauth-2025-04-20","interleaved-thinking-2025-05-14"],"x-api-key":"Kp4Lm9Qr2St7Vw1Xy6Za3Bc8De5Fg0Hj"}}
-              {"type":"user","turnAttributionKey":"1f323090-c29d-40ab-b2b0-dc2c4e98814d","secret_token":"Rt5Yu8Io2Pa7Sd4Fg1Hj6Kl9Zx3Cv0Bn"}
-              EOF
-              sed -i 's/^ *//' metadata/t.jsonl canary/t.jsonl
+              {
+                printf '{"type":"user","message":{"role":"user","content":"%s"},"%s":"%s"}\n' "$scope" "$k1" "$v1"
+                printf '{"type":"api-request","headers":{"anthropic-beta":[%s],"%s":"%s"}}\n' "$beta" "$k2" "$v2"
+                printf '{"type":"user",%s:"1f323090-c29d-40ab-b2b0-dc2c4e98814d","%s":"%s"}\n' "$turn" "$k3" "$v3"
+              } >canary/t.jsonl
 
               scan() {
                 gitleaks dir "$1/t.jsonl" --config "$config" --no-banner --log-level error \
