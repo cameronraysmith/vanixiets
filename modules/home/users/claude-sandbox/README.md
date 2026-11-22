@@ -76,6 +76,7 @@ It works in a scratch repository under `/tmp`, never in the session's checkout, 
 `nix run .#claude-cloud-session -- --help` drives sessions and reads these branches from outside the cloud, without teleporting a session; its git work happens in a scratch repository, never in the caller's checkout, where it only writes under the ignored `logs/`:
 `create` starts a session named `<name>-<sha7>` and records it in `logs/claude-sandbox/sessions/index.tsv`, `send` adds a turn, `wait` polls the branch until a turn has finished, and `fetch` writes the transcript to `logs/claude-sandbox/sessions/<session>.jsonl`.
 The branches accumulate: `claude-cloud-session prune --older-than <days>` lists those whose last commit is older, and `--yes` deletes them.
+The `sandbox-claude-cloud` skill covers when to use cloud sessions, the create, wait, fetch and send loop, and the CLI's traps.
 
 ## Operator steps for a new environment
 
