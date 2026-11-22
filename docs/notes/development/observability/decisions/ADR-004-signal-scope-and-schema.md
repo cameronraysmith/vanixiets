@@ -9,6 +9,7 @@ Amended in place under charter v22 (2026-10-21), from slice S2's planning (`open
 Amended in place under charter v23 (2026-10-28), from slice S4's planning (`openspec/changes/stand-up-linux-fleet-collection/`): `observability-notify@` instances are excluded from the per-host cap of 40 `systemd_unit_name` values and bounded by the host's notified units, the `fleet` estimate counts S4's notifier instances, filesystem series and collector self-telemetry, 6,154 series against the unchanged 8,000, `systemd_unit_name`'s fleet-wide bound becomes 268, and R4.2 runs hourly in the ingress host's `otel-envelope`, with its journald-bytes and logs-table `ttl` clauses landing with S7.
 Amended in place under charter v25 (2026-11-01): the keep-lists name series as their exporters expose them, and the store appends `_total` to a series its exporter declares a counter, so six of smartctl_exporter's kept names are stored, and visible to PromQL, with `_total`.
 Amended in place under charter v29 (2026-11-06), from slice S5 (`openspec/changes/stand-up-darwin-collection/`): the launchd job allow-list gains `org.nixos.otel-envelope`, `launchd_job_last_exit_code` reads 0 after a jetsam idle exit and -1 after a signal kill, and darwin's per-process floor is 384 MiB with the host's long-running fleet executables kept below it, Linux's staying 64 MiB.
+Amended in place on 2026-11-22 under OpenSpec change `agent-session-telemetry` (Linear CAM-120; the operator's content and consent decisions and ratification, the change's decision records D15 and D17): Claude Code is an emitter and its metrics, session events and spans, with omp's spans, enter `agent` on hosts whose host-table row sets `agentTelemetry`; the allow-lists gain Claude Code's metric names and keys, its event allow-list and the agent span keys; `user.name` is the one person identifier admitted, on `agent` data; prompts, responses, tool arguments, tool output and span status messages are stored on `agent` spans and session events, each value at most 64 KiB with credential shapes masked; `agent`'s retention is 30 d, its series budget regulated hourly; Q2, Q3, Q5 and Q6 record the revisions.
 
 ## Context
 
@@ -63,10 +64,13 @@ Signal scope for the first deployment:
 | Per-attribute CI outcomes | nixbot rows read on magnetite (ADR-005) | dev-loop | `devloop` |
 | Deploy records | `/var/log/deploy-record.jsonl` on every agent (ADR-005) | dev-loop | `devloop` |
 | Agent-harness metrics | omp OTLP metrics `omp.agent.tool.calls` and `omp.agent.errors` | dev-loop | `agent` |
+| Agent-harness metrics | Claude Code OTLP metrics, the eight `claude_code.*` names | agent sessions | `agent` |
+| Agent session events | Claude Code OTLP events on the agent-session allow-list, with prompt, response and tool-detail text | agent sessions | `agent`, table `session_event` |
+| Agent spans | Claude Code and omp OTLP spans, limited to the span keys of `schema.nix`'s `agentSession.spans`, with prompts, responses, tool arguments and tool output | agent sessions | `agent`, table `agent_span` |
 
-omp spans are admitted by this schema but are wired only when ADR-005 asks for them; omp OTLP logs are excluded (see ADR-008).
+Claude Code and omp spans are wired on agent-telemetry hosts into `agent.agent_span`, limited to the span keys of `schema.nix`'s `agentSession.spans`; omp OTLP logs are excluded (see ADR-008).
 Omnigent telemetry is out of scope until its package carries the `tracing` extra; when added, it enters `agent` under the same allow-list.
-Claude Code and hermes-agent are not emitters in this design.
+Claude Code is an emitter for every human user and every omnigent worker on hosts whose host-table row sets `agentTelemetry`, magnetite and pyrite; hermes-agent is not an emitter.
 
 Semantic-convention adherence:
 
@@ -79,12 +83,14 @@ Semantic-convention adherence:
 7. GreptimeDB's default translation stores OTLP names and keys with dots replaced by underscores and unit and `_total` suffixes appended, and the ingress promotes every allow-listed resource key to a label (ADR-003 item 15), so the names visible to PromQL are those listed below, except that the Prometheus keep-lists name series as their exporters expose them and a series its exporter declares a counter, which reaches the store as an OTLP Sum, is stored with `_total` appended (charter v25).
 
 Attribute allow-list (single source of truth for the collector and for the regulator).
-Key-level attribute redaction, `allow_all_keys: false`, applies only to the omp agent pipeline; Prometheus-scraped and `host_metrics` points keep their native label keys, bounded by the label bans and the per-label value cap below.
+Key-level attribute allow-listing, which drops every key not listed, applies only to the agent-session pipelines (Claude Code and omp); Prometheus-scraped and `host_metrics` points keep their native label keys, bounded by the label bans and the per-label value cap below.
 
-- Resource, every signal: `service.name`, `service.version`, `host.name`, `host.arch`, `os.type`; additionally `systemd.unit.name` on systemd receiver points and `process.executable.name` on process scraper points, including those `otelcol-process` forwards on darwin.
+- Resource, every signal: `service.name`, `service.version`, `host.name`, `host.arch`, `os.type`; additionally `systemd.unit.name` on systemd receiver points and `process.executable.name` on process scraper points, including those `otelcol-process` forwards on darwin. On the agent-session pipelines additionally `user.name`, the person a session runs for, which the emitter stamps.
 - omp metric names: exactly `omp.agent.tool.calls` and `omp.agent.errors`; every other omp metric, including token and cost metrics, is dropped (ADR-005 Q7).
 - omp metric points: `gen_ai.operation.name`, `gen_ai.provider.name`, `gen_ai.request.model`, `gen_ai.response.service_tier`, `gen_ai.response.finish_reason`, `gen_ai.tool.name`, `omp.tool.status`, `omp.gen_ai.agent.name`, `error.type`.
-- omp spans, when wired: the metric keys above plus `gen_ai.conversation.id`, `gen_ai.usage.input_tokens`, `gen_ai.usage.output_tokens` and their cache variants.
+- Claude Code metric names: exactly `claude_code.session.count`, `claude_code.lines_of_code.count`, `claude_code.pull_request.count`, `claude_code.commit.count`, `claude_code.cost.usage`, `claude_code.token.usage`, `claude_code.code_edit_tool.decision`, `claude_code.active_time.total`; metric point keys `model`, `type`, `query_source`, `speed`, `effort`, `agent.name`, `skill.name`, `plugin.name`, `marketplace.name`, `mcp_server.name`, `mcp_tool.name`, `tool_name`, `decision`, `source`, `language`, `start_type`, `user.name`.
+- Claude Code events: the event names and per-event keys of `schema.nix`'s `agentSession` allow-list; the record body is never kept.
+- Claude Code and omp spans: the keys of `schema.nix`'s `agentSession.spans.keys`, among them `gen_ai.output.messages`, `gen_ai.tool.call.arguments`, `gen_ai.tool.call.result`, Claude Code's span keys (`session.id`, `user_prompt`, `tool_name`, `tool_use_id`, `full_command`, `file_path`, `duration_ms`, `success`, `error` and its token counts) and `last_user_message`, the newest user message's text the collector copies from omp's `gen_ai.input.messages` on the first request of a top-level run; resource keys `service.name`, `service.version`, `user.name`, and the stamped `host.name`.
 - journald records: `MESSAGE` as the body, `_SYSTEMD_UNIT`, `PRIORITY` and `_HOSTNAME`; every other journal field is dropped.
 - Prometheus-scraped and `host_metrics` points: their native label keys, not key-redacted, subject to the label bans below.
 - Process scraper: metric `process.memory.usage` only, stored as `process_memory_usage_bytes{host_name, process_executable_name}`; the resource attributes `process.pid`, `process.parent_pid`, `process.command`, `process.command_line`, `process.executable.path` and `process.owner` are disabled at the source (ADR-003 item 16).
@@ -109,9 +115,11 @@ Key-level attribute redaction, `allow_all_keys: false`, applies only to the omp 
 | Merge-queue batch event | `batch`, `msg` (the event name), `build`, `sha`, `failed_check`, `members`, `landed`, `ejected`, `builds`, `flaky` | `(batch, msg)` | journal timestamp |
 | Deploy record | `host`, `closure`, `previous_closure`, `ts` | `(host)` | `ts` |
 
-Explicitly never stored, whatever their source: `gen_ai.input.messages`, `gen_ai.output.messages`, `gen_ai.system_instructions`, `gen_ai.tool.call.arguments`, `gen_ai.tool.call.result`, `gen_ai.tool.definitions`, `gen_ai.retrieval.query.text`, `gen_ai.prompt`, `gen_ai.completion`, `exception.message`, `exception.stacktrace`, span status messages, `user.email`, `user.id`, `user.account_uuid`, `user.account_id`, and any OTLP log record other than a `devloop` row (charter v22).
+Explicitly never stored, whatever their source: `gen_ai.input.messages`, `gen_ai.system_instructions`, `gen_ai.tool.definitions`, `gen_ai.retrieval.query.text`, `gen_ai.prompt`, `gen_ai.completion`, `exception.message`, `exception.stacktrace`, `user.email`, `user.id`, `user.account_uuid`, `user.account_id`, `organization.id`, `workspace.host_paths`, `ccr.session.id`, span events (Claude Code's `tool.output` included, whose content is stored as `gen_ai.tool.call.result` on its span), span links, Claude Code's `api_request_body` and `api_response_body` events, and any OTLP log record other than a `devloop` row or an `agent` session-event row (charter v22; operator 2026-11-22).
+`gen_ai.output.messages`, `gen_ai.tool.call.arguments`, `gen_ai.tool.call.result` and span status messages are stored on `agent` spans only (operator 2026-11-22).
+On `agent` spans and session events every kept string value is at most 64 KiB and has the credential shapes of `schema.nix`'s `agentSession.credentialPatterns` masked.
 A `devloop` row is an OTLP log record restricted to the column allow-list above and carrying no message body, so the journald `MESSAGE` of a gitea-mq line is dropped once parsed and the nixbot queries select no `error` text (charter v22).
-This list documents intent; enforcement is the allow-lists, so on the omp pipeline, in journald records and in `devloop` rows a key absent from its list is dropped.
+This list documents intent; enforcement is the allow-lists, so on the agent-session pipelines, in journald records and in `devloop` rows a key absent from its list is dropped.
 
 journald unit allow-list: `gitea`, `gitea-mq`, `nixbot*`, `niks3*`, `nix-daemon`, `nix-grpc-daemon`, `harmonia-gc`, `postgresql`, `nginx`, `greptimedb`, `opentelemetry-collector`, `zerotierone`.
 Never on the list: `omnigent*`, `omnigent-host-*`, `omnigraph`, `user@*`, and session scopes, because their output can carry agent or user content.
@@ -124,7 +132,7 @@ launchd job allow-list, darwin, by label: `org.nixos.nix-daemon`, `org.nixos.nix
 The probe writes each `org.nixos.omnigent-host-<owner>` label as `org.nixos.omnigent-host-<alias>` from the same owner-to-alias attrset.
 A job is expected to run continuously when its evaluated `serviceConfig.KeepAlive` is `true`, and `schema.nix` renders that set for ADR-009's not-running rule; jobs with conditional or no `KeepAlive` are judged by exit code and launches only.
 
-Metric label bans: pull-request number, commit SHA, derivation or store path, build id, `gen_ai.conversation.id`, `session.id`, trace or span id, `omp.gen_ai.agent.id`, the five `omp.agent.*.count` attributes, any person identifier, `process.pid`, `process.parent_pid`, `process.command`, `process.command_line`, `process.executable.path`, `process.owner`, a launchd job's `pid`, smartctl's `serial_number`, zerotierone's per-peer `node_id`, and filesystem mountpoints under `/Volumes/` or `/private/var/folders/`.
+Metric label bans: pull-request number, commit SHA, derivation or store path, build id, `gen_ai.conversation.id`, `session.id`, trace or span id, `omp.gen_ai.agent.id`, the five `omp.agent.*.count` attributes, any person identifier except `user.name` on `agent` series, `process.pid`, `process.parent_pid`, `process.command`, `process.command_line`, `process.executable.path`, `process.owner`, a launchd job's `pid`, smartctl's `serial_number`, zerotierone's per-peer `node_id`, and filesystem mountpoints under `/Volumes/` or `/private/var/folders/`.
 Process command lines are banned because they can carry secrets passed as arguments and agent prompt content, and the other process keys are banned because a pid changes on every restart, so a restart-looping unit would mint one series per restart.
 These may appear as span or log-row columns in `devloop` and `agent`, where they do not create series.
 
@@ -134,7 +142,7 @@ Budget per consumer:
 |---|---|---|---|---|
 | Fleet | `fleet` | at most 8,000 active series; at most 200 distinct values per label key per metric, except `process_executable_name`, bounded instead by 30 values per agent host (Q10), and `systemd_unit_name`, bounded instead by 40 values per NixOS agent host (Q12) plus that host's `observability-notify@` instances; per host at most 30 `process_executable_name` values, 40 `systemd_unit_name` values other than `observability-notify@` instances, at most one `observability-notify@` instance per unit in the host's `services.observability-notify.units`, and 30 `launchd_label` values (charter v23) | journald at most 100 MB per host per day, provisional | metrics 30 d; logs table 14 d |
 | Dev-loop | `devloop` | no metric series; rows only | at most 100,000 rows per day | 365 d |
-| Agent harness | `agent` | at most 2,000 active series; `gen_ai.tool.name` at most 200 values | at most 200,000 span rows per day when spans are wired | 90 d |
+| Agent harness | `agent` | at most 2,000 active series, regulated hourly; `gen_ai.tool.name` at most 200 values | at most 200,000 span rows per day | 30 d |
 
 Retention beyond 365 d for dev-loop data is the Parquet export path of ADR-006, not in-store history.
 
@@ -145,7 +153,7 @@ An allow-list rather than a deny-list is required because new content-bearing ke
 Keeping native names for scraped metrics avoids a rename layer whose only output would be different names.
 Dev-loop data gets the longest retention because it is the primary consumer and its volume is small: under 60,000 check outcomes per day at the measured evaluation ceiling (`research/otel-collector-topology.md` F42), and nixbot prunes its own rows at 90 days, so the store is the only place longer CI history can live (`research/dev-loop-signals.md` RF3).
 Fleet metrics at 30 d cover the incident-review windows recorded so far; fleet logs at 14 d bound the one signal whose volume is unmeasured.
-Agent-harness data at 90 d covers planning-unit sizing over a quarter, while limiting how long a personal activity record persists (`research/telemetry-security-and-tenancy.md` Q6).
+Agent-harness data was kept 90 d to cover planning-unit sizing over a quarter; since 2026-11-22 it is kept 30 d, because `agent` now holds session content and a shorter horizon limits how long a personal activity record persists (`research/telemetry-security-and-tenancy.md` Q6; Q6 below).
 Banning unbounded domains from metric labels is the single rule that keeps the budget satisfiable in one store, so RK4 does not fire (`research/otel-collector-topology.md` Bearing on D4).
 `omp.gen_ai.agent.id` and the `omp.agent.*.count` attributes are dropped because the first is per-instance and the second multiplies every tool series by run shape while feeding no decision in ADR-005.
 The fleet envelope was 6,000 series: the measured 392 points per host at seven hosts plus service endpoints, with headroom.
@@ -173,7 +181,7 @@ The RAM that zram's compressed pool occupies is not exported by any pinned colle
 - Unlimited retention for dev-loop data in the store: unbounded growth on magnetite's local caches and R2, when ADR-006 already provides a Parquet path.
 - Separate store for dev-loop telemetry: the budget is satisfiable in one store once metric labels are bounded (RK4 not confirmed).
 - Collecting omp OTLP logs through a redaction stage: the log signal has no emitter-side content gate and string bodies defeat the redaction processor (see ADR-008).
-- Person identifiers as attributes: no decision in ADR-005 needs them, and they make the store a personal-activity record.
+- Person identifiers as attributes: no decision in ADR-005 needs them, and they make the store a personal-activity record; revised on 2026-11-22 for `user.name` on `agent` data only, under the operator's organisational model (Q2).
 - Admitting `process.command_line` or `process.pid` under a redaction stage: a command line is content that a redaction pattern cannot enumerate, and a pid mints a series per restart; disabling them at the source keeps them out of collector memory.
 - Verbatim `omnigent-host-<owner>` unit names: each owner's name becomes a label value in `fleet` (ADR-003 Q12).
 - Reusing `systemd_unit_state` and `systemd_service_restarts_total` for launchd jobs: launchd's states and launch counter differ in meaning from systemd's, so one name would put incomparable series under one rule.
@@ -183,8 +191,8 @@ The RAM that zram's compressed pool occupies is not exported by any pinned colle
 
 The collector configuration and the regulator read one allow-list file, so widening the schema is a reviewed change to that file.
 Any new emitter attribute is dropped until added, which can hide a useful field until someone notices its absence.
-Failure classes for omp come only from `error.type`, and Omnigent tool failure classes remain unavailable under its content-safe configuration (`research/dev-loop-signals.md` RF12).
-Per-person cost attribution is not possible from the store; attribution is per host and per service.
+Failure classes for omp metrics come only from `error.type`; on agent-telemetry hosts omp's and Claude Code's spans also carry each tool's status and output, and Omnigent tool failure classes remain unavailable under its content-safe configuration (`research/dev-loop-signals.md` RF12).
+Per-person cost attribution is possible only for agent sessions, through `user.name` on `agent`; elsewhere attribution is per host and per service.
 The metric engine's metadata region and pipeline table never expire (`research/greptimedb.md` F36), so the store is not fully self-expiring.
 The journald volume envelope is provisional until a week of measurement exists (Q4).
 Process executable names are set by the running program, so a worker can choose them; the floor, 64 MiB on NixOS and 384 MiB on darwin, the per-host cap of 30 values and R4.2 bound what that admits.
@@ -209,7 +217,7 @@ TTLs are asserted, not only set: ADR-007's `greptimedb-schema` oneshot enforces 
 
 ## Failure prevented
 
-- Attribute allow-list: prompt, tool, or repository content reaches a store every admitted reader can query (RK5).
+- Attribute allow-list: prompt, tool, or repository content outside the agent-session allow-lists reaches a store every admitted reader can query (RK5).
 - journald unit allow-list: worker output written to the journal reaches the store through a path the attribute allow-list does not cover.
 - Metric label bans: a series explosion consumes store memory on a host that has already been OOM-killed (RK3).
 - Per-database retention: dev-loop history is lost at nixbot's 90-day prune, or fleet logs grow without bound.
@@ -237,14 +245,18 @@ TTLs are asserted, not only set: ADR-007's `greptimedb-schema` oneshot enforces 
    Resolution: recommended answer accepted at the 2026-10-15 gate.
 2. Q2: Are person identifiers excluded from the store entirely? Recommended: yes; keeping them enables per-person cost attribution and makes the store a personal-activity record readable by every admitted reader.
    Resolution: recommended answer accepted at the 2026-10-15 gate.
+   Revised 2026-11-22: `user.name`, the person a session runs for, is admitted on `agent` data (operator; `agent-session-telemetry` design D4); every other person identifier stays excluded.
 3. Q3: Are omp spans in scope for the first deployment? Recommended: no, metrics only, per ADR-005; enabling them adds `gen_ai.conversation.id` rows to `agent` under the same allow-list.
    Resolution: recommended answer accepted at the 2026-10-15 gate.
+   Revised 2026-11-22: yes, with content (`agent-session-telemetry` design D6).
 4. Q4: Is the 100 MB per host per day journald envelope accepted as provisional pending one week of measurement? Recommended: yes; the alternative is deferring the log leg until measured.
    Resolution: recommended answer accepted at the 2026-10-15 gate.
 5. Q5: Should Omnigent's package gain its `tracing` extra so its metrics enter `agent`? Recommended: defer to ADR-008, under which no omnigent worker account receives an OTLP endpoint or credential in this slice; until ADR-008 is revised Omnigent contributes nothing.
    Resolution: recommended answer accepted at the 2026-10-15 gate.
+   Revised 2026-11-22: ADR-008 now gives worker accounts on agent-telemetry hosts the loopback endpoint for their Claude Code and omp sessions; Omnigent's own telemetry stays out of scope.
 6. Q6: Is agent-harness retention 90 d? Recommended: yes; longer keeps a personal-activity record longer than any listed decision needs.
    Resolution: recommended answer accepted at the 2026-10-15 gate.
+   Revised 2026-11-22: no, 30 d, decided by the operator with the admission of session content (`agent-session-telemetry`).
 7. Q7: Should the allow-list admit `omp.gen_ai.agent.name`? Recommended: yes, it is bounded by the agent roster; dropping it loses the per-subagent breakdown of tool calls and errors.
    Resolution: recommended answer accepted at the 2026-10-15 gate.
 8. Q8: Raise the `fleet` active-series budget from 6,000 to 8,000 for the host-level signals? Recommended: yes, per the per-host arithmetic in Rationale, which with stibnite's 222 series reaches about 5,686 and leaves 2,314 of headroom; the alternative keeps 6,000 and leaves about 314 series of headroom over the estimated 3,000 base plus 2,464 plus 222.

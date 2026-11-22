@@ -6,6 +6,7 @@ title: "ADR-001: Telemetry store"
 
 Accepted (human gate, 2026-10-15).
 Amended in place under charter v11 (2026-10-16): the store package is `greptimedb-bin` because its upstream release tarball embeds the dashboard ADR-002 adopts, and R1.1 requires a stable release that serves that dashboard.
+Amended in place on 2026-11-22 under OpenSpec change `agent-session-telemetry` (Linear CAM-120; operator's ratification, the change's decision record D17): the Context records that 1.2.1's built-in `greptime_trace_v1` model carries the agent spans that change stores, so `greptime_trace_v2` is not required.
 
 ## Context
 
@@ -33,6 +34,7 @@ The functional differences between those versions that bear on this design are e
 Both 1.1.4 and 1.2.1 silently discard OTLP exponential histograms (`research/greptimedb.md` R7), which `v1.3.0-beta.2` ingests by default (`research/greptimedb.md` R8).
 Both lack the Prometheus `/metadata` route (`research/greptimedb.md` R12), which the Perses Prometheus plugin requests (`research/perses.md` F17).
 Both lack the `greptime_trace_v2` pipeline (`research/greptimedb.md` R9).
+1.2.1 accepts traces through its built-in `greptime_trace_v1` model, which `agent-session-telemetry` uses for Claude Code's and omp's spans with pre-created tables; `greptime_trace_v2` is not required.
 Neither accepts bearer tokens, and the bearer path that exists from `v1.3.0-alpha.1` still has no open-build provider behind it (`research/otel-collector-topology.md` C1, `research/telemetry-security-and-tenancy.md` R5, R6).
 Neither reloads a credential file across a sops-nix symlink swap, which is fixed from `v1.3.0-beta.1` (`research/telemetry-security-and-tenancy.md` R7).
 `v1.2.1` carries PromQL correctness fixes that 1.1.4 lacks, including counter-reset accumulation in rate windows (`GreptimeTeam/greptimedb@8174697c9`) and NULL-sample and counter-extrapolation backports (`GreptimeTeam/greptimedb@7cf45a21a`), plus a jemalloc thread-cache initialization fix (`GreptimeTeam/greptimedb@d99a88261`).

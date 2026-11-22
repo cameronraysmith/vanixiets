@@ -6,7 +6,7 @@ No harness exports today: Claude Code is not an emitter (ADR-004:69), no NixOS a
 
 Agent sessions run on magnetite and pyrite as the human user `cameron` (herdr panes and terminals, `homeManager.ai`) and as the omnigent workers `omnigent-cameron` and `omnigent-janettesmith` (`homeManager.omnigent-worker`, `modules/nixos/omnigent-host.nix:335-350`; owners in `modules/clan/inventory/services/omnigent.nix:64-103`).
 
-On 2026-11-22 the operator decided (brainstorm.md): record every such session, content included, readable by every store reader under an organisational model, with the group's consent; keep 30 days; Claude Code and omp first; no cloud sessions, no Langfuse, stibnite later. Traces, first left out, are included (D6, the decision record's D13), because omp puts its message content only on spans.
+On 2026-11-22 the operator decided (brainstorm.md): record every such session, content included, readable by every store reader under an organisational model, with the group's consent; keep 30 days; Claude Code and omp first; no cloud sessions, no Langfuse, stibnite later. Traces, first left out, are included (D6, the decision record's D13), because omp puts its message content only on spans; tool output, first left out, is stored (D15); and Langfuse Cloud was added later the same day as an experiment (D16).
 The store cannot isolate a database from any read-only account (`GreptimeTeam/greptimedb@v1.2.1:src/auth/src/permission.rs:320-353`, `src/auth/src/user_provider/static_user_provider.rs:75-83`; world assumption A188), which is why the operator's choice is between shared content and no stored content, not a private database.
 
 Stakeholders: the operator (decides, reads), Janette (her workers' sessions are recorded, consent stated by the operator, A189), every holder of a store reader (`perses`, `regulator`).
@@ -22,7 +22,7 @@ Stakeholders: the operator (decides, reads), Janette (her workers' sessions are 
 **Non-Goals:**
 - Span events as such (Claude's `tool.output` is copied onto its span first, D15) and span links (cleared, the span kept, D15); the Jaeger query API (`modules/nixos/greptimedb.nix:288`, ADR-007 E7.1, a separate decision).
 - stibnite: its `127.0.0.1:4318` receiver already feeds `fleet` from `otelcol-process` (`modules/lib/otel-collector-darwin.nix:128-129,308`); moving it is a darwin change for the operator's console deploy.
-- Claude's cloud sessions, claude-sandbox, the `claude-glm` and `claude-cerebras` wrappers, Langfuse, a public endpoint, omnigent's own telemetry (ADR-005 Q5).
+- Claude's cloud sessions, claude-sandbox, the `claude-glm` and `claude-cerebras` wrappers, Langfuse beyond D16's experiment, a public endpoint, omnigent's own telemetry (ADR-005 Q5).
 - Per-reader isolation of content (impossible at 1.2.1, A188).
 
 ## Decisions
@@ -327,9 +327,47 @@ The decision record's D16 sends agent traces to Langfuse Cloud as well as to Gre
     - `langfuse`: `blocked_on_user` was stored and not sent. With the sink stopped, then answering 403, 429 and 413, every POST answered 200, the store held each 5-span batch once, `otlp/local` refused nothing, there were no enqueue failures, and the queue peaked at about 1.6 KB and emptied. 403 and 413 dropped after one attempt (11 s, the batch's flush timeout). Down dropped after 27.7 s, and 429 after 26.5 s and 4 attempts, both at the limit. Langfuse received again afterwards.
   - The uncommitted mutant `langfuseBeforeMask` (fan-out before the mask) fails `agentSpans` with "github reached Langfuse unmasked" (`logs/d16-vmtest-fleet-ingress-mutant-langfuseBeforeMask-*.log`).
 
+## As deployed (2026-11-22)
+
+The change shipped as ten pull requests, all merged on 2026-11-22 (#4147 is an unrelated dependency update):
+
+| PR | Merge | What |
+|---|---|---|
+| #4143 | 7666cbe8 | the OpenSpec proposal |
+| #4144 | aaaed2a5 | store side: `agent` at 30 d, `agent.session_event` with its full-text indexes and the `agent_session_event` pipeline |
+| #4145 | f4ec2458 | collector side: `otlp/local` with the fail-closed metric and event pipelines |
+| #4146 | 25bd7ea2 | emitters: Claude Code's and omp's settings for every human and worker home on magnetite and pyrite |
+| #4148 | 13a4641f | traces (D6): `agent_span` through `greptime_trace_v1` with a closed span key set |
+| #4149 | 72f782b8 | the agent-session collector unit (D14) and magnetite's `otlp/loopback` hand-off |
+| #4150 | 2c7ee83f | tool output stored, capped and masked (D15), the schema job's ALTERs, and the F8 fix |
+| #4151 | e1d4962d | the Langfuse Cloud fan-out (D16) |
+| #4152 | de9bf36e | the F9, F10 and F11 fixes: omp's `details` strip with its fail-closed marker, the blob net, word boundaries, the unit's `Wants=` on the schema job |
+| #4153 | bd95469f | the R1 fix and the review's follow-ups: line-initial keys, non-string values deleted, Langfuse's exporter pinned, the schema job's probe timeout |
+
+**Live**: magnetite and pyrite both run main bd95469f (magnetite switched 23:08:04–23:08:48Z, pyrite 23:20:09–23:21:20Z, `logs/r1-*.log`).
+- magnetite: the store's `agent` database (30 d) with `session_event` and `agent_span`; its shared collector is the ingress, with `otlp/loopback` on `127.0.0.1:4321`; `otel-agent-session.service` holds `127.0.0.1:4318` and sends to the store through `otlp/loopback` and to Langfuse Cloud.
+- pyrite: `otel-agent-session.service` holds `127.0.0.1:4318` and sends over the mesh to magnetite's ingress and to Langfuse Cloud; pyrite's shared collector is as on main before #4145.
+- Both: Claude Code and omp in every human and worker home emit; Claude Code's metrics, session events and spans and omp's two metrics and spans arrive in GreptimeDB with host and person; the same spans, less `claude_code.tool.blocked_on_user`, arrive in Langfuse (17 of 18 and 41 of 42 at deploy, no send failure). The orchestrator read five real traces back from Langfuse's `/api/public/v2/observations` (HTTP 200): omp traces show the agent, two generations (the prompt as input of the first, the reply as output, token usage) and the tool with its arguments and result; Claude Code traces show the interaction with the prompt, two generations with usage but no input or output text, and the Bash tool with its command and output; the masking trace shows `****` for both dummy keys and the two plain words unmasked.
+- stibnite: not enabled (operator, task 7.2).
+
+**Findings from the deploys and the last review, and their fixes:**
+- F8 (#4148/#4149 deploy): `last_user_message` held omp's injected `<system-reminder>` text, because the copy took the first text part. Fixed in #4150: the last text part, with a leading reminder stripped (task 11.6).
+- F9 (#4150 review): three key shapes lacked a word boundary, so `task_test_configuration` was stored as `ta****`. Fixed in #4152 with `\b`, which R1 then replaced.
+- F10 (#4150 deploy): omp's tool result carried `details.trace.syntax`, a base64 copy of the parsed shell command, so a token in a command was stored intact inside it. Fixed in #4152: the `details` strip on omp spans before the cut, a fixed marker for any value still holding a `details` key, and the two-alphabet blob net (tasks 11.9, 11.10).
+- F11 (#4150 deploy): the agent unit started before the schema job's ALTERs finished, so the store refused two spans for unknown columns and `otel-envelope` posted FAILED and RESOLVED once. Fixed in #4152: the unit `Wants=` the job as well as `After=` it; at the #4151–#4153 deploy it started after the job ended and no span was refused (task 11.12).
+- R1 (review of #4151–#4152): `\b` missed every `sk-`, `sk_` or `rk_` key at the start of a line, after a tab or after a colour code in omp's JSON. Fixed in #4153: no boundary, precise body lengths (task 11.14); both hosts' masking sessions stored the keys as `****` and the two plain words unmasked.
+
+**D18 (delete authorised by the operator)**: the 2 `agent_span` rows of the deployer's own #4150 test sessions whose result held `"details"` could not be deleted: the store answered `DELETE is not allowed under append mode` (code 1004), and nothing changed (`logs/r1-magnetite-d18-20261122T2314Z.log`). The operator's decision: keep them until the 30-day TTL.
+
+**Known limits:**
+- Masking catches token shapes and unwrapped base64 runs only: a password, an AWS secret access key or any credential without a fixed shape is stored as written, and so is an encoded secret wrapped across lines or split by escapes.
+- `agent_span` is an append-mode table (the `greptime_trace_v1` model's), so its rows cannot be deleted selectively: a stored secret stays until the 30-day TTL unless the table's mode is changed or the table recreated.
+- Claude Code traces in Langfuse show the prompt on the interaction but no assistant text: Claude Code's request spans carry usage and no request or response text with detailed tracing off, and its response is on the `assistant_response` event, which only GreptimeDB receives.
+- Langfuse's Hobby allowance, 50,000 units a month, will be exceeded at this fleet's use (D16, Volume). A block would be silent: Langfuse answers 403, which the exporter drops at once and `otel-agent-session-envelope` does not page (`sendFailedExempt`); only the unit's own `otelcol_exporter_send_failed_spans{exporter="otlp_http/langfuse"}` shows it.
+
 ## Risks / Trade-offs
 
-- [Risk] Every store reader reads every session's prompts, responses and tool arguments, which can include secrets a person pasted. → The operator's decision (option C) accepts it under the organisational model; 30-day retention bounds it; tool output and raw bodies stay out. Recorded in the trust boundary.
+- [Risk] Every store reader reads every session's prompts, responses, tool arguments and, since D15, tool output, which can include secrets a person pasted or a tool printed. → The operator's decision (option C, then D15) accepts it under the organisational model; 30-day retention bounds it; credential shapes are masked (not every secret); raw bodies stay out. Recorded in the trust boundary.
 - [Risk] magnetite's collector is the fleet's single ingress; a bad pipeline stops every host's ingest. → VM test first; agent hosts queue during a rollback; the 15-minute watch with a named rollback.
 - [Risk] A forged sender: any local account can post to `otlp/local` with any `user.name` (A194). → Accepted; stated in the trust boundary; the allow-lists still bound what is stored.
 - [Risk] Concurrent sessions' deltas on one host collide at the same millisecond and the metric engine keeps one (A192). Per pair of concurrently active sessions with identical labels, each exporting once a minute at an independent phase, the chance per minute is about 1/60,000; at 8 such sessions (28 pairs) about 4.7 × 10⁻⁴ per minute, about 0.7 lost one-minute deltas a day, an undercount near 0.01 %. → Accepted; events carry exact per-request token counts and cost for exact sums.
@@ -340,9 +378,9 @@ The decision record's D16 sends agent traces to Langfuse Cloud as well as to Gre
 - [Resolved by D14] Fleet and agent metrics shared pyrite's `otlp_http/ingress` exporter, so stuck agent items could hold that exporter's consumers (`CollectorChainReview`). → Agent metrics now leave through the agent-session collector's own `otlp_http/ingress-metrics`.
 - [Risk, accepted] Any local account can flood `127.0.0.1:4318` (A194). Since D14 that trips the agent-session collector's limiter or ceiling first, costing agent telemetry. On magnetite what passes its allow-lists still reaches the ingress's shared limiter through `otlp/loopback`, bounded by D14: every kept value at most 64 KiB, one request per signal in flight (`num_consumers = 1`), so at most three hand-off requests at once, each no larger than the 20 MiB the unit's receiver accepted. → Accepted under the organisational model; `otel-agent-session-envelope`'s C4 posts the refusals and the notifier posts a restart.
 - [Risk, accepted] omp's emitter settings do not enforce: a project `.env` in a session's working directory overrides `~/.omp/agent/.env`, so a repository can switch omp's traces, content level or buffer bound (A197). → The collector's allow-lists still bound what leaves the host; only the buffer bound and the export itself depend on the file.
-- [Watch] `tool_result.error` (`schema.nix`'s events allow-list) is the only listed key whose value comes from a tool's result. → Read the first real failed-Bash rows after deploy (task 5.2); drop the key if it carries tool output.
-- [Trade-off] The ingress holds about 42 min of omp spans while the store is down (D6, D10), against 2 h for events. → Accepted to stay under 512 MiB without touching devloop's sizes; a longer store outage loses the oldest spans, which the queue's drop counters show.
-- [Trade-off] Only the first text part of the newest user message becomes `last_user_message`, found in the last 64 KiB of `gen_ai.input.messages`, and only on the spans D15 admits. Attached images, further parts and a newest message longer than 64 KiB yield none, and so does a change to omp's message shape; none of these ever leaks content, because the allow-list drops the source attribute either way.
+- [Watch] `tool_result.error` (`schema.nix`'s events allow-list) is the only listed event key whose value comes from a tool's result. → Read the first real failed-Bash rows (task 9.7); none existed at close-out.
+- [Trade-off] The ingress holds about 17 min of both hosts' spans while the store is down (D10, D15), against 2 h for events; each host's agent-session collector holds 3.2 h more. → Accepted to stay under 512 MiB without touching devloop's sizes; a longer store outage loses the oldest spans, which the queue's drop counters show.
+- [Trade-off] Only the last text part of the newest user message, with omp's leading reminder stripped, becomes `last_user_message`, found in the last 64 KiB of `gen_ai.input.messages`, and only on the spans D15 admits. Attached images, earlier parts and a newest message longer than 64 KiB yield none or part, and so does a change to omp's message shape; none of these ever leaks content, because the allow-list drops the source attribute either way.
 - [Risk] The agent-session collector cannot bound concurrent request decoding (A200): eight omp sessions posting max-size contexts in the same seconds, or 64-span bursts from several sessions, can make it refuse spans or restart. None of this host's 890 session-hours came near it. → Accepted by D14 as agent loss only; the host's collector is unaffected (load proof in D14), `otel-agent-session-envelope` C4 posts refusals, and systemd restarts the unit in 5 s.
 
 ## Migration Plan

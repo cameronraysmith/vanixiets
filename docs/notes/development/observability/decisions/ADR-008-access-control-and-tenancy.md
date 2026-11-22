@@ -7,6 +7,7 @@ title: "ADR-008: Access control and tenancy"
 Accepted (human gate, 2026-10-15).
 Amended in place under charter v11 (2026-10-16): the read side follows ADR-002's embedded dashboard, admitted through `sso-gateway` with the `perses:ro` credential injected by nginx.
 Amended in place under charter v28 (2026-11-05): the read side follows ADR-002's reversal to a standalone Perses server at `obs.scientistexperience.net`, which logs readers in through its own Kanidm client scoped to `perses_users` and holds the `perses:ro` credential itself; the v11 admission through `sso-gateway` is superseded.
+Amended in place on 2026-11-22 under OpenSpec change `agent-session-telemetry` (Linear CAM-120; the operator's content and consent decisions and ratification, the change's decision records D15, D16 and D17): the shared read zone admits the agent-session content of ADR-004's agent-session allow-lists into `agent`, readable by every store reader under the operator's organisational model (Q3, Q5); the local OTLP receiver's one logs pipeline, the agent-session metric and span stages, the emitter posture and the worker accounts' loopback endpoint follow; agent spans also go to Langfuse Cloud per host flag; R8.1 and R8.3 are restated for the agent-session pipelines.
 
 ## Context
 
@@ -50,7 +51,7 @@ Public surfaces:
 
 ## Decision
 
-Adopt a content-free shared read zone: the per-host collector is the only content boundary and the only path into the store, the store holds the four mode-separated credentials of ADR-007 of which no worker holds any, and every admitted reader may read all stored telemetry.
+Adopt a shared read zone: the per-host collector is the only content boundary and the only path into the store; on hosts whose `flake.lib.observabilityHosts` row sets `langfuse`, the agent-session collector also sends the same filtered, capped and masked agent spans to Langfuse Cloud (EU), where the Langfuse project's members and the vendor can read them (agent-session-telemetry design D16). The store holds the four mode-separated credentials of ADR-007 of which no worker holds any, and every admitted reader may read all stored telemetry, which is content-free except the agent-session content item 5 admits.
 
 What is enforceable with the open build, and is enforced:
 
@@ -58,22 +59,22 @@ What is enforceable with the open build, and is enforced:
 2. Read/write separation by user mode, with the four users ADR-007 enumerates: `collector` is `wo` and held only by the ingress collector on magnetite (ADR-003); `perses` is `ro` and held only by nginx on magnetite, which injects it into dashboard readers' requests (ADR-002); `regulator` is `ro` and held only by the read-only regulator units `otel-envelope` (ADR-003, ADR-004, this record), `devloop-reconcile` (ADR-005), `greptimedb-envelope` (ADR-007) and `fleet-alert.service` (ADR-009); `admin` is `rw` and held only by the local `greptimedb-schema` and `greptimedb-export` oneshots of ADR-007 and ADR-006, unless ADR-002 Q9 also assigns it to the dashboard reconcile oneshot.
 3. Network placement: the store's HTTP port binds loopback only for ingest (ADR-007), and the only mesh-facing telemetry listener is the mTLS ingress receiver (ADR-003).
 4. Configuration immutability against workers: each collector runs under a system account outside every worker UID, NixOS `DynamicUser` or darwin `_otelcol`, except the darwin `otelcol-process` collector, which runs as root because process inspection requires it, has no receiver endpoint and holds no credential (ADR-003 item 22); every collector's configuration is in the Nix store and its credentials, where it has any, are delivered by `LoadCredential` or as `0400` files owned by that account.
-5. Content exclusion at that collector, fail-closed, as follows.
+5. Content control at that collector, fail-closed, as follows: content is excluded everywhere except the agent-session content on ADR-004's agent-session allow-lists, namely Claude Code's prompt, response and tool-detail keys on its session events and, on `agent` spans, the prompts, responses, tool arguments and tool output of Claude Code and omp, which the operator admitted on 2026-11-22 and which every store reader may read (Q5).
 
 Collector content stages, applied on every agent before any exporter:
 
-1. No logs pipeline consumes the local OTLP receiver, so OTLP log records from any emitter are refused regardless of emitter settings.
-2. On the agent (omp) pipeline only, `redaction` on traces and metrics with `allow_all_keys: false`, `allowed_keys` from ADR-004's agent key allow-list, and `summary: silent`, plus a `filter` that drops every omp metric whose name is not on ADR-004's metric-name allow-list (`omp.agent.tool.calls` and `omp.agent.errors`); Prometheus-scraped and `host_metrics` points keep their native label keys, bounded by ADR-004's cardinality rules rather than by key redaction.
-3. `transform` on traces clearing span status messages and removing span events named `exception`.
+1. Only one logs pipeline, `logs/agent-session`, consumes the local OTLP receiver, and only on hosts whose host-table row sets `agentTelemetry`, where the receiver belongs to the agent-session collector (ADR-003 item 3); it admits records whose `service.name` is `claude-code` and whose `event.name` is on ADR-004's agent-session event allow-list, keeps only that event's allow-listed keys, replaces the body with an empty string and refuses everything else; elsewhere no logs pipeline consumes it.
+2. On the agent-session pipelines only: for metrics, a `filter` admitting `service.name` `claude-code` and `oh-my-pi`, a `filter` that drops every metric whose name is not on ADR-004's metric-name allow-lists (the eight `claude_code.*` metrics, `omp.agent.tool.calls` and `omp.agent.errors`), and a `transform` keeping only ADR-004's agent metric point and resource keys; for spans, the same service `filter` (`filter/agent-session-service`) and `transform/agent-session-spans` keeping only ADR-004's agent span and resource keys and clearing scope attributes, rather than `redaction`; Prometheus-scraped and `host_metrics` points keep their native label keys, bounded by ADR-004's cardinality rules rather than by key redaction.
+3. On agent-session spans: Claude Code's `tool.output` event is copied onto its span as `gen_ai.tool.call.result`, omp's tool-result `details` cache is stripped, span links are cleared, every span event is dropped (`filter/agent-session-span-events`), and every kept span value and the status message are cut to 64 KiB; a following stage, `transform/agent-session-mask`, replaces ADR-004's credential shapes and long base64 runs with `****` in every kept string of spans and session events, a defence in depth that catches token-shaped strings, not every secret.
 4. On journald logs, a `filter` that drops every record whose `_SYSTEMD_UNIT` is not on ADR-004's unit allow-list, independent of the receiver's own `units` setting.
 5. A `transform` that replaces each surviving journald map body with its `MESSAGE` string and keeps only the journal fields on ADR-004's journald field allow-list as attributes, so no string body enters the store from a source not on the unit allow-list, because `redaction` does not protect string bodies.
 6. Every record bound for `devloop` keeps only the columns on ADR-004's per-signal `devloop` column allow-list, under the primary key and time index ADR-004 states for that table.
 
 Emitter posture, a starting state and not an enforcement point:
 
-1. omp is configured with `OTEL_LOGS_EXPORTER=none` and without `OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT`, pointing at the local agent (see ADR-005).
+1. omp is configured with `OTEL_LOGS_EXPORTER=none`, `OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT=full`, a metrics and a traces endpoint, `OTEL_BSP_MAX_QUEUE_SIZE=64` and `OTEL_EXPORTER_OTLP_TIMEOUT=5000`; Claude Code with prompts, responses, tool details, traces and tool content on and raw API bodies off; both pointing at the local agent and stamping `user.name`.
 2. `OTEL_` is added to the reserved worker-environment prefixes, which prevents role settings from enabling a content gate but does not constrain code a worker runs (Q4).
-3. In this slice no omnigent worker account receives an OTLP endpoint or credential, so worker sessions emit no telemetry to any collector; enabling worker telemetry requires revising this record (Q3; ADR-004 Q5 and ADR-005 Q5 defer here).
+3. Every omnigent worker account on a host whose host-table row sets `agentTelemetry` receives the loopback OTLP endpoint, and no credential, through its home configuration rather than its unit environment; its Claude Code and omp sessions emit under the same gates as a human's, Janette's included under the consent recorded for Q3 on 2026-11-22.
 
 What is not enforceable with the open build, and is therefore not promised:
 
@@ -90,7 +91,7 @@ Readers and admission:
 1. Humans read through ADR-002's standalone Perses server at `obs.scientistexperience.net`, which logs them in through its own Kanidm OIDC client `perses`, whose only scope map is the group `perses_users`, so Kanidm refuses everyone outside that group.
    Perses has OIDC of its own, so the gateway module's rule that a service without OIDC registers with `sso-gateway` (`modules/nixos/sso-gateway.nix:288-298`) does not apply, and the gateway stays disabled; the operator alone also reads through the store's embedded dashboard over an SSH tunnel to loopback (ADR-002).
 2. Readers hold only `read` permission on a read-only Perses server, and the `perses:ro` credential only indirectly: the server's datasource proxy injects it from a file under its credentials directory and forwards only the anchored query paths and a fixed list of caller headers, so no reader's browser holds a store password and no reader can save, change or delete a view (ADR-002).
-3. Every admitted person reads every stored signal, including the other person's harness metrics; the boundary that makes this acceptable is that the store holds no content and no person identifier (ADR-004).
+3. Every admitted person reads every stored signal, including the other person's harness metrics; the boundary that makes this acceptable is the operator's organisational model of 2026-11-22: every member of the group consented to their agent sessions, content included, being read by the group; the store holds no account identifier of a model provider, and `user.name` on `agent` data is its only person identifier (ADR-004).
 4. A person removed from `perses_users` loses access within 1 h, because Perses renews a session for up to 45 min plus 15 min without consulting Kanidm (ADR-002).
 5. No worker account and no worker-run process holds any store credential.
 
@@ -126,32 +127,35 @@ A shared read zone among admitted people is the smallest model that is true as s
 ## Consequences
 
 Every admitted reader sees all telemetry, so admission to the Kanidm group `perses_users` is the only read decision, and its membership lives in the running Kanidm database rather than in the repository (`research/telemetry-security-and-tenancy.md` F13, R23).
-Content-bearing diagnostics, such as error messages and exception text, are unavailable from the store; failure classes come from `error.type` only (ADR-004).
+Content-bearing diagnostics, such as error messages and exception text, are unavailable from the store outside the agent-session content of `agent` (a failed tool's status message and output on its span, the `error` of a Claude Code `tool_result`); elsewhere failure classes come from `error.type` only (ADR-004).
 A worker can inject misleading telemetry for its own host; the dev-loop consumer must treat agent-harness metrics as emitter-claimed.
-Raising the content bar later, for example admitting a single opt-in content session, requires a separate store or the Enterprise provider, not a configuration change.
+Raising the content bar was decided on 2026-11-22 under the operator's organisational model: agent-session content is admitted to the shared store (Q5), so it needed no separate store and no Enterprise provider; admitting content that some admitted reader may not read would still need one.
+Since agent-session-telemetry design D16, content also leaves the fleet's store for Langfuse Cloud, per host flag; a self-hosted Langfuse would keep it inside the fleet.
 Perses forwards a reader's query to the store with the injected `Authorization` and only the headers its datasource's `allowHeaders` lists, so neither the reader's Perses session cookie nor a caller's `x-greptime-auth` reaches the store (ADR-002).
 Rotation of store credentials requires `restartUnits` on the store, the ingress collector and, from S6, `perses.service`, also after GreptimeDB 1.3, because `LoadCredential` snapshots credentials at start (ADR-007 Q6).
 The relationship to worker isolation is that the worker account boundary protects the collector's configuration and credentials, not the emitter's output, which remains untrusted.
 
 ## Operating envelope and regulator
 
-Envelope: no stored record carries a value from a key outside ADR-004's allow-lists (agent keys, journald fields, `devloop` columns) or an omp metric name outside ADR-004's metric-name allow-list, no stored log record originates from OTLP or from a unit outside the unit allow-list, and no store credential file is readable by a worker UID.
+Envelope: no stored record carries a value from a key outside ADR-004's allow-lists (agent keys, journald fields, `devloop` columns) or a metric name outside ADR-004's metric-name allow-lists, no stored log record originates from OTLP other than a `devloop` row or an `agent` session-event row, or from a unit outside the unit allow-list, and no store credential file is readable by a worker UID.
 
 Regulator R8.1, deterministic, build time: the flake check `checks.x86_64-linux.otel-redaction` runs `otelcol-contrib` with each agent's generated processor stages between an `otlpjsonfile` receiver and a `file` exporter, over fixtures that place one canary string in every never-stored key, in a span status message, in an `exception` event, in an unknown attribute, in an OTLP log record, and in a journald-shaped record from `omnigent-host-cameron`.
 It asserts that the canary appears nowhere in the output, that a positive-control allow-listed field and an allow-listed unit's message do appear, and, by evaluation, that no logs pipeline consumes the local OTLP receiver.
 It is shown able to fail at acceptance by two mutants: `allow_all_keys: true`, and removal of the journald unit filter, each of which must make the check fail with the canary in the output.
+Revised 2026-11-22 (`agent-session-telemetry`): for the agent-session pipelines R8.1 is discharged by `otel-collector-config`'s agent-session clauses and their mutants and by the `fleet-ingress` VM test's `agentSession` and `agentSpans` canaries, in place of a separate `otel-redaction` check; the evaluation clause reads that only `logs/agent-session` consumes the local OTLP receiver, on agent-telemetry hosts.
 
 Regulator R8.2, deterministic, evaluation time: assertions that every file of the `greptimedb-users` and `otel-cert` generators is owned by a non-worker account with mode `0400`, that the store's HTTP bind is loopback, and, if Q4 is accepted, that the existing mutant-tested oracle in `modules/checks/omnigent-environment.nix` rejects an `OTEL_` name in worker environment.
 It is shown able to fail by a mutant that sets a worker as owner of `collector-password`.
 
 Regulator R8.3, runtime: the `otel-envelope` timer of ADR-003, using ADR-007's `regulator` (`ro`) credential, lists the columns of every table in `fleet`, `devloop` and `agent` from `information_schema.columns` and fails when a column of an `agent` table is outside ADR-004's agent key allow-list, a column of a `devloop` table is outside ADR-004's `devloop` column allow-list for that table, or a column of a `fleet` log table is outside ADR-004's journald field allow-list, because GreptimeDB creates a column for each new attribute key; scraped and `host_metrics` tables keep native label columns, bounded by ADR-004's cardinality rules rather than by this check.
 It is shown able to fail at acceptance by writing one span with a disallowed attribute through an administrative credential and observing the unit fail.
+It applies to `agent.agent_span`'s columns too, where the store itself refuses a column off the list first, because the span tables are pre-created and written with `auto_create_table=false` (`agent-session-telemetry`, 2026-11-22).
 
 The dashboard layer's serving-configuration regulator, covering gateway admission, the injected read-only credential and the API listener, is ADR-002's `perses-config`.
 
 ## Failure prevented
 
-- Collector content stages: prompt, tool or repository content reaches a store every admitted reader can query (RK5, W9).
+- Collector content stages: prompt, tool or repository content outside ADR-004's agent-session allow-lists reaches a store every admitted reader can query (RK5, W9), or an admitted value arrives unbounded or with a token-shaped credential unmasked.
 - Refusing OTLP logs: omp's ungated log messages bypass every content gate.
 - journald unit filter and body transform: worker output in the journal enters the store as a string body the redaction processor does not inspect.
 - Credentials only in the ingress collector, nginx, the read-only regulator units and the administrative oneshots: a compromised or prompt-injected worker obtains a read channel over all fleet telemetry.
@@ -166,7 +170,7 @@ The dashboard layer's serving-configuration regulator, covering gateway admissio
 ## Implementation surface
 
 - Add `modules/checks/otel-redaction.nix`: regulator R8.1, reading `modules/clan/services/otel-collector/schema.nix` (ADR-004).
-- Modify `modules/clan/services/otel-collector/flake-module.nix` (ADR-003): the content stages above, the absence of a logs pipeline on the local OTLP receiver, and the R8.2 ownership assertions for `otel-cert`.
+- Modify `modules/clan/services/otel-collector/flake-module.nix` (ADR-003): the content stages above, the local OTLP receiver's single logs pipeline on agent-telemetry hosts and none elsewhere, and the R8.2 ownership assertions for `otel-cert`.
 - Modify `modules/lib/omnigent-environment.nix`: add `OTEL_` to the reserved prefixes, if Q4 is accepted.
 - Modify `modules/checks/omnigent-environment.nix`: add an `OTEL_` policy mutant, if Q4 is accepted.
 - Modify `modules/nixos/kanidm.nix` (ADR-002, charter v28): the group stub `perses_users` with `members = [ ]` and `overwriteMembers = false`, members managed operationally as for `omnigent_users`, and the client `systems.oauth2.perses` whose only scope map is that group.
@@ -183,10 +187,12 @@ The dashboard layer's serving-configuration regulator, covering gateway admissio
    Resolution: recommended answer accepted at the 2026-10-15 gate.
 3. Q3: If worker telemetry is later enabled (ADR-005 Q5), do Janette's worker sessions emit it? Recommended: no until she consents; the alternative records her agent activity in a store Cameron reads.
    Resolution: recommended answer accepted at the 2026-10-15 gate.
+   Revised 2026-11-22: the operator states that every member of the group was notified and consented to their agent sessions being recorded and readable by the group; Janette's workers emit.
 4. Q4: Add `OTEL_` to the reserved worker-environment prefixes? Recommended: yes; the alternative lets a role setting enable a content gate, though the collector still drops the content.
    Resolution: recommended answer accepted at the 2026-10-15 gate.
 5. Q5: Is content exclusion absolute, with no opt-in content session? Recommended: yes; the alternative needs a separate store with its own access model.
    Resolution: recommended answer accepted at the 2026-10-15 gate.
+   Revised 2026-11-22: no; the operator admits agent-session content to `agent`: Claude Code prompts, responses and tool details on its session events, and on spans the prompts, responses, tool arguments and tool output of Claude Code and omp (`agent-session-telemetry` design D6, D15), readable by every store reader (option C of `agent-session-telemetry`'s brainstorm).
 6. Q6: Disable omp's log signal at the emitter with `OTEL_LOGS_EXPORTER=none`? Recommended: yes, in addition to the collector refusing OTLP logs; the alternative sends records that are refused and logged as export errors.
    Resolution: recommended answer accepted at the 2026-10-15 gate.
 7. Q7: Keep the gitea-mq dashboard public? Recommended: yes while only public repositories are queued; restricting it breaks commit-status links and webhook delivery.
