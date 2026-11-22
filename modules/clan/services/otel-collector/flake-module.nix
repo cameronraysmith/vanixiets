@@ -743,6 +743,10 @@ in
                 )
               )
             }"'';
+            # A regex or a literal as an OTTL string.
+            ottlString = s: ''"${lib.escape [ "\\" "\"" ] s}"'';
+            encodedBlob = ottlString session.encodedBlobPattern;
+            toolResult = session.spans.toolResult;
             serviceName = ''resource.attributes["service.name"]'';
             eventName = ''log.attributes["event.name"]'';
             stamp =
@@ -779,23 +783,38 @@ in
               "otlp_http/ingress-agent" = mib 64;
               "otlp_http/ingress-traces" = mib 44;
             };
-            sessionExporter = mtlsExporter (
-              if ingress then
-                {
-                  endpoint = "https://${loopbackHandoff}";
-                  credentials = agentSessionCredentials;
-                  # The ingress's certificate names the host, not loopback.
-                  serverName = flakeLib.hosts.magnetite.fqdn;
-                  # One request per signal in flight into the ingress's
-                  # shared limiter (design D14).
-                  consumers = 1;
-                }
-              else
-                {
-                  endpoint = ingressEndpoint;
-                  credentials = agentSessionCredentials;
-                }
-            );
+            spanExporter = "otlp_http/ingress-traces";
+            # The ingress queues each span request whole in its 8 MiB
+            # agent_span queue, so a larger one could never be queued and,
+            # retried forever, would hold the hand-off: the span exporter
+            # sends one request at a time, split to a quarter of that queue
+            # (design D15).
+            handoffBatch = {
+              sizer = "bytes";
+              min_size = 0;
+              max_size = queueBytes.agent_span / 4;
+              flush_timeout = "1s";
+            };
+            sessionExporter =
+              name: queueSize:
+              lib.recursiveUpdate (mtlsExporter (
+                if ingress then
+                  {
+                    endpoint = "https://${loopbackHandoff}";
+                    credentials = agentSessionCredentials;
+                    # The ingress's certificate names the host, not loopback.
+                    serverName = flakeLib.hosts.magnetite.fqdn;
+                    # One request per signal in flight into the ingress's
+                    # shared limiter (design D14).
+                    consumers = 1;
+                  }
+                else
+                  {
+                    endpoint = ingressEndpoint;
+                    credentials = agentSessionCredentials;
+                    consumers = if name == spanExporter then 1 else null;
+                  }
+              ) queueSize) (lib.optionalAttrs (name == spanExporter) { sending_queue.batch = handoffBatch; });
             # Langfuse Cloud (design D16): the spans traces/agent-session
             # exports also go, through forward/langfuse, to traces/langfuse.
             # That branch must never refuse: a refusal there reaches
@@ -936,6 +955,23 @@ in
                   message = "otel-collector agent on ${hostName}: ${langfuseExporter} must retry for schema.nix's agentSession.langfuse.retryMinutes and no longer, queue at least twice a retry window's agentSpanBytesPerMinute, drain consumers x batch max_size per retry window at least drainMultiple times that, batch by bytes with min_size equal to max_size under requestLimitBytes, and be fed by traces/langfuse alone, from forward/langfuse, through processors that ignore their errors and no limiter (agent-session-telemetry design D16); exporter ${builtins.toJSON x}, pipeline ${builtins.toJSON pipeline}.";
                 }
               )
+              # The hand-off (design D15): one span request at a time, each
+              # under the ingress's agent_span queue, which takes a request
+              # whole or not at all.
+              (
+                let
+                  queue = settings.exporters.${spanExporter}.sending_queue or { };
+                  batch = queue.batch or { };
+                in
+                {
+                  assertion =
+                    (queue.num_consumers or null) == 1
+                    && (batch.sizer or null) == "bytes"
+                    && (batch.max_size or 0) > 0
+                    && batch.max_size <= queueBytes.agent_span / 4;
+                  message = "otel-collector agent on ${hostName}: ${spanExporter} must send one request at a time (num_consumers 1), batched by bytes to a max_size of at most a quarter of the ingress's agent_span queue of ${toString queueBytes.agent_span} B, which can never queue a larger request and refuses one that does not fit its free space (agent-session-telemetry design D15); sending_queue ${builtins.toJSON queue}.";
+                }
+              )
             ];
 
             # The hardening of nixpkgs' collector unit, without the journal
@@ -943,7 +979,13 @@ in
             # cutover that collector releases 127.0.0.1:4318, and on the
             # ingress host it runs otlp/loopback. Where the store runs, also
             # after its schema job, so a switch that adds span keys adds their
-            # columns before this unit sends them (design D15).
+            # columns before this unit sends them (design D15). After= orders
+            # only jobs in one transaction, and a switch starts each unit in
+            # a transaction of its own, so this unit also wants the job: its
+            # start then pulls the job's start in and waits for it to end.
+            # Wants, not Requires: a failed job leaves this unit starting
+            # anyway, sending keys the store may refuse until the job is
+            # rerun, rather than down until someone starts it.
             systemd.services.${agentSessionUnit} = {
               description = "OpenTelemetry collector for agent sessions' telemetry";
               wantedBy = [ "multi-user.target" ];
@@ -951,6 +993,7 @@ in
                 "opentelemetry-collector.service"
               ]
               ++ lib.optional (config.services.greptimedb.enable or false) "greptimedb-schema.service";
+              wants = lib.optional (config.services.greptimedb.enable or false) "greptimedb-schema.service";
               startLimitIntervalSec = 0;
               serviceConfig = {
                 ExecStart = "${lib.getExe package} --config=file:${configFile}";
@@ -1150,6 +1193,23 @@ in
                   error_mode = "propagate";
                   trace_conditions = [ "Len(span.links) > 0" ];
                 };
+                # omp's tool results without their `details` (design D15):
+                # before the cut, so the 64 KiB keep `content`; then any
+                # result still holding a `details` key is withheld whole.
+                # schema.nix's agentSession.spans.toolResult says why the
+                # text rule is exact.
+                "transform/agent-session-tool-result" =
+                  let
+                    result = ''span.attributes["${session.spans.toolOutput.key}"]'';
+                    omp = ''${serviceName} == "${toolResult.service}"'';
+                  in
+                  {
+                    error_mode = "propagate";
+                    trace_statements = [
+                      ''replace_pattern(${result}, ${ottlString toolResult.strip}, "]$$1}") where ${omp}''
+                      "set(${result}, ${ottlString toolResult.withheld}) where ${omp} and IsMatch(${result}, ${ottlString toolResult.detailsKey})"
+                    ];
+                  };
                 "transform/agent-session-spans" = {
                   error_mode = "propagate";
                   trace_statements = [
@@ -1166,17 +1226,28 @@ in
                     "keep_keys(scope.attributes, [])"
                   ];
                 };
-                # Credential shapes in every kept string, after the cut that
-                # bounds the scan (design D15). In addition to the key
-                # allow-lists, never instead: it masks token-shaped strings,
-                # not every secret. OTTL rather than the redaction processor,
-                # which does not reach the status message.
+                # Credential shapes, then encoded blobs, in every kept string,
+                # after the cut that bounds the scan (design D15). Shapes
+                # first: a JWT, a key block, a bearer token or a Slack URL
+                # spans several runs, and is masked whole before the blob
+                # net could mask one of its runs and leave the others. What
+                # the cut leaves of a run is masked at 129 characters or more
+                # and passes below, as any shorter run does. In addition to
+                # the key allow-lists, never instead: it masks token-shaped
+                # and encoded strings, not every secret. OTTL rather than the
+                # redaction processor, which does not reach the status
+                # message.
                 "transform/agent-session-mask" = {
                   error_mode = "propagate";
-                  log_statements = [ ''replace_all_patterns(log.attributes, "value", ${credentials}, "****")'' ];
+                  log_statements = [
+                    ''replace_all_patterns(log.attributes, "value", ${credentials}, "****")''
+                    ''replace_all_patterns(log.attributes, "value", ${encodedBlob}, "****")''
+                  ];
                   trace_statements = [
                     ''replace_all_patterns(span.attributes, "value", ${credentials}, "****")''
+                    ''replace_all_patterns(span.attributes, "value", ${encodedBlob}, "****")''
                     ''replace_pattern(span.status.message, ${credentials}, "****")''
+                    ''replace_pattern(span.status.message, ${encodedBlob}, "****")''
                   ];
                 };
               }
@@ -1194,7 +1265,7 @@ in
               };
 
               exporters =
-                lib.mapAttrs (_: sessionExporter) sessionQueueBytes
+                lib.mapAttrs sessionExporter sessionQueueBytes
                 // lib.optionalAttrs langfuse {
                   ${langfuseExporter} = {
                     inherit (lf) endpoint;
@@ -1268,6 +1339,7 @@ in
                       "transform/agent-session-prompt"
                       "transform/agent-session-tool-output"
                       "filter/agent-session-span-events"
+                      "transform/agent-session-tool-result"
                       "transform/agent-session-spans"
                       "transform/agent-session-mask"
                       "resource/agent-session"

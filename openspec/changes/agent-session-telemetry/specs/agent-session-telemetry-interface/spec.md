@@ -131,18 +131,34 @@ After the allow-lists, the agent-session collector SHALL cut every span attribut
 #### Scenario: The span table is read back
 
 - **WHEN** the VM test reads `SHOW CREATE TABLE agent.agent_span` and its `create_options` as `regulator`
-- **THEN** `span_attributes.last_user_message`, `span_attributes.gen_ai.output.messages`, `span_attributes.gen_ai.tool.call.result` and `span_attributes.user_prompt` carry the full-text index, `span_attributes.success` is `BOOLEAN`, `table_data_model` is `greptime_trace_v1`, and the table has no `ttl` of its own
+- **THEN** `span_attributes.last_user_message`, `span_attributes.gen_ai.output.messages`, `span_attributes.gen_ai.tool.call.result`, `span_attributes.user_prompt`, `span_attributes.full_command` and `span_attributes.gen_ai.tool.call.arguments` carry the full-text index and `matches_term` finds a nonce in the last two, `span_attributes.success` is `BOOLEAN`, `table_data_model` is `greptime_trace_v1`, and the table has no `ttl` of its own
+
+### Requirement: omp's tool results are stored without their `details`
+
+On spans whose `service.name` is `oh-my-pi`, before the 64 KiB cut, the agent-session collector SHALL remove from `gen_ai.tool.call.result` the `details` key that follows `content` and everything after it but a final `"isError":true`, and SHALL replace the whole value with `agentSession.spans.toolResult.withheld` if a `details` key remains; it SHALL change no other service's value.
+
+**Discharged by**: `checks.x86_64-linux.otel-collector-config`'s stages and keys clauses with mutants `toolResultStripRemoved`, `toolResultStripAfterCut`, `toolResultStripIgnoresErrors`, `toolResultStripUngated` and `toolResultNotWithheld`; `vmTests.x86_64-linux.fleet-ingress`'s `agentSpans` case and its uncommitted mutants `toolResultStripRemoved` and `toolResultNotWithheld`; resting on world assumption `A208 — omp serialises a tool result with its content first and its TUI cache under details`.
+
+#### Scenario: Tool results as omp sends them
+
+- **WHEN** the VM test posts omp's bash result with a shell trace holding a GitHub token only in its base64 `syntax`, an edit result with file snapshots, a failed result with `isError`, a result with no `details`, one whose text holds `],"details":` as JSON escapes it, and one with `details` before `content`
+- **THEN** each is stored, and reaches Langfuse, as `{"content":[…]}` with `"isError":true` where sent, the text intact, the last as the withheld marker; neither the token nor its base64 is in what left the host, any column or the Langfuse sink; with the strip or the withholding removed the case fails
+
+#### Scenario: Claude Code's output holds JSON with a `details` key
+
+- **WHEN** a Claude Code tool's output is JSON with `content` and `details` keys
+- **THEN** it is stored as sent
 
 ### Requirement: Credential shapes are masked in what the agent-session collector keeps
 
-After the allow-lists and the 64 KiB cut, the agent-session collector SHALL replace every match of `agentSession.credentialPatterns` with `****` in every kept string attribute of events and spans and in the span status message. The masking is in addition to the key allow-lists, never instead of them, and catches token-shaped strings only, not every secret.
+After the allow-lists and the 64 KiB cut, the agent-session collector SHALL replace every match of `agentSession.credentialPatterns`, and then every run of `agentSession.encodedBlobPattern` (129 or more base64 characters), with `****` in every kept string attribute of events and spans and in the span status message. The masking is in addition to the key allow-lists, never instead of them, and catches token-shaped and encoded strings only, not every secret.
 
-**Discharged by**: `checks.x86_64-linux.otel-collector-config`'s stages and keys clauses with mutants `maskRemovedFromSpans`, `maskRemovedFromEvents`, `maskBeforeCut`, `maskShapeDropped` and `statusMessageUnmasked`; `vmTests.x86_64-linux.fleet-ingress`'s `agentSession` and `agentSpans` cases, with credentials assembled at run time from pieces so that `checks.x86_64-linux.gitleaks` stays clean, and the case's uncommitted mutant `maskRemoved`; resting on world assumption `A203 — The collector's OTTL and queues behave as read at 0.155.0`.
+**Discharged by**: `checks.x86_64-linux.otel-collector-config`'s stages and keys clauses with mutants `maskRemovedFromSpans`, `maskRemovedFromEvents`, `maskBeforeCut`, `maskShapeDropped`, `statusMessageUnmasked`, `blobNetRemovedFromSpans`, `blobNetRemovedFromEvents`, `blobNetBeforeShapes` and `credentialPatternsEmptied` (the shape names asserted); `vmTests.x86_64-linux.fleet-ingress`'s `agentSession` and `agentSpans` cases, with every credential shape assembled at run time from pieces so that `checks.x86_64-linux.gitleaks` stays clean, and the case's uncommitted mutants `maskRemoved` and `blobNetRemoved`; resting on world assumption `A203 — The collector's OTTL and queues behave as read at 0.155.0`, which `otel-collector-config` pins by the collector's version (mutant `collectorUpgraded`).
 
 #### Scenario: Credentials are planted in tool output and errors
 
-- **WHEN** the VM test sends a GitHub token and a private-key block in an omp tool result, an Anthropic key in a status message, a bearer token and a JWT in a Claude Bash output, a private-key block in a Claude Read output, a GitHub token in a Claude tool-execution status, and a bearer token in an event's tool parameters
-- **THEN** each is stored as `****` around its unmasked context, and no part of any credential is in what left the host or in any column; with the masking stage removed the case fails
+- **WHEN** the VM test sends a GitHub token and a private-key block in an omp tool result, an Anthropic key in a status message, a bearer token and a JWT in a Claude Bash output, a private-key block in a Claude Read output, a GitHub token in a Claude tool-execution status, a bearer token and a 268-character base64 blob in an event's tool parameters, and in one omp result every one of the seventeen shapes, the blob, a sha512 in hex, `task_test_configuration` and `risk-admin-dashboard-components`
+- **THEN** each credential and blob is stored as `****` around its unmasked context, the hex and the two words as sent, and no part of any credential or of the blob is in what left the host, in any column or at the Langfuse sink; with the masking stage or the blob net removed the case fails
 
 #### Scenario: A credential without a known shape is sent
 
@@ -151,14 +167,30 @@ After the allow-lists and the 64 KiB cut, the agent-session collector SHALL repl
 
 ### Requirement: The schema job brings an existing span table to the declared columns
 
-On every run the schema job SHALL add each `agentSession.spans` key's column and each full-text index to an existing `agent.agent_span`, so a table an older generation created ends identical, up to column order, to a fresh one, and a second run changes nothing; on the store's host the agent-session collector SHALL start after the schema job.
+On every run the schema job SHALL add each `agentSession.spans` key's column and each full-text index to an existing `agent.agent_span`, so a table an older generation created ends identical, up to column order, to a fresh one, and a second run changes nothing; each statement SHALL time out after 90 s. On the store's host the agent-session collector SHALL start after the schema job ends even when a switch starts the two in separate transactions, and SHALL start when the job fails.
 
-**Discharged by**: `checks.x86_64-linux.otel-collector-config`'s traces and unit clauses with mutants `spanColumnsNotAltered`, `spanIndexesNotAltered` and `agentBeforeSchema`; `vmTests.x86_64-linux.fleet-ingress`'s `agentSpans` case, which recreates the table as main created it before design D15 and runs the job twice, and its uncommitted mutant `spanAltersRemoved`; resting on world assumption `A204 — The telemetry store alters a table idempotently as read at 1.2.1`.
+**Discharged by**: `checks.x86_64-linux.otel-collector-config`'s traces and unit clauses with mutants `spanColumnsNotAltered`, `spanIndexesNotAltered`, `agentBeforeSchema` and `agentSchemaNotWanted`; `vmTests.x86_64-linux.fleet-ingress`'s `agentSpans` case, which recreates the table as main created it before design D15 and as the D15 deploy left it and runs the job twice on each, and its uncommitted mutant `spanAltersRemoved`; its `schemaOrder` case, on magnetite's unit dependencies, and that case's uncommitted mutant `schemaNotWanted`; resting on world assumption `A204 — The telemetry store alters a table idempotently as read at 1.2.1`.
 
 #### Scenario: The table predates the new keys
 
-- **WHEN** `agent.agent_span` holds rows and lacks the columns and indexes design D15 adds, and the schema job runs
+- **WHEN** `agent.agent_span` holds rows and lacks the columns and indexes design D15 adds, or only the `full_command` and `gen_ai.tool.call.arguments` indexes, and the schema job runs
 - **THEN** the job succeeds, the rows remain, and the table's definition equals a fresh store's up to column order; a second run leaves it unchanged
+
+#### Scenario: A switch starts the collector's unit before the job
+
+- **WHEN** the agent-session collector's start is queued before the schema job's, each in a transaction of its own, as switch-to-configuration does
+- **THEN** the collector's process starts after the job has ended; and when the job fails, the collector starts anyway
+
+### Requirement: The hand-off sends span requests the ingress can queue
+
+Each agent-telemetry host's agent-session collector SHALL send its spans to the ingress one request at a time, each split to at most a quarter of the ingress's `agent_span` queue, which queues a request whole or not at all and refuses one that does not fit the space it has left.
+
+**Discharged by**: an agent assertion on every agent-telemetry host; `checks.x86_64-linux.otel-collector-config`'s hand-off clause with mutants `handoffUncapped`, `handoffCapAtQueue`, `handoffCapHalfQueue` and `handoffConsumersMany`; `vmTests.x86_64-linux.fleet-ingress`'s `handoffCap` case and its uncommitted mutant `handoffUncapped`; resting on world assumption `A207 — The collector's fan-out returns every branch's error as read at 0.155.0` (its batcher).
+
+#### Scenario: One request larger than the ingress's span queue
+
+- **WHEN** an emitter posts 160 omp tool spans of 60 KiB in one request, about 9.8 MB, to `otlp/local`
+- **THEN** the store holds all 160 and the ingress refuses and fails to enqueue none
 
 ### Requirement: Only a top-level run's first request gets a last user message
 

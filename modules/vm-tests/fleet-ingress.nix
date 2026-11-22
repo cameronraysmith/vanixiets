@@ -180,6 +180,27 @@
                 == "babb610506252a20f240d2d3d8c8b424b22481eab5bfdc9e96242fe3e9497b1e"
               ) "fleet-ingress: the pre-D15 agent_span is not main's (72f782b8) CREATE";
               table;
+            # agent.agent_span as the D15 deploy left it on magnetite
+            # (2c7ee83f): every span key, the four content indexes of then;
+            # the schema job adds the indexes on full_command and
+            # gen_ai.tool.call.arguments.
+            d15SpanTable =
+              let
+                table = self.lib.agentSessionStore.spanTableFor {
+                  inherit (self.lib.otelCollectorSchema.agentSession.spans) keys;
+                  fulltext = [
+                    "last_user_message"
+                    "gen_ai.output.messages"
+                    "gen_ai.tool.call.result"
+                    "user_prompt"
+                  ];
+                };
+              in
+              assert lib.assertMsg (
+                builtins.hashString "sha256" table
+                == "7d647ff8027f36b2f0766332712b68e821f84e89bd5f5f12f73702a63de1333d"
+              ) "fleet-ingress: the D15 agent_span is not 2c7ee83f's CREATE";
+              table;
             agentSessionState = "/var/lib/otel-agent-session";
             # Langfuse Cloud's stand-in (agent-session-telemetry design D16):
             # fleet-ingress/langfuse_sink.py on loopback, answering as the
@@ -828,6 +849,9 @@
               # Assembled here from pieces, so no credential-shaped string
               # exists in the repository (checks.gitleaks).
               BEARER = "Authorization: " + "Bear" + "er " + "c4n4ryB34r3r" + "T0k3nAbCdEf9"
+              # An encoded blob in a kept event attribute, masked whole
+              # (design D15).
+              EVENT_BLOB = base64.b64encode(bytes(range(200))).decode()
 
 
               def s(key, value):
@@ -873,7 +897,7 @@
                                                 {"key": "cost_usd", "value": {"doubleValue": 0.001234}}, n("duration_ms", 900),
                                                 s("speed", "normal"), s("effort", "medium")]),
                       record(4, "tool_result", [s("tool_name", "Bash"), s("success", "true"), s("duration_ms", "12"),
-                                                s("tool_parameters", json.dumps({"bash_command": f"curl -H '{BEARER}' x"})),
+                                                s("tool_parameters", json.dumps({"bash_command": f"curl -H '{BEARER}' x", "data": EVENT_BLOB})),
                                                 s("tool_input", json.dumps({"command": "ls"})),
                                                 s("tool_output", f"canary-output-{NONCE}")]),
                       record(5, "api_request_body", [s("body", f"canary-raw-{NONCE}")]),
@@ -937,6 +961,7 @@
               assert rows[2][6:9] == [100, 50, 1234] and rows[2][13] == "normal", rows
               assert rows[3][9] == 12 and rows[3][10] is True and rows[3][11] == "Bash", rows
               assert "****" in rows[3][12] and "T0k3nAbCdEf9" not in rows[3][12], rows[3][12]
+              assert rows[3][12].count("****") == 2 and EVENT_BLOB[100:140] not in rows[3][12], rows[3][12]
               found = gsql(f"SELECT event_name, host_name FROM session_event WHERE matches_term(prompt, '{NONCE}')", "agent")
               print(f"  matches_term(prompt, nonce): {found}", flush=True)
               assert found == [["user_prompt", "pyrite"]], found
@@ -980,7 +1005,7 @@
               assert NONCE not in taps["metrics"], taps["metrics"]
 
               assert nonce_hits(NONCE) == {"agent.session_event.prompt": 1}
-              assert nonce_hits("T0k3nAbCdEf9") == {}
+              assert nonce_hits("T0k3nAbCdEf9", EVENT_BLOB[100:140]) == {}
               forbidden = gsql(
                   "SELECT table_schema, table_name, column_name FROM information_schema.columns WHERE column_name IN "
                   "('user_email', 'organization_id', 'user_account_uuid', 'user_account_id', 'tool_output', 'prompt_text', "
@@ -1000,19 +1025,27 @@
             # omp's and Claude Code's spans (design D13, D15), through
             # pyrite's otlp/local, otlp/mesh and the ingress into
             # agent.agent_span. First the schema job's upgrade path on 1.2.1:
-            # agent_span as main created it (before D15) is brought by the job
-            # to the table a fresh store has, and a second run changes nothing.
+            # agent_span as main created it (before D15), and as the D15
+            # deploy left it, is brought by the job to the table a fresh
+            # store has, and a second run changes nothing.
             # Then omp: a chat span carrying the history (an older prompt, a
             # tool result, the newest prompt), one after a tool, a tool span
             # whose result is stored, cut to 64 KiB and masked, a span with a
             # link (kept, the link not), four spans the prompt copy's gate
-            # excludes (design D15's narrowing), and one from another service.
+            # excludes (design D15's narrowing), one from another service,
+            # and six tool results as omp serialises them: bash's with its
+            # shell trace (a GitHub token only in its base64 `syntax`),
+            # edit's, a failed one, one with every credential shape, an
+            # encoded blob, a sha512 in hex and two words the old shapes
+            # took, one whose text holds `],"details":`, and one with
+            # `details` first; `details` is stripped or the result withheld.
             # Then Claude Code: an interaction, an llm_request with a link,
             # retry events and a detailed-tracing attribute, Bash and Read
             # tool spans whose `tool.output` events become
-            # gen_ai.tool.call.result, and a failed tool.execution whose
-            # status message is stored, cut and masked; account identifiers
-            # on every span are not.
+            # gen_ai.tool.call.result (one of them JSON with a `details`
+            # key, left alone), and a failed tool.execution whose status
+            # message is stored, cut and masked; account identifiers on every
+            # span are not.
             agentSpans = ''
               print("=== case agentSpans", flush=True)
               fresh_start()
@@ -1038,23 +1071,30 @@
 
               # The upgrade (design D15), the column order aside: ADD COLUMN
               # appends, so the comparison is of the table's lines, sorted.
+              # From main's table before D15, and from the D15 deploy's,
+              # which lacks only the full_command and arguments indexes.
               fresh = table_lines()
               schema_job()
               assert table_lines() == fresh, "a second schema run on a fresh store changed agent_span"
-              admin("DROP TABLE agent_span")
-              admin(config()["oldSpanTable"])
-              admin("INSERT INTO agent_span (\"timestamp\", service_name, span_name) VALUES (now(), 'pre-d15', 'pre-d15 row')")
-              old = table_lines()
-              missing = sorted(set(fresh) - set(old))
-              print(f"  pre-D15 agent_span lacks {len(missing)} lines: {missing}", flush=True)
-              assert missing and all("span_attributes" in line for line in missing), missing
-              schema_job()
-              upgraded = table_lines()
-              assert upgraded == fresh, ("the upgraded agent_span differs from a fresh one", sorted(set(upgraded) ^ set(fresh)))
-              schema_job()
-              assert table_lines() == fresh, "a second schema run on the upgraded agent_span changed it"
-              assert gsql("SELECT count(*) FROM agent_span WHERE span_name = 'pre-d15 row'", "agent") == [[1]]
-              print("  agent_span: pre-D15 table upgraded to the fresh one; the second run changed nothing", flush=True)
+              for generation, statement in (("pre-D15", config()["oldSpanTable"]), ("D15", config()["d15SpanTable"])):
+                  admin("DROP TABLE agent_span")
+                  admin(statement)
+                  admin(f"INSERT INTO agent_span (\"timestamp\", service_name, span_name) VALUES (now(), 'old', '{generation} row')")
+                  old = table_lines()
+                  missing = sorted(set(fresh) - set(old))
+                  print(f"  {generation} agent_span lacks {len(missing)} lines: {missing}", flush=True)
+                  assert missing and all("span_attributes" in line for line in missing), missing
+                  if generation == "D15":
+                      assert [line.split('"')[1] for line in missing] == [
+                          "span_attributes.full_command", "span_attributes.gen_ai.tool.call.arguments"], missing
+                      assert all("FULLTEXT INDEX" in line for line in missing), missing
+                  schema_job()
+                  upgraded = table_lines()
+                  assert upgraded == fresh, (f"the upgraded {generation} agent_span differs from a fresh one", sorted(set(upgraded) ^ set(fresh)))
+                  schema_job()
+                  assert table_lines() == fresh, f"a second schema run on the upgraded {generation} agent_span changed it"
+                  assert gsql(f"SELECT count(*) FROM agent_span WHERE span_name = '{generation} row'", "agent") == [[1]]
+                  print(f"  agent_span: {generation} table upgraded to the fresh one, its row kept; the second run changed nothing", flush=True)
 
               store.succeed(f"systemctl restart {SESSION}.service")
               wait_telemetry(SESSION_PORT)
@@ -1079,6 +1119,54 @@
                   "bearer": "T0k3nGhIjKl8",
                   "jwt": "c4n4ryS1gn4tur3",
               }
+              # Every one of schema.nix's credential shapes, each exactly its
+              # pattern's match, assembled from pieces likewise (review
+              # follow-up 5); then the words the old `sk-`, `sk_` and `rk_`
+              # shapes took for keys (follow-up 1).
+              shapes = {
+                  "private-key": planted["pem"],
+                  "age-secret-key": "AGE-" + "SECRET-KEY-1" + ("QPZRY9X8GF2TVDW0S3JN54KHCE6MUA7L" * 2)[:58],
+                  "anthropic": planted["anthropic"],
+                  "openai": "sk-" + "admin-" + "c4n4ry0p3n4i" + "Adm1nK3y0123",
+                  "langfuse": "sk-" + "lf-" + "c4n4ry-lf-" + "s3cr3t42",
+                  "github": planted["github"],
+                  "gitlab": "glp" + "at-" + "c4n4ryG1tL4b" + "T0k3nAbCd",
+                  "npm": "np" + "m_" + "c4n4ryNpm" * 4,
+                  "pypi": "pypi-" + "AgEIcHlwaS5vcmc" + "c4n4ryPyP1" * 6,
+                  "linear": "lin_" + "api_" + ("c4n4ryL1n" * 5)[:40],
+                  "aws-access-key-id": "AK" + "IA" + "C4N4RYAWSKEYID23",
+                  "gcp-api-key": "AI" + "za" + ("c4n4ryGcp" * 4)[:35],
+                  "digitalocean": "do" + "p_v1_" + "0123456789abcdef" * 4,
+                  "slack": "xo" + "xb-" + "c4n4ry-sl4ck-" + "t0k3n",
+                  "stripe": "sk" + "_live_" + "c4n4ryStr1p3" + "K3y0123",
+                  "jwt": planted["jwt"],
+                  "bearer": "Bear" + "er " + "c4n4ryB34r3r" + "T0k3nGhIjKl8",
+              }
+              assert sorted(shapes) == config()["credentialPatternNames"], sorted(shapes)
+              tails.update({f"shape {name}": token[len(token) // 2 - 6:len(token) // 2 + 6] for name, token in shapes.items()})
+              WORDS = ["task_test_configuration", "risk-admin-dashboard-components"]
+              # A GitHub-shaped token only inside the base64 `syntax` of
+              # omp's shell trace, as magnetite stored one (design D15).
+              TRACE_TOKEN = "gh" + "o_" + "Wq3Er5Ty7Ui9Op1As3Df5" + "Gh7Jk9Lz2Xc4Vb6N"
+              SYNTAX = base64.b64encode(f"echo {TRACE_TOKEN}".encode()).decode()
+              tails.update({"trace token": TRACE_TOKEN[-12:], "trace syntax": SYNTAX[8:40]})
+              # An encoded blob of 268 characters, masked; a sha512 in hex,
+              # 128, kept.
+              BLOB = base64.b64encode(bytes(range(200))).decode()
+              HEX = hashlib.sha512(f"hex {time.time_ns()}".encode()).hexdigest()
+              # Two blob-net canaries: a 160-character path of hyphens and
+              # slashes, no run of either base64 alphabet 129 long, is kept;
+              # a 200-character URL-safe base64 run (it holds `-`) is masked.
+              LONG_PATH = ("/" + "/".join(["srv-agent-session-telemetry-run"] * 6))[:160]
+              URLSAFE_BLOB = base64.urlsafe_b64encode(bytes(range(150))).decode()
+              assert len(URLSAFE_BLOB) == 200 and ("-" in URLSAFE_BLOB or "_" in URLSAFE_BLOB), URLSAFE_BLOB
+              tails.update({"blob": BLOB[100:140], "urlsafe blob": URLSAFE_BLOB[100:140]})
+              # A key block whose END line is missing, then quoted text: masked
+              # up to the quote, so the JSON holding it stays whole.
+              ENDLESS = "-----BEGIN " + "EC PRIVATE KEY-----\n" + "MHcCAQEE" * 3 + " "
+              QUOTED = '"quoted tail" after it'
+              tails["endless key"] = "MHcCAQEEMHcCAQEE"
+              WITHHELD = config()["toolResultWithheld"]
               canary = {
                   "prompt": f"canary prompt {NONCE}",
                   "response": f"canary response {NONCE}",
@@ -1125,9 +1213,26 @@
                   "new context": f"canary-newcontext-{NONCE}",
                   "attempt": f"canary-attempt-{NONCE}",
                   "account": f"canary-account-{NONCE}",
+                  # omp's tool results (design D15): `content` kept, the
+                  # `details` re-render cache never.
+                  "bash content": f"canary-bashcontent-{NONCE}",
+                  "trace script": f"canary-tracescript-{NONCE}",
+                  "trace history": f"canary-tracehistory-{NONCE}",
+                  "edit content": f"canary-editcontent-{NONCE}",
+                  "edit snapshot": f"canary-editsnapshot-{NONCE}",
+                  "error content": f"canary-errorcontent-{NONCE}",
+                  "shapes content": f"canary-shapescontent-{NONCE}",
+                  "escaped content": f"canary-escapedcontent-{NONCE}",
+                  "escaped details": f"canary-escapeddetails-{NONCE}",
+                  "reordered content": f"canary-reorderedcontent-{NONCE}",
+                  "reordered details": f"canary-reordereddetails-{NONCE}",
+                  # Claude Code's output is plain text, a `details` key in it
+                  # its own.
+                  "claude json": f"canary-claudejson-{NONCE}",
               }
               admitted = ("prompt", "response", "arguments", "tool result", "status", "linked span", "claude session",
-                          "user prompt", "bash output", "read content", "command", "path", "claude status")
+                          "user prompt", "bash output", "read content", "command", "path", "claude status",
+                          "bash content", "edit content", "error content", "shapes content", "escaped content", "claude json")
 
 
               def s(key, value):
@@ -1165,7 +1270,7 @@
                       s("gen_ai.input.messages", json.dumps(history + [{"role": "user", "parts": [
                           {"type": "text", "content": canary["reminder"]}, {"type": "text", "content": canary["prompt"]}]}])),
                       # Past the 64 KiB every kept value is cut to.
-                      s("gen_ai.output.messages", json.dumps([{"role": "assistant", "parts": [{"type": "text", "content": canary["response"] + " " + "x" * 70000}]}])),
+                      s("gen_ai.output.messages", json.dumps([{"role": "assistant", "parts": [{"type": "text", "content": canary["response"] + " " + "x " * 35000}]}])),
                       s("canary.unlisted", canary["unlisted"]),
                   ],
                   "events": [{"name": "exception", "timeUnixNano": str(now - 1500000000),
@@ -1197,6 +1302,16 @@
                         s("omp.gen_ai.oneshot.kind", "compaction_summary")),
                   gated("eee19b7ec3c1b17d", "no tools", iv("omp.gen_ai.agent.step.number", 0)),
               ]
+              # omp serialises a tool result with JSON.stringify: no spaces,
+              # `content` first, `isError` only when true (design D15).
+              def compact(value):
+                  return json.dumps(value, separators=(",", ":"))
+
+
+              def text_result(text, **rest):
+                  return {"content": [{"type": "text", "text": text}], **rest}
+
+
               tool = {
                   "traceId": TRACE, "spanId": "eee19b7ec3c1b175", "parentSpanId": "eee19b7ec3c1b173",
                   "name": "execute_tool bash", "kind": 1,
@@ -1205,12 +1320,68 @@
                       s("gen_ai.operation.name", "execute_tool"), s("gen_ai.tool.name", "bash"),
                       s("gen_ai.conversation.id", f"session-{NONCE}"),
                       s("gen_ai.tool.call.arguments", json.dumps({"command": canary["arguments"]})),
-                      # Past the 64 KiB cut, two credentials inside it.
-                      s("gen_ai.tool.call.result", json.dumps({"content": [{"type": "text", "text": "\n".join(
-                          [canary["tool result"], planted["github"], planted["pem"], "y" * 70000])}], "isError": False})),
+                      # Past the 64 KiB cut, two credentials inside it; the
+                      # filler in words, so the blob net leaves it.
+                      s("gen_ai.tool.call.result", compact(text_result("\n".join(
+                          [canary["tool result"], planted["github"], planted["pem"], "y " * 35000])))),
                       s("omp.gen_ai.tool.status", "ok"),
                   ],
               }
+
+
+              def omp_tool(span_id, name, result, tool_status="ok", **extra):
+                  span = {
+                      "traceId": TRACE, "spanId": span_id, "parentSpanId": "eee19b7ec3c1b173",
+                      "name": f"execute_tool {name}", "kind": 1,
+                      "startTimeUnixNano": str(now - 900000000), "endTimeUnixNano": str(now - 800000000),
+                      "attributes": [s("gen_ai.operation.name", "execute_tool"), s("gen_ai.tool.name", name),
+                                     s("gen_ai.tool.call.result", compact(result)), s("omp.gen_ai.tool.status", tool_status)],
+                  }
+                  span.update(extra)
+                  return span
+
+
+              # bash's `details` as omp 19.1.0 sends it (key shapes read on
+              # magnetite, logs/d15-magnetite-extra-20261122T2015Z.log), its
+              # shell trace holding the token in base64 only.
+              shell_trace = {"v": 1, "seq": 1, "status": "ok", "rootVpid": 1073742212, "t_ns": 956341,
+                             "script": f"echo {canary['trace script']}", "units": [{"syntax": SYNTAX}],
+                             "history": [{"text": canary["trace history"], "argv": ["echo", canary["trace history"]]}]}
+              bash_details = {"wallTimeNoticeEmitted": False, "timeoutSeconds": 300, "wallTimeMs": 12.5, "trace": shell_trace}
+              SHAPES_TEXT = " | ".join([canary["shapes content"], *shapes.values(), BLOB, HEX, LONG_PATH, URLSAFE_BLOB, *WORDS, ENDLESS + QUOTED])
+              ESCAPED_TEXT = f"{canary['escaped content']} ],\"details\":{{\"x\":1}}"
+              CLAUDE_JSON = compact({"content": [canary["claude json"]], "details": {"note": "kept"}})
+              # Each span id with its result as sent and as it must be
+              # stored and reach Langfuse.
+              results = {
+                  "eee19b7ec3c1b180": (
+                      text_result(canary["bash content"], details=bash_details),
+                      compact(text_result(canary["bash content"]))),
+                  "eee19b7ec3c1b181": (
+                      text_result(canary["edit content"], details={
+                          "diff": f"-old\n+{canary['edit snapshot']}", "oldText": "old", "newText": canary["edit snapshot"],
+                          "diagnostics": {"summary": "ok", "messages": []}, "perFileResults": []}),
+                      compact(text_result(canary["edit content"]))),
+                  "eee19b7ec3c1b182": (
+                      text_result(canary["error content"], details=bash_details, isError=True),
+                      compact(text_result(canary["error content"], isError=True))),
+                  "eee19b7ec3c1b183": (
+                      text_result(SHAPES_TEXT),
+                      compact(text_result(" | ".join([canary["shapes content"], *["****"] * len(shapes), "****", HEX, LONG_PATH, "****", *WORDS, "****" + QUOTED])))),
+                  "eee19b7ec3c1b184": (
+                      text_result(ESCAPED_TEXT, details={"history": [{"text": canary["escaped details"]}]}),
+                      compact(text_result(ESCAPED_TEXT))),
+                  # `details` before `content`: the strip finds no
+                  # `],"details":`, so the whole result is withheld.
+                  "eee19b7ec3c1b185": (
+                      {"details": {"history": [{"text": canary["reordered details"]}], "trace": shell_trace},
+                       "content": [{"type": "text", "text": canary["reordered content"]}]},
+                      WITHHELD),
+              }
+              result_spans = [omp_tool(span_id, "edit" if span_id.endswith("81") else "bash", sent)
+                           for span_id, (sent, _) in results.items() if not span_id.endswith("82")]
+              result_spans.append(omp_tool("eee19b7ec3c1b182", "bash", results["eee19b7ec3c1b182"][0], tool_status="error",
+                                        status={"code": 2, "message": canary["error content"]}))
 
 
               def claude_span(span_id, parent, name, attributes, **extra):
@@ -1255,14 +1426,20 @@
                       s("tool_use_id", "toolu_claude_1"), bv("success", False), s("error", "ShellError"),
                       s("error.type", "tool_error")],
                       # Past the 64 KiB cut, a credential inside it.
-                      status={"code": 2, "message": " ".join([canary["claude status"], planted["github"], "z" * 70000])}),
+                      status={"code": 2, "message": " ".join([canary["claude status"], planted["github"], "z " * 35000])}),
+                  # Output holding JSON with `content` and `details` keys: the
+                  # strip and the withholding touch omp's spans only.
+                  claude_span("aaa19b7ec3c1b106", "aaa19b7ec3c1b101", "claude_code.tool", [
+                      s("tool_name", "Read"), s("tool_use_id", "toolu_claude_3")],
+                      events=[{"name": "tool.output", "timeUnixNano": str(now - 650000000),
+                               "attributes": [s("content", CLAUDE_JSON)]}]),
               ]
               body = {"resourceSpans": [
                   {"resource": {"attributes": [s("service.name", "oh-my-pi"), s("service.version", "19.1.0"), s("user.name", "cameron"),
                                                s("user.email", canary["email"]), s("host.name", f"canary-host-{NONCE}"),
                                                s("vanixiets.database", "fleet")]},
                    "scopeSpans": [{"scope": {"name": "omp", "attributes": [s("canary.scope", canary["scope"])]},
-                                   "spans": [chat, after_tool, tool, linked] + excluded}]},
+                                   "spans": [chat, after_tool, tool, linked] + excluded + result_spans}]},
                   {"resource": {"attributes": [s("service.name", "claude-code"), s("service.version", "2.1.330"), s("user.name", "cameron"),
                                                s("os.type", "linux"), s("host.arch", "amd64")]},
                    "scopeSpans": [{"scope": {"name": "com.anthropic.claude_code.tracing"}, "spans": claude_spans}]},
@@ -1291,16 +1468,18 @@
               assert '"links"' not in tap, "a span left the host with links"
               for what, tail in tails.items():
                   assert tail not in tap, f"{what} left the host unmasked"
+              for what, needle in (("trace token", TRACE_TOKEN), ("trace syntax", SYNTAX), ("blob", BLOB)):
+                  assert needle not in tap, f"{what} left the host"
 
 
               def stored_spans():
                   status, body = _request("/v1/sql", "agent", [("sql", "SELECT count(*) FROM agent_span WHERE \"resource_attributes.host.name\" = 'pyrite'")])
                   rows = json.loads(body)["output"][0]["records"]["rows"] if status == 200 else None
                   print(f"  agent_span rows from pyrite: {status} {rows}", flush=True)
-                  return rows == [[13]]
+                  return rows == [[20]]
 
 
-              wait_for(stored_spans, "pyrite's thirteen spans in agent.agent_span", 240)
+              wait_for(stored_spans, "pyrite's twenty spans in agent.agent_span", 240)
               columns = ["span_id", "span_name", "span_attributes.last_user_message", "span_attributes.gen_ai.output.messages",
                          "span_attributes.gen_ai.tool.call.arguments", "span_attributes.gen_ai.usage.input_tokens",
                          "resource_attributes.user.name", "resource_attributes.host.name", "service_name", "span_status_message",
@@ -1318,7 +1497,7 @@
                   print(f"  span: {json.dumps(shown)}", flush=True)
               omp = [spans[i] for i in ("eee19b7ec3c1b174", "eee19b7ec3c1b175", "eee19b7ec3c1b177", "eee19b7ec3c1b178",
                                         "eee19b7ec3c1b17a", "eee19b7ec3c1b17b", "eee19b7ec3c1b17c", "eee19b7ec3c1b17d")]
-              assert [r["service_name"] for r in spans.values()].count("claude-code") == 5, spans.keys()
+              assert [r["service_name"] for r in spans.values()].count("claude-code") == 6, spans.keys()
               assert all(r["resource_attributes.user.name"] == "cameron" and r["resource_attributes.host.name"] == "pyrite"
                          for r in spans.values()), spans
               chat_row, tool_row = omp[0], omp[1]
@@ -1340,11 +1519,30 @@
               assert all(r["span_status_message"] == "" for r in omp[1:]), omp
               # The linked span kept.
               assert omp[3]["span_name"] == "chat claude-opus", omp[3]
+              # omp's tool results without `details` (design D15): bash's
+              # shell trace, edit's snapshots and a failed result's trace
+              # gone, `isError` kept; a `],"details":` inside the content's
+              # text left alone; a result with `details` first withheld
+              # whole. Every credential shape and the blob masked, the hex
+              # and the two words kept.
+              for span_id, (_, expected) in results.items():
+                  stored = spans[span_id]["span_attributes.gen_ai.tool.call.result"]
+                  print(f"  {span_id} result: {stored[:300]}", flush=True)
+                  assert stored == expected, (span_id, stored[:600], expected[:600])
+              failed_tool = spans["eee19b7ec3c1b182"]
+              assert failed_tool["span_attributes.omp.gen_ai.tool.status"] == "error", failed_tool
+              assert failed_tool["span_status_message"] == canary["error content"], failed_tool
+              shapes_result = spans["eee19b7ec3c1b183"]["span_attributes.gen_ai.tool.call.result"]
+              assert HEX in shapes_result and LONG_PATH in shapes_result and all(word in shapes_result for word in WORDS), shapes_result
+              assert shapes_result.count("****") == len(shapes) + 3 and URLSAFE_BLOB[60:120] not in shapes_result and json.loads(shapes_result), shapes_result
+              print(f"  {len(shapes)} credential shapes, a {len(BLOB)}-character blob and a {len(URLSAFE_BLOB)}-character URL-safe run masked; the 128-character hex, the {len(LONG_PATH)}-character path, {WORDS} kept", flush=True)
 
               # Claude Code's spans (design D15).
-              interaction, llm, bash, read, execution = (spans[f"aaa19b7ec3c1b10{n}"] for n in range(1, 6))
+              interaction, llm, bash, read, execution, claude_json = (spans[f"aaa19b7ec3c1b10{n}"] for n in range(1, 7))
               assert all(r["span_attributes.session.id"] == canary["claude session"]
-                         for r in (interaction, llm, bash, read, execution)), spans
+                         for r in (interaction, llm, bash, read, execution, claude_json)), spans
+              # Claude Code's output untouched by omp's strip.
+              assert claude_json["span_attributes.gen_ai.tool.call.result"] == CLAUDE_JSON, claude_json
               assert interaction["span_attributes.user_prompt"] == canary["user prompt"], interaction
               assert [llm[c] for c in ("span_attributes.input_tokens", "span_attributes.output_tokens",
                                        "span_attributes.cache_read_tokens", "span_attributes.cache_creation_tokens",
@@ -1365,9 +1563,18 @@
               assert found == [["chat claude-opus"]], found
               found = gsql(f"SELECT span_id FROM agent_span WHERE matches_term(\"span_attributes.gen_ai.tool.call.result\", '{NONCE}') ORDER BY span_id", "agent")
               print(f"  matches_term(gen_ai.tool.call.result, nonce): {found}", flush=True)
-              assert found == [["aaa19b7ec3c1b103"], ["aaa19b7ec3c1b104"], ["eee19b7ec3c1b175"]], found
+              assert found == [[i] for i in ("aaa19b7ec3c1b103", "aaa19b7ec3c1b104", "aaa19b7ec3c1b106", "eee19b7ec3c1b175",
+                                             "eee19b7ec3c1b180", "eee19b7ec3c1b181", "eee19b7ec3c1b182", "eee19b7ec3c1b183",
+                                             "eee19b7ec3c1b184")], found
+              # Claude's commands and both harnesses' arguments searchable
+              # (review follow-up 8).
+              for column, span_id in (("full_command", "aaa19b7ec3c1b103"), ("gen_ai.tool.call.arguments", "eee19b7ec3c1b175")):
+                  found = gsql(f"SELECT span_id FROM agent_span WHERE matches_term(\"span_attributes.{column}\", '{NONCE}')", "agent")
+                  print(f"  matches_term({column}, nonce): {found}", flush=True)
+                  assert found == [[span_id]], (column, found)
               create = gsql("SHOW CREATE TABLE agent_span", "agent")[0][1]
-              for column in ("last_user_message", "gen_ai.output.messages", "gen_ai.tool.call.result", "user_prompt"):
+              for column in ("last_user_message", "gen_ai.output.messages", "gen_ai.tool.call.result", "user_prompt",
+                             "full_command", "gen_ai.tool.call.arguments"):
                   assert f"\"span_attributes.{column}\" STRING NULL FULLTEXT INDEX WITH(analyzer = 'English', backend = 'bloom', case_sensitive = 'false'" in create, column
               assert "\"span_attributes.success\" BOOLEAN NULL" in create, create
               options = gsql("SELECT create_options FROM information_schema.tables WHERE table_schema = 'agent' AND table_name = 'agent_span'", "agent")[0][0]
@@ -1393,24 +1600,25 @@
                   "agent.agent_span.span_attributes.gen_ai.conversation.id": 3,
                   "agent.agent_span.span_attributes.gen_ai.output.messages": 1,
                   "agent.agent_span.span_attributes.gen_ai.tool.call.arguments": 1,
-                  "agent.agent_span.span_attributes.gen_ai.tool.call.result": 3,
-                  "agent.agent_span.span_status_message": 2,
-                  "agent.agent_span.span_attributes.session.id": 5,
+                  "agent.agent_span.span_attributes.gen_ai.tool.call.result": 9,
+                  "agent.agent_span.span_status_message": 3,
+                  "agent.agent_span.span_attributes.session.id": 6,
                   "agent.agent_span.span_attributes.user_prompt": 1,
                   "agent.agent_span.span_attributes.full_command": 1,
                   "agent.agent_span.span_attributes.file_path": 1,
               }
-              for what, tail in tails.items():
-                  assert nonce_hits(tail) == {}, f"{what} stored unmasked"
+              # Every credential, the token inside the base64 syntax, decoded
+              # or not, and the blob: in no column.
+              assert nonce_hits(*tails.values(), TRACE_TOKEN, SYNTAX, BLOB) == {}, "a credential, the trace token or the blob stored"
               failed = {port: metric(port, r"otelcol_exporter_send_failed_[a-z_]+") for port in (INGRESS_PORT, SESSION_PORT)}
               print(f"  send_failed {failed}", flush=True)
               assert failed == {INGRESS_PORT: 0, SESSION_PORT: 0}, failed
 
-              # Langfuse (design D16): the same thirteen spans, after the same
+              # Langfuse (design D16): the same twenty spans, after the same
               # stages, with the test key pair and the ingestion version, and
               # Langfuse's names; none of them reaches the store.
               assert "langfuse." not in tap, "a Langfuse attribute reached the store's exporter"
-              wait_for(lambda: set(sink_spans(sink_records(NONCE))) >= set(spans), "the thirteen spans at the Langfuse sink", 120)
+              wait_for(lambda: set(sink_spans(sink_records(NONCE))) >= set(spans), "the twenty spans at the Langfuse sink", 120)
               records = sink_records(NONCE)
               basic = langfuse_basic()
               for r in records:
@@ -1422,6 +1630,8 @@
               blob = json.dumps(records)
               for what, tail in tails.items():
                   assert tail not in blob, f"{what} reached Langfuse unmasked"
+              for what, needle in (("trace token", TRACE_TOKEN), ("trace syntax", SYNTAX), ("blob", BLOB)):
+                  assert needle not in blob, f"{what} reached Langfuse"
               for what, value in canary.items():
                   assert (value in blob) == (what in admitted), (what, value in blob)
               for key in ("vanixiets.", "last_user_message", "user_prompt", "\"input_tokens\"", "\"cache_read_tokens\"", "links", "canary.link"):
@@ -1452,6 +1662,11 @@
               assert text(bash_lf, "langfuse.observation.output") == f"{canary['bash output']}\nAuthorization: ****\n****", bash_lf.keys()
               assert "gen_ai.tool.call.result" not in bash_lf
               assert text(read_lf, "langfuse.observation.input") == canary["path"] and text(read_lf, "langfuse.observation.output") == f"{canary['read content']}\n****"
+              # omp's results as the store holds them: stripped, withheld,
+              # masked; Claude's JSON output untouched.
+              for span_id, (_, expected) in results.items():
+                  assert text(lf[span_id][1], "gen_ai.tool.call.result") == expected, (span_id, text(lf[span_id][1], "gen_ai.tool.call.result"))
+              assert text(lf["aaa19b7ec3c1b106"][1], "langfuse.observation.output") == CLAUDE_JSON
               print("  Langfuse: the store's spans, masked and cut, under Langfuse's names; none reached the store", flush=True)
               print("ok: agentSpans", flush=True)
             '';
@@ -1590,13 +1805,105 @@
               print("ok: langfuse", flush=True)
             '';
 
+            # The agent unit and the store's schema job in a switch (design
+            # D15): switch-to-configuration starts each unit in a transaction
+            # of its own, on magnetite (2026-11-22) the agent unit's 20 ms
+            # before the job's, so After= alone ordered nothing. With the
+            # unit wanting the job, the unit's start pulls the job's start in
+            # and waits for it to end, the agent unit's queued first as on
+            # magnetite; and a failed job leaves the unit starting anyway.
+            schemaOrder = ''
+              print("=== case schemaOrder", flush=True)
+              fresh_start()
+
+
+              def monotonic(unit, prop):
+                  return int(store.succeed(f"systemctl show -P {prop} {unit}.service").strip())
+
+
+              store.succeed(f"systemctl stop {SESSION}.service greptimedb-schema.service")
+              store.succeed(f"systemctl start --no-block {SESSION}.service", "systemctl start --no-block greptimedb-schema.service")
+              store.wait_until_succeeds(f"systemctl is-active {SESSION}.service", timeout=300)
+              store.wait_until_succeeds("systemctl is-active greptimedb-schema.service", timeout=300)
+              finished = monotonic("greptimedb-schema", "ActiveEnterTimestampMonotonic")
+              started = monotonic(SESSION, "ExecMainStartTimestampMonotonic")
+              print(f"  schema job active at {finished} us, the agent unit's process started at {started} us", flush=True)
+              assert 0 < finished <= started, ("the agent unit started before the schema job ended", finished, started)
+
+              drop_in = "/run/systemd/system/greptimedb-schema.service.d/zz-fail.conf"
+              store.succeed(f"mkdir -p {os.path.dirname(drop_in)}",
+                            f"printf '[Service]\\nExecStart=\\nExecStart=/run/current-system/sw/bin/false\\n' > {drop_in}",
+                            "systemctl daemon-reload",
+                            f"systemctl stop {SESSION}.service greptimedb-schema.service")
+              code, out = store.execute(f"systemctl start {SESSION}.service")
+              print(f"  with the schema job failing: systemctl start {SESSION} exited {code} {out.strip()}", flush=True)
+              assert code == 0, out
+              store.succeed(f"systemctl is-active {SESSION}.service")
+              assert store.execute("systemctl is-failed greptimedb-schema.service")[0] == 0, "the schema job did not fail"
+              print("  a failed schema job: the agent unit started anyway", flush=True)
+              store.succeed(f"rm {drop_in}", "systemctl daemon-reload", "systemctl reset-failed greptimedb-schema.service",
+                            "systemctl start greptimedb-schema.service")
+              print("ok: schemaOrder", flush=True)
+            '';
+
+            # The hand-off cap (design D15): one request of 160 omp tool
+            # spans of 60 KiB, about 9.8 MB, past the ingress's 8 MiB
+            # agent_span queue, which takes a request whole or not at all.
+            # The span exporter splits it to a quarter of that queue, so the
+            # store gets every span and the ingress refuses none.
+            handoffCap = ''
+              print("=== case handoffCap", flush=True)
+              fresh_start()
+              store.succeed(f"systemctl restart {SESSION}.service")
+              wait_telemetry(SESSION_PORT)
+              nonce = f"cap{time.time_ns()}"
+              generator = "\n".join([
+                  "import json, os, sys, time",
+                  "nonce, now = sys.argv[1], time.time_ns()",
+                  "text = ('lorem ipsum ' * 5200)[:61440]",
+                  "def s(k, v): return {'key': k, 'value': {'stringValue': v}}",
+                  "spans = [{'traceId': os.urandom(16).hex(), 'spanId': os.urandom(8).hex(), 'name': 'execute_tool bash', 'kind': 1,",
+                  "          'startTimeUnixNano': str(now - 1000000), 'endTimeUnixNano': str(now),",
+                  "          'attributes': [s('gen_ai.operation.name', 'execute_tool'), s('gen_ai.conversation.id', nonce),",
+                  "                         s('gen_ai.tool.call.result', json.dumps({'content': [{'type': 'text', 'text': str(i) + ' ' + text}]}, separators=(',', ':')))]}",
+                  "         for i in range(160)]",
+                  "print(json.dumps({'resourceSpans': [{'resource': {'attributes': [s('service.name', 'oh-my-pi'), s('user.name', 'cameron')]}, 'scopeSpans': [{'spans': spans}]}]}))",
+              ])
+              store.succeed(f"python3 - {nonce} > /tmp/handoff.json <<'EOF'\n{generator}\nEOF")
+              size = int(store.succeed("stat -c %s /tmp/handoff.json"))
+              refused = {"refused": ("otelcol_receiver_refused_spans", {"receiver": "otlp/mesh"}),
+                         "enqueue_failed": ("otelcol_exporter_enqueue_failed_spans", {"exporter": "otlp_http/agent_span"})}
+              before = {k: metric(INGRESS_PORT, name, labels) for k, (name, labels) in refused.items()}
+              status = store.succeed(
+                  "curl -sS -o /tmp/handoff-answer -w '%{http_code}' -H 'Content-Type: application/json' "
+                  "--data @/tmp/handoff.json http://127.0.0.1:4318/v1/traces"
+              ).strip()
+              print(f"  POST otlp/local /v1/traces, {size} bytes: {status}", flush=True)
+              assert status == "200", status
+
+
+              def stored():
+                  rows = gsql(f"SELECT count(*) FROM agent_span WHERE \"span_attributes.gen_ai.conversation.id\" = '{nonce}'", "agent")
+                  print(f"  {nonce}: {rows} of 160 stored", flush=True)
+                  return rows == [[160]]
+
+
+              wait_for(stored, "the 160 spans in the store", 300)
+              after = {k: metric(INGRESS_PORT, name, labels) for k, (name, labels) in refused.items()}
+              print(f"  ingress, before and after: {before} {after}", flush=True)
+              assert after == before, (before, after)
+              print("ok: handoffCap", flush=True)
+            '';
+
             cases = [
               processName
               refusal
               delivery
               agentSession
               agentSpans
+              schemaOrder
               langfuse
+              handoffCap
               backPressure
               lossControls
               crashLoop
@@ -1646,7 +1953,11 @@
                   self.modules.nixos.otel-collector-ingress
                 ];
                 system.stateVersion = lib.trivial.release;
-                environment.systemPackages = [ pkgs.curl ];
+                # python3 writes the handoffCap case's request.
+                environment.systemPackages = [
+                  pkgs.curl
+                  pkgs.python3
+                ];
 
                 services.greptimedb = {
                   enable = true;
@@ -1768,7 +2079,9 @@
                 systemd.services.otel-agent-session = {
                   description = "pyrite's agent-session collector, exporting over mTLS to otlp/mesh";
                   wantedBy = [ "multi-user.target" ];
-                  after = [ "opentelemetry-collector.service" ];
+                  # magnetite's ordering: after the host's collector and the
+                  # store's schema job, which it also wants (design D15).
+                  inherit (reference.systemd.services.otel-agent-session) after wants;
                   startLimitIntervalSec = 0;
                   serviceConfig =
                     builtins.removeAttrs pyriteSessionUnit [
@@ -1838,10 +2151,13 @@
                       pki
                       agentDeployRecord
                       oldSpanTable
+                      d15SpanTable
                       sinkDir
                       sinkPort
                       langfuseTestRetry
                       ;
+                    toolResultWithheld = self.lib.otelCollectorSchema.agentSession.spans.toolResult.withheld;
+                    credentialPatternNames = builtins.attrNames self.lib.otelCollectorSchema.agentSession.credentialPatterns;
                     deployRecord = self.lib.deployRecordScript {
                       inherit pkgs;
                       hostName = "electrum";

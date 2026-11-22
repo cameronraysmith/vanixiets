@@ -131,14 +131,14 @@ in
           database_sql() {
             local status
             status="$(printf 'user = "admin:%s"\n' "$password" |
-              curl --silent --show-error --config - --output "$answer" --write-out '%{http_code}' \
+              curl --silent --show-error --max-time 90 --config - --output "$answer" --write-out '%{http_code}' \
                 --data-urlencode "sql=$2" "${httpUrl}/v1/sql?db=$1")"
             expect_200 "$status" "the statement on $1"
           }
           upload_pipeline() {
             local status
             status="$(printf 'user = "admin:%s"\n' "$password" |
-              curl --silent --show-error --config - --output "$answer" --write-out '%{http_code}' \
+              curl --silent --show-error --max-time 90 --config - --output "$answer" --write-out '%{http_code}' \
                 --form "file=@$3" "${httpUrl}/v1/pipelines/$2?db=$1")"
             expect_200 "$status" "pipeline $2 on $1"
           }
@@ -155,7 +155,9 @@ in
 
       # The store has no readiness notification, so the job polls /health
       # (design F7). The password reaches curl on stdin through the printf
-      # builtin, never on a command line.
+      # builtin, never on a command line. Each statement gets 90 s, past
+      # the store's own 60 s DDL timeout, so a hung connection fails the job
+      # rather than holding it, and the units ordered after it, forever.
       schema = pkgs.writeShellApplication {
         name = "greptimedb-schema";
         runtimeInputs = [
@@ -177,7 +179,7 @@ in
 
           sql() {
             printf 'user = "admin:%s"\n' "$password" |
-              curl --silent --show-error --fail-with-body --config - \
+              curl --silent --show-error --fail-with-body --max-time 90 --config - \
                 --data-urlencode "sql=$1" ${httpUrl}/v1/sql
             echo
           }

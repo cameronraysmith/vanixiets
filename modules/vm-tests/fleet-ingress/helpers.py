@@ -5,6 +5,7 @@
 # running with no mutant drop-in.
 import base64
 import datetime as dt
+import hashlib
 import json
 import os
 import re
@@ -55,11 +56,11 @@ def promql(expr, db="fleet"):
     return json.loads(body)["data"]["result"]
 
 
-def nonce_hits(nonce):
+def nonce_hits(*nonces):
     """Every string and JSON column of every table of every database, read
-    as `regulator`: `<db>.<table>.<column>` -> rows whose value holds nonce.
-    A JSON column is read through json_to_string, since a cast of its
-    binary value is refused."""
+    as `regulator`: `<db>.<table>.<column>` -> rows whose value holds any of
+    the nonces. A JSON column is read through json_to_string, since a cast
+    of its binary value is refused."""
     columns = gsql(
         "SELECT table_schema, table_name, column_name, lower(data_type) FROM information_schema.columns "
         "WHERE lower(data_type) IN ('string', 'json') AND table_schema NOT IN ('information_schema', 'greptime_private', 'pg_catalog')",
@@ -68,7 +69,8 @@ def nonce_hits(nonce):
     hits = {}
     for schema, table, column, kind in columns:
         value = f'json_to_string("{column}")' if kind == "json" else f'"{column}"'
-        count = gsql(f"SELECT count(*) FROM \"{schema}\".\"{table}\" WHERE {value} LIKE '%{nonce}%'", schema)[0][0]
+        held = " OR ".join(f"{value} LIKE '%{nonce}%'" for nonce in nonces)
+        count = gsql(f"SELECT count(*) FROM \"{schema}\".\"{table}\" WHERE {held}", schema)[0][0]
         if count:
             hits[f"{schema}.{table}.{column}"] = count
     tables = {(schema, table) for schema, table, _, _ in columns}

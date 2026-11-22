@@ -320,6 +320,23 @@ Any requirement whose discharge depends on this fact SHALL name it explicitly, a
 - **WHEN** the packaged collector differs from 0.155.0 and the fan-out, the batcher or the retry classification changes
 - **THEN** this assumption is void, the Langfuse branch's drain bound is recomputed, and the `langfuse` case is rerun before the flag stays on
 
+### Requirement: A208 — omp serialises a tool result with its content first and its TUI cache under details
+
+It is true of omp 19.1.0, independent of what this fleet builds, that `gen_ai.tool.call.result` is `JSON.stringify` of the whole tool result, `content` first, then `details`, a cache the model never sees, and that omp's other kept span values carry no `details`.
+Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL lose its discharge once the violation below is observed.
+
+**Evidence**: can1357/oh-my-pi at e1a9f4b41d (v19.1.0 plus 14 commits, read 2026-11-22; the hosts run the packaged 19.1.0): `packages/coding-agent/src/tools/tool-result.ts:97-109` (the builder's key order); `packages/agent/src/telemetry.ts:1132-1138,2245-2251` (the whole result through `JSON.stringify`), `agent-loop.ts:3866` (the full result passed); `packages/tui/src/tools/bash.ts:87-131` and `wire/src/shell-trace.ts` (the trace, `units[].syntax` from `crates/shell/src/bash/trace/syntax.rs`), `tui/src/tools/edit.ts:104-130`, `eval.ts:102-142`, `coding-agent/src/tools/browser.ts:161-170`, `mcp.ts:481-503` (other tools' `details`); `telemetry.ts:996-1016,1126-1130,1998-2001` and `agent-loop.ts:3856-3858` (output messages, arguments, status message); research in local://telemetry-tool-result-details.md. Observed on magnetite (2026-11-22): bash results with exactly those keys in that order (`logs/d15-magnetite-extra-20261122T2015Z.log` §1) and a typed token stored base64-encoded in `details.trace.units[].syntax` (`logs/d15-magnetite-e2e-20261122T2011Z.log` §5).
+
+#### Scenario: What the cache holds (read 2026-11-22)
+
+- **WHEN** omp's tool results are read at e1a9f4b41d and on magnetite
+- **THEN** the result's keys are `content`, `details`, then `isError` or `useless` only when true; bash's `details` holds a shell trace with a base64 copy of the parsed command and the expanded argv, environment values and stdout; edit's holds file snapshots, a diff and diagnostics; eval's, MCP's and the browser's hold image and raw-value copies; `gen_ai.output.messages`, `gen_ai.tool.call.arguments` and the status message hold none of it
+
+#### Scenario: A release orders the result differently or moves the cache
+
+- **WHEN** the packaged omp differs from 19.1.0 and puts `details` before `content`, adds a key between them, or carries encoded copies in another key or attribute
+- **THEN** this assumption is void; a result whose `details` survives the strip is stored as the fixed withheld marker, encoded runs of 129 characters or more are still masked, and the `agentSpans` case is rerun against the release's real results before the strip is relied on
+
 ## MODIFIED Requirements
 
 ### Requirement: Grounded vocabulary for behavioral requirements

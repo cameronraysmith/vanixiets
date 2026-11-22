@@ -97,6 +97,8 @@
         );
         meshAddress = self.lib.hosts.magnetite.address;
         storeVersion = magnetite.services.greptimedb.package.version;
+        # Both collector units run the host's collector package.
+        collectorVersion = magnetite.services.opentelemetry-collector.package.version;
         storeTables = magnetite.services.greptimedb.tables;
         notifierInterval =
           magnetite.systemd.services."observability-notify@".environment.OBSERVABILITY_NOTIFY_MIN_INTERVAL_SEC
@@ -337,22 +339,58 @@
             attribute:
             ''set(span.attributes["${session.spans.toolOutput.key}"], spanevent.attributes["${attribute}"]) where spanevent.name == "${session.spans.toolOutput.event}" and spanevent.attributes["${attribute}"] != nil''
           ) session.spans.toolOutput.attributes;
-          # Every one of schema.nix's credential shapes, in every kept
-          # string of events and spans and in the status message.
-          credentials = ''"${
-            lib.escape [ "\\" "\"" ] (
-              lib.concatMapStringsSep "|" (pattern: "(?:${pattern})") (
-                builtins.attrValues session.credentialPatterns
-              )
+          # Every one of schema.nix's credential shapes, then its encoded
+          # blob net, in every kept string of events and spans and in the
+          # status message.
+          ottlString = s: ''"${lib.escape [ "\\" "\"" ] s}"'';
+          credentials = ottlString (
+            lib.concatMapStringsSep "|" (pattern: "(?:${pattern})") (
+              builtins.attrValues session.credentialPatterns
             )
-          }"'';
+          );
+          blob = ottlString session.encodedBlobPattern;
           expectedMask = {
-            log_statements = [ ''replace_all_patterns(log.attributes, "value", ${credentials}, "****")'' ];
+            log_statements = [
+              ''replace_all_patterns(log.attributes, "value", ${credentials}, "****")''
+              ''replace_all_patterns(log.attributes, "value", ${blob}, "****")''
+            ];
             trace_statements = [
               ''replace_all_patterns(span.attributes, "value", ${credentials}, "****")''
+              ''replace_all_patterns(span.attributes, "value", ${blob}, "****")''
               ''replace_pattern(span.status.message, ${credentials}, "****")''
+              ''replace_pattern(span.status.message, ${blob}, "****")''
             ];
           };
+          # The shapes by name: a set emptied or thinned in schema.nix
+          # renders a mask the statement comparison above would accept.
+          credentialPatternNames = [
+            "age-secret-key"
+            "anthropic"
+            "aws-access-key-id"
+            "bearer"
+            "digitalocean"
+            "gcp-api-key"
+            "github"
+            "gitlab"
+            "jwt"
+            "langfuse"
+            "linear"
+            "npm"
+            "openai"
+            "private-key"
+            "pypi"
+            "slack"
+            "stripe"
+          ];
+          # omp's tool results stripped of `details` on its spans only,
+          # then withheld whole if a `details` key is left (design D15).
+          toolResult = session.spans.toolResult;
+          resultKey = ''span.attributes["${session.spans.toolOutput.key}"]'';
+          ompOnly = ''resource.attributes["service.name"] == "${toolResult.service}"'';
+          expectedToolResultStatements = [
+            ''replace_pattern(${resultKey}, ${ottlString toolResult.strip}, "]$$1}") where ${ompOnly}''
+            "set(${resultKey}, ${ottlString toolResult.withheld}) where ${ompOnly} and IsMatch(${resultKey}, ${ottlString toolResult.detailsKey})"
+          ];
           # agent.agent_span's CREATE TABLE as the schema job runs it, and
           # the attribute keys its columns are named after.
           spanTable =
@@ -704,8 +742,11 @@
               && !(builtins.elem "opentelemetry-collector.service" (deps (i.services.otel-agent-session or { })))
               && !(builtins.elem "otel-agent-session.service" (deps i.services.opentelemetry-collector))
               # On the store's host the columns for new span keys exist
-              # before the unit sends them (design D15).
+              # before the unit sends them (design D15): ordered after the
+              # schema job and pulling it into its own start, which a switch
+              # runs as a transaction of its own.
               && builtins.elem "greptimedb-schema.service" (i.services.otel-agent-session.after or [ ])
+              && builtins.elem "greptimedb-schema.service" (i.services.otel-agent-session.wants or [ ])
             )
           )
           (check
@@ -736,6 +777,7 @@
                   "transform/agent-session-prompt"
                   "transform/agent-session-tool-output"
                   "filter/agent-session-span-events"
+                  "transform/agent-session-tool-result"
                   "transform/agent-session-spans"
                   "transform/agent-session-mask"
                   "resource/agent-session"
@@ -750,6 +792,7 @@
                 "transform/agent-session-events"
                 "transform/agent-session-span-links"
                 "transform/agent-session-tool-output"
+                "transform/agent-session-tool-result"
                 "transform/agent-session-spans"
                 "transform/agent-session-mask"
               ]
@@ -877,6 +920,11 @@
                 (ap."transform/agent-session-span-links".trace_statements or null)
                 == [ "set(span.links, span.links)" ]
               && builtins.removeAttrs (ap."transform/agent-session-mask" or { }) [ "error_mode" ] == expectedMask
+              && sorted (builtins.attrNames session.credentialPatterns) == credentialPatternNames
+              &&
+                builtins.removeAttrs (ap."transform/agent-session-tool-result" or { }) [ "error_mode" ] == {
+                  trace_statements = expectedToolResultStatements;
+                }
               &&
                 (ap."filter/agent-session-span-events".trace_conditions or null) == [
                   ''spanevent.name != "" or spanevent.name == ""''
@@ -1004,6 +1052,30 @@
             builtins.elem "greptimedb-schema.service" i.services.opentelemetry-collector.after
             && builtins.elem "greptimedb-schema.service" i.services.opentelemetry-collector.wants
           ))
+
+          # The collector release the agent-session path was proven at
+          # (design D15; A203, A207, A208): the link clearing relies on its
+          # links setter, the tool-result strip and the masks on its OTTL,
+          # the hand-off cap on its batcher.
+          (check
+            "R3.1: the collector is not otelcol-contrib 0.155.0; before changing it, rerun fleet-ingress's agentSpans and handoffCap cases, which prove the link clearing, the tool-result strip, the masks and the hand-off cap at a release"
+            (i.collectorVersion == "0.155.0")
+          )
+          # The hand-off (design D15): the ingress queues a span request
+          # whole, so one larger than its agent_span queue never fits.
+          (check
+            "R3.1: the agent-session collector's span exporter does not send one request at a time, batched by bytes to at most a quarter of the ingress's agent_span queue"
+            (
+              let
+                queue = ae."otlp_http/ingress-traces".sending_queue or { };
+                batch = queue.batch or { };
+              in
+              (queue.num_consumers or null) == 1
+              && (batch.sizer or null) == "bytes"
+              && (batch.max_size or 0) > 0
+              && batch.max_size <= (e."otlp_http/agent_span".sending_queue.queue_size or 0) / 4
+            )
+          )
 
           # R1.2 (ADR-001): below 1.3.0 the store needs explicit-bucket histograms.
           (lib.optional (
@@ -1238,6 +1310,8 @@
         unit = "R3.1: the agent-session collector shares the host collector's queue directory, serves telemetry off loopback, does not always restart, is bound to the host's collector, or may start before the store's schema job";
         langfusePath = "R3.1: traces/langfuse exists where observabilityHosts does not set langfuse or is missing where it does, or is not fed by forward/langfuse from traces/agent-session alone, after all its stages, through stages that cannot refuse";
         langfuseExporter = "R3.1: Langfuse's exporter does not send to schema.nix's endpoint with the unit's Langfuse credentials and ingestion version, retry for retryMinutes and no longer, drain faster than spans arrive into a queue of twice a retry window, in batches under the request limit, or a store exporter of the agent-session collector does not retry forever, or its queues reach 512 MiB";
+        collectorVersion = "R3.1: the collector is not otelcol-contrib 0.155.0; before changing it, rerun fleet-ingress's agentSpans and handoffCap cases, which prove the link clearing, the tool-result strip, the masks and the hand-off cap at a release";
+        handoffCap = "R3.1: the agent-session collector's span exporter does not send one request at a time, batched by bytes to at most a quarter of the ingress's agent_span queue";
       };
       onAgent = update: i: i // { agentSettings = lib.recursiveUpdate i.agentSettings update; };
       withReceiver =
@@ -1617,6 +1691,22 @@
               };
             };
         };
+        # A switch starts the unit in a transaction of its own, so After=
+        # alone does not order it after a schema job started in another
+        # (magnetite, 2026-11-22: 20 ms before it, two spans refused).
+        agentSchemaNotWanted = {
+          clauses = [ clause.unit ];
+          mutate =
+            i:
+            i
+            // {
+              services = i.services // {
+                otel-agent-session = i.services.otel-agent-session // {
+                  wants = lib.remove "greptimedb-schema.service" (i.services.otel-agent-session.wants or [ ]);
+                };
+              };
+            };
+        };
         agentLimiterOverGoMemLimit = {
           clauses = [ clause.agentLimiter ];
           mutate = onAgent { processors.memory_limiter.limit_mib = 420; };
@@ -1863,6 +1953,163 @@
         agentQueuesOver512 = {
           clauses = [ clause.langfuseExporter ];
           mutate = onAgent { exporters."otlp_http/ingress-agent".sending_queue.queue_size = mib 400; };
+        };
+        # omp's tool-result strip (design D15): gone, after the cut that it
+        # must precede, ignoring its errors, on every service rather than
+        # omp's, or without the withholding behind it.
+        toolResultStripRemoved = {
+          clauses = [ clause.stages ];
+          mutate = agentStages "traces/agent-session" (lib.remove "transform/agent-session-tool-result");
+        };
+        toolResultStripAfterCut = {
+          clauses = [ clause.stages ];
+          mutate = agentStages "traces/agent-session" (
+            processors:
+            lib.concatMap (
+              n:
+              if n == "transform/agent-session-tool-result" then
+                [ ]
+              else if n == "transform/agent-session-spans" then
+                [
+                  n
+                  "transform/agent-session-tool-result"
+                ]
+              else
+                [ n ]
+            ) processors
+          );
+        };
+        toolResultStripIgnoresErrors = {
+          clauses = [ clause.stages ];
+          mutate = onAgent { processors."transform/agent-session-tool-result".error_mode = "ignore"; };
+        };
+        toolResultStripUngated = {
+          clauses = [ clause.keys ];
+          mutate =
+            i:
+            onAgent {
+              processors."transform/agent-session-tool-result".trace_statements = map (lib.replaceStrings
+                [ ''where resource.attributes["service.name"] == "${session.spans.toolResult.service}"'' ]
+                [ "" ]
+              ) i.agentSettings.processors."transform/agent-session-tool-result".trace_statements;
+            } i;
+        };
+        toolResultNotWithheld = {
+          clauses = [ clause.keys ];
+          mutate =
+            i:
+            onAgent {
+              processors."transform/agent-session-tool-result".trace_statements =
+                lib.take 1
+                  i.agentSettings.processors."transform/agent-session-tool-result".trace_statements;
+            } i;
+        };
+        # The encoded-blob net (design D15): gone from spans and the status
+        # message, gone from events, or run before the credential shapes.
+        blobNetRemovedFromSpans = {
+          clauses = [ clause.keys ];
+          mutate =
+            i:
+            onAgent {
+              processors."transform/agent-session-mask".trace_statements = lib.filter (
+                s: !lib.hasInfix session.encodedBlobPattern s
+              ) i.agentSettings.processors."transform/agent-session-mask".trace_statements;
+            } i;
+        };
+        blobNetRemovedFromEvents = {
+          clauses = [ clause.keys ];
+          mutate =
+            i:
+            onAgent {
+              processors."transform/agent-session-mask".log_statements =
+                lib.take 1
+                  i.agentSettings.processors."transform/agent-session-mask".log_statements;
+            } i;
+        };
+        blobNetBeforeShapes = {
+          clauses = [ clause.keys ];
+          mutate =
+            i:
+            onAgent {
+              processors."transform/agent-session-mask".log_statements =
+                lib.reverseList
+                  i.agentSettings.processors."transform/agent-session-mask".log_statements;
+            } i;
+        };
+        # schema.nix's shapes emptied and the mask rendered from the empty
+        # set, as the module would: only the names catch it.
+        credentialPatternsEmptied = {
+          clauses = [ clause.keys ];
+          mutate =
+            i:
+            let
+              rendered = map (
+                lib.replaceStrings
+                  [
+                    (lib.escape [ "\\" "\"" ] (
+                      lib.concatMapStringsSep "|" (pattern: "(?:${pattern})") (
+                        builtins.attrValues session.credentialPatterns
+                      )
+                    ))
+                  ]
+                  [ "" ]
+              );
+              mask = i.agentSettings.processors."transform/agent-session-mask";
+            in
+            onAgent
+              {
+                processors."transform/agent-session-mask" = {
+                  log_statements = rendered mask.log_statements;
+                  trace_statements = rendered mask.trace_statements;
+                };
+              }
+              (
+                i
+                // {
+                  schema = i.schema // {
+                    agentSession = i.schema.agentSession // {
+                      credentialPatterns = { };
+                    };
+                  };
+                }
+              );
+        };
+        # A collector release other than the one the path was proven at.
+        collectorUpgraded = {
+          clauses = [ clause.collectorVersion ];
+          mutate = i: i // { collectorVersion = "0.156.0"; };
+        };
+        # The hand-off (design D15): uncapped, capped at the ingress's
+        # queue, or several requests at once.
+        handoffUncapped = {
+          clauses = [ clause.handoffCap ];
+          mutate =
+            i:
+            let
+              exporter = i.agentSettings.exporters."otlp_http/ingress-traces";
+            in
+            i
+            // {
+              agentSettings = i.agentSettings // {
+                exporters = i.agentSettings.exporters // {
+                  "otlp_http/ingress-traces" = exporter // {
+                    sending_queue = builtins.removeAttrs exporter.sending_queue [ "batch" ];
+                  };
+                };
+              };
+            };
+        };
+        handoffCapAtQueue = {
+          clauses = [ clause.handoffCap ];
+          mutate = onAgent { exporters."otlp_http/ingress-traces".sending_queue.batch.max_size = mib 8; };
+        };
+        handoffCapHalfQueue = {
+          clauses = [ clause.handoffCap ];
+          mutate = onAgent { exporters."otlp_http/ingress-traces".sending_queue.batch.max_size = mib 4; };
+        };
+        handoffConsumersMany = {
+          clauses = [ clause.handoffCap ];
+          mutate = onAgent { exporters."otlp_http/ingress-traces".sending_queue.num_consumers = 10; };
         };
       };
       agentRejections = lib.mapAttrs (_: m: failures (m.mutate input)) agentMutants;

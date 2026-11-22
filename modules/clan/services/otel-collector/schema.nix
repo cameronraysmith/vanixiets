@@ -677,12 +677,40 @@
             cache_read_tokens = "int64";
             cache_creation_tokens = "int64";
           };
+          # Claude's commands land in `full_command`, both harnesses' tool
+          # arguments in `gen_ai.tool.call.arguments`.
           fulltext = [
             "last_user_message"
             "gen_ai.output.messages"
             "gen_ai.tool.call.result"
             "user_prompt"
+            "full_command"
+            "gen_ai.tool.call.arguments"
           ];
+          # omp's `gen_ai.tool.call.result` is JSON.stringify of the whole
+          # tool result: `content` (what the model saw), then `details`, a
+          # re-render cache for its TUI the model never sees (bash's shell
+          # trace with a base64 copy of the parsed command and the expanded
+          # argv, env and stdout; edit's whole-file snapshots; eval's, MCP's
+          # and the browser's image and raw-value copies), then `isError`
+          # and `useless` when true (omp 19.1.0
+          # packages/coding-agent/src/tools/tool-result.ts:104-108,
+          # packages/agent/src/telemetry.ts:1132-1138; design D15, A208).
+          # On its spans only (Claude Code's plain text lands in the same
+          # key), before the cut, `strip` drops everything from the
+          # `details` key that follows `content` to the end but a final
+          # `isError`, without parsing: an unescaped `],"details":` cannot
+          # occur inside a JSON string, so the first one is the key. A
+          # result still holding a `details` key after that (`detailsKey`:
+          # a key follows `{` or `,`, which no string can hold before an
+          # unescaped quote) becomes `withheld` whole, so a changed key
+          # order cannot reopen the hole.
+          toolResult = {
+            service = "oh-my-pi";
+            strip = ''\],"details":[\s\S]*?(,"isError":true)?(,"useless":true)?\}$'';
+            detailsKey = ''[{,]\s*"details"\s*:'';
+            withheld = "[tool result withheld: its details could not be stripped]";
+          };
           table = "agent_span";
         };
 
@@ -727,14 +755,21 @@
         # gitleaks 8.30.1's rules for these issuers, loosened to the token's
         # prefix and alphabet. They catch token-shaped strings only, never
         # every secret: a password, an AWS secret access key or any
-        # credential without a fixed prefix passes. A private key cut at 64
-        # KiB before its END line is masked to the end of the value.
+        # credential without a fixed prefix passes. The `sk-`, `sk_` and
+        # `rk_` shapes start at a word boundary, so `task_test_…` and
+        # `risk-admin-…` are words, not keys. A private key whose END line
+        # is missing (cut at 64 KiB, say) is masked up to the next
+        # unescaped double quote or the end of the value: in a JSON-encoded
+        # value that is the end of the string holding it, so the JSON stays
+        # whole. A length bound cannot cover a key: Go's RE2 refuses any
+        # repeat above 1,000, nested ones multiplied, and an RSA key's body
+        # is longer.
         credentialPatterns = {
-          private-key = "-----BEGIN[ A-Z0-9_-]{0,100}PRIVATE KEY(?: BLOCK)?-----(?:[\\s\\S]*?-----END[ A-Z0-9_-]{0,100}PRIVATE KEY(?: BLOCK)?-----|[\\s\\S]*)";
+          private-key = "-----BEGIN[ A-Z0-9_-]{0,100}PRIVATE KEY(?: BLOCK)?-----(?:[\\s\\S]*?-----END[ A-Z0-9_-]{0,100}PRIVATE KEY(?: BLOCK)?-----|(?:[^\"\\\\]|\\\\[^\"])*)";
           age-secret-key = "AGE-SECRET-KEY-1[QPZRY9X8GF2TVDW0S3JN54KHCE6MUA7L]{58}";
-          anthropic = "sk-ant-[A-Za-z0-9_-]{20,}";
-          openai = "sk-(?:proj|svcacct|admin)-[A-Za-z0-9_-]{20,}|sk-[A-Za-z0-9]{20}T3BlbkFJ[A-Za-z0-9]{20}";
-          langfuse = "sk-lf-[A-Za-z0-9-]{8,}";
+          anthropic = "\\bsk-ant-[A-Za-z0-9_-]{20,}";
+          openai = "\\bsk-(?:proj|svcacct|admin)-[A-Za-z0-9_-]{20,}|\\bsk-[A-Za-z0-9]{20}T3BlbkFJ[A-Za-z0-9]{20}";
+          langfuse = "\\bsk-lf-[A-Za-z0-9-]{8,}";
           github = "(?:ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9]{36,}|github_pat_[A-Za-z0-9_]{22,}";
           gitlab = "glpat-[A-Za-z0-9_-]{20,}";
           npm = "npm_[A-Za-z0-9]{36}";
@@ -744,10 +779,24 @@
           gcp-api-key = "AIza[A-Za-z0-9_-]{35}";
           digitalocean = "do[opr]_v1_[a-f0-9]{64}";
           slack = "xox[abeoprs]-[A-Za-z0-9-]{10,}|xapp-[0-9]-[A-Za-z0-9-]{10,}|hooks\\.slack\\.com/(?:services|workflows|triggers)/[A-Za-z0-9/_+-]{20,}";
-          stripe = "(?:sk|rk)_(?:test|live|prod)_[A-Za-z0-9]{10,}";
+          stripe = "\\b(?:sk|rk)_(?:test|live|prod)_[A-Za-z0-9]{10,}";
           jwt = "eyJ[A-Za-z0-9_-]{8,}\\.eyJ[A-Za-z0-9_-]{8,}\\.[A-Za-z0-9_-]*";
           bearer = "(?i:bearer)\\s+[A-Za-z0-9._~+/=-]{16,}";
         };
+
+        # Encoded blobs, masked to `****` in the same strings after the
+        # credential shapes (design D15): a run of 129 or more characters of
+        # base64's standard alphabet (`+` and `/`), with its padding, or of
+        # its URL-safe alphabet (`-` and `_`). Two alternatives rather than
+        # one merged class, so a path or URL (slashes and hyphens) is broken
+        # at every hyphen for the first and at every slash for the second
+        # and passes. 129 spares a sha512 in hex (128) and everything shorter
+        # (git and Nix hashes, UUIDs, sha256), and hides images, encrypted
+        # reasoning and any other encoded copy; a shorter blob, or a run the
+        # 64 KiB cut ends after fewer than 129 characters, passes. A path
+        # segment or dotless identifier of 129 characters in one alphabet is
+        # masked too.
+        encodedBlobPattern = "[A-Za-z0-9+/]{129,}={0,2}|[A-Za-z0-9_-]{129,}";
 
         # agent.session_event: one row per admitted event, the time index the
         # record's own Timestamp; non-append, so an exporter's replay of a
