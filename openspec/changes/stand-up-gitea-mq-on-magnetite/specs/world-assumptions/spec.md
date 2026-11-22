@@ -102,6 +102,11 @@ The corpus SHALL provide one designation record per content term this repository
 A term found to denote two distinct phenomena within this repository's vocabulary SHALL be recorded as two rows rather than collapsed into one.
 Thirteen terms carry two senses in this repository today and are disambiguated below rather than left to context: `session`, `package`, `policy`, `@`, `mutation`, `activation`, `probe`, `machine`, `host`, `interface`, `repository`, `build service`, and `merge`.
 
+#### Scenario: The designation records are read
+
+- **WHEN** the designation records are read
+- **THEN** they are the rows of this table, one per term and sense
+
 | Term | Sense | World phenomenon it denotes | Status |
 |---|---|---|---|
 | session | autonomous | a bounded episode during which an agent acts without a human present to answer a prompt | world-only |

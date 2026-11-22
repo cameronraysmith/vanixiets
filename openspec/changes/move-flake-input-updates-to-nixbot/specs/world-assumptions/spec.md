@@ -91,6 +91,11 @@ Any requirement whose discharge depends on this fact SHALL name it explicitly, a
 The corpus SHALL provide one designation record per content term this repository's `behavioral`-stratum requirements use, recording the term, the sense in which it is used when a term carries more than one, the world phenomenon it denotes, and whether that phenomenon is world-only, shared with the machine, or machine-only.
 A term found to denote two distinct phenomena within this repository's vocabulary SHALL be recorded as two rows rather than collapsed into one.
 
+#### Scenario: The designation records are read
+
+- **WHEN** the designation records are read
+- **THEN** they are the rows of this table, one per term and sense
+
 | Term | Sense | World phenomenon it denotes | Status |
 |---|---|---|---|
 | session | autonomous | a bounded episode during which an agent acts without a human present to answer a prompt | world-only |
