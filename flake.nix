@@ -58,7 +58,7 @@
     git-hooks.inputs.nixpkgs.follows = "nixpkgs";
     git-hooks.inputs.flake-compat.follows = "";
 
-    lazyvim-nix.url = "github:pfassina/lazyvim-nix/v16.0.1";
+    lazyvim-nix.url = "github:pfassina/lazyvim-nix/v16.0.2";
     lazyvim-nix.inputs.nixpkgs.follows = "nixpkgs";
 
     nix2container.url = "github:nlewo/nix2container";
