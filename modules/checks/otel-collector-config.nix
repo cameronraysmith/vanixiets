@@ -81,6 +81,7 @@
         );
         meshAddress = self.lib.hosts.magnetite.address;
         storeVersion = magnetite.services.greptimedb.package.version;
+        storeTables = magnetite.services.greptimedb.tables;
         notifierInterval =
           magnetite.systemd.services."observability-notify@".environment.OBSERVABILITY_NOTIFY_MIN_INTERVAL_SEC
             or null;
@@ -211,7 +212,11 @@
           exporterNames =
             map (db: "otlp_http/${db}") dbs
             ++ map (table: "otlp_http/devloop_${table}") devloopTables
-            ++ [ "otlp_http/agent_session_event" ];
+            ++ [
+              "otlp_http/agent_session_event"
+              "otlp_http/agent_span"
+            ];
+          tracesPipelineNames = builtins.filter (lib.hasPrefix "traces") (builtins.attrNames pipelines);
           logsPipelineNames = builtins.filter (lib.hasPrefix "logs/") (builtins.attrNames pipelines);
           # A logs pipeline writes only into devloop or agent.session_event:
           # through the forward and routing connectors, a devloop table's
@@ -262,6 +267,39 @@
             "keep_keys(resource.attributes, ${keyList session.metrics.resourceKeys})"
             "keep_keys(scope.attributes, [])"
           ];
+          # The span path's statements, whole (design D13): the prompt copy
+          # from the newest user message, found in the attribute's last
+          # 64 KiB without parsing the history, then the span allow-list.
+          source = ''span.attributes["${session.spans.promptSource}"]'';
+          expectedPromptStatements = [
+            ''set(span.cache["t"], ${source}) where ${source} != nil and Len(${source}) <= 65536''
+            ''set(span.cache["t"], Substring(${source}, Len(${source}) - 65536, 65536)) where ${source} != nil and Len(${source}) > 65536''
+            ''set(span.cache["x"], ExtractPatterns(span.cache["t"], "\\{\\s*\"role\"\\s*:\\s*\"user\"\\s*,\\s*\"parts\"\\s*:\\s*\\[\\s*\\{\\s*\"type\"\\s*:\\s*\"text\"\\s*,\\s*\"content\"\\s*:\\s*\"(?P<c>(?:[^\"\\\\]|\\\\.)*)\"\\s*\\}(?:\\s*,\\s*\\{[^\\[\\]]*\\})*\\s*\\]\\s*\\}\\s*\\]\\s*$")) where span.cache["t"] != nil''
+            ''set(span.cache["p"], ParseJSON(Concat(["[\"", span.cache["x"]["c"], "\"]"], ""))) where span.cache["x"]["c"] != nil''
+            ''set(span.attributes["prompt"], span.cache["p"][0]) where span.cache["p"] != nil''
+          ];
+          expectedSpanStatements = [
+            "keep_keys(span.attributes, ${keyList (builtins.attrNames session.spans.keys)})"
+            ''set(span.status.message, "")''
+            "keep_keys(resource.attributes, ${keyList session.spans.resourceKeys})"
+            "keep_keys(scope.attributes, [])"
+          ];
+          # agent.agent_span's CREATE TABLE as the schema job runs it, and
+          # the attribute keys its columns are named after.
+          spanTable =
+            lib.findFirst (lib.hasInfix ''CREATE TABLE IF NOT EXISTS "${session.spans.table}" ('') null
+              (i.storeTables.agent or [ ]);
+          columnKeys =
+            prefix:
+            lib.concatMap (part: if builtins.isList part then part else [ ]) (
+              builtins.split ''"${lib.escapeRegex prefix}[.]([^"]+)"'' (
+                if spanTable == null then "" else spanTable
+              )
+            );
+          spanTableColumns = {
+            span = columnKeys "span_attributes";
+            resource = columnKeys "resource_attributes";
+          };
           # The values a filter's conditions compare with.
           conditionValues =
             conditions:
@@ -391,15 +429,57 @@
             )
           )
 
-          # Content: no traces pipeline, and the logs pipelines write only
-          # into devloop and agent.session_event (S2 design D4;
-          # agent-session-telemetry design D3, D6; S7 adds journald logs
-          # behind ADR-008's stages).
+          # Content: the logs pipelines write only into devloop and
+          # agent.session_event (S2 design D4; agent-session-telemetry design
+          # D3; S7 adds journald logs behind ADR-008's stages).
+          (check "R3.1: a logs pipeline exporting outside devloop and agent.session_event" (
+            lib.all (name: lib.all exportsToDevloop pipelines.${name}.exporters) logsPipelineNames
+          ))
+          # Content: exactly two traces pipelines (agent-session-telemetry
+          # design D13), the host's on otlp/local into forward and the
+          # ingress's into otlp_http/agent_span, which writes agent.agent_span
+          # through greptime_trace_v1 without creating tables or columns;
+          # the table's attribute columns are exactly agentSession.spans'
+          # keys, so what the host keeps and what the store accepts agree.
           (check
-            "R3.1: a traces pipeline, or a logs pipeline exporting outside devloop and agent.session_event"
+            "R3.1: a traces pipeline other than traces/agent-session and traces/ingress, or a span route not into agent.agent_span's declared columns through greptime_trace_v1 with auto_create_table=false"
             (
-              lib.all (name: !(lib.hasPrefix "traces" name)) (builtins.attrNames pipelines)
-              && lib.all (name: lib.all exportsToDevloop pipelines.${name}.exporters) logsPipelineNames
+              sorted tracesPipelineNames == [
+                "traces/agent-session"
+                "traces/ingress"
+              ]
+              && (pipelines."traces/agent-session".exporters or null) == [ "forward" ]
+              &&
+                sorted (pipelines."traces/ingress".receivers or [ ]) == [
+                  "forward"
+                  "otlp/mesh"
+                  "otlp/mesh-tincr"
+                ]
+              &&
+                (pipelines."traces/ingress".processors or null) == [
+                  "memory_limiter"
+                  "filter/agent-spans-only"
+                  "resource/strip-database"
+                ]
+              &&
+                (p."filter/agent-spans-only".trace_conditions or null) == [
+                  ''not (resource.attributes["vanixiets.database"] == "agent")''
+                ]
+              && (pipelines."traces/ingress".exporters or null) == [ "otlp_http/agent_span" ]
+              && (e."otlp_http/agent_span".endpoint or null) == "http://127.0.0.1:4000/v1/otlp"
+              &&
+                (e."otlp_http/agent_span".headers or null) == {
+                  "x-greptime-db-name" = "agent";
+                  "x-greptime-trace-table-name" = session.spans.table;
+                  "x-greptime-pipeline-name" = "greptime_trace_v1";
+                  "x-greptime-hints" = "auto_create_table=false";
+                }
+              && spanTable != null
+              && sorted spanTableColumns.span == sorted (builtins.attrNames session.spans.keys)
+              &&
+                sorted spanTableColumns.resource
+                == sorted (lib.remove "service.name" session.spans.resourceKeys ++ [ "host.name" ])
+              && lib.hasInfix "table_data_model = 'greptime_trace_v1'" spanTable
             )
           )
           # otlpInLogsPipeline: no OTLP receiver but the agents' ingress
@@ -425,7 +505,7 @@
 
           # The agent-session path (agent-session-telemetry design D3, D5).
           (check
-            "R3.1: otlp/local is not an HTTP-only receiver on 127.0.0.1:4318 feeding exactly metrics/agent-session and logs/agent-session"
+            "R3.1: otlp/local is not an HTTP-only receiver on 127.0.0.1:4318 feeding exactly the three agent-session pipelines"
             (
               (r."otlp/local".protocols.http.endpoint or null) == "127.0.0.1:4318"
               && !(r."otlp/local".protocols ? grpc)
@@ -433,6 +513,7 @@
                 sorted localPipelines == [
                   "logs/agent-session"
                   "metrics/agent-session"
+                  "traces/agent-session"
                 ]
             )
           )
@@ -454,13 +535,27 @@
                   "transform/agent-session-events"
                   "resource/agent-session-events"
                 ]
+              &&
+                (pipelines."traces/agent-session".processors or null) == [
+                  "memory_limiter/agent-session"
+                  "filter/agent-session-service"
+                  "transform/agent-session-prompt"
+                  "filter/agent-session-span-events"
+                  "transform/agent-session-spans"
+                  "resource/agent-session"
+                ]
               && lib.all (n: (p.${n}.error_mode or null) == "propagate") [
                 "filter/agent-session-service"
                 "filter/agent-session-metrics"
                 "filter/agent-session-events"
+                "filter/agent-session-span-events"
                 "transform/agent-session-metrics"
                 "transform/agent-session-events"
+                "transform/agent-session-spans"
               ]
+              # The prompt copy alone ignores its errors: what it could not
+              # read, transform/agent-session-spans drops next.
+              && (p."transform/agent-session-prompt".error_mode or null) == "ignore"
             )
           )
           (check
@@ -478,14 +573,24 @@
               && sameSet (conditionValues (p."filter/agent-session-events".log_conditions or [ ])) (
                 builtins.attrNames session.events.keys
               )
+              && sameSet (conditionValues (
+                p."filter/agent-session-service".trace_conditions or [ ]
+              )) session.spans.services
               && lib.all (condition: lib.hasPrefix "not (" condition) (
                 p."filter/agent-session-service".metric_conditions or [ ]
                 ++ p."filter/agent-session-service".log_conditions or [ ]
+                ++ p."filter/agent-session-service".trace_conditions or [ ]
                 ++ p."filter/agent-session-metrics".metric_conditions or [ ]
                 ++ p."filter/agent-session-events".log_conditions or [ ]
               )
               && eventStatements == expectedEventStatements
               && metricStatements == expectedMetricStatements
+              && (p."transform/agent-session-spans".trace_statements or null) == expectedSpanStatements
+              && (p."transform/agent-session-prompt".trace_statements or null) == expectedPromptStatements
+              &&
+                (p."filter/agent-session-span-events".trace_conditions or null) == [
+                  ''spanevent.name != "" or spanevent.name == ""''
+                ]
             )
           )
           (check
@@ -535,9 +640,10 @@
             (e."otlp_http/fleet".sending_queue.queue_size or 0) >= 24 * 60 * i.schema.fleetBytesPerMinute
           ))
           # While the store is down the ingress holds 2 h of every
-          # agent-telemetry host's agent output (agent-session-telemetry
-          # design D10).
-          (check "R3.1: an agent queue below 2 h of the agent-telemetry hosts' assumed rates" (
+          # agent-telemetry host's agent metrics and events, and about 42
+          # min of their spans, the hold design D13 accepts within the sum
+          # (agent-session-telemetry design D10, D13).
+          (check "R3.1: an agent queue below its hold of the agent-telemetry hosts' assumed rates" (
             agentTelemetryHosts > 0
             &&
               (e."otlp_http/agent".sending_queue.queue_size or 0)
@@ -545,6 +651,9 @@
             &&
               (e."otlp_http/agent_session_event".sending_queue.queue_size or 0)
               >= 2 * 60 * agentTelemetryHosts * i.schema.agentEventBytesPerMinute
+            &&
+              (e."otlp_http/agent_span".sending_queue.queue_size or 0)
+              >= 40 * agentTelemetryHosts * i.schema.agentSpanBytesPerMinute
           ))
           (check "R3.1: queues at or above 512 MiB" (lib.foldl' builtins.add 0 queueSizes < mib 512))
 
@@ -554,6 +663,26 @@
             collectorMemoryMax != null
             && mib (p.memory_limiter.limit_mib or 0) < mib (lib.toInt (builtins.head collectorMemoryMax))
           ))
+
+          # design D13: omp's spans are decoded on the shared heap, so their
+          # pipeline's own limiter refuses them before the shared one refuses
+          # a fleet scrape, and the Go runtime collects below MemoryMax.
+          (check
+            "R3.1: the agent span limiter's soft limit is not below the shared limiter's, or GOMEMLIMIT is not below MemoryMax"
+            (
+              let
+                soft = l: (l.limit_mib or 0) - (l.spike_limit_mib or ((l.limit_mib or 0) / 5));
+                goMemLimit = builtins.match "GOMEMLIMIT=([0-9]+)MiB" (
+                  lib.findFirst (lib.hasPrefix "GOMEMLIMIT=") "" (lib.toList (i.collectorService.Environment or [ ]))
+                );
+              in
+              soft (p."memory_limiter/agent-session" or { }) > 0
+              && soft (p."memory_limiter/agent-session" or { }) < soft p.memory_limiter
+              && collectorMemoryMax != null
+              && goMemLimit != null
+              && lib.toInt (builtins.head goMemLimit) < lib.toInt (builtins.head collectorMemoryMax)
+            )
+          )
 
           # Validation override: only the zerotierone job's authorization.
           (check "R3.1: validation override beyond the zerotierone authorization" (
@@ -803,14 +932,16 @@
       # D5, D10), each with the clause it must fail; the build log lists
       # each with its failures.
       clause = {
-        local = "R3.1: otlp/local is not an HTTP-only receiver on 127.0.0.1:4318 feeding exactly metrics/agent-session and logs/agent-session";
+        local = "R3.1: otlp/local is not an HTTP-only receiver on 127.0.0.1:4318 feeding exactly the three agent-session pipelines";
         logsReceiver = "R3.1: a logs pipeline takes an OTLP receiver other than the ingress receivers and logs/agent-session's otlp/local";
-        content = "R3.1: a traces pipeline, or a logs pipeline exporting outside devloop and agent.session_event";
+        content = "R3.1: a logs pipeline exporting outside devloop and agent.session_event";
+        traces = "R3.1: a traces pipeline other than traces/agent-session and traces/ingress, or a span route not into agent.agent_span's declared columns through greptime_trace_v1 with auto_create_table=false";
         stages = "R3.1: an agent-session pipeline's stages are not the filters and transforms before the stamping";
         keys = "R3.1: an agent-session filter or transform keeps a service, metric, event or key off schema.nix's agentSession, or the body";
         route = "R3.1: agent events are not routed through routing/logs to otlp_http/agent_session_event with its four headers";
         promote = "R3.1: a database exporter's promote header is not the shared one, or agent's not it plus agentSession's";
-        agentQueue = "R3.1: an agent queue below 2 h of the agent-telemetry hosts' assumed rates";
+        agentQueue = "R3.1: an agent queue below its hold of the agent-telemetry hosts' assumed rates";
+        agentLimiter = "R3.1: the agent span limiter's soft limit is not below the shared limiter's, or GOMEMLIMIT is not below MemoryMax";
       };
       withReceiver =
         pipeline: receiver: i:
@@ -840,17 +971,77 @@
           clauses = [ clause.local ];
           mutate = withReceiver "metrics/host" "otlp/local";
         };
-        tracesPipeline = {
-          clauses = [
-            clause.content
-            clause.local
-          ];
+        # The span path (design D13). omp's whole history, tool results
+        # included, kept on the span.
+        spanInputMessagesKept = {
+          clauses = [ clause.keys ];
+          mutate =
+            replaceStatement "transform/agent-session-spans" "trace_statements"
+              "keep_keys(span.attributes, ${quotedList (builtins.attrNames session.spans.keys)})"
+              "keep_keys(span.attributes, ${
+                quotedList (builtins.attrNames session.spans.keys ++ [ session.spans.promptSource ])
+              })";
+        };
+        spanEventsKept = {
+          clauses = [ clause.stages ];
+          mutate =
+            i:
+            onSettings {
+              service.pipelines."traces/agent-session".processors =
+                lib.remove "filter/agent-session-span-events"
+                  i.settings.service.pipelines."traces/agent-session".processors;
+            } i;
+        };
+        # The copy after the allow-list reads an attribute already dropped,
+        # so no prompt is stored.
+        promptAfterAllowList = {
+          clauses = [ clause.stages ];
+          mutate =
+            i:
+            onSettings {
+              service.pipelines."traces/agent-session".processors =
+                lib.remove "transform/agent-session-prompt" (
+                  lib.remove "resource/agent-session" i.settings.service.pipelines."traces/agent-session".processors
+                )
+                ++ [
+                  "transform/agent-session-prompt"
+                  "resource/agent-session"
+                ];
+            } i;
+        };
+        # omp's spans under the shared limiter only: a span burst refuses
+        # fleet scrapes before any span.
+        spanLimiterShared = {
+          clauses = [ clause.stages ];
+          mutate =
+            i:
+            onSettings {
+              service.pipelines."traces/agent-session".processors = map (
+                n: if n == "memory_limiter/agent-session" then "memory_limiter" else n
+              ) i.settings.service.pipelines."traces/agent-session".processors;
+            } i;
+        };
+        spanLimiterAboveShared = {
+          clauses = [ clause.agentLimiter ];
           mutate = onSettings {
-            service.pipelines."traces/agent-session" = {
-              receivers = [ "otlp/local" ];
-              processors = [ "memory_limiter" ];
-              exporters = [ "forward" ];
+            processors."memory_limiter/agent-session" = {
+              limit_mib = 380;
+              spike_limit_mib = 10;
             };
+          };
+        };
+        goMemLimitUnset = {
+          clauses = [ clause.agentLimiter ];
+          mutate = i: i // { collectorService = builtins.removeAttrs i.collectorService [ "Environment" ]; };
+        };
+        spansToFleet = {
+          clauses = [ clause.traces ];
+          mutate = onSettings { service.pipelines."traces/ingress".exporters = [ "otlp_http/fleet" ]; };
+        };
+        spanTableAutoCreated = {
+          clauses = [ clause.traces ];
+          mutate = onSettings {
+            exporters."otlp_http/agent_span".headers."x-greptime-hints" = "auto_create_table=true";
           };
         };
         eventFilterDropped = {

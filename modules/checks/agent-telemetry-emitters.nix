@@ -37,9 +37,15 @@
               OTEL_METRICS_INCLUDE_ACCOUNT_UUID = "false";
               OTEL_RESOURCE_ATTRIBUTES = "user.name=${person}";
             };
+            # The metrics lines (design D2) and the traces lines (design
+            # D13), in the file's sorted order.
             ompExpected = person: ''
+              OTEL_BSP_MAX_QUEUE_SIZE=64
               OTEL_EXPORTER_OTLP_METRICS_ENDPOINT=http://127.0.0.1:4318/v1/metrics
               OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf
+              OTEL_EXPORTER_OTLP_TIMEOUT=5000
+              OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://127.0.0.1:4318/v1/traces
+              OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT=full
               OTEL_LOGS_EXPORTER=none
               OTEL_RESOURCE_ATTRIBUTES=user.name=${person}
             '';
@@ -107,7 +113,7 @@
               )
             }";
           assert lib.assertMsg (ompWrong == { })
-            "agent-telemetry: pyrite ~/.omp/agent/.env must be exactly the D2 metrics lines; wrong for ${show ompWrong}: ${
+            "agent-telemetry: pyrite ~/.omp/agent/.env must be exactly the D2 metrics and D13 traces lines; wrong for ${show ompWrong}: ${
               builtins.toJSON (lib.mapAttrs (user: _: ompFile pyrite.${user}) ompWrong)
             }";
           assert lib.assertMsg (wrappersLeaking == [ ])

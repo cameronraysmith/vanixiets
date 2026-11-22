@@ -41,9 +41,102 @@ let
   unkeptResource = lib.subtractLists (
     [ "host.name" ] ++ agentSession.events.resourceKeys
   ) columnResourceKeys;
+
+  # agent.agent_span and its two lookup tables (design D13): GreptimeDB
+  # 1.2.1's own greptime_trace_v1 schema, as the store writes it when it
+  # creates the tables on insert (GreptimeTeam/greptimedb@v1.2.1:
+  # src/servers/src/otlp/trace/v1.rs:48-95, :551; src/operator/src/insert.rs:686-790),
+  # with one column per allow-listed key and full-text indexes on the
+  # content columns. The ingress writes with auto_create_table=false, so a
+  # key off the list is refused rather than added as a column; there is no
+  # PARTITION ON (one region, standalone) and no ttl (agent's 30 d applies).
+  spans = agentSession.spans;
+  skipping = "SKIPPING INDEX WITH(false_positive_rate = '0.01', granularity = '10240', type = 'BLOOM')";
+  fulltext = "FULLTEXT INDEX WITH(analyzer = 'English', case_sensitive = 'false', backend = 'bloom')";
+  storeType = {
+    string = "STRING";
+    int64 = "BIGINT";
+  };
+  spanColumn =
+    key:
+    lib.concatStringsSep " " (
+      [
+        ''"span_attributes.${key}"''
+        storeType.${spans.keys.${key}}
+        "NULL"
+      ]
+      ++ lib.optional (lib.elem key spans.fulltext) fulltext
+    );
+  # service.name becomes service_name; host.name is stamped by the collector.
+  resourceColumns = map (key: ''"resource_attributes.${key}" STRING NULL'') (
+    lib.remove "service.name" spans.resourceKeys ++ [ "host.name" ]
+  );
+  createTable = name: columns: options: ''
+    CREATE TABLE IF NOT EXISTS "${name}" (
+      ${lib.concatStringsSep ",\n  " columns}
+    ) ENGINE=mito WITH(${lib.concatStringsSep ", " options})'';
+  spanDdl = [
+    (createTable spans.table
+      (
+        [
+          ''"timestamp" TIMESTAMP(9) NOT NULL''
+          ''"timestamp_end" TIMESTAMP(9) NULL''
+          ''"duration_nano" BIGINT UNSIGNED NULL''
+          ''"parent_span_id" STRING NULL ${skipping}''
+          ''"trace_id" STRING NULL ${skipping}''
+          ''"span_id" STRING NULL''
+          ''"span_kind" STRING NULL''
+          ''"span_name" STRING NULL''
+          ''"span_status_code" STRING NULL''
+          ''"span_status_message" STRING NULL''
+          ''"trace_state" STRING NULL''
+          ''"scope_name" STRING NULL''
+          ''"scope_version" STRING NULL''
+          ''"service_name" STRING NULL ${skipping}''
+        ]
+        ++ map spanColumn (lib.attrNames spans.keys)
+        ++ resourceColumns
+        ++ [
+          ''"span_events" JSON NULL''
+          ''"span_links" JSON NULL''
+          ''TIME INDEX ("timestamp")''
+          ''PRIMARY KEY ("service_name")''
+        ]
+      )
+      [
+        "append_mode = 'true'"
+        "'greptime.semantic.pipeline' = 'greptime_trace_v1'"
+        "'greptime.semantic.signal_type' = 'trace'"
+        "'greptime.semantic.source' = 'opentelemetry'"
+        "'greptime.semantic.trace.conventions' = 'unknown'"
+        "table_data_model = 'greptime_trace_v1'"
+      ]
+    )
+    (createTable "${spans.table}_services"
+      [
+        ''"timestamp" TIMESTAMP(9) NOT NULL''
+        ''"service_name" STRING NULL''
+        ''TIME INDEX ("timestamp")''
+        ''PRIMARY KEY ("service_name")''
+      ]
+      [ "append_mode = 'false'" ]
+    )
+    (createTable "${spans.table}_operations"
+      [
+        ''"timestamp" TIMESTAMP(9) NOT NULL''
+        ''"service_name" STRING NULL''
+        ''"span_name" STRING NULL''
+        ''"span_kind" STRING NULL''
+        ''TIME INDEX ("timestamp")''
+        ''PRIMARY KEY ("service_name", "span_name", "span_kind")''
+      ]
+      [ "append_mode = 'false'" ]
+    )
+  ];
 in
 {
   flake.lib.agentSessionStore = {
+    inherit spanDdl;
     inherit (rendered) ddl pipeline;
     pipelineName = "agent_session_event";
   };
@@ -57,7 +150,7 @@ in
         }.";
       }
     ];
-    services.greptimedb.tables.agent = [ rendered.ddl ];
+    services.greptimedb.tables.agent = [ rendered.ddl ] ++ spanDdl;
     services.greptimedb.pipelines.agent.agent_session_event = rendered.pipeline;
   };
 }

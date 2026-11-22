@@ -23,14 +23,19 @@ Where agent telemetry is on, the user settings' `env` SHALL set `CLAUDE_CODE_ENA
 
 ### Requirement: omp's environment file carries the emitter gates
 
-Where agent telemetry is on, `~/.omp/agent/.env` SHALL set `OTEL_EXPORTER_OTLP_METRICS_ENDPOINT=http://127.0.0.1:4318/v1/metrics`, `OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf`, `OTEL_LOGS_EXPORTER=none`, `OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT=full` and `OTEL_RESOURCE_ATTRIBUTES=user.name=<person>`, and no generic, traces or logs endpoint.
+Where agent telemetry is on, `~/.omp/agent/.env` SHALL set the metrics endpoint `http://127.0.0.1:4318/v1/metrics`, the traces endpoint `http://127.0.0.1:4318/v1/traces`, `OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf`, `OTEL_LOGS_EXPORTER=none`, `OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT=full`, `OTEL_BSP_MAX_QUEUE_SIZE=64`, `OTEL_EXPORTER_OTLP_TIMEOUT=5000` and `OTEL_RESOURCE_ATTRIBUTES=user.name=<person>`, and no generic or logs endpoint.
 
-**Discharged by**: the agent-telemetry home module's assertion over the rendered file; the activated file read after each deploy; resting on world assumptions `A191 — omp reads its own environment file and puts content only on spans` and `A195 — omnigent runs a worker's harness with the worker's home`.
+**Discharged by**: the agent-telemetry home module's assertion over the rendered file; `checks.x86_64-linux.agent-telemetry-emitters`, which writes the eight lines out itself; the activated file read after each deploy; resting on world assumptions `A191 — omp reads its own environment file and puts content only on spans`, `A195 — omnigent runs a worker's harness with the worker's home` and `A196 — omp bounds its span buffer by its own batch settings`, and limited by `A197 — A project's environment file overrides omp's own`.
 
 #### Scenario: The rendered file is evaluated
 
 - **WHEN** each home on magnetite and pyrite is evaluated
-- **THEN** `home.file.".omp/agent/.env"` holds exactly those five lines with that home's person
+- **THEN** `home.file.".omp/agent/.env"` holds exactly those eight lines with that home's person
+
+#### Scenario: The buffer bound is changed
+
+- **WHEN** the module's `OTEL_BSP_MAX_QUEUE_SIZE` is set to omp's default 2048
+- **THEN** `checks.x86_64-linux.agent-telemetry-emitters` fails naming the three pyrite homes
 
 ### Requirement: The emitters exist only where the collector listens for them
 
@@ -50,14 +55,14 @@ Where agent telemetry is on, `~/.omp/agent/.env` SHALL set `OTEL_EXPORTER_OTLP_M
 
 ### Requirement: The loopback receiver feeds only the agent-session pipelines
 
-On an agent-telemetry host, `otlp/local` SHALL be an OTLP/HTTP receiver on `127.0.0.1:4318` feeding exactly `metrics/agent-session` and `logs/agent-session`; no `traces*` pipeline SHALL exist, and no other pipeline SHALL take `otlp/local`.
+On an agent-telemetry host, `otlp/local` SHALL be an OTLP/HTTP receiver on `127.0.0.1:4318` feeding exactly `metrics/agent-session`, `logs/agent-session` and `traces/agent-session`; no other pipeline SHALL take it, and the only other traces pipeline SHALL be the ingress's `traces/ingress`.
 
-**Discharged by**: `checks.x86_64-linux.otel-collector-config`'s clauses over magnetite's evaluated configuration with mutants `localFeedsDevloop`, `localFeedsFleet` and `tracesPipeline`; the agent role's assertion on pyrite; nixpkgs' build-time `otelcol-contrib validate`.
+**Discharged by**: `checks.x86_64-linux.otel-collector-config`'s clauses over magnetite's evaluated configuration with mutants `localFeedsDevloop`, `localFeedsFleet` and `spansToFleet`; the `fleet-ingress` test's evaluation-time assertion over pyrite's receiver and the pipelines that take it; nixpkgs' build-time `otelcol-contrib validate`.
 
 #### Scenario: A mutant wires the receiver elsewhere
 
-- **WHEN** a mutant adds `otlp/local` to `metrics/host`, to a `logs/devloop-*` pipeline, or adds a `traces/agent-session` pipeline
-- **THEN** the check fails on its clause
+- **WHEN** a mutant adds `otlp/local` to `metrics/host` or to a `logs/devloop-*` pipeline, sends `traces/ingress` to `otlp_http/fleet`, adds a third consumer of pyrite's `otlp/local`, or binds pyrite's `otlp/local` to `0.0.0.0:4318`
+- **THEN** the check or the test's evaluation fails on its clause
 
 ### Requirement: The agent-session stages admit only allow-listed events and keys
 
@@ -74,6 +79,22 @@ On an agent-telemetry host, `otlp/local` SHALL be an OTLP/HTTP receiver on `127.
 
 - **WHEN** the VM test sends a `claude_code.token.usage` point carrying `session.id`, `prompt.id`, `user.email` and `organization.id`
 - **THEN** the stored series carries none of those labels and carries `user_name` and `host_name`
+
+### Requirement: The span path keeps only the newest prompt and listed span keys
+
+`traces/agent-session` SHALL admit `claude-code` and `oh-my-pi`, copy the newest user message's text into `prompt`, drop every span event, keep only `agentSession.spans` keys and resource keys, blank the status message and clear scope attributes before stamping; `traces/ingress` SHALL write only `agent`-stamped spans to the schema job's `agent.agent_span` through `greptime_trace_v1` with `auto_create_table=false`.
+
+**Discharged by**: `checks.x86_64-linux.otel-collector-config`'s stage, statement and traces clauses with mutants `spanInputMessagesKept`, `spanEventsKept`, `promptAfterAllowList`, `spansToFleet` and `spanTableAutoCreated`; `vmTests.x86_64-linux.fleet-ingress`'s `agentSpans` case; resting on world assumption `A198 — The telemetry store writes traces into pre-created v1 tables and refuses unknown columns`.
+
+#### Scenario: A chat span carries the whole history
+
+- **WHEN** the VM test posts an omp chat span whose `gen_ai.input.messages` holds an older prompt, a tool result and the newest prompt, plus a system prompt, an unlisted key, an exception event, a status message and a scope attribute
+- **THEN** `agent.agent_span` holds the newest prompt in `span_attributes.prompt`, the response and the tool arguments, and no column or value holds any of the rest
+
+#### Scenario: The span table is read back
+
+- **WHEN** the VM test reads `SHOW CREATE TABLE agent.agent_span` and its `create_options` as `regulator`
+- **THEN** `span_attributes.prompt` and `span_attributes.gen_ai.output.messages` carry the full-text index, `table_data_model` is `greptime_trace_v1`, and the table has no `ttl` of its own
 
 ### Requirement: One allow-list decides what the collector keeps and the store stores
 
@@ -115,7 +136,7 @@ The ingress SHALL route logs with `vanixiets.database=agent` and `vanixiets.tabl
 
 ### Requirement: Agent queues are sized to their holds
 
-On an agent-telemetry host other than the ingress, `otlp_http/ingress` SHALL be 408 MiB and logs-only `otlp_http/ingress-agent` 64 MiB, asserted at 24 h of `fleetBytesPerMinute` plus `agentMetricsBytesPerMinute` and 8 h of `agentEventBytesPerMinute`; on magnetite `otlp_http/agent` 16 MiB and `otlp_http/agent_session_event` 32 MiB, checked at 2 h of every agent-telemetry host's rates; all sums below 512 MiB.
+Non-ingress agent-telemetry hosts SHALL queue `otlp_http/ingress` 408 MiB (24 h of fleet and agent metrics), logs-only `otlp_http/ingress-agent` 64 MiB (8 h of events) and traces-only `otlp_http/ingress-traces` 20 MiB (3 h of spans); magnetite SHALL queue `otlp_http/agent` 16 MiB, `otlp_http/agent_session_event` 32 MiB (2 h) and `otlp_http/agent_span` 8 MiB (40 min) of every agent-telemetry host's rates; all sums below 512 MiB.
 
 **Discharged by**: the agent role's queue assertion with an `extendModules` override of pyrite's `otlp_http/ingress-agent` to 32 MiB; `checks.x86_64-linux.otel-collector-config`'s queue clauses with their mutants; the rates measured after deploy.
 
@@ -126,7 +147,7 @@ On an agent-telemetry host other than the ingress, `otlp_http/ingress` SHALL be 
 
 ### Requirement: Regulators cover the agent-session path
 
-`otel-envelope` on the ingress host SHALL fail its hourly budget run when `agent` holds more than 2,000 active series or a label more than 200 values, and `otel-collector-config` SHALL fail on any `traces*` pipeline, on `otlp/local` feeding any other pipeline, and on logs leaving for a database other than `devloop` or `agent`.
+`otel-envelope` on the ingress host SHALL fail its hourly budget run when `agent` holds more than 2,000 active series or a label more than 200 values, and `otel-collector-config` SHALL fail on a traces pipeline other than `traces/agent-session` and `traces/ingress`, on `otlp/local` feeding any other pipeline, on a transform statement list other than the one `agentSession` renders, and on logs leaving for a database other than `devloop` or `agent`.
 
 **Discharged by**: `checks.x86_64-linux.otel-envelope`'s case set with an `agent` fixture of 2,001 series; `checks.x86_64-linux.otel-collector-config` with its mutants.
 
@@ -145,6 +166,11 @@ On an agent-telemetry host other than the ingress, `otlp_http/ingress` SHALL be 
 
 - **WHEN** the test posts an `api_request_body` event, a `tool_result` with an unlisted `tool_output` key, an unlisted event, a `user_prompt` with `user.email`, `organization.id` and `user.account_uuid`, a string body, a `service.name` of `canary-other` and a metric `canary.metric`, each marked with a nonce
 - **THEN** a scan of every string column in every database finds no nonce but the admitted prompt's, and no column named after a forbidden key exists
+
+#### Scenario: The span canary runs
+
+- **WHEN** the `agentSpans` case posts omp spans carrying an older prompt, a tool result in the history and as an attribute, a system prompt, an unlisted key, an exception event, a status message, a scope attribute, `user.email` and a `canary-other` service, each marked with a nonce
+- **THEN** what left the host and every string and JSON column in every database hold the nonce only in the newest prompt, the response and the tool arguments
 
 ### Requirement: This capability states its own trust boundary
 
@@ -171,3 +197,8 @@ This capability SHALL state what its properties guarantee and what they do not, 
 
 - **WHEN** someone asks whether these properties limit who reads session content
 - **THEN** the answer is no: every holder of a read store account reads it (world assumption `A188 — The telemetry store authorizes reads by a global mode, not by database`), and nothing here governs what a reader does with it
+
+#### Scenario: A guarantee that the emitter settings hold is sought
+
+- **WHEN** someone asks whether omp's content level, traces endpoint or buffer bound are enforced
+- **THEN** the answer is no: a project `.env` in a session's working directory overrides `~/.omp/agent/.env` (world assumption `A197 — A project's environment file overrides omp's own`); the collector's allow-lists still bound what leaves the host

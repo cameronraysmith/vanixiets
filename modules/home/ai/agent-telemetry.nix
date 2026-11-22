@@ -50,17 +50,26 @@
       };
 
       # omp exports a signal only when that signal has an endpoint, so with a
-      # metrics endpoint alone it sends metrics and nothing else.
+      # metrics endpoint and a traces endpoint it sends those and no logs.
       ompMetricsEnv = {
         OTEL_EXPORTER_OTLP_METRICS_ENDPOINT = "${receiver}/v1/metrics";
         OTEL_EXPORTER_OTLP_PROTOCOL = "http/protobuf";
         OTEL_LOGS_EXPORTER = "none";
         OTEL_RESOURCE_ATTRIBUTES = resourceAttributes;
       };
-      # omp's traces settings (design D13): the traces endpoint, the content
-      # level, OTEL_BSP_MAX_QUEUE_SIZE and OTEL_EXPORTER_OTLP_TIMEOUT are
-      # added here, and only here, when the traces pipeline lands.
-      ompTracesEnv = { };
+      # omp's traces (design D13): spans to the receiver with message content
+      # at `full`, since omp puts content only on spans; the host's
+      # traces/agent-session keeps the newest prompt and the output and
+      # drops the history, tool results included. omp's span buffer holds
+      # at most 64 spans (OTel's default 2048 of about 600 KB chat spans
+      # would be about 1.2 GB while the collector is down), and an export
+      # gives up after 5 s, its retries included (A196).
+      ompTracesEnv = {
+        OTEL_EXPORTER_OTLP_TRACES_ENDPOINT = "${receiver}/v1/traces";
+        OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT = "full";
+        OTEL_BSP_MAX_QUEUE_SIZE = "64";
+        OTEL_EXPORTER_OTLP_TIMEOUT = "5000";
+      };
       ompEnv = ompMetricsEnv // ompTracesEnv;
       ompEnvText = lib.concatLines (lib.mapAttrsToList (name: value: "${name}=${value}") ompEnv);
 

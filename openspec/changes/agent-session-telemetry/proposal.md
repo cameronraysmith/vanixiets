@@ -42,7 +42,7 @@ Nobody can see what the fleet's agent sessions do. Claude Code and omp run in he
 magnetite and pyrite; every human user's sessions and every omnigent worker there, Janette's included; Claude Code metrics and events; omp's two admitted metrics.
 
 ### Non-goals
-Traces (GreptimeDB 1.2.1 has no `greptime_trace_v2`); stibnite (its loopback receiver needs the operator's console deploy); Claude's cloud sessions and claude-sandbox; Langfuse; a public ingest endpoint; tool output and raw API bodies; omp's log records; omp content, which omp puts only on spans and so arrives with traces.
+Claude Code's traces (its events carry its content); stibnite (its loopback receiver needs the operator's console deploy); Claude's cloud sessions and claude-sandbox; Langfuse; a public ingest endpoint; tool output and raw API bodies; omp's log records; omp's earlier conversation history on each span, of which only the newest prompt is kept (design D6, which includes omp's spans through GreptimeDB 1.2.1's `greptime_trace_v1`).
 
 ### Operator decisions recorded, and what still needs ratification
 - Content (decided 2026-11-22): option C, shared content under an organisational model; options B and D are recorded in brainstorm.md.

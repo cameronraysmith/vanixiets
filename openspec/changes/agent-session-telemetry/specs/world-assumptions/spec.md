@@ -136,6 +136,57 @@ Any requirement whose discharge depends on this fact SHALL name it explicitly, a
 - **WHEN** an omnigent release runs a harness with a `HOME` other than the worker's home, or with a settings directory of its own
 - **THEN** this assumption is void, and the `agent-session-telemetry` requirement `Agent sessions on agent-telemetry hosts are recorded` loses its discharge for workers' sessions
 
+### Requirement: A196 — omp bounds its span buffer by its own batch settings
+
+It is true of omp 19.1.0, independent of what this fleet builds, that its span processor reads `OTEL_BSP_MAX_QUEUE_SIZE` and the other `OTEL_BSP_*` settings, drops a span once the queue is full, and gives up on an export after at most 5 retries within `OTEL_EXPORTER_OTLP_TIMEOUT`, so its span memory is bounded by the queue size.
+Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL lose its discharge once the violation below is observed.
+
+**Evidence**: `can1357/oh-my-pi@v19.1.0` `packages/coding-agent/src/telemetry-export-otlp.ts:162-178` builds `new BatchSpanProcessor(exporter)` with no settings inside the window that exposes its `.env` values; the binary's bundled `@opentelemetry/sdk-trace-base@2.9.0` reads the four `OTEL_BSP_*` variables in that constructor and `@opentelemetry/sdk-trace@2.9.0`'s `BatchSpanProcessorBase` drops spans at `maxQueueSize` (default 2048); `@opentelemetry/otlp-exporter-base@0.220.0`'s retrying transport stops after 5 attempts within the export timeout (default 10 s); read from `/nix/store/…-omp-19.1.0/lib/omp/omp` on 2026-11-22.
+
+#### Scenario: Read at the source on 2026-11-22
+
+- **WHEN** the sources above were read on 2026-11-22
+- **THEN** each clause of this assumption held
+
+#### Scenario: omp hard-codes its batch settings or buffers without bound
+
+- **WHEN** the packaged omp version differs from 19.1.0 at a change's close-out and its span processor ignores `OTEL_BSP_MAX_QUEUE_SIZE` or keeps spans past its queue
+- **THEN** this assumption is void, and the `agent-session-telemetry-interface` requirement `omp's environment file carries the emitter gates` no longer bounds omp's memory while the collector is down
+
+### Requirement: A197 — A project's environment file overrides omp's own
+
+It is true of omp 19.1.0, independent of what this fleet builds, that a `.env` file in a session's working directory, and any `OTEL_*` variable already in the process environment, takes precedence over `~/.omp/agent/.env`, so the emitter settings this fleet writes can be overridden by any repository a session runs in.
+Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL lose its discharge once the violation below is observed.
+
+**Evidence**: `can1357/oh-my-pi@v19.1.0` `packages/utils/src/env.ts:290-293` parses the project, agent, config-root and home `.env` files; `:383-391` loads the project file into the process environment, while `:335-344` keeps an agent-file `OTEL_*` value only when no live value exists, and `:351-355` (`$otelEnv`) and `:366-381` (`withOmpOtelEnv`) prefer the live one; read 2026-11-22.
+
+#### Scenario: Read at the source on 2026-11-22
+
+- **WHEN** the sources above were read on 2026-11-22
+- **THEN** a project `.env` setting an `OTEL_*` name wins over the same name in `~/.omp/agent/.env`
+
+#### Scenario: omp stops honouring a project's environment file
+
+- **WHEN** an omp release reads `OTEL_*` only from its own files
+- **THEN** this assumption is void, and the trust boundary's statement that emitter settings do not enforce may be narrowed for omp
+
+### Requirement: A198 — The telemetry store writes traces into pre-created v1 tables and refuses unknown columns
+
+It is true of GreptimeDB 1.2.1, independent of what this fleet builds, that an OTLP trace export through `greptime_trace_v1` writes each span attribute into a column `span_attributes.<key>`, and that with `auto_create_table=false` it adds no table or column, refusing a span with an unknown key with HTTP 400.
+Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL lose its discharge once the violation below is observed.
+
+**Evidence**: `GreptimeTeam/greptimedb@v1.2.1:src/pipeline/src/manager.rs:80-82,144-172`, `src/servers/src/otlp/trace/v1.rs:48-95,535-640`, `src/operator/src/insert.rs:495-513,578-590,686-790`; observed on 2026-11-22 in a throwaway `fleet-ingress` VM test on pyrite against GreptimeDB 1.2.1: a span with `canary.direct.closed` was refused with `unknown columns: ["span_attributes.canary.direct.closed"]` and no column was added, while without the hint the store added `span_attributes.canary.direct.open`.
+
+#### Scenario: Observed on 2026-11-22
+
+- **WHEN** a span with a key the table lacks is posted with `auto_create_table=false`
+- **THEN** the store answers 400 and the table's columns are unchanged
+
+#### Scenario: The store adds columns despite the hint, or drops v1
+
+- **WHEN** a store release the fleet deploys adds a column under `auto_create_table=false`, or no longer accepts `greptime_trace_v1`
+- **THEN** this assumption is void, and the `agent-session-telemetry-interface` requirement `The span path keeps only the newest prompt and listed span keys` loses its store-side closure
+
 ## MODIFIED Requirements
 
 ### Requirement: Grounded vocabulary for behavioral requirements

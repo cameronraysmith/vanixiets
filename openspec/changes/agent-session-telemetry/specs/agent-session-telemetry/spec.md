@@ -41,7 +41,7 @@ The fleet SHALL keep session content where every reader of the telemetry store m
 
 No part of an agent session SHALL leave its host unless it is on the fleet's allow-list: listed harnesses, listed session events and their listed fields; prompts, responses and tool details are listed, tool output and raw API bodies are not, and anything unlisted SHALL be dropped on the host.
 
-**Discharged by**: `agent-session-telemetry-interface` requirements `The agent-session stages admit only allow-listed events and keys`, `One allow-list decides what the collector keeps and the store stores` and `The VM test proves the allow-list with a canary`; resting on world assumptions `A190 — Claude Code emits its telemetry as documented for its packaged version`, `A191 — omp reads its own environment file and puts content only on spans` and `A193 — The telemetry store's pipelines filter, close and index as documented`.
+**Discharged by**: `agent-session-telemetry-interface` requirements `The agent-session stages admit only allow-listed events and keys`, `The span path keeps only the newest prompt and listed span keys`, `One allow-list decides what the collector keeps and the store stores` and `The VM test proves the allow-list with a canary`; resting on world assumptions `A190 — Claude Code emits its telemetry as documented for its packaged version`, `A191 — omp reads its own environment file and puts content only on spans`, `A193 — The telemetry store's pipelines filter, close and index as documented` and `A198 — The telemetry store writes traces into pre-created v1 tables and refuses unknown columns`.
 
 #### Scenario: A harness is reconfigured to send tool output
 
@@ -52,6 +52,11 @@ No part of an agent session SHALL leave its host unless it is on the fleet's all
 
 - **WHEN** a harness release adds a field to an event on the allow-list
 - **THEN** the field is dropped on the host until the allow-list names it
+
+#### Scenario: An omp session sends its whole history
+
+- **WHEN** an omp session sends, with each model call, the whole conversation so far, earlier tool output included
+- **THEN** only the newest prompt of each turn, the response and the tool details reach the telemetry store; the earlier conversation and the tool output are dropped on the host
 
 ### Requirement: No account identifier leaves a host
 
@@ -104,7 +109,7 @@ Only Claude Code and omp sessions on agent-telemetry hosts SHALL send agent sess
 
 ### Requirement: An outage is held for a stated time
 
-Each agent-telemetry host SHALL keep at least 24 hours of its agent series and at least 8 hours of its session events through an outage of the ingress, and the ingress SHALL keep at least 2 hours of every agent-telemetry host's agent data through an outage of the telemetry store, at the rates the fleet's configuration assumes, without shortening the fleet's own 24 hours.
+Each agent-telemetry host SHALL keep at least 24 hours of its agent series, 8 hours of its session events and 3 hours of omp's session content through an outage of the ingress, and the ingress SHALL keep at least 2 hours of every agent-telemetry host's series and session events and 40 minutes of its omp content through an outage of the telemetry store, at the assumed rates, without shortening the fleet's own 24 hours.
 
 **Discharged by**: `agent-session-telemetry-interface` requirement `Agent queues are sized to their holds`; `fleet-ingress-interface` requirement `Each agent exports by its role`; `telemetry-store-interface` requirement `The collector's queue persists across a telemetry store restart`; the measured rates after deploy.
 

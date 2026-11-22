@@ -151,11 +151,12 @@
                   lib.attrNames pipelines == [
                     "logs/agent-session"
                     "metrics/agent-session"
+                    "traces/agent-session"
                   ]
                   && used "receivers" == [ "otlp/local" ]
                   && pyrite.receivers."otlp/local" == { protocols.http.endpoint = "127.0.0.1:4318"; }
                 )
-                "fleet-ingress: pyrite's otlp/local is not exactly 127.0.0.1:4318 feeding the two agent-session pipelines";
+                "fleet-ingress: pyrite's otlp/local is not exactly 127.0.0.1:4318 feeding the three agent-session pipelines";
               {
                 receivers = lib.genAttrs (used "receivers") (name: pyrite.receivers.${name});
                 processors = lib.genAttrs (used "processors") (name: pyrite.processors.${name});
@@ -855,11 +856,6 @@
 
               assert post("/v1/logs", logs) == "200"
               assert post("/v1/metrics", metrics) == "200"
-              # No traces pipeline takes otlp/local.
-              traces = post("/v1/traces", {"resourceSpans": [{"resource": {"attributes": claude}, "scopeSpans": [{"spans": [
-                  {"traceId": "5b8efff798038103d269b633813fc60c", "spanId": "eee19b7ec3c1b174", "name": f"canary-span-{NONCE}",
-                   "startTimeUnixNano": str(now), "endTimeUnixNano": str(now + 1)}]}]}]})
-              assert traces != "200", traces
 
 
               def stored_events():
@@ -923,21 +919,7 @@
               assert taps["logs"].count(NONCE) == taps["logs"].count(ADMITTED) == 1, taps["logs"]
               assert NONCE not in taps["metrics"], taps["metrics"]
 
-              # Every string column of every table of every database, as regulator.
-              columns = gsql(
-                  "SELECT table_schema, table_name, column_name FROM information_schema.columns "
-                  "WHERE lower(data_type) IN ('string', 'json') AND table_schema NOT IN ('information_schema', 'greptime_private', 'pg_catalog')", "agent")
-              by_table = {}
-              for schema, table, column in columns:
-                  by_table.setdefault((schema, table), []).append(column)
-              hits = {}
-              for (schema, table), names in sorted(by_table.items()):
-                  for column in names:
-                      count = gsql(f"SELECT count(*) FROM \"{schema}\".\"{table}\" WHERE CAST(\"{column}\" AS STRING) LIKE '%{NONCE}%'", schema)[0][0]
-                      if count:
-                          hits[f"{schema}.{table}.{column}"] = count
-              print(f"  scanned {len(columns)} string columns of {len(by_table)} tables; nonce found in {hits}", flush=True)
-              assert hits == {"agent.session_event.prompt": 1}, hits
+              assert nonce_hits(NONCE) == {"agent.session_event.prompt": 1}
               forbidden = gsql(
                   "SELECT table_schema, table_name, column_name FROM information_schema.columns WHERE column_name IN "
                   "('user_email', 'organization_id', 'user_account_uuid', 'user_account_id', 'tool_output', 'prompt_text', "
@@ -954,11 +936,156 @@
               print("ok: agentSession", flush=True)
             '';
 
+            # omp's spans (design D13): one chat span carrying the history
+            # (an older prompt, a tool result, the newest prompt), one after a
+            # tool, one tool span, and one from another service, through
+            # pyrite's otlp/local, otlp/mesh and the ingress into
+            # agent.agent_span, which the schema job created.
+            agentSpans = ''
+              print("=== case agentSpans", flush=True)
+              fresh_start()
+              store.succeed(f"systemctl restart {SESSION}.service")
+              wait_telemetry(SESSION_PORT)
+              NONCE = f"n{time.time_ns()}"
+              TRACE = "5b8efff798038103d269b633813fc60c"
+              canary = {
+                  "prompt": f"canary prompt {NONCE}",
+                  "response": f"canary response {NONCE}",
+                  "arguments": f"canary arguments {NONCE}",
+                  "older prompt": f"canary-oldprompt-{NONCE}",
+                  "tool result": f"canary-result-{NONCE}",
+                  "history result": f"canary-histresult-{NONCE}",
+                  "system": f"canary-system-{NONCE}",
+                  "unlisted": f"canary-unlisted-{NONCE}",
+                  "event": f"canary-event-{NONCE}",
+                  "status": f"canary-status-{NONCE}",
+                  "scope": f"canary-scope-{NONCE}",
+                  "email": f"canary-email-{NONCE}",
+                  "other service": f"canary-other-{NONCE}",
+              }
+              admitted = ("prompt", "response", "arguments")
+
+
+              def s(key, value):
+                  return {"key": key, "value": {"stringValue": value}}
+
+
+              now = time.time_ns()
+              history = [
+                  {"role": "user", "parts": [{"type": "text", "content": canary["older prompt"]}]},
+                  {"role": "assistant", "parts": [{"type": "tool_call", "id": "t1", "name": "bash", "arguments": {"command": "ls"}}]},
+                  {"role": "tool", "parts": [{"type": "tool_call_response", "id": "t1", "response": canary["history result"]}]},
+              ]
+              chat = {
+                  "traceId": TRACE, "spanId": "eee19b7ec3c1b174", "parentSpanId": "eee19b7ec3c1b173",
+                  "name": "chat claude-opus", "kind": 3,
+                  "startTimeUnixNano": str(now - 2000000000), "endTimeUnixNano": str(now - 1000000000),
+                  "attributes": [
+                      s("gen_ai.operation.name", "chat"), s("gen_ai.request.model", "claude-opus"),
+                      s("gen_ai.conversation.id", f"session-{NONCE}"),
+                      {"key": "gen_ai.usage.input_tokens", "value": {"intValue": "42"}},
+                      s("gen_ai.system_instructions", json.dumps([{"type": "text", "content": canary["system"]}])),
+                      s("gen_ai.input.messages", json.dumps(history + [{"role": "user", "parts": [{"type": "text", "content": canary["prompt"]}]}])),
+                      s("gen_ai.output.messages", json.dumps([{"role": "assistant", "parts": [{"type": "text", "content": canary["response"]}]}])),
+                      s("canary.unlisted", canary["unlisted"]),
+                  ],
+                  "events": [{"name": "exception", "timeUnixNano": str(now - 1500000000),
+                              "attributes": [s("exception.message", canary["event"])]}],
+                  "status": {"code": 2, "message": canary["status"]},
+              }
+              after_tool = dict(chat, spanId="eee19b7ec3c1b177", events=[], status={},
+                                attributes=[s("gen_ai.operation.name", "chat"), s("gen_ai.input.messages", json.dumps(history))])
+              tool = {
+                  "traceId": TRACE, "spanId": "eee19b7ec3c1b175", "parentSpanId": "eee19b7ec3c1b173",
+                  "name": "execute_tool bash", "kind": 1,
+                  "startTimeUnixNano": str(now - 900000000), "endTimeUnixNano": str(now - 800000000),
+                  "attributes": [
+                      s("gen_ai.operation.name", "execute_tool"), s("gen_ai.tool.name", "bash"),
+                      s("gen_ai.conversation.id", f"session-{NONCE}"),
+                      s("gen_ai.tool.call.arguments", json.dumps({"command": canary["arguments"]})),
+                      s("gen_ai.tool.call.result", canary["tool result"]),
+                  ],
+              }
+              body = {"resourceSpans": [
+                  {"resource": {"attributes": [s("service.name", "oh-my-pi"), s("service.version", "19.1.0"), s("user.name", "cameron"),
+                                               s("user.email", canary["email"]), s("host.name", f"canary-host-{NONCE}"),
+                                               s("vanixiets.database", "fleet")]},
+                   "scopeSpans": [{"scope": {"name": "omp", "attributes": [s("canary.scope", canary["scope"])]},
+                                   "spans": [chat, after_tool, tool]}]},
+                  {"resource": {"attributes": [s("service.name", "canary-other"), s("user.name", "cameron")]},
+                   "scopeSpans": [{"spans": [dict(tool, spanId="eee19b7ec3c1b176",
+                                                  attributes=[s("gen_ai.input.messages", canary["other service"])])]}]},
+              ]}
+              store.succeed(f"cat > /tmp/agent-spans.json <<'EOF'\n{json.dumps(body)}\nEOF")
+              status = store.succeed(
+                  "curl -sS -o /tmp/agent-spans-answer -w '%{http_code}' -H 'Content-Type: application/json' "
+                  "--data @/tmp/agent-spans.json http://127.0.0.1:4318/v1/traces"
+              ).strip()
+              print(f"  POST otlp/local /v1/traces: {status} {store.succeed('cat /tmp/agent-spans-answer')}", flush=True)
+              assert status == "200", status
+
+
+              def stored_spans():
+                  status, body = _request("/v1/sql", "agent", [("sql", "SELECT count(*) FROM agent_span WHERE \"resource_attributes.host.name\" = 'pyrite'")])
+                  rows = json.loads(body)["output"][0]["records"]["rows"] if status == 200 else None
+                  print(f"  agent_span rows from pyrite: {status} {rows}", flush=True)
+                  return rows == [[3]]
+
+
+              wait_for(stored_spans, "pyrite's three spans in agent.agent_span", 240)
+              rows = gsql(
+                  'SELECT span_name, "span_attributes.prompt", "span_attributes.gen_ai.output.messages", '
+                  '"span_attributes.gen_ai.tool.call.arguments", "span_attributes.gen_ai.usage.input_tokens", '
+                  '"resource_attributes.user.name", "resource_attributes.host.name", service_name, span_status_message '
+                  "FROM agent_span ORDER BY span_id", "agent")
+              for row in rows:
+                  print(f"  span: {row}", flush=True)
+              assert [r[0] for r in rows] == ["chat claude-opus", "execute_tool bash", "chat claude-opus"], rows
+              assert all(r[5:9] == ["cameron", "pyrite", "oh-my-pi", ""] for r in rows), rows
+              assert rows[0][1] == canary["prompt"] and canary["response"] in rows[0][2] and rows[0][4] == 42, rows
+              assert rows[2][1] is None and canary["arguments"] in rows[1][3], rows
+              found = gsql(f"SELECT span_name FROM agent_span WHERE matches_term(\"span_attributes.prompt\", '{NONCE}')", "agent")
+              print(f"  matches_term(prompt, nonce): {found}", flush=True)
+              assert found == [["chat claude-opus"]], found
+              create = gsql("SHOW CREATE TABLE agent_span", "agent")[0][1]
+              for column in ("span_attributes.prompt", "span_attributes.gen_ai.output.messages"):
+                  assert f"\"{column}\" STRING NULL FULLTEXT INDEX WITH(analyzer = 'English', backend = 'bloom', case_sensitive = 'false'" in create, column
+              options = gsql("SELECT create_options FROM information_schema.tables WHERE table_schema = 'agent' AND table_name = 'agent_span'", "agent")[0][0]
+              print(f"  agent_span create_options: {options}", flush=True)
+              assert "table_data_model=greptime_trace_v1" in options and "ttl" not in options, options
+              # The Jaeger lookup tables the store fills beside the spans.
+              print(f"  agent_span_operations: {gsql('SELECT service_name, span_name, span_kind FROM agent_span_operations ORDER BY span_name', 'agent')}", flush=True)
+
+              # What left the host.
+              # The file exporter flushes once a second.
+              store.wait_until_succeeds(f"grep -q {NONCE} /var/lib/agent-session-collector/tap-traces.jsonl", timeout=60)
+              tap = store.succeed("cat /var/lib/agent-session-collector/tap-traces.jsonl")
+              print(f"  tap-traces: {len(tap)} bytes, nonce {tap.count(NONCE)} time(s)", flush=True)
+              for what, value in canary.items():
+                  assert (value in tap) == (what in admitted), (what, value in tap)
+              for key in ("gen_ai.input.messages", "gen_ai.system_instructions", "gen_ai.tool.call.result", "canary.unlisted",
+                          "canary.scope", "user.email", "exception", "vanixiets.database\",\"value\":{\"stringValue\":\"fleet"):
+                  assert key not in tap, key
+
+              # Every string and JSON column of every database, as regulator.
+              assert nonce_hits(NONCE) == {
+                  "agent.agent_span.span_attributes.prompt": 1,
+                  "agent.agent_span.span_attributes.gen_ai.conversation.id": 2,
+                  "agent.agent_span.span_attributes.gen_ai.output.messages": 1,
+                  "agent.agent_span.span_attributes.gen_ai.tool.call.arguments": 1,
+              }
+              failed = {port: metric(port, r"otelcol_exporter_send_failed_[a-z_]+") for port in (INGRESS_PORT, SESSION_PORT)}
+              print(f"  send_failed {failed}", flush=True)
+              assert failed == {INGRESS_PORT: 0, SESSION_PORT: 0}, failed
+              print("ok: agentSpans", flush=True)
+            '';
+
             cases = [
               processName
               refusal
               delivery
               agentSession
+              agentSpans
               backPressure
               lossControls
               crashLoop

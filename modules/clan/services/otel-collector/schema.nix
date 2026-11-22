@@ -263,6 +263,11 @@
     # checks.x86_64-linux.otel-collector-config read them.
     agentMetricsBytesPerMinute = 35840;
     agentEventBytesPerMinute = 133000;
+    # omp spans after the host's span allow-list (design D13): 8 sessions x
+    # about 0.75 MB per session-hour (about 230 spans x 0.6 KB of fixed
+    # columns, the newest prompt, the assistant output and tool arguments,
+    # measured from 1,185 session-hours of omp transcripts) / 60 = 100,000.
+    agentSpanBytesPerMinute = 100000;
 
     # observability-notify@ instances pass the unit allow-list, so that
     # SystemdUnitFailed reports a failed post, but are bounded by the host's
@@ -597,6 +602,49 @@
             "omp.gen_ai.agent.name"
             "error.type"
           ];
+        };
+
+        # omp spans (design D13): the services, span keys and resource keys
+        # traces/agent-session keeps, each span key with the store type of
+        # its agent.agent_span column. `prompt` is not sent by omp: the
+        # host copies it from the newest user message of
+        # `gen_ai.input.messages` (promptSource), which it then drops with
+        # every other unlisted key, since that attribute holds the whole
+        # history, earlier tool results included. Span events are dropped.
+        spans = {
+          services = [
+            "claude-code"
+            "oh-my-pi"
+          ];
+          resourceKeys = [
+            "service.name"
+            "service.version"
+            "user.name"
+          ];
+          promptSource = "gen_ai.input.messages";
+          keys = {
+            "gen_ai.operation.name" = "string";
+            "gen_ai.provider.name" = "string";
+            "gen_ai.request.model" = "string";
+            "gen_ai.response.model" = "string";
+            "gen_ai.conversation.id" = "string";
+            "gen_ai.agent.name" = "string";
+            "gen_ai.tool.name" = "string";
+            "gen_ai.tool.call.id" = "string";
+            "gen_ai.tool.call.arguments" = "string";
+            "gen_ai.usage.input_tokens" = "int64";
+            "gen_ai.usage.output_tokens" = "int64";
+            "gen_ai.usage.cache_read.input_tokens" = "int64";
+            "gen_ai.usage.cache_creation.input_tokens" = "int64";
+            "error.type" = "string";
+            "gen_ai.output.messages" = "string";
+            prompt = "string";
+          };
+          fulltext = [
+            "prompt"
+            "gen_ai.output.messages"
+          ];
+          table = "agent_span";
         };
 
         # agent.session_event: one row per admitted event, the time index the

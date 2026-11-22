@@ -14,7 +14,7 @@ A shared home module sets the Claude Code and omp emitter gates where the host's
 
 ## Global Constraints
 
-- Three stacked commits, bottom to top, each evaluating, building and passing its checks alone: `vyprtvrk` (store side, task group 1), `rqwxkuup` (collector side and VM test, groups 2 and 4), `mzmrklxz` (emitters, group 3). Edits are made in `@` and routed with `jj squash --into <chain> --use-destination-message --keep-emptied <paths>`.
+- Four stacked commits, bottom to top, each evaluating, building and passing its checks alone: `vyprtvrk` (store side, task group 1), `rqwxkuup` (collector side and VM test, groups 2 and 4), `mzmrklxz` (emitters, group 3), `oqvywrql` (traces, group 9, design D6). Edits are made in `@` and routed with `jj squash --into <chain> --use-destination-message --keep-emptied <paths>`.
 - No deploy, no `clan`, no switch; nothing touches the live `fleet` or `devloop` data; no listener off loopback or the existing mesh addresses; no local aarch64-darwin build.
 - x86_64-linux builds on magnetite (`--eval-store auto --store ssh-ng://magnetite.zt`); container tests on pyrite (`--store ssh-ng://pyrite.vanixiets.internal`); logs under `logs/agent-session-telemetry-*`.
 - Rates: `agentMetricsBytesPerMinute = 35840`, `agentEventBytesPerMinute = 133000`; queues: pyrite 408 + 16 + 64 MiB, magnetite `agent` 16 MiB and `agent_session_event` 32 MiB, sums below 512 MiB.
@@ -75,11 +75,11 @@ A shared home module sets the Claude Code and omp emitter gates where the host's
 
 ## Task 3: Emitters (chain `mzmrklxz`)
 
-**Files:** Create `modules/home/ai/agent-telemetry.nix`; Modify `modules/home/ai/claude-code/default.nix` (import), `modules/home/ai/omnigent/worker.nix`, `modules/nixos/omnigent-host.nix`, `modules/home/ai/claude-code/wrappers.nix`.
+**Files:** Create `modules/home/ai/agent-telemetry.nix`, `modules/checks/agent-telemetry-emitters.nix`; Modify `modules/home/ai/claude-code/default.nix` (import), `modules/home/ai/omnigent/worker.nix`, `modules/home/ai/claude-code/wrappers.nix`.
 
-- [ ] **Step 1:** Module with D2's keys, gated on `osConfig.vanixiets.otelCollector.agentTelemetry or false`, asserting exactly those keys in `env` and the `.env` file.
-- [ ] **Step 2:** Import from `homeManager.ai` and `homeManager.omnigent-worker`; `agentTelemetry.person = worker.owner`; worker `managedConfigs.claude-code-settings`; wrappers strip `claudeCodeEnvNames`.
-- [ ] **Step 3:** Evaluate cameron on pyrite (`user.name=cameron`), `omnigent-janettesmith` on magnetite (`user.name=janettesmith`), stibnite/cinnabar absent, worker units' `environment` empty, wrappers clean; build `omnigent-worker-capabilities`, `omnigent-acp-spawn-env`, `claude-sandbox-session-secrets`.
+- [x] **Step 1:** Module with D2's keys, gated on `osConfig.vanixiets.otelCollector.agentTelemetry or false`, asserting exactly those keys in `env` and the `.env` file.
+- [x] **Step 2:** Import from `homeManager.ai` and `homeManager.omnigent-worker`; the worker's `agentTelemetry.person` is derived in `modules/home/ai/omnigent/worker.nix` from the `services.omnigent-host.workers` entry whose `user` is the home's (not set in `omnigent-host.nix`); worker `managedConfigs.claude-code-settings`; wrappers strip `claudeCodeEnvNames`.
+- [x] **Step 3:** Evaluate cameron on pyrite (`user.name=cameron`), `omnigent-janettesmith` on magnetite (`user.name=janettesmith`), stibnite/cinnabar absent, worker units' `environment` empty, wrappers clean; build `omnigent-worker-capabilities`, `omnigent-acp-spawn-env`, `claude-sandbox-session-secrets`, `agent-telemetry-emitters`.
 
 ## Task 4: Container test with the canary (chain `rqwxkuup`)
 
@@ -89,3 +89,13 @@ A shared home module sets the Claude Code and omp emitter gates where the host's
 - [x] **Step 2:** The store gets the `agent` table and pipeline; a third collector unit renders pyrite's evaluated agent-session receiver, processors, pipelines and exporters, pointed at `otlp/mesh`, with a file tap beside each pipeline's exporter.
 - [x] **Step 3:** Case `agentSession`: admitted `user_prompt` (nonce in `prompt`), `assistant_response`, `api_request`, `claude_code.token.usage`; canary kinds; scan every string column of every table of every database as `regulator`; `matches_term`; `SHOW CREATE TABLE`; `information_schema.schemata`; drop counters.
 - [x] **Step 4:** Run on pyrite; then mutants (transform removed, event filter removed, service filter removed, pipeline widened), each failing its assertion; then `devloop-ingest` and `greptimedb-pipeline` on pyrite.
+
+## Task 5: Traces (chain `oqvywrql`, design D6)
+
+**Files:** Modify `modules/clan/services/otel-collector/schema.nix` (`agentSession.spans`, `agentSpanBytesPerMinute`), `modules/nixos/agent-session-store.nix` (`spanDdl`), `modules/clan/services/otel-collector/flake-module.nix`, `modules/checks/otel-collector-config.nix`, `modules/clan/services/otel-collector/README.md`, `modules/home/ai/agent-telemetry.nix` (`ompTracesEnv`), `modules/checks/agent-telemetry-emitters.nix`, `modules/vm-tests/fleet-ingress.nix`, `modules/vm-tests/fleet-ingress/helpers.py`.
+
+- [x] **Step 1:** Span allow-list and rate in the schema; the three v1 tables rendered from 1.2.1's own DDL with full-text indexes, applied by the schema job.
+- [x] **Step 2:** `traces/agent-session` and `otlp_http/ingress-traces` (20 MiB) where the flag is set; `traces/ingress` and `otlp_http/agent_span` (8 MiB) on the ingress; the queue assertion's span term.
+- [x] **Step 3:** `otel-collector-config`'s traces clause replacing the no-traces rule, with mutants `spanInputMessagesKept`, `spanEventsKept`, `promptAfterAllowList`, `spansToFleet`, `spanTableAutoCreated`.
+- [x] **Step 4:** `ompTracesEnv` and the emitters check's expected lines, with the `OTEL_BSP_MAX_QUEUE_SIZE=2048` mutant.
+- [x] **Step 5:** `fleet-ingress` case `agentSpans` on pyrite, and the span-events-filter override failing it.

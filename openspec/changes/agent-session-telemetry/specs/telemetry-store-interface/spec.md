@@ -3,7 +3,7 @@
 ### Requirement: Ingest is OTLP over HTTP with a database header
 
 The ingress SHALL write metrics to the telemetry store only through OTLP over HTTP at `http://127.0.0.1:4000/v1/otlp` as `collector`, one `otlp_http` exporter per database behind a `routing` connector, taking them from magnetite's agent through `forward` and from other agent hosts through `otlp/mesh`.
-Logs SHALL enter the store only in `devloop`'s tables and `agent.session_event`, each limited to its allow-list, as scenarios below state; traces SHALL NOT enter it.
+Logs SHALL enter it only in `devloop`'s tables and `agent.session_event`, and traces only in `agent.agent_span`, each within its allow-list.
 
 **Discharged by**: the evaluation-time collector check (R3.1) with its mutants, nixpkgs' build-time `otelcol-contrib validate`, and the container tests `greptimedb-pipeline`, `devloop-ingest` and `fleet-ingress`.
 
@@ -21,6 +21,11 @@ Logs SHALL enter the store only in `devloop`'s tables and `agent.session_event`,
 
 - **WHEN** magnetite's collector configuration is evaluated
 - **THEN** `routing/logs` also routes `vanixiets.database = agent` and `vanixiets.table = session_event` to `otlp_http/agent_session_event`, authenticating as `collector` and sending `x-greptime-db-name: agent`, `x-greptime-log-table-name: session_event`, `x-greptime-pipeline-name: agent_session_event` and `x-greptime-hints: auto_create_table=false`, and `logs/ingress` exists whenever `devloop` tables or agent events are routed
+
+#### Scenario: omp spans are routed to their table
+
+- **WHEN** magnetite's collector configuration is evaluated
+- **THEN** `traces/ingress` is the only traces pipeline writing to the store, through `otlp_http/agent_span`, authenticating as `collector` and sending `x-greptime-db-name: agent`, `x-greptime-trace-table-name: agent_span`, `x-greptime-pipeline-name: greptime_trace_v1` and `x-greptime-hints: auto_create_table=false`
 
 #### Scenario: Dev-loop rows are ingested in the container test
 

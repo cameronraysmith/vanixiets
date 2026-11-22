@@ -55,6 +55,10 @@ let
     devloop = mib 4;
     agent = mib 16;
     agent_session_event = mib 32;
+    # omp spans (design D13): 8,388,608 B holds about 42 min of two
+    # agent-telemetry hosts at agentSpanBytesPerMinute while the store is
+    # down, the hold the design accepts within the 512 MiB sum.
+    agent_span = mib 8;
     devloop_ci_attribute = mib 32;
     devloop_ci_build = mib 4;
     devloop_batch_event = mib 4;
@@ -186,6 +190,7 @@ in
             metrics = [ "forward" ];
             logs = [ "forward" ];
             agentEvents = [ "forward" ];
+            agentSpans = [ "forward" ];
           }
         else
           {
@@ -196,6 +201,8 @@ in
             # exporter carries one signal, whose queue the assertion below
             # sizes (agent-session-telemetry design D10).
             agentEvents = [ "otlp_http/ingress-agent" ];
+            # And omp's spans theirs, traces only (design D13).
+            agentSpans = [ "otlp_http/ingress-traces" ];
           };
       # The queues of a host that is not the ingress (design D10): the
       # metrics queue holds 24 h of fleet and, with agent telemetry, agent
@@ -205,6 +212,8 @@ in
         "otlp_http/ingress" = mib (if agentTelemetry then 408 else 400);
         "otlp_http/ingress-logs" = mib 16;
         "otlp_http/ingress-agent" = mib 64;
+        # 20,971,520 B at agentSpanBytesPerMinute holds 3.5 h (design D13).
+        "otlp_http/ingress-traces" = mib 20;
       };
       ingressExporter = queueSize: {
         endpoint = "https://[${flakeLib.hosts.magnetite.zerotier.address}]:4318";
@@ -654,10 +663,11 @@ in
                   ) exporterNames
                   && size "otlp_http/ingress" >= 24 * 60 * metricsPerMinute
                   && (!agentTelemetry || size "otlp_http/ingress-agent" >= 8 * 60 * schema.agentEventBytesPerMinute)
+                  && (!agentTelemetry || size "otlp_http/ingress-traces" >= 3 * 60 * schema.agentSpanBytesPerMinute)
                   && lib.foldl' (s: n: s + size n) 0 exporterNames < mib 512
                   && memMax != null
                   && limit < lib.toInt (builtins.head memMax);
-                message = "otel-collector agent on ${hostName}: every exporter must queue in file_storage by bytes with unlimited retry, otlp_http/ingress must hold 24 h at fleetBytesPerMinute${lib.optionalString agentTelemetry " plus agentMetricsBytesPerMinute, otlp_http/ingress-agent 8 h at agentEventBytesPerMinute"}, the queues must sum below 512 MiB, and the limiter must be below MemoryMax (ADR-003 envelope; design D2); queues ${builtins.toJSON (lib.genAttrs exporterNames size)}.";
+                message = "otel-collector agent on ${hostName}: every exporter must queue in file_storage by bytes with unlimited retry, otlp_http/ingress must hold 24 h at fleetBytesPerMinute${lib.optionalString agentTelemetry " plus agentMetricsBytesPerMinute, otlp_http/ingress-agent 8 h at agentEventBytesPerMinute, otlp_http/ingress-traces 3 h at agentSpanBytesPerMinute"}, the queues must sum below 512 MiB, and the limiter must be below MemoryMax (ADR-003 envelope; design D2); queues ${builtins.toJSON (lib.genAttrs exporterNames size)}.";
               }
               # An exporter keeps one persistent queue per signal
               # (exporter_otlp_http_<name>_<signal>), so a metrics pipeline
@@ -686,12 +696,13 @@ in
 
         # Agent sessions' telemetry, where the host table sets agentTelemetry
         # (agent-session-telemetry design D3, D8): `otlp/local` on loopback
-        # feeds exactly the two agent-session pipelines, each of which drops
-        # every service, metric, event and key off schema.nix's agentSession
-        # allow-list before it stamps the host and the routing attributes.
-        # Every filter and transform propagates its errors, so a statement
-        # that cannot run refuses the batch rather than passing it on. No
-        # traces pipeline takes the receiver, which therefore refuses traces.
+        # feeds exactly the three agent-session pipelines, each of which drops
+        # every service, metric, event, span key and key off schema.nix's
+        # agentSession allow-list before it stamps the host and the routing
+        # attributes. Every filter and transform but the prompt copy
+        # propagates its errors, so a statement that cannot run refuses the
+        # batch rather than passing it on; the prompt copy ignores its own,
+        # since the span allow-list after it drops what it would have read.
         (lib.mkIf agentTelemetry (
           let
             session = schema.agentSession;
@@ -724,14 +735,39 @@ in
               }
             ];
 
+            # omp's chat spans arrive several MiB at a time, each request
+            # decoded on the heap the fleet pipelines share. The Go runtime
+            # collects before the cgroup's ceiling rather than letting garbage
+            # reach it, and the span pipeline has its own limiter whose soft
+            # limit sits a third below the shared limiter's, so agent spans
+            # are refused before a fleet scrape is (design D13).
+            systemd.services.opentelemetry-collector.serviceConfig.Environment =
+              let
+                memoryMax = lib.toInt (
+                  lib.removeSuffix "M" config.systemd.services.opentelemetry-collector.serviceConfig.MemoryMax
+                );
+              in
+              [ "GOMEMLIMIT=${toString (memoryMax * 4 / 5)}MiB" ];
+
             services.opentelemetry-collector.settings = {
               receivers."otlp/local".protocols.http.endpoint = "127.0.0.1:4318";
 
               processors = {
+                "memory_limiter/agent-session" =
+                  let
+                    shared = config.services.opentelemetry-collector.settings.processors.memory_limiter;
+                    sharedSoft = shared.limit_mib - (shared.spike_limit_mib or (shared.limit_mib / 5));
+                  in
+                  {
+                    check_interval = "1s";
+                    limit_mib = sharedSoft;
+                    spike_limit_mib = sharedSoft / 3;
+                  };
                 "filter/agent-session-service" = {
                   error_mode = "propagate";
                   metric_conditions = [ "not (${oneOf serviceName session.metrics.services})" ];
                   log_conditions = [ "not (${oneOf serviceName session.events.services})" ];
+                  trace_conditions = [ "not (${oneOf serviceName session.spans.services})" ];
                 };
                 "filter/agent-session-metrics" = {
                   error_mode = "propagate";
@@ -774,10 +810,48 @@ in
                     action = "upsert";
                   }
                 ];
+                # omp's gen_ai.input.messages holds the whole conversation,
+                # earlier tool results included (design D13): the text of its
+                # newest message, when that is a user text message, becomes
+                # `prompt`, and the allow-list below drops the attribute itself.
+                # Only the attribute's last 64 KiB is searched and only the
+                # matched text is parsed: parsing the whole history, often
+                # several MiB, held about ten times its size on the heap the
+                # fleet pipelines share. A newest message longer than that
+                # yields no prompt.
+                "transform/agent-session-prompt" =
+                  let
+                    source = ''span.attributes["${session.spans.promptSource}"]'';
+                  in
+                  {
+                    error_mode = "ignore";
+                    trace_statements = [
+                      ''set(span.cache["t"], ${source}) where ${source} != nil and Len(${source}) <= 65536''
+                      ''set(span.cache["t"], Substring(${source}, Len(${source}) - 65536, 65536)) where ${source} != nil and Len(${source}) > 65536''
+                      ''set(span.cache["x"], ExtractPatterns(span.cache["t"], "\\{\\s*\"role\"\\s*:\\s*\"user\"\\s*,\\s*\"parts\"\\s*:\\s*\\[\\s*\\{\\s*\"type\"\\s*:\\s*\"text\"\\s*,\\s*\"content\"\\s*:\\s*\"(?P<c>(?:[^\"\\\\]|\\\\.)*)\"\\s*\\}(?:\\s*,\\s*\\{[^\\[\\]]*\\})*\\s*\\]\\s*\\}\\s*\\]\\s*$")) where span.cache["t"] != nil''
+                      ''set(span.cache["p"], ParseJSON(Concat(["[\"", span.cache["x"]["c"], "\"]"], ""))) where span.cache["x"]["c"] != nil''
+                      ''set(span.attributes["prompt"], span.cache["p"][0]) where span.cache["p"] != nil''
+                    ];
+                  };
+                # Every span event, exceptions included, whatever its name.
+                "filter/agent-session-span-events" = {
+                  error_mode = "propagate";
+                  trace_conditions = [ ''spanevent.name != "" or spanevent.name == ""'' ];
+                };
+                "transform/agent-session-spans" = {
+                  error_mode = "propagate";
+                  trace_statements = [
+                    "keep_keys(span.attributes, ${list (builtins.attrNames session.spans.keys)})"
+                    ''set(span.status.message, "")''
+                    "keep_keys(resource.attributes, ${list session.spans.resourceKeys})"
+                    "keep_keys(scope.attributes, [])"
+                  ];
+                };
               };
 
               exporters = lib.mkIf (!ingress) {
                 "otlp_http/ingress-agent" = ingressExporter agentQueueBytes."otlp_http/ingress-agent";
+                "otlp_http/ingress-traces" = ingressExporter agentQueueBytes."otlp_http/ingress-traces";
               };
 
               service.pipelines = {
@@ -802,6 +876,18 @@ in
                     "resource/agent-session-events"
                   ];
                   exporters = agentExport.agentEvents;
+                };
+                "traces/agent-session" = {
+                  receivers = [ "otlp/local" ];
+                  processors = [
+                    "memory_limiter/agent-session"
+                    "filter/agent-session-service"
+                    "transform/agent-session-prompt"
+                    "filter/agent-session-span-events"
+                    "transform/agent-session-spans"
+                    "resource/agent-session"
+                  ];
+                  exporters = agentExport.agentSpans;
                 };
               };
             };
@@ -1151,6 +1237,39 @@ in
               receivers = [ "routing/logs" ];
               processors = [ "resource/strip-database" ];
               exporters = [ "otlp_http/agent_session_event" ];
+            };
+          };
+        })
+
+        # omp's spans into agent.agent_span through the store's built-in
+        # greptime_trace_v1 model (design D13), where the store declares
+        # the span tables beside the events table. The schema job creates
+        # all three, so auto_create_table=false refuses a key off the list
+        # instead of adding a column. Only data the agents stamped `agent`
+        # passes; on the ingress host its own spans arrive through forward.
+        (lib.mkIf agentLogs {
+          settings = {
+            processors."filter/agent-spans-only" = {
+              error_mode = "propagate";
+              trace_conditions = [ ''not (resource.attributes["vanixiets.database"] == "agent")'' ];
+            };
+            exporters."otlp_http/agent_span" = storeExporter {
+              "x-greptime-db-name" = "agent";
+              "x-greptime-trace-table-name" = schema.agentSession.spans.table;
+              "x-greptime-pipeline-name" = "greptime_trace_v1";
+              "x-greptime-hints" = "auto_create_table=false";
+            } queueBytes.agent_span;
+            service.pipelines."traces/ingress" = {
+              receivers = lib.optional config.vanixiets.otelCollector.agentTelemetry "forward" ++ [
+                "otlp/mesh"
+                "otlp/mesh-tincr"
+              ];
+              processors = [
+                "memory_limiter"
+                "filter/agent-spans-only"
+                "resource/strip-database"
+              ];
+              exporters = [ "otlp_http/agent_span" ];
             };
           };
         })

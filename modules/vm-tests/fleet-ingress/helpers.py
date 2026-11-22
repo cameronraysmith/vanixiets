@@ -53,6 +53,27 @@ def promql(expr, db="fleet"):
     return json.loads(body)["data"]["result"]
 
 
+def nonce_hits(nonce):
+    """Every string and JSON column of every table of every database, read
+    as `regulator`: `<db>.<table>.<column>` -> rows whose value holds nonce.
+    A JSON column is read through json_to_string, since a cast of its
+    binary value is refused."""
+    columns = gsql(
+        "SELECT table_schema, table_name, column_name, lower(data_type) FROM information_schema.columns "
+        "WHERE lower(data_type) IN ('string', 'json') AND table_schema NOT IN ('information_schema', 'greptime_private', 'pg_catalog')",
+        "agent",
+    )
+    hits = {}
+    for schema, table, column, kind in columns:
+        value = f'json_to_string("{column}")' if kind == "json" else f'"{column}"'
+        count = gsql(f"SELECT count(*) FROM \"{schema}\".\"{table}\" WHERE {value} LIKE '%{nonce}%'", schema)[0][0]
+        if count:
+            hits[f"{schema}.{table}.{column}"] = count
+    tables = {(schema, table) for schema, table, _, _ in columns}
+    print(f"  scanned {len(columns)} string and JSON columns of {len(tables)} tables; nonce found in {hits}", flush=True)
+    return hits
+
+
 def metric(port, name_regex, labels=None):
     """The sum over the series of a collector's telemetry endpoint whose name
     matches name_regex and whose labels include every `labels` pair; 0 when
