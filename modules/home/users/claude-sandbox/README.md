@@ -60,6 +60,9 @@ A pinned environment does: replace its pin at least every 30 days, even when not
 
 The first child after a rebuild runs the setup step (about 80 s on 2026-11-22: 46–48 s evaluating, 21–29 s fetching, 3 s activating); later children start from the snapshot and run only the session hooks.
 
+From the command line, `claude --cloud "<prompt>" -n <name>` starts a cloud session on Default, because the crs58 and cameron profiles set `remote.defaultEnvironmentId` to it (`modules/home/ai/claude-code`); without that key the CLI takes the account's first environment.
+To target another environment for one session, add `--settings '{"remote":{"defaultEnvironmentId":"env_…"}}'`.
+
 ## Operator steps for a new environment
 
 1. In claude.ai's environment settings, create or pick the environment and paste the bootstrap above into its setup box.

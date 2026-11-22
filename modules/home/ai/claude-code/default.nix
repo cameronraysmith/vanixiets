@@ -161,6 +161,9 @@ in
               };
               voiceEnabled = true;
               remoteControlAtStartup = true;
+              # Cloud environment for `claude --cloud` (Default); override per invocation with
+              # --settings '{"remote":{"defaultEnvironmentId":"env_…"}}'.
+              remote.defaultEnvironmentId = "env_011CULN8FWHtshNCrzLVdbp4";
               alwaysThinkingEnabled = true;
 
               env = {
