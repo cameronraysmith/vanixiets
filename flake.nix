@@ -87,17 +87,9 @@
     nixbot.inputs.nixpkgs.follows = "nixpkgs";
     nixbot.inputs.treefmt-nix.follows = "treefmt-nix";
 
-    # iets is nixbot's evaluator (CAM-111 task 5.2): modules/nixos/nixbot.nix
-    # selects the package modules/lib/nix-eval-jobs-iets.nix builds from it.
-    # Tracks upstream; updates come from the flake-update effect. Bumps aren't
-    # re-measured for nix-eval-jobs parity or performance (world assumption
-    # A147 was measured at 9157ca1a only), by choice: a uniform update process
-    # is preferred, and problems a bump causes are fixed as they arise. An
-    # 'Update iets' pull request is evaluated by the deployed iets; the new
-    # one is exercised by checks.x86_64-linux.nix-eval-jobs-iets (package
-    # shape only) and evaluates from magnetite's next deploy. No follows: the
-    # input keeps its own nixpkgs, and its build is substituted from
-    # cache.numtide.com (lib/caches.nix).
+    # nixbot's production evaluator: a bump takes effect at magnetite's next
+    # deploy, unmeasured against nix-eval-jobs (A147 held at 9157ca1a only).
+    # No follows: its build is substituted from cache.numtide.com.
     iets.url = "github:numtide/iets";
 
     gitea-mq.url = "github:Mic92/gitea-mq";
@@ -141,7 +133,7 @@
     bun2nix.inputs.systems.follows = "systems";
     bun2nix.inputs.treefmt-nix.follows = "treefmt-nix";
 
-    # Fork of pietdevries94's adding side-by-side darwin webkit builds.
+    # Fork of pietdevries94/playwright-web-flake adding side-by-side darwin WebKit builds.
     # Tags mirror upstream's names, so `1.65.1` is our tree, not upstream's, and
     # dropping the fork stays a one-word owner swap. Never bulk-push tags from a
     # fork clone: it creates upstream tags for versions we have not yet rebased
@@ -200,10 +192,8 @@
     nixhelm.url = "github:farcaller/nixhelm";
     nixhelm.inputs.nixpkgs.follows = "nixpkgs";
 
-    # Tracks upstream; updates come from the flake-update effect. Bumps aren't
-    # validated against the k3d integration run (test-cluster.yaml), by
-    # choice: a uniform update process is preferred, and problems a bump
-    # causes in the module API are fixed as they arise.
+    # CI doesn't evaluate it (its manifests need IFD), so the k3d run in
+    # test-cluster.yaml is the only check of its module API after a bump.
     easykubenix.url = "github:nixidae/easykubenix";
     easykubenix.flake = false;
 
@@ -229,7 +219,7 @@
   # allow-import-from-derivation is deliberately unset: with accept-flake-config
   # a value here overrides both the command line and nixbot's NIX_CONFIG.
   #
-  # sync with lib/caches.nix for machine modules
+  # Keep the substituters in sync with lib/caches.nix, which machine modules use.
   nixConfig = {
     extra-substituters = [
       "https://cache.nixos.org"
