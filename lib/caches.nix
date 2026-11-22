@@ -12,7 +12,9 @@
     "https://cache.nixos-cuda.org"
     "https://cache.scientistexperience.net?priority=45"
     "https://cameronraysmith.cachix.org?priority=50"
-    # Serves harmonia, which keeps its own nixpkgs so these binaries substitute.
+    # Serves harmonia. Its module builds harmonia with the host's pkgs, so a hit
+    # depends on our nixpkgs matching the one this cache built from, not on the
+    # harmonia input's nixpkgs.
     "https://cache.thalheim.io?priority=55"
   ];
 

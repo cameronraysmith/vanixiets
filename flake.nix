@@ -17,6 +17,7 @@
     flake-parts.inputs.nixpkgs-lib.follows = "nixpkgs";
 
     nix-index-database.url = "github:nix-community/nix-index-database";
+    nix-index-database.inputs.nixpkgs.follows = "nixpkgs";
 
     nix-darwin.url = "github:nix-darwin/nix-darwin";
     nix-darwin.inputs.nixpkgs.follows = "nixpkgs";
@@ -77,8 +78,10 @@
     tincr.url = "github:Mic92/tincr";
     tincr.inputs.nixpkgs.follows = "nixpkgs";
     tincr.inputs.treefmt-nix.follows = "treefmt-nix";
+    tincr.inputs.fenix.follows = "";
 
     harmonia.url = "github:nix-community/harmonia";
+    harmonia.inputs.nixpkgs.follows = "nixpkgs";
 
     nixbot.url = "github:Mic92/nixbot";
     nixbot.inputs.nixpkgs.follows = "nixpkgs";
@@ -153,6 +156,7 @@
 
     nuenv.url = "github:hallettj/nuenv/writeShellApplication";
     nuenv.inputs.nixpkgs.follows = "nixpkgs";
+    nuenv.inputs.rust-overlay.follows = "rust-overlay";
 
     llm-agents.url = "github:numtide/llm-agents.nix";
 
@@ -172,6 +176,7 @@
     hermes-agent.url = "github:NousResearch/hermes-agent/main";
     hermes-agent.inputs.nixpkgs.follows = "nixpkgs";
     hermes-agent.inputs.flake-parts.follows = "flake-parts";
+    hermes-agent.inputs.home-manager.follows = "home-manager";
     # hermes-agent's own pin predates uv2nix 4b59abb2 (stdenv.is* ->
     # stdenv.hostPlatform.is*), whose deprecation warnings it raised on every
     # evaluation; the hermes-agent derivation is identical either way.
