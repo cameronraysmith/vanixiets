@@ -73,6 +73,10 @@ It works in a scratch repository under `/tmp`, never in the session's checkout, 
 - The branch is keyed by the cloud session id, `session_01…`, which the hook reads from the transcript's `remote_session_change` record. A probe session on 2026-11-22 found the id there (5 occurrences in its own transcript) and in no environment variable: `CLAUDE_CODE_REMOTE_SESSION_ID` and `CLAUDE_CODE_SESSION_ID` exist, but no variable's value contains `session_01`. A transcript without that record falls back to the cloud-local uuid, and `session.json` then identifies the session by its first prompt.
 - The hook pushes to `git remote get-url --push origin` of the session's checkout, so it uses the same credentials as the session's own pushes: the probe found origin to be `https://github.com/cameronraysmith/vanixiets`, with the harness's `credential.https://github.com.helper` and `url.*.insteadof` set in its git configuration.
 
+`nix run .#claude-cloud-session -- --help` drives sessions and reads these branches from outside the cloud, without teleporting a session; its git work happens in a scratch repository, never in the caller's checkout, where it only writes under the ignored `logs/`:
+`create` starts a session named `<name>-<sha7>` and records it in `logs/claude-sandbox/sessions/index.tsv`, `send` adds a turn, `wait` polls the branch until a turn has finished, and `fetch` writes the transcript to `logs/claude-sandbox/sessions/<session>.jsonl`.
+The branches accumulate: `claude-cloud-session prune --older-than <days>` lists those whose last commit is older, and `--yes` deletes them.
+
 ## Operator steps for a new environment
 
 1. In claude.ai's environment settings, create or pick the environment and paste the bootstrap above into its setup box.
