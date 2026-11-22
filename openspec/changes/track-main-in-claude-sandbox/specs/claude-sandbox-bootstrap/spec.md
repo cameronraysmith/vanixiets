@@ -20,7 +20,7 @@ While pinned, the setup step SHALL be renewed at least every 30 days.
 #### Scenario: A month without changes
 
 - **WHEN** 30 days pass since a pinned setup step was last renewed
-- **THEN** the setup step has been regenerated and swapped, so its closure is still in the fleet's binary cache; a cloud environment that is not pinned needs no renewal
+- **THEN** the setup step has been renewed to name a newer closure, so its closure is still in the fleet's binary cache; a cloud environment that is not pinned needs no renewal
 
 #### Scenario: The newest commit is not yet published
 

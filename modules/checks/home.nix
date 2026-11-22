@@ -31,8 +31,8 @@
 #
 # claude-sandbox is embedded in no host; its check is also what makes nixbot
 # build the activation package and niks3 publish it to
-# cache.scientistexperience.net, where Claude Code cloud sessions substitute
-# it by store path (`nix run .#claude-sandbox-setup-script`).
+# cache.scientistexperience.net, from which Claude Code cloud sessions
+# substitute it (modules/apps/claude-sandbox-setup.sh).
 #
 # The key set is a literal per system so computing `checks.<system>` names
 # never forces `flake.users` aggregates, machine configurations, or `pkgs`.

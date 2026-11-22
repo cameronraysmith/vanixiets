@@ -24,9 +24,9 @@ A probe on 2026-11-22 showed a cloud session can evaluate `main` itself in 46 s 
 
 **Follow `main` by default**
 - From: the setup step names one closure; profile changes reach cloud sessions only after the operator regenerates and swaps the setup step.
-- To: the setup step's fixed text follows the newest commit on `main` whose closure the fleet's cache already holds, walking back at most 5 commits; an optional pin keeps the old behaviour.
+- To: the setup box holds three fixed lines that run the flake app `claude-sandbox-setup` from `main`, which follows the newest commit on `main` whose closure the fleet's cache already holds, walking back at most 5 commits; a store path argument pins one closure.
 - Reason: profile changes reach cloud sessions without a per-change approval card, and the monthly renewal is no longer needed while following `main`.
-- Impact: non-breaking; one approval card per environment to switch, and the pinned mode stays available.
+- Impact: non-breaking; one approval card per environment to switch, and a pin stays available.
 
 **Know when a session is behind**
 - From: nothing tells a session or the operator that its environment is older than `main`.
@@ -48,14 +48,14 @@ None.
 
 ### Modified Capabilities
 - `claude-sandbox-bootstrap` (behavioral): `One closure defines the environment` now follows `main`'s newest published closure by default and can be pinned; adds a staleness notice and the requirement that every input source stays in the cache.
-- `claude-sandbox-interface` (interface): the pinned-path requirements become the pinned mode; adds the track mode's fixed text, its bounded walk over `main`'s first-parent history, substitute-only realisation, its marker line, the read-only staleness hook, and the input-sources check.
+- `claude-sandbox-interface` (interface): the pinned-path and script-limit requirements are replaced by R1–R7 (the closure follows `main`, a pin as an argument, a fixed three-line box, the logic as a flake app whose every command comes from the flake, setup never failing the session, the profile's closure substituted, never built); adds the bounded walk over `main`'s first-parent history, its marker line, the read-only staleness hook, and the input-sources check.
   Trust boundary: these properties guarantee what the setup step evaluates, fetches and runs, and what the hook reads; they do not guarantee that any of the 5 newest commits is published, that the platform rebuilds the snapshot when documented, or that activation succeeds.
 - `world-assumptions` (world): adds the probe's measurement of evaluating `main` from the cache, the platform's documented snapshot expiry (not yet measured), and how the harness applies its own git configuration.
 
 ## Impact
 
-- `modules/apps/claude-sandbox-setup-script.nix`: a track mode printing fixed text; the pinned mode stays.
-- `modules/checks/claude-sandbox-setup-script.nix`: checks for the track-mode text.
+- `modules/apps/claude-sandbox-setup.{nix,sh}`: the setup app, replacing `modules/apps/claude-sandbox-setup-script.nix` (the generator of pasted scripts, removed with `flake.lib.claudeSandboxSetupScript`).
+- `modules/checks/claude-sandbox-setup-script.nix`: checks the app and the documented bootstrap against `lib/caches.nix`.
 - `modules/home/users/claude-sandbox/default.nix`: a staleness SessionStart hook.
 - `modules/checks/flake-input-sources.nix` (#4127) becomes load-bearing; no code change.
-- The cloud environments `nix-sandbox-test`, then Default, switch to the track-mode script (one approval card each).
+- The cloud environments `nix-sandbox-test`, then Default, switched to a pasted track-mode script (one approval card each); Default then takes the fixed bootstrap (one approval card), and `nix-sandbox-test` is deleted.

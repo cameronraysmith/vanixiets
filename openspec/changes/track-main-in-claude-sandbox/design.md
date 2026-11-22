@@ -11,16 +11,17 @@ Sources:
 
 ### State of the two environments
 
-Both environments run the track-mode script since 2026-11-22; the pinned scripts below are their restore path.
+Both environments run the track-mode script since 2026-11-22, pasted text from the retired generator (D2).
+Task 5.3 replaces Default's with the fixed bootstrap; task 5.4 deletes `nix-sandbox-test`.
 
 - Default (`env_011CULN8FWHtshNCrzLVdbp4`) ran the generated pinned script for `7c2a300ba97299b7f5c1d4453b3f0225ddaf0e72`, closure `d96f192x7b6r0gwahpdy877nsv2a6ad9-home-manager-generation`, from `bootstrap-claude-sandbox` task 7.2 until task 3.2 swapped it to the track-mode script (card approved at about 01:48Z on 2026-11-22).
 - `nix-sandbox-test` (`env_01GcXHMR3GM8Nv2encoaVjvs`) ran session 4's pinned script for `8c41bceba1e75f12c9fb9906eda0d3fa0346dc55`, closure `i6f12svdd7j8xcj85vdk6avimkfzwy0b-home-manager-generation`, until task 3.1 swapped it to the track-mode script (card approved at about 01:39:40Z on 2026-11-22).
 
-### Setup scripts to restore
+### Setup scripts replaced
 
-Rollback for either environment is `update_environment` with `script_change: "replaces the existing setup script"` and the text below.
+The two pinned scripts below are a record, not a restore path: the generator that printed them is gone (D2), `nix-sandbox-test` is deleted by task 5.4, and the normal rollback is a revert on `main`; a pin is the bootstrap with a store path argument.
 
-`nix-sandbox-test`'s setup script before task 3.1, verbatim from the 3.1 controller's `get_environment` (report `reports/claude-sandbox/task31-controller.md` on `claude/sandbox-reports-31c`):
+`nix-sandbox-test`'s setup script before task 3.1 (obsolete), verbatim from the 3.1 controller's `get_environment` (report `reports/claude-sandbox/task31-controller.md` on `claude/sandbox-reports-31c`):
 
 ```bash
 #!/bin/bash
@@ -102,17 +103,18 @@ This change adds `main branch` and `input source` (both shared); every other con
 | A175 | the GitHub gate refuses archives; anonymous git reads, the channels and the allowlisted caches are served | observed |
 | A177 | Nix 2.34.6, root trusted | observed |
 | A184 | a session evaluates `main` from the caches in 46 s, without the GitHub gate | observed 2026-11-22 (new) |
-| A185 | the platform rebuilds a snapshot after about seven days | documented only (new); task 3.3 measures it |
+| A185 | the platform rebuilds a snapshot after about seven days | documented only (new); not measured (task 3.3 closed by the operator on 2026-11-22) |
 | A186 | the harness applies its own git configuration beside the profile's | observed 2026-11-22 (new) |
 
 ### Assumptions not yet measured, with falsification triggers
 
 | ID | Assumption | Falsified when | Relied on by |
 |---|---|---|---|
-| T1 | Evaluating each further commit in the walk costs much less than the first, because most input sources are already in the store. | A walk of 5 commits exceeds 300 s with every source cached. | R2 |
-| T2 | `git+https://…?rev=<sha>&shallow=1` fetches a commit by SHA through the GitHub gate's anonymous lane (A141 shows GitHub serves it; the gate's lane is A175). | The walk's evaluation of a non-tip commit fails with a fetch error. | R2 |
+| T1 | Evaluating each further commit in the walk costs much less than the first, because most input sources are already in the store. | A walk of 5 commits exceeds 300 s with every source cached. | R1 |
+| T2 | `git+https://…?rev=<sha>&shallow=1` fetches a commit by SHA through the GitHub gate's anonymous lane (A141 shows GitHub serves it; the gate's lane is A175). | The walk's evaluation of a non-tip commit fails with a fetch error. | R1 |
 | T3 | ~~`curl` with the proxy's CA reaches `cache.scientistexperience.net` narinfos from the setup step.~~ Retired 2026-11-22: the walk no longer uses curl (D3). | — | — |
-| T4 | A snapshot made between a push and nixbot's publish is rare enough that walking back 5 commits covers it. | A snapshot's marker shows all 5 commits missed while the build service was healthy. | R2 |
+| T4 | A snapshot made between a push and nixbot's publish is rare enough that walking back 5 commits covers it. | A snapshot's marker shows all 5 commits missed while the build service was healthy. | R1 |
+| T5 | The image's Nix runs the bootstrap's `nix run` of `git+https://…?ref=main&shallow=1#claude-sandbox-setup` through the gate, building the app's wrapper from `cache.nixos.org` inputs, within the setup step's time (A169). | Task 5.3's cold start shows no `setup.log`, with the `nix run` failing in the setup step's output. | R3, R4 |
 
 T2, resolved on 2026-11-22: the listing and the by-SHA fetch were exercised in a container on magnetite without the gate (tasks.md 1.3), then through the gate by task 3.1's cold start.
 The commits are listed by a treeless shallow bare clone, `git clone --bare --depth 5 --filter=tree:0 --single-branch -b main`, then `git rev-list --first-parent -n 5 main`: 5 commit objects, 17 KiB in under 1 s, against 9.89 MiB for the probe's full shallow clone.
@@ -120,18 +122,24 @@ A per-commit `?rev=<sha>&shallow=1` fetch cannot name the parents, and `ls-remot
 If that clone fails, the script runs the plain shallow clone (`--depth 5` without the filter), the form the probe saw the gate serve; if the gate only withholds the filter capability, git ignores the filter itself.
 Shown against GitHub directly: `?rev=<sha>&shallow=1` evaluates non-tip commits (tip 72 s, then 15 s and 14 s, which also supports T1).
 Through the gate, task 3.1's cold start on `nix-sandbox-test` resolved the tip and evaluated it through `git+https://…?rev=<sha>&shallow=1` (`eval=0/48s`), with no `filter`, `unshallow`, `403` or `fatal` line in `run.log` beyond a store path's name (git warns `filtering not recognized by server` when a server drops the filter, and a failed first clone would have logged `fatal:`): the gate serves the treeless clone and the by-SHA fetch, so the plain-shallow fallback was not needed.
-Not yet shown: a by-SHA fetch of a non-tip commit through the gate (task 4.1), and the 300 s budget path, since no run has reached it (the container run with the cache host blocked missed all 5 commits in 176 s).
+Not shown, and not expected to be: a by-SHA fetch of a non-tip commit through the gate (task 4.1 closed by its fallback, since fast-forward landing builds `main`'s tip before `main` moves), and the 300 s budget path, since no run has reached it (the container run with the cache host blocked missed all 5 commits in 176 s).
 
 ## Goals / Non-Goals
 
 **Goals:**
 - The restated `One closure defines the environment`, `Sessions report how far behind the main branch they are` and `Every input source stays in the binary cache` (`specs/claude-sandbox-bootstrap`).
-- Switch `nix-sandbox-test`, then Default, to track mode.
+- R1–R7 (`specs/claude-sandbox-interface`, decided by the operator on 2026-11-22): sessions run `main`'s newest published closure without operator action (R1); a pin as an argument (R2); a fixed box of three lines generated from `lib/caches.nix` (R3); the logic as the flake app `claude-sandbox-setup` (R4) whose every command comes from the flake (R5); setup never fails the session (R6); the profile's closure substituted, never built (R7).
+- Switch `nix-sandbox-test`, then Default, to track mode; then Default to the fixed bootstrap.
 
 **Non-Goals:**
 - Activating a newer `main` during a session.
-- Building anything in the cloud session.
 - Changing the profile itself.
+
+The profile's closure is substituted, never built, in the session (R7); this is a requirement, not a ban on building.
+A miss means that commit is not published yet, and the walk answers it with the newest published commit, which CI built.
+A build would meet the GitHub gate on downloads from hosts outside the environment's allowed list, and would run far longer than the realise's timeout.
+`--max-jobs 0` on the realise makes a missing dependency fail fast and show in the marker.
+Small local builds outside the profile, such as the app's wrapper, are fine and need no exception.
 
 ## Decisions
 
@@ -145,31 +153,44 @@ All decided by the operator on 2026-11-22.
   - reading nixbot's API for the newest built closure: a new service dependency, coupling the setup step to nixbot's schema.
 - **Boundaries**: source-versus-delivered: the setup step consumes the delivered closure; evaluation in the sandbox only names it.
 
-### D2: fixed script text from a track mode of the existing app — DECIDED 2026-11-22
+### D2: a fixed bootstrap runs the flake app `claude-sandbox-setup` — DECIDED 2026-11-22 (final)
 
-- **Choice**: `nix run .#claude-sandbox-setup-script` gains a track mode that prints fixed text (no revision, store path or date).
-  It passes the substituters and keys as a bash array (the probe showed an unquoted string word-splits), activates unless the accepted path is already the current home-manager generation, appends the marker line, and always exits 0.
-  An optional `PIN=` line, when set, bypasses evaluation and fetches that store path as the pinned mode does; the pinned mode stays, to produce PIN values.
-- **Rationale**: a script change is what triggers an approval card and a snapshot rebuild, so following `main` needs text that does not change per commit.
-- **Boundaries**: source-versus-delivered: the script is generated and never committed; the `claude-sandbox-setup-script` check is its regulator, now for both modes.
+- **Choice**: the setup box holds three lines generated from `lib/caches.nix` (R3), which the `claude-sandbox-setup-script` check holds the app module's comment and the profile's README to:
+  `#!/bin/bash`; `nix run --option substituters '<S>' --option trusted-public-keys '<K>' --option accept-flake-config false 'git+https://github.com/cameronraysmith/vanixiets?ref=main&shallow=1#claude-sandbox-setup'`; `exit 0`.
+  The bootstrap passes no `--max-jobs 0`: that applies only to the app's realise of the profile (R7), and the image's Nix builds the app's wrapper locally.
+  A pin is a store path after `--` on the `nix run` line (R2), which bypasses the walk.
+- **The app** (R4): `modules/apps/claude-sandbox-setup.{nix,sh}`, the repository's app convention: a `writeShellApplication` whose build shellchecks the `.sh`, with `bashOptions = [ ]` (it must never abort before `exit 0`, R6) and the apm-context-compile `derivationArgs` (built locally, never asked of a cache).
+  Its `runtimeInputs` (coreutils, gawk, git and Nix) supply every command it calls (R5); only bash and the image's Nix come from the image, and only to start it.
+  The `.nix` writes a preamble of `R`, `C`, `S` and `K` from `lib/caches.nix` above the `.sh`, as `modules/apps/docs/deploy.nix` does, the only place cache values enter the script; bash arrays cannot travel as environment variables.
+  The `.sh` is three stages composed at its bottom: `choose` prints one outcome, `pinned <path>`, `tracked <path> <rev> <dist> <tip> <skips>` or `none <tip> <skips>`, and writes nothing but `run.log`; `realise` returns the realise's code; `activate` prints `skipped`, `current` or the activation's code. The marker is the one projection of the three, then `exit 0` (`select` is a bash keyword, hence `choose`).
+- **The app's own revision**: not recorded, because it would need `self.rev` in a derivation (tree-meta-in-drv); the marker's `tip=` stands in for it, since the bootstrap and the walk fetch the same `main` unless `main` moves between the two fetches.
+- **Alternatives withdrawn**:
+  - the pasted script, printed by `nix run .#claude-sandbox-setup-script` (tasks 1.1–3.2): it changes the box per update, contrary to R3; it and `flake.lib.claudeSandboxSetupScript` are removed;
+  - `curl` of the raw `.sh` from `raw.githubusercontent.com` piped to bash: it runs the image's tools, contrary to R5, and needs a guard against a download cut short;
+  - a pin in an environment variable: the setup step cannot read the environment's variables (A172).
+- **Rationale**: a change to the setup box triggers an approval card and a snapshot rebuild, so the box must not change per commit; a change to the app reaches an environment through the next snapshot rebuild (D4), like a profile change. The trade is one extra evaluation, of the app, before the walk's own.
+  Where `github:` flake references are accepted, `nix run github:cameronraysmith/vanixiets#claude-sandbox-setup` runs the same app.
+- **Rollback**: a revert on `main`, which the next snapshot rebuild picks up with no approval card; an approval card is needed only to pin.
+- **Assurance**: no Lean specification: the state space is three outcomes, and the container tests (task 5.2) and the `claude-sandbox-setup-script` check are proportionate to it.
+- **Boundaries**: source-versus-delivered: the committed `.nix` and `.sh` are the source, the bootstrap fetches and builds them from `main`; the `claude-sandbox-setup-script` check is their regulator.
 
 ### D3: substitute only, and walk back `main`'s first-parent history — DECIDED 2026-11-22
 
-- **Choice**: realisation uses `--max-jobs 0` and `--option builders ''`, so nothing is built in the session.
+- **Choice**: realisation uses `--max-jobs 0` and `--option builders ''`, so the profile's closure is never built in the session (R7).
   From `main`'s tip, the step fetches first-parent history to depth 5 (a temporary treeless shallow clone, T2), evaluates each commit's activation package path through `git+https://…?rev=<sha>&shallow=1`, and accepts the first whose narinfo `cache.scientistexperience.net` answers with 200; a failed evaluation counts as a miss (a lock change whose sources are not uploaded yet).
   The narinfo is asked for by `nix path-info --store "$C"` with `narinfo-cache-negative-ttl 0`, not by `curl`: Nix's own HTTP client is the one the probe saw reach the cache through the proxy (A184), so the step needs no assumption about curl and the proxy's CA (T3 retired), and turning the negative cache off keeps an earlier 404 from hiding a closure published since.
   The walk stops after 5 commits or about 300 s, then the step degrades and activates nothing.
   The marker records `main`'s tip when the walk ran (`tip=`), the commit used, its distance from the tip and each skipped commit with its reason (`eval` with its exit code, `narinfo`, or `budget`).
   `tip=` is what lets D5 tell whether `main` has moved since the snapshot: when the commit used is `main~2`, it differs from the tip even if `main` has not moved.
-  `PIN=` bypasses the walk.
+  A pin argument bypasses the walk.
 - **Rationale**: local builds would meet the GitHub gate on fixed-output sources such as the composed skills' dependencies (A175) and could run long; and a snapshot lives about seven days (A185), so losing the push-to-publish race would cost a week of sessions without the profile, not one.
 - **Accepted risk**: all 5 commits missing; the marker is its detector.
 - **Budget**: 300 s of walk plus about 31 s to realise and activate (session 4) stays inside the 360 s A169 observed; T1 is what keeps 5 evaluations inside 300 s.
 
 ### D4: freshness through the snapshot, refreshed by a text edit — DECIDED 2026-11-22
 
-- **Choice**: a tracking environment picks up a newer `main` when its snapshot is rebuilt: on a script-text or allowed-hosts change, or after about seven days (A185, documented, to be measured: task 3.3).
-  Refreshing now means any edit to the script text, such as a dated refresh comment, through an approval card or the claude.ai UI.
+- **Choice**: a tracking environment picks up a newer `main`, and a newer setup script, when its snapshot is rebuilt: on a setup-box or allowed-hosts change, or after about seven days (A185, documented, not measured).
+  Refreshing now means any edit to the setup box, such as a dated refresh comment after the bootstrap, through an approval card or the claude.ai UI.
 
 ### D5: a read-only staleness notice — DECIDED 2026-11-22
 
@@ -179,7 +200,7 @@ All decided by the operator on 2026-11-22.
 ### D6: the 30-day renewal applies only while pinned — DECIDED 2026-11-22
 
 - **Choice**: a tracking environment names no store path, so niks3's 30-day expiry of an unreferenced closure no longer applies to it; the renewal rule stays for pinned environments.
-  Since task 3.2 (2026-11-22) no environment is pinned, so the 30-day renewal `bootstrap-claude-sandbox` task 7.2 left as a standing obligation on Default no longer applies: it was the garbage-collection horizon of Default's pinned closure `d96f192x…`. It applies again only while an environment is pinned, including after a rollback to a script in §Setup scripts to restore or a `PIN=` in the track-mode script.
+  Since task 3.2 (2026-11-22) no environment is pinned, so the 30-day renewal `bootstrap-claude-sandbox` task 7.2 left as a standing obligation on Default no longer applies: it was the garbage-collection horizon of Default's pinned closure `d96f192x…`. It applies again only while an environment is pinned by a store path argument.
 
 ### D7: the input-sources check is load-bearing — DECIDED 2026-11-22
 
@@ -190,9 +211,9 @@ All decided by the operator on 2026-11-22.
 ## Risks / Trade-offs
 
 Obstacles, each the negation of a goal:
-- [Risk] None of `main`'s 5 newest commits is published when the snapshot is made (negates R2). → Accepted; the marker records every miss, and a script-text refresh retries.
-- [Risk] A lock change lands before its sources are in niks3 (negates R2, the input-sources requirement). → D7; the walk skips that commit as an `eval` miss.
-- [Risk] Evaluation slows as the flake grows (negates R2 within 360 s). → The marker records seconds per step; T1 and the 300 s bound.
+- [Risk] None of `main`'s 5 newest commits is published when the snapshot is made (negates R1). → Accepted; the marker records every miss, and a setup-box refresh retries.
+- [Risk] A lock change lands before its sources are in niks3 (negates R1, the input-sources requirement). → D7; the walk skips that commit as an `eval` miss.
+- [Risk] Evaluation slows as the flake grows (negates R1 within 360 s). → The marker records seconds per step; T1 and the 300 s bound.
 - [Risk] The snapshot outlives `main` by up to a week (negates freshness). → D5's notice, and D4's refresh by a text edit.
 - [Risk] The harness shadows a git key the profile relies on (A186). → Re-check per key when the profile adds git settings.
 - [Trade-off] A tracking environment changes without an approval card → accepted: each change still passes CI and review before it reaches `main`.
@@ -201,7 +222,7 @@ Obstacles, each the negation of a goal:
 
 | R | Discharged by S | Resting on W (A) and assumptions (T) |
 |---|---|---|
-| One closure defines the environment | interface: track-mode text, walk, substitute-only, marker; PIN mode | A175, A177, A181, A184, A185; T1–T4 |
+| One closure defines the environment | interface: R1–R7, the walk, the marker | A170, A172, A175, A177, A181, A184, A185; T1, T2, T4, T5 |
 | Sessions report how far behind the main branch they are | interface: the staleness hook, the marker | A167, A172 (hooks run at start, observed as S7 in the archived change) |
 | Every input source stays in the binary cache | interface: `Every lock source is in the cache` | A175, A184 |
 
@@ -210,11 +231,11 @@ Obstacles, each the negation of a goal:
 1. Implement the track mode and its check (tasks group 1), and the staleness hook (group 2); land through CI.
 2. From a controller session on `nix-sandbox-test`, swap its setup step to the track-mode script (one approval card) and run a cold start from `main` (group 3).
 3. Only after a passing cold start there, switch Default the same way (one approval card).
-4. Measure the snapshot expiry on one environment (task 3.3).
+4. Replace the pasted script by the fixed bootstrap running the app (D2 final, group 5): paste it into Default (one approval card) and check a cold start; then delete `nix-sandbox-test`.
 
-Rollback: replace the setup step with a pinned script printed by the pinned mode, or set `PIN=` in the track-mode script (one approval card); the snapshot is rebuilt from it.
+Rollback: a revert on `main`, picked up at the next snapshot rebuild; or the bootstrap with a pin argument (one approval card).
 
 ## Open Questions
 
-- The snapshot's real expiry (A185), measured by task 3.3.
+- The snapshot's real expiry (A185): documented at about seven days and not measured; task 3.3 was closed by the operator on 2026-11-22.
 - Whether a walk that reaches `main~4` in practice calls for a deeper or longer walk, judged from the markers once tracking runs.

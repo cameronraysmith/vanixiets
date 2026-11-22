@@ -1,75 +1,103 @@
-## MODIFIED Requirements
-
-### Requirement: The setup step names the activation package by store path
-
-When the setup step sets `PIN=` to a store path, it SHALL fetch that path with `nix-store --realise` from `cache.scientistexperience.net` and `cache.nixos.org`, trusting only their public keys, and run the path's `activate` as root, and SHALL NOT evaluate a flake.
-`nix run .#claude-sandbox-setup-script` in its pinned mode SHALL print that `PIN=` line for a revision.
-
-#### Scenario: The generated script is read
-
-- **WHEN** `nix run .#claude-sandbox-setup-script` prints the pinned setup script for a revision
-- **THEN** it sets `PIN` to the store path of that revision's activation package, realises it with only those two substituters and their keys, and runs its `activate`, with no `nix eval`, `nix build` or flake reference on that path
-
-### Requirement: The named store path is the CI check's output
-
-A `PIN=` store path the pinned mode prints SHALL be the output of `checks.x86_64-linux.home-manager-claude-sandbox` at the revision its comment records, so that the build service builds it and publishes it to `cache.scientistexperience.net`.
-
-#### Scenario: The script's store path is checked
-
-- **WHEN** the `claude-sandbox-setup-script` check is built for a revision
-- **THEN** it fails unless the pinned script's `PIN` equals that revision's `home-manager-claude-sandbox` output path
-
-### Requirement: The setup script stays within the platform's limits
-
-Each generated setup script, pinned or track mode, SHALL have at most 100 lines of at most 200 bytes each once filled in, and its last line SHALL be `exit 0`.
-
-#### Scenario: A script over the limits
-
-- **WHEN** either template would produce a line over 200 bytes once filled, more than 100 lines, or a last line other than `exit 0`
-- **THEN** the `claude-sandbox-setup-script` check fails evaluation with its own message
-
 ## ADDED Requirements
 
-### Requirement: The track-mode text is the same for every revision
+### Requirement: An environment can be pinned by an argument
 
-The track-mode setup script SHALL contain no revision, store path or date that depends on a commit, so that a new commit on `main` leaves the cloud environment's setup step unchanged.
+(R2) Given a store path as the argument after `--` in the setup box, the setup app SHALL realise that path from the two caches under their keys and activate it, without evaluating a flake or walking `main`.
+The pin SHALL be an argument, not an environment variable, because the setup step cannot read the environment's variables (A172).
+Relies on: A172, A177; S: the app's argument handling.
 
-#### Scenario: Two revisions print the track-mode script
+#### Scenario: A pinned bootstrap runs
 
-- **WHEN** `nix run .#claude-sandbox-setup-script` prints the track-mode script at two different revisions
-- **THEN** the two outputs are byte-identical, and the check fails on a template holding a 40-hex revision or a store path
+- **WHEN** the setup box's `nix run` line ends with `-- /nix/store/…-home-manager-generation`
+- **THEN** the app realises and activates that path with no `git clone` or walk evaluation, and its marker records `mode=pinned`
+
+### Requirement: The setup box is three fixed lines
+
+(R3) The setup box SHALL hold three fixed lines generated from `lib/caches.nix`: `#!/bin/bash`; `nix run` with the two caches as substituters, their keys and `accept-flake-config false` on `git+https://github.com/cameronraysmith/vanixiets?ref=main&shallow=1#claude-sandbox-setup`; and `exit 0`.
+Relies on: A170, A175, A184, T5; S: the `claude-sandbox-setup-script` check.
+
+#### Scenario: The documented bootstrap drifts
+
+- **WHEN** `lib/caches.nix` changes, or the bootstrap in the app module's comment or the profile's README differs from the lines the check generates
+- **THEN** the `claude-sandbox-setup-script` check fails evaluation, naming the file
+
+#### Scenario: A commit changes the setup app
+
+- **WHEN** a commit on `main` changes `modules/apps/claude-sandbox-setup.sh`
+- **THEN** the setup box is unchanged, and the next environment snapshot runs the changed app
+
+### Requirement: Cloud sessions run main's newest published closure
+
+(R1) Without a pin, each environment snapshot SHALL hold the `claude-sandbox@x86_64-linux` closure of the newest of `main`'s 5 newest first-parent commits that `cache.scientistexperience.net` serves, with no operator action per update.
+Relies on: A175, A184, A185, T1, T2, T4; S: the app's walk, the fixed bootstrap (R3), substitution (R7).
+
+#### Scenario: A profile change lands on main
+
+- **WHEN** a commit on `main` changes the profile and nixbot has published its closure
+- **THEN** the next environment snapshot holds that closure, with no change to the setup box
 
 ### Requirement: Track mode walks back main's first-parent history
 
-Without `PIN`, the setup step SHALL fetch `main`'s first-parent history to depth 5 and, from the tip, evaluate each commit's `claude-sandbox@x86_64-linux` activation package path with the two caches and keys passed as a bash array.
+Without a pin, the setup app SHALL list `main`'s 5 newest first-parent commits and, from the tip, evaluate each one's activation package path with the two caches and keys passed as bash arrays.
 It SHALL accept the first path whose narinfo `cache.scientistexperience.net` answers with 200, treating a failed evaluation as a miss, and stop after 5 commits or about 300 s.
 
 #### Scenario: The tip is unpublished
 
 - **WHEN** the tip's narinfo answers 404 and its parent's answers 200
-- **THEN** the setup step accepts the parent's path without evaluating further commits
+- **THEN** the setup app accepts the parent's path without evaluating further commits
 
 #### Scenario: The budget runs out
 
 - **WHEN** 5 commits are missed or about 300 s pass
-- **THEN** the setup step activates nothing, records the misses, and exits 0
+- **THEN** the setup app activates nothing, records the misses, and exits 0
 
-### Requirement: Track mode substitutes and never builds
+### Requirement: The setup logic is the claude-sandbox-setup app
 
-The track-mode setup step SHALL realise the accepted path with `--max-jobs 0` and `--option builders ''` from the two caches, run its `activate` as root unless it is already the current home-manager generation, and SHALL NOT build any derivation.
+(R4) The setup logic SHALL be the flake app `claude-sandbox-setup`, declared as `modules/apps/claude-sandbox-setup.nix` with its text in the co-located `claude-sandbox-setup.sh`, built by `writeShellApplication` so that its build shellchecks it.
+Relies on: A177; S: the app's build, which the `claude-sandbox-setup-script` check depends on.
+
+#### Scenario: The script has a shellcheck finding
+
+- **WHEN** `modules/apps/claude-sandbox-setup.sh` holds a construct shellcheck reports
+- **THEN** the app's build fails, and with it the `claude-sandbox-setup-script` check
+
+### Requirement: Every command the setup logic calls comes from the flake
+
+(R5) Every external command the setup app runs SHALL come from its `runtimeInputs`, Nix included; only bash and the image's Nix come from the image, and only to start the app.
+Relies on: A177; S: the app's `runtimeInputs`, the bootstrap's options.
+
+#### Scenario: The image lacks a tool
+
+- **WHEN** the image has no `git` or `awk` on its `PATH`
+- **THEN** the app still lists, evaluates, realises and activates, since its wrapper's `PATH` names them from the store
+
+### Requirement: Setup never fails the session
+
+(R6) The setup box and the setup app SHALL both end in `exit 0`, and every run of the app SHALL append one marker line to `/var/log/claude-sandbox-bootstrap/setup.log`.
+Relies on: A170; S: the app's final `exit 0` and its one marker write, the `claude-sandbox-setup-script` check.
+
+#### Scenario: Nothing can be activated
+
+- **WHEN** none of the 5 newest commits is published, or the realise or activation fails
+- **THEN** the app writes its marker and exits 0, and the session starts without the profile
+
+### Requirement: The profile's closure is substituted, never built
+
+(R7) The setup app SHALL realise the profile's closure with `--max-jobs 0 --option builders ''` from the two caches, so a missing path fails instead of building; small local builds outside the profile, such as the app's wrapper, are allowed.
+Relies on: A175, T4; S: the realise options, the walk (R1), the `claude-sandbox-setup-script` check.
 
 #### Scenario: Part of the closure is missing from the caches
 
 - **WHEN** the realise needs a path neither cache serves
-- **THEN** it fails without building, activation is skipped, and the script exits 0
+- **THEN** it fails without building, activation is skipped, and the app exits 0
 
 ### Requirement: The marker records the walk
 
-Each setup run SHALL append one line to `/var/log/claude-sandbox-bootstrap/setup.log` naming the mode, the commit used and its distance from `main`'s tip, the evaluation, realise and activate exit codes and seconds, and each skipped commit with its reason, and SHALL then exit 0.
+Each run's marker SHALL name the outcome (`mode=pinned`, `tracked` or `none`), `main`'s tip when the walk ran, the commit used and its distance from that tip, each skipped commit with its reason, and the walk's seconds and the realise and activate codes and seconds.
 
 #### Scenario: A run that walked back
 
-- **WHEN** the setup step accepted `main~1` after the tip's evaluation failed
+- **WHEN** the setup app accepted `main~1` after the tip's evaluation failed
 - **THEN** its marker names that commit, distance 1, and the tip with reason `eval` and its exit code
 
 ### Requirement: The staleness hook only reads
@@ -90,3 +118,23 @@ It SHALL NOT fetch history, evaluate, realise or activate anything.
 
 - **WHEN** a commit adds a flake input and its build lands on `main`
 - **THEN** the check's output refers to the new input's source, so the upload of the output's closure carries it, and cache-completeness fails if the check's output is not served
+
+## REMOVED Requirements
+
+### Requirement: The named store path is the CI check's output
+
+**Reason**: the generator that printed a pinned script, and checked its store path against `home-manager-claude-sandbox`, is removed; a pin is now a store path argument after `--` in the fixed bootstrap (R2).
+
+**Migration**: to pin, take the output path of `checks.x86_64-linux.home-manager-claude-sandbox` at the commit to pin, which nixbot builds and publishes, and pass it after `--` on the setup box's `nix run` line.
+
+### Requirement: The setup step names the activation package by store path
+
+**Reason**: the setup box no longer names a store path: it runs the `claude-sandbox-setup` app from `main`, which follows `main` (R1) and takes a pin as an argument (R2).
+
+**Migration**: to pin, pass the store path after `--` on the setup box's `nix run` line, as `An environment can be pinned by an argument` states.
+
+### Requirement: The setup script stays within the platform's limits
+
+**Reason**: the generated setup scripts are removed; the setup box holds three fixed lines (R3), well within the platform's 100 lines of 200 bytes, and its `exit 0` is held by the `claude-sandbox-setup-script` check.
+
+**Migration**: paste the bootstrap from the profile's README into the setup box, as `The setup box is three fixed lines` states.

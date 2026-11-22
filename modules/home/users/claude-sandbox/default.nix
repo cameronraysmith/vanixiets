@@ -134,7 +134,7 @@ let
         ];
         text = ''
           log_dir=${lib.escapeShellArg config.vanixiets.sandbox.bootstrapReport.directory}
-          repository=${lib.escapeShellArg flake.lib.claudeSandboxSetupScript.repository}
+          repository=https://github.com/cameronraysmith/vanixiets
 
           marker=
           if [[ -r $log_dir/setup.log ]]; then
@@ -198,7 +198,7 @@ let
       # carries no install step; sessionSecretsHook installs at session start.
       sopsInstallWithoutSystemd.atActivation = false;
 
-      # The cloud environment's setup script (`nix run .#claude-sandbox-setup-script`)
+      # The cloud environment's setup step (modules/apps/claude-sandbox-setup.sh)
       # activates as root, and a controller session reads this report back.
       vanixiets.sandbox.bootstrapReport.enable = true;
 

@@ -1,119 +1,119 @@
-# Holds the Claude Code cloud setup script templates (modules/apps/
-# claude-sandbox-setup-script.nix) to the platform's limits, the pinned one to
-# the closure CI builds and the track-mode one to its fixed text. Evaluation-time
-# obligations: the asserts fire when this attribute is evaluated. Its build runs
-# shellcheck over both and holds them as files.
+# Holds the `claude-sandbox-setup` app (modules/apps/claude-sandbox-setup.nix and
+# its .sh sidecar), the Claude Code cloud environment's setup step, and the
+# bootstrap its setup box holds. Evaluation-time obligations: the asserts fire
+# when this attribute is evaluated, over the package's script text; its build
+# depends on the package, whose writeShellApplication build shellchecks it.
 #
-# Both templates:
-# - at most 100 lines of at most 200 bytes, the pinned one once the app fills
-#   in the longest provenance it can (a dirty revision and an ISO date) (A175);
-# - `exit 0` as their last line, since a non-zero setup step stops the session
-#   from starting (A170);
-# - no revision in the template itself, which would rebuild the template, the
-#   app and this check on every commit.
-#
-# The pinned template's `P=` names the same store path as
-# checks.x86_64-linux.home-manager-claude-sandbox, which is what nixbot builds
-# and pushes to cache.scientistexperience.net.
-#
-# The track-mode template's text is the cloud environment's setup step, so a
-# commit-dependent value in it would cost an approval card per commit: it holds
-# no store path and no date either. It realises with `--max-jobs 0 --option
-# builders ''`, so nothing is built, and it passes the substituters and keys as
-# bash arrays, expanded only quoted, since the Q97 probe saw an unquoted string
-# split into arguments.
-{ self, lib, ... }:
+# - the bootstrap that the app module's header comment and the profile's README
+#   document equals the 3 lines generated here from lib/caches.nix;
+# - the script realises with `--max-jobs 0 --option builders ''`, so the
+#   profile's closure is never built;
+# - its C, S and K are the two caches' entries in lib/caches.nix, S and K as
+#   bash arrays expanded only quoted, since the Q97 probe saw an unquoted
+#   string split into arguments;
+# - it ends in `exit 0`, since a non-zero setup step stops the session from
+#   starting (A170).
+{ lib, ... }:
+let
+  caches = import ../../lib/caches.nix;
+  hosts = [
+    "cache.scientistexperience.net"
+    "cache.nixos.org"
+  ];
+  pick =
+    prefix: entries:
+    let
+      picked = lib.filter (e: lib.any (h: lib.hasPrefix (prefix h) e) hosts) entries;
+    in
+    assert lib.assertMsg (
+      lib.length picked == lib.length hosts
+    ) "lib/caches.nix must name exactly one entry per host in ${toString hosts}";
+    picked;
+  substituters = pick (h: "https://${h}") caches.substituters;
+  publicKeys = pick (h: "${h}-") caches.publicKeys;
+  fleetCache = lib.head (lib.filter (lib.hasPrefix "https://${lib.head hosts}") substituters);
+
+  bootstrap = [
+    "#!/bin/bash"
+    (lib.concatStringsSep " " [
+      "nix run"
+      "--option substituters ${lib.escapeShellArg (lib.concatStringsSep " " substituters)}"
+      "--option trusted-public-keys ${lib.escapeShellArg (lib.concatStringsSep " " publicKeys)}"
+      "--option accept-flake-config false"
+      (lib.escapeShellArg "git+https://github.com/cameronraysmith/vanixiets?ref=main&shallow=1#claude-sandbox-setup")
+    ])
+    "exit 0"
+  ];
+  documents = {
+    "modules/apps/claude-sandbox-setup.nix" = lib.concatMapStrings (l: "#   ${l}\n") bootstrap;
+    "modules/home/users/claude-sandbox/README.md" = lib.concatLines bootstrap;
+  };
+  undocumented = lib.filter (
+    file: !lib.hasInfix documents.${file} (builtins.readFile (../.. + "/${file}"))
+  ) (lib.attrNames documents);
+
+  sidecar = "modules/apps/claude-sandbox-setup.sh";
+  assignments = [
+    "C=${lib.escapeShellArg fleetCache}"
+    "S=(${lib.escapeShellArgs substituters})"
+    "K=(${lib.escapeShellArgs publicKeys})"
+  ];
+  quoted = [
+    "\"\${S[*]}\""
+    "\"\${K[*]}\""
+    "\"\${O[@]}\""
+  ];
+in
 {
   perSystem =
-    { pkgs, system, ... }:
+    {
+      pkgs,
+      system,
+      config,
+      ...
+    }:
+    let
+      package = config.packages.claude-sandbox-setup;
+      script = package.text;
+      lines = lib.filter (line: line != "") (
+        map (line: lib.head (builtins.match "[[:space:]]*(.*)" line)) (lib.splitString "\n" script)
+      );
+      text = builtins.replaceStrings [ "\n" ] [ " " ] script;
+      unquoted = builtins.replaceStrings quoted (map (_: "") quoted) text;
+      missing = lib.filter (a: !lib.elem a lines) assignments;
+    in
     {
       checks = lib.optionalAttrs (system == "x86_64-linux") {
         claude-sandbox-setup-script =
-          let
-            inherit (self.lib.claudeSandboxSetupScript) template trackTemplate placeholders;
-            filled =
-              builtins.replaceStrings
-                [
-                  placeholders.rev
-                  placeholders.date
-                ]
-                [
-                  "${lib.fixedWidthString 40 "f" ""}-dirty"
-                  "2000-01-01"
-                ]
-                template;
-            linesOf = text: lib.splitString "\n" (lib.removeSuffix "\n" text);
-            limits =
-              name: text:
-              let
-                lines = linesOf text;
-                long = lib.filter (l: lib.stringLength l > 200) lines;
-              in
-              lib.assertMsg (lib.length lines <= 100)
-                "claude-sandbox ${name} setup script has ${toString (lib.length lines)} lines; the platform allows 100"
-              && lib.assertMsg (
-                long == [ ]
-              ) "claude-sandbox ${name} setup script has lines over 200 bytes: ${lib.concatStringsSep " | " long}"
-              && lib.assertMsg (
-                lib.last lines == "exit 0"
-              ) "claude-sandbox ${name} setup script must end in `exit 0`, not `${lib.last lines}`";
-            oneLine = builtins.replaceStrings [ "\n" ] [ " " ];
-            revision = text: builtins.match ".*[0-9a-f]{40}.*" (oneLine text) != null;
-
-            track = oneLine trackTemplate;
-            trackLines = linesOf trackTemplate;
-            quoted = [
-              "\"\${S[*]}\""
-              "\"\${K[*]}\""
-              "\"\${O[@]}\""
-            ];
-            unquoted = builtins.replaceStrings quoted (map (_: "") quoted) track;
-
-            lines = linesOf filled;
-            built = builtins.unsafeDiscardStringContext self.checks.x86_64-linux.home-manager-claude-sandbox.outPath;
-          in
-          assert limits "track-mode" trackTemplate;
+          assert lib.assertMsg (undocumented == [ ])
+            "the setup box's bootstrap, generated from lib/caches.nix, is not documented verbatim in: ${lib.concatStringsSep ", " undocumented}; expected:\n${lib.concatLines bootstrap}";
+          assert lib.assertMsg (lib.hasInfix "--max-jobs 0 --option builders ''" text)
+            "claude-sandbox-setup must realise with `--max-jobs 0 --option builders ''`, never building the profile's closure";
           assert lib.assertMsg (
-            !revision trackTemplate
-          ) "claude-sandbox track-mode setup script holds a revision; its text must not change per commit";
-          assert lib.assertMsg (
-            !lib.hasInfix "${builtins.storeDir}/" track
-          ) "claude-sandbox track-mode setup script holds a store path; its text must not change per commit";
-          assert lib.assertMsg (
-            builtins.match ".*[0-9]{4}-[0-9]{2}-[0-9]{2}.*" track == null
-          ) "claude-sandbox track-mode setup script holds a date; its text must not change per commit";
-          assert lib.assertMsg (lib.hasInfix "--max-jobs 0 --option builders ''" track)
-            "claude-sandbox track-mode setup script must realise with `--max-jobs 0 --option builders ''`, never building";
+            missing == [ ]
+          ) "claude-sandbox-setup must set, from lib/caches.nix: ${lib.concatStringsSep " | " missing}";
           assert lib.assertMsg
             (
-              lib.all (v: lib.any (lib.hasPrefix "${v}=(") trackLines) [
+              lib.all (v: lib.length (lib.filter (lib.hasPrefix "${v}=") lines) == 1) [
+                "C"
                 "S"
                 "K"
                 "O"
               ]
-              && lib.all (q: lib.hasInfix q track) quoted
+              && lib.hasPrefix "O=(" (lib.findFirst (lib.hasPrefix "O=") "" lines)
+              && lib.all (q: lib.hasInfix q text) quoted
             )
-            "claude-sandbox track-mode setup script must set S, K and O as bash arrays and expand them as ${lib.concatStringsSep ", " quoted}";
-          assert lib.assertMsg (builtins.match ".*\\$\\{?[SKO]([^A-Za-z0-9_].*)?" unquoted == null)
-            "claude-sandbox track-mode setup script expands S, K or O other than as ${lib.concatStringsSep ", " quoted}";
-          assert limits "pinned" filled;
-          assert lib.assertMsg (lib.elem "P=${built}" lines)
-            "claude-sandbox setup script must set P=${built}, the path home-manager-claude-sandbox builds";
+            "claude-sandbox-setup must set C, S, K and O once each, O as a bash array, and expand them as ${lib.concatStringsSep ", " quoted}";
           assert lib.assertMsg (
-            !revision template
-          ) "claude-sandbox setup script template holds a revision; fill it in at run time instead";
-          pkgs.runCommand "claude-sandbox-setup-scripts"
-            {
-              nativeBuildInputs = [ pkgs.shellcheck ];
-              pinned = pkgs.writeText "claude-sandbox-setup.sh" template;
-              track = pkgs.writeText "claude-sandbox-setup-track.sh" trackTemplate;
-            }
-            ''
-              shellcheck --shell=bash "$pinned" "$track"
-              mkdir "$out"
-              cp "$pinned" "$out/pinned.sh"
-              cp "$track" "$out/track.sh"
-            '';
+            builtins.match ".*\\$\\{?[SKO]([^A-Za-z0-9_].*)?" unquoted == null
+          ) "claude-sandbox-setup expands S, K or O other than as ${lib.concatStringsSep ", " quoted}";
+          assert lib.assertMsg (
+            lib.last lines == "exit 0"
+          ) "${sidecar} must end in `exit 0`, not `${lib.last lines}`";
+          pkgs.runCommand "claude-sandbox-setup-script" { } ''
+            test -x ${lib.getExe package}
+            touch "$out"
+          '';
       };
     };
 }
