@@ -171,6 +171,25 @@ let
           exit 0
         '';
       };
+
+      # Publishes the transcript after each turn to its own branch,
+      # claude/transcripts/<session>, for `claude-cloud-session wait` and
+      # `fetch` to read from outside the cloud; see transcript-publish.sh.
+      # bashOptions is empty because a Stop hook must never fail the turn.
+      transcriptHook = pkgs.writeShellApplication {
+        name = "claude-sandbox-transcripts";
+        runtimeInputs = [
+          pkgs.coreutils
+          pkgs.git
+          pkgs.gitleaks
+          pkgs.jq
+        ];
+        bashOptions = [ ];
+        text = ''
+          log_dir=${lib.escapeShellArg config.vanixiets.sandbox.bootstrapReport.directory}
+          ${builtins.readFile ./transcript-publish.sh}
+        '';
+      };
     in
     {
       home.stateVersion = "23.11";
@@ -229,6 +248,16 @@ let
               {
                 type = "command";
                 command = lib.getExe stalenessHook;
+              }
+            ];
+          }
+        ];
+        settings.hooks.Stop = [
+          {
+            hooks = [
+              {
+                type = "command";
+                command = lib.getExe transcriptHook;
               }
             ];
           }

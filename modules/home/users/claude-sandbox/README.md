@@ -63,6 +63,16 @@ The first child after a rebuild runs the setup step (about 80 s on 2026-11-22: 4
 From the command line, `claude --cloud "<prompt>" -n <name>` starts a cloud session on Default, because the crs58 and cameron profiles set `remote.defaultEnvironmentId` to it (`modules/home/ai/claude-code`); without that key the CLI takes the account's first environment.
 To target another environment for one session, add `--settings '{"remote":{"defaultEnvironmentId":"env_…"}}'`.
 
+## Observing a session
+
+After each turn, the Stop hook `claude-sandbox-transcripts` publishes the session's transcript to its own branch, `claude/transcripts/<session>`: an orphan branch on the first turn, then one fast-forward commit per turn.
+Each commit holds `<session>.jsonl`, the transcript, and `session.json`: the cloud session id and the cloud-local uuid, the first prompt's first line, the start time, the checkout's commit, and the setup marker's `mode`, `tip`, `rev`, `dist` and `P`.
+The hook runs `gitleaks` on the transcript first (its default rules: the repository's `.gitleaks.toml` only allowlists paths, and a config with no rules of its own disables all of them); a finding pushes nothing and leaves `reason=gitleaks` in `/var/log/claude-sandbox-bootstrap/transcripts.log`, which logs one line per turn.
+It works in a scratch repository under `/tmp`, never in the session's checkout, and prints nothing.
+
+- The branch is keyed by the cloud session id, `session_01…`, which the hook reads from the transcript's `remote_session_change` record. A probe session on 2026-11-22 found the id there (5 occurrences in its own transcript) and in no environment variable: `CLAUDE_CODE_REMOTE_SESSION_ID` and `CLAUDE_CODE_SESSION_ID` exist, but no variable's value contains `session_01`. A transcript without that record falls back to the cloud-local uuid, and `session.json` then identifies the session by its first prompt.
+- The hook pushes to `git remote get-url --push origin` of the session's checkout, so it uses the same credentials as the session's own pushes: the probe found origin to be `https://github.com/cameronraysmith/vanixiets`, with the harness's `credential.https://github.com.helper` and `url.*.insteadof` set in its git configuration.
+
 ## Operator steps for a new environment
 
 1. In claude.ai's environment settings, create or pick the environment and paste the bootstrap above into its setup box.
