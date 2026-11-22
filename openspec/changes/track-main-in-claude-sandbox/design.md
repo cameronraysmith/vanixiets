@@ -9,9 +9,11 @@ Sources:
 - the Q97 probe of 2026-11-22 00:55 UTC (`logs/claude-sandbox/q97-probe.md`, a local copy; its report branch will be deleted, so the measurements relied on are quoted here and in `specs/world-assumptions` A184–A186);
 - #4126 (flake input trim) and #4127 (`checks.x86_64-linux.flake-input-sources`), both on `main`.
 
-### State of the two environments on 2026-11-22
+### State of the two environments
 
-- Default (`env_011CULN8FWHtshNCrzLVdbp4`) runs the generated pinned script for `7c2a300ba97299b7f5c1d4453b3f0225ddaf0e72`, closure `d96f192x7b6r0gwahpdy877nsv2a6ad9-home-manager-generation`, since `bootstrap-claude-sandbox` task 7.2.
+Both environments run the track-mode script since 2026-11-22; the pinned scripts below are their restore path.
+
+- Default (`env_011CULN8FWHtshNCrzLVdbp4`) ran the generated pinned script for `7c2a300ba97299b7f5c1d4453b3f0225ddaf0e72`, closure `d96f192x7b6r0gwahpdy877nsv2a6ad9-home-manager-generation`, from `bootstrap-claude-sandbox` task 7.2 until task 3.2 swapped it to the track-mode script (card approved at about 01:48Z on 2026-11-22).
 - `nix-sandbox-test` (`env_01GcXHMR3GM8Nv2encoaVjvs`) ran session 4's pinned script for `8c41bceba1e75f12c9fb9906eda0d3fa0346dc55`, closure `i6f12svdd7j8xcj85vdk6avimkfzwy0b-home-manager-generation`, until task 3.1 swapped it to the track-mode script (card approved at about 01:39:40Z on 2026-11-22).
 
 ### Setup scripts to restore
@@ -40,7 +42,7 @@ echo "$(date -u +%FT%TZ) rev=8c41bceba1e75f12c9fb9906eda0d3fa0346dc55 realise=$r
 exit 0
 ```
 
-Default's current setup script, recorded before task 3.2's swap: the script `bootstrap-claude-sandbox` task 7.2's controller applied (`logs/claude-sandbox/setup-cam118-7c2a300ba97299b7f5c1d4453b3f0225ddaf0e72.sh`); 3.2's controller re-records it from `get_environment` before the swap.
+Default's setup script before task 3.2, the script `bootstrap-claude-sandbox` task 7.2's controller applied (`logs/claude-sandbox/setup-cam118-7c2a300ba97299b7f5c1d4453b3f0225ddaf0e72.sh`); 3.2's controller re-recorded it from `get_environment` before the swap, and that record is byte-identical (`cmp`) to the text below.
 
 ```bash
 #!/bin/bash
@@ -177,6 +179,7 @@ All decided by the operator on 2026-11-22.
 ### D6: the 30-day renewal applies only while pinned — DECIDED 2026-11-22
 
 - **Choice**: a tracking environment names no store path, so niks3's 30-day expiry of an unreferenced closure no longer applies to it; the renewal rule stays for pinned environments.
+  Since task 3.2 (2026-11-22) no environment is pinned, so the 30-day renewal `bootstrap-claude-sandbox` task 7.2 left as a standing obligation on Default no longer applies: it was the garbage-collection horizon of Default's pinned closure `d96f192x…`. It applies again only while an environment is pinned, including after a rollback to a script in §Setup scripts to restore or a `PIN=` in the track-mode script.
 
 ### D7: the input-sources check is load-bearing — DECIDED 2026-11-22
 
