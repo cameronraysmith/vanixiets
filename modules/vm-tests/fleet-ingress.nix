@@ -1106,7 +1106,7 @@
               # is what the store and the tap must never hold.
               planted = {
                   "github": "gh" + "p_" + "Zq7Xw3Rt9Lk2Mn5Bv8Cx1Jh4" + "Gf6Ds0Pa3Yu7E",
-                  "anthropic": "sk-" + "ant-" + "api03-" + "Xy9Qw8Er7Ty6Ui5Op4As3Df2" + "Gh1Jk0Lz",
+                  "anthropic": "sk-" + "ant-" + "api03-" + ("Xy9Qw8Er7Ty6Ui5Op4As3Df2" * 4)[:85] + "Gh1Jk0Lz" + "AA",
                   "pem": "-----BEGIN " + "OPENSSH PRIVATE KEY-----\n" + "b3BlbnNzaC1yZGF0YQ" * 4
                                  + "\n-----END " + "OPENSSH PRIVATE KEY-----",
                   "bearer": "Authorization: " + "Bear" + "er " + "c4n4ryB34r3r" + "T0k3nGhIjKl8",
@@ -1127,8 +1127,8 @@
                   "private-key": planted["pem"],
                   "age-secret-key": "AGE-" + "SECRET-KEY-1" + ("QPZRY9X8GF2TVDW0S3JN54KHCE6MUA7L" * 2)[:58],
                   "anthropic": planted["anthropic"],
-                  "openai": "sk-" + "admin-" + "c4n4ry0p3n4i" + "Adm1nK3y0123",
-                  "langfuse": "sk-" + "lf-" + "c4n4ry-lf-" + "s3cr3t42",
+                  "openai": "sk-" + "admin-" + ("c4n4ry0p3n4i" + "Adm1nK3y0123") * 6,
+                  "langfuse": "sk-" + "lf-" + "c4a7e1f0-" + "4b2d-4e6f-8a9c-" + "0d1e2f3a4b5c",
                   "github": planted["github"],
                   "gitlab": "glp" + "at-" + "c4n4ryG1tL4b" + "T0k3nAbCd",
                   "npm": "np" + "m_" + "c4n4ryNpm" * 4,
@@ -1138,13 +1138,28 @@
                   "gcp-api-key": "AI" + "za" + ("c4n4ryGcp" * 4)[:35],
                   "digitalocean": "do" + "p_v1_" + "0123456789abcdef" * 4,
                   "slack": "xo" + "xb-" + "c4n4ry-sl4ck-" + "t0k3n",
-                  "stripe": "sk" + "_live_" + "c4n4ryStr1p3" + "K3y0123",
+                  "stripe": "sk" + "_live_" + ("c4n4ryStr1p3" + "K3y0123") * 2,
                   "jwt": planted["jwt"],
                   "bearer": "Bear" + "er " + "c4n4ryB34r3r" + "T0k3nGhIjKl8",
               }
               assert sorted(shapes) == config()["credentialPatternNames"], sorted(shapes)
               tails.update({f"shape {name}": token[len(token) // 2 - 6:len(token) // 2 + 6] for name, token in shapes.items()})
               WORDS = ["task_test_configuration", "risk-admin-dashboard-components"]
+              # The `sk-`, `sk_` and `rk_` keys at the start of a line, after a
+              # tab and after a colour code: in omp's JSON the character
+              # before each is a letter (`\n`, `\t`, `[32m`), so a word
+              # boundary would miss them (review R1).
+              OPENAI_LEGACY = "sk-" + "c4n4ryL3g4cy" + "K3y0" * 9
+              STRIPE_RESTRICTED = "rk" + "_test_" + ("c4n4ryR3str1ct" + "3d0123") * 2
+              LINE_KEYS = [shapes["anthropic"], shapes["openai"], OPENAI_LEGACY, shapes["langfuse"], shapes["stripe"], STRIPE_RESTRICTED]
+              LEADS = ["\n", "\t", "\x1b[32m"]
+              LINE_INITIAL = "".join(lead + key for lead in LEADS for key in LINE_KEYS)
+              LINE_INITIAL_MASKED = "".join(lead + "****" for lead in LEADS for _ in LINE_KEYS)
+              tails.update({"openai legacy": OPENAI_LEGACY[-16:], "stripe restricted": STRIPE_RESTRICTED[-16:]})
+              # String-typed keys sent as an array and as a map, a token in
+              # each: deleted, never stored or sent (review follow-up 2).
+              FORGED_TOKEN = "gh" + "p_" + "F0rg3dArr4yT0k3n" + "Zq7Xw3Rt9Lk2Mn5Bv8Cx"
+              tails["forged value"] = FORGED_TOKEN[-12:]
               # A GitHub-shaped token only inside the base64 `syntax` of
               # omp's shell trace, as magnetite stored one (design D15).
               TRACE_TOKEN = "gh" + "o_" + "Wq3Er5Ty7Ui9Op1As3Df5" + "Gh7Jk9Lz2Xc4Vb6N"
@@ -1348,7 +1363,7 @@
                              "script": f"echo {canary['trace script']}", "units": [{"syntax": SYNTAX}],
                              "history": [{"text": canary["trace history"], "argv": ["echo", canary["trace history"]]}]}
               bash_details = {"wallTimeNoticeEmitted": False, "timeoutSeconds": 300, "wallTimeMs": 12.5, "trace": shell_trace}
-              SHAPES_TEXT = " | ".join([canary["shapes content"], *shapes.values(), BLOB, HEX, LONG_PATH, URLSAFE_BLOB, *WORDS, ENDLESS + QUOTED])
+              SHAPES_TEXT = " | ".join([canary["shapes content"], *shapes.values(), BLOB, HEX, LONG_PATH, URLSAFE_BLOB, *WORDS, ENDLESS + QUOTED, LINE_INITIAL])
               ESCAPED_TEXT = f"{canary['escaped content']} ],\"details\":{{\"x\":1}}"
               CLAUDE_JSON = compact({"content": [canary["claude json"]], "details": {"note": "kept"}})
               # Each span id with its result as sent and as it must be
@@ -1367,7 +1382,7 @@
                       compact(text_result(canary["error content"], isError=True))),
                   "eee19b7ec3c1b183": (
                       text_result(SHAPES_TEXT),
-                      compact(text_result(" | ".join([canary["shapes content"], *["****"] * len(shapes), "****", HEX, LONG_PATH, "****", *WORDS, "****" + QUOTED])))),
+                      compact(text_result(" | ".join([canary["shapes content"], *["****"] * len(shapes), "****", HEX, LONG_PATH, "****", *WORDS, "****" + QUOTED, LINE_INITIAL_MASKED])))),
                   "eee19b7ec3c1b184": (
                       text_result(ESCAPED_TEXT, details={"history": [{"text": canary["escaped details"]}]}),
                       compact(text_result(ESCAPED_TEXT))),
@@ -1382,6 +1397,9 @@
                            for span_id, (sent, _) in results.items() if not span_id.endswith("82")]
               result_spans.append(omp_tool("eee19b7ec3c1b182", "bash", results["eee19b7ec3c1b182"][0], tool_status="error",
                                         status={"code": 2, "message": canary["error content"]}))
+              next(span for span in result_spans if span["spanId"] == "eee19b7ec3c1b183")["attributes"].append(
+                  {"key": "gen_ai.tool.call.arguments",
+                   "value": {"kvlistValue": {"values": [{"key": "command", "value": {"stringValue": f"echo {FORGED_TOKEN}"}}]}}})
 
 
               def claude_span(span_id, parent, name, attributes, **extra):
@@ -1424,7 +1442,8 @@
                                               s("file_path", canary["path"])]}]),
                   claude_span("aaa19b7ec3c1b105", "aaa19b7ec3c1b103", "claude_code.tool.execution", [
                       s("tool_use_id", "toolu_claude_1"), bv("success", False), s("error", "ShellError"),
-                      s("error.type", "tool_error")],
+                      s("error.type", "tool_error"),
+                      {"key": "gen_ai.tool.call.result", "value": {"arrayValue": {"values": [{"stringValue": f"forged {FORGED_TOKEN}"}]}}}],
                       # Past the 64 KiB cut, a credential inside it.
                       status={"code": 2, "message": " ".join([canary["claude status"], planted["github"], "z " * 35000])}),
                   # Output holding JSON with `content` and `details` keys: the
@@ -1534,8 +1553,9 @@
               assert failed_tool["span_status_message"] == canary["error content"], failed_tool
               shapes_result = spans["eee19b7ec3c1b183"]["span_attributes.gen_ai.tool.call.result"]
               assert HEX in shapes_result and LONG_PATH in shapes_result and all(word in shapes_result for word in WORDS), shapes_result
-              assert shapes_result.count("****") == len(shapes) + 3 and URLSAFE_BLOB[60:120] not in shapes_result and json.loads(shapes_result), shapes_result
-              print(f"  {len(shapes)} credential shapes, a {len(BLOB)}-character blob and a {len(URLSAFE_BLOB)}-character URL-safe run masked; the 128-character hex, the {len(LONG_PATH)}-character path, {WORDS} kept", flush=True)
+              assert shapes_result.count("****") == len(shapes) + 3 + len(LEADS) * len(LINE_KEYS) and URLSAFE_BLOB[60:120] not in shapes_result and json.loads(shapes_result), shapes_result
+              print(f"  {len(shapes)} credential shapes, {len(LEADS) * len(LINE_KEYS)} line-initial keys, a {len(BLOB)}-character blob and a {len(URLSAFE_BLOB)}-character URL-safe run masked; the 128-character hex, the {len(LONG_PATH)}-character path, {WORDS} kept", flush=True)
+              assert spans["eee19b7ec3c1b183"]["span_attributes.gen_ai.tool.call.arguments"] is None, spans["eee19b7ec3c1b183"]
 
               # Claude Code's spans (design D15).
               interaction, llm, bash, read, execution, claude_json = (spans[f"aaa19b7ec3c1b10{n}"] for n in range(1, 7))
@@ -1555,6 +1575,7 @@
               assert read["span_attributes.gen_ai.tool.call.result"] == f"{canary['read content']}\n****", read
               assert execution["span_attributes.success"] is False and execution["span_attributes.error"] == "ShellError", execution
               assert execution["span_attributes.error.type"] == "tool_error", execution
+              assert execution["span_attributes.gen_ai.tool.call.result"] is None, execution
               message = execution["span_status_message"]
               assert message.startswith(f"{canary['claude status']} **** z") and 65000 < len(message.encode()) <= 65536, message[:200]
 
@@ -1643,7 +1664,10 @@
 
 
               for span_id, (resource, attributes, span) in lf.items():
-                  assert text(resource, "user.name") == "cameron" and text(resource, "host.name") == "pyrite", (span_id, resource)
+                  assert text(resource, "user.name") == "cameron", (span_id, resource)
+                  # Not Langfuse's (review follow-up 3).
+                  assert "host.name" not in resource and "service.version" not in resource, (span_id, resource)
+                  assert not {"tool_use_id", "duration_ms"} & attributes.keys(), (span_id, attributes.keys())
                   for key, value in attributes.items():
                       assert len((value.get("stringValue") or "").encode()) <= 65536, (span_id, key)
               chat_lf, tool_lf = lf["eee19b7ec3c1b174"][1], lf["eee19b7ec3c1b175"][1]

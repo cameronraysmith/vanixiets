@@ -295,6 +295,10 @@
                 keyList (session.events.correlationKeys ++ session.events.keys.${event})
               }) where log.attributes["event.name"] == "${event}"''
             ) (builtins.attrNames session.events.keys)
+            ++ map (
+              key:
+              ''delete_key(log.attributes, "${key}") where log.attributes["${key}"] != nil and not IsString(log.attributes["${key}"])''
+            ) eventStringKeys
             ++ [
               ''set(log.body, "")''
               "truncate_all(log.attributes, 65536)"
@@ -324,8 +328,24 @@
             ''set(span.attributes["last_user_message"], span.cache["p"][0]) where span.cache["p"] != nil''
             ''replace_pattern(span.attributes["last_user_message"], "^<system-reminder>[\\s\\S]*?</system-reminder>\\s*", "")''
           ];
+          # A string-typed key holding an array or a map is deleted: the cut
+          # and the masks act on strings only.
+          spanStringKeys = builtins.attrNames (
+            lib.filterAttrs (_: type: type == "string") session.spans.keys
+          );
+          eventStringKeys = map (column: column.source.log) (
+            builtins.filter (
+              column: column.type == "string" && (column.source.log or null) != null
+            ) session.tables.session_event.columns
+          );
           expectedSpanStatements = [
             "keep_keys(span.attributes, ${keyList (builtins.attrNames session.spans.keys)})"
+          ]
+          ++ map (
+            key:
+            ''delete_key(span.attributes, "${key}") where span.attributes["${key}"] != nil and not IsString(span.attributes["${key}"])''
+          ) spanStringKeys
+          ++ [
             "truncate_all(span.attributes, 65536)"
             ''set(span.cache["status"], span.status.message)''
             "truncate_all(span.cache, 65536)"
@@ -807,7 +827,7 @@
           # alone, whose stages ignore their errors and include no limiter,
           # so the branch cannot refuse what the store path took.
           (check
-            "R3.1: traces/langfuse exists where observabilityHosts does not set langfuse or is missing where it does, or is not fed by forward/langfuse from traces/agent-session alone, after all its stages, through stages that cannot refuse"
+            "R3.1: traces/langfuse exists where observabilityHosts does not set langfuse or is missing where it does, or is not fed by forward/langfuse from traces/agent-session alone, after all its stages, through stages that cannot refuse, or sends the fleet's routing attributes, host.name, service.version, tool_use_id, duration_ms or a copied full_command or file_path"
             (
               (agentPipelines ? "traces/langfuse") == lfOn
               && (ae ? ${lfName}) == lfOn
@@ -836,15 +856,21 @@
                   ) (lp.processors or [ ])
                   &&
                     (ap."filter/langfuse".trace_conditions or null) == map (n: ''span.name == "${n}"'') lf.droppedSpans
-                  && builtins.elem ''delete_matching_keys(resource.attributes, "^vanixiets\\.")'' (
-                    ap."transform/langfuse".trace_statements or [ ]
-                  )
+                  && lib.all (s: builtins.elem s (ap."transform/langfuse".trace_statements or [ ])) [
+                    ''delete_key(span.attributes, "full_command") where span.attributes["full_command"] == span.attributes["langfuse.observation.input"]''
+                    ''delete_key(span.attributes, "file_path") where span.attributes["file_path"] == span.attributes["langfuse.observation.input"]''
+                    ''delete_key(span.attributes, "tool_use_id")''
+                    ''delete_key(span.attributes, "duration_ms")''
+                    ''delete_key(resource.attributes, "host.name")''
+                    ''delete_key(resource.attributes, "service.version")''
+                    ''delete_matching_keys(resource.attributes, "^vanixiets\\.")''
+                  ]
                 )
               )
             )
           )
           (check
-            "R3.1: Langfuse's exporter does not send to schema.nix's endpoint with the unit's Langfuse credentials and ingestion version, retry for retryMinutes and no longer, drain faster than spans arrive into a queue of twice a retry window, in batches under the request limit, or a store exporter of the agent-session collector does not retry forever, or its queues reach 512 MiB"
+            "R3.1: Langfuse's exporter does not send to schema.nix's endpoint, https://cloud.langfuse.com/api/public/otel, with verified TLS, no proxy and a 30 s timeout, with the unit's Langfuse credentials and ingestion version, retry for retryMinutes and no longer, drain faster than spans arrive into a queue of twice a retry window, in batches under the request limit, or a store exporter of the agent-session collector does not retry forever, or its queues reach 512 MiB"
             (
               let
                 queue = lfx.sending_queue or { };
@@ -862,6 +888,11 @@
                 !lfOn
                 || (
                   (lfx.endpoint or null) == lf.endpoint
+                  && lf.endpoint == "https://cloud.langfuse.com/api/public/otel"
+                  && !(lfx ? tls)
+                  && !(lfx ? proxy_url)
+                  && (lfx.timeout or null) == lf.timeout
+                  && lf.timeout == "30s"
                   && (lfx.headers or null) == { "x-langfuse-ingestion-version" = lf.ingestionVersion; }
                   && (lfx.auth.authenticator or null) == "basicauth/langfuse"
                   && builtins.elem "basicauth/langfuse" (a.service.extensions or [ ])
@@ -1308,8 +1339,8 @@
         agentLimiter = "R3.1: the agent-session collector's limiter is not below its GOMEMLIMIT and that below its MemoryMax, or the host's collector sets GOMEMLIMIT";
         notified = "R3.1: a greptimedb*, zfs-set-*, zfs-assert-*, devloop-*, collector, otel-envelope or agent-session unit is not notified";
         unit = "R3.1: the agent-session collector shares the host collector's queue directory, serves telemetry off loopback, does not always restart, is bound to the host's collector, or may start before the store's schema job";
-        langfusePath = "R3.1: traces/langfuse exists where observabilityHosts does not set langfuse or is missing where it does, or is not fed by forward/langfuse from traces/agent-session alone, after all its stages, through stages that cannot refuse";
-        langfuseExporter = "R3.1: Langfuse's exporter does not send to schema.nix's endpoint with the unit's Langfuse credentials and ingestion version, retry for retryMinutes and no longer, drain faster than spans arrive into a queue of twice a retry window, in batches under the request limit, or a store exporter of the agent-session collector does not retry forever, or its queues reach 512 MiB";
+        langfusePath = "R3.1: traces/langfuse exists where observabilityHosts does not set langfuse or is missing where it does, or is not fed by forward/langfuse from traces/agent-session alone, after all its stages, through stages that cannot refuse, or sends the fleet's routing attributes, host.name, service.version, tool_use_id, duration_ms or a copied full_command or file_path";
+        langfuseExporter = "R3.1: Langfuse's exporter does not send to schema.nix's endpoint, https://cloud.langfuse.com/api/public/otel, with verified TLS, no proxy and a 30 s timeout, with the unit's Langfuse credentials and ingestion version, retry for retryMinutes and no longer, drain faster than spans arrive into a queue of twice a retry window, in batches under the request limit, or a store exporter of the agent-session collector does not retry forever, or its queues reach 512 MiB";
         collectorVersion = "R3.1: the collector is not otelcol-contrib 0.155.0; before changing it, rerun fleet-ingress's agentSpans and handoffCap cases, which prove the link clearing, the tool-result strip, the masks and the hand-off cap at a release";
         handoffCap = "R3.1: the agent-session collector's span exporter does not send one request at a time, batched by bytes to at most a quarter of the ingress's agent_span queue";
       };
@@ -2078,6 +2109,92 @@
         collectorUpgraded = {
           clauses = [ clause.collectorVersion ];
           mutate = i: i // { collectorVersion = "0.156.0"; };
+        };
+        # A string-typed key holding an array or a map kept whole, uncut
+        # and unmasked (review follow-up 2).
+        nonStringSpanValueKept = {
+          clauses = [ clause.keys ];
+          mutate =
+            i:
+            onAgent {
+              processors."transform/agent-session-spans".trace_statements = builtins.filter (
+                s: !lib.hasInfix "IsString" s
+              ) i.agentSettings.processors."transform/agent-session-spans".trace_statements;
+            } i;
+        };
+        nonStringEventValueKept = {
+          clauses = [ clause.keys ];
+          mutate =
+            i:
+            onAgent {
+              processors."transform/agent-session-events".log_statements = builtins.filter (
+                s: !lib.hasInfix "IsString" s
+              ) i.agentSettings.processors."transform/agent-session-events".log_statements;
+            } i;
+        };
+        # What Langfuse need not get (review follow-up 3).
+        langfuseHostNameSent = {
+          clauses = [ clause.langfusePath ];
+          mutate =
+            i:
+            onAgent {
+              processors."transform/langfuse".trace_statements =
+                lib.remove ''delete_key(resource.attributes, "host.name")''
+                  i.agentSettings.processors."transform/langfuse".trace_statements;
+            } i;
+        };
+        langfuseCommandTwice = {
+          clauses = [ clause.langfusePath ];
+          mutate =
+            i:
+            onAgent {
+              processors."transform/langfuse".trace_statements = builtins.filter (
+                s: !lib.hasPrefix ''delete_key(span.attributes, "full_command")'' s
+              ) i.agentSettings.processors."transform/langfuse".trace_statements;
+            } i;
+        };
+        langfuseTlsInsecure = {
+          clauses = [ clause.langfuseExporter ];
+          mutate = onAgent { exporters."otlp_http/langfuse".tls.insecure_skip_verify = true; };
+        };
+        langfuseProxied = {
+          clauses = [ clause.langfuseExporter ];
+          mutate = onAgent { exporters."otlp_http/langfuse".proxy_url = "http://127.0.0.1:3128"; };
+        };
+        langfuseTimeoutDefault = {
+          clauses = [ clause.langfuseExporter ];
+          mutate =
+            i:
+            i
+            // {
+              agentSettings = i.agentSettings // {
+                exporters = i.agentSettings.exporters // {
+                  "otlp_http/langfuse" = builtins.removeAttrs i.agentSettings.exporters."otlp_http/langfuse" [
+                    "timeout"
+                  ];
+                };
+              };
+            };
+        };
+        # schema.nix and the exporter moved together to another endpoint.
+        langfuseEndpointElsewhere = {
+          clauses = [ clause.langfuseExporter ];
+          mutate =
+            i:
+            onAgent
+              { exporters."otlp_http/langfuse".endpoint = "https://langfuse.example.org/api/public/otel"; }
+              (
+                i
+                // {
+                  schema = i.schema // {
+                    agentSession = i.schema.agentSession // {
+                      langfuse = i.schema.agentSession.langfuse // {
+                        endpoint = "https://langfuse.example.org/api/public/otel";
+                      };
+                    };
+                  };
+                }
+              );
         };
         # The hand-off (design D15): uncapped, capped at the ingress's
         # queue, or several requests at once.

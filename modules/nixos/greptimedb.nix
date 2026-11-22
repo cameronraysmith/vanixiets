@@ -154,10 +154,13 @@ in
       );
 
       # The store has no readiness notification, so the job polls /health
-      # (design F7). The password reaches curl on stdin through the printf
+      # (design F7): 60 tries 2 s apart, each cut at 5 s, so a store that
+      # accepts the connection and never answers fails the job within
+      # 7 minutes. The password reaches curl on stdin through the printf
       # builtin, never on a command line. Each statement gets 90 s, past
-      # the store's own 60 s DDL timeout, so a hung connection fails the job
-      # rather than holding it, and the units ordered after it, forever.
+      # the store's own 60 s DDL timeout, so a hung connection fails the
+      # job rather than holding it, and the units ordered after it,
+      # forever.
       schema = pkgs.writeShellApplication {
         name = "greptimedb-schema";
         runtimeInputs = [
@@ -168,10 +171,10 @@ in
           password="$(cat "$CREDENTIALS_DIRECTORY/admin-password")"
 
           attempt=0
-          until curl --silent --fail --output /dev/null ${httpUrl}/health; do
+          until curl --silent --fail --max-time 5 --output /dev/null ${httpUrl}/health; do
             attempt=$((attempt + 1))
             if [ "$attempt" -ge 60 ]; then
-              echo "greptimedb-schema: ${httpUrl}/health did not answer within 120 s" >&2
+              echo "greptimedb-schema: ${httpUrl}/health did not answer in 60 tries" >&2
               exit 1
             fi
             sleep 2

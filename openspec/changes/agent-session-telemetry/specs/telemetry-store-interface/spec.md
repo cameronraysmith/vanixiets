@@ -64,7 +64,7 @@ Logs SHALL enter it only in `devloop`'s tables and `agent.session_event`, and tr
 
 ### Requirement: Databases and their retention are set at the telemetry store
 
-The machine SHALL run a oneshot `greptimedb-schema.service` as `admin` that polls `GET /health` until the telemetry store answers, then sets each database's retention as the scenarios below state.
+The machine SHALL run a oneshot `greptimedb-schema.service` as `admin` that polls `GET /health`, each try cut at 5 s, until the telemetry store answers, then sets each database's retention as the scenarios below state.
 The machine SHALL then create exactly the tables of `services.greptimedb.tables`, the four `devloop` tables and `agent.session_event`, and upload their pipelines from `services.greptimedb.pipelines`, as the scenarios below state, and SHALL create no other table.
 
 #### Scenario: Each database's retention is set

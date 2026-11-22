@@ -160,6 +160,16 @@ After the allow-lists and the 64 KiB cut, the agent-session collector SHALL repl
 - **WHEN** the VM test sends a GitHub token and a private-key block in an omp tool result, an Anthropic key in a status message, a bearer token and a JWT in a Claude Bash output, a private-key block in a Claude Read output, a GitHub token in a Claude tool-execution status, a bearer token and a 268-character base64 blob in an event's tool parameters, and in one omp result every one of the seventeen shapes, the blob, a sha512 in hex, `task_test_configuration` and `risk-admin-dashboard-components`
 - **THEN** each credential and blob is stored as `****` around its unmasked context, the hex and the two words as sent, and no part of any credential or of the blob is in what left the host, in any column or at the Langfuse sink; with the masking stage or the blob net removed the case fails
 
+#### Scenario: A key starts a line, follows a tab or a colour code
+
+- **WHEN** an omp tool result holds an Anthropic, OpenAI (admin and legacy), Langfuse, Stripe secret and Stripe restricted key, each after a `\n`, after a `\t` and after `ESC[32m`
+- **THEN** each is stored and sent to Langfuse as `****`; with the shapes anchored at a word boundary the case fails (`fleet-ingress` uncommitted mutant `wordBoundaryRestored`)
+
+#### Scenario: A string-typed key arrives as an array or a map
+
+- **WHEN** a Claude span carries `gen_ai.tool.call.result` as an array and an omp span `gen_ai.tool.call.arguments` as a map, each holding a GitHub token
+- **THEN** neither key is stored or sent to the Langfuse sink, and no part of the token leaves the host; `otel-collector-config` rejects `nonStringSpanValueKept` and `nonStringEventValueKept`
+
 #### Scenario: A credential without a known shape is sent
 
 - **WHEN** a session's tool output holds a password or an AWS secret access key

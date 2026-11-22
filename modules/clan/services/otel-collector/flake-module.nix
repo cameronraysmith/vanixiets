@@ -732,6 +732,16 @@ in
           let
             session = schema.agentSession;
             eventNames = builtins.attrNames session.events.keys;
+            # The keys whose column is a string: of each span key, by its
+            # declared type; of each event key, by its session_event column.
+            spanStringKeys = builtins.attrNames (
+              lib.filterAttrs (_: type: type == "string") session.spans.keys
+            );
+            eventStringKeys = map (column: column.source.log) (
+              builtins.filter (
+                column: column.type == "string" && (column.source.log or null) != null
+              ) session.tables.session_event.columns
+            );
             list = keys: "[${lib.concatMapStringsSep ", " (key: ''"${key}"'') keys}]";
             oneOf = path: values: lib.concatMapStringsSep " or " (value: ''${path} == "${value}"'') values;
             # schema.nix's credential shapes as one RE2 alternation, quoted
@@ -860,6 +870,14 @@ in
               ]) lf.usageKeys
             )
             ++ [
+              # The copies above once more, and what Langfuse shows nothing
+              # for (review follow-up 3).
+              ''delete_key(span.attributes, "full_command") where ${attr "full_command"} == ${attr "langfuse.observation.input"}''
+              ''delete_key(span.attributes, "file_path") where ${attr "file_path"} == ${attr "langfuse.observation.input"}''
+              ''delete_key(span.attributes, "tool_use_id")''
+              ''delete_key(span.attributes, "duration_ms")''
+              ''delete_key(resource.attributes, "host.name")''
+              ''delete_key(resource.attributes, "service.version")''
               # The fleet's routing attributes are not Langfuse's.
               ''delete_matching_keys(resource.attributes, "^vanixiets\\.")''
             ];
@@ -1106,6 +1124,13 @@ in
                         list (session.events.correlationKeys ++ session.events.keys.${event})
                       }) where ${eventName} == "${event}"''
                     ) eventNames
+                    # A value the store types as a string that is not one (an
+                    # array or map) goes: the cut and the masks act on strings
+                    # only, so it would pass whole and unmasked.
+                    ++ map (
+                      key:
+                      ''delete_key(log.attributes, "${key}") where log.attributes["${key}"] != nil and not IsString(log.attributes["${key}"])''
+                    ) eventStringKeys
                     ++ [
                       ''set(log.body, "")''
                       # Every kept value at most 64 KiB (design D14).
@@ -1214,6 +1239,16 @@ in
                   error_mode = "propagate";
                   trace_statements = [
                     "keep_keys(span.attributes, ${list (builtins.attrNames session.spans.keys)})"
+                  ]
+                  # A kept value schema.nix types as a string that is not one
+                  # (an array or map) goes: the cut and the masks act on
+                  # strings only, and Langfuse has no typed column to refuse
+                  # it.
+                  ++ map (
+                    key:
+                    ''delete_key(span.attributes, "${key}") where span.attributes["${key}"] != nil and not IsString(span.attributes["${key}"])''
+                  ) spanStringKeys
+                  ++ [
                     # Every kept value at most 64 KiB (design D14), the
                     # status message too (design D15): it holds a failed
                     # tool's output or error text. truncate_all cuts at a
@@ -1269,6 +1304,7 @@ in
                 // lib.optionalAttrs langfuse {
                   ${langfuseExporter} = {
                     inherit (lf) endpoint;
+                    inherit (lf) timeout;
                     auth.authenticator = "basicauth/langfuse";
                     headers."x-langfuse-ingestion-version" = lf.ingestionVersion;
                     sending_queue = {

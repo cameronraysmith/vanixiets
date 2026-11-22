@@ -730,6 +730,10 @@
         # spans when the emitters retry.
         langfuse = {
           endpoint = "https://cloud.langfuse.com/api/public/otel";
+          # Each request's deadline, set rather than left to the exporter's
+          # default, so a hanging server holds a consumer for at most this
+          # per try (review follow-up 5).
+          timeout = "30s";
           ingestionVersion = "4";
           requestLimitBytes = 5000000;
           retryMinutes = 5;
@@ -756,8 +760,23 @@
         # prefix and alphabet. They catch token-shaped strings only, never
         # every secret: a password, an AWS secret access key or any
         # credential without a fixed prefix passes. The `sk-`, `sk_` and
-        # `rk_` shapes start at a word boundary, so `task_test_…` and
-        # `risk-admin-…` are words, not keys. A private key whose END line
+        # `rk_` shapes take no word boundary: in a JSON-encoded value a key
+        # at the start of a line follows the letter of `\n` or `\t`, and
+        # after a colour code the `m` of `[32m`, so a boundary would leave
+        # it. They are precise in the body instead, each at its issuer's
+        # length: Anthropic's `sk-ant-<version>-` and 93 characters and
+        # `AA` (gitleaks anthropic-api-key, anthropic-admin-api-key), so 95
+        # or more after `sk-ant-`; OpenAI's project, service-account and
+        # admin keys 58 or 74 characters, `T3BlbkFJ`, then 58 or 74
+        # (gitleaks openai-api-key), so 124 or more, and its legacy key 48
+        # alphanumerics; Langfuse's `sk-lf-` and a UUID (langfuse
+        # packages/shared/src/server/auth/apiKeys.ts:81, `randomUUID()`);
+        # Stripe's secret and restricted keys 24 or more alphanumerics
+        # (gitleaks stripe-access-token allows 10 to 99). So
+        # `task_test_configuration` (13 after `sk_test_`) and
+        # `risk-admin-dashboard-components` are stored as written; a word
+        # holding `sk-` and 48 alphanumerics, or `sk_test_` and 24, is
+        # masked. A private key whose END line
         # is missing (cut at 64 KiB, say) is masked up to the next
         # unescaped double quote or the end of the value: in a JSON-encoded
         # value that is the end of the string holding it, so the JSON stays
@@ -767,9 +786,9 @@
         credentialPatterns = {
           private-key = "-----BEGIN[ A-Z0-9_-]{0,100}PRIVATE KEY(?: BLOCK)?-----(?:[\\s\\S]*?-----END[ A-Z0-9_-]{0,100}PRIVATE KEY(?: BLOCK)?-----|(?:[^\"\\\\]|\\\\[^\"])*)";
           age-secret-key = "AGE-SECRET-KEY-1[QPZRY9X8GF2TVDW0S3JN54KHCE6MUA7L]{58}";
-          anthropic = "\\bsk-ant-[A-Za-z0-9_-]{20,}";
-          openai = "\\bsk-(?:proj|svcacct|admin)-[A-Za-z0-9_-]{20,}|\\bsk-[A-Za-z0-9]{20}T3BlbkFJ[A-Za-z0-9]{20}";
-          langfuse = "\\bsk-lf-[A-Za-z0-9-]{8,}";
+          anthropic = "sk-ant-[A-Za-z0-9_-]{95,}";
+          openai = "sk-(?:proj|svcacct|admin)-[A-Za-z0-9_-]{124,}|sk-[A-Za-z0-9]{48}";
+          langfuse = "sk-lf-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
           github = "(?:ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9]{36,}|github_pat_[A-Za-z0-9_]{22,}";
           gitlab = "glpat-[A-Za-z0-9_-]{20,}";
           npm = "npm_[A-Za-z0-9]{36}";
@@ -779,7 +798,7 @@
           gcp-api-key = "AIza[A-Za-z0-9_-]{35}";
           digitalocean = "do[opr]_v1_[a-f0-9]{64}";
           slack = "xox[abeoprs]-[A-Za-z0-9-]{10,}|xapp-[0-9]-[A-Za-z0-9-]{10,}|hooks\\.slack\\.com/(?:services|workflows|triggers)/[A-Za-z0-9/_+-]{20,}";
-          stripe = "\\b(?:sk|rk)_(?:test|live|prod)_[A-Za-z0-9]{10,}";
+          stripe = "(?:sk|rk)_(?:test|live|prod)_[A-Za-z0-9]{24,}";
           jwt = "eyJ[A-Za-z0-9_-]{8,}\\.eyJ[A-Za-z0-9_-]{8,}\\.[A-Za-z0-9_-]*";
           bearer = "(?i:bearer)\\s+[A-Za-z0-9._~+/=-]{16,}";
         };
