@@ -138,6 +138,18 @@
             databases.fleet = "30d";
           };
         };
+        # The ingress's budget with `agent` beside `fleet`
+        # (agent-session-telemetry): B1 and B2 judge both.
+        budgetAgent = envelope {
+          budget = {
+            storeUrl = "http://127.0.0.1:${toString storePort}";
+            notifiedUnits.electrum = [ "otel-envelope" ];
+            databases = {
+              fleet = "30d";
+              agent = "30d";
+            };
+          };
+        };
         darwin = envelope {
           hostName = "stibnite";
           targets = darwinTargets;
@@ -238,6 +250,13 @@
           variants = [ "darwin" ];
           from = ''if [ -z "$bytes" ]; then'';
           to = ''if [ -z "$bytes" ]; then continue; fi; if false; then'';
+        };
+        # The agent series cap (agent-session-telemetry) is judged.
+        agentSeriesIgnored = {
+          case = "budgetAgentAt2001";
+          variants = [ "budgetAgent" ];
+          from = ''if [ "$series" -gt ${toString self.lib.otelCollectorSchema.budget.agentActiveSeries} ]; then'';
+          to = "if false; then";
         };
       };
       mutate = name: m: if m.source or false then mutateSource name m else mutateScript name m;
@@ -522,6 +541,26 @@
           s=$(mktemp -d)
           run agent "$s" agent-healthy down 0 && at 300 - "$s" 0 && at 4200 - "$s" 0
         }
+        # agent at its 2,000-series cap passes B1 and B2; at 2,001 fails B1
+        # alone, naming agent (agent-session-telemetry).
+        agentBudget() {
+          local -x OTEL_ENVELOPE_NOW=$t0 CREDENTIALS_DIRECTORY
+          local store=$1
+          CREDENTIALS_DIRECTORY=$(mktemp -d)
+          printf placeholder > "$CREDENTIALS_DIRECTORY/regulator-password"
+          run budgetAgent "$(mktemp -d)" agent-healthy down "$2"
+        }
+        case_budgetAgentAt2000() {
+          agentBudget agent2000 0 \
+            && grep -q '^otel-envelope: B1 active-series: ok$' "$work/out" \
+            && grep -q '^otel-envelope: B2 label-values: ok$' "$work/out" \
+            && grep -q '^otel-envelope: B6 ttl: ok$' "$work/out"
+        }
+        case_budgetAgentAt2001() {
+          agentBudget agent2001 1 \
+            && grep -q '^otel-envelope: B1 active-series: FAIL 2001 series in agent over the last hour, above 2000$' "$work/out" \
+            && [ "$(grep -c ': FAIL' "$work/out")" = 1 ]
+        }
 
         # stibnite's envelope (darwin): its two targets, its exporters and C5.
         case_darwinHealthy() {
@@ -627,6 +666,8 @@
         "budgetBreachCleared"
         "budgetRunStale"
         "budgetFreshState"
+        "budgetAgentAt2000"
+        "budgetAgentAt2001"
         "darwinHealthy"
         "darwinOtlpRefused"
         "c5ProcessResidentOver"

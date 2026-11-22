@@ -7,13 +7,20 @@
 #   - the store with magnetite's databases, its schema job and the devloop
 #     tables and pipelines;
 #   - opentelemetry-collector.service from the agent and ingress fragments,
-#     the ingress host, with otlp/mesh on 127.0.0.1:4318, otlp/mesh-tincr on
+#     the ingress host, with otlp/mesh on 127.0.0.1:4319, otlp/mesh-tincr on
 #     127.0.0.1:4320, and throwaway
 #     certificates from flake.lib.otelTestPki;
 #   - agent-collector.service, electrum's evaluated non-ingress collector
 #     configuration exporting over mTLS to that receiver, with its queue,
 #     telemetry (127.0.0.1:8889) and deploy-record file moved into its own
 #     state directory and the zerotierone job removed;
+#   - agent-session-collector.service, pyrite's evaluated agent-session
+#     pipelines with their receiver otlp/local, the one listener here on the
+#     harnesses' 127.0.0.1:4318, and their exporters, pointed at otlp/mesh,
+#     with telemetry on 127.0.0.1:8890 (agent-session-telemetry design D12);
+#   - the store's agent.session_event table and pipeline as magnetite
+#     declares them, and a file exporter on the ingress's logs/ingress that
+#     records every log record crossing the mesh, for the canary;
 #   - otel-envelope.service from the agent fragment and agent-envelope.service,
 #     the same unit for the agent collector, both started only by the cases;
 #   - the failure notifier over all four units, posting through an ntfy-send
@@ -73,7 +80,7 @@
                   name:
                   electrum.exporters.${name}
                   // {
-                    endpoint = "https://127.0.0.1:4318";
+                    endpoint = "https://127.0.0.1:4319";
                     tls = electrum.exporters.${name}.tls // {
                       ca_file = "${pki}/ca.crt";
                       cert_file = "${pki}/agent.crt";
@@ -119,6 +126,81 @@
                       receivers = lib.remove "prometheus/zerotier" electrum.service.pipelines."metrics/host".receivers;
                     };
                   };
+                };
+              };
+
+            # pyrite's agent-session path as the agent role renders it on a
+            # host whose agentTelemetry is true (agent-session-telemetry design
+            # D12): the receivers, processors and exporters its agent-session
+            # pipelines name, taken from the evaluated configuration so the
+            # test follows the module, with the exporters pointed at this
+            # container's otlp/mesh and the queue and telemetry moved aside.
+            pyrite = self.nixosConfigurations.pyrite.config.services.opentelemetry-collector.settings;
+            agentSessionState = "/var/lib/agent-session-collector";
+            agentSessionSettings =
+              let
+                # Every pyrite pipeline that consumes otlp/local, whatever its
+                # name, so a third consumer fails here rather than going untested.
+                pipelines = lib.filterAttrs (
+                  _: pipeline: builtins.elem "otlp/local" (pipeline.receivers or [ ])
+                ) pyrite.service.pipelines;
+                used = kind: lib.unique (lib.concatMap (pipeline: pipeline.${kind}) (lib.attrValues pipelines));
+              in
+              assert lib.assertMsg
+                (
+                  lib.attrNames pipelines == [
+                    "logs/agent-session"
+                    "metrics/agent-session"
+                  ]
+                  && used "receivers" == [ "otlp/local" ]
+                  && pyrite.receivers."otlp/local" == { protocols.http.endpoint = "127.0.0.1:4318"; }
+                )
+                "fleet-ingress: pyrite's otlp/local is not exactly 127.0.0.1:4318 feeding the two agent-session pipelines";
+              {
+                receivers = lib.genAttrs (used "receivers") (name: pyrite.receivers.${name});
+                processors = lib.genAttrs (used "processors") (name: pyrite.processors.${name});
+                exporters =
+                  lib.genAttrs (used "exporters") (
+                    name:
+                    pyrite.exporters.${name}
+                    // {
+                      endpoint = "https://127.0.0.1:4319";
+                      tls = pyrite.exporters.${name}.tls // {
+                        ca_file = "${pki}/ca.crt";
+                        cert_file = "${pki}/agent.crt";
+                        key_file = "${pki}/agent.key";
+                      };
+                    }
+                  )
+                  # What leaves the host, beside each pipeline's own exporter,
+                  # one JSON export per line, so the canary reads it before the
+                  # store's pipeline closes the columns again.
+                  // lib.mapAttrs' (
+                    name: _:
+                    lib.nameValuePair "file/tap-${lib.removeSuffix "/agent-session" name}" {
+                      path = "${agentSessionState}/tap-${lib.removeSuffix "/agent-session" name}.jsonl";
+                    }
+                  ) pipelines;
+                extensions.file_storage = pyrite.extensions.file_storage // {
+                  directory = "${agentSessionState}/queue";
+                };
+                service = {
+                  extensions = [ "file_storage" ];
+                  pipelines = lib.mapAttrs (
+                    name: pipeline:
+                    pipeline
+                    // {
+                      exporters = pipeline.exporters ++ [ "file/tap-${lib.removeSuffix "/agent-session" name}" ];
+                    }
+                  ) pipelines;
+                  telemetry.metrics.readers = [
+                    {
+                      pull.exporter.prometheus = {
+                        host = "127.0.0.1";
+                        port = 8890;
+                      };
+                    }
+                  ];
                 };
               };
             agentExecStart =
@@ -175,7 +257,7 @@
               time.sleep(5)
               # Both receivers, otlp/mesh (ZeroTier) and otlp/mesh-tincr, by
               # their loopback ports here.
-              receivers = [("otlp/mesh", 4318), ("otlp/mesh-tincr", 4320)]
+              receivers = [("otlp/mesh", 4319), ("otlp/mesh-tincr", 4320)]
               def receivers_accepted():
                   return {name: metric(INGRESS_PORT, "otelcol_receiver_accepted_metric_points", {"receiver": name}) for name, _ in receivers}
               accepted_before = receivers_accepted()
@@ -594,7 +676,7 @@
                   store.succeed(f"cat > /tmp/budget-fixture.json <<'EOF'\n{json.dumps(body)}\nEOF")
                   status = store.succeed(
                       f"curl -sS -o /dev/null -w '%{{http_code}}' --cacert {PKI}/ca.crt --cert {PKI}/agent.crt --key {PKI}/agent.key "
-                      "-H 'Content-Type: application/json' --data @/tmp/budget-fixture.json https://127.0.0.1:4318/v1/metrics"
+                      "-H 'Content-Type: application/json' --data @/tmp/budget-fixture.json https://127.0.0.1:4319/v1/metrics"
                   ).strip()
                   assert status == "200", status
 
@@ -667,10 +749,216 @@
               print("ok: budget", flush=True)
             '';
 
+            # agent-session-telemetry design D12: Claude-shaped OTLP logs and
+            # metrics posted to pyrite's otlp/local, through its agent-session
+            # pipelines, otlp_http/ingress-agent and otlp/mesh into `agent`,
+            # read back as `regulator`. One nonce marks the admitted prompt and
+            # every canary: tool output, a raw API body, an unlisted event, a
+            # record body, account identifiers, a foreign service, an unlisted
+            # metric, session labels on a metric, a forged host and route. What
+            # left the host (the unit's file taps) and every string column of
+            # every table of every database may hold the nonce only in that
+            # prompt. Posted as OTLP/JSON: the receiver decodes it to the same
+            # records as protobuf, and the exporters send protobuf onward.
+            agentSession = ''
+              print("=== case agentSession", flush=True)
+              fresh_start()
+              store.succeed(f"systemctl restart {SESSION}.service")
+              wait_telemetry(SESSION_PORT)
+              NONCE = f"n{time.time_ns()}"
+              ADMITTED = f"canary admitted prompt {NONCE}"
+              now = time.time_ns()
+
+
+              def s(key, value):
+                  return {"key": key, "value": {"stringValue": value}}
+
+
+              def n(key, value):
+                  return {"key": key, "value": {"intValue": str(value)}}
+
+
+              account = [
+                  s("user.email", f"canary-email-{NONCE}@example.com"),
+                  s("organization.id", f"canary-org-{NONCE}"),
+                  s("user.account_uuid", f"canary-uuid-{NONCE}"),
+              ]
+              claude = account + [
+                  s("service.name", "claude-code"), s("service.version", "2.1.330"), s("os.type", "linux"),
+                  s("host.arch", "amd64"), s("user.name", "cameron"), s("host.name", f"canary-host-{NONCE}"),
+                  s("vanixiets.database", "devloop"), s("vanixiets.table", "deploy_record"),
+              ]
+              other = [s("service.name", "canary-other"), s("user.name", "cameron")]
+
+
+              def record(seq, event, attributes, body=None):
+                  rec = {
+                      "timeUnixNano": str(now + seq), "observedTimeUnixNano": str(now + seq),
+                      "attributes": [s("event.name", event), n("event.sequence", seq), s("session.id", "agent-session-1"),
+                                     s("prompt.id", "agent-prompt-1"), s("terminal.type", "tmux")] + account + attributes,
+                  }
+                  if body is not None:
+                      rec["body"] = {"stringValue": body}
+                  return rec
+
+
+              logs = {"resourceLogs": [
+                  {"resource": {"attributes": claude}, "scopeLogs": [{"scope": {"name": "com.anthropic.claude_code.events", "attributes": [s("canary.scope", f"canary-scope-{NONCE}")]}, "logRecords": [
+                      record(1, "user_prompt", [s("prompt", ADMITTED), s("prompt_text", ADMITTED), n("prompt_length", len(ADMITTED))],
+                             body=f"canary-body-{NONCE}"),
+                      record(2, "assistant_response", [s("response", "admitted response zebrafish"), s("model", "claude-opus-5-5"),
+                                                       s("request_id", "req_agent_1")]),
+                      record(3, "api_request", [s("model", "claude-opus-5-5"), n("input_tokens", 100), n("output_tokens", 50),
+                                                n("cache_read_tokens", 7), n("cache_creation_tokens", 3), n("cost_usd_micros", 1234),
+                                                {"key": "cost_usd", "value": {"doubleValue": 0.001234}}, n("duration_ms", 900),
+                                                s("speed", "normal"), s("effort", "medium")]),
+                      record(4, "tool_result", [s("tool_name", "Bash"), s("success", "true"), s("duration_ms", "12"),
+                                                s("tool_parameters", json.dumps({"bash_command": "ls"})),
+                                                s("tool_input", json.dumps({"command": "ls"})),
+                                                s("tool_output", f"canary-output-{NONCE}")]),
+                      record(5, "api_request_body", [s("body", f"canary-raw-{NONCE}")]),
+                      record(6, "hook_execution_complete", [s("hook_name", f"canary-unlisted-{NONCE}")]),
+                  ]}]},
+                  {"resource": {"attributes": other}, "scopeLogs": [{"logRecords": [
+                      record(1, "user_prompt", [s("prompt", f"canary-other-{NONCE}")]),
+                  ]}]},
+              ]}
+
+
+              def delta(name, value, attributes):
+                  return {"name": name, "unit": "tokens", "sum": {"aggregationTemporality": 1, "isMonotonic": True, "dataPoints": [
+                      {"asInt": str(value), "startTimeUnixNano": str(now - 60000000000), "timeUnixNano": str(now), "attributes": attributes}]}}
+
+
+              metrics = {"resourceMetrics": [
+                  {"resource": {"attributes": claude}, "scopeMetrics": [{"scope": {"name": "com.anthropic.claude_code", "attributes": [s("canary.scope", f"canary-scope-{NONCE}")]}, "metrics": [
+                      delta("claude_code.token.usage", 42, [s("type", "input"), s("model", "claude-opus-5-5"),
+                                                            s("session.id", f"canary-session-{NONCE}"),
+                                                            s("prompt.id", f"canary-promptid-{NONCE}")] + account),
+                      delta("canary.metric", 1, [s("marker", f"canary-metric-{NONCE}")]),
+                  ]}]},
+                  {"resource": {"attributes": other}, "scopeMetrics": [{"metrics": [
+                      delta("claude_code.token.usage", 1, [s("type", "input"), s("model", f"canary-othermetric-{NONCE}")]),
+                  ]}]},
+              ]}
+
+
+              def post(path, body):
+                  store.succeed(f"cat > /tmp/agent-session.json <<'EOF'\n{json.dumps(body)}\nEOF")
+                  status = store.succeed(
+                      "curl -sS -o /tmp/agent-session-answer -w '%{http_code}' -H 'Content-Type: application/json' "
+                      f"--data @/tmp/agent-session.json http://127.0.0.1:4318{path}"
+                  ).strip()
+                  print(f"  POST otlp/local {path}: {status} {store.succeed('cat /tmp/agent-session-answer')[:300]}", flush=True)
+                  return status
+
+
+              assert post("/v1/logs", logs) == "200"
+              assert post("/v1/metrics", metrics) == "200"
+              # No traces pipeline takes otlp/local.
+              traces = post("/v1/traces", {"resourceSpans": [{"resource": {"attributes": claude}, "scopeSpans": [{"spans": [
+                  {"traceId": "5b8efff798038103d269b633813fc60c", "spanId": "eee19b7ec3c1b174", "name": f"canary-span-{NONCE}",
+                   "startTimeUnixNano": str(now), "endTimeUnixNano": str(now + 1)}]}]}]})
+              assert traces != "200", traces
+
+
+              def stored_events():
+                  status, body = _request("/v1/sql", "agent", [("sql", "SELECT count(*) FROM session_event WHERE host_name = 'pyrite'")])
+                  rows = json.loads(body)["output"][0]["records"]["rows"] if status == 200 else None
+                  print(f"  session_event rows from pyrite: {status} {rows}", flush=True)
+                  return rows == [[4]]
+
+
+              wait_for(stored_events, "pyrite's four admitted events in agent.session_event", 240)
+              rows = gsql(
+                  "SELECT event_name, host_name, user_name, service_name, prompt, response, input_tokens, output_tokens, "
+                  "cost_usd_micros, duration_ms, success, tool_name, tool_parameters, speed FROM session_event "
+                  "WHERE host_name = 'pyrite' ORDER BY event_sequence", "agent")
+              for row in rows:
+                  print(f"  admitted: {row}", flush=True)
+              assert [r[0] for r in rows] == ["user_prompt", "assistant_response", "api_request", "tool_result"], rows
+              assert all(r[1:4] == ["pyrite", "cameron", "claude-code"] for r in rows), rows
+              assert rows[0][4] == ADMITTED and rows[1][5] == "admitted response zebrafish", rows
+              assert rows[2][6:9] == [100, 50, 1234] and rows[2][13] == "normal", rows
+              assert rows[3][9] == 12 and rows[3][10] is True and rows[3][11] == "Bash", rows
+              found = gsql(f"SELECT event_name, host_name FROM session_event WHERE matches_term(prompt, '{NONCE}')", "agent")
+              print(f"  matches_term(prompt, nonce): {found}", flush=True)
+              assert found == [["user_prompt", "pyrite"]], found
+
+              create = gsql("SHOW CREATE TABLE session_event", "agent")[0][1]
+              print("  " + create.replace("\n", "\n  "), flush=True)
+              for column in ("prompt", "response"):
+                  assert f"\"{column}\" STRING NULL FULLTEXT INDEX WITH(analyzer = 'English', backend = 'bloom', case_sensitive = 'false'" in create, column
+              assert "append_mode = 'false'" in create, create
+              options = gsql("SELECT create_options FROM information_schema.tables WHERE table_schema = 'agent' AND table_name = 'session_event'", "agent")[0][0]
+              schemata = gsql("SELECT schema_name, options FROM information_schema.schemata WHERE schema_name = 'agent'", "agent")
+              print(f"  session_event create_options: {options}; agent schemata: {schemata}", flush=True)
+              assert "ttl" not in options, options
+              assert re.search(r"'ttl'='(30d|30days)'", schemata[0][1]), schemata
+
+
+              # The metric: no session, prompt or account labels; host and person.
+              def token_tables():
+                  tables = [r[0] for r in gsql("SELECT table_name FROM information_schema.tables WHERE table_schema = 'agent' AND table_name LIKE 'claude_code_token_usage%'", "agent")]
+                  print(f"  agent token tables: {tables}", flush=True)
+                  return tables
+
+
+              wait_for(lambda: len(token_tables()) == 1, "the claude_code.token.usage table in agent", 240)
+              [token] = token_tables()
+              columns = [r[0] for r in gsql(f"SELECT column_name FROM information_schema.columns WHERE table_schema = 'agent' AND table_name = '{token}'", "agent")]
+              points = gsql(f"SELECT \"host_name\", \"user_name\", \"model\", \"type\" FROM \"{token}\"", "agent")
+              print(f"  {token} columns {columns}; points {points}", flush=True)
+              assert {"host_name", "user_name"} <= set(columns), columns
+              assert not set(columns) & {"session_id", "prompt_id", "user_email", "organization_id", "user_account_uuid", "terminal_type"}, columns
+              assert points == [["pyrite", "cameron", "claude-opus-5-5", "input"]], points
+
+              # What left the host.
+              taps = {kind: store.succeed(f"cat /var/lib/agent-session-collector/tap-{kind}.jsonl") for kind in ("logs", "metrics")}
+              for kind, text in taps.items():
+                  print(f"  tap-{kind}: {len(text)} bytes, nonce {text.count(NONCE)} time(s)", flush=True)
+                  for key in ("user.email", "organization.id", "user.account_uuid", "tool_output", "prompt_text", "\"cost_usd\"",
+                              "hook_name", "terminal.type", "marker", "canary.scope", "canary-", "deploy_record"):
+                      assert key not in text, (kind, key)
+              assert taps["logs"].count(NONCE) == taps["logs"].count(ADMITTED) == 1, taps["logs"]
+              assert NONCE not in taps["metrics"], taps["metrics"]
+
+              # Every string column of every table of every database, as regulator.
+              columns = gsql(
+                  "SELECT table_schema, table_name, column_name FROM information_schema.columns "
+                  "WHERE lower(data_type) IN ('string', 'json') AND table_schema NOT IN ('information_schema', 'greptime_private', 'pg_catalog')", "agent")
+              by_table = {}
+              for schema, table, column in columns:
+                  by_table.setdefault((schema, table), []).append(column)
+              hits = {}
+              for (schema, table), names in sorted(by_table.items()):
+                  for column in names:
+                      count = gsql(f"SELECT count(*) FROM \"{schema}\".\"{table}\" WHERE CAST(\"{column}\" AS STRING) LIKE '%{NONCE}%'", schema)[0][0]
+                      if count:
+                          hits[f"{schema}.{table}.{column}"] = count
+              print(f"  scanned {len(columns)} string columns of {len(by_table)} tables; nonce found in {hits}", flush=True)
+              assert hits == {"agent.session_event.prompt": 1}, hits
+              forbidden = gsql(
+                  "SELECT table_schema, table_name, column_name FROM information_schema.columns WHERE column_name IN "
+                  "('user_email', 'organization_id', 'user_account_uuid', 'user_account_id', 'tool_output', 'prompt_text', "
+                  "'cost_usd', 'body', 'terminal_type', 'hook_name', 'marker') OR table_name LIKE 'canary%'", "agent")
+              print(f"  forbidden columns: {forbidden}", flush=True)
+              assert forbidden == [], forbidden
+
+              # The collector's own drop counters, and no failed send.
+              for name in ("otelcol_processor_filter_logs_filtered", "otelcol_processor_filter_datapoints_filtered"):
+                  print(f"  {SESSION} {name}: {metric(SESSION_PORT, name)}", flush=True)
+              failed = {port: metric(port, r"otelcol_exporter_send_failed_[a-z_]+") for port in (INGRESS_PORT, SESSION_PORT)}
+              print(f"  send_failed {failed}", flush=True)
+              assert failed == {INGRESS_PORT: 0, SESSION_PORT: 0}, failed
+              print("ok: agentSession", flush=True)
+            '';
+
             cases = [
               processName
               refusal
               delivery
+              agentSession
               backPressure
               lossControls
               crashLoop
@@ -731,6 +1019,10 @@
                   pipelines.devloop = lib.mapAttrs' (
                     name: pipeline: lib.nameValuePair "devloop_${name}" pipeline
                   ) devloop.pipelines;
+                  # agent.session_event and its pipeline as magnetite declares
+                  # them, which also routes agent events at the ingress.
+                  tables.agent = reference.services.greptimedb.tables.agent;
+                  pipelines.agent = reference.services.greptimedb.pipelines.agent;
                 };
 
                 # Credentials from magnetite's own generator script, run at
@@ -786,7 +1078,7 @@
                 # The ingress receivers on loopback, trusting the test CA.
                 vanixiets.otelCollector.caFile = "${pki}/ca.crt";
                 services.opentelemetry-collector.settings.receivers."otlp/mesh".protocols.http.endpoint =
-                  lib.mkForce "127.0.0.1:4318";
+                  lib.mkForce "127.0.0.1:4319";
                 services.opentelemetry-collector.settings.receivers."otlp/mesh-tincr".protocols.http.endpoint =
                   lib.mkForce "127.0.0.1:4320";
                 # The container has no ZFS dataset, so the agent fragment
@@ -823,6 +1115,20 @@
                     DynamicUser = true;
                     StateDirectory = "agent-collector";
                     ExecStart = agentExecStart collector agentSettings;
+                    Restart = "always";
+                    RestartSec = "5s";
+                  };
+                };
+
+                systemd.services.agent-session-collector = {
+                  description = "pyrite's agent-session pipelines, exporting over mTLS to otlp/mesh";
+                  wantedBy = [ "multi-user.target" ];
+                  after = [ "opentelemetry-collector.service" ];
+                  startLimitIntervalSec = 0;
+                  serviceConfig = {
+                    DynamicUser = true;
+                    StateDirectory = "agent-session-collector";
+                    ExecStart = agentExecStart collector agentSessionSettings;
                     Restart = "always";
                     RestartSec = "5s";
                   };

@@ -10,6 +10,11 @@
 # its textfile series; modules/nixos/node-exporter-textfile.nix asserts it
 # against the host's own configuration, which its machine check evaluates
 # anyway (F76). Every collecting darwin host's probe writes a textfile.
+# A NixOS host's `agentTelemetry` turns on the loopback receiver for its
+# agent sessions and, through the agent-telemetry home module, the
+# emitters of every person and Omnigent worker on it
+# (agent-session-telemetry design D8); it is a NixOS option only, so a
+# darwin row keeps it false.
 { ... }:
 {
   flake.lib.observabilityHosts =
@@ -20,6 +25,7 @@
         alwaysOn = false;
         smartDevices = [ ];
         textfile = false;
+        agentTelemetry = false;
         notifiedUnits = [
           "opentelemetry-collector"
           "otel-envelope"
@@ -62,6 +68,7 @@
         // {
           alwaysOn = true;
           textfile = true;
+          agentTelemetry = true;
         };
       cinnabar =
         agent [
@@ -74,6 +81,7 @@
         };
       pyrite = agent [ ] // {
         smartDevices = [ "/dev/nvme0" ];
+        agentTelemetry = true;
       };
       electrum = agent [ ];
       galena = agent [ ];

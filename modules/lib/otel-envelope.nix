@@ -48,12 +48,15 @@
 # table, no rows) fails the clause that sent the query:
 #
 # - B1 active-series: over budget.activeSeries series (`__tsid`) in `fleet`
-#   in the last hour.
-# - B2 label-values: a tag column of fleet's physical table, other than the
-#   store's own `__tsid` and `__table_id` and the three that B3 bounds per
-#   host, over budget.labelValues values within one metric in the last hour.
-#   A column within the limit across all metrics is within it for each, so
-#   only a column above it is grouped by metric.
+#   in the last hour, or, where `databases` has `agent`, over
+#   budget.agentActiveSeries in `agent` (agent-session-telemetry); an
+#   `agent` with no metric table yet is noted, not judged.
+# - B2 label-values: a tag column of fleet's, and of agent's, physical
+#   table, other than the store's own `__tsid` and `__table_id` and the
+#   three that B3 bounds per host, over budget.labelValues values within
+#   one metric in the last hour. A column within the limit across all
+#   metrics is within it for each, so only a column above it is grouped by
+#   metric; an agent table is named `agent.<table>`.
 # - B3 per-host: a host with over budget.processNames
 #   process_executable_name values, over OTEL_ENVELOPE_MAX_UNITS (default
 #   budget.units) systemd_unit_name values other than notifier instances, or
@@ -117,6 +120,8 @@ let
     let
       hour = "greptime_timestamp > now() - INTERVAL '1 hour'";
       limits = flakeLib.otelCollectorSchema.budget;
+      # B1 and B2 judge `agent` too where the budget declares it.
+      agent = budget.databases ? agent;
       devloopRows = lib.concatStringsSep " UNION ALL " (
         lib.mapAttrsToList (
           name: table:
@@ -190,28 +195,53 @@ let
           series=$(< "$tmp/b1")
           if [ "$series" -gt ${toString limits.activeSeries} ]; then problems="$series series in fleet over the last hour, above ${toString limits.activeSeries}; "; fi
         fi
-        verdict "B1 active-series"
-
-        if query "$tmp/tags" "SELECT column_name FROM information_schema.columns WHERE table_schema = 'fleet' AND table_name = 'greptime_physical_table' AND semantic_type = 'TAG' ORDER BY column_name"; then
-          mapfile -t tags < <(grep -vxE '__tsid|__table_id|process_executable_name|systemd_unit_name|launchd_label' "$tmp/tags" || true)
-          if [ "''${#tags[@]}" -gt 0 ]; then
-            counts=$(printf 'count(DISTINCT "%s"), ' "''${tags[@]}")
-            if query "$tmp/values" "SELECT ''${counts%, } FROM fleet.greptime_physical_table WHERE $hour"; then
-              read -r -a values < "$tmp/values"
-              for i in "''${!tags[@]}"; do
-                [ "''${values[$i]}" -gt ${toString limits.labelValues} ] || continue
-                tag=''${tags[$i]}
-                query "$tmp/per-table" "SELECT __table_id, count(DISTINCT \"$tag\") FROM fleet.greptime_physical_table WHERE $hour GROUP BY __table_id" || continue
-                awk -F '\t' '$2 > ${toString limits.labelValues}' "$tmp/per-table" > "$tmp/wide"
-                [ -s "$tmp/wide" ] || continue
-                query "$tmp/names" "SELECT table_id, table_name FROM information_schema.tables WHERE table_schema = 'fleet' AND table_id IN ($(cut -f 1 "$tmp/wide" | paste -s -d , -))" || continue
-                problems+=$(awk -F '\t' -v tag="$tag" '
-                  FILENAME == ARGV[1] { name[$1] = $2; next }
-                  { printf "%s %s %s; ", ($1 in name) ? name[$1] : "table_id " $1, tag, $2 }' "$tmp/names" "$tmp/wide")
-              done
+        ${lib.optionalString agent ''
+          # agent's series (agent-session-telemetry), once its metric
+          # engine's physical table exists: a store that has stored no agent
+          # series yet has none, which is not a breach.
+          agent_series=0
+          if query "$tmp/agent-physical" "SELECT count(*) FROM information_schema.tables WHERE table_schema = 'agent' AND table_name = 'greptime_physical_table'"; then
+            agent_series=$(< "$tmp/agent-physical")
+            if [ "$agent_series" = 0 ]; then
+              echo "otel-envelope: B1 active-series: agent holds no series yet"
+            elif query "$tmp/b1-agent" "SELECT count(DISTINCT __tsid) FROM agent.greptime_physical_table WHERE $hour"; then
+              series=$(< "$tmp/b1-agent")
+              # mutant: agentSeriesIgnored
+              if [ "$series" -gt ${toString limits.agentActiveSeries} ]; then problems+="$series series in agent over the last hour, above ${toString limits.agentActiveSeries}; "; fi
             fi
           fi
-        fi
+        ''}
+        verdict "B1 active-series"
+
+        # label_values DB PREFIX: every tag column of DB's physical table
+        # over budget.labelValues values within one metric, named PREFIX<table>.
+        label_values() {
+          local db=$1 prefix=$2
+          if query "$tmp/tags" "SELECT column_name FROM information_schema.columns WHERE table_schema = '$db' AND table_name = 'greptime_physical_table' AND semantic_type = 'TAG' ORDER BY column_name"; then
+            mapfile -t tags < <(grep -vxE '__tsid|__table_id|process_executable_name|systemd_unit_name|launchd_label' "$tmp/tags" || true)
+            if [ "''${#tags[@]}" -gt 0 ]; then
+              counts=$(printf 'count(DISTINCT "%s"), ' "''${tags[@]}")
+              if query "$tmp/values" "SELECT ''${counts%, } FROM $db.greptime_physical_table WHERE $hour"; then
+                read -r -a values < "$tmp/values"
+                for i in "''${!tags[@]}"; do
+                  [ "''${values[$i]}" -gt ${toString limits.labelValues} ] || continue
+                  tag=''${tags[$i]}
+                  query "$tmp/per-table" "SELECT __table_id, count(DISTINCT \"$tag\") FROM $db.greptime_physical_table WHERE $hour GROUP BY __table_id" || continue
+                  awk -F '\t' '$2 > ${toString limits.labelValues}' "$tmp/per-table" > "$tmp/wide"
+                  [ -s "$tmp/wide" ] || continue
+                  query "$tmp/names" "SELECT table_id, table_name FROM information_schema.tables WHERE table_schema = '$db' AND table_id IN ($(cut -f 1 "$tmp/wide" | paste -s -d , -))" || continue
+                  problems+=$(awk -F '\t' -v tag="$tag" -v prefix="$prefix" '
+                    FILENAME == ARGV[1] { name[$1] = $2; next }
+                    { printf "%s%s %s %s; ", prefix, ($1 in name) ? name[$1] : "table_id " $1, tag, $2 }' "$tmp/names" "$tmp/wide")
+                done
+              fi
+            fi
+          fi
+        }
+        label_values fleet ""
+        ${lib.optionalString agent ''
+          if [ "$agent_series" != 0 ]; then label_values agent agent.; fi
+        ''}
         verdict "B2 label-values"
 
         if query "$tmp/processes" "SELECT host_name, count(DISTINCT process_executable_name) FROM fleet.process_memory_usage_bytes WHERE $hour GROUP BY host_name"; then

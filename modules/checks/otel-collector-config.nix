@@ -75,6 +75,7 @@
         services = magnetite.systemd.services;
         notifyUnits = magnetite.services.observability-notify.units;
         schema = self.lib.otelCollectorSchema;
+        hosts = self.lib.observabilityHosts;
         ztAddress = lib.trim (
           builtins.readFile "${self}/vars/shared/zerotier-ip-magnetite-zerotier/ip/value"
         );
@@ -208,14 +209,17 @@
           dbs = lib.attrNames i.schema.databases;
           devloopTables = lib.attrNames i.schema.devloop.tables;
           exporterNames =
-            map (db: "otlp_http/${db}") dbs ++ map (table: "otlp_http/devloop_${table}") devloopTables;
+            map (db: "otlp_http/${db}") dbs
+            ++ map (table: "otlp_http/devloop_${table}") devloopTables
+            ++ [ "otlp_http/agent_session_event" ];
           logsPipelineNames = builtins.filter (lib.hasPrefix "logs/") (builtins.attrNames pipelines);
-          # A logs pipeline writes only into devloop: through the forward and
-          # routing connectors, or a devloop table's exporter whose database
-          # header is devloop.
-          # Not the metrics exporter otlp_http/devloop, which carries no table
-          # or pipeline header, so logs sent there would skip the allow-list
-          # pipeline.
+          # A logs pipeline writes only into devloop or agent.session_event:
+          # through the forward and routing connectors, a devloop table's
+          # exporter whose database header is devloop, or the agent events
+          # exporter whose headers name agent and session_event.
+          # Not the metrics exporters otlp_http/devloop and otlp_http/agent,
+          # which carry no table or pipeline header, so logs sent there would
+          # skip the allow-list pipeline.
           exportsToDevloop =
             name:
             name == "forward"
@@ -223,7 +227,63 @@
             || (
               builtins.elem name (map (table: "otlp_http/devloop_${table}") devloopTables)
               && (e.${name}.headers."x-greptime-db-name" or null) == "devloop"
+            )
+            || (
+              name == "otlp_http/agent_session_event"
+              && (e.${name}.headers."x-greptime-db-name" or null) == "agent"
+              && (e.${name}.headers."x-greptime-log-table-name" or null) == "session_event"
             );
+
+          # The agent-session path (agent-session-telemetry design D3, D5,
+          # D10), read back from the rendered OTTL and compared with
+          # schema.nix's agentSession.
+          session = i.schema.agentSession;
+          sorted = lib.sort lib.lessThan;
+          sameSet = a: b: sorted (lib.unique a) == sorted (lib.unique b);
+          eventStatements = p."transform/agent-session-events".log_statements or [ ];
+          # The transforms' statement lists, whole: one keep_keys per listed
+          # event, then the body, resource and scope statements. An added
+          # statement (a `set` copying the body, say) fails like a changed one.
+          keyList = keys: "[${lib.concatMapStringsSep ", " (key: ''"${key}"'') keys}]";
+          expectedEventStatements =
+            map (
+              event:
+              ''keep_keys(log.attributes, ${
+                keyList (session.events.correlationKeys ++ session.events.keys.${event})
+              }) where log.attributes["event.name"] == "${event}"''
+            ) (builtins.attrNames session.events.keys)
+            ++ [
+              ''set(log.body, "")''
+              "keep_keys(resource.attributes, ${keyList session.events.resourceKeys})"
+              "keep_keys(scope.attributes, [])"
+            ];
+          expectedMetricStatements = [
+            "keep_keys(datapoint.attributes, ${keyList session.metrics.pointKeys})"
+            "keep_keys(resource.attributes, ${keyList session.metrics.resourceKeys})"
+            "keep_keys(scope.attributes, [])"
+          ];
+          # The values a filter's conditions compare with.
+          conditionValues =
+            conditions:
+            lib.concatMap (
+              condition:
+              lib.concatMap (part: if builtins.isList part then part else [ ]) (
+                builtins.split ''== "([^"]*)"'' condition
+              )
+            ) conditions;
+          metricStatements = p."transform/agent-session-metrics".metric_statements or [ ];
+          localPipelines = builtins.filter (
+            name: builtins.elem "otlp/local" (pipelines.${name}.receivers or [ ])
+          ) (builtins.attrNames pipelines);
+          agentTelemetryHosts = builtins.length (
+            builtins.attrNames (lib.filterAttrs (_: h: h.agentTelemetry or false) i.hosts)
+          );
+          agentRoute = builtins.filter (
+            route:
+            route.condition or null
+            == ''attributes["vanixiets.database"] == "agent" and attributes["vanixiets.table"] == "session_event"''
+          ) (s.connectors."routing/logs".table or [ ]);
+          sharedPromote = lib.concatStringsSep ";" i.schema.promotedResourceAttributes;
           # The OTLP receiver's component type is `otlp`
           # (open-telemetry/opentelemetry-collector@v0.155.0:
           # receiver/otlpreceiver/internal/metadata/generated_status.go:12);
@@ -332,27 +392,135 @@
           )
 
           # Content: no traces pipeline, and the logs pipelines write only
-          # into devloop (S2 design D4; S7 adds journald logs behind ADR-008's
-          # stages).
-          (check "R3.1: a traces pipeline, or a logs pipeline exporting outside devloop" (
-            lib.all (name: !(lib.hasPrefix "traces" name)) (builtins.attrNames pipelines)
-            && lib.all (name: lib.all exportsToDevloop pipelines.${name}.exporters) logsPipelineNames
-          ))
+          # into devloop and agent.session_event (S2 design D4;
+          # agent-session-telemetry design D3, D6; S7 adds journald logs
+          # behind ADR-008's stages).
+          (check
+            "R3.1: a traces pipeline, or a logs pipeline exporting outside devloop and agent.session_event"
+            (
+              lib.all (name: !(lib.hasPrefix "traces" name)) (builtins.attrNames pipelines)
+              && lib.all (name: lib.all exportsToDevloop pipelines.${name}.exporters) logsPipelineNames
+            )
+          )
           # otlpInLogsPipeline: no OTLP receiver but the agents' ingress
-          # receivers feeds a logs pipeline (ADR-003:81; S2 design D4; design D3).
-          (check "R3.1: a logs pipeline takes an OTLP receiver other than the ingress receivers" (
-            lib.all (
-              name:
-              !(lib.any (
-                n:
-                isOtlpReceiver n
-                && !(builtins.elem n [
-                  "otlp/mesh"
-                  "otlp/mesh-tincr"
-                ])
-              ) pipelines.${name}.receivers)
-            ) logsPipelineNames
-          ))
+          # receivers feeds a logs pipeline (ADR-003:81; S2 design D4; design
+          # D3), but otlp/local feeds logs/agent-session.
+          (check
+            "R3.1: a logs pipeline takes an OTLP receiver other than the ingress receivers and logs/agent-session's otlp/local"
+            (
+              lib.all (
+                name:
+                !(lib.any (
+                  n:
+                  isOtlpReceiver n
+                  && !(builtins.elem n [
+                    "otlp/mesh"
+                    "otlp/mesh-tincr"
+                  ])
+                  && !(name == "logs/agent-session" && n == "otlp/local")
+                ) pipelines.${name}.receivers)
+              ) logsPipelineNames
+            )
+          )
+
+          # The agent-session path (agent-session-telemetry design D3, D5).
+          (check
+            "R3.1: otlp/local is not an HTTP-only receiver on 127.0.0.1:4318 feeding exactly metrics/agent-session and logs/agent-session"
+            (
+              (r."otlp/local".protocols.http.endpoint or null) == "127.0.0.1:4318"
+              && !(r."otlp/local".protocols ? grpc)
+              &&
+                sorted localPipelines == [
+                  "logs/agent-session"
+                  "metrics/agent-session"
+                ]
+            )
+          )
+          (check
+            "R3.1: an agent-session pipeline's stages are not the filters and transforms before the stamping"
+            (
+              (pipelines."metrics/agent-session".processors or null) == [
+                "memory_limiter"
+                "filter/agent-session-service"
+                "filter/agent-session-metrics"
+                "transform/agent-session-metrics"
+                "resource/agent-session"
+              ]
+              &&
+                (pipelines."logs/agent-session".processors or null) == [
+                  "memory_limiter"
+                  "filter/agent-session-service"
+                  "filter/agent-session-events"
+                  "transform/agent-session-events"
+                  "resource/agent-session-events"
+                ]
+              && lib.all (n: (p.${n}.error_mode or null) == "propagate") [
+                "filter/agent-session-service"
+                "filter/agent-session-metrics"
+                "filter/agent-session-events"
+                "transform/agent-session-metrics"
+                "transform/agent-session-events"
+              ]
+            )
+          )
+          (check
+            "R3.1: an agent-session filter or transform keeps a service, metric, event or key off schema.nix's agentSession, or the body"
+            (
+              sameSet (conditionValues (
+                p."filter/agent-session-service".metric_conditions or [ ]
+              )) session.metrics.services
+              && sameSet (conditionValues (
+                p."filter/agent-session-service".log_conditions or [ ]
+              )) session.events.services
+              && sameSet (conditionValues (
+                p."filter/agent-session-metrics".metric_conditions or [ ]
+              )) session.metrics.names
+              && sameSet (conditionValues (p."filter/agent-session-events".log_conditions or [ ])) (
+                builtins.attrNames session.events.keys
+              )
+              && lib.all (condition: lib.hasPrefix "not (" condition) (
+                p."filter/agent-session-service".metric_conditions or [ ]
+                ++ p."filter/agent-session-service".log_conditions or [ ]
+                ++ p."filter/agent-session-metrics".metric_conditions or [ ]
+                ++ p."filter/agent-session-events".log_conditions or [ ]
+              )
+              && eventStatements == expectedEventStatements
+              && metricStatements == expectedMetricStatements
+            )
+          )
+          (check
+            "R3.1: agent events are not routed through routing/logs to otlp_http/agent_session_event with its four headers"
+            (
+              map (route: route.pipelines) agentRoute == [ [ "logs/agent-session_event-out" ] ]
+              &&
+                (pipelines."logs/agent-session_event-out".exporters or null) == [ "otlp_http/agent_session_event" ]
+              &&
+                (e."otlp_http/agent_session_event".headers or null) == {
+                  "x-greptime-db-name" = "agent";
+                  "x-greptime-log-table-name" = "session_event";
+                  "x-greptime-pipeline-name" = "agent_session_event";
+                  "x-greptime-hints" = "auto_create_table=false";
+                }
+            )
+          )
+          # Every database's exporter promotes the shared resource attributes,
+          # and only `agent`'s also the agent session's person.
+          (check
+            "R3.1: a database exporter's promote header is not the shared one, or agent's not it plus agentSession's"
+            (
+              lib.all (
+                db:
+                (e."otlp_http/${db}".headers."x-greptime-otlp-metric-promote-resource-attrs" or null) == (
+                  if db == "agent" then
+                    lib.concatStringsSep ";" (
+                      i.schema.promotedResourceAttributes ++ session.metrics.promotedResourceAttributes
+                    )
+                  else
+                    sharedPromote
+                )
+              ) dbs
+            )
+          )
 
           # Queue (host-metrics-collection "Collection survives a telemetry store restart").
           (check "R3.1: queue not in file_storage" (
@@ -365,6 +533,18 @@
           ))
           (check "R3.1: fleet queue below 24 h" (
             (e."otlp_http/fleet".sending_queue.queue_size or 0) >= 24 * 60 * i.schema.fleetBytesPerMinute
+          ))
+          # While the store is down the ingress holds 2 h of every
+          # agent-telemetry host's agent output (agent-session-telemetry
+          # design D10).
+          (check "R3.1: an agent queue below 2 h of the agent-telemetry hosts' assumed rates" (
+            agentTelemetryHosts > 0
+            &&
+              (e."otlp_http/agent".sending_queue.queue_size or 0)
+              >= 2 * 60 * agentTelemetryHosts * i.schema.agentMetricsBytesPerMinute
+            &&
+              (e."otlp_http/agent_session_event".sending_queue.queue_size or 0)
+              >= 2 * 60 * agentTelemetryHosts * i.schema.agentEventBytesPerMinute
           ))
           (check "R3.1: queues at or above 512 MiB" (lib.foldl' builtins.add 0 queueSizes < mib 512))
 
@@ -618,6 +798,148 @@
         # R1.2's mutant.
         conversionRemoved = onSettings { processors."transform/exphist".metric_statements = [ ]; };
       };
+
+      # The agent-session path's mutants (agent-session-telemetry design D3,
+      # D5, D10), each with the clause it must fail; the build log lists
+      # each with its failures.
+      clause = {
+        local = "R3.1: otlp/local is not an HTTP-only receiver on 127.0.0.1:4318 feeding exactly metrics/agent-session and logs/agent-session";
+        logsReceiver = "R3.1: a logs pipeline takes an OTLP receiver other than the ingress receivers and logs/agent-session's otlp/local";
+        content = "R3.1: a traces pipeline, or a logs pipeline exporting outside devloop and agent.session_event";
+        stages = "R3.1: an agent-session pipeline's stages are not the filters and transforms before the stamping";
+        keys = "R3.1: an agent-session filter or transform keeps a service, metric, event or key off schema.nix's agentSession, or the body";
+        route = "R3.1: agent events are not routed through routing/logs to otlp_http/agent_session_event with its four headers";
+        promote = "R3.1: a database exporter's promote header is not the shared one, or agent's not it plus agentSession's";
+        agentQueue = "R3.1: an agent queue below 2 h of the agent-telemetry hosts' assumed rates";
+      };
+      withReceiver =
+        pipeline: receiver: i:
+        onSettings {
+          service.pipelines.${pipeline}.receivers = i.settings.service.pipelines.${pipeline}.receivers ++ [
+            receiver
+          ];
+        } i;
+      replaceStatement =
+        processor: kind: from: to: i:
+        onSettings {
+          processors.${processor}.${kind} = map (
+            statement: if statement == from then to else statement
+          ) i.settings.processors.${processor}.${kind};
+        } i;
+      session = self.lib.otelCollectorSchema.agentSession;
+      quotedList = keys: "[${lib.concatMapStringsSep ", " (key: ''"${key}"'') keys}]";
+      agentMutants = {
+        localFeedsDevloop = {
+          clauses = [
+            clause.local
+            clause.logsReceiver
+          ];
+          mutate = withReceiver "logs/devloop-deploy_record" "otlp/local";
+        };
+        localFeedsFleet = {
+          clauses = [ clause.local ];
+          mutate = withReceiver "metrics/host" "otlp/local";
+        };
+        tracesPipeline = {
+          clauses = [
+            clause.content
+            clause.local
+          ];
+          mutate = onSettings {
+            service.pipelines."traces/agent-session" = {
+              receivers = [ "otlp/local" ];
+              processors = [ "memory_limiter" ];
+              exporters = [ "forward" ];
+            };
+          };
+        };
+        eventFilterDropped = {
+          clauses = [ clause.stages ];
+          mutate =
+            i:
+            onSettings {
+              service.pipelines."logs/agent-session".processors =
+                lib.remove "filter/agent-session-events"
+                  i.settings.service.pipelines."logs/agent-session".processors;
+            } i;
+        };
+        bodyKept = {
+          clauses = [ clause.keys ];
+          mutate =
+            i:
+            onSettings {
+              processors."transform/agent-session-events".log_statements =
+                lib.remove ''set(log.body, "")''
+                  i.settings.processors."transform/agent-session-events".log_statements;
+            } i;
+        };
+        sessionIdKept = {
+          clauses = [ clause.keys ];
+          mutate =
+            replaceStatement "transform/agent-session-metrics" "metric_statements"
+              "keep_keys(datapoint.attributes, ${quotedList session.metrics.pointKeys})"
+              "keep_keys(datapoint.attributes, ${quotedList (session.metrics.pointKeys ++ [ "session.id" ])})";
+        };
+        toolOutputKept = {
+          clauses = [ clause.keys ];
+          mutate =
+            let
+              keys = session.events.correlationKeys ++ session.events.keys.tool_result;
+            in
+            replaceStatement "transform/agent-session-events" "log_statements"
+              ''keep_keys(log.attributes, ${quotedList keys}) where log.attributes["event.name"] == "tool_result"''
+              ''keep_keys(log.attributes, ${
+                quotedList (keys ++ [ "tool_output" ])
+              }) where log.attributes["event.name"] == "tool_result"'';
+        };
+        # An added statement copying the body into an attribute (review F4).
+        bodyCopied = {
+          clauses = [ clause.keys ];
+          mutate =
+            i:
+            onSettings {
+              processors."transform/agent-session-events".log_statements = [
+                ''set(log.attributes["x"], log.body)''
+              ]
+              ++ i.settings.processors."transform/agent-session-events".log_statements;
+            } i;
+        };
+        scopeKept = {
+          clauses = [ clause.keys ];
+          mutate =
+            i:
+            onSettings {
+              processors."transform/agent-session-metrics".metric_statements =
+                lib.remove "keep_keys(scope.attributes, [])"
+                  i.settings.processors."transform/agent-session-metrics".metric_statements;
+            } i;
+        };
+        agentEventsToDevloop = {
+          clauses = [ clause.route ];
+          mutate = onSettings {
+            service.pipelines."logs/agent-session_event-out".exporters = [ "otlp_http/devloop_ci_build" ];
+          };
+        };
+        fleetPromotesPerson = {
+          clauses = [ clause.promote ];
+          mutate =
+            i:
+            onSettings {
+              exporters."otlp_http/fleet".headers."x-greptime-otlp-metric-promote-resource-attrs" =
+                i.settings.exporters."otlp_http/agent".headers."x-greptime-otlp-metric-promote-resource-attrs";
+            } i;
+        };
+        agentQueueShort = {
+          clauses = [ clause.agentQueue ];
+          mutate = onSettings { exporters."otlp_http/agent_session_event".sending_queue.queue_size = mib 8; };
+        };
+      };
+      agentRejections = lib.mapAttrs (_: m: failures (m.mutate input)) agentMutants;
+      agentAccepted = lib.attrNames (
+        lib.filterAttrs (
+          name: m: !(lib.all (c: builtins.elem c agentRejections.${name}) m.clauses)
+        ) agentMutants
+      );
     in
     {
       checks = lib.optionalAttrs (system == "x86_64-linux") {
@@ -627,9 +949,18 @@
             "otel-collector-config accepted a mutant: ${
               builtins.toJSON (builtins.attrNames (lib.filterAttrs (_: m: failures (m input) == [ ]) mutants))
             }";
+          assert lib.assertMsg (agentAccepted == [ ])
+            "otel-collector-config: an agent-session mutant did not fail its clauses: ${
+              builtins.toJSON (lib.genAttrs agentAccepted (name: agentRejections.${name}))
+            }";
           pkgs.runCommand "otel-collector-config" { passthru = { inherit failures; }; } ''
             # The notifier's rate limit (review F1).
             test -e ${notifierRehearsal}
+            ${lib.concatStrings (
+              lib.mapAttrsToList (name: failed: ''
+                echo ${lib.escapeShellArg "mutant ${name} rejected: ${builtins.toJSON failed}"}
+              '') agentRejections
+            )}
             touch "$out"
           '';
       };

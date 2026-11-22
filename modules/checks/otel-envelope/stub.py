@@ -11,7 +11,9 @@ With $STUB_STORE set it also answers POST /v1/sql as GreptimeDB 1.2.1's
 HTTP API does, one records result, for each query of the budget clauses B1
 to B6: within every limit for host electrum, whose notifier instance is
 otel-envelope's and whose fleet ttl is 30d, except that `breach` puts B1
-over its limit. Any other statement is a 400.
+over its limit. `agent2000` and `agent2001` add an `agent` database (ttl
+30d) whose physical table holds that many series in the last hour, one
+tag `model` with 3 values. Any other statement is a 400.
 """
 
 import json
@@ -20,9 +22,25 @@ import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs
 
+
+def agent(store):
+    return store.startswith("agent")
+
+
 # (fragment of the statement, rows), first match wins: the unit query's
-# `NOT LIKE` before the notifier query's `LIKE`.
+# `NOT LIKE` before the notifier query's `LIKE`, and agent's queries before
+# fleet's, whose fragments they contain.
 ANSWERS = [
+    (
+        "table_schema = 'agent' AND table_name = 'greptime_physical_table' AND semantic_type = 'TAG'",
+        lambda store: [["model"]],
+    ),
+    (
+        "table_schema = 'agent' AND table_name = 'greptime_physical_table'",
+        lambda store: [[1 if agent(store) else 0]],
+    ),
+    ("count(DISTINCT __tsid) FROM agent.", lambda store: [[2001 if store == "agent2001" else 2000]]),
+    ('SELECT count(DISTINCT "model") FROM agent.', lambda store: [[3]]),
     ("count(DISTINCT __tsid)", lambda store: [[100000 if store == "breach" else 100]]),
     ("semantic_type = 'TAG'", lambda store: [["host_name"]]),
     ('SELECT count(DISTINCT "host_name")', lambda store: [[3]]),
@@ -34,7 +52,10 @@ ANSWERS = [
         lambda store: [["electrum", "observability-notify@otel-envelope.service.service"]],
     ),
     ("FROM devloop.", lambda store: [[0]]),
-    ("information_schema.schemata", lambda store: [["fleet", "'ttl'='30d'\n"]]),
+    (
+        "information_schema.schemata",
+        lambda store: [["fleet", "'ttl'='30d'\n"]] + ([["agent", "'ttl'='30d'\n"]] if agent(store) else []),
+    ),
 ]
 
 

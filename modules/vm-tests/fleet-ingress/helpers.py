@@ -13,6 +13,8 @@ INGRESS = "opentelemetry-collector"
 AGENT = "agent-collector"
 INGRESS_PORT = 8888
 AGENT_PORT = 8889
+SESSION = "agent-session-collector"
+SESSION_PORT = 8890
 CONFIG = None
 
 
@@ -167,7 +169,7 @@ def fresh_start():
     store.wait_until_succeeds("curl -sf http://127.0.0.1:4000/health", timeout=120)
     store.succeed(f"systemctl restart greptimedb-schema.service {INGRESS}.service")
     wait_telemetry(INGRESS_PORT)
-    store.wait_until_succeeds("bash -c 'echo > /dev/tcp/127.0.0.1/4318'", timeout=60)
+    store.wait_until_succeeds("bash -c 'echo > /dev/tcp/127.0.0.1/4319'", timeout=60)
     store.succeed(f"systemctl restart {AGENT}.service")
     wait_telemetry(AGENT_PORT)
     wait_for(lambda: agent_sent() > 0, "the agent's first send", 180)

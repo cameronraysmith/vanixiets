@@ -46,11 +46,15 @@ let
   # checks.x86_64-linux.otel-collector-config. devloop's 52 MiB is split
   # between its metrics and its five tables, ci_attribute holding about a
   # day of store outage on the busiest day (S2 design D4); eval_run's 4 MiB
-  # holds months of nixbot's roughly 100 evaluation lines a day.
+  # holds months of nixbot's roughly 100 evaluation lines a day. agent's 48
+  # MiB is split between its metrics and its session events, each holding
+  # about 2 h of every agent-telemetry host's assumed output while the store
+  # is down (agent-session-telemetry design D10).
   queueBytes = {
     fleet = mib 400;
     devloop = mib 4;
-    agent = mib 48;
+    agent = mib 16;
+    agent_session_event = mib 32;
     devloop_ci_attribute = mib 32;
     devloop_ci_build = mib 4;
     devloop_batch_event = mib 4;
@@ -96,6 +100,19 @@ let
               description = ''
                 NVMe devices read by a loopback smartctl exporter that the
                 agent scrapes; none when empty.
+              '';
+            };
+            agentTelemetry = lib.mkOption {
+              type = lib.types.bool;
+              default = false;
+              description = ''
+                Whether this host's agent listens for its agent sessions'
+                telemetry: the loopback receiver `otlp/local` on
+                127.0.0.1:4318 and the pipelines `metrics/agent-session` and
+                `logs/agent-session` (agent-session-telemetry design D3, D8).
+                Set by the clan agent role from the host's
+                flake.lib.observabilityHosts row; the agent-telemetry home
+                module configures the emitters only where it is true.
               '';
             };
             envelopeBudget = lib.mkOption {
@@ -162,17 +179,33 @@ in
       # Where the agent's pipelines end: the in-process `forward` connector on
       # the ingress host, the mTLS exporters to otlp/mesh elsewhere.
       ingress = config.vanixiets.otelCollector.ingress;
+      agentTelemetry = config.vanixiets.otelCollector.agentTelemetry;
       agentExport =
         if ingress then
           {
             metrics = [ "forward" ];
             logs = [ "forward" ];
+            agentEvents = [ "forward" ];
           }
         else
           {
             metrics = [ "otlp_http/ingress" ];
             logs = [ "otlp_http/ingress-logs" ];
+            # Agent events take their own logs-only exporter and queue, so
+            # neither they nor the deploy records crowd the other out, and an
+            # exporter carries one signal, whose queue the assertion below
+            # sizes (agent-session-telemetry design D10).
+            agentEvents = [ "otlp_http/ingress-agent" ];
           };
+      # The queues of a host that is not the ingress (design D10): the
+      # metrics queue holds 24 h of fleet and, with agent telemetry, agent
+      # metrics, and the agent events queue 8 h of agent events, all below
+      # 512 MiB; the assertion below judges them against schema.nix's rates.
+      agentQueueBytes = {
+        "otlp_http/ingress" = mib (if agentTelemetry then 408 else 400);
+        "otlp_http/ingress-logs" = mib 16;
+        "otlp_http/ingress-agent" = mib 64;
+      };
       ingressExporter = queueSize: {
         endpoint = "https://[${flakeLib.hosts.magnetite.zerotier.address}]:4318";
         tls = {
@@ -586,21 +619,29 @@ in
         })
 
         # The agent's envelope where it exports to the ingress (ADR-003
-        # envelope; design D2): the queue literals below against SC's rate
-        # assumption, and the limiter against the unit's ceiling.
+        # envelope; design D2; agent-session-telemetry design D10): every
+        # exporter of the host against schema.nix's rate assumptions, and the
+        # limiter against the unit's ceiling.
         (lib.mkIf (!config.vanixiets.otelCollector.ingress) {
           assertions =
             let
-              e = config.services.opentelemetry-collector.settings.exporters or { };
-              agentExporters = [
-                "otlp_http/ingress"
-                "otlp_http/ingress-logs"
-              ];
+              settings = config.services.opentelemetry-collector.settings;
+              e = settings.exporters or { };
+              exporterNames = builtins.attrNames e;
               q = n: e.${n}.sending_queue or { };
+              size = n: (q n).queue_size or 0;
               memMax = builtins.match "([0-9]+)M" (
                 config.systemd.services.opentelemetry-collector.serviceConfig.MemoryMax or ""
               );
-              limit = config.services.opentelemetry-collector.settings.processors.memory_limiter.limit_mib or 0;
+              limit = settings.processors.memory_limiter.limit_mib or 0;
+              metricsPerMinute =
+                schema.fleetBytesPerMinute + (if agentTelemetry then schema.agentMetricsBytesPerMinute else 0);
+              metricsPipelinesWith =
+                exporter:
+                builtins.filter (
+                  name:
+                  lib.hasPrefix "metrics" name && builtins.elem exporter settings.service.pipelines.${name}.exporters
+                ) (builtins.attrNames settings.service.pipelines);
             in
             [
               {
@@ -610,12 +651,21 @@ in
                     (q n).storage or null == "file_storage"
                     && (q n).sizer or null == "bytes"
                     && (e.${n}.retry_on_failure.max_elapsed_time or null) == "0s"
-                  ) agentExporters
-                  && ((q "otlp_http/ingress").queue_size or 0) >= 24 * 60 * schema.fleetBytesPerMinute
-                  && lib.foldl' (s: n: s + ((q n).queue_size or 0)) 0 agentExporters < mib 512
+                  ) exporterNames
+                  && size "otlp_http/ingress" >= 24 * 60 * metricsPerMinute
+                  && (!agentTelemetry || size "otlp_http/ingress-agent" >= 8 * 60 * schema.agentEventBytesPerMinute)
+                  && lib.foldl' (s: n: s + size n) 0 exporterNames < mib 512
                   && memMax != null
                   && limit < lib.toInt (builtins.head memMax);
-                message = "otel-collector agent on ${hostName}: both ingress exporters must queue in file_storage by bytes with unlimited retry, the metrics queue must hold 24 h at fleetBytesPerMinute, the queues must sum below 512 MiB, and the limiter must be below MemoryMax (ADR-003 envelope; design D2).";
+                message = "otel-collector agent on ${hostName}: every exporter must queue in file_storage by bytes with unlimited retry, otlp_http/ingress must hold 24 h at fleetBytesPerMinute${lib.optionalString agentTelemetry " plus agentMetricsBytesPerMinute, otlp_http/ingress-agent 8 h at agentEventBytesPerMinute"}, the queues must sum below 512 MiB, and the limiter must be below MemoryMax (ADR-003 envelope; design D2); queues ${builtins.toJSON (lib.genAttrs exporterNames size)}.";
+              }
+              # An exporter keeps one persistent queue per signal
+              # (exporter_otlp_http_<name>_<signal>), so a metrics pipeline
+              # on the agent events exporter would hold a second queue the
+              # sum above does not see (design D10).
+              {
+                assertion = metricsPipelinesWith "otlp_http/ingress-agent" == [ ];
+                message = "otel-collector agent on ${hostName}: otlp_http/ingress-agent carries agent events only, but the metrics pipelines ${builtins.toJSON (metricsPipelinesWith "otlp_http/ingress-agent")} export to it (agent-session-telemetry design D10).";
               }
             ];
         })
@@ -628,11 +678,135 @@ in
               limit_mib = lib.mkForce 150;
               spike_limit_mib = 30;
             };
-            exporters."otlp_http/ingress" = ingressExporter (mib 400);
-            exporters."otlp_http/ingress-logs" = ingressExporter (mib 16);
+            exporters."otlp_http/ingress" = ingressExporter agentQueueBytes."otlp_http/ingress";
+            exporters."otlp_http/ingress-logs" = ingressExporter agentQueueBytes."otlp_http/ingress-logs";
           };
           systemd.services.opentelemetry-collector.serviceConfig.MemoryMax = "256M";
         })
+
+        # Agent sessions' telemetry, where the host table sets agentTelemetry
+        # (agent-session-telemetry design D3, D8): `otlp/local` on loopback
+        # feeds exactly the two agent-session pipelines, each of which drops
+        # every service, metric, event and key off schema.nix's agentSession
+        # allow-list before it stamps the host and the routing attributes.
+        # Every filter and transform propagates its errors, so a statement
+        # that cannot run refuses the batch rather than passing it on. No
+        # traces pipeline takes the receiver, which therefore refuses traces.
+        (lib.mkIf agentTelemetry (
+          let
+            session = schema.agentSession;
+            eventNames = builtins.attrNames session.events.keys;
+            list = keys: "[${lib.concatMapStringsSep ", " (key: ''"${key}"'') keys}]";
+            oneOf = path: values: lib.concatMapStringsSep " or " (value: ''${path} == "${value}"'') values;
+            serviceName = ''resource.attributes["service.name"]'';
+            eventName = ''log.attributes["event.name"]'';
+            stamp =
+              extra:
+              [
+                {
+                  key = "host.name";
+                  value = hostName;
+                  action = "upsert";
+                }
+                {
+                  key = "vanixiets.database";
+                  value = "agent";
+                  action = "upsert";
+                }
+              ]
+              ++ extra;
+          in
+          {
+            assertions = [
+              {
+                assertion = !ingress || (config.services.greptimedb.pipelines.agent or { }) ? agent_session_event;
+                message = "otel-collector agent on ${hostName}: agent telemetry on the ingress host needs the store's agent_session_event pipeline (flake.modules.nixos.agent-session-store), which the ingress routes agent events through (agent-session-telemetry design D5).";
+              }
+            ];
+
+            services.opentelemetry-collector.settings = {
+              receivers."otlp/local".protocols.http.endpoint = "127.0.0.1:4318";
+
+              processors = {
+                "filter/agent-session-service" = {
+                  error_mode = "propagate";
+                  metric_conditions = [ "not (${oneOf serviceName session.metrics.services})" ];
+                  log_conditions = [ "not (${oneOf serviceName session.events.services})" ];
+                };
+                "filter/agent-session-metrics" = {
+                  error_mode = "propagate";
+                  metric_conditions = [ "not (${oneOf "metric.name" session.metrics.names})" ];
+                };
+                "filter/agent-session-events" = {
+                  error_mode = "propagate";
+                  log_conditions = [ "not (${oneOf eventName eventNames})" ];
+                };
+                "transform/agent-session-metrics" = {
+                  error_mode = "propagate";
+                  metric_statements = [
+                    "keep_keys(datapoint.attributes, ${list session.metrics.pointKeys})"
+                    "keep_keys(resource.attributes, ${list session.metrics.resourceKeys})"
+                    "keep_keys(scope.attributes, [])"
+                  ];
+                };
+                # Per event, its own keys and the correlation keys; the body,
+                # which ADR-008:42's redaction cannot protect, is replaced.
+                "transform/agent-session-events" = {
+                  error_mode = "propagate";
+                  log_statements =
+                    map (
+                      event:
+                      ''keep_keys(log.attributes, ${
+                        list (session.events.correlationKeys ++ session.events.keys.${event})
+                      }) where ${eventName} == "${event}"''
+                    ) eventNames
+                    ++ [
+                      ''set(log.body, "")''
+                      "keep_keys(resource.attributes, ${list session.events.resourceKeys})"
+                      "keep_keys(scope.attributes, [])"
+                    ];
+                };
+                "resource/agent-session".attributes = stamp [ ];
+                "resource/agent-session-events".attributes = stamp [
+                  {
+                    key = "vanixiets.table";
+                    value = "session_event";
+                    action = "upsert";
+                  }
+                ];
+              };
+
+              exporters = lib.mkIf (!ingress) {
+                "otlp_http/ingress-agent" = ingressExporter agentQueueBytes."otlp_http/ingress-agent";
+              };
+
+              service.pipelines = {
+                "metrics/agent-session" = {
+                  receivers = [ "otlp/local" ];
+                  processors = [
+                    "memory_limiter"
+                    "filter/agent-session-service"
+                    "filter/agent-session-metrics"
+                    "transform/agent-session-metrics"
+                    "resource/agent-session"
+                  ];
+                  exporters = agentExport.metrics;
+                };
+                "logs/agent-session" = {
+                  receivers = [ "otlp/local" ];
+                  processors = [
+                    "memory_limiter"
+                    "filter/agent-session-service"
+                    "filter/agent-session-events"
+                    "transform/agent-session-events"
+                    "resource/agent-session-events"
+                  ];
+                  exporters = agentExport.agentEvents;
+                };
+              };
+            };
+          }
+        ))
 
         # NVMe health where the host table lists devices (ADR-003 item 19;
         # design D4).
@@ -773,6 +947,11 @@ in
       # (flake.modules.nixos.devloop-collection); without a logs pipeline
       # exporting to `forward`, `logs/ingress` would fail validation.
       devloopLogs = (config.services.greptimedb.pipelines.devloop or { }) != { };
+      # Agent session events write through the store's agent_session_event
+      # pipeline (flake.modules.nixos.agent-session-store), so their route
+      # exists where the store declares it (agent-session-telemetry design D5).
+      agentSession = schema.agentSession;
+      agentLogs = (config.services.greptimedb.pipelines.agent or { }) ? agent_session_event;
       storeExporter = headers: queueSize: {
         endpoint = "http://127.0.0.1:4000/v1/otlp";
         inherit headers;
@@ -861,14 +1040,19 @@ in
               pipelines = [ "metrics/${db}" ];
             }) databaseNames;
 
+            # `agent` also promotes the person an agent session ran for
+            # (agent-session-telemetry design D4), which its emitters stamp on
+            # the resource; every other database's header is unchanged.
             exporters = lib.listToAttrs (
               map (
                 db:
                 lib.nameValuePair "otlp_http/${db}" (
                   storeExporter {
                     "x-greptime-db-name" = db;
-                    "x-greptime-otlp-metric-promote-resource-attrs" =
-                      lib.concatStringsSep ";" schema.promotedResourceAttributes;
+                    "x-greptime-otlp-metric-promote-resource-attrs" = lib.concatStringsSep ";" (
+                      schema.promotedResourceAttributes
+                      ++ lib.optionals (db == "agent") agentSession.metrics.promotedResourceAttributes
+                    );
                   } queueBytes.${db}
                 )
               ) databaseNames
@@ -933,18 +1117,7 @@ in
               ) devloopTables
             );
 
-            service.pipelines = {
-              "logs/ingress" = {
-                receivers = [
-                  "forward"
-                  "otlp/mesh"
-                  "otlp/mesh-tincr"
-                ];
-                processors = [ "memory_limiter" ];
-                exporters = [ "routing/logs" ];
-              };
-            }
-            // lib.listToAttrs (
+            service.pipelines = lib.listToAttrs (
               map (
                 table:
                 lib.nameValuePair "logs/devloop-${table}-out" {
@@ -954,6 +1127,44 @@ in
                 }
               ) devloopTables
             );
+          };
+        })
+
+        # Agent session events into agent.session_event through its own
+        # exporter, as a devloop table's (agent-session-telemetry design D5).
+        (lib.mkIf agentLogs {
+          settings = {
+            connectors."routing/logs".table = [
+              {
+                context = "resource";
+                condition = ''attributes["vanixiets.database"] == "agent" and attributes["vanixiets.table"] == "session_event"'';
+                pipelines = [ "logs/agent-session_event-out" ];
+              }
+            ];
+            exporters."otlp_http/agent_session_event" = storeExporter {
+              "x-greptime-db-name" = "agent";
+              "x-greptime-log-table-name" = "session_event";
+              "x-greptime-pipeline-name" = flakeLib.agentSessionStore.pipelineName;
+              "x-greptime-hints" = "auto_create_table=false";
+            } queueBytes.agent_session_event;
+            service.pipelines."logs/agent-session_event-out" = {
+              receivers = [ "routing/logs" ];
+              processors = [ "resource/strip-database" ];
+              exporters = [ "otlp_http/agent_session_event" ];
+            };
+          };
+        })
+
+        # The logs entry, wherever a logs route exists.
+        (lib.mkIf (devloopLogs || agentLogs) {
+          settings.service.pipelines."logs/ingress" = {
+            receivers = [
+              "forward"
+              "otlp/mesh"
+              "otlp/mesh-tincr"
+            ];
+            processors = [ "memory_limiter" ];
+            exporters = [ "routing/logs" ];
           };
         })
       ];
@@ -1104,6 +1315,7 @@ in
                   (lib.optionalAttrs collect {
                     vanixiets.otelCollector.caFile = pkgs.writeText "otel-ca.crt" gens.otel-ca.files."ca.crt".value;
                     vanixiets.otelCollector.smartDevices = flakeLib.observabilityHosts.${machine.name}.smartDevices;
+                    vanixiets.otelCollector.agentTelemetry = flakeLib.observabilityHosts.${machine.name}.agentTelemetry;
                     services.observability-notify = {
                       units = flakeLib.observabilityHosts.${machine.name}.notifiedUnits;
                       tokenFile = gens.ntfy-alerter.files.token.path;

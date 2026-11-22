@@ -65,13 +65,13 @@ A shared home module sets the Claude Code and omp emitter gates where the host's
 
 **Files:** Modify `modules/lib/observability-hosts.nix`, `modules/clan/services/otel-collector/flake-module.nix`, `modules/checks/otel-collector-config.nix`, `modules/lib/otel-envelope.nix`, `modules/checks/otel-envelope.nix`, `modules/checks/otel-envelope/stub.py`, `modules/clan/services/otel-collector/README.md`.
 
-- [ ] **Step 1:** Host flag `agentTelemetry` (magnetite, pyrite); option in the collector core, set by the agent role.
-- [ ] **Step 2:** Write the new `otel-collector-config` clauses and mutants (`localFeedsDevloop`, `localFeedsFleet`, `tracesPipeline`, `eventFilterDropped`, `bodyKept`, `sessionIdKept`, `agentEventsToDevloop`, `agentQueueShort`); build: fails on magnetite as it is (no agent pipelines).
-- [ ] **Step 3:** Agent fragment: `otlp/local`, the processors rendered from `agentSession`, both pipelines, `otlp_http/ingress-agent` 64 MiB and `otlp_http/ingress` 408 MiB where the flag is set; ingress: queue split, `routing/logs` route, `logs/agent-session_event-out`, `otlp_http/agent_session_event`, `logs/ingress` when devloop or agent logs, `user.name` promoted on `otlp_http/agent` only.
-- [ ] **Step 4:** Queue assertion over the host's exporter list and the `ingress-agent` metrics-pipeline assertion; `extendModules` overrides of pyrite (`ingress-agent` 32 MiB, `ingress` 400 MiB, `ingress-agent` in `metrics/host`) each fail with the assertion's message.
-- [ ] **Step 5:** `otel-collector-config` passes; each mutant's failure list printed in its log.
-- [ ] **Step 6:** `otel-envelope` B1/B2 over `agent` (2,000 series, 200 values), with cases `budgetAgentAt2000`/`budgetAgentAt2001` and mutant `agentSeriesIgnored`.
-- [ ] **Step 7:** README: loopback path, routing, queue table, schema entries.
+- [x] **Step 1:** Host flag `agentTelemetry` (magnetite, pyrite); option in the collector core, set by the agent role.
+- [x] **Step 2:** Write the new `otel-collector-config` clauses and mutants (`localFeedsDevloop`, `localFeedsFleet`, `tracesPipeline`, `eventFilterDropped`, `bodyKept`, `sessionIdKept`, `agentEventsToDevloop`, `agentQueueShort`, and `toolOutputKept`, `fleetPromotesPerson`). Deviation: the clauses were written after Step 3's module code, so their failure on the pre-change configuration was not recorded; each mutant failing its named clause stands as their integrity evidence.
+- [x] **Step 3:** Agent fragment: `otlp/local`, the processors rendered from `agentSession`, both pipelines, `otlp_http/ingress-agent` 64 MiB and `otlp_http/ingress` 408 MiB where the flag is set; ingress: queue split, `routing/logs` route, `logs/agent-session_event-out`, `otlp_http/agent_session_event`, `logs/ingress` when devloop or agent logs, `user.name` promoted on `otlp_http/agent` only.
+- [x] **Step 4:** Queue assertion over the host's exporter list and the `ingress-agent` metrics-pipeline assertion; `extendModules` overrides of pyrite (`ingress-agent` 32 MiB, `ingress` 400 MiB, `ingress-agent` in `metrics/host`) each fail with the assertion's message.
+- [x] **Step 5:** `otel-collector-config` passes; each mutant's failure list printed in its log.
+- [x] **Step 6:** `otel-envelope` B1/B2 over `agent` (2,000 series, 200 values), with cases `budgetAgentAt2000`/`budgetAgentAt2001` and mutant `agentSeriesIgnored`.
+- [x] **Step 7:** README: loopback path, routing, queue table, schema entries.
 
 ## Task 3: Emitters (chain `mzmrklxz`)
 
@@ -83,9 +83,9 @@ A shared home module sets the Claude Code and omp emitter gates where the host's
 
 ## Task 4: Container test with the canary (chain `rqwxkuup`)
 
-**Files:** Modify `modules/vm-tests/fleet-ingress.nix`, `modules/vm-tests/fleet-ingress/helpers.py`, `modules/vm-tests/devloop-ingest.nix`, `modules/vm-tests/greptimedb-pipeline.nix`; Create `modules/vm-tests/fleet-ingress/agent_session.py` (OTLP protobuf sender).
+**Files:** Modify `modules/vm-tests/fleet-ingress.nix`, `modules/vm-tests/fleet-ingress/helpers.py`, `modules/vm-tests/devloop-ingest.nix`, `modules/vm-tests/greptimedb-pipeline.nix`. The canary posts OTLP/JSON from the test driver (the receiver decodes JSON and protobuf alike, and the exporters send protobuf onward), so no protobuf sender file exists.
 
-- [ ] **Step 1:** Move `otlp/mesh` to `127.0.0.1:4319` and the other tests' 4318 binds off it; `rg -n '127\.0\.0\.1:4318' modules/vm-tests` finds only the agent-session unit's `otlp/local`.
-- [ ] **Step 2:** The store gets the `agent` table and pipeline; a third collector unit renders pyrite's evaluated agent-session receiver, processors, pipelines and exporters, pointed at `otlp/mesh`.
-- [ ] **Step 3:** Case `agentSession`: admitted `user_prompt` (nonce in `prompt`), `assistant_response`, `api_request`, `claude_code.token.usage`; canary kinds; scan every string column of every table of every database as `regulator`; `matches_term`; `SHOW CREATE TABLE`; `information_schema.schemata`; drop counters.
-- [ ] **Step 4:** Run on pyrite; then mutants (transform removed, event filter removed, pipeline widened), each failing its assertion; then `devloop-ingest` and `greptimedb-pipeline` on pyrite.
+- [x] **Step 1:** Move `otlp/mesh` to `127.0.0.1:4319` and the other tests' 4318 binds off it; `rg -n '127\.0\.0\.1:4318' modules/vm-tests` finds only the agent-session unit's `otlp/local`.
+- [x] **Step 2:** The store gets the `agent` table and pipeline; a third collector unit renders pyrite's evaluated agent-session receiver, processors, pipelines and exporters, pointed at `otlp/mesh`, with a file tap beside each pipeline's exporter.
+- [x] **Step 3:** Case `agentSession`: admitted `user_prompt` (nonce in `prompt`), `assistant_response`, `api_request`, `claude_code.token.usage`; canary kinds; scan every string column of every table of every database as `regulator`; `matches_term`; `SHOW CREATE TABLE`; `information_schema.schemata`; drop counters.
+- [x] **Step 4:** Run on pyrite; then mutants (transform removed, event filter removed, service filter removed, pipeline widened), each failing its assertion; then `devloop-ingest` and `greptimedb-pipeline` on pyrite.

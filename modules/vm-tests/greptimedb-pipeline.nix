@@ -175,6 +175,10 @@
                 # and the agent's notified-unit assertion satisfied; the
                 # envelope is fleet-ingress's subject, so its timer stays off.
                 vanixiets.otelCollector.caFile = "${pki}/ca.crt";
+                # As on magnetite: the agent-session pipelines end in forward,
+                # so logs/ingress, which the agent table's route creates, has
+                # a logs pipeline exporting to it (agent-session-telemetry).
+                vanixiets.otelCollector.agentTelemetry = true;
                 services.opentelemetry-collector.settings.receivers."otlp/mesh".protocols.http.endpoint =
                   lib.mkForce "127.0.0.1:4319";
                 services.opentelemetry-collector.settings.receivers."otlp/mesh-tincr".protocols.http.endpoint =

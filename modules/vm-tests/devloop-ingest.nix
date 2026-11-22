@@ -1344,7 +1344,7 @@
                 # fleet-ingress's subject, so its timer stays off here.
                 vanixiets.otelCollector.caFile = "${pki}/ca.crt";
                 services.opentelemetry-collector.settings.receivers."otlp/mesh".protocols.http.endpoint =
-                  lib.mkForce "127.0.0.1:4318";
+                  lib.mkForce "127.0.0.1:4319";
                 services.opentelemetry-collector.settings.receivers."otlp/mesh-tincr".protocols.http.endpoint =
                   lib.mkForce "127.0.0.1:4320";
                 services.observability-notify.units = [

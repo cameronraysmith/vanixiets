@@ -7,7 +7,7 @@ The clan `agent` role reads the `otel-ca`, `otel-cert` and `ntfy-alerter` vars, 
 
 The NixOS module runs one collector per host, so both roles' fragments merge into one `services.opentelemetry-collector` and one `opentelemetry-collector.service`.
 Both roles import `collectorCore`, which carries the shared module key `vanixiets#otel-collector-core` so a host holding both roles loads it once.
-`collectorCore` sets the package to `opentelemetry-collector-contrib`, defines the `memory_limiter` processor (384 MiB) that the agent pipelines and `metrics/ingress` run first, the `file_storage` extension under `/var/lib/opentelemetry-collector/queue`, and the options `vanixiets.otelCollector.ingress`, `caFile`, `smartDevices` and `envelopeBudget`, and gives the unit `RestartSec = 5s` with `StartLimitIntervalSec = 0`.
+`collectorCore` sets the package to `opentelemetry-collector-contrib`, defines the `memory_limiter` processor (384 MiB) that the agent pipelines and `metrics/ingress` run first, the `file_storage` extension under `/var/lib/opentelemetry-collector/queue`, and the options `vanixiets.otelCollector.ingress`, `caFile`, `smartDevices`, `agentTelemetry` and `envelopeBudget`, and gives the unit `RestartSec = 5s` with `StartLimitIntervalSec = 0`.
 
 ## Agent hosts and the host table
 
@@ -31,11 +31,11 @@ Both trust `vanixiets.otelCollector.caFile`, `otel-ca`'s `ca.crt` written to the
 `otel-ca` is shared, its `ca.key` is never deployed, and it signs each host's `otel-cert` only at generation time.
 Each `otel-cert` names its host as the CN with the extended key usage `clientAuth`; the ingress host's adds `serverAuth` and the SANs `IP:<its ZeroTier address>`, `DNS:<name>.zt`, `IP:<its mesh address>` and `DNS:<its fqdn>`, read from `flake.lib.hosts`; the ZeroTier pair goes with ZeroTier's retirement.
 A non-ingress agent runs with `MemoryMax = "256M"` and its `memory_limiter` at 150 MiB with a 30 MiB spike allowance.
-On every non-ingress host an assertion requires both exporters to queue in `file_storage` by bytes and retry without limit, the metrics queue to hold 24 hours at `flake.lib.otelCollectorSchema.fleetBytesPerMinute`, the two queues to sum below 512 MiB, and the limiter to stay below `MemoryMax`.
+On every non-ingress host an assertion requires every exporter to queue in `file_storage` by bytes and retry without limit, `otlp_http/ingress` to hold 24 hours at `flake.lib.otelCollectorSchema.fleetBytesPerMinute` plus, where `agentTelemetry` is set, `agentMetricsBytesPerMinute`, `otlp_http/ingress-agent` to hold 8 hours at `agentEventBytesPerMinute` where it exists, the queues to sum below 512 MiB, and the limiter to stay below `MemoryMax`; a second assertion keeps `otlp_http/ingress-agent` out of every metrics pipeline, because an exporter keeps one persistent queue per signal and that queue would escape the sum.
 
 The ingress's `otlp/mesh` receiver listens on `[<magnetite's ZeroTier address>]:4318` and its `otlp/mesh-tincr` receiver, with the same TLS, on `[<magnetite's mesh address>]:4318`, both HTTP only, with no gRPC; `otlp/mesh` goes with ZeroTier's retirement.
 It presents magnetite's `otel-cert` and `otel-key`, which the clan agent role loads on magnetite too, and sets `client_ca_file` to the same CA and `min_version = "1.3"`, so a client without a certificate from `otel-ca` fails the TLS handshake.
-It feeds `metrics/ingress` beside `forward`, and `logs/ingress` where the devloop routes exist.
+It feeds `metrics/ingress` beside `forward`, and `logs/ingress` where the devloop or agent-session routes exist.
 The clan ingress role opens TCP 4318 on the mesh interfaces only (`flake.lib.meshInterfaces`).
 magnetite sets `net.ipv6.ip_nonlocal_bind = 1`, so the receiver binds its address even before `zerotierone` holds it.
 
@@ -95,7 +95,7 @@ Each stored point is one process's resident memory: the pipeline's `aggregate_la
 The ingress converts exponential histograms to explicit buckets while the store is below 1.3.0, then the `routing` connector sends each resource to `metrics/<database>` by its `vanixiets.database` attribute.
 Each per-database pipeline deletes `vanixiets.database` and writes through its own `otlp_http/<database>` exporter.
 Each exporter sends `x-greptime-db-name: <database>` and `x-greptime-otlp-metric-promote-resource-attrs` built from `promotedResourceAttributes`, so the store turns those resource attributes into labels.
-Only `fleet` receives metrics; the `devloop` and `agent` metrics routes exist so later slices add metric producers without restructuring the ingress, and `devloop`'s rows arrive on the logs path below.
+`fleet` receives the hosts' metrics and `agent` the agent sessions' (see "Agent-session path"); the `devloop` metrics route exists so a later slice adds metric producers without restructuring the ingress, and `devloop`'s rows arrive on the logs path below.
 
 ## Logs path
 
@@ -146,7 +146,21 @@ The store's pipeline `devloop_<table>` keeps exactly the allow-listed fields, an
 With `auto_create_table=false`, a write that races the schema job is rejected instead of creating an append-mode table that would keep every duplicate.
 A record the pipeline cannot convert fails the whole request with HTTP 400, which the exporter drops as permanent; for `sqlquery` the cursor has already moved past it, so up to 10,000 rows are lost until a cursor reset, and `devloop-reconcile`'s `C1`, `C2`, `C3` and `C6` are the detectors (runbook, "Replaying a gap").
 No `skip_error` is set, because per-row loss would then be silent.
-No `logs/*` pipeline takes the local `otlp` receiver.
+No `logs/*` pipeline takes the local `otlp` receiver, and only `logs/agent-session` takes `otlp/local` (see "Agent-session path").
+
+## Agent-session path
+
+Where a host's row in `flake.lib.observabilityHosts` sets `agentTelemetry` (magnetite and pyrite), the clan agent role sets `vanixiets.otelCollector.agentTelemetry`, and the agent fragment adds the loopback receiver `otlp/local` on `127.0.0.1:4318`, HTTP only, for the Claude Code and omp sessions the agent-telemetry home module configures (`openspec/changes/agent-session-telemetry`, design D3, D8).
+`otlp/local` feeds exactly two pipelines, and no `traces*` pipeline takes it, so it answers a trace export with 404:
+
+- `metrics/agent-session`: `memory_limiter`; `filter/agent-session-service`, which drops a resource whose `service.name` is not `claude-code` or `oh-my-pi`; `filter/agent-session-metrics`, which drops a metric not named in `agentSession.metrics.names`; `transform/agent-session-metrics`, `keep_keys` on datapoint attributes to `pointKeys` and on resource attributes to `resourceKeys`, so no session, prompt or account identifier labels a series; `resource/agent-session`, which upserts `host.name` and `vanixiets.database = agent`.
+  It exports with the host's metrics, to `forward` on magnetite and `otlp_http/ingress` elsewhere, and the ingress routes it to `otlp_http/agent`, whose promote header adds `user.name` to the shared resource attributes.
+- `logs/agent-session`: `memory_limiter`; `filter/agent-session-service`, which admits `claude-code` only; `filter/agent-session-events`, which drops an `event.name` not in `agentSession.events.keys`; `transform/agent-session-events`, which keeps per event its own keys and the correlation keys, sets the body to `""` and keeps the resource keys; `resource/agent-session-events`, which upserts `host.name`, `vanixiets.database = agent` and `vanixiets.table = session_event`.
+  It exports to `forward` on magnetite and elsewhere to `otlp_http/ingress-agent`, a logs-only exporter with `otlp_http/ingress`'s endpoint and TLS and its own 64 MiB queue.
+
+Every filter and transform runs with `error_mode: propagate`, so a statement that cannot run refuses the batch rather than passing it on; the resource `keep_keys` runs before the stamping, so a local process cannot route its records by forging `vanixiets.*` or `host.name`.
+At the ingress, `routing/logs` routes `vanixiets.database = agent` and `vanixiets.table = session_event` to `logs/agent-session_event-out` and `otlp_http/agent_session_event`, which sends `x-greptime-db-name: agent`, `x-greptime-log-table-name: session_event`, `x-greptime-pipeline-name: agent_session_event` and `x-greptime-hints: auto_create_table=false`; the route exists where the store declares the `agent_session_event` pipeline (`flake.modules.nixos.agent-session-store`), and an assertion requires that pipeline on an ingress host whose `agentTelemetry` is set.
+The store's pipeline keeps the column set closed a second time: it returns null for an unlisted event and maps only the listed keys.
 
 ## The schema is the single source
 
@@ -202,8 +216,8 @@ The notifier reads no clan var itself; the clan agent role passes the path of th
 ## Queue
 
 Every exporter uses a persistent `file_storage` sending queue under `/var/lib/opentelemetry-collector/queue`, sized in bytes; the logs receivers keep their positions in the same directory, as `receiver_<type>_<name>` files, with `file_log` spelled `filelog`, beside the exporters' `exporter_otlp_http_<name>_<signal>` files.
-On magnetite the ingress's eight store exporters queue: `fleet` gets 400 MiB, `agent` 48 MiB, `devloop` (metrics) 4 MiB, `devloop_ci_attribute` 32 MiB, and `devloop_ci_build`, `devloop_batch_event`, `devloop_deploy_record` and `devloop_eval_run` 4 MiB each, 500 MiB in all, so the total stays under 512 MiB and `fleet` holds at least 24 hours at the assumed rate.
-On every other agent host `otlp_http/ingress` gets 400 MiB and `otlp_http/ingress-logs` 16 MiB, and these queues hold the host's exports while magnetite, its receiver or the mesh is unreachable.
+On magnetite the ingress's nine store exporters queue: `fleet` gets 400 MiB, `agent` (metrics) 16 MiB, `agent_session_event` 32 MiB, `devloop` (metrics) 4 MiB, `devloop_ci_attribute` 32 MiB, and `devloop_ci_build`, `devloop_batch_event`, `devloop_deploy_record` and `devloop_eval_run` 4 MiB each, 500 MiB in all, so the total stays under 512 MiB, `fleet` holds at least 24 hours at the assumed rate, and the two `agent` queues hold about 3.9 h and 2.1 h of both agent-telemetry hosts' assumed agent output while the store is down.
+On every other agent host `otlp_http/ingress` gets 400 MiB and `otlp_http/ingress-logs` 16 MiB, and these queues hold the host's exports while magnetite, its receiver or the mesh is unreachable; an agent-telemetry host gets 408 MiB for `otlp_http/ingress`, 24.4 h of fleet and agent metrics, and 64 MiB for the logs-only `otlp_http/ingress-agent`, 8.4 h of agent events, 488 MiB in all (`agent-session-telemetry` design D10).
 The assumed rate, `fleetBytesPerMinute` in `schema.nix`, is 256,000 bytes a minute per host.
 cinnabar's measured rate is far below it: on 2026-10-29 its metrics queue held 524,034 bytes after the 23 minutes between its deploy and the start of magnetite's receiver, about 22,800 bytes a minute, and was empty within 7 minutes of that start.
 Retries never stop (`max_elapsed_time = "0s"`), because a persistent queue drops an item whose retries run out.
@@ -375,6 +389,7 @@ Module assertions run whenever a host imports the modules:
 `checks.x86_64-linux.otel-collector-config` (`modules/checks/otel-collector-config.nix`) judges R3.1 and R1.2 over magnetite's evaluated configuration, each clause with a mutant that must fail.
 R3.1 covers loopback endpoints except `otlp/mesh`, whose address must equal the one ZeroTier assigned to magnetite in `vars/shared/zerotier-ip-magnetite-zerotier/ip/value` (mutants `meshWildcard`, `secondMeshReceiver` and `ztAddressOther`), the 64 MiB floor stage, the owner-alias transform, the signals pipelines may carry, with logs pipelines writing only into `devloop` (mutants `logsToFleet` and `logsToMetricsExporter`), queue storage and sizes over every exporter including the four logs exporters (mutant `logsQueueNotPersistent`), no `logs/*` pipeline taking the local OTLP receiver (`logsTakeLocalReceiver`, mutant `otlpInLogsPipeline`), `memory_limiter` under `MemoryMax`, the override scope, the notifier wiring against the failure-path policy, which includes `devloop-*` units and `otel-envelope` (mutants `reconcileNotNotified` and `envelopeNotNotified`), and the order after the schema job.
 Its build runs `observability-notify-rehearsal`, which drives the notifier scripts through a crash loop against a recording `ntfy-send`, requires one pair per interval and one `failed.log` line, mode `0644`, per posted `FAILED`, and rejects two mutants of the `failed` script, one without the append and one without the mode.
+Its agent-session clauses (`agent-session-telemetry` design D3, D5, D10) require `otlp/local` on `127.0.0.1:4318` feeding exactly the two agent-session pipelines, their stage order with `error_mode: propagate`, filter values and `keep_keys` lists equal to `agentSession` and the body set to `""`, the agent events route and its four headers, the promote headers, and the two `agent` queues at 2 h of the agent-telemetry hosts' assumed rates; each mutant (`localFeedsDevloop`, `localFeedsFleet`, `tracesPipeline`, `eventFilterDropped`, `bodyKept`, `sessionIdKept`, `toolOutputKept`, `agentEventsToDevloop`, `fleetPromotesPerson`, `agentQueueShort`) must fail its named clause, and the build log prints each with its failures.
 
 `checks.x86_64-linux.greptimedb-envelope` (`modules/checks/greptimedb-envelope.nix`) covers the store side: R7.1's memory and kill-order relations, R1.1, R8.2 file ownership, disko against the dataset binding, the PromQL read path, the users-file generator run, the SQL helper and table clause against recorded answers, and R7.2 against recorded cgroup files.
 
@@ -396,6 +411,7 @@ Four runtime tests live in the on-demand `vmTests` lane, outside the pull-reques
   It runs PostgreSQL with nixbot's migrations, the store with its schema job, the collector with the logs path, a stub `gitea-mq.service` and `devloop-reconcile`, and covers every `otlp_http/devloop_<table>` exporter's first send, the tables' shape against the allow-list, the rejection of a write to a table the schema job did not create (`auto_create_table=false`), overlap deduplication, the deploy-record line of a switch to an `extendModules` variant of the container's system, each reconcile clause's mutant, the burn rule and the three documented queries on the real store.
 - `vmTests.x86_64-linux.fleet-ingress` (`modules/vm-tests/fleet-ingress.nix`) is a systemd-nspawn container test needing `uid-range`, so it builds on magnetite.
   It runs the store, a collector of both roles with `otlp/mesh` on loopback, and electrum's evaluated non-ingress collector exporting to it over mTLS with throwaway certificates, and covers the refusal of a client without a certificate, with a rogue CA's certificate or at TLS 1.2, delivery of metrics and three deploy-record lines, back-pressure without loss while the store is stopped or the ingress's limiter refuses, each envelope clause's negative control, a crash loop, ten envelope runs whose state file stays the same size, an ingress whose client CA file is absent failing to start with one `FAILED` and one `RESOLVED` post, and the budget clauses against fixtures as the ingress host's unit; the real ZeroTier address and refusal are observed at deploy, not here.
+  Its `agentSession` case renders pyrite's evaluated agent-session pipelines as `agent-session-collector.service` on `otlp/local`, posts Claude-shaped events and metrics with a canary of each forbidden kind under one nonce, and requires the admitted rows as `regulator`, `matches_term` on the prompt, the table's index and options, the metric without session or account labels, the nonce only in the admitted prompt in what left the host and in every string column of every database, and no failed send.
 - `vmTests.x86_64-linux.greptimedb-oom-order` (`modules/vm-tests/greptimedb-oom-order.nix`) is a QEMU test needing `kvm`, so it builds only on pyrite.
   It covers the kill order 900, 500, 300.
 
