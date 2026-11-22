@@ -253,6 +253,17 @@
     # read it.
     fleetBytesPerMinute = 256000;
 
+    # Unmeasured estimates of one agent-telemetry host's agent output
+    # (agent-session-telemetry design D10), replaced by the measurement of
+    # its task 5.4. Metrics: 8 concurrent sessions x about 35 series each x
+    # 128 bytes per point, one delta export a minute = 35,840. Events: 8
+    # sessions x about 1.0 MB per session-hour (about 575 allow-listed events
+    # x 0.6 KB plus about 0.5 MB of prompts, responses and tool details) / 60
+    # = about 133,000. The agent role's queue assertion and
+    # checks.x86_64-linux.otel-collector-config read them.
+    agentMetricsBytesPerMinute = 35840;
+    agentEventBytesPerMinute = 133000;
+
     # observability-notify@ instances pass the unit allow-list, so that
     # SystemdUnitFailed reports a failed post, but are bounded by the host's
     # notified units, not by budget.units (ADR-004 as amended under charter
@@ -265,6 +276,9 @@
     # cannot disagree on the cap.
     budget = {
       activeSeries = 8000;
+      # The `agent` database's series (ADR-004's agent-harness row); B1 and
+      # B2 judge it beside fleet, with labelValues per label.
+      agentActiveSeries = 2000;
       labelValues = 200;
       processNames = 30;
       units = 40;
@@ -278,7 +292,7 @@
     databases = {
       fleet = "30d";
       devloop = "365d";
-      agent = "90d";
+      agent = "30d";
     };
 
     # The devloop allow-list (design D3; ADR-004 as amended by charter v22):
@@ -391,6 +405,261 @@
             (timeIndex "ts")
           ];
           primaryKey = [ "build_id" ];
+          timeIndex = "ts";
+        };
+      };
+
+    # The agent-session allow-list (agent-session-telemetry design D3, D5):
+    # the only declaration of what Claude Code and omp sessions may send from
+    # an agent-telemetry host's loopback receiver, and of the columns of
+    # agent.session_event. The agent role renders from it the collector's
+    # service, name and key filters; flake.lib.agentSessionStore renders the
+    # table's DDL and ingest pipeline; checks.x86_64-linux.otel-collector-config
+    # compares the collector's key lists with it. Anything not listed is
+    # dropped on the host, and again by the store's pipeline.
+    agentSession =
+      let
+        # The resource keys both pipelines keep; `user.name` is the person
+        # the emitter stamps (design D4). The collector then stamps host.name.
+        resourceKeys = [
+          "service.name"
+          "service.version"
+          "host.arch"
+          "os.type"
+          "user.name"
+        ];
+        column = name: type: key: {
+          inherit name type;
+          nullable = true;
+          source.log = key;
+        };
+        resource = name: key: {
+          inherit name;
+          type = "string";
+          nullable = true;
+          source.resource = key;
+        };
+        text = name: (column name "string" name) // { fulltext = true; };
+      in
+      {
+        # Claude Code's events (claude-code-docs monitoring-usage.md:792-1470).
+        # Every event keeps the correlation keys and its own keys below, each a
+        # column's source; the record body is replaced by "". Dropped by not
+        # being listed: api_request_body and api_response_body (raw bodies),
+        # the hook, plugin, MCP-connection, auth and settings events, every
+        # key a future release adds, `prompt_text` (a copy of `prompt`) and
+        # `cost_usd` (a float; `cost_usd_micros` carries it).
+        events = {
+          services = [ "claude-code" ];
+          inherit resourceKeys;
+          correlationKeys = [
+            "event.name"
+            "event.sequence"
+            "session.id"
+            "prompt.id"
+            "message.uuid"
+            "request_id"
+            "agent_id"
+            "parent_agent_id"
+          ];
+          keys = {
+            user_prompt = [
+              "prompt"
+              "prompt_length"
+              "command_name"
+              "command_source"
+            ];
+            assistant_response = [
+              "response"
+              "response_length"
+              "model"
+              "query_source"
+            ];
+            # tool_parameters and tool_input are the call's input (commands,
+            # paths, arguments, about 4 K characters at most); the output
+            # exists only as a trace span's tool.output, which is not wired.
+            tool_result = [
+              "tool_name"
+              "tool_use_id"
+              "success"
+              "duration_ms"
+              "error_type"
+              "error"
+              "decision_type"
+              "decision_source"
+              "tool_input_size_bytes"
+              "tool_result_size_bytes"
+              "tool_parameters"
+              "tool_input"
+            ];
+            tool_decision = [
+              "tool_name"
+              "tool_use_id"
+              "decision"
+              "source"
+              "tool_parameters"
+            ];
+            api_request = [
+              "model"
+              "cost_usd_micros"
+              "duration_ms"
+              "input_tokens"
+              "output_tokens"
+              "cache_read_tokens"
+              "cache_creation_tokens"
+              "query_source"
+              "speed"
+              "effort"
+            ];
+            api_error = [
+              "model"
+              "error"
+              "status_code"
+              "duration_ms"
+              "attempt"
+              "query_source"
+              "speed"
+              "effort"
+            ];
+            api_refusal = [
+              "model"
+              "query_source"
+              "attempt"
+              "speed"
+              "effort"
+            ];
+            api_retries_exhausted = [
+              "model"
+              "error"
+              "status_code"
+              "speed"
+            ];
+            compaction = [
+              "success"
+              "duration_ms"
+              "error"
+            ];
+            subagent_completed = [
+              "model"
+              "duration_ms"
+            ];
+            skill_activated = [ ];
+          };
+        };
+
+        # Claude Code's eight metrics and omp's two (ADR-004:85), each point
+        # keeping only these keys, so no session, prompt or account
+        # identifier labels a series. `user.name` stays on the resource,
+        # which the ingress promotes for `agent` only.
+        metrics = {
+          services = [
+            "claude-code"
+            "oh-my-pi"
+          ];
+          inherit resourceKeys;
+          promotedResourceAttributes = [ "user.name" ];
+          names = [
+            "claude_code.session.count"
+            "claude_code.lines_of_code.count"
+            "claude_code.pull_request.count"
+            "claude_code.commit.count"
+            "claude_code.cost.usage"
+            "claude_code.token.usage"
+            "claude_code.code_edit_tool.decision"
+            "claude_code.active_time.total"
+            "omp.agent.tool.calls"
+            "omp.agent.errors"
+          ];
+          pointKeys = [
+            "model"
+            "type"
+            "query_source"
+            "speed"
+            "effort"
+            "agent.name"
+            "skill.name"
+            "plugin.name"
+            "marketplace.name"
+            "mcp_server.name"
+            "mcp_tool.name"
+            "tool_name"
+            "decision"
+            "source"
+            "language"
+            "start_type"
+            "gen_ai.operation.name"
+            "gen_ai.provider.name"
+            "gen_ai.request.model"
+            "gen_ai.response.service_tier"
+            "gen_ai.response.finish_reason"
+            "gen_ai.tool.name"
+            "omp.tool.status"
+            "omp.gen_ai.agent.name"
+            "error.type"
+          ];
+        };
+
+        # agent.session_event: one row per admitted event, the time index the
+        # record's own Timestamp; non-append, so an exporter's replay of a
+        # batch the store already took collapses on the primary key (design
+        # D5). No ttl of its own: agent's applies.
+        tables.session_event = {
+          columns = [
+            {
+              name = "ts";
+              type = "timestamp";
+              nullable = false;
+              source.record = "Timestamp";
+            }
+            (resource "host_name" "host.name")
+            (resource "user_name" "user.name")
+            (resource "service_name" "service.name")
+            (resource "service_version" "service.version")
+            (column "session_id" "string" "session.id")
+            (column "prompt_id" "string" "prompt.id")
+            (column "event_name" "string" "event.name")
+            (column "event_sequence" "int64" "event.sequence")
+            (column "message_uuid" "string" "message.uuid")
+            (column "request_id" "string" "request_id")
+            (column "agent_id" "string" "agent_id")
+            (column "parent_agent_id" "string" "parent_agent_id")
+            (column "model" "string" "model")
+            (column "query_source" "string" "query_source")
+            (text "prompt")
+            (column "prompt_length" "int64" "prompt_length")
+            (column "command_name" "string" "command_name")
+            (column "command_source" "string" "command_source")
+            (text "response")
+            (column "response_length" "int64" "response_length")
+            (column "tool_name" "string" "tool_name")
+            (column "tool_use_id" "string" "tool_use_id")
+            (column "success" "boolean" "success")
+            (column "duration_ms" "int64" "duration_ms")
+            (column "error_type" "string" "error_type")
+            (column "error" "string" "error")
+            (column "decision" "string" "decision")
+            (column "decision_type" "string" "decision_type")
+            (column "decision_source" "string" "decision_source")
+            (column "source" "string" "source")
+            (column "tool_input_size_bytes" "int64" "tool_input_size_bytes")
+            (column "tool_result_size_bytes" "int64" "tool_result_size_bytes")
+            (column "tool_parameters" "string" "tool_parameters")
+            (column "tool_input" "string" "tool_input")
+            (column "cost_usd_micros" "int64" "cost_usd_micros")
+            (column "input_tokens" "int64" "input_tokens")
+            (column "output_tokens" "int64" "output_tokens")
+            (column "cache_read_tokens" "int64" "cache_read_tokens")
+            (column "cache_creation_tokens" "int64" "cache_creation_tokens")
+            (column "status_code" "int64" "status_code")
+            (column "attempt" "int64" "attempt")
+            (column "speed" "string" "speed")
+            (column "effort" "string" "effort")
+          ];
+          primaryKey = [
+            "host_name"
+            "session_id"
+            "event_sequence"
+          ];
           timeIndex = "ts";
         };
       };

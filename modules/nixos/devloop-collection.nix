@@ -32,22 +32,6 @@ let
   quote = name: ''"${name}"'';
   sqlLiteral = text: "'${lib.replaceStrings [ "'" ] [ "''" ] text}'";
 
-  storeType = {
-    int64 = "BIGINT";
-    string = "STRING";
-    boolean = "BOOLEAN";
-    timestamp = "TIMESTAMP(6)";
-  };
-
-  # Pipeline transform types
-  # (GreptimeTeam/greptimedb@v1.2.1:src/pipeline/src/etl/value.rs:58-100).
-  transformType = {
-    int64 = "int64";
-    string = "string";
-    boolean = "boolean";
-    timestamp = "time, us";
-  };
-
   # Columns taken from the OTLP record's Timestamp, nanoseconds since the
   # epoch (src/servers/src/otlp/logs.rs:153-156), rather than from a string
   # attribute: the journal's __REALTIME_TIMESTAMP (design D7).
@@ -55,102 +39,18 @@ let
     batch_event = [ "ts" ];
   };
 
-  ddl = lib.mapAttrs (
+  # The table statements and ingest pipelines, rendered by
+  # flake.lib.greptimedbLogTable (modules/lib/greptimedb-log-table.nix), the
+  # renderer agent.session_event shares.
+  rendered = lib.mapAttrs (
     name: table:
-    lib.concatStringsSep "\n" (
-      [ "CREATE TABLE IF NOT EXISTS ${quote name} (" ]
-      ++ map (
-        column:
-        let
-          notNull = lib.optionalString (!column.nullable) " NOT NULL";
-        in
-        "  ${quote column.name} ${storeType.${column.type}}${notNull},"
-      ) table.columns
-      ++ [
-        "  TIME INDEX (${quote table.timeIndex}),"
-        "  PRIMARY KEY (${lib.concatMapStringsSep ", " quote table.primaryKey})"
-        ") ENGINE=mito WITH ('append_mode' = 'false', 'sst_format' = 'flat')"
-      ]
-    )
+    config.flake.lib.greptimedbLogTable {
+      inherit name table;
+      recordTimestamps = recordTimestamps.${name} or [ ];
+    }
   ) tables;
-
-  # One VRL assignment per allow-listed column, after the event is replaced
-  # by an empty object: "" and an absent attribute become null before any
-  # coercion, because to_int and to_bool turn null into 0 and false
-  # (vectordotdev/vrl@v0.33.1:src/stdlib/to_int.rs:12,
-  # src/stdlib/to_bool.rs:11). VRL takes no `if` as an object-literal
-  # value, so the fields are assigned one by one.
-  vrlAssignment =
-    table: column:
-    let
-      attribute = "a.${column.name}";
-      coerced =
-        {
-          int64 = "to_int!(${attribute})";
-          boolean = "to_bool!(${attribute})";
-          string = "string!(${attribute})";
-          timestamp = "string!(${attribute})";
-        }
-        .${column.type};
-    in
-    if lib.elem column.name (recordTimestamps.${table} or [ ]) then
-      ''.${column.name} = if t == 0 { null } else { from_unix_timestamp!(t, unit: "nanoseconds") }''
-    else
-      ''.${column.name} = if ${attribute} == null || ${attribute} == "" { null } else { ${coerced} }'';
-
-  dateStep =
-    fields: ignoreMissing:
-    [
-      "  - date:"
-      "      fields:"
-    ]
-    ++ map (field: "        - ${field}") fields
-    ++ [
-      "      formats:"
-      "        - \"%Y-%m-%dT%H:%M:%S%.fZ\""
-      "        - \"%Y-%m-%dT%H:%M:%SZ\""
-      "      timezone: UTC"
-    ]
-    ++ lib.optional ignoreMissing "      ignore_missing: true";
-
-  pipelines = lib.mapAttrs (
-    name: table:
-    let
-      fromAttributes = lib.filter (
-        column: column.type == "timestamp" && !(lib.elem column.name (recordTimestamps.${name} or [ ]))
-      ) table.columns;
-      required = map (column: column.name) (lib.filter (column: !column.nullable) fromAttributes);
-      optional = map (column: column.name) (lib.filter (column: column.nullable) fromAttributes);
-      transformEntry =
-        column:
-        [
-          "  - fields:"
-          "      - ${column.name}"
-          "    type: ${transformType.${column.type}}"
-        ]
-        ++ lib.optional (lib.elem column.name table.primaryKey) "    tag: true"
-        ++ lib.optional (column.name == table.timeIndex) "    index: timestamp";
-    in
-    lib.concatStringsSep "\n" (
-      [
-        "version: 2"
-        "processors:"
-        "  - vrl:"
-        "      source: |"
-        "        a = object!(.LogAttributes)"
-      ]
-      # The record's Timestamp is read before the event is replaced.
-      ++ lib.optional (recordTimestamps ? ${name}) "        t = int!(.Timestamp)"
-      ++ [ "        . = {}" ]
-      ++ map (column: "        ${vrlAssignment name column}") table.columns
-      ++ [ "        ." ]
-      ++ lib.optionals (required != [ ]) (dateStep required false)
-      ++ lib.optionals (optional != [ ]) (dateStep optional true)
-      ++ [ "transform:" ]
-      ++ lib.concatMap transformEntry table.columns
-    )
-    + "\n"
-  ) tables;
+  ddl = lib.mapAttrs (_: table: table.ddl) rendered;
+  pipelines = lib.mapAttrs (_: table: table.pipeline) rendered;
 
   # The nixbot side (design D6): the SQL expression behind each alias of the
   # two CI tables, over nixbot's schema at the pinned input.

@@ -153,11 +153,11 @@ No `logs/*` pipeline takes the local `otlp` receiver.
 `flake.lib.otelCollectorSchema`, defined in `schema.nix`, holds every allow-list and bound the service reads.
 Nothing imports `schema.nix` by path; import-tree loads it as a flake-parts module.
 
-- `databases`: database name to TTL (`fleet` 30d, `devloop` 365d, `agent` 90d).
+- `databases`: database name to TTL (`fleet` 30d, `devloop` 365d, `agent` 30d).
   The ingress builds one route and one exporter per name, and magnetite's `services.greptimedb.databases` reads the same map, so the schema job creates exactly these databases.
 - `systemdUnits`: systemd unit patterns for the systemd receiver, `.service` units only.
   At most `budget.units` (40) units may match on one host.
-- `budget`: ADR-004's limits, `activeSeries` 8,000, `labelValues` 200, `processNames` 30, `units` 40, `launchdLabels` 30 and `devloopRows` 100,000; `otel-envelope`'s hourly clauses and the agent role's unit-cap assertion both read them.
+- `budget`: ADR-004's limits, `activeSeries` 8,000, `agentActiveSeries` 2,000, `labelValues` 200, `processNames` 30, `units` 40, `launchdLabels` 30 and `devloopRows` 100,000; `otel-envelope`'s hourly clauses and the agent role's unit-cap assertion both read them.
 - `ownerAliases`: owner name to opaque alias.
   `omnigent-host-<owner>.service` is stored as `omnigent-host-<alias>.service`, so no owner's name becomes a label value.
 - `promotedResourceAttributes`: the resource attributes the store promotes to labels.
@@ -169,8 +169,12 @@ Nothing imports `schema.nix` by path; import-tree loads it as a flake-parts modu
   The darwin floor is higher because macOS RSS counts each process's share of the dyld shared cache and frameworks.
 - `process.darwinFleetExecutables`: launchd label glob to the executable name the darwin process scraper reports; darwin's `otelcol-process` keeps these names below the floor, and the darwin fragment asserts that the globs cover the host's long-running `org.nixos.*` daemons.
 - `devloop.tables`: the `devloop` allow-list, table name to `{ columns, primaryKey, timeIndex }`, each column `{ name; type; nullable; }` with `type` one of `int64`, `string`, `boolean` and `timestamp`.
-  From it `modules/nixos/devloop-collection.nix` renders the store's `CREATE TABLE` statements and ingest pipelines, the nixbot queries' column aliases and order, and the gitea-mq and deploy-record keep-lists.
+  From it `modules/nixos/devloop-collection.nix` renders, through `flake.lib.greptimedbLogTable` (`modules/lib/greptimedb-log-table.nix`), the store's `CREATE TABLE` statements and ingest pipelines, and itself the nixbot queries' column aliases and order, and the gitea-mq and deploy-record keep-lists.
   A column added to an existing table is created by the pipeline's first write of it; a changed type needs an explicit migration.
+- `agentSession`: the agent-session allow-list (`openspec/changes/agent-session-telemetry`, design D3, D5), the only declaration of what Claude Code and omp sessions may send from an agent-telemetry host.
+  `events`: the admitted `services` (`claude-code`), the `resourceKeys` kept, the `correlationKeys` every event keeps and, under `keys`, each admitted event name with its own keys; `metrics`: the admitted `services` (`claude-code`, `oh-my-pi`), the `resourceKeys`, the metric `names`, the datapoint `pointKeys` and the `promotedResourceAttributes` (`user.name`) the `agent` exporter adds to the shared ones; `tables.session_event`: the columns of `agent.session_event`, each with its type and its `source` (a log attribute, a resource attribute or the record's `Timestamp`), `fulltext` on `prompt` and `response`, primary key `(host_name, session_id, event_sequence)` and time index `ts`.
+  `flake.lib.agentSessionStore` (`modules/nixos/agent-session-store.nix`) renders the table's DDL and its version-2 pipeline `agent_session_event`, which magnetite's schema job applies; an assertion there holds every kept key to a column and every column to a kept key.
+- `agentMetricsBytesPerMinute` (35,840) and `agentEventBytesPerMinute` (133,000): one agent-telemetry host's assumed agent output, beside `fleetBytesPerMinute`, until the measurement after deploy replaces them.
 
 To add a database, add `<name> = "<ttl>";` to `databases`, add a `queueBytes.<name>` entry in `flake-module.nix`, and have the producing pipeline set `vanixiets.database = "<name>"`.
 The queues must still sum to under 512 MiB.

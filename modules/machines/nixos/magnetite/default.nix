@@ -73,6 +73,7 @@ in
         omnigraph
         greptimedb
         devloop-collection
+        agent-session-store
         fleet-alert
         ntfy-alerter
         effects-vanixiets-secrets

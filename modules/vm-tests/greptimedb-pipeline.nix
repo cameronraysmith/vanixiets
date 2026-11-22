@@ -21,6 +21,11 @@
 #      store, fails on a table created with an undeclared ttl and on one
 #      created with sst_format='primary_key' (R6.3), and passes once both
 #      are dropped (review F8).
+#   8. greptimedb-schema creates agent.session_event with its bloom
+#      full-text index on prompt and response and uploads its pipeline,
+#      whose dry run keeps a listed event's listed keys, nulls a value of
+#      the wrong type and drops an unlisted event (agent-session-telemetry
+#      design D5).
 #
 # What it does not establish: R2 storage (the S3 stanza is magnetite's host
 # configuration; the store here uses its default File storage), the ZFS
@@ -123,6 +128,10 @@
                 services.greptimedb = {
                   enable = true;
                   inherit databases;
+                  # agent.session_event and its pipeline as magnetite declares
+                  # them (agent-session-telemetry design D5).
+                  tables.agent = reference.services.greptimedb.tables.agent;
+                  pipelines.agent = reference.services.greptimedb.pipelines.agent;
                 };
 
                 # Credentials come from magnetite's own generator script, run
@@ -161,7 +170,7 @@
                   "otel-key:${pki}/ingress.key"
                 ];
 
-                # The ingress receivers on loopback (4318 is the test's own
+                # The ingress receivers on loopback (4321 is the test's own
                 # otlp entry) with throwaway certificates, never the real vars,
                 # and the agent's notified-unit assertion satisfied; the
                 # envelope is fleet-ingress's subject, so its timer stays off.
@@ -180,7 +189,7 @@
                 # host.name and vanixiets.database, so a synthetic point takes
                 # the same forward and routing path as host metrics.
                 services.opentelemetry-collector.settings = {
-                  receivers.otlp.protocols.http.endpoint = "127.0.0.1:4318";
+                  receivers.otlp.protocols.http.endpoint = "127.0.0.1:4321";
                   service.pipelines."metrics/host".receivers = [ "otlp" ];
                 };
 
@@ -275,7 +284,7 @@
                   )
                   store.succeed(
                       "curl -sSf -H 'Content-Type: application/json' "
-                      f"--data {shlex.quote(payload)} http://127.0.0.1:4318/v1/metrics"
+                      f"--data {shlex.quote(payload)} http://127.0.0.1:4321/v1/metrics"
                   )
 
 
@@ -311,6 +320,61 @@
                   for db, want in DATABASES.items():
                       sql("public", f"CREATE DATABASE IF NOT EXISTS ttl_reference_{db} WITH (ttl = '{want}')")
                       assert ttl(db) == ttl(f"ttl_reference_{db}"), (db, ttl(db), want)
+
+              # agent-session-telemetry design D5: the schema job's table and
+              # pipeline, read back as the regulator and run through the
+              # store's own dry run (src/servers/src/http/event.rs:603-690 at
+              # v1.2.1) with records shaped as the OTLP logs handler hands them
+              # to a pipeline (src/servers/src/otlp/logs.rs:142-197).
+              with subtest("the schema oneshot creates agent.session_event with its index, and its pipeline keeps only listed events and keys"):
+                  create = sql("agent", "SHOW CREATE TABLE session_event", user="regulator")[0][1]
+                  print(create)
+                  for column in ("prompt", "response"):
+                      assert re.search(
+                          rf"\"{column}\" STRING NULL FULLTEXT INDEX WITH\(analyzer = 'English', backend = 'bloom', case_sensitive = 'false'",
+                          create,
+                      ), (column, create)
+                  assert "append_mode = 'false'" in create and "sst_format = 'flat'" in create, create
+                  # SHOW CREATE TABLE renders the database's ttl into the
+                  # table's WITH; create_options lists only the table's own
+                  # options, as greptimedb-envelope's table clause reads them.
+                  options = sql("agent", "SELECT create_options FROM information_schema.tables WHERE table_schema = 'agent' AND table_name = 'session_event'", user="regulator")[0][0]
+                  print(f"create_options: {options}")
+                  assert "ttl" not in options, options
+                  assert 'PRIMARY KEY ("host_name", "session_id", "event_sequence")' in create, create
+                  ns = 1_800_000_000_000_000_000
+                  resource = {"service.name": "claude-code", "host.name": "store-probe", "user.name": "cameron", "user.email": "canary-email@example.com"}
+                  records = [
+                      {"Timestamp": ns, "ResourceAttributes": resource, "Body": "canary-body", "LogAttributes": {
+                          "event.name": "user_prompt", "event.sequence": 1, "session.id": "s1", "prompt": "canary admitted prompt",
+                          "prompt_text": "canary admitted prompt", "prompt_length": 22, "user.email": "canary-email@example.com"}},
+                      {"Timestamp": ns + 1, "ResourceAttributes": resource, "LogAttributes": {
+                          "event.name": "api_request_body", "event.sequence": 2, "session.id": "s1", "body": "canary-raw"}},
+                      {"Timestamp": ns + 2, "ResourceAttributes": resource, "LogAttributes": {
+                          "event.name": "tool_result", "event.sequence": 3, "session.id": "s1", "tool_name": "Bash",
+                          "success": "true", "duration_ms": "12", "error_type": 5, "tool_output": "canary-output"}},
+                  ]
+                  payload = json.dumps({"pipeline_name": "agent_session_event", "data": json.dumps(records)})
+                  store.succeed(f"cat > /tmp/dryrun.json <<'EOF'\n{payload}\nEOF")
+                  status = store.succeed(
+                      f"curl -sS -o /tmp/dryrun-answer -w '%{{http_code}}' --netrc-file {VARS}/admin.netrc "
+                      "-H 'Content-Type: application/json' --data @/tmp/dryrun.json "
+                      "'http://127.0.0.1:4000/v1/pipelines/_dryrun?db=agent'"
+                  ).strip()
+                  answer = store.succeed("cat /tmp/dryrun-answer")
+                  print(f"dry run: {status} {answer}")
+                  assert status == "200", (status, answer)
+                  [result] = json.loads(answer)
+                  table_columns = [row[0] for row in sql("agent", "SELECT column_name FROM information_schema.columns WHERE table_schema = 'agent' AND table_name = 'session_event' ORDER BY column_name", user="regulator")]
+                  pipeline_columns = sorted(column["name"] for column in result["schema"])
+                  assert pipeline_columns == table_columns, (pipeline_columns, table_columns)
+                  rows = [{cell["key"]: cell["value"] for cell in row} for row in result["rows"]]
+                  assert [row["event_name"] for row in rows] == ["user_prompt", "tool_result"], rows
+                  prompt, tool = rows
+                  assert prompt["prompt"] == "canary admitted prompt" and prompt["user_name"] == "cameron", prompt
+                  assert prompt["host_name"] == "store-probe" and prompt["event_sequence"] == 1, prompt
+                  assert tool["duration_ms"] == 12 and tool["success"] is True and tool["error_type"] is None, tool
+                  assert "canary-" not in json.dumps(rows).replace("canary admitted prompt", ""), rows
 
               with subtest("a re-run with a changed TTL alters the stored TTL"):
                   sql(
