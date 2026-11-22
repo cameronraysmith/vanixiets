@@ -2,6 +2,7 @@
 { config, ... }:
 let
   managedConfigsModule = config.flake.modules.homeManager.managedConfigs;
+  agentTelemetryModule = config.flake.modules.homeManager.agent-telemetry;
 in
 {
   flake.modules = {
@@ -14,7 +15,10 @@ in
         ...
       }:
       {
-        imports = [ managedConfigsModule ];
+        imports = [
+          managedConfigsModule
+          agentTelemetryModule
+        ];
 
         config = {
           programs.claude-code = {

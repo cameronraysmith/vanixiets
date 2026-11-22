@@ -24,10 +24,12 @@
             envVarPrefix = lib.toUpper (lib.replaceStrings [ "-" ] [ "_" ] name);
 
             # Derive wrapper settings from base profile, overriding model env vars
-            # for the alternative backend. All other settings are inherited.
+            # for the alternative backend. All other settings are inherited except
+            # the agent-telemetry gates: sessions on another model provider do not
+            # export (agent-session-telemetry design D9).
             baseSettings = config.programs.claude-code.settings;
             wrapperSettings = baseSettings // {
-              env = (baseSettings.env or { }) // {
+              env = removeAttrs (baseSettings.env or { }) config.agentTelemetry.claudeCodeEnvNames // {
                 ANTHROPIC_DEFAULT_OPUS_MODEL = models.opus;
                 ANTHROPIC_DEFAULT_SONNET_MODEL = models.sonnet;
                 ANTHROPIC_DEFAULT_HAIKU_MODEL = models.haiku;

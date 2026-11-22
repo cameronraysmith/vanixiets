@@ -9,10 +9,19 @@ in
       config,
       pkgs,
       flake,
+      osConfig ? null,
       ...
     }:
     let
       home = config.home.homeDirectory;
+      # The worker's owner, the person its sessions run for (agent-session-
+      # telemetry design D4), from the host's worker declaration. Forced only
+      # where the agent-telemetry module is active, which needs osConfig.
+      workerOwners = lib.mapAttrsToList (_: worker: worker.owner) (
+        lib.filterAttrs (_: worker: worker.user == config.home.username) (
+          if osConfig == null then { } else osConfig.services.omnigent-host.workers or { }
+        )
+      );
       credentials = config.programs.omnigent.workerCredentials;
       signingKey = if credentials == null then null else credentials.signingKey;
       signingAllowed = signingKey != null;
@@ -112,7 +121,14 @@ in
         "openspec"
         "mergify"
         "secret-file-modes"
+        "agent-telemetry"
       ];
+
+      agentTelemetry.person =
+        if lib.length workerOwners == 1 then
+          lib.head workerOwners
+        else
+          throw "Omnigent worker home ${config.home.username}: agentTelemetry.person needs exactly one services.omnigent-host.workers entry with user ${config.home.username}, found ${toString (lib.length workerOwners)}; refusing to stamp the Unix account name as the person.";
 
       # Prefer HM's configured wrappers inside the profile, not in the supervisor PATH.
       home.packages = map (
@@ -129,6 +145,19 @@ in
       programs.claude-code = {
         enable = true;
         package = lib.mkDefault flake.packages.${pkgs.stdenv.hostPlatform.system}.claude-code;
+      };
+
+      # As for a human (claude-code/default.nix): Claude rewrites settings.json
+      # at runtime, so once settings are declared (the agent-telemetry gates)
+      # it is a managed copy, not a read-only store symlink. With no declared
+      # settings home-manager writes no file and the worker's own file stands.
+      managedConfigs.claude-code-settings = lib.mkIf (config.programs.claude-code.settings != { }) {
+        target = "${config.programs.claude-code.configDir}/settings.json";
+        format = "json";
+        settings = config.programs.claude-code.settings // {
+          "$schema" = "https://json.schemastore.org/claude-code-settings.json";
+        };
+        replacesHomeFile = "${config.programs.claude-code.configDir}/settings.json";
       };
 
       assertions = [
