@@ -94,6 +94,11 @@ Any requirement whose discharge depends on this fact SHALL name it explicitly, a
 The corpus SHALL provide one designation record per content term this repository's `behavioral`-stratum requirements use, recording the term, the sense in which it is used when a term carries more than one, the world phenomenon it denotes, and whether that phenomenon is world-only, shared with the machine, or machine-only.
 A term found to denote two distinct phenomena within this repository's vocabulary SHALL be recorded as two rows rather than collapsed into one.
 
+#### Scenario: The designation records are read
+
+- **WHEN** the designation records are read
+- **THEN** they are the rows of this table, one per term and sense
+
 | Term | Sense | World phenomenon it denotes | Status |
 |---|---|---|---|
 | session | autonomous | a bounded episode during which an agent acts without a human present to answer a prompt | world-only |
@@ -397,6 +402,8 @@ A term found to denote two distinct phenomena within this repository's vocabular
 | disk | — | the persistent storage of a cloud session's container, which survives into the environment snapshot, as distinct from memory-backed storage that does not | shared |
 | interactive terminal | — | a terminal screen a person watches and types into while a program runs, as distinct from a shell that only runs commands and returns their output | world-only |
 | clipboard | — | the copy-and-paste buffer of a person's desktop session | world-only |
+| main branch | — | this repository's default branch on the forge, whose newest commits the build service builds and publishes, and which a cloud environment that is not pinned follows | shared |
+| input source | — | the fetched contents of one flake input at the version the flake lock file records, which evaluating the flake needs before anything is built | shared |
 
 #### Scenario: The terms with two senses are read
 
@@ -1340,3 +1347,63 @@ Any requirement whose discharge depends on this fact SHALL name it explicitly, a
 
 - **WHEN** a cloud session runs as an account whose home is `/home/user`, or attached repositories are cloned elsewhere
 - **THEN** this assumption is void, and the `claude-sandbox-bootstrap` requirement `Attached repositories get their repository context` loses its discharge until the workspace directory the profile names is re-measured
+
+### Requirement: A184 — A cloud session evaluates the main branch from the caches without the GitHub gate
+
+It is true of a cloud session on the operator's limited-network cloud environments, independent of what this fleet builds, that it can evaluate this repository's `main` over anonymous git with every input source it needs substituted from the fleet's binary cache or `cache.nixos.org`, in under a minute and about 1 GiB.
+Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL lose its discharge once the violation below is observed.
+
+#### Scenario: Measured on 2026-11-22
+
+- **WHEN** a session on the Default environment evaluated `claude-sandbox@x86_64-linux`'s activation package path from `git+https://github.com/cameronraysmith/vanixiets?ref=main&shallow=1` at `5967d3ab41d4`, with the two caches passed as a bash array
+- **THEN** it printed `d96f192x7b6r0gwahpdy877nsv2a6ad9-home-manager-generation` with rc=0 in 46 s at 964,788 kB peak, copying 19 sources (18 from `cache.scientistexperience.net`, 1 from `cache.nixos.org`), with no 403 and no other GitHub fetch
+
+#### Scenario: Evaluation needs the GitHub gate or slows
+
+- **WHEN** evaluating `main` in a cloud session fetches an input source from GitHub, fails with 403, or exceeds the setup step's time budget with every source cached
+- **THEN** this assumption is void, and the `claude-sandbox-bootstrap` requirement `One closure defines the environment` loses its discharge for a cloud environment that is not pinned
+
+### Requirement: A185 — The platform documents that it rebuilds an environment snapshot after about seven days
+
+It is documented by Anthropic, and assumed here without measurement, that a cloud environment's snapshot is rebuilt when its setup script or allowed hosts change and after about seven days, and otherwise reused.
+Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL lose its discharge once the violation below is observed.
+
+#### Scenario: Documented, not yet measured
+
+- **WHEN** the platform's documentation on environment caching is read (record C12 of the session of 2026-11-21)
+- **THEN** it says the setup script "runs again to rebuild the cache when you change the environment's setup script or allowed network hosts, and when the cache reaches its expiry after roughly seven days"; the expiry has not been observed
+
+#### Scenario: A snapshot outlives or undercuts seven days
+
+- **WHEN** a session started more than about seven days after its snapshot's setup run still starts from that snapshot, or a snapshot is rebuilt with no change and well within seven days
+- **THEN** this assumption is void, and the `claude-sandbox-bootstrap` requirement `Sessions report how far behind the main branch they are` must be re-read against the measured expiry, since it is how the operator learns a refresh is due
+
+### Requirement: A186 — The harness applies its own git configuration beside the profile's
+
+It is true of a cloud session, independent of what this fleet builds, that the harness writes `/root/.gitconfig` after the setup step and injects `GIT_CONFIG_COUNT` with three `GIT_CONFIG_KEY_n`/`GIT_CONFIG_VALUE_n` overrides, while the profile's `/root/.config/git/config` still applies for every key the harness does not set.
+Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL lose its discharge once the violation below is observed.
+
+#### Scenario: Measured on 2026-11-22
+
+- **WHEN** the Q97 probe session listed the git environment variable names and the git configuration files, and asked git where `ghq.root` comes from
+- **THEN** it found `GIT_CONFIG_COUNT` and `GIT_CONFIG_KEY_0`–`_2` and `GIT_CONFIG_VALUE_0`–`_2`, `/root/.gitconfig` written at 22:48 after the 22:47 activation, and `file:/root/.config/git/config	/home/user/ghq`
+
+#### Scenario: The harness overrides a key the profile relies on
+
+- **WHEN** a key the profile sets in `/root/.config/git/config` is shadowed by the harness's file or its environment overrides
+- **THEN** this assumption is void for that key, and the `claude-sandbox-bootstrap` requirement `One source for agent context and skills` must be re-checked for any instruction that depends on it
+
+### Requirement: A187 — The platform refuses a setup-script line wider than 200 columns
+
+It is true of a cloud environment, independent of what this fleet builds, that the platform refuses a setup script holding any line wider than 200 columns, a tab counting 8, before an approval card is shown, so the script never changes.
+Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL lose its discharge once the violation below is observed.
+
+#### Scenario: Measured on 2026-11-22
+
+- **WHEN** task 5.3's controller sent Default a setup script whose line 2 was 402 columns
+- **THEN** `update_environment` answered `setup_script line 2 is 402 columns wide (a tab counts 8); keep each line to at most 200 (split long commands with "\" continuations) so the person approving can read all of it`, and nothing was changed
+
+#### Scenario: The platform's limit changes
+
+- **WHEN** the platform accepts a wider line, or refuses one of 200 columns or fewer
+- **THEN** this assumption is void, and the `claude-sandbox-interface` requirement `The setup box holds a fixed bootstrap` and the `claude-sandbox-setup-script` check's 200-column limit must be revised to the observed limit

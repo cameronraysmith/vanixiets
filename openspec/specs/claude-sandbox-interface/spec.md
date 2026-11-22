@@ -8,30 +8,121 @@ They do not guarantee that the caches still hold the path, that the platform run
 
 ## Requirements
 
-### Requirement: The setup step names the activation package by store path
+### Requirement: An environment can be pinned by an argument
 
-The setup step SHALL name the `claude-sandbox@x86_64-linux` home-manager activation package by its Nix store path and fetch that path with `nix-store --realise` from `cache.scientistexperience.net` and `cache.nixos.org`, trusting only their public keys.
-It SHALL then run the path's `activate` as root, and SHALL NOT evaluate a flake.
+(R2) Given a store path as the argument after `--` in the setup box, the setup app SHALL realise that path from the two caches under their keys and activate it, without evaluating a flake or walking `main`.
+The pin SHALL be an argument, not an environment variable, because the setup step cannot read the environment's variables (A172).
+Relies on: A172, A177; S: the app's argument handling.
 
-#### Scenario: The generated script is read
+#### Scenario: A pinned bootstrap runs
 
-- **WHEN** `nix run .#claude-sandbox-setup-script` prints the setup script for a revision
-- **THEN** it assigns `P` the store path of that revision's activation package, realises `P` with only those two substituters and their keys, and runs `"$P/activate"`, with no `nix eval`, `nix build` or flake reference
+- **WHEN** the setup box's flake reference is followed by `-- /nix/store/…-home-manager-generation`
+- **THEN** the app realises and activates that path with no `git clone` or walk evaluation, and its marker records `mode=pinned`
 
-### Requirement: The named store path is the CI check's output
+### Requirement: The setup box holds a fixed bootstrap
 
-The store path the setup step names SHALL be the output of `checks.x86_64-linux.home-manager-claude-sandbox` at the revision the script's first comment line records, so that the build service builds it and publishes it to `cache.scientistexperience.net`.
+(R3) The setup box SHALL hold a fixed bootstrap generated from `lib/caches.nix`: `#!/bin/bash`; one `nix run` command, split by `\` continuations into lines of at most 200 columns, with the two caches, their keys and `accept-flake-config false`, on `git+https://github.com/cameronraysmith/vanixiets?ref=main&shallow=1#claude-sandbox-setup`; and `exit 0`.
+Relies on: A170, A175, A184, A187, T5; S: the `claude-sandbox-setup-script` check.
 
-#### Scenario: The script's store path is checked
+#### Scenario: The documented bootstrap drifts
 
-- **WHEN** the `claude-sandbox-setup-script` check is built for a revision
-- **THEN** it fails unless the script's `P` equals that revision's `home-manager-claude-sandbox` output path
+- **WHEN** `lib/caches.nix` changes, a bootstrap line exceeds 200 columns with a tab counting 8, or the bootstrap in the app module's comment or the profile's README differs from the lines the check generates
+- **THEN** the `claude-sandbox-setup-script` check fails evaluation, naming the wide line or the file
 
-### Requirement: The setup script stays within the platform's limits
+#### Scenario: A commit changes the setup app
 
-The generated setup script SHALL have at most 100 lines of at most 200 bytes each once its revision and date are filled in, and its last line SHALL be `exit 0`.
+- **WHEN** a commit on `main` changes `modules/apps/claude-sandbox-setup.sh`
+- **THEN** the setup box is unchanged, and the next environment snapshot runs the changed app
 
-#### Scenario: A script over the limits
+### Requirement: Cloud sessions run main's newest published closure
 
-- **WHEN** the template would produce a line over 200 bytes once filled, more than 100 lines, or a last line other than `exit 0`
-- **THEN** the `claude-sandbox-setup-script` check fails evaluation with its own message
+(R1) Without a pin, each environment snapshot SHALL hold the `claude-sandbox@x86_64-linux` closure of the newest of `main`'s 5 newest first-parent commits that `cache.scientistexperience.net` serves, with no operator action per update.
+Relies on: A175, A184, A185, T1, T2, T4; S: the app's walk, the fixed bootstrap (R3), substitution (R7).
+
+#### Scenario: A profile change lands on main
+
+- **WHEN** a commit on `main` changes the profile and nixbot has published its closure
+- **THEN** the next environment snapshot holds that closure, with no change to the setup box
+
+### Requirement: Track mode walks back main's first-parent history
+
+Without a pin, the setup app SHALL list `main`'s 5 newest first-parent commits and, from the tip, evaluate each one's activation package path with the two caches and keys passed as bash arrays.
+It SHALL accept the first path whose narinfo `cache.scientistexperience.net` answers with 200, treating a failed evaluation as a miss, and stop after 5 commits or about 300 s.
+
+#### Scenario: The tip is unpublished
+
+- **WHEN** the tip's narinfo answers 404 and its parent's answers 200
+- **THEN** the setup app accepts the parent's path without evaluating further commits
+
+#### Scenario: The budget runs out
+
+- **WHEN** 5 commits are missed or about 300 s pass
+- **THEN** the setup app activates nothing, records the misses, and exits 0
+
+### Requirement: The setup logic is the claude-sandbox-setup app
+
+(R4) The setup logic SHALL be the flake app `claude-sandbox-setup`, declared as `modules/apps/claude-sandbox-setup.nix` with its text in the co-located `claude-sandbox-setup.sh`, built by `writeShellApplication` so that its build shellchecks it.
+Relies on: A177; S: the app's build, which the `claude-sandbox-setup-script` check depends on.
+
+#### Scenario: The script has a shellcheck finding
+
+- **WHEN** `modules/apps/claude-sandbox-setup.sh` holds a construct shellcheck reports
+- **THEN** the app's build fails, and with it the `claude-sandbox-setup-script` check
+
+### Requirement: Every command the setup logic calls comes from the flake
+
+(R5) Every external command the setup app runs SHALL come from its `runtimeInputs`, Nix included; only bash and the image's Nix come from the image, and only to start the app.
+Relies on: A177; S: the app's `runtimeInputs`, the bootstrap's options.
+
+#### Scenario: The image lacks a tool
+
+- **WHEN** the image has no `git` or `awk` on its `PATH`
+- **THEN** the app still lists, evaluates, realises and activates, since its wrapper's `PATH` names them from the store
+
+### Requirement: Setup never fails the session
+
+(R6) The setup box and the setup app SHALL both end in `exit 0`, and every run of the app SHALL append one marker line to `/var/log/claude-sandbox-bootstrap/setup.log`.
+Relies on: A170; S: the app's final `exit 0` and its one marker write, the `claude-sandbox-setup-script` check.
+
+#### Scenario: Nothing can be activated
+
+- **WHEN** none of the 5 newest commits is published, or the realise or activation fails
+- **THEN** the app writes its marker and exits 0, and the session starts without the profile
+
+### Requirement: The profile's closure is substituted, never built
+
+(R7) The setup app SHALL realise the profile's closure with `--max-jobs 0 --option builders ''` from the two caches, so a missing path fails instead of building; small local builds outside the profile, such as the app's wrapper, are allowed.
+Relies on: A175, T4; S: the realise options, the walk (R1), the `claude-sandbox-setup-script` check.
+
+#### Scenario: Part of the closure is missing from the caches
+
+- **WHEN** the realise needs a path neither cache serves
+- **THEN** it fails without building, activation is skipped, and the app exits 0
+
+### Requirement: The marker records the walk
+
+Each run's marker SHALL name the outcome (`mode=pinned`, `tracked` or `none`), `main`'s tip when the walk ran, the commit used and its distance from that tip, each skipped commit with its reason, and the walk's seconds and the realise and activate codes and seconds.
+
+#### Scenario: A run that walked back
+
+- **WHEN** the setup app accepted `main~1` after the tip's evaluation failed
+- **THEN** its marker names that commit, distance 1, and the tip with reason `eval` and its exit code
+
+### Requirement: The staleness hook only reads
+
+A SessionStart hook SHALL compare the commit the snapshot's marker records with `main`'s tip from `git ls-remote`, and append one `staleness` line to `run.log` with that commit, the distance the marker recorded, and whether the tip differs; it SHALL print nothing and exit 0.
+It SHALL NOT fetch history, evaluate, realise or activate anything.
+
+#### Scenario: The hook runs in a stale session
+
+- **WHEN** a session starts from a snapshot whose marker records `main~2`, and `main`'s tip has moved since
+- **THEN** `run.log` gains one `staleness` line naming the commit, distance 2 and a moved tip, the hook's stdout is empty, and the current home-manager generation is unchanged
+
+### Requirement: Every lock source is in the cache
+
+`checks.x86_64-linux.flake-input-sources` SHALL refer to the source of every non-`path` node of `flake.lock`, so that nixbot's upload of its output puts each in `cache.scientistexperience.net`, and the cache-completeness timer covers that output on `main`.
+
+#### Scenario: A lock change adds an input
+
+- **WHEN** a commit adds a flake input and its build lands on `main`
+- **THEN** the check's output refers to the new input's source, so the upload of the output's closure carries it, and cache-completeness fails if the check's output is not served

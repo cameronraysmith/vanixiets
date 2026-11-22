@@ -11,8 +11,8 @@ Sources:
 
 ### State of the two environments
 
-Default runs the fixed bootstrap since task 5.3 (card approved at about 04:09:22Z on 2026-11-22), stored as the 7-line form the check generates; before that, both environments ran the track-mode script pasted from the retired generator (D2).
-Task 5.4 deletes `nix-sandbox-test`, which still runs the pasted track-mode script.
+Default runs the fixed bootstrap since task 5.3 (card approved at about 04:09:22Z on 2026-11-22), stored as the 7-line form the check generates, plus a refresh-trigger line since task 6.5 (`main=0cd1be05`); before that, both environments ran the track-mode script pasted from the retired generator (D2).
+`nix-sandbox-test` was archived by the operator on 2026-11-22 (task 5.4); Default and Network are the active environments.
 
 - Default (`env_011CULN8FWHtshNCrzLVdbp4`) ran the generated pinned script for `7c2a300ba97299b7f5c1d4453b3f0225ddaf0e72`, closure `d96f192x7b6r0gwahpdy877nsv2a6ad9-home-manager-generation`, from `bootstrap-claude-sandbox` task 7.2 until task 3.2 swapped it to the track-mode script (card approved at about 01:48Z on 2026-11-22).
 - `nix-sandbox-test` (`env_01GcXHMR3GM8Nv2encoaVjvs`) ran session 4's pinned script for `8c41bceba1e75f12c9fb9906eda0d3fa0346dc55`, closure `i6f12svdd7j8xcj85vdk6avimkfzwy0b-home-manager-generation`, until task 3.1 swapped it to the track-mode script (card approved at about 01:39:40Z on 2026-11-22).
@@ -259,6 +259,12 @@ All decided by the operator on 2026-11-22.
 - **Choice**: every lock change must keep all input sources in niks3; `checks.x86_64-linux.flake-input-sources` (#4127) holds them there.
   A miss shows in the setup step's marker as an `eval` miss for that commit, and the hourly cache-completeness timer on magnetite fails if the check's output is not served.
 - **Boundaries**: vendored-versus-first-party: the sources are vendored flake inputs; the check is first-party and copies none of them, only references them.
+
+### The cloud-session loop and the refresh trigger (tasks group 6)
+
+A change on `main` reaches a tracking environment only when its snapshot is rebuilt (D4), and the sanctioned way to force that is one refresh-trigger line before `exit 0` in the stored bootstrap, `# refresh trigger <date> (main=<sha8> builds <hash>)`, printed by `nix run .#claude-cloud-session -- refresh-line` from GitHub's `main` and a pure evaluation of the activation package, at one approval card; it is the rollout mechanism, and a revert on `main` plus a refresh the rollback.
+Sessions are then driven and observed from the CLI: `claude-cloud-session` creates a session with an explicit environment, sends follow-ups through `claude -p --cloud`, and reads each turn from the branch `claude/transcripts/<session>` that the profile's Stop hook pushes after a gitleaks scan, never teleporting; `session.json` there names the checkout, the profile's commit (`marker.rev`) and the setup app's (`marker.tip`).
+On 2026-11-22 the loop ran end to end on Default after a refresh to `0cd1be05` (tasks 6.5): two rounds of create or send, wait and fetch, the second a fast-forward of the first.
 
 ## Risks / Trade-offs
 

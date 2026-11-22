@@ -1,3 +1,5 @@
+> **Superseded in part**: the generator design this plan executes (Task 1's `--track` app and `flake.lib.claudeSandboxSetupScript`) was replaced by design.md D2 (final), a fixed bootstrap running the flake app `claude-sandbox-setup` (tasks group 5); this plan is kept as the historical execution record.
+
 # Track `main` in Claude Code cloud sessions Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
