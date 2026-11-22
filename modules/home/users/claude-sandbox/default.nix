@@ -171,28 +171,6 @@ let
           exit 0
         '';
       };
-
-      # Publishes the transcript after each turn to its own branch,
-      # claude/transcripts/<session>, for `claude-cloud-session wait` and
-      # `fetch` to read from outside the cloud; see transcript-publish.sh.
-      # bashOptions is empty because a Stop hook must never fail the turn. Its
-      # gitleaks configuration, transcript-gitleaks.toml, is held by the
-      # claude-sandbox-transcripts check.
-      transcriptHook = pkgs.writeShellApplication {
-        name = "claude-sandbox-transcripts";
-        runtimeInputs = [
-          pkgs.coreutils
-          pkgs.git
-          pkgs.gitleaks
-          pkgs.jq
-        ];
-        bashOptions = [ ];
-        text = ''
-          log_dir=${lib.escapeShellArg config.vanixiets.sandbox.bootstrapReport.directory}
-          gitleaks_config=${./transcript-gitleaks.toml}
-          ${builtins.readFile ./transcript-publish.sh}
-        '';
-      };
     in
     {
       home.stateVersion = "23.11";
@@ -255,16 +233,7 @@ let
             ];
           }
         ];
-        settings.hooks.Stop = [
-          {
-            hooks = [
-              {
-                type = "command";
-                command = lib.getExe transcriptHook;
-              }
-            ];
-          }
-        ];
+        # No Stop hook publishes transcripts: the repository is public, so the claude-sandbox-transcripts hook (transcript-publish.sh) is disabled until publish-claude-sandbox-transcripts-to-r2 moves it to R2.
       };
 
       # ghq puts acquired repositories beside the attached ones rather than in

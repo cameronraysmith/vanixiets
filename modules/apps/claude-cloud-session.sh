@@ -8,12 +8,14 @@ Usage:
   claude-cloud-session send <session|name> <message | ->
   claude-cloud-session wait <session|name> [--timeout <seconds>]
   claude-cloud-session fetch <session|name> [<out>]
-  claude-cloud-session prune --older-than <days> [--yes]
+  claude-cloud-session prune [--older-than <days>] [--all | <session|name>...] [--yes]
   claude-cloud-session refresh-line
 
-Drives Claude Code cloud sessions from the command line and reads their
-transcripts from the branches the claude-sandbox profile's Stop hook pushes,
-claude/transcripts/<session>.
+Drives Claude Code cloud sessions from the command line. Transcript
+publishing is disabled: the claude-sandbox profile's Stop hook pushed each
+turn to claude/transcripts/<session> in this repository, which is public, so
+the profile no longer installs it (publish-claude-sandbox-transcripts-to-r2
+will move it to R2). wait and fetch read those branches and so find none.
 
   create  Starts a cloud session whose first message is the prompt file's
           text, named <name>-<sha7> after the commit it should start from,
@@ -32,10 +34,14 @@ claude/transcripts/<session>.
   wait    Polls the session's transcript branch until its newest turn has
           finished (the last message is the assistant's, with no tool call
           pending) and holds the last prompt sent, then prints the branch.
+          With no branch for the session, exits 1 at once: publishing is off.
   fetch   Writes the session's transcript to
-          logs/claude-sandbox/sessions/<session>.jsonl, or <out>.
-  prune   Lists transcript branches whose last commit is older than <days>;
-          --yes deletes them.
+          logs/claude-sandbox/sessions/<session>.jsonl, or <out>; exits 1
+          when the session has no branch.
+  prune   Lists transcript branches to delete: by default only those of the
+          sessions in this machine's index.tsv, or of the sessions named, or
+          with --all every claude/transcripts/* branch; --older-than narrows
+          them to those whose last commit is older than <days>. --yes deletes.
   refresh-line
           Prints only the line to add, or replace, before `exit 0` in a cloud
           environment's setup script so its snapshot is rebuilt now:
@@ -61,6 +67,7 @@ die() {
 
 state=${XDG_CACHE_HOME:-$HOME/.cache}/claude-cloud-session
 scratch=$state/scratch.git
+disabled="transcript publishing is disabled (the repository is public), so this session has no transcript branch; see modules/home/users/claude-sandbox/README.md, section \"Observing a session\""
 
 # The caller's checkout, read only: its top level for logs/, and its origin.
 context() {
@@ -228,6 +235,7 @@ cmd_wait() {
     esac
   done
   [ -r "$state/$id.prompts" ] && want=$(cat "$state/$id.prompts")
+  branch_of "$id" >/dev/null || die "$disabled"
   deadline=$(($(date +%s) + timeout))
   while [ "$(date +%s)" -lt "$deadline" ]; do
     if branch=$(branch_of "$id") && read -r prompts finished < <(transcript_of "$branch" | turn_state) &&
@@ -244,27 +252,41 @@ cmd_fetch() {
   [ $# -ge 1 ] || die "fetch needs <session|name>" 2
   local id branch out
   id=$(resolve "$1")
-  branch=$(branch_of "$id") || die "no transcript branch for $id yet"
+  branch=$(branch_of "$id") || die "$disabled"
   out=${2:-$sessions/$id.jsonl}
   mkdir -p "$(dirname "$out")"
   transcript_of "$branch" >"$out" || die "cannot read $branch"
   echo "$out"
 }
 
+# Deletes transcript branches: by default only those of the sessions this
+# machine created (index.tsv), or of the sessions named, or with --all every
+# claude/transcripts/* branch; --older-than narrows by last commit. Dry run
+# unless --yes.
 cmd_prune() {
-  local days='' yes=0 cutoff refs ref old=()
+  local days='' yes=0 all=0 cutoff ref id old=() wanted=()
   while [ $# -gt 0 ]; do
     case $1 in
       --older-than) days=${2:?--older-than needs days}; shift 2 ;;
       --yes) yes=1; shift ;;
-      *) die "unknown option $1" 2 ;;
+      --all) all=1; shift ;;
+      -*) die "unknown option $1" 2 ;;
+      *) wanted+=("$(resolve "$1")"); shift ;;
     esac
   done
-  [[ $days =~ ^[0-9]+$ ]] || die "prune needs --older-than <days>" 2
-  cutoff=$(($(date +%s) - days * 86400))
+  [ -z "$days" ] || [[ $days =~ ^[0-9]+$ ]] || die "--older-than needs a number of days" 2
+  [ "$all" = 0 ] || [ ${#wanted[@]} = 0 ] || die "--all takes no session names" 2
+  if [ "$all" = 0 ] && [ ${#wanted[@]} = 0 ] && [ -r "$index" ]; then
+    mapfile -t wanted < <(awk -F '\t' 'NR > 1 && $2 != "" { print $2 }' "$index")
+  fi
+  cutoff=$(($(date +%s) - ${days:-0} * 86400))
   fetch_transcript_refs || die "cannot fetch the transcript branches"
   for ref in "${refs[@]}"; do
-    if [ "$(g log -1 --format=%ct "$ref")" -lt "$cutoff" ]; then
+    id=${ref#refs/heads/claude/transcripts/}
+    if [ "$all" = 0 ] && ! printf '%s\n' "${wanted[@]}" | grep -qxF -- "$id"; then
+      continue
+    fi
+    if [ -z "$days" ] || [ "$(g log -1 --format=%ct "$ref")" -lt "$cutoff" ]; then
       old+=("$ref")
       printf '%s %s\n' "$(g log -1 --format=%cs "$ref")" "${ref#refs/heads/}"
     fi

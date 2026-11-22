@@ -84,19 +84,18 @@ To target another environment for one session, add `--settings '{"remote":{"defa
 
 ## Observing a session
 
-After each turn, the Stop hook `claude-sandbox-transcripts` publishes the session's transcript to its own branch, `claude/transcripts/<session>`: an orphan branch on the first turn, then one fast-forward commit per turn.
-Each commit holds `<session>.jsonl`, the transcript, and `session.json`: the cloud session id and the cloud-local uuid, the first prompt's first line, the start time, the checkout's commit, and the setup marker's `mode`, `tip`, `rev`, `dist` and `P`.
-The hook runs `gitleaks` on the transcript first, with its own configuration, `transcript-gitleaks.toml`: the default rules, minus three kinds of harness metadata that the default `generic-api-key` rule misread in every cloud transcript on 2026-11-22 (the `access is scoped to: \`owner/repo\`` notice, the `anthropic-beta` list of api-request records, and `turnAttributionKey`), each allowlisted only as a whole, anchored finding; the `claude-sandbox-transcripts` check holds it to finding a planted canary beside each.
-A finding pushes nothing and leaves `reason=gitleaks` in `/var/log/claude-sandbox-bootstrap/transcripts.log`, which logs one line per turn, written only after the turn ends.
-It works in a scratch repository under `/tmp`, never in the session's checkout, and prints nothing.
+**Transcript publishing is disabled.**
+From #4135 to the fix that disabled it, the profile's Stop hook `claude-sandbox-transcripts` pushed every turn's full transcript to a branch `claude/transcripts/<session>` of this repository, which is public, so every Default session's transcript was published, including Linear data read during the session.
+Its gitleaks scan (`transcript-gitleaks.toml`) catches credentials, not confidential content, so it could not prevent that.
+The profile no longer installs the hook; `transcript-publish.sh`, `transcript-gitleaks.toml` and the `claude-sandbox-transcripts` check stay, for the change `publish-claude-sandbox-transcripts-to-r2`, which is to publish transcripts to private R2 storage instead.
+An environment whose snapshot predates the fix still runs the hook until its next snapshot rebuild; a refresh-trigger line (above) forces one.
 
-- The branch is keyed by the cloud session id, `session_01…`, which the hook reads from the transcript's `remote_session_change` record. A probe session on 2026-11-22 found the id there (5 occurrences in its own transcript) and in no environment variable: `CLAUDE_CODE_REMOTE_SESSION_ID` and `CLAUDE_CODE_SESSION_ID` exist, but no variable's value contains `session_01`. A transcript without that record falls back to the cloud-local uuid, and `session.json` then identifies the session by its first prompt.
-- The hook pushes to `git remote get-url --push origin` of the session's checkout, so it uses the same credentials as the session's own pushes: the probe found origin to be `https://github.com/cameronraysmith/vanixiets`, with the harness's `credential.https://github.com.helper` and `url.*.insteadof` set in its git configuration.
+`nix run .#claude-cloud-session -- --help` still creates sessions and sends them follow-ups: `create` starts a session named `<name>-<sha7>` and records it in `logs/claude-sandbox/sessions/index.tsv`, and `send` adds a turn.
+Its `wait` and `fetch` read the transcript branches, find none, and say so.
+`claude-cloud-session prune` deletes leftover branches: by default only those of the sessions in this machine's `index.tsv`, or of the sessions named, or with `--all` every `claude/transcripts/*` branch; it is a dry run unless given `--yes`.
 
-`nix run .#claude-cloud-session -- --help` drives sessions and reads these branches from outside the cloud, without teleporting a session; its git work happens in a scratch repository, never in the caller's checkout, where it only writes under the ignored `logs/`:
-`create` starts a session named `<name>-<sha7>` and records it in `logs/claude-sandbox/sessions/index.tsv`, `send` adds a turn, `wait` polls the branch until a turn has finished, and `fetch` writes the transcript to `logs/claude-sandbox/sessions/<session>.jsonl`.
-The branches accumulate: `claude-cloud-session prune --older-than <days>` lists those whose last commit is older, and `--yes` deletes them.
-The `sandbox-claude-cloud` skill covers when to use cloud sessions, the create, wait, fetch and send loop, and the CLI's traps.
+Observing a session therefore currently means `claude --teleport <session_01…>`, run outside any jj working copy, for example in a scratch clone: it makes a local copy of the session with a new id and a derived-from record, checks out the session's branch, writes the local JSONL only after one local turn, and can catch a turn mid-way ("Tool call result not in this copy").
+The `sandbox-claude-cloud` skill covers when to use cloud sessions and the CLI's traps.
 
 ## Operator steps for a new environment
 

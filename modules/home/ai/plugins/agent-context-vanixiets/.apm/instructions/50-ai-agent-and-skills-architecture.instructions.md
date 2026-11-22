@@ -14,7 +14,7 @@ At build time `pkgs/by-name/apm-skills-compose/` composes those packages, plus r
 The delivered `~/.claude/skills/<skill>/SKILL.md` is a read-only Nix store symlink, so edits belong in the plugins source in this repository.
 
 `modules/home/ai/` also holds per-harness home-manager modules for hooks, MCP servers, settings, and wrappers, one directory per agent tool.
-Claude Code cloud sessions are created, steered and observed with `nix run .#claude-cloud-session` and the `sandbox-claude-cloud` skill; `modules/home/users/claude-sandbox/README.md` covers this repository's environments, setup step and transcript branches.
+Claude Code cloud sessions are created and steered with `nix run .#claude-cloud-session` and the `sandbox-claude-cloud` skill; `modules/home/users/claude-sandbox/README.md` covers this repository's environments and setup step, and why transcript publishing is disabled (the repository is public).
 
 ## Instructions packages are a separate primitive
 
