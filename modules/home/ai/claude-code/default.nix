@@ -76,12 +76,6 @@ in
                     repo = "anthropics/claude-plugins-official";
                   };
                 };
-                cognee = {
-                  source = {
-                    source = "directory";
-                    path = "${pkgs.agent-plugins-cognee}";
-                  };
-                };
                 cloudflare = {
                   source = {
                     source = "directory";
@@ -145,8 +139,6 @@ in
                 "skill-creator@claude-plugins-official" = true;
                 # superpowers ships per skill through the apm compose (the flat composed copy in modules/home/ai/skills), so the duplicate Claude-plugin delivery is disabled.
                 "superpowers@claude-plugins-official" = false;
-                # cognee
-                "cognee-memory@cognee" = false;
                 # cloudflare
                 "cloudflare@cloudflare" = false;
                 # dagster
