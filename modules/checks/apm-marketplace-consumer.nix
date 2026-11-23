@@ -8,10 +8,11 @@
 # The check fails when apm does not register exactly the groups that
 # marketplace.packages publishes, when a group does not install (a misspelled
 # source), when a skills group deploys no flat skill tree (apm deploying it
-# whole, under .agents/plugins), and when an installed skill or instructions
-# fragment differs from its source byte for byte.
-# Groups with remote dependencies need the network; `just
-# agents-marketplace-remote` installs them from GitHub.
+# whole, under .agents/plugins), when an installed skill or instructions
+# fragment differs from its source byte for byte, and when the number of
+# groups installed is not the source tree's number of groups without
+# dependencies, or is zero. Groups with remote dependencies need the network;
+# `just agents-marketplace-remote` installs them from GitHub.
 #
 # One system: the marketplace and plugin trees do not depend on the platform.
 { lib, ... }:
@@ -115,6 +116,18 @@
                 installed=$((installed + 1))
               done
               [ "$status" -eq 0 ] || exit 1
+              # Counted from the source tree, not from what apm registered, so a
+              # skipped group, or no group left to install offline, fails.
+              offline=0
+              for manifest in "$plugins"/*/apm.yml; do
+                if [ "$(yq -r '.dependencies // {} | length' "$manifest")" -eq 0 ]; then
+                  offline=$((offline + 1))
+                fi
+              done
+              if [ "$offline" -eq 0 ] || [ "$installed" -ne "$offline" ]; then
+                echo "FAIL: installed $installed groups; the source tree has $offline without dependencies, and at least one must install offline" >&2
+                exit 1
+              fi
               echo "installed $installed of $(wc -l < proj/registered) registered groups" | tee "$out"
             '';
       };

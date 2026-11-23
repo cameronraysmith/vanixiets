@@ -6,10 +6,12 @@
 #
 # It fails when validation fails (a skills path without "./"), when an entry
 # does not install (a source naming a missing directory, which validation
-# passes), and when a plugin's skills differ from its group's (an entry
-# without `skills` installs with none). The entry shape is undocumented
-# (world assumption A217, observed with Claude Code 2.1.330), so a claude-code
-# bump that changes it fails here.
+# passes), when a plugin's skills differ from its group's (an entry without
+# `skills` installs with none), and when the skills installed are fewer or more
+# than the source tree's first-party skill directories (an entry missing from
+# the manifest). The entry shape is undocumented (world assumption A217,
+# observed with Claude Code 2.1.330), so a claude-code bump that changes it
+# fails here.
 #
 # One system: the marketplace and plugin trees do not depend on the platform.
 { lib, ... }:
@@ -75,6 +77,11 @@
                 total=$((total + $(wc -l < got)))
               done
               [ "$status" -eq 0 ] || exit 1
+              skills=$(find repo/modules/home/ai/plugins/*/.apm/skills -mindepth 1 -maxdepth 1 -type d | wc -l)
+              if [ "$skills" -eq 0 ] || [ "$total" -ne "$skills" ]; then
+                echo "FAIL: installed $total skills; the source tree has $skills first-party skills" >&2
+                exit 1
+              fi
               echo "total $total" | tee "$out"
             '';
       };
