@@ -1,6 +1,0 @@
-{
-  "name": "preferences-web-platform-and-deployment",
-  "version": "0.0.0",
-  "description": "Web platform and deployment preferences — platform foundations, hypermedia development and documents, React/TanStack UI, web-application deployment, Cloudflare Wrangler.",
-  "skills": ["./.apm/skills"]
-}

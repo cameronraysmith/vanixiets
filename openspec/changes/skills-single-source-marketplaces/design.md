@@ -72,6 +72,7 @@ The operator, who bumps `llm-agents` and reviews regenerated files; the fleet's 
 
 - **Choice**: delete the 22 root `plugin.json` files.
 - **Rationale**: apm types a group `apm_package` because its `apm.yml` is "eligible" (it has `.apm/`), and that rule precedes any plugin-manifest rule, so the file has no effect on install. Verified on 2026-11-23 with apm 0.38.0: compose from a scratch flake copy without the files, 177 skills per tree, `nix hash path` equal to `main`'s; the download rebuilt to the same hash; a third-party consumer got flat, byte-identical skills; `apm pack` wrote the same file. No code reads them. Boundary: source-versus-delivered (source files removed, delivered trees unchanged).
+- **Supported apm**: the marketplace supports the apm version this repository builds with (0.38 at the time of writing) and later releases; older apm may deploy no skills from it. Operator decision, 2026-11-23: this unstable project needs no backwards compatibility, so the deletion is not tested on apm 0.36 or older, and the plugins README states the same to consumers.
 - **Alternatives considered**: keeping the files as Claude manifests. Claude reads only `.claude-plugin/plugin.json`; it did read the root file's version (undocumented), which is a reason to delete it, not to keep it.
 
 ### D3: versions live only where apm requires them

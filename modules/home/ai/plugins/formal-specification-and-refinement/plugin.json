@@ -1,6 +1,0 @@
-{
-  "name": "formal-specification-and-refinement",
-  "version": "0.0.0",
-  "description": "Formal specification and refinement skills — Nucleus platform, refinement-driven development, WRSPM requirements engineering, satisfaction-argument audit.",
-  "skills": ["./.apm/skills"]
-}

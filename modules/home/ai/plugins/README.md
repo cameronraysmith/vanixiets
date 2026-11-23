@@ -7,11 +7,10 @@ created: 2026-08-25
 
 126 skills across 18 apm packages, published as a marketplace any project can install independently of the Nix configurations.
 These counts are computed rather than maintained here: `testing-and-quality/.apm/skills/harborize/scripts/census.py --root modules/home/ai/plugins` regenerates `census.json`, whose `provenance` block carries the authoritative totals and the revision they were taken at.
-Each group directory carries an `apm.yml` and a `plugin.json`; the marketplace manifest is `../../../../.github/plugin/marketplace.json`.
+Each group directory carries an `apm.yml` beside its `.apm/` tree and no other manifest; the marketplace manifest is `../../../../.github/plugin/marketplace.json`.
 
-Each `plugin.json` declares `"skills": ["./.apm/skills"]`, and apm enumerates that container's immediate children as the deployable set.
-Adding a skill still means creating `<group>/.apm/skills/<name>/SKILL.md`; there is no registration step, since the container declaration covers every child without naming it.
-apm 0.29.0 requires a plugin-classified package to declare its skill sources, so an undeclared `.apm/skills/` directory deploys nothing.
+apm types a group as an apm package because its `apm.yml` sits beside an `.apm/` directory, and deploys every immediate child of `.apm/skills/`.
+Adding a skill still means creating `<group>/.apm/skills/<name>/SKILL.md`; there is no registration step.
 
 ## Two things that will silently discard your edits
 
@@ -63,7 +62,8 @@ The updaters of `mergify-cli-bin`, `worktrunk-bin` and `linear-cli` rewrite the 
 apm therefore installs only those skill directories: neither repository's hooks, agency's subagents nor its rule are installed, and a plain `apm install` of this package succeeds for the `agent-skills`, `claude`, `codex`, `copilot`, `cursor`, `gemini` and `opencode` targets (`logs/apm-marketplace-20261118-134756.log`).
 superpowers' SessionStart hook, which loads `using-superpowers` at the start of each session, is deliberately absent; apm 0.36 refuses superpowers' hook files, and upstream declined apm support (obra/superpowers#2681).
 For that hook and the plugin experience, install superpowers natively instead (`/plugin install superpowers@claude-plugins-official`, or its README for other harnesses), and either do not install `planning-and-development` alongside it or remove its superpowers lines, so the same skills are not installed twice.
-These dependencies were tested with apm 0.36.0, the version this repository builds with (`modules/nixpkgs/overlays/apm.nix`).
+The marketplace supports the apm version this repository builds with (`modules/nixpkgs/overlays/apm.nix`; 0.38 at the time of writing) and later releases.
+Older apm may install a group from it yet deploy none of its skills.
 Installers other than apm read `../../../../.github/plugin/marketplace.json`, whose entries name only each package's source directory, so they do not resolve `apm.yml` dependencies and install none of the remote skills.
 
 ## Authoring

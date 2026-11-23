@@ -7,7 +7,7 @@ description: vanixiets AI agent skills architecture — apm packaging, the compo
 Agent skills are packaged as apm marketplace plugins.
 The source of truth for every first-party skill is `modules/home/ai/plugins/<group>/.apm/skills/<skill>/SKILL.md`.
 The corpus size is computed, not maintained as a number in prose: a hand-written count has already drifted across this repository's own documents more than once, so treat any specific figure you read as a snapshot, not a fact, and recompute it with a glob such as `fd --hidden SKILL.md modules/home/ai/plugins/*/.apm/skills` when you need a current total.
-Each `<group>/` carries an `apm.yml` and a `plugin.json` manifest beside its `.apm/skills/` tree, and the marketplace manifest is `.github/plugin/marketplace.json`.
+Each `<group>/` carries an `apm.yml` beside its `.apm/` tree and no other manifest, and the marketplace manifest is `.github/plugin/marketplace.json`.
 
 At build time `pkgs/by-name/apm-skills-compose/` composes those packages, plus remote apm dependencies resolved offline, into a flat skill tree.
 `modules/home/ai/skills/{compose.nix,default.nix}` re-globs that tree and delivers it through home-manager symlinks to each harness's skills directory.
@@ -20,7 +20,7 @@ Past agent sessions are queryable read-only: `nix run .#obs-query` for SQL and f
 ## Instructions packages are a separate primitive
 
 The `agent-context-*` packages, this one included, ship only `.apm/instructions/*.instructions.md` fragments and carry no `.apm/skills/` directory.
-apm discovers and renders these into a compiled `AGENTS.md` independently of the skills pipeline described above; a package that mixed both primitives would still need the skills declaration in `plugin.json` for its skills half.
+apm discovers and renders these into a compiled `AGENTS.md` independently of the skills pipeline described above.
 See "Agent context composition" in this package for how these fragments reach both the repository-root `AGENTS.md` and the user-level harness surfaces.
 
 ## Issue tracking

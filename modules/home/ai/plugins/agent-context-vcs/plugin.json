@@ -1,6 +1,0 @@
-{
-  "name": "agent-context-vcs",
-  "version": "0.0.0",
-  "description": "Git-baseline version-control agent context — dispatch-unit/VCS-mode detection and the standing commit-behavior override, true whether or not jj is present.",
-  "skills": []
-}

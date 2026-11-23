@@ -1,6 +1,0 @@
-{
-  "name": "agent-context-vcs-jj",
-  "version": "0.0.0",
-  "description": "jj workstation-mechanics agent context — dispatch protocol in jj mode, working-copy discipline and hazards, and worktree/external-framework interop; omittable where jj is absent.",
-  "skills": []
-}

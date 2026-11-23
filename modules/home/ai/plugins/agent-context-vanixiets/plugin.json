@@ -1,5 +1,0 @@
-{
-  "name": "agent-context-vanixiets",
-  "version": "0.0.0",
-  "description": "Repository-specific agent context for vanixiets — architecture, file provenance, reference repositories, fleet and skills conventions, and the composition recipe for the generated AGENTS.md."
-}

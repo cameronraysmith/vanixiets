@@ -1,6 +1,0 @@
-{
-  "name": "planning-and-development",
-  "version": "0.0.0",
-  "description": "Planning and development skills — agentic planning-and-development workflow, the bundled OpenSpec change-lifecycle workflow skills, OpenSpec/Linear sync, and project management.",
-  "skills": ["./.apm/skills"]
-}

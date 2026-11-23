@@ -153,7 +153,7 @@ pi needs no new skills sink, and the earlier recommendation to make it the sixth
 pi already scans `~/.agents/skills` as a global discovery root, registered at `package-manager.ts:2375` and deliberately placed outside the project-trust gate, and it follows symlinks.
 The nix cost is therefore zero: the existing home-manager delivery to `~/.agents/skills` already reaches pi with no module change at all.
 Verified in the earlier packaged-binary pass: pi run from cwd `/tmp` with `--no-approve` enumerated 127 skills, every one of them reporting a location under `/Users/crs58/.agents/skills/`; this probe was not rerun against pi 0.84.1.
-Nothing upstream changes either: the compose derivation, `apmTargets`, the plugin layout, each `apm.yml` and `plugin.json`, and `.github/plugin/marketplace.json` are all harness-agnostic, and apm 0.27.0 has no `pi` target.
+Nothing upstream changes either: the compose derivation, `apmTargets`, the plugin layout, each `apm.yml`, and `.github/plugin/marketplace.json` are all harness-agnostic, and apm 0.27.0 has no `pi` target.
 
 Do not add `~/.pi/agent/skills` as a second sink.
 Discovery roots carry a precedence rank — project-local 0, project-auto 1, user-local 2, user-auto 3, package 4 — and on a name collision the `.pi` copy wins, so a second sink would shadow the `.agents` tree and dedupe silently, serving the same content from a path the rest of the fleet does not share.
@@ -189,7 +189,7 @@ Optionally create `pkgs/by-name/pi-agent-extensions/package.nix` as a `fetchFrom
 Optionally modify `modules/home/users/crs58/default.nix` to declare any new sops secret pi needs, and `.sops.yaml` if a new path regex is required; note that every `config.sops.secrets.<n>` reference in the `ai` aggregate is unguarded and the aggregate is currently crs58-only.
 
 No change is needed to `modules/home/ai/skills/default.nix`, because pi reads `~/.agents/skills` directly and the skills pipeline is untouched by this integration.
-Nor is any change needed to `pkgs/by-name/apm-skills-compose/package.nix`, `modules/home/ai/skills/compose.nix`, any plugin `apm.yml` or `plugin.json`, `.github/plugin/marketplace.json`, `modules/home/tools/agents-md.nix` (content only), or any user `meta.nix`.
+Nor is any change needed to `pkgs/by-name/apm-skills-compose/package.nix`, `modules/home/ai/skills/compose.nix`, any plugin `apm.yml`, `.github/plugin/marketplace.json`, `modules/home/tools/agents-md.nix` (content only), or any user `meta.nix`.
 
 ## Verification methods and environment state
 

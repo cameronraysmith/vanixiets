@@ -1,6 +1,0 @@
-{
-  "name": "agent-context-core",
-  "version": "0.0.0",
-  "description": "Fleet-global, role-neutral, VCS-neutral agent context — session protocol, development guidelines, temporal provenance, operating principles, communication, engineering standards, and orchestration and delegation.",
-  "skills": []
-}
