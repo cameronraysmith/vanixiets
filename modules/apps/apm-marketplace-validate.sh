@@ -116,23 +116,10 @@ echo "scratch:   ${SCRATCH}"
 apm --version | head -1 || true
 echo ""
 
-# published package set (producer manifest) cross-checked against the
-# marketplace.json apm registers. the worktree files faithfully reflect the
-# --local ref (HEAD) for these committed manifests.
+# published package set (producer manifest), compared below with the plugins
+# apm itself registers. the worktree's apm.yml reflects the --local ref (HEAD).
 mapfile -t published < <(yq -r '.marketplace.packages[].name' "${repo_root}/apm.yml" | sort)
-# the apm-facing file: apm's probe order reads .github/plugin/marketplace.json
-# before .claude-plugin/marketplace.json, and only it lists the instructions
-# packages. mapfile over process substitution cannot propagate a jq failure, so
-# a missing file would otherwise read as an empty served set and be reported
-# as total coverage drift.
-served_manifest="${repo_root}/.github/plugin/marketplace.json"
-if [ ! -f "${served_manifest}" ]; then
-  echo "error: marketplace manifest not found at ${served_manifest}" >&2
-  exit 1
-fi
-mapfile -t served < <(jq -r '.plugins[].name' "${served_manifest}" | sort)
 echo "published packages (apm.yml):          ${#published[@]}"
-echo "served plugins (marketplace.json):     ${#served[@]}"
 if [ "${#published[@]}" -eq 0 ]; then
   echo "error: no packages enumerated from ${repo_root}/apm.yml" >&2
   exit 1
@@ -180,7 +167,22 @@ if [ -z "${alias_name}" ] || [ "${alias_name}" = null ]; then
 fi
 echo "APM-VALIDATE-MARKETPLACE-ADDED: ${alias_name}"
 
-# coverage: the registered marketplace must serve exactly the published set.
+# coverage: the plugins apm registered must be exactly the published set. read
+# them from apm (`marketplace browse` lists each as `  <name>@<alias>`), not
+# from a local file: which marketplace file apm reads depends on its probe
+# order and on what the source ref carries, and the Claude file alone lists
+# only the skill groups.
+set +e
+browse_out="$(apm marketplace browse "${alias_name}" 2>&1)"
+browse_rc=$?
+set -e
+if [ "${browse_rc}" -ne 0 ]; then
+  echo "${browse_out}" >&2
+  echo "error: apm marketplace browse ${alias_name} failed (rc=${browse_rc})" >&2
+  exit 1
+fi
+mapfile -t served < <(printf '%s\n' "${browse_out}" | sed -n "s/^  \([^ ]*\)@${alias_name}\( .*\)\{0,1\}\$/\1/p" | sort)
+echo "registered plugins (apm):              ${#served[@]}"
 missing="$(comm -23 <(printf '%s\n' "${published[@]}") <(printf '%s\n' "${served[@]}"))"
 extra="$(comm -13 <(printf '%s\n' "${published[@]}") <(printf '%s\n' "${served[@]}"))"
 coverage_ok=1

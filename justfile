@@ -813,6 +813,13 @@ agents-skills-index:
 agents-marketplace:
   {{nix_cmd}} run .#skills-marketplace-write
 
+# Register cameronraysmith/vanixiets from GitHub (default ref main) with apm in an
+# isolated HOME and install all 22 groups, remote dependencies included; needs the
+# network. Options: --ref REF, --repo OWNER/REPO.
+[group('agents')]
+agents-marketplace-remote *args:
+  {{nix_cmd}} run .#apm-marketplace-validate -- --remote {{args}}
+
 # Compose this repo's agent-context-* apm packages into the repo-root AGENTS.md (vanixiets tier only).
 [group('agents')]
 agents-context:

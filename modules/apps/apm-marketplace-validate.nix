@@ -37,6 +37,7 @@
               pkgs.coreutils
               pkgs.cacert # TLS roots for the superpowers transitive dep + --remote fetch
               pkgs.gnugrep
+              pkgs.gnused
             ];
             runtimeEnv = {
               SSL_CERT_FILE = "${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt";
