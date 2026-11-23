@@ -7,8 +7,9 @@
 # url.insteadOf rewrite, so apm takes its git route for a remote marketplace.
 # The check fails when apm does not register exactly the groups that
 # marketplace.packages publishes, when a group does not install (a misspelled
-# source), and when an installed skill or instructions fragment differs from
-# its source byte for byte (apm deploying a group whole, or rewriting a file).
+# source), when a skills group deploys no flat skill tree (apm deploying it
+# whole, under .agents/plugins), and when an installed skill or instructions
+# fragment differs from its source byte for byte.
 # Groups with remote dependencies need the network; `just
 # agents-marketplace-remote` installs them from GitHub.
 #
@@ -86,7 +87,13 @@
                 fi
                 if [ -d "$plugins/$group/.apm/skills" ]; then
                   for tree in .agents/skills .claude/skills; do
-                    ls "$root/$tree" 2>/dev/null | LC_ALL=C sort > got
+                    if [ ! -d "$root/$tree" ]; then
+                      echo "FAIL: $group deploys no $tree; apm deployed under .agents and .claude:" >&2
+                      (cd "$root" && find .agents .claude -mindepth 1 -maxdepth 2 2>/dev/null | LC_ALL=C sort) >&2 || true
+                      status=1
+                      continue
+                    fi
+                    ls "$root/$tree" | LC_ALL=C sort > got
                     ls "$plugins/$group/.apm/skills" | LC_ALL=C sort > want
                     if ! diff -u --label "$group source" --label "$group $tree" want got; then
                       echo "FAIL: $group deploys other skills than its .apm/skills into $tree" >&2
