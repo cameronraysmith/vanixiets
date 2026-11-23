@@ -35,14 +35,22 @@ runCommand "tincapp-network-${phone}"
       [
         "Address = ${host.address}/128"
         "Route = ${mesh.prefixOf mesh.instance}"
+        # Android's resolver sends AAAA queries for AI_ADDRCONFIG lookups
+        # (Java's InetAddress) only if a UDP connect to 2000:: finds a
+        # non-link-local source (DnsResolver getaddrinfo.cpp,
+        # have_global_ipv6_connectivity). Every mesh name is AAAA only, so on
+        # an IPv4-only underlying network this route, whose source is the
+        # phone's mesh address, is what makes them resolve. It can go once the
+        # mesh has IPv4 or the phones move to headscale.
+        "Route = 2000::/128"
       ]
       ++ map (resolver: "DNSServer = ${hosts.${resolver}.address}") mesh.resolvers
       ++ [
         "SearchDomain = ${fleet.domain}"
         # Android blocks every address family the VPN configures nothing for;
         # the mesh is IPv6 only, so let IPv4 (AF_INET) fall through to the
-        # underlying network. IPv6 outside the mesh prefix matches no VPN
-        # route and leaves through the underlying network as well.
+        # underlying network. IPv6 outside the mesh prefix and 2000::/128
+        # matches no VPN route and leaves through the underlying network.
         "AllowFamily = 2"
       ]
     );

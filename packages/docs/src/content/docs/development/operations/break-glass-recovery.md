@@ -119,5 +119,8 @@ To give the phone every member:
 
 Repeat the copy whenever a member is added or rekeyed.
 
+`network.conf` routes `2000::/128` into the VPN only to satisfy Android's address-family check: Android's resolver asks for AAAA records only if a socket to `2000::` gets a source address, and every mesh name has only an AAAA record, so without the route Java apps such as ntfy cannot resolve mesh names on an IPv4-only network.
+The route can go once the mesh has IPv4 addresses or the phones move to headscale.
+
 Android runs one VPN at a time, and connecting tincapp disconnects the ZeroTier app.
 While ZeroTier still runs, reconnecting the ZeroTier app restores the phone's `.zt` names and drops the mesh.
