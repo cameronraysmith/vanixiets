@@ -331,7 +331,10 @@ in
     flake.lib.vanixietsEffectSecretsMap = secretsMapFor;
 
     herculesCI = herculesCI: {
-      onPush.default.outputs.effects = effectsFor "main" herculesCI.config.repo.rev;
+      # nixbot runs every onPush effect on every tag push too (Mic92/nixbot docs/EFFECTS.md "Tag pushes").
+      onPush.default.outputs.effects = lib.optionalAttrs (herculesCI.config.repo.tag == null) (
+        effectsFor "main" herculesCI.config.repo.rev
+      );
       onEvent.pull_request = effectsFor "pullRequest" null;
       onEvent.pull_request_closed = effectsFor "pullRequestClosed" null;
       onEvent.build_finished = effectsFor "buildFinished" null;

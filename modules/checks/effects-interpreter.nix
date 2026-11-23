@@ -31,7 +31,9 @@
 # runs share one lock, since build_finished may carry no pull request to
 # expand {pr}; flake-update is the one effect of its own onSchedule entry,
 # Tuesdays and Fridays at 22:00, with a checkout and no audience, and no
-# onPush or onEvent kind has it. Rows passing nixbot's
+# onPush or onEvent kind has it. The live onPush listing is pinned for a push
+# to main and is empty for a tag push, which nixbot would otherwise run every
+# onPush effect for. Rows passing nixbot's
 # NIXBOT_API_URL/NIXBOT_API_TOKEN show the rendered script leaves them in
 # the program's environment.
 #
@@ -166,19 +168,34 @@ in
           }
         ];
       };
-      fixtureOutputs = fixture.config.herculesCI { config.repo = { inherit rev; }; };
-      liveOutputs = self.herculesCI {
-        primaryRepo = {
+      fixtureOutputs = fixture.config.herculesCI {
+        config.repo = {
           inherit rev;
-          ref = "refs/heads/main";
-          branch = "main";
           tag = null;
-          owner = "cameronraysmith";
-          name = "vanixiets";
-          remoteHttpUrl = "https://github.com/cameronraysmith/vanixiets";
-          shortRev = builtins.substring 0 7 rev;
-          forgeType = "github";
-          webUrl = null;
+        };
+      };
+      livePrimaryRepo = {
+        inherit rev;
+        ref = "refs/heads/main";
+        branch = "main";
+        tag = null;
+        owner = "cameronraysmith";
+        name = "vanixiets";
+        remoteHttpUrl = "https://github.com/cameronraysmith/vanixiets";
+        shortRev = builtins.substring 0 7 rev;
+        forgeType = "github";
+        webUrl = null;
+      };
+      liveOutputs = self.herculesCI {
+        primaryRepo = livePrimaryRepo;
+        herculesCI = { };
+      };
+      # A tag push as nixbot lists it: tag set, branch null (deliver.py `_list_tag_effects`).
+      liveTagOutputs = self.herculesCI {
+        primaryRepo = livePrimaryRepo // {
+          ref = "refs/tags/docs-v0.28";
+          branch = null;
+          tag = "docs-v0.28";
         };
         herculesCI = { };
       };
@@ -240,6 +257,8 @@ in
         flakeUpdateOutsideSchedule =
           liveOutputs.onPush.default.outputs.effects ? flake-update
           || lib.any (effects: effects ? flake-update) (builtins.attrValues liveOutputs.onEvent);
+        liveMainNames = builtins.attrNames liveOutputs.onPush.default.outputs.effects;
+        liveTagMainNames = builtins.attrNames liveTagOutputs.onPush.default.outputs.effects;
       };
       expectedStructural = {
         eventNames = [
@@ -347,6 +366,12 @@ in
           lock = "flake-update";
         };
         flakeUpdateOutsideSchedule = false;
+        liveMainNames = [
+          "browser-evidence"
+          "docs"
+          "release-packages"
+        ];
+        liveTagMainNames = [ ];
       };
 
       mkTokenResponse = claims: ''
