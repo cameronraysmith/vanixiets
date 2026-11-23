@@ -12,14 +12,14 @@ The behavior described below was verified against apm 0.28.0, and the pinning de
 
 ## Routes
 
-The 22 plugin groups hold 126 first-party skills in 18 skill groups plus four `agent-context-*` instructions groups, and four of the skill groups declare remote dependencies that add 51 skills from other repositories.
+The 22 plugin groups hold 125 first-party skills in 18 skill groups plus four `agent-context-*` instructions groups, and four of the skill groups declare remote dependencies that add 51 skills from other repositories.
 Which of these a consumer receives depends on the route.
 
 | Route | Commands | Unit installed | Delivers |
 |---|---|---|---|
 | apm marketplace | `apm marketplace add cameronraysmith/vanixiets`, then `apm install '<group>@vanixiets#main'` | any subset of the 22 groups | first-party skills plus the group's remote dependencies; instructions groups as fragments for `apm compile` |
 | Claude Code and the Claude desktop app | `/plugin marketplace add cameronraysmith/vanixiets`, then `/plugin install <group>@vanixiets` | any of the 18 skill groups | first-party skills only |
-| skills CLI, whole repository | `npx skills add cameronraysmith/vanixiets --list`, then `--skill <name>` | any of the 126 skills, one by one | first-party skills only |
+| skills CLI, whole repository | `npx skills add cameronraysmith/vanixiets --list`, then `--skill <name>` | any of the 125 skills, one by one | first-party skills only |
 | skills CLI, one group | `npx skills add https://github.com/cameronraysmith/vanixiets/tree/main/modules/home/ai/plugins/<group>` | the skills of one group | first-party skills only |
 
 Only apm resolves the remote dependencies, because only apm reads each group's `apm.yml`; the other routes read the generated files, which name each group's directory and nothing else.

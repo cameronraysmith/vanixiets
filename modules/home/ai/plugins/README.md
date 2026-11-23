@@ -5,7 +5,7 @@ created: 2026-08-25
 
 ## First-party agent skill corpus
 
-126 skills across 18 apm packages, published as a marketplace any project can install independently of the Nix configurations.
+125 skills across 18 apm packages, published as a marketplace any project can install independently of the Nix configurations.
 These counts are computed rather than maintained here: `testing-and-quality/.apm/skills/harborize/scripts/census.py --root modules/home/ai/plugins` regenerates `census.json`, whose `provenance` block carries the authoritative totals and the revision they were taken at.
 Each group directory carries an `apm.yml` beside its `.apm/` tree and no other manifest.
 The two marketplace files and the skills CLI's discovery file are generated from the root `../../../../apm.yml` `marketplace:` block and the group `apm.yml` files by `pkgs/by-name/skills-marketplace`: `../../../../.github/plugin/marketplace.json` (apm's Copilot profile, all 22 groups, read by apm), `../../../../.claude-plugin/marketplace.json` (the 18 skill groups, read by Claude) and `../../../../skills.sh.json` (the 18 `.apm/skills` directories, read by `npx skills`).
@@ -74,7 +74,7 @@ The groups with remote dependencies need the network: `just agents-marketplace-r
 
 ## Skills CLI
 
-`npx skills add cameronraysmith/vanixiets` lists and installs the 126 first-party skills one by one (`--list`, `--skill <name>`); it finds them through the root `skills.sh.json`, because its default search stops above `<group>/.apm/skills/<name>`.
+`npx skills add cameronraysmith/vanixiets` lists and installs the 125 first-party skills one by one (`--list`, `--skill <name>`); it finds them through the root `skills.sh.json`, because its default search stops above `<group>/.apm/skills/<name>`.
 A group's tree URL, `npx skills add https://github.com/cameronraysmith/vanixiets/tree/main/modules/home/ai/plugins/<group>`, offers that group's skills.
 Neither route installs remote skills or instructions groups.
 The `skills-cli-discovery` check (x86_64-linux) runs the skills CLI that `llm-agents` pins against a copy of the repository and fails unless it lists exactly the first-party skill directories and installs one with `--skill` unchanged.
@@ -137,7 +137,7 @@ The clusters below are drawn directly from the removed index's existing bullet o
 
 Three separate, independently-operated mechanisms currently suppress or withhold a skill, and nothing before this section collected them in one place.
 
-1. **`disable-model-invocation: true` frontmatter**, set per skill, prevents that skill from auto-triggering on a description match; the skill is still delivered and still invocable by explicit name or slash command. 21 of the 126 skills in this corpus carry the flag set to `true`, and 2 carry it explicitly set to `false`. Factually, all 21 are operational or command-style skills — meta-tooling commands, event-modeling workflow steps, document-conversion utilities, and git/jj/nix operational commands — and none of them are `preferences-*` conceptual-foundation skills; no `preferences-*` skill in this corpus carries the flag.
+1. **`disable-model-invocation: true` frontmatter**, set per skill, prevents that skill from auto-triggering on a description match; the skill is still delivered and still invocable by explicit name or slash command. 20 of the 125 skills in this corpus carry the flag set to `true`, and 2 carry it explicitly set to `false`. Factually, all 20 are operational or command-style skills — meta-tooling commands, event-modeling workflow steps, document-conversion utilities, and git/jj/nix operational commands — and none of them are `preferences-*` conceptual-foundation skills; no `preferences-*` skill in this corpus carries the flag.
 2. **The delivery exclusion list** (`excludedUpstreamSkills` in `../skills/default.nix`) removes a skill from every delivered harness target (`~/.claude/skills`, `~/.factory/skills`, codex, opencode) even though the skill still exists in the composed tree. It currently withholds `tdd`, `writing-for-agents` and `linear-cli`, each for a documented reason in that file.
 3. **A named reference with an explicit loading condition**, in `../../tools/agents-md.nix` (this file's sibling), states a skill's name in the generated context text alongside a stated condition for when to load it, rather than inlining the skill's full body via a path-based force-load prefix and bypassing both delivery and description-based discovery. Only one skill carries this treatment; see "Archived skill index" below for the one that used to carry the old `@` force-load prefix instead.
 
