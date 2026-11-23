@@ -45,6 +45,13 @@ Worker profiles prefer procps' `kill` over coreutils' overlapping executable, ma
 `checks.<system>.omnigent-worker-capabilities` makes two Home Manager evaluations of the worker module: a positive worker home, whose assertions, generated PATH order, ACP settings, tools, skills and harnesses it compares, and one composite invalid home whose failed assertions must equal the four guard messages.
 Its build confirms that the harness executables exist in the generated profile and that `playwright-cli` reports its packaged version; it runs no CLI adapters, archive or file utilities, or workflow-tool smoke tests.
 
+## Evaluators
+
+iets evaluates many attributes at once: nixbot on magnetite (`nixos/nixbot.nix`), `just check-fast`'s local lane and `just check-ifd` on a darwin host that opts in (`home/development/nix-tools.nix`, stibnite only), and the orchestrator's publish gate; single-attribute commands (`nix build`, `darwin-rebuild`, `nh`) and remote `check-fast` lanes keep stock Nix, the latter behind the remote host's evaluation lock.
+On macOS iets ignores `--max-memory-size`, so the darwin wrapper bounds memory by worker count, and no patch to iets is carried.
+`apps/nix-eval-jobs-identity` (`just eval-identity [systems] [rev] [workers]`) is the drvPath-identity oracle between them: it evaluates `checks.<system>` of one commit with stock `nix-eval-jobs` and with iets and fails unless every attribute has the same drvPath, system and outputs.
+`checks.x86_64-linux.nix-eval-jobs-iets` stays Linux-only: what it pins (stock's `nix` passthru, the lock wrapper's forwarding) matters to nixbot and the lock, neither of which runs on darwin, and stibnite's machine check already realizes the darwin wrapper and the iets it links.
+
 ## On-demand VM tests
 
 `nixbot.toml` evaluates `checks`, which nixbot scopes to `checks.x86_64-linux` and, best-effort, `checks.aarch64-darwin`; VM tests instead live under `vmTests` and are not part of pull-request coverage.

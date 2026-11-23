@@ -344,6 +344,12 @@ home-package-names system="":
 #   lock, this run waits, printing "nix-eval-jobs: waiting for the host evaluation lock held by
 #   ..." every 30 s, instead of overlapping it. Two concurrent evaluations on magnetite caused the
 #   OOMs in docs/notes/development/incidents/2026-10-01-magnetite-concurrent-eval-oom.md.
+#   The remote lane keeps that wrapper over stock nix-eval-jobs: only the local lane changes evaluator.
+# On darwin the local lane evaluates with iets through nix-eval-jobs-iets (nix-tools.nix) when the
+#   host opts in (nixEvalJobsIets.workers, stibnite only), passed as --nix-eval-jobs because
+#   nix-fast-build puts stock nix-eval-jobs first on its own PATH; that wrapper caps --eval-workers
+#   at the host's bound, since iets cannot bound worker memory on macOS. Hosts without it (the 8 GiB
+#   Macs) use stock. The lane says which evaluator it used.
 # Params are positional, so usage is: just check-fast auto on x86_64-linux pyrite
 [group('nix')]
 check-fast nom="auto" push="off" system="" remote="magnetite":
@@ -366,6 +372,12 @@ check-fast nom="auto" push="off" system="" remote="magnetite":
   [ -n "$system" ] || system="$native"
   if [ "$system" = "$native" ]; then
     targetflags="--eval-workers 4"
+    if [ "$(uname -s)" = Darwin ] && iets=$(command -v nix-eval-jobs-iets); then
+      targetflags="$targetflags --nix-eval-jobs $iets"
+      echo "check-fast: evaluating locally with iets ($iets)" >&2
+    else
+      echo "check-fast: evaluating locally with stock nix-eval-jobs (this host has no nix-eval-jobs-iets)" >&2
+    fi
   else
     targetflags="$remotehostflags --no-download --retries 2"
   fi
@@ -376,25 +388,38 @@ check-fast nom="auto" push="off" system="" remote="magnetite":
 
 # Evaluate every check (including all nixos, darwin and home configurations) with
 # import-from-derivation disallowed, as nixbot's CI does; nothing is built.
+# On a darwin host that opts in (nixEvalJobsIets.workers, nix-tools.nix) it evaluates with iets
+# through nix-eval-jobs-iets, which refuses import-from-derivation unconditionally, so the verdict
+# is the same, and caps the workers at the host's bound; elsewhere it uses the nix-eval-jobs on
+# PATH (the evaluation-lock wrapper on magnetite and pyrite, stock on the other hosts).
 # Usage: just check-ifd                    (all three systems)
 #        just check-ifd "aarch64-darwin"
 [group('nix')]
 check-ifd systems="x86_64-linux aarch64-linux aarch64-darwin" workers="4" mem="4096":
   #!/usr/bin/env bash
   set -euo pipefail
+  evaluator=nix-eval-jobs
+  if [ "$(uname -s)" = Darwin ] && command -v nix-eval-jobs-iets > /dev/null; then
+    evaluator=nix-eval-jobs-iets
+  fi
+  echo "check-ifd: evaluating with $(command -v "$evaluator")" >&2
   out=$(mktemp); trap 'rm -f "$out"' EXIT
   failed=0
   for system in {{systems}}; do
-    nix-eval-jobs \
+    status=0
+    "$evaluator" \
       --flake ".#checks.$system" \
       --force-recurse \
       --workers {{workers}} --max-memory-size {{mem}} \
       --option allow-import-from-derivation false \
       --option eval-cache false \
       --option accept-flake-config true \
-      > "$out"
+      > "$out" || status=$?
     if jq -e -s 'any(.[]; .error != null)' "$out" > /dev/null; then
       jq -r --arg s "$system" 'select(.error != null) | "checks.\($s).\(.attr): \(.error | split("\n") | map(select(test("error:"))) | last // "")"' "$out" >&2
+      failed=1
+    elif [ "$status" -ne 0 ]; then
+      echo "checks.$system: $evaluator exited $status" >&2
       failed=1
     else
       echo "checks.$system: $(wc -l < "$out" | tr -d ' ') attributes evaluated with import-from-derivation disallowed"
