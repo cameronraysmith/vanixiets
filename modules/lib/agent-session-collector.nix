@@ -14,6 +14,12 @@ let
   handoff = flakeLib.agentSessionHandoff;
   langfuseExporter = "otlp_http/langfuse";
   spanExporter = "otlp_http/ingress-traces";
+  localReceiver = {
+    host = "127.0.0.1";
+    port = 4318;
+  };
+  localEndpoint = "${localReceiver.host}:${toString localReceiver.port}";
+  waitSeconds = 10;
 in
 {
   # The ingress host's agent-session collector hands its output to that
@@ -26,6 +32,27 @@ in
     address = "127.0.0.1:4321";
     spanQueueBytes = mib 12;
   };
+
+  # Waits at most waitSeconds for otlp/local to accept a connection, then
+  # returns 0 either way, so an Omnigent worker sends its startup telemetry
+  # to a listening receiver without depending on the collector being up.
+  # otelcol has no readiness notification, so an After= on its unit orders
+  # only its process start, and it listens 0.04 to 2.2 s later (stibnite,
+  # magnetite and pyrite logs, 2026-11-23). The bound is about four times
+  # the slowest of those and is the whole delay a worker start sees when
+  # the collector is down (darwin-agent-session-telemetry task 15.5).
+  flake.lib.agentSessionReceiverWait =
+    pkgs:
+    pkgs.writeShellScript "agent-session-receiver-wait" ''
+      deadline=$((SECONDS + ${toString waitSeconds}))
+      until (exec 3<>/dev/tcp/${localReceiver.host}/${toString localReceiver.port}) 2>/dev/null; do
+        if [ "$SECONDS" -ge "$deadline" ]; then
+          echo "agent-session collector not listening on ${localEndpoint} after ${toString waitSeconds} s; starting without it" >&2
+          exit 0
+        fi
+        ${pkgs.coreutils}/bin/sleep 0.25
+      done
+    '';
 
   # An otlp_http exporter over mTLS, presenting certFile and keyFile, with a
   # persistent queue of queueSize bytes.
@@ -263,7 +290,7 @@ in
           };
         };
 
-        receivers."otlp/local".protocols.http.endpoint = "127.0.0.1:4318";
+        receivers."otlp/local".protocols.http.endpoint = localEndpoint;
 
         processors = {
           memory_limiter = {

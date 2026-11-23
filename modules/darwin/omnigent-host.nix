@@ -212,6 +212,14 @@ in
           done
           ${lib.optionalString (builtins.hasAttr name credentialDeliveries) (receiptReadiness name)}
           ${workerHomes.${name}.activationPackage}/activate
+          ${
+            # launchd has no ordering, so where the agent-session daemon runs
+            # the worker waits, bounded, for its receiver before the host emits
+            # startup telemetry (darwin-agent-session-telemetry task 15.5).
+            lib.optionalString (config.vanixiets.otelCollector.agentTelemetry or false) (
+              toString (flakeConfig.flake.lib.agentSessionReceiverWait pkgs)
+            )
+          }
           exec ${
             lib.escapeShellArgs [
               (lib.getExe cfg.package)

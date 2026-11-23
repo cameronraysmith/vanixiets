@@ -89,6 +89,13 @@ in
       restrictedIncus = worker: worker.containers.incus == "restricted";
       runtimeDirFor = worker: "/run/user/${toString (account worker).uid}";
       userManager = worker: "user@${toString (account worker).uid}.service";
+      # Where the agent-session collector runs, each worker starts after it,
+      # wanting it so that a switch starting both orders them in one
+      # transaction, then waits for its receiver before the host emits
+      # startup telemetry; Wants, not Requires, so a failed collector costs
+      # the worker only that wait (darwin-agent-session-telemetry task 15.5).
+      agentTelemetry = config.vanixiets.otelCollector.agentTelemetry or false;
+      agentCollector = lib.optional agentTelemetry "otel-agent-session.service";
       containerPackages =
         worker:
         lib.optionals (rootlessPodman worker) [
@@ -403,8 +410,13 @@ in
                   (hmUnit worker)
                 ]
                 ++ secretDependencies name
-                ++ lib.optional (rootlessPodman worker) (userManager worker);
-                wants = [ "network-online.target" ] ++ lib.optional (rootlessPodman worker) (userManager worker);
+                ++ lib.optional (rootlessPodman worker) (userManager worker)
+                ++ agentCollector;
+                wants = [
+                  "network-online.target"
+                ]
+                ++ lib.optional (rootlessPodman worker) (userManager worker)
+                ++ agentCollector;
                 requires = [ (hmUnit worker) ] ++ secretDependencies name;
                 restartTriggers = [ config.home-manager.users.${worker.user}.home.activationPackage ];
                 environment = workerEnvironment worker;
@@ -433,6 +445,9 @@ in
                     test "$(${pkgs.coreutils}/bin/stat -c %u "$HOME")" = "$(${pkgs.coreutils}/bin/id -u)"
                     test "$(${pkgs.coreutils}/bin/stat -c %a "$HOME")" = 700
                     ${lib.optionalString deliveries.${name}.enabled deliveries.${name}.readiness}
+                    ${lib.optionalString agentTelemetry (
+                      toString (flakeConfig.flake.lib.agentSessionReceiverWait pkgs)
+                    )}
                   '';
                   ExecStart = lib.escapeShellArgs [
                     (lib.getExe cfg.package)

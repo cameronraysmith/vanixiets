@@ -309,6 +309,37 @@ let
           && lib.elem hostConfig.home-manager.users.${user}.home.activationPackage unit.restartTriggers
       ) declaredOwners;
 
+      # Where the host's row sets agentTelemetry, each worker starts after the
+      # agent-session collector and waits, bounded, for its receiver: on Linux
+      # ordered after and wanting otel-agent-session.service, never requiring
+      # it, with the wait in ExecStartPre; on Darwin the wait in the launcher.
+      # Without agentTelemetry neither (darwin-agent-session-telemetry task
+      # 15.5).
+      collectorOrdering =
+        let
+          agentTelemetry = hostConfig.vanixiets.otelCollector.agentTelemetry or false;
+          collector = "otel-agent-session.service";
+          waits =
+            text:
+            let
+              plain = builtins.unsafeDiscardStringContext text;
+            in
+            builtins.replaceStrings [ "-agent-session-receiver-wait" ] [ "" ] plain != plain;
+        in
+        lib.all (
+          owner:
+          if isDarwin then
+            waits hostConfig.launchd.daemons."omnigent-host-${owner}".command.text == agentTelemetry
+          else
+            let
+              unit = hostConfig.systemd.services."omnigent-host-${owner}";
+            in
+            lib.elem collector unit.after == agentTelemetry
+            && lib.elem collector unit.wants == agentTelemetry
+            && !lib.elem collector unit.requires
+            && waits unit.serviceConfig.ExecStartPre.text == agentTelemetry
+        ) declaredOwners;
+
       # Worker Home Manager consumes the delivered policy: GitHub HTTPS goes through the
       # gh credential wrapper, signing uses exactly the delivered key, Linear reads the
       # linked rendered template, and no tool-owned OAuth state is declared. Darwin worker

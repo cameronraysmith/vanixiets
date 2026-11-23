@@ -197,6 +197,7 @@ Network-online remains a soft boot dependency, with no sleep or network-lifetime
 The worker PATH orders required runtime packages, its actual Home Manager profile, then extras; neither shell initialization nor a global user profile supplies it.
 Atomic retains its ACP-only directory routing, and omp retains independent state.
 `autoApproveDirenv` defaults to false; opting in trusts project code under `workspaceRoot` as that worker.
+Where the host's row in `flake.lib.observabilityHosts` sets `agentTelemetry`, the unit is ordered `After` and `Wants`, never `Requires`, `otel-agent-session.service`, and its `ExecStartPre` waits at most 10 s for that collector's receiver on `127.0.0.1:4318` (`flake.lib.agentSessionReceiverWait`), then starts either way, so the host's startup telemetry reaches a listening receiver and a failed collector delays the worker by the wait alone (`darwin-agent-session-telemetry` design D16); the `collectorOrdering` fleet obligation holds both.
 
 For the first rollout, the user explicitly accepted upstream `sandbox: none` on Linux and Darwin on 2026-09-10.
 The dedicated Unix account is the whole-worker boundary, including auxiliaries, terminals and project hooks; this is not child, namespace, or filesystem confinement.
@@ -234,6 +235,7 @@ No worker joins `podman`, `docker` or `incus-admin`: the rootful sockets stay ou
 Each enabled worker runs as `system/org.nixos.omnigent-host-<key>`, with the dedicated account in the plist's `UserName`.
 The native `/bin/sh` entry waits for `/nix/store`, then invokes an executable launcher that checks private HOME/log directories, activates standalone Home Manager as the worker, and executes the foreground host only on success.
 An activation failure exits nonzero even if a previous activation succeeded.
+Where the host's row sets `agentTelemetry`, the launcher runs the same bounded wait for `127.0.0.1:4318` after activation and before the host, since launchd orders nothing.
 The daemon retains `ProcessType=Standard`, five-second throttling, failure restart and normal sleep behavior.
 It requires no worker graphical login, sleep inhibitor, or network-state load condition.
 

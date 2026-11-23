@@ -281,6 +281,14 @@
           && linux.home-manager.users.omnigent-raquel.programs.omnigent.enable
           && builtins.hasAttr "home-manager-omnigent\\x2draquel" linux.systemd.services;
         noLegacyFallback = !(linux.systemd.services ? omnigent-host);
+        # Without agentTelemetry no worker waits on the agent-session collector;
+        # with it, the hosts' fleet obligation collectorOrdering holds the rest.
+        noCollectorOrdering =
+          let
+            unit = linux.systemd.services.omnigent-host-cameron;
+          in
+          !lib.elem "otel-agent-session.service" (unit.after ++ unit.wants ++ unit.requires)
+          && !lib.hasInfix "-agent-session-receiver-wait" unit.serviceConfig.ExecStartPre.text;
       };
       privateHome = linux.systemd.services.omnigent-host-cameron.serviceConfig.ExecStartPre;
       homeUidFixture = pkgs.writeShellScript "omnigent-home-uid-fixture" ''
@@ -390,6 +398,8 @@
         compositeInvalid = sortedEqual (map (a: a.message) (
           lib.filter (a: !a.assertion) darwin.assertions
         )) darwinMessages;
+        noCollectorWait =
+          !lib.hasInfix "-agent-session-receiver-wait" darwin.launchd.daemons.omnigent-host-cameron.command.text;
       };
       darwinDaemon = darwin.launchd.daemons.omnigent-host-cameron;
       darwinPrepareTest = pkgs.writeText "omnigent-darwin-prepare-home.py" ''
