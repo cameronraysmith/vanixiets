@@ -56,20 +56,22 @@ let
   # checks.x86_64-linux.otel-collector-config. devloop's 52 MiB is split
   # between its metrics and its five tables, ci_attribute holding about a
   # day of store outage on the busiest day (S2 design D4); eval_run's 4 MiB
-  # holds months of nixbot's roughly 100 evaluation lines a day. agent's 48
+  # holds months of nixbot's roughly 100 evaluation lines a day. agent's 62
   # MiB is split between its metrics and its session events, each holding
-  # about 2 h of every agent-telemetry host's assumed output while the store
-  # is down (agent-session-telemetry design D10).
+  # about 2 h of three agent-telemetry hosts' assumed output while the store
+  # is down (agent-session-telemetry design D10; darwin-agent-session-
+  # telemetry design D7); fleet gave 18 MiB of its margin over 24 h for it
+  # and the span queue.
   queueBytes = {
-    fleet = mib 400;
+    fleet = mib 382;
     devloop = mib 4;
     agent = mib 16;
-    agent_session_event = mib 32;
+    agent_session_event = mib 46;
     # Agent spans (design D13, D15): flake.lib.agentSessionHandoff's
-    # 8,388,608 B holds about 17 min of two agent-telemetry hosts at
+    # 12,582,912 B holds about 17 min of three agent-telemetry hosts at
     # agentSpanBytesPerMinute while the store is down; a full queue refuses
     # the hand-off as retryable, so each host's agent-session collector then
-    # holds the rest in its own 44 MiB.
+    # holds the rest in its own queue.
     agent_span = flakeLib.agentSessionHandoff.spanQueueBytes;
     devloop_ci_attribute = mib 32;
     devloop_ci_build = mib 4;

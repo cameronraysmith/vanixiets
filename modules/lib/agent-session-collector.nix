@@ -19,10 +19,12 @@ in
   # The ingress host's agent-session collector hands its output to that
   # host's collector on this loopback address, whose agent_span queue takes
   # each span request whole or not at all (agent-session-telemetry design
-  # D14, D15).
+  # D14, D15); 12 MiB holds 15 min of three agent-telemetry hosts' assumed
+  # spans, and the span exporter's batch is a quarter of it
+  # (darwin-agent-session-telemetry design D7).
   flake.lib.agentSessionHandoff = {
     address = "127.0.0.1:4321";
-    spanQueueBytes = mib 8;
+    spanQueueBytes = mib 12;
   };
 
   # An otlp_http exporter over mTLS, presenting certFile and keyFile, with a

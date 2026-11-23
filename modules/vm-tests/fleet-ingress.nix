@@ -1903,11 +1903,12 @@
               print("ok: schemaOrder", flush=True)
             '';
 
-            # The hand-off cap (design D15): one request of 160 omp tool
-            # spans of 60 KiB, about 9.8 MB, past the ingress's 8 MiB
-            # agent_span queue, which takes a request whole or not at all.
-            # The span exporter splits it to a quarter of that queue, so the
-            # store gets every span and the ingress refuses none.
+            # The hand-off cap (design D15): one request of 240 omp tool
+            # spans of 60 KiB, about 14.7 MB, past the ingress's 12 MiB
+            # agent_span queue (darwin-agent-session-telemetry design D7),
+            # which takes a request whole or not at all. The span exporter
+            # splits it to a quarter of that queue, so the store gets every
+            # span and the ingress refuses none.
             handoffCap = ''
               print("=== case handoffCap", flush=True)
               fresh_start()
@@ -1923,7 +1924,7 @@
                   "          'startTimeUnixNano': str(now - 1000000), 'endTimeUnixNano': str(now),",
                   "          'attributes': [s('gen_ai.operation.name', 'execute_tool'), s('gen_ai.conversation.id', nonce),",
                   "                         s('gen_ai.tool.call.result', json.dumps({'content': [{'type': 'text', 'text': str(i) + ' ' + text}]}, separators=(',', ':')))]}",
-                  "         for i in range(160)]",
+                  "         for i in range(240)]",
                   "print(json.dumps({'resourceSpans': [{'resource': {'attributes': [s('service.name', 'oh-my-pi'), s('user.name', 'cameron')]}, 'scopeSpans': [{'spans': spans}]}]}))",
               ])
               store.succeed(f"python3 - {nonce} > /tmp/handoff.json <<'EOF'\n{generator}\nEOF")
@@ -1941,11 +1942,11 @@
 
               def stored():
                   rows = gsql(f"SELECT count(*) FROM agent_span WHERE \"span_attributes.gen_ai.conversation.id\" = '{nonce}'", "agent")
-                  print(f"  {nonce}: {rows} of 160 stored", flush=True)
-                  return rows == [[160]]
+                  print(f"  {nonce}: {rows} of 240 stored", flush=True)
+                  return rows == [[240]]
 
 
-              wait_for(stored, "the 160 spans in the store", 300)
+              wait_for(stored, "the 240 spans in the store", 300)
               after = {k: metric(INGRESS_PORT, name, labels) for k, (name, labels) in refused.items()}
               print(f"  ingress, before and after: {before} {after}", flush=True)
               assert after == before, (before, after)
