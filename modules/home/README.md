@@ -45,7 +45,7 @@ The wrapper defers to the writer only when the caller's effective ghq root resol
 The writer's update follows a change of the remote's default branch: a lazy clone switches to the new branch at its depth, and a full clone moves `origin/HEAD` and switches only when it was on the previous default with no local change.
 It never deletes, renames or relocates a clone; `ghq-sync --audit [QUERY]`, run as a participating account with that account's own `gh` token, reports renamed, transferred, deleted, archived, letter-case-only and default-branch drift against GitHub's API and prints the commands an administrator runs as the writer to retire or relocate a clone, changing nothing itself.
 
-`engineering-tools` groups recipe execution, edit checking and structured-output inspection through `just`, `shellcheck`, `uncomment` (from `uncomment-bin`), `ratchet`, `jc`, `jaq` and `yq`.
+`engineering-tools` groups recipe execution, edit checking and structured-output inspection through `just`, `shellcheck`, `uncomment` (from `uncomment-bin`), `ratchet`, `jc`, `jaq` and `yq`, and imports `cli-host-inspection` (`modules/system/cli-tools/host-inspection.nix`), so every home that selects it, directly or through `development`, can inspect the host it runs on.
 `nix-development` exposes the existing group in `development/nix-tools.nix` intact.
 `development` imports both groups without moving its other domain, diagram or clipboard tools into them.
 These Home Manager exports use consumer packages and stable module identities, so importing a named capability alongside its aggregate does not duplicate its contribution.

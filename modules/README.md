@@ -35,10 +35,12 @@ Top-level files configure the flake itself: `flake-parts.nix`, `formatting.nix`,
 
 ## Shared CLI capabilities
 
-`system/cli-tools/` exports `cli-unix`, `cli-archives`, `cli-network`, and their `cli-tools` aggregate under each of `flake.modules.nixos`, `flake.modules.darwin`, and `flake.modules.homeManager`.
+`system/cli-tools/` exports `cli-unix`, `cli-archives`, `cli-network`, `cli-host-inspection`, and their `cli-tools` aggregate under each of `flake.modules.nixos`, `flake.modules.darwin`, and `flake.modules.homeManager`.
 Import the export matching the consumer's module class; package selection uses that consumer's `pkgs`.
 The aggregate adds jq through its configured Home Manager module or as a system package.
 These exports are opt-in: Omnigent workers import `homeManager.cli-tools`, while human terminal declarations remain independent.
+`cli-host-inspection` is the exception, because it serves whoever lands on a host, person or agent: `fastfetch` (`fastfetch --format json`), `nix-info`, and on Linux `pciutils` and `usbutils`, all of which report without root.
+The NixOS and nix-darwin `base` aspects import it, putting it on the system PATH of every account on every machine, root included, and `homeManager.engineering-tools` imports it, reaching every home, among them the standalone `claude-sandbox` and `ubuntu` profiles that have no system configuration.
 Worker profiles prefer procps' `kill` over coreutils' overlapping executable, matching the existing supervisor PATH; the shared capabilities impose no worker-specific package priorities.
 `checks.<system>.omnigent-worker-capabilities` makes two Home Manager evaluations of the worker module: a positive worker home, whose assertions, generated PATH order, ACP settings, tools, skills and harnesses it compares, and one composite invalid home whose failed assertions must equal the four guard messages.
 Its build confirms that the harness executables exist in the generated profile and that `playwright-cli` reports its packaged version; it runs no CLI adapters, archive or file utilities, or workflow-tool smoke tests.

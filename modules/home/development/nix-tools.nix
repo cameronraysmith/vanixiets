@@ -26,7 +26,6 @@
         deadnix
         nil
         nixEvalJobs
-        nix-info
         nix-output-monitor
         nix-prefetch-scripts
         nix-update

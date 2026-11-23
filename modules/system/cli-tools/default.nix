@@ -9,6 +9,7 @@ in
         modules.nixos.cli-unix
         modules.nixos.cli-archives
         modules.nixos.cli-network
+        modules.nixos.cli-host-inspection
       ];
       environment.systemPackages = [ pkgs.jq ];
     };
@@ -17,6 +18,7 @@ in
         modules.darwin.cli-unix
         modules.darwin.cli-archives
         modules.darwin.cli-network
+        modules.darwin.cli-host-inspection
       ];
       environment.systemPackages = [ pkgs.jq ];
     };
@@ -25,6 +27,7 @@ in
         modules.homeManager.cli-unix
         modules.homeManager.cli-archives
         modules.homeManager.cli-network
+        modules.homeManager.cli-host-inspection
         modules.homeManager.jq
       ];
     };
