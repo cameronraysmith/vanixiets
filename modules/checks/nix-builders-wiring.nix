@@ -11,8 +11,9 @@
 # It also pins what each dispatcher actually schedules (the entries and the
 # store URI each one names), that the grpc:// plugin is loaded where it
 # dispatches and finds the dispatcher's certificate, key and CA linked at its
-# default lookup path, and that the build accounts and dispatch keys of the
-# retired ssh transport stay gone.
+# default lookup path, that the build accounts and dispatch keys of the
+# retired ssh transport stay gone, and that a Linux builder's own nix settings
+# give it uid-range exactly when it advertises uid-range.
 {
   self,
   lib,
@@ -205,6 +206,21 @@
             "builder"
             "nixbuild"
           ];
+          # nix includes uid-range only with auto-allocate-uids, which needs
+          # its experimental feature; nspawn tests also need cgroups.
+          uidRange =
+            if isDarwin machine then
+              null
+            else
+              let
+                s = config.nix.settings;
+              in
+              (s.auto-allocate-uids or false)
+              && builtins.elem "uid-range" (s.extra-system-features or [ ])
+              && lib.all (feature: builtins.elem feature s.experimental-features) [
+                "auto-allocate-uids"
+                "cgroups"
+              ];
         };
 
       expectedBuilderSide = machine: {
@@ -232,6 +248,12 @@
             lib.genAttrs (self.lib.meshInterfaces (configOf machine)) (_: true);
         globalPort = if isDarwin machine then null else false;
         sshBuildAccounts = [ ];
+        # A Linux builder honours uid-range exactly when it advertises it.
+        uidRange =
+          if isDarwin machine then
+            null
+          else
+            builtins.elem "uid-range" advertised.${machine}.supportedFeatures;
       };
 
       stibnite = configOf "stibnite";
@@ -268,6 +290,7 @@
         supportedFeatures = [
           "kvm"
           "nixos-test"
+          "uid-range"
         ];
       };
       toStibnite = expectedDispatch {
@@ -290,6 +313,10 @@
         toMagnetite
         toStibnite
       ];
+      advertised = {
+        magnetite = toMagnetite.value;
+        pyrite = toPyrite.value;
+      };
     in
     {
       # The fact is the same on every system and darwin builds are

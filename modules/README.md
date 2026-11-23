@@ -73,17 +73,18 @@ The darwin collection check is gated the same way and needs no darwin host.
 `checks.x86_64-linux.otel-collector-darwin` renders stibnite's agent and `otelcol-process` configurations from `flake.lib.otelCollectorDarwin` with `flake.lib` data only and validates each with the root pin's Linux `otelcol-contrib`, the same version the darwin jobs run.
 It establishes R3.1's darwin clauses over those configurations (loopback listeners, the six disabled process attributes, no listener or credential in `otelcol-process`, the strict disk and filesystem include lists), the probe's label selection and its parser over `launchctl print` and `smartctl` output recorded on stibnite, the notifier wrapper's `FAILED` and `RESOLVED` episodes over a recording `ntfy-send`, and the process filter keeping the fleet's own executables below the darwin floor, each with a mutant that must fail its own case.
 It establishes nothing about a darwin process starting: launchd loading the jobs, the collector running on macOS and reaching the ingress over ZeroTier are observed at stibnite's activation, and relations within stibnite are assertions in `darwin/otel-collector-agent.nix`, which stibnite's evaluation and nixbot's best-effort `checks.aarch64-darwin` evaluate.
-A runtime test builds only on a builder advertising the features its derivation requires: QEMU VM tests need `kvm`, which only Pyrite advertises, and systemd-nspawn container tests need `uid-range`, which only Magnetite advertises.
-Run one from a checkout of the intended revision on that host, or from a dispatcher such as Stibnite, which routes it to the only builder with those features:
+A runtime test builds only on a builder advertising the features its derivation requires: QEMU VM tests need `kvm`, which only Pyrite advertises, and systemd-nspawn container tests need `uid-range`, which Pyrite and Magnetite advertise (Pyrite once deployed with its `auto-allocate-uids` settings; `nix-builders-wiring` holds each Linux builder's settings to what it advertises).
+Run one from a checkout of the intended revision on that host, or from a dispatcher such as Stibnite, which routes a kvm test to Pyrite and a container test to whichever of the two is less loaded, Magnetite on a tie for its higher `speedFactor` (nix's `build-remote`).
+To keep a container test off the store host, run it on Pyrite with `--builders ''`, without which Pyrite's own daemon dispatches it to Magnetite:
 
 ```sh
 nix build .#vmTests.x86_64-linux.zerotier-mss-clamp-runtime   # Pyrite, kvm
 nix build .#vmTests.x86_64-linux.omnigent-worker-isolation    # Pyrite, kvm
-nix build .#vmTests.x86_64-linux.greptimedb-pipeline          # Magnetite, uid-range
-nix build .#vmTests.x86_64-linux.devloop-ingest               # Magnetite, uid-range
-nix build .#vmTests.x86_64-linux.fleet-ingress                # Magnetite, uid-range
-nix build .#vmTests.x86_64-linux.perses-greptimedb            # Magnetite, uid-range
-nix build .#vmTests.x86_64-linux.caddy-root-from-vars         # Magnetite, uid-range
+nix build .#vmTests.x86_64-linux.greptimedb-pipeline          # Pyrite or Magnetite, uid-range
+nix build .#vmTests.x86_64-linux.devloop-ingest               # Pyrite or Magnetite, uid-range
+nix build .#vmTests.x86_64-linux.fleet-ingress                # Pyrite or Magnetite, uid-range
+nix build .#vmTests.x86_64-linux.perses-greptimedb            # Pyrite or Magnetite, uid-range
+nix build .#vmTests.x86_64-linux.caddy-root-from-vars         # Pyrite or Magnetite, uid-range
 nix build .#vmTests.x86_64-linux.greptimedb-oom-order         # Pyrite, kvm
 nix build .#vmTests.x86_64-linux.tincr-mesh                   # Pyrite, kvm
 nix build .#vmTests.x86_64-linux.tincr-mesh-partition         # Pyrite, kvm

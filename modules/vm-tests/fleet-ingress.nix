@@ -3,7 +3,7 @@
 # tasks.md 3.4).
 #
 # One systemd-nspawn container `store`, on a builder that advertises
-# uid-range (magnetite), holds:
+# uid-range (pyrite or magnetite), holds:
 #   - the store with magnetite's databases, its schema job and the devloop
 #     tables and pipelines;
 #   - opentelemetry-collector.service from the agent and ingress fragments,

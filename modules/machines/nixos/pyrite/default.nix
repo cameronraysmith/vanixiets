@@ -164,6 +164,19 @@ in
       # lane runnable here.
       declaredKvm.present = true;
 
+      # systemd-nspawn-flavor NixOS tests require uid-range, auto-allocate-uids, and cgroups.
+      # See nixos/doc/manual/development/running-nixos-tests.section.md in nixpkgs.
+      # The same settings as magnetite's, so pyrite runs container tests as
+      # well as QEMU ones, off the store host (operator D39, 2026-11-23).
+      nix.settings = {
+        auto-allocate-uids = true;
+        extra-system-features = [ "uid-range" ];
+        experimental-features = [
+          "auto-allocate-uids"
+          "cgroups"
+        ];
+      };
+
       # Kept from base as a deliberate decision, not an inheritance (D6): the install
       # touches the pool from the installer environment under a different hostid, so
       # importing without force lands the machine's first boot in an emergency shell.

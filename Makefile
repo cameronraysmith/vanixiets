@@ -123,8 +123,8 @@ bootstrap: install-nix install-direnv
 # modules/darwin/nix-settings.nix:55-59 merges into the darwin set, is
 # deliberately omitted. The experimental feature only makes Nix accept the
 # setting of the same name, and the setting is true nowhere in this repo except
-# magnetite (modules/machines/nixos/magnetite/default.nix:76-83), which pairs it
-# with extra-system-features = uid-range for systemd-nspawn tests. That pairing is
+# magnetite and pyrite (modules/machines/nixos/{magnetite,pyrite}/default.nix),
+# which pair it with extra-system-features = uid-range for systemd-nspawn tests. That pairing is
 # belt-and-braces: nix's own getDefaultSystemFeatures
 # (nix src/libstore/globals.cc:217-239) already inserts uid-range
 # unconditionally on linux. Enabling the feature alone

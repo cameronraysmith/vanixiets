@@ -50,13 +50,16 @@ in
       # at a time. The fleet's only /dev/kvm, so the only route for
       # x86_64-linux kvm work; no big-parallel on two cores. An offline pyrite
       # fails kvm work with `missing system features` rather than degrading it
-      # to an emulated build.
+      # to an emulated build. uid-range comes from its auto-allocate-uids
+      # settings, as on magnetite, so nspawn container tests can route to
+      # either.
       pyrite.settings = {
         systems = [ "x86_64-linux" ];
         maxJobs = 1;
         supportedFeatures = [
           "kvm"
           "nixos-test"
+          "uid-range"
         ];
         address = hosts.pyrite.zerotier.address;
       };

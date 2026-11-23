@@ -2,7 +2,7 @@
 # (openspec/changes/stand-up-greptimedb-on-magnetite, design D13, tasks 6.1).
 #
 # What this establishes, in one systemd-nspawn container on a builder that
-# advertises uid-range (magnetite):
+# advertises uid-range (pyrite or magnetite):
 #   1. greptimedb-bin answers /health and serves its embedded dashboard at
 #      /dashboard/ (R1.1's runtime side);
 #   2. greptimedb-schema creates magnetite's databases with their TTLs, and a
