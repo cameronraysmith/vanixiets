@@ -32,8 +32,8 @@ Usage: apm-marketplace-validate [--local | --remote] [--repo OWNER/REPO] [--ref 
 
 Registers the vanixiets apm skills marketplace in a throwaway, fully isolated
 environment (overrides $HOME and every XDG dir) and installs each published
-package the way an external apm consumer would, asserting a SKILL.md or an
-instructions/rules artifact lands per package, and for instructions packages
+package the way an external apm consumer would, asserting a SKILL.md lands or
+instructions fragments are staged per package, and for instructions packages
 additionally compiling and asserting every staged fragment's heading reached
 the composed AGENTS.md (the marketplace publishes
 both skill packages and instructions packages; see the per-package install
@@ -216,26 +216,29 @@ for i in "${!published[@]}"; do
   rc=$?
   set -e
 
-  shopt -s nullglob
+  # the fragments live under the hidden .apm/instructions/ directory of each
+  # staged dependency, which ** does not descend into without dotglob.
+  shopt -s nullglob globstar dotglob
   claude_skills=("${root}"/.claude/skills/*/SKILL.md)
   agents_skills=("${root}"/.agents/skills/*/SKILL.md)
-  claude_rules=("${root}"/.claude/rules/*.md)
-  agents_rules=("${root}"/.agents/rules/*.md)
-  shopt -u nullglob
+  frag_files=("${root}"/apm_modules/**/*.instructions.md)
+  shopt -u nullglob globstar dotglob
   skill_count=$((${#claude_skills[@]} + ${#agents_skills[@]}))
-  rules_count=$((${#claude_rules[@]} + ${#agents_rules[@]}))
 
   # this marketplace publishes two package shapes: skill packages, whose
   # deliverable is a SKILL.md under .claude/skills/ or .agents/skills/, and
   # instructions packages (the agent-context-* set) whose manifest carries
   # only .apm/instructions/*.instructions.md and deliberately no skills
-  # directory at all. apm deploys the latter as .claude/rules/*.md rules
-  # instead (observed empirically: "N rule(s) integrated -> .claude/rules/"
-  # in the install log). a package installing zero SKILL.md is therefore not
-  # necessarily broken; only a package delivering neither shape is.
+  # directory at all. an instructions package is recognised by the fragments
+  # apm staged under apm_modules/, not by deployed rules: apm 0.36 also wrote
+  # them as .claude/rules/*.md, but apm 0.38 (#4005) deploys nothing for the
+  # claude target and asks for `apm compile` instead. the compose check below
+  # is what proves an instructions package works. a package installing zero
+  # SKILL.md is therefore not necessarily broken; only a package delivering
+  # neither shape is.
   if [ "${skill_count}" -gt 0 ]; then
     kind=skills
-  elif [ "${rules_count}" -gt 0 ]; then
+  elif [ "${#frag_files[@]}" -gt 0 ]; then
     kind=instructions
   else
     kind=none
@@ -270,12 +273,6 @@ for i in "${!published[@]}"; do
     # first `## ` heading of each installed fragment must appear verbatim
     # in the composed AGENTS.md. never hardcode fragment content here, so
     # adding/renaming/re-tiering a fragment needs no change to this check.
-    # dotglob is required alongside globstar: the fragments live under the
-    # hidden .apm/instructions/ directory, which ** does not descend into
-    # without it.
-    shopt -s globstar nullglob dotglob
-    frag_files=("${root}"/apm_modules/**/*.instructions.md)
-    shopt -u globstar nullglob dotglob
     expected_count=${#frag_files[@]}
 
     set +e
@@ -311,7 +308,7 @@ for i in "${!published[@]}"; do
       status[i]="OK (${kind})"
     fi
     passed=$((passed + 1))
-    echo "APM-VALIDATE-PKG-OK: ${pkg} kind=${kind} (claude_skills=${#claude_skills[@]} agents_skills=${#agents_skills[@]} claude_rules=${#claude_rules[@]} agents_rules=${#agents_rules[@]})"
+    echo "APM-VALIDATE-PKG-OK: ${pkg} kind=${kind} (claude_skills=${#claude_skills[@]} agents_skills=${#agents_skills[@]} fragments=${#frag_files[@]})"
   else
     if [ "${compose_ok}" -ne 1 ]; then
       status[i]="FAIL (instructions, not composed)"
@@ -321,7 +318,7 @@ for i in "${!published[@]}"; do
     failed=$((failed + 1))
     echo "APM-VALIDATE-PKG-FAIL: ${pkg} (rc=${rc})" >&2
     if [ "${rc}" -eq 0 ] && [ "${kind}" = none ]; then
-      echo "    install succeeded but no SKILL.md or rules artifact landed under ${root}" >&2
+      echo "    install succeeded but no SKILL.md or instructions fragment landed under ${root}" >&2
     fi
     while IFS= read -r line; do
       echo "    ${line}" >&2
