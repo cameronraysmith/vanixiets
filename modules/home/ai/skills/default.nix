@@ -14,8 +14,9 @@
 # as name -> skill directory (usually a store path string, not a Nix path), so
 # modules that check lib.isPath need home.file entries instead of skills options.
 #
-# Agents with programs.*.skills options (claude-code, opencode) use the
-# module-native mechanism. Codex, Droid, and hermes-agent lack recursive
+# Claude Code and OpenCode receive the one real-file tree agentsSkillsTree
+# through their programs.*.skills directory form, rather than one link
+# derivation per skill and harness. Codex, Droid, and hermes-agent lack recursive
 # symlink support in their modules, so skills are symlinked directly
 # via home.file. For hermes-agent, skills are delivered into
 # ~/.hermes/skills/ (SKILLS_DIR) directly rather than ~/.hermes/external-skills/
@@ -94,19 +95,28 @@ let
       );
     in
     {
-      options.aiSkills.extraSkills = lib.mkOption {
-        type = lib.types.attrsOf lib.types.path;
-        default = { };
-        description = "Third-party skills injected into all agent destinations alongside first-party skills, keyed by deployed name; each value is a skill directory containing SKILL.md, typically a store path string such as \"\${pkg.src}/skills/<name>\".";
+      options.aiSkills = {
+        extraSkills = lib.mkOption {
+          type = lib.types.attrsOf lib.types.path;
+          default = { };
+          description = "Third-party skills injected into all agent destinations alongside first-party skills, keyed by deployed name; each value is a skill directory containing SKILL.md, typically a store path string such as \"\${pkg.src}/skills/<name>\".";
+        };
+        delivered = lib.mkOption {
+          type = lib.types.attrsOf lib.types.path;
+          readOnly = true;
+          default = fileSkills;
+          defaultText = lib.literalMD "the compose's skills less the withheld upstream ones, and `aiSkills.extraSkills`";
+          description = "Every skill delivered to the agents, keyed by deployed name, as the source directory its delivered copy is made from.";
+        };
       };
 
       config = {
-        programs.claude-code.skills = fileSkills;
+        programs.claude-code.skills = "${agentsSkillsTree}";
         # Bypass programs.codex.skills: upstream codex module omits recursive = true
         # on home.file entries, causing .before-home-manager churn on every generation
         # change. Lock to empty to prevent conflicts if upstream changes the default.
         programs.codex.skills = { };
-        programs.opencode.skills = fileSkills;
+        programs.opencode.skills = "${agentsSkillsTree}";
 
         # ~/.agents/skills delivered as real files via home.activation below
         # (not home.file) because codex skips symlinked SKILL.md leaves.

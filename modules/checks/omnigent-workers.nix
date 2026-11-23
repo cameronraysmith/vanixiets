@@ -164,7 +164,7 @@
         browserAutomation =
           lib.elem pkgs.playwright-cli cfg.home.packages
           &&
-            toString cfg.programs.claude-code.skills.playwright-cli
+            toString (cfg.aiSkills.delivered.playwright-cli or "")
             == "${cfg.aiSkills.composed}/.claude/skills/playwright-cli"
           && !(cfg.aiSkills.extraSkills ? playwright-cli);
         workflowCapabilities =
@@ -184,7 +184,7 @@
           && cfg.programs.pi-coding-agent.enable
           && cfg.programs.claude-code.enable;
         linear = lib.elem pkgs.linear-cli cfg.home.packages;
-        skills = cfg.home.file."${cfg.home.homeDirectory}/.claude/skills/linear-cli".enable;
+        skills = cfg.aiSkills.delivered ? linear-cli;
         githubHelper = cfg.programs.gh.gitCredentialHelper.enable;
         # The deploy request key reaches the deployer only through its own SSH alias,
         # which the no-agent guard (held by `composition`) accepts.
