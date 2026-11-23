@@ -1,14 +1,18 @@
-# The two marketplace files, generated from the root apm.yml `marketplace:`
-# block and the group apm.yml files (design D5 of the
-# skills-single-source-marketplaces change):
+# The two marketplace files and the skills.sh discovery file, generated from the
+# root apm.yml `marketplace:` block and the group apm.yml files (design D5 and
+# D14 of the skills-single-source-marketplaces change):
 #
 # - .github/plugin/marketplace.json: apm's Copilot profile, every published group;
 #   apm consumers read it first.
 # - .claude-plugin/marketplace.json: apm's Claude profile reduced to the groups
 #   that carry .apm/skills, each entry pointing Claude at that directory, with no
 #   version so Claude versions installs by commit.
+# - skills.sh.json: one `paths` entry per group's .apm/skills, the containers
+#   `npx skills add cameronraysmith/vanixiets` walks (vercel-labs/skills
+#   src/skills-sh-config.ts); it walks each container three levels deep, so a
+#   single entry for the plugins directory finds nothing.
 #
-# `just agents-marketplace` copies both into the tree, and
+# `just agents-marketplace` copies the three into the tree, and
 # checks.x86_64-linux.skills-marketplace-drift fails when the committed copies
 # differ. apm cannot write the Claude entries itself: its Claude mapper has a
 # fixed field set and package entries refuse `skills` and `strict`. The root
@@ -97,4 +101,8 @@ runCommandLocal "skills-marketplace"
           | del(.version) + {skills: ["./.apm/skills"], strict: false}
         )
     ' .claude-plugin/marketplace.json > "$out/.claude-plugin/marketplace.json"
+    jq -n --argjson skillGroups "$skillGroups" '{
+      "$schema": "https://skills.sh/schemas/skills.sh.schema.json",
+      paths: [$skillGroups[] | "./modules/home/ai/plugins/\(.)/.apm/skills"]
+    }' > "$out/skills.sh.json"
   ''

@@ -1,6 +1,7 @@
 # checks.x86_64-linux.skills-marketplace-drift: the committed
-# .claude-plugin/marketplace.json and .github/plugin/marketplace.json equal the
-# skills-marketplace build, printing the difference when they do not. The build
+# .claude-plugin/marketplace.json, .github/plugin/marketplace.json and
+# skills.sh.json equal the skills-marketplace build, printing the difference
+# when they do not. The build
 # itself fails when marketplace.packages and the group directories disagree.
 # Fix: `just agents-marketplace`, review the diff, commit it.
 #
@@ -20,6 +21,7 @@
         fileset = lib.fileset.unions [
           ../../.claude-plugin/marketplace.json
           ../../.github/plugin/marketplace.json
+          ../../skills.sh.json
         ];
       };
     in
@@ -32,7 +34,7 @@
             }
             ''
               status=0
-              for file in .claude-plugin/marketplace.json .github/plugin/marketplace.json; do
+              for file in .claude-plugin/marketplace.json .github/plugin/marketplace.json skills.sh.json; do
                 if ! diff -u --label "committed $file" --label "generated $file" \
                   ${committed}/$file ${self'.packages.skills-marketplace}/$file; then
                   echo "FAIL: $file differs from the generated file; run just agents-marketplace" >&2

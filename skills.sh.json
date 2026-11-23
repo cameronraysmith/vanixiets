@@ -1,0 +1,23 @@
+{
+  "$schema": "https://skills.sh/schemas/skills.sh.schema.json",
+  "paths": [
+    "./modules/home/ai/plugins/agent-orchestration-and-meta-tooling/.apm/skills",
+    "./modules/home/ai/plugins/beads-issue-tracking-and-session-workflow/.apm/skills",
+    "./modules/home/ai/plugins/document-authoring-and-visualization/.apm/skills",
+    "./modules/home/ai/plugins/event-modeling-workflow/.apm/skills",
+    "./modules/home/ai/plugins/formal-specification-and-refinement/.apm/skills",
+    "./modules/home/ai/plugins/nix-build-operations/.apm/skills",
+    "./modules/home/ai/plugins/planning-and-development/.apm/skills",
+    "./modules/home/ai/plugins/preferences-code-and-collaboration-conventions/.apm/skills",
+    "./modules/home/ai/plugins/preferences-data-and-scientific-computing/.apm/skills",
+    "./modules/home/ai/plugins/preferences-domain-driven-architecture/.apm/skills",
+    "./modules/home/ai/plugins/preferences-event-driven-systems/.apm/skills",
+    "./modules/home/ai/plugins/preferences-functional-programming-theory/.apm/skills",
+    "./modules/home/ai/plugins/preferences-nix-and-secrets/.apm/skills",
+    "./modules/home/ai/plugins/preferences-operations-and-reliability/.apm/skills",
+    "./modules/home/ai/plugins/preferences-programming-languages/.apm/skills",
+    "./modules/home/ai/plugins/preferences-web-platform-and-deployment/.apm/skills",
+    "./modules/home/ai/plugins/testing-and-quality/.apm/skills",
+    "./modules/home/ai/plugins/version-control-and-forge/.apm/skills"
+  ]
+}
