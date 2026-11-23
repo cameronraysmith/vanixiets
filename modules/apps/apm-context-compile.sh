@@ -177,9 +177,9 @@ if [ ! -f apm.yml ]; then
   echo "apm-context-compile: no apm.yml at ${repo_root}" >&2
   exit 1
 fi
-manifest_output="$(yq -r '.marketplace.output' apm.yml)"
-if [ "${manifest_output}" != ".github/plugin/marketplace.json" ]; then
-  echo "apm-context-compile: apm.yml at ${repo_root} is not the vanixiets producer manifest (marketplace.output=${manifest_output})" >&2
+manifest_name="$(yq -r '.name' apm.yml)"
+if [ "${manifest_name}" != "vanixiets" ] || [ "$(yq -r '.marketplace.packages | length' apm.yml)" -eq 0 ]; then
+  echo "apm-context-compile: apm.yml at ${repo_root} is not the vanixiets producer manifest (name=${manifest_name}, needs marketplace.packages)" >&2
   exit 1
 fi
 

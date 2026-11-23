@@ -120,14 +120,14 @@ echo ""
 # marketplace.json apm registers. the worktree files faithfully reflect the
 # --local ref (HEAD) for these committed manifests.
 mapfile -t published < <(yq -r '.marketplace.packages[].name' "${repo_root}/apm.yml" | sort)
-# read the served set from wherever apm.yml says the manifest is emitted rather
-# than a second hardcoded path, which silently went stale when the directory
-# moved. mapfile over process substitution cannot propagate a jq failure, so a
-# missing file would otherwise read as an empty served set and be reported as
-# total coverage drift.
-served_manifest="${repo_root}/$(yq -r '.marketplace.output' "${repo_root}/apm.yml")"
+# the apm-facing file: apm's probe order reads .github/plugin/marketplace.json
+# before .claude-plugin/marketplace.json, and only it lists the instructions
+# packages. mapfile over process substitution cannot propagate a jq failure, so
+# a missing file would otherwise read as an empty served set and be reported
+# as total coverage drift.
+served_manifest="${repo_root}/.github/plugin/marketplace.json"
 if [ ! -f "${served_manifest}" ]; then
-  echo "error: marketplace manifest not found at ${served_manifest} (apm.yml marketplace.output)" >&2
+  echo "error: marketplace manifest not found at ${served_manifest}" >&2
   exit 1
 fi
 mapfile -t served < <(jq -r '.plugins[].name' "${served_manifest}" | sort)
