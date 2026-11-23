@@ -94,7 +94,7 @@
         # collector, unless C5_UNLOADED names the label.
         label=''${2#system/}
         if [ "$label" = "''${C5_UNLOADED:-}" ]; then echo "Could not find service \"$label\" in domain for system"; exit 113; fi
-        case $label in org.nixos.otelcol) pid=101 ;; org.nixos.otelcol-process) pid=202 ;; *) exit 113 ;; esac
+        case $label in org.nixos.otelcol) pid=101 ;; org.nixos.otelcol-process) pid=202 ;; org.nixos.otel-agent-session) pid=303 ;; *) exit 113 ;; esac
         printf '%s = {\n\tstate = running\n\tpid = %s\n}\n' "system/$label" "$pid"
       '';
       psStub = pkgs.writeShellScript "ps-stub" ''
@@ -184,6 +184,25 @@
               "org.nixos.otelcol" = 268435456;
               "org.nixos.otelcol-process" = 134217728;
             };
+          };
+        };
+        # stibnite's agent-session daemon's own envelope
+        # (darwin-agent-session-telemetry design D4, D9): its four exporters
+        # with Langfuse's failed sends exempt, and C5 at the 640 MiB
+        # (671,088,640 B) the fragment passes.
+        darwinAgentSession = envelope {
+          hostName = "stibnite";
+          exporters = [
+            "otlp_http/ingress-agent"
+            "otlp_http/ingress-metrics"
+            "otlp_http/ingress-traces"
+            "otlp_http/langfuse"
+          ];
+          sendFailedExempt = [ "otlp_http/langfuse" ];
+          darwinMemory = {
+            launchctl = "${launchctlStub}";
+            top = "${topStub}";
+            limits."org.nixos.otel-agent-session" = 671088640;
           };
         };
       };
@@ -724,6 +743,27 @@
           local -x C5_UNLOADED=org.nixos.otelcol-process C5_TOP_101=agent-134M C5_TOP_202=process-129M
           run darwin "$(mktemp -d)" darwin-healthy up 0 && grep -q '^otel-envelope: C5 memory: ok$' "$work/out"
         }
+        # stibnite's agent-session daemon (darwin-agent-session-telemetry
+        # design D4): C5 passes 1 MiB under its 640 MiB limit and fails 1 MiB
+        # over; Langfuse's failed sends are not loss there either.
+        case_c5AgentSessionAt639() {
+          local -x C5_TOP_303=agent-session-639M
+          run darwinAgentSession "$(mktemp -d)" agent-session-langfuse-healthy down 0 \
+            && grep -q '^otel-envelope: C5 memory: ok$' "$work/out"
+        }
+        case_c5AgentSessionAt641() {
+          local -x C5_TOP_303=agent-session-641M
+          run darwinAgentSession "$(mktemp -d)" agent-session-langfuse-healthy down 1 \
+            && grep -q '^otel-envelope: C5 memory: FAIL org.nixos.otel-agent-session 641 MiB above its limit$' "$work/out" \
+            && [ "$(grep -c ': FAIL' "$work/out")" = 1 ]
+        }
+        case_darwinLangfuseSendFailed() {
+          local s
+          s=$(mktemp -d)
+          local -x C5_TOP_303=agent-session-639M
+          run darwinAgentSession "$s" agent-session-langfuse-healthy down 0 \
+            && run darwinAgentSession "$s" agent-session-langfuse-send-failed down 0
+        }
 
         for c in "$@"; do
           current=$c
@@ -779,6 +819,9 @@
         "c5ProcessGone"
         "c5TopHangs"
         "c5NotLoaded"
+        "c5AgentSessionAt639"
+        "c5AgentSessionAt641"
+        "darwinLangfuseSendFailed"
       ];
       allCases = lib.concatStringsSep " " caseNames;
     in

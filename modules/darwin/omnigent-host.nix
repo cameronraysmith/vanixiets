@@ -113,6 +113,15 @@ in
             deliveries.${name}.homeModule
             flakeConfig.flake.lib.sourceContextObligations.homeModule
             { vcs.author = flakeConfig.flake.lib.vcsAuthor flakeConfig.flake.users.${worker.owner}.meta; }
+            # The worker home has no osConfig, so it takes the host's flag
+            # (set by the otel-collector role from the host's row) and its
+            # owner as the person (darwin-agent-session-telemetry design D10).
+            {
+              agentTelemetry = {
+                enable = config.vanixiets.otelCollector.agentTelemetry or false;
+                person = worker.owner;
+              };
+            }
             ({ lib, ... }: {
               home = {
                 username = worker.user;
@@ -258,6 +267,13 @@ in
           type = lib.types.attrsOf lib.types.str;
           default = { };
           description = "Non-secret environment values forwarded to the foreground host.";
+        };
+        workerHomes = lib.mkOption {
+          type = lib.types.attrsOf lib.types.raw;
+          internal = true;
+          readOnly = true;
+          default = lib.mapAttrs (_: home: home.config) workerHomes;
+          description = "Each worker's evaluated standalone Home Manager configuration, for checks that read its rendered files (agent-telemetry-emitters).";
         };
       };
 

@@ -1587,6 +1587,12 @@ in
                       }
                     ];
                   }
+                  # The fragment declares these, as the NixOS role sets them: the
+                  # agent-telemetry home module reads agentTelemetry to turn the
+                  # emitters on (darwin-agent-session-telemetry design D10).
+                  (lib.optionalAttrs collect {
+                    vanixiets.otelCollector = { inherit agentTelemetry langfuse; };
+                  })
                   (lib.optionalAttrs agentTelemetry {
                     users.knownGroups = [
                       "_otelagent"

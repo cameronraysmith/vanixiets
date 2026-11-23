@@ -2426,6 +2426,11 @@
       };
       # darwin-agent-session-telemetry design D6: the agent-session daemon is
       # in stibnite's kept-alive list, so the rule's union expects it running.
+      # No leg for rosegold or argentum: their probes select labels from the
+      # host's own launchd daemons (otelHostProbeLabels over
+      # config.launchd.daemons), which hold no org.nixos.otel-agent-session
+      # there, so they write no series for it and the union's running arm
+      # has nothing to fire on.
       agentSessionKeptAlive =
         notRunningFor15 evaluatorRules "org.nixos.otel-agent-session" "not_running"
         // {
@@ -2869,6 +2874,48 @@
                 notRunningFor15 rulesList "org.nixos.otel-agent-session" "not_running"
                 // {
                   inherit (agentSessionKeptAlive) name;
+                }
+              )
+            ];
+          };
+        # darwin-agent-session-telemetry design D3 undone: LaunchdJobFailed
+        # without the agent-session envelope in its exclusion reports the
+        # envelope's own failure a second time.
+        failedReportsAgentSessionEnvelope =
+          let
+            rulesList = map (
+              r:
+              if r.alert == "LaunchdJobFailed" then
+                r
+                // {
+                  expr =
+                    mutateText "failedReportsAgentSessionEnvelope" "org[.]nixos[.]otel-agent-session-envelope|" ""
+                      r.expr;
+                }
+              else
+                r
+            ) evaluatorRules;
+          in
+          {
+            evaluator = realEvaluator;
+            config = checkConfig rulesList;
+            legs = [
+              (
+                agentSessionEnvelopeFailedNotReported
+                // {
+                  rules = rulesList;
+                  steps = map (
+                    n:
+                    onStibnite {
+                      at = minute n;
+                      series.LaunchdJobFailed = failedAnswer rulesList 0 [
+                        {
+                          label = "org.nixos.otel-agent-session-envelope";
+                          exit = 1;
+                        }
+                      ];
+                    }
+                  ) (lib.range 0 15);
                 }
               )
             ];

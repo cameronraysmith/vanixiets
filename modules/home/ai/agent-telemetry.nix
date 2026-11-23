@@ -1,8 +1,11 @@
 # Agent session telemetry emitters (openspec agent-session-telemetry, design
 # D2, D8, D9): Claude Code and omp export to the host's loopback collector
-# receiver, and only on a host whose collector has that receiver
+# receiver, and only where `agentTelemetry.enable` is set: by default on a
+# host whose collector has that receiver
 # (osConfig.vanixiets.otelCollector.agentTelemetry, set from the host's
-# flake.lib.observabilityHosts row). Elsewhere (darwin, hosts without the
+# flake.lib.observabilityHosts row, on NixOS and darwin alike), and on a
+# darwin Omnigent worker, a standalone home, by its builder
+# (darwin-agent-session-telemetry design D10). Elsewhere (hosts without the
 # flag, standalone homes such as claude-sandbox) this module sets nothing.
 #
 # Imported by homeManager.ai (every human home) and homeManager.omnigent-worker
@@ -17,7 +20,27 @@
 #
 # The collector, not these gates, enforces what leaves the host (design D3):
 # a key added here that the collector does not allow is dropped there.
-{ ... }:
+{ config, lib, ... }:
+let
+  inherit (config.flake) userAliases users;
+  # The person a human home's user name is: the one flake.userAliases key
+  # naming it (crs58 is cameron, aliases.nix), else the name itself when it
+  # is a flake user or alias. Anything else fails evaluation rather than
+  # stamp a name the fleet does not know (design D10).
+  personOf =
+    name:
+    let
+      aliases = lib.attrNames (lib.filterAttrs (_: target: target == name) userAliases);
+    in
+    if lib.length aliases == 1 then
+      lib.head aliases
+    else if aliases != [ ] then
+      throw "agent-telemetry: user ${name} is the target of several flake.userAliases (${lib.concatStringsSep ", " aliases}); set agentTelemetry.person explicitly."
+    else if users ? ${name} || userAliases ? ${name} then
+      name
+    else
+      throw "agent-telemetry: user ${name} is neither a flake.users key nor a flake.userAliases key; set agentTelemetry.person explicitly rather than stamp an unknown name.";
+in
 {
   flake.modules.homeManager.agent-telemetry =
     {
@@ -28,7 +51,7 @@
     }:
     let
       cfg = config.agentTelemetry;
-      enabled = osConfig != null && (osConfig.vanixiets.otelCollector.agentTelemetry or false);
+      enabled = cfg.enable;
       receiver = "http://127.0.0.1:4318";
       resourceAttributes = "user.name=${cfg.person}";
 
@@ -107,14 +130,24 @@
       key = "vanixiets/agent-telemetry";
 
       options.agentTelemetry = {
+        enable = lib.mkOption {
+          type = lib.types.bool;
+          default = osConfig != null && (osConfig.vanixiets.otelCollector.agentTelemetry or false);
+          defaultText = lib.literalExpression "osConfig != null && (osConfig.vanixiets.otelCollector.agentTelemetry or false)";
+          description = ''
+            Whether Claude Code and omp export to the loopback agent-session
+            receiver. A standalone home, such as a darwin Omnigent worker's
+            (osConfig = null), sets it from its host's row.
+          '';
+        };
         person = lib.mkOption {
           type = lib.types.strMatching "[a-z_][a-z0-9_-]*";
-          default = config.home.username;
-          defaultText = lib.literalExpression "config.home.username";
+          default = personOf config.home.username;
+          defaultText = lib.literalMD "the `flake.userAliases` key naming `home.username`, else `home.username` when it is a flake user or alias";
           description = ''
             The person a session runs for, stamped as the resource attribute
-            `user.name`: the home's user for a human, the worker's owner for an
-            Omnigent worker (design D4).
+            `user.name`: the home's user, or its alias (crs58 is cameron), for a
+            human, the worker's owner for an Omnigent worker (design D4).
           '';
         };
         claudeCodeEnvNames = lib.mkOption {

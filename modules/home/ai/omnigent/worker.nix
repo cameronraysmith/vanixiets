@@ -15,8 +15,10 @@ in
     let
       home = config.home.homeDirectory;
       # The worker's owner, the person its sessions run for (agent-session-
-      # telemetry design D4), from the host's worker declaration. Forced only
-      # where the agent-telemetry module is active, which needs osConfig.
+      # telemetry design D4), from the host's worker declaration. A default,
+      # forced only where the agent-telemetry module is active and nothing
+      # sets the person: the darwin worker builder, whose home has no
+      # osConfig, sets it to the owner (darwin-agent-session-telemetry D10).
       workerOwners = lib.mapAttrsToList (_: worker: worker.owner) (
         lib.filterAttrs (_: worker: worker.user == config.home.username) (
           if osConfig == null then { } else osConfig.services.omnigent-host.workers or { }
@@ -124,11 +126,12 @@ in
         "agent-telemetry"
       ];
 
-      agentTelemetry.person =
+      agentTelemetry.person = lib.mkDefault (
         if lib.length workerOwners == 1 then
           lib.head workerOwners
         else
-          throw "Omnigent worker home ${config.home.username}: agentTelemetry.person needs exactly one services.omnigent-host.workers entry with user ${config.home.username}, found ${toString (lib.length workerOwners)}; refusing to stamp the Unix account name as the person.";
+          throw "Omnigent worker home ${config.home.username}: agentTelemetry.person needs exactly one services.omnigent-host.workers entry with user ${config.home.username}, found ${toString (lib.length workerOwners)}; refusing to stamp the Unix account name as the person."
+      );
 
       # Prefer HM's configured wrappers inside the profile, not in the supervisor PATH.
       home.packages = map (

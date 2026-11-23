@@ -406,6 +406,42 @@
           i.fragment.agentSessionEnvelopeMemoryLimits == {
             "org.nixos.otel-agent-session" = 640 * 1024 * 1024;
           };
+        # design D9: where stibnite's row sets langfuse, its fleet collector
+        # scrapes the daemon's own telemetry listener, typed here as
+        # 127.0.0.1:8890, keeping Langfuse's sent and failed span counters
+        # alone without the instance id, as otel-collector-config's
+        # langfuseScrape holds on NixOS; elsewhere no such job.
+        agentSessionScrape =
+          let
+            jobs = builtins.filter (
+              j: j.job_name == "otelcol-agent-session"
+            ) i.fragment.agentSettings.receivers.prometheus.config.scrape_configs;
+            listener =
+              (builtins.head i.stibniteAgentSession.service.telemetry.metrics.readers).pull.exporter.prometheus;
+          in
+          if !i.stibniteLangfuse then
+            jobs == [ ]
+          else
+            builtins.length jobs == 1
+            && "${listener.host}:${toString listener.port}" == "127.0.0.1:8890"
+            && (builtins.head jobs).static_configs == [ { targets = [ "127.0.0.1:8890" ]; } ]
+            &&
+              (builtins.head jobs).metric_relabel_configs == [
+                {
+                  source_labels = [ "__name__" ];
+                  regex = "otelcol_exporter_sent_spans|otelcol_exporter_send_failed_spans";
+                  action = "keep";
+                }
+                {
+                  source_labels = [ "exporter" ];
+                  regex = "otlp_http/langfuse";
+                  action = "keep";
+                }
+                {
+                  regex = "service_instance_id";
+                  action = "labeldrop";
+                }
+              ];
       };
 
       mutants = {
@@ -576,6 +612,30 @@
             i:
             lib.recursiveUpdate i {
               fragment.agentSessionEnvelopeMemoryLimits."org.nixos.otel-agent-session" = 704 * 1024 * 1024;
+            };
+        };
+        agentSessionScrapeWidened = {
+          clause = "agentSessionScrape";
+          apply =
+            i:
+            lib.recursiveUpdate i {
+              fragment.agentSettings.receivers.prometheus.config.scrape_configs = map (
+                j:
+                if j.job_name == "otelcol-agent-session" then
+                  j // { metric_relabel_configs = lib.drop 1 j.metric_relabel_configs; }
+                else
+                  j
+              ) i.fragment.agentSettings.receivers.prometheus.config.scrape_configs;
+            };
+        };
+        agentSessionScrapeMissing = {
+          clause = "agentSessionScrape";
+          apply =
+            i:
+            lib.recursiveUpdate i {
+              fragment.agentSettings.receivers.prometheus.config.scrape_configs = builtins.filter (
+                j: j.job_name != "otelcol-agent-session"
+              ) i.fragment.agentSettings.receivers.prometheus.config.scrape_configs;
             };
         };
       };

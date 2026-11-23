@@ -17,7 +17,8 @@
 # (agent-session-telemetry design D8, D14); on darwin the launchd daemon
 # org.nixos.otel-agent-session under _otelagent, with the fleet collector's
 # own receiver moved to 4319 (darwin-agent-session-telemetry design D2, D3),
-# and org.nixos.otel-agent-session joins the host's kept-alive list
+# and the emitters of its human homes and its standalone Omnigent workers
+# (design D10); org.nixos.otel-agent-session joins that host's kept-alive list
 # (flake.lib.launchdKeptAlive, design D6). Its row lists the collector's
 # envelope among the notified units, and on NixOS the unit too, which the
 # agent role asserts. `agentSpanQueueMiB` sizes a darwin agent-session
@@ -29,7 +30,8 @@
 # collector's filtered, capped and masked agent spans out to Langfuse Cloud
 # (agent-session-telemetry design D16); the agent role asserts the
 # requirement, and the host must be a recipient of the shared `langfuse` var
-# (flake.lib.sharedVarsObligations).
+# (flake.lib.sharedVarsObligations). magnetite, pyrite and stibnite set both
+# flags; rosegold and argentum neither.
 { ... }:
 {
   flake.lib.observabilityHosts =
@@ -122,6 +124,7 @@
         ];
         smartDevices = [ "disk0" ];
         agentTelemetry = true;
+        langfuse = true;
         agentSpanQueueMiB = 256;
       };
       # The laptops that build for the fleet and fill their store disks
