@@ -198,6 +198,8 @@
       "org.nixos.otelcol"
       "org.nixos.otelcol-process"
       "org.nixos.otel-envelope"
+      "org.nixos.otel-agent-session"
+      "org.nixos.otel-agent-session-envelope"
       "org.nixos.prometheus-node-exporter"
       "org.nixos.omnigent-host-*"
     ];
@@ -249,6 +251,7 @@
       "org.nixos.nix-daemon" = "nix";
       "org.nixos.nix-grpc-daemon" = "nix-grpc-daemon";
       "org.nixos.omnigent-host-*" = "python3.14";
+      "org.nixos.otel-agent-session" = "otelcol-contrib";
       "org.nixos.otelcol" = "otelcol-contrib";
       "org.nixos.otelcol-process" = "otelcol-contrib";
       "org.nixos.prometheus-node-exporter" = "node_exporter";

@@ -80,11 +80,15 @@ in
       # One exporter per signal, each with its own persistent queue: 24 h of
       # agent metrics, 8 h of agent events and 3 h of spans at schema.nix's
       # rates while the ingress is unreachable (design D10, D14, D15);
-      # flake.lib.agentSessionAssertions judges them.
+      # flake.lib.agentSessionAssertions judges them. The span queue is the
+      # host-table row's agentSpanQueueMiB: 44 on the NixOS hosts, larger on
+      # a Mac that is off the mesh for days (darwin-agent-session-telemetry
+      # design D7).
+      spanQueueMiB ? 44,
       queueBytes ? {
         "otlp_http/ingress-metrics" = mib 52;
         "otlp_http/ingress-agent" = mib 64;
-        "otlp_http/ingress-traces" = mib 44;
+        "otlp_http/ingress-traces" = mib spanQueueMiB;
       },
       # Its own telemetry port, beside the host's collector on 8888.
       telemetryPort ? 8890,

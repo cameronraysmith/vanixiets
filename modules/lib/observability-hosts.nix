@@ -10,17 +10,26 @@
 # its textfile series; modules/nixos/node-exporter-textfile.nix asserts it
 # against the host's own configuration, which its machine check evaluates
 # anyway (F76). Every collecting darwin host's probe writes a textfile.
-# A NixOS host's `agentTelemetry` turns on the agent-session collector,
-# otel-agent-session.service with its loopback receiver, for its agent
-# sessions and, through the agent-telemetry home module, the emitters of
-# every person and Omnigent worker on it (agent-session-telemetry design D8,
-# D14); its row also lists that unit and its envelope among the notified
-# units, which the agent role asserts. It is a NixOS option only, so a
-# darwin row keeps it false.
-# A NixOS host's `langfuse`, which requires its `agentTelemetry`, also fans
-# that collector's filtered, capped and masked agent spans out to Langfuse
-# Cloud (agent-session-telemetry design D16); the agent role asserts the
-# requirement.
+# A host's `agentTelemetry` turns on the agent-session collector, with its
+# loopback receiver on 127.0.0.1:4318, for its agent sessions: on NixOS
+# otel-agent-session.service and, through the agent-telemetry home module,
+# the emitters of every person and Omnigent worker on it
+# (agent-session-telemetry design D8, D14); on darwin the launchd daemon
+# org.nixos.otel-agent-session under _otelagent, with the fleet collector's
+# own receiver moved to 4319 (darwin-agent-session-telemetry design D2, D3),
+# and org.nixos.otel-agent-session joins the host's kept-alive list
+# (flake.lib.launchdKeptAlive, design D6). Its row lists the collector's
+# envelope among the notified units, and on NixOS the unit too, which the
+# agent role asserts. `agentSpanQueueMiB` sizes a darwin agent-session
+# daemon's span queue (design D7): 256 on stibnite, a week of its average
+# use off the mesh; the NixOS unit keeps flake.lib.agentSessionCollector's
+# default, the 44 of the base row, because its VM tests run it under host
+# names that have no row.
+# A host's `langfuse`, which requires its `agentTelemetry`, also fans that
+# collector's filtered, capped and masked agent spans out to Langfuse Cloud
+# (agent-session-telemetry design D16); the agent role asserts the
+# requirement, and the host must be a recipient of the shared `langfuse` var
+# (flake.lib.sharedVarsObligations).
 { ... }:
 {
   flake.lib.observabilityHosts =
@@ -33,6 +42,7 @@
         textfile = false;
         agentTelemetry = false;
         langfuse = false;
+        agentSpanQueueMiB = 44;
         notifiedUnits = [
           "opentelemetry-collector"
           "otel-envelope"
@@ -106,8 +116,13 @@
       # systemd units; its SMART device is read by the probe (design D4, D7).
       stibnite = agent [ ] // {
         platform = "darwin";
-        notifiedUnits = [ "otel-envelope" ];
+        notifiedUnits = [
+          "otel-envelope"
+          "otel-agent-session-envelope"
+        ];
         smartDevices = [ "disk0" ];
+        agentTelemetry = true;
+        agentSpanQueueMiB = 256;
       };
       # The laptops that build for the fleet and fill their store disks
       # (bound-fleet-garbage-collection D6). Collecting since operator

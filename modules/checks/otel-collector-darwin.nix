@@ -97,13 +97,72 @@
             agentSettings
             processSettings
             envelopeMemoryLimits
+            agentSessionEnvelopeMemoryLimits
             ;
           # nix-darwin leaves EnvironmentVariables null without `environment`.
           processEnvironment =
             lib.defaultTo { }
               self.darwinConfigurations.stibnite.config.launchd.daemons.otelcol-process.serviceConfig.EnvironmentVariables;
         };
+        # Sources of agentSessionEqualsPyrite (darwin-agent-session-telemetry
+        # design D12): stibnite's evaluated agent-session daemon settings, and
+        # pyrite's evaluated otel-agent-session.service settings, from which
+        # the clause reads pyrite's host facts. Evaluating pyrite adds one
+        # NixOS evaluation to this check; stibnite's is already made above.
+        stibniteAgentSession =
+          self.darwinConfigurations.stibnite.config.vanixiets.otelCollector.agentSessionSettings;
+        pyriteAgentSession =
+          self.nixosConfigurations.pyrite.config.vanixiets.otelCollector.agentSessionSettings;
+        stibniteLangfuse = self.lib.observabilityHosts.stibnite.langfuse;
       };
+
+      # An agent-session collector's settings with what may differ by host
+      # replaced by placeholders: the host name, TLS and Langfuse key file
+      # paths, the queue directory, queue sizes and the telemetry port
+      # (darwin-agent-session-telemetry design D12). Everything else, every
+      # processor, statement, pipeline and exporter, must be equal.
+      normaliseAgentSession =
+        hostName: s:
+        let
+          exporter =
+            e:
+            lib.recursiveUpdate e (
+              lib.optionalAttrs (e ? tls) {
+                tls = {
+                  ca_file = "@CA@";
+                  cert_file = "@CERT@";
+                  key_file = "@KEY@";
+                };
+              }
+              // lib.optionalAttrs (e ? sending_queue.queue_size) { sending_queue.queue_size = 0; }
+            );
+          normalised = s // {
+            extensions = lib.recursiveUpdate s.extensions (
+              {
+                file_storage.directory = "@QUEUE@";
+              }
+              // lib.optionalAttrs (s.extensions ? "basicauth/langfuse") {
+                "basicauth/langfuse".client_auth = {
+                  username_file = "@LANGFUSE_PUBLIC@";
+                  password_file = "@LANGFUSE_SECRET@";
+                };
+              }
+            );
+            exporters = lib.mapAttrs (_: exporter) s.exporters;
+            service = s.service // {
+              telemetry = s.service.telemetry // {
+                metrics = s.service.telemetry.metrics // {
+                  readers = map (
+                    r: lib.recursiveUpdate r { pull.exporter.prometheus.port = 0; }
+                  ) s.service.telemetry.metrics.readers;
+                };
+              };
+            };
+          };
+        in
+        builtins.replaceStrings [ (builtins.toJSON hostName) ] [ ''"@HOST@"'' ] (
+          builtins.unsafeDiscardStringContext (builtins.toJSON normalised)
+        );
 
       isLoopback =
         s:
@@ -177,7 +236,7 @@
           && lib.all (
             p: !(lib.hasInfix p (builtins.unsafeDiscardStringContext (builtins.toJSON i.r.process)))
           ) i.credentialPaths
-          && i.r.process.exporters."otlp_http/agent".endpoint == "http://127.0.0.1:4318";
+          && i.r.process.exporters."otlp_http/agent".endpoint == "http://127.0.0.1:4319";
         strictIncludes =
           let
             s = i.r.agent.receivers."host_metrics/memory".scrapers;
@@ -280,6 +339,73 @@
           && lib.all (n: !(builtins.elem "otlp" p.${n}.receivers)) (
             builtins.filter (lib.hasPrefix "logs/") (builtins.attrNames p)
           );
+        # darwin-agent-session-telemetry design D2: the fleet collector's
+        # receiver on 4319, typed here, and none of its pipelines, receivers
+        # or exporters the agent-session collector's, so 127.0.0.1:4318 is
+        # the daemon's alone and agent data never enters the fleet heap.
+        fleetOffAgentPort =
+          let
+            a = i.fragment.agentSettings;
+          in
+          i.r.agent.receivers.otlp.protocols.http.endpoint == "127.0.0.1:4319"
+          && a.receivers.otlp.protocols.http.endpoint == "127.0.0.1:4319"
+          && !(a.receivers ? "otlp/local")
+          && lib.all (n: !(lib.hasInfix "agent-session" n)) (builtins.attrNames a.service.pipelines)
+          && lib.all (n: !(builtins.hasAttr n a.exporters)) (
+            builtins.attrNames i.stibniteAgentSession.exporters
+          );
+        # design D12: stibnite's daemon runs pyrite's pipelines. pyrite's host
+        # facts are read from its own settings and passed back through
+        # flake.lib.agentSessionCollector, which must reproduce them exactly;
+        # that call, with stibnite's Langfuse flag, must equal stibnite's
+        # settings after normaliseAgentSession.
+        agentSessionEqualsPyrite =
+          let
+            p = i.pyriteAgentSession;
+            tls = p.exporters."otlp_http/ingress-metrics".tls;
+            auth = p.extensions."basicauth/langfuse".client_auth;
+            pyriteWith =
+              langfuse:
+              (self.lib.agentSessionCollector {
+                hostName = "pyrite";
+                caFile = tls.ca_file;
+                certFile = tls.cert_file;
+                keyFile = tls.key_file;
+                queueDirectory = p.extensions.file_storage.directory;
+                telemetryPort = (builtins.head p.service.telemetry.metrics.readers).pull.exporter.prometheus.port;
+                langfuse =
+                  if langfuse then
+                    {
+                      publicKeyFile = auth.username_file;
+                      secretKeyFile = auth.password_file;
+                    }
+                  else
+                    null;
+              }).settings;
+          in
+          pyriteWith true == p
+          &&
+            normaliseAgentSession "stibnite" i.stibniteAgentSession
+            == normaliseAgentSession "pyrite" (pyriteWith i.stibniteLangfuse);
+        # design D7: stibnite's queues, typed here, 404 MiB with Langfuse's.
+        agentSessionQueues =
+          let
+            mib = n: n * 1024 * 1024;
+            sizes = lib.mapAttrs (_: e: e.sending_queue.queue_size) i.stibniteAgentSession.exporters;
+          in
+          sizes == {
+            "otlp_http/ingress-metrics" = mib 52;
+            "otlp_http/ingress-agent" = mib 64;
+            "otlp_http/ingress-traces" = mib 256;
+          }
+          // lib.optionalAttrs i.stibniteLangfuse { "otlp_http/langfuse" = mib 32; }
+          && lib.foldl' (s: v: s + v) 0 (builtins.attrValues sizes) < mib 512;
+        # design D4 and the orchestrator's D32: C5 for the daemon at 640 MiB,
+        # its own envelope's only target.
+        agentSessionC5 =
+          i.fragment.agentSessionEnvelopeMemoryLimits == {
+            "org.nixos.otel-agent-session" = 640 * 1024 * 1024;
+          };
       };
 
       mutants = {
@@ -398,6 +524,60 @@
               ];
             };
         };
+        fleetReceiverOn4318 = {
+          clause = "fleetOffAgentPort";
+          apply =
+            i:
+            lib.recursiveUpdate i {
+              fragment.agentSettings.receivers.otlp.protocols.http.endpoint = "127.0.0.1:4318";
+            };
+        };
+        agentPipelineInFleet = {
+          clause = "fleetOffAgentPort";
+          apply =
+            i:
+            lib.recursiveUpdate i {
+              fragment.agentSettings.service.pipelines."traces/agent-session" =
+                i.stibniteAgentSession.service.pipelines."traces/agent-session";
+            };
+        };
+        stibniteProcessorDropped = {
+          clause = "agentSessionEqualsPyrite";
+          apply =
+            i:
+            let
+              s = i.stibniteAgentSession;
+              dropped = "filter/agent-session-service";
+            in
+            i
+            // {
+              stibniteAgentSession = s // {
+                processors = builtins.removeAttrs s.processors [ dropped ];
+                service = s.service // {
+                  pipelines = lib.mapAttrs (
+                    _: p: p // { processors = lib.remove dropped p.processors; }
+                  ) s.service.pipelines;
+                };
+              };
+            };
+        };
+        stibniteSpanQueueDefault = {
+          clause = "agentSessionQueues";
+          apply =
+            i:
+            lib.recursiveUpdate i {
+              stibniteAgentSession.exporters."otlp_http/ingress-traces".sending_queue.queue_size =
+                44 * 1024 * 1024;
+            };
+        };
+        agentSessionC5Raised = {
+          clause = "agentSessionC5";
+          apply =
+            i:
+            lib.recursiveUpdate i {
+              fragment.agentSessionEnvelopeMemoryLimits."org.nixos.otel-agent-session" = 704 * 1024 * 1024;
+            };
+        };
       };
 
       held = clauses input;
@@ -418,6 +598,13 @@
       yaml = pkgs.formats.yaml { };
       agentYaml = yaml.generate "otelcol-agent.yaml" input.r.agent;
       processYaml = yaml.generate "otelcol-process.yaml" input.r.process;
+      # stibnite's agent-session daemon's configuration (design D12), the
+      # file the daemon runs, validated as the fleet files are; its CA is a
+      # darwin store path, so its context is discarded and nothing darwin is
+      # built here.
+      agentSessionYaml = yaml.generate "otel-agent-session.yaml" (
+        builtins.fromJSON (builtins.unsafeDiscardStringContext (builtins.toJSON input.stibniteAgentSession))
+      );
       # The validation's negative control: an unknown key must be refused.
       badYaml = yaml.generate "otelcol-agent-bad.yaml" (
         lib.recursiveUpdate input.r.agent { exporters."otlp_http/ingress".sending_queue.queue_sizee = 1; }
@@ -719,7 +906,7 @@
             ''
               set -uo pipefail
               printf '%s' ${lib.escapeShellArg clauseReport}
-              for c in agent:${agentYaml} process:${processYaml}; do
+              for c in agent:${agentYaml} process:${processYaml} agent-session:${agentSessionYaml}; do
                 if otelcol-contrib validate --config "''${c#*:}" > "$TMPDIR/v.out" 2>&1; then
                   echo "ok: validate ''${c%%:*}"
                 else

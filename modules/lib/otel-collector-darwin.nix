@@ -65,6 +65,10 @@ in
       fleetExecutables,
     }:
     let
+      # Where the host's row sends agent spans to Langfuse, the daemon's
+      # telemetry port (modules/darwin/otel-collector-agent.nix).
+      langfuse = flakeLib.observabilityHosts.${hostName}.langfuse;
+      agentSessionTarget = "127.0.0.1:8890";
       # The process filter's clause sparing one fleet executable.
       spared = n: ''resource.attributes["process.executable.name"] != ${builtins.toJSON n}'';
       # As the NixOS agent's exporters (modules/clan/services/otel-collector/
@@ -137,7 +141,10 @@ in
             };
           };
           # otelcol-process's points; no logs pipeline reads it (ADR-003:81).
-          otlp.protocols.http.endpoint = "127.0.0.1:4318";
+          # 4319, not 4318: 127.0.0.1:4318 is the agent-session receiver on
+          # every host, and an emitter must never reach metrics/host
+          # (darwin-agent-session-telemetry design D2).
+          otlp.protocols.http.endpoint = "127.0.0.1:4319";
           prometheus.config.scrape_configs = [
             (scrape "node" "${node.listenAddress}:${toString node.port}" {
               metric_relabel_configs = [ (keep (schema.darwinNodeExporterKeep ++ schema.smartctlKeep)) ];
@@ -152,7 +159,26 @@ in
                 }
               ];
             })
-          ];
+          ]
+          # The agent-session daemon's Langfuse sent and failed span
+          # counters, for LangfuseSendFailing, as on NixOS
+          # (darwin-agent-session-telemetry design D9).
+          ++ lib.optional langfuse (
+            scrape "otelcol-agent-session" agentSessionTarget {
+              metric_relabel_configs = [
+                (keep schema.otelcolAgentSessionKeep)
+                {
+                  source_labels = [ "exporter" ];
+                  regex = "otlp_http/langfuse";
+                  action = "keep";
+                }
+                {
+                  regex = "service_instance_id";
+                  action = "labeldrop";
+                }
+              ];
+            }
+          );
           # As every NixOS agent host's, with the same receiver id and
           # settings, so the stored rows have the same shape (design D11).
           "file_log/deploy-record" = {
@@ -316,7 +342,7 @@ in
           };
         };
         exporters."otlp_http/agent" = {
-          endpoint = "http://127.0.0.1:4318";
+          endpoint = "http://127.0.0.1:4319";
           sending_queue.enabled = true;
         };
         # No listener and no reader: level none builds no meter reader
@@ -343,7 +369,11 @@ in
           job = "otelcol";
           url = "http://127.0.0.1:8888/metrics";
         }
-      ];
+      ]
+      ++ lib.optional langfuse {
+        job = "otelcol-agent-session";
+        url = "http://${agentSessionTarget}/metrics";
+      };
       exporters = builtins.attrNames agent.exporters;
     };
 }

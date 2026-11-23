@@ -2424,6 +2424,25 @@
         ) (lib.range 0 15);
         expect = [ ];
       };
+      # darwin-agent-session-telemetry design D6: the agent-session daemon is
+      # in stibnite's kept-alive list, so the rule's union expects it running.
+      agentSessionKeptAlive =
+        notRunningFor15 evaluatorRules "org.nixos.otel-agent-session" "not_running"
+        // {
+          name = "agentSessionKeptAlive: otel-agent-session not running for 15 min fires one LaunchdJobNotRunning stibnite after 10 min and resolves once";
+        };
+      # design D3: its envelope posts its own notice, so stibnite's row lists
+      # it in notifiedUnits and LaunchdJobFailed leaves it out.
+      agentSessionEnvelopeFailedNotReported = envelopeFailedNotReported // {
+        name = "agentSessionEnvelopeFailedNotReported: otel-agent-session-envelope's non-zero exit for 15 min, which the rendered exclusion removes, posts no LaunchdJobFailed";
+        steps = map (
+          n:
+          onStibnite {
+            at = minute n;
+            series.LaunchdJobFailed = failedOn "org.nixos.otel-agent-session-envelope";
+          }
+        ) (lib.range 0 15);
+      };
       harmoniaFailedReported = {
         name = "harmoniaFailedReported: harmonia-gc's non-zero exit for 15 min fires one LaunchdJobFailed stibnite after 5 min and nothing more";
         steps = map (
@@ -2586,6 +2605,8 @@
         (keptAliveUnloaded evaluatorRules)
         envelopeUnloaded
         envelopeFailedNotReported
+        agentSessionKeptAlive
+        agentSessionEnvelopeFailedNotReported
         harmoniaFailedReported
         (keptAliveRestarted evaluatorRules)
         keptAliveCrashed
@@ -2822,6 +2843,35 @@
             evaluator = realEvaluator;
             config = checkConfig rulesList;
             legs = [ (keptAliveUnloaded rulesList) ];
+          };
+        # darwin-agent-session-telemetry design D6 undone: the rule's union
+        # without stibnite's agent-session daemon never sees it stopped.
+        keptAliveWithoutAgentSession =
+          let
+            rulesList = map (
+              r:
+              if r.alert == "LaunchdJobNotRunning" then
+                r
+                // {
+                  expr =
+                    mutateText "keptAliveWithoutAgentSession" ''|org[.]nixos[.]otel-agent-session"'' ''"''
+                      r.expr;
+                }
+              else
+                r
+            ) evaluatorRules;
+          in
+          {
+            evaluator = realEvaluator;
+            config = checkConfig rulesList;
+            legs = [
+              (
+                notRunningFor15 rulesList "org.nixos.otel-agent-session" "not_running"
+                // {
+                  inherit (agentSessionKeptAlive) name;
+                }
+              )
+            ];
           };
         # CAM-92's defect restored: a kept-alive job's abnormal last exit
         # counted for as long as the relaunched job runs.

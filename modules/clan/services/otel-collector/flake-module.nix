@@ -1387,6 +1387,43 @@ in
                   '';
                 };
               };
+            # Langfuse Cloud's project keys (agent-session-telemetry design
+            # D16): one shared var, entered once at hidden prompts and kept,
+            # so every flagged host sends with the same project's keys and
+            # each must be its recipient (flake.lib.sharedVarsObligations).
+            # The script only checks their shape; clan writes each prompt to
+            # its file. One definition for both module classes, as
+            # otelGenerators (darwin-agent-session-telemetry design D5).
+            langfuseGenerator = pkgs: {
+              share = true;
+              prompts.public-key = {
+                description = ''
+                  Public key (pk-lf-…) of the Langfuse Cloud project
+                  (EU, https://cloud.langfuse.com) that receives the
+                  fleet's agent spans; used by no other service.
+                '';
+                type = "hidden";
+                persist = true;
+                display = {
+                  group = "langfuse";
+                  label = "LANGFUSE_PUBLIC_KEY";
+                };
+              };
+              prompts.secret-key = {
+                description = "Secret key (sk-lf-…) paired with the public key above.";
+                type = "hidden";
+                persist = true;
+                display = {
+                  group = "langfuse";
+                  label = "LANGFUSE_SECRET_KEY";
+                };
+              };
+              runtimeInputs = [ pkgs.gnugrep ];
+              script = ''
+                grep -Eqx 'pk-lf-[A-Za-z0-9-]+' "$out/public-key" || { echo "langfuse: public-key is not pk-lf-…" >&2; exit 1; }
+                grep -Eqx 'sk-lf-[A-Za-z0-9-]+' "$out/secret-key" || { echo "langfuse: secret-key is not sk-lf-…" >&2; exit 1; }
+              '';
+            };
           in
           {
             nixosModule =
@@ -1460,44 +1497,15 @@ in
                     systemd.services.${agentSessionUnit}.serviceConfig.LoadCredential = credentials;
                   })
                   # Langfuse Cloud's project keys (agent-session-telemetry
-                  # design D16): one shared var, entered once at hidden
-                  # prompts and kept, so every flagged host sends with the same
-                  # project's keys and each must be its recipient
-                  # (flake.lib.sharedVarsObligations). The script only checks
-                  # their shape; clan writes each prompt to its file.
+                  # design D16), with the unit's restart on a change.
                   (lib.optionalAttrs langfuse {
-                    clan.core.vars.generators.langfuse = {
-                      share = true;
-                      prompts.public-key = {
-                        description = ''
-                          Public key (pk-lf-…) of the Langfuse Cloud project
-                          (EU, https://cloud.langfuse.com) that receives the
-                          fleet's agent spans; used by no other service.
-                        '';
-                        type = "hidden";
-                        persist = true;
-                        display = {
-                          group = "langfuse";
-                          label = "LANGFUSE_PUBLIC_KEY";
-                        };
-                      };
-                      prompts.secret-key = {
-                        description = "Secret key (sk-lf-…) paired with the public key above.";
-                        type = "hidden";
-                        persist = true;
-                        display = {
-                          group = "langfuse";
-                          label = "LANGFUSE_SECRET_KEY";
-                        };
-                      };
-                      files.public-key.restartUnits = [ "${agentSessionUnit}.service" ];
-                      files.secret-key.restartUnits = [ "${agentSessionUnit}.service" ];
-                      runtimeInputs = [ pkgs.gnugrep ];
-                      script = ''
-                        grep -Eqx 'pk-lf-[A-Za-z0-9-]+' "$out/public-key" || { echo "langfuse: public-key is not pk-lf-…" >&2; exit 1; }
-                        grep -Eqx 'sk-lf-[A-Za-z0-9-]+' "$out/secret-key" || { echo "langfuse: secret-key is not sk-lf-…" >&2; exit 1; }
-                      '';
-                    };
+                    clan.core.vars.generators.langfuse = lib.mkMerge [
+                      (langfuseGenerator pkgs)
+                      {
+                        files.public-key.restartUnits = [ "${agentSessionUnit}.service" ];
+                        files.secret-key.restartUnits = [ "${agentSessionUnit}.service" ];
+                      }
+                    ];
                     systemd.services.${agentSessionUnit}.serviceConfig.LoadCredential = [
                       "langfuse-public-key:${gens.langfuse.files.public-key.path}"
                       "langfuse-secret-key:${gens.langfuse.files.secret-key.path}"
@@ -1511,6 +1519,11 @@ in
             # collector runs; the fragment only where collect is true (design
             # D1, D2, D5). nix-darwin has no tmpfiles and no restartUnits:
             # the fragment's OTEL_CERT_SHA256 reloads the agent on a reissue.
+            # Where the row sets agentTelemetry, the agent-session daemon's
+            # own account _otelagent, so that only it can read the Langfuse
+            # keys, as only otel-agent-session.service loads them on NixOS;
+            # the client key both collectors present is then group _otelcert's
+            # at 0440 (darwin-agent-session-telemetry design D3, D5).
             darwinModule =
               {
                 lib,
@@ -1520,6 +1533,8 @@ in
               let
                 # Static data, so it can select imports without evaluating the host (design D6).
                 collect = flakeLib.observabilityHosts.${machine.name}.collect;
+                agentTelemetry = collect && flakeLib.observabilityHosts.${machine.name}.agentTelemetry;
+                langfuse = agentTelemetry && flakeLib.observabilityHosts.${machine.name}.langfuse;
                 otelcol = {
                   owner = "_otelcol";
                   group = "_otelcol";
@@ -1532,29 +1547,85 @@ in
                 ]
                 ++ lib.optional collect darwinModules.otel-collector-agent;
 
-                # As nix-grpc-store's darwin module declares nix-grpc-daemon.
-                users.knownGroups = [ "_otelcol" ];
-                users.knownUsers = [ "_otelcol" ];
-                users.groups._otelcol.gid = 536;
-                users.users._otelcol = {
-                  uid = 536;
-                  gid = 536;
-                  home = "/var/empty";
-                  shell = "/usr/bin/false";
-                  isHidden = true;
-                  description = "OpenTelemetry collector agent";
-                };
-
-                clan.core.vars.generators = lib.mkMerge [
-                  (otelGenerators { inherit lib pkgs; })
+                config = lib.mkMerge [
                   {
-                    otel-cert.files."key.pem" = otelcol // {
-                      neededFor = "services";
+                    assertions = [
+                      {
+                        assertion = !flakeLib.observabilityHosts.${machine.name}.langfuse || agentTelemetry;
+                        message = "otel-collector agent on ${machine.name}: flake.lib.observabilityHosts sets langfuse without collect and agentTelemetry; Langfuse is fed by the agent-session collector (agent-session-telemetry design D16).";
+                      }
+                    ];
+
+                    # As nix-grpc-store's darwin module declares nix-grpc-daemon.
+                    users.knownGroups = [ "_otelcol" ];
+                    users.knownUsers = [ "_otelcol" ];
+                    users.groups._otelcol.gid = 536;
+                    users.users._otelcol = {
+                      uid = 536;
+                      gid = 536;
+                      home = "/var/empty";
+                      shell = "/usr/bin/false";
+                      isHidden = true;
+                      description = "OpenTelemetry collector agent";
                     };
-                    ntfy-alerter.files.token = {
-                      inherit (otelcol) owner mode;
-                    };
+
+                    clan.core.vars.generators = lib.mkMerge [
+                      (otelGenerators { inherit lib pkgs; })
+                      {
+                        otel-cert.files."key.pem" =
+                          otelcol
+                          // {
+                            neededFor = "services";
+                          }
+                          // lib.optionalAttrs agentTelemetry {
+                            group = "_otelcert";
+                            mode = "0440";
+                          };
+                        ntfy-alerter.files.token = {
+                          inherit (otelcol) owner mode;
+                        };
+                      }
+                    ];
                   }
+                  (lib.optionalAttrs agentTelemetry {
+                    users.knownGroups = [
+                      "_otelagent"
+                      "_otelcert"
+                    ];
+                    users.knownUsers = [ "_otelagent" ];
+                    users.groups._otelagent.gid = 537;
+                    users.groups._otelcert = {
+                      gid = 538;
+                      members = [
+                        "_otelcol"
+                        "_otelagent"
+                      ];
+                    };
+                    users.users._otelagent = {
+                      uid = 537;
+                      gid = 537;
+                      home = "/var/empty";
+                      shell = "/usr/bin/false";
+                      isHidden = true;
+                      description = "OpenTelemetry agent-session collector";
+                    };
+                  })
+                  # Read by path through basicauth/langfuse's username_file and
+                  # password_file; no restartUnits on darwin, the daemon's
+                  # LANGFUSE_VAR_SHA256 reloads it instead.
+                  (lib.optionalAttrs langfuse {
+                    clan.core.vars.generators.langfuse = lib.mkMerge [
+                      (langfuseGenerator pkgs)
+                      {
+                        files = lib.genAttrs [ "public-key" "secret-key" ] (_: {
+                          owner = "_otelagent";
+                          group = "_otelagent";
+                          mode = "0400";
+                          neededFor = "services";
+                        });
+                      }
+                    ];
+                  })
                 ];
               };
           };
