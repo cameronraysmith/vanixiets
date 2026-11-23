@@ -226,6 +226,9 @@ in
         ''delete_key(span.attributes, "file_path") where ${attr "file_path"} == ${attr "langfuse.observation.input"}''
         ''delete_key(span.attributes, "tool_use_id")''
         ''delete_key(span.attributes, "duration_ms")''
+        # The store's oneshot kind (design D8), which Langfuse shows nothing
+        # for.
+        ''delete_key(span.attributes, "omp.gen_ai.oneshot.kind")''
         ''delete_key(resource.attributes, "host.name")''
         ''delete_key(resource.attributes, "service.version")''
         # The fleet's routing attributes are not Langfuse's.
@@ -457,10 +460,15 @@ in
           };
         }
         // lib.optionalAttrs withLangfuse {
-          # Claude Code's spans that carry nothing after the allow-list.
+          # Claude Code's spans that carry nothing after the allow-list, and
+          # omp's startup requests (darwin-agent-session-telemetry design
+          # D8).
           "filter/langfuse" = {
             error_mode = "ignore";
-            trace_conditions = [ (oneOf "span.name" lf.droppedSpans) ];
+            trace_conditions = [
+              (oneOf "span.name" lf.droppedSpans)
+              (oneOf (attr "omp.gen_ai.oneshot.kind") lf.droppedOneshotKinds)
+            ];
           };
           # Langfuse's names for what the store keeps under ours.
           "transform/langfuse" = {

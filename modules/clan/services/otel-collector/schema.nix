@@ -659,6 +659,10 @@
             "gen_ai.usage.cache_read.input_tokens" = "int64";
             "gen_ai.usage.cache_creation.input_tokens" = "int64";
             "omp.gen_ai.tool.status" = "string";
+            # omp's oneshot requests (compaction, handoff, startup
+            # summaries): which one a span is (darwin-agent-session-telemetry
+            # design D8).
+            "omp.gen_ai.oneshot.kind" = "string";
             "error.type" = "string";
             "gen_ai.output.messages" = "string";
             last_user_message = "string";
@@ -744,6 +748,14 @@
           # Claude Code's span that, after the allow-list, carries only a
           # duration: one billable unit per tool call and nothing to read.
           droppedSpans = [ "claude_code.tool.blocked_on_user" ];
+          # omp's startup requests, which summarise the session's skills
+          # and MCP namespaces on a small model: noise in Langfuse, still
+          # stored (darwin-agent-session-telemetry design D8). Every other
+          # oneshot kind is sent.
+          droppedOneshotKinds = [
+            "skill_description"
+            "mcp_namespace_hint"
+          ];
           # Claude Code's bare token counts, under the names Langfuse reads.
           usageKeys = {
             input_tokens = "gen_ai.usage.input_tokens";

@@ -827,7 +827,7 @@
           # alone, whose stages ignore their errors and include no limiter,
           # so the branch cannot refuse what the store path took.
           (check
-            "R3.1: traces/langfuse exists where observabilityHosts does not set langfuse or is missing where it does, or is not fed by forward/langfuse from traces/agent-session alone, after all its stages, through stages that cannot refuse, or sends the fleet's routing attributes, host.name, service.version, tool_use_id, duration_ms or a copied full_command or file_path"
+            "R3.1: traces/langfuse exists where observabilityHosts does not set langfuse or is missing where it does, or is not fed by forward/langfuse from traces/agent-session alone, after all its stages, through stages that cannot refuse, or sends the fleet's routing attributes, host.name, service.version, tool_use_id, duration_ms, a copied full_command or file_path, omp's startup requests or the oneshot kind"
             (
               (agentPipelines ? "traces/langfuse") == lfOn
               && (ae ? ${lfName}) == lfOn
@@ -855,12 +855,23 @@
                     && !(lib.hasPrefix "filter/agent-session" n || lib.hasPrefix "transform/agent-session" n)
                   ) (lp.processors or [ ])
                   &&
-                    (ap."filter/langfuse".trace_conditions or null) == map (n: ''span.name == "${n}"'') lf.droppedSpans
+                    (ap."filter/langfuse".trace_conditions or null) == [
+                      (lib.concatMapStringsSep " or " (n: ''span.name == "${n}"'') lf.droppedSpans)
+                      (lib.concatMapStringsSep " or " (
+                        k: ''span.attributes["omp.gen_ai.oneshot.kind"] == "${k}"''
+                      ) lf.droppedOneshotKinds)
+                    ]
+                  &&
+                    lf.droppedOneshotKinds == [
+                      "skill_description"
+                      "mcp_namespace_hint"
+                    ]
                   && lib.all (s: builtins.elem s (ap."transform/langfuse".trace_statements or [ ])) [
                     ''delete_key(span.attributes, "full_command") where span.attributes["full_command"] == span.attributes["langfuse.observation.input"]''
                     ''delete_key(span.attributes, "file_path") where span.attributes["file_path"] == span.attributes["langfuse.observation.input"]''
                     ''delete_key(span.attributes, "tool_use_id")''
                     ''delete_key(span.attributes, "duration_ms")''
+                    ''delete_key(span.attributes, "omp.gen_ai.oneshot.kind")''
                     ''delete_key(resource.attributes, "host.name")''
                     ''delete_key(resource.attributes, "service.version")''
                     ''delete_matching_keys(resource.attributes, "^vanixiets\\.")''
@@ -1339,7 +1350,7 @@
         agentLimiter = "R3.1: the agent-session collector's limiter is not below its GOMEMLIMIT and that below its MemoryMax, or the host's collector sets GOMEMLIMIT";
         notified = "R3.1: a greptimedb*, zfs-set-*, zfs-assert-*, devloop-*, collector, otel-envelope or agent-session unit is not notified";
         unit = "R3.1: the agent-session collector shares the host collector's queue directory, serves telemetry off loopback, does not always restart, is bound to the host's collector, or may start before the store's schema job";
-        langfusePath = "R3.1: traces/langfuse exists where observabilityHosts does not set langfuse or is missing where it does, or is not fed by forward/langfuse from traces/agent-session alone, after all its stages, through stages that cannot refuse, or sends the fleet's routing attributes, host.name, service.version, tool_use_id, duration_ms or a copied full_command or file_path";
+        langfusePath = "R3.1: traces/langfuse exists where observabilityHosts does not set langfuse or is missing where it does, or is not fed by forward/langfuse from traces/agent-session alone, after all its stages, through stages that cannot refuse, or sends the fleet's routing attributes, host.name, service.version, tool_use_id, duration_ms, a copied full_command or file_path, omp's startup requests or the oneshot kind";
         langfuseExporter = "R3.1: Langfuse's exporter does not send to schema.nix's endpoint, https://cloud.langfuse.com/api/public/otel, with verified TLS, no proxy and a 30 s timeout, with the unit's Langfuse credentials and ingestion version, retry for retryMinutes and no longer, drain faster than spans arrive into a queue of twice a retry window, in batches under the request limit, or a store exporter of the agent-session collector does not retry forever, or its queues reach 512 MiB";
         collectorVersion = "R3.1: the collector is not otelcol-contrib 0.155.0; before changing it, rerun fleet-ingress's agentSpans and handoffCap cases, which prove the link clearing, the tool-result strip, the masks and the hand-off cap at a release";
         handoffCap = "R3.1: the agent-session collector's span exporter does not send one request at a time, batched by bytes to at most a quarter of the ingress's agent_span queue";
@@ -1928,6 +1939,29 @@
         langfuseTransformPropagates = {
           clauses = [ clause.langfusePath ];
           mutate = onAgent { processors."transform/langfuse".error_mode = "propagate"; };
+        };
+        # omp's startup requests reach Langfuse (darwin-agent-session-
+        # telemetry design D8).
+        langfuseOneshotConditionDropped = {
+          clauses = [ clause.langfusePath ];
+          mutate =
+            i:
+            onAgent {
+              processors."filter/langfuse".trace_conditions =
+                lib.take 1
+                  i.agentSettings.processors."filter/langfuse".trace_conditions;
+            } i;
+        };
+        # The oneshot kind reaches Langfuse.
+        langfuseOneshotKeyKept = {
+          clauses = [ clause.langfusePath ];
+          mutate =
+            i:
+            onAgent {
+              processors."transform/langfuse".trace_statements =
+                lib.remove ''delete_key(span.attributes, "omp.gen_ai.oneshot.kind")''
+                  i.agentSettings.processors."transform/langfuse".trace_statements;
+            } i;
         };
         langfuseRoutingKept = {
           clauses = [ clause.langfusePath ];

@@ -147,7 +147,8 @@
             pyriteSession = pyriteConfig.vanixiets.otelCollector.agentSessionSettings;
             pyriteSessionUnit = pyriteConfig.systemd.services.otel-agent-session.serviceConfig;
             # agent.agent_span as main created it before design D15 (72f782b8,
-            # the table magnetite holds): the span keys D15 adds removed and
+            # the table magnetite holds): the span keys D15 and the oneshot
+            # kind (darwin-agent-session-telemetry design D8) add removed and
             # the two content indexes of then, its CREATE pinned by hash.
             oldSpanTable =
               let
@@ -155,6 +156,7 @@
                   keys = builtins.removeAttrs self.lib.otelCollectorSchema.agentSession.spans.keys [
                     "gen_ai.tool.call.result"
                     "omp.gen_ai.tool.status"
+                    "omp.gen_ai.oneshot.kind"
                     "session.id"
                     "user_prompt"
                     "tool_name"
@@ -181,13 +183,16 @@
               ) "fleet-ingress: the pre-D15 agent_span is not main's (72f782b8) CREATE";
               table;
             # agent.agent_span as the D15 deploy left it on magnetite
-            # (2c7ee83f): every span key, the four content indexes of then;
-            # the schema job adds the indexes on full_command and
+            # (2c7ee83f): every span key but the oneshot kind, the four
+            # content indexes of then; the schema job adds the oneshot
+            # column and the indexes on full_command and
             # gen_ai.tool.call.arguments.
             d15SpanTable =
               let
                 table = self.lib.agentSessionStore.spanTableFor {
-                  inherit (self.lib.otelCollectorSchema.agentSession.spans) keys;
+                  keys = builtins.removeAttrs self.lib.otelCollectorSchema.agentSession.spans.keys [
+                    "omp.gen_ai.oneshot.kind"
+                  ];
                   fulltext = [
                     "last_user_message"
                     "gen_ai.output.messages"
@@ -1085,9 +1090,13 @@
                   print(f"  {generation} agent_span lacks {len(missing)} lines: {missing}", flush=True)
                   assert missing and all("span_attributes" in line for line in missing), missing
                   if generation == "D15":
+                      # The two indexes of then, and the oneshot kind's
+                      # column (darwin-agent-session-telemetry design D8).
                       assert [line.split('"')[1] for line in missing] == [
-                          "span_attributes.full_command", "span_attributes.gen_ai.tool.call.arguments"], missing
-                      assert all("FULLTEXT INDEX" in line for line in missing), missing
+                          "span_attributes.full_command", "span_attributes.gen_ai.tool.call.arguments",
+                          "span_attributes.omp.gen_ai.oneshot.kind"], missing
+                      assert all("FULLTEXT INDEX" in line for line in missing[:2]), missing
+                      assert missing[2].endswith("STRING NULL") or missing[2].endswith("STRING NULL,"), missing
                   schema_job()
                   upgraded = table_lines()
                   assert upgraded == fresh, (f"the upgraded {generation} agent_span differs from a fresh one", sorted(set(upgraded) ^ set(fresh)))
@@ -1655,7 +1664,8 @@
                   assert needle not in blob, f"{what} reached Langfuse"
               for what, value in canary.items():
                   assert (value in blob) == (what in admitted), (what, value in blob)
-              for key in ("vanixiets.", "last_user_message", "user_prompt", "\"input_tokens\"", "\"cache_read_tokens\"", "links", "canary.link"):
+              for key in ("vanixiets.", "last_user_message", "user_prompt", "\"input_tokens\"", "\"cache_read_tokens\"", "links", "canary.link",
+                          "omp.gen_ai.oneshot.kind"):
                   assert key not in blob, key
 
 
@@ -1776,6 +1786,29 @@
               time.sleep(12)
               assert set(sink_spans(sink_records(nonce))) == {"bbb19b7ec3c1b101"}, sink_spans(sink_records(nonce)).keys()
               print("  ok: blocked_on_user stored, not sent to Langfuse", flush=True)
+
+              # omp's startup requests (darwin-agent-session-telemetry design
+              # D8): root chat spans of one completion each. All three reach
+              # the store with their kind; Langfuse gets the compaction alone,
+              # without the kind.
+              nonce = f"lfoneshot{time.time_ns()}"
+              now = time.time_ns()
+              kinds = {"ccc19b7ec3c1b101": "skill_description", "ccc19b7ec3c1b102": "mcp_namespace_hint",
+                       "ccc19b7ec3c1b103": "compaction_summary"}
+              oneshots = [{"traceId": os.urandom(16).hex(), "spanId": span_id, "name": "chat claude-haiku-4-5", "kind": 3,
+                           "startTimeUnixNano": str(now - 2000000), "endTimeUnixNano": str(now),
+                           "attributes": [a("gen_ai.operation.name", "chat"), a("gen_ai.conversation.id", nonce),
+                                          a("omp.gen_ai.oneshot.kind", kind)]} for span_id, kind in kinds.items()]
+              assert lf_post(nonce, oneshots) == "200"
+              wait_for(lambda: lf_stored(nonce) == 3, "the three oneshot spans in the store", 120)
+              stored = gsql(f"SELECT \"span_attributes.omp.gen_ai.oneshot.kind\" FROM agent_span WHERE \"span_attributes.gen_ai.conversation.id\" = '{nonce}' ORDER BY 1", "agent")
+              assert [row[0] for row in stored] == sorted(kinds.values()), stored
+              wait_for(lambda: "ccc19b7ec3c1b103" in sink_spans(sink_records(nonce)), "the compaction span at the sink", 120)
+              time.sleep(12)
+              sent = sink_spans(sink_records(nonce))
+              assert set(sent) == {"ccc19b7ec3c1b103"}, sent.keys()
+              assert "omp.gen_ai.oneshot.kind" not in sent["ccc19b7ec3c1b103"][1], sent["ccc19b7ec3c1b103"][1].keys()
+              print("  ok: startup requests stored with their kind, not sent to Langfuse; the compaction sent without it", flush=True)
 
               results = {}
               for mode in ("down", "403", "429", "413"):
