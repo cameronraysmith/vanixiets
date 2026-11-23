@@ -21,6 +21,9 @@
         "fdContainer-x86_64"
         "rgContainer-aarch64"
         "rgContainer-x86_64"
+        # built by checks.x86_64-linux.skills-marketplace-drift only; its output
+        # does not depend on the platform (design D8, skills-single-source-marketplaces)
+        "skills-marketplace"
         # intentional effect-input-wires (impure ghcr.io push)
         "fdManifest"
         "fdManifest-aarch64"
