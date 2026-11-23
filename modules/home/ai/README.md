@@ -38,4 +38,4 @@ The lighter human `agents` aggregate does not import it.
 
 Harness-specific modules, each configuring one agent's settings, hooks, MCP servers, and wrappers: `atomic/`, `claude-code/`, `codex/`, `firstmate/`, `omp/`, `opencode/`, `pi/`.
 
-Supporting tools these harnesses invoke: `moshi/` (session multiplexing), `hunk/` and `tuicr/` (interactive diff review), `worktrunk/` (worktree management).
+Supporting tools these harnesses invoke: `moshi/` (session multiplexing), `tuicr/` (interactive diff review), `worktrunk/` (worktree management).

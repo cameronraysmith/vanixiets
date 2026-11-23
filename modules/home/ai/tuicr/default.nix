@@ -4,7 +4,7 @@
 # enable, package, settings, and themes, writing settings to
 # $XDG_CONFIG_HOME/tuicr/config.toml. This file only sets values on that module.
 #
-# Self-enabling, matching hunk: every ai user gets it. The enable flag, the
+# Self-enabling: every ai user gets it. The enable flag, the
 # package, and each settings leaf are defined with lib.mkDefault so a machine or
 # user module can disable the program or override one setting without a
 # definition collision.

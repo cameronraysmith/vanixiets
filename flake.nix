@@ -158,10 +158,6 @@
     delta.url = "github:zed-industries/delta-nix";
     delta.inputs.nixpkgs.follows = "nixpkgs";
 
-    hunk.url = "github:modem-dev/hunk";
-    hunk.inputs.nixpkgs.follows = "nixpkgs";
-    hunk.inputs.bun2nix.follows = "bun2nix";
-
     rust-overlay.url = "github:oxalica/rust-overlay";
     rust-overlay.inputs.nixpkgs.follows = "nixpkgs";
 
