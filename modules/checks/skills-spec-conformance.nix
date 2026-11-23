@@ -62,7 +62,9 @@
                 esac
               done
               [ "$status" -eq 0 ] || exit 1
-              echo "validated $count skills" | tee "$out"
+              # Naming the validator makes it a reference of $out, so the upload
+              # of this check carries it to the cache; nothing else builds it.
+              echo "validated $count skills with ${self'.packages.skill-validator}" | tee "$out"
             '';
       };
     };

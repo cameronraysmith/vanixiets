@@ -10,7 +10,7 @@
 { lib, ... }:
 {
   perSystem =
-    { self', ... }:
+    { self', system, ... }:
     let
       blacklist = [
         # evaluation needs import-from-derivation
@@ -24,8 +24,9 @@
         # built by checks.x86_64-linux.skills-marketplace-drift only; its output
         # does not depend on the platform (design D8, skills-single-source-marketplaces)
         "skills-marketplace"
-        # built by checks.x86_64-linux.skills-spec-conformance, the only thing
-        # that runs it (skills-single-source-marketplaces D15)
+        # run by checks.x86_64-linux.skills-spec-conformance, whose output names
+        # it so that the check's upload carries it to the cache
+        # (skills-single-source-marketplaces D15)
         "skill-validator"
         # intentional effect-input-wires (impure ghcr.io push)
         "fdManifest"
@@ -41,6 +42,13 @@
       filtered = lib.filterAttrs (n: _v: !(builtins.elem n blacklist)) self'.packages;
     in
     {
-      checks = lib.mapAttrs' (n: lib.nameValuePair "package-${n}") filtered;
+      checks =
+        lib.mapAttrs' (n: lib.nameValuePair "package-${n}") filtered
+        # The compose copies its remote dependencies from this fixed-output
+        # derivation at build time only, so no package's upload carries it; one
+        # path on every system, exposed once.
+        // lib.optionalAttrs (system == "x86_64-linux") {
+          apm-deps = self'.packages.apm-skills-compose.deps;
+        };
     };
 }
