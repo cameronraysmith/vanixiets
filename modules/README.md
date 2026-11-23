@@ -64,12 +64,13 @@ Homes install whatever their host chose (`home/development/nix-tools.nix`), so t
 | pyrite | 16 GiB | iets | 1 worker x 2048 MiB | yes |
 | cinnabar, electrum | 16 GiB (declared) | iets | 1 x 2048 | yes, new on cinnabar |
 | stibnite | 64 GiB | iets | 3 workers | none on darwin |
-| argentum, rosegold | 8 GiB | stock | | none |
+| argentum, rosegold | 8 GiB | iets | 1 worker | none on darwin |
 | blackphos | unknown | stock | | none |
 
 Measured on 2026-11-23 at trunk `b9889f23`, nixbot's arguments, through each host's lock, as cgroup `memory.peak`.
 - magnetite, `checks.x86_64-linux` (226 attributes), 5 x 3072: stock 121-131 s, iets 41-43 s. The two-system set (338 attributes): stock 198 s, iets 69 s. Both peak at 10.1 GiB, which is magnetite's `user.slice` `MemoryHigh` (`nixos/magnetite-user-slice-guard.nix`), so user evaluations there are throttled rather than bounded by the evaluator. nixbot's own unit is not a user evaluation: its 5 x 3072 iets peaks at 68-72 % of its 20 GiB `MemoryHigh` (`nixos/nixbot.nix`), and that unthrottled figure is what the 30 GiB rule assumes for galena and scheelite.
 - pyrite, `checks.x86_64-linux`: stock at the remote lane's 2 x 2048 took 424-738 s and peaked at 4.0-4.6 GiB. iets took 85-94 s at 2 x 2048 (5.1-5.5 GiB) and 140 s at 1 x 2048 (3.2 GiB). The two-system set (338 attributes): stock 759 s and 4.0 GiB, iets 172 s and 2.7 GiB at 1 x 2048, 119 s and 4.5 GiB at 2 x 2048. One worker keeps iets below what the stock lane already takes there, which is all a 16 GiB host with a desktop, QEMU tests and, on cinnabar, ntfy, DNS and Caddy is assumed to spare.
+- argentum (8 GiB) at 1 worker: `checks.aarch64-darwin` iets 15.6 s and 4.8 GiB against stock's 68-74 s and 12.6 GiB at 4 workers; both systems iets 62-111 s (12.8 GiB footprint, 5.3 GiB of swap) against stock's 232-354 s (14.4 GiB). Two iets workers exceeded the swap guard on both systems.
 - On Linux, iets' `--max-memory-size` does restart workers: at 256 MiB magnetite's run used 97 worker processes for 5 workers, against 5 at 3072, and peaked 2 GiB lower. On macOS it is inert.
 
 Every iets run gave the same drvPath, system, outputs and error status as stock on every attribute.

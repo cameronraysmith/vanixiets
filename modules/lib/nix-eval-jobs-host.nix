@@ -29,8 +29,15 @@
 # - darwin, at least 48 GiB: 3 workers. iets ignores --max-memory-size on
 #   macOS, so memory is bounded by the worker count only: stibnite
 #   (64 GiB), 2026-11-23, peak process-tree RSS 19.8-20.2 GiB at 3 workers,
-#   13.0 GiB at 1, within 3 % of 5 workers' wall time. No worker count fits
-#   an 8 GiB Mac.
+#   13.0 GiB at 1, within 3 % of 5 workers' wall time.
+# - darwin, at least 8 GiB: 1 worker. argentum (M1, 8 GiB), 2026-11-23, at
+#   nixbot's arguments: checks.aarch64-darwin iets 15.6 s and 4.8 GiB
+#   against stock's 68-74 s and 12.6 GiB at 4 workers; both systems (338
+#   attributes) iets 62-111 s, 12.8 GiB footprint, +5.3 GiB swap, against
+#   stock's 232-354 s and 14.4 GiB. Two iets workers exceeded the swap guard
+#   on both systems. The class decides the worker count, not whether iets is
+#   installed: every darwin host with a known memory of at least 8 GiB gets
+#   it.
 {
   config,
   inputs,
@@ -57,6 +64,11 @@ let
       {
         minGiB = 48;
         workers = 3;
+        maxMemorySize = null;
+      }
+      {
+        minGiB = 8;
+        workers = 1;
         maxMemorySize = null;
       }
     ];
