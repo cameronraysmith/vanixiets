@@ -43,7 +43,7 @@ Alternatives rejected: an `UPDATE` setting status 5, which is not omnigent's int
 ### D3: The early-warning alert is shelved
 
 An alert `OmnigentLoginGrantExpiring` was built for this change: the collector read each owner's earliest grant expiry from `device_grants` as a column-limited database role, and the rule warned 14 days ahead.
-The operator shelved it on 2026-11-14, unchanged, as commit `cc0370f3` on branch `omnigent-grant-alert-shelved`.
+The operator shelved it on 2026-11-14, unchanged, as commit `cc0370f3`; its branch was deleted on 2026-11-23, so the commit id is a historical identifier only, and the note below carries what was worth keeping.
 Reasons: it couples the collector to omnigent's internal `device_grants` schema; it needs its own database role and column grants; and it would fire on superseded grants until the server purges them.
 The exit-78 `SystemdUnitFailed` notice of #3863 already gives one clear notice at expiry, and owners can renew ahead of the date.
 

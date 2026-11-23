@@ -99,10 +99,11 @@ No unmasked credential and no account identifier was found.
 
 Email shapes: the one in `last_user_message` (stibnite, 20:33:19Z, conversation `01a0aabc-d42f-…`, 27 characters) is the operator's commit email (`jj config get user.email`), pasted into a prompt with a jj log; it is not the signed-in account's address.
 Of the 20 in tool results, 10 are the same commit email in printed jj or git output, one is a `git@` remote, two are placeholders and seven are other addresses printed by tools; none is an account's address.
-The requirement `No account identifier leaves a host` reads: "No account identifier SHALL leave a host in an agent session's data, and the only person identifier stored SHALL be the session's user name."
+The requirement `No account identifier leaves a host` read, at the scan: "No account identifier SHALL leave a host in an agent session's data, and the only person identifier stored SHALL be the session's user name."
 Its scenario and task 8.1's check cover the identifiers the harness attaches as telemetry attributes (`user.email`, `organization.id`, account ids), and world-assumptions defines an account identifier as one a model provider assigns; the commit email is not one, so the first clause holds.
-The second clause, read literally, is not met: content columns now hold person identifiers (the commit email and other addresses), which decision D15 stores as session content.
-Either the wording narrows to the attributes ("… and the only person identifier stored outside the content columns SHALL be the session's user name; text a person types or a tool prints is session content, stored as written"), or a mask rule replaces email shapes in content; this is the operator's decision.
+The second clause, read literally, was not met: content columns hold person identifiers (the commit email and other addresses), which decision D15 stores as session content.
+On 2026-11-23 the operator narrowed the second clause and added no email mask: outside the content columns the only person identifier stored is the session's user name, and text a person types or a tool prints is session content, stored as written within the 64 KiB cut and the credential masking (design D15, "Person identifiers in content").
+Against the narrowed requirement the scan's results pass: no account identifier in any column, content columns included, and `'@'` outside the content columns only in `scope_name`'s package name.
 
 Searchability on stibnite (task 8.1's form; stibnite's enablement is task 7.2's change): a fresh human session `omp --model haiku -p 'Reply with the single word ok. Marker DLSMARK202542z'` (20:25:42–20:25:45Z) was found at 20:26Z by `matches_term("span_attributes.last_user_message", 'DLSMARK202542z')` as `chat claude-haiku-4-5`, stibnite, cameron, no `harness_host`.
 Every worker `user_prompt` on magnetite and stibnite is omnigent's `/model` (magnetite 17:06:43Z, cameron and janettesmith; stibnite 16:01:14, 17:58:33 and 20:12:04Z, cameron), stamped with host, person and `harness_host` `omnigent` and found by `matches_term(prompt, 'model')`; the only worker prompt with a distinctive word is pyrite's `HH-CLAUDE-WORKER-pyrite-102947` (2026-11-23T10:30:51Z, cameron), so no worker session with a distinctive prompt has run on magnetite or stibnite.
@@ -112,7 +113,7 @@ Every worker `user_prompt` on magnetite and stibnite is omnigent's `/model` (mag
 | Item | Owner | What is missing |
 |---|---|---|
 | 5.2, 8.1 worker half | operator, or a later task | a session through Janette's worker (and cameron's) on magnetite, found by its word with `user_name` `janettesmith` |
-| 8.1 person identifiers in content | operator's decision | the requirement's wording or a mask rule for email shapes in content ("Day-later scans", email shapes) |
+| 8.1 person identifiers in content | closed 2026-11-23 by the operator's decision | none: the requirement `No account identifier leaves a host` narrowed to "outside the content columns, the only person identifier stored is the session's user name"; text a person types or a tool prints is stored as written; no email mask ("Day-later scans", email shapes) |
 | 5.4 | operator's decision | stopping `greptimedb.service` on magnetite for ten minutes to measure the agent rates; the rates in use are estimates checked by the load measurements |
 | 6.1 | later task | the deployed GreptimeDB, Claude Code, omp and omnigent versions recorded here and compared with A188–A195 |
 | 6.2 | later task | the journal of an :00 `otel-envelope` run on magnetite showing B1 over `agent` (the 5-minute runs' `B0 budget-run: ok` implies the 20:00Z budget run passed) |

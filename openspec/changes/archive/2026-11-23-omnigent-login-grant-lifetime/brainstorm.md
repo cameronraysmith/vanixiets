@@ -35,7 +35,7 @@ On 2026-11-14 the operator chose instead a temporary 7-day lifetime and one refr
 
 ## Q4: Should the fleet warn before a grant runs out?
 
-An early-warning alert was built and then shelved by the operator's decision, unchanged, as commit `cc0370f3` on branch `omnigent-grant-alert-shelved`.
+An early-warning alert was built and then shelved by the operator's decision, unchanged, as commit `cc0370f3`; its branch was deleted on 2026-11-23, so the commit id is a historical identifier only, and design D3's "If revisited" note carries what was worth keeping.
 It read the earliest expiry per owner from `device_grants` through the collector and warned 14 days ahead.
 It was shelved because it couples the collector to omnigent's internal `device_grants` schema, needs its own database role and column grants, and would fire on superseded grants until the server purges them.
 The exit-78 `SystemdUnitFailed` notice of #3863 already gives one clear notice at expiry.

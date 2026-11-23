@@ -76,14 +76,26 @@ Secrets of a listed token shape (private-key blocks and the tokens of the issuer
 
 ### Requirement: No account identifier leaves a host
 
-No account identifier SHALL leave a host in an agent session's data, and the only person identifier stored SHALL be the session's user name.
+No account identifier SHALL leave a host in an agent session's data.
+Outside the content columns, which hold prompts, responses, tool details, tool output, error text and span status messages, the only person identifier stored SHALL be the session's user name.
+Text a person types or a tool prints is session content and SHALL be stored as written, within the 64 KiB cut and the credential masking, so it may name a person or hold an address.
 
-**Discharged by**: `agent-session-telemetry-interface` requirements `The agent-session stages admit only allow-listed events and keys` and `The VM test proves the allow-list with a canary`; resting on world assumption `A190 — Claude Code emits its telemetry as documented for its packaged version`.
+**Discharged by**: `agent-session-telemetry-interface` requirements `The agent-session stages admit only allow-listed events and keys`, `Every kept span and event value is at most 64 KiB`, `Credential shapes are masked in what the agent-session collector keeps` and `The VM test proves the allow-list with a canary`; resting on world assumption `A190 — Claude Code emits its telemetry as documented for its packaged version`; the operator's day-later scan (task 8.1).
 
 #### Scenario: A session sends its account's email address
 
 - **WHEN** Claude Code sends the account's email address, account ids and organisation id with every session event and series, as it does when signed in
-- **THEN** none of them is stored, and the session event carries the user name only
+- **THEN** none of them is in any column of any table of `agent`, content columns included, and the session event carries the user name only
+
+#### Scenario: A person pastes an address, or a tool prints one
+
+- **WHEN** a person pastes a jj log holding their commit email address into a prompt, or a `git log` a session runs prints it
+- **THEN** the address is stored as written in a content column (`last_user_message` or `prompt`, or `gen_ai.tool.call.result`), and from a host whose row sets `langfuse` reaches Langfuse on the same span, in `langfuse.observation.input` or `.output` or the span attribute that holds it; no account identifier is in any column, and outside the content columns no column holds a person identifier other than `user_name`
+
+#### Scenario: The content columns are listed
+
+- **WHEN** the operator lists the columns of `agent` that hold session content
+- **THEN** they are `session_event`'s `prompt`, `response`, `tool_parameters`, `tool_input` and `error`, and `agent_span`'s `span_status_message` and span attributes `last_user_message`, `user_prompt`, `gen_ai.output.messages`, `gen_ai.tool.call.arguments`, `gen_ai.tool.call.result`, `omp.gen_ai.tool.status`, `full_command`, `file_path` and `error`
 
 ### Requirement: Session events are kept for 30 days
 

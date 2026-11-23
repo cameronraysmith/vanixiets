@@ -10,6 +10,7 @@ Amended in place under charter v23 (2026-10-28), from slice S4's planning (`open
 Amended in place under charter v25 (2026-11-01): the keep-lists name series as their exporters expose them, and the store appends `_total` to a series its exporter declares a counter, so six of smartctl_exporter's kept names are stored, and visible to PromQL, with `_total`.
 Amended in place under charter v29 (2026-11-06), from slice S5 (`openspec/changes/stand-up-darwin-collection/`): the launchd job allow-list gains `org.nixos.otel-envelope`, `launchd_job_last_exit_code` reads 0 after a jetsam idle exit and -1 after a signal kill, and darwin's per-process floor is 384 MiB with the host's long-running fleet executables kept below it, Linux's staying 64 MiB.
 Amended in place on 2026-11-22 under OpenSpec change `agent-session-telemetry` (Linear CAM-120; the operator's content and consent decisions and ratification, the change's decision records D15 and D17): Claude Code is an emitter and its metrics, session events and spans, with omp's spans, enter `agent` on hosts whose host-table row sets `agentTelemetry`; the allow-lists gain Claude Code's metric names and keys, its event allow-list and the agent span keys; `user.name` is the one person identifier admitted, on `agent` data; prompts, responses, tool arguments, tool output and span status messages are stored on `agent` spans and session events, each value at most 64 KiB with credential shapes masked; `agent`'s retention is 30 d, its series budget regulated hourly; Q2, Q3, Q5 and Q6 record the revisions.
+Amended in place on 2026-11-23, decided by the operator, under OpenSpec change `agent-session-telemetry` (Linear CAM-120): `user.name` is the one person identifier admitted outside session content; text a person types or a tool prints is session content, stored as written, and may name a person or hold an address (Q2).
 
 ## Context
 
@@ -246,6 +247,7 @@ TTLs are asserted, not only set: ADR-007's `greptimedb-schema` oneshot enforces 
 2. Q2: Are person identifiers excluded from the store entirely? Recommended: yes; keeping them enables per-person cost attribution and makes the store a personal-activity record readable by every admitted reader.
    Resolution: recommended answer accepted at the 2026-10-15 gate.
    Revised 2026-11-22: `user.name`, the person a session runs for, is admitted on `agent` data (operator; `agent-session-telemetry` design D4); every other person identifier stays excluded.
+   Revised 2026-11-23: "excluded" applies outside session content; a prompt, response, tool detail, tool output or error text is stored as written and may name a person or hold an address, with no email mask (operator; `agent-session-telemetry`, CAM-120).
 3. Q3: Are omp spans in scope for the first deployment? Recommended: no, metrics only, per ADR-005; enabling them adds `gen_ai.conversation.id` rows to `agent` under the same allow-list.
    Resolution: recommended answer accepted at the 2026-10-15 gate.
    Revised 2026-11-22: yes, with content (`agent-session-telemetry` design D6).

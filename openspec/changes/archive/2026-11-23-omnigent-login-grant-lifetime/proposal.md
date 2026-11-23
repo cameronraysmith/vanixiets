@@ -28,7 +28,7 @@ Decisions tagged `D<n>` are developed in `design.md`; the operator decided D1, D
 
 - The Omnigent server runs with `OMNIGENT_GRANT_MAX_LIFETIME_DAYS = "90"` (D1).
 - The superseded grants are purged first, by a temporary 7-day lifetime on magnetite that never reaches `main` and the server's own purge, so raising the lifetime revives none (D2).
-- No early-warning alert is added; the one built for this change is shelved on branch `omnigent-grant-alert-shelved` (D3).
+- No early-warning alert is added; the one built for this change was shelved as commit `cc0370f3`, whose branch was deleted on 2026-11-23, and design D3's "If revisited" note carries what was worth keeping (D3).
 
 ## Capabilities
 
