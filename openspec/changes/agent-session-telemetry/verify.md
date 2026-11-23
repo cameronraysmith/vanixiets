@@ -53,13 +53,66 @@ Masking on real hosts: both hosts' masking sessions (traces `5fdd0a5a…`, `91ad
 
 Langfuse: the agent unit sent 17 of 18 spans on magnetite and 41 of 42 on pyrite (the unsent one each is `claude_code.tool.blocked_on_user`), with no send or enqueue failure; the orchestrator read five real traces back from `/api/public/v2/observations` with HTTP 200 (design "As deployed").
 
+## Day-later scans
+
+Task 8.1's account-identifier scan and task 11.7's credential-shape scan count from pyrite's deploy of bd95469f (#4151–#4153), finished 2026-11-22T23:21:20Z.
+The final run started at 2026-11-23T23:22:30Z, after the mark, over exactly the window [2026-11-22T23:21:20Z, 2026-11-23T23:21:20Z), as `regulator` through `obs-query sql agent` (`logs/day-later-scans-rerun-20261123T232230.log`, exit 0; the script is `logs/day-later-scan-rerun.py` on stibnite).
+Every hit was then read with value-free queries (lengths, character classes, surrounding key names, span and conversation) in `logs/day-later-classify-20261123T233618.log`.
+An early run on 2026-11-23 at 20:15–20:28Z over every row, including the 2026-11-22 rows before the window (`logs/day-later-scans-20261123T201542.log`), found the same classes; besides them it found only finding F10's two pre-fix rows (magnetite, 2026-11-22T20:12:44 and 20:12:51Z, `encodedBlobPattern`, `AwAAAA` 132 and 152), whose decoded bytes hold the dummy `ghp_` and 36 `a`s and no other credential shape.
+Earliness hid nothing already stored: the `agent` ttl is 30 days, a query reads rows not yet flushed, compaction rewrites no value, and no daily job writes to `agent`.
+
+Rows in the window, by table, host and user (human + worker, worker meaning `harness_host` `omnigent`):
+
+| Host, user | `session_event` | `agent_span` | metric rows |
+|---|---|---|---|
+| magnetite, cameron | 1 + 1 | 17 + 1 | 8 |
+| magnetite, janettesmith | 1 + 1 | 1 + 1 | 4 |
+| pyrite, cameron | 8 + 6 | 98 + 9 | 31 |
+| pyrite, janettesmith | 2 + 3 | 2 + 3 | 10 |
+| stibnite, cameron | 10 + 3 | 4,101 + 3 | 14,331 |
+| total | 36 | 4,235 | 14,384 |
+
+stibnite's rows begin at 2026-11-23T09:02:25Z, so the window covers about 14 h 19 min of stibnite, cameron only; janettesmith has no stibnite row; `agent_span_operations` and `agent_span_services` hold no row in the window.
+The orchestrating session and its subagents, exporting from stibnite since about 18:06Z, account for 4,059 of stibnite's 4,101 human spans (26 conversations; the orchestrator's own, `01a0aabc-d42f-…`, 528 spans from 18:07 to 23:21Z) and 14,287 of its 14,331 metric rows; the scans' hits on stibnite are mostly these sessions reading this change's patterns, hashes and logs.
+
+Columns: no column of `agent` is named after an account identifier, a raw API body, `gen_ai.input.messages`, a system prompt or `details` (`regexp_like(lower(column_name), 'email|organi|account|body|input\.messages|system|instruction|details|oauth|credential|secret|password')` over `information_schema.columns`: no row); `span_events` and `span_links` hold `[]` in every row.
+Account identifiers: the email address, organisation id and account id of the signed-in Claude account (one account across the seven `.claude.json` files on magnetite, pyrite and stibnite) appear in no row of any column of any table, content columns included.
+`'@'` outside the content columns appears only in `agent_span.scope_name`, 4,199 rows in the run, all holding the package name `@oh-my-pi/pi-agent-core`.
+
+Credential shapes, counted per table, column and pattern, every hit read as host, row time, first six characters and length:
+
+| Pattern | Hits in the window (rows) | Reading |
+|---|---|---|
+| the collector's 17 `credentialPatterns`, one alternation | none | |
+| the collector's `encodedBlobPattern` | none | |
+| `sk-[A-Za-z0-9_-]{16,}` | output.messages 4, tool.call.arguments 2, tool.call.result 6, last_user_message 1 | `sk-adm` 29 (`risk-admin-dashboard-components`, the masking sessions' kept word), `sk-r1-` 29 and `sk-che` 24, lowercase kebab words |
+| `(?:sk\|rk\|pk)_(?:live\|test\|prod)_[A-Za-z0-9]{8,}` | output.messages 3, tool.call.arguments 2, tool.call.result 3, last_user_message 1 | `sk_tes` 21 (`task_test_configuration`) |
+| `AGE-SECRET-KEY` | output.messages 7, tool.call.arguments 4, tool.call.result 2, `span_status_message` 1, all stibnite | the 14-character name followed by prose or punctuation; in the tool result and status message it is followed by `-1[QPZR`, the collector's own mask regex read from `schema.nix`; `AGE-SECRET-KEY-1` and 20 key characters: none |
+| key=value secret | tool.call.result 7, output.messages 2, all stibnite | read by character class, no value a credential: a key and a lowercase word (two rows), a key and an identifier followed by the next line's number, a key and a hyphenated word, a key assigned a function call, two keys followed by a `${…}` Nix interpolation; in output.messages a key assigned a function call and a key assigned a `<placeholder>` |
+| `gh[pousr]_…`, `github_pat_…`, `xox[abprs]-…`, `AKIA`/`ASIA…`, `AIza…`, JWT, `BEGIN … PRIVATE KEY`, `age1…`, bearer | none | |
+| email shape | last_user_message 1; tool.call.result 20; all stibnite | see below |
+| `[A-Za-z0-9+]{40,}={0,2}` | tool.call.result 191, output.messages 46, tool.call.arguments 45, `span_status_message` 6 | 40-hex commit ids (97, 44, 43, 3), 64-hex sha256 (26, 0, 0, 1), Nix and npm `sha256-`/`sha512-` hashes (25, 2, 2, 1), jj Change-Ids (9), cache public keys (3), one other hex length; the 31 others are 40-hex ids after an escaped newline, a Nix base32 store hash, SRI hashes cut at a `/`, a Cloudflare report-URL parameter, a `googleusercontent.com` image path, and one 71-character fragment of omp's base64 `details.trace.syntax` in a `grep` over an omp session file, whose decoded bytes hold no credential text |
+| `[0-9a-fA-F]{40,}` | tool.call.result 162, output.messages 44, tool.call.arguments 43, `span_status_message` 4 | commit ids and sha256 hashes as above |
+| `\*\*\*\*` | 29 rows on pyrite and stibnite | masked values |
+
+No unmasked credential and no account identifier was found.
+
+Email shapes: the one in `last_user_message` (stibnite, 20:33:19Z, conversation `01a0aabc-d42f-…`, 27 characters) is the operator's commit email (`jj config get user.email`), pasted into a prompt with a jj log; it is not the signed-in account's address.
+Of the 20 in tool results, 10 are the same commit email in printed jj or git output, one is a `git@` remote, two are placeholders and seven are other addresses printed by tools; none is an account's address.
+The requirement `No account identifier leaves a host` reads: "No account identifier SHALL leave a host in an agent session's data, and the only person identifier stored SHALL be the session's user name."
+Its scenario and task 8.1's check cover the identifiers the harness attaches as telemetry attributes (`user.email`, `organization.id`, account ids), and world-assumptions defines an account identifier as one a model provider assigns; the commit email is not one, so the first clause holds.
+The second clause, read literally, is not met: content columns now hold person identifiers (the commit email and other addresses), which decision D15 stores as session content.
+Either the wording narrows to the attributes ("… and the only person identifier stored outside the content columns SHALL be the session's user name; text a person types or a tool prints is session content, stored as written"), or a mask rule replaces email shapes in content; this is the operator's decision.
+
+Searchability on stibnite (task 8.1's form; stibnite's enablement is task 7.2's change): a fresh human session `omp --model haiku -p 'Reply with the single word ok. Marker DLSMARK202542z'` (20:25:42–20:25:45Z) was found at 20:26Z by `matches_term("span_attributes.last_user_message", 'DLSMARK202542z')` as `chat claude-haiku-4-5`, stibnite, cameron, no `harness_host`.
+Every worker `user_prompt` on magnetite and stibnite is omnigent's `/model` (magnetite 17:06:43Z, cameron and janettesmith; stibnite 16:01:14, 17:58:33 and 20:12:04Z, cameron), stamped with host, person and `harness_host` `omnigent` and found by `matches_term(prompt, 'model')`; the only worker prompt with a distinctive word is pyrite's `HH-CLAUDE-WORKER-pyrite-102947` (2026-11-23T10:30:51Z, cameron), so no worker session with a distinctive prompt has run on magnetite or stibnite.
+
 ## 2. Open items and owners
 
 | Item | Owner | What is missing |
 |---|---|---|
 | 5.2, 8.1 worker half | operator, or a later task | a session through Janette's worker (and cameron's) on magnetite, found by its word with `user_name` `janettesmith` |
-| 8.1 day-later scan | later task | after 2026-11-23T23:21Z: no `agent` column named after an account identifier or raw API body; no value outside the content columns equal to an account's email or organisation id |
-| 11.7 | later task | the credential-shape scan over a day's rows, after 2026-11-23T23:21Z |
+| 8.1 person identifiers in content | operator's decision | the requirement's wording or a mask rule for email shapes in content ("Day-later scans", email shapes) |
 | 5.4 | operator's decision | stopping `greptimedb.service` on magnetite for ten minutes to measure the agent rates; the rates in use are estimates checked by the load measurements |
 | 6.1 | later task | the deployed GreptimeDB, Claude Code, omp and omnigent versions recorded here and compared with A188–A195 |
 | 6.2 | later task | the journal of an :00 `otel-envelope` run on magnetite showing B1 over `agent` (the 5-minute runs' `B0 budget-run: ok` implies the 20:00Z budget run passed) |
