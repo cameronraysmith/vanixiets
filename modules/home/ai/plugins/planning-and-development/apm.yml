@@ -28,11 +28,15 @@ dependencies:
     - srid/agency/.apm/skills/hickey#81455051ccca654c57ad6088838c85e7248ac159
     - srid/agency/.apm/skills/lowy#81455051ccca654c57ad6088838c85e7248ac159
     - srid/agency/.apm/skills/fact-check#81455051ccca654c57ad6088838c85e7248ac159
-    # mattpocock/skills is a whole-plugin remote dep (claude-plugin repo:
-    # plugin.json, no apm.yml); apm normalizes its plugin.json-declared skills
-    # into flat skills at install. The commit is pinned here only; Nix downloads
-    # it in apm-deps (pkgs/by-name/apm-skills-compose/deps.nix).
-    - mattpocock/skills#6acc160e4e0cd062dbbbd7a1b26ae92855edf07e
+    # mattpocock/skills is a Claude Code plugin repository (.claude-plugin/plugin.json).
+    # apm >= 0.38 deploys a whole-repo plugin dependency without a skills:
+    # selection whole to .agents/plugins/; the selection keeps it flat in
+    # .claude/skills and .agents/skills. It lists every skill of the plugin.json
+    # at this commit. The commit is pinned here only; Nix downloads it in
+    # apm-deps (pkgs/by-name/apm-skills-compose/deps.nix).
+    - git: mattpocock/skills
+      ref: 6acc160e4e0cd062dbbbd7a1b26ae92855edf07e
+      skills: [ask-matt, code-review, codebase-design, diagnosing-bugs, domain-modeling, grill-me, grill-with-docs, grilling, handoff, implement, improve-codebase-architecture, prototype, research, resolving-merge-conflicts, setup-matt-pocock-skills, tdd, teach, to-questionnaire, to-spec, to-tickets, triage, wait-what, wayfinder, wizard, writing-for-agents]
     # linear-cli ships one agent skill under skills/linear-cli/ alongside its
     # CLI. openspec-linear-sync in this plugin is linear-cli-driven, so marketplace
     # consumers need the skill propagated with the plugin; the skills subset takes

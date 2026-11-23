@@ -28,7 +28,7 @@
   # NAR hash of the apm-deps download. After a remote ref or apm version change
   # the download is renamed and fails with a hash mismatch printing the new
   # value to put here.
-  apmDepsHash ? "sha256-8+DPJA+j13sVvLd1hqh3muY3K0yr8Bn3JwHWNux5ju8=",
+  apmDepsHash ? "sha256-8tHi1PGBMMfychJrcbSstFOkvYNNTC4CkI1uLbrZc+U=",
 
   # Every remote apm dependency, downloaded once (deps.nix, design D1).
   apmDeps ? callPackage ./deps.nix {
