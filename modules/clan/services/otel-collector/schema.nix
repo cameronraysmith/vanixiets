@@ -257,14 +257,20 @@
       "org.nixos.prometheus-node-exporter" = "node_exporter";
     };
 
-    # Unmeasured estimate of magnetite's `fleet` export rate: about 2000
-    # series (ADR-004's ~800 host-level series per NixOS host plus the
-    # scraped service endpoints) at 128 bytes per OTLP number point with its
-    # resource and attribute overhead, one point per minute. The deployment
-    # measurement (logs/s1-evidence/8.5-queue-rate.log) replaces it. The
-    # agents' queue assertion and checks.x86_64-linux.otel-collector-config
-    # read it.
-    fleetBytesPerMinute = 256000;
+    # magnetite's `fleet` export rate, measured: 2,228 metric points a minute
+    # into `otlp_http/fleet` on magnetite's 127.0.0.1:8888, the 237-minute
+    # average of otelcol_exporter_sent_metric_points (528,244) after the
+    # collector's restart at 2026-11-23 03:27:47Z, with at least one Mac
+    # asleep; a fresh 4-minute sample gave 2,221. At 128 bytes per OTLP
+    # number point with its resource and attribute overhead that is 285,184
+    # B/min (darwin-agent-session-telemetry design D35). 128 B is kept: the
+    # only byte measurement, October's (logs/s1-evidence/8.5-queue-rate.log),
+    # gave about 112 B a point. Re-read the rate when a host is added. It is
+    # every host's points together; the agents' assertions, that each
+    # agent's otlp_http/ingress holds 24 h of it, apply it to one host,
+    # which overstates that host's own rate. Those assertions and
+    # checks.x86_64-linux.otel-collector-config read it.
+    fleetBytesPerMinute = 285184;
 
     # Unmeasured estimates of one agent-telemetry host's agent output
     # (agent-session-telemetry design D10), replaced by the measurement of

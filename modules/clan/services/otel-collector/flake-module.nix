@@ -51,19 +51,20 @@ let
 
   mib = n: n * 1024 * 1024;
 
-  # Persistent queue per exporter: at least 24 h of fleet and under 512 MiB
-  # in total (ADR-003 envelope), asserted by
-  # checks.x86_64-linux.otel-collector-config. devloop's 52 MiB is split
-  # between its metrics and its five tables, ci_attribute holding about a
-  # day of store outage on the busiest day (S2 design D4); eval_run's 4 MiB
+  # Persistent queue per exporter: at least 24 h of fleet and, for the
+  # ingress collector process alone, under 640 MiB in total (ADR-003
+  # envelope as amended 2026-11-23; darwin-agent-session-telemetry design
+  # D35), asserted by checks.x86_64-linux.otel-collector-config. fleet's 480
+  # MiB holds 29.4 h at the measured fleetBytesPerMinute. devloop's 52 MiB is
+  # split between its metrics and its five tables, ci_attribute holding about
+  # a day of store outage on the busiest day (S2 design D4); eval_run's 4 MiB
   # holds months of nixbot's roughly 100 evaluation lines a day. agent's 62
   # MiB is split between its metrics and its session events, each holding
   # about 2 h of three agent-telemetry hosts' assumed output while the store
   # is down (agent-session-telemetry design D10; darwin-agent-session-
-  # telemetry design D7); fleet gave 18 MiB of its margin over 24 h for it
-  # and the span queue.
+  # telemetry design D7).
   queueBytes = {
-    fleet = mib 382;
+    fleet = mib 480;
     devloop = mib 4;
     agent = mib 16;
     agent_session_event = mib 46;

@@ -249,7 +249,7 @@ Nothing imports `schema.nix` by path; import-tree loads it as a flake-parts modu
 - `agentMetricsBytesPerMinute` (35,840), `agentEventBytesPerMinute` (133,000) and `agentSpanBytesPerMinute` (240,000): one agent-telemetry host's assumed agent output, beside `fleetBytesPerMinute`, until the measurement after deploy replaces them.
 
 To add a database, add `<name> = "<ttl>";` to `databases`, add a `queueBytes.<name>` entry in `flake-module.nix`, and have the producing pipeline set `vanixiets.database = "<name>"`.
-The queues must still sum to under 512 MiB.
+The ingress's queues must still sum to under 640 MiB, the budget of the ingress collector process alone (ADR-003 as amended 2026-11-23); every other collector process's queues stay under 512 MiB.
 The ingress assertion fails if the store would create a different set of databases from the one the ingress routes to.
 
 To add a unit, add its pattern to `systemdUnits`; an agent assertion fails the evaluation of any host on which more than `budget.units` services, notifier instances (`systemdUnitsNotifierPattern`) apart, match it.
@@ -274,13 +274,13 @@ The notifier reads no clan var itself; the clan agent role passes the path of th
 ## Queue
 
 Every exporter uses a persistent `file_storage` sending queue under `/var/lib/opentelemetry-collector/queue`, sized in bytes; the logs receivers keep their positions in the same directory, as `receiver_<type>_<name>` files, with `file_log` spelled `filelog`, beside the exporters' `exporter_otlp_http_<name>_<signal>` files.
-On magnetite the ingress's ten store exporters queue: `fleet` gets 382 MiB, `agent` (metrics) 16 MiB, `agent_session_event` 46 MiB, `agent_span` 12 MiB, `devloop` (metrics) 4 MiB, `devloop_ci_attribute` 32 MiB, and `devloop_ci_build`, `devloop_batch_event`, `devloop_deploy_record` and `devloop_eval_run` 4 MiB each, 508 MiB in all, so the total stays under 512 MiB, `fleet` holds about 26 hours at the assumed rate (24 required), the two `agent` queues hold about 2.6 h and 2.0 h of three agent-telemetry hosts' assumed agent output while the store is down, and `agent_span` about 17.5 min of their spans (the check requires 15; `darwin-agent-session-telemetry` design D7).
+On magnetite the ingress's ten store exporters queue: `fleet` gets 480 MiB, `agent` (metrics) 16 MiB, `agent_session_event` 46 MiB, `agent_span` 12 MiB, `devloop` (metrics) 4 MiB, `devloop_ci_attribute` 32 MiB, and `devloop_ci_build`, `devloop_batch_event`, `devloop_deploy_record` and `devloop_eval_run` 4 MiB each, 606 MiB in all, so the total stays under the ingress process's 640 MiB (`darwin-agent-session-telemetry` design D35), `fleet` holds about 29.4 hours at the measured rate (24 required), the two `agent` queues hold about 2.6 h and 2.0 h of three agent-telemetry hosts' assumed agent output while the store is down, and `agent_span` about 17.5 min of their spans (the check requires 15; `darwin-agent-session-telemetry` design D7).
 
 The ingress's agent queues against the three agent-telemetry hosts (magnetite, pyrite, stibnite) at their assumed rates while the store is down (design D7; `otel-collector-config`'s agent-queue clause, mutant `agentQueueShortThreeHosts`):
 
 | Ingress exporter | Size | Hold at three hosts | Required |
 |---|---|---|---|
-| `otlp_http/fleet` | 382 MiB | about 26 h of every host's fleet data | 24 h |
+| `otlp_http/fleet` | 480 MiB | about 29.4 h of every host's fleet data at the measured rate | 24 h |
 | `otlp_http/agent` (metrics) | 16 MiB | about 2.6 h | |
 | `otlp_http/agent_session_event` | 46 MiB | about 2.0 h | |
 | `otlp_http/agent_span` | 12 MiB | about 17.5 min, then each host's own `otlp_http/ingress-traces` queue | 15 min |
@@ -288,7 +288,7 @@ The ingress's agent queues against the three agent-telemetry hosts (magnetite, p
 That is not the whole span hold: a full `agent_span` queue refuses the hand-off with a retryable error (`sending queue is full` becomes HTTP 503 at the receiver, because `otlp_http/agent_span` does not set `block_on_overflow`, which `otel-collector-config` requires), so each host's agent-session collector keeps its spans in its own `otlp_http/ingress-traces` queue, 3.2 h, and the end-to-end hold while the store is down is about 17 min plus 3.2 h.
 On every other agent host `otlp_http/ingress` gets 400 MiB and `otlp_http/ingress-logs` 16 MiB, and these queues hold the host's exports while magnetite, its receiver or the mesh is unreachable.
 An agent-telemetry host's agent-session collector queues under `/var/lib/otel-agent-session/queue`, 160 MiB in all for the store: 52 MiB for `otlp_http/ingress-metrics`, 25.4 h of agent metrics, 64 MiB for `otlp_http/ingress-agent`, 8.4 h of agent events, and 44 MiB for `otlp_http/ingress-traces`, 3.2 h of spans (`agent-session-telemetry` design D10, D14, D15). Where `langfuse` is set, `otlp_http/langfuse` adds 32 MiB, for 192 MiB in all (design D16).
-The assumed rate, `fleetBytesPerMinute` in `schema.nix`, is 256,000 bytes a minute per host.
+The rate, `fleetBytesPerMinute` in `schema.nix`, is 285,184 bytes a minute: 2,228 metric points a minute into magnetite's `otlp_http/fleet`, measured on 2026-11-23 over the 237 minutes after the collector's restart, at 128 bytes a point (October's only byte measurement gave about 112). It is every host's points together; the non-ingress hosts' assertion applies it to one host's `otlp_http/ingress`, whose 400 MiB holds 24.5 h of it.
 cinnabar's measured rate is far below it: on 2026-10-29 its metrics queue held 524,034 bytes after the 23 minutes between its deploy and the start of magnetite's receiver, about 22,800 bytes a minute, and was empty within 7 minutes of that start.
 Retries never stop (`max_elapsed_time = "0s"`), because a persistent queue drops an item whose retries run out.
 `devloop_ci_attribute` holds about a day of store outage on the busiest day, about 64,800 attribute rows at roughly 0.5 KiB each; a fuller queue loses rows from the store's copy only, which `devloop-reconcile` reports and a receiver replay restores (runbook, "Replaying a gap").

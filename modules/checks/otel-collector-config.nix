@@ -1075,7 +1075,10 @@
               >= 15 * agentTelemetryHosts * i.schema.agentSpanBytesPerMinute
             && !(e."otlp_http/agent_span".sending_queue.block_on_overflow or false)
           ))
-          (check "R3.1: queues at or above 512 MiB" (lib.foldl' builtins.add 0 queueSizes < mib 512))
+          # The ingress collector process's queues alone get 640 MiB (ADR-003
+          # envelope as amended 2026-11-23; darwin-agent-session-telemetry
+          # design D35); every other collector process keeps 512.
+          (check "R3.1: queues at or above 640 MiB" (lib.foldl' builtins.add 0 queueSizes < mib 640))
 
           # Envelope: the limiter refuses data before the unit's ceiling kills
           # the collector and its in-memory batches.
@@ -1266,8 +1269,6 @@
               };
             };
           };
-        queueUnder24h = onSettings { exporters."otlp_http/fleet".sending_queue.queue_size = mib 64; };
-        queueOver512MiB = onSettings { exporters."otlp_http/fleet".sending_queue.queue_size = mib 448; };
         # S2 design D4: a logs exporter without the persistent queue.
         logsQueueNotPersistent =
           i:
@@ -1369,9 +1370,12 @@
       };
 
       # The agent-session path's mutants (agent-session-telemetry design D3,
-      # D5, D10, D14), each with the clause it must fail; the build log
-      # lists each with its failures.
+      # D5, D10, D14) and the ingress's queue mutants (darwin-agent-session-
+      # telemetry design D7, D35), each with the clause it must fail; the
+      # build log lists each with its failures.
       clause = {
+        fleetQueue = "R3.1: fleet queue below 24 h";
+        queueBudget = "R3.1: queues at or above 640 MiB";
         loopback = "R3.1: an endpoint off loopback other than the ingress receivers, or an ingress receiver not on magnetite's address or without otlp/mesh's TLS";
         handoff = "R3.1: the agent-session collector does not hand off over mTLS to otlp/loopback, an HTTP-only receiver with otlp/mesh's TLS feeding the ingress pipelines";
         local = "R3.1: otlp/local is not the agent-session collector's only receiver, HTTP-only on 127.0.0.1:4318, feeding exactly its three agent-session pipelines";
@@ -1439,6 +1443,16 @@
       session = self.lib.otelCollectorSchema.agentSession;
       quotedList = keys: "[${lib.concatMapStringsSep ", " (key: ''"${key}"'') keys}]";
       agentMutants = {
+        # fleet back at the re-budget's 382 MiB: 23.4 h at the measured rate.
+        queueFleetAt382 = {
+          clauses = [ clause.fleetQueue ];
+          mutate = onSettings { exporters."otlp_http/fleet".sending_queue.queue_size = mib 382; };
+        };
+        # The ingress's queues at 646 MiB, past its 640.
+        queueOver640MiB = {
+          clauses = [ clause.queueBudget ];
+          mutate = onSettings { exporters."otlp_http/fleet".sending_queue.queue_size = mib 520; };
+        };
         # The ingress's agent queues before the re-budget, at the host
         # table's three agent-telemetry hosts (magnetite, pyrite, stibnite).
         agentQueueShortThreeHosts = {
