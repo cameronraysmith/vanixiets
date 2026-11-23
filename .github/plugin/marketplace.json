@@ -1,8 +1,11 @@
 {
   "name": "vanixiets",
   "owner": {
-    "name": "cameronraysmith",
-    "url": "https://github.com/cameronraysmith"
+    "name": "cameronraysmith"
+  },
+  "metadata": {
+    "description": "Skills marketplace for vanixiets",
+    "version": "0.0.0"
   },
   "plugins": [
     {

@@ -805,6 +805,14 @@ agents-skills-index:
   jq -n --argjson names "$names" --argjson remote "$remote" '{names: $names, remote: $remote}' > "$index"
   echo "wrote $index ($(jq '.names | length' "$index") skills, $(jq '.remote | length' "$index") remote hashes)"
 
+# Regenerate .claude-plugin/marketplace.json and .github/plugin/marketplace.json
+# from the apm.yml manifests; checks.x86_64-linux.skills-marketplace-drift fails
+# until the regenerated files are committed. New group directories must be
+# git-tracked first.
+[group('agents')]
+agents-marketplace:
+  {{nix_cmd}} run .#skills-marketplace-write
+
 # Compose this repo's agent-context-* apm packages into the repo-root AGENTS.md (vanixiets tier only).
 [group('agents')]
 agents-context:
