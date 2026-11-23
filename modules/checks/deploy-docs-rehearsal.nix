@@ -60,7 +60,7 @@
     }:
     let
       deployDocsProgram = config.apps.deploy-docs.program;
-      payload = config.packages.vanixiets-docs;
+      payload = config.packages.vanixiets-docs-payload;
       realWrangler = "${config.packages.vanixiets-docs-deps}/packages/docs/node_modules/.bin/wrangler";
 
       rev = "0123456789abcdef0123456789abcdef01234567";
@@ -70,8 +70,8 @@
       pr = "7";
       previewUrl = "https://pr-${pr}-infra-docs.sciexp.workers.dev";
       checkRunId = "4242";
-      docsAttr = "checks.x86_64-linux.package-vanixiets-docs";
-      unrealisable = "/nix/store/zyxwvsrqpnmlkjihgfdcba9876543210-vanixiets-docs";
+      docsAttr = "checks.x86_64-linux.package-vanixiets-docs-payload";
+      unrealisable = "/nix/store/zyxwvsrqpnmlkjihgfdcba9876543210-vanixiets-docs-payload";
 
       # The docs nixbot built for the pull request: a store path the check
       # can read, distinguishable from the built-in payload by its marker.

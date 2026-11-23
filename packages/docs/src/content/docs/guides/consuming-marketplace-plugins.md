@@ -21,8 +21,10 @@ Which of these a consumer receives depends on the route.
 | Claude Code and the Claude desktop app | `/plugin marketplace add cameronraysmith/vanixiets`, then `/plugin install <group>@vanixiets` | any of the 18 skill groups | first-party skills only |
 | skills CLI, whole repository | `npx skills add cameronraysmith/vanixiets --list`, then `--skill <name>` | any of the 125 skills, one by one | first-party skills only |
 | skills CLI, one group | `npx skills add https://github.com/cameronraysmith/vanixiets/tree/main/modules/home/ai/plugins/<group>` | the skills of one group | first-party skills only |
+| skills CLI, docs site | `npx skills add https://infra.cameronraysmith.net --list`, then `--skill <name>` | any of the 125 skills, one by one | first-party skills only, each download checked against its sha256 digest in the index |
 
-Only apm resolves the remote dependencies, because only apm reads each group's `apm.yml`; the other routes read the generated files, which name each group's directory and nothing else.
+Only apm resolves the remote dependencies, because only apm reads each group's `apm.yml`; the other routes read generated files that name each group's directory, or its skills, and nothing else.
+The docs-site route reads the [Agent Skills discovery index](https://github.com/cloudflare/agent-skills-discovery-rfc) at `/.well-known/agent-skills/index.json`, which lists each skill with its description and the sha256 digest of its download, a `SKILL.md` or, for a skill with supporting files, a zip archive; it is generated from the skill directories and published with every deploy of this site from `main`.
 
 ## Quick start
 

@@ -109,13 +109,17 @@ Unset the detection variables for the run, for example `env -u AGENT -u CLAUDECO
 ## Agent-facing outputs
 
 The build emits three things for crawlers and LLM agents besides the HTML pages.
-`src/pages/robots.txt.ts` serves `/robots.txt`: it allows every crawler, names the sitemap and points at `/llms.txt`.
+`src/pages/robots.txt.ts` serves `/robots.txt`: it allows every crawler, names the sitemap and points at `/llms.txt` and the Agent Skills discovery index.
 [starlight-llms-txt](https://github.com/delucis/starlight-llms-txt) serves `/llms.txt` with the entry points configured in `astro.config.ts`, plus `/llms-full.txt` (every page) and `/llms-small.txt` (every page outside `development/`).
 It runs with `rawContent: true`, so both bundles carry each page's Markdown source: its HTML-to-Markdown round trip flattens KaTeX formulas and drops their TeX, and the source keeps them.
 [starlight-md-txt](https://github.com/max-ostapenko/starlight-md-txt) serves each page's source at its path with `.md` in place of the trailing slash (`/index.md` for the home page), with absolute links, and adds `<link rel="alternate" type="text/markdown">` to every page's head.
 Being source, neither output renders MDX components, so the fleet table that `concepts/fleet-topology.mdx` imports is absent from both.
 None of these appears in the sitemap, which lists HTML pages only.
 `e2e/agent-affordances.spec.ts` checks all three against the built site.
+
+The Agent Skills discovery index at `/.well-known/agent-skills/` (`index.json`, one `SKILL.md` or zip per first-party skill, each with its sha256 digest) is not part of this build.
+`pkgs/by-name/vanixiets-docs-payload` generates it from `modules/home/ai/plugins/*/.apm/skills/` and adds it to the nix-built site that `deploy-docs` deploys, so a skill edit rebuilds the index and that copy but neither `astro build` nor the e2e suite.
+`bun run build` and `bun run preview` therefore serve no index; `checks.x86_64-linux.agent-skills-index` checks it, and the skills CLI installing from it, against the deploy payload.
 
 ## Code quality
 

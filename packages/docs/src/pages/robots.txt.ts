@@ -6,6 +6,7 @@ export const GET: APIRoute = ({ site }) => {
     [
       `# Documentation for LLMs and agents: ${new URL("/llms.txt", site).href}`,
       "# Each page is also served as Markdown at its path with .md in place of the trailing slash.",
+      `# Agent Skills discovery index: ${new URL("/.well-known/agent-skills/index.json", site).href}`,
       "User-agent: *",
       "Allow: /",
       "",

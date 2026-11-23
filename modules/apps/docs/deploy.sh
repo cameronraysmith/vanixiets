@@ -6,7 +6,7 @@
 # the Preview name and, for a manual preview, a payload. Secrets come only
 # from the environment.
 #
-# Set by deploy.nix: builtin_payload (config.packages.vanixiets-docs),
+# Set by deploy.nix: builtin_payload (config.packages.vanixiets-docs-payload),
 # DOCS_NODE_MODULES (vanixiets-docs-deps node_modules tree),
 # DEPLOY_DOCS_CHECK_RUN (the github-check-run program) and
 # DEPLOY_DOCS_PULL_REQUEST (the github-pull-request program).
@@ -29,7 +29,7 @@ usage: deploy-docs production --rev <sha> [--deployed-by <name>]
        deploy-docs tail
        deploy-docs --help
 
-Deploy the nix-built vanixiets-docs payload to the infra-docs Cloudflare Worker.
+Deploy the nix-built vanixiets-docs-payload to the infra-docs Cloudflare Worker.
 
 Subcommands:
   production           Deploy the built-in payload to 100% of production
@@ -61,8 +61,8 @@ Flags:
                        (production and preview, required)
   --name <name>        Preview name, sanitized to lowercase [a-z0-9-] and at
                        most 40 characters (preview only, required)
-  --payload <dir>      vanixiets-docs build to preview instead of the built-in
-                       one; treated as untrusted (preview only)
+  --payload <dir>      vanixiets-docs-payload build to preview instead of the
+                       built-in one; treated as untrusted (preview only)
   --deployed-by <name> deployer recorded in the deployment message
                        (default: nixbot)
   --limit <n>          rows to list, newest first (default: 10)
@@ -504,7 +504,7 @@ read_pull_request_state() {
 # which deploy_preview accounts for. Event effects post no commit status, so
 # the outcome is the `docs-preview` check run on the head commit.
 pull_request() {
-  local docs_attr=checks.x86_64-linux.package-vanixiets-docs
+  local docs_attr=checks.x86_64-linux.package-vanixiets-docs-payload
   local build_number is_fork writer who reason build_url build_json build_status attribute attr_status payload
 
   [[ "${NIXBOT_EVENT_KIND:-}" == pull_request ]] ||

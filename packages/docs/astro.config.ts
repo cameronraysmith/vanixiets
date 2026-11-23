@@ -28,6 +28,7 @@ export default defineConfig({
             "",
             "- [Source repository](https://github.com/cameronraysmith/vanixiets): the flake, its modules and the agent skills under `modules/home/ai/plugins/`",
             "- [Consuming marketplace plugins](https://infra.cameronraysmith.net/guides/consuming-marketplace-plugins.md): install routes for the repository's agent-skill marketplace (apm, Claude Code, the Claude desktop app, the skills CLI)",
+            "- [Agent Skills discovery index](https://infra.cameronraysmith.net/.well-known/agent-skills/index.json): the first-party skills with a sha256 digest per download, per the Agent Skills discovery RFC; `npx skills add https://infra.cameronraysmith.net` reads it",
             "- [Getting started](https://infra.cameronraysmith.net/guides/getting-started.md): the guides' starting point",
             "",
             "Every page is also served as Markdown: append `.md` to its path without the trailing slash, for example `/guides/getting-started.md`, and `/index.md` for the home page.",

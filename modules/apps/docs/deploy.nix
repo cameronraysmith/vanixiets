@@ -1,4 +1,4 @@
-# Deploy the vanixiets-docs derivation to Cloudflare Workers.
+# Deploy the vanixiets-docs-payload derivation to Cloudflare Workers.
 #
 #   nix run .#deploy-docs -- production --rev <sha>
 #   nix run .#deploy-docs -- preview --rev <sha> --name <name> [--payload <dir>]
@@ -8,7 +8,8 @@
 # modes, which read the event environment instead of arguments.
 #
 # Why: the program deploys the nix-built CF Worker payload from
-# config.packages.vanixiets-docs, interpolated into the script as the
+# config.packages.vanixiets-docs-payload (the vanixiets-docs build plus the
+# Agent Skills discovery index), interpolated into the script as the
 # non-exported shell variable `builtin_payload` so no environment variable can
 # replace what production deploys. Only Previews take another build: through
 # --payload, or the store path nixbot built for a pull request.
@@ -51,7 +52,7 @@
               DEPLOY_DOCS_PULL_REQUEST = config.apps.github-pull-request.program;
             };
             text = ''
-              builtin_payload=${lib.escapeShellArg config.packages.vanixiets-docs}
+              builtin_payload=${lib.escapeShellArg config.packages.vanixiets-docs-payload}
               ${builtins.readFile ./deploy.sh}
             '';
           }
