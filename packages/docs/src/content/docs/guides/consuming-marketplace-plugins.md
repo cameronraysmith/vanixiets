@@ -12,7 +12,7 @@ The behavior described below was verified against apm 0.28.0, and the pinning de
 
 ## Routes
 
-The 22 plugin groups hold 125 first-party skills in 18 skill groups plus four `agent-context-*` instructions groups, and four of the skill groups declare remote dependencies that add 51 skills from other repositories.
+The 22 plugin groups hold 125 first-party skills in 18 skill groups plus four `agent-context-*` instructions groups, and five of the skill groups declare remote dependencies that add 92 skills from other repositories.
 Which of these a consumer receives depends on the route.
 
 | Route | Commands | Unit installed | Delivers |

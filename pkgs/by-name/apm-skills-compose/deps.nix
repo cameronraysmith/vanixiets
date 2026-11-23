@@ -28,35 +28,55 @@ let
     path = pluginsDir;
     name = "apm-plugins";
   };
-  superpowers = builtins.filter (d: d.repo == "obra/superpowers") guard.remoteDeps;
-
-  # Design D3, rule 5: the declared superpowers skills equal upstream skills/ at
-  # the declared commit. Upstream's listing needs the network, so the rule runs
+  # Design D3, rule 5, for the repositories consumed one skill directory at a
+  # time from a flat skills/ directory: the declared skills plus the ones
+  # deliberately withheld here equal upstream skills/ at the declared commit, so
+  # a bump that adds or removes an upstream skill fails until a group apm.yml or
+  # this table names it. Upstream's listing needs the network, so the rule runs
   # here; nothing it produces reaches $out, so the output hash is unaffected.
-  superpowersListRule = lib.optionalString (superpowers != [ ]) ''
-    sp_ref=${lib.escapeShellArg (lib.head guard.refsByRepo."obra/superpowers")}
-    declared=${
-      lib.escapeShellArg (
-        lib.concatStringsSep "\n" (
-          lib.sort lib.lessThan (map (d: lib.removePrefix "skills/" d.path) superpowers)
+  listedRepos = {
+    "obra/superpowers".withheld = [ ];
+    # Both are one-time installers of a Claude Code SessionStart hook that runs
+    # a curl-driven script on every session: autosync-ic-skills rewrites
+    # .claude/skills from skills.internetcomputer.org, autoupgrade-icp-cli
+    # upgrades the icp and ic-wasm binaries. Nix pins and delivers the skills
+    # and the toolchain instead.
+    "dfinity/icskills".withheld = [
+      "autosync-ic-skills"
+      "autoupgrade-icp-cli"
+    ];
+  };
+  listRule =
+    repo:
+    { withheld }:
+    let
+      declaredDeps = builtins.filter (d: d.repo == repo) guard.remoteDeps;
+      ref = lib.head guard.refsByRepo.${repo};
+      dir = "$TMPDIR/list/${repo}";
+    in
+    lib.optionalString (declaredDeps != [ ]) ''
+      expected=${
+        lib.escapeShellArg (
+          lib.concatStringsSep "\n" (
+            lib.sort lib.lessThan (map (d: lib.removePrefix "skills/" d.path) declaredDeps ++ withheld)
+          )
         )
-      )
-    }
-    git init -q "$TMPDIR/sp"
-    git -C "$TMPDIR/sp" fetch -q --depth 1 --filter=blob:none https://github.com/obra/superpowers "$sp_ref"
-    upstream=$(git -C "$TMPDIR/sp" ls-tree --name-only "$sp_ref" skills/ | sed 's|^skills/||' | LC_ALL=C sort)
-    if [ "$declared" != "$upstream" ]; then
-      echo "apm-deps: superpowers skills declared in the plugin apm.yml files differ from upstream skills/ at $sp_ref:" >&2
-      diff <(printf '%s\n' "$declared") <(printf '%s\n' "$upstream") >&2 || true
-      exit 1
-    fi
-  '';
+      }
+      git init -q "${dir}"
+      git -C "${dir}" fetch -q --depth 1 --filter=blob:none https://github.com/${repo} ${ref}
+      upstream=$(git -C "${dir}" ls-tree -d --name-only ${ref} skills/ | sed 's|^skills/||' | LC_ALL=C sort)
+      if [ "$expected" != "$upstream" ]; then
+        echo "apm-deps: ${repo} skills declared in the plugin apm.yml files plus those withheld in deps.nix differ from upstream skills/ at ${ref}:" >&2
+        diff <(printf '%s\n' "$expected") <(printf '%s\n' "$upstream") >&2 || true
+        exit 1
+      fi
+    '';
 
   mattpocock = builtins.filter (d: d.repo == "mattpocock/skills") guard.remoteDeps;
   flowSequence = s: map lib.trim (lib.splitString "," (lib.head (builtins.match "\\[(.*)]" s)));
 
   # Design D7, G2: the declared mattpocock skills equal the skills of upstream's
-  # .claude-plugin/plugin.json at the declared commit. Like the superpowers
+  # .claude-plugin/plugin.json at the declared commit. Like the skills/ list
   # rule, it reads the network and writes nothing to $out.
   mattpocockListRule = lib.optionalString (mattpocock != [ ]) ''
     mp_ref=${lib.escapeShellArg (lib.head guard.refsByRepo."mattpocock/skills")}
@@ -107,7 +127,7 @@ runCommand "apm-deps-${guard.digest}"
     } > apm.yml
     apm lock -t agent-skills,claude
 
-    ${superpowersListRule}
+    ${lib.concatStrings (lib.mapAttrsToList listRule listedRepos)}
     ${mattpocockListRule}
 
     rm -rf apm_modules/_local

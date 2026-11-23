@@ -119,6 +119,7 @@ let
   # Design D3 rules 1-4 for the repositories consumed one skill directory at a time.
   perSkill = {
     "obra/superpowers" = "skills/[a-z0-9-]+";
+    "dfinity/icskills" = "skills/[a-z0-9-]+";
     "srid/agency" = "\\.apm/skills/[a-z0-9-]+";
   };
   sameRef = lib.all (

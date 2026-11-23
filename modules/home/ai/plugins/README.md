@@ -37,13 +37,14 @@ flowchart LR
 
 ## Remote apm dependencies
 
-Four packages declare remote apm dependencies: `planning-and-development`, `version-control-and-forge`, `preferences-code-and-collaboration-conventions` and `preferences-operations-and-reliability`.
+Five packages declare remote apm dependencies: `planning-and-development`, `version-control-and-forge`, `preferences-code-and-collaboration-conventions`, `preferences-operations-and-reliability` and `preferences-web-platform-and-deployment`.
 Each dependency's commit is written only in the declaring package's `apm.yml`, as a full 40-character SHA; no Nix fetcher repeats it.
 Nix downloads all of them with apm itself in one fixed-output derivation, `apm-deps-<digest>` (`pkgs/by-name/apm-skills-compose/deps.nix`), under the single `apmDepsHash` in `pkgs/by-name/apm-skills-compose/package.nix`, and the compose installs offline from that download.
 The `<digest>` covers every remote entry and apm's version (`pkgs/by-name/apm-skills-compose/guard.nix`, tested by the `eval-apm-guard` check), so a changed ref or apm version renames the download and its build fails with a hash mismatch that prints the new hash, instead of reusing the previous download.
-The guard also fails evaluation on a ref that is not a full SHA, on an entry shape it cannot parse, and on superpowers or agency entries that are not one skill directory each or do not share one ref.
+The guard also fails evaluation on a ref that is not a full SHA, on an entry shape it cannot parse, and on superpowers, agency or icskills entries that are not one skill directory each or do not share one ref.
+The download fails when the superpowers or icskills skills declared in the group `apm.yml` files, plus those `deps.nix` withholds by name, differ from upstream `skills/` at the pinned commit, so an upstream skill added or removed by a bump has to be declared or withheld explicitly.
 
-To bump a dependency, edit its `ref:` (for superpowers and agency, every line of the repository together), build `.#apm-skills-compose`, and copy the hash from the mismatch into `apmDepsHash`.
+To bump a dependency, edit its `ref:` (for superpowers, agency and icskills, every line of the repository together), build `.#apm-skills-compose`, and copy the hash from the mismatch into `apmDepsHash`.
 After the change reaches `main`, `just agents-relock` refreshes the root `apm.lock.yaml`.
 
 Five tools ship their agent skill in the same upstream release as their CLI, and the skill's ref must equal the commit the CLI package records:
@@ -66,10 +67,13 @@ apm therefore installs only those skill directories: neither repository's hooks,
 superpowers' SessionStart hook, which loads `using-superpowers` at the start of each session, is deliberately absent; apm 0.36 refuses superpowers' hook files, and upstream declined apm support (obra/superpowers#2681).
 For that hook and the plugin experience, install superpowers natively instead (`/plugin install superpowers@claude-plugins-official`, or its README for other harnesses), and either do not install `planning-and-development` alongside it or remove its superpowers lines, so the same skills are not installed twice.
 The marketplace supports the apm version this repository builds with (`modules/nixpkgs/overlays/apm.nix`; 0.38 at the time of writing) and later releases.
+`preferences-web-platform-and-deployment` depends on 41 of the 43 Internet Computer skills of `dfinity/icskills`, each declared as its own skill directory, so apm deploys them flat and nothing else from that repository.
+The two it withholds, `autosync-ic-skills` and `autoupgrade-icp-cli`, are one-time installers of a Claude Code SessionStart hook whose script fetches newer skills from skills.internetcomputer.org or upgrades `icp` and `ic-wasm` on every session; the withheld list and its reason sit in `pkgs/by-name/apm-skills-compose/deps.nix`.
+`canhelp` is delivered and carries two scripts, pre-approved in its `allowed-tools`, that run `icp canister metadata` and query ic-api.internetcomputer.org when the skill is invoked.
 Older apm may install a group from it yet deploy none of its skills.
 Installers other than apm read the generated marketplace files, whose entries name only each package's source directory, so they do not resolve `apm.yml` dependencies and install none of the remote skills.
 
-The `apm-marketplace-consumer` check (x86_64-linux) registers the marketplace from a bare repository of the committed files and installs the 18 groups that declare no dependencies, comparing every deployed skill and staged instructions fragment with its source.
+The `apm-marketplace-consumer` check (x86_64-linux) registers the marketplace from a bare repository of the committed files and installs the 17 groups that declare no dependencies, comparing every deployed skill and staged instructions fragment with its source.
 The groups with remote dependencies need the network: `just agents-marketplace-remote` registers `cameronraysmith/vanixiets` at `main` from GitHub and installs all 22 groups, comparing the groups apm registers with `marketplace.packages`.
 
 ## Skills CLI
@@ -86,7 +90,7 @@ In the Claude desktop app, Customize > Plugins > Add marketplace takes the same 
 Each of the 18 skill groups is one plugin whose entry carries `skills: ["./.apm/skills"]`, `strict: false` and no version, so installs follow the repository's commits.
 
 The plugins carry only first-party skills.
-The 51 remote skills reach users only through apm or this repository's home-manager configuration, and the four `agent-context-*` groups are not offered to Claude.
+The 92 remote skills reach users only through apm or this repository's home-manager configuration, and the four `agent-context-*` groups are not offered to Claude.
 On a machine where home-manager already delivers the skills to `~/.claude/skills`, installing a plugin loads its skills a second time, namespaced as `<group>:<skill>`.
 
 Two behaviours the Claude file relies on are observed, not documented: that Claude installs a manifest-free entry whose skills sit in the hidden `./.apm/skills` (world assumptions A217 for Claude Code, A218 for the desktop app), and that a plugin without any version follows the marketplace's commits (A219).

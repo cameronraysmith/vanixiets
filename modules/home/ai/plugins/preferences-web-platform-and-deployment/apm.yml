@@ -1,3 +1,55 @@
 name: preferences-web-platform-and-deployment
 version: 0.0.0
-description: Web platform and deployment preferences — platform foundations, hypermedia development and documents, React/TanStack UI, web-application deployment, Cloudflare Wrangler.
+description: Web platform and deployment preferences — platform foundations, hypermedia development and documents, React/TanStack UI, web-application deployment, Cloudflare Wrangler, and DFINITY's Internet Computer skills (canisters, Motoko, icp-cli, deployment, identity, chain-key tokens).
+dependencies:
+  apm:
+    # dfinity/icskills is consumed one skill directory at a time
+    # (virtual-subdirectory dependencies, as obra/superpowers in
+    # planning-and-development), so apm deploys each skill flat. Every line
+    # shares one full 40-char SHA; the apm-deps guard fails evaluation
+    # otherwise, and the apm-deps download fails unless these skills plus the
+    # withheld ones listed in pkgs/by-name/apm-skills-compose/deps.nix
+    # (autosync-ic-skills and autoupgrade-icp-cli, which install SessionStart
+    # hooks that self-update skills or the icp toolchain) equal upstream
+    # skills/ at that commit.
+    - dfinity/icskills/skills/agent-web-identity#429a3cb161b95c71e2699358bad772a13ac196a0
+    - dfinity/icskills/skills/buy-cycles#429a3cb161b95c71e2699358bad772a13ac196a0
+    - dfinity/icskills/skills/caffeine-app#429a3cb161b95c71e2699358bad772a13ac196a0
+    - dfinity/icskills/skills/canhelp#429a3cb161b95c71e2699358bad772a13ac196a0
+    - dfinity/icskills/skills/canister-audit#429a3cb161b95c71e2699358bad772a13ac196a0
+    - dfinity/icskills/skills/canister-security#429a3cb161b95c71e2699358bad772a13ac196a0
+    - dfinity/icskills/skills/certified-variables#429a3cb161b95c71e2699358bad772a13ac196a0
+    - dfinity/icskills/skills/ckbtc#429a3cb161b95c71e2699358bad772a13ac196a0
+    - dfinity/icskills/skills/cketh#429a3cb161b95c71e2699358bad772a13ac196a0
+    - dfinity/icskills/skills/cksol#429a3cb161b95c71e2699358bad772a13ac196a0
+    - dfinity/icskills/skills/cloud-engine-canisters#429a3cb161b95c71e2699358bad772a13ac196a0
+    - dfinity/icskills/skills/custom-domains#429a3cb161b95c71e2699358bad772a13ac196a0
+    - dfinity/icskills/skills/cycles-management#429a3cb161b95c71e2699358bad772a13ac196a0
+    - dfinity/icskills/skills/deploy-to-cloud-engine#429a3cb161b95c71e2699358bad772a13ac196a0
+    - dfinity/icskills/skills/encrypted-maps#429a3cb161b95c71e2699358bad772a13ac196a0
+    - dfinity/icskills/skills/evm-rpc#429a3cb161b95c71e2699358bad772a13ac196a0
+    - dfinity/icskills/skills/https-outcalls#429a3cb161b95c71e2699358bad772a13ac196a0
+    - dfinity/icskills/skills/ic-dashboard#429a3cb161b95c71e2699358bad772a13ac196a0
+    - dfinity/icskills/skills/icp-cli#429a3cb161b95c71e2699358bad772a13ac196a0
+    - dfinity/icskills/skills/icp-deploy-check#429a3cb161b95c71e2699358bad772a13ac196a0
+    - dfinity/icskills/skills/icrc-ledger#429a3cb161b95c71e2699358bad772a13ac196a0
+    - dfinity/icskills/skills/migrating-motoko-actors#429a3cb161b95c71e2699358bad772a13ac196a0
+    - dfinity/icskills/skills/migrating-to-moc-2#429a3cb161b95c71e2699358bad772a13ac196a0
+    - dfinity/icskills/skills/mops-cli#429a3cb161b95c71e2699358bad772a13ac196a0
+    - dfinity/icskills/skills/multi-canister#429a3cb161b95c71e2699358bad772a13ac196a0
+    - dfinity/icskills/skills/organization-sign-in#429a3cb161b95c71e2699358bad772a13ac196a0
+    - dfinity/icskills/skills/reviewing-motoko#429a3cb161b95c71e2699358bad772a13ac196a0
+    - dfinity/icskills/skills/service-discoverability#429a3cb161b95c71e2699358bad772a13ac196a0
+    - dfinity/icskills/skills/single-sign-in#429a3cb161b95c71e2699358bad772a13ac196a0
+    - dfinity/icskills/skills/smtp-gateway#429a3cb161b95c71e2699358bad772a13ac196a0
+    - dfinity/icskills/skills/sns-launch#429a3cb161b95c71e2699358bad772a13ac196a0
+    - dfinity/icskills/skills/stable-memory#429a3cb161b95c71e2699358bad772a13ac196a0
+    - dfinity/icskills/skills/static-site#429a3cb161b95c71e2699358bad772a13ac196a0
+    - dfinity/icskills/skills/threshold-signatures#429a3cb161b95c71e2699358bad772a13ac196a0
+    - dfinity/icskills/skills/troubleshooting-motoko-migrations#429a3cb161b95c71e2699358bad772a13ac196a0
+    - dfinity/icskills/skills/user-attributes#429a3cb161b95c71e2699358bad772a13ac196a0
+    - dfinity/icskills/skills/user-notifications#429a3cb161b95c71e2699358bad772a13ac196a0
+    - dfinity/icskills/skills/user-sign-in#429a3cb161b95c71e2699358bad772a13ac196a0
+    - dfinity/icskills/skills/vetkeys#429a3cb161b95c71e2699358bad772a13ac196a0
+    - dfinity/icskills/skills/wallet-integration#429a3cb161b95c71e2699358bad772a13ac196a0
+    - dfinity/icskills/skills/writing-motoko#429a3cb161b95c71e2699358bad772a13ac196a0

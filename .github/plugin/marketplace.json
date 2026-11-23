@@ -40,7 +40,7 @@
     },
     {
       "name": "preferences-web-platform-and-deployment",
-      "description": "Web platform and deployment preferences — platform foundations, hypermedia development and documents, React/TanStack UI, web-application deployment, Cloudflare Wrangler.",
+      "description": "Web platform and deployment preferences — platform foundations, hypermedia development and documents, React/TanStack UI, web-application deployment, Cloudflare Wrangler, and DFINITY's Internet Computer skills (canisters, Motoko, icp-cli, deployment, identity, chain-key tokens).",
       "version": "0.0.0",
       "source": "./modules/home/ai/plugins/preferences-web-platform-and-deployment"
     },
