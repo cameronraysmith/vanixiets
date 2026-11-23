@@ -785,17 +785,25 @@ agents-install *args:
 agents-relock *args:
   {{nix_cmd}} run .#apm-skills-install -- --relock {{args}}
 
-# Regenerate pkgs/by-name/apm-skills-compose/skills.json, the committed skill index the
-# compose build guards against drift. New skill dirs must be git-tracked first.
+# Regenerate pkgs/by-name/apm-skills-compose/skills.json, the committed skill index
+# (names, and a `nix hash path` per remote skill) that the compose's tree oracle
+# checks. After a deliberate remote ref or apm bump the oracle names each remote
+# skill whose hash moved: review those skills' content, run this, review the diff.
+# New skill dirs must be git-tracked first.
 [group('agents')]
 agents-skills-index:
   #!/usr/bin/env bash
   set -euo pipefail
-  out=$({{nix_cmd}} build --no-link --print-out-paths --impure --expr \
-    'let f = builtins.getFlake (toString ./.); in f.packages.${builtins.currentSystem}.apm-skills-compose.override { skillNames = null; }')
-  find "$out/.claude/skills" -mindepth 1 -maxdepth 1 -type d -exec basename {} \; \
-    | LC_ALL=C sort | jq -R . | jq -s . > pkgs/by-name/apm-skills-compose/skills.json
-  echo "wrote pkgs/by-name/apm-skills-compose/skills.json ($(jq length pkgs/by-name/apm-skills-compose/skills.json) skills)"
+  index=pkgs/by-name/apm-skills-compose/skills.json
+  compose='(builtins.getFlake (toString ./.)).packages.${builtins.currentSystem}.apm-skills-compose.override { skillIndex = null; }'
+  out=$({{nix_cmd}} build --no-link --print-out-paths --impure --expr "$compose")
+  firstParty=$({{nix_cmd}} eval --json --impure --expr "($compose).firstPartySkills")
+  names=$(find "$out/.claude/skills" -mindepth 1 -maxdepth 1 -type d -exec basename {} \; | LC_ALL=C sort | jq -R . | jq -s .)
+  remote=$(jq -r --argjson firstParty "$firstParty" '(. - $firstParty)[]' <<<"$names" | while read -r n; do
+    jq -n --arg n "$n" --arg hash "$({{nix_cmd}} hash path "$out/.claude/skills/$n")" '{($n): $hash}'
+  done | jq -s 'add // {}')
+  jq -n --argjson names "$names" --argjson remote "$remote" '{names: $names, remote: $remote}' > "$index"
+  echo "wrote $index ($(jq '.names | length' "$index") skills, $(jq '.remote | length' "$index") remote hashes)"
 
 # Compose this repo's agent-context-* apm packages into the repo-root AGENTS.md (vanixiets tier only).
 [group('agents')]

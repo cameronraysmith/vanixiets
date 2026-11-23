@@ -4,6 +4,7 @@
   runCommandLocal,
   jq,
   writeText,
+  nix,
 
   apm,
 
@@ -27,12 +28,13 @@
     "claude"
   ],
 
-  # Committed index of the skill directory names this compose emits under
+  # Committed index: `names`, the skill directories this compose emits under
   # .claude/skills and .agents/skills, so consumers enumerate skills at eval time
-  # without reading the build output (no import-from-derivation). The build fails
-  # when the output drifts from it; `just agents-skills-index` regenerates it.
-  # null disables the guard (used only by that recipe).
-  skillNames ? lib.importJSON ./skills.json,
+  # without reading the build output (no import-from-derivation); `remote`, the
+  # `nix hash path` of every skill no first-party group carries. The tree oracle
+  # fails when the output drifts from it; `just agents-skills-index` regenerates
+  # it. null disables the index comparisons (used only by that recipe).
+  skillIndex ? lib.importJSON ./skills.json,
 }:
 let
   pluginsDir = (import ../../../lib/plugin-groups.nix).root;
@@ -59,18 +61,65 @@ let
     cp -RL ${d.src} ./${d.name}
     chmod -R u+w ./${d.name}'') upstreamDeps;
 
-  # Fails the build, printing the corrected index, when either skills tree's
-  # directory names differ from skillNames.
-  skillIndexGuard = lib.optionalString (skillNames != null) ''
+  firstPartySkills = lib.concatMap (
+    group:
+    map
+      (name: {
+        inherit name;
+        src = "${pluginsDir + "/${group}"}/.apm/skills/${name}";
+      })
+      (
+        lib.attrNames (
+          lib.filterAttrs (_: t: t == "directory") (builtins.readDir (pluginsDir + "/${group}/.apm/skills"))
+        )
+      )
+  ) firstPartyPackages;
+
+  remoteSkills = lib.subtractLists (map (s: s.name) firstPartySkills) skillIndex.names;
+
+  hashPath = path: ''nix-hash --type sha256 --sri "${path}" || echo missing'';
+
+  # Design D7, G1. Records every difference, naming the skill, then fails.
+  treeOracle = ''
+    oracle_status=0
+    oracle_fail() {
+      echo "apm-skills-compose: $*" >&2
+      oracle_status=1
+    }
+  ''
+  + lib.optionalString (skillIndex != null) ''
     for target in .claude .agents; do
       actual=$(find "$out/$target/skills" -mindepth 1 -maxdepth 1 -type d -printf '%f\n' | LC_ALL=C sort | jq -R . | jq -s .)
-      if [ "$(jq -c . <<<"$actual")" != ${lib.escapeShellArg (builtins.toJSON skillNames)} ]; then
-        echo "apm-skills-compose: $target/skills differs from pkgs/by-name/apm-skills-compose/skills.json." >&2
-        echo "Run 'just agents-skills-index' or replace skills.json with:" >&2
+      if [ "$(jq -c . <<<"$actual")" != ${lib.escapeShellArg (builtins.toJSON skillIndex.names)} ]; then
+        oracle_fail "$target/skills names differ from skills.json names; run 'just agents-skills-index' or set them to:"
         echo "$actual" >&2
-        exit 1
       fi
     done
+  ''
+  + lib.concatMapStrings (s: ''
+    diff -r ${s.src} "$out/.claude/skills/${s.name}" >&2 || oracle_fail "first-party skill ${s.name} differs from its source ${s.src}"
+  '') firstPartySkills
+  + lib.optionalString (skillIndex != null) (
+    lib.concatMapStrings (
+      n:
+      let
+        recorded = skillIndex.remote.${n} or "unrecorded";
+      in
+      ''
+        actual=$(${hashPath "$out/.claude/skills/${n}"})
+        [ "$actual" = ${lib.escapeShellArg recorded} ] || oracle_fail "remote skill ${n} hashes to $actual, skills.json records ${recorded}; review the change, then run 'just agents-skills-index'"
+      ''
+    ) remoteSkills
+    + lib.concatMapStrings (n: ''
+      oracle_fail "skills.json records a remote hash for ${n}, which is not a remote skill"
+    '') (lib.subtractLists remoteSkills (lib.attrNames skillIndex.remote))
+  )
+  + ''
+    if [ "$(${hashPath "$out/.claude/skills"})" != "$(${hashPath "$out/.agents/skills"})" ]; then
+      diff -r "$out/.claude/skills" "$out/.agents/skills" >&2 || true
+      oracle_fail ".claude/skills differs from .agents/skills"
+    fi
+    exit "$oracle_status"
   '';
 in
 runCommandLocal "apm-skills-compose"
@@ -78,12 +127,14 @@ runCommandLocal "apm-skills-compose"
     nativeBuildInputs = [
       apm
       jq
+      nix
     ];
     meta = {
       description = "Consumer apm compose over all auto-discovered first-party plugin packages, emitting flat .claude/skills and .agents/skills trees for the vanixiets marketplace; offline consumer of the apm-deps download.";
     };
     passthru = {
-      inherit skillNames;
+      skillNames = if skillIndex == null then null else skillIndex.names;
+      firstPartySkills = map (s: s.name) firstPartySkills;
       deps = apmDeps;
     };
   }
@@ -129,38 +180,5 @@ runCommandLocal "apm-skills-compose"
       sed -i -e '/^generated_at:/d' -e '/^apm_version:/d' "$out/apm.lock.yaml"
     fi
 
-    for expected in \
-      "$out/.claude/skills/nix-flake-pr-cycle/SKILL.md" \
-      "$out/.agents/skills/nix-flake-pr-cycle/SKILL.md" \
-      "$out/.claude/skills/systematic-debugging/SKILL.md" \
-      "$out/.claude/skills/brainstorming/SKILL.md" \
-      "$out/.agents/skills/brainstorming/SKILL.md" \
-      "$out/.claude/skills/worktrunk/SKILL.md" \
-      "$out/.claude/skills/wt-switch-create/SKILL.md" \
-      "$out/.claude/skills/tdd/SKILL.md" \
-      "$out/.claude/skills/code-review/SKILL.md" \
-      "$out/.claude/skills/unslop/SKILL.md" \
-      "$out/.agents/skills/unslop/SKILL.md" \
-      "$out/.claude/skills/unslop/scripts/banned_phrase_scan.py" \
-      "$out/.claude/skills/gh-stack/SKILL.md" \
-      "$out/.agents/skills/gh-stack/SKILL.md" \
-      "$out/.claude/skills/gh-stack/references/commands.md" \
-      "$out/.claude/skills/mergify-stack/SKILL.md" \
-      "$out/.agents/skills/mergify-stack/SKILL.md" \
-      "$out/.claude/skills/greptimedb-perses-dashboard/SKILL.md" \
-      "$out/.agents/skills/greptimedb-perses-dashboard/SKILL.md" \
-      "$out/.claude/skills/greptimedb-perses-dashboard/reference.md" \
-      "$out/.claude/skills/greptimedb-perses-dashboard/catalog.md" \
-      "$out/.claude/skills/greptimedb-perses-dashboard/scripts/save-dashboard.sh" \
-      "$out/.claude/skills/linear-cli/SKILL.md" \
-      "$out/.agents/skills/linear-cli/SKILL.md" \
-      "$out/.claude/skills/playwright-cli/SKILL.md" \
-      "$out/.agents/skills/playwright-cli/SKILL.md"; do
-      if [ ! -f "$expected" ]; then
-        echo "apm-skills-compose assertion failed: missing $expected" >&2
-        exit 1
-      fi
-    done
-
-    ${skillIndexGuard}
+    ${treeOracle}
   ''

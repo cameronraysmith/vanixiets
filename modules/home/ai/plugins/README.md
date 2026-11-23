@@ -31,7 +31,7 @@ flowchart LR
   C -->|delivered| E["~/.claude/skills<br/>~/.factory/skills<br/>codex, opencode"]
 ```
 
-`pkgs/by-name/apm-skills-compose/` flattens the packages plus remote apm dependencies such as superpowers into one tree and records its skill names in the committed `skills.json` index (the build fails when they drift; `just agents-skills-index` regenerates it); `../skills/default.nix` then enumerates that index, applies an exclusion list, and delivers the result. A skill present in the composed output but absent from `~/.claude/skills/` is withheld deliberately, not broken — the exclusions and their reasons are in that file.
+`pkgs/by-name/apm-skills-compose/` flattens the packages plus remote apm dependencies such as superpowers into one tree and records its skill names, and the `nix hash path` of each remote skill, in the committed `skills.json` index; the build fails when the names drift, when a first-party skill differs from its `.apm/skills/` source, or when a remote skill's hash moves (after a deliberate ref or apm bump, review the named skills, then `just agents-skills-index` regenerates the index). `../skills/default.nix` then enumerates that index, applies an exclusion list, and delivers the result. A skill present in the composed output but absent from `~/.claude/skills/` is withheld deliberately, not broken — the exclusions and their reasons are in that file.
 
 ## Remote apm dependencies
 
