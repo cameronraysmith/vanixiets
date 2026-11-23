@@ -47,10 +47,43 @@ Its build confirms that the harness executables exist in the generated profile a
 
 ## Evaluators
 
-iets evaluates many attributes at once: nixbot on magnetite (`nixos/nixbot.nix`), `just check-fast`'s local lane and `just check-ifd` on a darwin host that opts in (`home/development/nix-tools.nix`, stibnite only), and the orchestrator's publish gate; single-attribute commands (`nix build`, `darwin-rebuild`, `nh`) and remote `check-fast` lanes keep stock Nix, the latter behind the remote host's evaluation lock.
-On macOS iets ignores `--max-memory-size`, so the darwin wrapper bounds memory by worker count, and no patch to iets is carried.
-`apps/nix-eval-jobs-identity` (`just eval-identity [systems] [rev] [workers]`) is the drvPath-identity oracle between them: it evaluates `checks.<system>` of one commit with stock `nix-eval-jobs` and with iets and fails unless every attribute has the same drvPath, system and outputs.
-`checks.x86_64-linux.nix-eval-jobs-iets` stays Linux-only: what it pins (stock's `nix` passthru, the lock wrapper's forwarding) matters to nixbot and the lock, neither of which runs on darwin, and stibnite's machine check already realizes the darwin wrapper and the iets it links.
+A host's memory decides its many-attribute evaluator, and nothing else does.
+`flake.lib.hosts.<name>.memoryGiB` (`lib/hosts.nix`) is required for every member that runs Nix, `"unknown"` where nobody has read it.
+`flake.lib.nixEvalJobsBoundRules` (`lib/nix-eval-jobs-host.nix`) turns it into a bound, by the first rule for the host's platform that its memory reaches.
+A host with a bound gets iets as `nix-eval-jobs`, capped at the bound's workers and, on Linux, its per-worker `--max-memory-size`: the bound is the default when the caller gives none and the ceiling when it asks for more.
+Stock is beside it as `nix-eval-jobs-stock`.
+A host without a bound keeps stock as `nix-eval-jobs` and gets nothing else.
+On NixOS, `nixos/nix-eval-lock.nix` is imported by every host and enabled wherever iets is (an assertion), and both names are lock-wrapped: iets fails a whole evaluation when the OOM killer takes one of its workers, so it must not overlap another evaluation.
+On darwin, `darwin/nix-eval-jobs.nix` installs both names at system level.
+Homes install whatever their host chose (`home/development/nix-tools.nix`), so the user profile never shadows it, and a standalone home gets stock.
+
+| host | memory | evaluator | bound | lock |
+|---|---|---|---|---|
+| magnetite | 32 GiB | iets | 5 workers x 3072 MiB | yes |
+| galena, scheelite | 32, 30 GiB (declared, not provisioned) | iets | 5 x 3072 | yes |
+| pyrite | 16 GiB | iets | 1 worker x 2048 MiB | yes |
+| cinnabar, electrum | 16 GiB (declared) | iets | 1 x 2048 | yes, new on cinnabar |
+| stibnite | 64 GiB | iets | 3 workers | none on darwin |
+| argentum, rosegold | 8 GiB | stock | | none |
+| blackphos | unknown | stock | | none |
+
+Measured on 2026-11-23 at trunk `b9889f23`, nixbot's arguments, through each host's lock, as cgroup `memory.peak`.
+- magnetite, `checks.x86_64-linux` (226 attributes), 5 x 3072: stock 121-131 s, iets 41-43 s. The two-system set (338 attributes): stock 198 s, iets 69 s. Both peak at 10.1 GiB, which is magnetite's `user.slice` `MemoryHigh` (`nixos/magnetite-user-slice-guard.nix`), so user evaluations there are throttled rather than bounded by the evaluator. nixbot's own unit is not a user evaluation: its 5 x 3072 iets peaks at 68-72 % of its 20 GiB `MemoryHigh` (`nixos/nixbot.nix`), and that unthrottled figure is what the 30 GiB rule assumes for galena and scheelite.
+- pyrite, `checks.x86_64-linux`: stock at the remote lane's 2 x 2048 took 424-738 s and peaked at 4.0-4.6 GiB. iets took 85-94 s at 2 x 2048 (5.1-5.5 GiB) and 140 s at 1 x 2048 (3.2 GiB). The two-system set (338 attributes): stock 759 s and 4.0 GiB, iets 172 s and 2.7 GiB at 1 x 2048, 119 s and 4.5 GiB at 2 x 2048. One worker keeps iets below what the stock lane already takes there, which is all a 16 GiB host with a desktop, QEMU tests and, on cinnabar, ntfy, DNS and Caddy is assumed to spare.
+- On Linux, iets' `--max-memory-size` does restart workers: at 256 MiB magnetite's run used 97 worker processes for 5 workers, against 5 at 3072, and peaked 2 GiB lower. On macOS it is inert.
+
+Every iets run gave the same drvPath, system, outputs and error status as stock on every attribute.
+
+`nix-eval-jobs-stock` is the escape hatch for what iets refuses.
+iets rejects `--help` ("error: unknown flag '--help'"), `--override-input` and `--override-flake` ("… is not supported by iets: iets evaluates locked flakes only …"), and `--repair`, each with exit 1.
+It also refuses import-from-derivation ("import from derivation is not supported: … is not built").
+nixbot's arguments and nix-fast-build's (`--gc-roots-dir`, `--force-recurse`, `--max-memory-size`, `--workers`, `--option`, `--flake`, `--check-cache-status`, and `--impure`, `--select` or `--reference-lock-file` when asked) are all accepted.
+nix-fast-build passes `--override-input` only when its own `--override-input` is given, which no recipe does.
+nixbot keeps its own evaluator, `config.services.nixEvalLock.wrap config.vanixiets.nixbot.ietsEvaluator` (`nixos/nixbot.nix`), unbounded by the host table and unchanged in derivation.
+
+`apps/nix-eval-jobs-identity` (`just eval-identity [systems] [rev] [workers]`) is the drvPath-identity oracle between stock `nix-eval-jobs` and iets over `checks.<system>` of one commit.
+Every machine check (`checks.<system>.nixos-<host>`, `darwin-<host>`) judges its host's evaluators with `flake.lib.nixEvalJobsObligations`: its bound is the table's, its system PATH holds iets at that bound and `nix-eval-jobs-stock` exactly where there is one, the lock is enabled where iets is, no home installs another evaluator, and nixbot evaluates with lock-wrapped iets at the host's bound and names it in its records; the lock module's own assertion rejects any unwrapped evaluator on a profile or service PATH.
+`checks.x86_64-linux.nix-eval-jobs-iets` holds what does not depend on a host: the rules (a Linux bound without a memory limit fails it), the lock's judgement (an unlocked iets on nixbot's PATH or an unlocked stock alias fails it), the per-host judgement over a magnetite fixture and its mutants, and the bounded wrapper run against a stub.
 
 ## On-demand VM tests
 

@@ -56,7 +56,6 @@ in
         magnetite-user-slice-guard
         memory-pressure-guards
         niks3
-        nix-eval-lock
         ssh-known-hosts
         stibnite-session
         zt-dns

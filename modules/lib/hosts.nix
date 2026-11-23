@@ -158,10 +158,44 @@ let
       "flake.lib.hosts.${name}.primaryUser: ${builtins.toJSON user} is not null or a name under flake.users";
     user;
 
+  # Memory in GiB of every machine that runs Nix (class nixos or darwin), or
+  # "unknown". It alone decides the machine's nix-eval-jobs: iets or stock,
+  # and iets' bound, by flake.lib.nixEvalJobsBoundRules
+  # (modules/lib/nix-eval-jobs-host.nix). Cloud machines carry their declared
+  # server type's memory (flake.lib.cloudMachines); the others were read on
+  # the machine (MemTotal, hw.memsize).
+  memoryGiB = {
+    cinnabar = 16; # cx43
+    electrum = 16; # ccx23
+    galena = 32; # e2-standard-8
+    scheelite = 30; # n1-standard-8
+    magnetite = 32; # cx53
+    pyrite = 16;
+    stibnite = 64;
+    blackphos = "unknown";
+    argentum = 8;
+    rosegold = 8;
+  };
+  memoryOf =
+    name: member:
+    let
+      memory = memoryGiB.${name} or null;
+      runsNix = member.class == "nixos" || member.class == "darwin";
+    in
+    assert lib.assertMsg
+      (if runsNix then builtins.isInt memory && memory > 0 || memory == "unknown" else memory == null)
+      "flake.lib.hosts.${name}.memoryGiB: ${builtins.toJSON memory} is not ${
+        if runsNix then "a positive number of GiB or \"unknown\"" else "unset for a ${member.class} member"
+      }";
+    memory;
+
   hosts =
     assert lib.assertMsg (lib.all (name: members ? ${name}) (
       lib.attrNames primaryUsers
     )) "flake.lib.hosts: primaryUsers names a machine that is not a member";
+    assert lib.assertMsg (lib.all (name: members ? ${name}) (
+      lib.attrNames memoryGiB
+    )) "flake.lib.hosts: memoryGiB names a machine that is not a member";
     lib.mapAttrs (
       name: member:
       member
@@ -169,6 +203,7 @@ let
         fqdn = "${name}.${fleet.domain}";
         address = mesh.addressOf mesh.instance name;
         primaryUser = primaryUserOf name;
+        memoryGiB = memoryOf name member;
         # The one address every deploy path names for this machine: clan's
         # own targetHost (darwin machine modules), the inventory's
         # deploy.targetHost where a NixOS machine sets one, and the fleet

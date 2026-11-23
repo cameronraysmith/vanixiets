@@ -51,10 +51,10 @@ It never deletes, renames or relocates a clone; `ghq-sync --audit [QUERY]`, run 
 These Home Manager exports use consumer packages and stable module identities, so importing a named capability alongside its aggregate does not duplicate its contribution.
 They require neither personal secrets nor `osConfig`, and selecting them confers no credentials or host authority.
 
-`nix-development` also installs `nix-eval-jobs-iets` (iets, `flake.lib.mkNixEvalJobsIets`, behind `nix-eval-jobs-iets.sh`) beside stock `nix-eval-jobs` on a darwin host that sets `nixEvalJobsIets.workers`, which only stibnite does (3).
-It is what `just check-fast`'s local lane and `just check-ifd` evaluate with there, and the orchestrator's publish gate runs the same pinned iets; `nix build`, `darwin-rebuild`, `nh` and any tool calling `nix-eval-jobs` by name keep stock Nix, because iets refuses import-from-derivation, `--override-input`, `--override-flake` and `--repair`.
-On macOS iets ignores `--max-memory-size` (it reads `/proc`) and frees nothing a worker evaluated, so the wrapper bounds memory by worker count only, as the default and the ceiling: a two-system check run peaks near 20 GiB at 3 workers and 13 GiB at one, which no worker count fits in the 8 GiB Macs (rosegold, argentum), so they and blackphos keep stock; a darwin-only run (4.6 GiB at one worker) would fit one, so opting such a host in is deliberate.
-Linux hosts never get it, by assertion, because it would evaluate outside the host evaluation lock that magnetite and pyrite keep over stock `nix-eval-jobs`; no patch to iets is carried, and `just eval-identity` re-checks drvPath identity with stock.
+`nix-development` installs the `nix-eval-jobs` its host chose, and on a host that evaluates with iets, `nix-eval-jobs-stock` beside it, so the user profile, which precedes the system profile on PATH, never shadows the host's evaluator.
+The host's memory in `flake.lib.hosts` makes the choice, and so does nothing in the home (`modules/README.md`, Evaluators).
+On NixOS the home takes the lock-wrapped packages of `services.nixEvalLock`, and on darwin those of `vanixiets.nixEvalJobs`.
+A standalone home, and a home on a NixOS host without the evaluation lock, gets stock `nix-eval-jobs`.
 
 `neovim` supplies plain Home Manager Neovim without personal plugins or language-provider hooks; the human `development` aggregate keeps its LazyVim configuration.
 The Git feature owns `git-xet` when Git LFS uses the configured xet transfer, rather than relying on the general development package list.

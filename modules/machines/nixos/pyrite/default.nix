@@ -77,7 +77,6 @@ in
         hm-sops-bridge
         kvm-declaration
         memory-pressure-guards
-        nix-eval-lock
         shared-reference-tree
         ssh-known-hosts
         workstation-ca-trust

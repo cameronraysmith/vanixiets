@@ -50,6 +50,7 @@
       postgresqlBackupObligations = self.lib.postgresqlBackupObligations;
       r2UsageObligations = self.lib.r2UsageObligations;
       fleetDeployer = self.lib.fleetDeployer;
+      nixEvalJobsObligations = self.lib.nixEvalJobsObligations;
 
       withFleetObligations =
         name: machineConfig: toplevel:
@@ -66,6 +67,7 @@
           unmetPostgresqlBackup = postgresqlBackupObligations.failures name machineConfig;
           unmetR2Usage = r2UsageObligations.failures name machineConfig;
           unmetFleetDeployer = fleetDeployer.failures name machineConfig;
+          unmetNixEvalJobs = nixEvalJobsObligations.failures name machineConfig;
           hostFailures = map (a: a.message) (lib.filter (a: !a.assertion) machineConfig.assertions);
         in
         assert lib.assertMsg
@@ -79,9 +81,10 @@
             && unmetPostgresqlBackup == [ ]
             && unmetR2Usage == [ ]
             && unmetFleetDeployer == [ ]
+            && unmetNixEvalJobs == [ ]
           )
           (
-            "Fleet obligations unmet on ${name}: omnigentFleetObligations [${lib.concatStringsSep ", " unmet}]; deployRecordObligations [${lib.concatStringsSep ", " unmetDeployRecord}]; commitSigningObligations [${lib.concatStringsSep ", " unmetSigning}]; resolverReloadObligations [${lib.concatStringsSep ", " unmetResolverReload}]; meshHostsObligations [${lib.concatStringsSep ", " unmetMeshHosts}]; harmoniaGcObligations [${lib.concatStringsSep ", " unmetHarmoniaGc}]; postgresqlBackupObligations [${lib.concatStringsSep ", " unmetPostgresqlBackup}]; r2UsageObligations [${lib.concatStringsSep ", " unmetR2Usage}]; fleetDeployer [${lib.concatStringsSep ", " unmetFleetDeployer}]"
+            "Fleet obligations unmet on ${name}: omnigentFleetObligations [${lib.concatStringsSep ", " unmet}]; deployRecordObligations [${lib.concatStringsSep ", " unmetDeployRecord}]; commitSigningObligations [${lib.concatStringsSep ", " unmetSigning}]; resolverReloadObligations [${lib.concatStringsSep ", " unmetResolverReload}]; meshHostsObligations [${lib.concatStringsSep ", " unmetMeshHosts}]; harmoniaGcObligations [${lib.concatStringsSep ", " unmetHarmoniaGc}]; postgresqlBackupObligations [${lib.concatStringsSep ", " unmetPostgresqlBackup}]; r2UsageObligations [${lib.concatStringsSep ", " unmetR2Usage}]; fleetDeployer [${lib.concatStringsSep ", " unmetFleetDeployer}]; nixEvalJobsObligations [${lib.concatStringsSep ", " unmetNixEvalJobs}]"
             + lib.optionalString (hostFailures != [ ]) (
               "\n${name} assertion failures: ${lib.concatStringsSep "\n" hostFailures}"
             )

@@ -23,6 +23,11 @@
 #
 # Consumers install the wrapper through services.nixEvalLock.wrap, which keeps
 # each service's own evaluator build underneath (a service may ship its own).
+# The host's own nix-eval-jobs (services.nixEvalLock.package, on the system
+# PATH and in every home on the host) wraps iets at the bound the host's
+# memory gives it (flake.lib.nixEvalJobsBound), with the wrapped stock as
+# nix-eval-jobs-stock beside it, or wraps stock alone on a host without a
+# bound (modules/lib/nix-eval-jobs-host.nix).
 #
 # The failure the assertions guard is silent: a service or user resolving the
 # bare `nix-eval-jobs` to an unwrapped binary evaluates outside the lock, which
@@ -35,6 +40,11 @@ let
   flakeLib = config.flake.lib;
 in
 {
+  # Every NixOS host imports the capability; it is enabled where the host
+  # table gives the host iets (flake.lib.nixEvalJobsBound) or where the host
+  # enables it itself.
+  flake.modules.nixos.base.imports = [ config.flake.modules.nixos.nix-eval-lock ];
+
   flake.modules.nixos.nix-eval-lock =
     {
       config,
@@ -45,19 +55,11 @@ in
     }:
     let
       cfg = config.services.nixEvalLock;
+      evaluators = flakeLib.nixEvalJobsPackages pkgs {
+        inherit (cfg) bound wrap;
+      };
 
-      # A wrapper carries the evaluator it wraps as `unwrapped`, and must
-      # forward that evaluator's nix CLI passthru (nixbot puts it on its
-      # service PATH).
-      evaluatorsOf = builtins.filter (
-        p: builtins.isAttrs p && (p.pname or p.name or "") == "nix-eval-jobs"
-      );
-      isWrapped =
-        p: p ? unwrapped && (!(p.unwrapped ? nix) || (p ? nix && p.nix.drvPath == p.unwrapped.nix.drvPath));
-      unwrappedIn =
-        lists: lib.attrNames (lib.filterAttrs (_: ps: !lib.all isWrapped (evaluatorsOf ps)) lists);
-
-      unwrappedProfiles = unwrappedIn (
+      unwrappedProfiles = flakeLib.nixEvalLockUnwrapped (
         lib.mapAttrs' (n: u: lib.nameValuePair "users.users.${n}.packages" u.packages) config.users.users
         // lib.optionalAttrs (options ? home-manager) (
           lib.mapAttrs' (
@@ -68,11 +70,26 @@ in
           "environment.systemPackages" = config.environment.systemPackages;
         }
       );
-      unwrappedServices = unwrappedIn (lib.mapAttrs (_: s: s.path) config.systemd.services);
+      unwrappedServices = flakeLib.nixEvalLockUnwrapped (
+        lib.mapAttrs (_: s: s.path) config.systemd.services
+      );
     in
     {
       options.services.nixEvalLock = {
-        enable = lib.mkEnableOption "the host evaluation lock around nix-eval-jobs";
+        enable = lib.mkOption {
+          type = lib.types.bool;
+          default = cfg.bound != null;
+          defaultText = lib.literalExpression "config.services.nixEvalLock.bound != null";
+          description = "Whether to serialise every nix-eval-jobs on the host behind the host evaluation lock; required where the host evaluates with iets.";
+        };
+
+        bound = lib.mkOption {
+          type = lib.types.nullOr lib.types.attrs;
+          default = flakeLib.nixEvalJobsBound config.networking.hostName;
+          defaultText = lib.literalExpression "flake.lib.nixEvalJobsBound config.networking.hostName";
+          readOnly = true;
+          description = "iets' bound (workers, maxMemorySize) from the host's memory in flake.lib.hosts, or null where the host keeps stock nix-eval-jobs.";
+        };
 
         lockFile = lib.mkOption {
           type = lib.types.str;
@@ -91,42 +108,66 @@ in
 
         package = lib.mkOption {
           type = lib.types.package;
-          default = cfg.wrap pkgs.nix-eval-jobs;
-          defaultText = lib.literalExpression "config.services.nixEvalLock.wrap pkgs.nix-eval-jobs";
+          default = evaluators.package;
+          defaultText = lib.literalExpression "config.services.nixEvalLock.wrap of iets at config.services.nixEvalLock.bound, or of pkgs.nix-eval-jobs where it is null";
           readOnly = true;
-          description = "The wrapped nix-eval-jobs installed on the system PATH.";
+          description = "The wrapped nix-eval-jobs installed on the system PATH: iets where the host table gives the host a bound, stock otherwise.";
+        };
+
+        stockPackage = lib.mkOption {
+          type = lib.types.nullOr lib.types.package;
+          default = evaluators.stockPackage;
+          defaultText = lib.literalExpression "nix-eval-jobs-stock, the wrapped pkgs.nix-eval-jobs, where package is iets; null otherwise";
+          readOnly = true;
+          description = "The wrapped stock evaluator installed as nix-eval-jobs-stock where package is iets, for what iets refuses (import-from-derivation, --override-input, --override-flake, --repair, --help).";
         };
       };
 
-      config = lib.mkIf cfg.enable {
-        systemd.tmpfiles.rules = [
-          "f ${cfg.lockFile} 0444 root root -"
-          "f ${cfg.lockFile}.owner 0444 root root -"
-        ];
+      config = lib.mkMerge [
+        {
+          assertions = [
+            {
+              # iets fails the whole evaluation when one of its workers is
+              # OOM-killed, so it never runs beside another evaluation.
+              assertion = cfg.bound == null || cfg.enable;
+              message = "nix-eval-lock: ${config.networking.hostName} evaluates with iets (flake.lib.hosts memoryGiB) and must keep the host evaluation lock enabled";
+            }
+          ];
+        }
+        (lib.mkIf cfg.enable {
 
-        # hiPrio so an interactive or ssh user's `nix-eval-jobs`, which is what
-        # `nix-fast-build --remote` runs, is the wrapper even if some other
-        # system package also ships the binary.
-        environment.systemPackages = [ (lib.hiPrio cfg.package) ];
+          systemd.tmpfiles.rules = [
+            "f ${cfg.lockFile} 0444 root root -"
+            "f ${cfg.lockFile}.owner 0444 root root -"
+          ];
 
-        assertions = [
-          {
-            assertion = unwrappedProfiles == [ ];
-            message = "nix-eval-lock: unwrapped nix-eval-jobs (bypassing ${cfg.lockFile}) in: ${lib.concatStringsSep ", " unwrappedProfiles}";
-          }
-          {
-            assertion = unwrappedServices == [ ];
-            message = "nix-eval-lock: unwrapped nix-eval-jobs (bypassing ${cfg.lockFile}) on the PATH of systemd services: ${lib.concatStringsSep ", " unwrappedServices}";
-          }
-          {
-            # OpenSSH already holds its listener at -1000 and restores the
-            # unit's value in every session it forks, so setting one would make
-            # every ssh session, and the evaluator it runs, OOM-immune
-            # (modules/nixos/memory-pressure-guards.nix).
-            assertion = !((config.systemd.services.sshd.serviceConfig or { }) ? OOMScoreAdjust);
-            message = "nix-eval-lock: sshd must carry no OOMScoreAdjust; every ssh session would inherit it";
-          }
-        ];
-      };
+          # hiPrio so an interactive or ssh user's `nix-eval-jobs`, which is what
+          # `nix-fast-build --remote` runs, is the wrapper even if some other
+          # system package also ships the binary.
+          environment.systemPackages = [
+            (lib.hiPrio cfg.package)
+          ]
+          ++ lib.optional (cfg.stockPackage != null) cfg.stockPackage;
+
+          assertions = [
+            {
+              assertion = unwrappedProfiles == [ ];
+              message = "nix-eval-lock: unwrapped nix-eval-jobs (bypassing ${cfg.lockFile}) in: ${lib.concatStringsSep ", " unwrappedProfiles}";
+            }
+            {
+              assertion = unwrappedServices == [ ];
+              message = "nix-eval-lock: unwrapped nix-eval-jobs (bypassing ${cfg.lockFile}) on the PATH of systemd services: ${lib.concatStringsSep ", " unwrappedServices}";
+            }
+            {
+              # OpenSSH already holds its listener at -1000 and restores the
+              # unit's value in every session it forks, so setting one would make
+              # every ssh session, and the evaluator it runs, OOM-immune
+              # (modules/nixos/memory-pressure-guards.nix).
+              assertion = !((config.systemd.services.sshd.serviceConfig or { }) ? OOMScoreAdjust);
+              message = "nix-eval-lock: sshd must carry no OOMScoreAdjust; every ssh session would inherit it";
+            }
+          ];
+        })
+      ];
     };
 }
