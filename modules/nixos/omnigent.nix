@@ -114,8 +114,8 @@ in
             OMNIGENT_ADMIN_LIST_PATH = adminList;
             # CLI-login tickets are process-local in Omnigent v0.12.0.
             WEB_CONCURRENCY = "1";
-            # The 30-day default stopped every worker on 2026-10-15; 90 days is
-            # the operator's decision (openspec/changes/omnigent-login-grant-lifetime).
+            # The 30-day default stopped every worker on 2026-10-15; 90 days is the operator's
+            # decision (openspec/changes/archive/2026-11-23-omnigent-login-grant-lifetime).
             OMNIGENT_GRANT_MAX_LIFETIME_DAYS = "90";
           }
           // lib.optionalAttrs (cfg.oidc.allowedDomains != [ ]) {

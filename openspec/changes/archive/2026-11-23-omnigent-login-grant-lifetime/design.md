@@ -47,10 +47,36 @@ The operator shelved it on 2026-11-14, unchanged, as commit `cc0370f3` on branch
 Reasons: it couples the collector to omnigent's internal `device_grants` schema; it needs its own database role and column grants; and it would fire on superseded grants until the server purges them.
 The exit-78 `SystemdUnitFailed` notice of #3863 already gives one clear notice at expiry, and owners can renew ahead of the date.
 
+#### If revisited
+
+The shelved mechanism, commit `cc0370f3`, ran on magnetite in three parts.
+A oneshot unit granted the collector's database role `SELECT` on four columns of `device_grants`; an `sqlquery` receiver, written inline in `modules/nixos/omnigent.nix`, emitted `omnigent_login_grant_expiry_timestamp_seconds{omnigent_owner}`, each owner's earliest redeemed CLI grant plus the lifetime; and the rule warned 14 days ahead, with its expected host hard-coded as `magnetite`.
+Besides the reasons above, it could not have caught two failures.
+It grouped grants by owner, so a person's own CLI login counted as one more of that owner's grants, indistinguishable from a worker's.
+It watched only the countdown, so a grant lost to a purge or a revocation removed a row and raised nothing.
+The operator's own CLI login on stibnite was found expired on 2026-11-23; inferred, not confirmed against the table: it was most likely approved before 2026-11-07 and deleted by D2's purge, which counted the grants of 2026-10-17 and 2026-10-25 as superseded worker grants.
+
+Worth keeping from it:
+- The alert reads the server, the one place that holds every grant's age.
+- The role reads only `user_id`, `client_id`, `status` and `approved_at`, never the token hashes, the codes or the grant id.
+- The SQL maps each owner's login address to the owner's alias, so no email address becomes a label value.
+- One Nix binding sets both `OMNIGENT_GRANT_MAX_LIFETIME_DAYS` and the lifetime in the SQL, so the alert cannot drift from the server.
+- Three mutants: `grantThresholdInDays`, the threshold written in days, checked in `promtoolRehearsal`; `noExporter` and `otherHost`, which break the module's two assertions, run once by hand and never checked in.
+
+A fresh change should cover:
+- who holds each grant, a worker or a person, and on which host;
+- loss as well as countdown, for example each owner's live grants against the worker accounts the inventory expects;
+- whether persons' CLI logins are in scope;
+- a receiver in the `sqlquery` library pattern of `modules/nixos/postgresql-collation.nix`, with a check against a real PostgreSQL as in `modules/checks/postgresql-collation.nix`;
+- a flag in the host table, `modules/lib/observability-hosts.nix`, in place of the hard-coded host;
+- A105, A106, the four columns and the status codes re-read against the omnigent version then pinned; on 2026-11-23 the cited lines of 0.23.0 still matched.
+
+The grants approved on 2026-11-14 reach 90 days about 2027-02-12, so a countdown alert with a 14-day warning must be deployed by late January 2027 to warn before them.
+
 ## Risks / Trade-offs
 
 - [A leaked worker refresh token lives up to 90 days] → whoever holds it can revoke it through `/oauth/revoke`; otherwise it lasts until the lifetime, the accepted cost of D1.
-- [The first warning is the failure itself] → #3863's notice names the failed unit, and the README tells owners to renew ahead of the date; the shelved alert can be restored from its branch.
+- [The first warning is the failure itself] → #3863's notice names the failed unit, and the README tells owners to renew ahead of the date; D3's "If revisited" records the shelved alert.
 - [The 90-day deploy slips after the temporary one] → under 7 days the 2026-11-14 grants expire on 2026-11-21, so the 90-day deploy follows in the same session.
 
 ## Migration Plan
