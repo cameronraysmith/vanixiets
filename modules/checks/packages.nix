@@ -24,6 +24,9 @@
         # built by checks.x86_64-linux.skills-marketplace-drift only; its output
         # does not depend on the platform (design D8, skills-single-source-marketplaces)
         "skills-marketplace"
+        # built by checks.x86_64-linux.skills-spec-conformance, the only thing
+        # that runs it (skills-single-source-marketplaces D15)
+        "skill-validator"
         # intentional effect-input-wires (impure ghcr.io push)
         "fdManifest"
         "fdManifest-aarch64"
