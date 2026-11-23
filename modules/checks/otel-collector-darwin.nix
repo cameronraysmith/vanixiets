@@ -127,8 +127,10 @@
           exporter =
             e:
             lib.recursiveUpdate e (
+              # Only the TLS keys the exporter has, so one missing on either
+              # side (no CA, no client certificate) still differs.
               lib.optionalAttrs (e ? tls) {
-                tls = {
+                tls = lib.intersectAttrs e.tls {
                   ca_file = "@CA@";
                   cert_file = "@CERT@";
                   key_file = "@KEY@";
@@ -593,6 +595,27 @@
                   pipelines = lib.mapAttrs (
                     _: p: p // { processors = lib.remove dropped p.processors; }
                   ) s.service.pipelines;
+                };
+              };
+            };
+        };
+        # Review F3: stibnite's metrics exporter without its CA, which the
+        # normaliser once filled in, must differ from pyrite's.
+        stibniteCaFileDropped = {
+          clause = "agentSessionEqualsPyrite";
+          apply =
+            i:
+            let
+              s = i.stibniteAgentSession;
+              e = s.exporters."otlp_http/ingress-metrics";
+            in
+            i
+            // {
+              stibniteAgentSession = s // {
+                exporters = s.exporters // {
+                  "otlp_http/ingress-metrics" = e // {
+                    tls = builtins.removeAttrs e.tls [ "ca_file" ];
+                  };
                 };
               };
             };

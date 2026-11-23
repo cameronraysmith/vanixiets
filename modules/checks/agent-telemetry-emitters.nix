@@ -12,9 +12,10 @@
 #   services.omnigent-host.workerHomes;
 # - the claude-glm and claude-cerebras wrappers' settings carry no telemetry
 #   name, so other model providers' sessions do not export;
-# - on cinnabar (NixOS, no flag), rosegold and argentum (darwin, no flag) and
-#   the claude-sandbox profile, no Claude settings carry a telemetry name and
-#   no omp .env line starts with OTEL_.
+# - on cinnabar (NixOS, no flag), rosegold (darwin, no flag; argentum is the
+#   same archetype, a laptop whose row sets neither flag, so one stands for
+#   both) and the claude-sandbox profile, no Claude settings carry a
+#   telemetry name and no omp .env line starts with OTEL_.
 #
 # The expectations are written out here rather than read from the module, so
 # a key added to or dropped from the module (OTEL_LOG_RAW_API_BODIES added, or
@@ -83,7 +84,6 @@
 
             pyrite = self.nixosConfigurations.pyrite.config.home-manager.users;
             stibnite = self.darwinConfigurations.stibnite.config;
-            darwinUsers = host: self.darwinConfigurations.${host}.config.home-manager.users;
             # Each flagged home and the person its sessions run for.
             withFlag = {
               "pyrite cameron" = {
@@ -109,8 +109,7 @@
             };
             withoutFlag = {
               "cinnabar cameron" = self.nixosConfigurations.cinnabar.config.home-manager.users.cameron;
-              "rosegold cameron" = (darwinUsers "rosegold").cameron;
-              "argentum cameron" = (darwinUsers "argentum").cameron;
+              "rosegold cameron" = self.darwinConfigurations.rosegold.config.home-manager.users.cameron;
               "claude-sandbox" = self.homeConfigurations."claude-sandbox@x86_64-linux".config;
             };
 

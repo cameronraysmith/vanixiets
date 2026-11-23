@@ -1438,30 +1438,15 @@
         } i;
       session = self.lib.otelCollectorSchema.agentSession;
       quotedList = keys: "[${lib.concatMapStringsSep ", " (key: ''"${key}"'') keys}]";
-      # stibnite's row flagged as well: three agent-telemetry hosts
-      # (darwin-agent-session-telemetry design D7).
-      threeHosts =
-        i:
-        i
-        // {
-          hosts = i.hosts // {
-            stibnite = i.hosts.stibnite // {
-              agentTelemetry = true;
-            };
-          };
-        };
       agentMutants = {
-        # The ingress's agent queues before the re-budget, at three hosts.
+        # The ingress's agent queues before the re-budget, at the host
+        # table's three agent-telemetry hosts (magnetite, pyrite, stibnite).
         agentQueueShortThreeHosts = {
           clauses = [ clause.agentQueue ];
-          mutate =
-            i:
-            threeHosts (
-              onSettings {
-                exporters."otlp_http/agent_session_event".sending_queue.queue_size = mib 32;
-                exporters."otlp_http/agent_span".sending_queue.queue_size = mib 8;
-              } i
-            );
+          mutate = onSettings {
+            exporters."otlp_http/agent_session_event".sending_queue.queue_size = mib 32;
+            exporters."otlp_http/agent_span".sending_queue.queue_size = mib 8;
+          };
         };
         # A third series of the agent-session collector reaches fleet
         # (darwin-agent-session-telemetry design D9).
@@ -2370,8 +2355,6 @@
             "otel-collector-config: an agent-session mutant did not fail its clauses: ${
               builtins.toJSON (lib.genAttrs agentAccepted (name: agentRejections.${name}))
             }";
-          assert lib.assertMsg (!(builtins.elem clause.agentQueue (failures (threeHosts input))))
-            "otel-collector-config: the ingress's agent queues do not hold three agent-telemetry hosts (darwin-agent-session-telemetry design D7)";
           pkgs.runCommand "otel-collector-config" { passthru = { inherit failures; }; } ''
             # The notifier's rate limit (review F1).
             test -e ${notifierRehearsal}

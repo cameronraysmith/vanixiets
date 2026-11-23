@@ -48,7 +48,7 @@ Listeners:
 Upstream emitters and scrape targets:
 
 - omp on human accounts, OTLP/HTTP metrics to `127.0.0.1:4318` (ADR-005 signal 4); see `components/devloop-exporters.md`.
-- `otelcol-process` on darwin, OTLP/HTTP to the local agent's `127.0.0.1:4318`, whose `otlp` receiver feeds the agent's `metrics/host` pipeline, so the points take the agent's `memory_limiter` and `host.name` stamping; no `service.name` is set and nothing routes by one (ADR-003 item 22; charter v29).
+- `otelcol-process` on darwin, OTLP/HTTP to the local agent's `127.0.0.1:4319` (`127.0.0.1:4318` before `darwin-agent-session-telemetry` design D2, which frees 4318 for the agent-session receiver on every host), whose `otlp` receiver feeds the agent's `metrics/host` pipeline, so the points take the agent's `memory_limiter` and `host.name` stamping; no `service.name` is set and nothing routes by one (ADR-003 item 22, amended 2026-11-23; charter v29).
 - zerotierone at `localhost:9993/metrics` on every NixOS agent, bearer token from `metricstoken.secret` through `LoadCredential` (ADR-003 item 5).
 - On magnetite: gitea at `127.0.0.1:3002`, niks3 at `127.0.0.1:5752`, nixbot through a new loopback-only nginx server on `127.0.0.1:9180` proxying `/metrics` to `/run/nixbot/web.sock`, and nginx through the `nginx` receiver at `http://127.0.0.1/nginx_status` (ADR-003 item 6).
 - On every NixOS agent: node_exporter at `127.0.0.1:9100`; on pyrite also smartctl_exporter at `127.0.0.1:9633`; on darwin agents node_exporter at `127.0.0.1:9100` serving the probe's textfiles (ADR-003 items 18, 19, 23); see `components/host-probes.md`.
