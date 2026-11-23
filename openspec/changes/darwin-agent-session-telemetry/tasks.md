@@ -20,8 +20,10 @@
 
 ## 3. Stage 1: per-host kept-alive list (design D6)
 
-- [ ] 3.1 Add `flake.lib.launchdKeptAlive hostName` (the base list plus `org.nixos.otel-agent-session` where the row sets `agentTelemetry`), move the darwin fragment's equality assertion onto it, and render `LaunchdJobNotRunning`'s `<kept-alive labels>` from the union over darwin rows — verify: by evaluation, magnetite's rendered `fleet-alert` rules and stibnite's, rosegold's and argentum's toplevel `drvPath`s are unchanged from task 1.1's log
-- [ ] 3.2 Show the per-host assertion failing — verify: an `extendModules` override of rosegold that adds `org.nixos.otel-agent-session` to its expectation fails rosegold's evaluation with the fragment's message, recorded in `logs/darwin-ast-keptalive-mutant-<ts>.log`
+- [x] 3.1 Add `flake.lib.launchdKeptAlive hostName` (the base list plus `org.nixos.otel-agent-session` where the row sets `agentTelemetry`), move the darwin fragment's equality assertion onto it, and render `LaunchdJobNotRunning`'s `<kept-alive labels>` from the union over darwin rows — verify: by evaluation, magnetite's rendered `fleet-alert` rules and stibnite's, rosegold's and argentum's toplevel `drvPath`s are unchanged from task 1.1's log
+  - Evidence (2026-11-22): `flake.lib.fleetAlertRules` renders byte-identical JSON before (5fdce185) and after; argentum, blackphos, rosegold and stibnite `drvPath`s equal task 1.1's (`logs/darwin-ast-keptalive-darwin-20261122-212616.log`); `lib.launchdKeptAlive "magnetite"` (a row with `agentTelemetry`) appends `org.nixos.otel-agent-session`, stibnite's is the base list.
+- [x] 3.2 Show the per-host assertion failing — verify: an `extendModules` override of rosegold that adds `org.nixos.otel-agent-session` to its expectation fails rosegold's evaluation with the fragment's message, recorded in `logs/darwin-ast-keptalive-mutant-<ts>.log`
+  - Evidence: the expectation is `flake.lib`, which `extendModules` cannot reach, so the override changes the other side: rosegold with `otelcol-process`'s `KeepAlive` forced false fails with "rosegold's kept-alive labels […] (flake.lib.launchdKeptAlive) must equal the allow-listed labels whose evaluated KeepAlive is true […]" (`logs/darwin-ast-keptalive-mutant-20261122-212616.log`).
 
 ## 4. Stage 1: the ingress queues at three hosts (design D7; operator's Q1)
 

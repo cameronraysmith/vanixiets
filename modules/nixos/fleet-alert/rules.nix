@@ -31,7 +31,9 @@
 # GarbageCollectionOverrun expects its launchd arm's selector
 # on the darwin hosts and its systemd arm's on the NixOS hosts
 # (bound-fleet-garbage-collection D7). LaunchdJobNotRunning expects running the kept-alive labels of
-# flake.lib.otelCollectorSchema.launchdKeptAlive and reports any other
+# every darwin row, the union of flake.lib.launchdKeptAlive over them,
+# which selects nothing on a Mac that does not define a label (its probe
+# writes only its own daemons'), and reports any other
 # allow-listed label unloaded; its two arms select disjoint labels, because
 # the probe writes all four states for every label, so a kept-alive label
 # unloaded, running 0 and unloaded 1, is one instance, not two (tasks.md
@@ -88,7 +90,13 @@
       # Each dot written [.], as notifiedRegex below.
       launchdRegex =
         labels: lib.concatMapStringsSep "|" (builtins.replaceStrings [ "." ] [ "[.]" ]) labels;
-      keptAlive = launchdRegex config.flake.lib.otelCollectorSchema.launchdKeptAlive;
+      keptAlive = launchdRegex (
+        lib.unique (
+          lib.concatMap config.flake.lib.launchdKeptAlive (
+            builtins.attrNames (lib.filterAttrs (_: h: h.platform == "darwin") hosts)
+          )
+        )
+      );
       selfNotified = launchdRegex (
         map (unit: "org.nixos.${unit}") (
           lib.unique (

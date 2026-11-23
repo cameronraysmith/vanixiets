@@ -43,6 +43,17 @@ in
     in
     builtins.filter (l: lib.any (p: builtins.match (toRegex p) l != null) launchdLabels) daemonLabels;
 
+  # The launchd labels a darwin host keeps alive, which its fragment asserts
+  # against its evaluated launchd.daemons and LaunchdJobNotRunning expects
+  # running: SC's launchdKeptAlive, the list every Mac shares, and the
+  # agent-session daemon where the host's row sets agentTelemetry
+  # (darwin-agent-session-telemetry design D6; CAM-90).
+  flake.lib.launchdKeptAlive =
+    hostName:
+    schema.launchdKeptAlive
+    ++ lib.optional (flakeLib.observabilityHosts.${hostName}.agentTelemetry or false
+    ) "org.nixos.otel-agent-session";
+
   flake.lib.otelCollectorDarwin =
     {
       hostName,
