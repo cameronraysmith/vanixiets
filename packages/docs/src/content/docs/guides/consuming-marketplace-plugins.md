@@ -1,11 +1,11 @@
 ---
 title: Consuming marketplace plugins
-description: Installing this repository's agent-skill plugins with the apm CLI
+description: Installing this repository's agent-skill plugins with the apm CLI, Claude Code or the Claude desktop app
 sidebar:
   order: 10
 ---
 
-This repository publishes an apm marketplace named `vanixiets`, declared by the manifest at `.github/plugin/marketplace.json`.
+This repository publishes a marketplace named `vanixiets` in two generated files: `.github/plugin/marketplace.json` for apm, listing all 22 plugin groups, and `.claude-plugin/marketplace.json` for Claude, listing the 18 groups that carry skills.
 Its plugins package the agent skills maintained under `modules/home/ai/plugins/`, and any project can consume them with the [apm CLI](https://github.com/microsoft/apm) and deploy them to Claude Code, Codex, Cursor, OpenCode, and the other harnesses apm supports.
 Consuming the marketplace requires only apm and does not depend on Nix or on any other part of this repository's infrastructure.
 The behavior described below was verified against apm 0.28.0, and the pinning details in particular are version-dependent.
@@ -103,3 +103,21 @@ apm install 'preferences-code-and-collaboration-conventions@vanixiets#main' -g -
 
 For the claude target this deploys to `$CLAUDE_CONFIG_DIR` when that variable is set and to `~/.claude/skills/` otherwise, and it keeps its own manifest and lockfile under `~/.apm/`.
 Users whose home configuration is managed declaratively, for example with nix home-manager, should prefer project scope, because a global install writes into the managed tree.
+
+## Claude Code and the Claude desktop app
+
+Claude users add the same repository as a Claude plugin marketplace; no apm is involved.
+In Claude Code run `/plugin marketplace add cameronraysmith/vanixiets` (or `claude plugin marketplace add cameronraysmith/vanixiets` from a shell), then install a group with `/plugin install nix-build-operations@vanixiets`.
+In the Claude desktop app open Customize > Plugins > Add marketplace, enter `cameronraysmith/vanixiets`, and install groups from the list.
+
+Each Claude plugin carries only the group's own first-party skills.
+The 51 skills that four groups take from remote repositories, superpowers among them, come only through apm or this repository's home-manager configuration; install superpowers itself from `claude-plugins-official`.
+The four `agent-context-*` instructions groups are not offered to Claude.
+
+The entries declare no version, so Claude versions each install by the marketplace's commit, and "Check for updates" brings the newest commit on `main`.
+
+Plugin skills are namespaced as `<group>:<skill>`, while skills delivered to `~/.claude/skills` are not, so on a machine where home-manager already delivers these skills a plugin install loads each of its skills a second time under a different name.
+Install the plugins only on machines without that delivery.
+
+Two behaviours this route relies on are observed rather than documented: that Claude installs an entry without a `.claude-plugin/plugin.json` whose skills sit in the hidden `./.apm/skills` directory, and that a plugin without any version follows the marketplace's commits.
+Claude Code is checked on each update by the `claude-marketplace-install` flake check; the desktop app was observed on 2026-11-23 with the fixture repository `cameronraysmith/skills-marketplace-test`, and the re-test steps are in `modules/home/ai/plugins/README.md`.

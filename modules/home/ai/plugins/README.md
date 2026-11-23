@@ -7,7 +7,9 @@ created: 2026-08-25
 
 126 skills across 18 apm packages, published as a marketplace any project can install independently of the Nix configurations.
 These counts are computed rather than maintained here: `testing-and-quality/.apm/skills/harborize/scripts/census.py --root modules/home/ai/plugins` regenerates `census.json`, whose `provenance` block carries the authoritative totals and the revision they were taken at.
-Each group directory carries an `apm.yml` beside its `.apm/` tree and no other manifest; the marketplace manifest is `../../../../.github/plugin/marketplace.json`.
+Each group directory carries an `apm.yml` beside its `.apm/` tree and no other manifest.
+The two marketplace files are generated from the root `../../../../apm.yml` `marketplace:` block and the group `apm.yml` files by `pkgs/by-name/skills-marketplace`: `../../../../.github/plugin/marketplace.json` (apm's Copilot profile, all 22 groups, read by apm) and `../../../../.claude-plugin/marketplace.json` (the 18 skill groups, read by Claude).
+After editing a group's name, description or the published list, run `just agents-marketplace` and commit both files; the `skills-marketplace-drift` check fails until they match, and the generator fails when a group directory is missing from `marketplace.packages`.
 
 apm types a group as an apm package because its `apm.yml` sits beside an `.apm/` directory, and deploys every immediate child of `.apm/skills/`.
 Adding a skill still means creating `<group>/.apm/skills/<name>/SKILL.md`; there is no registration step.
@@ -64,7 +66,26 @@ superpowers' SessionStart hook, which loads `using-superpowers` at the start of 
 For that hook and the plugin experience, install superpowers natively instead (`/plugin install superpowers@claude-plugins-official`, or its README for other harnesses), and either do not install `planning-and-development` alongside it or remove its superpowers lines, so the same skills are not installed twice.
 The marketplace supports the apm version this repository builds with (`modules/nixpkgs/overlays/apm.nix`; 0.38 at the time of writing) and later releases.
 Older apm may install a group from it yet deploy none of its skills.
-Installers other than apm read `../../../../.github/plugin/marketplace.json`, whose entries name only each package's source directory, so they do not resolve `apm.yml` dependencies and install none of the remote skills.
+Installers other than apm read the generated marketplace files, whose entries name only each package's source directory, so they do not resolve `apm.yml` dependencies and install none of the remote skills.
+
+## Claude marketplace
+
+In Claude Code, `/plugin marketplace add cameronraysmith/vanixiets` (or `claude plugin marketplace add cameronraysmith/vanixiets`) adds the marketplace, and `/plugin install <group>@vanixiets` installs a group.
+In the Claude desktop app, Customize > Plugins > Add marketplace takes the same `cameronraysmith/vanixiets`.
+Each of the 18 skill groups is one plugin whose entry carries `skills: ["./.apm/skills"]`, `strict: false` and no version, so installs follow the repository's commits.
+
+The plugins carry only first-party skills.
+The 51 remote skills reach users only through apm or this repository's home-manager configuration, and the four `agent-context-*` groups are not offered to Claude.
+On a machine where home-manager already delivers the skills to `~/.claude/skills`, installing a plugin loads its skills a second time, namespaced as `<group>:<skill>`.
+
+Two behaviours the Claude file relies on are observed, not documented: that Claude installs a manifest-free entry whose skills sit in the hidden `./.apm/skills` (world assumptions A217 for Claude Code, A218 for the desktop app), and that a plugin without any version follows the marketplace's commits (A219).
+The `claude-marketplace-install` check (x86_64-linux) installs every entry with the pinned Claude Code and compares each plugin's skills with its `.apm/skills`, so a Claude Code update that breaks A217 fails there.
+No check reaches the desktop app; the public repository `cameronraysmith/skills-marketplace-test` is its fixture, re-tested after each desktop release the operator installs or when Claude's plugin documentation changes:
+
+1. In the desktop app, Customize > Plugins > Add marketplace, enter `cameronraysmith/skills-marketplace-test` (remove and re-add it if already present).
+2. Install each of the three layout plugins and confirm each shows all its skills (five, plus `sync-probe` after its follow-up commit).
+3. Push a one-line edit to one skill without any version change, run "Check for updates", and confirm the edit arrives.
+4. Record the app version, date and result in the Evidence of A218 and A219 in `openspec/specs/world-assumptions/spec.md` (until the `skills-single-source-marketplaces` change is archived, in its `specs/world-assumptions/spec.md`); a failure voids the assumption and moves the skills to `skills/` (design D11 of that change).
 
 ## Authoring
 
