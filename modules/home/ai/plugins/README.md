@@ -8,8 +8,9 @@ created: 2026-08-25
 126 skills across 18 apm packages, published as a marketplace any project can install independently of the Nix configurations.
 These counts are computed rather than maintained here: `testing-and-quality/.apm/skills/harborize/scripts/census.py --root modules/home/ai/plugins` regenerates `census.json`, whose `provenance` block carries the authoritative totals and the revision they were taken at.
 Each group directory carries an `apm.yml` beside its `.apm/` tree and no other manifest.
-The two marketplace files are generated from the root `../../../../apm.yml` `marketplace:` block and the group `apm.yml` files by `pkgs/by-name/skills-marketplace`: `../../../../.github/plugin/marketplace.json` (apm's Copilot profile, all 22 groups, read by apm) and `../../../../.claude-plugin/marketplace.json` (the 18 skill groups, read by Claude).
-After editing a group's name, description or the published list, run `just agents-marketplace` and commit both files; the `skills-marketplace-drift` check fails until they match, and the generator fails when a group directory is missing from `marketplace.packages`.
+The two marketplace files and the skills CLI's discovery file are generated from the root `../../../../apm.yml` `marketplace:` block and the group `apm.yml` files by `pkgs/by-name/skills-marketplace`: `../../../../.github/plugin/marketplace.json` (apm's Copilot profile, all 22 groups, read by apm), `../../../../.claude-plugin/marketplace.json` (the 18 skill groups, read by Claude) and `../../../../skills.sh.json` (the 18 `.apm/skills` directories, read by `npx skills`).
+After editing a group's name, description or the published list, or adding or removing a group, run `just agents-marketplace` and commit the three files; the `skills-marketplace-drift` check fails until they match, and the generator fails when a group directory is missing from `marketplace.packages`.
+The routes consumers install by, and what each delivers, are tabulated in the docs guide `packages/docs/src/content/docs/guides/consuming-marketplace-plugins.md`.
 
 apm types a group as an apm package because its `apm.yml` sits beside an `.apm/` directory, and deploys every immediate child of `.apm/skills/`.
 Adding a skill still means creating `<group>/.apm/skills/<name>/SKILL.md`; there is no registration step.
@@ -68,6 +69,16 @@ The marketplace supports the apm version this repository builds with (`modules/n
 Older apm may install a group from it yet deploy none of its skills.
 Installers other than apm read the generated marketplace files, whose entries name only each package's source directory, so they do not resolve `apm.yml` dependencies and install none of the remote skills.
 
+The `apm-marketplace-consumer` check (x86_64-linux) registers the marketplace from a bare repository of the committed files and installs the 18 groups that declare no dependencies, comparing every deployed skill and staged instructions fragment with its source.
+The groups with remote dependencies need the network: `just agents-marketplace-remote` registers `cameronraysmith/vanixiets` at `main` from GitHub and installs all 22 groups, comparing the groups apm registers with `marketplace.packages`.
+
+## Skills CLI
+
+`npx skills add cameronraysmith/vanixiets` lists and installs the 126 first-party skills one by one (`--list`, `--skill <name>`); it finds them through the root `skills.sh.json`, because its default search stops above `<group>/.apm/skills/<name>`.
+A group's tree URL, `npx skills add https://github.com/cameronraysmith/vanixiets/tree/main/modules/home/ai/plugins/<group>`, offers that group's skills.
+Neither route installs remote skills or instructions groups.
+The `skills-cli-discovery` check (x86_64-linux) runs the skills CLI that `llm-agents` pins against a copy of the repository and fails unless it lists exactly the first-party skill directories and installs one with `--skill` unchanged.
+
 ## Claude marketplace
 
 In Claude Code, `/plugin marketplace add cameronraysmith/vanixiets` (or `claude plugin marketplace add cameronraysmith/vanixiets`) adds the marketplace, and `/plugin install <group>@vanixiets` installs a group.
@@ -89,7 +100,8 @@ No check reaches the desktop app; the public repository `cameronraysmith/skills-
 
 ## Authoring
 
-`SKILL.md` frontmatter needs a `name` matching `[a-z0-9-]` and a `description` at most 1024 characters.
+`SKILL.md` frontmatter needs a `name` equal to the skill's directory name and matching `[a-z0-9-]`, and a `description` at most 1024 characters; quote any value that starts with `[` or `{`, or YAML reads it as a list or a map.
+The `skills-spec-conformance` check (x86_64-linux) runs `skill-validator validate structure` on every skill and fails on its errors; frontmatter fields beyond the Agent Skills specification and files at a skill's root are allowed, and its warnings are printed only.
 The description is the entire trigger surface: a skill fires on what its description says, so content added without extending the description is unreachable in practice.
 
 Skills follow a strict one-owner discipline. Each concept has exactly one owning skill, and siblings point at the owner rather than restating it, so an addition that duplicates an existing skill's material is a routing edit rather than new prose.

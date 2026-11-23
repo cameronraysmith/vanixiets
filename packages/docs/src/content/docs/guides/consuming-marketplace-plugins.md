@@ -1,14 +1,28 @@
 ---
 title: Consuming marketplace plugins
-description: Installing this repository's agent-skill plugins with the apm CLI, Claude Code or the Claude desktop app
+description: Installing this repository's agent-skill plugins with the apm CLI, Claude Code, the Claude desktop app or the skills CLI
 sidebar:
   order: 10
 ---
 
-This repository publishes a marketplace named `vanixiets` in two generated files: `.github/plugin/marketplace.json` for apm, listing all 22 plugin groups, and `.claude-plugin/marketplace.json` for Claude, listing the 18 groups that carry skills.
+This repository publishes a marketplace named `vanixiets` in two generated files: `.github/plugin/marketplace.json` for apm, listing all 22 plugin groups, and `.claude-plugin/marketplace.json` for Claude, listing the 18 groups that carry skills; a third generated file, `skills.sh.json`, points the skills CLI (`npx skills`) at the same 18 groups.
 Its plugins package the agent skills maintained under `modules/home/ai/plugins/`, and any project can consume them with the [apm CLI](https://github.com/microsoft/apm) and deploy them to Claude Code, Codex, Cursor, OpenCode, and the other harnesses apm supports.
 Consuming the marketplace requires only apm and does not depend on Nix or on any other part of this repository's infrastructure.
 The behavior described below was verified against apm 0.28.0, and the pinning details in particular are version-dependent.
+
+## Routes
+
+The 22 plugin groups hold 126 first-party skills in 18 skill groups plus four `agent-context-*` instructions groups, and four of the skill groups declare remote dependencies that add 51 skills from other repositories.
+Which of these a consumer receives depends on the route.
+
+| Route | Commands | Unit installed | Delivers |
+|---|---|---|---|
+| apm marketplace | `apm marketplace add cameronraysmith/vanixiets`, then `apm install '<group>@vanixiets#main'` | any subset of the 22 groups | first-party skills plus the group's remote dependencies; instructions groups as fragments for `apm compile` |
+| Claude Code and the Claude desktop app | `/plugin marketplace add cameronraysmith/vanixiets`, then `/plugin install <group>@vanixiets` | any of the 18 skill groups | first-party skills only |
+| skills CLI, whole repository | `npx skills add cameronraysmith/vanixiets --list`, then `--skill <name>` | any of the 126 skills, one by one | first-party skills only |
+| skills CLI, one group | `npx skills add https://github.com/cameronraysmith/vanixiets/tree/main/modules/home/ai/plugins/<group>` | the skills of one group | first-party skills only |
+
+Only apm resolves the remote dependencies, because only apm reads each group's `apm.yml`; the other routes read the generated files, which name each group's directory and nothing else.
 
 ## Quick start
 
@@ -121,3 +135,17 @@ Install the plugins only on machines without that delivery.
 
 Two behaviours this route relies on are observed rather than documented: that Claude installs an entry without a `.claude-plugin/plugin.json` whose skills sit in the hidden `./.apm/skills` directory, and that a plugin without any version follows the marketplace's commits.
 Claude Code is checked on each update by the `claude-marketplace-install` flake check; the desktop app was observed on 2026-11-23 with the fixture repository `cameronraysmith/skills-marketplace-test`, and the re-test steps are in `modules/home/ai/plugins/README.md`.
+
+## The skills CLI
+
+The [skills CLI](https://github.com/vercel-labs/skills) clones the repository and installs individual skills, with no apm and no plugin grouping.
+
+```bash
+npx skills add cameronraysmith/vanixiets --list
+npx skills add cameronraysmith/vanixiets --skill openspec-explore -a claude-code codex
+```
+
+It writes each skill to `.agents/skills/<name>`, links it into the directories of agents such as Claude Code, and records the source commit in `skills-lock.json`; `-g` installs at user level instead.
+It finds the skills through the root `skills.sh.json`, whose `paths` name each group's `.apm/skills` directory; without that file its search stops above those directories and finds nothing.
+A group's tree URL offers that group's skills alone, and works without `skills.sh.json`.
+These commands were verified with skills 1.9.0 on 2026-11-23, and the `skills-cli-discovery` flake check repeats the listing and a `--skill` install with the version this repository pins.

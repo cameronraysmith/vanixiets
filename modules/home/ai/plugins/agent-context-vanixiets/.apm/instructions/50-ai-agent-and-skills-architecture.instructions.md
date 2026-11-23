@@ -7,7 +7,7 @@ description: vanixiets AI agent skills architecture — apm packaging, the compo
 Agent skills are packaged as apm marketplace plugins.
 The source of truth for every first-party skill is `modules/home/ai/plugins/<group>/.apm/skills/<skill>/SKILL.md`.
 The corpus size is computed, not maintained as a number in prose: a hand-written count has already drifted across this repository's own documents more than once, so treat any specific figure you read as a snapshot, not a fact, and recompute it with a glob such as `fd --hidden SKILL.md modules/home/ai/plugins/*/.apm/skills` when you need a current total.
-Each `<group>/` carries an `apm.yml` beside its `.apm/` tree and no other manifest, and the marketplace manifest is `.github/plugin/marketplace.json`.
+Each `<group>/` carries an `apm.yml` beside its `.apm/` tree and no other manifest; `.github/plugin/marketplace.json` (apm), `.claude-plugin/marketplace.json` (Claude) and `skills.sh.json` (`npx skills`) are generated from the `apm.yml` files by `just agents-marketplace`, never edited by hand.
 
 At build time `pkgs/by-name/apm-skills-compose/` composes those packages, plus remote apm dependencies resolved offline, into a flat skill tree.
 `modules/home/ai/skills/{compose.nix,default.nix}` re-globs that tree and delivers it through home-manager symlinks to each harness's skills directory.
