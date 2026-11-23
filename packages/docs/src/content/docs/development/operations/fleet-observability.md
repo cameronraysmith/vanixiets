@@ -1,6 +1,6 @@
 ---
 title: Fleet observability
-description: "Operating the fleet's telemetry store, metrics collectors, dev-loop record and alerting: dashboard access, querying devloop, alerts and failure notices on fleet-alerts, the dead-man on cinnabar, agent hosts and their certificates, the ingress, the hourly and five-minute envelopes, the daily reconcile, credential rotation and retention."
+description: "Operating the fleet's telemetry store, metrics collectors, dev-loop record and alerting: dashboard access, querying agent sessions and devloop, alerts and failure notices on fleet-alerts, the dead-man on cinnabar, agent hosts and their certificates, the ingress, the hourly and five-minute envelopes, the daily reconcile, credential rotation and retention."
 ---
 
 This runbook is for the operator of the fleet's telemetry store, its collectors, its dev-loop record, alerting and the dashboard, as deployed by slices S1 to S6.
@@ -875,6 +875,42 @@ The S3 cutover took three deployments, each from a fresh worktree of `origin/mai
 
 Roll back in the reverse order: redeploy cinnabar without the access entries first, then revert magnetite to anonymous posting, and only then remove the provisioning.
 Removing `alerter` from `ntfy-env` deletes the user and its token at ntfy's next start, and every token-bearing post is then refused with 401.
+
+## Querying agent sessions
+
+Agent sessions reach two stores: the `agent` database on magnetite, read with `obs-query`, and the Langfuse Cloud project (EU), read with `langfuse-query`.
+Both are read-only from the workstation, and both run from a vanixiets checkout.
+
+Use `obs-query` for SQL over what the fleet stored: full-text search with `matches_term` over Claude Code's prompts and responses in `agent.session_event`, its commands, tool input and costs there, and omp's spans with tool arguments and results in `agent.agent_span`.
+It is the only store with Claude Code's full content, and it keeps 30 days.
+Use `langfuse-query` for a trace as a tree, the traces of a session, and tokens and cost per trace.
+omp's traces render fully there, model calls with their input and output and tool calls with their arguments, while Claude Code's carry no assistant text.
+
+```sh
+just obs-sql agent --table "SELECT ts, host_name, session_id, event_name FROM session_event WHERE matches_term(prompt, 'deploy') ORDER BY ts DESC LIMIT 20"
+just obs-sql agent --table "SELECT \"timestamp\", trace_id, span_name FROM agent_span WHERE \"span_attributes.gen_ai.tool.call.arguments\" LIKE '%nix build%' LIMIT 20"
+just obs-sql agent --table "SELECT session_id, sum(cost_usd_micros) / 1e6 AS usd FROM session_event WHERE ts > now() - '1d'::interval GROUP BY session_id ORDER BY usd DESC LIMIT 10"
+```
+
+```sh
+just langfuse-query --table traces --user cameron --from 1d
+just langfuse-query --table trace <trace-id> --chars 80
+just langfuse-query --table session <session-id>
+just langfuse-query --table search 'nix build' --from 7d
+```
+
+`traces` lists each trace's root observation, newest first, with its observation count, tokens and cost from Langfuse's metrics API; `trace` prints one trace's observations depth first with type, name, model, input and output cut to `--chars`, token usage and cost; `session` is `traces` for one session id; `search` finds observations whose input or output contains whole words of the text, case-insensitively.
+Each prints JSON, or an aligned table with `--table`.
+`langfuse-query api` runs the official Langfuse CLI (`pkgs/by-name/langfuse-cli`) for anything else on its read allow-list: `observations list` (every filter, including the structured `--filter` JSON), `metrics get`, `scores list`, `score-configs`, `comments`, `models` and `health`.
+`langfuse-query api help observations list` and `langfuse-query api schema --json` describe them and need no key.
+
+Langfuse Cloud's v4 API has no traces or sessions resource: a trace is the observations sharing a trace id and a session those sharing a session id, which is how the subcommands read them.
+Its full-text search is the `matches` operator on `input` and `output`, which matches whole tokens, not substrings inside one, and one request can search only one of the two fields.
+
+The project key is the shared clan var `langfuse/{public,secret}-key`, whose readers are magnetite, pyrite and the operator.
+`langfuse-query` decrypts it with the caller's own sops age identity at each run and hands it to the CLI in its environment, never an argument or a file, and exits 1 with one line when the identity cannot decrypt it.
+Nothing in Langfuse limits what that key may call from the workstation, so read-only rests on the wrapper: any action off the allow-list, and any of the CLI's global options but `--json`, exits 2 before a request is made, and `checks.x86_64-linux.langfuse-query` refuses every non-GET operation of the packaged CLI's contract.
+Langfuse can create project keys with the Viewer permission set, read-only on the server; a Viewer key in its own var would make the server enforce it too.
 
 ## Querying devloop
 

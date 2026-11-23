@@ -15,6 +15,7 @@ The delivered `~/.claude/skills/<skill>/SKILL.md` is a read-only Nix store symli
 
 `modules/home/ai/` also holds per-harness home-manager modules for hooks, MCP servers, settings, and wrappers, one directory per agent tool.
 Claude Code cloud sessions are created and steered with `nix run .#claude-cloud-session` and the `sandbox-claude-cloud` skill; `modules/home/users/claude-sandbox/README.md` covers this repository's environments and setup step, and why transcript publishing is disabled (the repository is public).
+Past agent sessions are queryable read-only: `nix run .#obs-query` for SQL and full-text search over the `agent` database on magnetite, and `nix run .#langfuse-query` for trace trees, sessions and cost in Langfuse Cloud; "Querying agent sessions" in `packages/docs/src/content/docs/development/operations/fleet-observability.md` says which to use.
 
 ## Instructions packages are a separate primitive
 

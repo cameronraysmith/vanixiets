@@ -916,6 +916,12 @@ obs-promql *args:
 obs-sql db *args:
   @{{nix_cmd}} run --no-warn-dirty .#obs-query -- sql "$@"
 
+# Read agent traces from Langfuse Cloud, read-only: just langfuse-query [--table] traces|trace|session|search|api ...
+[group('observability')]
+[positional-arguments]
+langfuse-query *args:
+  @{{nix_cmd}} run --no-warn-dirty .#langfuse-query -- "$@"
+
 ## docs
 
 # Install workspace dependencies
