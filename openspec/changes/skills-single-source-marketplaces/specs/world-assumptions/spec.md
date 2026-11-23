@@ -94,7 +94,7 @@ Any requirement whose discharge depends on this fact SHALL name it explicitly, a
 
 **Documentation**: the desktop documentation names `skills/<name>/SKILL.md` and a `.claude-plugin/plugin.json` manifest for Chat and Cowork (`plugins/build.md:21,39,56`); this assumption is an observation, not a documented promise.
 
-**Evidence**: the operator's test of `cameronraysmith/skills-marketplace-test` (commit 2542b08) on 2026-11-23: all three layouts tested, including the manifest-free entry with `skills: ["./.apm/skills"]` and `strict: false`, listed, installed and showed five skills.
+**Evidence**: the operator's test of `cameronraysmith/skills-marketplace-test` (commit 2542b08) on 2026-11-23: all three layouts tested, including the manifest-free entry with `skills: ["./.apm/skills"]` and `strict: false`, listed, installed and showed five skills. On the real repository with Claude 6.28899.6 (2f5fc5, 2026-11-20T22:01:14Z) on 2026-11-23, the operator added `cameronraysmith/vanixiets` (`main` 43a4ac7d): the dialog listed exactly 18 plugins, none `agent-context-*`, and the installed `nix-build-operations` and `planning-and-development` showed 5 and 16 skills, every skill of their `.apm/skills`. After those installs, on stibnite, `~/.claude/plugins/installed_plugins.json` and `enabledPlugins` in `~/.claude/settings.json` held no vanixiets entry: the desktop installs did not appear in Claude Code's plugin state on that machine (observed, not explained).
 
 #### Scenario: Observed on 2026-11-23
 
@@ -111,7 +111,7 @@ Any requirement whose discharge depends on this fact SHALL name it explicitly, a
 It is true of Claude Code that a plugin's version comes from its plugin manifest, else its marketplace entry, else the commit of the marketplace's git source (`plugins/marketplace-reference.md`), so a plugin with no version anywhere installs at, and updates to, the marketplace's current commit, while `0.0.0` pins it.
 Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL lose its discharge once the violation below is observed.
 
-**Evidence**: Claude Code 2.1.330 on 2026-11-23: a git marketplace without versions installed at `6832a512c2fe`, a local git checkout at `9b57e72a448b`, an entry with `0.0.0` at `0.0.0`, and an entry without version beside a root `plugin.json` with `0.0.0` at `0.0.0` (the root manifest was read although the documentation names only `.claude-plugin/plugin.json`).
+**Evidence**: Claude Code 2.1.330 on 2026-11-23: a git marketplace without versions installed at `6832a512c2fe`, a local git checkout at `9b57e72a448b`, an entry with `0.0.0` at `0.0.0`, and an entry without version beside a root `plugin.json` with `0.0.0` at `0.0.0` (the root manifest was read although the documentation names only `.claude-plugin/plugin.json`). The desktop app, Claude 6.28899.6 on 2026-11-23, installed the version-free `nix-build-operations` and `planning-and-development` entries; that it offers a later commit as an update (D13 step 3) is not yet observed.
 
 #### Scenario: Observed on 2026-11-23
 
@@ -171,7 +171,7 @@ Any requirement relying on this SHALL name it and SHALL lose its discharge once 
 It is true of apm 0.38.0 that an installed package whose tree differs from its lock's content hash is deleted and re-fetched rather than used.
 Any requirement relying on this SHALL name it and SHALL lose its discharge once the condition below is observed.
 
-**Evidence**: F6 under 0.36.x, `apm_cli/install/phases/integrate.py:281-300` (`logs/apm-verify-f5f6v-*`); to be re-observed under 0.38.0 by this change's first stage.
+**Evidence**: F6 under 0.36.x, `apm_cli/install/phases/integrate.py:281-300` (`logs/apm-verify-f5f6v-*`). Re-observed under 0.38.0 on 2026-11-23 in the compose's layout (the download's `apm_modules` and lock, an isolated HOME): after one line was appended to `apm_modules/obra/superpowers/skills/brainstorming/SKILL.md`, `apm install` reported "Content hash mismatch ... Re-downloading from the locked source". Offline (no usable git) the re-fetch failed, the install failed and rolled back ("Deployed files restored to their previous state"), and the deployed `brainstorming` stayed unedited; unlike 0.36, which deleted the copy before fetching, the edited copy stayed in `apm_modules` (`logs/apm-verify-f5f6-038-20261123-151020.log`). With git and the network the same install re-fetched it, passed, and left the copy byte-identical to the download (`logs/apm-verify-f6-online-038-20261123-151107.log`). The edited download is never used, so the assumption holds.
 
 #### Scenario: an edited download is used
 
@@ -195,7 +195,7 @@ Any requirement relying on this SHALL name it and SHALL lose its discharge once 
 It is true of apm 0.38.0 that `apm lock` writes, per remote dependency, its resolved commit and content hash, with no deployed-files records, so `--frozen` cannot install from it.
 Any requirement relying on this SHALL name it and SHALL lose its discharge once the condition below is observed.
 
-**Evidence**: U3 and F5 under 0.36.x (`logs/apm-verify-f5f6v-*`); on 2026-11-23 a frozen install of the composition under apm 0.38.0 (forced by `CI=true`) failed because the lock records no deployed files for the local packages; to be re-observed for the remote entries by this change's first stage.
+**Evidence**: U3 and F5 under 0.36.x (`logs/apm-verify-f5f6v-*`); on 2026-11-23 a frozen install of the composition under apm 0.38.0 (forced by `CI=true`) failed because the lock records no deployed files for the local packages. Re-observed for the remote entries under 0.38.0 on 2026-11-23: the download's lock, written by `apm lock`, has 26 remote entries, each with `resolved_commit` and `content_hash`, none with `deployed_files`; a plain offline install from it deploys 177 skills per tree and records `deployed_files` for all 26; `apm install --frozen` with those 26 entries as `apm lock` wrote them (local entries taken from the plain install) fails with "apm.lock.yaml does not record everything this install deploys" and 102 "deployed by this install but not recorded" lines (`logs/apm-verify-f5f6-038-20261123-151020.log`). The assumption holds.
 
 #### Scenario: the lock shape changes
 

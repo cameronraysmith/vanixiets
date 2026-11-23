@@ -214,8 +214,11 @@ Rollback: each stage is one revert; reverting stage 4 removes the Claude file (i
 
 The orchestrator's run against `main` (log `skills-postmerge-20261123-144935`) printed `APM-VALIDATE-SUMMARY: passed=22 failed=0 total=22` for `apm-marketplace-validate --local`, the same for `just agents-marketplace-remote` against GitHub `main` with coverage intact (R2, task 6.3), and "Found 126 skills" for `skills` 1.9.0 `add cameronraysmith/vanixiets --list` (R4, task 7.7).
 The relock (task 7.6) moved the 18 `#main` pins to 43a4ac7d and the lock to format v4; the project now supports only the apm it builds with, 0.38, and later.
-For A218 and A219 (R3, task 6.2), the operator's Claude desktop app listed exactly 18 plugins for `cameronraysmith/vanixiets`, none `agent-context-*`, with the names and descriptions of the group `apm.yml` files.
-Installing two of them and counting their skills, the update after a version-free edit, and the app version are not yet observed, so D13's step 4 has not been recorded in A218's and A219's Evidence.
+For A218 and A219 (R3, task 6.2), the operator's Claude desktop app, Claude 6.28899.6 (2f5fc5, 2026-11-20T22:01:14Z), listed exactly 18 plugins for `cameronraysmith/vanixiets`, none `agent-context-*`, with the names and descriptions of the group `apm.yml` files, and installed `nix-build-operations` with 5 skills and `planning-and-development` with 16; D13's step 4 is recorded in A218's and A219's Evidence.
+On stibnite after those installs, `~/.claude/plugins/installed_plugins.json` and `enabledPlugins` in `~/.claude/settings.json` held no vanixiets entry, so the desktop installs did not appear in Claude Code's plugin state on that machine; this is observed, not explained.
+The update after a version-free edit (D13 step 3) is not yet observed: it needs a commit that edits a skill of one of the two installed plugins to reach `main`.
+The orchestrator deleted `origin/claude-marketplace` (d68d40ed) on the operator's instruction (D10, task 5.4), and the operator activated stibnite at generation 243, which delivers `but` and no `gitbutler-but-cli` (task 6.1).
+Under apm 0.38.0, A138 and A140 still hold (task 1.4), and the 26 apm-touching x86_64-linux checks build at `main` 9c288da5 (task 1.5).
 
 ## Open Questions
 

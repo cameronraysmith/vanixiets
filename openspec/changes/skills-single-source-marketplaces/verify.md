@@ -5,8 +5,8 @@
 > corresponding artifact for correction before re-running verify.
 
 **Change**: `skills-single-source-marketplaces` (CAM-122)
-**Verified at**: `2026-11-23 20:01` UTC
-**Verifier**: subagent `SkillsCloseout` (omp), running `openspec-verify-change` and this schema's checks 1–7 on `main` 43a4ac7d plus the relock commit
+**Verified at**: `2026-11-23 20:19` UTC (first run 20:01 UTC)
+**Verifier**: subagent `SkillsCloseout` (omp), running `openspec-verify-change` and this schema's checks 1–7 on `main` 43a4ac7d plus the relock commit; re-run by subagent `SkillsVerifyFixes` on `main` 9c288da5 plus the commits that close tasks 1.4, 1.5, 5.4 and 6.1 and the two drift warnings
 
 Prechecks: the change's commits on `main` run from `f2d5a9335` (`docs(openspec): propose skills-single-source-marketplaces`) to `43a4ac7d5` (`docs(openspec): record stage 5 and its follow-ups of skills-single-source-marketplaces`), and `tasks.md` holds 31 `- [x]` lines, so both are positive.
 OpenSpec ran with HOME and the XDG directories under a scratch directory, the `superpowers-bridge-wrspm` schema copied there from `modules/home/ai/openspec/assets/schemas`.
@@ -25,20 +25,19 @@ openspec validate skills-single-source-marketplaces --strict: Change 'skills-sin
 ```
 
 The two failures are other changes, unchanged since `track-main-in-claude-sandbox`'s verify: `stand-up-gitea-mq-on-magnetite` and `stand-up-nixbot-on-magnetite`.
+The re-run gave the same totals and the same two failures, and `--strict` on this change printed "is valid" (openspec 2.1.1; log `skills-verify-fixes-openspec-20261123-151929`).
 
 ## 2. Task Completion (`tasks.md`)
 
 - [ ] All `- [ ]` have been changed to `- [x]`
 
-31 of 36. Each open task records its reason in `tasks.md`.
+35 of 36. The open task records its reason in `tasks.md`.
 
 | Task | Reason incomplete | Blocks archive? |
 |---|---|---|
-| 1.4 Re-observe A138 and A140 under apm 0.38.0 | no rerun of the F5 and F6 procedures under apm 0.38.0 is logged; both assumptions' Evidence still reads "to be re-observed" | yes, unless the operator closes it without measurement |
-| 1.5 Build the 32 apm-touching checks on x86_64-linux, evaluate the 111 darwin ones | no log of that sweep exists; each stage built its own checks on magnetite instead (tasks 3.1, 4.5, 4.6, 5.1, 7.3, 7.5) | yes, unless closed by that substitute evidence |
-| 5.4 The operator deletes `origin/claude-marketplace` | operator action; `git ls-remote origin claude-marketplace` still prints `d68d40ed` on 2026-11-23 | yes |
-| 6.1 Corpus unchanged on a stibnite activation | stibnite has not activated a generation from 43a4ac7d (`~/.claude/skills` holds `gitbutler-but-cli`, no `but`); the expected names now differ from stage 4's by the D15 rename | yes |
-| 6.2 Desktop install count and update (A218, A219) | the Add marketplace dialog listed exactly 18 plugins, none `agent-context-*`; installing `nix-build-operations` (5) and `planning-and-development` (16), "Check for updates" after a version-free edit, and the app version are not yet observed | yes |
+| 6.2 Desktop update without a version change (A219) | with Claude 6.28899.6 the dialog listed 18 plugins, none `agent-context-*`, and `nix-build-operations` and `planning-and-development` installed with 5 and 16 skills; "Check for updates" bringing a version-free skill edit is not yet observed, and needs a commit editing a skill of one of those two plugins to reach `main` | yes |
+
+Closed since the first run: 1.4 (A138 and A140 hold under apm 0.38.0; logs `apm-verify-f5f6-038-20261123-151020`, `apm-verify-f6-online-038-20261123-151107`), 1.5 (26 apm-touching x86_64-linux checks built on magnetite's store, 111 aarch64-darwin checks evaluated, at `main` 9c288da5; logs `skills-1.5-x86-apm-checks-magnetite-20261123-151738`, `skills-1.5-darwin-eval-20261123-151020`), 5.4 (`git ls-remote origin claude-marketplace` prints nothing), 6.1 (stibnite generation 243 delivers `but`, no `gitbutler-but-cli`).
 
 ## 3. Delta Spec Sync State
 
@@ -61,34 +60,35 @@ Every ADDED and MODIFIED behavioural requirement and its scenarios, mapped to wh
 | Build-time apm composition (deterministic offline build; per-harness flat deployment; an apm release changes the trees) | `pkgs/by-name/apm-skills-compose` with `--no-frozen`, the `.apm-local/installation` removal and the tree oracle (G1, G6, G7) | tasks 2.2, 2.3, 2.5: rebuild deterministic; four oracle mutants fail naming the skill |
 | First-party skills conform to the Agent Skills specification (name differs; frontmatter does not parse) | `checks.x86_64-linux.skills-spec-conformance`, `pkgs/by-name/skill-validator` (G9) | task 7.5: both mutants fail |
 | An apm consumer installs every published plugin group (skills group; instructions group; group added) | `apm-marketplace-consumer` (G5a), `just agents-marketplace-remote` (G5b), `skills-marketplace-drift` (G3) | tasks 5.1, 6.3 (22/22 against GitHub `main` 43a4ac7d, coverage intact), 4.3 (unlisted group fails) |
-| A Claude user installs every skill group with all its first-party skills (installed in a Claude app; a dependency's skills are wanted) | `claude-marketplace-install` (G4) for Claude Code; D12 (remote skills excluded); desktop by the operator (D13) | task 4.6: `total 126`; task 6.2 partial: 18 plugins listed, none `agent-context-*`; install counts open |
+| A Claude user installs every skill group with all its first-party skills (installed in a Claude app; a dependency's skills are wanted) | `claude-marketplace-install` (G4) for Claude Code; D12 (remote skills excluded); desktop by the operator (D13) | task 4.6: `total 126`; task 6.2: in Claude 6.28899.6, 18 plugins listed, none `agent-context-*`, `nix-build-operations` 5 skills and `planning-and-development` 16 |
 | A Claude user follows the published skills without versions (a skill changes on main) | no `version` in the Claude entries (D3), A219 | Claude Code 2.1.330 observation in A219; desktop update open (task 6.2) |
-| Publication never changes what the fleet's hosts receive (the published layout changes) | G1 per stage; stage 5 changes the trees deliberately (D15, design Migration Plan) | tasks 3.1, 7.4; the activation check, task 6.1, is open |
+| Publication never changes what the fleet's hosts receive (the published layout changes) | G1 per stage; stage 5 changes the trees deliberately (D15, design Migration Plan) | tasks 3.1, 7.4; task 6.1: stibnite generation 243 delivers `but`, no `gitbutler-but-cli` |
 | A skills CLI user installs each first-party skill (listed; one selected) | root `skills.sh.json` from the generator (D14), `skills-cli-discovery` (G8) | tasks 7.2, 7.3, 7.7 ("Found 126 skills" from GitHub `main`) |
 | Each fact about a plugin group is authored once (per-group manifest reappears; list and tree disagree) | `lib/plugin-groups.nix` and `pkgs/by-name/skills-marketplace` assertions | task 4.3: the `plugin.json`, unlisted-group and name mutants fail |
 | Both marketplace files are generated and committed unchanged (description changes; apm bump changes bytes) | `skills-marketplace-drift` (G3), `just agents-marketplace` | tasks 4.4, 4.5 |
 | Claude Code installs every Claude entry with exactly its group's skills (missing directory; no skills path) | `claude-marketplace-install` (G4) | task 4.6: both mutants fail |
-| An offline apm consumer installs from a served copy (a published source path is wrong) | `apm-marketplace-consumer` (G5a) | task 5.1: the typo mutant fails at that group |
+| An offline apm consumer installs from a served copy (a published source path is wrong) | `apm-marketplace-consumer` (G5a) | task 5.1: the typo mutant fails at that group (re-run on magnetite's store after the fix below, `mutant-s5-consumer-source-typo-magnetite-20261123-151804`) |
 | The composed trees are compared with their sources and recorded hashes (remote skill changes; first-party skill rewritten) | G1 with `skills.json` `{names, remote}` | task 2.5 |
 | The composition installs without frozen mode and leaves no installation id (CI variable; two builds compared) | G6, G7 one-off proofs | tasks 2.2, 2.3 |
 | Group discovery is computed once (a group of skills is added) | `lib/plugin-groups.nix`, used by the compose, `deps.nix`, home-manager and the generator | task 2.1: drvPaths unchanged |
 | A whole-plugin upstream is consumed through a skill list (list diverges; selection removed) | the mattpocock list rule in `deps.nix` (G2); G1's names for the removed selection | task 2.6: the `tdd` mutant fails; task 2.5: `tdd` missing fails on names |
-| A213–A220, A136–A140 (world assumptions) | Evidence recorded per assumption | A138 and A140 re-observation under apm 0.38.0 open (task 1.4); A218 and A219 desktop evidence partial (task 6.2) |
+| A213–A220, A136–A140 (world assumptions) | Evidence recorded per assumption | A138 and A140 re-observed under apm 0.38.0, both hold (task 1.4); A218 recorded with Claude 6.28899.6; A219's desktop update open (task 6.2) |
 
 The consumer mutant "a group manifest that makes apm deploy it whole" (design D7, G5a) ran after the merge on magnetite (logs in the `skills-arch` workspace's `logs/`): `nix-build-operations` with its `apm.yml` replaced by a `.claude-plugin/plugin.json` in the served copy only was deployed to `.agents/plugins/`, and the check failed (`mutant-g5a-group-deployed-whole-served-20261123-145603`, `...-served-diag-20261123-145747`).
 A `plugin.json` beside the `apm.yml` left the group flat and the check passed, as A213 states (`mutant-g5a-group-deployed-whole-20261123-145436`).
+After the fix below, the same mutant fails with "FAIL: nix-build-operations deploys no .agents/skills" (and `.claude/skills`), followed by what apm deployed: `.agents/plugins/nix-build-operations` and `.claude/settings.json` (`mutant-g5a-group-deployed-whole-served-20261123-151229`); the unmutated check prints "installed 18 of 22 registered groups" (`s5-apm-marketplace-consumer-magnetite-20261123-151229`).
 
-**Drift warnings** (non-blocking):
+**Drift warnings** (non-blocking): both from the first run are resolved.
 
-- The deploy-whole mutant fails G5a through `ls` exiting 2 under `pipefail` at the missing `.agents/skills`, before the check prints a `FAIL:` line naming the group; the log shows only the previous group as the last output. Recommendation: in `modules/checks/apm-marketplace-consumer.nix`, test `[ -d "$root/$tree" ]` before the `ls` and print `FAIL: $group deploys no $tree` so the failure names the group.
-- The spec scenario "A per-group manifest reappears" says the generator's build fails; the stray-manifest rule is an evaluation-time assertion (task 4.3), which fails earlier and also names the file. Recommendation: say "evaluation of the marketplace generator fails" in `specs/skill-marketplace-publication-interface/spec.md` before archive.
+- The deploy-whole mutant failed G5a through `ls` exiting 2 under `pipefail` before any `FAIL:` line named the group. Fixed in `modules/checks/apm-marketplace-consumer.nix`: the check tests the tree first, prints `FAIL: $group deploys no $tree` and lists what apm deployed under `.agents` and `.claude`.
+- The spec scenario "A per-group manifest reappears" said the generator's build fails; the stray-manifest rule is an evaluation-time assertion (task 4.3). The scenario in `specs/skill-marketplace-publication-interface/spec.md` now says evaluation of the generator fails, before any build starts.
 
 ## 5. Implementation Signal
 
-- [x] No unstaged files in the worktree (the jj working copy is committed: the relock and these records)
-- [ ] All related commits have been pushed: `f2d5a9335..43a4ac7d5` is on `origin/main`; the relock and record commits are not yet published
+- [x] No unstaged files in the worktree (the jj working copy is committed: the fix, the spec wording and these records)
+- [ ] All related commits have been pushed: `f2d5a9335..9c288da5` is on `origin/main`; the consumer fix, the spec wording and the record commit are not yet published
 
-**Commit range**: `f2d5a9335..43a4ac7d5`, then the relock (`apm.lock.yaml` at 43a4ac7d, lockfile v4) and the record commit
+**Commit range**: `f2d5a9335..9c288da5`, then the consumer fix, the spec wording and the record commit
 
 ## 6. Front-Door Routing Leak Detector (warning, non-blocking)
 
@@ -108,8 +108,8 @@ A `plugin.json` beside the `apm.yml` left the group flat and the check passed, a
 - [ ] (warn) PASS WITH WARNINGS — may proceed to subsequent steps but note: `<explanation>`
 - [x] (fail) FAIL — return to the failed artifact, correct it, then re-run verify
 
-The implementation matches every requirement and scenario above; the failure is task completion alone: five tasks are open (1.4, 1.5, 5.4, 6.1, 6.2), three of them waiting on the operator.
+The implementation matches every requirement and scenario above, and both drift warnings are resolved; the failure is task completion alone: one task is open, 6.2's desktop update without a version change, which waits on a skill edit reaching `main` and on the operator.
 
 **Next step**:
 
-The operator finishes task 6.2 (install counts, update, app version) and records D13's step 4 in A218's and A219's Evidence, deletes `origin/claude-marketplace` (5.4), and activates stibnite (6.1); tasks 1.4 and 1.5 are run or closed with a stated reason. Then re-run verify, write the retrospective and archive.
+Once a commit editing a skill of `nix-build-operations` or `planning-and-development` reaches `main`, the operator runs "Check for updates" in the Claude desktop app, confirms the edit arrives, and records the app version and commit in A219's Evidence (D13 steps 3 and 4); then tick 6.2, re-run verify, write the retrospective and archive.
