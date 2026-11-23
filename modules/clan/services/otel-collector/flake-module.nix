@@ -1216,11 +1216,15 @@ in
           };
         })
 
-        # The logs entry, wherever a logs route exists.
+        # The logs entry, wherever a logs route exists. `forward` only where
+        # a local logs pipeline exports to it, the deploy record's, which
+        # needs the devloop route: since the agent-session pipelines left
+        # this collector (agent-session-telemetry design D14), an ingress
+        # with the agent route alone has none, and the collector refuses a
+        # connector no pipeline exports to.
         (lib.mkIf (devloopLogs || agentLogs) {
           settings.service.pipelines."logs/ingress" = {
-            receivers = [
-              "forward"
+            receivers = lib.optional devloopLogs "forward" ++ [
               "otlp/mesh"
               "otlp/mesh-tincr"
             ];

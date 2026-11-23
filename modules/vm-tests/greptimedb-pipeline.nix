@@ -170,14 +170,17 @@
                   "otel-key:${pki}/ingress.key"
                 ];
 
-                # The ingress receivers on loopback (4321 is the test's own
-                # otlp entry) with throwaway certificates, never the real vars,
+                # The ingress receivers on loopback (4322 is the test's own
+                # otlp entry; 4321 is otlp/loopback, the agent-session
+                # unit's hand-off) with throwaway certificates, never the real vars,
                 # and the agent's notified-unit assertion satisfied; the
-                # envelope is fleet-ingress's subject, so its timer stays off.
+                # envelopes are fleet-ingress's subject, so their timers stay
+                # off.
                 vanixiets.otelCollector.caFile = "${pki}/ca.crt";
-                # As on magnetite: the agent-session pipelines end in forward,
-                # so logs/ingress, which the agent table's route creates, has
-                # a logs pipeline exporting to it (agent-session-telemetry).
+                # As on magnetite: the ingress routes agent events, so
+                # logs/ingress exists, fed by the agent-session unit over
+                # otlp/loopback; the unit loads the test's certificate as
+                # the clan role loads otel-cert.
                 vanixiets.otelCollector.agentTelemetry = true;
                 services.opentelemetry-collector.settings.receivers."otlp/mesh".protocols.http.endpoint =
                   lib.mkForce "127.0.0.1:4319";
@@ -186,14 +189,21 @@
                 services.observability-notify.units = [
                   "opentelemetry-collector"
                   "otel-envelope"
+                  "otel-agent-session"
+                  "otel-agent-session-envelope"
                 ];
                 systemd.timers.otel-envelope.wantedBy = lib.mkForce [ ];
+                systemd.timers.otel-agent-session-envelope.wantedBy = lib.mkForce [ ];
+                systemd.services.otel-agent-session.serviceConfig.LoadCredential = [
+                  "otel-cert:${pki}/ingress.crt"
+                  "otel-key:${pki}/ingress.key"
+                ];
 
                 # A loopback OTLP entry into the agent pipeline that stamps
                 # host.name and vanixiets.database, so a synthetic point takes
                 # the same forward and routing path as host metrics.
                 services.opentelemetry-collector.settings = {
-                  receivers.otlp.protocols.http.endpoint = "127.0.0.1:4321";
+                  receivers.otlp.protocols.http.endpoint = "127.0.0.1:4322";
                   service.pipelines."metrics/host".receivers = [ "otlp" ];
                 };
 
@@ -288,7 +298,7 @@
                   )
                   store.succeed(
                       "curl -sSf -H 'Content-Type: application/json' "
-                      f"--data {shlex.quote(payload)} http://127.0.0.1:4321/v1/metrics"
+                      f"--data {shlex.quote(payload)} http://127.0.0.1:4322/v1/metrics"
                   )
 
 
