@@ -402,6 +402,15 @@ check-ifd systems="x86_64-linux aarch64-linux aarch64-darwin" workers="4" mem="4
   done
   exit "$failed"
 
+# Compare stock nix-eval-jobs and iets attribute by attribute over checks.<system> of one
+# commit: same attribute names, drvPaths, systems and outputs, failing in both or neither.
+# Run it after an iets bump or before widening where iets evaluates. rev defaults to HEAD.
+# Usage: just eval-identity                          (x86_64-linux and aarch64-darwin)
+#        just eval-identity "aarch64-darwin" <rev> 2
+[group('nix')]
+eval-identity systems="x86_64-linux aarch64-darwin" rev="" workers="2":
+  nix run --accept-flake-config .#nix-eval-jobs-identity -- {{ if rev == "" { "" } else { "--rev " + rev } }} --workers {{workers}} {{systems}}
+
 # Verify system configuration builds after updates (run before activate)
 [group('nix')]
 verify:
