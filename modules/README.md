@@ -81,7 +81,10 @@ nixbot's arguments and nix-fast-build's (`--gc-roots-dir`, `--force-recurse`, `-
 nix-fast-build passes `--override-input` only when its own `--override-input` is given, which no recipe does.
 nixbot keeps its own evaluator, `config.services.nixEvalLock.wrap config.vanixiets.nixbot.ietsEvaluator` (`nixos/nixbot.nix`), unbounded by the host table and unchanged in derivation.
 
-`apps/nix-eval-jobs-identity` (`just eval-identity [systems] [rev] [workers]`) is the drvPath-identity oracle between stock `nix-eval-jobs` and iets over `checks.<system>` of one commit.
+`just check-fast` evaluates with the evaluating host's `nix-eval-jobs`: locally through `--nix-eval-jobs`, because nix-fast-build puts stock first on its own PATH, and remotely through the bare name on the remote's PATH, because nix-fast-build ignores `--nix-eval-jobs` on `--remote`.
+`just check-ifd` runs `nix-eval-jobs` from PATH.
+Both say which evaluator ran.
+`apps/nix-eval-jobs-identity` (`just eval-identity [systems] [rev] [workers]`) is the drvPath-identity oracle: it runs the host's `nix-eval-jobs-stock` and `nix-eval-jobs` over `checks.<system>` of one commit, behind the lock where there is one, and fails unless every attribute has the same drvPath, system and outputs.
 Every machine check (`checks.<system>.nixos-<host>`, `darwin-<host>`) judges its host's evaluators with `flake.lib.nixEvalJobsObligations`: its bound is the table's, its system PATH holds iets at that bound and `nix-eval-jobs-stock` exactly where there is one, the lock is enabled where iets is, no home installs another evaluator, and nixbot evaluates with lock-wrapped iets at the host's bound and names it in its records; the lock module's own assertion rejects any unwrapped evaluator on a profile or service PATH.
 `checks.x86_64-linux.nix-eval-jobs-iets` holds what does not depend on a host: the rules (a Linux bound without a memory limit fails it), the lock's judgement (an unlocked iets on nixbot's PATH or an unlocked stock alias fails it), the per-host judgement over a magnetite fixture and its mutants, and the bounded wrapper run against a stub.
 

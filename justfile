@@ -339,17 +339,17 @@ home-package-names system="":
 #   magnetite -> --remote magnetite.zt --eval-workers 4
 #   pyrite    -> --remote pyrite.zt --eval-workers 2 --eval-max-memory-size 2048, sized for a
 #                15.5 GiB laptop that also runs the desktop and the omnigent workers
-#   --remote runs nix-eval-jobs on that host over ssh, and both hosts put an evaluation-lock
-#   wrapper first on PATH (services.nixEvalLock): if nixbot or another evaluation holds the host
-#   lock, this run waits, printing "nix-eval-jobs: waiting for the host evaluation lock held by
-#   ..." every 30 s, instead of overlapping it. Two concurrent evaluations on magnetite caused the
-#   OOMs in docs/notes/development/incidents/2026-10-01-magnetite-concurrent-eval-oom.md.
-#   The remote lane keeps that wrapper over stock nix-eval-jobs: only the local lane changes evaluator.
-# On darwin the local lane evaluates with iets through nix-eval-jobs-iets (nix-tools.nix) when the
-#   host opts in (nixEvalJobsIets.workers, stibnite only), passed as --nix-eval-jobs because
-#   nix-fast-build puts stock nix-eval-jobs first on its own PATH; that wrapper caps --eval-workers
-#   at the host's bound, since iets cannot bound worker memory on macOS. Hosts without it (the 8 GiB
-#   Macs) use stock. The lane says which evaluator it used.
+#   --remote runs the remote host's nix-eval-jobs over ssh: nix-fast-build ignores --nix-eval-jobs
+#   on that lane and runs the bare name from the ssh user's PATH. Both hosts put an
+#   evaluation-lock wrapper first on PATH (services.nixEvalLock): if nixbot or another evaluation
+#   holds the host lock, this run waits, printing "nix-eval-jobs: waiting for the host evaluation
+#   lock held by ..." every 30 s, instead of overlapping it. Two concurrent evaluations on
+#   magnetite caused the OOMs in docs/notes/development/incidents/2026-10-01-magnetite-concurrent-eval-oom.md.
+# Every lane evaluates with the evaluating host's nix-eval-jobs, which its memory in
+#   flake.lib.hosts makes iets (bounded in workers and, on Linux, per-worker memory, with
+#   nix-eval-jobs-stock beside it) or stock (modules/README.md, Evaluators). The local lane passes it
+#   as --nix-eval-jobs because nix-fast-build puts stock nix-eval-jobs first on its own PATH. The
+#   lane says which evaluator it used.
 # Params are positional, so usage is: just check-fast auto on x86_64-linux pyrite
 [group('nix')]
 check-fast nom="auto" push="off" system="" remote="magnetite":
@@ -371,15 +371,13 @@ check-fast nom="auto" push="off" system="" remote="magnetite":
   system="{{system}}"
   [ -n "$system" ] || system="$native"
   if [ "$system" = "$native" ]; then
-    targetflags="--eval-workers 4"
-    if [ "$(uname -s)" = Darwin ] && iets=$(command -v nix-eval-jobs-iets); then
-      targetflags="$targetflags --nix-eval-jobs $iets"
-      echo "check-fast: evaluating locally with iets ($iets)" >&2
-    else
-      echo "check-fast: evaluating locally with stock nix-eval-jobs (this host has no nix-eval-jobs-iets)" >&2
-    fi
+    evaluator=$(command -v nix-eval-jobs)
+    targetflags="--eval-workers 4 --nix-eval-jobs $evaluator"
+    if command -v nix-eval-jobs-stock > /dev/null; then kind=iets; else kind=stock; fi
+    echo "check-fast: evaluating locally with $kind ($evaluator)" >&2
   else
     targetflags="$remotehostflags --no-download --retries 2"
+    echo "check-fast: evaluating on {{remote}} with its nix-eval-jobs" >&2
   fi
   nix-fast-build $flag $pushflag $targetflags \
     --option accept-flake-config true \
@@ -388,10 +386,10 @@ check-fast nom="auto" push="off" system="" remote="magnetite":
 
 # Evaluate every check (including all nixos, darwin and home configurations) with
 # import-from-derivation disallowed, as nixbot's CI does; nothing is built.
-# On a darwin host that opts in (nixEvalJobsIets.workers, nix-tools.nix) it evaluates with iets
-# through nix-eval-jobs-iets, which refuses import-from-derivation unconditionally, so the verdict
-# is the same, and caps the workers at the host's bound; elsewhere it uses the nix-eval-jobs on
-# PATH (the evaluation-lock wrapper on magnetite and pyrite, stock on the other hosts).
+# It evaluates with the nix-eval-jobs on PATH: iets where the host's memory qualifies (which
+# refuses import-from-derivation unconditionally, so the verdict is the same, and caps workers and,
+# on Linux, memory at the host's bound), stock elsewhere; on magnetite and pyrite behind the
+# evaluation lock.
 # Usage: just check-ifd                    (all three systems)
 #        just check-ifd "aarch64-darwin"
 [group('nix')]
@@ -399,10 +397,8 @@ check-ifd systems="x86_64-linux aarch64-linux aarch64-darwin" workers="4" mem="4
   #!/usr/bin/env bash
   set -euo pipefail
   evaluator=nix-eval-jobs
-  if [ "$(uname -s)" = Darwin ] && command -v nix-eval-jobs-iets > /dev/null; then
-    evaluator=nix-eval-jobs-iets
-  fi
-  echo "check-ifd: evaluating with $(command -v "$evaluator")" >&2
+  if command -v nix-eval-jobs-stock > /dev/null; then kind=iets; else kind=stock; fi
+  echo "check-ifd: evaluating with $kind ($(command -v "$evaluator"))" >&2
   out=$(mktemp); trap 'rm -f "$out"' EXIT
   failed=0
   for system in {{systems}}; do
@@ -429,6 +425,8 @@ check-ifd systems="x86_64-linux aarch64-linux aarch64-darwin" workers="4" mem="4
 
 # Compare stock nix-eval-jobs and iets attribute by attribute over checks.<system> of one
 # commit: same attribute names, drvPaths, systems and outputs, failing in both or neither.
+# It runs the host's own two names, nix-eval-jobs (iets) and nix-eval-jobs-stock, so on a
+# locked host both queue on the evaluation lock; a host without iets refuses.
 # Run it after an iets bump or before widening where iets evaluates. rev defaults to HEAD.
 # Usage: just eval-identity                          (x86_64-linux and aarch64-darwin)
 #        just eval-identity "aarch64-darwin" <rev> 2
