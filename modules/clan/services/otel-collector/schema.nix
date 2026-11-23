@@ -447,13 +447,16 @@
     agentSession =
       let
         # The resource keys both pipelines keep; `user.name` is the person
-        # the emitter stamps (design D4). The collector then stamps host.name.
+        # the emitter stamps (design D4), `vanixiets.harness_host` the
+        # harness host a worker home stamps (darwin-agent-session-telemetry
+        # design D15). The collector then stamps host.name.
         resourceKeys = [
           "service.name"
           "service.version"
           "host.arch"
           "os.type"
           "user.name"
+          "vanixiets.harness_host"
         ];
         column = name: type: key: {
           inherit name type;
@@ -649,6 +652,7 @@
             "service.name"
             "service.version"
             "user.name"
+            "vanixiets.harness_host"
           ];
           promptSource = "gen_ai.input.messages";
           toolOutput = {
@@ -864,6 +868,7 @@
             (resource "user_name" "user.name")
             (resource "service_name" "service.name")
             (resource "service_version" "service.version")
+            (resource "harness_host" "vanixiets.harness_host")
             (column "session_id" "string" "session.id")
             (column "prompt_id" "string" "prompt.id")
             (column "event_name" "string" "event.name")

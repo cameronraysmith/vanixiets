@@ -6,7 +6,7 @@
 # convention.
 #
 # flake.lib.greptimedbLogTable { name; table; recordTimestamps ? [ ];
-# eventFilter ? null; } → { ddl; pipeline; }. `table` is { columns;
+# eventFilter ? null; } → { ddl; alters; pipeline; }. `table` is { columns;
 # primaryKey; timeIndex; }, each column { name; type; nullable; } of the
 # four types below, and optionally:
 #   - `source`: { log = <key>; } or { resource = <key>; }, the OTLP log
@@ -79,6 +79,22 @@ in
           ") ENGINE=mito WITH ('append_mode' = 'false', 'sst_format' = 'flat')"
         ]
       );
+
+      # CREATE TABLE IF NOT EXISTS changes nothing once the table exists, and
+      # with auto_create_table=false 1.2.1 refuses a pipeline's write of a
+      # column the table lacks ("unknown columns", the whole request), so
+      # each nullable column outside the primary key is also added to an
+      # existing table, with its full-text index, every run: ADD COLUMN IF
+      # NOT EXISTS does nothing to a column that is there, and 1.2.1 takes no
+      # index inside ADD COLUMN (src/sql/src/parsers/alter_parser.rs:697-724).
+      alters = lib.concatMap (
+        column:
+        [
+          "ALTER TABLE ${quote name} ADD COLUMN IF NOT EXISTS ${quote column.name} ${storeType.${column.type}} NULL"
+        ]
+        ++ lib.optional (column.fulltext or false
+        ) "ALTER TABLE ${quote name} MODIFY COLUMN ${quote column.name} SET ${fulltextIndex}"
+      ) (lib.filter (column: column.nullable && !(lib.elem column.name table.primaryKey)) table.columns);
 
       fromResource = lib.any (column: column ? source.resource) table.columns;
 
@@ -162,7 +178,7 @@ in
       ];
     in
     {
-      inherit ddl;
+      inherit ddl alters;
       pipeline =
         lib.concatStringsSep "\n" (
           [

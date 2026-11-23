@@ -53,7 +53,10 @@ in
       cfg = config.agentTelemetry;
       enabled = cfg.enable;
       receiver = "http://127.0.0.1:4318";
-      resourceAttributes = "user.name=${cfg.person}";
+      resourceAttributes = lib.concatStringsSep "," (
+        [ "user.name=${cfg.person}" ]
+        ++ lib.optional (cfg.harnessHost != null) "vanixiets.harness_host=${cfg.harnessHost}"
+      );
 
       # Prompts, responses and tool details on (operator's content decision);
       # tool output on (design D15): Claude's beta traces with tool content,
@@ -148,6 +151,16 @@ in
             The person a session runs for, stamped as the resource attribute
             `user.name`: the home's user, or its alias (crs58 is cameron), for a
             human, the worker's owner for an Omnigent worker (design D4).
+          '';
+        };
+        harnessHost = lib.mkOption {
+          type = lib.types.nullOr (lib.types.enum [ "omnigent" ]);
+          default = null;
+          description = ''
+            The harness host whose worker home this is, stamped as the
+            resource attribute `vanixiets.harness_host` beside `user.name`;
+            null, and no attribute, in a person's own home
+            (darwin-agent-session-telemetry design D15).
           '';
         };
         claudeCodeEnvNames = lib.mkOption {

@@ -8,7 +8,10 @@
 #   user.name the person (a worker's owner, not its Unix account; stibnite's
 #   crs58 as cameron, its flake.userAliases name, darwin-agent-session-
 #   telemetry design D10), and ~/.omp/agent/.env is exactly the lines below.
-#   stibnite's worker is a standalone home with no osConfig, read through
+#   A worker's home alone adds vanixiets.harness_host=omnigent to the
+#   resource attributes, a person's own home never
+#   (darwin-agent-session-telemetry design D15). stibnite's worker is a
+#   standalone home with no osConfig, read through
 #   services.omnigent-host.workerHomes;
 # - the claude-glm and claude-cerebras wrappers' settings carry no telemetry
 #   name, so other model providers' sessions do not export;
@@ -32,7 +35,7 @@
         agent-telemetry-emitters =
           let
             # design D2's gates and D15's traces with tool content.
-            claudeExpected = person: {
+            claudeExpected = resource: {
               CLAUDE_CODE_ENABLE_TELEMETRY = "1";
               CLAUDE_CODE_ENHANCED_TELEMETRY_BETA = "1";
               OTEL_METRICS_EXPORTER = "otlp";
@@ -46,12 +49,12 @@
               OTEL_LOG_TOOL_CONTENT = "1";
               OTEL_BSP_MAX_QUEUE_SIZE = "64";
               OTEL_METRICS_INCLUDE_ACCOUNT_UUID = "false";
-              OTEL_RESOURCE_ATTRIBUTES = "user.name=${person}";
+              OTEL_RESOURCE_ATTRIBUTES = resource;
             };
             # The metrics lines (design D2), the traces lines (design D13)
             # and one span per request (darwin-agent-session-telemetry
             # design D13), in the file's sorted order.
-            ompExpected = person: ''
+            ompExpected = resource: ''
               OTEL_BSP_MAX_EXPORT_BATCH_SIZE=1
               OTEL_BSP_MAX_QUEUE_SIZE=64
               OTEL_EXPORTER_OTLP_METRICS_ENDPOINT=http://127.0.0.1:4318/v1/metrics
@@ -60,7 +63,7 @@
               OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://127.0.0.1:4318/v1/traces
               OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT=full
               OTEL_LOGS_EXPORTER=none
-              OTEL_RESOURCE_ATTRIBUTES=user.name=${person}
+              OTEL_RESOURCE_ATTRIBUTES=${resource}
             '';
 
             telemetryName =
@@ -84,29 +87,37 @@
 
             pyrite = self.nixosConfigurations.pyrite.config.home-manager.users;
             stibnite = self.darwinConfigurations.stibnite.config;
-            # Each flagged home and the person its sessions run for.
+            # Each flagged home, the person its sessions run for and whether
+            # it is an Omnigent worker's.
             withFlag = {
               "pyrite cameron" = {
                 home = pyrite.cameron;
                 person = "cameron";
+                worker = false;
               };
               "pyrite omnigent-cameron" = {
                 home = pyrite.omnigent-cameron;
                 person = "cameron";
+                worker = true;
               };
               "pyrite omnigent-janettesmith" = {
                 home = pyrite.omnigent-janettesmith;
                 person = "janettesmith";
+                worker = true;
               };
               "stibnite crs58" = {
                 home = stibnite.home-manager.users.crs58;
                 person = "cameron";
+                worker = false;
               };
               "stibnite omnigent-cameron" = {
                 home = stibnite.services.omnigent-host.workerHomes.cameron;
                 person = "cameron";
+                worker = true;
               };
             };
+            resourceOf =
+              f: "user.name=${f.person}" + lib.optionalString f.worker ",vanixiets.harness_host=omnigent";
             withoutFlag = {
               "cinnabar cameron" = self.nixosConfigurations.cinnabar.config.home-manager.users.cameron;
               "rosegold cameron" = self.darwinConfigurations.rosegold.config.home-manager.users.cameron;
@@ -114,8 +125,8 @@
             };
 
             claudeOf = home: telemetryOf (home.managedConfigs.claude-code-settings.settings.env or { });
-            claudeWrong = lib.filterAttrs (_: f: claudeOf f.home != claudeExpected f.person) withFlag;
-            ompWrong = lib.filterAttrs (_: f: ompFile f.home != ompExpected f.person) withFlag;
+            claudeWrong = lib.filterAttrs (_: f: claudeOf f.home != claudeExpected (resourceOf f)) withFlag;
+            ompWrong = lib.filterAttrs (_: f: ompFile f.home != ompExpected (resourceOf f)) withFlag;
             wrappersLeaking =
               lib.concatMap
                 (
@@ -142,11 +153,11 @@
             show = attrs: lib.concatStringsSep ", " (lib.attrNames attrs);
           in
           assert lib.assertMsg (claudeWrong == { })
-            "agent-telemetry: flagged homes' Claude settings env must carry exactly the D2 and D15 gates with their person; wrong for ${show claudeWrong}: ${
+            "agent-telemetry: flagged homes' Claude settings env must carry exactly the D2 and D15 gates with their person and, for a worker's, its harness host; wrong for ${show claudeWrong}: ${
               builtins.toJSON (lib.mapAttrs (_: f: claudeOf f.home) claudeWrong)
             }";
           assert lib.assertMsg (ompWrong == { })
-            "agent-telemetry: flagged homes' ~/.omp/agent/.env must be exactly the D2 metrics and D13 traces lines with their person; wrong for ${show ompWrong}: ${
+            "agent-telemetry: flagged homes' ~/.omp/agent/.env must be exactly the D2 metrics and D13 traces lines with their person and, for a worker's, its harness host; wrong for ${show ompWrong}: ${
               builtins.toJSON (lib.mapAttrs (_: f: ompFile f.home) ompWrong)
             }";
           assert lib.assertMsg (wrappersLeaking == [ ])

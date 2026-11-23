@@ -175,6 +175,7 @@
                     "last_user_message"
                     "gen_ai.output.messages"
                   ];
+                  inherit resourceKeys;
                 };
               in
               assert lib.assertMsg (
@@ -199,6 +200,7 @@
                     "gen_ai.tool.call.result"
                     "user_prompt"
                   ];
+                  inherit resourceKeys;
                 };
               in
               assert lib.assertMsg (
@@ -206,6 +208,34 @@
                 == "7d647ff8027f36b2f0766332712b68e821f84e89bd5f5f12f73702a63de1333d"
               ) "fleet-ingress: the D15 agent_span is not 2c7ee83f's CREATE";
               table;
+            # The span resource keys of both generations above: neither had
+            # the harness host's (darwin-agent-session-telemetry design D15).
+            resourceKeys = [
+              "service.name"
+              "service.version"
+              "user.name"
+            ];
+            # agent.session_event as 55c644f6 created it on magnetite, before
+            # the harness host's column (darwin-agent-session-telemetry design
+            # D15), its CREATE pinned by hash.
+            oldEventTable =
+              let
+                table = self.lib.otelCollectorSchema.agentSession.tables.session_event;
+                inherit
+                  (self.lib.greptimedbLogTable {
+                    name = "session_event";
+                    table = table // {
+                      columns = builtins.filter (column: column.name != "harness_host") table.columns;
+                    };
+                  })
+                  ddl
+                  ;
+              in
+              assert lib.assertMsg (
+                builtins.hashString "sha256" ddl
+                == "7ba25aefca51d569324455e05cdb05f4e286f1d3f2f58d031d00dad8e74c8d3f"
+              ) "fleet-ingress: the pre-marker session_event is not 55c644f6's CREATE";
+              ddl;
             agentSessionState = "/var/lib/otel-agent-session";
             # Langfuse Cloud's stand-in (agent-session-telemetry design D16):
             # fleet-ingress/langfuse_sink.py on loopback, answering as the
@@ -846,6 +876,41 @@
             agentSession = ''
               print("=== case agentSession", flush=True)
               fresh_start()
+              # session_event as 55c644f6 created it on magnetite, before the
+              # harness host's column (darwin-agent-session-telemetry design
+              # D15), with a row: the schema job adds the column, which the
+              # pipeline's write of it needs (1.2.1 refuses unknown columns
+              # under auto_create_table=false), and the table ends as a
+              # fresh one is, its row kept.
+              def event_lines():
+                  create = gsql("SHOW CREATE TABLE session_event", "agent")[0][1]
+                  return sorted(line.strip().rstrip(",") for line in create.splitlines())
+
+
+              def admin(sql):
+                  status = store.succeed(
+                      f"curl -sS -o /tmp/agent-admin -w '%{{http_code}}' --netrc-file {config()['vars']}/admin.netrc "
+                      f"--data-urlencode {shlex.quote('sql=' + sql)} 'http://127.0.0.1:4000/v1/sql?db=agent'"
+                  ).strip()
+                  assert status == "200", (sql, status, store.succeed("cat /tmp/agent-admin"))
+
+
+              fresh_events = event_lines()
+              admin("DROP TABLE session_event")
+              admin(config()["oldEventTable"])
+              admin("INSERT INTO session_event (ts, host_name, session_id, event_sequence, event_name) "
+                    "VALUES (now(), 'old', 'old-session', 1, 'pre-marker row')")
+              missing = sorted(set(fresh_events) - set(event_lines()))
+              print(f"  pre-marker session_event lacks {len(missing)} lines: {missing}", flush=True)
+              assert missing == ['"harness_host" STRING NULL'], missing
+              store.succeed("systemctl restart greptimedb-schema.service")
+              assert event_lines() == fresh_events, ("the upgraded session_event differs from a fresh one",
+                                                     sorted(set(event_lines()) ^ set(fresh_events)))
+              store.succeed("systemctl restart greptimedb-schema.service")
+              assert event_lines() == fresh_events, "a second schema run on the upgraded session_event changed it"
+              assert gsql("SELECT count(*) FROM session_event WHERE event_name = 'pre-marker row'", "agent") == [[1]]
+              store.succeed(f"systemctl restart {INGRESS}.service")
+              wait_telemetry(INGRESS_PORT)
               store.succeed(f"systemctl restart {SESSION}.service")
               wait_telemetry(SESSION_PORT)
               NONCE = f"n{time.time_ns()}"
@@ -911,6 +976,12 @@
                   {"resource": {"attributes": other}, "scopeLogs": [{"logRecords": [
                       record(1, "user_prompt", [s("prompt", f"canary-other-{NONCE}")]),
                   ]}]},
+                  # A worker home's session (darwin-agent-session-telemetry
+                  # design D15).
+                  {"resource": {"attributes": [s("service.name", "claude-code"), s("service.version", "2.1.330"), s("user.name", "cameron"),
+                                               s("vanixiets.harness_host", "omnigent")]}, "scopeLogs": [{"logRecords": [
+                      record(7, "user_prompt", [s("prompt", "worker prompt")]),
+                  ]}]},
               ]}
 
 
@@ -950,14 +1021,18 @@
                   status, body = _request("/v1/sql", "agent", [("sql", "SELECT count(*) FROM session_event WHERE host_name = 'pyrite'")])
                   rows = json.loads(body)["output"][0]["records"]["rows"] if status == 200 else None
                   print(f"  session_event rows from pyrite: {status} {rows}", flush=True)
-                  return rows == [[4]]
+                  return rows == [[5]]
 
 
-              wait_for(stored_events, "pyrite's four admitted events in agent.session_event", 240)
+              wait_for(stored_events, "pyrite's five admitted events in agent.session_event", 240)
+              marked = gsql("SELECT event_sequence, user_name, harness_host FROM session_event "
+                            "WHERE host_name = 'pyrite' AND harness_host IS NOT NULL", "agent")
+              print(f"  harness_host rows: {marked}", flush=True)
+              assert marked == [[7, "cameron", "omnigent"]], marked
               rows = gsql(
                   "SELECT event_name, host_name, user_name, service_name, prompt, response, input_tokens, output_tokens, "
                   "cost_usd_micros, duration_ms, success, tool_name, tool_parameters, speed FROM session_event "
-                  "WHERE host_name = 'pyrite' ORDER BY event_sequence", "agent")
+                  "WHERE host_name = 'pyrite' AND harness_host IS NULL ORDER BY event_sequence", "agent")
               for row in rows:
                   print(f"  admitted: {row}", flush=True)
               assert [r[0] for r in rows] == ["user_prompt", "assistant_response", "api_request", "tool_result"], rows
@@ -973,6 +1048,8 @@
 
               create = gsql("SHOW CREATE TABLE session_event", "agent")[0][1]
               print("  " + create.replace("\n", "\n  "), flush=True)
+              assert event_lines() == fresh_events, ("the written pre-marker session_event differs from a fresh one",
+                                                     sorted(set(event_lines()) ^ set(fresh_events)))
               for column in ("prompt", "response"):
                   assert f"\"{column}\" STRING NULL FULLTEXT INDEX WITH(analyzer = 'English', backend = 'bloom', case_sensitive = 'false'" in create, column
               assert "append_mode = 'false'" in create, create
@@ -1088,15 +1165,19 @@
                   old = table_lines()
                   missing = sorted(set(fresh) - set(old))
                   print(f"  {generation} agent_span lacks {len(missing)} lines: {missing}", flush=True)
-                  assert missing and all("span_attributes" in line for line in missing), missing
+                  # Each generation also lacks the harness host's column
+                  # (darwin-agent-session-telemetry design D15).
+                  marker_column = '"resource_attributes.vanixiets.harness_host" STRING NULL'
+                  assert missing[0] == marker_column, missing
+                  assert missing[1:] and all("span_attributes" in line for line in missing[1:]), missing
                   if generation == "D15":
                       # The two indexes of then, and the oneshot kind's
                       # column (darwin-agent-session-telemetry design D8).
-                      assert [line.split('"')[1] for line in missing] == [
+                      assert [line.split('"')[1] for line in missing[1:]] == [
                           "span_attributes.full_command", "span_attributes.gen_ai.tool.call.arguments",
                           "span_attributes.omp.gen_ai.oneshot.kind"], missing
-                      assert all("FULLTEXT INDEX" in line for line in missing[:2]), missing
-                      assert missing[2].endswith("STRING NULL") or missing[2].endswith("STRING NULL,"), missing
+                      assert all("FULLTEXT INDEX" in line for line in missing[1:3]), missing
+                      assert missing[3].endswith("STRING NULL") or missing[3].endswith("STRING NULL,"), missing
                   schema_job()
                   upgraded = table_lines()
                   assert upgraded == fresh, (f"the upgraded {generation} agent_span differs from a fresh one", sorted(set(upgraded) ^ set(fresh)))
@@ -1469,7 +1550,7 @@
                    "scopeSpans": [{"scope": {"name": "omp", "attributes": [s("canary.scope", canary["scope"])]},
                                    "spans": [chat, after_tool, tool, linked] + excluded + result_spans}]},
                   {"resource": {"attributes": [s("service.name", "claude-code"), s("service.version", "2.1.330"), s("user.name", "cameron"),
-                                               s("os.type", "linux"), s("host.arch", "amd64")]},
+                                               s("os.type", "linux"), s("host.arch", "amd64"), s("vanixiets.harness_host", "omnigent")]},
                    "scopeSpans": [{"scope": {"name": "com.anthropic.claude_code.tracing"}, "spans": claude_spans}]},
                   {"resource": {"attributes": [s("service.name", "canary-other"), s("user.name", "cameron")]},
                    "scopeSpans": [{"spans": [dict(tool, spanId="eee19b7ec3c1b176",
@@ -1516,7 +1597,8 @@
                          "span_attributes.tool_use_id", "span_attributes.full_command", "span_attributes.file_path",
                          "span_attributes.duration_ms", "span_attributes.success", "span_attributes.error",
                          "span_attributes.input_tokens", "span_attributes.output_tokens", "span_attributes.cache_read_tokens",
-                         "span_attributes.cache_creation_tokens", "span_attributes.gen_ai.request.model", "span_attributes.error.type"]
+                         "span_attributes.cache_creation_tokens", "span_attributes.gen_ai.request.model", "span_attributes.error.type",
+                         "resource_attributes.vanixiets.harness_host"]
               found_rows = gsql("SELECT " + ", ".join(f'"{c}"' for c in columns)
                                 + " FROM agent_span WHERE \"resource_attributes.host.name\" = 'pyrite' ORDER BY span_id", "agent")
               spans = {row[0]: dict(zip(columns, row)) for row in found_rows}
@@ -1527,6 +1609,10 @@
                                         "eee19b7ec3c1b17a", "eee19b7ec3c1b17b", "eee19b7ec3c1b17c", "eee19b7ec3c1b17d")]
               assert [r["service_name"] for r in spans.values()].count("claude-code") == 6, spans.keys()
               assert all(r["resource_attributes.user.name"] == "cameron" and r["resource_attributes.host.name"] == "pyrite"
+                         for r in spans.values()), spans
+              # Claude Code's resource carries a worker home's harness host,
+              # omp's none (darwin-agent-session-telemetry design D15).
+              assert all(r["resource_attributes.vanixiets.harness_host"] == ("omnigent" if r["service_name"] == "claude-code" else None)
                          for r in spans.values()), spans
               chat_row, tool_row = omp[0], omp[1]
               assert chat_row["span_attributes.last_user_message"] == canary["prompt"], chat_row
@@ -2210,6 +2296,7 @@
                       agentDeployRecord
                       oldSpanTable
                       d15SpanTable
+                      oldEventTable
                       sinkDir
                       sinkPort
                       langfuseTestRetry

@@ -132,6 +132,7 @@ in
         else
           throw "Omnigent worker home ${config.home.username}: agentTelemetry.person needs exactly one services.omnigent-host.workers entry with user ${config.home.username}, found ${toString (lib.length workerOwners)}; refusing to stamp the Unix account name as the person."
       );
+      agentTelemetry.harnessHost = "omnigent";
 
       # Prefer HM's configured wrappers inside the profile, not in the supervisor PATH.
       home.packages = map (
