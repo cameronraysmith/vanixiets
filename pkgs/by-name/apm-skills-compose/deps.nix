@@ -10,20 +10,16 @@
   git,
   cacert,
   yq,
-  pluginsDir,
   apmDepsHash,
 }:
 let
-  # Every package directory, independent of the compose's firstPartyPackages,
-  # so a narrowed package list cannot change the content under an unchanged name.
-  discovered = lib.attrNames (
-    lib.filterAttrs (n: t: t == "directory" && builtins.pathExists (pluginsDir + "/${n}/.apm/skills")) (
-      builtins.readDir pluginsDir
-    )
-  );
+  pluginGroups = import ../../../lib/plugin-groups.nix;
+  pluginsDir = pluginGroups.root;
+  # Every skill group, independent of the compose's firstPartyPackages, so a
+  # narrowed package list cannot change the content under an unchanged name.
   manifests = lib.genAttrs (builtins.filter (
     p: builtins.pathExists (pluginsDir + "/${p}/apm.yml")
-  ) discovered) (p: builtins.readFile (pluginsDir + "/${p}/apm.yml"));
+  ) pluginGroups.skills) (p: builtins.readFile (pluginsDir + "/${p}/apm.yml"));
   guard = import ./guard.nix { inherit lib; } {
     inherit manifests;
     apmVersion = apm.version;

@@ -7,18 +7,7 @@
 
   apm,
 
-  # Auto-discover every apm package dir (one containing .apm/skills) under the
-  # plugins root. readDir over a source path → no IFD. Sorted == alphabetical,
-  # reproducing the prior hardcoded order.
-  firstPartyPackages ?
-    let
-      root = ../../../modules/home/ai/plugins;
-    in
-    lib.attrNames (
-      lib.filterAttrs (n: t: t == "directory" && builtins.pathExists (root + "/${n}/.apm/skills")) (
-        builtins.readDir root
-      )
-    ),
+  firstPartyPackages ? (import ../../../lib/plugin-groups.nix).skills,
 
   # Upstream source trees composed as additional local packages. Empty: remote
   # apm dependencies are declared in the plugin apm.yml files and come from
@@ -31,10 +20,7 @@
   apmDepsHash ? "sha256-8tHi1PGBMMfychJrcbSstFOkvYNNTC4CkI1uLbrZc+U=",
 
   # Every remote apm dependency, downloaded once (deps.nix, design D1).
-  apmDeps ? callPackage ./deps.nix {
-    inherit apm apmDepsHash;
-    pluginsDir = ../../../modules/home/ai/plugins;
-  },
+  apmDeps ? callPackage ./deps.nix { inherit apm apmDepsHash; },
 
   targets ? [
     "agent-skills"
@@ -49,7 +35,7 @@
   skillNames ? lib.importJSON ./skills.json,
 }:
 let
-  pluginsDir = ../../../modules/home/ai/plugins;
+  pluginsDir = (import ../../../lib/plugin-groups.nix).root;
 
   consumerApmDeps = lib.concatStringsSep "\n" (
     map (n: "    - ./${n}") firstPartyPackages ++ map (d: "    - ./${d.name}") upstreamDeps

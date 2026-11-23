@@ -11,11 +11,7 @@ let
       options.aiSkills = {
         packages = lib.mkOption {
           type = lib.types.listOf lib.types.str;
-          default = lib.attrNames (
-            lib.filterAttrs (n: t: t == "directory" && builtins.pathExists (../plugins + "/${n}/.apm/skills")) (
-              builtins.readDir ../plugins
-            )
-          );
+          default = (import ../../../../lib/plugin-groups.nix).skills;
           description = "First-party apm package directory names under modules/home/ai/plugins/ to compose into the marketplace tree. Defaults to every directory containing an .apm/skills subtree, so new packages are auto-included.";
         };
 
