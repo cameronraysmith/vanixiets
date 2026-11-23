@@ -775,6 +775,36 @@ in
                   builtins.toJSON (unit.Environment or null)
                 }, MemoryMax ${builtins.toJSON (unit.MemoryMax or null)}.";
               }
+              # checks.x86_64-linux.otel-collector-darwin compares stibnite's
+              # daemon with this call over placeholder host facts, which stands
+              # for this host only while its settings are the call over the
+              # facts that check's normaliser replaces, read back from the
+              # settings (darwin-agent-session-telemetry design D12).
+              {
+                assertion =
+                  let
+                    tls = settings.exporters."otlp_http/ingress-metrics".tls;
+                    auth = settings.extensions."basicauth/langfuse".client_auth;
+                  in
+                  settings == (flakeLib.agentSessionCollector {
+                    inherit hostName ingress;
+                    caFile = tls.ca_file;
+                    certFile = tls.cert_file;
+                    keyFile = tls.key_file;
+                    queueDirectory = settings.extensions.file_storage.directory;
+                    telemetryPort =
+                      (builtins.head settings.service.telemetry.metrics.readers).pull.exporter.prometheus.port;
+                    langfuse =
+                      if langfuse then
+                        {
+                          publicKeyFile = auth.username_file;
+                          secretKeyFile = auth.password_file;
+                        }
+                      else
+                        null;
+                  }).settings;
+                message = "otel-collector agent on ${hostName}: agentSessionSettings must be flake.lib.agentSessionCollector's over the host's facts alone (host name, TLS files, queue directory, telemetry port, Langfuse key files), as checks.otel-collector-darwin's agentSessionEqualsPyrite assumes (darwin-agent-session-telemetry design D12).";
+              }
             ]
             ++ flakeLib.agentSessionAssertions {
               inherit hostName settings langfuse;

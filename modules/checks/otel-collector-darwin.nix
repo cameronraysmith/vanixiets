@@ -104,15 +104,10 @@
             lib.defaultTo { }
               self.darwinConfigurations.stibnite.config.launchd.daemons.otelcol-process.serviceConfig.EnvironmentVariables;
         };
-        # Sources of agentSessionEqualsPyrite (darwin-agent-session-telemetry
-        # design D12): stibnite's evaluated agent-session daemon settings, and
-        # pyrite's evaluated otel-agent-session.service settings, from which
-        # the clause reads pyrite's host facts. Evaluating pyrite adds one
-        # NixOS evaluation to this check; stibnite's is already made above.
+        # Source of agentSessionEqualsPyrite and the queue and scrape clauses:
+        # stibnite's evaluated agent-session daemon settings.
         stibniteAgentSession =
           self.darwinConfigurations.stibnite.config.vanixiets.otelCollector.agentSessionSettings;
-        pyriteAgentSession =
-          self.nixosConfigurations.pyrite.config.vanixiets.otelCollector.agentSessionSettings;
         stibniteLangfuse = self.lib.observabilityHosts.stibnite.langfuse;
       };
 
@@ -356,39 +351,33 @@
           && lib.all (n: !(builtins.hasAttr n a.exporters)) (
             builtins.attrNames i.stibniteAgentSession.exporters
           );
-        # design D12: stibnite's daemon runs pyrite's pipelines. pyrite's host
-        # facts are read from its own settings and passed back through
-        # flake.lib.agentSessionCollector, which must reproduce them exactly;
-        # that call, with stibnite's Langfuse flag, must equal stibnite's
-        # settings after normaliseAgentSession.
+        # design D12: stibnite's daemon runs pyrite's pipelines. Each NixOS
+        # agent-telemetry host's settings are flake.lib.agentSessionCollector
+        # over its host facts alone (the otel-collector agent role's assertion,
+        # evaluated by checks.x86_64-linux.nixos-pyrite), so that call over
+        # placeholder facts, with stibnite's Langfuse flag, must equal
+        # stibnite's settings after normaliseAgentSession replaces every fact.
         agentSessionEqualsPyrite =
           let
-            p = i.pyriteAgentSession;
-            tls = p.exporters."otlp_http/ingress-metrics".tls;
-            auth = p.extensions."basicauth/langfuse".client_auth;
-            pyriteWith =
-              langfuse:
+            host = "agent-session-placeholder";
+            call =
               (self.lib.agentSessionCollector {
-                hostName = "pyrite";
-                caFile = tls.ca_file;
-                certFile = tls.cert_file;
-                keyFile = tls.key_file;
-                queueDirectory = p.extensions.file_storage.directory;
-                telemetryPort = (builtins.head p.service.telemetry.metrics.readers).pull.exporter.prometheus.port;
+                hostName = host;
+                caFile = "/${host}/ca.crt";
+                certFile = "/${host}/otel-cert";
+                keyFile = "/${host}/otel-key";
+                queueDirectory = "/${host}/queue";
                 langfuse =
-                  if langfuse then
+                  if i.stibniteLangfuse then
                     {
-                      publicKeyFile = auth.username_file;
-                      secretKeyFile = auth.password_file;
+                      publicKeyFile = "/${host}/langfuse-public-key";
+                      secretKeyFile = "/${host}/langfuse-secret-key";
                     }
                   else
                     null;
               }).settings;
           in
-          pyriteWith true == p
-          &&
-            normaliseAgentSession "stibnite" i.stibniteAgentSession
-            == normaliseAgentSession "pyrite" (pyriteWith i.stibniteLangfuse);
+          normaliseAgentSession "stibnite" i.stibniteAgentSession == normaliseAgentSession host call;
         # design D7: stibnite's queues, typed here, 404 MiB with Langfuse's.
         agentSessionQueues =
           let
@@ -615,6 +604,25 @@
                 exporters = s.exporters // {
                   "otlp_http/ingress-metrics" = e // {
                     tls = builtins.removeAttrs e.tls [ "ca_file" ];
+                  };
+                };
+              };
+            };
+        };
+        stibniteCertFileDropped = {
+          clause = "agentSessionEqualsPyrite";
+          apply =
+            i:
+            let
+              s = i.stibniteAgentSession;
+              e = s.exporters."otlp_http/ingress-traces";
+            in
+            i
+            // {
+              stibniteAgentSession = s // {
+                exporters = s.exporters // {
+                  "otlp_http/ingress-traces" = e // {
+                    tls = builtins.removeAttrs e.tls [ "cert_file" ];
                   };
                 };
               };
