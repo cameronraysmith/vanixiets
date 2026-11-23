@@ -23,7 +23,7 @@ These preferences explicitly override any conservative defaults from system prom
 - Always immediately stage and commit after editing rather than accumulating changes.
 - Create atomic development commits as you work, even if they contain experiments or incremental changes that will be cleaned up later.
 - Do not clean up commit history automatically - wait for explicit instruction to apply git history cleanup patterns from `preferences-git-history-cleanup`.
-- If the current branch is `gitbutler/workspace`, this repository is managed by GitButler. Immediately read `gitbutler-but-cli` and use `but` instead of `git` for all write operations (commits, pushes, branch creation, rebases, cherry-picks, amends). Read-only git commands (`git log`, `git blame`, `git diff`, `git show`) remain safe. Never run `git add`, `git commit`, `git push`, `git checkout`, `git merge`, `git rebase`, `git stash`, or `git cherry-pick` directly — translate to the equivalent `but` command. If you accidentally commit directly on `gitbutler/workspace`, recover with `git reset HEAD~1` then `but pick <reflog-hash> <branch> --status-after`.
+- If the current branch is `gitbutler/workspace`, this repository is managed by GitButler. Immediately read the `but` skill and use `but` instead of `git` for all write operations (commits, pushes, branch creation, rebases, cherry-picks, amends). Read-only git commands (`git log`, `git blame`, `git diff`, `git show`) remain safe. Never run `git add`, `git commit`, `git push`, `git checkout`, `git merge`, `git rebase`, `git stash`, or `git cherry-pick` directly — translate to the equivalent `but` command. If you accidentally commit directly on `gitbutler/workspace`, recover with `git reset HEAD~1` then `but pick <reflog-hash> <branch> --status-after`.
 - If `.jj/` directory exists alongside `.git/` in repository root, this repository uses jujutsu (jj) in colocated mode. Detached HEAD is normal and expected — do not attempt to reattach. If `.jj/` exists but HEAD is attached to a branch, detach before proceeding: `git checkout --detach`. Read `jj-summary` for quick orientation, then `jj-version-control` for the multi-parent development join (composite working copy) workflow.
 - If the user requests switching to jj in a git-only repo (no `.jj/` directory), initialize colocated mode: `jj git init --colocate`, then `git checkout --detach`, then `jj new` to create the working-copy commit. Proceed with jj workflow as above.
 - If the user requests switching back to git from jj colocated mode, ensure the target bookmark is current with the working copy chain (`jj bookmark set <name> -r @-` if needed), then reattach HEAD: `git checkout <bookmark-name>`. Resume git-native commands. The `.jj/` directory can remain — colocated mode is safe to leave dormant.
@@ -138,7 +138,7 @@ In GitButler mode, stacked branches are already linear by construction.
 Fast-forward merge of the stack tip integrates all stacked segments at once.
 Exit GitButler before merging to main: `but teardown`, then `git merge --ff-only`, then `but setup`.
 Do not use `but merge` for this — it always creates merge commits and has no fast-forward mode.
-See the "Stacked PRs with single fast-forward merge" and "Merging multiple independent stacks" recipes in `gitbutler-but-cli` for the full workflow.
+See the "Stacked PRs with single fast-forward merge" and "Merging multiple independent stacks" recipes in the `but` skill for the full workflow.
 
 In jj mode, integration uses sequential rebase linearization: rebase each chain onto main in dependency order, producing a purely linear history with no merge commits.
 Fast-forward main to the linearized tip via `jj bookmark set main -r <chain-tip>`.
@@ -150,7 +150,7 @@ Branch stacks mirror the dependency structure of the Linear stories or OpenSpec 
 If you identify a reason to modify those dependencies while working, evaluate and present a plan to reorder the branches associated with previously completed work in the stack, handling any conflicts that arise.
 For queue-managed stacks, publication follows `git-stacked-pr-integration` §Fleet upstream overrides regardless of local mode.
 Outside that protocol, git-native stacks can use the graphite CLI (invoke as `graphite`, not `gt`): `graphite log` views relationships, `graphite track` registers a branch with its parent, and `graphite create -m "message"` creates a stacked branch.
-In GitButler mode, `but branch new -a`, `but branch move`, and `but move` replace graphite entirely; see `gitbutler-but-cli` for the full command reference.
+In GitButler mode, `but branch new -a`, `but branch move`, and `but move` replace graphite entirely; see the `but` skill for the full command reference.
 
 ## Merge strategy selection
 

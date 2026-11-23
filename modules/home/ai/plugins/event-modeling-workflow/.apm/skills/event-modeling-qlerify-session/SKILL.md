@@ -1,7 +1,7 @@
 ---
 name: event-modeling-qlerify-session
 description: Guide interactive Qlerify session with browser integration for collaborative event modeling.
-argument-hint: [step-number]
+argument-hint: "[step-number]"
 disable-model-invocation: true
 ---
 Guide an interactive Event Modeling session with Qlerify open in the browser.

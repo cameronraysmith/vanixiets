@@ -30,7 +30,7 @@ but branch new {issue-ID}-descriptor -a <anchor-commit>
 
 The anchor commit and everything below it become the new branch.
 Everything above the anchor stays with the original branch.
-See the "Split a branch at a commit boundary" recipe in `gitbutler-but-cli` for details.
+See the "Split a branch at a commit boundary" recipe in the `but` skill for details.
 
 When issue work is complete, commits are already part of the stack's linear history.
 No rebase or merge step is needed — the stack tip integrates all segments at once when merged to main.
