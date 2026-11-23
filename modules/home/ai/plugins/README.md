@@ -67,10 +67,10 @@ The updaters of `mergify-cli-bin`, `worktrunk-bin` and `linear-cli` rewrite the 
 apm therefore installs only those skill directories: neither repository's hooks, agency's subagents nor its rule are installed, and a plain `apm install` of this package succeeds for the `agent-skills`, `claude`, `codex`, `copilot`, `cursor`, `gemini` and `opencode` targets (`logs/apm-marketplace-20261118-134756.log`).
 superpowers' SessionStart hook, which loads `using-superpowers` at the start of each session, is deliberately absent; apm 0.36 refuses superpowers' hook files, and upstream declined apm support (obra/superpowers#2681).
 For that hook and the plugin experience, install superpowers natively instead (`/plugin install superpowers@claude-plugins-official`, or its README for other harnesses), and either do not install `planning-and-development` alongside it or remove its superpowers lines, so the same skills are not installed twice.
-The marketplace supports the apm version this repository builds with (`modules/nixpkgs/overlays/apm.nix`; 0.38 at the time of writing) and later releases.
 `preferences-web-platform-and-deployment` depends on 41 of the 43 Internet Computer skills of `dfinity/icskills`, each declared as its own skill directory, so apm deploys them flat and nothing else from that repository.
 The two it withholds, `autosync-ic-skills` and `autoupgrade-icp-cli`, are one-time installers of a Claude Code SessionStart hook whose script fetches newer skills from skills.internetcomputer.org or upgrades `icp` and `ic-wasm` on every session; the withheld list and its reason sit in `pkgs/by-name/apm-skills-compose/deps.nix`.
 `canhelp` is delivered and carries two scripts, pre-approved in its `allowed-tools`, that run `icp canister metadata` and query ic-api.internetcomputer.org when the skill is invoked.
+The marketplace supports the apm version this repository builds with (`modules/nixpkgs/overlays/apm.nix`; 0.38 at the time of writing) and later releases.
 Older apm may install a group from it yet deploy none of its skills.
 Installers other than apm read the generated marketplace files, whose entries name only each package's source directory, so they do not resolve `apm.yml` dependencies and install none of the remote skills.
 
