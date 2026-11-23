@@ -907,10 +907,10 @@ Each prints JSON, or an aligned table with `--table`.
 Langfuse Cloud's v4 API has no traces or sessions resource: a trace is the observations sharing a trace id and a session those sharing a session id, which is how the subcommands read them.
 Its full-text search is the `matches` operator on `input` and `output`, which matches whole tokens, not substrings inside one, and one request can search only one of the two fields.
 
-The project key is the shared clan var `langfuse/{public,secret}-key`, whose readers are magnetite, pyrite and the operator.
-`langfuse-query` decrypts it with the caller's own sops age identity at each run and hands it to the CLI in its environment, never an argument or a file, and exits 1 with one line when the identity cannot decrypt it.
-Nothing in Langfuse limits what that key may call from the workstation, so read-only rests on the wrapper: any action off the allow-list, and any of the CLI's global options but `--json`, exits 2 before a request is made, and `checks.x86_64-linux.langfuse-query` refuses every non-GET operation of the packaged CLI's contract.
-Langfuse can create project keys with the Viewer permission set, read-only on the server; a Viewer key in its own var would make the server enforce it too.
+The app's key is a Viewer key, so Langfuse's server refuses writes too; the collectors' key is an Application key, which can't read or delete.
+The Viewer key is the clan secrets `langfuse-viewer-public-key` and `langfuse-viewer-secret-key`, encrypted to the operator and no machine, and `clan secrets users add-secret <user> <secret>` for both adds another reader; the Application key is the shared clan var `langfuse/{public,secret}-key`, read by magnetite, pyrite and the operator.
+`langfuse-query` decrypts its key with the caller's own sops age identity at each run and hands it to the CLI in its environment, never an argument or a file, and exits 1 with one line when the identity cannot decrypt it.
+The wrapper also refuses locally: any action off the allow-list, and any of the CLI's global options but `--json`, exits 2 before a request is made, and `checks.x86_64-linux.langfuse-query` refuses every non-GET operation of the packaged CLI's contract and fails if the app reads any key file but the Viewer key's.
 
 ## Querying devloop
 

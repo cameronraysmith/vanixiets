@@ -16,8 +16,9 @@ Usage:
 
 Reads agent traces from the Langfuse Cloud project (EU) with the official
 Langfuse CLI, read-only: anything but the read actions below exits 2 before a
-request is made. The project key is decrypted at run time from the shared clan
-var langfuse/{public,secret}-key with your own sops age identity.
+request is made, and the key is a Viewer key, which Langfuse's server also
+refuses writes. It is decrypted at run time from the clan secrets
+langfuse-viewer-{public,secret}-key with your own sops age identity.
 Options may appear before or after the arguments; "--" ends them.
 
   traces    Recent traces, newest first: each trace's root observation, with
@@ -92,7 +93,7 @@ decrypt_key() {
   if ! public_key=$(sops decrypt --extract '["data"]' "$LANGFUSE_QUERY_PUBLIC_KEY_FILE" 2>"$sops_error") ||
     ! secret_key=$(sops decrypt --extract '["data"]' "$LANGFUSE_QUERY_SECRET_KEY_FILE" 2>"$sops_error") ||
     [ -z "$public_key" ] || [ -z "$secret_key" ]; then
-    printf 'langfuse-query: cannot decrypt the Langfuse project key (clan var langfuse/secret-key) with your sops age identity; its recipients are magnetite, pyrite and the operator: %s\n' \
+    printf 'langfuse-query: cannot decrypt the Langfuse Viewer key (clan secrets langfuse-viewer-{public,secret}-key) with your sops age identity; "clan secrets users add-secret <user> <secret>" adds a reader: %s\n' \
       "$(grep -m1 -o 'no identity matched any of the recipients\|Failed to get the data key[^.]*' "$sops_error" || echo "sops failed")" >&2
     exit 1
   fi
