@@ -24,6 +24,66 @@ let
     magnetite = "omni.scientistexperience.net";
   };
 
+  # The telemetry files a flagged home writes (agent-session-telemetry design D2, D13,
+  # D15; darwin-agent-session-telemetry design D13), written out here rather than read
+  # from modules/home/ai/agent-telemetry.nix, so that a key the module adds or drops
+  # fails. `resource` is the expected OTEL_RESOURCE_ATTRIBUTES. Shared with
+  # checks.x86_64-linux.agent-telemetry-emitters.
+  telemetryFiles =
+    let
+      telemetryName =
+        name:
+        lib.hasPrefix "OTEL_" name
+        || lib.elem name [
+          "CLAUDE_CODE_ENABLE_TELEMETRY"
+          "CLAUDE_CODE_ENHANCED_TELEMETRY_BETA"
+          "ENABLE_BETA_TRACING_DETAILED"
+          "BETA_TRACING_ENDPOINT"
+        ];
+      telemetryOf = env: lib.filterAttrs (name: _: telemetryName name) env;
+      ompFile =
+        home:
+        let
+          file = home.home.file.".omp/agent/.env" or { enable = false; };
+        in
+        if file.enable then file.text else null;
+    in
+    {
+      inherit telemetryOf ompFile;
+      claudeExpected = resource: {
+        CLAUDE_CODE_ENABLE_TELEMETRY = "1";
+        CLAUDE_CODE_ENHANCED_TELEMETRY_BETA = "1";
+        OTEL_METRICS_EXPORTER = "otlp";
+        OTEL_LOGS_EXPORTER = "otlp";
+        OTEL_TRACES_EXPORTER = "otlp";
+        OTEL_EXPORTER_OTLP_PROTOCOL = "http/protobuf";
+        OTEL_EXPORTER_OTLP_ENDPOINT = "http://127.0.0.1:4318";
+        OTEL_LOG_USER_PROMPTS = "1";
+        OTEL_LOG_ASSISTANT_RESPONSES = "1";
+        OTEL_LOG_TOOL_DETAILS = "1";
+        OTEL_LOG_TOOL_CONTENT = "1";
+        OTEL_BSP_MAX_QUEUE_SIZE = "64";
+        OTEL_METRICS_INCLUDE_ACCOUNT_UUID = "false";
+        OTEL_RESOURCE_ATTRIBUTES = resource;
+      };
+      # In the file's sorted order.
+      ompExpected = resource: ''
+        OTEL_BSP_MAX_EXPORT_BATCH_SIZE=1
+        OTEL_BSP_MAX_QUEUE_SIZE=64
+        OTEL_EXPORTER_OTLP_METRICS_ENDPOINT=http://127.0.0.1:4318/v1/metrics
+        OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf
+        OTEL_EXPORTER_OTLP_TIMEOUT=5000
+        OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://127.0.0.1:4318/v1/traces
+        OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT=full
+        OTEL_LOGS_EXPORTER=none
+        OTEL_RESOURCE_ATTRIBUTES=${resource}
+      '';
+      claudeOf = home: telemetryOf (home.managedConfigs.claude-code-settings.settings.env or { });
+      claudeProgramOf = home: telemetryOf (home.programs.claude-code.settings.env or { });
+      ompTelemetryLines =
+        text: lib.filter (lib.hasPrefix "OTEL_") (lib.splitString "\n" (if text == null then "" else text));
+    };
+
   authorBound =
     {
       meta,
@@ -122,6 +182,7 @@ let
       declaredOwners = lib.filter (owner: workers ? ${owner}) owners;
       generators = hostConfig.clan.core.vars.generators;
       homes = map (worker: toString hostConfig.users.users.${worker.user}.home) (lib.attrValues workers);
+      agentTelemetry = hostConfig.vanixiets.otelCollector.agentTelemetry or false;
     in
     {
       workerRoster =
@@ -317,7 +378,6 @@ let
       # 15.5).
       collectorOrdering =
         let
-          agentTelemetry = hostConfig.vanixiets.otelCollector.agentTelemetry or false;
           collector = "otel-agent-session.service";
           waits =
             text:
@@ -338,6 +398,28 @@ let
             && lib.elem collector unit.wants == agentTelemetry
             && !lib.elem collector unit.requires
             && waits unit.serviceConfig.ExecStartPre.text == agentTelemetry
+        ) declaredOwners;
+
+      # A Darwin worker's home is a standalone generation the host only references, so
+      # its telemetry files are held here, where the host is evaluated anyway: where the
+      # row sets agentTelemetry, exactly the expected files stamped with the owner and
+      # the omnigent harness host (darwin-agent-session-telemetry design D10, D15);
+      # without it, no telemetry name and no omp OTEL_ line. The Linux workers' homes
+      # are held by checks.x86_64-linux.agent-telemetry-emitters.
+      workerTelemetry =
+        !isDarwin
+        || lib.all (
+          owner:
+          let
+            home = hostConfig.services.omnigent-host.workerHomes.${owner};
+            resource = "user.name=${owner},vanixiets.harness_host=omnigent";
+          in
+          if agentTelemetry then
+            telemetryFiles.claudeOf home == telemetryFiles.claudeExpected resource
+            && telemetryFiles.ompFile home == telemetryFiles.ompExpected resource
+          else
+            telemetryFiles.claudeProgramOf home == { }
+            && telemetryFiles.ompTelemetryLines (telemetryFiles.ompFile home) == [ ]
         ) declaredOwners;
 
       # Worker Home Manager consumes the delivered policy: GitHub HTTPS goes through the
@@ -504,7 +586,7 @@ let
 in
 {
   flake.lib.omnigentFleetObligations = {
-    inherit expectedOwners authorBound;
+    inherit expectedOwners authorBound telemetryFiles;
 
     failures =
       machine: hostConfig:

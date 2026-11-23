@@ -3,16 +3,17 @@
 #
 # - on pyrite and stibnite, hosts whose observabilityHosts row sets
 #   agentTelemetry, the Claude Code settings file each home writes (its
-#   managedConfigs entry, so a writable copy, for the humans and every
-#   worker) carries exactly the telemetry keys and values below, with
-#   user.name the person (a worker's owner, not its Unix account; stibnite's
-#   crs58 as cameron, its flake.userAliases name, darwin-agent-session-
-#   telemetry design D10), and ~/.omp/agent/.env is exactly the lines below.
-#   A worker's home alone adds vanixiets.harness_host=omnigent to the
-#   resource attributes, a person's own home never
-#   (darwin-agent-session-telemetry design D15). stibnite's worker is a
-#   standalone home with no osConfig, read through
-#   services.omnigent-host.workerHomes;
+#   managedConfigs entry, so a writable copy, for the humans and pyrite's
+#   workers) carries exactly the telemetry keys and values of
+#   flake.lib.omnigentFleetObligations.telemetryFiles, with user.name the
+#   person (a worker's owner, not its Unix account; stibnite's crs58 as
+#   cameron, its flake.userAliases name, darwin-agent-session-telemetry
+#   design D10), and ~/.omp/agent/.env is exactly its lines. A worker's home
+#   alone adds vanixiets.harness_host=omnigent to the resource attributes, a
+#   person's own home never (darwin-agent-session-telemetry design D15).
+#   stibnite's worker home, a standalone generation, is held to the same
+#   files by that obligation's workerTelemetry case in
+#   checks.aarch64-darwin.darwin-stibnite;
 # - the claude-glm and claude-cerebras wrappers' settings carry no telemetry
 #   name, so other model providers' sessions do not export;
 # - on cinnabar (NixOS, no flag), rosegold (darwin, no flag; argentum is the
@@ -20,9 +21,8 @@
 #   both) and the claude-sandbox profile, no Claude settings carry a
 #   telemetry name and no omp .env line starts with OTEL_.
 #
-# The expectations are written out here rather than read from the module, so
-# a key added to or dropped from the module (OTEL_LOG_RAW_API_BODIES added, or
-# OTEL_LOG_TOOL_CONTENT dropped, say), or a person stamped as the account
+# A key added to or dropped from the module (OTEL_LOG_RAW_API_BODIES added,
+# or OTEL_LOG_TOOL_CONTENT dropped, say), or a person stamped as the account
 # name (crs58), fails this check. Evaluation-time obligations: the asserts
 # fire when this attribute is evaluated; the value is the rendered files of
 # the flagged homes as a file.
@@ -34,56 +34,15 @@
       checks = lib.optionalAttrs (system == "x86_64-linux") {
         agent-telemetry-emitters =
           let
-            # design D2's gates and D15's traces with tool content.
-            claudeExpected = resource: {
-              CLAUDE_CODE_ENABLE_TELEMETRY = "1";
-              CLAUDE_CODE_ENHANCED_TELEMETRY_BETA = "1";
-              OTEL_METRICS_EXPORTER = "otlp";
-              OTEL_LOGS_EXPORTER = "otlp";
-              OTEL_TRACES_EXPORTER = "otlp";
-              OTEL_EXPORTER_OTLP_PROTOCOL = "http/protobuf";
-              OTEL_EXPORTER_OTLP_ENDPOINT = "http://127.0.0.1:4318";
-              OTEL_LOG_USER_PROMPTS = "1";
-              OTEL_LOG_ASSISTANT_RESPONSES = "1";
-              OTEL_LOG_TOOL_DETAILS = "1";
-              OTEL_LOG_TOOL_CONTENT = "1";
-              OTEL_BSP_MAX_QUEUE_SIZE = "64";
-              OTEL_METRICS_INCLUDE_ACCOUNT_UUID = "false";
-              OTEL_RESOURCE_ATTRIBUTES = resource;
-            };
-            # The metrics lines (design D2), the traces lines (design D13)
-            # and one span per request (darwin-agent-session-telemetry
-            # design D13), in the file's sorted order.
-            ompExpected = resource: ''
-              OTEL_BSP_MAX_EXPORT_BATCH_SIZE=1
-              OTEL_BSP_MAX_QUEUE_SIZE=64
-              OTEL_EXPORTER_OTLP_METRICS_ENDPOINT=http://127.0.0.1:4318/v1/metrics
-              OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf
-              OTEL_EXPORTER_OTLP_TIMEOUT=5000
-              OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://127.0.0.1:4318/v1/traces
-              OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT=full
-              OTEL_LOGS_EXPORTER=none
-              OTEL_RESOURCE_ATTRIBUTES=${resource}
-            '';
-
-            telemetryName =
-              name:
-              lib.hasPrefix "OTEL_" name
-              || lib.elem name [
-                "CLAUDE_CODE_ENABLE_TELEMETRY"
-                "CLAUDE_CODE_ENHANCED_TELEMETRY_BETA"
-                "ENABLE_BETA_TRACING_DETAILED"
-                "BETA_TRACING_ENDPOINT"
-              ];
-            telemetryOf = env: lib.filterAttrs (name: _: telemetryName name) env;
-            ompFile =
-              home:
-              let
-                file = home.home.file.".omp/agent/.env" or { enable = false; };
-              in
-              if file.enable then file.text else null;
-            ompTelemetryLines =
-              text: lib.filter (lib.hasPrefix "OTEL_") (lib.splitString "\n" (if text == null then "" else text));
+            inherit (self.lib.omnigentFleetObligations.telemetryFiles)
+              claudeExpected
+              ompExpected
+              telemetryOf
+              ompFile
+              claudeOf
+              claudeProgramOf
+              ompTelemetryLines
+              ;
 
             pyrite = self.nixosConfigurations.pyrite.config.home-manager.users;
             stibnite = self.darwinConfigurations.stibnite.config;
@@ -110,11 +69,6 @@
                 person = "cameron";
                 worker = false;
               };
-              "stibnite omnigent-cameron" = {
-                home = stibnite.services.omnigent-host.workerHomes.cameron;
-                person = "cameron";
-                worker = true;
-              };
             };
             resourceOf =
               f: "user.name=${f.person}" + lib.optionalString f.worker ",vanixiets.harness_host=omnigent";
@@ -124,7 +78,6 @@
               "claude-sandbox" = self.homeConfigurations."claude-sandbox@x86_64-linux".config;
             };
 
-            claudeOf = home: telemetryOf (home.managedConfigs.claude-code-settings.settings.env or { });
             claudeWrong = lib.filterAttrs (_: f: claudeOf f.home != claudeExpected (resourceOf f)) withFlag;
             ompWrong = lib.filterAttrs (_: f: ompFile f.home != ompExpected (resourceOf f)) withFlag;
             wrappersLeaking =
@@ -142,11 +95,7 @@
                   "pyrite cameron"
                   "stibnite crs58"
                 ];
-            claudeLeaking = lib.attrNames (
-              lib.filterAttrs (
-                _: home: telemetryOf (home.programs.claude-code.settings.env or { }) != { }
-              ) withoutFlag
-            );
+            claudeLeaking = lib.attrNames (lib.filterAttrs (_: home: claudeProgramOf home != { }) withoutFlag);
             ompLeaking = lib.attrNames (
               lib.filterAttrs (_: home: ompTelemetryLines (ompFile home) != [ ]) withoutFlag
             );
