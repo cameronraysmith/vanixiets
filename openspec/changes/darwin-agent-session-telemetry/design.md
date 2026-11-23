@@ -173,6 +173,13 @@ The ingress on magnetite, while the store is down. `otel-collector-config` requi
 - queue drain after a wake off the mesh;
 - which desktop and IDE harnesses export (D10).
 
+### D13: omp exports one span per request (orchestrator D31)
+- **Choice**: `OTEL_BSP_MAX_EXPORT_BATCH_SIZE=1` in omp's `~/.omp/agent/.env` (`ompTracesEnv`, `modules/home/ai/agent-telemetry.nix`) on every agent-telemetry host; `agent-telemetry-emitters` expects the line.
+- **Why**: the load proof at 16 concurrent senders (`local://telemetry-load-16.md` §1, §3) OOM-killed the capped agent unit in two scenarios (fleet points unaffected). With batch size 1 each request carries one span, at most 13.8 MiB, under the receiver's 20 MiB body limit, and the simulated runs at 8, 12 and 16 senders had no kills and delivered every request (`logs/load16-mit-bsp-batch1-20261122-235609.log`, `-8-20261123-002407`, `-12-20261123-001011`). Rejected: a 16 MiB body limit (refuses content), `GOGC=50` (4 kills), limiter 320/128 (2 kills).
+- **Vendored grounding**: omp 19.1.0 builds `new BatchSpanProcessor(exporter)` with no config (`can1357/oh-my-pi packages/coding-agent/src/telemetry-export-otlp.ts:42,176`), from `@opentelemetry/sdk-trace-base` 2.9.0 (`bun.lock:683`), whose `BatchSpanProcessor-shim.js:19-31` fills `maxExportBatchSize` from `OTEL_BSP_MAX_EXPORT_BATCH_SIZE` through `getNumberFromEnv` (`@opentelemetry/core` 2.9.0 `platform/node/environment.js:18-29`, `Number(raw)`, no range check). `@opentelemetry/sdk-trace` 2.9.0 `BatchSpanProcessorBase.js:30-38` clamps it only down to `maxQueueSize` (64 here), so 1 stands; the timer path exports one batch at a time (`:175-199`), and `forceFlush` sends every pending batch in parallel (`:104-118`).
+- **Not covered**: omp's 30 s `forceFlush` herd (a backlog at flush time is still sent at once); with slow exports a backlog moves loss into omp's own 64-span queue [INFERENCE].
+- **Boundary**: vendored omp SDK reading first-party `.env`; verified after deploy by one tool-heavy omp session (requests per span rise, no span lost: `otelcol_receiver_accepted_spans` against the session's span count).
+
 ## Risks / Trade-offs
 
 - [Risk] No memory ceiling: a runaway daemon at this Mac's concurrency (p99 12, up to 30) causes Mac-wide memory pressure before C5 notices, every 5 minutes while awake. → Process isolation protects fleet signals; the soft bounds hold the steady state; the load proof at 12 and 16 measures the peaks first; the operator accepts or refuses (Q2).

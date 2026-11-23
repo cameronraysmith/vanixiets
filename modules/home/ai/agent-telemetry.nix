@@ -77,6 +77,8 @@
         OTEL_EXPORTER_OTLP_TRACES_ENDPOINT = "${receiver}/v1/traces";
         OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT = "full";
         OTEL_BSP_MAX_QUEUE_SIZE = "64";
+        # One span per request: none can exceed the collector's 20 MiB body limit, which removed the OOM kills at 16 senders (darwin-agent-session-telemetry D13).
+        OTEL_BSP_MAX_EXPORT_BATCH_SIZE = "1";
         OTEL_EXPORTER_OTLP_TIMEOUT = "5000";
       };
       ompEnv = ompMetricsEnv // ompTracesEnv;

@@ -43,9 +43,11 @@
               OTEL_METRICS_INCLUDE_ACCOUNT_UUID = "false";
               OTEL_RESOURCE_ATTRIBUTES = "user.name=${person}";
             };
-            # The metrics lines (design D2) and the traces lines (design
-            # D13), in the file's sorted order.
+            # The metrics lines (design D2), the traces lines (design D13)
+            # and one span per request (darwin-agent-session-telemetry
+            # design D13), in the file's sorted order.
             ompExpected = person: ''
+              OTEL_BSP_MAX_EXPORT_BATCH_SIZE=1
               OTEL_BSP_MAX_QUEUE_SIZE=64
               OTEL_EXPORTER_OTLP_METRICS_ENDPOINT=http://127.0.0.1:4318/v1/metrics
               OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf
