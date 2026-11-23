@@ -15,6 +15,7 @@ export const requiredCases: Readonly<Record<string, readonly string[]>> = {
     "fleet-topology.spec.ts::fleet topology page loads",
     "fleet-topology.spec.ts::both fleet topology diagrams load",
     "fleet-topology.spec.ts::every host and network in fleet.json is text in the diagrams",
+    "agent-affordances.spec.ts::robots.txt, llms.txt and a page's Markdown twin are served and linked",
   ],
   "playwright.negative.config.ts": ["reader-journey.spec.ts::damaged guide is rejected by the real reader journey"],
   "playwright.action-negative.config.ts": [

@@ -37,6 +37,7 @@ packages/docs/
 │   │           └── prompts/        # LLM session templates
 │   ├── components/          # Astro components
 │   ├── grammars/            # Syntax highlighting (Justfile)
+│   ├── pages/               # Endpoints outside the docs collection (robots.txt)
 │   └── utils/               # Utility functions
 ├── public/                  # Static assets (favicon, etc.)
 ├── e2e/                     # End-to-end tests
@@ -101,6 +102,20 @@ bun run test:ui
 # Generate coverage
 bun run test:coverage
 ```
+
+When an AI coding agent runs these, Astro 7 detects it and starts `astro preview` in the background, so Playwright's `webServer` (under `CI`) reports that the process exited early.
+Unset the detection variables for the run, for example `env -u AGENT -u CLAUDECODE bun run test:e2e`.
+
+## Agent-facing outputs
+
+The build emits three things for crawlers and LLM agents besides the HTML pages.
+`src/pages/robots.txt.ts` serves `/robots.txt`: it allows every crawler, names the sitemap and points at `/llms.txt`.
+[starlight-llms-txt](https://github.com/delucis/starlight-llms-txt) serves `/llms.txt` with the entry points configured in `astro.config.ts`, plus `/llms-full.txt` (every page) and `/llms-small.txt` (every page outside `development/`).
+It runs with `rawContent: true`, so both bundles carry each page's Markdown source: its HTML-to-Markdown round trip flattens KaTeX formulas and drops their TeX, and the source keeps them.
+[starlight-md-txt](https://github.com/max-ostapenko/starlight-md-txt) serves each page's source at its path with `.md` in place of the trailing slash (`/index.md` for the home page), with absolute links, and adds `<link rel="alternate" type="text/markdown">` to every page's head.
+Being source, neither output renders MDX components, so the fleet table that `concepts/fleet-topology.mdx` imports is absent from both.
+None of these appears in the sitemap, which lists HTML pages only.
+`e2e/agent-affordances.spec.ts` checks all three against the built site.
 
 ## Code quality
 

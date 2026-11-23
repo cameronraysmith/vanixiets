@@ -2,6 +2,8 @@ import cloudflare from "@astrojs/cloudflare";
 import starlight from "@astrojs/starlight";
 import starlightLinksValidator from "starlight-links-validator";
 import { starlightKatex } from "starlight-katex";
+import starlightLlmsTxt from "starlight-llms-txt";
+import starlightMdTxt from "starlight-md-txt";
 import { unified } from "@astrojs/markdown-remark";
 import { defineConfig } from "astro/config";
 import justGrammar from "./src/grammars/just.tmLanguage.json";
@@ -15,14 +17,30 @@ export default defineConfig({
     starlight({
       title: "vanixiets",
       prerender: true,
-      plugins: process.env.CHECK_LINKS
-        ? [
-            starlightLinksValidator({
-              errorOnRelativeLinks: false,
-            }),
-            starlightKatex(),
-          ]
-        : [starlightKatex()],
+      plugins: [
+        ...(process.env.CHECK_LINKS ? [starlightLinksValidator({ errorOnRelativeLinks: false })] : []),
+        starlightKatex(),
+        starlightLlmsTxt({
+          description:
+            "vanixiets is a Nix flake for a multi-machine fleet of NixOS, nix-darwin and home-manager configurations, built from aspect-based deferred flake-parts modules and deployed with clan; it also publishes a marketplace of agent skills.",
+          details: [
+            "Entry points:",
+            "",
+            "- [Source repository](https://github.com/cameronraysmith/vanixiets): the flake, its modules and the agent skills under `modules/home/ai/plugins/`",
+            "- [Consuming marketplace plugins](https://infra.cameronraysmith.net/guides/consuming-marketplace-plugins.md): install routes for the repository's agent-skill marketplace (apm, Claude Code, the Claude desktop app, the skills CLI)",
+            "- [Getting started](https://infra.cameronraysmith.net/guides/getting-started.md): the guides' starting point",
+            "",
+            "Every page is also served as Markdown: append `.md` to its path without the trailing slash, for example `/guides/getting-started.md`, and `/index.md` for the home page.",
+          ].join("\n"),
+          demote: ["development/traceability/satisfaction"],
+          exclude: ["development/**"],
+          // The default HTML-to-Markdown round trip flattens KaTeX output to its
+          // visual text (`\bigsqcup_{i=1}^{n}` becomes `i=1⨆n`) and drops the TeX;
+          // the source keeps every formula as written.
+          rawContent: true,
+        }),
+        starlightMdTxt({ alternateLink: true, absoluteLinks: true }),
+      ],
       customCss: ["./src/fonts/font-face.css", "./src/styles/custom.css"],
       social: [
         {
