@@ -257,6 +257,11 @@ in
             pkgs.elan
           ];
 
+          # iets for many-attribute evaluation (nix-eval-jobs-iets, `just check-fast`, `just
+          # check-ifd`). 3 workers: about 20 GiB of 64 for a two-system check run and within
+          # 3 % of 5 workers' wall time; measurements beside the option in nix-tools.nix.
+          nixEvalJobsIets.workers = 3;
+
           # Incus k3s profiles (see ADR-004)
           # Provides instance profiles for k3s clusters in Colima
           incus.k3sProfiles = {
