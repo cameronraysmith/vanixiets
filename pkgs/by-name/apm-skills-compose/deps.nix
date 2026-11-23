@@ -51,6 +51,31 @@ let
       exit 1
     fi
   '';
+
+  mattpocock = builtins.filter (d: d.repo == "mattpocock/skills") guard.remoteDeps;
+  flowSequence = s: map lib.trim (lib.splitString "," (lib.head (builtins.match "\\[(.*)]" s)));
+
+  # Design D7, G2: the declared mattpocock skills equal the skills of upstream's
+  # .claude-plugin/plugin.json at the declared commit. Like the superpowers
+  # rule, it reads the network and writes nothing to $out.
+  mattpocockListRule = lib.optionalString (mattpocock != [ ]) ''
+    mp_ref=${lib.escapeShellArg (lib.head guard.refsByRepo."mattpocock/skills")}
+    declared=${
+      lib.escapeShellArg (
+        lib.concatStringsSep "\n" (
+          lib.sort lib.lessThan (lib.concatMap (d: flowSequence (d.skills or "[]")) mattpocock)
+        )
+      )
+    }
+    git init -q "$TMPDIR/mp"
+    git -C "$TMPDIR/mp" fetch -q --depth 1 --filter=blob:none https://github.com/mattpocock/skills "$mp_ref"
+    upstream=$(git -C "$TMPDIR/mp" show "$mp_ref:.claude-plugin/plugin.json" | yq -r '.skills[] | split("/") | last' | LC_ALL=C sort)
+    if [ "$declared" != "$upstream" ]; then
+      echo "apm-deps: mattpocock/skills skills declared in the plugin apm.yml files differ from upstream .claude-plugin/plugin.json at $mp_ref:" >&2
+      diff <(printf '%s\n' "$declared") <(printf '%s\n' "$upstream") >&2 || true
+      exit 1
+    fi
+  '';
 in
 runCommand "apm-deps-${guard.digest}"
   {
@@ -83,6 +108,7 @@ runCommand "apm-deps-${guard.digest}"
     apm lock -t agent-skills,claude
 
     ${superpowersListRule}
+    ${mattpocockListRule}
 
     rm -rf apm_modules/_local
     mkdir "$out"
