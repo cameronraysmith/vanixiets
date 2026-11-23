@@ -497,7 +497,31 @@ in
                       }
                     ];
                   })
-                ];
+                ]
+                # The agent-session collector's Langfuse sent and failed
+                # span counters, for LangfuseSendFailing: two series, and
+                # nothing else of that collector reaches fleet
+                # (darwin-agent-session-telemetry design D9).
+                ++ lib.optional config.vanixiets.otelCollector.langfuse (
+                  scrape "otelcol-agent-session" "127.0.0.1:${toString agentSessionTelemetryPort}" {
+                    metric_relabel_configs = [
+                      {
+                        source_labels = [ "__name__" ];
+                        regex = lib.concatStringsSep "|" schema.otelcolAgentSessionKeep;
+                        action = "keep";
+                      }
+                      {
+                        source_labels = [ "exporter" ];
+                        regex = "otlp_http/langfuse";
+                        action = "keep";
+                      }
+                      {
+                        regex = "service_instance_id";
+                        action = "labeldrop";
+                      }
+                    ];
+                  }
+                );
               };
 
               # The ingress receives the agent's pipelines in-process.

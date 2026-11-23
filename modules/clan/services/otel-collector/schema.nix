@@ -151,6 +151,16 @@
       "otelcol_receiver_refused_log_records"
     ];
 
+    # The agent-session collector's own counters the host collector stores,
+    # on hosts whose row sets langfuse, for the Langfuse exporter only: its
+    # sent and failed spans, which LangfuseSendFailing compares
+    # (darwin-agent-session-telemetry design D9). Separate from otelcolKeep,
+    # so no other host's scrape changes.
+    otelcolAgentSessionKeep = [
+      "otelcol_exporter_sent_spans"
+      "otelcol_exporter_send_failed_spans"
+    ];
+
     # smartctl_exporter series kept; `smartctl_device` and
     # `smartctl_version` are dropped (ADR-004).
     smartctlKeep = [

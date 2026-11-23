@@ -49,6 +49,7 @@ The `gitea`, `niks3`, `nixbot` and `greptimedb` jobs exist only where their serv
 The scraper sets `include_virtual_filesystems = true`, because it otherwise drops every ZFS mount as a `nodev` filesystem, and keeps `system.filesystem.usage` alone.
 A host without ZFS mounts gets no `filesystem` scraper, because an empty strict list is no filter in otelcol.
 The `otelcol` job scrapes the collector's own telemetry at `127.0.0.1:8888`, keeps the eight queue, send-failure, enqueue-failure and refusal series of `schema.otelcolKeep`, and drops the `service_instance_id` label, which changes at every collector start.
+Where the host's row sets `langfuse`, the `otelcol-agent-session` job scrapes the agent-session collector's telemetry at `127.0.0.1:8890` and keeps only `schema.otelcolAgentSessionKeep`'s sent and failed span counters of `exporter="otlp_http/langfuse"`, without `service_instance_id`, for the info-level `LangfuseSendFailing` rule (`openspec/changes/darwin-agent-session-telemetry`, design D9).
 Where `vanixiets.otelCollector.smartDevices` is non-empty, the agent runs `prometheus-smartctl-exporter.service` on `127.0.0.1:9633` with `openFirewall = false` and `MemoryMax = "64M"`, and the `smartctl` job keeps the eight series of `schema.smartctlKeep`.
 The exporter's NixOS module grants the `smartctl-exporter-access` group its ACL on each device by a udev rule that fires only on an `add` event, which a switch does not replay.
 The unit therefore runs one privileged `ExecStartPre` per device, `+setfacl -m g:smartctl-exporter-access:rw <device>`.

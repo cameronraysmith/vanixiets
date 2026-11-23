@@ -558,6 +558,42 @@
               && (r."otlp/mesh-tincr".protocols.http.tls or null) == r."otlp/mesh".protocols.http.tls
             )
           )
+          # The Langfuse counters (darwin-agent-session-telemetry design D9):
+          # where langfuse is set, one job reads the agent-session
+          # collector's telemetry and keeps Langfuse's sent and failed span
+          # counters alone, without the instance id; elsewhere none.
+          (check
+            "R3.1: the otelcol-agent-session scrape job is missing where langfuse is set or present where it is not, or keeps more than the Langfuse exporter's sent and failed span counters"
+            (
+              let
+                jobs = builtins.filter (job: job.job_name == "otelcol-agent-session") (
+                  r.prometheus.config.scrape_configs or [ ]
+                );
+              in
+              if !lfOn then
+                jobs == [ ]
+              else
+                builtins.length jobs == 1
+                && (builtins.head jobs).static_configs == [ { targets = [ "127.0.0.1:8890" ]; } ]
+                &&
+                  (builtins.head jobs).metric_relabel_configs == [
+                    {
+                      source_labels = [ "__name__" ];
+                      regex = "otelcol_exporter_sent_spans|otelcol_exporter_send_failed_spans";
+                      action = "keep";
+                    }
+                    {
+                      source_labels = [ "exporter" ];
+                      regex = "otlp_http/langfuse";
+                      action = "keep";
+                    }
+                    {
+                      regex = "service_instance_id";
+                      action = "labeldrop";
+                    }
+                  ]
+            )
+          )
           # The hand-off (design D14): the agent-session collector exports
           # only to otlp/loopback, which takes HTTP only, requires otlp/mesh's
           # client certificate, so no local account writes past otlp/local's
@@ -1351,6 +1387,7 @@
         notified = "R3.1: a greptimedb*, zfs-set-*, zfs-assert-*, devloop-*, collector, otel-envelope or agent-session unit is not notified";
         unit = "R3.1: the agent-session collector shares the host collector's queue directory, serves telemetry off loopback, does not always restart, is bound to the host's collector, or may start before the store's schema job";
         langfusePath = "R3.1: traces/langfuse exists where observabilityHosts does not set langfuse or is missing where it does, or is not fed by forward/langfuse from traces/agent-session alone, after all its stages, through stages that cannot refuse, or sends the fleet's routing attributes, host.name, service.version, tool_use_id, duration_ms, a copied full_command or file_path, omp's startup requests or the oneshot kind";
+        langfuseScrape = "R3.1: the otelcol-agent-session scrape job is missing where langfuse is set or present where it is not, or keeps more than the Langfuse exporter's sent and failed span counters";
         langfuseExporter = "R3.1: Langfuse's exporter does not send to schema.nix's endpoint, https://cloud.langfuse.com/api/public/otel, with verified TLS, no proxy and a 30 s timeout, with the unit's Langfuse credentials and ingestion version, retry for retryMinutes and no longer, drain faster than spans arrive into a queue of twice a retry window, in batches under the request limit, or a store exporter of the agent-session collector does not retry forever, or its queues reach 512 MiB";
         collectorVersion = "R3.1: the collector is not otelcol-contrib 0.155.0; before changing it, rerun fleet-ingress's agentSpans and handoffCap cases, which prove the link clearing, the tool-result strip, the masks and the hand-off cap at a release";
         handoffCap = "R3.1: the agent-session collector's span exporter does not send one request at a time, batched by bytes to at most a quarter of the ingress's agent_span queue";
@@ -1402,6 +1439,33 @@
       session = self.lib.otelCollectorSchema.agentSession;
       quotedList = keys: "[${lib.concatMapStringsSep ", " (key: ''"${key}"'') keys}]";
       agentMutants = {
+        # A third series of the agent-session collector reaches fleet
+        # (darwin-agent-session-telemetry design D9).
+        agentSessionKeepWidened = {
+          clauses = [ clause.langfuseScrape ];
+          mutate =
+            i:
+            onSettings {
+              receivers.prometheus.config.scrape_configs = map (
+                job:
+                if job.job_name == "otelcol-agent-session" then
+                  job
+                  // {
+                    metric_relabel_configs = [
+                      (
+                        builtins.head job.metric_relabel_configs
+                        // {
+                          regex = "${(builtins.head job.metric_relabel_configs).regex}|otelcol_exporter_queue_size";
+                        }
+                      )
+                    ]
+                    ++ builtins.tail job.metric_relabel_configs;
+                  }
+                else
+                  job
+              ) i.settings.receivers.prometheus.config.scrape_configs;
+            } i;
+        };
         # Isolation (design D14).
         localFeedsDevloop = {
           clauses = [

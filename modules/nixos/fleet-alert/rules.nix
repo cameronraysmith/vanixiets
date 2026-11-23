@@ -367,6 +367,19 @@
           severity = "warning";
           annotations.summary = "An R2 bucket has held a pending multipart upload for over 24 h; list them with `aws s3api list-multipart-uploads` against the R2 endpoint and abort the stale ones, or add an abort rule to the bucket's lifecycle";
         }
+        # darwin-agent-session-telemetry design D9: Langfuse answers a quota
+        # block with 403, which its exporter drops at once and the
+        # agent-session envelope exempts, so a block would stop Langfuse
+        # data for every host unseen. Per host, failed sends above sent ones
+        # over a day; no presence selector, so a sleeping host raises
+        # nothing. Info: it pages no one.
+        {
+          alert = "LangfuseSendFailing";
+          expr = ''sum by (host_name) (increase(otelcol_exporter_send_failed_spans{exporter="otlp_http/langfuse"}[1d])) > sum by (host_name) (increase(otelcol_exporter_sent_spans{exporter="otlp_http/langfuse"}[1d]))'';
+          for = "1h";
+          severity = "info";
+          annotations.summary = "More agent spans failed to reach Langfuse Cloud than reached it over the last day: Langfuse may be refusing the fleet's spans (a quota block answers 403); the store still has them. Check the Langfuse project's usage";
+        }
         # track-r2-usage design D4: Class A and Class B projected past their
         # free tier by the end of the billing period, each a whole-million
         # step in the bill ($4.50 and $0.36) because Cloudflare rounds up,

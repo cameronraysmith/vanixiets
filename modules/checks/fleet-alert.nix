@@ -1536,6 +1536,61 @@
         messages = [ "development/operations/postgresql-backup.md" ];
       };
 
+      # darwin-agent-session-telemetry design D9: pyrite's Langfuse failures
+      # above its sends post one FIRING and one RESOLVED at priority low;
+      # a day without that condition posts nothing.
+      langfuseBlocked =
+        let
+          rule = ruleNamed "LangfuseSendFailing";
+          f = rule.for / 60;
+          priority = priorityOf rule.severity;
+        in
+        # Runs at the minutes that decide the rule, within the fixture
+        # budget: pending, still pending, its `for` reached, still firing,
+        # cleared, 5 min after it was last seen, and after. On magnetite,
+        # a host the fixture reports (an unreported host's instances are
+        # frozen); an info instance posts no RESOLVED.
+        {
+          name = "LangfuseSendFailing fires once after its for of ${toString f} min and posts nothing when it clears";
+          steps =
+            map
+              (n: {
+                at = minute n;
+                series = lib.optionalAttrs (n <= f + 1) {
+                  LangfuseSendFailing = [ (seriesOn "magnetite" "LangfuseSendFailing") ];
+                };
+              })
+              [
+                0
+                (f / 2)
+                f
+                (f + 1)
+                (f + 2)
+                (f + 6)
+                (f + 7)
+              ];
+          expect = [ "2 [FIRING] LangfuseSendFailing magnetite ${priority}" ];
+        };
+      langfuseHealthy =
+        let
+          f = (ruleNamed "LangfuseSendFailing").for / 60;
+        in
+        {
+          name = "LangfuseSendFailing stays silent while Langfuse takes the spans";
+          steps =
+            map
+              (n: {
+                at = minute n;
+                series = { };
+              })
+              [
+                0
+                f
+                (f + 7)
+              ];
+          expect = [ ];
+        };
+
       # The SystemdUnitFailed exclusion a rule list renders.
       exclusionRegexOf =
         rulesList:
@@ -2552,6 +2607,8 @@
         ++ [
           collationDriftLeg
           backupStaleLeg
+          langfuseBlocked
+          langfuseHealthy
           exclusionLeg
           storeErrorLeg
           silentHostLeg
@@ -2681,6 +2738,16 @@
             map (r: if r.alert == "HostMemoryPressure" then r // { for = 0; } else r) evaluatorRules
           );
           legs = [ (fireAndResolve "HostMemoryPressure") ];
+        };
+        # LangfuseSendFailing at warning would page at priority default.
+        langfuseWarning = {
+          evaluator = realEvaluator;
+          config = checkConfig (
+            map (
+              r: if r.alert == "LangfuseSendFailing" then r // { severity = "warning"; } else r
+            ) evaluatorRules
+          );
+          legs = [ langfuseBlocked ];
         };
         noStoreFreeze = {
           evaluator = evaluatorWith (
