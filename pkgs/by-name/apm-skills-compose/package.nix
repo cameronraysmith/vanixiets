@@ -116,7 +116,12 @@ runCommandLocal "apm-skills-compose"
     cp ${rootConsumerManifest} ./apm.yml
     # agent-skills,claude only: the codex/hermes/opencode/droid harnesses are
     # fanned out nix-side from this composed $out in a later task, not by apm.
-    apm install --root "$out" -t ${lib.concatStringsSep "," targets}
+    # apm defaults to --frozen when CI is set and apm.lock.yaml exists; this
+    # lock holds only the remote entries, so frozen mode refuses the local ones.
+    apm install --no-frozen --root "$out" -t ${lib.concatStringsSep "," targets}
+
+    # A random id apm writes on every install.
+    rm -f "$out/.apm-local/installation"
 
     # generated_at and apm_version are nondeterministic; strip both so $out is
     # byte-reproducible across builds.
