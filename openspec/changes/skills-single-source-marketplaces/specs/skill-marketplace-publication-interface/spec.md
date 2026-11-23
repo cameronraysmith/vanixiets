@@ -15,7 +15,7 @@ Evaluation and the generator's build establish that the authored facts are consi
 #### Scenario: A per-group manifest reappears
 
 - **WHEN** a file named `plugin.json`, or a `.claude-plugin/` directory, is committed inside a group directory
-- **THEN** the marketplace generator's build fails naming the file
+- **THEN** evaluation of the marketplace generator fails naming the file, before any build starts
 
 #### Scenario: The published list and the tree disagree
 
