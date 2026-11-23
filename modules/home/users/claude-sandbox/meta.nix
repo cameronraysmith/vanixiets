@@ -42,6 +42,7 @@
       openspec
       pandoc
       ripgrep
+      terminal
       typst
       vcs-author
       worktrunk

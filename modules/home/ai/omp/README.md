@@ -31,6 +31,14 @@ Bitwarden is installed by hand in each Helium profile.
 Force-installing it would need a macOS configuration profile that has to be approved manually.
 Helium also ignores extension update URLs that do not go through its proxy on Macs not enrolled in MDM.
 
+## Cross-instance agent messaging
+
+The `ai` aggregate sets `task.crossInstance: true` in `config.yml`, so the interactive omp sessions of one user in one project directory can list each other with `agent://peers`, read each other's agent outputs and transcripts through `agent://<pid>/<id>`, and send messages that wake each other's agents.
+Only the interactive main session joins (`bindAgentMesh` in `src/main.ts`); print mode (`-p`) and `omp acp` sessions do not.
+The worker homes import `homeManager.omp` without the aggregate and run omp only through ACP, so they leave the key at omp's default `false`.
+The room is a unit of the per-user omp daemon, which omp starts on demand; it listens on a socket in a `0700` directory and requires a `0600` token, so another account on the same host cannot join.
+An instance accepts at most 20 messages from one peer in 10 minutes (`WAKE_BUDGET` in `src/irc/mesh.ts`).
+
 ## ovnfs checkouts
 
 `programs.omp.ovnfs.enable` (off by default) sets omp's `ovnfs.path` to the binary from `programs.omp.ovnfs.package`, which defaults to `pkgs/by-name/ovnfs`.

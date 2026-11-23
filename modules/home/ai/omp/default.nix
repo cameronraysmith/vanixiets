@@ -403,6 +403,15 @@ let
     };
 in
 {
-  flake.modules.homeManager.ai = content;
+  flake.modules.homeManager.ai =
+    { lib, ... }:
+    {
+      imports = [ content ];
+      # Only the interactive session joins the project's agent mesh
+      # (src/main.ts bindAgentMesh), so in the ACP sessions of the worker homes,
+      # which import homeManager.omp alone, the key would only add a prompt line
+      # advertising agent://peers.
+      programs.omp.settings.task.crossInstance = lib.mkDefault true;
+    };
   flake.modules.homeManager.omp = content;
 }
