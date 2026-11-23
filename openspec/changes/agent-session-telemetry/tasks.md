@@ -46,6 +46,7 @@
 
 - [x] 7.1 Apply design D11's ADR edits, every one of them now decided (the operator ratified all pending edits on 2026-11-22, the decision record's D17), after this change is published — unblocked — verify: `rg -n "2026-11-22" docs/notes/development/observability/decisions/ADR-00{1,3,4,5,8}*.md` finds each applied edit — done with D6's, D14's, D15's and D16's: each edit written once in its final form (D15's and D16's text over D11's and D6's where they changed it), each ADR given a dated Status note naming `agent-session-telemetry`, and the lines that contradicted the amendments (ADR-004's retention rationale, Q2, Q5, Q6 and person-identifier lines; ADR-005's worker and emitter lines and Q5; ADR-008's Consequences, envelope and Failure prevented lines) brought in line
 - [ ] 7.2 stibnite (operator's console deploy): move `otelcol-process` to another loopback port, enable `agentTelemetry`, add the darwin clauses — verify: a separate change carries it; nothing in this change sets `agentTelemetry` for stibnite (`nix eval .#lib.observabilityHosts.stibnite.agentTelemetry` is `false`) — the operator's, in a separate change
+  - Carried by `openspec/changes/darwin-agent-session-telemetry/` (Linear CAM-121, 2026-11-23): its design D2 moves the fleet collector and `otelcol-process` to `127.0.0.1:4319` and D3 runs these pipelines on stibnite as `org.nixos.otel-agent-session`; this task closes when that change's task 12.1 passes.
 
 ## 8. Integration Verification
 
