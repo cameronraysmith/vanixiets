@@ -123,6 +123,23 @@ Any requirement whose discharge depends on this fact SHALL name it explicitly, a
 - **WHEN** a Claude release installs a version-free plugin as `unknown` from a git marketplace, or, re-tested by hand with `cameronraysmith/skills-marketplace-test` (push a skill edit without a version change, then check for updates), does not offer the newer commit as an update
 - **THEN** this assumption is void, and the `skill-marketplace-publication` requirement `A Claude user follows the published skills without versions` loses its discharge
 
+### Requirement: A220 — The skills CLI finds skills in the directories a root skills.sh.json lists
+
+It is true of the skills CLI 1.9.0 that it walks each directory listed in the `paths` of a repository's root `skills.sh.json` three levels deep and lists every skill found there by its frontmatter `name`.
+Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL lose its discharge once the violation below is observed.
+
+**Evidence**: design D14 (vercel-labs/skills 57217cf source and the 2026-11-23 runs, `logs/s5-npx-skills-proof-*`).
+
+#### Scenario: Observed on 2026-11-23
+
+- **WHEN** skills 1.9.0 listed this repository at `main` c8b35ddb, which has no `skills.sh.json`, then a copy with the generated file listing the 18 `.apm/skills` directories, then a copy whose file lists only `./modules/home/ai/plugins`
+- **THEN** it found no skills, then the 126 first-party skills and none of the remote ones (`--skill openspec-explore` installed that skill alone), then no skills
+
+#### Scenario: The skills CLI stops reading skills.sh.json
+
+- **WHEN** a skills release pinned by `llm-agents` lists fewer skills than the first-party directories in the `skills-cli-discovery` check, or `npx skills add cameronraysmith/vanixiets --list` from GitHub does
+- **THEN** this assumption is void, and the `skill-marketplace-publication` requirement `A skills CLI user installs each first-party skill` loses its discharge
+
 ## MODIFIED Requirements
 
 ### Requirement: A136 — apm installs a locked remote dependency from apm_modules without fetching
@@ -506,6 +523,8 @@ A term found to denote two distinct phenomena within this repository's vocabular
 | apm consumer | — | a person, outside this fleet or in it, who registers the marketplace with apm and installs plugin groups into a project of their own | world-only |
 | Claude app | — | Anthropic's Claude Code program or Claude desktop application, in which a person can add a marketplace by the forge name of its repository | world-only |
 | Claude user | — | a person who has added the marketplace in a Claude app and installs plugin groups from it | world-only |
+| skills CLI | — | the `skills` command-line program (vercel-labs/skills, run as `npx skills`), which clones a repository by its forge name and installs the individual skills it finds there | world-only |
+| skills CLI user | — | a person who lists or installs skills from this repository with the skills CLI | world-only |
 
 
 #### Scenario: The terms with two senses are read

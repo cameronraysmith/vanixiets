@@ -22,3 +22,20 @@ The derivation SHALL fail when a composed skill differs from its source or from 
 
 - **WHEN** an apm release deploys a first-party skill differently from its source, or changes a remote skill's content
 - **THEN** the build fails naming the skill, before any host receives the changed tree
+
+## ADDED Requirements
+
+### Requirement: First-party skills conform to the Agent Skills specification
+
+Every first-party skill's `SKILL.md` frontmatter SHALL parse as YAML, its `name` SHALL equal the skill's directory name, and the skill SHALL otherwise pass the Agent Skills specification's structure rules.
+Frontmatter fields beyond the specification MAY be present, and files MAY sit at the skill's root.
+
+#### Scenario: A skill's name differs from its directory
+
+- **WHEN** a commit gives a first-party skill a frontmatter `name` other than its directory name
+- **THEN** the commit is refused before it reaches the main branch
+
+#### Scenario: A skill's frontmatter does not parse
+
+- **WHEN** a commit leaves a first-party skill's frontmatter unparseable as YAML
+- **THEN** the commit is refused before it reaches the main branch

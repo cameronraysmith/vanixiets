@@ -61,3 +61,21 @@ Changing how the marketplace is published MUST NOT change any skill the skill co
 
 - **WHEN** a change to the marketplace's files reaches the main branch
 - **THEN** every skill delivered to a host after its next activation is identical to the one delivered before
+
+---
+
+### Requirement: A skills CLI user installs each first-party skill
+
+A user of the skills CLI who adds this repository by its forge name MUST be offered every first-party skill under its own name, and SHALL be able to install any one of them alone.
+The skills CLI SHALL NOT be offered the skills a plugin group takes from a dependency.
+This requirement relies on A220.
+
+#### Scenario: The skills are listed
+
+- **WHEN** a skills CLI user lists the skills of this repository
+- **THEN** every first-party skill is listed once under its name, and no skill of a dependency is listed
+
+#### Scenario: One skill is selected
+
+- **WHEN** a skills CLI user installs one skill by name
+- **THEN** only that skill is installed, identical to the skill as committed on the main branch
