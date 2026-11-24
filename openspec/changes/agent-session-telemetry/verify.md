@@ -134,7 +134,7 @@ A side effect of the change is that the `OTEL_*` values no longer reach the prog
 | 5.4 | closed 2026-11-23, dropped by the operator (decision record D21) | none: the agent rates are read from the store after a week instead of stopping the store |
 | 6.1 | closed 2026-11-24 | none: "Deployed versions against A188–A195" above; omp differs (19.1.1) and A191 was re-read |
 | 6.2 | closed 2026-11-24 | none: magnetite's 01:00Z and 02:00Z budget runs pass with `agent.greptime_physical_table` present, so B1 counted `agent` (`logs/closeout-cam120-remote-20261123-211005.log`) |
-| 7.2 | `darwin-agent-session-telemetry` (CAM-121) | merged and deployed on stibnite; closes when that change's task 12.1 passes |
+| 7.2 | closed 2026-11-24 | none: `darwin-agent-session-telemetry` (CAM-121) is merged, deployed on stibnite, and its task 12.1 passed (`logs/c121-12.1-cache-20261124T032509Z.log`) |
 | 9.7 | watch | no failed-Bash `tool_result` row exists yet (3 rows, none failed, none with `error`); read the first one's `error` |
 | 10.8 | operator, or a later deploy task | remove pyrite's orphan `/var/lib/private/opentelemetry-collector/queue/exporter_otlp_http_ingress-agent_logs` |
 | 12.7 | operator | review Langfuse and decide keep, sample, upgrade, self-host or flag off; record it in design D16 |
