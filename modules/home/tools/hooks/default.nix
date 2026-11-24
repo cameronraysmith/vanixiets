@@ -8,11 +8,15 @@
     pkgs:
     let
       # Hosts where mutating HTTP requests (POST, PUT, etc.) are auto-approved
-      # by gate-mutating-http without prompting. Matched as hostnames in URLs
-      # with or without scheme prefix (e.g. both https://ntfy.zt/topic and
-      # ntfy.zt/topic are recognized).
+      # by gate-mutating-http without prompting. Matched as exact hostnames in
+      # URLs with or without scheme prefix (e.g. both https://ntfy.zt/topic and
+      # ntfy.zt/topic are recognized), never as suffixes. Both names are
+      # cinnabar's ntfy: ntfy.zt over ZeroTier, ntfy.vanixiets.internal over
+      # tincr, the name Macs use because Local Network privacy can refuse
+      # ZeroTier to a store binary (pkgs/by-name/ntfy-send/package.nix).
       trustedHttpMutationHosts = [
         "ntfy.zt"
+        "ntfy.vanixiets.internal"
       ];
 
       trustedHostsPattern =
