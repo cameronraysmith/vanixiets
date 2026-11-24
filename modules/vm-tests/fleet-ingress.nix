@@ -55,11 +55,14 @@
     {
       # Size classes (declare-test-size-classes stages 1 and 3): fleet-ingress
       # is medium. Its script measured 252.56, 280.74 and 216.61 s on pyrite on
-      # 2026-11-24 (logs/tsc-1-fleet-ingress-pyrite-*.log), so its margin under
-      # the 300 s timeout has been as small as 19 s. A timeout failure here is
-      # the regulator saying the test has outgrown medium; the response is the
-      # trimming options of design D7 first, then the operator's answer to the
-      # design's Open Question 1.
+      # 2026-11-24 (logs/tsc-1-fleet-ingress-pyrite-*.log), then reached the
+      # 300 s timeout in its last case (logs/tsc-3-run-fleet-ingress-*.log):
+      # processName took 10 or 66 s by its phase against the collectors' 60 s
+      # process scrape. With that wait removed (design D14) it measured
+      # 189.37 s (logs/tsc-3-trim-fleet-ingress-20261124-135419.log). A timeout
+      # failure here is the regulator saying the test has outgrown medium; the
+      # response is to remove the wait or work in the test, not to loosen the
+      # timeout.
       # fleet-ingress-outage measured 1,660.34 s of script, 1,676 s whole
       # (logs/tsc-1-fleet-ingress-outage-20261124-114719.log).
       testSizes.vmTests = lib.optionalAttrs (system == "x86_64-linux") {
@@ -650,9 +653,12 @@
           # F64: a process whose comm fills the kernel's 15 bytes and whose
           # argv[0] carries its command line, as Chromium's retitled
           # processes do, is stored under its executable's name alone.
+          # The process starts before fresh_start restarts both collectors, so
+          # each collector's first process scrape after its restart (the
+          # scraper's 1 s initial delay) already sees it, and the case does
+          # not wait out the 60 s scrape interval for a later one.
           processName = ''
             print("=== case processName", flush=True)
-            fresh_start()
             EXE = "abcdefghijklmnop-x"
             TITLE = f"/tmp/{EXE} --field-trial-handle=3,i,7729614572803203038"
             store.succeed(
@@ -663,6 +669,7 @@
             pid = store.succeed("systemctl show -p MainPID --value f64-title.service").strip()
             store.wait_until_succeeds(f"test \"$(cat /proc/{pid}/comm)\" = {EXE[:15]}", timeout=30)
             assert store.succeed(f"tr '\\0' '\\n' < /proc/{pid}/cmdline | head -n 1").strip() == TITLE
+            fresh_start()
             SQL = (
                 "SELECT host_name, process_executable_name FROM process_memory_usage_bytes "
                 f"WHERE process_executable_name LIKE '{EXE[:15]}%' GROUP BY host_name, process_executable_name ORDER BY host_name"
