@@ -10,9 +10,14 @@
 #   each must call `{{nix_stock}}` and no `{{nix_cmd}}` or bare `nix`.
 # Also nix-direnv (flake.lib.nixDirenv, every home's): its preflight, sourced
 # with the classic wrapper first on PATH, must pick another `nix`; every
-# nix-direnv call would fall back from the wrapper with a notice.
+# nix-direnv call would fall back from the wrapper with a notice. And .envrc's
+# `nix_direnv_version` guard must accept that build: a version above it fails
+# the guard, and upstream's direnvrc, downloaded in its place, restores the
+# PATH lookup; a missing guard fails too. Compared in the build, with sort -V,
+# so a failure is this check's message rather than an evaluation error.
 # Mutants, seen failing: pkgs.nh in place of flake.lib.withFleetNix in
-# modules/darwin/app.nix; `{{nix_cmd}}` in k3d-up; nixDirenv without its patch.
+# modules/darwin/app.nix; `{{nix_cmd}}` in k3d-up; nixDirenv without its patch;
+# .envrc requiring a newer nix-direnv; .envrc without its version guard.
 # One system: the apps and the devShell are the same expression on every system.
 { config, ... }:
 let
@@ -29,6 +34,7 @@ in
     }:
     let
       classic = flakeLib.nixClassic pkgs;
+      nixDirenv = flakeLib.nixDirenv pkgs;
       app = name: program: {
         inherit program;
         path = "$(prefix ${config.apps.${name}.program})";
@@ -57,6 +63,10 @@ in
       justfile = builtins.path {
         path = ../../justfile;
         name = "justfile";
+      };
+      envrc = builtins.path {
+        path = ../../.envrc;
+        name = "envrc";
       };
     in
     {
@@ -98,12 +108,23 @@ in
             direnv=true NIX_DIRENV_SKIP_VERSION_CHECK=1
             source "$1"
             _nix_direnv_preflight >&2 && echo "$_nix_direnv_nix"
-          ' nix-direnv ${flakeLib.nixDirenv pkgs}/share/nix-direnv/direnvrc)
+          ' nix-direnv ${nixDirenv}/share/nix-direnv/direnvrc)
           if [ -z "$nix" ] || [ "$nix" = "$classic" ]; then
             echo "nix-direnv: runs ''${nix:-no nix}"
             failed=1
           else
             echo "nix-direnv: runs $nix"
+          fi
+          packaged=${nixDirenv.version}
+          required=$(sed -n '/nix_direnv_version "/{s/.*nix_direnv_version "\([^"]*\)".*/\1/p;q}' ${envrc})
+          if [ -z "$required" ]; then
+            echo ".envrc: no nix_direnv_version guard; packaged nix-direnv is $packaged"
+            failed=1
+          elif [ "$(printf '%s\n' "$packaged" "$required" | sort -V | tail -n 1)" != "$packaged" ]; then
+            echo ".envrc: requires nix-direnv $required, packaged is $packaged"
+            failed=1
+          else
+            echo ".envrc: requires nix-direnv $required, packaged is $packaged"
           fi
           if [ "$failed" -ne 0 ]; then exit 1; fi
           touch $out
