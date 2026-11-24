@@ -476,6 +476,14 @@
               with subtest("the systemd receiver stores unit state under DynamicUser, owners only as aliases"):
                   dynamic = store.succeed("systemctl show -P DynamicUser opentelemetry-collector.service")
                   assert dynamic.strip() == "yes", dynamic
+                  # The receiver scrapes once when the collector starts and
+                  # then every 60 s; with the unit active before a restart,
+                  # that first scrape stores it, so the case waits for the
+                  # event rather than for the next tick of the interval
+                  # (declare-test-size-classes design D14).
+                  store.wait_for_unit(f"omnigent-host-{OWNER}.service")
+                  store.succeed("systemctl restart opentelemetry-collector.service")
+                  store.wait_for_unit("opentelemetry-collector.service")
                   unit_query = f'systemd_unit_state{{host_name="{hostname}",systemd_unit_name="{ALIAS_UNIT}"}}'
                   retry(
                       lambda _last: len(promql_status(unit_query)[1]) > 0,
