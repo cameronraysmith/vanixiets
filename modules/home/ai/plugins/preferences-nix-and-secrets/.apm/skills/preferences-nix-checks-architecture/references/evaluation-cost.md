@@ -4,6 +4,14 @@ This reference is the procedure behind "Evaluation cost as a design constraint" 
 It is written so that an agent with no prior context can measure what an attribute costs to evaluate, find where the cost comes from, decide whether a candidate change is an improvement, and prove that a refactor did not change any output.
 The figures quoted are measurements from this repository, not targets.
 
+## Recording a measurement
+
+More than one evaluator can answer to the same command name: an alternative implementation such as [iets](https://github.com/numtide/iets) can be installed as `nix-eval-jobs`, or as a `nix` wrapper that evaluates some subcommands itself and hands the rest to the real Nix, with the stock tool kept beside it under another name.
+The same attribute set can take several times longer under one evaluator than under another, and their memory behaviour differs, so a figure without its conditions cannot be compared with anything.
+Every recorded figure names the evaluator and its version, the host and its memory, the worker count and per-worker memory limit, the attribute scope, and whether another evaluation was running on the host at the time.
+Find the evaluator from the binary the command resolves to (`command -v`, then `readlink -f`) rather than from its name.
+A comparison with a historical figure uses the evaluator that produced that figure; a change of evaluator starts a new baseline.
+
 ## Cost of one attribute
 
 Evaluate the attribute's `drvPath` with the evaluator's statistics enabled:
@@ -15,6 +23,7 @@ jaq '{bytes: .gc.totalBytes, cpu: .cpuTime}' /tmp/x.json
 ```
 
 `drvPath` is the right target because it forces the whole derivation expression, including every input's derivation, without building anything.
+`NIX_SHOW_STATS` is Nix's own instrument, so where `nix` may be a wrapper around another evaluator, call the real Nix binary for this measurement.
 `gc.totalBytes` is the total allocation during the evaluation and `cpuTime` is the evaluator's CPU time in seconds; together they are the cost an evaluator worker pays for this attribute from a cold start.
 The `.#.` prefix makes the attribute path absolute.
 Without the leading dot, `nix eval '.#checks...'` first probes default prefixes such as `packages.<system>.` and `legacyPackages.<system>.`, and those probes can force unrelated outputs and contaminate the measurement.
@@ -63,14 +72,15 @@ These per-attribute figures overstate what removing a given check would save.
 Each fresh worker, whether at start-up or after a restart triggered by `--max-memory-size`, evaluates the flake and every strict prefix before its first attribute, and that shared cost is charged to whichever attribute the worker happens to evaluate first.
 An attribute that appears expensive may simply have been first in a fresh worker.
 Before deleting or restructuring a check because of its nix-eval-jobs figure, confirm with the single-attribute and key-set measurements above, and count worker restarts in the run, since the shared prefix is paid once per restart.
+An evaluator that never restarts its workers, such as iets on macOS, where it ignores `--max-memory-size`, pays the prefix once per worker instead, and its workers grow with everything they evaluate.
 
 ## A/B/A/B benchmark discipline
 
 A candidate change to evaluation is accepted on measurement, and the measurement is interleaved.
-Run baseline, candidate, baseline, candidate, at minimum, on the same host with the same nix-eval-jobs flags.
+Run baseline, candidate, baseline, candidate, at minimum, on the same host with the same evaluator and the same flags.
 A single baseline/candidate pair is confounded by store and evaluation cache state, by page cache, and by whatever else the host is doing; interleaving makes those effects show up as variance within each arm rather than as a difference between arms.
 
-For each run record wall time, total allocation (summed `stats.allocBytes` or the process-level figure), the number of worker restarts, and whether anything else was running on the host.
+For each run record wall time, total allocation (summed `stats.allocBytes` or the process-level figure), the number of worker restarts, and the conditions listed under "Recording a measurement".
 Report every run, not the best one.
 A result is credible when the two candidate runs agree with each other, the two baseline runs agree with each other, and the arms separate.
 
@@ -109,3 +119,10 @@ Run the set with `label=before` on the base revision and `label=after` on the ca
 Identical output is the pass condition.
 Any difference must be intended and named in the change description: an attribute deliberately removed because it duplicated another system's identical derivation, or a check moved to one system by gating.
 An unexplained difference in a toplevel means the refactor changed a deployed system and is not a pure evaluation refactor, whatever its intent.
+
+### Between two evaluators
+
+The same oracle decides whether an alternative evaluator may stand in for the stock one.
+Run both over the same commit and attribute set and compare, per attribute, drvPath, system, outputs, and whether evaluation failed.
+Repeat it on every version bump of the alternative evaluator and on every change to which evaluator a host or pipeline selects.
+A difference is a finding about the evaluator: report the attribute and both drvPaths, and do not exclude the attribute, pin around it, or rewrite the expression until the two agree.

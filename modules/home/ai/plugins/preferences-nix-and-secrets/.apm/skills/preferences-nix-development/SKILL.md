@@ -58,6 +58,8 @@ IFD-free patterns, in order of preference:
 
 Enforcement: CI evaluates with `allow-import-from-derivation = false` (nixbot's `NIX_CONFIG`), and `just check-ifd` runs `nix-eval-jobs` over `checks.<system>` for every system with IFD disabled and lists each attribute that errors.
 Verify a single attribute with `nix eval --raw --option allow-import-from-derivation false '.#<attr>.drvPath'`.
+Some evaluators refuse IFD whatever the setting: iets, for one, fails the attribute with `import from derivation is not supported: … is not built`.
+Under such an evaluator the fix is the same, remove the IFD; switching to the stock evaluator to get past the error only hides it.
 
 An exception requires an argument in review showing that none of the patterns above applies, and a recorded decision naming the attribute; an IFD-dependent output stays out of `checks` until then.
 

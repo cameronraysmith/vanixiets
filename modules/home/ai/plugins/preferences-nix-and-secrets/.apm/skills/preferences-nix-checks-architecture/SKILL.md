@@ -185,11 +185,12 @@ The assertion still fails loudly if clan stops overriding the controller's packa
 
 ### Per-worker amortization
 
-nix-eval-jobs forks a pool of evaluator workers and recycles any worker whose heap exceeds `--max-memory-size`.
+Stock nix-eval-jobs forks a pool of evaluator workers and recycles any worker whose heap exceeds `--max-memory-size`.
 Each fresh worker re-loads the flake and recomputes every strict prefix, including the key set, before it evaluates its first attribute.
 Any cost incurred before the first attribute is therefore paid once per worker per restart, not once per run.
 The zerotier key set above was paid about 26 times per CI run for this reason, which accounts for roughly 25 GiB of the original 92 GiB.
 A fixed cost that looks negligible in a single `nix eval` multiplies by the restart count in CI, and restarts are themselves driven by allocation, so the two compound.
+An evaluator that ignores the limit, as iets does on macOS, never restarts its workers: it pays the prefix once per worker, and its workers grow with everything they evaluate instead.
 
 ### One package set per system
 

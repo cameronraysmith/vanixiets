@@ -5,7 +5,8 @@ description: >
   and buildbot-nix. Use when designing CI pipelines for nix-based repositories,
   migrating from hand-crafted CI matrices to nix-native check fanout, configuring
   buildbot-nix project registration, or planning binary cache strategy. Also load
-  when sizing nix-eval-jobs evaluation workers and memory budgets, when reading
+  when sizing nix-eval-jobs evaluation workers and memory budgets (stock or an
+  alternative evaluator such as iets), when reading
   nix-eval/nix-build statuses, cached or best-effort (ignored-failure) attributes
   before merging, when working with the merge queue, or when the two-phase
   migration pattern (GHA+nix-fast-build to buildbot-nix delegation) or the effect
@@ -82,15 +83,15 @@ Under high parallelism, SQLite write locks can cause contention that manifests a
 It is not the constraint that governs sizing on a memory-bound CI host.
 
 The constraint that does govern it is memory.
-nix-eval-jobs documents in its README that `workers x max-memory-size` is a single shared memory budget for the whole evaluation.
+Stock nix-eval-jobs documents in its README that `workers x max-memory-size` is a single shared memory budget for the whole evaluation.
 A worker whose heap exceeds its share is not killed mid-attribute; it finishes the attribute in flight, exits, and is replaced by a fresh worker before the next attribute.
-nix-eval-jobs runs the Boehm collector with `GC_DONT_GC=1`, so a worker's heap only grows until it is recycled.
+Stock nix-eval-jobs runs the Boehm collector with `GC_DONT_GC=1`, so a worker's heap only grows until it is recycled.
 Sizing is therefore a tradeoff between parallelism and restart frequency: more workers each get a smaller share and recycle more often.
 The price of a restart is whatever fixed work a fresh worker must redo before it can evaluate its first attribute, which is at minimum the strict key set of the attribute set it is reaching into (see §"Key-set strictness" under §"Evaluation cost as a design constraint" in `preferences-nix-checks-architecture`).
 In this repository a check module once derived its key set from six evaluated NixOS machine configurations, so every fresh worker paid ~930 MiB and ~3 s before evaluating anything, and that cost was paid ~26 times per run; after the fix a trivial check costs 89 MiB and 0.27 s.
 Restart frequency is only cheap when that fixed cost is small, so the worker sizing and the flake's evaluation structure have to be read together.
 
-The measured sizing for this fleet's CI host (magnetite, 16 vCPU, 30.6 GiB RAM) over a 311-attribute, two-system scope (`x86_64-linux` and `aarch64-darwin`) is recorded in `modules/nixos/nixbot.nix`:
+The measured sizing of stock nix-eval-jobs for this fleet's CI host (magnetite, 16 vCPU, 30.6 GiB RAM) over a 311-attribute, two-system scope (`x86_64-linux` and `aarch64-darwin`) is recorded in `modules/nixos/nixbot.nix`:
 
 | workers x max-memory-size | wall time | restarts |
 |---|---|---|
@@ -109,6 +110,18 @@ The method is to measure on the actual host rather than adopt a default: run the
 Any evaluation run on a production host must also keep a hard memory bound, both through the nix-eval-jobs budget and through the service's cgroup limits.
 The hazard is not hypothetical: an unbounded evaluation probe on this fleet's CI host exhausted memory and hard-reset the machine via the kernel watchdog.
 The host-wide evaluation lock that serializes remote `nix-eval-jobs` runs against nixbot's own evaluation exists for the same reason.
+
+Stock is not the only evaluator that answers to `nix-eval-jobs`.
+[iets](https://github.com/numtide/iets), an independent Nix evaluator, implements the same command line and can be installed under that name; on the check sets it has been measured against, it evaluated several times faster than stock.
+It does not share stock's memory model, so a sizing measured for one evaluator does not carry over to the other:
+
+- iets has no garbage collector, so a worker's memory grows with everything it evaluates.
+- It enforces `--max-memory-size` only where it can read a worker's peak resident memory, which is Linux; on macOS the flag does nothing and only the worker count bounds memory.
+- A worker that is killed, by the OOM killer for instance, fails the whole evaluation instead of being replaced, so evaluations on one host must not overlap: serialize them with a host-wide lock or run them one at a time.
+- It refuses import-from-derivation outright, rejects `--override-input`, `--override-flake`, `--repair` and `--help`, and evaluates only a local root flake.
+
+Where it is installed, keep stock beside it under a second name as the escape hatch for what it refuses, and gate the substitution with the drvPath-identity oracle between the two evaluators (`preferences-nix-checks-architecture`, `references/evaluation-cost.md`), re-run on every version bump.
+Before sizing or comparing, establish which evaluator a host's `nix-eval-jobs` actually is, since a wrapper may also cap the workers a caller asks for.
 
 Two execution modes serve different contexts in the justfile convention.
 `just check` runs sequential `nix flake check`, which is appropriate for local development where the developer watches output interactively and benefits from nom's progress display.

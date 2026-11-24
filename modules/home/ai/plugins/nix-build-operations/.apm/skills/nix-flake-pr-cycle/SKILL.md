@@ -72,6 +72,7 @@ Any other value fails before evaluation with the list of allowed values, for exa
 On both hosts the remote `nix-eval-jobs` is a wrapper that takes a host-wide evaluation lock, so a remote run that collides with nixbot's evaluation waits rather than overlapping it.
 While it waits it prints `nix-eval-jobs: waiting for the host evaluation lock held by <user> pid <pid> since <time> (<command>); evaluations on this host run one at a time to avoid exhausting memory` to stderr every 30 seconds.
 That line is expected queueing, not a hang; do not interrupt the run or retry it in parallel, since a second evaluation would queue behind the same lock.
+The remote's `nix-eval-jobs` is whichever evaluator that host installs, which need not be stock nix-eval-jobs and may lower the worker count it is given to the host's own bound; the repository's agent context says which evaluator each host has.
 
 The sibling `just check` recipe runs `nix flake check -L --show-trace` sequentially and is the slower, verbose alternative.
 Prefer it when a single-derivation failure under `check-fast` is obscured by parallel buffering and the linear trace order matters more than wall-clock.
