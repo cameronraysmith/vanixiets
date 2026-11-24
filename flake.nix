@@ -58,7 +58,12 @@
     git-hooks.inputs.nixpkgs.follows = "nixpkgs";
     git-hooks.inputs.flake-compat.follows = "";
 
-    lazyvim-nix.url = "github:pfassina/lazyvim-nix/v16.0.2";
+    # Held at v16.0.1: v16.0.2 links each dev-path plugin as <owner>--<repo>
+    # (lazyvim-nix #115), and lazy.nvim derives a plugin's name from that
+    # directory basename, so require() of a lazy plugin returns its module
+    # without loading it (lualine's trouble component fails at startup).
+    # Advance past a tag that fixes it: pfassina/lazyvim-nix#117 and #119.
+    lazyvim-nix.url = "github:pfassina/lazyvim-nix/v16.0.1";
     lazyvim-nix.inputs.nixpkgs.follows = "nixpkgs";
 
     nix2container.url = "github:nlewo/nix2container";
