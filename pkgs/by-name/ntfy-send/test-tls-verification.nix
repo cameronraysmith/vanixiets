@@ -1,7 +1,8 @@
-# passthru.tests.tls-verification (CAM-87): ntfy-send verifies ntfy.zt against
+# passthru.tests.tls-verification (CAM-87): ntfy-send verifies ntfy against
 # the CA file in NTFY_CACERT. The real curl and the script meet a loopback TLS
-# server for ntfy.zt, reached through ntfy-send's pass-through
-# `--connect-to ntfy.zt:443:127.0.0.1:<port>`, whose leaf a CA made here
+# server for the host in the wrapper's NTFY_URL (ntfy.vanixiets.internal on
+# darwin, ntfy.zt on Linux), reached through ntfy-send's pass-through
+# `--connect-to <host>:443:127.0.0.1:<port>`, whose leaf a CA made here
 # ("other") signed. Under caddy's root the source script and the built wrapper
 # are refused (curl exit 60) and the server records nothing; under "other",
 # and under a file holding caddy's root then "other", the post is accepted.
@@ -17,6 +18,9 @@
   ntfySend,
   caddyRootCa,
 }:
+let
+  host = lib.removePrefix "https://" ntfySend.ntfyUrl;
+in
 runCommand "ntfy-send-test-tls-verification"
   {
     nativeBuildInputs = [
@@ -34,8 +38,8 @@ runCommand "ntfy-send-test-tls-verification"
     openssl req -x509 -new -key other.key -sha256 -days 30 -subj "/CN=ntfy-send test other root" \
       -addext basicConstraints=critical,CA:TRUE -addext keyUsage=critical,keyCertSign,cRLSign -out other.crt
     openssl ecparam -name prime256v1 -genkey -noout -out leaf.key
-    openssl req -new -key leaf.key -subj "/CN=ntfy.zt" -out leaf.csr
-    printf 'subjectAltName=DNS:ntfy.zt\nextendedKeyUsage=serverAuth\n' > leaf.ext
+    openssl req -new -key leaf.key -subj "/CN=${host}" -out leaf.csr
+    printf 'subjectAltName=DNS:${host}\nextendedKeyUsage=serverAuth\n' > leaf.ext
     openssl x509 -req -in leaf.csr -CA other.crt -CAkey other.key -CAcreateserial -days 30 -sha256 -extfile leaf.ext -out leaf.crt
     cat ${caddyRootCa} other.crt > bundle.crt
 
@@ -72,6 +76,7 @@ runCommand "ntfy-send-test-tls-verification"
     for _ in $(seq 100); do [ -s port ] && break; sleep 0.1; done
     port=$(cat port)
     export NTFY_CURL_BIN=${lib.getExe curl}
+    export NTFY_URL=${ntfySend.ntfyUrl}
 
     # post WHO [CA]: WHO is `built` or a script path; CA, given with a script,
     # is NTFY_CACERT. Sets $rc and $got.
@@ -80,9 +85,9 @@ runCommand "ntfy-send-test-tls-verification"
       : > received
       rc=0
       if [ "$who" = built ]; then
-        ${lib.getExe ntfySend} hello t --connect-to "ntfy.zt:443:127.0.0.1:$port" > /dev/null 2>&1 || rc=$?
+        ${lib.getExe ntfySend} hello t --connect-to "${host}:443:127.0.0.1:$port" > /dev/null 2>&1 || rc=$?
       else
-        NTFY_CACERT=$ca ${bash}/bin/bash "$who" hello t --connect-to "ntfy.zt:443:127.0.0.1:$port" > /dev/null 2>&1 || rc=$?
+        NTFY_CACERT=$ca ${bash}/bin/bash "$who" hello t --connect-to "${host}:443:127.0.0.1:$port" > /dev/null 2>&1 || rc=$?
       fi
       got=$(cat received)
     }

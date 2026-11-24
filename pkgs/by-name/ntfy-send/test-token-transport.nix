@@ -6,6 +6,8 @@
 # header with -H and must reject it. caUnset and caEmpty require the script to
 # exit before curl runs when NTFY_CACERT is unset or empty, and the mutant
 # cacertGuardDropped, the script without its NTFY_CACERT guard, runs only caEmpty.
+# urlEmpty requires the same of an empty NTFY_URL, and the mutant
+# urlGuardDropped, the script without its NTFY_URL guard, must fail it.
 {
   runCommand,
   bash,
@@ -23,7 +25,8 @@ runCommand "ntfy-send-test-token-transport" { } ''
   chmod +x "$work/curl"
   export NTFY_CURL_BIN="$work/curl"
   export NTFY_CACERT=/ca
-  caller=$(printf '%s\n' -H "Title: t" -d hello https://ntfy.zt/fleet-acceptance)
+  export NTFY_URL=https://ntfy.example
+  caller=$(printf '%s\n' -H "Title: t" -d hello https://ntfy.example/fleet-acceptance)
 
   # run SCRIPT ENV...: runs SCRIPT under `env ENV...` with the stub recording
   # into a fresh $REC; sets $status.
@@ -104,5 +107,21 @@ runCommand "ntfy-send-test-token-transport" { } ''
     exit 1
   fi
   echo "mutant cacertGuardDropped rejected"
+
+  # urlEmpty SCRIPT: without a base URL the script exits non-zero before curl
+  # runs. Without the guard, curl would run against "/fleet-acceptance".
+  urlEmpty() {
+    run "$1" NTFY_URL=
+    [ "$status" != 0 ] && [ ! -e "$REC/argv" ] || { echo "FAIL: urlEmpty: exit $status, argv $(cat "$REC/argv" 2>/dev/null | tr '\n' ' ')"; return 1; }
+    echo "ok: urlEmpty: exit $status before curl"
+  }
+  urlEmpty ${./ntfy-send.sh}
+  substitute ${./ntfy-send.sh} "$work/urlless.sh" \
+    --replace-fail ': "''${NTFY_URL:?ntfy-send: NTFY_URL names no ntfy server}"' ':'
+  if urlEmpty "$work/urlless.sh"; then
+    echo "FAIL: mutant urlGuardDropped passed urlEmpty"
+    exit 1
+  fi
+  echo "mutant urlGuardDropped rejected"
   touch "$out"
 ''

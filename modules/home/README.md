@@ -119,7 +119,7 @@ The fifth builds the sandbox profile that the Devin snapshot activates.
 - `security/` — secrets and key handling (age, sops, ssh-to-age, Bitwarden CLI, YubiKey, gitleaks, aws-vault).
 - `shell/` — bash, fish, atuin, tmux, zellij, yazi, session path, shell aliases.
 - `terminal/` — terminal utilities with `programs.*` modules (bat, btop, fzf, zoxide, and others) and the raw Unix, I/O, and compression tools.
-- `tools/` — operator tooling (nix helpers, gpg, awscli, k9s, texlive, typst, repository sync).
+- `tools/` — operator tooling (nix helpers, gpg, awscli, k9s, texlive, typst, repository sync), and `ntfy-send`, which the agent hooks post through and which reaches ntfy as `ntfy.vanixiets.internal` on a Mac, where Local Network privacy can refuse `ntfy.zt` to a store binary (`pkgs/by-name/ntfy-send/package.nix`).
 - `users/` — identity, aggregate lists, and per-user overrides; `lib.nix` declares `flake.users`.
 
 Top-level files: `app.nix` (the `home` app, an `nh`-based `home-switch`), `configurations.nix`, `mk-home.nix`; `home-bootstrap` lives in `modules/apps/bootstrap/`.

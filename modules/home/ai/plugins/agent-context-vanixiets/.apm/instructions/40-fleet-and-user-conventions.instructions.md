@@ -11,6 +11,8 @@ A machine present in `machines/` is therefore not necessarily provisioned, and a
 Every account on every host has `fastfetch` and `nix-info` (`cli-host-inspection`, imported by the NixOS and nix-darwin `base` aspects and `homeManager.engineering-tools`), so `fastfetch --format json -s <modules>` (for example `-s os:kernel:cpu:memory`) and `nix-info -m` describe a host without root.
 NixOS hosts add `systemd-detect-virt`, `lscpu -J` and `lsblk -J` for virtualisation, CPU and block-device detail.
 
+From an agent session on a Mac, reach fleet services by their `*.vanixiets.internal` (tincr) names, not `*.zt`: macOS Local Network privacy refuses ZeroTier's Ethernet-like `feth` interface to a Nix-built client (the store's curl or python, for instance) whose responsible program, herdr for instance, holds no Local Network grant, failing in milliseconds with "No route to host", while tincr's tunnel interface is outside that privacy.
+
 Two admin-username conventions coexist: older machines force the username `crs58`, and newer ones use `cameron` as a home-manager alias for the same account.
 Modules that hardcode a username are following one convention or the other, and which one is a property of the machine.
 

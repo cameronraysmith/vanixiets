@@ -39,7 +39,8 @@ REPO_NAME=$(basename "$REPO_ROOT")
 # Build notification message
 MESSAGE="Claude Code needs permission to use ${TOOL_NAME}: ${BRIEF}"
 
-# Send notification to ntfy.zt through ntfy-send, which verifies the server's
+# Send notification to ntfy through ntfy-send, which addresses it by the
+# platform's name (ntfy.vanixiets.internal on a Mac), verifies the server's
 # certificate and times out after 5 seconds; best-effort, never fail the hook.
 ntfy-send "$MESSAGE" "$NTFY_TOPIC" \
   -H "Title: Permission: ${TOOL_NAME}" \

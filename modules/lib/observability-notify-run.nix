@@ -20,7 +20,8 @@
 # passes after a posted FAILED, nothing for a new episode within
 # minIntervalSec of the last FAILED. ntfy-send reads the token through
 # NTFY_TOKEN_FILE, set only for its calls; on darwin, as on NixOS, it posts
-# with the store curl and verifies ntfy.zt against caddy's root.
+# with the store curl and verifies ntfy against caddy's root, at
+# ntfy.vanixiets.internal on darwin and ntfy.zt on NixOS.
 # checks.x86_64-linux.otel-collector-darwin runs it over a
 # recording ntfy-send.
 { lib, ... }:
