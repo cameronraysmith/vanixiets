@@ -22,7 +22,7 @@ stibnite is the operator's main workstation: omp ran 621 session-hours there in 
 
 **Stage 1, NixOS only (magnetite, then pyrite)**
 - The agent-session collector's settings become one function of host facts; magnetite's and pyrite's evaluated collectors are unchanged by it, byte for byte.
-- omp's oneshot kind is stored as a span column; Langfuse no longer receives omp's two startup requests (`skill_description`, `mcp_namespace_hint`), on any host; compaction, handoff and other oneshot requests are still sent.
+- omp's oneshot kind is stored as a span column; Langfuse no longer receives omp's two startup requests (`skill_description`, `mcp_namespace_hint`), on any host, nor, since 2026-11-24, its background jobs' caption and widget requests (`job_caption`, `job_widget`); compaction, handoff and other oneshot requests are still sent.
 - Each Mac's kept-alive launchd expectation follows its own host-table row.
 - The ingress's agent event and span queues grow for three agent-telemetry hosts, taken from the `fleet` queue's surplus (the operator's decision, design Q1).
 - A Langfuse send-failure rule posts at low priority when a day's failures outnumber its sends.
@@ -46,7 +46,7 @@ None.
 
 ### Modified Capabilities
 
-- `agent-session-telemetry` (stratum: behavioral): stibnite becomes an agent-telemetry host; its outage hold is a week of average use; on a host without a memory ceiling an overload costs memory headroom and is reported; Langfuse is not sent omp's startup requests; a Langfuse block reaches a person without paging; a darwin host's own series keep arriving.
+- `agent-session-telemetry` (stratum: behavioral): stibnite becomes an agent-telemetry host; its outage hold is a week of average use; on a host without a memory ceiling an overload costs memory headroom and is reported; Langfuse is not sent omp's helper requests; a Langfuse block reaches a person without paging; a darwin host's own series keep arriving.
 - `agent-session-telemetry-interface` (stratum: interface): the settings function and its equality check; the darwin daemon, its port, account, credentials, queues and footprint clause; the emitters' explicit enable and person; the Langfuse oneshot filter; the ingress queues at three hosts; the Langfuse send-failure series. Trust boundary: these properties reach as far as evaluation on Linux, `otelcol-contrib validate`, the VM tests and the live reads after the console deploy; nothing here bounds a Mac's memory, and nothing proves which harnesses on a Mac read the settings.
 - `fleet-alerting-interface` (stratum: interface): `LaunchdJobNotRunning`'s kept-alive labels follow each host's row; a new `info` rule reads Langfuse's sent and failed spans. Trust boundary: the rule sees only what the host collector scraped while the host was awake and on the mesh.
 - `world-assumptions` (stratum: world): A209–A212 (launchd's absent ceiling, stibnite's concurrency and volume, omp's oneshot spans, the per-host rates behind the ingress budget); the designation `agent-telemetry host` gains stibnite.

@@ -70,16 +70,21 @@ However many agent sessions run on an agent-telemetry host and however large the
 
 ## ADDED Requirements
 
-### Requirement: Langfuse is not sent omp's startup requests
+### Requirement: Langfuse is not sent omp's helper requests
 
-omp's two startup requests, kinds `skill_description` and `mcp_namespace_hint`, SHALL reach the telemetry store with their kind recorded, and SHALL NOT be sent to the Langfuse project from any host; every other span, other oneshot kinds such as compaction and handoff included, SHALL be sent as before.
+omp's helper requests, its two startup requests (kinds `skill_description` and `mcp_namespace_hint`) and its background jobs' caption and widget requests (kinds `job_caption` and `job_widget`), SHALL reach the telemetry store with their kind recorded, and SHALL NOT be sent to the Langfuse project from any host; every other span, other oneshot kinds such as compaction and handoff included, SHALL be sent as before.
 
-**Discharged by**: `agent-session-telemetry-interface` requirement `Langfuse's branch drops omp's startup requests`; resting on world assumptions `A211 — omp marks each oneshot request's span with its kind, and a startup request is a leaf root` and `A204 — The telemetry store alters a table idempotently as read at 1.2.1`.
+**Discharged by**: `agent-session-telemetry-interface` requirement `Langfuse's branch drops omp's helper requests`; resting on world assumptions `A211 — omp marks each oneshot request's span with its kind, and a startup request is a leaf root` and `A204 — The telemetry store alters a table idempotently as read at 1.2.1`.
 
 #### Scenario: A session starts and omp makes its startup requests
 
 - **WHEN** an omp session starts on pyrite after its deploy and omp makes its skill-summary and MCP namespace-hint requests
 - **THEN** the telemetry store holds both spans with kinds `skill_description` and `mcp_namespace_hint`, and the Langfuse project receives no trace for either
+
+#### Scenario: omp captions a background job
+
+- **WHEN** an omp session starts a background job and omp asks a small model for the job's caption or widget spec
+- **THEN** the telemetry store holds that span with kind `job_caption` or `job_widget`, and the Langfuse project receives no observation for it
 
 #### Scenario: omp summarises a long conversation
 

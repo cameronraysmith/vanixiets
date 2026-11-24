@@ -771,13 +771,17 @@
           # Claude Code's span that, after the allow-list, carries only a
           # duration: one billable unit per tool call and nothing to read.
           droppedSpans = [ "claude_code.tool.blocked_on_user" ];
-          # omp's startup requests, which summarise the session's skills
-          # and MCP namespaces on a small model: noise in Langfuse, still
-          # stored (darwin-agent-session-telemetry design D8). Every other
-          # oneshot kind is sent.
+          # omp's helper requests on a small model, noise in Langfuse and
+          # still stored: the two startup requests, which summarise the
+          # session's skills and MCP namespaces, and the caption and widget
+          # spec it writes for a background job (darwin-agent-session-
+          # telemetry design D8). Each is a leaf span, so dropping it
+          # orphans nothing. Every other oneshot kind is sent.
           droppedOneshotKinds = [
             "skill_description"
             "mcp_namespace_hint"
+            "job_caption"
+            "job_widget"
           ];
           # Claude Code's bare token counts, under the names Langfuse reads.
           usageKeys = {

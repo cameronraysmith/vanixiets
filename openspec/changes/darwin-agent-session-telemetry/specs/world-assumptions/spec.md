@@ -46,10 +46,15 @@ Any requirement whose discharge depends on this fact SHALL name it explicitly, a
 - **WHEN** the files above were read on 2026-11-22 and 2026-11-23
 - **THEN** the skill-description and MCP namespace-hint requests' spans carried `omp.gen_ai.oneshot.kind` `skill_description` and `mcp_namespace_hint`, enclosed only the completion, and had no active parent
 
+#### Scenario: Read in the store
+
+- **WHEN** the `job_caption` and `job_widget` spans stored from stibnite's omp 19.1.1 were counted on 2026-11-24
+- **THEN** 89 were their trace's root and 198 sat inside session traces, none with a span of its own beneath it, so each is a leaf whether or not it is a root (`logs/c121-job-kinds-roots-20261123-224707.log`)
+
 #### Scenario: A release renames the kind or nests a span
 
-- **WHEN** the packaged omp differs from 19.1.0 and renames the key, `skill_description` or `mcp_namespace_hint`, starts a startup request inside a run, or opens a span inside a oneshot request
-- **THEN** this assumption is void, and the `agent-session-telemetry` requirement `Langfuse is not sent omp's startup requests` loses its discharge until `fleet-ingress`'s `agentSpans` and `langfuse` cases pass with spans recorded from the new release
+- **WHEN** the packaged omp differs from 19.1.0 and renames the key, `skill_description`, `mcp_namespace_hint`, `job_caption` or `job_widget`, starts a startup request inside a run, or opens a span inside a oneshot request
+- **THEN** this assumption is void, and the `agent-session-telemetry` requirement `Langfuse is not sent omp's helper requests` loses its discharge until `fleet-ingress`'s `agentSpans` and `langfuse` cases pass with spans recorded from the new release
 
 ### Requirement: A212 — Each agent-telemetry host's agent output stays within the assumed rates
 

@@ -196,7 +196,7 @@ The schema job creates `agent_span`, `agent_span_services` and `agent_span_opera
 
 Where a host's row sets `langfuse` (magnetite and pyrite), `traces/agent-session` also exports to the connector `forward/langfuse`. `traces/langfuse` therefore starts after every allow-list, cut, mask and stamp, and gets exactly the spans the store gets.
 
-`filter/langfuse` drops `claude_code.tool.blocked_on_user`. `transform/langfuse` then:
+`filter/langfuse` drops `claude_code.tool.blocked_on_user` and omp's helper requests, the spans whose `omp.gen_ai.oneshot.kind` is on `agentSession.langfuse.droppedOneshotKinds` (`skill_description`, `mcp_namespace_hint`, `job_caption`, `job_widget`; `darwin-agent-session-telemetry` design D8); the store keeps them. `transform/langfuse` then:
 
 - sets `langfuse.observation.input` and `.output`: from omp's `last_user_message` and `gen_ai.output.messages`, from Claude Code's `user_prompt`, and from a Claude tool's `full_command` or `file_path` and its `gen_ai.tool.call.result`;
 - moves Claude's token counts to `gen_ai.usage.*`;

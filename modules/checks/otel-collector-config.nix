@@ -863,7 +863,7 @@
           # alone, whose stages ignore their errors and include no limiter,
           # so the branch cannot refuse what the store path took.
           (check
-            "R3.1: traces/langfuse exists where observabilityHosts does not set langfuse or is missing where it does, or is not fed by forward/langfuse from traces/agent-session alone, after all its stages, through stages that cannot refuse, or sends the fleet's routing attributes, host.name, service.version, tool_use_id, duration_ms, a copied full_command or file_path, omp's startup requests or the oneshot kind"
+            "R3.1: traces/langfuse exists where observabilityHosts does not set langfuse or is missing where it does, or is not fed by forward/langfuse from traces/agent-session alone, after all its stages, through stages that cannot refuse, or sends the fleet's routing attributes, host.name, service.version, tool_use_id, duration_ms, a copied full_command or file_path, omp's helper requests (startup, job caption and widget) or the oneshot kind"
             (
               (agentPipelines ? "traces/langfuse") == lfOn
               && (ae ? ${lfName}) == lfOn
@@ -901,6 +901,8 @@
                     lf.droppedOneshotKinds == [
                       "skill_description"
                       "mcp_namespace_hint"
+                      "job_caption"
+                      "job_widget"
                     ]
                   && lib.all (s: builtins.elem s (ap."transform/langfuse".trace_statements or [ ])) [
                     ''delete_key(span.attributes, "full_command") where span.attributes["full_command"] == span.attributes["langfuse.observation.input"]''
@@ -1390,7 +1392,7 @@
         agentLimiter = "R3.1: the agent-session collector's limiter is not below its GOMEMLIMIT and that below its MemoryMax, or the host's collector sets GOMEMLIMIT";
         notified = "R3.1: a greptimedb*, zfs-set-*, zfs-assert-*, devloop-*, collector, otel-envelope or agent-session unit is not notified";
         unit = "R3.1: the agent-session collector shares the host collector's queue directory, serves telemetry off loopback, does not always restart, is bound to the host's collector, or may start before the store's schema job";
-        langfusePath = "R3.1: traces/langfuse exists where observabilityHosts does not set langfuse or is missing where it does, or is not fed by forward/langfuse from traces/agent-session alone, after all its stages, through stages that cannot refuse, or sends the fleet's routing attributes, host.name, service.version, tool_use_id, duration_ms, a copied full_command or file_path, omp's startup requests or the oneshot kind";
+        langfusePath = "R3.1: traces/langfuse exists where observabilityHosts does not set langfuse or is missing where it does, or is not fed by forward/langfuse from traces/agent-session alone, after all its stages, through stages that cannot refuse, or sends the fleet's routing attributes, host.name, service.version, tool_use_id, duration_ms, a copied full_command or file_path, omp's helper requests (startup, job caption and widget) or the oneshot kind";
         langfuseScrape = "R3.1: the otelcol-agent-session scrape job is missing where langfuse is set or present where it is not, or keeps more than the Langfuse exporter's sent and failed span counters";
         langfuseExporter = "R3.1: Langfuse's exporter does not send to schema.nix's endpoint, https://cloud.langfuse.com/api/public/otel, with verified TLS, no proxy and a 30 s timeout, with the unit's Langfuse credentials and ingestion version, retry for retryMinutes and no longer, drain faster than spans arrive into a queue of twice a retry window, in batches under the request limit, or a store exporter of the agent-session collector does not retry forever, or its queues reach 512 MiB";
         collectorVersion = "R3.1: the collector is not otelcol-contrib 0.155.0; before changing it, rerun fleet-ingress's agentSpans and handoffCap cases, which prove the link clearing, the tool-result strip, the masks and the hand-off cap at a release";
@@ -2037,6 +2039,24 @@
               processors."filter/langfuse".trace_conditions =
                 lib.take 1
                   i.agentSettings.processors."filter/langfuse".trace_conditions;
+            } i;
+        };
+        # One helper kind, job_widget, reaches Langfuse (design D8,
+        # operator 2026-11-24): the filter matches the other three only.
+        langfuseJobWidgetKept = {
+          clauses = [ clause.langfusePath ];
+          mutate =
+            i:
+            onAgent {
+              processors."filter/langfuse".trace_conditions =
+                lib.take 1 i.agentSettings.processors."filter/langfuse".trace_conditions
+                ++ [
+                  (lib.concatMapStringsSep " or " (k: ''span.attributes["omp.gen_ai.oneshot.kind"] == "${k}"'') [
+                    "skill_description"
+                    "mcp_namespace_hint"
+                    "job_caption"
+                  ])
+                ];
             } i;
         };
         # The oneshot kind reaches Langfuse.

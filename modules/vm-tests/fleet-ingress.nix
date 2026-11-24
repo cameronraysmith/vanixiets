@@ -1873,20 +1873,25 @@
               assert set(sink_spans(sink_records(nonce))) == {"bbb19b7ec3c1b101"}, sink_spans(sink_records(nonce)).keys()
               print("  ok: blocked_on_user stored, not sent to Langfuse", flush=True)
 
-              # omp's startup requests (darwin-agent-session-telemetry design
-              # D8): root chat spans of one completion each. All three reach
-              # the store with their kind; Langfuse gets the compaction alone,
-              # without the kind.
+              # omp's helper requests (darwin-agent-session-telemetry design
+              # D8): chat spans of one completion each, the startup requests
+              # and a job caption as roots, a job widget inside a session's
+              # trace as omp also sends it. All five reach the store with
+              # their kind; Langfuse gets the compaction alone, without the
+              # kind.
               nonce = f"lfoneshot{time.time_ns()}"
               now = time.time_ns()
               kinds = {"ccc19b7ec3c1b101": "skill_description", "ccc19b7ec3c1b102": "mcp_namespace_hint",
-                       "ccc19b7ec3c1b103": "compaction_summary"}
+                       "ccc19b7ec3c1b103": "compaction_summary", "ccc19b7ec3c1b104": "job_caption",
+                       "ccc19b7ec3c1b105": "job_widget"}
+              parents = {"ccc19b7ec3c1b105": "ccc19b7ec3c1b1ff"}
               oneshots = [{"traceId": os.urandom(16).hex(), "spanId": span_id, "name": "chat claude-haiku-4-5", "kind": 3,
                            "startTimeUnixNano": str(now - 2000000), "endTimeUnixNano": str(now),
+                           **({"parentSpanId": parents[span_id]} if span_id in parents else {}),
                            "attributes": [a("gen_ai.operation.name", "chat"), a("gen_ai.conversation.id", nonce),
                                           a("omp.gen_ai.oneshot.kind", kind)]} for span_id, kind in kinds.items()]
               assert lf_post(nonce, oneshots) == "200"
-              wait_for(lambda: lf_stored(nonce) == 3, "the three oneshot spans in the store", 120)
+              wait_for(lambda: lf_stored(nonce) == len(kinds), "the five oneshot spans in the store", 120)
               stored = gsql(f"SELECT \"span_attributes.omp.gen_ai.oneshot.kind\" FROM agent_span WHERE \"span_attributes.gen_ai.conversation.id\" = '{nonce}' ORDER BY 1", "agent")
               assert [row[0] for row in stored] == sorted(kinds.values()), stored
               wait_for(lambda: "ccc19b7ec3c1b103" in sink_spans(sink_records(nonce)), "the compaction span at the sink", 120)
@@ -1894,7 +1899,7 @@
               sent = sink_spans(sink_records(nonce))
               assert set(sent) == {"ccc19b7ec3c1b103"}, sent.keys()
               assert "omp.gen_ai.oneshot.kind" not in sent["ccc19b7ec3c1b103"][1], sent["ccc19b7ec3c1b103"][1].keys()
-              print("  ok: startup requests stored with their kind, not sent to Langfuse; the compaction sent without it", flush=True)
+              print("  ok: helper requests stored with their kind, not sent to Langfuse; the compaction sent without it", flush=True)
 
               results = {}
               for mode in ("down", "403", "429", "413"):

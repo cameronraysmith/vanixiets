@@ -494,8 +494,9 @@ in
         }
         // lib.optionalAttrs withLangfuse {
           # Claude Code's spans that carry nothing after the allow-list, and
-          # omp's startup requests (darwin-agent-session-telemetry design
-          # D8).
+          # omp's helper requests: its startup requests and its background
+          # jobs' captions and widgets (darwin-agent-session-telemetry
+          # design D8).
           "filter/langfuse" = {
             error_mode = "ignore";
             trace_conditions = [

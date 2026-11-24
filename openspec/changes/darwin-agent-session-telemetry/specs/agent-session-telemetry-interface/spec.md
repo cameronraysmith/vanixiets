@@ -143,21 +143,26 @@ Where a darwin row sets `agentTelemetry`, `org.nixos.otel-agent-session` SHALL r
 - **WHEN** the envelope's stubbed `top` reports the daemon's footprint 1 MiB above its limit
 - **THEN** C5 fails and the wrapper posts `FAILED otel-agent-session-envelope on stibnite`; 1 MiB below, it passes
 
-### Requirement: Langfuse's branch drops omp's startup requests
+### Requirement: Langfuse's branch drops omp's helper requests
 
-`agentSession.spans.keys` SHALL keep `omp.gen_ai.oneshot.kind`, the schema job SHALL add its `agent_span` column, `filter/langfuse` SHALL drop a span whose kind is on `agentSession.langfuse.droppedOneshotKinds`, which is `[ "skill_description" "mcp_namespace_hint" ]`, and `transform/langfuse` SHALL delete the key from every span it sends.
+`agentSession.spans.keys` SHALL keep `omp.gen_ai.oneshot.kind`, the schema job SHALL add its `agent_span` column, `filter/langfuse` SHALL drop a span whose kind is on `agentSession.langfuse.droppedOneshotKinds`, which is `[ "skill_description" "mcp_namespace_hint" "job_caption" "job_widget" ]`, and `transform/langfuse` SHALL delete the key from every span it sends.
 
-**Discharged by**: `checks.x86_64-linux.otel-collector-config`'s span-key and Langfuse clauses; `vmTests.x86_64-linux.fleet-ingress`'s `agentSpans` and `langfuse` cases with uncommitted mutants `langfuseOneshotKept` and `oneshotKeySent`; resting on world assumptions `A211 — omp marks each oneshot request's span with its kind, and a startup request is a leaf root`, `A198 — The telemetry store writes traces into pre-created v1 tables and refuses unknown columns` and `A204 — The telemetry store alters a table idempotently as read at 1.2.1`.
+**Discharged by**: `checks.x86_64-linux.otel-collector-config`'s span-key and Langfuse clauses with mutant `langfuseJobWidgetKept`; `vmTests.x86_64-linux.fleet-ingress`'s `agentSpans` and `langfuse` cases with uncommitted mutants `langfuseOneshotKept` and `oneshotKeySent`; resting on world assumptions `A211 — omp marks each oneshot request's span with its kind, and a startup request is a leaf root`, `A198 — The telemetry store writes traces into pre-created v1 tables and refuses unknown columns` and `A204 — The telemetry store alters a table idempotently as read at 1.2.1`.
 
-#### Scenario: The VM test posts the startup requests
+#### Scenario: The VM test posts the helper requests
 
-- **WHEN** `agentSpans` posts omp root `chat` spans with kinds `skill_description`, `mcp_namespace_hint` and `compaction_summary`
-- **THEN** the store holds all three with their kinds, the Langfuse sink receives only the third, and no span the sink receives carries the key
+- **WHEN** the `langfuse` case posts omp `chat` spans with kinds `skill_description`, `mcp_namespace_hint`, `job_caption` and `compaction_summary` as roots and `job_widget` inside another trace
+- **THEN** the store holds all five with their kinds, the Langfuse sink receives only the compaction span, and no span the sink receives carries the key
 
 #### Scenario: The filter is removed
 
 - **WHEN** the uncommitted mutant `langfuseOneshotKept` removes the kind condition
-- **THEN** the `langfuse` case fails because the sink received the startup spans
+- **THEN** the `langfuse` case fails because the sink received the helper spans
+
+#### Scenario: One kind leaves the filter
+
+- **WHEN** the mutant `langfuseJobWidgetKept` renders the kind condition without `job_widget`
+- **THEN** `otel-collector-config` fails its Langfuse clause
 
 ### Requirement: The host collector keeps Langfuse's send counters
 
