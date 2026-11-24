@@ -136,7 +136,7 @@ A side effect of the change is that the `OTEL_*` values no longer reach the prog
 | 6.2 | closed 2026-11-24 | none: magnetite's 01:00Z and 02:00Z budget runs pass with `agent.greptime_physical_table` present, so B1 counted `agent` (`logs/closeout-cam120-remote-20261123-211005.log`) |
 | 7.2 | closed 2026-11-24 | none: `darwin-agent-session-telemetry` (CAM-121) is merged, deployed on stibnite, and its task 12.1 passed (`logs/c121-12.1-cache-20261124T032509Z.log`) |
 | 9.7 | watch | no failed-Bash `tool_result` row exists yet (3 rows, none failed, none with `error`); read the first one's `error` |
-| 10.8 | operator, or a later deploy task | remove pyrite's orphan `/var/lib/private/opentelemetry-collector/queue/exporter_otlp_http_ingress-agent_logs` |
+| 10.8 | closed 2026-11-24 | none: pyrite's orphan `exporter_otlp_http_ingress-agent_logs` removed with the operator's authorisation, the collector unaffected (`logs/cam120-10.8-pyrite-orphan-20261124T034512Z.log`) |
 | 12.7 | operator | review Langfuse and decide keep, sample, upgrade, self-host or flag off; record it in design D16 |
 | ADR-003 span queue 15 min | closed 2026-11-23 | none: accepted by the operator (decision record D21) and recorded in ADR-003 |
 
