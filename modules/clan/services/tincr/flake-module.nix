@@ -10,7 +10,7 @@
   ...
 }:
 let
-  inherit (config.flake.lib) mesh hosts;
+  inherit (config.flake.lib) mesh hosts launchdSecretPoll;
 
   # One member's host file. SPTPSCipher and SPTPSKex take effect on a link
   # only when both ends' host files carry them (tincr docs/COMPAT.md), so they
@@ -331,16 +331,51 @@ in
               let
                 network = config.vanixiets.tincr.network;
                 package = config.services.tincr.networks.${instanceName}.package;
+                daemon = "tincr-${instanceName}";
+                job = config.launchd.daemons.${daemon};
+                # What tincr writes under /etc/tinc/<instance>: tinc.conf
+                # names the private key; hosts and tinc-up are store paths.
+                configText = lib.concatMapStrings (entry: lib.optionalString (entry.text != null) entry.text) (
+                  lib.attrValues (
+                    lib.filterAttrs (name: _: lib.hasPrefix "tinc/${instanceName}/" name) config.environment.etc
+                  )
+                );
               in
               {
                 imports = [ shared ];
                 services.tincr.networks.${instanceName} = network // {
                   utunUnit = lib.toInt (lib.removePrefix "utun" mesh.interface.darwin);
                 };
-                # tincr's darwin daemon reads host files only at start; a changed
-                # plist makes nix-darwin reload the daemon on activation.
-                launchd.daemons."tincr-${instanceName}".serviceConfig.EnvironmentVariables.TINCR_HOST_FILES =
-                  builtins.hashString "sha256" (builtins.toJSON network.hosts);
+                launchd.daemons.${daemon} = {
+                  # tincr's darwin daemon reads host files only at start; a
+                  # changed plist makes nix-darwin reload the daemon on
+                  # activation.
+                  serviceConfig.EnvironmentVariables.TINCR_HOST_FILES = builtins.hashString "sha256" (
+                    builtins.toJSON network.hosts
+                  );
+                  # tincd reads its key at start, and launchd can start it at
+                  # boot before sops-install-secrets has written it; the start
+                  # polls, bounded, for every secret its configuration names
+                  # (flake.lib.launchdSecretPoll, which says why not wait4path).
+                  script = lib.mkBefore (launchdSecretPoll.prefix { } (launchdSecretPoll.namedIn config configText));
+                };
+                assertions =
+                  map
+                    (message: {
+                      assertion = false;
+                      inherit message;
+                    })
+                    (
+                      launchdSecretPoll.failures {
+                        label = "launchd.daemons.${daemon}";
+                        start = job.script;
+                        outer = job.serviceConfig.ProgramArguments;
+                        # Every /run path the daemon's configuration names.
+                        named = lib.unique (
+                          map builtins.head (builtins.filter builtins.isList (builtins.split "(/run/[^ \n]+)" configText))
+                        );
+                      }
+                    );
                 # The darwin daemon writes its pidfile where the tinc CLI does
                 # not look (tincr nix/darwin-module.nix, names.rs).
                 environment.systemPackages = [
