@@ -8,8 +8,11 @@
 #   program, then `nix` as that program sees it, and fails on the wrapper.
 # - `recipes`: justfile recipes whose own nix calls produce such a result;
 #   each must call `{{nix_stock}}` and no `{{nix_cmd}}` or bare `nix`.
+# Also nix-direnv (flake.lib.nixDirenv, every home's): its preflight, sourced
+# with the classic wrapper first on PATH, must pick another `nix`; every
+# nix-direnv call would fall back from the wrapper with a notice.
 # Mutants, seen failing: pkgs.nh in place of flake.lib.withFleetNix in
-# modules/darwin/app.nix; `{{nix_cmd}}` in k3d-up.
+# modules/darwin/app.nix; `{{nix_cmd}}` in k3d-up; nixDirenv without its patch.
 # One system: the apps and the devShell are the same expression on every system.
 { config, ... }:
 let
@@ -85,6 +88,23 @@ in
               echo "just $r: {{nix_stock}}"
             fi
           done
+          nix=$(PATH="${classic}/bin:$PATH" bash -c '
+            log_error() { echo "$*" >&2; }
+            log_status() { :; }
+            has() { command -v "$1" >/dev/null; }
+            watch_file() { :; }
+            PATH_add() { :; }
+            direnv_layout_dir() { echo "$TMPDIR/direnv-layout"; }
+            direnv=true NIX_DIRENV_SKIP_VERSION_CHECK=1
+            source "$1"
+            _nix_direnv_preflight >&2 && echo "$_nix_direnv_nix"
+          ' nix-direnv ${flakeLib.nixDirenv pkgs}/share/nix-direnv/direnvrc)
+          if [ -z "$nix" ] || [ "$nix" = "$classic" ]; then
+            echo "nix-direnv: runs ''${nix:-no nix}"
+            failed=1
+          else
+            echo "nix-direnv: runs $nix"
+          fi
           if [ "$failed" -ne 0 ]; then exit 1; fi
           touch $out
         '';

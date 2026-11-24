@@ -3,8 +3,9 @@
 # direnv-instant makes shell prompts non-blocking by running direnv export
 # asynchronously in a daemon. When builds take longer than mux_delay, it
 # spawns a tmux pane showing progress.
-{ ... }:
+{ config, ... }:
 let
+  flakeLib = config.flake.lib;
   content =
     {
       flake,
@@ -19,7 +20,11 @@ let
 
       programs.direnv = {
         enable = true;
-        nix-direnv.enable = true;
+        nix-direnv = {
+          enable = true;
+          # The fleet's Nix by absolute path, never the `nix` on PATH (flake.lib.nixDirenv).
+          package = flakeLib.nixDirenv pkgs;
+        };
         config.global = {
           warn_timeout = "10m";
           hide_env_diff = true;
