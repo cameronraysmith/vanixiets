@@ -145,6 +145,7 @@ nix build .#vmTests.x86_64-linux.greptimedb-pipeline          # Pyrite or Magnet
 nix build .#vmTests.x86_64-linux.devloop-ingest               # Pyrite or Magnetite, uid-range
 nix build .#vmTests.x86_64-linux.devloop-ingest-reconcile     # Pyrite or Magnetite, uid-range; enormous, announce first
 nix build .#vmTests.x86_64-linux.fleet-ingress                # Pyrite or Magnetite, uid-range
+nix build .#vmTests.x86_64-linux.fleet-ingress-outage         # Pyrite or Magnetite, uid-range; enormous, announce first
 nix build .#vmTests.x86_64-linux.perses-greptimedb            # Pyrite or Magnetite, uid-range
 nix build .#vmTests.x86_64-linux.caddy-root-from-vars         # Pyrite or Magnetite, uid-range
 nix build .#vmTests.x86_64-linux.greptimedb-oom-order         # Pyrite, kvm
@@ -152,6 +153,12 @@ nix build .#vmTests.x86_64-linux.tincr-mesh                   # Pyrite, kvm
 nix build .#vmTests.x86_64-linux.tincr-mesh-partition         # Pyrite, kvm
 nix build .#vmTests.x86_64-linux.fleet-deployer               # Pyrite, kvm
 ```
+
+Each test declares its size class in `testSizes.vmTests` beside its definition (`checks/test-sizes.nix` declares the option and `flake.lib.testSizeLimits`), and `vm-tests/default.nix` passes every test through the test framework's `extend` with `globalTimeout` set to its class limit: small 60 s, medium 300 s, large 900 s, enormous 3,600 s, the driver's default.
+A test with no entry fails evaluation, naming it.
+The driver starts the timer just before the test script and, when it fires, logs `timeout reached; test terminating...`, releases every VM and container and fails the build; the driver and node builds are outside it.
+A test no run has measured is declared medium with `measured = false`, the three `vmTests.aarch64-linux` tests because the fleet has no aarch64-linux builder.
+`flake.lib.enormousTests` lists the enormous x86_64-linux tests, `devloop-ingest-reconcile` and `fleet-ingress-outage`.
 
 `fleet-deployer` runs the fleet deployer's request path end to end, in two QEMU VMs.
 - **What it imports:** the deployer imports `flake.modules.nixos.fleet-deployer`. Its forge is a local bare repository, its cache is a `file://` store, its ntfy is a recording `ntfy-send`, and stubs replace the commit's evaluation, `clan vars check` and `clan machines update`, which switch the target to the closure a test commit names. The target has the deploy record and `fleet-deploy-watch`, plus three specialisations: `next`, `broken` (a failing unit) and `isolated` (a firewall dropping the deployer's SSH).

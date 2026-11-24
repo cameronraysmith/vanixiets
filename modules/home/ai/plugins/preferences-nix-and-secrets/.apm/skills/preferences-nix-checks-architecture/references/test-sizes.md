@@ -73,7 +73,7 @@ Without those scans, the seven cases that assert filtering, routing, and refusal
 The test was split on 2026-11-24 (`declare-test-size-classes` stage 1) into two attributes built from one container definition.
 `fleet-ingress` keeps the eight cases that assert filtering, routing, refusal, the absence of forbidden values, the hand-off cap and the budget.
 Each of its scans now runs as one command inside the container, four queries at a time, and the driver checks the scan's column count against its own.
-Its script measured 252.56 to 280.74 s on pyrite, a medium run.
+Its script measured 216.61 to 280.74 s on pyrite in three runs, a medium run with as little as 19 s of margin under the 300 s timeout; a timeout failure there means it has outgrown medium, and the response is to trim it first.
 `fleet-ingress-outage` takes `langfuse`, `backPressure`, `lossControls`, `crashLoop`, `longRun` and `absentClientCa`, an enormous run.
 
 `vmTests.x86_64-linux.devloop-ingest` was split the same way (stage 2), moving the slow part whole.
@@ -81,7 +81,18 @@ Its `reconcile` case took about 1,468 s of its 1,690 to 1,701 s, waiting out the
 `devloop-ingest` keeps the other eight cases and measured 229.54 s of script, 246 s for the whole build, on pyrite on 2026-11-24, a medium run.
 `devloop-ingest-reconcile` runs `firstStart`, the reconcile case's readiness precondition, then `reconcile`, and measured 1,490.54 s of script, 1,506 s for the whole build, an enormous run.
 
+## What is enforced
+
+In vanixiets, each runtime test declares its class beside its definition, `testSizes.vmTests.<name> = { class; reason ? null; measured ? true; }` in the module that defines the test, and `modules/vm-tests/default.nix` sets every test's driver `globalTimeout` to its class limit through the test framework's `extend` (`declare-test-size-classes` stage 3).
+A test with no entry fails evaluation, naming it.
+The driver starts that timer just before the test script; when it fires, the driver logs `timeout reached; test terminating...`, releases every VM and container and kills itself, so the build fails.
+A test that no run has measured is declared medium with `measured = false`: a wrong guess fails at 5 minutes, and that run is its measurement.
+
 ## What is not enforced
 
-Nothing fails a build or a test for exceeding its class.
-Classes are declared and announced by the people and agents who run checks, and a check's measured duration is visible only in nixbot's records and the driver's log.
+The timer does not cover the driver and node builds, so a test whose script fits its class can still take longer as a whole cold run; time the whole `nix build` to see it.
+Nothing observes whether a person or agent gave a run notice.
+
+Checks do not declare classes yet, and nothing fails a check for exceeding one; their entries and a structural check that every check has exactly one arrive in stage 4 of that change.
+Pure builds are judged after the fact, from nixbot's records, in its stage 5.
+Until then a check's class is declared and announced by the people and agents who run it, and its measured duration is visible only in nixbot's records.
