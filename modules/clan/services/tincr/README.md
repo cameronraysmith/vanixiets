@@ -33,6 +33,7 @@ On NixOS the service also installs two invitation hooks, both computing the invi
 An invitation carries only the inviter's host file, so a device gets the rest from `flake.lib.meshHostFiles`, and a device is invited before it is declared, because `tinc invite` refuses a name whose host file exists.
 
 On darwin the network runs as the launchd daemon `org.tincr.<instance>` on `flake.lib.mesh.interface.darwin`, whose unit number the service passes to tincr's module, and tincr's `tinc-up` assigns the address.
+launchd orders no job after another, so at boot tincd can start before sops-install-secrets has written its private key; its start script polls once a second, for at most 60 seconds, for every `/run/secrets` path that `/etc/tinc/<instance>/` names, then starts tincd, which fails and is relaunched as before if the key is still missing (`flake.lib.launchdSecretPoll`, which says why not `/bin/wait4path`), and an assertion in the darwin module holds that.
 The darwin module has no firewall, DNS or socket-activation options, so what reaches a Mac is read on it after activation.
 Its daemon writes its pidfile to `/var/run/tincr-<instance>.pid`, where the `tinc` CLI does not look, so the service installs a `tinc` wrapper passing `--pidfile`, and `tinc -n <instance> info` works on a Mac.
 Its log, `/var/log/tincr-<instance>.log`, grows without rotation: launchd holds the file open and macOS `newsyslog` has no copy-and-truncate mode, so rotation would need a daemon restart; tincd runs at its default debug level 0, and this is accepted.
