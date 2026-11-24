@@ -94,6 +94,18 @@ Any requirement whose discharge depends on this fact SHALL name it explicitly, a
 
 ## MODIFIED Requirements
 
+### Requirement: A52 — The collector answers back-pressure with a retryable refusal and keeps its persistent queue across an outage and a restart
+
+It is true of `otelcol-contrib` 0.155.0, independent of what this fleet builds, that a receiver whose queue is full or whose memory limiter refuses answers HTTP 503, which its exporter retries, and that a `file_storage` queue keeps its items across an outage of the receiver and a restart of its collector.
+Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL be treated as losing its discharge once this assumption's violation condition below is observed.
+
+**Evidence**: on magnetite on 2026-10-28 a spike ingress with a two-request queue toward an absent store, and then with a refusing limiter, answered `503` with `{"code":14,...}`, the agent logged `Will retry`, its queue grew from 28 to 59 requests across an outage and its own restart, and every one of the 783 points it scraped arrived once the ingress recovered, while the ingress counted the same points as refused and enqueue-failed (`logs/s4/grounding.md` §2); `vmTests.x86_64-linux.fleet-ingress-outage`'s back-pressure case, run on demand before any collector bump merges and weekly on the default branch, is its monitor.
+
+#### Scenario: A collector bump changes the refusal or the queue
+
+- **WHEN** a collector version answers a full queue or a refusing limiter with a status its exporter treats as permanent, or loses persistent-queue items across a restart
+- **THEN** this assumption is void, and the `host-metrics-collection` requirement `Collection survives a telemetry store restart without losing the queued interval` and the `fleet-ingress-interface` requirement `otel-envelope regulates each agent from its own collector` lose the argument that the ingress's refusals are back-pressure rather than loss
+
 ### Requirement: Grounded vocabulary for behavioral requirements
 
 The corpus SHALL provide one designation record per content term this repository's `behavioral`-stratum requirements use, recording the term, the sense in which it is used when a term carries more than one, the world phenomenon it denotes, and whether that phenomenon is world-only, shared with the machine, or machine-only.

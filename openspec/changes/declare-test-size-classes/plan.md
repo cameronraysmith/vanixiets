@@ -47,8 +47,8 @@
 
 - [ ] **Step 1:** Wait for the operator's answer to design Open Question 1; record it (1.1).
 - [ ] **Step 2:** `rg -n 'fleet-ingress|backPressure|lossControls|crashLoop|longRun|absentClientCa|langfuse' openspec/specs` and read each hit's requirement; write the list to `logs/tsc-1-corpus-<ts>.log` (1.2).
-- [ ] **Step 3:** In `modules/vm-tests/fleet-ingress.nix`, add a `nonce-scan` `writeShellApplication` (runtimeInputs `curl`, `jq`) to the store container's `environment.systemPackages`; it takes the nonces as arguments, queries `information_schema.columns` as `regulator` exactly as `helpers.py` `nonce_hits` does, loops the columns locally and prints the hit dictionary as JSON.
-- [ ] **Step 4:** Change `nonce_hits` in `modules/vm-tests/fleet-ingress/helpers.py` to `json.loads(store.succeed("nonce-scan " + " ".join(shlex.quote(n) for n in nonces)))`, keeping its print line; evaluate the container's closure (1.3).
+- [ ] **Step 3:** Add `modules/vm-tests/fleet-ingress/nonce_scan.py`, shipped as `/etc/fleet-ingress/nonce_scan.py` in the store container: it takes the regulator's netrc and the nonces as arguments, queries `information_schema.columns` as `regulator` exactly as `helpers.py` `nonce_hits` did, loops the columns on the container's loopback and prints the hit dictionary with the column and table counts as JSON.
+- [ ] **Step 4:** Change `nonce_hits` in `modules/vm-tests/fleet-ingress/helpers.py` to one `store.succeed` of `python3 /etc/fleet-ingress/nonce_scan.py`, keeping its print line; evaluate the container's closure (1.3).
 - [ ] **Step 5:** Turn the `fleet-ingress` binding into a function of `{ name, cases }` over the shared container and helpers; define `fleet-ingress` and `fleet-ingress-outage` with design D7's case lists; update the header comment (1.4). Commit: `test(fleet-ingress): split the outage cases into fleet-ingress-outage`.
 - [ ] **Step 6:** Run `agentSession` and `agentSpans` alone, then `scanFirstTable` and `scanStringOnly` in throwaway trees; record results (1.5).
 - [ ] **Step 7:** Run `fleet-ingress` cold on pyrite under `time`, tee to `logs/` (1.6). If over 300 s, apply the Open Question 1 answer.

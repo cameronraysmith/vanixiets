@@ -3,15 +3,16 @@ linear_story_id: CAM-123
 linear_story_identifier: CAM-123
 linear_story_title: "Declare and enforce test size classes"
 linear_story_url: https://linear.app/cameronraysmith/issue/CAM-123/declare-and-enforce-test-size-classes
-linear_story_state: Todo
+linear_story_state: In Progress
 linear_team: CAM
 linear_project: nixbot-herculesci-cicd
-last_synced_state: Todo
-last_synced_at: "2026-11-24T10:00:46Z"
+last_synced_state: In Progress
+last_synced_at: "2026-11-24T16:15:15Z"
 review_round: 0
 max_review_rounds: 3
 attempt_log:
   - { at: "2026-11-24T10:00:46Z", transition: "Backlog->Todo", outcome: "posted", note: "Issue CAM-123 created in Todo in project 82a27ad740f7 (Migrate to nixbot and herculesCI CI/CD), no label, with description seeded from proposal.md's Why and What Changes; state and project confirmed by read-only view; bind comment posted" }
+  - { at: "2026-11-24T16:15:15Z", transition: "Todo->In Progress", outcome: "posted", note: "First stage 1 task (1.1) started after the operator answered the six open questions; state confirmed In Progress by read-only view; comment posted" }
 ---
 
 ## Why
@@ -53,7 +54,7 @@ The fleet's test size policy (pull request #4224, 2026-11-24) gives every test a
 ### Modified Capabilities
 
 - `world-assumptions` (stratum: world): A221–A225 (the test driver's global timeout, the absence of a per-derivation time limit, nixbot's duration record, pyrite as the only kvm host, and the measured durations the initial classes rest on); designations for test, check, size class, run (test sense), run notice, scheduled run and pull-request gate.
-- Corpus requirements that cite a case moved by stages 1 and 2 (in `fleet-ingress-interface`, `devloop-collection-interface` and `world-assumptions` A52) are restated in the stage that moves the case; design D7 lists the candidates.
+- `fleet-ingress-interface` (stratum: interface), `telemetry-store-interface` (stratum: interface) and `world-assumptions` A52: requirements whose discharge or scenario cites a `fleet-ingress` case that stage 1 moves to `fleet-ingress-outage` are restated to name the new test (design D7); stage 2 restates the `devloop-collection-interface` requirements that cite the reconcile case.
 
 ## Impact
 
