@@ -76,6 +76,11 @@
       "allowedVersions": "<26"
     },
     {
+      "description": "lazyvim-nix v16.0.2 links each Nix-managed plugin into the dev path as <owner>--<repo> (pfassina/lazyvim-nix#115); lazy.nvim derives a plugin's name from that directory, so require() of a lazy plugin returns its module without loading it and lualine's config fails at every Neovim start. flake.nix holds v16.0.1; skip only the broken tag, so a later tag that fixes it (pfassina/lazyvim-nix#117, #119) is still proposed.",
+      "matchPackageNames": ["pfassina/lazyvim-nix"],
+      "allowedVersions": "!/^v16\\.0\\.2$/"
+    },
+    {
       "description": "bun is derived, not tracked: the packageManager field must equal the nixpkgs bun that renovate's bun post-upgrade task runs, or a different bun can rewrite bun.lock. The renovate aspect (modules/nixos/renovate.nix) asserts the pairing, so a flake.lock bump that moves nixpkgs bun must carry the packageManager edit. Renovate never proposes it on its own.",
       "matchManagers": ["bun"],
       "matchDepTypes": ["packageManager"],
