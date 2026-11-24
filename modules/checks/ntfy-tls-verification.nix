@@ -73,6 +73,8 @@
         pkgs/by-name/ntfy-send/package.nix	builds the client and names curl's path
         modules/vm-tests/caddy-root-from-vars.nix	a VM test whose curl verifies with --cacert against a root made in the test, inside the VM
         modules/lib/observability-notify-run.nix	a comment on how ntfy-send posts; the notifier posts through ntfy-send and runs no curl
+        modules/home/tools/hooks/default.nix	names ntfy's hosts for gate-mutating-http's allowlist; its curl is a comment, and it runs no curl
+        modules/checks/hooks.nix	gate-mutating-http's cases, curl commands handed to the hook as text and never run
       '';
       exempt = pkgs.writeText "ntfy-exempt" ''
         pkgs/by-name/ntfy-send/test-token-transport.nix	a recording curl stub

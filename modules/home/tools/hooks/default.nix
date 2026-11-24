@@ -3,32 +3,33 @@
 # path, so a hook runs whether or not it is on PATH; `tools` also puts them on
 # PATH.
 { config, ... }:
+let
+  # Hosts a mutating HTTP request (POST, PUT, etc.) may go to without a
+  # prompt from gate-mutating-http. The hook allows a mutating command only
+  # when it is one curl command whose every URL's host is exactly one of
+  # these, with no option that sends the bytes elsewhere; anything else, or
+  # anything it cannot read from the text, asks (its header has the rule).
+  # Both names are cinnabar's ntfy: ntfy.zt over ZeroTier,
+  # ntfy.vanixiets.internal over tincr, the name Macs use because Local
+  # Network privacy can refuse ZeroTier to a store binary
+  # (pkgs/by-name/ntfy-send/package.nix).
+  trustedHttpMutationHosts = [
+    "ntfy.zt"
+    "ntfy.vanixiets.internal"
+  ];
+in
 {
+  # The hook's text with the trusted hosts filled in, which
+  # checks.<system>.hook-gate-mutating-http (modules/checks/hooks.nix) drives.
+  flake.lib.gateMutatingHttpScript =
+    builtins.replaceStrings
+      [ "@trustedHttpMutationHosts@" ]
+      [ (builtins.concatStringsSep " " trustedHttpMutationHosts) ]
+      (builtins.readFile ./gate-mutating-http.sh);
+
   flake.lib.claudeCodeHooks =
     pkgs:
     let
-      # Hosts where mutating HTTP requests (POST, PUT, etc.) are auto-approved
-      # by gate-mutating-http without prompting. Matched as exact hostnames in
-      # URLs with or without scheme prefix (e.g. both https://ntfy.zt/topic and
-      # ntfy.zt/topic are recognized), never as suffixes. Both names are
-      # cinnabar's ntfy: ntfy.zt over ZeroTier, ntfy.vanixiets.internal over
-      # tincr, the name Macs use because Local Network privacy can refuse
-      # ZeroTier to a store binary (pkgs/by-name/ntfy-send/package.nix).
-      trustedHttpMutationHosts = [
-        "ntfy.zt"
-        "ntfy.vanixiets.internal"
-      ];
-
-      trustedHostsPattern =
-        if trustedHttpMutationHosts == [ ] then
-          ""
-        else
-          let
-            escaped = map (h: builtins.replaceStrings [ "." ] [ "\\." ] h) trustedHttpMutationHosts;
-            alternation = builtins.concatStringsSep "|" escaped;
-          in
-          "(https?://|[[:space:]])(${alternation})(/|:|[[:space:]]|$)";
-
       # Prepended to the hooks that resolve repository context. Shell has no
       # import, and these are single-file writeShellApplication derivations, so
       # sharing means textual composition at build time.
@@ -94,9 +95,7 @@
           pkgs.jq
           pkgs.gnugrep
         ];
-        text = builtins.replaceStrings [ "@trustedHostsPattern@" ] [ trustedHostsPattern ] (
-          builtins.readFile ./gate-mutating-http.sh
-        );
+        text = config.flake.lib.gateMutatingHttpScript;
       };
 
       gate-worktree-surfaces = pkgs.writeShellApplication {
