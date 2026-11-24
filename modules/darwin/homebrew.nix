@@ -57,6 +57,7 @@
           "stats"
           "tableplus"
           "visual-studio-code"
+          "voiceink"
           "wezterm@nightly"
           "zed"
           "zen"
