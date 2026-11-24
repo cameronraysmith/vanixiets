@@ -8,8 +8,9 @@ description: >
   type-check, unit-test, integration/e2e, nix-infrastructure, build/eval) is relevant,
   when adding, gating, or reviewing any check (evaluation cost, attribute key-set
   strictness, nix-eval-jobs memory, per-system gating, nixpkgs instantiation count),
-  when measuring or benchmarking flake evaluation, or when judging whether a check is
-  vacuous, tautological, duplicated, or placed on the wrong rung.
+  when measuring or benchmarking flake evaluation, when judging whether a check is
+  vacuous, tautological, duplicated, or placed on the wrong rung, or when assigning a
+  check or VM test its size class or measuring how long one run takes.
 ---
 
 # Nix checks architecture
@@ -361,6 +362,15 @@ The PR cycle in `nix-flake-pr-cycle` exercises the closure operator over whichev
 The decision to escalate is therefore principally about whether the additional confidence is worth the build cost, not about whether the CI infrastructure can accommodate it.
 
 See `references/process-compose-checks.md` for the full treatment of the application-composition regulator, `references/nixos-vm-tests.md` for the nspawn and full-QEMU regulators, and `preferences-compositional-continuous-verification` for the operating-envelope-plus-regulator framing.
+
+
+## Test sizes
+
+Every check and test has a size class set by the wall-clock duration of one cold run: small up to 1 minute, medium up to 5 minutes, large up to 15 minutes, and enormous up to 60 minutes, the timeouts Bazel implies for its test sizes.
+Small and medium checks belong on the pull-request gate, a large one only with a recorded reason, and an enormous one never; it runs on a schedule or on demand.
+A run expected to exceed 5 minutes is announced before it starts, with its expected duration, what it proves that a cheaper run cannot, and what waits on it.
+The escalation ladder above picks the cheapest regulator for an envelope, and the size class holds each case's run time to what its assertion needs; a test larger than its purpose is a defect to report, not a cost to absorb.
+See `references/test-sizes.md` for assigning a class, measuring one run, and what to do when a check outgrows its class.
 
 
 ## Check module organization in flake-parts
