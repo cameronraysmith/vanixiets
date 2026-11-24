@@ -18,7 +18,8 @@ Because edits land in the integrated surface unattributed, accumulated change is
 Splice into a chain with `jj new --no-edit -B <tip>`; descendants rebase automatically and a downstream merge keeps every edge, so the join stays intact without being touched.
 
 Other top-level sessions may share this working copy and its join, each owning chains you did not create.
-Change the join's parents only with a destination derived from its current parents, `jj rebase -s <join> -d '(parents(<join>) ~ ::trunk()) | <new-chain>'`, never an explicit parent list, which silently drops the chains you did not name; and when a landing moves the trunk, rebase your own remaining chains onto it and rebuild the join the same way before reporting the landing.
+Change the join's parents only with a destination derived from its current parents and the trunk, `jj rebase -s <join> -d 'heads((parents(<join>) ~ ::trunk()) | trunk() | <new-chain>)'`, never an explicit parent list, which silently drops the chains you did not name; `| trunk()` keeps what has landed in the join when every remaining chain is based on an older trunk, and `heads()` drops it again when another parent already contains it.
+Add a new chain to the join immediately after creating it, before any edit, since a squash into a chain outside the join removes those paths from the working copy; and when a landing moves the trunk, rebase your own remaining chains onto it and rebuild the join the same way before reporting the landing.
 The rest of the protocol, which a harness with inter-session messaging carries over that channel, is the `jj-version-control` skill §"Coordinating concurrent sessions on one join".
 
 Read-only inspection takes the global `--ignore-working-copy` so it does not snapshot and race a concurrent session.

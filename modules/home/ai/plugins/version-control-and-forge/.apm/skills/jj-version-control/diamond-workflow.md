@@ -140,7 +140,7 @@ Independent chains within the same linearization step can be ordered discretiona
    Develop in wip, routing changes to chains via the edit-route cycle.
    Throughout the develop phase `@` stays the single empty `[wip]` directly atop `[merge]` (invariant (iii)/(vi)); this shared `[wip]` is the stable coordination point that lets multiple concurrent editors write the same integrated surface safely.
    Route every change DOWN from `@` using only `@`-preserving verbs — `jj squash --from @ … --keep-emptied`, `jj absorb`, or `jj split` keeping the wip — and never `jj describe @` into content nor make `@` the subject of `jj rebase` / `--revisions @`, which drift `@` off `[wip]`, remove the surface other actors are concurrently writing, and (in this repo) drag the pushed `wip` deploy bookmark that machines rebuild from.
-   The one sanctioned `jj rebase` touching `@` is the destination add/remove-chain form, whose destination is derived from the join's current parents (`jj rebase -s <join> -d '(parents(<join>) ~ ::trunk()) | <new-chain>'`) and which keeps `@` an empty child of the rebuilt join; the positional `--insert-before` / `--insert-after` (and the `-A` / `-B` aliases) forms are the prohibited ones.
+   The one sanctioned `jj rebase` touching `@` is the destination add/remove-chain form, whose destination is derived from the join's current parents and the trunk (`jj rebase -s <join> -d 'heads((parents(<join>) ~ ::trunk()) | trunk() | <new-chain>)'`) and which keeps `@` an empty child of the rebuilt join; the positional `--insert-before` / `--insert-after` (and the `-A` / `-B` aliases) forms are the prohibited ones.
    See the sibling `SKILL.md` invariant (iii-b) for the canonical statement.
    Each route from `[wip]` to a chain is either an append-route (default: land a new atomic commit on the chain) or an amend-route (fixups against the existing tip).
    The append-route is the default for landing new work:
@@ -339,8 +339,9 @@ Finish the landing before announcing it:
 jj git fetch
 # Rebase each of your remaining chains onto the new trunk.
 jj rebase -s 'roots(trunk()..<own-chain-b>) | roots(trunk()..<own-chain-c>)' -d 'trunk()'
-# Rebuild the join; parents now on the trunk drop out.
-jj rebase -s <join> -d 'parents(<join>) ~ ::trunk()'
+# Rebuild the join; parents now on the trunk drop out, and the trunk stays a parent
+# while no remaining chain contains it.
+jj rebase -s <join> -d 'heads((parents(<join>) ~ ::trunk()) | trunk())'
 ```
 
 When the forge rewrote the landed commits, their local copies are not ancestors of the trunk, so remove that chain with the remove form in `SKILL.md` §"Adding and removing chains".

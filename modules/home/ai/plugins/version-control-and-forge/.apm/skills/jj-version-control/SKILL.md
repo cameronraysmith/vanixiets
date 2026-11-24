@@ -7,7 +7,7 @@ description: Jujutsu version control conventions and workflow patterns, includin
 
 **IMPORTANT for AI agents**: Commands like `jj describe` and `jj split <paths>` require `-m "message"` flag for non-interactive execution. See `jj-workflow` §"Non-interactive command execution" for comprehensive guidance.
 
-**Development-join invariant (multi-chain mode)**: when a development join is present, `@` is ALWAYS the empty `[wip]` commit directly atop the frozen multi-parent `[merge]`. Route all content DOWNWARD into a chain (`jj squash --from @ … --keep-emptied`, `jj absorb`, `jj split`) — NEVER `jj describe @` into content and NEVER relocate `@` via the positional rebase forms `jj rebase -r @ --insert-before/--insert-after <target>` or `jj rebase --revisions @ --insert-before/--insert-after <target>`, which drift `@` off `[wip]`. In every splice/relocation recipe the relocated `<commit>`/`<X>`/`<range>` is a SEPARATE, already-sealed non-wip commit, never `@`. The one sanctioned `jj rebase` naming `@` is the destination form that re-anchors `[wip]` onto a rebuilt join, with a destination derived from the join's current parents and never an explicit parent list (§"Adding and removing chains"). See Diamond invariants (iii-b) below, the composite maintenance invariant, and the edit-route cycle.
+**Development-join invariant (multi-chain mode)**: when a development join is present, `@` is ALWAYS the empty `[wip]` commit directly atop the frozen multi-parent `[merge]`. Route all content DOWNWARD into a chain (`jj squash --from @ … --keep-emptied`, `jj absorb`, `jj split`) — NEVER `jj describe @` into content and NEVER relocate `@` via the positional rebase forms `jj rebase -r @ --insert-before/--insert-after <target>` or `jj rebase --revisions @ --insert-before/--insert-after <target>`, which drift `@` off `[wip]`. In every splice/relocation recipe the relocated `<commit>`/`<X>`/`<range>` is a SEPARATE, already-sealed non-wip commit, never `@`. The one sanctioned `jj rebase` naming `@` is the destination form that re-anchors `[wip]` onto a rebuilt join, with a destination derived from the join's current parents and the trunk and never an explicit parent list (§"Adding and removing chains"). See Diamond invariants (iii-b) below, the composite maintenance invariant, and the edit-route cycle.
 
 ## Core philosophy
 
@@ -417,7 +417,7 @@ All content leaves `@` by routing DOWNWARD with `@` left in place and empty, via
 - `jj squash --from @ --insert-before 'children(fork_point(parents(<join>))) & ::<join>' -m "msg" --keep-emptied -- <paths>` (splice-below-join from live `@`);
 - `jj split` keeping the wip remainder.
 
-The ONLY sanctioned `jj rebase` touching `@` is the DESTINATION form that re-anchors `[wip]` onto a rebuilt multi-parent join when adding or removing a chain, with a destination derived from the join's current parents — `jj rebase -s <join> -d '(parents(<join>) ~ ::trunk()) | <new-chain>'` (add) / `jj rebase -s <join> -d '(parents(<join>) ~ ::trunk()) ~ <leaving-chain>'` (remove), never an explicit parent list (see §"Adding and removing chains").
+The ONLY sanctioned `jj rebase` touching `@` is the DESTINATION form that re-anchors `[wip]` onto a rebuilt multi-parent join when adding or removing a chain, with a destination derived from the join's current parents and the trunk — `jj rebase -s <join> -d 'heads((parents(<join>) ~ ::trunk()) | trunk() | <new-chain>)'` (add) / `jj rebase -s <join> -d 'heads((parents(<join>) ~ ::trunk() ~ <leaving-chain>) | trunk())'` (remove), never an explicit parent list (see §"Adding and removing chains").
 That form keeps `@` an empty direct child of the join and so does not drift it; it is distinct from the prohibited positional `--insert-before/--insert-after` forms above.
 
 In every splice/relocation recipe the relocated `<commit>`/`<X>`/`<range>` is a SEPARATE, already-sealed NON-wip commit, never `@`/`[wip]` itself.
@@ -471,11 +471,11 @@ By-relocation (ONLY for a SEPARATE, already-sealed NON-wip commit that already e
 jj rebase --revisions <separate-sealed-non-wip-commit> --insert-before 'children(fork_point(parents(<join>))) & ::<join>'
 ```
 
-Sanctioned destination-form rebase (add/remove a chain; re-anchors the empty `@` onto the rebuilt multi-parent join; the destination is derived from the join's current parents, never listed; this is the ONLY `jj rebase` whose effect may move `@` and it does NOT drift `@`):
+Sanctioned destination-form rebase (add/remove a chain; re-anchors the empty `@` onto the rebuilt multi-parent join; the destination is derived from the join's current parents and the trunk, never listed; this is the ONLY `jj rebase` whose effect may move `@` and it does NOT drift `@`):
 
 ```bash
-jj rebase -s <join> -d '(parents(<join>) ~ ::trunk()) | <new-chain>'     # add chain
-jj rebase -s <join> -d '(parents(<join>) ~ ::trunk()) ~ <leaving-chain>' # remove chain
+jj rebase -s <join> -d 'heads((parents(<join>) ~ ::trunk()) | trunk() | <new-chain>)'      # add chain
+jj rebase -s <join> -d 'heads((parents(<join>) ~ ::trunk() ~ <leaving-chain>) | trunk())'  # remove chain
 # On the two-commit [merge]+[wip] model <join> is [merge]; -s carries [wip] and any stack above it.
 # Where @ is itself the join, the same destinations take -r @.
 ```
@@ -505,7 +505,7 @@ Invariant (iii) above is the maintenance invariant: the join + wip structure req
 
 Before any operation that moves `@` (like `jj new <single-parent>` or `jj edit`), verify and record `[merge]`'s change ID.
 After any such operation, immediately restore `[wip]` on top: `jj new <merge-change-id> -m "wip"`.
-When adding a new bookmark to the development join, use the parents-derived form `jj rebase -s <merge> -d '(parents(<merge>) ~ ::trunk()) | <new-chain>'`; see §"Adding and removing chains" for why an explicit parent list is never used and why rebuilding `[merge]` and `[wip]` with `jj new` is reserved for dissolution.
+When adding a new bookmark to the development join, use the derived form `jj rebase -s <merge> -d 'heads((parents(<merge>) ~ ::trunk()) | trunk() | <new-chain>)'`; see §"Adding and removing chains" for why the trunk is part of the destination, why an explicit parent list is never used, and why rebuilding `[merge]` and `[wip]` with `jj new` is reserved for dissolution.
 Subagent prompts must specify whether they operate in `[wip]` (edit files, let orchestrator route) or outside it (e.g., working on a single chain directly).
 
 #### Idle vs mid-operation states
@@ -883,7 +883,8 @@ Evidence: one afternoon in November 2026 with two interactive sessions on one jo
 1. Discover before you change the graph: read the join's parents and what each touches (`diamond-workflow.md` §"Concurrent sessions on one join" has the commands), and ask the operator which other sessions are active.
    The join's parent set is the registry of chains; no session writes it except through rule 3.
 2. Announce on start which chains you own (change ids) and which paths you are about to edit.
-3. Change the join's parent set only with the parents-derived form, `jj rebase -s <join> -d '(parents(<join>) ~ ::trunk()) | <new-chain>'`, never with an explicit list of parents (§"Adding and removing chains").
+3. Change the join's parent set only with the derived form, `jj rebase -s <join> -d 'heads((parents(<join>) ~ ::trunk()) | trunk() | <new-chain>)'`, never with an explicit list of parents (§"Adding and removing chains").
+   Add a chain to the join immediately after creating it, before any edit: a chain outside the join is invisible to the other session's derived rebases, and a squash into it takes its paths out of the working copy.
    An explicit list drops every chain you did not name, and the chains you do not know about are another session's.
 4. Make every landing complete before you announce it: after `jj git fetch` moves the trunk, rebase your own remaining chains onto it and rebuild the join with the rule 3 form.
 5. Reserve paths before a subagent edits them by naming them to the other session, and release them once the edit is routed into its chain.
@@ -901,18 +902,34 @@ For omp, whose sessions can message each other, the mechanism and message templa
 
 ### Adding and removing chains
 
-Change the join's parent set with a destination derived from its current parents, so that chains you did not name stay where they are:
+Change the join's parent set with a destination derived from its current parents and the trunk, so that chains you did not name stay where they are and the working copy keeps what has landed:
 
 ```bash
-# Add a chain.
-jj rebase -s <join> -d '(parents(<join>) ~ ::trunk()) | <new-chain>'
-# Add a chain stacked on a chain already in the join: heads() keeps the ancestor out.
-jj rebase -s <join> -d 'heads((parents(<join>) ~ ::trunk()) | <new-chain>)'
+# Add a chain, including one stacked on a chain already in the join.
+jj rebase -s <join> -d 'heads((parents(<join>) ~ ::trunk()) | trunk() | <new-chain>)'
+# Drop the chains that have landed, after the trunk moves.
+jj rebase -s <join> -d 'heads((parents(<join>) ~ ::trunk()) | trunk())'
 # Remove a chain.
-jj rebase -s <join> -d '(parents(<join>) ~ ::trunk()) ~ <leaving-chain>'
+jj rebase -s <join> -d 'heads((parents(<join>) ~ ::trunk() ~ <leaving-chain>) | trunk())'
 ```
 
-`~ ::trunk()` drops parents the trunk already contains, so the same form also cleans up after a landing.
+`~ ::trunk()` drops parents the trunk already contains, and `| trunk()` puts the trunk itself among the candidates, because a join whose remaining chains all sit on an older trunk otherwise loses everything that landed since (`hazards.md` §"The trunk drops out of the join").
+`heads()` then drops the trunk whenever another parent already contains it, and drops a chain's ancestor when the new chain is stacked on it, so the join keeps only the parents that add content.
+
+Add a new chain to the join in the step that creates it, before any edit:
+
+```bash
+jj new --no-edit 'trunk()' -m "<conventional-commit subject>"
+jj rebase -s <join> -d 'heads((parents(<join>) ~ ::trunk()) | trunk() | <new-chain>)'
+jj --ignore-working-copy log -r 'parents(<join>)'   # confirm <new-chain> is listed
+```
+
+Until it is a parent, the chain is outside `@`, another session's derived rebase correctly leaves it out, and a path-scoped squash into it removes those paths from the working copy (`hazards.md` §"A chain created but not yet joined").
+
+These forms assume `trunk()` names the commit your chains land on; check with `jj log -r 'trunk()'`.
+In vanixiets the repository config sets `revset-aliases."trunk()" = "main@origin"`, while the fleet's user-level alias picks the newest of `main`, `master` and `develop` on the `rad`, `origin` and `upstream` remotes and falls back to `root()`.
+Where `trunk()` is `root()`, the forms keep landed chains as parents instead of dropping them, and where it names a branch the chains do not land on, they make that branch a parent of the join; in either case set the alias for the repository first, for example `jj config set --repo 'revset-aliases."trunk()"' main@origin`.
+
 On the two-commit `[merge]`+`[wip]` model `<join>` is `[merge]`, and `-s` carries `[wip]` and anything stacked above it in the same operation, so no second rebase is needed.
 Where `@` is itself the join, use `-r @` with the same destination; this destination form is the ONE sanctioned `jj rebase` that names `@`, because it keeps `@` a direct child of the rebuilt join.
 It is distinct from, and must not be confused with, the prohibited positional forms `jj rebase -r @ --insert-before/--insert-after <target>` and `jj rebase --revisions @ --insert-before/--insert-after <target>`, which drop `@` into the chain/splice interior (see invariant (iii-b)).

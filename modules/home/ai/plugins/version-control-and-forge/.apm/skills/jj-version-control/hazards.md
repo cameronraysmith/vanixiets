@@ -54,13 +54,26 @@ Recovery for the second is `jj undo`; the first needs nothing.
 
 ## Concurrent sessions on one join
 
-These four failures occurred while two sessions shared one join; the rules that answer them are in `SKILL.md` §"Coordinating concurrent sessions on one join".
+These six failures occurred while two or more sessions shared one join; the rules that answer them are in `SKILL.md` §"Coordinating concurrent sessions on one join".
 
 ### An explicit parent list drops another session's chains
 
 Rebuilding the join with `-d <chain-a> -d <chain-b> -d <new-chain>` sets its parents to exactly that list.
 A chain another session added is not on it, so it leaves the join without a warning, and its commits stay in the graph while its content disappears from the working copy.
-Always derive the destination from the join's current parents (`SKILL.md` §"Adding and removing chains"); recovery is the add form for each dropped chain.
+Always derive the destination from the join's current parents and the trunk (`SKILL.md` §"Adding and removing chains"); recovery is the add form for each dropped chain.
+
+### The trunk drops out of the join
+
+The earlier derived form, `heads((parents(<join>) ~ ::trunk()) | <new-chain>)`, removes every parent the trunk contains and adds nothing back.
+When a chain lands and every remaining parent is based on the older trunk, the join stops containing what landed, and the landed files disappear from `@` while `jj log -r 'trunk() ~ ::<join>'` is non-empty.
+Recovery is `jj rebase -s <join> -d 'heads((parents(<join>) ~ ::trunk()) | trunk())'`, which makes the trunk a parent again; the `| trunk()` term in every form in `SKILL.md` §"Adding and removing chains" prevents it.
+
+### A chain created but not yet joined
+
+A chain created with `jj new --no-edit` is not a parent of the join until someone adds it, so its content is not in `@`.
+Another session's derived rebase keeps every existing parent and so correctly leaves it out, and a path-scoped `jj squash --into` that chain moves those paths out of `@` into a commit `@` does not contain, so the files disappear from the working copy.
+The symptom is a chain missing from `jj log -r 'parents(<join>)'`, together with edits that vanish from the working copy after being squashed into it.
+Recovery is the add form in `SKILL.md` §"Adding and removing chains", which brings the content back into `@`; prevent it by adding every new chain to the join immediately after creating it, before any edit.
 
 ### A landing conflicts your sibling chains
 
