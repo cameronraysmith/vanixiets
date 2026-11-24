@@ -160,6 +160,11 @@
             package-markdown-tree-parser.class = "small";
             # nixbot: median 5.1 s, slowest 33 s, all 9 runs 2026-09-02..2026-11-11
             package-mergify-cli-bin.class = "small";
+            # nixbot: 0 runs, too few to class (design D4)
+            package-mops-bin = {
+              class = "medium";
+              measured = false;
+            };
             # nixbot: median 12 s, slowest 51 s, all 11 runs 2026-08-31..2026-11-11
             package-moshi-hook.class = "small";
             # nixbot: median 5.4 s, slowest 54 s, all 13 runs 2026-09-04..2026-10-23
@@ -358,6 +363,11 @@
             package-markdown-tree-parser.class = "medium";
             # nixbot: 2 runs, too few to class (design D4)
             package-mergify-cli-bin = {
+              class = "medium";
+              measured = false;
+            };
+            # nixbot: 0 runs, too few to class (design D4)
+            package-mops-bin = {
               class = "medium";
               measured = false;
             };

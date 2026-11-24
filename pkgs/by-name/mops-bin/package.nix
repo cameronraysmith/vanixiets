@@ -1,0 +1,69 @@
+# mops-bin: the Motoko package manager CLI (`mops`) from upstream's prebuilt
+# release bundle. The icp-cli `@dfinity/motoko` recipe shells out to mops,
+# which in turn downloads the moc and pocket-ic versions a project pins in its
+# mops.toml [toolchain], so neither is packaged here. nixpkgs carries no mops.
+#
+# cli.tgz holds bundle/: cli.js with every npm dependency inlined, bin/mops.js
+# importing it, the .wasm modules, declarations/ and templates/ cli.js reads
+# at runtime. The declared `buffer` dependency is not shipped and not needed:
+# its one bare `buffer` import resolves to node's builtin module. No build,
+# only node (package.json engines: >=22).
+{
+  lib,
+  stdenvNoCC,
+  fetchurl,
+  makeWrapper,
+  nodejs_22,
+  versionCheckHook,
+}:
+stdenvNoCC.mkDerivation (finalAttrs: {
+  pname = "mops-bin";
+  version = "3.8.0";
+
+  # The release publishes no checksum file; this equals the sha256 digest
+  # GitHub records for the asset.
+  src = fetchurl {
+    url = "https://github.com/caffeinelabs/mops/releases/download/cli-v${finalAttrs.version}/cli.tgz";
+    hash = "sha256-mHVzKVCzp8USfKW4cf3xPKySpScpHNDDxusACONfZuI=";
+  };
+
+  nativeBuildInputs = [ makeWrapper ];
+
+  dontConfigure = true;
+  dontBuild = true;
+
+  # package.json maps both `mops` and `ic-mops` to bin/mops.js.
+  installPhase = ''
+    runHook preInstall
+    mkdir -p $out/lib/mops-bin
+    cp -r . $out/lib/mops-bin/
+    for bin in mops ic-mops; do
+      makeWrapper ${lib.getExe nodejs_22} $out/bin/$bin \
+        --add-flags $out/lib/mops-bin/bin/mops.js
+    done
+    runHook postInstall
+  '';
+
+  nativeInstallCheckInputs = [ versionCheckHook ];
+  versionCheckProgram = "${placeholder "out"}/bin/mops";
+  doInstallCheck = true;
+
+  passthru.updateScript = ./update.sh;
+
+  meta = {
+    description = "Motoko package manager CLI (upstream prebuilt bundle)";
+    homepage = "https://mops.one";
+    changelog = "https://github.com/caffeinelabs/mops/releases/tag/cli-v${finalAttrs.version}";
+    license = lib.licenses.mit;
+    mainProgram = "mops";
+    platforms = [
+      "x86_64-linux"
+      "aarch64-linux"
+      "x86_64-darwin"
+      "aarch64-darwin"
+    ];
+    # cli.js is a minified bundle and the .wasm modules are compiled code.
+    sourceProvenance = with lib.sourceTypes; [ binaryBytecode ];
+    maintainers = with lib.maintainers; [ cameronraysmith ];
+  };
+})
