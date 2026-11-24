@@ -1,5 +1,5 @@
 lockfile_version: '4'
-generated_at: '2026-11-23T22:28:15.896082+00:00'
+generated_at: '2026-11-24T21:32:24.149892+00:00'
 apm_version: 0.38.0
 manifest_targets:
 - agent-skills
@@ -7,7 +7,7 @@ dependencies:
 - repo_url: cameronraysmith/vanixiets
   name: agent-orchestration-and-meta-tooling
   host: github.com
-  resolved_commit: 57cdb751513d6f5f54b53b453cae61a1025a0429
+  resolved_commit: ee1218490118997fbae53016ab3d86d827ba9867
   resolved_ref: main
   version: 0.0.0
   virtual_path: modules/home/ai/plugins/agent-orchestration-and-meta-tooling
@@ -66,6 +66,9 @@ dependencies:
   - .agents/skills/meta-skill-creator/scripts/init_skill.py
   - .agents/skills/meta-skill-creator/scripts/package_skill.py
   - .agents/skills/meta-skill-creator/scripts/quick_validate.py
+  - .agents/skills/pr-digest
+  - .agents/skills/pr-digest/SKILL.md
+  - .agents/skills/pr-digest/references/inner-prompt.md
   - .agents/skills/sandbox-claude-cloud
   - .agents/skills/sandbox-claude-cloud/SKILL.md
   deployed_file_hashes:
@@ -105,12 +108,14 @@ dependencies:
     .agents/skills/meta-skill-creator/scripts/init_skill.py: sha256:cf12790f1d4958799281920d599f56aea38fb5c26e2812a61dd740bf3d4b6b99
     .agents/skills/meta-skill-creator/scripts/package_skill.py: sha256:b31fbcb3e362d5c5308e99255ff8e83cde3a513e0636953964a648494ca10931
     .agents/skills/meta-skill-creator/scripts/quick_validate.py: sha256:67cf5703402013936c8fb75ad6a1afecd8841d45cc5e606b634eb05825fde365
+    .agents/skills/pr-digest/SKILL.md: sha256:0ea321bf8c2daaeea21a0f428557c21cc04c8af9295c91ba3127ff6b191c3cf6
+    .agents/skills/pr-digest/references/inner-prompt.md: sha256:5c8fca8f9ae84311ac30d2c6bbcdfbb8998b2ae59276839213e307d2b3c4211a
     .agents/skills/sandbox-claude-cloud/SKILL.md: sha256:a674fd5c4e4f9bf3097b58d96019f9a31addd99e1d2d208147afc3e94f3b0c22
-  content_hash: sha256:b8f6ec6ca2c4607b5329ccb720fdb867a9d28b238aefb304d1d74bcb614301e1
+  content_hash: sha256:5f5f92dced49a04506c7a4542319b239b9abb910ed2679424edc14a8c26452ee
 - repo_url: cameronraysmith/vanixiets
   name: beads-issue-tracking-and-session-workflow
   host: github.com
-  resolved_commit: 57cdb751513d6f5f54b53b453cae61a1025a0429
+  resolved_commit: ee1218490118997fbae53016ab3d86d827ba9867
   resolved_ref: main
   version: 0.0.0
   virtual_path: modules/home/ai/plugins/beads-issue-tracking-and-session-workflow
@@ -137,7 +142,7 @@ dependencies:
 - repo_url: cameronraysmith/vanixiets
   name: document-authoring-and-visualization
   host: github.com
-  resolved_commit: 57cdb751513d6f5f54b53b453cae61a1025a0429
+  resolved_commit: ee1218490118997fbae53016ab3d86d827ba9867
   resolved_ref: main
   version: 0.0.0
   virtual_path: modules/home/ai/plugins/document-authoring-and-visualization
@@ -181,7 +186,7 @@ dependencies:
 - repo_url: cameronraysmith/vanixiets
   name: event-modeling-workflow
   host: github.com
-  resolved_commit: 57cdb751513d6f5f54b53b453cae61a1025a0429
+  resolved_commit: ee1218490118997fbae53016ab3d86d827ba9867
   resolved_ref: main
   version: 0.0.0
   virtual_path: modules/home/ai/plugins/event-modeling-workflow
@@ -205,7 +210,7 @@ dependencies:
 - repo_url: cameronraysmith/vanixiets
   name: formal-specification-and-refinement
   host: github.com
-  resolved_commit: 57cdb751513d6f5f54b53b453cae61a1025a0429
+  resolved_commit: ee1218490118997fbae53016ab3d86d827ba9867
   resolved_ref: main
   version: 0.0.0
   virtual_path: modules/home/ai/plugins/formal-specification-and-refinement
@@ -261,7 +266,7 @@ dependencies:
 - repo_url: cameronraysmith/vanixiets
   name: nix-build-operations
   host: github.com
-  resolved_commit: 57cdb751513d6f5f54b53b453cae61a1025a0429
+  resolved_commit: ee1218490118997fbae53016ab3d86d827ba9867
   resolved_ref: main
   version: 0.0.0
   virtual_path: modules/home/ai/plugins/nix-build-operations
@@ -283,18 +288,18 @@ dependencies:
   - .agents/skills/worktree-sparsity-eval/scripts/update_claude_md.sh
   deployed_file_hashes:
     .agents/skills/ci-log-verification/SKILL.md: sha256:3d39b10e55ee25e8e8b178f6aa515e515be16e093b331565039de6108d706593
-    .agents/skills/nix-flake-pr-cycle/SKILL.md: sha256:34375aa748f4393de966aa6d49a54413636540e67a67626221d6838c3c71a55c
+    .agents/skills/nix-flake-pr-cycle/SKILL.md: sha256:7816cb081a8cafd550e732ec31797a2b0ae0f6c6dc53586625a12675fbd7a234
     .agents/skills/nixpkgs-broken-package/SKILL.md: sha256:d85e3566c7e41daacf69579568c765121846b68a58b1c2c36123eb49f104d6f6
     .agents/skills/process-compose-init/SKILL.md: sha256:e5b8add4f560cb80003676019f58e62f5703b6c26ce29b5759815d765ac47fd2
     .agents/skills/worktree-sparsity-eval/SKILL.md: sha256:535cb6232b4a5e57d0c904ab3a66cedf5acc817314c4a7da8204893d39083f55
     .agents/skills/worktree-sparsity-eval/references/sparse-checkout-patterns.md: sha256:e705baaaf6b655c9655627f4f1d02fd933cd7468668b1be25f6a421401b58273
     .agents/skills/worktree-sparsity-eval/scripts/collect_metrics.sh: sha256:aba77011a293a40baeb4c8708e2644999da09d2147f7f219a1d969ea810db39f
     .agents/skills/worktree-sparsity-eval/scripts/update_claude_md.sh: sha256:d794b75c4f31487f8c0f87ceddfa543a11ce611c6556b03b1db74642619c163c
-  content_hash: sha256:49e8e9b6bfa821e4570a00158bb22e84ecfe1a3349452112668eb9fb440c5726
+  content_hash: sha256:757dfb445f9499c7925636e42642a5947efa0a0c8efeddceaf19b464b4bd39a3
 - repo_url: cameronraysmith/vanixiets
   name: planning-and-development
   host: github.com
-  resolved_commit: 57cdb751513d6f5f54b53b453cae61a1025a0429
+  resolved_commit: ee1218490118997fbae53016ab3d86d827ba9867
   resolved_ref: main
   version: 0.0.0
   virtual_path: modules/home/ai/plugins/planning-and-development
@@ -386,7 +391,7 @@ dependencies:
 - repo_url: cameronraysmith/vanixiets
   name: preferences-code-and-collaboration-conventions
   host: github.com
-  resolved_commit: 57cdb751513d6f5f54b53b453cae61a1025a0429
+  resolved_commit: ee1218490118997fbae53016ab3d86d827ba9867
   resolved_ref: main
   version: 0.0.0
   virtual_path: modules/home/ai/plugins/preferences-code-and-collaboration-conventions
@@ -438,7 +443,7 @@ dependencies:
 - repo_url: cameronraysmith/vanixiets
   name: preferences-data-and-scientific-computing
   host: github.com
-  resolved_commit: 57cdb751513d6f5f54b53b453cae61a1025a0429
+  resolved_commit: ee1218490118997fbae53016ab3d86d827ba9867
   resolved_ref: main
   version: 0.0.0
   virtual_path: modules/home/ai/plugins/preferences-data-and-scientific-computing
@@ -493,7 +498,7 @@ dependencies:
 - repo_url: cameronraysmith/vanixiets
   name: preferences-domain-driven-architecture
   host: github.com
-  resolved_commit: 57cdb751513d6f5f54b53b453cae61a1025a0429
+  resolved_commit: ee1218490118997fbae53016ab3d86d827ba9867
   resolved_ref: main
   version: 0.0.0
   virtual_path: modules/home/ai/plugins/preferences-domain-driven-architecture
@@ -538,7 +543,7 @@ dependencies:
 - repo_url: cameronraysmith/vanixiets
   name: preferences-event-driven-systems
   host: github.com
-  resolved_commit: 57cdb751513d6f5f54b53b453cae61a1025a0429
+  resolved_commit: ee1218490118997fbae53016ab3d86d827ba9867
   resolved_ref: main
   version: 0.0.0
   virtual_path: modules/home/ai/plugins/preferences-event-driven-systems
@@ -565,7 +570,7 @@ dependencies:
 - repo_url: cameronraysmith/vanixiets
   name: preferences-functional-programming-theory
   host: github.com
-  resolved_commit: 57cdb751513d6f5f54b53b453cae61a1025a0429
+  resolved_commit: ee1218490118997fbae53016ab3d86d827ba9867
   resolved_ref: main
   version: 0.0.0
   virtual_path: modules/home/ai/plugins/preferences-functional-programming-theory
@@ -629,7 +634,7 @@ dependencies:
 - repo_url: cameronraysmith/vanixiets
   name: preferences-nix-and-secrets
   host: github.com
-  resolved_commit: 57cdb751513d6f5f54b53b453cae61a1025a0429
+  resolved_commit: ee1218490118997fbae53016ab3d86d827ba9867
   resolved_ref: main
   version: 0.0.0
   virtual_path: modules/home/ai/plugins/preferences-nix-and-secrets
@@ -644,6 +649,7 @@ dependencies:
   - .agents/skills/preferences-nix-checks-architecture/references/nix-unit-invariants.md
   - .agents/skills/preferences-nix-checks-architecture/references/nixos-vm-tests.md
   - .agents/skills/preferences-nix-checks-architecture/references/process-compose-checks.md
+  - .agents/skills/preferences-nix-checks-architecture/references/test-sizes.md
   - .agents/skills/preferences-nix-ci-cd-integration
   - .agents/skills/preferences-nix-ci-cd-integration/SKILL.md
   - .agents/skills/preferences-nix-ci-cd-integration/references/buildbot-nix-configuration.md
@@ -656,26 +662,27 @@ dependencies:
   - .agents/skills/preferences-secrets
   - .agents/skills/preferences-secrets/SKILL.md
   deployed_file_hashes:
-    .agents/skills/preferences-nix-checks-architecture/SKILL.md: sha256:18047b4f867dda1ab059c37bd31c42a60ee5a00ae20ebb6931053b77ba987919
+    .agents/skills/preferences-nix-checks-architecture/SKILL.md: sha256:bd14373d3937ec6ad9169e05ca8bdf964388948d7ebfd6d05afd2b4609fbbd25
     .agents/skills/preferences-nix-checks-architecture/references/check-vacuity.md: sha256:ea9fb2ce863e160f7ba6bb9a109c470f81904e23f4489cfbca0d5c5a7f84ae98
     .agents/skills/preferences-nix-checks-architecture/references/derivation-patterns.md: sha256:ddea7e26e26442e741ad38e26a43942e1967f32e9e7cbf2ce0ab63aad95ebd39
-    .agents/skills/preferences-nix-checks-architecture/references/evaluation-cost.md: sha256:550e87a9a13f38f42faa74f62a6f571e05977d2f51441dd0976b560a0f72623b
+    .agents/skills/preferences-nix-checks-architecture/references/evaluation-cost.md: sha256:0fcb6031869e0c2051179affb54ba42f93e36356fc7a4cdb24a292f52e415876
     .agents/skills/preferences-nix-checks-architecture/references/nix-unit-invariants.md: sha256:1ede702a5c183071e4ab0bfc35c2642fe910f582da1cc82702b760382888126d
     .agents/skills/preferences-nix-checks-architecture/references/nixos-vm-tests.md: sha256:3ae52d94fc112f5075e3e81db020a6e1b0da10817b6c5504e9887173de9a27f6
     .agents/skills/preferences-nix-checks-architecture/references/process-compose-checks.md: sha256:80aac4508b84b06f5dd44c04de896b118ee16be95848313416ec49f02b3b3338
-    .agents/skills/preferences-nix-ci-cd-integration/SKILL.md: sha256:7d0a7270e42e9e204c28260ae4f41cf37fb935d73311b1b64f4dcd1329d0533f
+    .agents/skills/preferences-nix-checks-architecture/references/test-sizes.md: sha256:d27d6c4bdc0e13d104a80c178a1308b6bf225ef37a9f65847d6fbb7e9c20bd25
+    .agents/skills/preferences-nix-ci-cd-integration/SKILL.md: sha256:c2c38f291b67ae3eadf08411ae8d903fc9d7876f9ad83348adc0e47fb28a326a
     .agents/skills/preferences-nix-ci-cd-integration/references/buildbot-nix-configuration.md: sha256:6ca0ddf19b428d429cbbed496c92cfc7c0124aa20b782dff9ea8376b76343764
     .agents/skills/preferences-nix-ci-cd-integration/references/caching-strategies.md: sha256:48d3fc51acbf6cbe836556ecacdfd634b1923fc72bcb2364d20df02947d08d7c
     .agents/skills/preferences-nix-ci-cd-integration/references/migration-pattern.md: sha256:4886dd8cc8f5b1b5f96c21a0262a02d8162e8a751faf878cc05f3248eef0d0ee
     .agents/skills/preferences-nix-ci-cd-integration/references/nix-native-effects.md: sha256:72d4ceac07665327275cbbe9e2ac3be9c17055297718bcdc1e0edbaca4f9efae
-    .agents/skills/preferences-nix-development/SKILL.md: sha256:f521b96daa75a7bdbda755b3b90caf49f420895de05ba59ff86bd857212198cd
+    .agents/skills/preferences-nix-development/SKILL.md: sha256:73b241f6b513378e059ffe8f92f0d45e364aa4511671822c9c3479f3e161fcf1
     .agents/skills/preferences-nix-development/references/dendritic-module-composition.md: sha256:29373464d2ee8e444df266c56ecdda6259834cae976e51d28c1effdc83af61ee
-    .agents/skills/preferences-secrets/SKILL.md: sha256:7a92aef91af096be1ad05c3ff1b8b7b0b1c02da030c140e7f7ee2a7cd876c2c7
-  content_hash: sha256:01ca586924ac2c4963ea282b6d686e1170f732a68e6d2df0f705fa8ffe24a9f2
+    .agents/skills/preferences-secrets/SKILL.md: sha256:f3174e07e93ebc71b799ff775d308c7bb30acad03bdf8e77a9260bd28870caa4
+  content_hash: sha256:d7b53869de31b9c9bc289f16714bfc9ea2d5a241314c54b9aab97d0e69b54d7e
 - repo_url: cameronraysmith/vanixiets
   name: preferences-operations-and-reliability
   host: github.com
-  resolved_commit: 57cdb751513d6f5f54b53b453cae61a1025a0429
+  resolved_commit: ee1218490118997fbae53016ab3d86d827ba9867
   resolved_ref: main
   version: 0.0.0
   virtual_path: modules/home/ai/plugins/preferences-operations-and-reliability
@@ -711,7 +718,7 @@ dependencies:
 - repo_url: cameronraysmith/vanixiets
   name: preferences-programming-languages
   host: github.com
-  resolved_commit: 57cdb751513d6f5f54b53b453cae61a1025a0429
+  resolved_commit: ee1218490118997fbae53016ab3d86d827ba9867
   resolved_ref: main
   version: 0.0.0
   virtual_path: modules/home/ai/plugins/preferences-programming-languages
@@ -765,7 +772,7 @@ dependencies:
 - repo_url: cameronraysmith/vanixiets
   name: preferences-web-platform-and-deployment
   host: github.com
-  resolved_commit: 57cdb751513d6f5f54b53b453cae61a1025a0429
+  resolved_commit: ee1218490118997fbae53016ab3d86d827ba9867
   resolved_ref: main
   version: 0.0.0
   virtual_path: modules/home/ai/plugins/preferences-web-platform-and-deployment
@@ -815,11 +822,11 @@ dependencies:
     .agents/skills/preferences-react-tanstack-ui-development/SKILL.md: sha256:dee434b2bfa768ddba819897f128064d7b6303d462fd24c115f71f1ea05a2b68
     .agents/skills/preferences-web-application-deployment/SKILL.md: sha256:42592f77674f21095325f5834b36291cf9733092131fbf5a789942c7cc94ae1d
     .agents/skills/preferences-web-platform-foundations/SKILL.md: sha256:0e4457d361689bbac7eec3e6d6537bba17988645845b6dd44ba81ca57869475e
-  content_hash: sha256:960b534975853db60bc3be7210a6582d981b6aa1318a19c70a5530e8e60e3793
+  content_hash: sha256:69d5907a2d979ac2f924561025f893fa03ab3d76aa6d4386920ce8f4d45ee293
 - repo_url: cameronraysmith/vanixiets
   name: testing-and-quality
   host: github.com
-  resolved_commit: 57cdb751513d6f5f54b53b453cae61a1025a0429
+  resolved_commit: ee1218490118997fbae53016ab3d86d827ba9867
   resolved_ref: main
   version: 0.0.0
   virtual_path: modules/home/ai/plugins/testing-and-quality
@@ -886,7 +893,7 @@ dependencies:
 - repo_url: cameronraysmith/vanixiets
   name: version-control-and-forge
   host: github.com
-  resolved_commit: 57cdb751513d6f5f54b53b453cae61a1025a0429
+  resolved_commit: ee1218490118997fbae53016ab3d86d827ba9867
   resolved_ref: main
   version: 0.0.0
   virtual_path: modules/home/ai/plugins/version-control-and-forge
@@ -935,12 +942,1021 @@ dependencies:
     .agents/skills/jj-git-interactive-rebase-to-jj/SKILL.md: sha256:eabdbc270c63cf3f0718f89a3114603baec9887df9c456ef6e525230a1c666db
     .agents/skills/jj-history-cleanup/SKILL.md: sha256:6c680eefa63adcf84d6fd02375903384c9c52bd688dad26d0aeaf4d1f53a1ac6
     .agents/skills/jj-summary/SKILL.md: sha256:ad6db629d366a1fced1f60a7c8f2b44aa565b2a28b8dbc023a4be1cd4774af93
-    .agents/skills/jj-version-control/SKILL.md: sha256:f61cda7d4fd06d2bfb24bbb0a367e12a2c6c872c8d179718c51604d8665b1f1a
-    .agents/skills/jj-version-control/diamond-workflow.md: sha256:cc1c1f77f895b9444e79b751f9b13eff91a9d4d3c239b0f9d0f205456e1556a7
-    .agents/skills/jj-version-control/hazards.md: sha256:e2a85d7a050d2d9342242a52a01335422ce07c2d7fcdda494c24c97558ee059b
+    .agents/skills/jj-version-control/SKILL.md: sha256:ffd0b770de577e6f4dbe18be3d28207ebdccba28cc4c47656adf2167670432f7
+    .agents/skills/jj-version-control/diamond-workflow.md: sha256:dc40b29345171185c110f83cb1579c96b19b9782f48064c30dbd75f9b00d5a07
+    .agents/skills/jj-version-control/hazards.md: sha256:6138b4cd7915594d858230fac1932957eb98e6075dad6396849a32bca08aa859
     .agents/skills/jj-version-control/tiered-ceremony.md: sha256:131bf1184d7cb5011542c235046b5c3589e1b7b1f85212b85e80c954b3f554f0
     .agents/skills/jj-workflow/SKILL.md: sha256:9d8aae85295d42ddbd0844ff547758de08127842a223841eb5a97583b5da2a00
-  content_hash: sha256:c1d8697d04ac3833cd80a5ef1e1b5e624e9de3617ab76e4f3a151758f395b126
+  content_hash: sha256:4264ed546b157b8234328f3c813a0201cabb03d396b639cf8238b33bbe72f470
+- repo_url: dfinity/icskills
+  name: agent-web-identity
+  host: github.com
+  resolved_commit: 429a3cb161b95c71e2699358bad772a13ac196a0
+  resolved_ref: 429a3cb161b95c71e2699358bad772a13ac196a0
+  version: unknown
+  virtual_path: skills/agent-web-identity
+  is_virtual: true
+  depth: 2
+  resolved_by: cameronraysmith/vanixiets
+  package_type: claude_skill
+  deployed_files:
+  - .agents/skills/agent-web-identity
+  - .agents/skills/agent-web-identity/LICENSE
+  - .agents/skills/agent-web-identity/SKILL.md
+  deployed_file_hashes:
+    .agents/skills/agent-web-identity/LICENSE: sha256:da3a1730b16cd3437d830f3890091a8c2084df6320c25ed5ef3bd93a64263628
+    .agents/skills/agent-web-identity/SKILL.md: sha256:9f4ff8829beee9db7a95a43645a713ce4cb07e4151007d2342ab9edd7ac9449c
+  content_hash: sha256:a0adfb062c9937f16b467b7b2e12e6b5d3d5084d657fff155c36e0c0824bf7cb
+  carried_licenses:
+  - path: LICENSE
+    source: LICENSE
+    hash: sha256:da3a1730b16cd3437d830f3890091a8c2084df6320c25ed5ef3bd93a64263628
+- repo_url: dfinity/icskills
+  name: buy-cycles
+  host: github.com
+  resolved_commit: 429a3cb161b95c71e2699358bad772a13ac196a0
+  resolved_ref: 429a3cb161b95c71e2699358bad772a13ac196a0
+  version: unknown
+  virtual_path: skills/buy-cycles
+  is_virtual: true
+  depth: 2
+  resolved_by: cameronraysmith/vanixiets
+  package_type: claude_skill
+  deployed_files:
+  - .agents/skills/buy-cycles
+  - .agents/skills/buy-cycles/LICENSE
+  - .agents/skills/buy-cycles/SKILL.md
+  deployed_file_hashes:
+    .agents/skills/buy-cycles/LICENSE: sha256:da3a1730b16cd3437d830f3890091a8c2084df6320c25ed5ef3bd93a64263628
+    .agents/skills/buy-cycles/SKILL.md: sha256:77d5cadd702eafafb2a23ba8e4fb5388fe64ecff26d47eb0ce295cdebcfc72af
+  content_hash: sha256:61f37d27b15e376b7ad52dc3a2239ec3da1cb6f673e70ab6ac98ac8c307a8d08
+  carried_licenses:
+  - path: LICENSE
+    source: LICENSE
+    hash: sha256:da3a1730b16cd3437d830f3890091a8c2084df6320c25ed5ef3bd93a64263628
+- repo_url: dfinity/icskills
+  name: caffeine-app
+  host: github.com
+  resolved_commit: 429a3cb161b95c71e2699358bad772a13ac196a0
+  resolved_ref: 429a3cb161b95c71e2699358bad772a13ac196a0
+  version: unknown
+  virtual_path: skills/caffeine-app
+  is_virtual: true
+  depth: 2
+  resolved_by: cameronraysmith/vanixiets
+  package_type: claude_skill
+  deployed_files:
+  - .agents/skills/caffeine-app
+  - .agents/skills/caffeine-app/LICENSE
+  - .agents/skills/caffeine-app/SKILL.md
+  - .agents/skills/caffeine-app/references/frontend-template.md
+  deployed_file_hashes:
+    .agents/skills/caffeine-app/LICENSE: sha256:da3a1730b16cd3437d830f3890091a8c2084df6320c25ed5ef3bd93a64263628
+    .agents/skills/caffeine-app/SKILL.md: sha256:97c54646ddddd93cc4a3fd69161a8d321ca940642f41edd6a191c5f3d302a93b
+    .agents/skills/caffeine-app/references/frontend-template.md: sha256:f4950e5eed41199ae2412027b46e6734fdf93632ba7290065b2b1d5873e5472b
+  content_hash: sha256:2456df858617fe090ba2b384340817f255d4042e55049d104d5642c15bc81c7a
+  carried_licenses:
+  - path: LICENSE
+    source: LICENSE
+    hash: sha256:da3a1730b16cd3437d830f3890091a8c2084df6320c25ed5ef3bd93a64263628
+- repo_url: dfinity/icskills
+  name: canhelp
+  host: github.com
+  resolved_commit: 429a3cb161b95c71e2699358bad772a13ac196a0
+  resolved_ref: 429a3cb161b95c71e2699358bad772a13ac196a0
+  version: unknown
+  virtual_path: skills/canhelp
+  is_virtual: true
+  depth: 2
+  resolved_by: cameronraysmith/vanixiets
+  package_type: claude_skill
+  deployed_files:
+  - .agents/skills/canhelp
+  - .agents/skills/canhelp/LICENSE
+  - .agents/skills/canhelp/SKILL.md
+  - .agents/skills/canhelp/scripts/fetch-candid.sh
+  - .agents/skills/canhelp/scripts/resolve-canister-id.sh
+  deployed_file_hashes:
+    .agents/skills/canhelp/LICENSE: sha256:da3a1730b16cd3437d830f3890091a8c2084df6320c25ed5ef3bd93a64263628
+    .agents/skills/canhelp/SKILL.md: sha256:5091021ea488bcc5061b07a4ac36f940c9fb870bcd72204add01e5eb97d14370
+    .agents/skills/canhelp/scripts/fetch-candid.sh: sha256:80f58a3eadbc9e450ebd5e49e2124da3414a727644ad8ba83d10fde6ee3e14fc
+    .agents/skills/canhelp/scripts/resolve-canister-id.sh: sha256:fafdbfa5e89b6a3f6b80c139a3bcab0ca491a9f917116a8a7ac1b59bef37f5dd
+  content_hash: sha256:a7f7b8015e4e6bd72984958125fb3659044af48822ab59a11179683f7f07be7b
+  carried_licenses:
+  - path: LICENSE
+    source: LICENSE
+    hash: sha256:da3a1730b16cd3437d830f3890091a8c2084df6320c25ed5ef3bd93a64263628
+- repo_url: dfinity/icskills
+  name: canister-audit
+  host: github.com
+  resolved_commit: 429a3cb161b95c71e2699358bad772a13ac196a0
+  resolved_ref: 429a3cb161b95c71e2699358bad772a13ac196a0
+  version: unknown
+  virtual_path: skills/canister-audit
+  is_virtual: true
+  depth: 2
+  resolved_by: cameronraysmith/vanixiets
+  package_type: claude_skill
+  deployed_files:
+  - .agents/skills/canister-audit
+  - .agents/skills/canister-audit/LICENSE
+  - .agents/skills/canister-audit/SKILL.md
+  deployed_file_hashes:
+    .agents/skills/canister-audit/LICENSE: sha256:da3a1730b16cd3437d830f3890091a8c2084df6320c25ed5ef3bd93a64263628
+    .agents/skills/canister-audit/SKILL.md: sha256:fc6d9fa9f47e0e9133c0906e1bd4eae80837cf8875cb9d8bbfae423747ee9aa4
+  content_hash: sha256:e512d7cad95f5d5eb0add21e7123714ccfa02b6cc565682e1e97ecedbb5d8f75
+  carried_licenses:
+  - path: LICENSE
+    source: LICENSE
+    hash: sha256:da3a1730b16cd3437d830f3890091a8c2084df6320c25ed5ef3bd93a64263628
+- repo_url: dfinity/icskills
+  name: canister-security
+  host: github.com
+  resolved_commit: 429a3cb161b95c71e2699358bad772a13ac196a0
+  resolved_ref: 429a3cb161b95c71e2699358bad772a13ac196a0
+  version: unknown
+  virtual_path: skills/canister-security
+  is_virtual: true
+  depth: 2
+  resolved_by: cameronraysmith/vanixiets
+  package_type: claude_skill
+  deployed_files:
+  - .agents/skills/canister-security
+  - .agents/skills/canister-security/LICENSE
+  - .agents/skills/canister-security/SKILL.md
+  deployed_file_hashes:
+    .agents/skills/canister-security/LICENSE: sha256:da3a1730b16cd3437d830f3890091a8c2084df6320c25ed5ef3bd93a64263628
+    .agents/skills/canister-security/SKILL.md: sha256:0ca63d9254d223feb4298086093cf0561c583662ec3e0db3419f360c70141932
+  content_hash: sha256:49c35d427f469dccbc935342b71af439adf695935a5f3c843fbb623b0b33a7ef
+  carried_licenses:
+  - path: LICENSE
+    source: LICENSE
+    hash: sha256:da3a1730b16cd3437d830f3890091a8c2084df6320c25ed5ef3bd93a64263628
+- repo_url: dfinity/icskills
+  name: certified-variables
+  host: github.com
+  resolved_commit: 429a3cb161b95c71e2699358bad772a13ac196a0
+  resolved_ref: 429a3cb161b95c71e2699358bad772a13ac196a0
+  version: unknown
+  virtual_path: skills/certified-variables
+  is_virtual: true
+  depth: 2
+  resolved_by: cameronraysmith/vanixiets
+  package_type: claude_skill
+  deployed_files:
+  - .agents/skills/certified-variables
+  - .agents/skills/certified-variables/LICENSE
+  - .agents/skills/certified-variables/SKILL.md
+  - .agents/skills/certified-variables/references/http-certification.md
+  deployed_file_hashes:
+    .agents/skills/certified-variables/LICENSE: sha256:da3a1730b16cd3437d830f3890091a8c2084df6320c25ed5ef3bd93a64263628
+    .agents/skills/certified-variables/SKILL.md: sha256:e30c0717b5d4d7487b6cafb8a049812ada213d6872fac78b6e2e3244dc944bc2
+    .agents/skills/certified-variables/references/http-certification.md: sha256:3d67b8f21ad0bc01aaf2d61813c3dc565f66dea9f7486d48f8044dd8a504dbef
+  content_hash: sha256:6967d72d323f081beda557ec5d4c5bc45b1d7ac57c8cab285ff99e276e8a0abe
+  carried_licenses:
+  - path: LICENSE
+    source: LICENSE
+    hash: sha256:da3a1730b16cd3437d830f3890091a8c2084df6320c25ed5ef3bd93a64263628
+- repo_url: dfinity/icskills
+  name: ckbtc
+  host: github.com
+  resolved_commit: 429a3cb161b95c71e2699358bad772a13ac196a0
+  resolved_ref: 429a3cb161b95c71e2699358bad772a13ac196a0
+  version: unknown
+  virtual_path: skills/ckbtc
+  is_virtual: true
+  depth: 2
+  resolved_by: cameronraysmith/vanixiets
+  package_type: claude_skill
+  deployed_files:
+  - .agents/skills/ckbtc
+  - .agents/skills/ckbtc/LICENSE
+  - .agents/skills/ckbtc/SKILL.md
+  deployed_file_hashes:
+    .agents/skills/ckbtc/LICENSE: sha256:da3a1730b16cd3437d830f3890091a8c2084df6320c25ed5ef3bd93a64263628
+    .agents/skills/ckbtc/SKILL.md: sha256:7afd15b68c4213393108f77e20389a999a42e80e95e0dcdbdea24464b12a7851
+  content_hash: sha256:b2ac29ce2e667fdc8e97b6c1d5c3d81f540586b3f079b487a8ae77eed0aca465
+  carried_licenses:
+  - path: LICENSE
+    source: LICENSE
+    hash: sha256:da3a1730b16cd3437d830f3890091a8c2084df6320c25ed5ef3bd93a64263628
+- repo_url: dfinity/icskills
+  name: cketh
+  host: github.com
+  resolved_commit: 429a3cb161b95c71e2699358bad772a13ac196a0
+  resolved_ref: 429a3cb161b95c71e2699358bad772a13ac196a0
+  version: unknown
+  virtual_path: skills/cketh
+  is_virtual: true
+  depth: 2
+  resolved_by: cameronraysmith/vanixiets
+  package_type: claude_skill
+  deployed_files:
+  - .agents/skills/cketh
+  - .agents/skills/cketh/LICENSE
+  - .agents/skills/cketh/SKILL.md
+  - .agents/skills/cketh/references/backend.md
+  - .agents/skills/cketh/references/frontend.md
+  deployed_file_hashes:
+    .agents/skills/cketh/LICENSE: sha256:da3a1730b16cd3437d830f3890091a8c2084df6320c25ed5ef3bd93a64263628
+    .agents/skills/cketh/SKILL.md: sha256:9fa12205ce18a50d92ecea98b436130d6f8caaceaeff91e801a63ac3da808dbe
+    .agents/skills/cketh/references/backend.md: sha256:71cc641a0da7c42aec532aef6031a5d4b4f1612adab8f0cca7c797db05208b8b
+    .agents/skills/cketh/references/frontend.md: sha256:14146b8d80a31f1ca9d240212b0fcf4c927e3a056ebe67e2d231f34e8335bcc4
+  content_hash: sha256:3c4d7b00ab00680e9e433b246a4e87987985b50ac3db3dc33b8f4b06ec1904a1
+  carried_licenses:
+  - path: LICENSE
+    source: LICENSE
+    hash: sha256:da3a1730b16cd3437d830f3890091a8c2084df6320c25ed5ef3bd93a64263628
+- repo_url: dfinity/icskills
+  name: cksol
+  host: github.com
+  resolved_commit: 429a3cb161b95c71e2699358bad772a13ac196a0
+  resolved_ref: 429a3cb161b95c71e2699358bad772a13ac196a0
+  version: unknown
+  virtual_path: skills/cksol
+  is_virtual: true
+  depth: 2
+  resolved_by: cameronraysmith/vanixiets
+  package_type: claude_skill
+  deployed_files:
+  - .agents/skills/cksol
+  - .agents/skills/cksol/LICENSE
+  - .agents/skills/cksol/SKILL.md
+  deployed_file_hashes:
+    .agents/skills/cksol/LICENSE: sha256:da3a1730b16cd3437d830f3890091a8c2084df6320c25ed5ef3bd93a64263628
+    .agents/skills/cksol/SKILL.md: sha256:c77fdcb1f9028c25dabc83a397891e4c7033267ba7e60f5a178dedcc81a3002b
+  content_hash: sha256:94f215e34495fe8fa12d6d8ec44cc2e3b1702724c8652c54cb2fc796243a164d
+  carried_licenses:
+  - path: LICENSE
+    source: LICENSE
+    hash: sha256:da3a1730b16cd3437d830f3890091a8c2084df6320c25ed5ef3bd93a64263628
+- repo_url: dfinity/icskills
+  name: cloud-engine-canisters
+  host: github.com
+  resolved_commit: 429a3cb161b95c71e2699358bad772a13ac196a0
+  resolved_ref: 429a3cb161b95c71e2699358bad772a13ac196a0
+  version: unknown
+  virtual_path: skills/cloud-engine-canisters
+  is_virtual: true
+  depth: 2
+  resolved_by: cameronraysmith/vanixiets
+  package_type: claude_skill
+  deployed_files:
+  - .agents/skills/cloud-engine-canisters
+  - .agents/skills/cloud-engine-canisters/LICENSE
+  - .agents/skills/cloud-engine-canisters/SKILL.md
+  deployed_file_hashes:
+    .agents/skills/cloud-engine-canisters/LICENSE: sha256:da3a1730b16cd3437d830f3890091a8c2084df6320c25ed5ef3bd93a64263628
+    .agents/skills/cloud-engine-canisters/SKILL.md: sha256:a24d61fec9c0f80998d2de75a430ec13d93800dc72bfd82acc0ac8cd4453bab0
+  content_hash: sha256:e809465108d0d748765bdf160f2a0033bb480178e7c1c3761d12057686271e7e
+  carried_licenses:
+  - path: LICENSE
+    source: LICENSE
+    hash: sha256:da3a1730b16cd3437d830f3890091a8c2084df6320c25ed5ef3bd93a64263628
+- repo_url: dfinity/icskills
+  name: custom-domains
+  host: github.com
+  resolved_commit: 429a3cb161b95c71e2699358bad772a13ac196a0
+  resolved_ref: 429a3cb161b95c71e2699358bad772a13ac196a0
+  version: unknown
+  virtual_path: skills/custom-domains
+  is_virtual: true
+  depth: 2
+  resolved_by: cameronraysmith/vanixiets
+  package_type: claude_skill
+  deployed_files:
+  - .agents/skills/custom-domains
+  - .agents/skills/custom-domains/LICENSE
+  - .agents/skills/custom-domains/SKILL.md
+  deployed_file_hashes:
+    .agents/skills/custom-domains/LICENSE: sha256:da3a1730b16cd3437d830f3890091a8c2084df6320c25ed5ef3bd93a64263628
+    .agents/skills/custom-domains/SKILL.md: sha256:8220e94827b8e96395eb9683d556057978236dc25789d67d9c6d2fef3cf9417f
+  content_hash: sha256:8b877e196dfafd5686d8f6e03a8749d7c5bef820dfa0895b78b8ec913e3653d4
+  carried_licenses:
+  - path: LICENSE
+    source: LICENSE
+    hash: sha256:da3a1730b16cd3437d830f3890091a8c2084df6320c25ed5ef3bd93a64263628
+- repo_url: dfinity/icskills
+  name: cycles-management
+  host: github.com
+  resolved_commit: 429a3cb161b95c71e2699358bad772a13ac196a0
+  resolved_ref: 429a3cb161b95c71e2699358bad772a13ac196a0
+  version: unknown
+  virtual_path: skills/cycles-management
+  is_virtual: true
+  depth: 2
+  resolved_by: cameronraysmith/vanixiets
+  package_type: claude_skill
+  deployed_files:
+  - .agents/skills/cycles-management
+  - .agents/skills/cycles-management/LICENSE
+  - .agents/skills/cycles-management/SKILL.md
+  deployed_file_hashes:
+    .agents/skills/cycles-management/LICENSE: sha256:da3a1730b16cd3437d830f3890091a8c2084df6320c25ed5ef3bd93a64263628
+    .agents/skills/cycles-management/SKILL.md: sha256:1cb88a046a155f53487f031ce8102ae88cd46e3ed9a511c84b584276d98e1dcd
+  content_hash: sha256:b957bba265e3e6a366d778a7eaeeb13dfc191b8d1b09c11b26abd029baa02fcb
+  carried_licenses:
+  - path: LICENSE
+    source: LICENSE
+    hash: sha256:da3a1730b16cd3437d830f3890091a8c2084df6320c25ed5ef3bd93a64263628
+- repo_url: dfinity/icskills
+  name: deploy-to-cloud-engine
+  host: github.com
+  resolved_commit: 429a3cb161b95c71e2699358bad772a13ac196a0
+  resolved_ref: 429a3cb161b95c71e2699358bad772a13ac196a0
+  version: unknown
+  virtual_path: skills/deploy-to-cloud-engine
+  is_virtual: true
+  depth: 2
+  resolved_by: cameronraysmith/vanixiets
+  package_type: claude_skill
+  deployed_files:
+  - .agents/skills/deploy-to-cloud-engine
+  - .agents/skills/deploy-to-cloud-engine/LICENSE
+  - .agents/skills/deploy-to-cloud-engine/SKILL.md
+  deployed_file_hashes:
+    .agents/skills/deploy-to-cloud-engine/LICENSE: sha256:da3a1730b16cd3437d830f3890091a8c2084df6320c25ed5ef3bd93a64263628
+    .agents/skills/deploy-to-cloud-engine/SKILL.md: sha256:7be7266af7fd1ba39ad92aada9667b359724ac302a7ec9b4ec4862af3cbf9354
+  content_hash: sha256:3ffbf01554fa47bcaed0439759976c1a98567fabb4bb558558b7893930714f56
+  carried_licenses:
+  - path: LICENSE
+    source: LICENSE
+    hash: sha256:da3a1730b16cd3437d830f3890091a8c2084df6320c25ed5ef3bd93a64263628
+- repo_url: dfinity/icskills
+  name: encrypted-maps
+  host: github.com
+  resolved_commit: 429a3cb161b95c71e2699358bad772a13ac196a0
+  resolved_ref: 429a3cb161b95c71e2699358bad772a13ac196a0
+  version: unknown
+  virtual_path: skills/encrypted-maps
+  is_virtual: true
+  depth: 2
+  resolved_by: cameronraysmith/vanixiets
+  package_type: claude_skill
+  deployed_files:
+  - .agents/skills/encrypted-maps
+  - .agents/skills/encrypted-maps/LICENSE
+  - .agents/skills/encrypted-maps/SKILL.md
+  - .agents/skills/encrypted-maps/references/metadata.md
+  deployed_file_hashes:
+    .agents/skills/encrypted-maps/LICENSE: sha256:da3a1730b16cd3437d830f3890091a8c2084df6320c25ed5ef3bd93a64263628
+    .agents/skills/encrypted-maps/SKILL.md: sha256:b3c7a2d73bb83a6a0a4037a393d3f36922697dcbc0760c9b17ea418e5472cd5f
+    .agents/skills/encrypted-maps/references/metadata.md: sha256:65ac629096ab1c2fe299bc050d3df53b7bbc01b75e52a7d910ebdbbd616754fe
+  content_hash: sha256:a77f56c5c67690dab9d27843dbc1ba3a7e7bbe82563dd182a1dd957c3c82ec95
+  carried_licenses:
+  - path: LICENSE
+    source: LICENSE
+    hash: sha256:da3a1730b16cd3437d830f3890091a8c2084df6320c25ed5ef3bd93a64263628
+- repo_url: dfinity/icskills
+  name: evm-rpc
+  host: github.com
+  resolved_commit: 429a3cb161b95c71e2699358bad772a13ac196a0
+  resolved_ref: 429a3cb161b95c71e2699358bad772a13ac196a0
+  version: unknown
+  virtual_path: skills/evm-rpc
+  is_virtual: true
+  depth: 2
+  resolved_by: cameronraysmith/vanixiets
+  package_type: claude_skill
+  deployed_files:
+  - .agents/skills/evm-rpc
+  - .agents/skills/evm-rpc/LICENSE
+  - .agents/skills/evm-rpc/SKILL.md
+  deployed_file_hashes:
+    .agents/skills/evm-rpc/LICENSE: sha256:da3a1730b16cd3437d830f3890091a8c2084df6320c25ed5ef3bd93a64263628
+    .agents/skills/evm-rpc/SKILL.md: sha256:be6c1c6cf49ec028adc64f04e0aa88c45bc4f8c661e49d6feebe075d74cac9c5
+  content_hash: sha256:d219502e1686b530a0b96f540783469ca282ba56de2e2bc75af2270ffcbdaae2
+  carried_licenses:
+  - path: LICENSE
+    source: LICENSE
+    hash: sha256:da3a1730b16cd3437d830f3890091a8c2084df6320c25ed5ef3bd93a64263628
+- repo_url: dfinity/icskills
+  name: https-outcalls
+  host: github.com
+  resolved_commit: 429a3cb161b95c71e2699358bad772a13ac196a0
+  resolved_ref: 429a3cb161b95c71e2699358bad772a13ac196a0
+  version: unknown
+  virtual_path: skills/https-outcalls
+  is_virtual: true
+  depth: 2
+  resolved_by: cameronraysmith/vanixiets
+  package_type: claude_skill
+  deployed_files:
+  - .agents/skills/https-outcalls
+  - .agents/skills/https-outcalls/LICENSE
+  - .agents/skills/https-outcalls/SKILL.md
+  - .agents/skills/https-outcalls/references/flexible-outcalls.md
+  - .agents/skills/https-outcalls/references/json-responses.md
+  - .agents/skills/https-outcalls/references/pricing-version-2.md
+  deployed_file_hashes:
+    .agents/skills/https-outcalls/LICENSE: sha256:da3a1730b16cd3437d830f3890091a8c2084df6320c25ed5ef3bd93a64263628
+    .agents/skills/https-outcalls/SKILL.md: sha256:bb66aff5d0e7c1226f4270a4ced410c4c141f4f65fb714adeb833e96bc045056
+    .agents/skills/https-outcalls/references/flexible-outcalls.md: sha256:4ad709be52f1632fa26e403e8b288d423578e391ad384225d4109a4a64132d03
+    .agents/skills/https-outcalls/references/json-responses.md: sha256:272442ad925ea00ec542adfec03fab48b4fb291179213884d8b4fb89d15490cb
+    .agents/skills/https-outcalls/references/pricing-version-2.md: sha256:fe2e6794ce5700dd99aa185655f4cf79f81ce94ffea1c40c9f5657023190b58e
+  content_hash: sha256:a5e2800f02297645be00b840cdbf5ad897cf6309e654f230ee7bf3c5eff68efa
+  carried_licenses:
+  - path: LICENSE
+    source: LICENSE
+    hash: sha256:da3a1730b16cd3437d830f3890091a8c2084df6320c25ed5ef3bd93a64263628
+- repo_url: dfinity/icskills
+  name: ic-dashboard
+  host: github.com
+  resolved_commit: 429a3cb161b95c71e2699358bad772a13ac196a0
+  resolved_ref: 429a3cb161b95c71e2699358bad772a13ac196a0
+  version: unknown
+  virtual_path: skills/ic-dashboard
+  is_virtual: true
+  depth: 2
+  resolved_by: cameronraysmith/vanixiets
+  package_type: claude_skill
+  deployed_files:
+  - .agents/skills/ic-dashboard
+  - .agents/skills/ic-dashboard/LICENSE
+  - .agents/skills/ic-dashboard/SKILL.md
+  deployed_file_hashes:
+    .agents/skills/ic-dashboard/LICENSE: sha256:da3a1730b16cd3437d830f3890091a8c2084df6320c25ed5ef3bd93a64263628
+    .agents/skills/ic-dashboard/SKILL.md: sha256:ba4353151fda2e04100c83482f490f60c902cdaf3da6e499645931b9287073c4
+  content_hash: sha256:b117ea3d3c0d4326855fa91cf19782e8108af4f1fd8017125605e8b0c9b53e7a
+  carried_licenses:
+  - path: LICENSE
+    source: LICENSE
+    hash: sha256:da3a1730b16cd3437d830f3890091a8c2084df6320c25ed5ef3bd93a64263628
+- repo_url: dfinity/icskills
+  name: icp-cli
+  host: github.com
+  resolved_commit: 429a3cb161b95c71e2699358bad772a13ac196a0
+  resolved_ref: 429a3cb161b95c71e2699358bad772a13ac196a0
+  version: unknown
+  virtual_path: skills/icp-cli
+  is_virtual: true
+  depth: 2
+  resolved_by: cameronraysmith/vanixiets
+  package_type: claude_skill
+  deployed_files:
+  - .agents/skills/icp-cli
+  - .agents/skills/icp-cli/LICENSE
+  - .agents/skills/icp-cli/SKILL.md
+  - .agents/skills/icp-cli/references/binding-generation.md
+  - .agents/skills/icp-cli/references/bundling.md
+  - .agents/skills/icp-cli/references/canister-env-vars.md
+  - .agents/skills/icp-cli/references/dev-server.md
+  - .agents/skills/icp-cli/references/dfx-migration.md
+  deployed_file_hashes:
+    .agents/skills/icp-cli/LICENSE: sha256:da3a1730b16cd3437d830f3890091a8c2084df6320c25ed5ef3bd93a64263628
+    .agents/skills/icp-cli/SKILL.md: sha256:155c41a6c8a667f2c23d6d354c7632e50504e8f82f8ad4bb2103e6e99921fa98
+    .agents/skills/icp-cli/references/binding-generation.md: sha256:7c58e1b2c302c6bc4cb4c97b3582435af1c7cefb7693a5cadd5e48f1beed1808
+    .agents/skills/icp-cli/references/bundling.md: sha256:fe913d62ec1231c77542736e91c264b4b94885ae78f38b48af163243ef7dacd4
+    .agents/skills/icp-cli/references/canister-env-vars.md: sha256:393b23596b56b354cf0e0512bde501c77ff9e5682bb6da7135074e394c6f00d9
+    .agents/skills/icp-cli/references/dev-server.md: sha256:2e9049069d800df18c6a172eb619de910072a5d4394dd99734c758474e5328d2
+    .agents/skills/icp-cli/references/dfx-migration.md: sha256:576cb9d388813c3c80749ac9e515e61e1b0cdf896af54a021f450184a701afcb
+  content_hash: sha256:fb3b8eed7fd96605f02bf14b94c48aa21d1046bdbf0dfd1d545d32abad13c281
+  carried_licenses:
+  - path: LICENSE
+    source: LICENSE
+    hash: sha256:da3a1730b16cd3437d830f3890091a8c2084df6320c25ed5ef3bd93a64263628
+- repo_url: dfinity/icskills
+  name: icp-deploy-check
+  host: github.com
+  resolved_commit: 429a3cb161b95c71e2699358bad772a13ac196a0
+  resolved_ref: 429a3cb161b95c71e2699358bad772a13ac196a0
+  version: unknown
+  virtual_path: skills/icp-deploy-check
+  is_virtual: true
+  depth: 2
+  resolved_by: cameronraysmith/vanixiets
+  package_type: claude_skill
+  deployed_files:
+  - .agents/skills/icp-deploy-check
+  - .agents/skills/icp-deploy-check/LICENSE
+  - .agents/skills/icp-deploy-check/SKILL.md
+  deployed_file_hashes:
+    .agents/skills/icp-deploy-check/LICENSE: sha256:da3a1730b16cd3437d830f3890091a8c2084df6320c25ed5ef3bd93a64263628
+    .agents/skills/icp-deploy-check/SKILL.md: sha256:fec03503c88c3d099546c276029954f6fce2222ca07d7df4a0d4b32f6928f48e
+  content_hash: sha256:5442ef14729bda0ca74926baceb8859def7c93c4cc50c1c172c4c96a6d1df821
+  carried_licenses:
+  - path: LICENSE
+    source: LICENSE
+    hash: sha256:da3a1730b16cd3437d830f3890091a8c2084df6320c25ed5ef3bd93a64263628
+- repo_url: dfinity/icskills
+  name: icrc-ledger
+  host: github.com
+  resolved_commit: 429a3cb161b95c71e2699358bad772a13ac196a0
+  resolved_ref: 429a3cb161b95c71e2699358bad772a13ac196a0
+  version: unknown
+  virtual_path: skills/icrc-ledger
+  is_virtual: true
+  depth: 2
+  resolved_by: cameronraysmith/vanixiets
+  package_type: claude_skill
+  deployed_files:
+  - .agents/skills/icrc-ledger
+  - .agents/skills/icrc-ledger/LICENSE
+  - .agents/skills/icrc-ledger/SKILL.md
+  deployed_file_hashes:
+    .agents/skills/icrc-ledger/LICENSE: sha256:da3a1730b16cd3437d830f3890091a8c2084df6320c25ed5ef3bd93a64263628
+    .agents/skills/icrc-ledger/SKILL.md: sha256:8155a7faf779cc9bd7969012d20f8846b3a35549a7248800e8a694c03e133670
+  content_hash: sha256:5bf8fa81f4d020a926aaa91b318174d771af86cad99c1af8c1b915006d0ac9c4
+  carried_licenses:
+  - path: LICENSE
+    source: LICENSE
+    hash: sha256:da3a1730b16cd3437d830f3890091a8c2084df6320c25ed5ef3bd93a64263628
+- repo_url: dfinity/icskills
+  name: migrating-motoko-actors
+  host: github.com
+  resolved_commit: 429a3cb161b95c71e2699358bad772a13ac196a0
+  resolved_ref: 429a3cb161b95c71e2699358bad772a13ac196a0
+  version: unknown
+  virtual_path: skills/migrating-motoko-actors
+  is_virtual: true
+  depth: 2
+  resolved_by: cameronraysmith/vanixiets
+  package_type: claude_skill
+  deployed_files:
+  - .agents/skills/migrating-motoko-actors
+  - .agents/skills/migrating-motoko-actors/LICENSE
+  - .agents/skills/migrating-motoko-actors/SKILL.md
+  - .agents/skills/migrating-motoko-actors/references/examples.md
+  deployed_file_hashes:
+    .agents/skills/migrating-motoko-actors/LICENSE: sha256:da3a1730b16cd3437d830f3890091a8c2084df6320c25ed5ef3bd93a64263628
+    .agents/skills/migrating-motoko-actors/SKILL.md: sha256:142e72f6e002d7213099cf31ab3b1f9c766e253d2307e782b9147fc6af388c80
+    .agents/skills/migrating-motoko-actors/references/examples.md: sha256:ca4a527e632cc12f0e5f8b7135c9d090c10fee1854025eda658bce04ca06fd21
+  content_hash: sha256:7e0dc1f3a5de2677578d2453b80a8971b16472a69535175d1a746ae8fbc0c4b4
+  carried_licenses:
+  - path: LICENSE
+    source: LICENSE
+    hash: sha256:da3a1730b16cd3437d830f3890091a8c2084df6320c25ed5ef3bd93a64263628
+- repo_url: dfinity/icskills
+  name: migrating-to-moc-2
+  host: github.com
+  resolved_commit: 429a3cb161b95c71e2699358bad772a13ac196a0
+  resolved_ref: 429a3cb161b95c71e2699358bad772a13ac196a0
+  version: unknown
+  virtual_path: skills/migrating-to-moc-2
+  is_virtual: true
+  depth: 2
+  resolved_by: cameronraysmith/vanixiets
+  package_type: claude_skill
+  deployed_files:
+  - .agents/skills/migrating-to-moc-2
+  - .agents/skills/migrating-to-moc-2/LICENSE
+  - .agents/skills/migrating-to-moc-2/SKILL.md
+  deployed_file_hashes:
+    .agents/skills/migrating-to-moc-2/LICENSE: sha256:da3a1730b16cd3437d830f3890091a8c2084df6320c25ed5ef3bd93a64263628
+    .agents/skills/migrating-to-moc-2/SKILL.md: sha256:95dec2414832c4a3a9131590834df2fe80143afeb3dd38e7aa6dd2655b5d0cc9
+  content_hash: sha256:373da15a61f40559c96014f944359d1808d98f286de268e459cdf01d92f21377
+  carried_licenses:
+  - path: LICENSE
+    source: LICENSE
+    hash: sha256:da3a1730b16cd3437d830f3890091a8c2084df6320c25ed5ef3bd93a64263628
+- repo_url: dfinity/icskills
+  name: mops-cli
+  host: github.com
+  resolved_commit: 429a3cb161b95c71e2699358bad772a13ac196a0
+  resolved_ref: 429a3cb161b95c71e2699358bad772a13ac196a0
+  version: unknown
+  virtual_path: skills/mops-cli
+  is_virtual: true
+  depth: 2
+  resolved_by: cameronraysmith/vanixiets
+  package_type: claude_skill
+  deployed_files:
+  - .agents/skills/mops-cli
+  - .agents/skills/mops-cli/LICENSE
+  - .agents/skills/mops-cli/SKILL.md
+  deployed_file_hashes:
+    .agents/skills/mops-cli/LICENSE: sha256:da3a1730b16cd3437d830f3890091a8c2084df6320c25ed5ef3bd93a64263628
+    .agents/skills/mops-cli/SKILL.md: sha256:e963556a159df2bc54e9f4364fd08b2dd3fe58cb7bcfe78ca76496af2d7c01b8
+  content_hash: sha256:9316516d6813efa771411499a72d71c6a73ef1b10c8005f3c747d902f270b0ba
+  carried_licenses:
+  - path: LICENSE
+    source: LICENSE
+    hash: sha256:da3a1730b16cd3437d830f3890091a8c2084df6320c25ed5ef3bd93a64263628
+- repo_url: dfinity/icskills
+  name: multi-canister
+  host: github.com
+  resolved_commit: 429a3cb161b95c71e2699358bad772a13ac196a0
+  resolved_ref: 429a3cb161b95c71e2699358bad772a13ac196a0
+  version: unknown
+  virtual_path: skills/multi-canister
+  is_virtual: true
+  depth: 2
+  resolved_by: cameronraysmith/vanixiets
+  package_type: claude_skill
+  deployed_files:
+  - .agents/skills/multi-canister
+  - .agents/skills/multi-canister/LICENSE
+  - .agents/skills/multi-canister/SKILL.md
+  deployed_file_hashes:
+    .agents/skills/multi-canister/LICENSE: sha256:da3a1730b16cd3437d830f3890091a8c2084df6320c25ed5ef3bd93a64263628
+    .agents/skills/multi-canister/SKILL.md: sha256:e6aee628f4e5904734270b38ee61dd2f24145f8fd7695cbc1a3195489a607cb3
+  content_hash: sha256:b1c42c106278b9964456776d0659d037578d79168d8c0534a9cd59d42890d8e7
+  carried_licenses:
+  - path: LICENSE
+    source: LICENSE
+    hash: sha256:da3a1730b16cd3437d830f3890091a8c2084df6320c25ed5ef3bd93a64263628
+- repo_url: dfinity/icskills
+  name: organization-sign-in
+  host: github.com
+  resolved_commit: 429a3cb161b95c71e2699358bad772a13ac196a0
+  resolved_ref: 429a3cb161b95c71e2699358bad772a13ac196a0
+  version: unknown
+  virtual_path: skills/organization-sign-in
+  is_virtual: true
+  depth: 2
+  resolved_by: cameronraysmith/vanixiets
+  package_type: claude_skill
+  deployed_files:
+  - .agents/skills/organization-sign-in
+  - .agents/skills/organization-sign-in/LICENSE
+  - .agents/skills/organization-sign-in/SKILL.md
+  deployed_file_hashes:
+    .agents/skills/organization-sign-in/LICENSE: sha256:da3a1730b16cd3437d830f3890091a8c2084df6320c25ed5ef3bd93a64263628
+    .agents/skills/organization-sign-in/SKILL.md: sha256:03c47e6f0806a34b3bdd9dbcf2f38aa304f551a6fd6fc3d7935bf6b48d886bf8
+  content_hash: sha256:6c36e67aa24bea4b7bf2ed90180dfd74a5dfe234e24885dc146a316b1186b1ee
+  carried_licenses:
+  - path: LICENSE
+    source: LICENSE
+    hash: sha256:da3a1730b16cd3437d830f3890091a8c2084df6320c25ed5ef3bd93a64263628
+- repo_url: dfinity/icskills
+  name: reviewing-motoko
+  host: github.com
+  resolved_commit: 429a3cb161b95c71e2699358bad772a13ac196a0
+  resolved_ref: 429a3cb161b95c71e2699358bad772a13ac196a0
+  version: unknown
+  virtual_path: skills/reviewing-motoko
+  is_virtual: true
+  depth: 2
+  resolved_by: cameronraysmith/vanixiets
+  package_type: claude_skill
+  deployed_files:
+  - .agents/skills/reviewing-motoko
+  - .agents/skills/reviewing-motoko/LICENSE
+  - .agents/skills/reviewing-motoko/SKILL.md
+  - .agents/skills/reviewing-motoko/references/state-and-persistence.md
+  - .agents/skills/reviewing-motoko/references/type-encoding.md
+  deployed_file_hashes:
+    .agents/skills/reviewing-motoko/LICENSE: sha256:da3a1730b16cd3437d830f3890091a8c2084df6320c25ed5ef3bd93a64263628
+    .agents/skills/reviewing-motoko/SKILL.md: sha256:f8b1a348b60c5af5dfa85641b7c976d664d4246949ea9dd841d8f44bde7c23fa
+    .agents/skills/reviewing-motoko/references/state-and-persistence.md: sha256:d2408d7b36b0827eed65c0ec9669a63ba7b6e17c8e9bb0f7f02ca3e1658ff9d7
+    .agents/skills/reviewing-motoko/references/type-encoding.md: sha256:f5adb710978ed8a849ff5dca29bacf7866b0ebcb24c0a0c21111d96fd9a9f8f7
+  content_hash: sha256:4709e75d4ed267d5df8af8bfb940122e6532910e3404b8477d9c16717fb2071f
+  carried_licenses:
+  - path: LICENSE
+    source: LICENSE
+    hash: sha256:da3a1730b16cd3437d830f3890091a8c2084df6320c25ed5ef3bd93a64263628
+- repo_url: dfinity/icskills
+  name: service-discoverability
+  host: github.com
+  resolved_commit: 429a3cb161b95c71e2699358bad772a13ac196a0
+  resolved_ref: 429a3cb161b95c71e2699358bad772a13ac196a0
+  version: unknown
+  virtual_path: skills/service-discoverability
+  is_virtual: true
+  depth: 2
+  resolved_by: cameronraysmith/vanixiets
+  package_type: claude_skill
+  deployed_files:
+  - .agents/skills/service-discoverability
+  - .agents/skills/service-discoverability/LICENSE
+  - .agents/skills/service-discoverability/SKILL.md
+  deployed_file_hashes:
+    .agents/skills/service-discoverability/LICENSE: sha256:da3a1730b16cd3437d830f3890091a8c2084df6320c25ed5ef3bd93a64263628
+    .agents/skills/service-discoverability/SKILL.md: sha256:78ee815e32dc7315093bd6cd8a0769e80f519b78834f594b1c91b82b3cc7e8d7
+  content_hash: sha256:03f3431c4b78ba47d4191518f0fd9ab0de1928392d2480560bc35dd311526f29
+  carried_licenses:
+  - path: LICENSE
+    source: LICENSE
+    hash: sha256:da3a1730b16cd3437d830f3890091a8c2084df6320c25ed5ef3bd93a64263628
+- repo_url: dfinity/icskills
+  name: single-sign-in
+  host: github.com
+  resolved_commit: 429a3cb161b95c71e2699358bad772a13ac196a0
+  resolved_ref: 429a3cb161b95c71e2699358bad772a13ac196a0
+  version: unknown
+  virtual_path: skills/single-sign-in
+  is_virtual: true
+  depth: 2
+  resolved_by: cameronraysmith/vanixiets
+  package_type: claude_skill
+  deployed_files:
+  - .agents/skills/single-sign-in
+  - .agents/skills/single-sign-in/LICENSE
+  - .agents/skills/single-sign-in/SKILL.md
+  deployed_file_hashes:
+    .agents/skills/single-sign-in/LICENSE: sha256:da3a1730b16cd3437d830f3890091a8c2084df6320c25ed5ef3bd93a64263628
+    .agents/skills/single-sign-in/SKILL.md: sha256:4305a86c26affb5f0a359f7e2f1c8e6162fa696604945771787149eb18fc3de9
+  content_hash: sha256:730e3c747b8164eddcc80252f384b1a3ba1787e544076a08bc0a1803d501330f
+  carried_licenses:
+  - path: LICENSE
+    source: LICENSE
+    hash: sha256:da3a1730b16cd3437d830f3890091a8c2084df6320c25ed5ef3bd93a64263628
+- repo_url: dfinity/icskills
+  name: smtp-gateway
+  host: github.com
+  resolved_commit: 429a3cb161b95c71e2699358bad772a13ac196a0
+  resolved_ref: 429a3cb161b95c71e2699358bad772a13ac196a0
+  version: unknown
+  virtual_path: skills/smtp-gateway
+  is_virtual: true
+  depth: 2
+  resolved_by: cameronraysmith/vanixiets
+  package_type: claude_skill
+  deployed_files:
+  - .agents/skills/smtp-gateway
+  - .agents/skills/smtp-gateway/LICENSE
+  - .agents/skills/smtp-gateway/SKILL.md
+  - .agents/skills/smtp-gateway/references/chunked-upload.md
+  deployed_file_hashes:
+    .agents/skills/smtp-gateway/LICENSE: sha256:da3a1730b16cd3437d830f3890091a8c2084df6320c25ed5ef3bd93a64263628
+    .agents/skills/smtp-gateway/SKILL.md: sha256:3683bbb240b2e6410f8e7927b1d17cf8572fc0ecd623135241c6b4d86d021a46
+    .agents/skills/smtp-gateway/references/chunked-upload.md: sha256:859323819b5a6d896daca68836ad9aa069d5849db22a04bf9cac9ab52955d46e
+  content_hash: sha256:22b75199c711f5fd47639a7ace9e2580402d3feeab29e03613c66569b4b5651d
+  carried_licenses:
+  - path: LICENSE
+    source: LICENSE
+    hash: sha256:da3a1730b16cd3437d830f3890091a8c2084df6320c25ed5ef3bd93a64263628
+- repo_url: dfinity/icskills
+  name: sns-launch
+  host: github.com
+  resolved_commit: 429a3cb161b95c71e2699358bad772a13ac196a0
+  resolved_ref: 429a3cb161b95c71e2699358bad772a13ac196a0
+  version: unknown
+  virtual_path: skills/sns-launch
+  is_virtual: true
+  depth: 2
+  resolved_by: cameronraysmith/vanixiets
+  package_type: claude_skill
+  deployed_files:
+  - .agents/skills/sns-launch
+  - .agents/skills/sns-launch/LICENSE
+  - .agents/skills/sns-launch/SKILL.md
+  deployed_file_hashes:
+    .agents/skills/sns-launch/LICENSE: sha256:da3a1730b16cd3437d830f3890091a8c2084df6320c25ed5ef3bd93a64263628
+    .agents/skills/sns-launch/SKILL.md: sha256:48e0fa9fe149acdbf20028ddb3da6a72f90f7398a525fe9662c0de50603d403b
+  content_hash: sha256:59bc49de0f9ff776ebeb06815c4547f3bcb5cd87a78c2c8c0dbfce149513a1a0
+  carried_licenses:
+  - path: LICENSE
+    source: LICENSE
+    hash: sha256:da3a1730b16cd3437d830f3890091a8c2084df6320c25ed5ef3bd93a64263628
+- repo_url: dfinity/icskills
+  name: stable-memory
+  host: github.com
+  resolved_commit: 429a3cb161b95c71e2699358bad772a13ac196a0
+  resolved_ref: 429a3cb161b95c71e2699358bad772a13ac196a0
+  version: unknown
+  virtual_path: skills/stable-memory
+  is_virtual: true
+  depth: 2
+  resolved_by: cameronraysmith/vanixiets
+  package_type: claude_skill
+  deployed_files:
+  - .agents/skills/stable-memory
+  - .agents/skills/stable-memory/LICENSE
+  - .agents/skills/stable-memory/SKILL.md
+  deployed_file_hashes:
+    .agents/skills/stable-memory/LICENSE: sha256:da3a1730b16cd3437d830f3890091a8c2084df6320c25ed5ef3bd93a64263628
+    .agents/skills/stable-memory/SKILL.md: sha256:5c5e4d66db05c672fb90c0f7bab94d54b9c726f60388aaa5cdb0f6492ceb5d2e
+  content_hash: sha256:ff90fa65ca1ff165a8c996e3239f9a88052b4a3470fec81ebac2253b0ea49ba2
+  carried_licenses:
+  - path: LICENSE
+    source: LICENSE
+    hash: sha256:da3a1730b16cd3437d830f3890091a8c2084df6320c25ed5ef3bd93a64263628
+- repo_url: dfinity/icskills
+  name: static-site
+  host: github.com
+  resolved_commit: 429a3cb161b95c71e2699358bad772a13ac196a0
+  resolved_ref: 429a3cb161b95c71e2699358bad772a13ac196a0
+  version: unknown
+  virtual_path: skills/static-site
+  is_virtual: true
+  depth: 2
+  resolved_by: cameronraysmith/vanixiets
+  package_type: claude_skill
+  deployed_files:
+  - .agents/skills/static-site
+  - .agents/skills/static-site/LICENSE
+  - .agents/skills/static-site/SKILL.md
+  - .agents/skills/static-site/references/legacy-asset-canister.md
+  - .agents/skills/static-site/references/migrating-from-asset-canister.md
+  deployed_file_hashes:
+    .agents/skills/static-site/LICENSE: sha256:da3a1730b16cd3437d830f3890091a8c2084df6320c25ed5ef3bd93a64263628
+    .agents/skills/static-site/SKILL.md: sha256:8954b3c2b28b4dbaf5ab7c720a6aa93357a4c938b208d0aaa28b161a25c3fcc0
+    .agents/skills/static-site/references/legacy-asset-canister.md: sha256:6afc5e5b9dfe8cb2a85d87a79b463585434af92f9d0b6c343575e9267e49dd73
+    .agents/skills/static-site/references/migrating-from-asset-canister.md: sha256:88b25ec284fc3048ad680cb506fad4e43194f77fa4c1969ae9a7e99dfe669a23
+  content_hash: sha256:0319a27c5ef3eb60c3b9ed102ba2c4cc915ec3c1b5faa3e627f4def67f387f84
+  carried_licenses:
+  - path: LICENSE
+    source: LICENSE
+    hash: sha256:da3a1730b16cd3437d830f3890091a8c2084df6320c25ed5ef3bd93a64263628
+- repo_url: dfinity/icskills
+  name: threshold-signatures
+  host: github.com
+  resolved_commit: 429a3cb161b95c71e2699358bad772a13ac196a0
+  resolved_ref: 429a3cb161b95c71e2699358bad772a13ac196a0
+  version: unknown
+  virtual_path: skills/threshold-signatures
+  is_virtual: true
+  depth: 2
+  resolved_by: cameronraysmith/vanixiets
+  package_type: claude_skill
+  deployed_files:
+  - .agents/skills/threshold-signatures
+  - .agents/skills/threshold-signatures/LICENSE
+  - .agents/skills/threshold-signatures/SKILL.md
+  - .agents/skills/threshold-signatures/references/chain-formats.md
+  - .agents/skills/threshold-signatures/references/motoko.md
+  - .agents/skills/threshold-signatures/references/public-keys.md
+  deployed_file_hashes:
+    .agents/skills/threshold-signatures/LICENSE: sha256:da3a1730b16cd3437d830f3890091a8c2084df6320c25ed5ef3bd93a64263628
+    .agents/skills/threshold-signatures/SKILL.md: sha256:ad49d249d9b4baf24de6befe8a46af1945d2375a7dc12971f1ea3f4cdc345091
+    .agents/skills/threshold-signatures/references/chain-formats.md: sha256:46e69ffa17118d207a7136dd780332d2d5980e05dbf775c1b3bf05b441eacd05
+    .agents/skills/threshold-signatures/references/motoko.md: sha256:fd562e522c6bf88fa1e240af330dc483864568745af5a31b9704aab1c868cd93
+    .agents/skills/threshold-signatures/references/public-keys.md: sha256:fe60d9ef94b7ef619766fc13af66281511db7fadae06586d8aade98e87a88ff7
+  content_hash: sha256:aa0ba15fd4c40e4e3c05e7ee7d788f3d9f6a9e5dbd39291185eb7782db97c7f6
+  carried_licenses:
+  - path: LICENSE
+    source: LICENSE
+    hash: sha256:da3a1730b16cd3437d830f3890091a8c2084df6320c25ed5ef3bd93a64263628
+- repo_url: dfinity/icskills
+  name: troubleshooting-motoko-migrations
+  host: github.com
+  resolved_commit: 429a3cb161b95c71e2699358bad772a13ac196a0
+  resolved_ref: 429a3cb161b95c71e2699358bad772a13ac196a0
+  version: unknown
+  virtual_path: skills/troubleshooting-motoko-migrations
+  is_virtual: true
+  depth: 2
+  resolved_by: cameronraysmith/vanixiets
+  package_type: claude_skill
+  deployed_files:
+  - .agents/skills/troubleshooting-motoko-migrations
+  - .agents/skills/troubleshooting-motoko-migrations/LICENSE
+  - .agents/skills/troubleshooting-motoko-migrations/SKILL.md
+  deployed_file_hashes:
+    .agents/skills/troubleshooting-motoko-migrations/LICENSE: sha256:da3a1730b16cd3437d830f3890091a8c2084df6320c25ed5ef3bd93a64263628
+    .agents/skills/troubleshooting-motoko-migrations/SKILL.md: sha256:86329d132c8b552682ba359adec7c145e1e3ba8b20ba0a1809b002c997c1b761
+  content_hash: sha256:147b238fd97c91a94bef4d0448f6e6ba32957a96bba165b2c55bafcf7d21a34e
+  carried_licenses:
+  - path: LICENSE
+    source: LICENSE
+    hash: sha256:da3a1730b16cd3437d830f3890091a8c2084df6320c25ed5ef3bd93a64263628
+- repo_url: dfinity/icskills
+  name: user-attributes
+  host: github.com
+  resolved_commit: 429a3cb161b95c71e2699358bad772a13ac196a0
+  resolved_ref: 429a3cb161b95c71e2699358bad772a13ac196a0
+  version: unknown
+  virtual_path: skills/user-attributes
+  is_virtual: true
+  depth: 2
+  resolved_by: cameronraysmith/vanixiets
+  package_type: claude_skill
+  deployed_files:
+  - .agents/skills/user-attributes
+  - .agents/skills/user-attributes/LICENSE
+  - .agents/skills/user-attributes/SKILL.md
+  deployed_file_hashes:
+    .agents/skills/user-attributes/LICENSE: sha256:da3a1730b16cd3437d830f3890091a8c2084df6320c25ed5ef3bd93a64263628
+    .agents/skills/user-attributes/SKILL.md: sha256:36a970468e7f29f0af76a1e950bbb4db2c95a14972d7dd5e5a63a8a4cf13eee2
+  content_hash: sha256:851464191f70a397f28e359c40c254bf4909e363d6452262ccf92ab3f6676dc5
+  carried_licenses:
+  - path: LICENSE
+    source: LICENSE
+    hash: sha256:da3a1730b16cd3437d830f3890091a8c2084df6320c25ed5ef3bd93a64263628
+- repo_url: dfinity/icskills
+  name: user-notifications
+  host: github.com
+  resolved_commit: 429a3cb161b95c71e2699358bad772a13ac196a0
+  resolved_ref: 429a3cb161b95c71e2699358bad772a13ac196a0
+  version: unknown
+  virtual_path: skills/user-notifications
+  is_virtual: true
+  depth: 2
+  resolved_by: cameronraysmith/vanixiets
+  package_type: claude_skill
+  deployed_files:
+  - .agents/skills/user-notifications
+  - .agents/skills/user-notifications/LICENSE
+  - .agents/skills/user-notifications/SKILL.md
+  deployed_file_hashes:
+    .agents/skills/user-notifications/LICENSE: sha256:da3a1730b16cd3437d830f3890091a8c2084df6320c25ed5ef3bd93a64263628
+    .agents/skills/user-notifications/SKILL.md: sha256:b88ecc294fdca2627a75f9b49872eb592e30b24671e85489ef9067719b8f6417
+  content_hash: sha256:79aee9f41d48518d9c28a3f7527ba4aba8881bb392b6fa11451b5fa71becaa83
+  carried_licenses:
+  - path: LICENSE
+    source: LICENSE
+    hash: sha256:da3a1730b16cd3437d830f3890091a8c2084df6320c25ed5ef3bd93a64263628
+- repo_url: dfinity/icskills
+  name: user-sign-in
+  host: github.com
+  resolved_commit: 429a3cb161b95c71e2699358bad772a13ac196a0
+  resolved_ref: 429a3cb161b95c71e2699358bad772a13ac196a0
+  version: unknown
+  virtual_path: skills/user-sign-in
+  is_virtual: true
+  depth: 2
+  resolved_by: cameronraysmith/vanixiets
+  package_type: claude_skill
+  deployed_files:
+  - .agents/skills/user-sign-in
+  - .agents/skills/user-sign-in/LICENSE
+  - .agents/skills/user-sign-in/SKILL.md
+  deployed_file_hashes:
+    .agents/skills/user-sign-in/LICENSE: sha256:da3a1730b16cd3437d830f3890091a8c2084df6320c25ed5ef3bd93a64263628
+    .agents/skills/user-sign-in/SKILL.md: sha256:3a4fa0077799e551f08162aa8d82f7f2e2f4d96fa2520fee53abf247fbb86698
+  content_hash: sha256:d19b487cbb59b4ff5e9a9a293e74d7a4374f2eac4fc9e56b75dc12574dbd102a
+  carried_licenses:
+  - path: LICENSE
+    source: LICENSE
+    hash: sha256:da3a1730b16cd3437d830f3890091a8c2084df6320c25ed5ef3bd93a64263628
+- repo_url: dfinity/icskills
+  name: vetkeys
+  host: github.com
+  resolved_commit: 429a3cb161b95c71e2699358bad772a13ac196a0
+  resolved_ref: 429a3cb161b95c71e2699358bad772a13ac196a0
+  version: unknown
+  virtual_path: skills/vetkeys
+  is_virtual: true
+  depth: 2
+  resolved_by: cameronraysmith/vanixiets
+  package_type: claude_skill
+  deployed_files:
+  - .agents/skills/vetkeys
+  - .agents/skills/vetkeys/LICENSE
+  - .agents/skills/vetkeys/SKILL.md
+  - .agents/skills/vetkeys/references/bls-signing.md
+  - .agents/skills/vetkeys/references/ibe.md
+  deployed_file_hashes:
+    .agents/skills/vetkeys/LICENSE: sha256:da3a1730b16cd3437d830f3890091a8c2084df6320c25ed5ef3bd93a64263628
+    .agents/skills/vetkeys/SKILL.md: sha256:900ef73de1cc8af14a17281d177bfff0964ea706f74b1d3ecdd9552091e88e35
+    .agents/skills/vetkeys/references/bls-signing.md: sha256:1cec9c2ca986506ccadd0df8ab537b6c04e489f3695ff4e3362cd198df4961fd
+    .agents/skills/vetkeys/references/ibe.md: sha256:78ec670caf884f377c3a7d335f38840ad854fb8b6aca75ec84eaa1224aa92ad5
+  content_hash: sha256:005137b0339e20a646bd8cea905cd68364c1b4a047f3fdce8c92953abbb6c088
+  carried_licenses:
+  - path: LICENSE
+    source: LICENSE
+    hash: sha256:da3a1730b16cd3437d830f3890091a8c2084df6320c25ed5ef3bd93a64263628
+- repo_url: dfinity/icskills
+  name: wallet-integration
+  host: github.com
+  resolved_commit: 429a3cb161b95c71e2699358bad772a13ac196a0
+  resolved_ref: 429a3cb161b95c71e2699358bad772a13ac196a0
+  version: unknown
+  virtual_path: skills/wallet-integration
+  is_virtual: true
+  depth: 2
+  resolved_by: cameronraysmith/vanixiets
+  package_type: claude_skill
+  deployed_files:
+  - .agents/skills/wallet-integration
+  - .agents/skills/wallet-integration/LICENSE
+  - .agents/skills/wallet-integration/SKILL.md
+  deployed_file_hashes:
+    .agents/skills/wallet-integration/LICENSE: sha256:da3a1730b16cd3437d830f3890091a8c2084df6320c25ed5ef3bd93a64263628
+    .agents/skills/wallet-integration/SKILL.md: sha256:5ffa3377004e1b646af16074c95e2395fc0bf679c7f0b8274c4d737d613f33eb
+  content_hash: sha256:396eb849280939ae40b134d67f40f6af74254bd59331cd3fa70f7ad8cd92a22c
+  carried_licenses:
+  - path: LICENSE
+    source: LICENSE
+    hash: sha256:da3a1730b16cd3437d830f3890091a8c2084df6320c25ed5ef3bd93a64263628
+- repo_url: dfinity/icskills
+  name: writing-motoko
+  host: github.com
+  resolved_commit: 429a3cb161b95c71e2699358bad772a13ac196a0
+  resolved_ref: 429a3cb161b95c71e2699358bad772a13ac196a0
+  version: unknown
+  virtual_path: skills/writing-motoko
+  is_virtual: true
+  depth: 2
+  resolved_by: cameronraysmith/vanixiets
+  package_type: claude_skill
+  deployed_files:
+  - .agents/skills/writing-motoko
+  - .agents/skills/writing-motoko/LICENSE
+  - .agents/skills/writing-motoko/SKILL.md
+  - .agents/skills/writing-motoko/references/api-reference.md
+  - .agents/skills/writing-motoko/references/control-flow.md
+  - .agents/skills/writing-motoko/references/equality.md
+  - .agents/skills/writing-motoko/references/examples.md
+  - .agents/skills/writing-motoko/references/project-setup.md
+  - .agents/skills/writing-motoko/references/reserved-keywords.md
+  - .agents/skills/writing-motoko/references/type-conversions.md
+  deployed_file_hashes:
+    .agents/skills/writing-motoko/LICENSE: sha256:da3a1730b16cd3437d830f3890091a8c2084df6320c25ed5ef3bd93a64263628
+    .agents/skills/writing-motoko/SKILL.md: sha256:9e55155b07f32bdf03563bd8454601df8e8a399b73d2d4608e9774e6e6ab414a
+    .agents/skills/writing-motoko/references/api-reference.md: sha256:649096399d9402c28d94f324d4ade1969b026caa2e249e1d166fc615421961b7
+    .agents/skills/writing-motoko/references/control-flow.md: sha256:539aa10446ac15b7cca1d05bfbd0e8a44bcd855a8b6c41e601a664abb76364b8
+    .agents/skills/writing-motoko/references/equality.md: sha256:ebb0d5ce94cab891481ac7331776aaadb79cef51e2bbfe21ad9cb6464924c2d7
+    .agents/skills/writing-motoko/references/examples.md: sha256:7a7d6274b04b1c452487454ffbba32e97897297a81eb30d5314636ccc945d9d6
+    .agents/skills/writing-motoko/references/project-setup.md: sha256:b838da486bb9bcfa2f98bb635a7d107b0ea0e5e754052042eb449b3e39aff0b6
+    .agents/skills/writing-motoko/references/reserved-keywords.md: sha256:3e18964eedc11e52e44026cedfdde0cc0e1ed8cbdcd1ba747411788beb6457c3
+    .agents/skills/writing-motoko/references/type-conversions.md: sha256:da6fa4b5843742b2b992f98c60b614d3a64929dedfe35234c0a4c00b406e398c
+  content_hash: sha256:14e7a896e76eca4864c4d63fc48b21eb7fb705bcaba7d5ad43bf57f55376675e
+  carried_licenses:
+  - path: LICENSE
+    source: LICENSE
+    hash: sha256:da3a1730b16cd3437d830f3890091a8c2084df6320c25ed5ef3bd93a64263628
 - repo_url: github/gh-stack
   name: gh-stack
   host: github.com
@@ -3164,6 +4180,33 @@ dependencies:
 deployments:
 - kind: project-relative
   target: agent-skills
+  value: .agents/skills/agent-web-identity
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/agent-web-identity
+  active_owner: dfinity/icskills/skills/agent-web-identity
+  content_hash: null
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/agent-web-identity/LICENSE
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/agent-web-identity
+  active_owner: dfinity/icskills/skills/agent-web-identity
+  content_hash: sha256:da3a1730b16cd3437d830f3890091a8c2084df6320c25ed5ef3bd93a64263628
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/agent-web-identity/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/agent-web-identity
+  active_owner: dfinity/icskills/skills/agent-web-identity
+  content_hash: sha256:9f4ff8829beee9db7a95a43645a713ce4cb07e4151007d2342ab9edd7ac9449c
+- kind: project-relative
+  target: agent-skills
   value: .agents/skills/agentic-planning-development-workflow
   runtime: null
   scope: project
@@ -3650,6 +4693,204 @@ deployments:
   content_hash: sha256:5631ccefea114ce15b92735400bc0ae7de2d6e1e430cdaff7353109e42835b38
 - kind: project-relative
   target: agent-skills
+  value: .agents/skills/buy-cycles
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/buy-cycles
+  active_owner: dfinity/icskills/skills/buy-cycles
+  content_hash: null
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/buy-cycles/LICENSE
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/buy-cycles
+  active_owner: dfinity/icskills/skills/buy-cycles
+  content_hash: sha256:da3a1730b16cd3437d830f3890091a8c2084df6320c25ed5ef3bd93a64263628
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/buy-cycles/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/buy-cycles
+  active_owner: dfinity/icskills/skills/buy-cycles
+  content_hash: sha256:77d5cadd702eafafb2a23ba8e4fb5388fe64ecff26d47eb0ce295cdebcfc72af
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/caffeine-app
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/caffeine-app
+  active_owner: dfinity/icskills/skills/caffeine-app
+  content_hash: null
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/caffeine-app/LICENSE
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/caffeine-app
+  active_owner: dfinity/icskills/skills/caffeine-app
+  content_hash: sha256:da3a1730b16cd3437d830f3890091a8c2084df6320c25ed5ef3bd93a64263628
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/caffeine-app/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/caffeine-app
+  active_owner: dfinity/icskills/skills/caffeine-app
+  content_hash: sha256:97c54646ddddd93cc4a3fd69161a8d321ca940642f41edd6a191c5f3d302a93b
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/caffeine-app/references/frontend-template.md
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/caffeine-app
+  active_owner: dfinity/icskills/skills/caffeine-app
+  content_hash: sha256:f4950e5eed41199ae2412027b46e6734fdf93632ba7290065b2b1d5873e5472b
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/canhelp
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/canhelp
+  active_owner: dfinity/icskills/skills/canhelp
+  content_hash: null
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/canhelp/LICENSE
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/canhelp
+  active_owner: dfinity/icskills/skills/canhelp
+  content_hash: sha256:da3a1730b16cd3437d830f3890091a8c2084df6320c25ed5ef3bd93a64263628
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/canhelp/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/canhelp
+  active_owner: dfinity/icskills/skills/canhelp
+  content_hash: sha256:5091021ea488bcc5061b07a4ac36f940c9fb870bcd72204add01e5eb97d14370
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/canhelp/scripts/fetch-candid.sh
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/canhelp
+  active_owner: dfinity/icskills/skills/canhelp
+  content_hash: sha256:80f58a3eadbc9e450ebd5e49e2124da3414a727644ad8ba83d10fde6ee3e14fc
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/canhelp/scripts/resolve-canister-id.sh
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/canhelp
+  active_owner: dfinity/icskills/skills/canhelp
+  content_hash: sha256:fafdbfa5e89b6a3f6b80c139a3bcab0ca491a9f917116a8a7ac1b59bef37f5dd
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/canister-audit
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/canister-audit
+  active_owner: dfinity/icskills/skills/canister-audit
+  content_hash: null
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/canister-audit/LICENSE
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/canister-audit
+  active_owner: dfinity/icskills/skills/canister-audit
+  content_hash: sha256:da3a1730b16cd3437d830f3890091a8c2084df6320c25ed5ef3bd93a64263628
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/canister-audit/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/canister-audit
+  active_owner: dfinity/icskills/skills/canister-audit
+  content_hash: sha256:fc6d9fa9f47e0e9133c0906e1bd4eae80837cf8875cb9d8bbfae423747ee9aa4
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/canister-security
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/canister-security
+  active_owner: dfinity/icskills/skills/canister-security
+  content_hash: null
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/canister-security/LICENSE
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/canister-security
+  active_owner: dfinity/icskills/skills/canister-security
+  content_hash: sha256:da3a1730b16cd3437d830f3890091a8c2084df6320c25ed5ef3bd93a64263628
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/canister-security/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/canister-security
+  active_owner: dfinity/icskills/skills/canister-security
+  content_hash: sha256:0ca63d9254d223feb4298086093cf0561c583662ec3e0db3419f360c70141932
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/certified-variables
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/certified-variables
+  active_owner: dfinity/icskills/skills/certified-variables
+  content_hash: null
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/certified-variables/LICENSE
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/certified-variables
+  active_owner: dfinity/icskills/skills/certified-variables
+  content_hash: sha256:da3a1730b16cd3437d830f3890091a8c2084df6320c25ed5ef3bd93a64263628
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/certified-variables/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/certified-variables
+  active_owner: dfinity/icskills/skills/certified-variables
+  content_hash: sha256:e30c0717b5d4d7487b6cafb8a049812ada213d6872fac78b6e2e3244dc944bc2
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/certified-variables/references/http-certification.md
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/certified-variables
+  active_owner: dfinity/icskills/skills/certified-variables
+  content_hash: sha256:3d67b8f21ad0bc01aaf2d61813c3dc565f66dea9f7486d48f8044dd8a504dbef
+- kind: project-relative
+  target: agent-skills
   value: .agents/skills/ci-log-verification
   runtime: null
   scope: project
@@ -3666,6 +4907,132 @@ deployments:
   - cameronraysmith/vanixiets/modules/home/ai/plugins/nix-build-operations
   active_owner: cameronraysmith/vanixiets/modules/home/ai/plugins/nix-build-operations
   content_hash: sha256:3d39b10e55ee25e8e8b178f6aa515e515be16e093b331565039de6108d706593
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/ckbtc
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/ckbtc
+  active_owner: dfinity/icskills/skills/ckbtc
+  content_hash: null
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/ckbtc/LICENSE
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/ckbtc
+  active_owner: dfinity/icskills/skills/ckbtc
+  content_hash: sha256:da3a1730b16cd3437d830f3890091a8c2084df6320c25ed5ef3bd93a64263628
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/ckbtc/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/ckbtc
+  active_owner: dfinity/icskills/skills/ckbtc
+  content_hash: sha256:7afd15b68c4213393108f77e20389a999a42e80e95e0dcdbdea24464b12a7851
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/cketh
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/cketh
+  active_owner: dfinity/icskills/skills/cketh
+  content_hash: null
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/cketh/LICENSE
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/cketh
+  active_owner: dfinity/icskills/skills/cketh
+  content_hash: sha256:da3a1730b16cd3437d830f3890091a8c2084df6320c25ed5ef3bd93a64263628
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/cketh/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/cketh
+  active_owner: dfinity/icskills/skills/cketh
+  content_hash: sha256:9fa12205ce18a50d92ecea98b436130d6f8caaceaeff91e801a63ac3da808dbe
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/cketh/references/backend.md
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/cketh
+  active_owner: dfinity/icskills/skills/cketh
+  content_hash: sha256:71cc641a0da7c42aec532aef6031a5d4b4f1612adab8f0cca7c797db05208b8b
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/cketh/references/frontend.md
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/cketh
+  active_owner: dfinity/icskills/skills/cketh
+  content_hash: sha256:14146b8d80a31f1ca9d240212b0fcf4c927e3a056ebe67e2d231f34e8335bcc4
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/cksol
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/cksol
+  active_owner: dfinity/icskills/skills/cksol
+  content_hash: null
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/cksol/LICENSE
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/cksol
+  active_owner: dfinity/icskills/skills/cksol
+  content_hash: sha256:da3a1730b16cd3437d830f3890091a8c2084df6320c25ed5ef3bd93a64263628
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/cksol/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/cksol
+  active_owner: dfinity/icskills/skills/cksol
+  content_hash: sha256:c77fdcb1f9028c25dabc83a397891e4c7033267ba7e60f5a178dedcc81a3002b
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/cloud-engine-canisters
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/cloud-engine-canisters
+  active_owner: dfinity/icskills/skills/cloud-engine-canisters
+  content_hash: null
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/cloud-engine-canisters/LICENSE
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/cloud-engine-canisters
+  active_owner: dfinity/icskills/skills/cloud-engine-canisters
+  content_hash: sha256:da3a1730b16cd3437d830f3890091a8c2084df6320c25ed5ef3bd93a64263628
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/cloud-engine-canisters/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/cloud-engine-canisters
+  active_owner: dfinity/icskills/skills/cloud-engine-canisters
+  content_hash: sha256:a24d61fec9c0f80998d2de75a430ec13d93800dc72bfd82acc0ac8cd4453bab0
 - kind: project-relative
   target: agent-skills
   value: .agents/skills/code-review
@@ -3758,6 +5125,60 @@ deployments:
   content_hash: sha256:edebc9e4fcfe102114012575eaa9600b9b5fd08c311664f389c36e7bc717740f
 - kind: project-relative
   target: agent-skills
+  value: .agents/skills/custom-domains
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/custom-domains
+  active_owner: dfinity/icskills/skills/custom-domains
+  content_hash: null
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/custom-domains/LICENSE
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/custom-domains
+  active_owner: dfinity/icskills/skills/custom-domains
+  content_hash: sha256:da3a1730b16cd3437d830f3890091a8c2084df6320c25ed5ef3bd93a64263628
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/custom-domains/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/custom-domains
+  active_owner: dfinity/icskills/skills/custom-domains
+  content_hash: sha256:8220e94827b8e96395eb9683d556057978236dc25789d67d9c6d2fef3cf9417f
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/cycles-management
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/cycles-management
+  active_owner: dfinity/icskills/skills/cycles-management
+  content_hash: null
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/cycles-management/LICENSE
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/cycles-management
+  active_owner: dfinity/icskills/skills/cycles-management
+  content_hash: sha256:da3a1730b16cd3437d830f3890091a8c2084df6320c25ed5ef3bd93a64263628
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/cycles-management/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/cycles-management
+  active_owner: dfinity/icskills/skills/cycles-management
+  content_hash: sha256:1cb88a046a155f53487f031ce8102ae88cd46e3ed9a511c84b584276d98e1dcd
+- kind: project-relative
+  target: agent-skills
   value: .agents/skills/dependency-source-acquisition
   runtime: null
   scope: project
@@ -3774,6 +5195,33 @@ deployments:
   - cameronraysmith/vanixiets/modules/home/ai/plugins/version-control-and-forge
   active_owner: cameronraysmith/vanixiets/modules/home/ai/plugins/version-control-and-forge
   content_hash: sha256:4ec3372c3c05d9212feadfa52cbb1fecd40a5c190ed4f34f5cf57c5b9b8a054d
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/deploy-to-cloud-engine
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/deploy-to-cloud-engine
+  active_owner: dfinity/icskills/skills/deploy-to-cloud-engine
+  content_hash: null
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/deploy-to-cloud-engine/LICENSE
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/deploy-to-cloud-engine
+  active_owner: dfinity/icskills/skills/deploy-to-cloud-engine
+  content_hash: sha256:da3a1730b16cd3437d830f3890091a8c2084df6320c25ed5ef3bd93a64263628
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/deploy-to-cloud-engine/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/deploy-to-cloud-engine
+  active_owner: dfinity/icskills/skills/deploy-to-cloud-engine
+  content_hash: sha256:7be7266af7fd1ba39ad92aada9667b359724ac302a7ec9b4ec4862af3cbf9354
 - kind: project-relative
   target: agent-skills
   value: .agents/skills/diagnosing-bugs
@@ -4136,6 +5584,42 @@ deployments:
   content_hash: sha256:f6bf2aa996c6e6f53fdd0708e18a0d16a56aed8322cca59fedbe3c0d2c75f06b
 - kind: project-relative
   target: agent-skills
+  value: .agents/skills/encrypted-maps
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/encrypted-maps
+  active_owner: dfinity/icskills/skills/encrypted-maps
+  content_hash: null
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/encrypted-maps/LICENSE
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/encrypted-maps
+  active_owner: dfinity/icskills/skills/encrypted-maps
+  content_hash: sha256:da3a1730b16cd3437d830f3890091a8c2084df6320c25ed5ef3bd93a64263628
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/encrypted-maps/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/encrypted-maps
+  active_owner: dfinity/icskills/skills/encrypted-maps
+  content_hash: sha256:b3c7a2d73bb83a6a0a4037a393d3f36922697dcbc0760c9b17ea418e5472cd5f
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/encrypted-maps/references/metadata.md
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/encrypted-maps
+  active_owner: dfinity/icskills/skills/encrypted-maps
+  content_hash: sha256:65ac629096ab1c2fe299bc050d3df53b7bbc01b75e52a7d910ebdbbd616754fe
+- kind: project-relative
+  target: agent-skills
   value: .agents/skills/event-modeling-brownfield
   runtime: null
   scope: project
@@ -4206,6 +5690,33 @@ deployments:
   - cameronraysmith/vanixiets/modules/home/ai/plugins/event-modeling-workflow
   active_owner: cameronraysmith/vanixiets/modules/home/ai/plugins/event-modeling-workflow
   content_hash: sha256:4ae9f8b45b2ff2810162731c2a4660ff5a45e702147d9881c0f2aed04815630f
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/evm-rpc
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/evm-rpc
+  active_owner: dfinity/icskills/skills/evm-rpc
+  content_hash: null
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/evm-rpc/LICENSE
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/evm-rpc
+  active_owner: dfinity/icskills/skills/evm-rpc
+  content_hash: sha256:da3a1730b16cd3437d830f3890091a8c2084df6320c25ed5ef3bd93a64263628
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/evm-rpc/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/evm-rpc
+  active_owner: dfinity/icskills/skills/evm-rpc
+  content_hash: sha256:be6c1c6cf49ec028adc64f04e0aa88c45bc4f8c661e49d6feebe075d74cac9c5
 - kind: project-relative
   target: agent-skills
   value: .agents/skills/executable-specification-testing
@@ -4721,6 +6232,213 @@ deployments:
   content_hash: sha256:c7da3fda455cc17adc5788984954baf95a354f2e83367bff0efd1b01f45a96a3
 - kind: project-relative
   target: agent-skills
+  value: .agents/skills/https-outcalls
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/https-outcalls
+  active_owner: dfinity/icskills/skills/https-outcalls
+  content_hash: null
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/https-outcalls/LICENSE
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/https-outcalls
+  active_owner: dfinity/icskills/skills/https-outcalls
+  content_hash: sha256:da3a1730b16cd3437d830f3890091a8c2084df6320c25ed5ef3bd93a64263628
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/https-outcalls/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/https-outcalls
+  active_owner: dfinity/icskills/skills/https-outcalls
+  content_hash: sha256:bb66aff5d0e7c1226f4270a4ced410c4c141f4f65fb714adeb833e96bc045056
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/https-outcalls/references/flexible-outcalls.md
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/https-outcalls
+  active_owner: dfinity/icskills/skills/https-outcalls
+  content_hash: sha256:4ad709be52f1632fa26e403e8b288d423578e391ad384225d4109a4a64132d03
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/https-outcalls/references/json-responses.md
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/https-outcalls
+  active_owner: dfinity/icskills/skills/https-outcalls
+  content_hash: sha256:272442ad925ea00ec542adfec03fab48b4fb291179213884d8b4fb89d15490cb
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/https-outcalls/references/pricing-version-2.md
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/https-outcalls
+  active_owner: dfinity/icskills/skills/https-outcalls
+  content_hash: sha256:fe2e6794ce5700dd99aa185655f4cf79f81ce94ffea1c40c9f5657023190b58e
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/ic-dashboard
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/ic-dashboard
+  active_owner: dfinity/icskills/skills/ic-dashboard
+  content_hash: null
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/ic-dashboard/LICENSE
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/ic-dashboard
+  active_owner: dfinity/icskills/skills/ic-dashboard
+  content_hash: sha256:da3a1730b16cd3437d830f3890091a8c2084df6320c25ed5ef3bd93a64263628
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/ic-dashboard/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/ic-dashboard
+  active_owner: dfinity/icskills/skills/ic-dashboard
+  content_hash: sha256:ba4353151fda2e04100c83482f490f60c902cdaf3da6e499645931b9287073c4
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/icp-cli
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/icp-cli
+  active_owner: dfinity/icskills/skills/icp-cli
+  content_hash: null
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/icp-cli/LICENSE
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/icp-cli
+  active_owner: dfinity/icskills/skills/icp-cli
+  content_hash: sha256:da3a1730b16cd3437d830f3890091a8c2084df6320c25ed5ef3bd93a64263628
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/icp-cli/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/icp-cli
+  active_owner: dfinity/icskills/skills/icp-cli
+  content_hash: sha256:155c41a6c8a667f2c23d6d354c7632e50504e8f82f8ad4bb2103e6e99921fa98
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/icp-cli/references/binding-generation.md
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/icp-cli
+  active_owner: dfinity/icskills/skills/icp-cli
+  content_hash: sha256:7c58e1b2c302c6bc4cb4c97b3582435af1c7cefb7693a5cadd5e48f1beed1808
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/icp-cli/references/bundling.md
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/icp-cli
+  active_owner: dfinity/icskills/skills/icp-cli
+  content_hash: sha256:fe913d62ec1231c77542736e91c264b4b94885ae78f38b48af163243ef7dacd4
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/icp-cli/references/canister-env-vars.md
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/icp-cli
+  active_owner: dfinity/icskills/skills/icp-cli
+  content_hash: sha256:393b23596b56b354cf0e0512bde501c77ff9e5682bb6da7135074e394c6f00d9
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/icp-cli/references/dev-server.md
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/icp-cli
+  active_owner: dfinity/icskills/skills/icp-cli
+  content_hash: sha256:2e9049069d800df18c6a172eb619de910072a5d4394dd99734c758474e5328d2
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/icp-cli/references/dfx-migration.md
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/icp-cli
+  active_owner: dfinity/icskills/skills/icp-cli
+  content_hash: sha256:576cb9d388813c3c80749ac9e515e61e1b0cdf896af54a021f450184a701afcb
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/icp-deploy-check
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/icp-deploy-check
+  active_owner: dfinity/icskills/skills/icp-deploy-check
+  content_hash: null
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/icp-deploy-check/LICENSE
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/icp-deploy-check
+  active_owner: dfinity/icskills/skills/icp-deploy-check
+  content_hash: sha256:da3a1730b16cd3437d830f3890091a8c2084df6320c25ed5ef3bd93a64263628
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/icp-deploy-check/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/icp-deploy-check
+  active_owner: dfinity/icskills/skills/icp-deploy-check
+  content_hash: sha256:fec03503c88c3d099546c276029954f6fce2222ca07d7df4a0d4b32f6928f48e
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/icrc-ledger
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/icrc-ledger
+  active_owner: dfinity/icskills/skills/icrc-ledger
+  content_hash: null
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/icrc-ledger/LICENSE
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/icrc-ledger
+  active_owner: dfinity/icskills/skills/icrc-ledger
+  content_hash: sha256:da3a1730b16cd3437d830f3890091a8c2084df6320c25ed5ef3bd93a64263628
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/icrc-ledger/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/icrc-ledger
+  active_owner: dfinity/icskills/skills/icrc-ledger
+  content_hash: sha256:8155a7faf779cc9bd7969012d20f8846b3a35549a7248800e8a694c03e133670
+- kind: project-relative
+  target: agent-skills
   value: .agents/skills/implement
   runtime: null
   scope: project
@@ -4871,7 +6589,7 @@ deployments:
   owners:
   - cameronraysmith/vanixiets/modules/home/ai/plugins/version-control-and-forge
   active_owner: cameronraysmith/vanixiets/modules/home/ai/plugins/version-control-and-forge
-  content_hash: sha256:f61cda7d4fd06d2bfb24bbb0a367e12a2c6c872c8d179718c51604d8665b1f1a
+  content_hash: sha256:ffd0b770de577e6f4dbe18be3d28207ebdccba28cc4c47656adf2167670432f7
 - kind: project-relative
   target: agent-skills
   value: .agents/skills/jj-version-control/diamond-workflow.md
@@ -4880,7 +6598,7 @@ deployments:
   owners:
   - cameronraysmith/vanixiets/modules/home/ai/plugins/version-control-and-forge
   active_owner: cameronraysmith/vanixiets/modules/home/ai/plugins/version-control-and-forge
-  content_hash: sha256:cc1c1f77f895b9444e79b751f9b13eff91a9d4d3c239b0f9d0f205456e1556a7
+  content_hash: sha256:dc40b29345171185c110f83cb1579c96b19b9782f48064c30dbd75f9b00d5a07
 - kind: project-relative
   target: agent-skills
   value: .agents/skills/jj-version-control/hazards.md
@@ -4889,7 +6607,7 @@ deployments:
   owners:
   - cameronraysmith/vanixiets/modules/home/ai/plugins/version-control-and-forge
   active_owner: cameronraysmith/vanixiets/modules/home/ai/plugins/version-control-and-forge
-  content_hash: sha256:e2a85d7a050d2d9342242a52a01335422ce07c2d7fcdda494c24c97558ee059b
+  content_hash: sha256:6138b4cd7915594d858230fac1932957eb98e6075dad6396849a32bca08aa859
 - kind: project-relative
   target: agent-skills
   value: .agents/skills/jj-version-control/tiered-ceremony.md
@@ -5765,6 +7483,123 @@ deployments:
   content_hash: sha256:67cf5703402013936c8fb75ad6a1afecd8841d45cc5e606b634eb05825fde365
 - kind: project-relative
   target: agent-skills
+  value: .agents/skills/migrating-motoko-actors
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/migrating-motoko-actors
+  active_owner: dfinity/icskills/skills/migrating-motoko-actors
+  content_hash: null
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/migrating-motoko-actors/LICENSE
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/migrating-motoko-actors
+  active_owner: dfinity/icskills/skills/migrating-motoko-actors
+  content_hash: sha256:da3a1730b16cd3437d830f3890091a8c2084df6320c25ed5ef3bd93a64263628
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/migrating-motoko-actors/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/migrating-motoko-actors
+  active_owner: dfinity/icskills/skills/migrating-motoko-actors
+  content_hash: sha256:142e72f6e002d7213099cf31ab3b1f9c766e253d2307e782b9147fc6af388c80
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/migrating-motoko-actors/references/examples.md
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/migrating-motoko-actors
+  active_owner: dfinity/icskills/skills/migrating-motoko-actors
+  content_hash: sha256:ca4a527e632cc12f0e5f8b7135c9d090c10fee1854025eda658bce04ca06fd21
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/migrating-to-moc-2
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/migrating-to-moc-2
+  active_owner: dfinity/icskills/skills/migrating-to-moc-2
+  content_hash: null
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/migrating-to-moc-2/LICENSE
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/migrating-to-moc-2
+  active_owner: dfinity/icskills/skills/migrating-to-moc-2
+  content_hash: sha256:da3a1730b16cd3437d830f3890091a8c2084df6320c25ed5ef3bd93a64263628
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/migrating-to-moc-2/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/migrating-to-moc-2
+  active_owner: dfinity/icskills/skills/migrating-to-moc-2
+  content_hash: sha256:95dec2414832c4a3a9131590834df2fe80143afeb3dd38e7aa6dd2655b5d0cc9
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/mops-cli
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/mops-cli
+  active_owner: dfinity/icskills/skills/mops-cli
+  content_hash: null
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/mops-cli/LICENSE
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/mops-cli
+  active_owner: dfinity/icskills/skills/mops-cli
+  content_hash: sha256:da3a1730b16cd3437d830f3890091a8c2084df6320c25ed5ef3bd93a64263628
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/mops-cli/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/mops-cli
+  active_owner: dfinity/icskills/skills/mops-cli
+  content_hash: sha256:e963556a159df2bc54e9f4364fd08b2dd3fe58cb7bcfe78ca76496af2d7c01b8
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/multi-canister
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/multi-canister
+  active_owner: dfinity/icskills/skills/multi-canister
+  content_hash: null
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/multi-canister/LICENSE
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/multi-canister
+  active_owner: dfinity/icskills/skills/multi-canister
+  content_hash: sha256:da3a1730b16cd3437d830f3890091a8c2084df6320c25ed5ef3bd93a64263628
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/multi-canister/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/multi-canister
+  active_owner: dfinity/icskills/skills/multi-canister
+  content_hash: sha256:e6aee628f4e5904734270b38ee61dd2f24145f8fd7695cbc1a3195489a607cb3
+- kind: project-relative
+  target: agent-skills
   value: .agents/skills/nix-flake-pr-cycle
   runtime: null
   scope: project
@@ -5780,7 +7615,7 @@ deployments:
   owners:
   - cameronraysmith/vanixiets/modules/home/ai/plugins/nix-build-operations
   active_owner: cameronraysmith/vanixiets/modules/home/ai/plugins/nix-build-operations
-  content_hash: sha256:34375aa748f4393de966aa6d49a54413636540e67a67626221d6838c3c71a55c
+  content_hash: sha256:7816cb081a8cafd550e732ec31797a2b0ae0f6c6dc53586625a12675fbd7a234
 - kind: project-relative
   target: agent-skills
   value: .agents/skills/nixpkgs-broken-package
@@ -6152,6 +7987,33 @@ deployments:
   content_hash: sha256:3b86fbb9734fdb6b942dd12d0afa4247457aa7f212bb48832eae133f5e66880a
 - kind: project-relative
   target: agent-skills
+  value: .agents/skills/organization-sign-in
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/organization-sign-in
+  active_owner: dfinity/icskills/skills/organization-sign-in
+  content_hash: null
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/organization-sign-in/LICENSE
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/organization-sign-in
+  active_owner: dfinity/icskills/skills/organization-sign-in
+  content_hash: sha256:da3a1730b16cd3437d830f3890091a8c2084df6320c25ed5ef3bd93a64263628
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/organization-sign-in/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/organization-sign-in
+  active_owner: dfinity/icskills/skills/organization-sign-in
+  content_hash: sha256:03c47e6f0806a34b3bdd9dbcf2f38aa304f551a6fd6fc3d7935bf6b48d886bf8
+- kind: project-relative
+  target: agent-skills
   value: .agents/skills/playwright-cli
   runtime: null
   scope: project
@@ -6267,6 +8129,33 @@ deployments:
   - microsoft/playwright-cli
   active_owner: microsoft/playwright-cli
   content_hash: sha256:1c800b897824cb54394c34265d8ebffdbb530adfc8d612c5d798b667a1799f48
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/pr-digest
+  runtime: null
+  scope: project
+  owners:
+  - cameronraysmith/vanixiets/modules/home/ai/plugins/agent-orchestration-and-meta-tooling
+  active_owner: cameronraysmith/vanixiets/modules/home/ai/plugins/agent-orchestration-and-meta-tooling
+  content_hash: null
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/pr-digest/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - cameronraysmith/vanixiets/modules/home/ai/plugins/agent-orchestration-and-meta-tooling
+  active_owner: cameronraysmith/vanixiets/modules/home/ai/plugins/agent-orchestration-and-meta-tooling
+  content_hash: sha256:0ea321bf8c2daaeea21a0f428557c21cc04c8af9295c91ba3127ff6b191c3cf6
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/pr-digest/references/inner-prompt.md
+  runtime: null
+  scope: project
+  owners:
+  - cameronraysmith/vanixiets/modules/home/ai/plugins/agent-orchestration-and-meta-tooling
+  active_owner: cameronraysmith/vanixiets/modules/home/ai/plugins/agent-orchestration-and-meta-tooling
+  content_hash: sha256:5c8fca8f9ae84311ac30d2c6bbcdfbb8998b2ae59276839213e307d2b3c4211a
 - kind: project-relative
   target: agent-skills
   value: .agents/skills/preferences-adaptive-planning
@@ -7040,7 +8929,7 @@ deployments:
   owners:
   - cameronraysmith/vanixiets/modules/home/ai/plugins/preferences-nix-and-secrets
   active_owner: cameronraysmith/vanixiets/modules/home/ai/plugins/preferences-nix-and-secrets
-  content_hash: sha256:18047b4f867dda1ab059c37bd31c42a60ee5a00ae20ebb6931053b77ba987919
+  content_hash: sha256:bd14373d3937ec6ad9169e05ca8bdf964388948d7ebfd6d05afd2b4609fbbd25
 - kind: project-relative
   target: agent-skills
   value: .agents/skills/preferences-nix-checks-architecture/references/check-vacuity.md
@@ -7067,7 +8956,7 @@ deployments:
   owners:
   - cameronraysmith/vanixiets/modules/home/ai/plugins/preferences-nix-and-secrets
   active_owner: cameronraysmith/vanixiets/modules/home/ai/plugins/preferences-nix-and-secrets
-  content_hash: sha256:550e87a9a13f38f42faa74f62a6f571e05977d2f51441dd0976b560a0f72623b
+  content_hash: sha256:0fcb6031869e0c2051179affb54ba42f93e36356fc7a4cdb24a292f52e415876
 - kind: project-relative
   target: agent-skills
   value: .agents/skills/preferences-nix-checks-architecture/references/nix-unit-invariants.md
@@ -7097,6 +8986,15 @@ deployments:
   content_hash: sha256:80aac4508b84b06f5dd44c04de896b118ee16be95848313416ec49f02b3b3338
 - kind: project-relative
   target: agent-skills
+  value: .agents/skills/preferences-nix-checks-architecture/references/test-sizes.md
+  runtime: null
+  scope: project
+  owners:
+  - cameronraysmith/vanixiets/modules/home/ai/plugins/preferences-nix-and-secrets
+  active_owner: cameronraysmith/vanixiets/modules/home/ai/plugins/preferences-nix-and-secrets
+  content_hash: sha256:d27d6c4bdc0e13d104a80c178a1308b6bf225ef37a9f65847d6fbb7e9c20bd25
+- kind: project-relative
+  target: agent-skills
   value: .agents/skills/preferences-nix-ci-cd-integration
   runtime: null
   scope: project
@@ -7112,7 +9010,7 @@ deployments:
   owners:
   - cameronraysmith/vanixiets/modules/home/ai/plugins/preferences-nix-and-secrets
   active_owner: cameronraysmith/vanixiets/modules/home/ai/plugins/preferences-nix-and-secrets
-  content_hash: sha256:7d0a7270e42e9e204c28260ae4f41cf37fb935d73311b1b64f4dcd1329d0533f
+  content_hash: sha256:c2c38f291b67ae3eadf08411ae8d903fc9d7876f9ad83348adc0e47fb28a326a
 - kind: project-relative
   target: agent-skills
   value: .agents/skills/preferences-nix-ci-cd-integration/references/buildbot-nix-configuration.md
@@ -7166,7 +9064,7 @@ deployments:
   owners:
   - cameronraysmith/vanixiets/modules/home/ai/plugins/preferences-nix-and-secrets
   active_owner: cameronraysmith/vanixiets/modules/home/ai/plugins/preferences-nix-and-secrets
-  content_hash: sha256:f521b96daa75a7bdbda755b3b90caf49f420895de05ba59ff86bd857212198cd
+  content_hash: sha256:73b241f6b513378e059ffe8f92f0d45e364aa4511671822c9c3479f3e161fcf1
 - kind: project-relative
   target: agent-skills
   value: .agents/skills/preferences-nix-development/references/dendritic-module-composition.md
@@ -7643,7 +9541,7 @@ deployments:
   owners:
   - cameronraysmith/vanixiets/modules/home/ai/plugins/preferences-nix-and-secrets
   active_owner: cameronraysmith/vanixiets/modules/home/ai/plugins/preferences-nix-and-secrets
-  content_hash: sha256:7a92aef91af096be1ad05c3ff1b8b7b0b1c02da030c140e7f7ee2a7cd876c2c7
+  content_hash: sha256:f3174e07e93ebc71b799ff775d308c7bb30acad03bdf8e77a9260bd28870caa4
 - kind: project-relative
   target: agent-skills
   value: .agents/skills/preferences-strategic-domain-analysis
@@ -8294,6 +10192,51 @@ deployments:
   content_hash: sha256:a1f4f96838f2ed6282eb28abbbf99029cb8fadce552baf53da90a025b8bffddf
 - kind: project-relative
   target: agent-skills
+  value: .agents/skills/reviewing-motoko
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/reviewing-motoko
+  active_owner: dfinity/icskills/skills/reviewing-motoko
+  content_hash: null
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/reviewing-motoko/LICENSE
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/reviewing-motoko
+  active_owner: dfinity/icskills/skills/reviewing-motoko
+  content_hash: sha256:da3a1730b16cd3437d830f3890091a8c2084df6320c25ed5ef3bd93a64263628
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/reviewing-motoko/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/reviewing-motoko
+  active_owner: dfinity/icskills/skills/reviewing-motoko
+  content_hash: sha256:f8b1a348b60c5af5dfa85641b7c976d664d4246949ea9dd841d8f44bde7c23fa
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/reviewing-motoko/references/state-and-persistence.md
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/reviewing-motoko
+  active_owner: dfinity/icskills/skills/reviewing-motoko
+  content_hash: sha256:d2408d7b36b0827eed65c0ec9669a63ba7b6e17c8e9bb0f7f02ca3e1658ff9d7
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/reviewing-motoko/references/type-encoding.md
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/reviewing-motoko
+  active_owner: dfinity/icskills/skills/reviewing-motoko
+  content_hash: sha256:f5adb710978ed8a849ff5dca29bacf7866b0ebcb24c0a0c21111d96fd9a9f8f7
+- kind: project-relative
+  target: agent-skills
   value: .agents/skills/sandbox-claude-cloud
   runtime: null
   scope: project
@@ -8355,6 +10298,33 @@ deployments:
   - cameronraysmith/vanixiets/modules/home/ai/plugins/document-authoring-and-visualization
   active_owner: cameronraysmith/vanixiets/modules/home/ai/plugins/document-authoring-and-visualization
   content_hash: sha256:ee1401ab8c1db613573426f9679d662254e9db00b4911f79be392a2ea3d887b6
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/service-discoverability
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/service-discoverability
+  active_owner: dfinity/icskills/skills/service-discoverability
+  content_hash: null
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/service-discoverability/LICENSE
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/service-discoverability
+  active_owner: dfinity/icskills/skills/service-discoverability
+  content_hash: sha256:da3a1730b16cd3437d830f3890091a8c2084df6320c25ed5ef3bd93a64263628
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/service-discoverability/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/service-discoverability
+  active_owner: dfinity/icskills/skills/service-discoverability
+  content_hash: sha256:78ee815e32dc7315093bd6cd8a0769e80f519b78834f594b1c91b82b3cc7e8d7
 - kind: project-relative
   target: agent-skills
   value: .agents/skills/session-checkpoint
@@ -8508,6 +10478,168 @@ deployments:
   - mattpocock/skills
   active_owner: mattpocock/skills
   content_hash: sha256:4f53c9b40ce2651e3611aa090eaedbd6dbc9b71ef8c5f7e65eac0d8263190d0d
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/single-sign-in
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/single-sign-in
+  active_owner: dfinity/icskills/skills/single-sign-in
+  content_hash: null
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/single-sign-in/LICENSE
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/single-sign-in
+  active_owner: dfinity/icskills/skills/single-sign-in
+  content_hash: sha256:da3a1730b16cd3437d830f3890091a8c2084df6320c25ed5ef3bd93a64263628
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/single-sign-in/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/single-sign-in
+  active_owner: dfinity/icskills/skills/single-sign-in
+  content_hash: sha256:4305a86c26affb5f0a359f7e2f1c8e6162fa696604945771787149eb18fc3de9
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/smtp-gateway
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/smtp-gateway
+  active_owner: dfinity/icskills/skills/smtp-gateway
+  content_hash: null
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/smtp-gateway/LICENSE
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/smtp-gateway
+  active_owner: dfinity/icskills/skills/smtp-gateway
+  content_hash: sha256:da3a1730b16cd3437d830f3890091a8c2084df6320c25ed5ef3bd93a64263628
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/smtp-gateway/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/smtp-gateway
+  active_owner: dfinity/icskills/skills/smtp-gateway
+  content_hash: sha256:3683bbb240b2e6410f8e7927b1d17cf8572fc0ecd623135241c6b4d86d021a46
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/smtp-gateway/references/chunked-upload.md
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/smtp-gateway
+  active_owner: dfinity/icskills/skills/smtp-gateway
+  content_hash: sha256:859323819b5a6d896daca68836ad9aa069d5849db22a04bf9cac9ab52955d46e
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/sns-launch
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/sns-launch
+  active_owner: dfinity/icskills/skills/sns-launch
+  content_hash: null
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/sns-launch/LICENSE
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/sns-launch
+  active_owner: dfinity/icskills/skills/sns-launch
+  content_hash: sha256:da3a1730b16cd3437d830f3890091a8c2084df6320c25ed5ef3bd93a64263628
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/sns-launch/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/sns-launch
+  active_owner: dfinity/icskills/skills/sns-launch
+  content_hash: sha256:48e0fa9fe149acdbf20028ddb3da6a72f90f7398a525fe9662c0de50603d403b
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/stable-memory
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/stable-memory
+  active_owner: dfinity/icskills/skills/stable-memory
+  content_hash: null
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/stable-memory/LICENSE
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/stable-memory
+  active_owner: dfinity/icskills/skills/stable-memory
+  content_hash: sha256:da3a1730b16cd3437d830f3890091a8c2084df6320c25ed5ef3bd93a64263628
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/stable-memory/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/stable-memory
+  active_owner: dfinity/icskills/skills/stable-memory
+  content_hash: sha256:5c5e4d66db05c672fb90c0f7bab94d54b9c726f60388aaa5cdb0f6492ceb5d2e
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/static-site
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/static-site
+  active_owner: dfinity/icskills/skills/static-site
+  content_hash: null
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/static-site/LICENSE
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/static-site
+  active_owner: dfinity/icskills/skills/static-site
+  content_hash: sha256:da3a1730b16cd3437d830f3890091a8c2084df6320c25ed5ef3bd93a64263628
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/static-site/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/static-site
+  active_owner: dfinity/icskills/skills/static-site
+  content_hash: sha256:8954b3c2b28b4dbaf5ab7c720a6aa93357a4c938b208d0aaa28b161a25c3fcc0
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/static-site/references/legacy-asset-canister.md
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/static-site
+  active_owner: dfinity/icskills/skills/static-site
+  content_hash: sha256:6afc5e5b9dfe8cb2a85d87a79b463585434af92f9d0b6c343575e9267e49dd73
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/static-site/references/migrating-from-asset-canister.md
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/static-site
+  active_owner: dfinity/icskills/skills/static-site
+  content_hash: sha256:88b25ec284fc3048ad680cb506fad4e43194f77fa4c1969ae9a7e99dfe669a23
 - kind: project-relative
   target: agent-skills
   value: .agents/skills/stigmergic-convention
@@ -8942,6 +11074,60 @@ deployments:
   content_hash: sha256:ce4289d49558fb56abfc30191df7b4d28e8dc5ba539c95a694c451ffe5ce5149
 - kind: project-relative
   target: agent-skills
+  value: .agents/skills/threshold-signatures
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/threshold-signatures
+  active_owner: dfinity/icskills/skills/threshold-signatures
+  content_hash: null
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/threshold-signatures/LICENSE
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/threshold-signatures
+  active_owner: dfinity/icskills/skills/threshold-signatures
+  content_hash: sha256:da3a1730b16cd3437d830f3890091a8c2084df6320c25ed5ef3bd93a64263628
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/threshold-signatures/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/threshold-signatures
+  active_owner: dfinity/icskills/skills/threshold-signatures
+  content_hash: sha256:ad49d249d9b4baf24de6befe8a46af1945d2375a7dc12971f1ea3f4cdc345091
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/threshold-signatures/references/chain-formats.md
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/threshold-signatures
+  active_owner: dfinity/icskills/skills/threshold-signatures
+  content_hash: sha256:46e69ffa17118d207a7136dd780332d2d5980e05dbf775c1b3bf05b441eacd05
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/threshold-signatures/references/motoko.md
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/threshold-signatures
+  active_owner: dfinity/icskills/skills/threshold-signatures
+  content_hash: sha256:fd562e522c6bf88fa1e240af330dc483864568745af5a31b9704aab1c868cd93
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/threshold-signatures/references/public-keys.md
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/threshold-signatures
+  active_owner: dfinity/icskills/skills/threshold-signatures
+  content_hash: sha256:fe60d9ef94b7ef619766fc13af66281511db7fadae06586d8aade98e87a88ff7
+- kind: project-relative
+  target: agent-skills
   value: .agents/skills/to-questionnaire
   runtime: null
   scope: project
@@ -9102,6 +11288,33 @@ deployments:
   - mattpocock/skills
   active_owner: mattpocock/skills
   content_hash: sha256:2e683717720cf456d165d0bb1a68bb600d0b6a8ccb61841c172e50d26f95351c
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/troubleshooting-motoko-migrations
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/troubleshooting-motoko-migrations
+  active_owner: dfinity/icskills/skills/troubleshooting-motoko-migrations
+  content_hash: null
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/troubleshooting-motoko-migrations/LICENSE
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/troubleshooting-motoko-migrations
+  active_owner: dfinity/icskills/skills/troubleshooting-motoko-migrations
+  content_hash: sha256:da3a1730b16cd3437d830f3890091a8c2084df6320c25ed5ef3bd93a64263628
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/troubleshooting-motoko-migrations/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/troubleshooting-motoko-migrations
+  active_owner: dfinity/icskills/skills/troubleshooting-motoko-migrations
+  content_hash: sha256:86329d132c8b552682ba359adec7c145e1e3ba8b20ba0a1809b002c997c1b761
 - kind: project-relative
   target: agent-skills
   value: .agents/skills/ubiquitous-language
@@ -13109,6 +15322,87 @@ deployments:
   content_hash: sha256:616b9c491a5c98c37a32678a6bbf051dfd909552fa921aa260bfd8acc80824a0
 - kind: project-relative
   target: agent-skills
+  value: .agents/skills/user-attributes
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/user-attributes
+  active_owner: dfinity/icskills/skills/user-attributes
+  content_hash: null
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/user-attributes/LICENSE
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/user-attributes
+  active_owner: dfinity/icskills/skills/user-attributes
+  content_hash: sha256:da3a1730b16cd3437d830f3890091a8c2084df6320c25ed5ef3bd93a64263628
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/user-attributes/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/user-attributes
+  active_owner: dfinity/icskills/skills/user-attributes
+  content_hash: sha256:36a970468e7f29f0af76a1e950bbb4db2c95a14972d7dd5e5a63a8a4cf13eee2
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/user-notifications
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/user-notifications
+  active_owner: dfinity/icskills/skills/user-notifications
+  content_hash: null
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/user-notifications/LICENSE
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/user-notifications
+  active_owner: dfinity/icskills/skills/user-notifications
+  content_hash: sha256:da3a1730b16cd3437d830f3890091a8c2084df6320c25ed5ef3bd93a64263628
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/user-notifications/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/user-notifications
+  active_owner: dfinity/icskills/skills/user-notifications
+  content_hash: sha256:b88ecc294fdca2627a75f9b49872eb592e30b24671e85489ef9067719b8f6417
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/user-sign-in
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/user-sign-in
+  active_owner: dfinity/icskills/skills/user-sign-in
+  content_hash: null
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/user-sign-in/LICENSE
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/user-sign-in
+  active_owner: dfinity/icskills/skills/user-sign-in
+  content_hash: sha256:da3a1730b16cd3437d830f3890091a8c2084df6320c25ed5ef3bd93a64263628
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/user-sign-in/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/user-sign-in
+  active_owner: dfinity/icskills/skills/user-sign-in
+  content_hash: sha256:3a4fa0077799e551f08162aa8d82f7f2e2f4d96fa2520fee53abf247fbb86698
+- kind: project-relative
+  target: agent-skills
   value: .agents/skills/using-git-worktrees
   runtime: null
   scope: project
@@ -13253,6 +15547,51 @@ deployments:
   content_hash: sha256:2befe7fc55bcadaa3d97dd9e8efeb633d2561c0ebe74c5a8b17c4d9e7e4520b3
 - kind: project-relative
   target: agent-skills
+  value: .agents/skills/vetkeys
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/vetkeys
+  active_owner: dfinity/icskills/skills/vetkeys
+  content_hash: null
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/vetkeys/LICENSE
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/vetkeys
+  active_owner: dfinity/icskills/skills/vetkeys
+  content_hash: sha256:da3a1730b16cd3437d830f3890091a8c2084df6320c25ed5ef3bd93a64263628
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/vetkeys/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/vetkeys
+  active_owner: dfinity/icskills/skills/vetkeys
+  content_hash: sha256:900ef73de1cc8af14a17281d177bfff0964ea706f74b1d3ecdd9552091e88e35
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/vetkeys/references/bls-signing.md
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/vetkeys
+  active_owner: dfinity/icskills/skills/vetkeys
+  content_hash: sha256:1cec9c2ca986506ccadd0df8ab537b6c04e489f3695ff4e3362cd198df4961fd
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/vetkeys/references/ibe.md
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/vetkeys
+  active_owner: dfinity/icskills/skills/vetkeys
+  content_hash: sha256:78ec670caf884f377c3a7d335f38840ad854fb8b6aca75ec84eaa1224aa92ad5
+- kind: project-relative
+  target: agent-skills
   value: .agents/skills/wait-what
   runtime: null
   scope: project
@@ -13287,6 +15626,33 @@ deployments:
   - mattpocock/skills
   active_owner: mattpocock/skills
   content_hash: sha256:3ec661af8fc7063b650518c95ab775bbeabaefce38b89acaf6da2f749168f37e
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/wallet-integration
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/wallet-integration
+  active_owner: dfinity/icskills/skills/wallet-integration
+  content_hash: null
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/wallet-integration/LICENSE
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/wallet-integration
+  active_owner: dfinity/icskills/skills/wallet-integration
+  content_hash: sha256:da3a1730b16cd3437d830f3890091a8c2084df6320c25ed5ef3bd93a64263628
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/wallet-integration/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/wallet-integration
+  active_owner: dfinity/icskills/skills/wallet-integration
+  content_hash: sha256:5ffa3377004e1b646af16074c95e2395fc0bf679c7f0b8274c4d737d613f33eb
 - kind: project-relative
   target: agent-skills
   value: .agents/skills/wayfinder
@@ -13647,6 +16013,96 @@ deployments:
   - mattpocock/skills
   active_owner: mattpocock/skills
   content_hash: sha256:eacb24b2a618cfb81dacb0416f4fdd75ddf3a8060f8ddb99aae1b1e301907e4b
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/writing-motoko
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/writing-motoko
+  active_owner: dfinity/icskills/skills/writing-motoko
+  content_hash: null
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/writing-motoko/LICENSE
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/writing-motoko
+  active_owner: dfinity/icskills/skills/writing-motoko
+  content_hash: sha256:da3a1730b16cd3437d830f3890091a8c2084df6320c25ed5ef3bd93a64263628
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/writing-motoko/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/writing-motoko
+  active_owner: dfinity/icskills/skills/writing-motoko
+  content_hash: sha256:9e55155b07f32bdf03563bd8454601df8e8a399b73d2d4608e9774e6e6ab414a
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/writing-motoko/references/api-reference.md
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/writing-motoko
+  active_owner: dfinity/icskills/skills/writing-motoko
+  content_hash: sha256:649096399d9402c28d94f324d4ade1969b026caa2e249e1d166fc615421961b7
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/writing-motoko/references/control-flow.md
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/writing-motoko
+  active_owner: dfinity/icskills/skills/writing-motoko
+  content_hash: sha256:539aa10446ac15b7cca1d05bfbd0e8a44bcd855a8b6c41e601a664abb76364b8
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/writing-motoko/references/equality.md
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/writing-motoko
+  active_owner: dfinity/icskills/skills/writing-motoko
+  content_hash: sha256:ebb0d5ce94cab891481ac7331776aaadb79cef51e2bbfe21ad9cb6464924c2d7
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/writing-motoko/references/examples.md
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/writing-motoko
+  active_owner: dfinity/icskills/skills/writing-motoko
+  content_hash: sha256:7a7d6274b04b1c452487454ffbba32e97897297a81eb30d5314636ccc945d9d6
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/writing-motoko/references/project-setup.md
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/writing-motoko
+  active_owner: dfinity/icskills/skills/writing-motoko
+  content_hash: sha256:b838da486bb9bcfa2f98bb635a7d107b0ea0e5e754052042eb449b3e39aff0b6
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/writing-motoko/references/reserved-keywords.md
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/writing-motoko
+  active_owner: dfinity/icskills/skills/writing-motoko
+  content_hash: sha256:3e18964eedc11e52e44026cedfdde0cc0e1ed8cbdcd1ba747411788beb6457c3
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/writing-motoko/references/type-conversions.md
+  runtime: null
+  scope: project
+  owners:
+  - dfinity/icskills/skills/writing-motoko
+  active_owner: dfinity/icskills/skills/writing-motoko
+  content_hash: sha256:da6fa4b5843742b2b992f98c60b614d3a64929dedfe35234c0a4c00b406e398c
 - kind: project-relative
   target: agent-skills
   value: .agents/skills/writing-plans
