@@ -128,11 +128,21 @@ in
             flake = flakeForHomeManager;
           };
 
-          users.${primaryUser}.imports = flakeUsers.${primaryUser}.modules;
+          # Both accounts are deployed while they have no screen session on
+          # the laptop, so neither may run a gui-domain launchd agent.
+          users.${primaryUser} = {
+            imports = flakeUsers.${primaryUser}.modules;
+            deploysWithoutScreenSession = true;
+            services.jj-pr-sync.enable = false;
+          };
 
           # cameron is an alias for crs58; alias-keyed reads keep this
           # call site ignorant of the alias->target relationship.
-          users.cameron.imports = flakeUsers.cameron.modules;
+          users.cameron = {
+            imports = flakeUsers.cameron.modules;
+            deploysWithoutScreenSession = true;
+            services.jj-pr-sync.enable = false;
+          };
         };
       };
     };

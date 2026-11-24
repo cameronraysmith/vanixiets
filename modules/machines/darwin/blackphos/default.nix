@@ -167,7 +167,13 @@ in
 
         users.crs58.imports = flakeUsers.crs58.modules;
 
-        users.raquel.imports = flakeUsers.raquel.modules;
+        # raquel is deployed while she has no screen session on blackphos, so
+        # her home may run no gui-domain launchd agent.
+        users.raquel = {
+          imports = flakeUsers.raquel.modules;
+          deploysWithoutScreenSession = true;
+          services.jj-pr-sync.enable = false;
+        };
       };
     };
 }

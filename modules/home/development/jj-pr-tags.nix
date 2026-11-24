@@ -294,46 +294,60 @@ in
       ];
     in
     {
-      home.packages = [
-        sync
-        (mkPr pkgs pkgs.gh sync)
-      ];
-      programs.jujutsu.settings.template-aliases."format_commit_labels(commit)" = commitLabels;
-      programs.jjui.settings.actions = jjuiActions;
-
-      launchd.agents.jj-pr-sync = lib.mkIf pkgs.stdenv.hostPlatform.isDarwin {
-        enable = true;
-        # gh keeps its token in the login keychain, which only processes in the
-        # graphical session can read; over ssh `gh auth status` reports the
-        # token invalid although the screen session has the keychain unlocked.
-        domain = "gui";
-        config = {
-          ProgramArguments = refresh;
-          StartInterval = refreshInterval;
-          RunAtLoad = true;
-          ProcessType = "Background";
-          LowPriorityIO = true;
-          StandardErrorPath = "${config.home.homeDirectory}/Library/Logs/jj-pr-sync.log";
-        };
+      options.services.jj-pr-sync.enable = lib.mkOption {
+        type = lib.types.bool;
+        default = true;
+        description = ''
+          Whether a background job refreshes the jj pull request tags of every
+          registered repository: a launchd agent on darwin, a systemd user timer
+          on Linux. The `jj-pr-sync` and `jj-pr` commands are installed either way.
+        '';
       };
 
-      systemd.user = lib.mkIf pkgs.stdenv.hostPlatform.isLinux {
-        services.jj-pr-sync = {
-          Unit.Description = "Refresh jj pull request tags";
-          Service = {
-            Type = "oneshot";
-            ExecStart = lib.escapeShellArgs refresh;
-            Nice = 19;
-            IOSchedulingClass = "idle";
+      config = {
+        home.packages = [
+          sync
+          (mkPr pkgs pkgs.gh sync)
+        ];
+        programs.jujutsu.settings.template-aliases."format_commit_labels(commit)" = commitLabels;
+        programs.jjui.settings.actions = jjuiActions;
+
+        launchd.agents.jj-pr-sync =
+          lib.mkIf (pkgs.stdenv.hostPlatform.isDarwin && config.services.jj-pr-sync.enable)
+            {
+              enable = true;
+              # gh keeps its token in the login keychain, which only processes in the
+              # graphical session can read; over ssh `gh auth status` reports the
+              # token invalid although the screen session has the keychain unlocked.
+              domain = "gui";
+              config = {
+                ProgramArguments = refresh;
+                StartInterval = refreshInterval;
+                RunAtLoad = true;
+                ProcessType = "Background";
+                LowPriorityIO = true;
+                StandardErrorPath = "${config.home.homeDirectory}/Library/Logs/jj-pr-sync.log";
+              };
+            };
+
+        systemd.user = lib.mkIf (pkgs.stdenv.hostPlatform.isLinux && config.services.jj-pr-sync.enable) {
+          services.jj-pr-sync = {
+            Unit.Description = "Refresh jj pull request tags";
+            Service = {
+              Type = "oneshot";
+              ExecStart = lib.escapeShellArgs refresh;
+              Nice = 19;
+              IOSchedulingClass = "idle";
+            };
           };
-        };
-        timers.jj-pr-sync = {
-          Unit.Description = "Refresh jj pull request tags";
-          Timer = {
-            OnStartupSec = "1min";
-            OnUnitActiveSec = "${toString refreshInterval}s";
+          timers.jj-pr-sync = {
+            Unit.Description = "Refresh jj pull request tags";
+            Timer = {
+              OnStartupSec = "1min";
+              OnUnitActiveSec = "${toString refreshInterval}s";
+            };
+            Install.WantedBy = [ "timers.target" ];
           };
-          Install.WantedBy = [ "timers.target" ];
         };
       };
     };

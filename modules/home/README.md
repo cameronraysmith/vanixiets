@@ -81,6 +81,7 @@ On a Mac a home's sops secrets live on a RAM disk under the account's `DARWIN_US
 A launchd agent of a darwin home sets `launchd.agents.<name>.domain` where it is defined, which `core/launchd-domains.nix` asserts.
 home-manager's default, `gui`, bootstraps into the account's graphical session and fails the whole activation with `Bootstrap failed: 125` when the account has no screen session on that Mac; `user` agents load into `user/<uid>` at activation and, through home-manager's `launchd-primer` daemon, at every boot.
 `devin-worker-<n>` stays `gui` for computer use, and `jj-pr-sync` stays `gui` because `gh` keeps its token in the login keychain, which processes outside the graphical session cannot read.
+An account deployed while it has no screen session on its Mac sets `deploysWithoutScreenSession = true` beside its `home-manager.users` entry (`modules/darwin/laptop.nix` for both laptop accounts, `machines/darwin/blackphos` for `raquel`), and `core/launchd-domains.nix` then rejects any enabled `gui` agent in that home; those accounts turn `jj-pr-sync` off with `services.jj-pr-sync.enable = false`.
 
 ## Verification
 
