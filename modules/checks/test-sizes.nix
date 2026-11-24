@@ -13,7 +13,10 @@
 # Bazel implies for its test sizes; modules/vm-tests/default.nix gives every
 # runtime test its class limit as the driver's globalTimeout (design D3).
 # flake.lib.enormousTests lists the x86_64-linux runtime tests declared
-# enormous.
+# enormous. flake.lib.checkSizes maps every check of the two gated systems,
+# by the attribute path nixbot records (`checks.<system>.<name>`), to its
+# `class` and `measured`; fleet-alert's CheckOutgrewItsClass renders its
+# per-check limits from it (design D10).
 {
   lib,
   flake-parts-lib,
@@ -71,6 +74,24 @@ in
     enormousTests = withSystem "x86_64-linux" (
       { config, ... }:
       lib.attrNames (lib.filterAttrs (_: e: e.class == "enormous") config.testSizes.vmTests)
+    );
+    # The two systems nixbot's gate builds; only the entries are read, so
+    # no check is evaluated.
+    checkSizes = lib.listToAttrs (
+      lib.concatMap
+        (
+          system:
+          withSystem system (
+            { config, ... }:
+            lib.mapAttrsToList (
+              name: e: lib.nameValuePair "checks.${system}.${name}" { inherit (e) class measured; }
+            ) config.testSizes.checks
+          )
+        )
+        [
+          "x86_64-linux"
+          "aarch64-darwin"
+        ]
     );
   };
 }

@@ -54,10 +54,11 @@
 # StoreQueryFailing has no database of its own: transition.jq raises one
 # instance per failing database (review F7). RuleSignalMissing's `database`
 # is the one the evaluator reads system_memory_usage_bytes from, the
-# selector `reporting` comes from. PullRequestQueueWaitBurn (design D1)
-# and IetsEvaluationUnhealthy read devloop's ci_build and eval_run in SQL,
-# which promtool cannot parse; vmTests.x86_64-linux.devloop-ingest's
-# burnRule and ietsHealthRule cases run them on GreptimeDB 1.2.1.
+# selector `reporting` comes from. PullRequestQueueWaitBurn (design D1),
+# IetsEvaluationUnhealthy and CheckOutgrewItsClass read devloop's ci_build,
+# eval_run and ci_attribute in SQL, which promtool cannot parse;
+# vmTests.x86_64-linux.devloop-ingest's burnRule, ietsHealthRule and
+# sizeRule cases run them on GreptimeDB 1.2.1.
 { config, ... }:
 {
   flake.lib.fleetAlertRules =
@@ -67,6 +68,10 @@
       # A parameter so checks.x86_64-linux.fleet-alert can render the rule
       # with a fixture bucket listed (track-r2-usage design D8).
       r2ExternalBuckets ? config.flake.lib.r2Usage.externalBuckets,
+      # A parameter so devloop-ingest's sizeRule case can render
+      # CheckOutgrewItsClass over fixture checks (declare-test-size-classes
+      # design D10).
+      checkSizes ? config.flake.lib.checkSizes,
     }:
     let
       # A host is expected, or always-on, only once it collects (S4 design
@@ -118,6 +123,31 @@
         class: limit:
         ''sum by (class) (vanixiets_r2_operations{class="${class}"}) * ${r2Projection} > ${toString limit}'';
 
+      # declare-test-size-classes design D10: every gated check's declared
+      # class, its limit and whether a run measured it, as the VALUES list
+      # CheckOutgrewItsClass joins on. Names are quoted without escaping.
+      checkLimits =
+        let
+          names = builtins.attrNames checkSizes;
+        in
+        assert lib.assertMsg (lib.all (n: builtins.match "[A-Za-z0-9._+-]+" n != null) names)
+          "fleetAlertRules: check names must match [A-Za-z0-9._+-]+, so the VALUES list needs no escape; got ${builtins.toJSON names}";
+        lib.concatMapStringsSep ", " (
+          n:
+          let
+            e = checkSizes.${n};
+          in
+          "('${n}', '${e.class}', ${
+            toString config.flake.lib.testSizeLimits.${e.class}
+          }, ${lib.boolToString e.measured})"
+        ) names;
+      # The class a median falls in, by flake.lib.testSizeLimits.
+      classOf =
+        column:
+        let
+          l = config.flake.lib.testSizeLimits;
+        in
+        "CASE WHEN ${column} <= ${toString l.small} THEN 'small' WHEN ${column} <= ${toString l.medium} THEN 'medium' WHEN ${column} <= ${toString l.large} THEN 'large' WHEN ${column} <= ${toString l.enormous} THEN 'enormous' ELSE 'over enormous' END";
       # Appended to HostMemoryPressure and HostOOMKill messages (ADR-009 item
       # 5); the evaluator substitutes the firing host for <host>.
       memoryAttribution = [
@@ -542,6 +572,32 @@
           for = "0s";
           severity = "critical";
           annotations.summary = "A production nixbot evaluation by iets lost a worker, was killed or crashed; the value is its exit status. 1. Rebuild build_id in nixbot; if it passes, record it in verify.md as transient. 2. If it fails again: kills above 0 are capacity, so tune evalWorkerCount or evalMaxMemorySize (D9); a crash, or errors stock nix-eval-jobs does not produce (the stock check command in the runbook), is fixed forward, e.g. by pinning iets to its last good revision. 3. Revert to stock (task 7.3) only if merges are blocked and no quick fix exists, recorded in verify.md (runbook in modules/nixos/fleet-alert/rules.nix). Resolves 12 h after the evaluation, not when fixed";
+        }
+        # declare-test-size-classes design D2, D10: a check's cost over
+        # time, judged on nixbot's recorded runs, never on one. A run is a
+        # row of this repository's project (another project's checks share
+        # names such as treefmt and gitleaks) that succeeded uncached and
+        # took at least 1 s: nixbot marks no row in which nothing was built,
+        # and those take 0.10 to 0.99 s. Over the last 30 days, one instance
+        # per check that has at least three runs and either was never
+        # measured (`measured = false`), so its runs give the class to
+        # declare, or has a median above its class limit, the classing
+        # statistic's first tier, so the rule and the declarations agree by
+        # construction; or that has any run above 3,600 s. A check with
+        # fewer than three runs in 30 days is left to its declaration. A
+        # duration includes the dependencies built for the check, shared
+        # ones included, since a cold run of either sibling builds them
+        # (design D6). The value carries the median, slowest run and count,
+        # so the instance's labels stay put as runs arrive. Info: it pages
+        # no one.
+        {
+          alert = "CheckOutgrewItsClass";
+          database = "devloop";
+          language = "sql";
+          expr = "SELECT l.attr, l.class, CAST(l.measured AS STRING) AS measured, ${classOf "r.median_s"} AS runs_class, concat('median ', CAST(round(r.median_s, 1) AS STRING), ' s, slowest ', CAST(round(r.slowest_s, 1) AS STRING), ' s, ', CAST(r.runs AS STRING), ' runs in 30 days, limit ', CAST(l.limit_s AS STRING), ' s') AS value FROM (SELECT attr, count(*) AS runs, median(d) AS median_s, max(d) AS slowest_s FROM (SELECT attr, CAST(finished_at - started_at AS BIGINT) / 1000000.0 AS d FROM ci_attribute WHERE project = 'cameronraysmith/vanixiets' AND status = 'succeeded' AND NOT cached AND finished_at >= now() - INTERVAL '30 days' AND finished_at - started_at >= INTERVAL '1 second') AS runs GROUP BY attr) AS r JOIN (VALUES ${checkLimits}) AS l (attr, class, limit_s, measured) ON r.attr = l.attr WHERE r.slowest_s > 3600 OR (r.runs >= 3 AND (NOT l.measured OR r.median_s > l.limit_s))";
+          for = "24h";
+          severity = "info";
+          annotations.summary = "A check's builds on nixbot no longer fit its declared size class, or a check declared without a measurement (measured = false) now has three runs: the value gives the median, slowest run and run count of its uncached builds of at least 1 s in the last 30 days, runs_class the class that median gives. Reclassify it in its testSizes entry with the measurement, split it, or remove time its purpose does not need (the preferences-nix-checks-architecture skill's references/test-sizes.md); a median above 900 s takes it off the gate";
         }
         {
           alert = "StoreQueryFailing";

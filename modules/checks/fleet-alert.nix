@@ -2,7 +2,7 @@
 # D11, D13-D16, D19; tasks.md 4.5, 4.6; stand-up-devloop-collection design
 # D17, tasks.md 5.1, 5.3-5.5).
 #
-# Six parts, each a derivation in passthru so it can be built alone:
+# Seven parts, each a derivation in passthru so it can be built alone:
 # - promtoolRehearsal: `promtool check rules` over the YAML rendered from
 #   modules/nixos/fleet-alert/rules.nix, and a malformed-expression mutant
 #   that promtool must reject; `promtool test rules` over a drifted and a
@@ -51,6 +51,9 @@
 # - pingTransport (CAM-76 design D5): flake.lib.fleetDeadmanPing built with a
 #   recording curl must read the ping URL on stdin and put it on no argv,
 #   and the mutant pingOnArgv, which passes the URL as an argument, must fail.
+# - sizeRuleClause (declare-test-size-classes design D10): CheckOutgrewItsClass
+#   renders one VALUES tuple per gated check with its class limit, and the
+#   mutants sizeRenderLimitOff and sizeRenderDropped must each fail.
 #
 # Relations within one host are assertions where the units are declared,
 # which CI already pays for when it evaluates the host (S1 review F5, S3
@@ -87,7 +90,12 @@
 { self, lib, ... }:
 {
   perSystem =
-    { pkgs, system, ... }:
+    {
+      config,
+      pkgs,
+      system,
+      ...
+    }:
     let
       magnetite = self.nixosConfigurations.magnetite.config;
       hosts = self.lib.observabilityHosts;
@@ -1270,6 +1278,68 @@
           }";
         pkgs.runCommand "fleet-alert-deadman-clause" { } ''
           echo "ok: dead-man relations hold and ${toString (builtins.length (lib.attrNames deadmanMutants))} mutants are rejected"
+          touch "$out"
+        '';
+
+      # declare-test-size-classes design D10, regulator G5: the
+      # CheckOutgrewItsClass query carries one VALUES tuple per gated check,
+      # each with its declared class's limit from flake.lib.testSizeLimits,
+      # and the list holds every check this system declares. The mutants
+      # sizeRenderLimitOff (medium rendered as 3,000 s) and
+      # sizeRenderDropped (this check's own entry left out) must each fail.
+      # devloop-ingest's sizeRule case runs the query itself.
+      sizeRuleFindings =
+        checkSizes: expr:
+        let
+          names = builtins.attrNames checkSizes;
+          tuple =
+            n:
+            let
+              e = checkSizes.${n};
+            in
+            "('${n}', '${e.class}', ${
+              toString self.lib.testSizeLimits.${e.class}
+            }, ${lib.boolToString e.measured})";
+          tuples = builtins.length (lib.splitString "('checks." expr) - 1;
+        in
+        map (n: "no VALUES tuple ${tuple n}") (lib.filter (n: !lib.hasInfix (tuple n) expr) names)
+        ++ map (n: "checks.${system}.${n} is declared and not rendered") (
+          lib.filter (n: !(checkSizes ? "checks.${system}.${n}")) (builtins.attrNames config.testSizes.checks)
+        )
+        ++ lib.optional (
+          tuples != builtins.length names
+        ) "the VALUES list has ${toString tuples} tuples for ${toString (builtins.length names)} checks";
+      sizeExprOf =
+        checkSizes:
+        (lib.findFirst (r: r.alert == "CheckOutgrewItsClass")
+          (throw "fleet-alert check: no CheckOutgrewItsClass")
+          (self.lib.fleetAlertRules { inherit lib hosts checkSizes; }).rules
+        ).expr;
+      sizeActual = sizeRuleFindings self.lib.checkSizes (ruleNamed "CheckOutgrewItsClass").expr;
+      sizeMutants = {
+        sizeRenderLimitOff = sizeRuleFindings self.lib.checkSizes (
+          builtins.replaceStrings [ "'medium', 300, " ] [ "'medium', 3000, " ]
+            (ruleNamed "CheckOutgrewItsClass").expr
+        );
+        sizeRenderDropped =
+          let
+            dropped = builtins.removeAttrs self.lib.checkSizes [ "checks.${system}.fleet-alert" ];
+          in
+          sizeRuleFindings dropped (sizeExprOf dropped);
+      };
+      sizeRuleClause =
+        assert lib.assertMsg (
+          sizeActual == [ ]
+        ) "fleet-alert CheckOutgrewItsClass rendering: ${builtins.toJSON sizeActual}";
+        assert lib.assertMsg (lib.all (f: f != [ ]) (lib.attrValues sizeMutants))
+          "fleet-alert accepted a size-rule rendering mutant: ${
+            builtins.toJSON (builtins.attrNames (lib.filterAttrs (_: f: f == [ ]) sizeMutants))
+          }";
+        pkgs.runCommand "fleet-alert-size-rule-clause" { } ''
+          echo "ok: CheckOutgrewItsClass renders ${toString (builtins.length (builtins.attrNames self.lib.checkSizes))} checks with their class limits"
+          ${lib.concatMapStrings (n: ''
+            echo ${lib.escapeShellArg "mutant ${n} rejected: ${builtins.head sizeMutants.${n}}"}
+          '') (builtins.attrNames sizeMutants)}
           touch "$out"
         '';
 
@@ -3225,6 +3295,7 @@
                   deadmanPingRehearsal
                   pingTransport
                   deadmanClause
+                  sizeRuleClause
                   ;
               };
             }
@@ -3238,6 +3309,7 @@
               test -e ${deadmanPingRehearsal}
               test -e ${pingTransport}
               test -e ${deadmanClause}
+              test -e ${sizeRuleClause}
               touch "$out"
             '';
       };
