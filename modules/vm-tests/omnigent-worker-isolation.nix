@@ -65,6 +65,14 @@
       system,
       ...
     }:
+    let
+      # The test's name depends on `system` alone, so reading the vmTests
+      # names instantiates no nixpkgs (declare-test-size-classes design D5).
+      linux = lib.elem system [
+        "x86_64-linux"
+        "aarch64-linux"
+      ];
+    in
     {
       # Size class: on x86_64-linux the script measured 27 to 39 s on pyrite
       # (logs/vmtest-worker-isolation-20261116-131043.log). The fleet has no
@@ -80,7 +88,7 @@
             measured = false;
           };
         };
-      vmTests = lib.optionalAttrs pkgs.stdenv.hostPlatform.isLinux {
+      vmTests = lib.optionalAttrs linux {
         omnigent-worker-isolation =
           let
             # The same package set every machine builds against: perSystem `pkgs`

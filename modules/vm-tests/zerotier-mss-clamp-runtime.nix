@@ -8,6 +8,12 @@
       ...
     }:
     let
+      # The tests' names depend on `system` alone, so reading the vmTests
+      # names instantiates no nixpkgs (declare-test-size-classes design D5).
+      linux = lib.elem system [
+        "x86_64-linux"
+        "aarch64-linux"
+      ];
       # Backend-independent: a veth named like a ZeroTier interface and a SYN
       # probe that reads the negotiated MSS on both ends, dual-stack.
       packetOracle = ''
@@ -88,7 +94,7 @@
             measured = false;
           };
         };
-      vmTests = lib.optionalAttrs pkgs.stdenv.hostPlatform.isLinux {
+      vmTests = lib.optionalAttrs linux {
         zerotier-mss-clamp-runtime = pkgs.testers.runNixOSTest {
           name = "zerotier-mss-clamp-runtime";
           requiredFeatures = {
