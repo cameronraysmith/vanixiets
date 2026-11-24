@@ -8,6 +8,9 @@ Cloud machines are declared through terranix in `modules/terranix/`, one file pe
 Each machine carries an `enabled` boolean: setting it to `false` and running `nix run .#terraform` removes the cloud resources while leaving the machine's full NixOS configuration, clan inventory entry, and disko layout in the repository.
 A machine present in `machines/` is therefore not necessarily provisioned, and agents should not assume any machine is reachable or attempt remote operations against one.
 
+Every account on every host has `fastfetch` and `nix-info` (`cli-host-inspection`, imported by the NixOS and nix-darwin `base` aspects and `homeManager.engineering-tools`), so `fastfetch --format json -s <modules>` (for example `-s os:kernel:cpu:memory`) and `nix-info -m` describe a host without root.
+NixOS hosts add `systemd-detect-virt`, `lscpu -J` and `lsblk -J` for virtualisation, CPU and block-device detail.
+
 Two admin-username conventions coexist: older machines force the username `crs58`, and newer ones use `cameron` as a home-manager alias for the same account.
 Modules that hardcode a username are following one convention or the other, and which one is a property of the machine.
 

@@ -45,6 +45,9 @@ A check module's attribute names must derive only from static data — literals,
 A check whose derivation would be identical on every system belongs to exactly one of them, while a check whose derivation genuinely differs per platform must stay per system.
 Before adding, removing, or restructuring a check, read the `preferences-nix-checks-architecture` skill, whose `references/evaluation-cost.md` carries the measurement protocol and the derivation-path oracle that any evaluation refactor must pass, and whose `references/check-vacuity.md` carries the patterns that decide whether a proposed check can fail at all.
 
+VM and container tests live under `vmTests`, not `checks`, so nixbot never runs them and they are not part of pull-request coverage.
+QEMU tests need `kvm`, which only Pyrite advertises, and systemd-nspawn container tests run on Pyrite or Magnetite; a container test started on Pyrite must pass `--builders ''`, or Pyrite's daemon dispatches it to Magnetite (`modules/README.md` §On-demand VM tests).
+
 `preferences-nix-development` governs the Nix code itself, including the rule that this repository instantiates one nixpkgs per system and the hard constraint that an upstream flake input's nixpkgs is never redirected with `follows`, because that changes the input's store paths and forfeits its binary cache.
 
 Documentation has its own lane under `packages/docs`: `just docs-lint`, `just docs-check`, and the `just docs-test-*` recipes.
