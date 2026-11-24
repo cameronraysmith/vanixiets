@@ -13,7 +13,10 @@
 # address exists after boot; launchd has no socket activation, so idleTimeout is
 # null there. The upstream darwin module starts the daemon by its store path,
 # which launchd can try before the store volume is mounted and then never
-# retries, so the arguments are restated behind /bin/wait4path.
+# retries, so the arguments are restated behind /bin/wait4path. launchd has no
+# ordering between jobs either, so at boot the daemon can also start before
+# sops-install-secrets has written its key; the same start waits for every
+# argument that is one of the machine's sops secrets or templates.
 #
 # Identities are clan vars: one shared CA whose private key is never deployed,
 # and one certificate per machine with the machine name as CN and both serverAuth
@@ -392,20 +395,30 @@ in
                   # [::1] as on the ZeroTier address, and binds without it.
                   sandbox.enable = false;
                 };
-                launchd.daemons.nix-grpc-daemon.serviceConfig.ProgramArguments = lib.mkForce (
-                  [
-                    "/bin/sh"
-                    "-c"
-                    ''/bin/wait4path /nix/store && exec "$@"''
-                    "sh"
-                  ]
-                  ++ map toString (
-                    import "${inputs.nix-grpc-store}/nixos/daemon-args.nix" {
-                      cfg = config.services.nix-grpc-daemon;
-                      inherit lib pkgs;
-                    }
-                  )
-                );
+                launchd.daemons.nix-grpc-daemon.serviceConfig.ProgramArguments =
+                  let
+                    args = map toString (
+                      import "${inputs.nix-grpc-store}/nixos/daemon-args.nix" {
+                        cfg = config.services.nix-grpc-daemon;
+                        inherit lib pkgs;
+                      }
+                    );
+                    secretPaths = map (secret: secret.path) (
+                      lib.attrValues config.sops.secrets ++ lib.attrValues config.sops.templates
+                    );
+                    waited = [ "/nix/store" ] ++ lib.unique (lib.filter (arg: lib.elem arg secretPaths) args);
+                  in
+                  lib.mkForce (
+                    [
+                      "/bin/sh"
+                      "-c"
+                      (
+                        lib.concatMapStrings (path: "/bin/wait4path ${lib.escapeShellArg path} && ") waited + ''exec "$@"''
+                      )
+                      "sh"
+                    ]
+                    ++ args
+                  );
 
                 nix.daemonProcessType = lib.mkIf (settings.daemonProcessType != null) settings.daemonProcessType;
                 nix.daemonIOLowPriority = lib.mkIf (

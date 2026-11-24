@@ -13,7 +13,9 @@
 # dispatches and finds the dispatcher's certificate, key and CA linked at its
 # default lookup path, that the build accounts and dispatch keys of the
 # retired ssh transport stay gone, and that a Linux builder's own nix settings
-# give it uid-range exactly when it advertises uid-range.
+# give it uid-range exactly when it advertises uid-range, and that a darwin
+# builder's launchd job waits for the store and every daemon argument under
+# /run before it execs the daemon.
 {
   self,
   lib,
@@ -221,6 +223,30 @@
                 "auto-allocate-uids"
                 "cgroups"
               ];
+          # launchd starts the darwin daemon with no ordering against
+          # sops-install-secrets, so `sh -c` must wait for the store and for
+          # every daemon argument under /run, which macOS empties at boot,
+          # before it execs the daemon with the arguments that follow `sh`.
+          start =
+            if isDarwin machine then
+              let
+                argv = map plain config.launchd.daemons.nix-grpc-daemon.serviceConfig.ProgramArguments;
+                segments = lib.splitString " && " (builtins.elemAt argv 2);
+                waits = lib.init segments;
+                isWait = lib.hasPrefix "/bin/wait4path ";
+                waited = map (lib.removePrefix "/bin/wait4path ") (builtins.filter isWait waits);
+                daemonArgs = lib.drop 4 argv;
+              in
+              {
+                shell = lib.take 2 argv ++ [ (builtins.elemAt argv 3) ];
+                daemon = baseNameOf (builtins.head daemonArgs);
+                waited = sortStrings waited;
+                notWaits = builtins.filter (segment: !isWait segment) waits;
+                exec = lib.last segments;
+                unwaited = builtins.filter (arg: lib.hasPrefix "/run/" arg && !builtins.elem arg waited) daemonArgs;
+              }
+            else
+              null;
         };
 
       expectedBuilderSide = machine: {
@@ -254,6 +280,26 @@
             null
           else
             builtins.elem "uid-range" advertised.${machine}.supportedFeatures;
+        # The store and the TLS key, the one daemon argument under /run.
+        start =
+          if isDarwin machine then
+            {
+              shell = [
+                "/bin/sh"
+                "-c"
+                "sh"
+              ];
+              daemon = "nix-grpc-daemon";
+              waited = sortStrings [
+                "/nix/store"
+                (keyPath machine)
+              ];
+              notWaits = [ ];
+              exec = ''exec "$@"'';
+              unwaited = [ ];
+            }
+          else
+            null;
       };
 
       stibnite = configOf "stibnite";
