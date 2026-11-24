@@ -111,6 +111,12 @@ activate-darwin hostname *FLAGS:
     @if [ -x /opt/homebrew/bin/brew ]; then /opt/homebrew/bin/brew update; fi
     {{nix_cmd}} run .#darwin -- {{hostname}} . {{FLAGS}}
 
+# Upgrade one cask, including a `version :latest` cask such as wezterm@nightly (activation never upgrades)
+[group('activation')]
+upgrade-cask cask:
+    /opt/homebrew/bin/brew update
+    /opt/homebrew/bin/brew upgrade --cask --greedy {{cask}}
+
 # Activate NixOS configuration
 [group('activation')]
 activate-os hostname *FLAGS:
