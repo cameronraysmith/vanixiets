@@ -39,8 +39,9 @@ let
     # Both are one-time installers of a Claude Code SessionStart hook that runs
     # a curl-driven script on every session: autosync-ic-skills rewrites
     # .claude/skills from skills.internetcomputer.org, autoupgrade-icp-cli
-    # upgrades the icp and ic-wasm binaries. Nix pins and delivers the skills
-    # and the toolchain instead.
+    # upgrades the icp and ic-wasm binaries. The skills are pinned here instead,
+    # and icp, ic-wasm and mops come from pkgs/by-name/icp-cli-bin, ic-wasm-bin
+    # and mops-bin.
     "dfinity/icskills".withheld = [
       "autosync-ic-skills"
       "autoupgrade-icp-cli"
