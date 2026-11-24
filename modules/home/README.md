@@ -77,6 +77,7 @@ The `<aggregate>/tools.nix` files hold raw packages that no home-manager module 
 
 `users/ubuntu` is the profile activated inside a Devin sandbox VM, which has no AI secrets, and whose exec shells reach no systemd user manager while its snapshot builds do; `users/claude-sandbox` is activated as root inside a Claude Code cloud session's container, which has no systemd user manager.
 Modules that start user services or read sops secrets fail there and must be overridable as described above; an activation must also succeed under a user manager with no key present, which is what `base/sops-install-without-systemd.nix` provides.
+On a Mac a home's sops secrets live on a RAM disk under the account's `DARWIN_USER_TEMP_DIR` (`secrets.d`), so a restart erases them; the per-user LaunchAgent recreates them at a screen login, and a system LaunchDaemon `org.nixos.sops-nix-<user>` from `modules/darwin/sops-boot-install.nix` recreates them at boot for accounts that never log in at the screen.
 
 ## Verification
 

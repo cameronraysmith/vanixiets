@@ -51,6 +51,7 @@
       r2UsageObligations = self.lib.r2UsageObligations;
       fleetDeployer = self.lib.fleetDeployer;
       nixEvalJobsObligations = self.lib.nixEvalJobsObligations;
+      sopsBootInstallObligations = self.lib.sopsBootInstallObligations;
 
       withFleetObligations =
         name: machineConfig: toplevel:
@@ -61,6 +62,10 @@
           # Darwin only: NixOS has no /etc/resolver.
           unmetResolverReload = lib.optionals (lib.hasSuffix "-darwin" machineSystems.${name}) (
             resolverReloadObligations.failures name machineConfig
+          );
+          # Darwin only: NixOS homes install secrets from their systemd user unit.
+          unmetSopsBootInstall = lib.optionals (lib.hasSuffix "-darwin" machineSystems.${name}) (
+            sopsBootInstallObligations.failures name machineConfig
           );
           unmetMeshHosts = meshHostsObligations.failures name machineConfig;
           unmetHarmoniaGc = harmoniaGcObligations.failures name machineConfig;
@@ -82,9 +87,10 @@
             && unmetR2Usage == [ ]
             && unmetFleetDeployer == [ ]
             && unmetNixEvalJobs == [ ]
+            && unmetSopsBootInstall == [ ]
           )
           (
-            "Fleet obligations unmet on ${name}: omnigentFleetObligations [${lib.concatStringsSep ", " unmet}]; deployRecordObligations [${lib.concatStringsSep ", " unmetDeployRecord}]; commitSigningObligations [${lib.concatStringsSep ", " unmetSigning}]; resolverReloadObligations [${lib.concatStringsSep ", " unmetResolverReload}]; meshHostsObligations [${lib.concatStringsSep ", " unmetMeshHosts}]; harmoniaGcObligations [${lib.concatStringsSep ", " unmetHarmoniaGc}]; postgresqlBackupObligations [${lib.concatStringsSep ", " unmetPostgresqlBackup}]; r2UsageObligations [${lib.concatStringsSep ", " unmetR2Usage}]; fleetDeployer [${lib.concatStringsSep ", " unmetFleetDeployer}]; nixEvalJobsObligations [${lib.concatStringsSep ", " unmetNixEvalJobs}]"
+            "Fleet obligations unmet on ${name}: omnigentFleetObligations [${lib.concatStringsSep ", " unmet}]; deployRecordObligations [${lib.concatStringsSep ", " unmetDeployRecord}]; commitSigningObligations [${lib.concatStringsSep ", " unmetSigning}]; resolverReloadObligations [${lib.concatStringsSep ", " unmetResolverReload}]; meshHostsObligations [${lib.concatStringsSep ", " unmetMeshHosts}]; harmoniaGcObligations [${lib.concatStringsSep ", " unmetHarmoniaGc}]; postgresqlBackupObligations [${lib.concatStringsSep ", " unmetPostgresqlBackup}]; r2UsageObligations [${lib.concatStringsSep ", " unmetR2Usage}]; fleetDeployer [${lib.concatStringsSep ", " unmetFleetDeployer}]; nixEvalJobsObligations [${lib.concatStringsSep ", " unmetNixEvalJobs}]; sopsBootInstallObligations [${lib.concatStringsSep ", " unmetSopsBootInstall}]"
             + lib.optionalString (hostFailures != [ ]) (
               "\n${name} assertion failures: ${lib.concatStringsSep "\n" hostFailures}"
             )
