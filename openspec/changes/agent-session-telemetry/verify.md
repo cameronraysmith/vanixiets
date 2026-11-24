@@ -108,20 +108,37 @@ Against the narrowed requirement the scan's results pass: no account identifier 
 Searchability on stibnite (task 8.1's form; stibnite's enablement is task 7.2's change): a fresh human session `omp --model haiku -p 'Reply with the single word ok. Marker DLSMARK202542z'` (20:25:42–20:25:45Z) was found at 20:26Z by `matches_term("span_attributes.last_user_message", 'DLSMARK202542z')` as `chat claude-haiku-4-5`, stibnite, cameron, no `harness_host`.
 Every worker `user_prompt` on magnetite and stibnite is omnigent's `/model` (magnetite 17:06:43Z, cameron and janettesmith; stibnite 16:01:14, 17:58:33 and 20:12:04Z, cameron), stamped with host, person and `harness_host` `omnigent` and found by `matches_term(prompt, 'model')`; the only worker prompt with a distinctive word is pyrite's `HH-CLAUDE-WORKER-pyrite-102947` (2026-11-23T10:30:51Z, cameron), so no worker session with a distinctive prompt has run on magnetite or stibnite.
 
+## Deployed versions against A188–A195 (task 6.1)
+
+Read on 2026-11-24 at 02:19Z (`logs/closeout-cam120-versions-20261123-211911.log`): each human and worker home's `claude` and `omp` on magnetite and pyrite, magnetite's `greptimedb.service`, the `omnigent-host-cameron` unit on both servers, stibnite's own binaries, and the `service_version` the store holds for the last day.
+
+| Assumption | Version it names | Deployed | Result |
+|---|---|---|---|
+| A188, A192, A193 (GreptimeDB) | 1.2.1 | `greptimedb-bin-1.2.1` on magnetite | equal |
+| A189 (consent) | none | none | not a software version |
+| A190 (Claude Code) | 2.1.330 | 2.1.330 in every home on magnetite, pyrite and stibnite; `session_event.service_version` 2.1.330 on all three hosts | equal |
+| A191 (omp) | as packaged on 2026-11-22 (18.13.2 on stibnite on 2026-11-23) | 19.1.1 in every home on all three hosts | differs; re-read below |
+| A194 (loopback receivers) | none | none | not a software version |
+| A195 (omnigent) | 0.23.0 | `omnigent-0.23.0` on magnetite, pyrite and stibnite | equal |
+
+A191 re-read at omp 19.1.1 (`git diff v18.13.2 v19.1.1` of `docs/environment-variables.md`, `packages/agent/src/telemetry.ts`, `packages/coding-agent/src/telemetry-export.ts` and `telemetry-export-otlp.ts` in `can1357/oh-my-pi`): the `OTEL_*` entries of `~/.omp/agent/.env` are now read through a private map, `$otelEnv`, instead of the process environment, and are put in `process.env` only while the exporters are built; each signal is still enabled only by its own endpoint (or the common one) and its exporter variable; content capture still reads `OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT`, now through `$otelEnv`.
+None of the violations A191 names is observed: stibnite's omp 19.1.1 sessions export spans stamped `user.name` `cameron` from the `.env` (5,628 spans in the last 6 hours), `session_event` holds no `oh-my-pi` row, so `OTEL_LOGS_EXPORTER=none` still holds, and `omp_agent_tool_calls_total` carries no session-id label.
+A side effect of the change is that the `OTEL_*` values no longer reach the programs omp launches.
+
 ## 2. Open items and owners
 
 | Item | Owner | What is missing |
 |---|---|---|
 | 5.2, 8.1 worker half | operator, or a later task | a session through Janette's worker (and cameron's) on magnetite, found by its word with `user_name` `janettesmith` |
 | 8.1 person identifiers in content | closed 2026-11-23 by the operator's decision | none: the requirement `No account identifier leaves a host` narrowed to "outside the content columns, the only person identifier stored is the session's user name"; text a person types or a tool prints is stored as written; no email mask ("Day-later scans", email shapes) |
-| 5.4 | operator's decision | stopping `greptimedb.service` on magnetite for ten minutes to measure the agent rates; the rates in use are estimates checked by the load measurements |
-| 6.1 | later task | the deployed GreptimeDB, Claude Code, omp and omnigent versions recorded here and compared with A188–A195 |
-| 6.2 | later task | the journal of an :00 `otel-envelope` run on magnetite showing B1 over `agent` (the 5-minute runs' `B0 budget-run: ok` implies the 20:00Z budget run passed) |
-| 7.2 | operator | stibnite, in a separate change |
+| 5.4 | closed 2026-11-23, dropped by the operator (decision record D21) | none: the agent rates are read from the store after a week instead of stopping the store |
+| 6.1 | closed 2026-11-24 | none: "Deployed versions against A188–A195" above; omp differs (19.1.1) and A191 was re-read |
+| 6.2 | closed 2026-11-24 | none: magnetite's 01:00Z and 02:00Z budget runs pass with `agent.greptime_physical_table` present, so B1 counted `agent` (`logs/closeout-cam120-remote-20261123-211005.log`) |
+| 7.2 | `darwin-agent-session-telemetry` (CAM-121) | merged and deployed on stibnite; closes when that change's task 12.1 passes |
 | 9.7 | watch | no failed-Bash `tool_result` row exists yet (3 rows, none failed, none with `error`); read the first one's `error` |
 | 10.8 | operator, or a later deploy task | remove pyrite's orphan `/var/lib/private/opentelemetry-collector/queue/exporter_otlp_http_ingress-agent_logs` |
 | 12.7 | operator | review Langfuse and decide keep, sample, upgrade, self-host or flag off; record it in design D16 |
-| ADR-003 span queue 15 min | operator | review of the figure the orchestrator accepted on 2026-11-22 |
+| ADR-003 span queue 15 min | closed 2026-11-23 | none: accepted by the operator (decision record D21) and recorded in ADR-003 |
 
 Langfuse traces to look up (task 12.7):
 
