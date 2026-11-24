@@ -48,6 +48,14 @@ Before adding, removing, or restructuring a check, read the `preferences-nix-che
 VM and container tests live under `vmTests`, not `checks`, so nixbot never runs them and they are not part of pull-request coverage.
 QEMU tests need `kvm`, which only Pyrite advertises, and systemd-nspawn container tests run on Pyrite or Magnetite; a container test started on Pyrite must pass `--builders ''`, or Pyrite's daemon dispatches it to Magnetite (`modules/README.md` §On-demand VM tests).
 
+The test size classes of the fleet-wide agent context (§Test sizes) map onto this repository's runners as follows.
+nixbot's pull-request gate builds `checks.x86_64-linux` on Magnetite's store and `checks.aarch64-darwin` best-effort; small and medium checks belong there, and a large check belongs there only with its reason recorded beside its definition.
+nixbot records each attribute's build in the `build_attributes` table of its PostgreSQL database on Magnetite, from builder-slot acquisition to completion, and the dev-loop collection copies those rows into the telemetry store's `devloop` database; an uncached run there is the measurement a check's class rests on.
+VM and container tests run on Pyrite, a container test with `--builders ''`, and their driver prints `test script finished in <seconds>`, to which a cold run adds the driver and node builds.
+An enormous test never gates a pull request: `fleet-ingress` (35 to 39 minutes per run on Pyrite) and `devloop-ingest` (about 28 minutes) belong on a weekly schedule, which does not exist yet, so today every run of them is on demand and announced first.
+No check or VM test declares its class in code, and nothing fails a build for exceeding one.
+The `preferences-nix-checks-architecture` skill's `references/test-sizes.md` covers assigning a class, measuring one run, and what to do when a check outgrows its class.
+
 `preferences-nix-development` governs the Nix code itself, including the rule that this repository instantiates one nixpkgs per system and the hard constraint that an upstream flake input's nixpkgs is never redirected with `follows`, because that changes the input's store paths and forfeits its binary cache.
 
 Documentation has its own lane under `packages/docs`: `just docs-lint`, `just docs-check`, and the `just docs-test-*` recipes.
