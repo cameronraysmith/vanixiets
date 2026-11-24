@@ -129,6 +129,37 @@ in
         inherit caFile;
         inherit fleetExecutables;
       };
+      # launchd can start a collector at boot before sops-install-secrets has
+      # written the files its settings name; its script polls, bounded, for
+      # them (flake.lib.launchdSecretPoll, which says why not wait4path), and
+      # an assertion requires the poll for every /run path in its settings.
+      secretPoll =
+        settings:
+        flakeLib.launchdSecretPoll.prefix { } (
+          flakeLib.launchdSecretPoll.namedIn config (builtins.toJSON settings)
+        );
+      secretPollAssertions =
+        name: settings:
+        let
+          job = config.launchd.daemons.${name};
+        in
+        map
+          (message: {
+            assertion = false;
+            inherit message;
+          })
+          (
+            flakeLib.launchdSecretPoll.failures {
+              label = "launchd.daemons.${name}";
+              start = job.script;
+              outer = job.serviceConfig.ProgramArguments;
+              named = lib.unique (
+                map builtins.head (
+                  builtins.filter builtins.isList (builtins.split "(/run/[^\"' }]+)" (builtins.toJSON settings))
+                )
+              );
+            }
+          );
     in
     {
       options.vanixiets.otelCollector.darwin = {
@@ -211,12 +242,12 @@ in
           # the home of _prometheus-node-exporter beside node_exporter's log.
           # `script` and `command` run behind /bin/wait4path /nix/store.
           launchd.daemons = {
-            # The key's wait covers boot, before sops-install-secrets has run;
-            # the certificate's hash changes the plist on a reissue, so
+            # The key's poll covers boot, before sops-install-secrets has
+            # run; the certificate's hash changes the plist on a reissue, so
             # nix-darwin reloads the job (design D2, D5).
             otelcol = {
               script = ''
-                /bin/wait4path ${gens.otel-cert.files."key.pem".path}
+                ${secretPoll cfg.agentSettings}
                 exec ${lib.getExe' pkgs.opentelemetry-collector-contrib "otelcol-contrib"} --config ${
                   (pkgs.formats.yaml { }).generate "otelcol-agent.yaml" cfg.agentSettings
                 }
@@ -381,7 +412,8 @@ in
                 );
               message = "otel-collector darwin agent: each long-running org.nixos.* daemon ${builtins.toJSON longRunning} must match exactly one glob of SC's process.darwinFleetExecutables, and its omnigent-host-* name must be the omnigent package's interpreter ${builtins.toJSON omnigentPython}, so that otelcol-process keeps the fleet's own executables below the darwin floor (design D3; A77).";
             }
-          ];
+          ]
+          ++ secretPollAssertions "otelcol" cfg.agentSettings;
         }
         (lib.mkIf agentTelemetry {
           vanixiets.otelCollector.agentSessionSettings = agentSession.settings;
