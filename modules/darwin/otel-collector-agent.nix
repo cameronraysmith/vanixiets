@@ -429,7 +429,7 @@ in
           '';
 
           launchd.daemons = {
-            # As otelcol, under its own account: the waits cover boot before
+            # As otelcol, under its own account: the poll covers boot before
             # sops-install-secrets has run, and the certificate's and the
             # Langfuse var's hashes reload the job when either changes (the
             # encrypted file's hash, never the value). launchd enforces no
@@ -438,11 +438,8 @@ in
             # (design D3, D4, D5).
             ${agentSessionLabel} = {
               script = ''
-                /bin/wait4path ${keyPath}
-                ${lib.optionalString langfuse ''
-                  /bin/wait4path ${langfuseFiles.publicKeyFile}
-                  /bin/wait4path ${langfuseFiles.secretKeyFile}
-                ''}exec ${lib.getExe' pkgs.opentelemetry-collector-contrib "otelcol-contrib"} --config ${
+                ${secretPoll agentSessionSettings}
+                exec ${lib.getExe' pkgs.opentelemetry-collector-contrib "otelcol-contrib"} --config ${
                   (pkgs.formats.yaml { }).generate "${agentSessionLabel}.yaml" agentSessionSettings
                 }
               '';
@@ -577,7 +574,8 @@ in
                 assertion = lib.elem "${agentSessionLabel}-envelope" row.notifiedUnits;
                 message = "otel-collector darwin agent: ${config.networking.hostName}'s row must list ${agentSessionLabel}-envelope in notifiedUnits, so LaunchdJobFailed leaves its failures to its own notice (darwin-agent-session-telemetry design D3).";
               }
-            ];
+            ]
+            ++ secretPollAssertions agentSessionLabel agentSessionSettings;
         })
       ];
     };
