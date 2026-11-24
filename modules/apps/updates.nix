@@ -50,6 +50,21 @@
         program = "${config.packages.golem-binary.updateScript}";
       };
 
+      apps.update-icp-cli-bin = {
+        type = "app";
+        program = "${config.packages.icp-cli-bin.updateScript}";
+      };
+
+      apps.update-ic-wasm-bin = {
+        type = "app";
+        program = "${config.packages.ic-wasm-bin.updateScript}";
+      };
+
+      apps.update-mops-bin = {
+        type = "app";
+        program = "${config.packages.mops-bin.updateScript}";
+      };
+
       # greptimedb-bin exists only on x86_64-linux (its package.nix yields null
       # elsewhere); the updater is host-agnostic, so the app runs the script
       # itself and is available on every system, stibnite included.
