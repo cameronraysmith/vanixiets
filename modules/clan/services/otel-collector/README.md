@@ -314,7 +314,7 @@ Each run prints one line per clause, `otel-envelope: <clause> <name>: ok` or `ot
 `otel-envelope` is in every host's `notifiedUnits`, so a failed run posts `FAILED otel-envelope.service on <host>`.
 
 - `C1 telemetry` fails when the telemetry endpoint did not answer within 10 s on this run and the previous one.
-- `C2 targets` fails when a declared target did not answer `GET` with 200 within 10 s on this run and the previous one, and names it: every target of every scrape job is probed, named `<job>`, or `<job>@<host:port>` in a job with several targets.
+- `C2 targets` fails when a declared target did not answer `GET` with 200 within 10 s on this run and the previous one, and names it: every target of every scrape job is probed, named `<job>`, or `<job>@<host:port>` in a job with several targets, except the `otelcol-agent-session` job, whose collector its own envelope judges (`darwin-agent-session-telemetry` design D18).
 - `C3 queue` fails when telemetry answered and an exporter the collector's configuration declares has no `otelcol_exporter_queue_size` or no `otelcol_exporter_queue_capacity` series, or when an exporter's size reached 90 % of its capacity, or its capacity is absent.
 - `C4 loss` fails when, since the previous run, an `otelcol_exporter_send_failed_*` counter rose, an `otelcol_receiver_refused_*` counter rose on any receiver but the ingress's `otlp/mesh`, `otlp/mesh-tincr` and `otlp/loopback`, or, off the ingress host, an `otelcol_exporter_enqueue_failed_*` counter rose; the agent-session collector's envelope is off the ingress host, so a span refused at its `otlp/local` is loss.
 

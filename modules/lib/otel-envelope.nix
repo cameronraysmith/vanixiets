@@ -110,13 +110,27 @@
 #
 # flake.lib.otelEnvelopeTargets receivers renders `targets` from a
 # collector's evaluated receivers: every target of every job of every
-# `prometheus*` receiver, so the envelope probes what the collector scrapes.
-# A target is named by its job, or `<job>@<host:port>` in a job with more
-# than one target, and a job's authorization.credentials_file becomes the
-# credential of that file's name.
+# `prometheus*` receiver but the exempt ones below, so the envelope probes
+# what the collector scrapes. A target is named by its job, or
+# `<job>@<host:port>` in a job with more than one target, and a job's
+# authorization.credentials_file becomes the credential of that file's
+# name. flake.lib.otelEnvelopeJudgedTargets targets drops the exempt jobs'
+# targets from a list of targets, for the darwin agent's typed list.
 { config, lib, ... }:
 let
   flakeLib = config.flake.lib;
+
+  # C2 does not probe the agent-session collector's telemetry, which the
+  # host collector scrapes only for Langfuse's counters: that collector's
+  # own envelope judges it, so its outage does not hold the host's fleet
+  # envelope failed and mute a fleet failure behind it
+  # (darwin-agent-session-telemetry design D18; operator, 2026-11-24).
+  c2Exempt = [ "otelcol-agent-session" ];
+  judged = builtins.filter (
+    target:
+    # mutant: agentSessionTargetJudged
+    !(builtins.elem (builtins.head (lib.splitString "@" target.job)) c2Exempt)
+  );
 
   # The budget run's clock, read before C1 and C2, whose 10 s probes could
   # otherwise carry a run started at minute 00 into minute 01.
@@ -326,27 +340,32 @@ let
     '';
 in
 {
+  # mutant: darwinAgentSessionTargetJudged
+  flake.lib.otelEnvelopeJudgedTargets = judged;
+
   flake.lib.otelEnvelopeTargets =
     receivers:
-    lib.concatMap (
-      name:
+    judged (
       lib.concatMap (
-        job:
-        let
-          # mutant: firstTargetOnly
-          hostPorts = lib.concatMap (c: c.targets) job.static_configs;
-        in
-        map (hostPort: {
-          job = if builtins.length hostPorts == 1 then job.job_name else "${job.job_name}@${hostPort}";
-          url = "${job.scheme or "http"}://${hostPort}${job.metrics_path or "/metrics"}";
-          credential =
-            if job ? authorization.credentials_file then
-              baseNameOf job.authorization.credentials_file
-            else
-              null;
-        }) hostPorts
-      ) receivers.${name}.config.scrape_configs
-    ) (builtins.filter (lib.hasPrefix "prometheus") (builtins.attrNames receivers));
+        name:
+        lib.concatMap (
+          job:
+          let
+            # mutant: firstTargetOnly
+            hostPorts = lib.concatMap (c: c.targets) job.static_configs;
+          in
+          map (hostPort: {
+            job = if builtins.length hostPorts == 1 then job.job_name else "${job.job_name}@${hostPort}";
+            url = "${job.scheme or "http"}://${hostPort}${job.metrics_path or "/metrics"}";
+            credential =
+              if job ? authorization.credentials_file then
+                baseNameOf job.authorization.credentials_file
+              else
+                null;
+          }) hostPorts
+        ) receivers.${name}.config.scrape_configs
+      ) (builtins.filter (lib.hasPrefix "prometheus") (builtins.attrNames receivers))
+    );
 
   flake.lib.otelEnvelope =
     pkgs:

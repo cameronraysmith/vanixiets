@@ -71,6 +71,20 @@
           ];
         }
       ];
+      # A Langfuse host's receivers: the node target up, and the
+      # agent-session collector's telemetry down, which C2 leaves to that
+      # collector's own envelope (darwin-agent-session-telemetry design D18).
+      agentSessionJob.prometheus.config.scrape_configs = [
+        {
+          job_name = "node";
+          metrics_path = "/ok";
+          static_configs = [ { targets = [ "127.0.0.1:${toString targetPort}" ]; } ];
+        }
+        {
+          job_name = "otelcol-agent-session";
+          static_configs = [ { targets = [ "127.0.0.1:${toString secondTargetPort}" ]; } ];
+        }
+      ];
       # stibnite's envelope: the darwin renderer's job names on the target
       # stub's port, its exporters, and C5 over stubbed launchctl and top.
       # Value sources for C5: the physical footprints in the recorded top
@@ -80,9 +94,24 @@
       # against the limits typed here, 268,435,456 B and 134,217,728 B,
       # which the fragment passes too. The ps stub's resident sizes are what
       # a C5 reading RSS, the c5ReadsRss mutant, would see instead.
-      darwinTargets =
-        map (t: t // { url = "http://127.0.0.1:${toString targetPort}/ok"; })
-          (self.lib.otelCollectorDarwin {
+      # The darwin targets are rendered by otelCollectorDarwin, the library's
+      # or a mutant's, with the agent-session daemon's, if it is judged,
+      # pointed at the down port as its outage.
+      darwinTargetsOf =
+        otelCollectorDarwin:
+        map
+          (
+            t:
+            t
+            // {
+              url =
+                if t.job == "otelcol-agent-session" then
+                  "http://127.0.0.1:${toString secondTargetPort}/metrics"
+                else
+                  "http://127.0.0.1:${toString targetPort}/ok";
+            }
+          )
+          (otelCollectorDarwin {
             hostName = "stibnite";
             certFile = "c";
             keyFile = "k";
@@ -113,12 +142,14 @@
         esac
       '';
       # The script as each case runs it, with receivers' targets rendered by
-      # targetsOf.
-      variantsWith = targetsOf: {
+      # l.otelEnvelopeTargets and stibnite's by l.otelCollectorDarwin, the
+      # library's or a source mutant's.
+      variantsWith = l: {
         agent = envelope { };
         agentOk = envelope { targets = target "/ok"; };
         agentSlow = envelope { targets = target "/slow"; };
-        agentTwoTargets = envelope { targets = targetsOf twoTargets; };
+        agentTwoTargets = envelope { targets = l.otelEnvelopeTargets twoTargets; };
+        agentWithAgentSessionJob = envelope { targets = l.otelEnvelopeTargets agentSessionJob; };
         ingress = envelope {
           hostName = "magnetite";
           ingress = true;
@@ -176,7 +207,7 @@
         };
         darwin = envelope {
           hostName = "stibnite";
-          targets = darwinTargets;
+          targets = darwinTargetsOf l.otelCollectorDarwin;
           darwinMemory = {
             launchctl = "${launchctlStub}";
             top = "${topStub}";
@@ -206,7 +237,7 @@
           };
         };
       };
-      variants = variantsWith self.lib.otelEnvelopeTargets;
+      variants = variantsWith self.lib;
       variantsDir =
         name: scripts:
         pkgs.runCommand name { } ''
@@ -272,6 +303,21 @@
           source = true;
           from = "hostPorts = lib.concatMap (c: c.targets) job.static_configs;";
           to = "hostPorts = [ (builtins.head (builtins.head job.static_configs).targets) ];";
+        };
+        # C2 judges the agent-session collector's telemetry again
+        # (darwin-agent-session-telemetry design D18): in the shared filter,
+        # and in the filter the darwin renderer applies.
+        agentSessionTargetJudged = {
+          case = "agentSessionTargetExempt";
+          source = true;
+          from = ''!(builtins.elem (builtins.head (lib.splitString "@" target.job)) c2Exempt)'';
+          to = "true";
+        };
+        darwinAgentSessionTargetJudged = {
+          case = "darwinAgentSessionTargetExempt";
+          source = true;
+          from = "flake.lib.otelEnvelopeJudgedTargets = judged;";
+          to = "flake.lib.otelEnvelopeJudgedTargets = lib.id;";
         };
         budgetVerdictNotCarried = {
           case = "budgetBreachCarried";
@@ -347,7 +393,8 @@
             ''
         ) variants;
       # The library file with the marked line replaced, imported as the
-      # flake-parts module it is, renders every variant's targets.
+      # flake-parts module it is, renders every variant's targets, the darwin
+      # renderer's included, which reads the mutated library.
       mutateSource =
         name: m:
         let
@@ -363,9 +410,14 @@
                 inherit lib;
                 config.flake.lib = self.lib;
               };
+          mutatedLib = self.lib // mutated.flake.lib;
+          darwin = import ../lib/otel-collector-darwin.nix {
+            inherit lib;
+            config.flake.lib = mutatedLib;
+          };
         in
         assert lib.assertMsg marked "mutant ${name}: the line after its marker is not the one replaced";
-        variantsWith mutated.flake.lib.otelEnvelopeTargets;
+        variantsWith (mutatedLib // { inherit (darwin.flake.lib) otelCollectorDarwin; });
 
       # cases VARIANTS CASE...: runs each case with the scripts under
       # VARIANTS, printing `$RESULT_PREFIX<ok|FAIL>: <case>` and appending
@@ -757,6 +809,34 @@
             && grep -q '^otel-envelope: C5 memory: FAIL org.nixos.otel-agent-session 641 MiB above its limit$' "$work/out" \
             && [ "$(grep -c ': FAIL' "$work/out")" = 1 ]
         }
+        # The agent-session collector's telemetry down on two runs fails
+        # neither the host's fleet envelope on NixOS nor stibnite's: C2
+        # leaves it to that collector's own envelope (design D18).
+        case_agentSessionTargetExempt() {
+          local s
+          s=$(mktemp -d)
+          run agentWithAgentSessionJob "$s" agent-healthy up 0 && run agentWithAgentSessionJob "$s" agent-healthy up 0 \
+            && grep -q '^otel-envelope: C2 targets: ok$' "$work/out"
+        }
+        case_darwinAgentSessionTargetExempt() {
+          local s
+          s=$(mktemp -d)
+          local -x C5_TOP_101=agent-134M C5_TOP_202=process-102M
+          run darwin "$s" darwin-healthy up 0 && run darwin "$s" darwin-healthy up 0 \
+            && grep -q '^otel-envelope: C2 targets: ok$' "$work/out"
+        }
+        # That collector's own envelope still fails when it is down, on
+        # NixOS and on stibnite.
+        case_agentSessionCollectorDown() {
+          local s d
+          s=$(mktemp -d)
+          d=$(mktemp -d)
+          local -x C5_TOP_303=agent-session-639M
+          run agentSession "$s" down down 0 && run agentSession "$s" down down 1 \
+            && grep -q '^otel-envelope: C1 telemetry: FAIL' "$work/out" \
+            && run darwinAgentSession "$d" down down 0 && run darwinAgentSession "$d" down down 1 \
+            && grep -q '^otel-envelope: C1 telemetry: FAIL' "$work/out"
+        }
         case_darwinLangfuseSendFailed() {
           local s
           s=$(mktemp -d)
@@ -822,6 +902,9 @@
         "c5AgentSessionAt639"
         "c5AgentSessionAt641"
         "darwinLangfuseSendFailed"
+        "agentSessionTargetExempt"
+        "darwinAgentSessionTargetExempt"
+        "agentSessionCollectorDown"
       ];
       allCases = lib.concatStringsSep " " caseNames;
     in

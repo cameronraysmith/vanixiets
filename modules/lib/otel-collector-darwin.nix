@@ -360,20 +360,25 @@ in
           exporters = [ "otlp_http/agent" ];
         };
       };
-      targets = [
-        {
-          job = "node";
-          url = "http://${node.listenAddress}:${toString node.port}/metrics";
+      # What the agent scrapes, less what C2 leaves to another envelope: the
+      # agent-session daemon's telemetry is its own envelope's
+      # (darwin-agent-session-telemetry design D18).
+      targets = flakeLib.otelEnvelopeJudgedTargets (
+        [
+          {
+            job = "node";
+            url = "http://${node.listenAddress}:${toString node.port}/metrics";
+          }
+          {
+            job = "otelcol";
+            url = "http://127.0.0.1:8888/metrics";
+          }
+        ]
+        ++ lib.optional langfuse {
+          job = "otelcol-agent-session";
+          url = "http://${agentSessionTarget}/metrics";
         }
-        {
-          job = "otelcol";
-          url = "http://127.0.0.1:8888/metrics";
-        }
-      ]
-      ++ lib.optional langfuse {
-        job = "otelcol-agent-session";
-        url = "http://${agentSessionTarget}/metrics";
-      };
+      );
       exporters = builtins.attrNames agent.exporters;
     };
 }
