@@ -60,7 +60,7 @@ in
             pkgs.writeShellApplication {
               name = "darwin-switch";
               runtimeInputs = [
-                pkgs.nh
+                (topArgs.config.flake.lib.withFleetNix pkgs "nh" pkgs.nh)
                 (topArgs.config.flake.lib.darwinMachineKeyGuard pkgs)
               ];
               meta.description = "Build and activate the nix-darwin configuration for a hostname (uses nh)";

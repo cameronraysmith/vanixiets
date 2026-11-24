@@ -16,7 +16,12 @@
 # Direct nix build (alternative):
 #   nix build .#nixidyEnvs.aarch64-darwin.local-k3d.environmentPackage  # Full environment
 #   nix build .#nixidyEnvs.aarch64-darwin.local-k3d.bootstrapPackage    # Bootstrap Application CR
-{ inputs, lib, ... }:
+{
+  config,
+  inputs,
+  lib,
+  ...
+}:
 {
   # Expose nixidyEnvs as a top-level flake output (per-system)
   flake.nixidyEnvs = lib.genAttrs [ "aarch64-darwin" "x86_64-linux" "aarch64-linux" ] (
@@ -54,10 +59,16 @@
   );
 
   perSystem =
-    { pkgs, system, ... }:
     {
-      # nixidy CLI tool for build/info commands
-      packages.nixidy = inputs.nixidy.packages.${system}.cli;
+      pkgs,
+      system,
+      self',
+      ...
+    }:
+    {
+      # nixidy CLI tool for build/info commands. It runs `nix` from PATH to
+      # render the manifests the cluster applies, so it gets the fleet's Nix.
+      packages.nixidy = config.flake.lib.withFleetNix pkgs "nixidy" inputs.nixidy.packages.${system}.cli;
 
       # Convenience app for building manifests
       apps.nixidy-build-local-k3d = {
@@ -65,7 +76,7 @@
         program =
           (pkgs.writeShellScript "nixidy-build-local-k3d" ''
             set -euo pipefail
-            ${inputs.nixidy.packages.${system}.cli}/bin/nixidy build .#nixidyEnvs.${system}.local-k3d
+            ${self'.packages.nixidy}/bin/nixidy build .#nixidyEnvs.${system}.local-k3d
           '').outPath;
       };
     };

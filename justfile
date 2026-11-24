@@ -1,6 +1,9 @@
 # justfile for vanixiets. Sections separated by ##; recipes documented with single # on the preceding line.
 
 nix_cmd := "nix --accept-flake-config"
+# For recipes whose result a cluster or a gate consumes: nix-stock where `nix` may be iets'
+# classic mode (modules/lib/nix-classic.nix), nix elsewhere.
+nix_stock := `command -v nix-stock || echo nix` + " --accept-flake-config"
 
 # Default command when 'just' is run without arguments
 default: help
@@ -423,16 +426,24 @@ check-ifd systems="x86_64-linux aarch64-linux aarch64-darwin" workers="4" mem="4
   done
   exit "$failed"
 
-# Compare stock nix-eval-jobs and iets attribute by attribute over checks.<system> of one
-# commit: same attribute names, drvPaths, systems and outputs, failing in both or neither.
-# It runs the host's own two names, nix-eval-jobs (iets) and nix-eval-jobs-stock, so on a
-# locked host both queue on the evaluation lock; a host without iets refuses.
-# Run it after an iets bump or before widening where iets evaluates. rev defaults to HEAD.
+# The iets identity oracles, both at one commit (rev defaults to HEAD); any difference fails.
+# 1. Stock nix-eval-jobs against iets attribute by attribute over checks.<system>: same
+#    attribute names, drvPaths, systems and outputs, failing in both or neither. It runs the
+#    host's own two names, nix-eval-jobs (iets) and nix-eval-jobs-stock, so on a locked host
+#    both queue on the evaluation lock; a host without iets refuses.
+# 2. Stock nix against iets' classic mode (flake.lib.nixClassic) over every host system, every
+#    home activationPackage and this system's default devShell: drvPath and whole .drv
+#    closure, with both evaluation times.
+# Run it on every iets input bump and before widening where iets evaluates.
 # Usage: just eval-identity                          (x86_64-linux and aarch64-darwin)
 #        just eval-identity "aarch64-darwin" <rev> 2
 [group('nix')]
 eval-identity systems="x86_64-linux aarch64-darwin" rev="" workers="2":
-  nix run --accept-flake-config .#nix-eval-jobs-identity -- {{ if rev == "" { "" } else { "--rev " + rev } }} --workers {{workers}} {{systems}}
+  #!/usr/bin/env bash
+  failed=0
+  nix run --accept-flake-config .#nix-eval-jobs-identity -- {{ if rev == "" { "" } else { "--rev " + rev } }} --workers {{workers}} {{systems}} || failed=1
+  nix run --accept-flake-config .#nix-classic-identity -- {{ if rev == "" { "" } else { "--rev " + rev } }} || failed=1
+  exit "$failed"
 
 # Verify system configuration builds after updates (run before activate)
 [group('nix')]
@@ -828,11 +839,11 @@ agents-skills-index:
   set -euo pipefail
   index=pkgs/by-name/apm-skills-compose/skills.json
   compose='(builtins.getFlake (toString ./.)).packages.${builtins.currentSystem}.apm-skills-compose.override { skillIndex = null; }'
-  out=$({{nix_cmd}} build --no-link --print-out-paths --impure --expr "$compose")
-  firstParty=$({{nix_cmd}} eval --json --impure --expr "($compose).firstPartySkills")
+  out=$({{nix_stock}} build --no-link --print-out-paths --impure --expr "$compose")
+  firstParty=$({{nix_stock}} eval --json --impure --expr "($compose).firstPartySkills")
   names=$(find "$out/.claude/skills" -mindepth 1 -maxdepth 1 -type d -exec basename {} \; | LC_ALL=C sort | jq -R . | jq -s .)
   remote=$(jq -r --argjson firstParty "$firstParty" '(. - $firstParty)[]' <<<"$names" | while read -r n; do
-    jq -n --arg n "$n" --arg hash "$({{nix_cmd}} hash path "$out/.claude/skills/$n")" '{($n): $hash}'
+    jq -n --arg n "$n" --arg hash "$({{nix_stock}} hash path "$out/.claude/skills/$n")" '{($n): $hash}'
   done | jq -s 'add // {}')
   jq -n --argjson names "$names" --argjson remote "$remote" '{names: $names, remote: $remote}' > "$index"
   echo "wrote $index ($(jq '.names | length' "$index") skills, $(jq '.remote | length' "$index") remote hashes)"
@@ -1261,7 +1272,7 @@ k3d-up:
   # The cluster config volume-mounts this host path at /manifests; k3d only warns
   # when it is absent, leaving the mount unusable for the rest of the run.
   @mkdir -p /tmp/k3d-manifests
-  ctlptl apply -f "$({{nix_cmd}} build --no-warn-dirty --no-link --print-out-paths .#k3d-cluster-config)"
+  ctlptl apply -f "$({{nix_stock}} build --no-warn-dirty --no-link --print-out-paths .#k3d-cluster-config)"
   @just k3d-bootstrap-secrets
 
 # Bootstrap secrets required before first deployment (idempotent)
@@ -1281,7 +1292,7 @@ k3d-configure-dns *ARGS:
 # Delete local k3d cluster
 [group('k3d')]
 k3d-down:
-  ctlptl delete -f "$({{nix_cmd}} build --no-warn-dirty --no-link --print-out-paths .#k3d-cluster-config)"
+  ctlptl delete -f "$({{nix_stock}} build --no-warn-dirty --no-link --print-out-paths .#k3d-cluster-config)"
 
 # Show k3d cluster status
 [group('k3d')]

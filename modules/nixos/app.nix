@@ -1,4 +1,7 @@
-{ ... }:
+{ config, ... }:
+let
+  flakeLib = config.flake.lib;
+in
 {
   perSystem =
     {
@@ -16,7 +19,7 @@
             pkgs.writeShellApplication {
               name = "nixos-switch";
               runtimeInputs = [
-                pkgs.nh
+                (flakeLib.withFleetNix pkgs "nh" pkgs.nh)
               ];
               meta.description = "Build and activate the NixOS configuration for a hostname (uses nh)";
               text = ''

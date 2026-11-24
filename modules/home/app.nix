@@ -1,4 +1,7 @@
-{ ... }:
+{ config, ... }:
+let
+  flakeLib = config.flake.lib;
+in
 {
   perSystem =
     {
@@ -16,7 +19,7 @@
             pkgs.writeShellApplication {
               name = "home-switch";
               runtimeInputs = [
-                pkgs.nh
+                (flakeLib.withFleetNix pkgs "nh" pkgs.nh)
               ];
               meta.description = "Activate home-manager configuration for a user on the current system architecture (uses nh)";
               text = ''
