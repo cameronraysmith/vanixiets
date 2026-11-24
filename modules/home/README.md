@@ -77,7 +77,10 @@ The `<aggregate>/tools.nix` files hold raw packages that no home-manager module 
 
 `users/ubuntu` is the profile activated inside a Devin sandbox VM, which has no AI secrets, and whose exec shells reach no systemd user manager while its snapshot builds do; `users/claude-sandbox` is activated as root inside a Claude Code cloud session's container, which has no systemd user manager.
 Modules that start user services or read sops secrets fail there and must be overridable as described above; an activation must also succeed under a user manager with no key present, which is what `base/sops-install-without-systemd.nix` provides.
-On a Mac a home's sops secrets live on a RAM disk under the account's `DARWIN_USER_TEMP_DIR` (`secrets.d`), so a restart erases them; the per-user LaunchAgent recreates them at a screen login, and a system LaunchDaemon `org.nixos.sops-nix-<user>` from `modules/darwin/sops-boot-install.nix` recreates them at boot for accounts that never log in at the screen.
+On a Mac a home's sops secrets live on a RAM disk under the account's `DARWIN_USER_TEMP_DIR` (`secrets.d`), so a restart erases them; a system LaunchDaemon `org.nixos.sops-nix-<user>` from `modules/darwin/sops-boot-install.nix` recreates them at boot, and each activation restarts the per-user LaunchAgent, which no longer runs when it is loaded so that it cannot race that daemon at boot.
+A launchd agent of a darwin home sets `launchd.agents.<name>.domain` where it is defined, which `core/launchd-domains.nix` asserts.
+home-manager's default, `gui`, bootstraps into the account's graphical session and fails the whole activation with `Bootstrap failed: 125` when the account has no screen session on that Mac; `user` agents load into `user/<uid>` at activation and, through home-manager's `launchd-primer` daemon, at every boot.
+`devin-worker-<n>` stays `gui` for computer use, and `jj-pr-sync` stays `gui` because `gh` keeps its token in the login keychain, which processes outside the graphical session cannot read.
 
 ## Verification
 

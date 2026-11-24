@@ -530,6 +530,8 @@
                 index:
                 lib.nameValuePair (unitName index) {
                   enable = true;
+                  # computer use drives the desktop session; see the header.
+                  domain = "gui";
                   config = {
                     ProgramArguments = [ (lib.getExe (launcher index)) ];
                     RunAtLoad = true;

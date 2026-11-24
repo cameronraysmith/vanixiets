@@ -16,6 +16,10 @@
         flake,
         ...
       }: # flake from extraSpecialArgs
+      let
+        # sops-nix defines its agent only for a home that declares secrets.
+        onDarwinWithSecrets = pkgs.stdenv.hostPlatform.isDarwin && config.sops.secrets != { };
+      in
       {
         # Import sops-nix home-manager module
         imports = [ flake.inputs.sops-nix.homeManagerModules.sops ];
@@ -45,6 +49,24 @@
                 ]
               )
             );
+
+        # sops-nix's own darwin activation entry boots the agent out of and into
+        # gui/<uid>, which fails the activation for an account with no screen
+        # session. The agent lives in user/<uid> instead, which home-manager's
+        # setupLaunchAgents loads and the launchd-primer daemon loads at boot.
+        # RunAtLoad is off so that load, at the same moment as
+        # org.nixos.sops-nix-<user> (modules/darwin/sops-boot-install.nix), does
+        # not run a second install that races it to mount the RAM disk; the
+        # boot install is that daemon's, and activation starts the agent here.
+        launchd.agents.sops-nix.domain = lib.mkIf onDarwinWithSecrets "user";
+        launchd.agents.sops-nix.config.RunAtLoad = lib.mkIf onDarwinWithSecrets (lib.mkForce false);
+        home.activation.sops-nix = lib.mkIf onDarwinWithSecrets (
+          lib.mkForce (
+            lib.hm.dag.entryAfter [ "setupLaunchAgents" ] ''
+              run /bin/launchctl kickstart -k "user/$(id -u)/${config.launchd.agents.sops-nix.config.Label}"
+            ''
+          )
+        );
 
         # Per-user modules will set defaultSopsFile to their specific secrets file
         # Example: secrets/home-manager/users/crs58/secrets.yaml

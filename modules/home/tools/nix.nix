@@ -1,7 +1,7 @@
 { ... }:
 {
   flake.modules.homeManager.tools =
-    { ... }:
+    { lib, pkgs, ... }:
     {
       ## home-manager only
       #
@@ -61,5 +61,7 @@
         frequency = "daily";
         store.cleanup = false;
       };
+
+      launchd.agents.home-manager-auto-expire.domain = lib.mkIf pkgs.stdenv.hostPlatform.isDarwin "user";
     };
 }

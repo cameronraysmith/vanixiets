@@ -5,16 +5,18 @@
 # `getconf DARWIN_USER_TEMP_DIR`, and mounts a 64 MB `hdiutil ram://` HFS disk
 # there whenever its marker file is absent (sops-nix 7c637afd
 # pkgs/sops-install-secrets/darwin.go:13-72), then repoints
-# ~/.config/sops-nix/secrets at the new generation. Its only runs are a
-# per-user LaunchAgent with RunAtLoad and the activation that bootstraps it
-# into gui/<uid> (modules/home-manager/sops.nix:424-468), so an account that
-# never logs in at the screen, as cameron on rosegold, has dangling secrets
-# links from each restart until the next activation.
+# ~/.config/sops-nix/secrets at the new generation. Its only runs are those of
+# its per-user LaunchAgent, which modules/home/base/sops.nix places in
+# user/<uid> with RunAtLoad off and starts at every activation, so nothing
+# runs the install after a restart until the next activation, as on an account
+# that never logs in at the screen such as cameron on rosegold.
 #
 # For each home of the host that declares secrets, a system LaunchDaemon runs
 # that home's install program at boot as the account, with the agent's
 # environment and through nix-darwin's `command` (/bin/wait4path /nix/store).
-# The agent stays: it serves screen logins and activation. Boot ordering:
+# The agent stays for activation. home-manager's launchd-primer daemon loads
+# it at boot without running it, so this daemon is the only install at boot.
+# Boot ordering:
 # - getconf resolves the temp directory from the process's euid and the
 #   account's UUID, and asks the system dirhelper to create it when missing
 #   (Libc-997.1.1 darwin/_dirhelper.c:196-209,282-338), so no login session

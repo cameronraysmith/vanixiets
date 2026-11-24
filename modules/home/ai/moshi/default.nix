@@ -204,6 +204,7 @@
 
           launchd.agents.moshi-hook = lib.mkIf pkgs.stdenv.hostPlatform.isDarwin {
             enable = true;
+            domain = "user";
             config = {
               ProgramArguments = [ (lib.getExe launcher) ];
               RunAtLoad = true;

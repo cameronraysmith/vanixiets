@@ -203,6 +203,7 @@ Reading values from `config` within the same module's `config` block is the stan
 NixOS modules manage system services through `systemd.services` and declare system-level state under `environment`, `networking`, `security`, and similar top-level option namespaces.
 nix-darwin modules use `launchd.daemons` and `launchd.agents` for service management, with system configuration under `system`, `security`, and `homebrew` namespaces.
 home-manager modules target user-level configuration through `home.file`, `home.packages`, `xdg`, and `programs.*` option namespaces.
+On the vanixiets Macs every home-manager `launchd.agents.<name>` sets `domain`, `"user"` unless the agent needs the graphical session, because a `gui` agent fails the deploy with `Bootstrap failed: 125` when the deploying account has no screen session on that Mac (`modules/home/core/launchd-domains.nix`).
 
 All three share the module system primitives (`mkOption`, `mkIf`, `mkMerge`, `mkDefault`, `mkForce`) and compose identically.
 The difference is the set of available option namespaces, not the module authoring mechanics.

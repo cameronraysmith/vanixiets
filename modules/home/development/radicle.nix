@@ -66,6 +66,7 @@
       # the supervisor's single instance makes safe.
       launchd.agents.radicle-node = lib.mkIf pkgs.stdenv.hostPlatform.isDarwin {
         enable = true;
+        domain = "user";
         config = {
           ProgramArguments = nodeArgv;
           EnvironmentVariables = nodeEnv;

@@ -303,6 +303,10 @@ in
 
       launchd.agents.jj-pr-sync = lib.mkIf pkgs.stdenv.hostPlatform.isDarwin {
         enable = true;
+        # gh keeps its token in the login keychain, which only processes in the
+        # graphical session can read; over ssh `gh auth status` reports the
+        # token invalid although the screen session has the keychain unlocked.
+        domain = "gui";
         config = {
           ProgramArguments = refresh;
           StartInterval = refreshInterval;

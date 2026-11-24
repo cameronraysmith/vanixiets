@@ -1,7 +1,12 @@
 { ... }:
 {
   flake.modules.homeManager.tools =
-    { config, ... }:
+    {
+      config,
+      lib,
+      pkgs,
+      ...
+    }:
     {
       programs.rclone = {
         enable = true;
@@ -23,5 +28,7 @@
           };
         };
       };
+
+      launchd.agents.rclone-config.domain = lib.mkIf pkgs.stdenv.hostPlatform.isDarwin "user";
     };
 }

@@ -175,7 +175,7 @@ creation_rules:
 }
 ```
 
-On the vanixiets Macs, home-manager secrets live on a RAM disk under the account's `DARWIN_USER_TEMP_DIR` (`secrets.d`, linked from `~/.config/sops-nix/secrets`), which a restart erases; a per-user LaunchDaemon `org.nixos.sops-nix-<user>` recreates them at boot and the user's LaunchAgent at a screen login, so a dangling link there means neither has run since the restart.
+On the vanixiets Macs, home-manager secrets live on a RAM disk under the account's `DARWIN_USER_TEMP_DIR` (`secrets.d`, linked from `~/.config/sops-nix/secrets`), which a restart erases; a per-user LaunchDaemon `org.nixos.sops-nix-<user>` recreates them at boot and each activation restarts the user's LaunchAgent, so a dangling link there means neither has run since the restart.
 
 ### Age vs GPG key selection
 
