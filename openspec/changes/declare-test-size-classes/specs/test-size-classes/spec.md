@@ -144,6 +144,17 @@ A declared size class SHALL constrain three properties of a test, each held by i
 - **WHEN** a medium runtime test's recorded script times stay within two seconds of 269 seconds
 - **THEN** no alert is posted
 
+### Requirement: A short bounded timeout that shows something does not happen is not a wait on time
+
+A short, bounded timeout that shows that something does not happen, such as a resolver that does not answer or a connection that is refused, SHALL NOT count as waiting on the passage of time, because no event exists to wait for and the bound is the proof; such a timeout SHALL be the tool's own, of a few seconds, and the case's time SHALL be recorded with each run.
+
+**Discharged by**: the per-case times each measured run records from the test's case markers; `tincr-mesh-partition`'s resolver case, two `dig +tries=1 +time=2` queries against stopped resolvers, about 4 seconds of its 38.40 to 38.60 seconds (`declare-test-size-classes` stages 3 and 4).
+
+#### Scenario: A small test shows that a stopped resolver does not answer
+
+- **WHEN** a case of a small test queries each stopped resolver once with the client's own 2-second timeout and requires no answer
+- **THEN** the test stays small, and the case's time is recorded with the run's per-case times
+
 ### Requirement: Variation that comes from inside a test is removed in the test
 
 A test whose script time varies between runs for a reason internal to the test, such as its phase against a scrape, export or flush interval, SHALL be treated as defective, and the variation SHALL be removed in the test, so that it waits for the event it needs rather than the next tick of an interval; a timeout SHALL NOT be loosened, and a class SHALL NOT be raised, to absorb such variation.
