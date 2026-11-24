@@ -6,7 +6,7 @@ created: 2026-08-25
 ## First-party agent skill corpus
 
 125 skills across 18 apm packages, published as a marketplace any project can install independently of the Nix configurations.
-These counts are computed rather than maintained here: `testing-and-quality/.apm/skills/harborize/scripts/census.py --root modules/home/ai/plugins` regenerates `census.json`, whose `provenance` block carries the authoritative totals and the revision they were taken at.
+These counts are computed rather than maintained here: `fd --hidden SKILL.md modules/home/ai/plugins/*/.apm/skills` lists one `SKILL.md` per skill, and the census script that would regenerate them belongs to the parked harborize work on branch `fm/vx-harborize-rung0`.
 Each group directory carries an `apm.yml` beside its `.apm/` tree and no other manifest.
 The two marketplace files and the skills CLI's discovery file are generated from the root `../../../../apm.yml` `marketplace:` block and the group `apm.yml` files by `pkgs/by-name/skills-marketplace`: `../../../../.github/plugin/marketplace.json` (apm's Copilot profile, all 22 groups, read by apm), `../../../../.claude-plugin/marketplace.json` (the 18 skill groups, read by Claude) and `../../../../skills.sh.json` (the 18 `.apm/skills` directories, read by `npx skills`).
 After editing a group's name, description or the published list, or adding or removing a group, run `just agents-marketplace` and commit the three files; the `skills-marketplace-drift` check fails until they match, and the generator fails when a group directory is missing from `marketplace.packages`.
@@ -30,7 +30,7 @@ Composition and delivery are two stages with a filter between them, which is why
 flowchart LR
   A["18 apm packages<br/>.apm/skills/*"] --> B["apm-skills-compose<br/>+ remote apm deps"]
   B --> C{"delivery<br/>exclusion list"}
-  C -->|withheld| D["tdd, harborize"]
+  C -->|withheld| D["tdd, writing-for-agents, linear-cli"]
   C -->|delivered| E["~/.claude/skills<br/>~/.factory/skills<br/>codex, opencode"]
 ```
 
