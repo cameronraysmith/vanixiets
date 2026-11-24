@@ -52,6 +52,31 @@ Promotion leaves the old change in place with describe, bookmark and rebase entr
 Destruction shows a squash that omitted `--keep-emptied`, with the old change abandoned.
 Recovery for the second is `jj undo`; the first needs nothing.
 
+## Concurrent sessions on one join
+
+These four failures occurred while two sessions shared one join; the rules that answer them are in `SKILL.md` §"Coordinating concurrent sessions on one join".
+
+### An explicit parent list drops another session's chains
+
+Rebuilding the join with `-d <chain-a> -d <chain-b> -d <new-chain>` sets its parents to exactly that list.
+A chain another session added is not on it, so it leaves the join without a warning, and its commits stay in the graph while its content disappears from the working copy.
+Always derive the destination from the join's current parents (`SKILL.md` §"Adding and removing chains"); recovery is the add form for each dropped chain.
+
+### A landing conflicts your sibling chains
+
+A publish that lands one of your chains moves the trunk under your other chains, and one of them can then conflict in the join with the landed content, leaving the shared working copy conflicted for the other session as well.
+Rebase your remaining chains onto the new trunk and rebuild the join as part of the landing, before announcing it (`diamond-workflow.md` §"Landing while another session shares the join").
+
+### A tool rewrites the join's description
+
+A script that regenerates the `join N=` description replaces whatever the session maintaining it wrote there.
+Treat any rewrite of the join's description as an announced join operation, and never keep state you need in it.
+
+### Strays go unnoticed
+
+An agent that leaves an undescribed commit behind leaves it for someone else to find.
+Run the stray checks in `diamond-workflow.md` §"Reading the shared state" before reporting; describe, route or abandon your own and report anyone else's.
+
 ## Worktree interop
 
 `jj-version-control/SKILL.md` §"Worktree interop" is the authority for worktree mechanics — it carries the jj-version provenance and upstream citations this file does not, and the worktree-surface hook messages point there.
