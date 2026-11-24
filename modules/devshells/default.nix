@@ -152,7 +152,9 @@ in
           # The fleet client (flake.lib.fleetNix) rather than nixpkgs' default,
           # which nix-fast-build and nix-prefetch-github otherwise put on PATH
           # ahead of /run/current-system/sw/bin inside the project directory.
-          (flakeLib.fleetNix pkgs)
+          # Its `nix` is iets' classic mode only for a user who opted in
+          # (nixClassic.enable); everywhere else it execs the fleet's nix.
+          (flakeLib.nixClassic pkgs)
           python
           inputs'.clan-core.packages.default
           inputs'.nix2container.packages.skopeo-nix2container

@@ -189,6 +189,10 @@ let
       }";
     memory;
 
+  # Machines whose primary user's `nix` is iets' classic mode
+  # (home/development/nix-classic.nix): a trial, stibnite first.
+  nixClassic = [ "stibnite" ];
+
   hosts =
     assert lib.assertMsg (lib.all (name: members ? ${name}) (
       lib.attrNames primaryUsers
@@ -196,6 +200,9 @@ let
     assert lib.assertMsg (lib.all (name: members ? ${name}) (
       lib.attrNames memoryGiB
     )) "flake.lib.hosts: memoryGiB names a machine that is not a member";
+    assert lib.assertMsg (lib.all (
+      name: primaryUsers ? ${name}
+    ) nixClassic) "flake.lib.hosts: nixClassic names a machine without a primaryUser";
     lib.mapAttrs (
       name: member:
       member
@@ -204,6 +211,7 @@ let
         address = mesh.addressOf mesh.instance name;
         primaryUser = primaryUserOf name;
         memoryGiB = memoryOf name member;
+        nixClassic = lib.elem name nixClassic;
         # The one address every deploy path names for this machine: clan's
         # own targetHost (darwin machine modules), the inventory's
         # deploy.targetHost where a NixOS machine sets one, and the fleet
