@@ -41,7 +41,7 @@ push to main
 pull request closed or merged
 └── docs effect           delete the pull request's Cloudflare Preview
 
-Tuesday and Friday, 22:00 UTC (or `nbo schedule run flake-update flake-update -f`)
+Tuesday and Friday, 10:00 UTC (or `nbo schedule run flake-update flake-update -f`)
 └── flake-update effect   one update-<input> branch and pull request
                           per moved branch-tracking flake input
 ```
@@ -231,7 +231,7 @@ Runs the `flake-update` program, which refreshes each flake input that tracks a 
 
 | Trigger | nixbot effect | Program | Secrets | Lock | Forge token |
 |---------|---------------|---------|---------|------|-------------|
-| `schedule` (Tuesday and Friday, 22:00 UTC; checkout) | `onSchedule.flake-update.outputs.effects.flake-update` | `flake-update` | `FLAKE_UPDATER_APP_ID`, `FLAKE_UPDATER_PRIVATE_KEY` | `flake-update` | No |
+| `schedule` (Tuesday and Friday, 10:00 UTC; checkout) | `onSchedule.flake-update.outputs.effects.flake-update` | `flake-update` | `FLAKE_UPDATER_APP_ID`, `FLAKE_UPDATER_PRIVATE_KEY` | `flake-update` | No |
 
 Each run signs a JWT with the App's key, looks up the App's installation on the repository and mints a one-hour installation token restricted to it with `contents` and `pull_requests` write, then runs nixbot's `flakeUpdate` script with `perInput = true` and that token, and revokes the token on exit.
 For every root input of `main`'s `flake.lock` except `playwright-web-flake` it rebuilds `update-<input>` from `main`, runs `nix flake update <input> --commit-lock-file`, pushes when the result differs from the branch on GitHub, and opens the pull request `Update <input>`; commits carry the author and committer `vanixiets-flake-updater[bot]`.

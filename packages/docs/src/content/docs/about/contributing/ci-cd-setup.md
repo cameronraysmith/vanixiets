@@ -250,11 +250,12 @@ The `flake-update` effect refreshes the flake inputs that track a branch, each o
 
 | Trigger | nixbot effect | Program | Lock |
 |---------|---------------|---------|------|
-| `schedule` (Tuesday and Friday, 22:00 UTC, with a checkout) | `herculesCI.onSchedule.flake-update.outputs.effects.flake-update` | `flake-update` | `flake-update` |
+| `schedule` (Tuesday and Friday, 10:00 UTC, with a checkout) | `herculesCI.onSchedule.flake-update.outputs.effects.flake-update` | `flake-update` | `flake-update` |
 
 The program (`modules/effects/vanixiets/flake-update.{nix,sh}`) runs nixbot's own `flakeUpdate` script from the locked `nixbot` input with `perInput = true`: for every root input of `main`'s `flake.lock` except `playwright-web-flake`, it rebuilds the branch `update-<input>` from `main`, runs `nix flake update <input> --commit-lock-file`, force-pushes only when the result differs from the branch on GitHub, and opens a pull request titled `Update <input>` whose body is the lock change, treating GitHub's "already exists" answer as success.
 When `main` already has an input's update, the branch is deleted; one failing input does not stop the others, and the run fails naming them.
 Pull requests are not auto-merged: a person enqueues them into gitea-mq, as Renovate's.
+nixbot reads the schedule in UTC with no time zone, so the run starts at 05:00 New York time in winter and 06:00 in summer, before the working day and at least an hour after magnetite's daily store collection (`harmonia-gc`, at 04:00 New York time).
 
 It writes as the GitHub App `vanixiets-flake-updater`, whose commits carry the author and committer `vanixiets-flake-updater[bot] <246545483+vanixiets-flake-updater[bot]@users.noreply.github.com>`.
 Each run reads the App id and key (`FLAKE_UPDATER_APP_ID`, `FLAKE_UPDATER_PRIVATE_KEY`), signs a nine-minute JWT with `gh-token`, looks up the App's installation on the repository named by the checkout's `origin`, and mints a one-hour installation token restricted to that repository with `contents` and `pull_requests` write.

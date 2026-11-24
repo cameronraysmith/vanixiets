@@ -42,9 +42,15 @@
 # without a pull request. Under it main resolves the build for `--rev` itself.
 #
 # flake-update refreshes the branch-tracking flake inputs on Tuesdays and
-# Fridays at 22:00 UTC, one `update-<input>` branch and pull request per
-# moved input, playwright-web-flake excluded (./flake-update.nix). nixbot runs
-# it from the default branch's tip in a checkout of it; run it by hand with
+# Fridays at 10:00 UTC, one `update-<input>` branch and pull request per
+# moved input, playwright-web-flake excluded (./flake-update.nix). nixbot
+# matches `when` against the UTC clock and knows no time zone
+# (nixbot/schedules.py), so the run starts at 05:00 New York time in winter
+# and 06:00 in summer, on the same Tuesday and Friday: its burst of builds
+# lands hours before the working day, and it starts at least an hour after
+# magnetite's store collection (harmonia-gc, at 04:00 New York time, so
+# 09:00 UTC in winter), not during it. nixbot runs the effect from the
+# default branch's tip in a checkout of it; run it by hand with
 # `nbo schedule run flake-update flake-update -f`. It writes as the GitHub
 # App vanixiets-flake-updater: the program signs a JWT with the App's key,
 # looks up the App's installation on this repository and mints a one-hour
@@ -155,7 +161,7 @@
               "Tue"
               "Fri"
             ];
-            hour = 22;
+            hour = 10;
             minute = 0;
           };
           checkout = true;

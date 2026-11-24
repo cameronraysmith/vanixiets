@@ -30,7 +30,7 @@
 # carries `when.permission` (trust is nixbot's CI approval), and all three
 # runs share one lock, since build_finished may carry no pull request to
 # expand {pr}; flake-update is the one effect of its own onSchedule entry,
-# Tuesdays and Fridays at 22:00, with a checkout and no audience, and no
+# Tuesdays and Fridays at 10:00 UTC, with a checkout and no audience, and no
 # onPush or onEvent kind has it. The live onPush listing is pinned for a push
 # to main and is empty for a tag push, which nixbot would otherwise run every
 # onPush effect for. Rows passing nixbot's
@@ -348,7 +348,7 @@ in
         scheduleSecretsMap.CLOUDFLARE_API_TOKEN = "CLOUDFLARE_API_TOKEN";
         liveSchedules = [ "flake-update" ];
         # hercules-ci-effects' typed `when` option normalises the declared
-        # { dayOfWeek; hour = 22; minute = 0; }: hour becomes a list and the
+        # { dayOfWeek; hour = 10; minute = 0; }: hour becomes a list and the
         # unset dayOfMonth null. This is the value nixbot reads.
         liveFlakeUpdate = {
           when = {
@@ -357,7 +357,7 @@ in
               "Tue"
               "Fri"
             ];
-            hour = [ 22 ];
+            hour = [ 10 ];
             minute = 0;
           };
           effects = [ "flake-update" ];
