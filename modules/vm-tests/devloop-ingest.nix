@@ -3,8 +3,9 @@
 # 4.6, 5.6), built as two tests from the one container below
 # (declare-test-size-classes design D8):
 #   - devloop-ingest, the medium test of the collection path, the documented
-#     queries and the two SQL alert rules: firstStart, noAutoCreate, overlap,
-#     tableShape, switch, documentedQueries, burnRule, ietsHealthRule;
+#     queries and the three SQL alert rules: firstStart, noAutoCreate,
+#     overlap, tableShape, switch, documentedQueries, burnRule,
+#     ietsHealthRule, sizeRule;
 #   - devloop-ingest-reconcile, the enormous test of devloop-reconcile and its
 #     mutant legs, whose waits on the receiver's 60 s polls are what it
 #     proves: firstStart, the container's readiness gate, then reconcile.
@@ -1155,7 +1156,159 @@
             print("ok: ietsHealthRule", flush=True)
           '';
 
-          # The collection path, the documented queries and the two SQL
+          # declare-test-size-classes design D10, regulator G5:
+          # CheckOutgrewItsClass as fleet-alert's evaluator sends it,
+          # rendered over fixture checks, against ci_attribute rows written
+          # as admin. Each fixture check isolates one clause of the query, so
+          # each mutant below changes the answer.
+          sizeFixtureChecks = {
+            # three runs of 420 s, medium: fires
+            "checks.x86_64-linux.fx-grown" = {
+              class = "medium";
+              measured = true;
+            };
+            # two runs of 420 s, medium: too few runs, silent
+            "checks.x86_64-linux.fx-two" = {
+              class = "medium";
+              measured = true;
+            };
+            # nine runs of 10 s and one of 3,700 s, small: fires
+            "checks.x86_64-linux.fx-hour" = {
+              class = "small";
+              measured = true;
+            };
+            # three runs of 30 s, small, beside rows that are not runs of
+            # it: another project's, cached and failed rows of 400 s; silent
+            "checks.x86_64-linux.fx-within" = {
+              class = "small";
+              measured = true;
+            };
+            # three runs of 420 s that finished 31 days ago: silent
+            "checks.x86_64-linux.fx-old" = {
+              class = "medium";
+              measured = true;
+            };
+            # never measured, three runs of 30 s: fires, its runs small
+            "checks.aarch64-darwin.fx-unmeasured" = {
+              class = "medium";
+              measured = false;
+            };
+            # never measured, two runs of 30 s and two rows under 1 s, in
+            # which nothing was built: silent
+            "checks.aarch64-darwin.fx-floor" = {
+              class = "medium";
+              measured = false;
+            };
+          };
+          sizeAlertRule =
+            lib.findFirst (r: r.alert == "CheckOutgrewItsClass")
+              (throw "devloop-ingest: no CheckOutgrewItsClass rule")
+              (self.lib.fleetAlertRules {
+                inherit lib;
+                checkSizes = sizeFixtureChecks;
+              }).rules;
+          sizeRule = ''
+            print("=== case sizeRule", flush=True)
+            import datetime  # noqa: F811 -- burnRule's import precedes it, unused at module level
+
+            SIZE_EXPR = json.loads(${builtins.toJSON (builtins.toJSON sizeAlertRule.expr)})
+            SIZE_DB = ${builtins.toJSON sizeAlertRule.database}
+            assert ${builtins.toJSON sizeAlertRule.language} == "sql", "CheckOutgrewItsClass is not an SQL rule"
+            assert SIZE_DB == "devloop", SIZE_DB
+
+            # ci_attribute holds exactly the rows written below.
+            reset_devloop()
+            SIZE_NOW = int(store.succeed("date -u +%s").strip())
+            SIZE_ROWS = []
+
+
+            def size_time(epoch):
+                return datetime.datetime.fromtimestamp(epoch, datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+
+
+            def size_runs(attr, seconds, days_ago=1, project="cameronraysmith/vanixiets", status="succeeded", cached=False):
+                """One ci_attribute row per duration, each its own build, finished days_ago days ago."""
+                for duration in seconds:
+                    build_id = 1000 + len(SIZE_ROWS)
+                    finished = SIZE_NOW - days_ago * 86400 - len(SIZE_ROWS)
+                    SIZE_ROWS.append(
+                        f"({build_id}, '{attr}', '{attr.split('.')[1]}', '{status}', {str(cached).lower()}, false, "
+                        f"'{size_time(finished - duration)}', '{size_time(finished)}', '{project}')"
+                    )
+
+
+            size_runs("checks.x86_64-linux.fx-grown", [420, 420, 420])
+            size_runs("checks.x86_64-linux.fx-two", [420, 420])
+            size_runs("checks.x86_64-linux.fx-hour", [10] * 9 + [3700])
+            size_runs("checks.x86_64-linux.fx-within", [30, 30, 30])
+            size_runs("checks.x86_64-linux.fx-within", [400, 400, 400], project="sciexp/ironstar")
+            size_runs("checks.x86_64-linux.fx-within", [400, 400, 400], cached=True)
+            size_runs("checks.x86_64-linux.fx-within", [400, 400, 400], status="failed")
+            size_runs("checks.x86_64-linux.fx-old", [420, 420, 420], days_ago=31)
+            size_runs("checks.aarch64-darwin.fx-unmeasured", [30, 30, 30])
+            size_runs("checks.aarch64-darwin.fx-floor", [30, 30, 0.4, 0.9])
+            # A name with no entry: the rule judges declared checks only.
+            size_runs("checks.x86_64-linux.fx-undeclared", [4000, 4000, 4000])
+            admin_sql(
+                'INSERT INTO "ci_attribute" ("build_id", "attr", "system", "status", "cached", "abandoned", '
+                '"started_at", "finished_at", "project") VALUES ' + ", ".join(SIZE_ROWS),
+                db=SIZE_DB,
+            )
+            stored = gsql('SELECT count(*) FROM "ci_attribute"', db=SIZE_DB)
+            assert stored == [[len(SIZE_ROWS)]], (stored, len(SIZE_ROWS))
+
+
+            def size_fired(expr):
+                return sorted(row[0] for row in gsql(expr, db=SIZE_DB))
+
+
+            def size_mutant(name, old, new):
+                assert old in SIZE_EXPR, f"mutant {name} found nothing to replace"
+                return SIZE_EXPR.replace(old, new)
+
+
+            FIRING = [
+                "checks.aarch64-darwin.fx-unmeasured",
+                "checks.x86_64-linux.fx-grown",
+                "checks.x86_64-linux.fx-hour",
+            ]
+            fired = size_fired(SIZE_EXPR)
+            print(f"CheckOutgrewItsClass fires for {fired}", flush=True)
+            assert fired == FIRING, (fired, FIRING)
+            # One row per check, its labels the declared class, whether it
+            # was measured and the class its runs give, and a value column,
+            # which the evaluator requires.
+            labelled = gsql(f'SELECT "attr", "class", "measured", "runs_class", "value" FROM ({SIZE_EXPR}) AS outgrown ORDER BY "attr"', db=SIZE_DB)
+            print(f"CheckOutgrewItsClass rows {labelled}", flush=True)
+            assert labelled == [
+                ["checks.aarch64-darwin.fx-unmeasured", "medium", "false", "small", "median 30.0 s, slowest 30.0 s, 3 runs in 30 days, limit 300 s"],
+                ["checks.x86_64-linux.fx-grown", "medium", "true", "large", "median 420.0 s, slowest 420.0 s, 3 runs in 30 days, limit 300 s"],
+                ["checks.x86_64-linux.fx-hour", "small", "true", "small", "median 10.0 s, slowest 3700.0 s, 10 runs in 30 days, limit 60 s"],
+            ], labelled
+
+            SIZE_MUTANTS = {
+                # design G5: medium rendered as 3,000 s
+                "sizeRuleLimitOff": size_mutant("sizeRuleLimitOff", "'medium', 300, true", "'medium', 3000, true"),
+                "minimumTwo": size_mutant("minimumTwo", "r.runs >= 3", "r.runs >= 2"),
+                "noHourArm": size_mutant("noHourArm", "r.slowest_s > 3600 OR ", ""),
+                "noUnmeasuredArm": size_mutant("noUnmeasuredArm", "NOT l.measured OR ", ""),
+                "noWindow": size_mutant("noWindow", " AND finished_at >= now() - INTERVAL '30 days'", ""),
+                "noFloor": size_mutant("noFloor", " AND finished_at - started_at >= INTERVAL '1 second'", ""),
+                "noProjectFilter": size_mutant("noProjectFilter", "project = 'cameronraysmith/vanixiets' AND ", ""),
+                "noCachedFilter": size_mutant("noCachedFilter", " AND NOT cached", ""),
+                "noStatusFilter": size_mutant("noStatusFilter", "status = 'succeeded' AND ", ""),
+            }
+            for name, expr in SIZE_MUTANTS.items():
+                got = size_fired(expr)
+                assert got != FIRING, f"mutant {name} accepted: {got}"
+                print(f"mutant {name} rejected: fires for {got}", flush=True)
+
+            reset_devloop()
+            collector_restart()
+            print("ok: sizeRule", flush=True)
+          '';
+
+          # The collection path, the documented queries and the three SQL
           # alert rules: a medium run (declare-test-size-classes design D8).
           ingestCases = [
             firstStart
@@ -1166,6 +1319,7 @@
             documentedQueries
             burnRule
             ietsHealthRule
+            sizeRule
           ];
           # devloop-reconcile and its mutant legs, which wait out the
           # receiver's 60 s polls: an enormous run, weekly or on demand
