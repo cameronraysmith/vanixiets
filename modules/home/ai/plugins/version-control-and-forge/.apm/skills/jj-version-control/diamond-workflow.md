@@ -140,7 +140,7 @@ Independent chains within the same linearization step can be ordered discretiona
    Develop in wip, routing changes to chains via the edit-route cycle.
    Throughout the develop phase `@` stays the single empty `[wip]` directly atop `[merge]` (invariant (iii)/(vi)); this shared `[wip]` is the stable coordination point that lets multiple concurrent editors write the same integrated surface safely.
    Route every change DOWN from `@` using only `@`-preserving verbs — `jj squash --from @ … --keep-emptied`, `jj absorb`, or `jj split` keeping the wip — and never `jj describe @` into content nor make `@` the subject of `jj rebase` / `--revisions @`, which drift `@` off `[wip]`, remove the surface other actors are concurrently writing, and (in this repo) drag the pushed `wip` deploy bookmark that machines rebuild from.
-   The one sanctioned `jj rebase` touching `@` is the destination add/remove-chain form `jj rebase -r @ -d <chain-a> -d <chain-b> …`, which keeps `@` an empty child of the rebuilt join; the positional `--insert-before` / `--insert-after` (and the `-A` / `-B` aliases) forms are the prohibited ones.
+   The one sanctioned `jj rebase` touching `@` is the destination add/remove-chain form, whose destination is derived from the join's current parents (`jj rebase -s <join> -d '(parents(<join>) ~ ::trunk()) | <new-chain>'`) and which keeps `@` an empty child of the rebuilt join; the positional `--insert-before` / `--insert-after` (and the `-A` / `-B` aliases) forms are the prohibited ones.
    See the sibling `SKILL.md` invariant (iii-b) for the canonical statement.
    Each route from `[wip]` to a chain is either an append-route (default: land a new atomic commit on the chain) or an amend-route (fixups against the existing tip).
    The append-route is the default for landing new work:
@@ -178,27 +178,21 @@ Issuing only `jj new main -m "wip(<name>): seed chain"` to begin a new chain pro
 The correct sequence creates the seed commit AND grows `[merge]` to include it in one operation sequence:
 
 ```bash
-# 1. Seed the new chain from main
-jj new main -m "wip(<name>): seed chain"
+# 1. Seed the new chain from the trunk without moving @
+jj new --no-edit 'trunk()' -m "<type>(<scope>): <subject>"
 
 # 2. Bookmark the seed commit so it is addressable
-jj bookmark create <name> -r @
+jj bookmark create <name> -r <seed-change-id>
 
-# 3. Reparent [merge] to include the new chain alongside existing chains
-jj rebase -r <merge-change-id> -d <existing-chain-a> -d <existing-chain-b> -d <name>
+# 3. Add the new chain to [merge]'s parents; -s carries [wip] and anything above it
+jj rebase -s <merge-change-id> -d '(parents(<merge-change-id>) ~ ::trunk()) | <name>'
 
-# 4. Re-attach [wip] to the rebased [merge] (required successor of step 3)
-#    -s, not -r: any commits stacked above [wip] must return with it
-jj rebase -s <wip-change-id> -d <merge-change-id>
-
-# 5. Rewrite [merge]'s description with the new full set
+# 4. Rewrite [merge]'s description with the new full set (announce it first when the join is shared)
 jj describe <merge-change-id> -m "join N=k+1: <alphabetical bookmarks including <name>>"
 ```
 
-Step 4 is the second half of the `jj rebase -r <merge>` tool-pair documented in `SKILL.md` §"Re-attaching `[wip]` after `jj rebase -r <merge>`".
-Steps 3 and 4 are one sequence: issuing step 3 without step 4 leaves `@` a two-parent merge at the old parent set with the rebuilt join orphaned.
-Step 4 names `[merge]`'s former direct child and uses `-s` so that its descendants come along; `-r` would move `[wip]` alone and orphan any commits stacked above it.
-After step 5, run the diamond-health diagnostic from the sibling `SKILL.md` as a sanity check on the executed recipe.
+Step 3 derives the destination from `[merge]`'s current parents rather than listing them, so a chain another session added since you last read the graph stays in the join; see `SKILL.md` §"Adding and removing chains".
+After step 4, run the diamond-health diagnostic from the sibling `SKILL.md` as a sanity check on the executed recipe.
 
 ### Phase 3: converge (validate)
 
@@ -306,6 +300,100 @@ See the sibling `SKILL.md` §"Diamond integration on remote advance" for the rec
 Both operations target the same topological location — commits between `<base>` and the antichain `children(fork_point(parents(<join>))) & ::<join>`.
 Splice-below-join inserts new commits there during diamond work; diamond integration on remote advance moves the entire diamond above a new `<base>` position, carrying the splice region (if any) with it.
 The patterns compose: a diamond with accumulated splice commits can be integrated onto an advanced remote in one rebase, then return the ready splice ref for external authorization under the same owner.
+
+## Concurrent sessions on one join
+
+`SKILL.md` §"Coordinating concurrent sessions on one join" states the rules.
+This section holds the commands behind them, the landing sequence, what a separate workspace gives up, and the omp mechanism.
+
+### Reading the shared state
+
+The join's parent set is a registry of chains that no session writes directly, and every harness can read it:
+
+```bash
+# Chains the join carries.
+jj --ignore-working-copy log --no-graph -r 'parents(<join>) ~ ::trunk()' \
+  -T 'change_id.short(8) ++ " " ++ description.first_line() ++ "\n"'
+# Paths a chain already touches.
+jj --ignore-working-copy diff --name-only --from 'trunk()' --to <chain>
+# Strays: undescribed mutable commits, and any child of the join besides @.
+jj --ignore-working-copy log -r 'mutable() & description(exact:"")'
+jj --ignore-working-copy log -r 'children(<join>)'
+```
+
+Which session owns which chain, and which paths a session is about to edit, are not in the graph.
+The join's description looks like a place to record them, and it is not sound as one.
+It is a single string that every session would rewrite.
+Two sessions describing the join in overlapping operations each rewrite the same commit, and jj merges the concurrent operations by keeping both rewrites, which leaves the join a divergent change (jj `docs/technical/concurrency.md` §"Merging divergent operations"; `docs/guides/divergence.md`).
+Tools that regenerate the description from the parent set overwrite whatever a session added, and tools that parse its `join N=` first line break when it holds anything else.
+Bookmarks on chain heads avoid the shared string, since concurrent moves of different bookmarks merge without conflict, but they record no paths and are one `jj git push` away from publication.
+The `stigmergic-convention` signal tables live on beads issues and an agent-team task list belongs to one harness, so neither records the chains of a join.
+No neutral registry for ownership and reservations is sound yet: read the parent set and the chains' diffs from jj, and carry ownership and reservations over whatever channel the sessions share.
+
+### Landing while another session shares the join
+
+A landing that moves the trunk leaves your other chains on the old trunk, and such a chain can conflict in the join with the content that just landed.
+Finish the landing before announcing it:
+
+```bash
+jj git fetch
+# Rebase each of your remaining chains onto the new trunk.
+jj rebase -s 'roots(trunk()..<own-chain-b>) | roots(trunk()..<own-chain-c>)' -d 'trunk()'
+# Rebuild the join; parents now on the trunk drop out.
+jj rebase -s <join> -d 'parents(<join>) ~ ::trunk()'
+```
+
+When the forge rewrote the landed commits, their local copies are not ancestors of the trunk, so remove that chain with the remove form in `SKILL.md` §"Adding and removing chains".
+Then confirm the other session's chains are still parents of the join and announce the landing as done.
+
+### Sessions in a separate jj workspace
+
+A separate jj workspace is warranted only when a separate tree is itself the point (`SKILL.md` §"Worktree interop").
+Its `@` is not under the join, so its chains are not merged into the shared working copy and an incompatibility with them surfaces at landing rather than at the keyboard.
+It also sits in a different directory, so harness features scoped to the directory, such as omp's cross-instance messaging below, do not connect it to the sessions in the primary.
+What remains is the shared commit graph and operation log: both sides see each other's commits with the commands above, `jj workspace list` names the workspace, and its working-copy commit is not a stray to abandon.
+Announce the workspace, its base and the paths it edits through the operator or any other channel, and add its chain to the join with the parents-derived form when it should integrate with the rest.
+
+### omp: cross-instance messaging (other harnesses skip this subsection)
+
+omp lets its interactive sessions in one directory read and message each other.
+Each statement below is from omp's source (`packages/coding-agent/src`, omp 19.1.1) unless marked as observed; the mechanism was added in omp 19.0.0.
+
+- Setting: `task.crossInstance`, default `false` (`task/settings.ts`), turned on in every participating session; it takes effect in a running session.
+- Who joins: the main session of an interactive `omp` process, and through it that process's subagents (`main.ts`, `bindAgentMesh` only when interactive).
+  `omp -p` and `omp acp` never join: with the setting on, `agent://peers` reports no other instances, reading `agent://<pid>` fails, and sends to a pid fail, because the mesh is never bound (`irc/mesh.ts` `agentMesh()`; `internal-urls/agent-protocol.ts`).
+  An omp session driven over ACP, for example by omnigent, therefore neither sees nor is seen by interactive sessions, whatever directory it runs in; an ACP client also typically gives it its own workspace.
+  Participation would need an upstream change that binds the mesh per ACP session; the mesh is one per process, while an ACP server holds several sessions with their own directories, and no setting does it.
+- Room: the realpath of the directory omp started in (`daemon/client.ts` `canonicalProjectDir`); nothing maps a subdirectory, a second clone, a git worktree or a jj workspace back to the repository, so each is a separate room (not tested).
+  The room is a unit of a per-user daemon, so another account cannot join.
+- List: read `agent://peers`, which prints `- agent://<pid> (<status>)` per peer, with the note `This instance: <pid>`; it shows no titles, directories or subagent ids.
+- Read: `agent://<pid>` shows a peer's yields and latest assistant text, not its tool calls, and `agent://<pid>/<SubagentName>` a peer subagent's output; reading never disturbs the peer (observed).
+  `history://` does not resolve peers.
+- Message: write to `agent://<pid>` or `agent://<pid>/<SubagentName>`.
+  A busy peer gets it at its next step boundary and an idle one is woken into a new turn (`session/irc-bridge.ts`); the sender sees `Delivered to <pid>.` and the recipient must write back for there to be a reply (observed).
+- Notes: append `?progress` (`agent://<pid>?progress`).
+  A note does not interrupt a busy peer and does not count against the budget, but an idle peer is still woken by it (`session/irc-bridge.ts`).
+- Budget: a session accepts at most 20 messages from one peer in 10 minutes, notes excluded (`irc/mesh.ts` `WAKE_BUDGET`).
+- Limits: pids change when a session restarts, so read `agent://peers` again after any restart; the TUI lists no peers; incoming text is marked as from an agent, never the user (rule 8).
+  Messaging informs and enforces nothing; the join keeps its parents only while each session follows the rules.
+
+Templates, with `<pid>` the peer's pid from `agent://peers`:
+
+```text
+# Start of session, to agent://<pid>
+Session <own-pid> on this join. I own chains <change-id> (<subject>) and <change-id> (<subject>).
+I will edit <paths>. Reply with your chains and any paths you have reserved.
+
+# Before and after a landing, to agent://<pid>?progress
+Landing <change-id> now: publish, then fetch and restack the join. Hold join rebuilds until I say done.
+Landed <change-id>. My remaining chains are on the new trunk and the join is rebuilt; your chains <change-ids> are still parents.
+
+# Reserve and release paths, to agent://<pid>
+Reserving <paths> while a subagent edits them for <change-id>; please stay out of them until I release.
+Released <paths>; the edit is routed into <change-id>.
+```
+
+Evidence for this subsection: the source reading above, plus one afternoon of two interactive sessions on one join that used listing, reading, notes and messages as described.
 
 ## Open questions
 
