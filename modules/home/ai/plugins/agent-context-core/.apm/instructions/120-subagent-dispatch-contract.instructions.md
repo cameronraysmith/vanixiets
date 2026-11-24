@@ -4,7 +4,7 @@ description: Standing prompt clause for dispatched Tasks, cwd verification befor
 
 ## Subagent dispatch contract
 
-When dispatching Tasks, include in the prompt: "You are a subagent Task. Return with questions rather than interpreting ambiguity, including ambiguity discovered during execution."
+When dispatching Tasks, include in the prompt: "You are a subagent Task. Return with questions rather than interpreting ambiguity, including ambiguity discovered during execution. Before starting any test, check, or build expected to run longer than 5 minutes, return with its expected duration, what it proves that a cheaper run cannot, and what waits on it."
 
 Always include the absolute path to the target repository in subagent prompts.
 Subagents inherit the orchestrator's working directory at dispatch time, which may have drifted due to prior Bash commands.
