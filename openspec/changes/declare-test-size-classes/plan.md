@@ -38,8 +38,9 @@
 | Lib | `flake.lib.enormousTests : listOf str` (x86_64-linux `vmTests` entries with `class = "enormous"`) | Task 3 |
 | vmTests | `fleet-ingress`, `fleet-ingress-outage` (Task 1); `devloop-ingest`, `devloop-ingest-reconcile` (Task 2) | Tasks 1, 2 |
 | Check | `checks.{x86_64-linux,aarch64-darwin}.test-size-classes` | Task 4 |
-| Alert rule | `CheckOutgrewItsClass` (SQL, `devloop`, `info`, `for = "1d"`); `EnormousTestStale` (PromQL, `warning`) | Tasks 5, 6 |
-| Units (pyrite) | `enormous-tests.service`, `enormous-tests.timer`; metrics `vanixiets_enormous_test_last_run_timestamp_seconds{test,result}`, `vanixiets_enormous_test_last_success_timestamp_seconds{test}` | Task 6 |
+| Alert rule | `CheckOutgrewItsClass` (SQL, `devloop`, `info`, `for = "1d"`); `RuntimeTestCostDrift` (SQL, `devloop`, `info`); `EnormousTestStale` (SQL, `devloop`, `warning`, `for = "2h"`) | Tasks 5, 6 |
+| Units (pyrite) | `enormous-tests.service`, `enormous-tests.timer`; records `/var/log/runtime-test-result.jsonl` → `devloop.runtime_test_result` (`host`, `test`, `revision`, `drv_path`, `class`, `limit_s`, `outcome`, `script_ms`, `build_ms`, `finished_at`) | Task 6 |
+| Lib | `flake.lib.runtimeTestSizes : attrsOf { class; limit; }` (x86_64-linux `vmTests` entries) | Task 6 |
 
 ---
 
@@ -91,14 +92,14 @@
 - [ ] **Step 3:** Add the `sizeRule` case and `sizeRuleLimitOff` mutant to `devloop-ingest`; run (5.3).
 - [ ] **Step 4:** Deploy magnetite; read alert posts for 24 hours (5.4); update the policy text (5.5).
 
-## Task 6: the weekly enormous run (tasks.md 6.1–6.8)
+## Task 6: the weekly runtime-test run (tasks.md 6.1–6.8)
 
-- [ ] **Step 1:** Record the operator's answers to Open Questions 2 and 6 (6.1).
-- [ ] **Step 2:** Evaluate pyrite's node exporter flags; add the textfile directory if absent and extend `node-exporter-textfile` (6.2).
-- [ ] **Step 3:** Add the module defining `enormous-tests.service` (oneshot; `Environment=ENORMOUS_TESTS_FLAKE=github:cameronraysmith/vanixiets/main`; script: resolve the revision with `nix flake metadata --json`, `nix eval --json "<ref>#lib.enormousTests"`, then per name `nix build --no-link --builders '' "<ref>#vmTests.x86_64-linux.<name>"`, writing both metrics atomically after each) and `enormous-tests.timer`; add the unit to pyrite's `notifiedUnits` (6.3). Commit: `feat(pyrite): run the enormous runtime tests weekly`.
-- [ ] **Step 4:** Add `EnormousTestStale` and its fixture legs and mutant (6.4). Commit: `feat(fleet-alert): alert when an enormous test has not passed for eight days`.
+- [ ] **Step 1:** Record the operator's answers to Open Questions 2 and 6 (6.1); settle design D11's questions (source, lock, what is a run, the record, transport, staleness, load) and amend the design and the interface requirements.
+- [ ] **Step 2:** Add `runtime_test_result` to `otelCollectorSchema.devloop.tables` with its queue; generalise `file_log/deploy-record` into `vanixiets.otelCollector.devloopRecordFiles` (6.2).
+- [ ] **Step 3:** Add `flake.lib.runtimeTestSizes` and the module defining `enormous-tests.service` (oneshot; `ENORMOUS_TESTS_FLAKE`; script: `nix flake prefetch --out-link`, `nix eval --json "path:<src>#lib.runtimeTestSizes"`, the host's `nix-eval-jobs --flake "path:<src>#vmTests.x86_64-linux" --gc-roots-dir`, then per test a store lookup and `nix build --builders '' -L "<drv>^*"`, one JSON record per test) and `enormous-tests.timer`; add the unit to pyrite's `notifiedUnits` and the record file to its `devloopRecordFiles` (6.3); add `checks.x86_64-linux.enormous-tests` (6.3b). Commit: `feat(pyrite): run every runtime test of main weekly and record each result`.
+- [ ] **Step 4:** Add `RuntimeTestCostDrift` and `EnormousTestStale` and `fleet-alert`'s `staleRenderClause` (6.3a, 6.4). Commit: `feat(fleet-alert): judge runtime tests' recorded runs for drift and staleness`; then `devloop-ingest`'s `runtimeRules` case. Commit: `test(devloop-ingest): run the runtime-test rules against shipped records`.
 - [ ] **Step 5:** Deploy pyrite, then magnetite; read posts (6.5).
-- [ ] **Step 6:** Give the notice; start the service once; read the metrics and the rule (6.6).
+- [ ] **Step 6:** Give the notice; start the service once; read the records and both rules (6.6).
 - [ ] **Step 7:** Run the failure mutant through a runtime drop-in; remove it (6.7); update the policy text (6.8).
 
 ## Task 7: integration verification (tasks.md 7.1–7.4)
