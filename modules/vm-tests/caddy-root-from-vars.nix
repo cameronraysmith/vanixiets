@@ -39,14 +39,11 @@ in
       };
     in
     {
-      # Size class (declare-test-size-classes design D4): no run measured yet.
-      # Declared medium, the largest class that needs no run notice, so a wrong
-      # guess fails at the 300 s timeout and that run is its measurement.
+      # Size class: the script measured 8.05 s, 20 s for the whole build with
+      # the driver already built, on pyrite on 2026-11-24
+      # (logs/tsc-3-measure-caddy-root-from-vars-20261124-133524.log).
       testSizes.vmTests = lib.optionalAttrs (system == "x86_64-linux") {
-        caddy-root-from-vars = {
-          class = "medium";
-          measured = false;
-        };
+        caddy-root-from-vars.class = "small";
       };
       vmTests = lib.optionalAttrs (system == "x86_64-linux") {
         caddy-root-from-vars = pkgs.testers.runNixOSTest {

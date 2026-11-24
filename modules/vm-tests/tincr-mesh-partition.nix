@@ -52,14 +52,11 @@ in
       ...
     }:
     {
-      # Size class (declare-test-size-classes design D4): no run measured yet.
-      # Declared medium, the largest class that needs no run notice, so a wrong
-      # guess fails at the 300 s timeout and that run is its measurement.
+      # Size class: the script measured 38.60 s, 69 s for the whole build with
+      # the driver already built, on pyrite on 2026-11-24
+      # (logs/tsc-3-measure-tincr-mesh-partition-20261124-133626.log).
       testSizes.vmTests = lib.optionalAttrs (system == "x86_64-linux") {
-        tincr-mesh-partition = {
-          class = "medium";
-          measured = false;
-        };
+        tincr-mesh-partition.class = "small";
       };
       vmTests = lib.optionalAttrs (system == "x86_64-linux") {
         tincr-mesh-partition = nixosLib.runTest {

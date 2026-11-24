@@ -30,14 +30,11 @@
       ...
     }:
     {
-      # Size class (declare-test-size-classes design D4): no run measured yet.
-      # Declared medium, the largest class that needs no run notice, so a wrong
-      # guess fails at the 300 s timeout and that run is its measurement.
+      # Size class: the script measured 25.36 s, 42 s for the whole build with
+      # the driver already built, on pyrite on 2026-11-24
+      # (logs/tsc-3-measure-greptimedb-oom-order-20261124-133544.log).
       testSizes.vmTests = lib.optionalAttrs (system == "x86_64-linux") {
-        greptimedb-oom-order = {
-          class = "medium";
-          measured = false;
-        };
+        greptimedb-oom-order.class = "small";
       };
       vmTests = lib.optionalAttrs (system == "x86_64-linux") {
         greptimedb-oom-order =
