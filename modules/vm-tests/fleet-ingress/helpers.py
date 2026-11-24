@@ -60,21 +60,22 @@ def nonce_hits(*nonces):
     """Every string and JSON column of every table of every database, read
     as `regulator`: `<db>.<table>.<column>` -> rows whose value holds any of
     the nonces. A JSON column is read through json_to_string, since a cast
-    of its binary value is refused."""
-    columns = gsql(
-        "SELECT table_schema, table_name, column_name, lower(data_type) FROM information_schema.columns "
-        "WHERE lower(data_type) IN ('string', 'json') AND table_schema NOT IN ('information_schema', 'greptime_private', 'pg_catalog')",
-        "agent",
+    of its binary value is refused. The per-column queries run inside the
+    container, one driver command per scan (/etc/fleet-ingress/nonce_scan.py)."""
+    listed_sql = (
+        "SELECT count(*) FROM information_schema.columns "
+        "WHERE lower(data_type) IN ('string', 'json') AND table_schema NOT IN ('information_schema', 'greptime_private', 'pg_catalog')"
     )
-    hits = {}
-    for schema, table, column, kind in columns:
-        value = f'json_to_string("{column}")' if kind == "json" else f'"{column}"'
-        held = " OR ".join(f"{value} LIKE '%{nonce}%'" for nonce in nonces)
-        count = gsql(f"SELECT count(*) FROM \"{schema}\".\"{table}\" WHERE {held}", schema)[0][0]
-        if count:
-            hits[f"{schema}.{table}.{column}"] = count
-    tables = {(schema, table) for schema, table, _, _ in columns}
-    print(f"  scanned {len(columns)} string and JSON columns of {len(tables)} tables; nonce found in {hits}", flush=True)
+    before = gsql(listed_sql, "agent")[0][0]
+    args = [f"{config()['vars']}/regulator.netrc", *nonces]
+    scan = json.loads(store.succeed(shlex.join(["python3", "/etc/fleet-ingress/nonce_scan.py", *args])))
+    after = gsql(listed_sql, "agent")[0][0]
+    hits = scan["hits"]
+    print(f"  scanned {scan['columns']} string and JSON columns of {scan['tables']} tables; nonce found in {hits}", flush=True)
+    # The scan runs out of the driver's sight, so it must have read every
+    # column the driver counts around it (ingest may add tables meanwhile);
+    # a scan that skipped columns would otherwise pass unnoticed.
+    assert before <= scan["columns"] <= after, ("the scan skipped columns", before, scan["columns"], after)
     return hits
 
 

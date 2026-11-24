@@ -2294,6 +2294,7 @@
                 };
 
                 environment.etc = {
+                  "fleet-ingress/nonce_scan.py".source = ./fleet-ingress/nonce_scan.py;
                   "fleet-ingress/config.json".text = builtins.toJSON {
                     inherit
                       vars
