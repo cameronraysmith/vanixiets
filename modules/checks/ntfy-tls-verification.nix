@@ -13,10 +13,25 @@
 # Clause C counts a mention of curl or wget anywhere in a file, comments
 # included, so a file that only mentions one beside an ntfy name is declared a
 # non-client with its reason.
-# Each mutant changes one copy of the tree and runs only its clause.
+# Clause D fails when a darwin sender's ntfy-send exports an NTFY_URL whose
+# host is a ZeroTier name (*.zt): macOS Local Network privacy refuses ZeroTier
+# to a store binary whose responsible program holds no grant, an agent session
+# under herdr for one (pkgs/by-name/ntfy-send/package.nix). The darwin senders
+# are, for each darwin machine of the clan inventory, the ntfy-send in its
+# system pkgs, which its launchd notify jobs run (flake.lib.observabilityNotifyRun),
+# and the one in each home-manager user's home.packages, which the permission
+# hooks share under useGlobalPkgs; each is judged by the NTFY_URL line of its
+# wrapper's text, read at evaluation, and its mutant sets the first sender's
+# ntfyUrl back to https://ntfy.zt and must fail naming that sender alone.
+# Each mutant of clauses A to C changes one copy of the tree and runs only its clause.
 # The same check judges flake.lib.caddyRootCheck, which cinnabar runs weekly,
 # against chains served by openssl s_server on loopback (design D6).
-{ config, lib, ... }:
+{
+  self,
+  config,
+  lib,
+  ...
+}:
 {
   perSystem =
     { pkgs, system, ... }:
@@ -66,6 +81,55 @@
         modules/checks/ntfy-tls-verification/scan.bash	this check's scanner
       '';
       scan = ./ntfy-tls-verification/scan.bash;
+      darwinHosts = builtins.attrNames (
+        lib.filterAttrs (_: machine: machine.machineClass == "darwin") self.clan.inventory.machines
+      );
+      darwinSenders = lib.concatMap (
+        host:
+        let
+          darwin = self.darwinConfigurations.${host};
+        in
+        [
+          {
+            name = "${host} launchd notify jobs";
+            drv = darwin.pkgs.ntfy-send;
+          }
+        ]
+        ++ lib.concatLists (
+          lib.mapAttrsToList (
+            user: home:
+            map (drv: {
+              name = "${host} home-manager ${user}";
+              inherit drv;
+            }) (builtins.filter (p: lib.getName p == "ntfy-send") home.home.packages)
+          ) darwin.config.home-manager.users
+        )
+      ) darwinHosts;
+      # zeroTierSenders SENDERS: "<sender>: <NTFY_URL>" for each sender whose
+      # wrapper exports no NTFY_URL or one whose host ends in .zt. The text's
+      # context, which names darwin derivations, is dropped, so the check
+      # depends on no darwin build.
+      zeroTierSenders = lib.concatMap (
+        { name, drv }:
+        let
+          prefix = "export NTFY_URL=";
+          lines = builtins.filter (lib.hasPrefix prefix) (
+            lib.splitString "\n" (builtins.unsafeDiscardStringContext drv.text)
+          );
+          url = if lines == [ ] then "no NTFY_URL" else lib.removePrefix prefix (lib.head lines);
+          host = builtins.match "https?://([^/:]+).*" url;
+        in
+        lib.optional (host == null || lib.hasSuffix ".zt" (lib.head host)) "${name}: ${url}"
+      );
+      darwinFailures = zeroTierSenders darwinSenders;
+      zeroTierMutant =
+        let
+          first = lib.head darwinSenders;
+        in
+        zeroTierSenders (
+          [ (first // { drv = first.drv.override { ntfyUrl = "https://ntfy.zt"; }; }) ]
+          ++ lib.tail darwinSenders
+        );
     in
     {
       # Size classes (declare-test-size-classes design D1, D2): the median of
@@ -119,6 +183,20 @@
               mutant insecureFleetDomain A modules/x/post.sh "mkdir -p modules/x && printf 'curl -k https://${fleetNtfy}/x\n' > modules/x/post.sh"
               mutant undeclaredClientFleetDomain C modules/x/post.sh "mkdir -p modules/x && printf 'curl --cacert ca https://${fleetNtfy}/x\n' > modules/x/post.sh"
               mutant undeclaredClient C modules/x/post.sh "mkdir -p modules/x && printf 'curl --cacert ca https://ntfy.zt/x\n' > modules/x/post.sh"
+
+              # Clause D, judged at evaluation (see the header).
+              ${
+                if darwinFailures == [ ] then
+                  ''echo "ok: ${toString (builtins.length darwinSenders)} darwin senders address ntfy by no ZeroTier name"''
+                else
+                  ''printf 'FAIL D: %s\n' ${lib.escapeShellArgs darwinFailures}; exit 1''
+              }
+              ${
+                if zeroTierMutant == [ "${(lib.head darwinSenders).name}: https://ntfy.zt" ] then
+                  "echo ${lib.escapeShellArg "mutant zeroTierDarwinSender rejected: FAIL D: ${lib.head zeroTierMutant}"}"
+                else
+                  "echo ${lib.escapeShellArg "FAIL: mutant zeroTierDarwinSender: ${builtins.toJSON zeroTierMutant}"}; exit 1"
+              }
 
               # Root-check legs (design D6): a root, an intermediate under it and a leaf
               # for ntfy.zt, served by openssl s_server on loopback; validities relative to
