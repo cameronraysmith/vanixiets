@@ -181,12 +181,21 @@ let
             editor = "nvim";
             color = "auto";
             default-command = [ "log" ];
-            diff-editor = ":builtin";
+            diff-editor = "oyui";
             diff-formatter = ":git";
             pager = lib.mkDefault "delta";
 
             # Show signature status in log output
             show-cryptographic-signatures = true;
+          };
+
+          merge-tools.oyui = {
+            program = lib.getExe pkgs.oyui;
+            edit-args = [
+              "diff"
+              "$left"
+              "$right"
+            ];
           };
 
           git = {
