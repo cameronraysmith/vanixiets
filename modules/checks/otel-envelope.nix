@@ -118,6 +118,23 @@
             caFile = "a";
             fleetExecutables = [ ];
           }).targets;
+      # C5's logged reading of LABEL: the footprint in bytes the top stub's
+      # fixture names and the limit typed in the variant, the two numbers
+      # the verdict compares.
+      mib = n: n * 1048576;
+      c5Read =
+        label: bytes: limit:
+        "${label} footprint_bytes=${toString bytes} limit_bytes=${toString limit}";
+      agentRead = bytes: c5Read "org.nixos.otelcol" bytes 268435456;
+      processRead = bytes: c5Read "org.nixos.otelcol-process" bytes 134217728;
+      agentSessionRead = bytes: c5Read "org.nixos.otel-agent-session" bytes 671088640;
+      darwinReads = agent: process: "${agentRead agent}; ${processRead process}";
+      # C5's whole line at the cases' OTEL_ENVELOPE_NOW, c5Now: the verdict,
+      # the failures of a FAIL, the run's time, then the readings.
+      c5Now = 1795507200;
+      c5Ok = reads: "otel-envelope: C5 memory: ok at=2026-11-24T08:00:00Z; ${reads}";
+      c5Fail =
+        problems: reads: "otel-envelope: C5 memory: FAIL ${problems}; at=2026-11-24T08:00:00Z; ${reads}";
       launchctlStub = pkgs.writeShellScript "launchctl-stub" ''
         # `print system/<label>`: pid 101 for the agent and 202 for the process
         # collector, unless C5_UNLOADED names the label.
@@ -348,6 +365,18 @@
           variants = [ "darwin" ];
           from = ''if [ -z "$bytes" ]; then'';
           to = ''if [ -z "$bytes" ]; then continue; fi; if false; then'';
+        };
+        # C5's line carries the footprint and limit it compared, which the
+        # first-day and week-after reads of stibnite's agent-session daemon
+        # count (darwin-agent-session-telemetry tasks 12.5, 14.1).
+        c5FootprintUnlogged = {
+          case = "c5AgentSessionAt639";
+          variants = [
+            "darwin"
+            "darwinAgentSession"
+          ];
+          from = ''readings+="$label footprint_bytes=$bytes limit_bytes=$limit; "'';
+          to = ":";
         };
         # The agent series cap (agent-session-telemetry) is judged.
         agentSeriesIgnored = {
@@ -730,9 +759,10 @@
         case_darwinHealthy() {
           local s
           s=$(mktemp -d)
-          local -x C5_TOP_101=agent-134M C5_TOP_202=process-102M
+          local -x C5_TOP_101=agent-134M C5_TOP_202=process-102M OTEL_ENVELOPE_NOW=${toString c5Now}
           run darwin "$s" darwin-healthy up 0 && run darwin "$s" darwin-healthy up 0 \
-            && ! grep -q ': FAIL' "$work/out" && grep -q '^otel-envelope: C5 memory: ok$' "$work/out"
+            && ! grep -q ': FAIL' "$work/out" \
+            && grep -qxF ${lib.escapeShellArg (c5Ok (darwinReads (mib 134) (mib 102)))} "$work/out"
         }
         case_darwinOtlpRefused() {
           local s
@@ -745,68 +775,73 @@
         # of it the mapped binary's file-backed pages, with a physical
         # footprint of 102 MiB, within its 128 MiB.
         case_c5ProcessResidentOver() {
-          local -x C5_TOP_101=agent-134M C5_TOP_202=process-102M C5_RSS_101=223664 C5_RSS_202=183792
-          run darwin "$(mktemp -d)" darwin-healthy up 0 && grep -q '^otel-envelope: C5 memory: ok$' "$work/out"
+          local -x C5_TOP_101=agent-134M C5_TOP_202=process-102M C5_RSS_101=223664 C5_RSS_202=183792 OTEL_ENVELOPE_NOW=${toString c5Now}
+          run darwin "$(mktemp -d)" darwin-healthy up 0 \
+            && grep -qxF ${lib.escapeShellArg (c5Ok (darwinReads (mib 134) (mib 102)))} "$work/out"
         }
         case_c5AgentAt255() {
-          local -x C5_TOP_101=agent-255M C5_TOP_202=process-102M
-          run darwin "$(mktemp -d)" darwin-healthy up 0 && grep -q '^otel-envelope: C5 memory: ok$' "$work/out"
+          local -x C5_TOP_101=agent-255M C5_TOP_202=process-102M OTEL_ENVELOPE_NOW=${toString c5Now}
+          run darwin "$(mktemp -d)" darwin-healthy up 0 \
+            && grep -qxF ${lib.escapeShellArg (c5Ok (darwinReads (mib 255) (mib 102)))} "$work/out"
         }
         case_c5AgentAt257() {
-          local -x C5_TOP_101=agent-257M C5_TOP_202=process-102M
+          local -x C5_TOP_101=agent-257M C5_TOP_202=process-102M OTEL_ENVELOPE_NOW=${toString c5Now}
           run darwin "$(mktemp -d)" darwin-healthy up 1 \
-            && grep -q '^otel-envelope: C5 memory: FAIL org.nixos.otelcol 257 MiB above its limit$' "$work/out"
+            && grep -qxF ${lib.escapeShellArg (c5Fail "org.nixos.otelcol 257 MiB above its limit" (darwinReads (mib 257) (mib 102)))} "$work/out"
         }
         # top's G suffix, and the `+` it appends to a grown value.
         case_c5AgentGigabyte() {
-          local -x C5_TOP_101=agent-1G+ C5_TOP_202=process-102M
+          local -x C5_TOP_101=agent-1G+ C5_TOP_202=process-102M OTEL_ENVELOPE_NOW=${toString c5Now}
           run darwin "$(mktemp -d)" darwin-healthy up 1 \
-            && grep -q '^otel-envelope: C5 memory: FAIL org.nixos.otelcol 1024 MiB above its limit$' "$work/out"
+            && grep -qxF ${lib.escapeShellArg (c5Fail "org.nixos.otelcol 1024 MiB above its limit" (darwinReads (mib 1024) (mib 102)))} "$work/out"
         }
         case_c5ProcessKibibytes() {
-          local -x C5_TOP_101=agent-134M C5_TOP_202=process-2144K
-          run darwin "$(mktemp -d)" darwin-healthy up 0 && grep -q '^otel-envelope: C5 memory: ok$' "$work/out"
+          local -x C5_TOP_101=agent-134M C5_TOP_202=process-2144K OTEL_ENVELOPE_NOW=${toString c5Now}
+          run darwin "$(mktemp -d)" darwin-healthy up 0 \
+            && grep -qxF ${lib.escapeShellArg (c5Ok (darwinReads (mib 134) (2144 * 1024)))} "$work/out"
         }
         case_c5ProcessAt129() {
-          local -x C5_TOP_101=agent-134M C5_TOP_202=process-129M
+          local -x C5_TOP_101=agent-134M C5_TOP_202=process-129M OTEL_ENVELOPE_NOW=${toString c5Now}
           run darwin "$(mktemp -d)" darwin-healthy up 1 \
-            && grep -q '^otel-envelope: C5 memory: FAIL org.nixos.otelcol-process 129 MiB above its limit$' "$work/out"
+            && grep -qxF ${lib.escapeShellArg (c5Fail "org.nixos.otelcol-process 129 MiB above its limit" (darwinReads (mib 134) (mib 129)))} "$work/out"
         }
         # A MEM field C5 cannot read, or none, fails rather than passes.
         case_c5MemUnparsable() {
-          local -x C5_TOP_101=agent-134M C5_TOP_202=process-unparsable
+          local -x C5_TOP_101=agent-134M C5_TOP_202=process-unparsable OTEL_ENVELOPE_NOW=${toString c5Now}
           run darwin "$(mktemp -d)" darwin-healthy up 1 \
-            && grep -q "^otel-envelope: C5 memory: FAIL org.nixos.otelcol-process: no MEM for pid 202 in top's output (102)$" "$work/out"
+            && grep -qxF ${lib.escapeShellArg (c5Fail "org.nixos.otelcol-process: no MEM for pid 202 in top's output (102)" (agentRead (mib 134)))} "$work/out"
         }
         # top's text for a pid that exited after launchctl printed it.
         case_c5ProcessGone() {
-          local -x C5_TOP_101=agent-134M C5_TOP_202=gone
+          local -x C5_TOP_101=agent-134M C5_TOP_202=gone OTEL_ENVELOPE_NOW=${toString c5Now}
           run darwin "$(mktemp -d)" darwin-healthy up 1 \
-            && grep -q "^otel-envelope: C5 memory: FAIL org.nixos.otelcol-process: no MEM for pid 202 in top's output (absent)$" "$work/out"
+            && grep -qxF ${lib.escapeShellArg (c5Fail "org.nixos.otelcol-process: no MEM for pid 202 in top's output (absent)" (agentRead (mib 134)))} "$work/out"
         }
         case_c5TopHangs() {
-          local -x C5_TOP_101=agent-134M C5_TOP_202=hang
+          local -x C5_TOP_101=agent-134M C5_TOP_202=hang OTEL_ENVELOPE_NOW=${toString c5Now}
           run darwin "$(mktemp -d)" darwin-healthy up 1 \
-            && grep -q '^otel-envelope: C5 memory: FAIL org.nixos.otelcol-process: top failed or did not answer within 10 s$' "$work/out"
+            && grep -qxF ${lib.escapeShellArg (c5Fail "org.nixos.otelcol-process: top failed or did not answer within 10 s" (agentRead (mib 134)))} "$work/out"
         }
         # A job with no pid is LaunchdJobNotRunning's, and the agent's absence
         # C1's, so C5 does not judge it, whatever its size would be.
         case_c5NotLoaded() {
-          local -x C5_UNLOADED=org.nixos.otelcol-process C5_TOP_101=agent-134M C5_TOP_202=process-129M
-          run darwin "$(mktemp -d)" darwin-healthy up 0 && grep -q '^otel-envelope: C5 memory: ok$' "$work/out"
+          local -x C5_UNLOADED=org.nixos.otelcol-process C5_TOP_101=agent-134M C5_TOP_202=process-129M OTEL_ENVELOPE_NOW=${toString c5Now}
+          run darwin "$(mktemp -d)" darwin-healthy up 0 \
+            && grep -qxF ${lib.escapeShellArg (c5Ok (agentRead (mib 134)))} "$work/out"
         }
         # stibnite's agent-session daemon (darwin-agent-session-telemetry
         # design D4): C5 passes 1 MiB under its 640 MiB limit and fails 1 MiB
-        # over; Langfuse's failed sends are not loss there either.
+        # over, logging the footprint and limit it compared either way;
+        # Langfuse's failed sends are not loss there either.
         case_c5AgentSessionAt639() {
-          local -x C5_TOP_303=agent-session-639M
+          local -x C5_TOP_303=agent-session-639M OTEL_ENVELOPE_NOW=${toString c5Now}
           run darwinAgentSession "$(mktemp -d)" agent-session-langfuse-healthy down 0 \
-            && grep -q '^otel-envelope: C5 memory: ok$' "$work/out"
+            && grep -qxF ${lib.escapeShellArg (c5Ok (agentSessionRead (mib 639)))} "$work/out"
         }
         case_c5AgentSessionAt641() {
-          local -x C5_TOP_303=agent-session-641M
+          local -x C5_TOP_303=agent-session-641M OTEL_ENVELOPE_NOW=${toString c5Now}
           run darwinAgentSession "$(mktemp -d)" agent-session-langfuse-healthy down 1 \
-            && grep -q '^otel-envelope: C5 memory: FAIL org.nixos.otel-agent-session 641 MiB above its limit$' "$work/out" \
+            && grep -qxF ${lib.escapeShellArg (c5Fail "org.nixos.otel-agent-session 641 MiB above its limit" (agentSessionRead (mib 641)))} "$work/out" \
             && [ "$(grep -c ': FAIL' "$work/out")" = 1 ]
         }
         # The agent-session collector's telemetry down on two runs fails

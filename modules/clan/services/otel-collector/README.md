@@ -432,6 +432,8 @@ On stibnite `otel-envelope` judges `C1` to `C4` against the targets `node` and `
 launchd bounds no memory, so the darwin envelope adds `C5 memory`, from the `darwinMemory` argument of `flake.lib.otelEnvelope`: for each job that `launchctl print` shows with a `pid`, it reads the physical footprint from the MEM field of `/usr/bin/top -l 1 -pid <pid> -stats pid,mem`, and fails above 256 MiB for `org.nixos.otelcol` and 128 MiB for `org.nixos.otelcol-process`, the NixOS `MemoryMax` analogues.
 The footprint is the kernel's own accounting, which jetsam uses; the resident size that `ps -o rss=` reports also counts the mapped 357 MiB collector binary's file-backed pages, and read 178 MiB for `otelcol-process` when its footprint was 101 MB (#3740).
 `top` is setuid root, so `_otelcol` reads root's `otelcol-process`; a `top` that fails or does not answer within 10 s, or an absent or unreadable MEM field, fails the clause.
+Its line, `ok` or `FAIL`, ends with the run's UTC time and each footprint it read, `; `-separated and after the failures of a `FAIL`: `at=<time>` then `<label> footprint_bytes=<bytes> limit_bytes=<bytes>`, the two numbers its verdict compared; a job not read has no entry, and launchd's log of the job has no timestamps of its own.
+`checks.x86_64-linux.otel-envelope`'s darwin cases match the whole line, and its mutant `c5FootprintUnlogged`, which drops the reading, fails `c5AgentSessionAt639`.
 The limits were confirmed on 2026-11-06 from footprints of 134M for `otelcol` and 106M for `otelcol-process` and 105 consecutive passing runs.
 Without `darwinMemory` the script's text is unchanged, so no NixOS envelope changes.
 

@@ -48,8 +48,13 @@
 #   otelcol-process too. A top that fails or does not answer within 10 s,
 #   or a MEM field that is absent or unreadable, fails the clause. A job
 #   with no pid is not judged: a stopped job is LaunchdJobNotRunning's, and
-#   the agent's absence C1's. Without `darwinMemory` the script's text is
-#   unchanged, so every NixOS envelope's store path stays as it was.
+#   the agent's absence C1's. C5's line, ok or FAIL, ends with the run's
+#   time and each footprint read, `; `-separated, after the failures on a
+#   FAIL line: `at=<UTC, from OTEL_ENVELOPE_NOW or date>` then
+#   `<label> footprint_bytes=<bytes> limit_bytes=<bytes>`, the two numbers
+#   the verdict compares; a label not read has none. Without
+#   `darwinMemory` the script's text is unchanged, so every NixOS
+#   envelope's store path stays as it was.
 #
 # With `budget` = { storeUrl; notifiedUnits; databases; } (the ingress host,
 # S4 design D8), a run whose minute is 00 (OTEL_ENVELOPE_MINUTE, default the
@@ -554,6 +559,9 @@ in
             "\n"
             + ''
               memory=""
+              readings=""
+              # The run's UTC time, which launchd's log of the job lacks.
+              c5_at=$(date -u -d "@''${OTEL_ENVELOPE_NOW:-$(date -u +%s)}" +%Y-%m-%dT%H:%M:%SZ)
               # launchctl print's first-level `pid`, indented by one tab.
               pidKey="$(printf '\t')pid"
               while read -r label limit; do
@@ -578,13 +586,17 @@ in
                   memory+="$label: no MEM for pid $pid in top's output (''${mem:-absent}); "
                   continue
                 fi
+                # The footprint and limit this verdict compares, in bytes.
+                # mutant: c5FootprintUnlogged
+                readings+="$label footprint_bytes=$bytes limit_bytes=$limit; "
                 if [ "$bytes" -gt "$limit" ]; then memory+="$label $((bytes / 1048576)) MiB above its limit; "; fi
               done <<< ${
                 lib.escapeShellArg (
                   lib.concatStrings (lib.mapAttrsToList (l: b: "${l} ${toString b}\n") darwinMemory.limits)
                 )
               }
-              if [ -n "$memory" ]; then fail "C5 memory" "''${memory%; }"; else ok "C5 memory"; fi''
+              c5="at=$c5_at''${readings:+; ''${readings%; }}"
+              if [ -n "$memory" ]; then fail "C5 memory" "''${memory%; }; $c5"; else echo "otel-envelope: C5 memory: ok $c5"; fi''
           )
         }
         ${lib.optionalString (budget != null) (budgetClauses pkgs budget)}
