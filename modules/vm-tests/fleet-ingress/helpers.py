@@ -1,11 +1,12 @@
-# Helpers for vmTests.x86_64-linux.fleet-ingress (design D12). The test
-# driver runs this file and then each case string of the `cases` list in
-# modules/vm-tests/fleet-ingress.nix, in order. Every case prints
+# Helpers for vmTests.x86_64-linux.fleet-ingress and fleet-ingress-outage
+# (design D12). The test driver runs this file and then each case string
+# of the test's case list (`routingCases` or `outageCases` in
+# modules/vm-tests/fleet-ingress.nix), in order. Every case prints
 # `=== case <name>` first and `ok: <name>` last, and leaves every unit
 # running with no mutant drop-in.
 import base64
 import datetime as dt
-import hashlib
+import hashlib  # noqa: F401 -- agentSpans uses it; fleet-ingress-outage's cases do not
 import json
 import os
 import re
