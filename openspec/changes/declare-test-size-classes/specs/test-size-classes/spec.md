@@ -51,7 +51,7 @@ No enormous test SHALL be part of the pull-request gate, and a large check SHALL
 
 ### Requirement: A check that outgrows its class reaches the operator without paging
 
-A check whose recent runs on the build service take longer than its size class allows, judged by the median of at least three runs within 30 days, or any one of whose runs takes longer than 60 minutes, SHALL reach the operator as a low-priority alert naming the check, its median and slowest run, and its class.
+A check whose recent runs on the build service take longer than its size class allows, judged by the median of at least three runs within 30 days, or any one of whose runs takes longer than 60 minutes, SHALL reach the operator as a low-priority alert naming the check, its median and slowest run, and its class. A run is a successful build of the check's own output, by this repository's project, that took at least one second.
 
 **Discharged by**: `test-size-classes-interface` requirement `CheckOutgrewItsClass reports a check over its class limit`, resting on world assumptions `A222 — Neither Nix nor nixbot bounds the build time of one derivation` and `A223 — nixbot times an attribute's build from its builder slot to its completion, and an output already present gets no duration`.
 
@@ -69,6 +69,17 @@ A check whose recent runs on the build service take longer than its size class a
 
 - **WHEN** any run of a check takes longer than 60 minutes
 - **THEN** a low-priority alert names the check, whatever its median
+
+### Requirement: A check declared without a measurement is reported once its runs measure it
+
+A check declared without a measured run SHALL reach the operator as a low-priority alert once it has three runs within 30 days, naming its median and slowest run, its declared class and the class its runs give, so that its declaration is corrected.
+
+**Discharged by**: `test-size-classes-interface` requirement `CheckOutgrewItsClass reports a check over its class limit`, resting on world assumption `A223 — nixbot times an attribute's build from its builder slot to its completion, and an output already present gets no duration`.
+
+#### Scenario: A check declared without a measurement gains three runs
+
+- **WHEN** a check declared medium and unmeasured has three runs in the last 30 days, each taking about 30 seconds
+- **THEN** a low-priority alert names the check, its median, its slowest run, its declared class and the class its runs give, small
 
 ### Requirement: Every enormous test runs weekly with a visible result
 
