@@ -132,6 +132,11 @@
             };
             # nixbot: median 5.6 s, slowest 33 s, all 9 runs 2026-09-04..2026-11-11
             package-hindsight.class = "small";
+            # nixbot: 0 runs, too few to class (design D4)
+            package-icp-cli-bin = {
+              class = "medium";
+              measured = false;
+            };
             # nixbot: median 12 s, slowest 106 s, all 18 runs 2026-08-29..2026-11-13
             package-impressive.class = "small";
             # nixbot: 1 run, too few to class (design D4)
@@ -320,6 +325,11 @@
             };
             # nixbot: median 78 s, slowest 261 s, all 4 runs 2026-10-04..2026-11-11
             package-hindsight.class = "medium";
+            # nixbot: 0 runs, too few to class (design D4)
+            package-icp-cli-bin = {
+              class = "medium";
+              measured = false;
+            };
             # nixbot: median 76 s, slowest 333 s, 3 runs in 30 days
             package-impressive.class = "medium";
             # nixbot: 2 runs, too few to class (design D4)
