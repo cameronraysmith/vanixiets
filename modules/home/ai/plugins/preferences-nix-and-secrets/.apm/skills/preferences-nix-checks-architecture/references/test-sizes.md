@@ -33,7 +33,8 @@ A cold run is one in which the check's own output is in no store or cache the ru
 A check built by CI takes the class of the median of its recent uncached runs there, with the slowest run reported beside it, because concurrent builds on a shared builder lengthen individual runs.
 A run is a build that happened: a record that took under a second built nothing, whatever its status says, and is not counted.
 The median is over the last 30 days when there are at least three runs, otherwise over every recorded run when there are at least three, noted with their number and dates; with fewer, the check has no measured class yet.
-One run is not a class: it may fall on a day when the builder is busy, and it carries whatever dependencies that build happened to build first.
+One run is not a class: it may fall on a day when the builder is busy, or on the day a large dependency was rebuilt.
+Checks that share a dependency rebuild it together in one build, each waiting on it, so each one's duration holds the whole shared build, which is what a cold build of either alone would take; judge each on its own runs, and treat a pair that crosses a limit together as one cost to cut in the shared dependency.
 Where runs straddle the limit whose higher class would take a check off the pull-request gate, the lower class is declared and marked as a boundary until fresh runs decide it, because removing a regulator is the costlier error.
 A NixOS VM or container test takes the class of its test script, the driver's `test script finished in`, which is what its timeout enforces; its driver and node builds are build cost, which depends on what the store holds, and are not part of its class.
 A test that has never run has no class yet, and its first run is announced if it may exceed 5 minutes.
@@ -41,24 +42,31 @@ A test that has never run has no class yet, and its first run is announced if it
 The class a test needs follows from what it asserts.
 An assertion about configuration, filtering, routing, or a pure function is small or medium.
 Only behaviour whose point is the passage of time, such as an outage window, retries with backoff or a crash loop, justifies a large or enormous case; a medium test may still wait on a scrape or export interval as a means, within its limit.
+A small test waits on no passage of time; a tool's own timeout of a few seconds that shows something does not happen, such as a resolver that does not answer or a connection that is refused, is not such a wait, because no event exists to wait for and the bound is the proof, and the case's time is recorded with each run.
 
 ## Measuring one run
 
 For a check built by nixbot, query its PostgreSQL database for the attribute's uncached successful runs:
 
 ```sql
-SELECT system, count(*) AS runs,
-       percentile_cont(0.5) WITHIN GROUP (ORDER BY extract(epoch FROM finished_at - started_at)) AS median_s,
-       max(extract(epoch FROM finished_at - started_at)) AS slowest_s,
-       max(finished_at) AS latest
-FROM build_attributes
-WHERE attr = 'checks.x86_64-linux.<name>' AND status = 'succeeded' AND NOT cached
-  AND finished_at > now() - interval '30 days'
-GROUP BY system;
+SELECT ba.system, count(*) AS runs,
+       percentile_cont(0.5) WITHIN GROUP (ORDER BY extract(epoch FROM ba.finished_at - ba.started_at)) AS median_s,
+       max(extract(epoch FROM ba.finished_at - ba.started_at)) AS slowest_s,
+       max(ba.finished_at) AS latest
+FROM build_attributes ba
+JOIN builds b ON b.id = ba.build_id
+JOIN projects p ON p.id = b.project_id
+WHERE p.owner = '<owner>' AND p.name = '<repository>'
+  AND ba.attr = 'checks.x86_64-linux.<name>' AND ba.status = 'succeeded' AND NOT ba.cached
+  AND ba.finished_at - ba.started_at >= interval '1 second'
+  AND ba.finished_at > now() - interval '30 days'
+GROUP BY ba.system;
 ```
 
 nixbot sets `started_at` after the attribute acquires a builder slot, so the duration excludes queue wait and includes the dependencies built for the attribute and the upload that follows.
 An attribute whose output was already in nixbot's store has status `skipped_local` and no duration.
+Filter by project: nixbot builds other repositories whose checks can share a name (`treefmt`, `gitleaks`), and without the filter their runs count into this one's.
+The telemetry store's `devloop.ci_attribute` copy holds the same rows with a `project` column, and GreptimeDB's `median` gives the same exact median.
 
 For a check built locally, `nix build --rebuild .#checks.<system>.<name>` rebuilds only the top-level derivation once its output exists, so timing it measures the check's own run without its dependencies.
 Capture the run with `tee` into `logs/` as for any long-running command.
@@ -108,10 +116,14 @@ A test that no run has measured is declared medium with `measured = false`: a wr
 In vanixiets, every check on the gated systems declares its class the same way in `testSizes.checks`, generated names in a literal set beside the code that generates them, and `checks.<system>.test-size-classes` fails the pull-request gate on a check with no entry, an entry naming no attribute, an enormous check, or a large check with no reason (stage 4); on x86_64-linux it also fails on a runtime test of x86_64-linux or aarch64-linux with no entry or an entry naming none.
 It reads key sets and the literal entries only, so it forces no check's derivation.
 
+In vanixiets, a check's cost over time is judged after the fact by fleet-alert's `CheckOutgrewItsClass` (stage 5), an SQL rule at severity `info`, which posts at low priority and never pages.
+It reads the telemetry store's copy of nixbot's records, this repository's uncached successful runs of at least 1 s in the last 30 days, and posts a check that has at least three of them and a median above its class limit, a check declared `measured = false` that has three of them, with the class they give so its entry can be corrected, or a check with any run above an hour.
+Its per-check limits are rendered from the `testSizes` entries at evaluation, and `checks.x86_64-linux.fleet-alert` pins the rendered list.
+
 ## What is not enforced
 
 The timer does not cover the driver and node builds, so a test whose script fits its class can still take longer as a whole cold run; that time is build cost, not part of the class, and no regulator judges it.
-Growth of a runtime test's script time over many runs, and a spread wider than its margin, are not yet watched: a scheduled run that records every runtime test's script time, and a rule over those records, arrive in stages 5 and 6.
+Growth of a runtime test's script time over many runs, and a spread wider than its margin, are not yet watched: a scheduled run that records every runtime test's script time, and `RuntimeTestCostDrift` over those records, arrive in stage 6.
 Nothing observes whether a person or agent gave a run notice.
 
-How long a check's builds take is not enforced: pure builds are judged after the fact, from nixbot's records, in that change's stage 5, and until then a check that outgrows its class is visible only in nixbot's records.
+How long one build of a check takes is not bounded while it runs: `CheckOutgrewItsClass` sees only builds nixbot recorded for this repository, after they finish, so no local build and no runtime test, and it never judges one run.
