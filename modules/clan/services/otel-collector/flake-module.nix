@@ -55,10 +55,12 @@ let
   # ingress collector process alone, under 640 MiB in total (ADR-003
   # envelope as amended 2026-11-23; darwin-agent-session-telemetry design
   # D35), asserted by checks.x86_64-linux.otel-collector-config. fleet's 480
-  # MiB holds 29.4 h at the measured fleetBytesPerMinute. devloop's 52 MiB is
-  # split between its metrics and its five tables, ci_attribute holding about
+  # MiB holds 29.4 h at the measured fleetBytesPerMinute. devloop's 53 MiB is
+  # split between its metrics and its six tables, ci_attribute holding about
   # a day of store outage on the busiest day (S2 design D4); eval_run's 4 MiB
-  # holds months of nixbot's roughly 100 evaluation lines a day. agent's 62
+  # holds months of nixbot's roughly 100 evaluation lines a day, and
+  # runtime_test_result's 1 MiB years of pyrite's weekly run, one line of
+  # about 400 B per runtime test (declare-test-size-classes design D11). agent's 62
   # MiB is split between its metrics and its session events, each holding
   # about 2 h of three agent-telemetry hosts' assumed output while the store
   # is down (agent-session-telemetry design D10; darwin-agent-session-
@@ -79,6 +81,7 @@ let
     devloop_batch_event = mib 4;
     devloop_deploy_record = mib 4;
     devloop_eval_run = mib 4;
+    devloop_runtime_test_result = mib 1;
   };
 
   # Imported by both roles. `package` accepts a single definition, and the
@@ -168,6 +171,30 @@ let
                 also judges the store's series and row budget hourly as the
                 store's `regulator`, whose password it loads as the
                 regulator-password credential (design D8).
+              '';
+            };
+            devloopRecordFiles = lib.mkOption {
+              type = lib.types.attrsOf (
+                lib.types.submodule {
+                  options = {
+                    file = lib.mkOption {
+                      type = lib.types.str;
+                      description = "The JSON-lines file the host appends one record per line to.";
+                    };
+                    table = lib.mkOption {
+                      type = lib.types.str;
+                      description = "The devloop table, a key of otelCollectorSchema.devloop.tables, whose allow-listed columns each line carries.";
+                    };
+                  };
+                }
+              );
+              default = { };
+              description = ''
+                The host's JSON-lines record files the agent role ships into
+                devloop, each through file_log/<name> (S4 design D5;
+                declare-test-size-classes design D11). The agent role lists
+                the deploy record as `deploy-record`, the receiver id magnetite
+                has used since S2; a host adds its own files beside it.
               '';
             };
           };
@@ -608,57 +635,66 @@ in
           };
         }
 
-        # Every agent host's deploy records into devloop.deploy_record, with the
-        # receiver id and settings magnetite has used since S2, so its stored
-        # offset carries over (S4 design D5). On an ingress host the records
-        # reach the store only through `logs/ingress`, which exists where the
-        # store declares the devloop pipelines; without it, `forward` would be
-        # an exporter with no receiving pipeline and fail validation.
+        # Every agent host's record files into their devloop tables: the
+        # deploy record into devloop.deploy_record, with the receiver id and
+        # settings magnetite has used since S2, so its stored offset carries
+        # over (S4 design D5), and whatever a host adds to devloopRecordFiles,
+        # as pyrite adds the weekly runtime-test results
+        # (declare-test-size-classes design D11). On an ingress host the
+        # records reach the store only through `logs/ingress`, which exists
+        # where the store declares the devloop pipelines; without it,
+        # `forward` would be an exporter with no receiving pipeline and fail
+        # validation.
         (lib.mkIf (!ingress || (config.services.greptimedb.pipelines.devloop or { }) != { }) {
+          vanixiets.otelCollector.devloopRecordFiles.deploy-record = {
+            file = flakeLib.devloopCollection.deployRecordFile;
+            table = "deploy_record";
+          };
           services.opentelemetry-collector.settings =
             let
-              inherit (flakeLib.devloopCollection) keepAttributes dropBody deployRecordFile;
-            in
-            {
-              receivers."file_log/deploy-record" = {
-                include = [ deployRecordFile ];
-                start_at = "beginning";
-                storage = "file_storage";
-                operators = [
+              inherit (flakeLib.devloopCollection) keepAttributes dropBody;
+              recordFile = name: entry: {
+                receivers."file_log/${name}" = {
+                  include = [ entry.file ];
+                  start_at = "beginning";
+                  storage = "file_storage";
+                  operators = [
+                    {
+                      type = "json_parser";
+                      id = "parse-line";
+                    }
+                    (keepAttributes (map (column: column.name) schema.devloop.tables.${entry.table}.columns))
+                    dropBody
+                  ];
+                };
+                processors."resource/devloop-${entry.table}".attributes = [
                   {
-                    type = "json_parser";
-                    id = "parse-line";
+                    key = "vanixiets.database";
+                    value = "devloop";
+                    action = "upsert";
                   }
-                  (keepAttributes (map (column: column.name) schema.devloop.tables.deploy_record.columns))
-                  dropBody
+                  {
+                    key = "vanixiets.table";
+                    value = entry.table;
+                    action = "upsert";
+                  }
+                  {
+                    key = "host.name";
+                    value = hostName;
+                    action = "upsert";
+                  }
                 ];
+                service.pipelines."logs/devloop-${entry.table}" = {
+                  receivers = [ "file_log/${name}" ];
+                  processors = [
+                    "memory_limiter"
+                    "resource/devloop-${entry.table}"
+                  ];
+                  exporters = agentExport.logs;
+                };
               };
-              processors."resource/devloop-deploy_record".attributes = [
-                {
-                  key = "vanixiets.database";
-                  value = "devloop";
-                  action = "upsert";
-                }
-                {
-                  key = "vanixiets.table";
-                  value = "deploy_record";
-                  action = "upsert";
-                }
-                {
-                  key = "host.name";
-                  value = hostName;
-                  action = "upsert";
-                }
-              ];
-              service.pipelines."logs/devloop-deploy_record" = {
-                receivers = [ "file_log/deploy-record" ];
-                processors = [
-                  "memory_limiter"
-                  "resource/devloop-deploy_record"
-                ];
-                exporters = agentExport.logs;
-              };
-            };
+            in
+            lib.mkMerge (lib.mapAttrsToList recordFile config.vanixiets.otelCollector.devloopRecordFiles);
         })
 
         # The agent's envelope where it exports to the ingress (ADR-003

@@ -120,10 +120,16 @@ In vanixiets, a check's cost over time is judged after the fact by fleet-alert's
 It reads the telemetry store's copy of nixbot's records, this repository's uncached successful runs of at least 1 s in the last 30 days, and posts a check that has at least three of them and a median above its class limit, a check declared `measured = false` that has three of them, with the class they give so its entry can be corrected, or a check with any run above an hour.
 Its per-check limits are rendered from the `testSizes` entries at evaluation, and `checks.x86_64-linux.fleet-alert` pins the rendered list.
 
+In vanixiets, every runtime test runs weekly on pyrite (stage 6): `enormous-tests.service`, started by its timer on Sundays at 03:00 America/New_York, fetches `main` once, evaluates every `vmTests.x86_64-linux` test under the host evaluation lock, and builds each with `--builders ''`, the enormous ones first, writing one record per test to the telemetry store's `devloop.runtime_test_result`.
+A record is `passed` with the driver's `test script finished in` from that build's own log, `timed_out` with the class limit, `failed`, or `present` when the test's output was already in the store or the build succeeded without running the script, which is not a run.
+A failed, timed-out or unevaluated test fails the unit, which posts a failure notice.
+fleet-alert's `RuntimeTestCostDrift` (severity `info`) judges each test's newest 8 runs within 180 days by the class and limit of its newest record: it posts a test whose newest 3 runs' median exceeds the older runs' by more than a tenth of the limit, or whose margin under the limit is smaller than its range.
+`EnormousTestStale` (`warning`) posts an enormous test with no `passed` or `present` record in 8 days, or with none at all.
+
 ## What is not enforced
 
 The timer does not cover the driver and node builds, so a test whose script fits its class can still take longer as a whole cold run; that time is build cost, not part of the class, and no regulator judges it.
-Growth of a runtime test's script time over many runs, and a spread wider than its margin, are not yet watched: a scheduled run that records every runtime test's script time, and `RuntimeTestCostDrift` over those records, arrive in stage 6.
+`RuntimeTestCostDrift` sees only the weekly run's runs, not on-demand ones, and a result record of a non-enormous test lost on its way to the store is not detected; a week in which pyrite is off or off the mesh shows only as `EnormousTestStale` for the enormous tests.
 Nothing observes whether a person or agent gave a run notice.
 
 How long one build of a check takes is not bounded while it runs: `CheckOutgrewItsClass` sees only builds nixbot recorded for this repository, after they finish, so no local build and no runtime test, and it never judges one run.

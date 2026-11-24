@@ -54,7 +54,7 @@ Each agent host's collector SHALL read `/var/log/deploy-record.jsonl` through `f
 
 ### Requirement: The devloop tables are pre-created with keys, a time index and deduplication
 
-`greptimedb-schema.service` SHALL, after the databases, issue `CREATE TABLE IF NOT EXISTS` for `devloop.ci_attribute`, `devloop.ci_build`, `devloop.batch_event` and `devloop.deploy_record`, each `ENGINE=mito WITH ('append_mode' = 'false', 'sst_format' = 'flat')`, with every identifier quoted, its allow-listed primary key, a `TIMESTAMP(6) NOT NULL` time index and no `ttl`.
+`greptimedb-schema.service` SHALL, after the databases, issue `CREATE TABLE IF NOT EXISTS` for `devloop.ci_attribute`, `devloop.ci_build`, `devloop.batch_event`, `devloop.deploy_record`, `devloop.eval_run` and `devloop.runtime_test_result`, each `ENGINE=mito WITH ('append_mode' = 'false', 'sst_format' = 'flat')`, with every identifier quoted, its allow-listed primary key, a `TIMESTAMP(6) NOT NULL` time index and no `ttl`.
 
 **Discharged by**: R3.1's ordering clause, which keeps the collector after `greptimedb-schema`, and `greptimedb-envelope`'s table clause, resting on world assumption `A46 — GreptimeDB 1.2.1 keeps one row per key and time in a pre-created non-append table`; `vmTests.x86_64-linux.devloop-ingest`'s first-start and writer-ordering cases; `devloop-reconcile`'s comparison of CI rows with its append-mode mutant.
 

@@ -12,6 +12,7 @@ import shlex
 
 COLLECTOR = "opentelemetry-collector"
 DEPLOY_RECORD = "/var/log/deploy-record.jsonl"
+RUNTIME_RECORD = "/var/log/runtime-test-result.jsonl"
 _CONFIG = None
 
 
@@ -97,9 +98,10 @@ def collector_restart(mutant=None):
 
 def reset_devloop():
     """Stop the collector, delete its file_storage directory (cursors and
-    queues), drop the four tables as admin, rerun the schema job and empty
-    the deploy-record file. The journald receiver then re-reads the stub's
-    journal from its beginning. The collector stays stopped."""
+    queues), drop the tables as admin, rerun the schema job and empty the
+    deploy-record and runtime-test result files. The journald receiver then
+    re-reads the stub's journal from its beginning. The collector stays
+    stopped."""
     store.succeed(
         f"systemctl stop {COLLECTOR}.service",
         "rm -rf /var/lib/opentelemetry-collector/queue",
@@ -109,6 +111,7 @@ def reset_devloop():
     store.succeed(
         "systemctl restart greptimedb-schema.service",
         f": > {DEPLOY_RECORD}",
+        f": > {RUNTIME_RECORD}",
     )
 
 
