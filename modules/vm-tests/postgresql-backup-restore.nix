@@ -42,9 +42,10 @@
         {
           name,
           mutant ? { },
+          passthru ? { },
         }:
         pkgs.testers.runNixOSTest {
-          inherit name;
+          inherit name passthru;
           requiredFeatures = {
             nixos-test = true;
             uid-range = true;
@@ -140,8 +141,9 @@
     in
     {
       vmTests = lib.optionalAttrs (system == "x86_64-linux") {
-        postgresql-backup-restore = restoreTest { name = "postgresql-backup-restore"; } // {
-          prepareStartsNoDumps =
+        postgresql-backup-restore = restoreTest {
+          name = "postgresql-backup-restore";
+          passthru.prepareStartsNoDumps =
             pkgs.runCommand "postgresql-backup-restore-prepare-starts-no-dumps"
               {
                 failed =

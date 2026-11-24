@@ -40,9 +40,10 @@
           name ? "shared-reference-tree",
           prelude ? "",
           control ? "touch",
+          passthru ? { },
         }:
         pkgs.testers.runNixOSTest {
-          inherit name;
+          inherit name passthru;
           requiredFeatures = {
             kvm = true;
             nixos-test = true;
@@ -591,8 +592,8 @@
     in
     {
       vmTests = lib.optionalAttrs (system == "x86_64-linux") {
-        shared-reference-tree = mkTest { } // {
-          mutations = {
+        shared-reference-tree = mkTest {
+          passthru.mutations = {
             group-writable = mkTest {
               name = "shared-reference-tree-group-writable";
               prelude = ''
