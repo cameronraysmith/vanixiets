@@ -133,6 +133,11 @@
             # nixbot: median 5.6 s, slowest 33 s, all 9 runs 2026-09-04..2026-11-11
             package-hindsight.class = "small";
             # nixbot: 0 runs, too few to class (design D4)
+            package-ic-wasm-bin = {
+              class = "medium";
+              measured = false;
+            };
+            # nixbot: 0 runs, too few to class (design D4)
             package-icp-cli-bin = {
               class = "medium";
               measured = false;
@@ -325,6 +330,11 @@
             };
             # nixbot: median 78 s, slowest 261 s, all 4 runs 2026-10-04..2026-11-11
             package-hindsight.class = "medium";
+            # nixbot: 0 runs, too few to class (design D4)
+            package-ic-wasm-bin = {
+              class = "medium";
+              measured = false;
+            };
             # nixbot: 0 runs, too few to class (design D4)
             package-icp-cli-bin = {
               class = "medium";
