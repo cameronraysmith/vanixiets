@@ -82,9 +82,9 @@ After the fix below, the same mutant fails with "FAIL: nix-build-operations depl
 ## 5. Implementation Signal
 
 - [x] No unstaged files in the worktree (the jj working copy is committed: the fix, the spec wording and these records)
-- [ ] All related commits have been pushed: `f2d5a9335..9c288da5` is on `origin/main`; the consumer fix, the spec wording and the two record commits are not yet published
+- [x] All related commits have been pushed: `f2d5a9335..9c288da5` is on `origin/main`; the consumer fix (`ca5969679`), the spec wording (`29a1f809d`) and the two record commits (`10ce41e8d`, `418f65643`) reached `origin/main` after this run (checked at archive time, `main` db5e5b881)
 
-**Commit range**: `f2d5a9335..9c288da5`, then the consumer fix, the spec wording and the two record commits
+**Commit range**: `f2d5a9335..9c288da5`, then `ca5969679`, `29a1f809d`, `10ce41e8d` and `418f65643`
 
 ## 6. Front-Door Routing Leak Detector (warning, non-blocking)
 
