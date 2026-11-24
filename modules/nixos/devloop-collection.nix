@@ -278,6 +278,11 @@ let
   # The file flake.modules.nixos.deploy-record appends to (design D9).
   deployRecordFile = "/var/log/deploy-record.jsonl";
 
+  # The file pyrite's enormous-tests.service appends one result per runtime
+  # test to each week, which the agent role ships into
+  # devloop.runtime_test_result (declare-test-size-classes design D11).
+  runtimeTestResultFile = "/var/log/runtime-test-result.jsonl";
+
   # The keep-list and the body removal are defence in depth: the
   # pre-created tables and each pipeline's VRL reset decide the stored
   # columns, and no test can see either operator fail (plan review F15).
@@ -758,6 +763,7 @@ in
       keepAttributes
       dropBody
       deployRecordFile
+      runtimeTestResultFile
       ;
   };
 

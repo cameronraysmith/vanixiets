@@ -434,6 +434,31 @@
           primaryKey = [ "build_id" ];
           timeIndex = "ts";
         };
+        # One row per runtime test per weekly run on pyrite, from the line
+        # enormous-tests.service appends to /var/log/runtime-test-result.jsonl
+        # (declare-test-size-classes design D11): the class and limit the
+        # revision declares, the outcome (passed, failed, timed_out, or
+        # present when the output was already built and nothing ran), the
+        # driver's script time and the whole build's, in milliseconds.
+        runtime_test_result = {
+          columns = [
+            (column "host" "string")
+            (column "test" "string")
+            (column "revision" "string")
+            (column "drv_path" "string")
+            (column "class" "string")
+            (column "limit_s" "int64")
+            (column "outcome" "string")
+            (column "script_ms" "int64")
+            (column "build_ms" "int64")
+            (timeIndex "finished_at")
+          ];
+          primaryKey = [
+            "host"
+            "test"
+          ];
+          timeIndex = "finished_at";
+        };
       };
 
     # The agent-session allow-list (agent-session-telemetry design D3, D5):

@@ -1518,6 +1518,44 @@
                       done
                     '';
                   };
+
+                  # The weekly run's result file, shipped as pyrite ships it
+                  # (declare-test-size-classes design D11), with one seeded
+                  # `present` line, so firstStart sees runtime_test_result's
+                  # first send and row like every other table's; the
+                  # cases may append fixture records here.
+                  vanixiets.otelCollector.devloopRecordFiles.runtime-test-result = {
+                    file = devloop.runtimeTestResultFile;
+                    table = "runtime_test_result";
+                  };
+                  systemd.services.devloop-ingest-runtime-seed = {
+                    description = "One seeded runtime-test result line";
+                    wantedBy = [ "multi-user.target" ];
+                    before = [ "opentelemetry-collector.service" ];
+                    serviceConfig = {
+                      Type = "oneshot";
+                      RemainAfterExit = true;
+                    };
+                    script = ''
+                      if [ ! -s ${devloop.runtimeTestResultFile} ]; then
+                        install -m 0644 ${pkgs.writeText "runtime-test-seed.jsonl" (
+                          builtins.toJSON {
+                            host = "store";
+                            test = "seed";
+                            revision = "seed";
+                            drv_path = null;
+                            class = "small";
+                            limit_s = 60;
+                            outcome = "present";
+                            script_ms = null;
+                            build_ms = null;
+                            finished_at = "2026-11-24T00:00:00.000000Z";
+                          }
+                          + "\n"
+                        )} ${devloop.runtimeTestResultFile}
+                      fi
+                    '';
+                  };
                   systemd.services.greptimedb.serviceConfig.LoadCredential = [ "users:${vars}/users" ];
                   systemd.services.greptimedb-schema.serviceConfig.LoadCredential = [
                     "admin-password:${vars}/admin-password"
