@@ -15,8 +15,9 @@
 # which launchd can try before the store volume is mounted and then never
 # retries, so the arguments are restated behind /bin/wait4path. launchd has no
 # ordering between jobs either, so at boot the daemon can also start before
-# sops-install-secrets has written its key; the same start waits for every
-# argument that is one of the machine's sops secrets or templates.
+# sops-install-secrets has written its key; the same start polls, bounded, for
+# every argument that is one of the machine's sops secrets or templates
+# (flake.lib.launchdSecretPoll, which says why not wait4path).
 #
 # Identities are clan vars: one shared CA whose private key is never deployed,
 # and one certificate per machine with the machine name as CN and both serverAuth
@@ -39,7 +40,7 @@
 # work only that builder could take fails with `missing system features`.
 { inputs, config, ... }:
 let
-  inherit (config.flake.lib) hosts meshInterfaces;
+  inherit (config.flake.lib) hosts meshInterfaces launchdSecretPoll;
 in
 {
   flake.clan.modules.nix-builders =
@@ -403,17 +404,15 @@ in
                         inherit lib pkgs;
                       }
                     );
-                    secretPaths = map (secret: secret.path) (
-                      lib.attrValues config.sops.secrets ++ lib.attrValues config.sops.templates
-                    );
-                    waited = [ "/nix/store" ] ++ lib.unique (lib.filter (arg: lib.elem arg secretPaths) args);
                   in
                   lib.mkForce (
                     [
                       "/bin/sh"
                       "-c"
                       (
-                        lib.concatMapStrings (path: "/bin/wait4path ${lib.escapeShellArg path} && ") waited + ''exec "$@"''
+                        "/bin/wait4path /nix/store && "
+                        + launchdSecretPoll.prefix { } (launchdSecretPoll.namedIn config (lib.concatStringsSep " " args))
+                        + ''exec "$@"''
                       )
                       "sh"
                     ]

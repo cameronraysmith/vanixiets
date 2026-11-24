@@ -14,8 +14,8 @@
 # default lookup path, that the build accounts and dispatch keys of the
 # retired ssh transport stay gone, and that a Linux builder's own nix settings
 # give it uid-range exactly when it advertises uid-range, and that a darwin
-# builder's launchd job waits for the store and every daemon argument under
-# /run before it execs the daemon.
+# builder's launchd job waits for the store and polls, bounded, for every
+# daemon argument under /run before it execs the daemon.
 {
   self,
   lib,
@@ -224,26 +224,29 @@
                 "cgroups"
               ];
           # launchd starts the darwin daemon with no ordering against
-          # sops-install-secrets, so `sh -c` must wait for the store and for
-          # every daemon argument under /run, which macOS empties at boot,
-          # before it execs the daemon with the arguments that follow `sh`.
+          # sops-install-secrets, so `sh -c` must poll, bounded, for every
+          # daemon argument under /run, which macOS empties at boot, before it
+          # execs the daemon with the arguments that follow `sh`, and use
+          # /bin/wait4path, which only a mount wakes, for the store alone.
           start =
             if isDarwin machine then
               let
                 argv = map plain config.launchd.daemons.nix-grpc-daemon.serviceConfig.ProgramArguments;
-                segments = lib.splitString " && " (builtins.elemAt argv 2);
-                waits = lib.init segments;
-                isWait = lib.hasPrefix "/bin/wait4path ";
-                waited = map (lib.removePrefix "/bin/wait4path ") (builtins.filter isWait waits);
+                script = builtins.elemAt argv 2;
                 daemonArgs = lib.drop 4 argv;
+                named = builtins.filter (lib.hasPrefix "/run/") daemonArgs;
               in
               {
                 shell = lib.take 2 argv ++ [ (builtins.elemAt argv 3) ];
                 daemon = baseNameOf (builtins.head daemonArgs);
-                waited = sortStrings waited;
-                notWaits = builtins.filter (segment: !isWait segment) waits;
-                exec = lib.last segments;
-                unwaited = builtins.filter (arg: lib.hasPrefix "/run/" arg && !builtins.elem arg waited) daemonArgs;
+                storeFirst = lib.hasPrefix "/bin/wait4path /nix/store && " script;
+                exec = lib.last (lib.splitString "; " script);
+                inherit named;
+                failures = self.lib.launchdSecretPoll.failures {
+                  label = "${machine} nix-grpc-daemon";
+                  start = script;
+                  inherit named;
+                };
               }
             else
               null;
@@ -280,7 +283,7 @@
             null
           else
             builtins.elem "uid-range" advertised.${machine}.supportedFeatures;
-        # The store and the TLS key, the one daemon argument under /run.
+        # The TLS key, the one daemon argument under /run.
         start =
           if isDarwin machine then
             {
@@ -290,13 +293,10 @@
                 "sh"
               ];
               daemon = "nix-grpc-daemon";
-              waited = sortStrings [
-                "/nix/store"
-                (keyPath machine)
-              ];
-              notWaits = [ ];
+              storeFirst = true;
               exec = ''exec "$@"'';
-              unwaited = [ ];
+              named = [ (keyPath machine) ];
+              failures = [ ];
             }
           else
             null;
