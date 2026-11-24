@@ -133,7 +133,10 @@ It establishes R3.1's darwin clauses over those configurations (loopback listene
 It establishes nothing about a darwin process starting: launchd loading the jobs, the collector running on macOS and reaching the ingress over ZeroTier are observed at stibnite's activation, and relations within stibnite are assertions in `darwin/otel-collector-agent.nix`, which stibnite's evaluation and nixbot's best-effort `checks.aarch64-darwin` evaluate.
 A runtime test builds only on a builder advertising the features its derivation requires: QEMU VM tests need `kvm`, which only Pyrite advertises, and systemd-nspawn container tests need `uid-range`, which Pyrite and Magnetite advertise (Pyrite once deployed with its `auto-allocate-uids` settings; `nix-builders-wiring` holds each Linux builder's settings to what it advertises).
 Run one from a checkout of the intended revision on that host, or from a dispatcher such as Stibnite, which routes a kvm test to Pyrite and a container test to whichever of the two is less loaded, Magnetite on a tie for its higher `speedFactor` (nix's `build-remote`).
-To keep a container test off the store host, run it on Pyrite with `--builders ''`, without which Pyrite's own daemon dispatches it to Magnetite:
+To keep a container test off the store host, run it on Pyrite with `--builders ''`, without which Pyrite's own daemon dispatches it to Magnetite.
+Run it on Pyrite itself, `ssh pyrite.vanixiets.internal nix build --builders '' '<source>#vmTests.x86_64-linux.<name>'`, against a source already on Pyrite: a checkout there, or the store path `nix flake archive --to ssh-ng://pyrite.vanixiets.internal "git+file://$PWD?rev=<commit>"` prints.
+`nix build --store ssh-ng://pyrite… --builders ''` from another host does not keep the build on Pyrite: the flag does not reach Pyrite's daemon, which on 2026-11-24 handed such a `fleet-ingress` build to Magnetite (`logs/tsc-1-fleet-ingress-20261124-111732.log`).
+The commands below are as run in a checkout on the host that builds them:
 
 ```sh
 nix build .#vmTests.x86_64-linux.zerotier-mss-clamp-runtime   # Pyrite, kvm

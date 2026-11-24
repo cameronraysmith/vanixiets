@@ -47,6 +47,8 @@ Before adding, removing, or restructuring a check, read the `preferences-nix-che
 
 VM and container tests live under `vmTests`, not `checks`, so nixbot never runs them and they are not part of pull-request coverage.
 QEMU tests need `kvm`, which only Pyrite advertises, and systemd-nspawn container tests run on Pyrite or Magnetite; a container test started on Pyrite must pass `--builders ''`, or Pyrite's daemon dispatches it to Magnetite (`modules/README.md` §On-demand VM tests).
+The form that keeps a runtime test on Pyrite is `ssh pyrite.vanixiets.internal nix build --builders '' '<source>#vmTests.x86_64-linux.<name>'` against a source already on Pyrite, a checkout there or the store path `nix flake archive --to ssh-ng://pyrite.vanixiets.internal` prints.
+`nix build --store ssh-ng://pyrite… --builders ''` from another host does not: the flag does not reach Pyrite's daemon, which on 2026-11-24 handed such a `fleet-ingress` build to Magnetite (`magnetite: building …` in `logs/tsc-1-fleet-ingress-20261124-111732.log`).
 
 The test size classes of the fleet-wide agent context (§Test sizes) map onto this repository's runners as follows.
 nixbot's pull-request gate builds `checks.x86_64-linux` on Magnetite's store and `checks.aarch64-darwin` best-effort; small and medium checks belong there, and a large check belongs there only with its reason recorded beside its definition.

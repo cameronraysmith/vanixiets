@@ -53,6 +53,8 @@ Capture the run with `tee` into `logs/` as for any long-running command.
 For a NixOS VM or container test, the driver prints `test script finished in <seconds>`, and every driver line carries `[<seconds>s]` counted from the driver's start.
 A test script that prints a marker at the start of each case, such as `print("=== case <name>", flush=True)`, can be split by case from its log: a case's duration is the timestamp before the next case's marker minus the timestamp before its own.
 Time the whole `nix build` as well, since the class covers the driver and node builds.
+In vanixiets, run a runtime test on Pyrite itself, `ssh pyrite.vanixiets.internal nix build --builders '' '<source>#vmTests.x86_64-linux.<name>'` against a source already on Pyrite (a checkout there, or the store path `nix flake archive --to ssh-ng://pyrite.vanixiets.internal` prints), so that the measurement is Pyrite's.
+`nix build --store ssh-ng://pyrite… --builders ''` from another host does not keep the build on Pyrite: the flag does not reach Pyrite's daemon, which on 2026-11-24 handed such a `fleet-ingress` build to Magnetite, where a case failed (`logs/tsc-1-fleet-ingress-20261124-111732.log`).
 
 ## When a check outgrows its class
 
