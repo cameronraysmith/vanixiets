@@ -109,6 +109,7 @@
     "openspec-verify-change",
     "organization-sign-in",
     "playwright-cli",
+    "pr-digest",
     "preferences-adaptive-planning",
     "preferences-algebraic-data-types",
     "preferences-algebraic-laws",

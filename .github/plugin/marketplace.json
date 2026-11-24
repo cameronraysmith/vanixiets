@@ -82,7 +82,7 @@
     },
     {
       "name": "agent-orchestration-and-meta-tooling",
-      "description": "Agent orchestration and meta-tooling skills — agent teams, dispatch, orchestrator lifecycle, session resume and search, skill creation, context and handoff generation, prompt optimization, Claude Code cloud sandbox sessions.",
+      "description": "Agent orchestration and meta-tooling skills — agent teams, dispatch, orchestrator lifecycle, session resume and search, skill creation, context and handoff generation, prompt optimization, daily PR digest sessions, Claude Code cloud sandbox sessions.",
       "version": "0.0.0",
       "source": "./modules/home/ai/plugins/agent-orchestration-and-meta-tooling"
     },
