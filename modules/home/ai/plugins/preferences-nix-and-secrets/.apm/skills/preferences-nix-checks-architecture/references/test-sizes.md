@@ -31,6 +31,10 @@ Growth over many runs, and a spread wider than the margin under the limit, are s
 A class is a measured property of one cold run on the runner that executes it, not an estimate from the test's design.
 A cold run is one in which the check's own output is in no store or cache the runner consults; dependencies built only for this check count toward it, because a pull request that changes them pays for them as well.
 A check built by CI takes the class of the median of its recent uncached runs there, with the slowest run reported beside it, because concurrent builds on a shared builder lengthen individual runs.
+A run is a build that happened: a record that took under a second built nothing, whatever its status says, and is not counted.
+The median is over the last 30 days when there are at least three runs, otherwise over every recorded run when there are at least three, noted with their number and dates; with fewer, the check has no measured class yet.
+One run is not a class: it may fall on a day when the builder is busy, and it carries whatever dependencies that build happened to build first.
+Where runs straddle the limit whose higher class would take a check off the pull-request gate, the lower class is declared and marked as a boundary until fresh runs decide it, because removing a regulator is the costlier error.
 A NixOS VM or container test takes the class of its test script, the driver's `test script finished in`, which is what its timeout enforces; its driver and node builds are build cost, which depends on what the store holds, and are not part of its class.
 A test that has never run has no class yet, and its first run is announced if it may exceed 5 minutes.
 
@@ -101,12 +105,13 @@ A test with no entry fails evaluation, naming it.
 The driver starts that timer just before the test script; when it fires, the driver logs `timeout reached; test terminating...`, releases every VM and container and kills itself, so the build fails.
 A test that no run has measured is declared medium with `measured = false`: a wrong guess fails at 5 minutes, and that run is its measurement.
 
+In vanixiets, every check on the gated systems declares its class the same way in `testSizes.checks`, generated names in a literal set beside the code that generates them, and `checks.<system>.test-size-classes` fails the pull-request gate on a check with no entry, an entry naming no attribute, an enormous check, or a large check with no reason (stage 4); on x86_64-linux it also fails on a runtime test of x86_64-linux or aarch64-linux with no entry or an entry naming none.
+It reads key sets and the literal entries only, so it forces no check's derivation.
+
 ## What is not enforced
 
 The timer does not cover the driver and node builds, so a test whose script fits its class can still take longer as a whole cold run; that time is build cost, not part of the class, and no regulator judges it.
 Growth of a runtime test's script time over many runs, and a spread wider than its margin, are not yet watched: a scheduled run that records every runtime test's script time, and a rule over those records, arrive in stages 5 and 6.
 Nothing observes whether a person or agent gave a run notice.
 
-Checks do not declare classes yet, and nothing fails a check for exceeding one; their entries and a structural check that every check has exactly one arrive in stage 4 of that change.
-Pure builds are judged after the fact, from nixbot's records, in its stage 5.
-Until then a check's class is declared and announced by the people and agents who run it, and its measured duration is visible only in nixbot's records.
+How long a check's builds take is not enforced: pure builds are judged after the fact, from nixbot's records, in that change's stage 5, and until then a check that outgrows its class is visible only in nixbot's records.
