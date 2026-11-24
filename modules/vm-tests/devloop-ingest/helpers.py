@@ -1,6 +1,7 @@
-# Helpers for vmTests.x86_64-linux.devloop-ingest (design D16). The test
-# driver runs this file and then each case string of the `cases` list in
-# modules/vm-tests/devloop-ingest.nix, in order. Every case prints
+# Helpers for vmTests.x86_64-linux.devloop-ingest and devloop-ingest-reconcile
+# (design D16). The test driver runs this file and then each case string of
+# the test's case list (`ingestCases` or `reconcileCases` in
+# modules/vm-tests/devloop-ingest.nix), in order. Every case prints
 # `=== case <name>` first and `ok: <name>` last, prints
 # `mutant <name> rejected: <reason>` for each mutant it shows rejected, and
 # leaves the collector running with no mutant drop-in.
