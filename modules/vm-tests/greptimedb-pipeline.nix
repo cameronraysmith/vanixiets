@@ -43,10 +43,21 @@
       ...
     }:
     {
-      # Size class: the script measured 13 to 16 s on 2026-11-22
+      # Size class: medium, by what the test waits on rather than by its
+      # time (declare-test-size-classes, requirement "A size class
+      # constrains what a test may wait on...", scenario "A small test
+      # sleeps"). Its last leg, a point emitted while the store is stopped,
+      # waits for the collector's otlphttp exporter to retry the send after
+      # the store starts again (retry_on_failure: 5 s initial interval with
+      # backoff, at most 60 s), and that retry is what the leg proves, so
+      # the wait stays and the test may not be small. The script measured
+      # 13 to 16 s on 2026-11-22
       # (logs/darwin-ast-vmtest-c0-greptimedb-pipeline-20261122-212504.log).
       testSizes.vmTests = lib.optionalAttrs (system == "x86_64-linux") {
-        greptimedb-pipeline.class = "small";
+        greptimedb-pipeline = {
+          class = "medium";
+          reason = "its store-restart leg waits on the collector exporter's retry interval, which is the behaviour it proves";
+        };
       };
       vmTests = lib.optionalAttrs (system == "x86_64-linux") {
         greptimedb-pipeline =
