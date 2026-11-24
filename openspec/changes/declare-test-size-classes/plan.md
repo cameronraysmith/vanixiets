@@ -16,7 +16,7 @@
 
 - Six stacked chains, one per stage, each landing as one pull request in order (tasks.md groups 1–6); each commit evaluates and passes its checks alone. Edits are made in `@` and routed with `jj squash --into <chain> --use-destination-message --keep-emptied <paths>`.
 - Every run is announced first when expected to exceed 5 minutes (tasks.md names each such run and its notice); a subagent returns the notice to its orchestrator instead of starting the run.
-- Runtime tests run on pyrite (`--store ssh-ng://pyrite.vanixiets.internal`, container tests with `--builders ''`); x86_64-linux builds on magnetite's store (`--eval-store auto --store ssh-ng://magnetite.zt`); never an aarch64-darwin system closure.
+- Runtime tests run on pyrite itself (`ssh pyrite.vanixiets.internal nix build --builders ''` against a source archived on pyrite; `--store ssh-ng://pyrite…` from another host does not keep the build on pyrite, `logs/tsc-1-fleet-ingress-20261124-111732.log`); x86_64-linux builds on magnetite's store (`--eval-store auto --store ssh-ng://magnetite.zt`); never an aarch64-darwin system closure.
 - Every regulator is seen failing on its mutant (design's regulator table) before it is trusted; each mutant runs only the case or clause it must fail, in a throwaway tree.
 - `testSizes` entries are literal or depend only on `system`; any other form is a defect, found by task 4.7's key-set measurement.
 - Deploys (stages 5 and 6) are `clan machines update <host>` by an agent after the stage's pull request merges, each followed by reading every alert and failure post since the deploy began.
