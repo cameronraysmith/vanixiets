@@ -80,6 +80,9 @@
       '';
     in
     lib.optionalAttrs (system == "x86_64-linux") {
+      # Size class: the script measured 201 to 240 s over nine runs on pyrite,
+      # 2026-11-18 to 2026-11-21 (logs/fleet-deployer-vmtest-*.log).
+      testSizes.vmTests.fleet-deployer.class = "medium";
       vmTests.fleet-deployer = pkgs.testers.runNixOSTest (
         { nodes, ... }:
         let

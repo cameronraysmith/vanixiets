@@ -59,8 +59,27 @@
 { self, inputs, ... }:
 {
   perSystem =
-    { pkgs, lib, ... }:
     {
+      pkgs,
+      lib,
+      system,
+      ...
+    }:
+    {
+      # Size class: on x86_64-linux the script measured 27 to 39 s on pyrite
+      # (logs/vmtest-worker-isolation-20261116-131043.log). The fleet has no
+      # aarch64-linux builder, so no run can measure that system's test, which
+      # is declared medium and unmeasured (declare-test-size-classes design D4).
+      testSizes.vmTests =
+        lib.optionalAttrs (system == "x86_64-linux") {
+          omnigent-worker-isolation.class = "small";
+        }
+        // lib.optionalAttrs (system == "aarch64-linux") {
+          omnigent-worker-isolation = {
+            class = "medium";
+            measured = false;
+          };
+        };
       vmTests = lib.optionalAttrs pkgs.stdenv.hostPlatform.isLinux {
         omnigent-worker-isolation =
           let

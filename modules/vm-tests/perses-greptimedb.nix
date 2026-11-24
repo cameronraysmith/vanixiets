@@ -40,6 +40,11 @@
       ...
     }:
     {
+      # Size class: the script measured 19.85 s on 2026-11-18
+      # (logs/cam111-perses-greptimedb-20261118-160547.log).
+      testSizes.vmTests = lib.optionalAttrs (system == "x86_64-linux") {
+        perses-greptimedb.class = "small";
+      };
       vmTests = lib.optionalAttrs (system == "x86_64-linux") {
         perses-greptimedb =
           let

@@ -591,6 +591,11 @@
         };
     in
     {
+      # Size class: the script measured 26 to 48 s, the slowest 48.47 s on
+      # pyrite on 2026-11-16 (logs/ghq-d28-vmtest-pyrite-20261116-200158.log).
+      testSizes.vmTests = lib.optionalAttrs (system == "x86_64-linux") {
+        shared-reference-tree.class = "small";
+      };
       vmTests = lib.optionalAttrs (system == "x86_64-linux") {
         shared-reference-tree = mkTest {
           passthru.mutations = {

@@ -140,6 +140,11 @@
         };
     in
     {
+      # Size class: the script measured 14.66 s on 2026-11-19
+      # (logs/pgb-5.1-restore-1795113795.log).
+      testSizes.vmTests = lib.optionalAttrs (system == "x86_64-linux") {
+        postgresql-backup-restore.class = "small";
+      };
       vmTests = lib.optionalAttrs (system == "x86_64-linux") {
         postgresql-backup-restore = restoreTest {
           name = "postgresql-backup-restore";

@@ -1,7 +1,12 @@
 { self, ... }:
 {
   perSystem =
-    { pkgs, lib, ... }:
+    {
+      pkgs,
+      lib,
+      system,
+      ...
+    }:
     let
       # Backend-independent: a veth named like a ZeroTier interface and a SYN
       # probe that reads the negotiated MSS on both ends, dual-stack.
@@ -60,6 +65,29 @@
       };
     in
     {
+      # Size classes: on x86_64-linux zerotier-mss-clamp-runtime's script
+      # measured 35.53 s on pyrite on 2026-11-23
+      # (logs/ws-pyrite-qemu-20261123T1709Z.log), and the nftables variant's
+      # whole build, driver included, 62 s on 2026-11-16
+      # (logs/clamp-vmtests-pyrite-20261116-110310.log). The fleet has no
+      # aarch64-linux builder, so no run can measure that system's tests,
+      # which are declared medium and unmeasured
+      # (declare-test-size-classes design D4).
+      testSizes.vmTests =
+        lib.optionalAttrs (system == "x86_64-linux") {
+          zerotier-mss-clamp-runtime.class = "small";
+          zerotier-mss-clamp-runtime-nftables.class = "medium";
+        }
+        // lib.optionalAttrs (system == "aarch64-linux") {
+          zerotier-mss-clamp-runtime = {
+            class = "medium";
+            measured = false;
+          };
+          zerotier-mss-clamp-runtime-nftables = {
+            class = "medium";
+            measured = false;
+          };
+        };
       vmTests = lib.optionalAttrs pkgs.stdenv.hostPlatform.isLinux {
         zerotier-mss-clamp-runtime = pkgs.testers.runNixOSTest {
           name = "zerotier-mss-clamp-runtime";

@@ -53,6 +53,22 @@
       ...
     }:
     {
+      # Size classes (declare-test-size-classes stages 1 and 3): fleet-ingress
+      # is medium. Its script measured 252.56, 280.74 and 216.61 s on pyrite on
+      # 2026-11-24 (logs/tsc-1-fleet-ingress-pyrite-*.log), so its margin under
+      # the 300 s timeout has been as small as 19 s. A timeout failure here is
+      # the regulator saying the test has outgrown medium; the response is the
+      # trimming options of design D7 first, then the operator's answer to the
+      # design's Open Question 1.
+      # fleet-ingress-outage measured 1,660.34 s of script, 1,676 s whole
+      # (logs/tsc-1-fleet-ingress-outage-20261124-114719.log).
+      testSizes.vmTests = lib.optionalAttrs (system == "x86_64-linux") {
+        fleet-ingress.class = "medium";
+        fleet-ingress-outage = {
+          class = "enormous";
+          reason = "its outage, queue, crash-loop, long-run and Langfuse-timer cases wait out real time, which is what they prove";
+        };
+      };
       vmTests =
         let
           # The flake overlay carries greptimedb-bin; the recording

@@ -66,6 +66,11 @@ in
       ...
     }:
     {
+      # Size class: the script measured 267.74 and 269.94 s on 2026-11-18
+      # (logs/f34-vmtest-seq-dualstack-20261118-032609.log).
+      testSizes.vmTests = lib.optionalAttrs (system == "x86_64-linux") {
+        tincr-mesh.class = "medium";
+      };
       vmTests = lib.optionalAttrs (system == "x86_64-linux") {
         tincr-mesh = nixosLib.runTest {
           imports = [ inputs.clan-core.modules.nixosTest.clanTest ];

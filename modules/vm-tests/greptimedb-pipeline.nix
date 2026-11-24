@@ -43,6 +43,11 @@
       ...
     }:
     {
+      # Size class: the script measured 13 to 16 s on 2026-11-22
+      # (logs/darwin-ast-vmtest-c0-greptimedb-pipeline-20261122-212504.log).
+      testSizes.vmTests = lib.optionalAttrs (system == "x86_64-linux") {
+        greptimedb-pipeline.class = "small";
+      };
       vmTests = lib.optionalAttrs (system == "x86_64-linux") {
         greptimedb-pipeline =
           let

@@ -54,6 +54,21 @@
       ...
     }:
     {
+      # Size classes (declare-test-size-classes stage 2): devloop-ingest's
+      # script measured 229.54 s, 246 s for the whole build, on pyrite on
+      # 2026-11-24 (logs/tsc-2-devloop-ingest-20261124-123348.log).
+      # devloop-ingest-reconcile measured 1,490.54 s of script, 1,506 s whole
+      # (logs/tsc-2-reconcile-20261124-123815.log). Started in the last 30
+      # minutes before 00:00 UTC, its reconcile case first sleeps until the
+      # next UTC day, up to about 1,860 s, and the run then finishes with
+      # about 250 s to spare under the enormous limit of 3,600 s.
+      testSizes.vmTests = lib.optionalAttrs (system == "x86_64-linux") {
+        devloop-ingest.class = "medium";
+        devloop-ingest-reconcile = {
+          class = "enormous";
+          reason = "reconcile's legs wait out the receivers' 60 s polls, which is what the case proves";
+        };
+      };
       vmTests =
         let
           # perSystem `pkgs` lacks the flake overlay that carries

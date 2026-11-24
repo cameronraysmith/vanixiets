@@ -39,6 +39,15 @@ in
       };
     in
     {
+      # Size class (declare-test-size-classes design D4): no run measured yet.
+      # Declared medium, the largest class that needs no run notice, so a wrong
+      # guess fails at the 300 s timeout and that run is its measurement.
+      testSizes.vmTests = lib.optionalAttrs (system == "x86_64-linux") {
+        caddy-root-from-vars = {
+          class = "medium";
+          measured = false;
+        };
+      };
       vmTests = lib.optionalAttrs (system == "x86_64-linux") {
         caddy-root-from-vars = pkgs.testers.runNixOSTest {
           name = "caddy-root-from-vars";
