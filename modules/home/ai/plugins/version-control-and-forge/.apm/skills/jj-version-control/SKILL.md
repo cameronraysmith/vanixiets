@@ -1550,15 +1550,14 @@ The diamond invariants, the bookmark conventions, and the tiered ceremony model 
 
 No authorization mechanism or allowlist backs these gates, and none is needed.
 The apparent need for one was manufactured entirely by a resolver defect since fixed: the gate keyed on the session's working directory rather than the target repository, so a session rooted in a jj repository was denied `git worktree add` in unrelated pure-git repositories, and an allowlist looked like the way to carve those back out.
-With the target resolved per command segment through `-C`, `--git-dir`, or a preceding `cd`, pure-git tools such as firstmate and worktrunk short-circuit the gate on their own, because the jj-mode branch never fires for them.
+With the target resolved per command segment through `-C`, `--git-dir`, or a preceding `cd`, pure-git tools such as worktrunk short-circuit the gate on their own, because the jj-mode branch never fires for them.
 This is recorded as a negative design decision so its absence is read as deliberate rather than as an oversight to correct by building the allowlist.
 The gate is an ask and not a security boundary; Claude Code's documentation directs a hard allow or deny to the permission system rather than to a hook.
 
 ### External frameworks get their own clone
 
-When an external agent framework such as firstmate manages repositories on our behalf, give it its own clone rather than a symlink to a working copy we also use.
-This is our choice given what the framework does, not an upstream recommendation; firstmate documents no preference either way.
-Its fleet-sync runs `git fetch --prune`, `git branch -D` on gone-tracking branches, and `git checkout <default>` to reattach a detached HEAD, and its project sweep dereferences symlinks — each in the class of operations named above as forbidden against a jj primary.
+When an external agent framework manages repositories on our behalf, give it its own clone rather than a symlink to a working copy we also use.
+Frameworks that sync a fleet of repositories commonly run `git fetch --prune`, `git branch -D` on gone-tracking branches, and `git checkout <default>` to reattach a detached HEAD, and sweep project directories through symlinks — each in the class of operations named above as forbidden against a jj primary.
 
 ## Citing upstream jj source
 

@@ -258,7 +258,8 @@ The module sets `enable = true` unconditionally inside `flake.modules.homeManage
 
 Extensions are settled for `pi-openai-server-compaction` and open for the rest.
 That extension is delivered as a `pkgs/by-name` source pin registered through the `packages` settings key, the cheaper of the two routes weighed above.
-Whether to bring in rytswd/pi-agent-extensions at all, and whether any of the kunchenguid `-axi` tools are in scope, remain open.
+Whether to bring in rytswd/pi-agent-extensions at all remains open.
+The kunchenguid `-axi` tools, `no-mistakes`, and `treehouse` were packaged for the firstmate experiment and removed with it on 2026-11-24; they are out of scope.
 
 Drive-by cleanup: fix the stale beads overlay references, the CLAUDE.md counts and override wording, the CLAUDE.md claim of five agents-md destinations, and the `apm-marketplace-validate.sh` manifest path as part of this change, or file them separately?
 The same question applies to the two malformed `SKILL.md` frontmatter blocks in `meta-orchestrator-checkpoint` and `meta-session-resume`, which are a portability defect independent of pi adoption.

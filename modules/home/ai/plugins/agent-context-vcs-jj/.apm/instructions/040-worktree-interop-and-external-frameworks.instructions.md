@@ -14,5 +14,5 @@ Create the jj workspace with `jj workspace add --name <name> --revision 'trunk()
 Create the git worktree with `wt switch --create <branch> --no-cd`, never a detached `git worktree add`, so the tree has a named branch that `wt list` ties to its pull request and `wt remove` cleans up with the branch.
 The discipline is exclusive branch ownership — a branch belongs to the jj primary or to one worktree, never both — and return-by-ref: commit in the worktree, integrate by ref in the primary.
 The primary's HEAD stays detached throughout; never reattach it, force-checkout, delete branches, `git fetch --prune`, or `git stash` in a jj working copy.
-An external agent framework such as firstmate gets its own clone rather than a symlink to a working copy we also use, because its fleet-sync runs exactly the operations forbidden above.
+An external agent framework that manages repositories gets its own clone rather than a symlink to a working copy we also use, because fleet-sync tooling of that kind typically runs exactly the operations forbidden above.
 Full mechanics and recovery: the `jj-version-control` skill §"Worktree interop".

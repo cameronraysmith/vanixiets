@@ -36,6 +36,6 @@ The lighter human `agents` aggregate does not import it.
 - `openspec/` — the OpenSpec CLI, its schema bundles, and vendored artifact refresh.
 - `agent-settings.nix` — settings shared across harnesses.
 
-Harness-specific modules, each configuring one agent's settings, hooks, MCP servers, and wrappers: `atomic/`, `claude-code/`, `codex/`, `firstmate/`, `omp/`, `opencode/`, `pi/`.
+Harness-specific modules, each configuring one agent's settings, hooks, MCP servers, and wrappers: `atomic/`, `claude-code/`, `codex/`, `omp/`, `opencode/`, `pi/`.
 
 Supporting tools these harnesses invoke: `moshi/` (session multiplexing), `tuicr/` (interactive diff review), `worktrunk/` (worktree management).
