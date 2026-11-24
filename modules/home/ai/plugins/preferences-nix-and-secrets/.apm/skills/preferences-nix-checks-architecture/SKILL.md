@@ -366,7 +366,8 @@ See `references/process-compose-checks.md` for the full treatment of the applica
 
 ## Test sizes
 
-Every check and test has a size class set by the wall-clock duration of one cold run: small up to 1 minute, medium up to 5 minutes, large up to 15 minutes, and enormous up to 60 minutes, the timeouts Bazel implies for its test sizes.
+Every check and test has a size class that says what it may wait on and how long one run may take: small up to 1 minute, medium up to 5 minutes, large up to 15 minutes, and enormous up to 60 minutes, the timeouts Bazel implies for its test sizes; a small test waits on no passage of time, and behaviour whose point is the passage of time, such as an outage window or a crash loop, belongs in a test kept for it.
+A check's run is its build; a runtime test's run is its test script, which its timeout holds, and its driver and node builds are build cost outside the class.
 Small and medium checks belong on the pull-request gate, a large one only with a recorded reason, and an enormous one never; it runs on a schedule or on demand.
 A run expected to exceed 5 minutes is announced before it starts, with its expected duration, what it proves that a cheaper run cannot, and what waits on it.
 The escalation ladder above picks the cheapest regulator for an envelope, and the size class holds each case's run time to what its assertion needs; a test larger than its purpose is a defect to report, not a cost to absorb.

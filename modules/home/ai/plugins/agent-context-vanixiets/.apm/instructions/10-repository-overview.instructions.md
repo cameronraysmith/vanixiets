@@ -51,14 +51,24 @@ The form that keeps a runtime test on Pyrite is `ssh pyrite.vanixiets.internal n
 `nix build --store ssh-ng://pyrite… --builders ''` from another host does not: the flag does not reach Pyrite's daemon, which on 2026-11-24 handed such a `fleet-ingress` build to Magnetite (`magnetite: building …` in `logs/tsc-1-fleet-ingress-20261124-111732.log`).
 
 The test size classes of the fleet-wide agent context (§Test sizes) map onto this repository's runners as follows.
+A class says what a test may touch or wait on and how long one run may take, after the feature table of Google's test sizes ([Test Sizes](https://testing.googleblog.com/2010/12/test-sizes.html)), adapted here:
+
+| | small | medium | large | enormous |
+|---|---|---|---|---|
+| one run at most: a check's build, a runtime test's script | 1 minute | 5 minutes | 15 minutes | 60 minutes |
+| may wait on the passage of time (a sleep, a scrape, export, flush or retry interval) | no | yes, within its limit | yes, within its limit | yes, within its limit |
+| reaches anything outside the Nix sandbox or the test's own VMs and containers | no | no | no | no |
+
+Behaviour whose point is the passage of time (an outage window, a queue filling at its real rate, a crash loop, the next UTC day) runs only in `fleet-ingress-outage` and `devloop-ingest-reconcile`, held there by the exact case lists of the `declare-test-size-classes` interface.
+Each runtime test's timeout is its class limit, which Bazel's advice to set a timeout "as tight as you can without incurring any flakiness" ([test encyclopedia](https://bazel.build/reference/test-encyclopedia)) asks of it; a case whose time varies with its own timers is fixed in the test, not given a looser timeout or a larger class.
 nixbot's pull-request gate builds `checks.x86_64-linux` on Magnetite's store and `checks.aarch64-darwin` best-effort; small and medium checks belong there, and a large check belongs there only with its reason recorded beside its definition.
 nixbot records each attribute's build in the `build_attributes` table of its PostgreSQL database on Magnetite, from builder-slot acquisition to completion, and the dev-loop collection copies those rows into the telemetry store's `devloop` database; an uncached run there is the measurement a check's class rests on.
-VM and container tests run on Pyrite, a container test with `--builders ''`, and their driver prints `test script finished in <seconds>`, to which a cold run adds the driver and node builds.
-`fleet-ingress` is medium (its script measured 216.61 to 280.74 s on Pyrite on 2026-11-24, as little as 19 s under its 300 s timeout) and is the test to run for a change to what the collectors filter, route or store.
+VM and container tests run on Pyrite, a container test with `--builders ''`; their class is their test script's time, the driver's `test script finished in`, and the driver and node builds a cold run adds are build cost outside the class.
+`fleet-ingress` is medium (its script measured 189.37 s on Pyrite on 2026-11-24 once `processName` stopped waiting on the collectors' scrape interval, after earlier runs of 216.61 to 280.74 s and one that reached the 300 s timeout) and is the test to run for a change to what the collectors filter, route or store.
 `devloop-ingest` is medium (229.54 s of script, 246 s for the whole build on Pyrite on 2026-11-24) and is the test to run for a change to the dev-loop receivers, pipelines, allow-list or alert-rule SQL.
 An enormous test never gates a pull request: `fleet-ingress-outage` (about 28 minutes of script on Pyrite, the outage, queue, crash-loop, long-run and Langfuse-timer cases split out of `fleet-ingress`) and `devloop-ingest-reconcile` (1,490.54 s of script, 1,506 s for the whole build on Pyrite on 2026-11-24, `devloop-reconcile` and its mutant legs split out of `devloop-ingest`) belong on a weekly schedule, which does not exist yet, so today every run of them is on demand and announced first.
 Each runtime test declares its class in `testSizes.vmTests` beside its definition (`modules/checks/test-sizes.nix` declares the option), and `modules/vm-tests/default.nix` gives every test its class limit as the driver's `globalTimeout` (small 60 s, medium 300 s, large 900 s, enormous 3,600 s), so a test script that outlasts its class fails with `timeout reached; test terminating...`.
-The timer covers the test script only, not the driver and node builds a cold run adds; a test with no measured run is declared medium with `measured = false`, so its first run is its measurement.
+The timer covers the test script only; a test with no measured run is declared medium with `measured = false`, so its first run is its measurement.
 Checks do not declare classes yet, and nothing fails a check for exceeding one: their entries and the structural check `test-size-classes` arrive in stage 4 of the `declare-test-size-classes` change, and stage 5 judges pure builds after the fact from nixbot's records.
 The `preferences-nix-checks-architecture` skill's `references/test-sizes.md` covers assigning a class, measuring one run, and what to do when a check outgrows its class.
 

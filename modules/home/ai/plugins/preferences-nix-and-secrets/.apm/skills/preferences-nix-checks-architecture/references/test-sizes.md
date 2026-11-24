@@ -6,28 +6,37 @@ The figures quoted are measurements from this repository, not targets.
 
 ## The classes
 
-| class | one run takes at most | where it runs |
-|---|---|---|
-| small | 1 minute | the pull-request gate |
-| medium | 5 minutes | the pull-request gate |
-| large | 15 minutes | the pull-request gate only with a recorded reason, otherwise on demand |
-| enormous | 60 minutes | never the pull-request gate; a schedule, or on demand |
+A class says two things about a test: what it may touch or wait on, and how long one run may take.
+Google's test sizes are defined the same way, by a table of features (network, database, file system, threads, sleep statements, system properties, external systems) of which the time limit is one row of eight, so that a size is a name for measurable criteria a test can be policed on ([Test Sizes](https://testing.googleblog.com/2010/12/test-sizes.html), 2010).
+Adapted to a Nix repository, where every check builds in the sandbox and every runtime test runs in its own VMs or containers:
+
+| | small | medium | large | enormous |
+|---|---|---|---|---|
+| one run takes at most | 1 minute | 5 minutes | 15 minutes | 60 minutes |
+| may wait on the passage of time (a sleep, a scrape, export, flush or retry interval) | no | yes, within its limit | yes, within its limit | yes, within its limit |
+| reaches anything outside its sandbox or its own VMs and containers | no | no | no | no |
+| where it runs | the pull-request gate | the pull-request gate | the gate only with a recorded reason, otherwise on demand | never the gate; a schedule, or on demand |
 
 The limits are the timeouts Bazel implies for its test sizes: short 60 s, moderate 300 s, long 900 s and eternal 3600 s ([test encyclopedia](https://bazel.build/reference/test-encyclopedia)).
-Bazel's size also sets a test's assumed memory and CPU; these classes measure wall-clock time only.
+Bazel keeps a test's size and its timeout as separate attributes and advises setting the timeout as tight as it can be without incurring flakiness; a test whose time varies with its own timers is fixed in the test, not given a looser timeout or a larger class.
 Before any run expected to exceed 5 minutes, that is any large or enormous run, the person or agent starting it states its expected duration, what it proves that a cheaper run cannot, and what waits on its result.
+
+A class constrains three properties, and each has its own regulator.
+What a test may wait on is deterministic and is held structurally: a small test waits on no passage of time, and behaviour whose point is the passage of time (an outage window, a queue filling at its real rate, a crash loop) lives in the tests kept for it, by which cases each test contains.
+The time of one run is held by a timeout on that run.
+Growth over many runs, and a spread wider than the margin under the limit, are statistical and are held on recorded runs, never on one run.
 
 ## Assigning a class
 
 A class is a measured property of one cold run on the runner that executes it, not an estimate from the test's design.
 A cold run is one in which the check's own output is in no store or cache the runner consults; dependencies built only for this check count toward it, because a pull request that changes them pays for them as well.
 A check built by CI takes the class of the median of its recent uncached runs there, with the slowest run reported beside it, because concurrent builds on a shared builder lengthen individual runs.
-A NixOS VM or container test takes the class of its whole run: the test script plus the driver and node builds.
+A NixOS VM or container test takes the class of its test script, the driver's `test script finished in`, which is what its timeout enforces; its driver and node builds are build cost, which depends on what the store holds, and are not part of its class.
 A test that has never run has no class yet, and its first run is announced if it may exceed 5 minutes.
 
 The class a test needs follows from what it asserts.
 An assertion about configuration, filtering, routing, or a pure function is small or medium.
-Only behaviour that takes real time to occur, such as an outage window, retries with backoff, a scrape or export interval, or a crash loop, justifies a large or enormous case.
+Only behaviour whose point is the passage of time, such as an outage window, retries with backoff or a crash loop, justifies a large or enormous case; a medium test may still wait on a scrape or export interval as a means, within its limit.
 
 ## Measuring one run
 
@@ -52,7 +61,8 @@ Capture the run with `tee` into `logs/` as for any long-running command.
 
 For a NixOS VM or container test, the driver prints `test script finished in <seconds>`, and every driver line carries `[<seconds>s]` counted from the driver's start.
 A test script that prints a marker at the start of each case, such as `print("=== case <name>", flush=True)`, can be split by case from its log: a case's duration is the timestamp before the next case's marker minus the timestamp before its own.
-Time the whole `nix build` as well, since the class covers the driver and node builds.
+Record each case's time beside earlier runs: a case whose time differs between runs by about one interval of a scrape, export or flush is waiting on its phase against that interval, which is a defect in the test (see below).
+Time the whole `nix build` as well, so that a slow cold build is visible, although build cost is not part of a runtime test's class.
 In vanixiets, run a runtime test on Pyrite itself, `ssh pyrite.vanixiets.internal nix build --builders '' '<source>#vmTests.x86_64-linux.<name>'` against a source already on Pyrite (a checkout there, or the store path `nix flake archive --to ssh-ng://pyrite.vanixiets.internal` prints), so that the measurement is Pyrite's.
 `nix build --store ssh-ng://pyrite… --builders ''` from another host does not keep the build on Pyrite: the flag does not reach Pyrite's daemon, which on 2026-11-24 handed such a `fleet-ingress` build to Magnetite, where a case failed (`logs/tsc-1-fleet-ingress-20261124-111732.log`).
 
@@ -62,7 +72,8 @@ A check whose measured run exceeds its class, or exceeds what its purpose needs,
 The proposal takes one of three forms.
 Split the check into cases that each fit the class their purpose needs, as separate attributes so that each builds, caches, and fails on its own.
 Move the slow part, the cases that wait out real time, into a case of the larger class that runs on that class's cadence.
-Remove time the purpose does not need: replace a fixed sleep with polling for the condition, shorten an interval in the test's own configuration, or batch many driver round trips into one command.
+Remove time the purpose does not need: replace a fixed sleep with polling for the condition, shorten an interval in the test's own configuration, start the thing a case observes before the event that samples it rather than waiting for the next sample, or batch many driver round trips into one command.
+A case whose time varies with its phase against its own timers is fixed this way before anything else; the timeout is not loosened and the class not raised to absorb the variation.
 Raising the class instead is a decision recorded beside the check's definition with its reason, the same record a large check on the pull-request gate needs.
 
 `vmTests.x86_64-linux.fleet-ingress` is the measured instance.
@@ -73,7 +84,9 @@ Without those scans, the seven cases that assert filtering, routing, and refusal
 The test was split on 2026-11-24 (`declare-test-size-classes` stage 1) into two attributes built from one container definition.
 `fleet-ingress` keeps the eight cases that assert filtering, routing, refusal, the absence of forbidden values, the hand-off cap and the budget.
 Each of its scans now runs as one command inside the container, four queries at a time, and the driver checks the scan's column count against its own.
-Its script measured 216.61 to 280.74 s on pyrite in three runs, a medium run with as little as 19 s of margin under the 300 s timeout; a timeout failure there means it has outgrown medium, and the response is to trim it first.
+Its script measured 216.61 to 280.74 s on pyrite in three runs, then reached its 300 s timeout in the first run under it.
+Its per-case times showed why: `processName` took 10 s or 66 s, by where its process landed against the collectors' 60 s process scrape.
+The case now starts its process before restarting the collectors, so their first scrape after the restart sees it; it took 5 s, and the script 189.37 s.
 `fleet-ingress-outage` takes `langfuse`, `backPressure`, `lossControls`, `crashLoop`, `longRun` and `absentClientCa`, an enormous run.
 
 `vmTests.x86_64-linux.devloop-ingest` was split the same way (stage 2), moving the slow part whole.
@@ -90,7 +103,8 @@ A test that no run has measured is declared medium with `measured = false`: a wr
 
 ## What is not enforced
 
-The timer does not cover the driver and node builds, so a test whose script fits its class can still take longer as a whole cold run; time the whole `nix build` to see it.
+The timer does not cover the driver and node builds, so a test whose script fits its class can still take longer as a whole cold run; that time is build cost, not part of the class, and no regulator judges it.
+Growth of a runtime test's script time over many runs, and a spread wider than its margin, are not yet watched: a scheduled run that records every runtime test's script time, and a rule over those records, arrive in stages 5 and 6.
 Nothing observes whether a person or agent gave a run notice.
 
 Checks do not declare classes yet, and nothing fails a check for exceeding one; their entries and a structural check that every check has exactly one arrive in stage 4 of that change.

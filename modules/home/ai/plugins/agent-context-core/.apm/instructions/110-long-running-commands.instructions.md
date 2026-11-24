@@ -18,8 +18,17 @@ Where the log files live and how the directory is verified is owned by the `pref
 
 ## Test sizes
 
-A test or check run has a size class set by the wall-clock duration of one run, using the limits Bazel implies for its test sizes ([test encyclopedia](https://bazel.build/reference/test-encyclopedia)): small up to 1 minute, medium up to 5 minutes, large up to 15 minutes, enormous up to 60 minutes.
+A test's size class says two things: what it may touch or wait on, and how long one run may take, after the feature table of Google's test sizes ([Test Sizes](https://testing.googleblog.com/2010/12/test-sizes.html)) and the limits Bazel implies for them.
+
+| | small | medium | large | enormous |
+|---|---|---|---|---|
+| one run at most (a check's build, a runtime test's script) | 1 minute | 5 minutes | 15 minutes | 60 minutes |
+| may wait on the passage of time (a sleep, a scrape, flush or retry interval) | no | yes, within its limit | yes, within its limit | yes, within its limit |
+
+Behaviour whose point is the passage of time, such as an outage window, a queue filling at its real rate or a crash loop, belongs in a test kept for it, not in the test that checks routing or filtering.
+
+A timeout is set as tight as it can be without flakiness ([Bazel test encyclopedia](https://bazel.build/reference/test-encyclopedia)); a test whose time varies with its own timers is fixed in the test, not given a looser timeout or a larger class.
 Before starting any run expected to exceed 5 minutes, state its expected duration, what it proves that a cheaper run cannot, and what waits on its result.
 A subagent returns to its orchestrator with that notice instead of starting the run; an orchestrator gives the notice to the operator before starting it.
 A test larger than its purpose is a defect to report, with a proposal to split it or to move its slow part into a case of a larger class.
-Classes are declared and announced by people and agents; nothing yet fails a run for exceeding its class.
+A repository that enforces classes says how in its own context; elsewhere classes are declared and announced by people and agents.
