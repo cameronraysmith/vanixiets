@@ -76,6 +76,11 @@ Each of its scans now runs as one command inside the container, four queries at 
 Its script measured 252.56 to 280.74 s on pyrite, a medium run.
 `fleet-ingress-outage` takes `langfuse`, `backPressure`, `lossControls`, `crashLoop`, `longRun` and `absentClientCa`, an enormous run.
 
+`vmTests.x86_64-linux.devloop-ingest` was split the same way (stage 2), moving the slow part whole.
+Its `reconcile` case took about 1,468 s of its 1,690 to 1,701 s, waiting out the receiver's 60 s polls, which is what it proves.
+`devloop-ingest` keeps the other eight cases and measured 229.54 s of script, 246 s for the whole build, on pyrite on 2026-11-24, a medium run.
+`devloop-ingest-reconcile` runs `firstStart`, the reconcile case's readiness precondition, then `reconcile`, and measured 1,490.54 s of script, 1,506 s for the whole build, an enormous run.
+
 ## What is not enforced
 
 Nothing fails a build or a test for exceeding its class.
